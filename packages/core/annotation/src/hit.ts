@@ -25,6 +25,7 @@ import {
   type Rect,
   type Point,
 } from './types';
+import { fieldsOf } from './record';
 
 export type Target =
   | { kind: 'handle'; id: Id; handle: string; cursor: Cursor }
@@ -51,7 +52,7 @@ export function paintOrder(model: Model, page: PageRef): Id[] {
   for (const id of model.order) {
     const annotation = model.byId[id];
     if (!annotation || annotation.page.pageObjectNumber !== pageObjectNumber) continue;
-    if (!viewable(annotation.flags, model.selected.includes(id))) continue;
+    if (!viewable(annotation.annotation, model.selected.includes(id))) continue;
     if (isSubstrateOnly(annotation)) continue;
     (isMarkup(annotation.subtype) ? markup : other).push(id);
   }
@@ -72,7 +73,7 @@ export const isSelectable = (model: Model, id: Id): boolean => {
  *  as fixed as classic markup. Markup kinds themselves have `movable: false`
  *  and never reach this gate. */
 const textBound = (annotation: ModelAnnotation): boolean =>
-  capsFor(annotation.subtype).anchored && annotation.geometry.kind === 'quads';
+  capsFor(annotation.subtype).anchored && fieldsOf(annotation).geometry.kind === 'quads';
 
 /** Can this annotation be dragged by its body to move? (`locked` freezes it.) */
 export const canMove = (model: Model, id: Id): boolean => {
@@ -99,21 +100,25 @@ const hasHandles = (model: Model, annotation: ModelAnnotation): boolean => {
  *  projection for `noZoom`/`noRotate` annotations, the stored geom otherwise.
  *  The same projection `pageItems` renders, so click matches paint. */
 const hitGeomOf = (annotation: ModelAnnotation, view: ViewEnv | undefined): ModelGeometry =>
-  anchoredGeom(annotation.geometry, anchorModeOf(annotation), view);
+  anchoredGeom(fieldsOf(annotation).geometry, anchorModeOf(annotation), view);
 
 /** Stroke width in effective content units (a noZoom body's line weight scales
  *  with its geometry). */
 const hitStrokeOf = (annotation: ModelAnnotation, view: ViewEnv | undefined): number =>
-  anchoredStrokeWidth(annotation.style.strokeWidth, anchorModeOf(annotation), view);
+  anchoredStrokeWidth(fieldsOf(annotation).style.strokeWidth, anchorModeOf(annotation), view);
 
 // `opaqueBody` kinds (stamp images) are visible across their whole box, so they
 // hit like a filled shape. Not keyed on `source: 'baked'` — every annotation
 // loaded from a PDF starts baked, and an unfilled square must still be grabbed
 // only on its outline.
-const isFilled = (annotation: ModelAnnotation): boolean =>
-  annotation.style.interiorColor != null ||
-  annotation.geometry.kind === 'quads' ||
-  capsFor(annotation.subtype).opaqueBody;
+const isFilled = (annotation: ModelAnnotation): boolean => {
+  const { style, geometry } = fieldsOf(annotation);
+  return (
+    style.interiorColor != null ||
+    geometry.kind === 'quads' ||
+    capsFor(annotation.subtype).opaqueBody
+  );
+};
 const inRect = (rect: Rect, point: Point): boolean =>
   point.x >= rect.x &&
   point.x <= rect.x + rect.width &&
@@ -206,10 +211,11 @@ export function hitTest(
         }
       }
       if (hasHandles(model, annotation)) {
+        const { measure, style } = fieldsOf(annotation);
         const geometry = hitGeomOf(annotation, view);
         const distance =
-          annotation.measure?.intent === 'line-dimension' &&
-          distanceLayout(geometry, annotation.measure, hitStrokeOf(annotation, view));
+          measure?.intent === 'line-dimension' &&
+          distanceLayout(geometry, measure, hitStrokeOf(annotation, view));
         const handles = distance ? distanceHandles(distance) : geomHandles(geometry);
         if (distance) {
           // Nearby endpoint and leader hit areas overlap at small offsets.
@@ -222,9 +228,9 @@ export function hitTest(
         // The text is the drag target. It owns no visible handle, and wins
         // before the annotation's sticky body bounds.
         const layout =
-          annotation.measure &&
-          measurementLayout(geometry, annotation.measure, {
-            ...annotation.style,
+          measure &&
+          measurementLayout(geometry, measure, {
+            ...style,
             strokeWidth: hitStrokeOf(annotation, view),
           });
         if (
@@ -307,14 +313,12 @@ export function hitTest(
     // A selected annotation is sticky-grabbable from anywhere in its bounds, but
     // only if it can actually move; otherwise it's grabbed on its stroke/fill like
     // an unselected one (so a selectable-but-anchored kind still re-selects cleanly).
+    const { measure, style } = fieldsOf(annotation);
     const geometry = hitGeomOf(annotation, view);
     const strokeWidth = hitStrokeOf(annotation, view);
     const distance =
-      annotation.measure?.intent === 'line-dimension' &&
-      distanceLayout(geometry, annotation.measure, strokeWidth);
-    const layout =
-      annotation.measure &&
-      measurementLayout(geometry, annotation.measure, { ...annotation.style, strokeWidth });
+      measure?.intent === 'line-dimension' && distanceLayout(geometry, measure, strokeWidth);
+    const layout = measure && measurementLayout(geometry, measure, { ...style, strokeWidth });
     const hit =
       (layout && distanceCaptionHit(layout, point, strokeMargin)) ||
       (model.selected.includes(id) && canMove(model, id)

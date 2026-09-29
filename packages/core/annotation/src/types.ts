@@ -209,6 +209,11 @@ export type AnnotationPropsPatch = {
   [K in PropKey]?: K extends 'lineEndings' ? Partial<LineEndings> : AnnotationProps[K];
 };
 
+/**
+ * One annotation as the core works on it: the engine's record, and how it is
+ * drawn right now. The record is the only data; the core's gestures read it
+ * through `fieldsOf` and change it through `withFields` (record/).
+ */
 export interface ModelAnnotation {
   id: Id;
   ref: AnnotationRef | null;
@@ -216,26 +221,6 @@ export interface ModelAnnotation {
    *  `page.pageObjectNumber`; the address itself is what callers pass around. */
   page: PageRef;
   subtype: Subtype;
-  geometry: ModelGeometry;
-  style: Style;
-  /** Text styling — present only for text-editable kinds (free text). Like
-   *  `style`, a page-space projection of `data`, editable via `setProps`. */
-  text?: TextStyle;
-  /** Redaction label (`/OverlayText` + `/Repeat`) — redact kind only. A
-   *  projection of `data` like `text`; the hover preview scene draws it. */
-  label?: { text: string; repeat: boolean };
-  measure?: MeasurementAppearance;
-  /** `/Name` icon — present only for icon kinds (text note, file attachment).
-   *  Like `style`, a projection of `data`, editable via `setProps`. */
-  icon?: string;
-  /**
-   * The `/F` annotation flags, verbatim from the DTO (freshly drawn annotations
-   * start at {@link DRAWN_FLAGS} — `print` set). Never read individual keys to
-   * gate behavior — the predicates in `flags.ts` (`annotInteractive`,
-   * `annotTransformable`, `annotContentsEditable`, `viewable`) are the one
-   * interpretation of the spec, and `anchorModeOf` owns `noZoom`/`noRotate`.
-   */
-  flags: AnnotationFlags;
   /**
    * How the record renders: `baked` blits the engine's appearance raster,
    * `vector` draws it live from its geometry and style. The core sets
@@ -284,12 +269,48 @@ export interface ModelAnnotation {
    * The annotation's data in the engine's shape: what the engine will read
    * back once this session's writes land. A confirmed record's is the
    * engine's own read; a record this session created predicts it from its
-   * create (`newRecord`); an edit brings it up to date with the fields the
-   * edit changed, at the end of `update`. The fields above are projections
-   * the gestures work on; its `rect` (for a kind the engine draws) and its
-   * attribution wait for the engine's answer.
+   * create (`newRecord`); an edit merges the fields it changed, and `update`
+   * applies them as the engine will. Its `rect` (for a kind the engine
+   * draws) and its attribution wait for the engine's answer.
    */
   annotation: AnnotationDTO;
+  /**
+   * Relationship to another annotation. `irt` ("in reply to") links a child to a
+   * parent — a reply in a comment thread, or a caret bound to its strikeout in a
+   * replace-text pair. `group` ties a set into one composite unit (created and,
+   * typically, deleted together). Both are record keys, so a record this
+   * session created is named by its `new:<n>` id.
+   */
+  irt?: Id;
+  group?: string;
+}
+
+/**
+ * A record as the core's gestures read and write it: its annotation's
+ * geometry, style and text in the core's own shapes. `fieldsOf` works them
+ * out from the annotation, and `withFields` turns changed ones back into the
+ * annotation's fields (record/). A new record has no annotation yet: its
+ * create is what predicts one.
+ */
+export interface RecordFields extends Omit<ModelAnnotation, 'annotation'> {
+  geometry: ModelGeometry;
+  style: Style;
+  /** Text styling — present only for text-editable kinds (free text). */
+  text?: TextStyle;
+  /** Redaction label (`/OverlayText` + `/Repeat`) — redact kind only. The
+   *  hover preview scene draws it. */
+  label?: { text: string; repeat: boolean };
+  measure?: MeasurementAppearance;
+  /** `/Name` icon — present only for icon kinds (text note, file attachment). */
+  icon?: string;
+  /**
+   * The `/F` annotation flags (freshly drawn annotations start at
+   * {@link DRAWN_FLAGS} — `print` set). Never read individual keys to gate
+   * behavior — the predicates in `flags.ts` (`annotInteractive`,
+   * `annotTransformable`, `annotContentsEditable`, `viewable`) are the one
+   * interpretation of the spec, and `anchorModeOf` owns `noZoom`/`noRotate`.
+   */
+  flags: AnnotationFlags;
   /** Normalized PDF `/IT` for intent-bearing annotations authored before a DTO exists. */
   intent?: CaretIntent | StrikeoutIntent | InkIntent;
   /**
@@ -300,24 +321,8 @@ export interface ModelAnnotation {
    * store nothing.
    */
   link?: PdfLinkTarget | null;
-  /**
-   * Relationship to another annotation. `irt` ("in reply to") links a child to a
-   * parent — a reply in a comment thread, or a caret bound to its strikeout in a
-   * replace-text pair. `group` ties a set into one composite unit (created and,
-   * typically, deleted together). Both are unused until comments / replace-text
-   * land, but the field lives here from the start so select/delete/persistence
-   * never have to be retrofitted around it.
-   */
-  irt?: Id;
-  group?: string;
+  annotation?: AnnotationDTO;
 }
-
-/**
- * A record's fields, with or without its engine annotation: what its engine
- * writes are made from (record/). A new record has none yet; its create is
- * what predicts it.
- */
-export type RecordFields = Omit<ModelAnnotation, 'annotation'> & { annotation?: AnnotationDTO };
 
 /** A draggable handle: a resize corner/edge (rect) or a vertex (line/poly). */
 export interface Handle {

@@ -6,7 +6,7 @@
 import { annotationKey, type AnnotationRef } from '@embedpdf/engine-core/runtime';
 import { describe, expect, it, vi } from 'vitest';
 
-import { annotationHarness, PAGE, type FileAnnotation, fieldsOf } from './harness';
+import { annotationHarness, PAGE, type FileAnnotation, dataOf } from './harness';
 
 const FLAGS = {
   invisible: false,
@@ -98,7 +98,7 @@ describe('store.apply', () => {
 
     const patch = { subtype: 'square', color: '#00ff00' } as const;
     const done = harness.capability.update(refOf(20), patch);
-    expect(fieldsOf(harness.capability.get(refOf(20))).color).toBe('#00ff00');
+    expect(dataOf(harness.capability.get(refOf(20))).color).toBe('#00ff00');
     const [pending] = harness.state().pending;
     expect(pending!.change).toMatchObject({ kind: 'edit', patch });
     expect(harness.update).toHaveBeenCalledWith(refOf(20), patch);
@@ -109,7 +109,7 @@ describe('store.apply', () => {
     write.resolve({ annotation: square(20, '#00ff00') });
     await done;
     expect(harness.state().pending).toEqual([]);
-    expect(fieldsOf(harness.capability.get(refOf(20))).color).toBe('#00ff00');
+    expect(dataOf(harness.capability.get(refOf(20))).color).toBe('#00ff00');
   });
 
   it('a refused update is dropped at once: the engine’s record shows again', async () => {
@@ -122,7 +122,7 @@ describe('store.apply', () => {
     write.reject(new Error('refused'));
     await expect(done).rejects.toThrow();
     expect(harness.state().pending).toEqual([]);
-    expect(fieldsOf(harness.capability.get(refOf(20))).color).toBe('#000000');
+    expect(dataOf(harness.capability.get(refOf(20))).color).toBe('#000000');
   });
 
   it('an explicit `rect` is a command, written as given', async () => {

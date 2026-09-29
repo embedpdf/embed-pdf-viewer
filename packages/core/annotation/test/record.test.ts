@@ -11,7 +11,8 @@ import type {
   PdfRect,
 } from '@embedpdf/engine-core/runtime';
 import {
-  ANNOTATION_FIELD_NAMES,
+  annotationPatchBetween,
+  applyAnnotationPatch,
   pageAnnotationOf,
   pdfAnnotationDraftOf,
   pdfAnnotationPatchOf,
@@ -24,17 +25,17 @@ import { describe, expect, it } from 'vitest';
 import { DRAWN_FLAGS } from '../src/flags';
 import { linkChildrenOf, linkOf } from '../src/links';
 import { isAttachedLink } from '../src/plane';
-import type { AnnotationPropsPatch, Model, ModelAnnotation } from '../src/types';
+import type { AnnotationPropsPatch, Model, ModelAnnotation, RecordFields } from '../src/types';
 import { record } from './support';
 import { KINDS } from '../src/kinds';
 import { applyProps } from '../src/props';
 import {
-  annotationAfter,
+  fieldsOf,
   fromDTO,
   linkChildRects,
-  patchBetween,
   toCreateDraft,
   toPatch,
+  withFields,
 } from '../src/record';
 
 const CROP: PdfRect = { left: 0, bottom: 0, right: 600, top: 800 };
@@ -51,6 +52,22 @@ const fromFile = (dto: AnnotationDTO<PdfCoordinates>): AnnotationDTO =>
 /** A patch as the engine writes it to the file. */
 const toFile = (patch: AnnotationPatch | null): AnnotationPatch<PdfCoordinates> | null =>
   patch && pdfAnnotationPatchOf(patch, CROP, boxOf);
+/**
+ * What changing a record's fields writes: the annotation fields the change
+ * moved, as `update` sends them. `null` when it moved none.
+ */
+const writeOf = (
+  annotation: ModelAnnotation,
+  change: Partial<RecordFields>,
+): AnnotationPatch | null => {
+  const patch = annotationPatchBetween(
+    annotation.annotation,
+    withFields(annotation, change).annotation,
+  );
+  return Object.keys(patch).length
+    ? ({ ...patch, subtype: annotation.annotation.subtype } as AnnotationPatch)
+    : null;
+};
 /** A create as the engine writes it to the file. */
 const draftToFile = (draft: AnnotationDraft | null): AnnotationDraft<PdfCoordinates> | null =>
   draft && pdfAnnotationDraftOf(draft, CROP, boxOf);
@@ -178,16 +195,16 @@ describe('record — Ink Highlight intent and blend', () => {
 
   it('round-trips intent and blend through the content model, draft, and patch', () => {
     const annotation = fromDTO(fromFile(dto()));
-    expect(annotation.intent).toBe('ink-highlight');
-    expect(annotation.style.blendMode).toBe('multiply');
-    expect(draftToFile(toCreateDraft(annotation))).toMatchObject({
+    expect(fieldsOf(annotation).intent).toBe('ink-highlight');
+    expect(fieldsOf(annotation).style.blendMode).toBe('multiply');
+    expect(draftToFile(toCreateDraft(fieldsOf(annotation)))).toMatchObject({
       subtype: 'ink',
       intent: 'ink-highlight',
       blendMode: 'multiply',
     });
     // `/IT` is a create-only statement: patches don't restate it (the engine's
     // tri-state law preserves what a patch omits), so only the draft carries it.
-    const patch = toFile(toPatch(annotation)) as Record<string, unknown> | null;
+    const patch = toFile(toPatch(fieldsOf(annotation))) as Record<string, unknown> | null;
     expect(patch).toMatchObject({ subtype: 'ink', blendMode: 'multiply' });
     expect(patch).not.toHaveProperty('intent');
   });
@@ -232,13 +249,13 @@ describe('record — Replace Text authoring', () => {
       group: caret.id,
     });
 
-    expect(draftToFile(toCreateDraft(caret))).toMatchObject({
+    expect(draftToFile(toCreateDraft(fieldsOf(caret)))).toMatchObject({
       subtype: 'caret',
       intent: 'replace',
       print: true,
       box: { left: 90, right: 100, bottom: 750, top: 760 },
     });
-    expect(draftToFile(toCreateDraft(strikeout))).toMatchObject({
+    expect(draftToFile(toCreateDraft(fieldsOf(strikeout)))).toMatchObject({
       subtype: 'strikeout',
       intent: 'strikeout-text-edit',
       print: true,
@@ -256,8 +273,9 @@ describe('record — Replace Text authoring', () => {
       flags: DRAWN_FLAGS,
       source: 'vector',
     });
+    const caretGeometry = fieldsOf(caret).geometry;
     // Clockwise 270° passes through with the box; the engine works out `rect`.
-    const draft = draftToFile(toCreateDraft(caret));
+    const draft = draftToFile(toCreateDraft(fieldsOf(caret)));
     expect(draft).toMatchObject({
       subtype: 'caret',
       rotation: 270,
@@ -265,10 +283,10 @@ describe('record — Replace Text authoring', () => {
     });
     expect(draft).not.toHaveProperty('rect');
 
-    if (caret.geometry.kind !== 'caret') throw new Error('Expected caret projection');
-    const upright: ModelAnnotation = {
-      ...caret,
-      geometry: { kind: 'caret', rect: caret.geometry.rect },
+    if (caretGeometry.kind !== 'caret') throw new Error('Expected caret projection');
+    const upright: RecordFields = {
+      ...fieldsOf(caret),
+      geometry: { kind: 'caret', rect: caretGeometry.rect },
     };
     // Tri-state flatten: upright carets state null so a stale turn can't linger.
     expect(draftToFile(toCreateDraft(upright))).toMatchObject({ rotation: null });
@@ -401,14 +419,15 @@ function rotatedPolylineDTO(
 describe('record — rotation round-trip', () => {
   it('box: fromDTO reads the box and the clockwise rot', () => {
     const annotation = fromDTO(fromFile(rotatedSquareDTO(90)));
-    if (annotation.geometry.kind !== 'rect') throw new Error('expected rect geom');
+    const geometry = fieldsOf(annotation).geometry;
+    if (geometry.kind !== 'rect') throw new Error('expected rect geom');
     // box {100,100,200,200} → content {x:100,y:600,w:100,h:100}
-    expect(annotation.geometry.rect).toMatchObject({ x: 100, y: 600, width: 100, height: 100 });
-    expect(annotation.geometry.rot).toBe(90);
+    expect(geometry.rect).toMatchObject({ x: 100, y: 600, width: 100, height: 100 });
+    expect(geometry.rot).toBe(90);
   });
 
   it('box: toPatch emits the box + rotation, and no rect', () => {
-    const patch = toFile(toPatch(fromDTO(fromFile(rotatedSquareDTO(90))))) as Extract<
+    const patch = toFile(toPatch(fieldsOf(fromDTO(fromFile(rotatedSquareDTO(90)))))) as Extract<
       AnnotationPatch<PdfCoordinates>,
       { subtype?: 'square' }
     >;
@@ -419,7 +438,7 @@ describe('record — rotation round-trip', () => {
   });
 
   it('box: an unrotated DTO states the turn clear explicitly (total projection)', () => {
-    const patch = toFile(toPatch(fromDTO(fromFile(squareDTO(32))))) as Extract<
+    const patch = toFile(toPatch(fieldsOf(fromDTO(fromFile(squareDTO(32)))))) as Extract<
       AnnotationPatch<PdfCoordinates>,
       { subtype?: 'square' }
     >;
@@ -433,14 +452,15 @@ describe('record — rotation round-trip', () => {
     const dto = rotatedPolylineDTO(30);
     if (dto.subtype !== 'polyline') throw new Error('expected polyline');
     const annotation = fromDTO(fromFile(dto));
-    if (annotation.geometry.kind !== 'poly') throw new Error('expected poly geom');
-    expect(annotation.geometry.rot).toBe(30);
+    const geometry = fieldsOf(annotation).geometry;
+    if (geometry.kind !== 'poly') throw new Error('expected poly geom');
+    expect(geometry.rot).toBe(30);
     // The model keeps the points as drawn: the upright ones turned about their box's middle.
     const drawn = pdfPointTurned(dto.vertices[0]!, pdfTurnOfUpright(dto.vertices, 30));
-    expect(annotation.geometry.points[0]!.x).toBeCloseTo(drawn.x - CROP.left, 9);
-    expect(annotation.geometry.points[0]!.y).toBeCloseTo(CROP.top - drawn.y, 9);
+    expect(geometry.points[0]!.x).toBeCloseTo(drawn.x - CROP.left, 9);
+    expect(geometry.points[0]!.y).toBeCloseTo(CROP.top - drawn.y, 9);
 
-    const patch = toFile(toPatch(annotation)) as Extract<
+    const patch = toFile(toPatch(fieldsOf(annotation))) as Extract<
       AnnotationPatch<PdfCoordinates>,
       { subtype?: 'polyline' }
     > & {
@@ -456,8 +476,9 @@ describe('record — rotation round-trip', () => {
 
   it('vertex: an unrotated polyline states the advisory clear explicitly', () => {
     const annotation = fromDTO(fromFile(rotatedPolylineDTO(0, 33)));
-    expect(annotation.geometry.kind === 'poly' && annotation.geometry.rot).toBeFalsy();
-    const patch = toFile(toPatch(annotation)) as Extract<
+    const geometry = fieldsOf(annotation).geometry;
+    expect(geometry.kind === 'poly' && geometry.rot).toBeFalsy();
+    const patch = toFile(toPatch(fieldsOf(annotation))) as Extract<
       AnnotationPatch<PdfCoordinates>,
       { subtype?: 'polyline' }
     > & {
@@ -470,25 +491,26 @@ describe('record — rotation round-trip', () => {
 describe('record — free-text callout mapping', () => {
   it('fromDTO: intent + /CL → a text geom with a leader (the box, conn dropped)', () => {
     const annotation = fromDTO(fromFile(calloutDTO()));
-    expect(annotation.geometry.kind).toBe('text');
-    if (annotation.geometry.kind !== 'text' || !annotation.geometry.callout)
-      throw new Error('expected callout geom');
+    const geometry = fieldsOf(annotation).geometry;
+    expect(geometry.kind).toBe('text');
+    if (geometry.kind !== 'text' || !geometry.callout) throw new Error('expected callout geom');
     // the text box, in page space
-    expect(annotation.geometry.rect).toMatchObject({ x: 200, y: 140, width: 120, height: 60 });
+    expect(geometry.rect).toMatchObject({ x: 200, y: 140, width: 120, height: 60 });
     // tip / knee map to page space (y flips about the 800-pt crop)
-    expect(annotation.geometry.callout.tip).toEqual({ x: 40, y: 60 });
-    expect(annotation.geometry.callout.knee).toEqual({ x: 120, y: 100 });
-    expect(annotation.geometry.callout.ending).toBe('open-arrow');
+    expect(geometry.callout.tip).toEqual({ x: 40, y: 60 });
+    expect(geometry.callout.knee).toEqual({ x: 120, y: 100 });
+    expect(geometry.callout.ending).toBe('open-arrow');
   });
 
   it('fromDTO: a plain free-text (no /CL) has no callout', () => {
     const annotation = fromDTO(fromFile(plainFreeTextDTO()));
-    expect(annotation.geometry.kind).toBe('text');
-    expect(annotation.geometry.kind === 'text' && annotation.geometry.callout).toBeUndefined();
+    const geometry = fieldsOf(annotation).geometry;
+    expect(geometry.kind).toBe('text');
+    expect(geometry.kind === 'text' && geometry.callout).toBeUndefined();
   });
 
   it('toCreateDraft: a callout geom → intent + the text box + /CL + /LE', () => {
-    const draft = draftToFile(toCreateDraft(fromDTO(fromFile(calloutDTO())))) as Extract<
+    const draft = draftToFile(toCreateDraft(fieldsOf(fromDTO(fromFile(calloutDTO()))))) as Extract<
       AnnotationDraft<PdfCoordinates>,
       { subtype: 'free-text' }
     >;
@@ -508,17 +530,16 @@ describe('record — free-text callout mapping', () => {
   });
 
   it('toCreateDraft: a plain free-text → intent free-text + its box (no leader)', () => {
-    const draft = draftToFile(toCreateDraft(fromDTO(fromFile(plainFreeTextDTO())))) as Extract<
-      AnnotationDraft<PdfCoordinates>,
-      { subtype: 'free-text' }
-    >;
+    const draft = draftToFile(
+      toCreateDraft(fieldsOf(fromDTO(fromFile(plainFreeTextDTO())))),
+    ) as Extract<AnnotationDraft<PdfCoordinates>, { subtype: 'free-text' }>;
     expect(draft.intent).toBe('free-text');
     expect(draft.calloutLine).toBeUndefined();
     expect(draft.box).toMatchObject(BOX_PDF);
   });
 
   it('toPatch: a callout sends the text box + /CL + /LE together', () => {
-    const patch = toFile(toPatch(fromDTO(fromFile(calloutDTO())))) as Extract<
+    const patch = toFile(toPatch(fieldsOf(fromDTO(fromFile(calloutDTO()))))) as Extract<
       AnnotationPatch<PdfCoordinates>,
       { subtype?: 'free-text' }
     > | null;
@@ -532,7 +553,7 @@ describe('record — free-text callout mapping', () => {
 describe('record — free-text style + font round-trip', () => {
   it('fromDTO projects the /DA font fields into `text` (fontColor falls back to /DA colour)', () => {
     const annotation = fromDTO(fromFile(calloutDTO()));
-    expect(annotation.text).toEqual({
+    expect(fieldsOf(annotation).text).toEqual({
       fontFamily: 'helvetica',
       fontSize: 14,
       fontColor: '#c80000', // no explicit fontColor → the /DA colour {200,0,0}
@@ -544,10 +565,15 @@ describe('record — free-text style + font round-trip', () => {
     const annotation = fromDTO(fromFile(plainFreeTextDTO()));
     // a props edit: restyle + refont the box (what updateSelection applies)
     const edited = {
-      ...annotation,
-      style: { ...annotation.style, color: '#0000ff', interiorColor: '#ffff00', opacity: 0.5 },
+      ...fieldsOf(annotation),
+      style: {
+        ...fieldsOf(annotation).style,
+        color: '#0000ff',
+        interiorColor: '#ffff00',
+        opacity: 0.5,
+      },
       text: {
-        ...annotation.text!,
+        ...fieldsOf(annotation).text!,
         fontSize: 22,
         fontColor: '#00ff00',
         textAlign: 'center' as const,
@@ -570,7 +596,10 @@ describe('record — free-text style + font round-trip', () => {
 
   it('toPatch carries style + font for a callout too, alongside the leader fields', () => {
     const annotation = fromDTO(fromFile(calloutDTO()));
-    const edited = { ...annotation, text: { ...annotation.text!, fontFamily: 'courier' } };
+    const edited = {
+      ...fieldsOf(annotation),
+      text: { ...fieldsOf(annotation).text!, fontFamily: 'courier' },
+    };
     const patch = toFile(toPatch(edited)) as Extract<
       AnnotationPatch<PdfCoordinates>,
       { subtype?: 'free-text' }
@@ -583,8 +612,8 @@ describe('record — free-text style + font round-trip', () => {
   it('toCreateDraft seeds the draft from `text` (the tool font defaults), not hardcoded values', () => {
     const annotation = fromDTO(fromFile(plainFreeTextDTO()));
     const seeded = {
-      ...annotation,
-      text: { ...annotation.text!, fontSize: 18, textAlign: 'right' as const },
+      ...fieldsOf(annotation),
+      text: { ...fieldsOf(annotation).text!, fontSize: 18, textAlign: 'right' as const },
     };
     const draft = draftToFile(toCreateDraft(seeded)) as Extract<
       AnnotationDraft<PdfCoordinates>,
@@ -646,12 +675,12 @@ function polygonDTO(
 describe('record — polygon cloudy border', () => {
   it('fromDTO reads /BE intensity into a cloudy border', () => {
     const annotation = fromDTO(fromFile(polygonDTO(2)));
-    expect(annotation.style.border).toEqual({ kind: 'cloudy', intensity: 2 });
+    expect(fieldsOf(annotation).style.border).toEqual({ kind: 'cloudy', intensity: 2 });
   });
 
   it('toPatch carries cloudyIntensity and no rect: the engine measures the curls', () => {
     const annotation = fromDTO(fromFile(polygonDTO(2)));
-    const patch = toFile(toPatch(annotation)) as Extract<
+    const patch = toFile(toPatch(fieldsOf(annotation))) as Extract<
       AnnotationPatch<PdfCoordinates>,
       { subtype?: 'polygon' }
     >;
@@ -664,8 +693,8 @@ describe('record — polygon cloudy border', () => {
   it('toPatch clears the effect with cloudyIntensity null when the border is solid again', () => {
     const annotation = fromDTO(fromFile(polygonDTO(2)));
     const solid = {
-      ...annotation,
-      style: { ...annotation.style, border: { kind: 'solid' as const } },
+      ...fieldsOf(annotation),
+      style: { ...fieldsOf(annotation).style, border: { kind: 'solid' as const } },
     };
     const patch = toFile(toPatch(solid)) as Extract<
       AnnotationPatch<PdfCoordinates>,
@@ -678,8 +707,8 @@ describe('record — polygon cloudy border', () => {
   it('an open polyline never carries cloudy fields', () => {
     const annotation = fromDTO(fromFile(rotatedPolylineDTO(0, 41)));
     const cloudyStyled = {
-      ...annotation,
-      style: { ...annotation.style, border: { kind: 'cloudy' as const, intensity: 2 } },
+      ...fieldsOf(annotation),
+      style: { ...fieldsOf(annotation).style, border: { kind: 'cloudy' as const, intensity: 2 } },
     };
     const patch = toFile(toPatch(cloudyStyled)) as Extract<
       AnnotationPatch<PdfCoordinates>,
@@ -689,23 +718,21 @@ describe('record — polygon cloudy border', () => {
   });
 });
 
-describe('record — patchBetween (a change is its write)', () => {
-  const moved = (annotation: ModelAnnotation, dx: number): ModelAnnotation => {
-    const geometry = annotation.geometry as Extract<ModelAnnotation['geometry'], { kind: 'rect' }>;
-    return {
-      ...annotation,
-      geometry: { ...geometry, rect: { ...geometry.rect, x: geometry.rect.x + dx } },
-    };
+describe('record — withFields (a change is its write)', () => {
+  const moved = (annotation: ModelAnnotation, dx: number): Partial<RecordFields> => {
+    const geometry = fieldsOf(annotation).geometry as Extract<
+      RecordFields['geometry'],
+      { kind: 'rect' }
+    >;
+    return { geometry: { ...geometry, rect: { ...geometry.rect, x: geometry.rect.x + dx } } };
   };
-  const patchOf = (before: ModelAnnotation, after: ModelAnnotation) =>
-    toFile(patchBetween(before, after)) as unknown as Record<string, unknown>;
+  const patchOf = (annotation: ModelAnnotation, change: Partial<RecordFields>) =>
+    toFile(writeOf(annotation, change)) as unknown as Record<string, unknown>;
 
-  it('a moved square writes ONLY its box group (no style biography)', () => {
+  it('a moved square writes ONLY its box (no style biography, no unchanged turn)', () => {
     const annotation = fromDTO(fromFile(squareDTO(60)));
     const patch = patchOf(annotation, moved(annotation, 10));
-    // the box + its total turn — and nothing else.
-    expect(Object.keys(patch).sort()).toEqual(['box', 'rotation', 'subtype']);
-    expect(patch.rotation).toBe(null);
+    expect(Object.keys(patch).sort()).toEqual(['box', 'subtype']);
     expect(patch.box).toMatchObject({ left: 110, right: 210 });
   });
 
@@ -720,10 +747,7 @@ describe('record — patchBetween (a change is its write)', () => {
 
   it('a text style change writes its key 1:1 (fontSize alone, engine RMW makes it safe)', () => {
     const annotation = fromDTO(fromFile(calloutDTO(21)));
-    const patch = patchOf(annotation, {
-      ...annotation,
-      text: { ...annotation.text!, fontSize: 20 },
-    });
+    const patch = patchOf(annotation, { text: { ...fieldsOf(annotation).text!, fontSize: 20 } });
     expect(patch).toEqual({ subtype: 'free-text', fontSize: 20 });
   });
 
@@ -731,7 +755,7 @@ describe('record — patchBetween (a change is its write)', () => {
     const cloudy = fromDTO(
       fromFile({ ...squareDTO(62), cloudyIntensity: 2 } as AnnotationDTO<PdfCoordinates>),
     );
-    const patch = patchOf(cloudy, { ...cloudy, style: { ...cloudy.style, strokeWidth: 3 } });
+    const patch = patchOf(cloudy, { style: { ...fieldsOf(cloudy).style, strokeWidth: 3 } });
     expect(patch.strokeWidth).toBe(3);
     // The cloud's reach follows the stroke width, so the box is stated again.
     expect(patch.box).toBeDefined();
@@ -739,25 +763,18 @@ describe('record — patchBetween (a change is its write)', () => {
 
   it('strokeWidth on a polygon sends no rect: the engine measures the stroke', () => {
     const annotation = fromDTO(fromFile(polygonDTO(undefined)));
-    const patch = patchOf(annotation, {
-      ...annotation,
-      style: { ...annotation.style, strokeWidth: annotation.style.strokeWidth + 1 },
-    });
-    expect(patch.strokeWidth).toBe(annotation.style.strokeWidth + 1);
+    const { style } = fieldsOf(annotation);
+    const patch = patchOf(annotation, { style: { ...style, strokeWidth: style.strokeWidth + 1 } });
+    expect(patch.strokeWidth).toBe(fieldsOf(annotation).style.strokeWidth + 1);
     expect(patch).not.toHaveProperty('rect');
   });
 
-  it('a border change on a plain square states the tri-state clears', () => {
+  it('a border change on a plain square writes the border alone: no cloud or box it already has', () => {
     const annotation = fromDTO(fromFile(squareDTO(63)));
     const patch = patchOf(annotation, {
-      ...annotation,
-      style: { ...annotation.style, border: { kind: 'dashed', dash: [4, 2] } },
+      style: { ...fieldsOf(annotation).style, border: { kind: 'dashed', dash: [4, 2] } },
     });
-    expect(patch.borderStyle).toBe('dashed');
-    expect(patch.dashArray).toEqual([4, 2]);
-    expect(patch.cloudyIntensity).toBe(null);
-    expect(patch.box).toMatchObject({ left: 100, bottom: 100, right: 200, top: 200 });
-    expect(patch).not.toHaveProperty('color');
+    expect(patch).toEqual({ subtype: 'square', borderStyle: 'dashed', dashArray: [4, 2] });
   });
 
   it('opacity on a stamp reads and writes /CA alone (the engine re-bakes it)', () => {
@@ -779,24 +796,25 @@ describe('record — patchBetween (a change is its write)', () => {
         rotation: null,
       } as AnnotationDTO<PdfCoordinates>),
     );
-    expect(stamp.style.opacity).toBe(0.3);
-    const patch = patchOf(stamp, { ...stamp, style: { ...stamp.style, opacity: 0.6 } });
+    expect(fieldsOf(stamp).style.opacity).toBe(0.3);
+    const patch = patchOf(stamp, { style: { ...fieldsOf(stamp).style, opacity: 0.6 } });
     expect(patch).toEqual({ subtype: 'stamp', opacity: 0.6 });
   });
 
   it('writes only what changed: each changed flag, and nothing for a change the engine keeps nothing of', () => {
     const annotation = fromDTO(fromFile(squareDTO(64)));
-    expect(
-      patchOf(annotation, { ...annotation, flags: { ...annotation.flags, hidden: true } }),
-    ).toEqual({ subtype: 'square', hidden: true });
+    const { flags, style, geometry } = fieldsOf(annotation);
+    expect(patchOf(annotation, { flags: { ...flags, hidden: true } })).toEqual({
+      subtype: 'square',
+      hidden: true,
+    });
     // Live rendering, and a style value set to what it was, are no write.
-    expect(patchBetween(annotation, { ...annotation, source: 'vector' })).toBeNull();
-    expect(patchBetween(annotation, { ...annotation, style: { ...annotation.style } })).toBeNull();
+    expect(writeOf(annotation, { source: 'vector' })).toBeNull();
+    expect(writeOf(annotation, { style: { ...style } })).toBeNull();
     // A key the kind doesn't take is never written (a square has no line endings).
     expect(
-      patchBetween(annotation, {
-        ...annotation,
-        geometry: { ...annotation.geometry, ends: { start: 'none', end: 'open-arrow' } } as never,
+      writeOf(annotation, {
+        geometry: { ...geometry, ends: { start: 'none', end: 'open-arrow' } } as never,
       }),
     ).toBeNull();
   });
@@ -841,12 +859,11 @@ describe('record — line endings leave /Rect to the engine', () => {
 
   it('new lineEndings on a line send the endings and no rect: the engine measures the arrows', () => {
     const none = fromDTO(fromFile(lineDTO({ start: 'none', end: 'none' })));
-    // The model after the reducer applied the user's gesture: arrows on both ends.
+    // The user's gesture: arrows on both ends.
     const arrows = {
-      ...none,
-      geometry: { ...none.geometry, ends: { start: 'open-arrow', end: 'open-arrow' } },
-    } as typeof none;
-    const patch = toFile(patchBetween(none, arrows)) as RectPatch;
+      geometry: { ...fieldsOf(none).geometry, ends: { start: 'open-arrow', end: 'open-arrow' } },
+    } as Partial<RecordFields>;
+    const patch = toFile(writeOf(none, arrows)) as RectPatch;
     expect(patch.lineEndings).toEqual({ start: 'open-arrow', end: 'open-arrow' });
     expect(patch).not.toHaveProperty('rect');
   });
@@ -854,10 +871,12 @@ describe('record — line endings leave /Rect to the engine', () => {
   it('polyline endings send no rect either', () => {
     const base = fromDTO(fromFile(rotatedPolylineDTO(0, 78)));
     const arrows = {
-      ...base,
-      geometry: { ...base.geometry, ends: { start: 'closed-arrow', end: 'closed-arrow' } },
-    } as typeof base;
-    const patch = toFile(patchBetween(base, arrows)) as RectPatch;
+      geometry: {
+        ...fieldsOf(base).geometry,
+        ends: { start: 'closed-arrow', end: 'closed-arrow' },
+      },
+    } as Partial<RecordFields>;
+    const patch = toFile(writeOf(base, arrows)) as RectPatch;
     expect(patch.lineEndings).toBeDefined();
     expect(patch).not.toHaveProperty('rect');
   });
@@ -869,15 +888,16 @@ describe('record — shape cloudy border tri-state', () => {
 
   it('fromDTO reads /BE intensity into a cloudy border, the model box around the cloud', () => {
     const annotation = fromDTO(fromFile(cloudySquare()));
-    expect(annotation.style.border).toEqual({ kind: 'cloudy', intensity: 2 });
+    const geometry = fieldsOf(annotation).geometry;
+    expect(fieldsOf(annotation).style.border).toEqual({ kind: 'cloudy', intensity: 2 });
     // The model keeps the outer box: the engine's box grown by the cloud's reach.
-    if (annotation.geometry.kind !== 'rect') throw new Error('expected rect geom');
-    expect(annotation.geometry.rect.x).toBeLessThan(100);
-    expect(annotation.geometry.rect.width).toBeGreaterThan(100);
+    if (geometry.kind !== 'rect') throw new Error('expected rect geom');
+    expect(geometry.rect.x).toBeLessThan(100);
+    expect(geometry.rect.width).toBeGreaterThan(100);
   });
 
   it('toPatch on a cloudy square carries /BE and the box the cloud starts from', () => {
-    const patch = toFile(toPatch(fromDTO(fromFile(cloudySquare())))) as Extract<
+    const patch = toFile(toPatch(fieldsOf(fromDTO(fromFile(cloudySquare()))))) as Extract<
       AnnotationPatch<PdfCoordinates>,
       { subtype?: 'square' }
     >;
@@ -889,8 +909,8 @@ describe('record — shape cloudy border tri-state', () => {
   it('toPatch states the clear when the border is solid again, and the box fills the model box', () => {
     const annotation = fromDTO(fromFile(cloudySquare()));
     const solid = {
-      ...annotation,
-      style: { ...annotation.style, border: { kind: 'solid' as const } },
+      ...fieldsOf(annotation),
+      style: { ...fieldsOf(annotation).style, border: { kind: 'solid' as const } },
     };
     const patch = toFile(toPatch(solid)) as Extract<
       AnnotationPatch<PdfCoordinates>,
@@ -931,7 +951,7 @@ describe('record — attached links (fold + desired state + link kind mapping)',
   it('fromDTO maps a link DTO target onto the link slot', () => {
     const annotation = fromDTO(fromFile(linkDTO(20, URI)));
     expect(annotation.subtype).toBe('link');
-    expect(annotation.link).toEqual(URI);
+    expect(fieldsOf(annotation).link).toEqual(URI);
   });
 
   it('a grouped link child is SUBSTRATE: classified attached, read via linkOf', () => {
@@ -976,8 +996,8 @@ describe('record — attached links (fold + desired state + link kind mapping)',
     // centre — not the 100×100 unrotated box. (Stroke handling follows
     // `selectionQuad`'s own convention — the same envelope the chrome
     // outlines.)
-    const rotated: ModelAnnotation = {
-      ...square,
+    const rotated: RecordFields = {
+      ...fieldsOf(square),
       geometry: {
         kind: 'rect',
         rect: { x: 100, y: 600, width: 100, height: 100 },
@@ -995,9 +1015,9 @@ describe('record — attached links (fold + desired state + link kind mapping)',
 
   it('linkChildRects: one rect per markup quad, one visual-bounds rect otherwise', () => {
     const square = fromDTO(fromFile(squareDTO(10)));
-    expect(linkChildRects(square)).toHaveLength(1);
-    const markup: ModelAnnotation = {
-      ...square,
+    expect(linkChildRects(fieldsOf(square))).toHaveLength(1);
+    const markup: RecordFields = {
+      ...fieldsOf(square),
       subtype: 'highlight',
       geometry: {
         kind: 'quads',
@@ -1014,13 +1034,13 @@ describe('record — attached links (fold + desired state + link kind mapping)',
 
   it('toPatch on the link kind: writable target rides, null clears, read-only arms leave', () => {
     const base = { ...fromDTO(fromFile(linkDTO(20, URI))) };
-    const patched = toFile(toPatch(base));
+    const patched = toFile(toPatch(fieldsOf(base)));
     expect(patched && 'target' in patched && patched.target).toEqual(URI);
 
-    const dead = toFile(toPatch({ ...base, link: null }));
+    const dead = toFile(toPatch({ ...fieldsOf(base), link: null }));
     expect(dead && 'target' in dead && dead.target).toBeNull();
 
-    const js = toFile(toPatch({ ...base, link: { kind: 'javascript' } }));
+    const js = toFile(toPatch({ ...fieldsOf(base), link: { kind: 'javascript' } }));
     expect(js && !('target' in js)).toBe(true); // geometry-only: foreign /A survives
   });
 });
@@ -1028,7 +1048,7 @@ describe('record — attached links (fold + desired state + link kind mapping)',
 describe('record — every prop a kind takes writes only fields its engine kind has', () => {
   const PAGE = toPageRef(1);
   const box = { x: 100, y: 100, width: 80, height: 40 };
-  const geometryOf = (subtype: string): ModelAnnotation['geometry'] => {
+  const geometryOf = (subtype: string): RecordFields['geometry'] => {
     switch (subtype) {
       case 'free-text':
         return { kind: 'text', rect: box };
@@ -1118,17 +1138,15 @@ describe('record — every prop a kind takes writes only fields its engine kind 
           source: 'baked',
         });
         const value = spec.key === 'icon' ? spec.options[1] : values[spec.key];
-        const after = applyProps(before, { [spec.key]: value } as AnnotationPropsPatch);
-        const patch = after ? patchBetween(before, after) : null;
-        if (!after || !patch) return;
-        const known: readonly string[] =
-          ANNOTATION_FIELD_NAMES[patch.subtype as keyof typeof ANNOTATION_FIELD_NAMES];
-        const unknown = Object.keys(patch).filter(
-          (name) => name !== 'subtype' && !known.includes(name),
-        );
-        expect(unknown).toEqual([]);
-        // …and the engine takes it, so the record's annotation follows.
-        expect(() => annotationAfter(before, after)).not.toThrow();
+        const after = applyProps(fieldsOf(before), { [spec.key]: value } as AnnotationPropsPatch);
+        if (!after) return;
+        // `withFields` refuses a field the engine kind doesn't have…
+        const written = withFields(before, after);
+        const patch = writeOf(before, after);
+        if (!patch) return;
+        // …and the engine takes what it wrote, so the record's annotation follows.
+        expect(() => applyAnnotationPatch(before.annotation, patch)).not.toThrow();
+        expect(written.annotation).not.toBe(before.annotation);
       });
     }
   }

@@ -5,9 +5,10 @@
  * with the engine's record once the engine answered.
  */
 import { PluginError, pageRefsEqual, type OperationOptions } from '@embedpdf/core';
-import { patchBetween } from '@embedpdf/core-annotation';
+import { fieldsOf, withFields } from '@embedpdf/core-annotation';
 import {
   annotationKey,
+  annotationPatchBetween,
   type AnnotationDraft,
   type AnnotationDTO,
   type AnnotationPatch,
@@ -76,9 +77,13 @@ export function createCrud(
   /** Turn one annotation to `degrees`: the patch the turn means. The selection's quarter turns use it. */
   const setRotation = async (ref: AnnotationRef, degrees: number): Promise<void> => {
     const annotation = annotations.loadedOrThrow(ref);
-    const turned = { ...annotation, geometry: geometryWithRotation(annotation.geometry, degrees) };
-    const patch = patchBetween(annotation, turned);
-    if (patch) await update(ref, patch);
+    const turned = withFields(annotation, {
+      geometry: geometryWithRotation(fieldsOf(annotation).geometry, degrees),
+    });
+    const patch = annotationPatchBetween(annotation.annotation, turned.annotation);
+    if (Object.keys(patch).length) {
+      await update(ref, { ...patch, subtype: annotation.annotation.subtype } as AnnotationPatch);
+    }
   };
 
   const remove = async (ref: AnnotationRef): Promise<void> => {

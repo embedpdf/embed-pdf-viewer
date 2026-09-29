@@ -57,6 +57,7 @@ import type {
   Point,
 } from './types';
 import type { CreationDraftAnchor } from './types';
+import { fieldsOf } from './record';
 
 const DRAFT_ID = '__draft__';
 const PREVIEW_ID = '__markup_preview__';
@@ -69,14 +70,15 @@ const polyPreviewPoints = (points: Point[], current: Point): Point[] => {
 function effMeasure(model: Model, id: Id) {
   const annotation = model.byId[id];
   const draft = model.draft;
-  const measure = annotation.measure;
+  const measure = fieldsOf(annotation).measure;
 
   if (!measure || !draft) {
     return measure;
   }
 
   if (draft.kind === 'caption' && draft.id === id) {
-    return moveMeasurementCaption(annotation.geometry, measure, draft.delta, annotation.style);
+    const { geometry, style } = fieldsOf(annotation);
+    return moveMeasurementCaption(geometry, measure, draft.delta, style);
   }
 
   if (draft.kind === 'leader' && draft.id === id && measure.intent === 'line-dimension') {
@@ -122,7 +124,7 @@ function effMeasure(model: Model, id: Id) {
  */
 function effGeom(model: Model, id: Id, view: ViewEnv | undefined): ModelGeometry {
   const annotation = model.byId[id];
-  const geometry = anchoredGeom(annotation.geometry, anchorModeOf(annotation), view);
+  const geometry = anchoredGeom(fieldsOf(annotation).geometry, anchorModeOf(annotation), view);
   const draft = model.draft;
   if (draft) {
     if (draft.kind === 'move' && draft.ids.includes(id))
@@ -144,11 +146,9 @@ function effGeom(model: Model, id: Id, view: ViewEnv | undefined): ModelGeometry
  *  constant line weight); everyone else keeps their style verbatim. */
 function effStyle(annotation: ModelAnnotation, view: ViewEnv | undefined): Style {
   const mode = anchorModeOf(annotation);
-  if (!mode?.zoom || !view) return annotation.style;
-  return {
-    ...annotation.style,
-    strokeWidth: anchoredStrokeWidth(annotation.style.strokeWidth, mode, view),
-  };
+  const { style } = fieldsOf(annotation);
+  if (!mode?.zoom || !view) return style;
+  return { ...style, strokeWidth: anchoredStrokeWidth(style.strokeWidth, mode, view) };
 }
 
 /** The blit placement for a baked raster: its box (view space, live move
@@ -175,7 +175,7 @@ function effAp(model: Model, id: Id, view: ViewEnv | undefined): { box?: Rect; r
   if (!annotation.apBox) return { rot: annotation.apRot };
   const projected = anchoredBox(
     annotation.apBox,
-    anchorOf(annotation.geometry),
+    anchorOf(fieldsOf(annotation).geometry),
     anchorModeOf(annotation),
     view,
   );
@@ -201,7 +201,7 @@ function effSource(model: Model, id: Id): 'baked' | 'vector' {
   // callout's leader — + DOM text): the flat baked raster can't hide just
   // its text, so any blend doubles it. Geometry gestures flip below; editing
   // joins them here.
-  if (model.editing === id && annotation.geometry.kind === 'text') return 'vector';
+  if (model.editing === id && fieldsOf(annotation).geometry.kind === 'text') return 'vector';
   const draft = model.draft;
   // A live resize/rotate/group transform must render live — the baked raster
   // can't stretch or tilt — even before the commit flips `source`.
@@ -231,6 +231,7 @@ export function pageItems(model: Model, page: PageRef, view?: ViewEnv): RenderIt
   // what you see.
   for (const id of paintOrder(model, page)) {
     const annotation = model.byId[id];
+    const fields = fieldsOf(annotation);
     // Free text stays in the render list in every state, like a shape: a baked,
     // idle box renders as its engine /AP image; a live one (editing / resizing /
     // restyled) renders its box — fill + border, and a callout's leader — via
@@ -254,15 +255,15 @@ export function pageItems(model: Model, page: PageRef, view?: ViewEnv): RenderIt
       box: distance?.visualBounds ?? geomVisualBounds(geometry, style.strokeWidth, style.border),
       apBox: ap.box,
       style,
-      ...(annotation.text ? { text: annotation.text } : {}),
-      ...(annotation.label ? { label: annotation.label } : {}),
+      ...(fields.text ? { text: fields.text } : {}),
+      ...(fields.label ? { label: fields.label } : {}),
       measure,
       source: effSource(model, id),
       selected: model.selected.includes(id),
       ...(model.hovered === id ? { hovered: true } : {}),
       rot: geomRotation(geometry),
       ...(ap.rot ? { apRot: ap.rot } : {}),
-      blend: blendFor(annotation.style),
+      blend: blendFor(fields.style),
     });
   }
   const draft = model.draft;
@@ -393,10 +394,10 @@ export function textBoxes(model: Model, page: PageRef, view?: ViewEnv): TextBox[
     const annotation = model.byId[id];
     if (
       annotation.page.pageObjectNumber !== pageObjectNumber ||
-      annotation.geometry.kind !== 'text'
+      fieldsOf(annotation).geometry.kind !== 'text'
     )
       continue;
-    if (!viewable(annotation.flags, model.selected.includes(id))) continue; // `/F`-hidden
+    if (!viewable(annotation.annotation, model.selected.includes(id))) continue; // `/F`-hidden
     if (!textIsLive(model, id)) continue; // baked → rendered as the /AP image instead
     const geometry = effGeom(model, id, view);
     if (geometry.kind !== 'text') continue;
@@ -444,8 +445,7 @@ const boxCorners = (rect: Rect): [Point, Point, Point, Point] => [
 /** Project the complete annotation after applying the current gesture. */
 function effectiveSelectionFrame(model: Model, id: Id, geometry: ModelGeometry, view?: ViewEnv) {
   const annotation = model.byId[id];
-  return annotationSelectionFrame({
-    ...annotation,
+  return annotationSelectionFrame(annotation, undefined, {
     geometry,
     style: effStyle(annotation, view),
     measure: effMeasure(model, id),
@@ -536,7 +536,7 @@ export function selectionKnob(
       page,
       pageBox,
       knobOffset,
-      (id) => anchoredGeom(model.byId[id].geometry, anchorModeOf(model.byId[id]), view),
+      (id) => anchoredGeom(fieldsOf(model.byId[id]).geometry, anchorModeOf(model.byId[id]), view),
       view,
     );
     if (!rest) return null;

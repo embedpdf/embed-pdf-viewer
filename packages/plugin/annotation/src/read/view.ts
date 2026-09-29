@@ -91,7 +91,7 @@ export function createView(
 
   /**
    * A record with its pending changes applied, oldest first: each edit's
-   * fields over the record, and its patch over the record's annotation. Over
+   * patch over the record's annotation, and how it is drawn over the record. Over
    * a confirmed record it keeps the confirmed appearance version and
    * authority: those are the engine's, and may have moved on since the
    * changes were made.

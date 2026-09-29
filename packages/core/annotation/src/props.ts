@@ -1,6 +1,6 @@
 /**
- * The flat property vocabulary over the model: read and apply
- * {@link AnnotationProps} keys on an `ModelAnnotation`, routing each key to where it is
+ * The flat property vocabulary over a record's fields: read and apply
+ * {@link AnnotationProps} keys on its {@link RecordFields}, routing each key to where it is
  * stored (`style`, `geom.ends`, or `text`) so callers never learn the storage.
  * Which keys a kind takes is declared in the kind table (`propsFor`); keys a
  * kind doesn't declare are ignored — that's what lets one patch restyle a
@@ -9,7 +9,7 @@
 import { propsFor, type PropSpec } from './kinds';
 import { annotTransformable } from './flags';
 import type {
-  ModelAnnotation,
+  RecordFields,
   AnnotationProps,
   AnnotationPropsPatch,
   ModelGeometry,
@@ -67,7 +67,7 @@ const endingsGeom = (
  * on a polygon). The read side of `applyProps`.
  */
 export function readProp<K extends PropKey>(
-  annotation: ModelAnnotation,
+  annotation: RecordFields,
   key: K,
 ): AnnotationProps[K] | undefined {
   const out = ((): AnnotationProps[PropKey] | undefined => {
@@ -112,18 +112,18 @@ export function readProp<K extends PropKey>(
 }
 
 /**
- * Apply a property patch to one annotation, honouring its kind's declared keys.
- * Returns the changed annotation, or `null` when nothing applied (locked /
+ * Apply a property patch to one record's fields, honouring its kind's declared
+ * keys. Returns the changed fields, or `null` when nothing applied (locked /
  * read-only per its `/F` flags, or no declared key in the patch) — so the
  * caller emits no spurious engine write. Flags themselves are not props: they
  * write through the `setFlags` message, which is deliberately not gated here
  * (unlocking must work on a locked annotation).
  */
 export function applyProps(
-  annotation: ModelAnnotation,
+  annotation: RecordFields,
   patch: AnnotationPropsPatch,
-): ModelAnnotation | null {
-  if (!annotTransformable(annotation)) return null;
+): RecordFields | null {
+  if (!annotTransformable({ ...annotation, annotation: annotation.flags })) return null;
   const takes = new Set<PropKey>(propsFor(annotation.subtype).map((spec) => spec.key));
   /** A key this kind takes, set to a value other than the one it has. */
   const changes = <K extends PropKey>(key: K, current: unknown): boolean =>

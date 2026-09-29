@@ -1,4 +1,11 @@
-import type { ModelAnnotation, TextStyle } from '@embedpdf/core-annotation';
+import {
+  annotationOfRecord,
+  DRAWN_FLAGS,
+  recordOf,
+  type ModelAnnotation,
+  type RecordFields,
+  type TextStyle,
+} from '@embedpdf/core-annotation';
 import type { FontHandle, RichTextDocument } from '@embedpdf/engine-core/runtime';
 import { toPageRef } from '@embedpdf/engine-core/runtime';
 import { describe, expect, it } from 'vitest';
@@ -45,12 +52,13 @@ const text: TextStyle = {
   textAlign: 'left',
 };
 
-const annot = (extra: Partial<ModelAnnotation> = {}): ModelAnnotation =>
-  ({
+/** A free-text record, its annotation predicted from these fields. */
+const annot = (): ModelAnnotation => {
+  const fields: RecordFields = {
     id: 'a',
     ref: null,
     page: toPageRef(1),
-    subtype: 'freeText',
+    subtype: 'free-text',
     geometry: { kind: 'text', rect: { x: 0, y: 0, width: 100, height: 20 } },
     style: {
       color: '#000000',
@@ -61,10 +69,14 @@ const annot = (extra: Partial<ModelAnnotation> = {}): ModelAnnotation =>
       border: { kind: 'solid' },
     },
     text,
+    flags: DRAWN_FLAGS,
     source: 'vector',
-    apVersion: 0,
-    ...extra,
-  }) as unknown as ModelAnnotation;
+  };
+  return recordOf(
+    fields,
+    annotationOfRecord(fields, { ref: { kind: 'nm', page: fields.page, nm: 'a' }, index: 0 }),
+  );
+};
 
 describe('faces', () => {
   it('maps a face to the font that names it: a registered key, a standard name, else the family', () => {
@@ -91,7 +103,7 @@ describe('documents', () => {
   it('commits the rich paragraphs, with paragraph properties equal to the body stripped', () => {
     const plain = [{ runs: [{ text: 'hello' }] }];
     const styled = [{ runs: [{ text: 'hel', style: { weight: 700 } }, { text: 'lo' }] }];
-    const annotation = annot({ data: { subtype: 'free-text' } } as never);
+    const annotation = annot();
     expect(textCommitPatch(annotation, plain)).toEqual({ richText: { paragraphs: plain } });
     expect(textCommitPatch(annotation, styled)).toEqual({ richText: { paragraphs: styled } });
     // Paragraph align/dir equal to the body's (the editor round-trips what it

@@ -24,6 +24,7 @@ import { batchResultOf, throwIfFailed } from './outcomes';
 import { rotationOf } from './page-patch';
 import type { TextEditing } from './text-editing';
 import { refsOfIn, type Commit } from '../services/store';
+import { fieldsOf } from '@embedpdf/core-annotation';
 
 /**
  * The selection: what is selected, and the verbs that restyle, flag, delete,
@@ -66,7 +67,7 @@ export function createSelectionWrites(
       const commits: Commit[] = [];
       if (Object.keys(delta).length) {
         const next = applyStyleToRange(
-          { paragraphs: richDocOf(annotation, fonts).paragraphs },
+          { paragraphs: richDocOf(fieldsOf(annotation), fonts).paragraphs },
           range,
           delta,
         );
@@ -111,12 +112,9 @@ export function createSelectionWrites(
         const annotation = model.byId[id];
         if (!annotation || !pageRefsEqual(annotation.page, page) || !isSelectable(model, id))
           return false;
+        const { geometry, style } = fieldsOf(annotation);
         const hit = intersectRects(
-          geomVisualBounds(
-            annotation.geometry,
-            annotation.style.strokeWidth,
-            annotation.style.border,
-          ),
+          geomVisualBounds(geometry, style.strokeWidth, style.border),
           rect,
         );
         return hit.width > 0 && hit.height > 0;
@@ -137,7 +135,7 @@ export function createSelectionWrites(
       }
       for (const ref of selectedRefs()) {
         const annotation = annotations.loadedOrThrow(ref);
-        await crud.setRotation(ref, rotationOf(annotation.geometry) - 90);
+        await crud.setRotation(ref, rotationOf(fieldsOf(annotation).geometry) - 90);
       }
     },
     resetSelectionRotation: async () => {

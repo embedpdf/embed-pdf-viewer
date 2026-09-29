@@ -8,6 +8,7 @@ import { toPageRef } from '@embedpdf/engine-core/runtime';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { annotationHarness, type FileAnnotation } from './harness';
+import { fieldsOf } from '@embedpdf/core-annotation';
 
 const PON = 1;
 const PAGE = toPageRef(PON);
@@ -168,7 +169,7 @@ describe('the property surface while editing', () => {
         runs: [{ text: 'hello', style: { weight: 700, color: '#ff0000' } }, { text: ' world' }],
       },
     ]);
-    expect(harness.model().byId[harness.id]!.text!.bold).toBeUndefined(); // the body is untouched
+    expect(fieldsOf(harness.model().byId[harness.id]!).text!.bold).toBeUndefined(); // the body is untouched
     const props = harness.capability.getSelectionProps();
     expect(props.values).toMatchObject({ bold: true, fontColor: '#ff0000', italic: false });
     expect(props.mixed).toEqual([]);
@@ -200,7 +201,7 @@ describe('the property surface while editing', () => {
     // A bare caret: the body takes the toggle, written as a rich body patch.
     harness.capability.setTextSelection(REF, { start: 2, end: 2 });
     harness.capability.toggleTextFormat('bold');
-    expect(harness.model().byId[harness.id]!.text!.bold).toBe(true);
+    expect(fieldsOf(harness.model().byId[harness.id]!).text!.bold).toBe(true);
     expect(harness.capability.getSelectionProps().values.bold).toBe(true);
     expect(harness.capability.listTextItems(PAGE)[0]!.css.fontWeight).toBe(700);
     const bodyWrite = harness.update.mock.calls.find((call) => call[1].richText?.body);
@@ -220,7 +221,7 @@ describe('the property surface while editing', () => {
     harness.capability.draftRichText(REF, { paragraphs: [{ runs: [{ text: 'typed' }] }] });
     harness.capability.setTextSelection(REF, { start: 0, end: 5 });
     harness.capability.updateSelection({ opacity: 0.5, underline: true });
-    expect(harness.model().byId[harness.id]!.style.opacity).toBe(0.5);
+    expect(fieldsOf(harness.model().byId[harness.id]!).style.opacity).toBe(0.5);
     // order: the (flushed) text write, then the opacity write
     expect(harness.update.mock.calls.map((call) => Object.keys(call[1]).sort().join(','))).toEqual([
       'richText,subtype',

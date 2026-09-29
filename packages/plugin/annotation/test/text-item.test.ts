@@ -1,5 +1,6 @@
 import {
   annotationOfRecord,
+  recordOf,
   initialModel,
   type ModelAnnotation,
   type AnnotationFlags,
@@ -63,10 +64,10 @@ const freeText = (
     flags: FLAGS,
     source: 'baked',
   } as const;
-  return {
-    ...fields,
-    annotation: annotationOfRecord(fields, { ref: { kind: 'nm', page: PAGE, nm: id }, index: 0 }),
-  };
+  return recordOf(
+    fields,
+    annotationOfRecord(fields, { ref: { kind: 'nm', page: PAGE, nm: id }, index: 0 }),
+  );
 };
 
 describe('buildTextItems — text plate mirrors the AP generator', () => {
@@ -103,14 +104,9 @@ describe('buildTextItems — the editor document', () => {
       { kind: 'text', rect: { x: 10, y: 10, width: 80, height: 30 } },
       1,
     );
-    (annotation as { text?: unknown }).text = {
-      fontFamily: 'helvetica',
-      fontSize: 12,
-      fontColor: '#000000',
-      textAlign: 'center',
-    };
     (annotation as { annotation?: unknown }).annotation = {
-      subtype: 'free-text',
+      ...annotation.annotation,
+      textAlign: 'center',
       contents: 'one\rtwo',
       richText: {
         body: {

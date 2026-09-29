@@ -6,13 +6,13 @@
  * the link target in link.ts).
  */
 import { initialTextStyle } from '../props';
-import type { ModelAnnotation, PropKey, RecordFields } from '../types';
+import type { PropKey, RecordFields, Style } from '../types';
 import type { Wire } from './projection';
 import { hexColorOf } from './seam';
 
 /** /BS slice of the style — a cloudy border keeps a solid underlying stroke
  *  (the scallops are the /BE effect, layered on by the shape kinds). */
-export const borderSlice = (style: ModelAnnotation['style']): Wire => ({
+export const borderSlice = (style: Style): Wire => ({
   borderStyle: style.border.kind === 'dashed' ? ('dashed' as const) : ('solid' as const),
   ...(style.border.kind === 'dashed' ? { dashArray: style.border.dash } : {}),
 });

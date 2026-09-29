@@ -7,7 +7,7 @@
  */
 import type { AnnotationDTO, PageBox, PageQuad } from '@embedpdf/engine-core/runtime';
 
-import type { ModelAnnotation, RecordFields } from '../../types';
+import type { ModelGeometry, RecordFields } from '../../types';
 import type { KindProjection } from '../projection';
 import { boxGeomFields } from '../seam';
 
@@ -97,7 +97,7 @@ export const redact: KindProjection = {
     // Text redaction carries per-line quads; an area redaction is rect-only
     // (`/Rect` is the removal region per ISO 32000-2), so its geometry is a
     // box and it moves/resizes like a shape.
-    const geometry: ModelAnnotation['geometry'] =
+    const geometry: ModelGeometry =
       redactDto.quadPoints.length > 0
         ? { kind: 'quads', quads: redactDto.quadPoints }
         : { kind: 'rect', rect: redactDto.rect, ellipse: false };

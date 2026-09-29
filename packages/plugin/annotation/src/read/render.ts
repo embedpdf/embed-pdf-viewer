@@ -15,6 +15,7 @@ import type { LinkNavItem, TextItem } from '../contract';
 import type { AnnotationState } from '../model';
 import type { AnnotationContext, AnnotationServices } from '../services';
 import { buildTextItems } from '../text-item';
+import { fieldsOf } from '@embedpdf/core-annotation';
 
 /**
  * What a page paints: the vector items (drafts, previews and the tool ghost
@@ -117,22 +118,22 @@ export function createRenderReads(
         annotation.subtype !== 'link'
       )
         continue;
-      if (!viewable(annotation.flags, false)) continue; // hidden links don't navigate
+      if (!viewable(annotation.annotation, false)) continue; // hidden links don't navigate
       // Standalone links carry their own model `link` (/A); attached children
       // carry the target on their DTO. Rects are the child's own committed
       // geometry — anchors render only in view contexts, where nothing is
       // mid-gesture, so no live parent-derivation is needed.
       const record = annotation.annotation;
-      const target =
-        annotation.link ?? (record.subtype === 'link' ? (record.target ?? null) : null);
-      if (target == null || annotation.geometry.kind !== 'rect') continue;
+      const { link, geometry } = fieldsOf(annotation);
+      const target = link ?? (record.subtype === 'link' ? (record.target ?? null) : null);
+      if (target == null || geometry.kind !== 'rect') continue;
       const activate = record.actions?.activate;
       const ref = annotation.ref ?? undefined;
       const hoverEnter = Boolean(record.actions?.cursorEnter?.root);
       const hoverExit = Boolean(record.actions?.cursorExit?.root);
       items.push({
         id,
-        bounds: annotation.geometry.rect,
+        bounds: geometry.rect,
         target,
         attached: annotation.group !== undefined,
         ...(activate ? { activate } : {}),

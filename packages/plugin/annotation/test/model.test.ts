@@ -1,5 +1,6 @@
 import {
   annotationOfRecord,
+  recordOf,
   DRAWN_FLAGS,
   initialSession,
   type ModelAnnotation,
@@ -57,7 +58,7 @@ describe('pending changes', () => {
       ref: { kind: 'nm', page: fields.page, nm: id },
       index: 0,
     });
-    return { ...fields, annotation, ...extra };
+    return { ...recordOf(fields, annotation), ...extra };
   };
   const edit = (token: number, id: string, fields: Partial<ModelAnnotation>): PendingChange => ({
     token,
@@ -71,10 +72,14 @@ describe('pending changes', () => {
   const tokens = (state: { pending: readonly PendingChange[] }) =>
     state.pending.map((change) => change.token);
 
-  it('changedFields holds exactly the fields a message changed', () => {
+  it('changedFields holds exactly the fields a message changed, beside the annotation', () => {
     const before = record('a');
-    const after = { ...before, flags: { ...before.flags, locked: true } };
-    expect(changedFields(before, after)).toEqual({ flags: after.flags });
+    const after = {
+      ...before,
+      source: 'vector' as const,
+      apBox: { x: 1, y: 2, width: 3, height: 4 },
+    };
+    expect(changedFields(before, after)).toEqual({ source: 'vector', apBox: after.apBox });
   });
 
   it('stage keeps the session and appends the changes; a live change makes the record prefer vector', () => {
@@ -87,7 +92,7 @@ describe('pending changes', () => {
 
   it('a refused change goes at once, even behind an older one', () => {
     const state = writeSettled(
-      withPending([edit(1, 'a', { flags: DRAWN_FLAGS }), edit(2, 'a', {})]),
+      withPending([edit(1, 'a', { source: 'vector' }), edit(2, 'a', {})]),
       [2],
       'refused',
     );
@@ -115,7 +120,7 @@ describe('pending changes', () => {
             id: 'new:2',
             change: { kind: 'create', record: record('new:2', { group: 'new:1' }) },
           },
-          edit(3, 'new:1', { flags: DRAWN_FLAGS }),
+          edit(3, 'new:1', { source: 'vector' }),
         ]),
         vector: { 'new:1': true },
         textSelection: { id: 'new:1', start: 0, end: 2 },

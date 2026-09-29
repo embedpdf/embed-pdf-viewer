@@ -11,9 +11,9 @@
  * and composes the session with them into the core's `Model`.
  *
  * A pending edit holds the engine patch its write carries (a record's new
- * flags, its new geometry, its typed text), beside the record's new fields,
- * so settling one write never touches other outstanding work on the same
- * record. A refused change is
+ * flags, its new geometry, its typed text), beside how the record is drawn
+ * after it, so settling one write never touches other outstanding work on
+ * the same record. A refused change is
  * dropped at once: the view shows the engine's record again, never a copy
  * taken before the write. An accepted change is dropped once the confirmed
  * record holds it and every older change of that record has settled, so the
@@ -32,9 +32,9 @@ export type RecordChange =
   | { readonly kind: 'create'; readonly record: ModelAnnotation }
   /**
    * An edit: the engine patch its write carries (none when the engine keeps
-   * nothing of it), and the record's new fields beside it. The view lays the
-   * fields over the record, and the patch over its annotation, as the engine
-   * will apply it.
+   * nothing of it), and how the record is drawn after it (live, or its raster
+   * moved). The view lays the patch over the record's annotation, as the
+   * engine will apply it, and the rest over the record.
    */
   | {
       readonly kind: 'edit';
@@ -130,7 +130,7 @@ export const initialAnnotationState = (config: AnnotationConfig = {}): Annotatio
 
 /**
  * The top-level fields whose value differs between two versions of a record,
- * its annotation aside: an edit carries that as its patch.
+ * its annotation aside: how it is drawn, which an edit carries beside its patch.
  */
 export function changedFields(
   before: ModelAnnotation,

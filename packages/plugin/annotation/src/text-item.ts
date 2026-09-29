@@ -17,6 +17,7 @@ import type { PageRef } from '@embedpdf/engine-core/runtime';
 
 import type { TextItem } from './contract';
 import { cssFontFamilyForFont, stripBodyDefaults } from './rich-text';
+import { fieldsOf } from '@embedpdf/core-annotation';
 
 /** Project the model's free-text boxes into render-ready {@link TextItem}s — the
  *  core geometry (`textBoxes`) joined with the DTO-derived CSS. Pure; memoized by
@@ -24,13 +25,14 @@ import { cssFontFamilyForFont, stripBodyDefaults } from './rich-text';
 export function buildTextItems(model: Model, page: PageRef, view?: ViewEnv): TextItem[] {
   return textBoxes(model, page, view).map((tb) => {
     const annotation = model.byId[tb.id];
+    const fields = annotation ? fieldsOf(annotation) : undefined;
     // `text`/`style` show the user's pending change (a props edit lands here
     // before the engine confirms it), so the editor restyles instantly.
-    const style = annotation?.text ?? initialTextStyle;
+    const style = fields?.text ?? initialTextStyle;
     // Match the engine's text plate inset. Browser font metrics and line
     // heights belong to the shared editor binding.
-    const sw = annotation?.style.strokeWidth ?? 0;
-    const doc = annotation ? richDocOf(annotation) : null;
+    const sw = fields?.style.strokeWidth ?? 0;
+    const doc = fields ? richDocOf(fields) : null;
     return {
       id: tb.id,
       ref: annotation?.ref ?? null,

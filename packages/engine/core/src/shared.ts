@@ -448,8 +448,10 @@ export { appearanceImpactOf, semanticEqual } from './annotation/appearance';
 export { pdfAppearanceTurnOf } from './annotation/appearanceTurn';
 export { assertAnnotationDraft } from './annotation/checkWrite';
 export {
+  annotationPatchBetween,
   assertDeclaredFields,
   assertRichTextAgreement,
+  mergeAnnotationPatch,
   pdfResolveAnnotationDraft,
   pdfResolveAnnotationPatch,
   resolveMeasurementDraft,

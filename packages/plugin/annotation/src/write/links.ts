@@ -12,6 +12,7 @@ import { linkChildRects, writableTarget } from '@embedpdf/core-annotation';
 import type { AnnotationContext, AnnotationServices } from '../services';
 import type { StoreChange } from '../services/store';
 import { appliedOrThrow, throwIfFailed } from './outcomes';
+import { fieldsOf } from '@embedpdf/core-annotation';
 
 /**
  * Attached links (a Link child riding an editable annotation) and group
@@ -54,7 +55,7 @@ export function createLinkWrites(
     // Read-only target arms can't be (re)written: children keep their /A and
     // only their rects follow the parent.
     const target = writableTarget(desired);
-    const rects = desired == null ? [] : linkChildRects(annotation);
+    const rects = desired == null ? [] : linkChildRects(fieldsOf(annotation));
     const current = linkChildrenOf(store.model(), id);
     const changes: StoreChange[] = [];
     const paired = Math.min(current.length, rects.length);
@@ -149,7 +150,7 @@ export function createLinkWrites(
         const annotation = model.byId[annotationKey(ref)];
         if (!annotation) return null;
         return annotation.subtype === 'link'
-          ? (annotation.link ?? null)
+          ? (fieldsOf(annotation).link ?? null)
           : linkOf(model, annotation.id);
       },
       // The verbs go straight to the reconciler chain (latest-wins per

@@ -8,7 +8,7 @@ import { quadBounds } from '@embedpdf/core-geometry';
 
 import { selectionQuad, unionRect } from '../geometry';
 import { propsFor } from '../kinds';
-import type { ModelAnnotation, Rect } from '../types';
+import type { Rect, RecordFields } from '../types';
 import { annotationKey } from './seam';
 
 /** Does this kind's table declare the `link` prop (may it carry an attached
@@ -30,7 +30,7 @@ const takesLink = (subtype: string): boolean =>
  * the selection chrome outlines. Exact rotated hit regions need
  * `/QuadPoints` (tier 2).
  */
-export function linkChildRects(annotation: ModelAnnotation): Rect[] {
+export function linkChildRects(annotation: RecordFields): Rect[] {
   if (annotation.geometry.kind === 'quads') return annotation.geometry.quads.map(quadBounds);
   return [
     unionRect(

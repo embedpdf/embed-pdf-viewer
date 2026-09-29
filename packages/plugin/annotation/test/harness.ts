@@ -24,8 +24,8 @@ import { initialAnnotationState, type AnnotationState } from '../src/model';
 
 export const PAGE = toPageRef(1);
 
-/** A read's fields by name, for assertions that span kinds (`color` is a square's, not a widget's). */
-export const fieldsOf = (annotation: AnnotationDTO | null | undefined): Record<string, unknown> =>
+/** A read's data by field name, for assertions that span kinds (`color` is a square's, not a widget's). */
+export const dataOf = (annotation: AnnotationDTO | null | undefined): Record<string, unknown> =>
   (annotation ?? {}) as unknown as Record<string, unknown>;
 export const PAGE2 = toPageRef(2);
 

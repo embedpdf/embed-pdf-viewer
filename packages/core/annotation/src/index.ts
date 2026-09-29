@@ -157,15 +157,18 @@ export {
   groupResizeFactors,
 } from './geometry';
 // The engine's record and the model's entry, both ways: the entry a record
-// reads as, and the engine writes an entry states.
+// reads as, the fields the core's gestures read off it, and the engine
+// fields a change of them writes.
 export {
   annotationOfRecord,
   boxGeomFields,
+  fieldsOf,
   fromDTO,
   hexColorOf,
   linkChildRects,
-  patchBetween,
+  recordOf,
   styleFromDTO,
+  withFields,
   toCreateDraft,
   toPatch,
   widgetAppearanceFromProps,

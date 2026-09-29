@@ -9,10 +9,12 @@ import type { AnnotationFlags, AnnotationRef } from '@embedpdf/engine-core/runti
 import { toPageRef } from '@embedpdf/engine-core/runtime';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import { fieldsOf } from '@embedpdf/core-annotation';
+
 import { createdRefOf } from '../src/write/outcomes';
 import {
   annotationHarness,
-  fieldsOf,
+  dataOf,
   PAGE2,
   snapshotOf,
   type AnnotationHarness,
@@ -190,13 +192,13 @@ describe('a refused write shows the truth', () => {
     harness.capability.select(ref(20));
 
     const restyle = harness.capability.updateSelection({ color: '#00ff00' });
-    expect(fieldsOf(harness.capability.get(ref(20))).color).toBe('#00ff00');
+    expect(dataOf(harness.capability.get(ref(20))).color).toBe('#00ff00');
     harness.emit(remoteUpdate(square(20, { contents: 'from Bob' })));
     write.reject(new Error('Forbidden'));
     await restyle;
 
     const annotation = harness.capability.get(ref(20))!;
-    expect(fieldsOf(annotation).color).toBe('#000000');
+    expect(dataOf(annotation).color).toBe('#000000');
     expect(annotation.contents).toBe('from Bob');
   });
 
@@ -214,8 +216,8 @@ describe('a refused write shows the truth', () => {
     const result = await harness.capability.updateSelection({ color: '#00ff00' });
 
     expect(result.failed.map((failure) => failure.ref)).toEqual([ref(21)]);
-    expect(fieldsOf(harness.capability.get(ref(20))).color).toBe('#00ff00');
-    expect(fieldsOf(harness.capability.get(ref(21))).color).toBe('#000000');
+    expect(dataOf(harness.capability.get(ref(20))).color).toBe('#00ff00');
+    expect(dataOf(harness.capability.get(ref(21))).color).toBe('#000000');
   });
 });
 
@@ -247,7 +249,7 @@ describe('what the capability says about a write', () => {
     await restyle;
 
     expect(harness.capability.isPending(ref(20))).toBe(false);
-    expect(fieldsOf(harness.capability.get(ref(20))).color).toBe('#00ff00');
+    expect(dataOf(harness.capability.get(ref(20))).color).toBe('#00ff00');
   });
 
   it('a refused create removes the new annotation and rejects', async () => {
@@ -301,7 +303,7 @@ describe('weak annotations (direct objects without /NM)', () => {
     await harness.capability.updateSelection({ color: '#00ff00' });
 
     expect(harness.capability.list()).toHaveLength(1);
-    expect(fieldsOf(harness.capability.get(named)).color).toBe('#00ff00');
+    expect(dataOf(harness.capability.get(named)).color).toBe('#00ff00');
     expect(harness.capability.getSelection()).toEqual([named]);
   });
 
@@ -359,7 +361,7 @@ describe('several changes to one record', () => {
 
     const annotation = harness.capability.get(ref(30))!;
     expect(annotation.contents).toBe('Hello world');
-    expect(fieldsOf(annotation).box).toEqual(moved); // the moved box, not the one typing started in
+    expect(dataOf(annotation).box).toEqual(moved); // the moved box, not the one typing started in
   });
 
   it('two restyles settling out of order show the newer value', async () => {
@@ -373,11 +375,11 @@ describe('several changes to one record', () => {
 
     const red = harness.capability.updateSelection({ color: '#ff0000' });
     await harness.capability.updateSelection({ color: '#0000ff' });
-    expect(fieldsOf(harness.capability.get(ref(20))).color).toBe('#0000ff');
+    expect(dataOf(harness.capability.get(ref(20))).color).toBe('#0000ff');
 
     older.resolve({ annotation: square(20, { color: '#0000ff' }) });
     await red;
-    expect(fieldsOf(harness.capability.get(ref(20))).color).toBe('#0000ff');
+    expect(dataOf(harness.capability.get(ref(20))).color).toBe('#0000ff');
   });
 
   it('an older write refused after a newer one succeeded shows the newer value', async () => {
@@ -394,7 +396,7 @@ describe('several changes to one record', () => {
     older.reject(new Error('Forbidden'));
     await red;
 
-    expect(fieldsOf(harness.capability.get(ref(20))).color).toBe('#0000ff');
+    expect(dataOf(harness.capability.get(ref(20))).color).toBe('#0000ff');
   });
 
   it('a slow older write never drops newer work', async () => {
@@ -414,7 +416,7 @@ describe('several changes to one record', () => {
     slow.resolve({ annotation: square(20, { color: '#ff0000' }) });
     await red;
 
-    expect(fieldsOf(harness.capability.get(ref(20))).color).toBe('#00ff00');
+    expect(dataOf(harness.capability.get(ref(20))).color).toBe('#00ff00');
   });
 });
 
@@ -440,7 +442,7 @@ describe('a new record before the engine confirms it', () => {
 
     const restyle = harness.capability.updateSelection({ color: '#00ff00' });
     expect(harness.model().order).toEqual(['new:1']);
-    expect(harness.model().byId['new:1']!.style.color).toBe('#00ff00');
+    expect(fieldsOf(harness.model().byId['new:1']!).style.color).toBe('#00ff00');
     expect(harness.update).not.toHaveBeenCalled();
 
     confirm();
@@ -449,7 +451,7 @@ describe('a new record before the engine confirms it', () => {
     expect(harness.update).toHaveBeenCalledTimes(1);
     expect(harness.update.mock.calls[0]![0]).toEqual(ref(60));
     expect(harness.model().selected).toEqual(['obj:60']);
-    expect(fieldsOf(harness.capability.get(ref(60))).color).toBe('#00ff00');
+    expect(dataOf(harness.capability.get(ref(60))).color).toBe('#00ff00');
   });
 
   it('a delete hides it for good: the engine deletes it after the create', async () => {
@@ -499,7 +501,7 @@ describe('a weak record the engine names', () => {
     await green;
 
     expect(harness.capability.list()).toHaveLength(1);
-    expect(fieldsOf(harness.capability.get(named)).strokeWidth).toBe(5);
+    expect(dataOf(harness.capability.get(named)).strokeWidth).toBe(5);
     expect(harness.capability.getSelection()).toEqual([named]);
 
     second.resolve({
@@ -839,7 +841,7 @@ describe('a record whose key changes keeps everything that belongs to it', () =>
     await refreshed;
     await created;
     expect(await restyled).toMatchObject({ applied: [ref(60)], failed: [] });
-    expect(fieldsOf(harness.capability.get(ref(60))).color).toBe('#ff0000');
+    expect(dataOf(harness.capability.get(ref(60))).color).toBe('#ff0000');
   });
 
   it("a link set on a new record is written once the record's create is confirmed", async () => {
@@ -949,7 +951,7 @@ describe('how a record with a pending change renders', () => {
     harness.emit(remoteUpdate(square(20, { color: '#ff0000', author: 'Bob' })));
 
     const item = () => harness.capability.listPageItems(PAGE).find(({ id }) => id === 'obj:20')!;
-    expect(fieldsOf(harness.capability.get(ref(20))).color).toBe('#00ff00');
+    expect(dataOf(harness.capability.get(ref(20))).color).toBe('#00ff00');
     expect(item().source).toBe('vector');
 
     pending.resolve({ annotation: square(20, { color: '#00ff00', author: 'Bob' }) });

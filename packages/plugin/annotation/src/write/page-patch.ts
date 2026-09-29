@@ -1,6 +1,6 @@
 /**
  * A record's turn, as a geometry change: what the selection's quarter turns
- * write through `patchBetween`.
+ * write through `withFields`.
  */
 import { PluginError } from '@embedpdf/core';
 import type { ModelGeometry } from '@embedpdf/core-annotation';

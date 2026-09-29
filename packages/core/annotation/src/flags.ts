@@ -1,7 +1,7 @@
 /**
  * Annotation `/F` flags — the one interpretation of ISO 32000-2 Table 167.
  *
- * `ModelAnnotation.flags` carries the named booleans verbatim from the engine DTO; every
+ * A record's annotation carries the named booleans as the engine reads them; every
  * behavioral question (can I see it? click it? move it? edit its text?) is
  * answered here and nowhere else, so rendering, hit-testing, chrome, and the
  * reducer can never disagree about what a flag means.
@@ -55,10 +55,11 @@ export const viewable = (flags: AnnotationFlags, engaged = false): boolean =>
 export const interactive = (flags: AnnotationFlags): boolean =>
   !flags.hidden && !flags.noView && !flags.readOnly;
 
-/** The subset of an ModelAnnotation these predicates read — keeps them testable bare. */
+/** The subset of a ModelAnnotation these predicates read — keeps them testable bare. */
 export interface FlagBearer {
   subtype: string;
-  flags: AnnotationFlags;
+  /** The record's annotation: its `/F` flags are read off it. */
+  annotation: AnnotationFlags;
   /** Session authority projected at ingest (permissions.md). Absent =
    *  unstamped (drafts, wildcard local engines, tests) = allowed. */
   authority?: { update: boolean; delete: boolean };
@@ -67,10 +68,10 @@ export interface FlagBearer {
 /** Interaction gate for a concrete annotation: widget kinds ignore `readOnly`
  *  (ISO 32000 — a ReadOnly form field must still be movable by a form designer;
  *  the form-filling layer enforces field ReadOnly itself). */
-export const annotInteractive = (annotation: FlagBearer): boolean =>
-  capsFor(annotation.subtype).ignoresReadOnly
-    ? !annotation.flags.hidden && !annotation.flags.noView
-    : interactive(annotation.flags);
+export const annotInteractive = (record: FlagBearer): boolean =>
+  capsFor(record.subtype).ignoresReadOnly
+    ? !record.annotation.hidden && !record.annotation.noView
+    : interactive(record.annotation);
 
 /**
  * Geometry/style mutations — `locked` freezes the object, not its contents
@@ -78,20 +79,16 @@ export const annotInteractive = (annotation: FlagBearer): boolean =>
  * the record. One predicate for hit-test, chrome, and props alike, so a
  * record you may not edit renders and behaves exactly like a locked one.
  */
-export const annotTransformable = (annotation: FlagBearer): boolean =>
-  annotInteractive(annotation) &&
-  !annotation.flags.locked &&
-  (annotation.authority?.update ?? true);
+export const annotTransformable = (record: FlagBearer): boolean =>
+  annotInteractive(record) && !record.annotation.locked && (record.authority?.update ?? true);
 
 /** Deletion — the delete half of the authority split (a narrowed grant can
  *  allow update but not delete, or vice versa). Flags gate like transforms. */
-export const annotDeletable = (annotation: FlagBearer): boolean =>
-  annotInteractive(annotation) &&
-  !annotation.flags.locked &&
-  (annotation.authority?.delete ?? true);
+export const annotDeletable = (record: FlagBearer): boolean =>
+  annotInteractive(record) && !record.annotation.locked && (record.authority?.delete ?? true);
 
 /** `/Contents` text edits — the contents counterpart of `locked`. */
-export const annotContentsEditable = (annotation: FlagBearer): boolean =>
-  annotInteractive(annotation) &&
-  !annotation.flags.lockedContents &&
-  (annotation.authority?.update ?? true);
+export const annotContentsEditable = (record: FlagBearer): boolean =>
+  annotInteractive(record) &&
+  !record.annotation.lockedContents &&
+  (record.authority?.update ?? true);

@@ -59,10 +59,10 @@ export interface AnchorMode {
  * statics — the spec's "Text (note) annotations behave as if NoZoom and
  * NoRotate are always set", expressed as kind caps. Null when not anchored.
  */
-export function anchorModeOf(annotation: FlagBearer): AnchorMode | null {
-  const caps = capsFor(annotation.subtype);
-  const zoom = annotation.flags.noZoom || caps.noZoom;
-  const upright = annotation.flags.noRotate || caps.noRotate;
+export function anchorModeOf(record: FlagBearer): AnchorMode | null {
+  const caps = capsFor(record.subtype);
+  const zoom = !!record.annotation.noZoom || caps.noZoom;
+  const upright = !!record.annotation.noRotate || caps.noRotate;
   return zoom || upright ? { zoom, upright } : null;
 }
 

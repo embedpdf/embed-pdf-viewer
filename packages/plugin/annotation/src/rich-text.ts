@@ -13,6 +13,7 @@
  */
 import {
   faceForFont,
+  fieldsOf,
   locateOffset,
   richDocOf,
   type AnnotationPropsPatch,
@@ -158,7 +159,9 @@ export function textCommitPatch(
   fonts?: FontLookup,
 ): { richText: { paragraphs: RichTextParagraph[] } } {
   return {
-    richText: { paragraphs: stripBodyDefaults(paragraphs, richDocOf(annotation, fonts).body) },
+    richText: {
+      paragraphs: stripBodyDefaults(paragraphs, richDocOf(fieldsOf(annotation), fonts).body),
+    },
   };
 }
 

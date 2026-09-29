@@ -20,8 +20,11 @@
 import { annotContentsEditable } from '../flags';
 import { expandGroups } from '../group';
 import { isSelectable } from '../hit';
-import { annotationAfter, patchBetween } from '../record';
-import type { AnnotationPatch } from '@embedpdf/engine-core/runtime';
+import {
+  annotationPatchBetween,
+  applyAnnotationPatch,
+  type AnnotationPatch,
+} from '@embedpdf/engine-core/runtime';
 
 import type {
   ChangeSet,
@@ -113,10 +116,10 @@ export const sameSession = (left: Session, right: Session): boolean =>
 export const EMPTY_CHANGE: ChangeSet = { put: [], drop: [], patches: {} };
 
 /**
- * The records a transition changed, each with the patch its change means and
- * its annotation brought up to date with that patch (a new record already
- * carries the annotation it predicts). Cheap when nothing changed: `byId`
- * keeps its identity.
+ * The records a transition changed, each with the patch its change means (the
+ * annotation fields it changed) and its annotation brought up to date as the
+ * engine will apply that patch. A new record already carries the annotation
+ * it predicts. Cheap when nothing changed: `byId` keeps its identity.
  */
 function changeBetween(before: Model, after: Model): ChangeSet {
   if (before.byId === after.byId) return EMPTY_CHANGE;
@@ -130,10 +133,18 @@ function changeBetween(before: Model, after: Model): ChangeSet {
       put.push(record);
       continue;
     }
-    const patch = patchBetween(previous, record);
-    if (patch) patches[id] = patch;
-    const annotation = annotationAfter(previous, record, patch);
-    put.push(annotation === record.annotation ? record : { ...record, annotation });
+    const fields = annotationPatchBetween(previous.annotation, record.annotation);
+    if (!Object.keys(fields).length) {
+      put.push(
+        record.annotation === previous.annotation
+          ? record
+          : { ...record, annotation: previous.annotation },
+      );
+      continue;
+    }
+    const patch = { ...fields, subtype: previous.annotation.subtype } as AnnotationPatch;
+    patches[id] = patch;
+    put.push({ ...record, annotation: applyAnnotationPatch(previous.annotation, patch) });
   }
   const drop = before.order.filter((id) => before.byId[id] && !after.byId[id]);
   return put.length || drop.length ? { put, drop, patches } : EMPTY_CHANGE;

@@ -19,7 +19,8 @@
 import {
   annotationOfDraft,
   appearanceTurnOf,
-  applyAnnotationPatch,
+  assertDeclaredFields,
+  mergeAnnotationPatch,
   type AnnotationDraft,
   type AnnotationDTO,
   type AnnotationPatch,
@@ -101,13 +102,16 @@ const wireSubtypeOf = (annotation: RecordFields): string =>
 
 /* ── DTO → model ──────────────────────────────────────────────────────────── */
 
+/** The client kind of a read: its subtype, or a widget's field family. */
+const kindOf = (dto: AnnotationDTO): string =>
+  dto.subtype === 'widget' ? widgetKindOf(dto.fieldFamily) : dto.subtype;
+
 /**
  * Engine DTO → ModelAnnotation, rendering from the engine's
  * appearance raster (`source: 'baked'`, placed by `apBox`). Whether this
  * session renders it live instead is the view's choice (read/view.ts).
  */
 export function fromDTO(dto: AnnotationDTO): ModelAnnotation {
-  const slice = projectionOf(dto.subtype).ingest(dto);
   // Rotation-stripped appearances (`appearanceTurnOf`, the engine's own rule):
   // a box kind drawn turned whose drawing stays inside the turned box has a
   // flat raster placed by its `box`, the stripped rotation re-applied as a
@@ -119,23 +123,89 @@ export function fromDTO(dto: AnnotationDTO): ModelAnnotation {
     id: annotationKey(dto.ref),
     ref: dto.ref,
     page: dto.page,
-    subtype: dto.subtype === 'widget' ? widgetKindOf(dto.fieldFamily) : dto.subtype,
-    // `/F` verbatim — every behavioral question (visible? selectable? frozen?)
-    // is answered by the core's flag predicates, never derived here.
-    flags: flagsOf(dto),
+    subtype: kindOf(dto),
     source: 'baked',
-    // The engine's read itself; the fields around it are projections of it.
     annotation: dto,
     // Relationship to a parent annotation. `irt` mirrors `/IRT`; `group` is the
     // primary's key for `/RT /Group` subordinates only (a visual group acts as
     // a unit). `/RT /R` (comment replies) keep `irt` but are not a visual group.
     ...(dto.reply ? { irt: annotationKey(dto.reply.to) } : {}),
     ...(dto.reply?.type === 'group' ? { group: annotationKey(dto.reply.to) } : {}),
-    style: styleFromDTO(dto),
-    ...slice,
     apBox: strippedRect ?? dto.rect,
-    ...(strippedRect ? { apRot: geomRotation(slice.geometry) } : {}),
+    ...(strippedRect ? { apRot: geomRotation(projected(dto).geometry) } : {}),
   };
+}
+
+/** What `fieldsOf` works out from an annotation, beside the record's own keys. */
+type Projected = Omit<RecordFields, keyof ModelAnnotation>;
+
+const projections = new WeakMap<AnnotationDTO, Projected>();
+
+/** An annotation's fields in the core's shapes, worked out once per annotation. */
+function projected(dto: AnnotationDTO): Projected {
+  const cached = projections.get(dto);
+  if (cached) return cached;
+  const fields: Projected = {
+    // `/F` verbatim — every behavioral question (visible? selectable? frozen?)
+    // is answered by the core's flag predicates, never derived here.
+    flags: flagsOf(dto),
+    style: styleFromDTO(dto),
+    ...projectionOf(kindOf(dto)).ingest(dto),
+  };
+  projections.set(dto, fields);
+  return fields;
+}
+
+const recordFields = new WeakMap<ModelAnnotation, RecordFields>();
+
+/**
+ * A record's fields as the core's gestures read them: its geometry, style,
+ * text and the rest, worked out from its annotation. The same object for the
+ * same record.
+ */
+export function fieldsOf(record: ModelAnnotation): RecordFields {
+  const cached = recordFields.get(record);
+  if (cached) return cached;
+  const fields: RecordFields = { ...record, ...projected(record.annotation) };
+  recordFields.set(record, fields);
+  return fields;
+}
+
+/** The record `fields` describe, holding `annotation`: its keys and how it is drawn, beside it. */
+export function recordOf(fields: RecordFields, annotation: AnnotationDTO): ModelAnnotation {
+  const { id, ref, page, subtype, source, apBox, apRot, apVersion, authority, irt, group } = fields;
+  return {
+    id,
+    ref,
+    page,
+    subtype,
+    source,
+    annotation,
+    ...(apBox ? { apBox } : {}),
+    ...(apRot !== undefined ? { apRot } : {}),
+    ...(apVersion !== undefined ? { apVersion } : {}),
+    ...(authority ? { authority } : {}),
+    ...(irt !== undefined ? { irt } : {}),
+    ...(group !== undefined ? { group } : {}),
+  };
+}
+
+/**
+ * The record with some of its fields changed: the engine fields the change
+ * means (`patchFor`), merged into its annotation as given. `update` then
+ * applies them as the engine will. The same record when nothing the engine
+ * keeps changed.
+ */
+export function withFields(
+  record: ModelAnnotation,
+  change: Partial<RecordFields>,
+): ModelAnnotation {
+  const before = fieldsOf(record);
+  const patch = patchFor(before, { ...before, ...change });
+  if (!patch) return record;
+  // A field the kind doesn't have is a mistake in the core, never dropped quietly.
+  assertDeclaredFields(record.annotation.subtype, patch);
+  return { ...record, annotation: mergeAnnotationPatch(record.annotation, patch) };
 }
 
 /* ── model → wire statements (the derivation) ─────────────────────────────── */
@@ -253,27 +323,13 @@ const endsOf = (geometry: ModelGeometry) => ('ends' in geometry ? geometry.ends 
 const shapeMoved = (before: ModelGeometry, after: ModelGeometry): boolean =>
   before !== after && !sameValue({ ...before, ends: undefined }, { ...after, ends: undefined });
 
-/** The fields the core wrote on the annotation itself (typed text), each value whole. */
-function annotationWrites(before: AnnotationDTO, after: AnnotationDTO): Wire {
-  const out: Wire = {};
-  if (before === after) return out;
-  const was = before as unknown as Wire;
-  for (const [name, value] of Object.entries(after)) if (value !== was[name]) out[name] = value;
-  return out;
-}
-
 /**
- * What the change from `before` to `after` means to the engine, as `update`
- * takes it: the fields the core wrote on the annotation itself, the kind's
+ * What the change from `before` to `after` means to the engine: the kind's
  * geometry group when its geometry moved, a measurement's caption or leader
  * when that moved, each prop whose value changed, and each flag that changed.
- * `null` when nothing the engine keeps changed: a record handed to live
- * rendering, or a value set to what it was, makes no write.
+ * `null` when nothing the engine keeps changed.
  */
-export function patchBetween(
-  before: ModelAnnotation,
-  after: ModelAnnotation,
-): AnnotationPatch | null {
+function patchFor(before: RecordFields, after: RecordFields): AnnotationPatch | null {
   const takes = new Set(editableKeys(after.subtype));
   const keys: PropKey[] = [];
   const compare = (key: PropKey, was: unknown, now: unknown) => {
@@ -289,7 +345,7 @@ export function patchBetween(
   compare('icon', before.icon, after.icon);
   compare('link', before.link, after.link);
 
-  const out = annotationWrites(before.annotation, after.annotation);
+  const out: Wire = {};
   if (shapeMoved(before.geometry, after.geometry)) {
     Object.assign(out, projectionOf(after.subtype).geometry(after));
   }
@@ -311,17 +367,4 @@ export function patchBetween(
   return Object.keys(out).length
     ? ({ ...out, subtype: wireSubtypeOf(after) } as AnnotationPatch)
     : null;
-}
-
-/**
- * A record's annotation after the core changed its fields: the patch the
- * change means (`patchBetween`), applied as the engine applies it. The same
- * annotation when nothing the engine keeps changed.
- */
-export function annotationAfter(
-  before: ModelAnnotation,
-  after: ModelAnnotation,
-  patch: AnnotationPatch | null = patchBetween(before, after),
-): AnnotationDTO {
-  return patch ? applyAnnotationPatch(before.annotation, patch) : before.annotation;
 }

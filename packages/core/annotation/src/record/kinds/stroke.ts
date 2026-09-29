@@ -20,7 +20,7 @@ import {
 import { geomRotation } from '../../geometry';
 import { distanceLabel } from '../../measurement';
 import { shapeMeasurementLabel } from '../../measurement-shape';
-import type { ModelAnnotation, RecordFields } from '../../types';
+import type { ModelGeometry, RecordFields } from '../../types';
 import type { KindProjection, Wire } from '../projection';
 import { borderSlice } from '../props';
 import { rotFromDTO } from '../seam';
@@ -42,7 +42,7 @@ const unturned = (point: PagePoint, turn: PagePointTurn | undefined): PagePoint 
   turn ? pagePointUnturned(point, turn) : point;
 
 /** The turn, total: 0 states `null` (tri-state clear) — omission would keep a stale turn. */
-const rotationOf = (geometry: ModelAnnotation['geometry']): { rotation: number | null } => {
+const rotationOf = (geometry: ModelGeometry): { rotation: number | null } => {
   const rot = geomRotation(geometry);
   return { rotation: rot ? rot : null };
 };
@@ -213,9 +213,7 @@ export const ink: KindProjection = {
 };
 
 /** A line's model geometry from its read: the upright points turned onto the page. */
-function lineGeometryFromDTO(
-  lineDto: Extract<AnnotationDTO, { subtype: 'line' }>,
-): ModelAnnotation['geometry'] {
+function lineGeometryFromDTO(lineDto: Extract<AnnotationDTO, { subtype: 'line' }>): ModelGeometry {
   const { start, end } = lineDto.linePoints;
   const turn = turnOfRead([start, end], lineDto.rotation);
   return {

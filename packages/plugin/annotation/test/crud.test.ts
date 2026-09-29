@@ -2,7 +2,7 @@ import { isPluginError, toPageRef } from '@embedpdf/core';
 import type { AnnotationFlags } from '@embedpdf/engine-core/runtime';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { annotationHarness, type FileAnnotation, fieldsOf } from './harness';
+import { annotationHarness, type FileAnnotation, dataOf } from './harness';
 import { annotationKey } from '@embedpdf/core';
 
 /**
@@ -151,7 +151,7 @@ describe('create, update and delete', () => {
       subtype: 'square',
       opacity: 0.5,
     });
-    expect(fieldsOf(updated.annotation).opacity).toBe(0.5);
+    expect(dataOf(updated.annotation).opacity).toBe(0.5);
     await harness.capability.delete(annotation.ref);
     expect(log).toEqual(['updated:obj:5:local', 'deleted:obj:5:local']);
   });

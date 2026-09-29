@@ -12,6 +12,7 @@ import { capsFor } from '../kinds';
 import { linkChildrenOf } from '../links';
 import { transformMeasurementCaption } from '../measurement-shape';
 import { applyProps, kindTakesLink } from '../props';
+import { fieldsOf, withFields } from '../record';
 import { annotationTurnPivot } from '../selection';
 import type { AnnotationPropsPatch, Effect, Id, Model, Point } from '../types';
 import { ownGeometry, toVector, withoutRecords } from './changes';
@@ -42,25 +43,28 @@ export function setProps(model: Model, patch: AnnotationPropsPatch): [Model, Eff
       annotation.subtype !== 'link' &&
       kindTakesLink(annotation.subtype) &&
       annotTransformable(annotation);
-    const next = applyProps(annotation, patch);
+    const fields = fieldsOf(annotation);
+    const next = applyProps(fields, patch);
     if (!next) {
       // Nothing applied to the model (link-only patch on a parent, or an
       // undeclared key) — the link intent still materializes.
       if (linkIntent) fx.push({ type: 'syncLink', id, target: patch.link ?? null });
       continue;
     }
-    const linkChanged = next.link !== annotation.link;
+    const linkChanged = next.link !== fields.link;
     const otherChanged =
-      next.style !== annotation.style ||
-      next.geometry !== annotation.geometry ||
-      next.text !== annotation.text ||
-      next.icon !== annotation.icon;
+      next.style !== fields.style ||
+      next.geometry !== fields.geometry ||
+      next.text !== fields.text ||
+      next.icon !== fields.icon;
+    const written = withFields(annotation, next);
     // A restyle flips to vector (we own the appearance now) — except
     // `opaqueBody` kinds (widgets), which have no vector render: they stay
     // baked and the shell re-fetches the engine's re-baked raster on resolve.
     // Flipping them would also drop them out of `appearanceEpoch`, freezing
     // their raster forever.
-    byId[id] = capsFor(annotation.subtype).opaqueBody || !otherChanged ? next : toVector(next);
+    byId[id] =
+      capsFor(annotation.subtype).opaqueBody || !otherChanged ? written : toVector(written);
     changed ||= otherChanged || linkChanged;
     if (linkIntent) fx.push({ type: 'syncLink', id, target: patch.link ?? null });
   }
@@ -95,10 +99,11 @@ export function setFlags(
   for (const id of targets) {
     const annotation = (byId ?? model.byId)[id];
     if (!annotation) continue;
-    const flags = mergeFlags(annotation.flags, patch);
-    if (flagsEqual(flags, annotation.flags)) continue; // no spurious engine writes
+    const current = fieldsOf(annotation).flags;
+    const flags = mergeFlags(current, patch);
+    if (flagsEqual(flags, current)) continue; // no spurious engine writes
     byId ??= { ...model.byId };
-    byId[id] = { ...annotation, flags };
+    byId[id] = withFields(annotation, { flags });
   }
   return byId ? [{ ...model, byId }, []] : [model, []];
 }
@@ -136,14 +141,15 @@ export function rotateSelection(model: Model, deltaDeg: number): [Model, Effect[
   const byId = { ...model.byId };
   for (const id of ids) {
     const annotation = byId[id];
-    const before = annotation.geometry;
-    byId[id] = ownGeometry({
-      ...annotation,
-      geometry: geomRotateAbout(before, pivot, deltaDeg),
-      measure: transformMeasurementCaption(annotation.measure, (point) =>
-        rotatePoint(point, pivot, deltaDeg),
-      ),
-    });
+    const { geometry, measure } = fieldsOf(annotation);
+    byId[id] = ownGeometry(
+      withFields(annotation, {
+        geometry: geomRotateAbout(geometry, pivot, deltaDeg),
+        measure: transformMeasurementCaption(measure, (point) =>
+          rotatePoint(point, pivot, deltaDeg),
+        ),
+      }),
+    );
   }
   return [{ ...model, byId }, []];
 }
@@ -156,16 +162,17 @@ export function resetRotation(model: Model): [Model, Effect[]] {
   let turned = false;
   for (const id of model.selected) {
     const annotation = byId[id];
-    if (!annotation || !annotTransformable(annotation) || geomRotation(annotation.geometry) === 0)
-      continue;
+    if (!annotation || !annotTransformable(annotation)) continue;
+    const { geometry, measure } = fieldsOf(annotation);
+    const turn = geomRotation(geometry);
+    if (turn === 0) continue;
     const pivot = annotationTurnPivot(annotation);
-    byId[id] = ownGeometry({
-      ...annotation,
-      geometry: geomResetRotation(annotation.geometry, pivot),
-      measure: transformMeasurementCaption(annotation.measure, (point) =>
-        rotatePoint(point, pivot, -geomRotation(annotation.geometry)),
-      ),
-    });
+    byId[id] = ownGeometry(
+      withFields(annotation, {
+        geometry: geomResetRotation(geometry, pivot),
+        measure: transformMeasurementCaption(measure, (point) => rotatePoint(point, pivot, -turn)),
+      }),
+    );
     turned = true;
   }
   return turned ? [{ ...model, byId }, []] : [model, []];

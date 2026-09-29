@@ -1,7 +1,7 @@
 import type { AnnotationDTO } from '@embedpdf/engine-core/runtime';
 
 import { geomRotation } from '../geometry';
-import type { ModelAnnotation, PropKey, RecordFields } from '../types';
+import type { ModelGeometry, PropKey, RecordFields } from '../types';
 import { boxGeomFields } from './seam';
 
 /** An untyped partial wire statement — merged fragments are cast to the
@@ -10,8 +10,8 @@ export type Wire = Record<string, unknown>;
 
 /** The kind-specific slice a DTO ingest contributes on top of the generic
  *  base (id/ref/flags/relationships) that `fromDTO` builds for every kind. */
-export type IngestSlice = { geometry: ModelAnnotation['geometry'] } & Partial<
-  Pick<ModelAnnotation, 'text' | 'icon' | 'label' | 'link' | 'intent' | 'measure'>
+export type IngestSlice = { geometry: ModelGeometry } & Partial<
+  Pick<RecordFields, 'text' | 'icon' | 'label' | 'link' | 'intent' | 'measure'>
 >;
 
 /**
@@ -52,7 +52,7 @@ export interface KindProjection {
  *  its turn → `box` + `rotation`, total (null states the clear). */
 export const boxEmit = (annotation: RecordFields): Wire => {
   const boxGeometry = annotation.geometry as Extract<
-    ModelAnnotation['geometry'],
+    ModelGeometry,
     { kind: 'rect' } | { kind: 'text' }
   >;
   return boxGeomFields(boxGeometry.rect, geomRotation(annotation.geometry));

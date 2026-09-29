@@ -6,8 +6,17 @@
  */
 import { anchoredGeom, anchorModeOf, unanchoredGeom, type ViewEnv } from '../anchor';
 import { capsFor } from '../kinds';
-import { annotationOfRecord, type AnnotationPlace } from '../record';
-import type { ModelGeometry, Id, Model, ModelAnnotation, Point, Rect, Subtype } from '../types';
+import { annotationOfRecord, fieldsOf, recordOf, type AnnotationPlace } from '../record';
+import type {
+  ModelGeometry,
+  Id,
+  Model,
+  ModelAnnotation,
+  Point,
+  Rect,
+  RecordFields,
+  Subtype,
+} from '../types';
 import { forget } from './session';
 
 export const isPolySubtype = (subtype: Subtype): subtype is 'polygon' | 'polyline' =>
@@ -27,9 +36,8 @@ export const toVector = (annotation: ModelAnnotation): ModelAnnotation =>
  */
 export const ownGeometry = (annotation: ModelAnnotation): ModelAnnotation => {
   if (!capsFor(annotation.subtype).opaqueBody) return toVector(annotation);
-  return 'rect' in annotation.geometry
-    ? { ...annotation, apBox: annotation.geometry.rect }
-    : annotation;
+  const { geometry } = fieldsOf(annotation);
+  return 'rect' in geometry ? { ...annotation, apBox: geometry.rect } : annotation;
 };
 
 export const sub = (from: Point, to: Point): Point => ({ x: from.x - to.x, y: from.y - to.y });
@@ -54,7 +62,7 @@ export const commitViewGesture = (
   op: (geometry: ModelGeometry) => ModelGeometry,
 ): ModelGeometry => {
   const mode = anchorModeOf(annotation);
-  return unanchoredGeom(op(anchoredGeom(annotation.geometry, mode, view)), mode, view);
+  return unanchoredGeom(op(anchoredGeom(fieldsOf(annotation).geometry, mode, view)), mode, view);
 };
 
 export const geomEqual = (left: ModelGeometry, right: ModelGeometry): boolean =>
@@ -64,7 +72,7 @@ export const geomEqual = (left: ModelGeometry, right: ModelGeometry): boolean =>
 export const newRecordId = (model: Model, offset = 1): Id => `new:${model.seq + offset}`;
 
 /** The fields a new record is made from: everything but what `newRecord` gives it. */
-export type NewRecordFields = Omit<ModelAnnotation, 'id' | 'ref' | 'source' | 'annotation'>;
+export type NewRecordFields = Omit<RecordFields, 'id' | 'ref' | 'source' | 'annotation'>;
 
 /**
  * The `offset`-th record a message creates: id `new:<n>`, drawn live, and the
@@ -78,11 +86,11 @@ export function newRecord(
   options: { offset?: number; reply?: AnnotationPlace['reply'] } = {},
 ): ModelAnnotation {
   const offset = options.offset ?? 1;
-  const record = {
+  const record: RecordFields = {
     ...fields,
     id: newRecordId(model, offset),
     ref: null,
-    source: 'vector' as const,
+    source: 'vector',
   };
   const page = fields.page;
   const onPage = model.order.filter(
@@ -93,7 +101,7 @@ export function newRecord(
     index: onPage + offset - 1,
     ...(options.reply ? { reply: options.reply } : {}),
   });
-  return { ...record, annotation };
+  return recordOf(record, annotation);
 }
 
 /** The model without these records, and without any session reference to them. */

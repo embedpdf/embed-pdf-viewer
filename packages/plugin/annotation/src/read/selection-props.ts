@@ -1,5 +1,6 @@
 import {
   FLAG_KEYS,
+  fieldsOf,
   linkOf,
   readProp,
   richDocOf,
@@ -54,7 +55,7 @@ export function createSelectionPropsReads(
     const valueOf = (annotation: ModelAnnotation, key: PropKey): unknown =>
       key === 'link' && annotation.subtype !== 'link'
         ? linkOf(model, annotation.id)
-        : readProp(annotation, key);
+        : readProp(fieldsOf(annotation), key);
     for (const spec of specs) {
       const first = valueOf(members[0], spec.key);
       (values as Record<PropKey, unknown>)[spec.key] = first;
@@ -66,7 +67,7 @@ export function createSelectionPropsReads(
     // range keys report the runs it covers, resolved against the body — the
     // same values `updateSelection` would restyle.
     if (range && members.length === 1 && members[0]!.id === range.id) {
-      const rp = rangeProps(richDocOf(members[0]!, fonts), range, fonts);
+      const rp = rangeProps(richDocOf(fieldsOf(members[0]!), fonts), range, fonts);
       for (const spec of specs) {
         if (!RANGE_KEYS.includes(spec.key)) continue;
         (values as Record<PropKey, unknown>)[spec.key] = rp.values[spec.key];
@@ -92,8 +93,10 @@ export function createSelectionPropsReads(
     if (members.length) {
       flags = {} as SelectionFlags;
       for (const key of FLAG_KEYS) {
-        const first = members[0].flags[key];
-        flags[key] = members.every((annotation) => annotation.flags[key] === first) ? first : null;
+        const first = members[0].annotation[key];
+        flags[key] = members.every((annotation) => annotation.annotation[key] === first)
+          ? first
+          : null;
       }
     }
     selFlagsCache = { model, v: flags };

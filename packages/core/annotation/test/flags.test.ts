@@ -2,7 +2,7 @@ import { quadFromRect } from '@embedpdf/core-geometry';
 import { toPageRef } from '@embedpdf/engine-core/runtime';
 import { describe, expect, it } from 'vitest';
 
-import { modelWith, record, step } from './support';
+import { modelWith, record, step, type RecordInput } from './support';
 import { anchoredGeom, anchorModeOf, anchorOf, unanchoredGeom, type ViewEnv } from '../src/anchor';
 import {
   DRAWN_FLAGS,
@@ -20,6 +20,7 @@ import { hitTest, isSelectable, paintOrder } from '../src/hit';
 import { initialModel, DEFAULT_CHROME_GEOMETRY } from '../src/index';
 import type { ModelAnnotation, ModelGeometry, Model, Message, Point } from '../src/types';
 import { pageItems, chrome, textBoxes } from '../src/view';
+import { fieldsOf } from '../src/record';
 
 const PON = 1;
 const PAGE = toPageRef(PON);
@@ -31,7 +32,7 @@ const flagsWith = (over: Partial<AnnotationFlags> = {}): AnnotationFlags => ({
 const square = (
   id: string,
   flags: AnnotationFlags = DRAWN_FLAGS,
-  over: Partial<ModelAnnotation> = {},
+  over: Partial<RecordInput> = {},
 ): ModelAnnotation =>
   record({
     id,
@@ -68,7 +69,7 @@ describe('flag predicates (ISO 32000 Table 167)', () => {
 
   it('readOnly is visible but inert; locked stays interactive but frozen', () => {
     const ro = square('a1', flagsWith({ readOnly: true }));
-    expect(viewable(ro.flags)).toBe(true);
+    expect(viewable(ro.annotation)).toBe(true);
     expect(annotInteractive(ro)).toBe(false);
     const lk = square('a2', flagsWith({ locked: true }));
     expect(annotInteractive(lk)).toBe(true);
@@ -110,8 +111,8 @@ describe('flag predicates (ISO 32000 Table 167)', () => {
       },
     ]);
     const annotation = model.byId[model.order[0]];
-    expect(annotation.flags).toEqual(DRAWN_FLAGS);
-    expect(annotation.flags.print).toBe(true);
+    expect(fieldsOf(annotation).flags).toEqual(DRAWN_FLAGS);
+    expect(annotation.annotation.print).toBe(true);
   });
 
   it('a tool flags seed merges over DRAWN_FLAGS at commit (the note-tool path)', () => {
@@ -137,7 +138,9 @@ describe('flag predicates (ISO 32000 Table 167)', () => {
       },
     ]);
     const annotation = model.byId[model.order[0]];
-    expect(annotation.flags).toEqual(flagsWith({ print: true, noZoom: true, noRotate: true }));
+    expect(fieldsOf(annotation).flags).toEqual(
+      flagsWith({ print: true, noZoom: true, noRotate: true }),
+    );
   });
 });
 
@@ -188,7 +191,9 @@ describe('flag-driven behavior in the model', () => {
     expect(nodes.some((node) => node.kind === 'rotate-knob')).toBe(false);
     // restyle is blocked, silently (no effect emitted)
     const [afterProps, propsFx] = step(model, { type: 'setProps', patch: { color: '#00ff00' } });
-    expect(afterProps.byId['l1'].style.color).toBe(model.byId['l1'].style.color);
+    expect(fieldsOf(afterProps.byId['l1']).style.color).toBe(
+      fieldsOf(model.byId['l1']).style.color,
+    );
     expect(propsFx).toEqual([]);
     // delete is blocked — the locked member survives, still selected
     const [afterDelete, deleteFx] = step(model, { type: 'delete' });
@@ -196,7 +201,7 @@ describe('flag-driven behavior in the model', () => {
     expect(deleteFx).toEqual([]);
     // …but setFlags is not gated by locked: unlocking must work
     const [unlocked, unlockFx] = step(model, { type: 'setFlags', patch: { locked: false } });
-    expect(unlocked.byId['l1'].flags.locked).toBe(false);
+    expect(unlocked.byId['l1'].annotation.locked).toBe(false);
     expect(unlockFx).toEqual([
       { type: 'patch', id: 'l1', patch: { subtype: 'square', locked: false } },
     ]);
@@ -211,7 +216,7 @@ describe('flag-driven behavior in the model', () => {
       { type: 'patch', id: 's1', patch: { subtype: 'square', hidden: true } },
       { type: 'patch', id: 's2', patch: { subtype: 'square', hidden: true } },
     ]);
-    expect(next.byId['s1'].flags.hidden).toBe(true);
+    expect(next.byId['s1'].annotation.hidden).toBe(true);
     expect(next.byId['s1'].source).toBe('baked'); // flags never re-bake
     // a pure no-op patch emits nothing and keeps the model reference
     const [same, none] = step(next, { type: 'setFlags', patch: { hidden: true } });
@@ -224,7 +229,7 @@ describe('flag-driven behavior in the model', () => {
     let model = loaded([created]);
     model = { ...model, selected: ['new:1'] };
     const [next, fx] = step(model, { type: 'setFlags', patch: { locked: true } });
-    expect(next.byId['new:1'].flags.locked).toBe(true);
+    expect(next.byId['new:1'].annotation.locked).toBe(true);
     expect(fx).toEqual([
       { type: 'patch', id: 'new:1', patch: { subtype: 'square', locked: true } },
     ]);
@@ -443,15 +448,16 @@ describe('screen-anchored bodies (noZoom / noRotate)', () => {
       },
     ]);
     const an = model.byId['an'];
+    const anGeometry = fieldsOf(an).geometry;
     const pl = model.byId['pl'];
-    if (an.geometry.kind !== 'rect' || pl.geometry.kind !== 'rect')
-      throw new Error('expected rects');
-    expect(an.geometry.rot).toBe(90); // the body turns — same as everyone
-    expect(pl.geometry.rot).toBe(90);
+    const plGeometry = fieldsOf(pl).geometry;
+    if (anGeometry.kind !== 'rect' || plGeometry.kind !== 'rect') throw new Error('expected rects');
+    expect(anGeometry.rot).toBe(90); // the body turns — same as everyone
+    expect(plGeometry.rot).toBe(90);
     // its centre orbited the pivot rigidly: (140,130) about (240,130) by 90°
     // CW in y-down space → (240,30)
-    expect(an.geometry.rect.x + an.geometry.rect.width / 2).toBeCloseTo(240);
-    expect(an.geometry.rect.y + an.geometry.rect.height / 2).toBeCloseTo(30);
+    expect(anGeometry.rect.x + anGeometry.rect.width / 2).toBeCloseTo(240);
+    expect(anGeometry.rect.y + anGeometry.rect.height / 2).toBeCloseTo(30);
     expect(an.source).toBe('vector'); // a real rotation re-bakes, like any member
   });
 
@@ -469,7 +475,7 @@ describe('screen-anchored bodies (noZoom / noRotate)', () => {
     expect(Math.max(...handleXs)).toBeLessThanOrEqual(100 + 80 / 2 + 2);
     // rotate90 turns the authored tilt (displayed directly at any page rotation)
     const [after, fx] = step(model, { type: 'rotate90' });
-    const geometry = after.byId['an'].geometry;
+    const geometry = fieldsOf(after.byId['an']).geometry;
     expect(geometry.kind === 'rect' && geometry.rot).toBe(90);
     expect(fx).toHaveLength(1);
   });
@@ -494,7 +500,7 @@ describe('screen-anchored bodies (noZoom / noRotate)', () => {
       { type: 'editPointer', phase: 'move', in: input(180, 160) },
       { type: 'editPointer', phase: 'up', in: input(180, 160) },
     ]);
-    const geometry = model.byId['nz2'].geometry;
+    const geometry = fieldsOf(model.byId['nz2']).geometry;
     if (geometry.kind !== 'rect') throw new Error('expected rect');
     // …so the stored /Rect (screen size at zoom 1) becomes 160×120, and its
     // own re-projection is exactly the released preview: {100,100,80,60}.

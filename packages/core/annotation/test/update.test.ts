@@ -11,6 +11,7 @@ import { modelWith, record, step } from './support';
 import { DRAWN_FLAGS } from '../src/flags';
 import type { Message, ModelAnnotation } from '../src/types';
 import { EMPTY_CHANGE, initialStyle, update } from '../src/update';
+import { fieldsOf } from '../src/record';
 
 const PAGE = toPageRef(1);
 const editPtr = (phase: 'down' | 'move' | 'up', x: number, y: number): Message => ({
@@ -51,23 +52,21 @@ describe('update', () => {
     const result = update(dragged, editPtr('up', 190, 160));
     expect(result.change.put.map((record) => record.id)).toEqual(['obj:1']);
     expect(result.change.drop).toEqual([]);
-    // The change is the write: the moved square's box group, nothing else.
+    // The change is the write: the moved square's box, nothing else.
     expect(result.effects).toEqual([
       {
         type: 'patch',
         id: 'obj:1',
-        patch: {
-          subtype: 'square',
-          box: { x: 140, y: 130, width: 100, height: 60 },
-          rotation: null,
-        },
+        patch: { subtype: 'square', box: { x: 140, y: 130, width: 100, height: 60 } },
       },
     ]);
     // The change set holds the very patch the effect writes.
     const [write] = result.effects;
     expect(write?.type === 'patch' && write.patch).toBe(result.change.patches['obj:1']);
     // The records it was given are untouched: the core keeps nothing.
-    expect(dragged.byId['obj:1']!.geometry).toEqual(model.byId['obj:1']!.geometry);
+    expect(fieldsOf(dragged.byId['obj:1']!).geometry).toEqual(
+      fieldsOf(model.byId['obj:1']!).geometry,
+    );
   });
 
   it('a delete drops the deleted ids and asks for the engine delete', () => {
@@ -92,7 +91,7 @@ describe('update', () => {
 
   it('typing puts the edited record and asks for a text write', () => {
     const box = record({
-      ...square('obj:3', 100),
+      ...fieldsOf(square('obj:3', 100)),
       subtype: 'free-text',
       geometry: { kind: 'text', rect: { x: 100, y: 100, width: 100, height: 60 } },
       annotation: undefined,

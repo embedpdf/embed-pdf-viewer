@@ -11,7 +11,7 @@ import {
 import { annotationSelectionFrame, shapeMeasurementLayout } from '../../../core/annotation/src';
 import { rotatePoint, turnPivotOf } from '../../../core/annotation/src/geometry';
 import { createLocalEngine } from '../src/index';
-import { fromDTO } from '../../../core/annotation/src/record';
+import { fieldsOf, fromDTO } from '../../../core/annotation/src/record';
 import { annotationKey } from '@embedpdf/engine-core/runtime';
 import { annotationShell } from './helpers/annotation-shell';
 
@@ -83,7 +83,7 @@ describe.each(['wasm', 'native'] as const)('shape authoring integration (%s)', (
         expect(created.contents).toBe(tool === 'area' ? '50.00 m²' : '25.00 m');
         expect(created.captionEnabled).toBe(true);
         expect(created.captionCenter).toBe(null);
-        const model = fromDTO(created);
+        const model = fieldsOf(fromDTO(created));
         if (!model.measure || model.measure.intent === 'line-dimension')
           throw new Error('Expected shape measure');
         const label = shapeMeasurementLayout(model.geometry, model.measure, model.style)!.caption!
@@ -105,7 +105,7 @@ describe.each(['wasm', 'native'] as const)('shape authoring integration (%s)', (
         expectVector();
 
         const before = current();
-        const pivot = turnPivotOf(fromDTO(before).geometry);
+        const pivot = turnPivotOf(fieldsOf(fromDTO(before)).geometry);
         const rotatedCaption = rotatePoint(target, pivot, 90);
         await annotation.rotateSelectionBy(90);
         await vi.waitFor(() => {
@@ -123,7 +123,7 @@ describe.each(['wasm', 'native'] as const)('shape authoring integration (%s)', (
           );
           expect(drawnCaption.x).toBeCloseTo(rotatedCaption.x, 3);
           expect(drawnCaption.y).toBeCloseTo(rotatedCaption.y, 3);
-          const after = turnPivotOf(fromDTO(current()).geometry);
+          const after = turnPivotOf(fieldsOf(fromDTO(current())).geometry);
           expect(after.x).toBeCloseTo(pivot.x, 3);
           expect(after.y).toBeCloseTo(pivot.y, 3);
         });

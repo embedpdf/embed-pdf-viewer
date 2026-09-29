@@ -17,7 +17,7 @@ import {
   splitRunsAt,
   styleAt,
 } from '../src/richtext';
-import type { ModelAnnotation, TextStyle } from '../src/types';
+import type { RecordFields, TextStyle } from '../src/types';
 
 const doc = () => ({
   paragraphs: [
@@ -176,7 +176,7 @@ describe('a free text’s document', () => {
       subtype: 'free-text',
       text,
       annotation: { subtype: 'free-text', contents: 'a\rb' },
-    } as unknown as ModelAnnotation;
+    } as unknown as RecordFields;
     const doc = richDocOf(annotation);
     expect(doc.paragraphs).toEqual([{ runs: [{ text: 'a' }] }, { runs: [{ text: 'b' }] }]);
     expect(doc.body.family).toBe('Helvetica');

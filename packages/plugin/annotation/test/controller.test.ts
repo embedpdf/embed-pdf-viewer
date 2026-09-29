@@ -5,6 +5,7 @@ import { toPageRef } from '@embedpdf/engine-core/runtime';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { annotationHarness, type FileAnnotation } from './harness';
+import { fieldsOf } from '@embedpdf/core-annotation';
 
 const PON = 1;
 const PON2 = 2;
@@ -187,7 +188,7 @@ describe('annotation flags', () => {
 
     harness.capability.updateSelectionFlags({ locked: true });
     // optimistic: the model flips immediately, source untouched (still baked)
-    expect(harness.model().byId[id].flags.locked).toBe(true);
+    expect(harness.model().byId[id].annotation.locked).toBe(true);
     expect(harness.model().byId[id].source).toBe('baked');
 
     await vi.waitFor(() => expect(harness.update).toHaveBeenCalledTimes(1));
@@ -218,7 +219,7 @@ describe('annotation flags', () => {
     harness.capability.select(ref(23));
     harness.update.mockResolvedValueOnce({ annotation: squareDTO(23) });
     harness.capability.updateSelectionFlags({ locked: false });
-    expect(harness.model().byId[id].flags.locked).toBe(false);
+    expect(harness.model().byId[id].annotation.locked).toBe(false);
     await vi.waitFor(() => expect(harness.update).toHaveBeenCalledTimes(1));
   });
 
@@ -939,13 +940,13 @@ describe('the twin law — authority fused into presentation and gestures', () =
     await harness.load([stamped(20, 'me')]);
     harness.capability.select(ref(20));
     const id = harness.model().order[0]!;
-    const before = harness.model().byId[id]!.style.color;
+    const before = fieldsOf(harness.model().byId[id]!).style.color;
     harness.update.mockRejectedValueOnce(new Error('Forbidden'));
     harness.capability.updateSelection({ color: '#00ff00' });
     // optimistic first…
-    expect(harness.model().byId[id]!.style.color).toBe('#00ff00');
+    expect(fieldsOf(harness.model().byId[id]!).style.color).toBe('#00ff00');
     // …then the refusal restores the pre-patch annotation.
-    await vi.waitFor(() => expect(harness.model().byId[id]!.style.color).toBe(before));
+    await vi.waitFor(() => expect(fieldsOf(harness.model().byId[id]!).style.color).toBe(before));
   });
 });
 
