@@ -10,6 +10,7 @@ import {
 import type { AnnotCommitEntry, AnnotCommitResult } from '@embedpdf/plugin-actions/contract/host';
 
 import type { AnnotationContext, AnnotationServices } from '../services';
+import { appliedOrThrow } from './outcomes';
 
 /** Script patch → the engine's per-kind patch vocabulary. Colors cross the
  *  Acrobat-array → engine {r,g,b}/255 boundary here; a script's rect, in the
@@ -118,7 +119,7 @@ export function createScriptEffects(
           continue;
         }
         try {
-          await doc.page(toPageRef(pageObjectNumber)).annotations.update(ref, patch);
+          await appliedOrThrow(store.apply([{ type: 'update', ref, patch }]));
           results.push({ annotObjectNumber: entry.annotObjectNumber, status: 'applied' });
         } catch (error) {
           // Stop on the first failure: a refused entry (for example a

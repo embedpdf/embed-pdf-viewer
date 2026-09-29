@@ -3,8 +3,10 @@
  * engine's answer is in the confirmed records.
  *
  *   1. stage   the message's session enters the state, and every record it
- *              changed becomes one pending change (new fields, a new record,
- *              or a delete) with a token of its own; the view shows it at once
+ *              changed becomes one pending change (an edit and its patch, a
+ *              new record, or a delete) with a token of its own; the view
+ *              shows it at once. A change stated in code (`store.apply`) is
+ *              staged the same way.
  *   2. write   the effect runners' engine writes run; each carries the
  *              changes of the records it names
  *   3. settle  a refused write drops its changes at once: they are wrong. An
@@ -27,7 +29,13 @@ import { toPluginError, toPluginErrorInfo, type Mirror, type PluginError } from 
 import type { Id, Model, UpdateResult } from '@embedpdf/core-annotation';
 import type { AnnotationRef } from '@embedpdf/engine-core/runtime';
 
-import { changedFields, stage, writeSettled, type PendingChange } from '../model';
+import {
+  changedFields,
+  stage,
+  writeSettled,
+  type PendingChange,
+  type RecordChange,
+} from '../model';
 import type { AnnotationContext } from './context';
 import type { AnnotationEvents } from './events';
 import type { AnnotationRecords } from '../sync/records';
@@ -138,6 +146,13 @@ export function createIntents(
     return new Map(changes.map((change) => [change.id, change.token]));
   };
 
+  /** Step 1 for changes stated in code: each record's change, with the session as it is. */
+  const beginStated = (stated: readonly { id: Id; change: RecordChange }[]): Staged => {
+    const changes = stated.map(({ id, change }): PendingChange => ({ token: ++token, id, change }));
+    ctx.state.update(stage, ctx.state.get().session, changes);
+    return new Map(changes.map((change) => [change.id, change.token]));
+  };
+
   /** Steps 2 and 3: run the writes and settle the changes they carried. */
   const run = async (staged: Staged, writes: readonly IntentWrite[]): Promise<IntentOutcome> => {
     const tokensOf = (ids: readonly Id[]) =>
@@ -177,7 +192,7 @@ export function createIntents(
     return { created, failed };
   };
 
-  return { begin, run };
+  return { begin, beginStated, run };
 }
 
 export type Intents = ReturnType<typeof createIntents>;

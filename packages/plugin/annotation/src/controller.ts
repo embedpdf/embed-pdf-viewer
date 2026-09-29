@@ -47,7 +47,8 @@ export function createAnnotationController(ctx: AnnotationContext, config: Annot
   // Sync: what follows when the engine confirms a change.
   followConfirmedChanges(ctx, services, createAnnouncer(events, annotations.projectRef));
 
-  // Writes: every change goes through the store's one commit door.
+  // Writes: every change goes through the store, a gesture's through `commit`,
+  // one stated in code through `apply`, and each ends in the same writes.
   const text = createTextEditing(ctx, services, annotations, chrome);
   const links = createLinkWrites(ctx, services);
   registerEffectRunners(ctx, services, links);
@@ -112,5 +113,7 @@ export function createAnnotationController(ctx: AnnotationContext, config: Annot
     connect: () => connectAnnotation(ctx, api),
     /** The composed model every read and gesture works on (for the plugin's tests). */
     model: view.model,
+    /** The door for changes stated in code (for the plugin's tests). */
+    apply: services.store.apply,
   };
 }

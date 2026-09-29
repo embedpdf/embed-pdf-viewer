@@ -7,16 +7,7 @@
 import { anchoredGeom, anchorModeOf, unanchoredGeom, type ViewEnv } from '../anchor';
 import { capsFor } from '../kinds';
 import { annotationOfRecord, type AnnotationPlace } from '../record';
-import type {
-  ModelGeometry,
-  Effect,
-  Id,
-  Model,
-  ModelAnnotation,
-  Point,
-  Rect,
-  Subtype,
-} from '../types';
+import type { ModelGeometry, Id, Model, ModelAnnotation, Point, Rect, Subtype } from '../types';
 import { forget } from './session';
 
 export const isPolySubtype = (subtype: Subtype): subtype is 'polygon' | 'polyline' =>

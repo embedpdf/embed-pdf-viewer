@@ -10,7 +10,8 @@ import {
 
 import { linkChildRects, writableTarget } from '@embedpdf/core-annotation';
 import type { AnnotationContext, AnnotationServices } from '../services';
-import { named } from './named';
+import type { StoreChange } from '../services/store';
+import { appliedOrThrow, throwIfFailed } from './outcomes';
 
 /**
  * Attached links (a Link child riding an editable annotation) and group
@@ -41,46 +42,47 @@ export function createLinkWrites(
    * The one place attached link children are created, retargeted, re-rected,
    * or deleted. Declarative: desired state = `desired` target + the parent's
    * committed geometry (`linkChildRects`); current state is read straight
-   * from the substrate (`linkChildrenOf`) — no join-key ledger. Each write's
-   * confirmed record reaches the records mirror before the write resolves, so
-   * the `linkOf` lens converges as the run goes, here and in every other
-   * session. Idempotent — foreign inconsistencies heal on the next local edit.
+   * from the substrate (`linkChildrenOf`), children not confirmed yet
+   * included — no join-key ledger. The changes go through `store.apply`, so
+   * they show at once and the `linkOf` lens converges as the run goes, here
+   * and in every other session. Idempotent — foreign inconsistencies heal on
+   * the next local edit.
    */
   const reconcileChildren = async (id: Id, desired: PdfLinkTarget | null): Promise<void> => {
-    const doc = ctx.doc;
     const annotation = store.model().byId[id];
-    if (!doc || !annotation || !annotation.ref || annotation.subtype === 'link') return;
-    const page = doc.page(annotation.page);
+    if (!ctx.doc || !annotation || !annotation.ref || annotation.subtype === 'link') return;
     // Read-only target arms can't be (re)written: children keep their /A and
     // only their rects follow the parent.
     const target = writableTarget(desired);
     const rects = desired == null ? [] : linkChildRects(annotation);
     const current = linkChildrenOf(store.model(), id);
-    try {
-      const paired = Math.min(current.length, rects.length);
-      for (let i = 0; i < paired; i++) {
-        const ref = current[i].ref;
-        if (!ref) continue;
-        await page.annotations.update(ref, {
+    const changes: StoreChange[] = [];
+    const paired = Math.min(current.length, rects.length);
+    for (let i = 0; i < paired; i++) {
+      changes.push({
+        type: 'update',
+        ref: current[i].annotation.ref,
+        patch: { subtype: 'link', rect: rects[i], ...(target ? { target } : {}) },
+      });
+    }
+    for (let i = current.length; i < rects.length; i++) {
+      changes.push({
+        type: 'create',
+        page: annotation.page,
+        draft: {
           subtype: 'link',
           rect: rects[i],
-          ...(target ? { target } : {}),
-        });
-      }
-      for (let i = current.length; i < rects.length; i++) {
-        await page.annotations.create(
-          named({
-            subtype: 'link',
-            rect: rects[i],
-            target,
-            reply: { to: annotation.ref, type: 'group' },
-          } as AnnotationDraft),
-        );
-      }
-      for (let i = rects.length; i < current.length; i++) {
-        const child = current[i];
-        if (child.ref) await page.annotations.delete(child.ref);
-      }
+          target,
+          reply: { to: annotation.ref, type: 'group' },
+        } as AnnotationDraft,
+      });
+    }
+    for (let i = rects.length; i < current.length; i++) {
+      changes.push({ type: 'delete', ref: current[i].annotation.ref });
+    }
+    if (!changes.length) return;
+    try {
+      throwIfFailed(await store.apply(changes).written);
     } catch (error) {
       console.error('[annotation] attached-link sync failed:', error);
     }
@@ -119,15 +121,14 @@ export function createLinkWrites(
     reply: { to: AnnotationRef; type?: 'group' } | null,
   ): AnnotationPatch => ({ subtype, reply }) as AnnotationPatch;
 
-  /** Write a relationship change to one committed annotation; the fold applies the result. */
+  /** Write a relationship change to one committed annotation: shown at once, then written. */
   const writeRelationship = async (
     record: ModelAnnotation,
     reply: { to: AnnotationRef; type?: 'group' } | null,
   ): Promise<void> => {
     if (!record.ref) return;
-    await ctx.doc
-      .page(record.page)
-      .annotations.update(record.ref, relationshipPatch(record.annotation.subtype, reply));
+    const patch = relationshipPatch(record.annotation.subtype, reply);
+    await appliedOrThrow(store.apply([{ type: 'update', ref: record.ref, patch }]));
   };
 
   // A restyle that set or cleared a link: the verb that made it waits for the

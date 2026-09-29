@@ -50,7 +50,7 @@ import {
 import { caret, highlight, redact, squiggly, strikeout, underline } from './kinds/quads';
 import { circle, square } from './kinds/shape';
 import { captionFieldsFor, ink, line, polygon, polyline } from './kinds/stroke';
-import { boxEmit, type KindProjection, type Wire } from './projection';
+import type { KindProjection, Wire } from './projection';
 import { GENERIC_PROPS } from './props';
 import { annotationKey, flagsOf, styleFromDTO } from './seam';
 

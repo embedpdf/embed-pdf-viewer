@@ -105,10 +105,10 @@ export function annotationHarness(options: AnnotationHarnessOptions = {}) {
     doc: {
       page: (page: PageRef) => ({
         annotations: {
-          create: async (draft: unknown) => {
+          create: async (draft: unknown, resources?: unknown) => {
             // Every create this plugin sends to the viewed document carries an /NM.
             if (!(draft as { nm?: string }).nm) throw new Error('a create without an /NM');
-            const result = readResult(await create(draft));
+            const result = readResult(await create(draft, ...(resources ? [resources] : [])));
             ctx.emitDocumentEvent({
               type: 'annotations.created',
               page: result.annotation.page ?? page,
@@ -118,8 +118,8 @@ export function annotationHarness(options: AnnotationHarnessOptions = {}) {
             } as unknown as DocumentEvent);
             return result;
           },
-          update: async (ref: AnnotationRef, patch: unknown) => {
-            const result = readResult(await update(ref, patch));
+          update: async (ref: AnnotationRef, patch: unknown, resources?: unknown) => {
+            const result = readResult(await update(ref, patch, ...(resources ? [resources] : [])));
             if (result?.annotation) {
               ctx.emitDocumentEvent({
                 type: 'annotations.updated',
@@ -213,6 +213,8 @@ export function annotationHarness(options: AnnotationHarnessOptions = {}) {
     state: () => ctx.state.get(),
     /** The composed model: confirmed records, pending changes and the session. */
     model: () => instance.model(),
+    /** State changes in code, through the store's `apply` door. */
+    apply: instance.apply,
     startSync,
     connectAll,
     /** A fixture (the file's values) as the engine hands it out, in page space. */

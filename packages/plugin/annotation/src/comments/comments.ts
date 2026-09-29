@@ -3,7 +3,6 @@ import {
   annotationKey,
   isDimension,
   toPageRef,
-  type AnnotationDTO,
   type AnnotationDraft,
   type AnnotationPatch,
   type AnnotationRef,
@@ -14,7 +13,7 @@ import type { CommentPermissions, CommentsApi, ThreadDeleteResult } from '../con
 import type { AnnotationContext, AnnotationServices } from '../services';
 import type { ThreadIndex } from './threads';
 import type { Crud } from '../write/crud';
-import { named } from '../write/named';
+import { appliedOrThrow, appliedRefOf } from '../write/outcomes';
 
 // Screen-anchored like a sticky note; `print` for Acrobat parity.
 const REPLY_FLAGS = { print: true, noZoom: true, noRotate: true };
@@ -37,17 +36,15 @@ export function createComments(
   threads: ThreadIndex,
   crud: Pick<Crud, 'updateRaw'>,
 ) {
-  /** Create a conversation annotation (a reply or a review state); the fold adds it to the model. */
-  const createConversationAnnot = async (
+  /** Create a conversation annotation (a reply or a review state): shown at once, then confirmed. */
+  const createConversationAnnot = (
     pageObjectNumber: number,
     draft: AnnotationDraft,
-  ): Promise<AnnotationDTO> => {
-    const result = await ctx.doc.page(toPageRef(pageObjectNumber)).annotations.create(named(draft));
-    return result.annotation;
-  };
+  ): Promise<AnnotationRef> =>
+    appliedRefOf(store.apply([{ type: 'create', page: toPageRef(pageObjectNumber), draft }]));
 
   const deleteOne = async (ref: AnnotationRef): Promise<void> => {
-    await ctx.doc.page(ref.page).annotations.delete(ref);
+    await appliedOrThrow(store.apply([{ type: 'delete', ref }]));
   };
 
   const announce = (
@@ -72,7 +69,7 @@ export function createComments(
         ...REPLY_FLAGS,
       });
       announce(root, 'reply');
-      return created.ref;
+      return created;
     },
 
     setText: async (ref, text) => {

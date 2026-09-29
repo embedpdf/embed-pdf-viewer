@@ -1,6 +1,5 @@
 import { fitStampBox, type Rect, type Point } from '@embedpdf/core-annotation';
 import {
-  annotationKey,
   resolveBinarySource,
   sniffBinaryMetadata,
   toPageRef,
@@ -21,7 +20,7 @@ import { previewBucket } from '../host-contract';
 import { setToolGhost } from '../model';
 import { boxGeomFields } from '@embedpdf/core-annotation';
 import type { AnnotationContext, AnnotationServices } from '../services';
-import { named } from './named';
+import { appliedRefOf } from './outcomes';
 import { ARMED_STAMP_TOOL_ID } from '../tools/definitions';
 
 /**
@@ -166,24 +165,23 @@ export function createStamps(
     const page = geometry.sizeOf(pageObjectNumber);
     if (!doc || !page) return null;
     const box: Rect = fitStampBox(point, desired, page, rotCW);
-    return doc
-      .page(toPageRef(pageObjectNumber))
-      .annotations.create(
-        named({
+    const applied = store.apply([
+      {
+        type: 'create',
+        page: toPageRef(pageObjectNumber),
+        draft: {
           subtype: 'stamp',
           ...boxGeomFields(box, rotCW),
           fit: 'contain',
           ...(identity.name !== undefined ? { name: identity.name } : {}),
           ...(identity.subject !== undefined ? { subject: identity.subject } : {}),
-        }),
-        { appearance: bytesOf(source) },
-      )
-      .then((result) => {
-        // The fold has added the confirmed stamp; every placement selects
-        // its result (the anchor for menus and editing).
-        store.commit({ type: 'select', ids: [annotationKey(result.annotation.ref)] });
-        return result.annotation.ref;
-      });
+        },
+        resources: { appearance: bytesOf(source) },
+      },
+    ]);
+    // Every placement selects its stamp (the anchor for menus and editing).
+    store.commit({ type: 'select', ids: [...applied.ids] });
+    return appliedRefOf(applied);
   };
 
   /** The click path's fire-and-forget wrapper: a rejected placement is logged,

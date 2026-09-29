@@ -1,7 +1,6 @@
 import { PluginError, toPluginError } from '@embedpdf/core';
 import { defaultsFor, fitStampBox, type Rect, type Point } from '@embedpdf/core-annotation';
 import {
-  annotationKey,
   toPageRef,
   type AnnotationDraft,
   type AnnotationRef,
@@ -15,7 +14,7 @@ import { ICON_PLACE_SIZE, iconPlacement, isIconPlaceKind } from './placement';
 import type { FilePickerProvider } from '../contract';
 import type { AnnotationReads } from '../read/annotations';
 import type { AnnotationContext, AnnotationServices } from '../services';
-import { named } from './named';
+import { appliedRefOf } from './outcomes';
 import type { Stamps } from './stamps';
 import type { ResolvedTool } from '../tools/definitions';
 
@@ -38,17 +37,15 @@ export function createIcons(
 ) {
   /** Create an icon annotation and select it (the anchor for its menu and comment popup). */
   const createIcon = (
-    doc: NonNullable<AnnotationContext['doc']>,
     pageObjectNumber: number,
     { data, resources }: { data: AnnotationDraft; resources?: AnnotationResources },
-  ): Promise<AnnotationRef> =>
-    doc
-      .page(toPageRef(pageObjectNumber))
-      .annotations.create(named(data), resources)
-      .then((result) => {
-        store.commit({ type: 'select', ids: [annotationKey(result.annotation.ref)] });
-        return result.annotation.ref;
-      });
+  ): Promise<AnnotationRef> => {
+    const applied = store.apply([
+      { type: 'create', page: toPageRef(pageObjectNumber), draft: data, resources },
+    ]);
+    store.commit({ type: 'select', ids: [...applied.ids] });
+    return appliedRefOf(applied);
+  };
 
   /** Place an icon annotation (note / file attachment) at its usual size,
    *  centred on a page point — the icon-kind sibling of the stamp
@@ -71,7 +68,7 @@ export function createIcons(
       tool.flags,
       file,
     );
-    void createIcon(doc, pageObjectNumber, placement).catch((error) =>
+    void createIcon(pageObjectNumber, placement).catch((error) =>
       console.error('[annotation] icon placement failed:', error),
     );
     return true;
@@ -123,7 +120,7 @@ export function createIcons(
         tool.flags,
         file,
       );
-      return createIcon(doc, pageObjectNumber, placement).catch((error) => {
+      return createIcon(pageObjectNumber, placement).catch((error) => {
         throw toPluginError('annotation', error);
       });
     },

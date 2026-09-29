@@ -7,7 +7,7 @@ import { PluginError, toPluginError, toPluginErrorInfo, type BatchResult } from 
 import { annotationKey, type AnnotationRef } from '@embedpdf/engine-core/runtime';
 
 import type { IntentOutcome } from '../services/intents';
-import type { Commit } from '../services/store';
+import type { Applied, Commit } from '../services/store';
 
 /** The outcome over the refs a selection verb addressed: each applied, or failed with the refusal. */
 export function batchResultOf(
@@ -43,6 +43,24 @@ export async function createdRefOf(commit: Commit): Promise<AnnotationRef> {
   const outcome = await commit.written;
   throwIfFailed(outcome);
   const ref = id === null ? undefined : outcome.created[id];
+  if (!ref) {
+    throw new PluginError('operation-failed', 'annotation', 'the annotation could not be created');
+  }
+  return ref;
+}
+
+/** Wait for stated changes to be written; rejects with the first refusal. */
+export async function appliedOrThrow(applied: Applied): Promise<IntentOutcome> {
+  const outcome = await applied.written;
+  throwIfFailed(outcome);
+  return outcome;
+}
+
+/** The ref of the record a stated create made, once the engine confirmed it. */
+export async function appliedRefOf(applied: Applied, index = 0): Promise<AnnotationRef> {
+  const outcome = await appliedOrThrow(applied);
+  const id = applied.ids[index];
+  const ref = id === undefined ? undefined : outcome.created[id];
   if (!ref) {
     throw new PluginError('operation-failed', 'annotation', 'the annotation could not be created');
   }

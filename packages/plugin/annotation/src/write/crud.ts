@@ -1,20 +1,22 @@
 /**
- * Create, update and delete: the public page-space verbs and their raw
- * (PDF-space) twins. `create` takes the same path a draw tool does (the core's
- * `createAnnot`, so defaults, flags and the new record's pending entry are
- * identical); the update and delete verbs write straight to the engine, and
- * the records mirror shows their result before they resolve.
+ * Create, update and delete: the public verbs and their raw twins. `create`
+ * takes the same path a draw tool does (the core's `createAnnot`, so defaults,
+ * flags and the new record's pending entry are identical); every other verb
+ * states its change through `store.apply`, so it shows at once and is written,
+ * settled and refused exactly like a gesture's.
  */
 import { PluginError, pageRefsEqual, type BatchResult } from '@embedpdf/core';
 import {
   FLAG_KEYS,
+  annotTransformable,
   applyProps,
+  propsFor,
+  type AnnotationPropsPatch,
   type ModelGeometry,
   type ModelAnnotation,
   type Subtype,
 } from '@embedpdf/core-annotation';
 import {
-  type AnnotationDTO,
   type AnnotationDraft,
   type AnnotationPatch,
   type AnnotationRef,
@@ -24,10 +26,9 @@ import {
 import type { AnnotationPatch as AnnotationPagePatch } from '../contract';
 import { geometryFromInput, type CreateAnnotationInput } from '../create-input';
 import type { AnnotationReads } from '../read/annotations';
-import { patchBetween, toPatch } from '@embedpdf/core-annotation';
+import { patchBetween } from '@embedpdf/core-annotation';
 import type { AnnotationContext, AnnotationServices } from '../services';
-import { named } from './named';
-import { batchOver, createdRefOf, throwIfFailed } from './outcomes';
+import { appliedOrThrow, appliedRefOf, batchOver, createdRefOf, throwIfFailed } from './outcomes';
 import {
   geometryWithBounds,
   geometryWithPatch,
@@ -35,6 +36,15 @@ import {
   rotationOf,
 } from './page-patch';
 import type { TextEditing } from './text-editing';
+
+/** Whether a props patch speaks to this annotation: it may change, and its kind takes a key. */
+const propsApply = (annotation: ModelAnnotation, props: AnnotationPropsPatch): boolean => {
+  const takes = new Set(propsFor(annotation.subtype).map((spec) => spec.key));
+  return (
+    annotTransformable(annotation) &&
+    Object.keys(props).some((key) => takes.has(key as keyof AnnotationPropsPatch))
+  );
+};
 
 export function createCrud(
   ctx: Pick<AnnotationContext, 'doc' | 'document'>,
@@ -47,13 +57,10 @@ export function createCrud(
   annotations: Pick<AnnotationReads, 'loadedOrThrow' | 'pageOf'>,
   text: Pick<TextEditing, 'flushText'>,
 ) {
-  /** The one engine-update path of the programmatic verbs. */
+  /** The one engine-update path of the programmatic verbs: the patch as given. */
   const updateRaw = async (ref: AnnotationRef, patch: AnnotationPatch): Promise<void> => {
-    await ctx.doc.page(annotations.pageOf(ref)).annotations.update(ref, patch);
+    await appliedOrThrow(store.apply([{ type: 'update', ref, patch }]));
   };
-
-  const wireSubtypeOf = (annotation: ModelAnnotation): AnnotationDTO['subtype'] =>
-    annotation.annotation.subtype;
 
   const update = async (ref: AnnotationRef, patch: AnnotationPagePatch): Promise<void> => {
     const annotation = annotations.loadedOrThrow(ref);
@@ -66,24 +73,27 @@ export function createCrud(
     }
     if (patch.props) {
       const applied = applyProps(modified, patch.props);
-      if (!applied) {
+      // Nothing applied: a value it already has, or a patch it doesn't take.
+      if (applied) modified = applied;
+      else if (!propsApply(modified, patch.props)) {
         throw new PluginError(
           'invalid-input',
           'annotation',
           'the props patch does not apply to this annotation',
         );
       }
-      modified = applied;
     }
-    let engine: Record<string, unknown> = {};
-    if (modified !== annotation) engine = { ...engine, ...(toPatch(modified) ?? {}) };
-    // Each flag is its own engine field: only the ones the patch names are written.
-    if (patch.flags) engine = { ...engine, ...patch.flags };
-    if (patch.contents !== undefined) engine = { ...engine, contents: patch.contents };
-    if (Object.keys(engine).length) {
+    // What changed, as the engine takes it; each flag is its own field, so
+    // only the ones the patch names are written.
+    const engine: Record<string, unknown> = {
+      ...patchBetween(annotation, modified),
+      ...patch.flags,
+      ...(patch.contents !== undefined ? { contents: patch.contents } : {}),
+    };
+    if (Object.keys(engine).some((name) => name !== 'subtype')) {
       await updateRaw(annotation.ref, {
-        subtype: wireSubtypeOf(annotation),
         ...engine,
+        subtype: annotation.annotation.subtype,
       } as AnnotationPatch);
     }
     if (patch.richText) {
@@ -148,12 +158,11 @@ export function createCrud(
       (key) => (draft as Partial<Record<string, unknown>>)[key] !== undefined,
     );
     const withFlags = (setsFlags ? draft : { ...draft, print: true }) as AnnotationDraft;
-    const result = await ctx.doc.page(page).annotations.create(named(withFlags));
-    return result.annotation.ref;
+    return appliedRefOf(store.apply([{ type: 'create', page, draft: withFlags }]));
   };
 
   const remove = async (ref: AnnotationRef): Promise<void> => {
-    await ctx.doc.page(annotations.pageOf(ref)).annotations.delete(ref);
+    await appliedOrThrow(store.apply([{ type: 'delete', ref }]));
   };
 
   const api = {

@@ -1,8 +1,11 @@
 /**
- * The effect runners: how a change the user makes with a gesture or a
- * selection verb reaches the engine. Each turns one core effect into one
- * engine write and touches no state; the intents service runs the write and
- * settles the pending changes it carries (services/intents.ts).
+ * The effect runners and the stated-change writer: how a change reaches the
+ * engine, whichever door it came through (a gesture or a selection verb's core
+ * effect, or a change stated in code with `store.apply`). Each turns one change
+ * into one engine write and touches no state; the intents service runs the
+ * write and settles the pending changes it carries (services/intents.ts). An
+ * update is written the same way from both doors, and attached link children
+ * follow it.
  *
  * A write to a record runs through `identity.withRef`, so an edit or a
  * delete of a record the engine has not confirmed yet is written after its
@@ -11,15 +14,19 @@
  * The text runner lives with text editing, the link runner with links, and
  * the capture runner with creation drafts.
  */
-import { linkChildrenOf } from '@embedpdf/core-annotation';
+import { linkChildrenOf, type Id } from '@embedpdf/core-annotation';
 import {
   annotationKey,
   type AnnotationDraft,
+  type AnnotationPatch,
   type AnnotationRef,
+  type AnnotationResources,
+  type PageRef,
 } from '@embedpdf/engine-core/runtime';
 
 import { toCreateDraft } from '@embedpdf/core-annotation';
 import type { AnnotationContext, AnnotationServices } from '../services';
+import type { IntentWrite } from '../services/intents';
 import type { LinkWrites } from './links';
 import { named } from './named';
 
@@ -28,28 +35,70 @@ export function registerEffectRunners(
   { store, geometry, identity }: Pick<AnnotationServices, 'store' | 'geometry' | 'identity'>,
   links: Pick<LinkWrites, 'scheduleSync'>,
 ): void {
-  // A new record: written with a fresh /NM, matched back to its id by that name.
-  store.onEffect('create', (effect, model) => {
-    const record = model.byId[effect.id];
-    const draft = record ? toCreateDraft(record) : null;
-    if (!record || !draft) return;
+  /** A new record: written under its name, matched back to its id by that name. */
+  const createWrite = (
+    id: Id,
+    page: PageRef,
+    draft: AnnotationDraft,
+    resources?: AnnotationResources,
+  ): IntentWrite => {
     const create = named(draft);
-    identity.expect(create.nm, effect.id);
+    identity.expect(create.nm, id);
     return {
-      ids: [effect.id],
+      ids: [id],
       perform: async () => {
         try {
           const { annotation: created } = await ctx.doc
-            .page(record.page)
-            .annotations.create(create);
-          identity.confirm(effect.id, created.ref);
-          return { [effect.id]: created.ref };
+            .page(page)
+            .annotations.create(create, resources);
+          identity.confirm(id, created.ref);
+          return { [id]: created.ref };
         } catch (error) {
-          identity.abandon(effect.id);
+          identity.abandon(id);
           throw error;
         }
       },
     };
+  };
+
+  /** One record's patch, and any new bytes, written; attached link children follow it. */
+  const updateWrite = (
+    id: Id,
+    patch: AnnotationPatch,
+    resources?: AnnotationResources,
+  ): IntentWrite => ({
+    ids: [id],
+    perform: () =>
+      identity.withRef(id, async (ref) => {
+        await ctx.doc.page(ref.page).annotations.update(ref, patch, resources);
+        const parent = annotationKey(ref);
+        if (linkChildrenOf(store.model(), parent).length) {
+          void links.scheduleSync(parent, 'keep');
+        }
+      }),
+  });
+
+  const deleteWrite = (id: Id): IntentWrite => ({
+    ids: [id],
+    perform: () =>
+      identity.withRef(id, async (ref) => {
+        await ctx.doc.page(ref.page).annotations.delete(ref);
+      }),
+  });
+
+  store.onApply((change, id) =>
+    change.type === 'create'
+      ? createWrite(id, change.page, change.draft, change.resources)
+      : change.type === 'update'
+        ? updateWrite(id, change.patch, change.resources)
+        : deleteWrite(id),
+  );
+
+  store.onEffect('create', (effect, model) => {
+    const record = model.byId[effect.id];
+    const draft = record ? toCreateDraft(record) : null;
+    if (!record || !draft) return;
+    return createWrite(effect.id, record.page, draft);
   });
 
   // A composite (a replace-text caret and its strikeout): the primary first,
@@ -104,27 +153,7 @@ export function registerEffectRunners(
 
   // What a record's change means to the engine, as the core worked it out:
   // the same patch its pending change holds.
-  store.onEffect('patch', (effect) => {
-    const { patch } = effect;
-    return {
-      ids: [effect.id],
-      perform: () =>
-        identity.withRef(effect.id, async (ref) => {
-          await ctx.doc.page(ref.page).annotations.update(ref, patch);
-          // Attached link children follow their parent's written geometry.
-          const parent = annotationKey(ref);
-          if (linkChildrenOf(store.model(), parent).length) {
-            void links.scheduleSync(parent, 'keep');
-          }
-        }),
-    };
-  });
+  store.onEffect('patch', (effect) => updateWrite(effect.id, effect.patch));
 
-  store.onEffect('delete', (effect) => ({
-    ids: [effect.id],
-    perform: () =>
-      identity.withRef(effect.id, async (ref) => {
-        await ctx.doc.page(ref.page).annotations.delete(ref);
-      }),
-  }));
+  store.onEffect('delete', (effect) => deleteWrite(effect.id));
 }
