@@ -30,12 +30,16 @@ describe('createTestContext', () => {
     expect(documents.listPages('elsewhere')).toEqual([]);
   });
 
-  it('answers page geometry from the page list, like the kernel', () => {
+  it('answers pages from the page list, like the kernel', () => {
     const ctx = make();
-    const space = ctx.geometry.forPage(toPageRef(7));
-    expect(space.pdfToPage({ x: 10, y: 820 })).toEqual({ x: 0, y: 0 });
-    expect(ctx.geometry.tryForPage(toPageRef(8))).toBeNull();
-    expect(() => ctx.geometry.forPage(toPageRef(8))).toThrow(/not in this document/);
+    expect(ctx.getPage(toPageRef(7))?.pdfCropBox).toEqual({
+      left: 10,
+      bottom: 20,
+      right: 610,
+      top: 820,
+    });
+    expect(ctx.getPage(toPageRef(8))).toBeNull();
+    expect(() => ctx.assertPageRef(toPageRef(8))).toThrow(/not in this document/);
     expect(ctx.document()?.pages[0]?.size).toEqual({ width: 600, height: 800 });
   });
 

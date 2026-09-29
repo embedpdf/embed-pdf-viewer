@@ -188,7 +188,7 @@ export function runAnnotationDeclarationConformance(
       await onAuthoringPage(async (page) => {
         const square = creatables().find(({ data }) => data.subtype === 'square')!.data;
         await expect(
-          page.annotations.create({ ...square, colour: { r: 0, g: 0, b: 0 } } as never),
+          page.annotations.create({ ...square, colour: '#000000' } as never),
         ).rejects.toMatchObject({ code: EngineErrorCode.InvalidArg });
         const { annotation: created } = await page.annotations.create({
           ...square,
@@ -259,8 +259,8 @@ export function runAnnotationDeclarationConformance(
           details: { field },
         });
         await expect(
-          page.annotations.create({ subtype: 'square', box: rect, color: { r: 300, g: 0, b: 0 } }),
-        ).rejects.toMatchObject(refused('color.r'));
+          page.annotations.create({ subtype: 'square', box: rect, color: 'red' }),
+        ).rejects.toMatchObject(refused('color'));
         await expect(
           page.annotations.create({ subtype: 'square', box: rect, opacity: 1.5 }),
         ).rejects.toMatchObject(refused('opacity'));

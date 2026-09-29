@@ -101,14 +101,14 @@ describe('FreeText and Callout partial updates preserve text (wasm)', () => {
           for (let cycle = 0; cycle < 2; cycle++) {
             const ref = (await annotation(doc)).ref;
             const patches: FreeTextPatch[] = [
-              { subtype: 'free-text', color: { r: 20 + cycle, g: 40, b: 60 } },
-              { subtype: 'free-text', fontSize: 20 + cycle, fontColor: { r: 0, g: 40, b: 120 } },
+              { subtype: 'free-text', color: cycle ? '#15283c' : '#14283c' },
+              { subtype: 'free-text', fontSize: 20 + cycle, fontColor: '#002878' },
               {
                 subtype: 'free-text',
                 fontFamily: cycle ? 'helvetica' : 'times-roman',
                 textAlign: cycle ? 'left' : 'center',
               },
-              { subtype: 'free-text', interiorColor: { r: 240, g: 245, b: 250 }, opacity: 0.9 },
+              { subtype: 'free-text', interiorColor: '#f0f5fa', opacity: 0.9 },
               { subtype: 'free-text', box: { ...RECT, width: 330 + cycle * 10 } },
               { subtype: 'free-text', subject: `metadata-only-${cycle}` },
               ...(callout

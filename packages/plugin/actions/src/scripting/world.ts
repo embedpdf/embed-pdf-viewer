@@ -12,15 +12,18 @@ import type {
   ScriptEventInput,
   ScriptWorldInput,
 } from '@embedpdf/core-acrojs';
-import { pdfRectOf, toPageRef } from '@embedpdf/engine-core/runtime';
+import { pdfRectOf, rgbOf, toPageRef } from '@embedpdf/engine-core/runtime';
 import type { FormSnapshot, PageObjectNumber } from '@embedpdf/engine-core/runtime';
 
 import type { ActionContext } from '../contract';
 
 export function createScriptWorld(ctx: PluginContext<void>) {
-  const engineColorToArray = (
-    color: { r: number; g: number; b: number } | null | undefined,
-  ): ScriptColorArray => (color ? ['RGB', color.r / 255, color.g / 255, color.b / 255] : ['T']);
+  // Acrobat's JavaScript keeps colors as color arrays, so they convert here, at its edge.
+  const engineColorToArray = (color: string | null | undefined): ScriptColorArray => {
+    if (!color) return ['T'];
+    const { r, g, b } = rgbOf(color);
+    return ['RGB', r / 255, g / 255, b / 255];
+  };
 
   const scriptWorldFor = async (
     pageObjectNumber: PageObjectNumber,
@@ -41,8 +44,8 @@ export function createScriptWorld(ctx: PluginContext<void>) {
         // numbers, [x_ll, y_ll, x_ur, y_ur], so it converts here, at its edge.
         const inFile = layout ? pdfRectOf(annotation.rect, layout.pdfCropBox) : null;
         const styled = annotation as unknown as {
-          color?: { r: number; g: number; b: number };
-          interiorColor?: { r: number; g: number; b: number } | null;
+          color?: string;
+          interiorColor?: string | null;
           opacity?: number;
           strokeWidth?: number;
           borderStyle?: string;

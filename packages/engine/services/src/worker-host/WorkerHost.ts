@@ -1320,6 +1320,7 @@ export class WorkerHost {
     const session = this.requireSession(req);
     return wirePack({
       tag: 'measure.viewports',
+      page: req.page,
       viewports: new MeasureReader(this.runtime, session).viewports(
         session.resolvePageRef(req.page).pageObjectNumber,
         signal,
@@ -2011,7 +2012,7 @@ export class WorkerHost {
   }
 
   private handleFormsCreateField(
-    req: FormsCreateFieldWorkerRequest,
+    req: FormsCreateFieldWorkerRequest<PdfCoordinates>,
     signal: AbortSignal,
   ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);

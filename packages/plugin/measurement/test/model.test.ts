@@ -15,14 +15,20 @@ import {
   setReports,
 } from '../src/model';
 
-const CROP = { left: 0, bottom: 0, right: 600, top: 800 };
+const SIZE = { width: 600, height: 800 };
+const PAGE_BOX = { x: 0, y: 0, ...SIZE };
 const FALLBACK = measureFromRatio(1, 1, 'm');
 const OWNED = measureFromRatio(1, 100, 'm');
 const FOREIGN = measureFromRatio(1, 50, 'm');
 const ERROR = { code: 'Unknown', message: 'read failed' } as never;
 
 const viewport = (owned: boolean, measure = owned ? OWNED : FOREIGN): PageMeasurementViewport =>
-  ({ bbox: CROP, name: owned ? 'EmbedPDF' : 'Other', owned, measure }) as PageMeasurementViewport;
+  ({
+    bbox: PAGE_BOX,
+    name: owned ? 'EmbedPDF' : 'Other',
+    owned,
+    measure,
+  }) as PageMeasurementViewport;
 
 describe('measurement transitions', () => {
   it('counts scale changes in flight and never below zero', () => {
@@ -63,15 +69,15 @@ describe('measurement transitions', () => {
 });
 
 describe('page scale projection', () => {
-  it('prefers the owned viewport, then the one at the crop center, then the fallback', () => {
-    expect(selectPageScale([viewport(false), viewport(true)], CROP, FALLBACK, true)).toEqual({
+  it('prefers the owned viewport, then the one at the page center, then the fallback', () => {
+    expect(selectPageScale([viewport(false), viewport(true)], SIZE, FALLBACK, true)).toEqual({
       measure: OWNED,
       source: 'owned',
       ready: true,
       persistent: true,
     });
-    expect(selectPageScale([viewport(false)], CROP, FALLBACK, true).source).toBe('foreign');
-    expect(selectPageScale([], CROP, FALLBACK, false)).toEqual({
+    expect(selectPageScale([viewport(false)], SIZE, FALLBACK, true).source).toBe('foreign');
+    expect(selectPageScale([], SIZE, FALLBACK, false)).toEqual({
       measure: FALLBACK,
       source: 'default',
       ready: true,
@@ -84,7 +90,7 @@ describe('page scale projection', () => {
       viewports: undefined,
       status: 'loading' as const,
       error: undefined,
-      crop: CROP,
+      size: SIZE,
       fallback: FALLBACK,
       persistent: true,
     };
@@ -102,7 +108,7 @@ describe('page scale projection', () => {
       viewports: [viewport(true)],
       status: 'error',
       error: ERROR,
-      crop: CROP,
+      size: SIZE,
       fallback: FALLBACK,
       persistent: true,
     });
@@ -114,7 +120,7 @@ describe('page scale projection', () => {
       viewports: [],
       status: 'ready',
       error: ERROR,
-      crop: CROP,
+      size: SIZE,
       fallback: FALLBACK,
       persistent: true,
     });

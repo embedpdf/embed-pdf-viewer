@@ -1,7 +1,7 @@
 /**
- * The geometry/colour seam between the engine's wire vocabulary and the
- * core's model. Both measure places in page space, so geometry passes through
- * as it is; colours cross between the engine's `Color` and CSS hex here.
+ * The seam between the engine's wire vocabulary and the core's model. Both
+ * measure places in page space and spell colors as hex, so values pass
+ * through as they are.
  */
 import {
   FLAG_KEYS,
@@ -26,30 +26,15 @@ import type {
 // The one annotation key (engine-core `annotationKey`): obj:<n> | nm:<page>:<name> | idx:<page>:<i>.
 export { annotationKey } from '@embedpdf/core';
 
-/* ── colour seam (engine Color ↔ CSS hex) ─────────────────────────────────── */
-
-const h2 = (channel: number) =>
-  Math.max(0, Math.min(255, Math.round(channel)))
-    .toString(16)
-    .padStart(2, '0');
-export const colorToCss = (color: Color): string => `#${h2(color.r)}${h2(color.g)}${h2(color.b)}`;
-export function cssToColor(css: string): Color {
+/**
+ * The model's CSS color as the engine takes it, `'#rrggbb'`: a short `#rgb`
+ * is spelled out, and anything else that isn't a hex color is black.
+ */
+export function hexColorOf(css: string): Color {
   const trimmed = css.trim();
-  const m6 = /^#?([0-9a-f]{6})$/i.exec(trimmed);
-  if (m6) {
-    const packed = parseInt(m6[1], 16);
-    return { r: (packed >> 16) & 255, g: (packed >> 8) & 255, b: packed & 255 };
-  }
-  const m3 = /^#?([0-9a-f]{3})$/i.exec(trimmed);
-  if (m3) {
-    const [red, green, blue] = m3[1];
-    return {
-      r: parseInt(red + red, 16),
-      g: parseInt(green + green, 16),
-      b: parseInt(blue + blue, 16),
-    };
-  }
-  return { r: 0, g: 0, b: 0 };
+  if (/^#[0-9a-f]{6}$/i.test(trimmed)) return trimmed;
+  const short = /^#([0-9a-f])([0-9a-f])([0-9a-f])$/i.exec(trimmed);
+  return short ? `#${short[1]}${short[1]}${short[2]}${short[2]}${short[3]}${short[3]}` : '#000000';
 }
 
 /** The `/F` flags of a read, as the model's one flag set. */
@@ -119,8 +104,8 @@ const STROKE_KINDS = new Set(['square', 'circle', 'line', 'polygon', 'polyline',
 export function styleFromDTO(dto: AnnotationDTO): Style {
   if (dto.subtype === 'widget') {
     return {
-      color: dto.color ? colorToCss(dto.color) : '#1a1a1a',
-      interiorColor: dto.interiorColor ? colorToCss(dto.interiorColor) : null,
+      color: dto.color ? dto.color : '#1a1a1a',
+      interiorColor: dto.interiorColor ? dto.interiorColor : null,
       strokeWidth: dto.strokeWidth,
       opacity: 1,
       blendMode: dto.blendMode,
@@ -133,8 +118,8 @@ export function styleFromDTO(dto: AnnotationDTO): Style {
       { interiorColor: Color | null; opacity: number; strokeWidth: number }
     >;
     return {
-      color: colorToCss(strokeDto.color),
-      interiorColor: strokeDto.interiorColor ? colorToCss(strokeDto.interiorColor) : null,
+      color: strokeDto.color,
+      interiorColor: strokeDto.interiorColor ? strokeDto.interiorColor : null,
       strokeWidth: strokeDto.strokeWidth,
       opacity: strokeDto.opacity,
       blendMode: dto.blendMode,
@@ -144,7 +129,7 @@ export function styleFromDTO(dto: AnnotationDTO): Style {
   if (TEXT_MARKUP.has(dto.subtype)) {
     const markupDto = dto as Extract<AnnotationDTO, { color: Color }>;
     return {
-      color: colorToCss(markupDto.color),
+      color: markupDto.color,
       interiorColor: null,
       strokeWidth: 0,
       opacity: markupDto.opacity,
@@ -155,7 +140,7 @@ export function styleFromDTO(dto: AnnotationDTO): Style {
   if (dto.subtype === 'caret') {
     const caretDto = dto as Extract<AnnotationDTO, { color: Color; opacity: number }>;
     return {
-      color: colorToCss(caretDto.color),
+      color: caretDto.color,
       interiorColor: null,
       strokeWidth: 1,
       opacity: caretDto.opacity,
@@ -169,8 +154,8 @@ export function styleFromDTO(dto: AnnotationDTO): Style {
     // for a callout's leader/arrow/box-border (and the style toolbar's readout).
     const freeTextDto = dto as Extract<AnnotationDTO, { subtype: 'free-text' }>;
     return {
-      color: colorToCss(freeTextDto.color),
-      interiorColor: freeTextDto.interiorColor ? colorToCss(freeTextDto.interiorColor) : null,
+      color: freeTextDto.color,
+      interiorColor: freeTextDto.interiorColor ? freeTextDto.interiorColor : null,
       strokeWidth: freeTextDto.strokeWidth,
       opacity: freeTextDto.opacity,
       blendMode: dto.blendMode,
@@ -182,8 +167,8 @@ export function styleFromDTO(dto: AnnotationDTO): Style {
     // No `/BS` on redact — the outline weight is a client rendering choice.
     const redactDto = dto as Extract<AnnotationDTO, { subtype: 'redact' }>;
     return {
-      color: colorToCss(redactDto.color),
-      interiorColor: redactDto.interiorColor ? colorToCss(redactDto.interiorColor) : null,
+      color: redactDto.color,
+      interiorColor: redactDto.interiorColor ? redactDto.interiorColor : null,
       strokeWidth: 1.5,
       opacity: redactDto.opacity,
       blendMode: dto.blendMode,
@@ -205,7 +190,7 @@ export function styleFromDTO(dto: AnnotationDTO): Style {
     // Icon kinds: /C is the icon fill, /CA its opacity — no stroke/fill split.
     const iconDto = dto as Extract<AnnotationDTO, { color: Color; opacity: number }>;
     return {
-      color: colorToCss(iconDto.color),
+      color: iconDto.color,
       interiorColor: null,
       strokeWidth: 1,
       opacity: iconDto.opacity,
@@ -232,9 +217,9 @@ export function styleFromDTO(dto: AnnotationDTO): Style {
  */
 export function widgetAppearanceFromProps(props: AnnotationPropsPatch): WidgetAppearance {
   return {
-    ...(props.color !== undefined ? { color: cssToColor(props.color) } : {}),
+    ...(props.color !== undefined ? { color: hexColorOf(props.color) } : {}),
     ...(props.interiorColor !== undefined
-      ? { interiorColor: props.interiorColor ? cssToColor(props.interiorColor) : null }
+      ? { interiorColor: props.interiorColor ? hexColorOf(props.interiorColor) : null }
       : {}),
     ...(props.strokeWidth !== undefined ? { strokeWidth: props.strokeWidth } : {}),
     ...(props.border !== undefined
@@ -242,7 +227,7 @@ export function widgetAppearanceFromProps(props: AnnotationPropsPatch): WidgetAp
       : {}),
     ...(props.fontFamily !== undefined ? { fontFamily: props.fontFamily as StandardFont } : {}),
     ...(props.fontSize !== undefined ? { fontSize: props.fontSize } : {}),
-    ...(props.fontColor !== undefined ? { fontColor: cssToColor(props.fontColor) } : {}),
+    ...(props.fontColor !== undefined ? { fontColor: hexColorOf(props.fontColor) } : {}),
     ...(props.textAlign !== undefined ? { textAlign: props.textAlign } : {}),
   };
 }

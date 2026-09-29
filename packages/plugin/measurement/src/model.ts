@@ -11,7 +11,7 @@ import { viewportForPoint } from '@embedpdf/engine-core/runtime';
 import type {
   PageMeasurementViewport,
   PdfMeasure,
-  PdfRect,
+  PdfSize,
   SerializedEngineError,
 } from '@embedpdf/engine-core/runtime';
 import type { ResourceStatus } from '@embedpdf/core';
@@ -84,20 +84,17 @@ export const setLocalViewports = (
 
 /**
  * The scale a page's viewports resolve to: the owned viewport, else the one
- * containing the crop box's center, else the fallback.
+ * containing the page's center, else the fallback.
  */
 export function selectPageScale(
   viewports: readonly PageMeasurementViewport[],
-  crop: PdfRect,
+  size: PdfSize,
   fallback: PdfMeasure,
   persistent: boolean,
 ): PageScale {
   const selected =
     viewports.find((viewport) => viewport.owned) ??
-    viewportForPoint(viewports, {
-      x: (crop.left + crop.right) / 2,
-      y: (crop.top + crop.bottom) / 2,
-    });
+    viewportForPoint(viewports, { x: size.width / 2, y: size.height / 2 });
   return {
     measure: selected ? (selected.measure ?? null) : fallback,
     source: selected ? (selected.owned ? 'owned' : 'foreign') : 'default',
@@ -112,8 +109,8 @@ export interface PageScaleInputs {
   readonly viewports: readonly PageMeasurementViewport[] | undefined;
   readonly status: ResourceStatus;
   readonly error: SerializedEngineError | undefined;
-  /** The page's crop box; undefined when the page is not in the registry. */
-  readonly crop: PdfRect | undefined;
+  /** The page's size; undefined when the page is not in the registry. */
+  readonly size: PdfSize | undefined;
   readonly fallback: PdfMeasure;
   readonly persistent: boolean;
 }
@@ -125,7 +122,7 @@ export interface PageScaleInputs {
  */
 export function pageScaleOf(inputs: PageScaleInputs): PageScale {
   const error = inputs.status === 'error' && inputs.error ? { error: inputs.error } : {};
-  if (!inputs.viewports || !inputs.crop) {
+  if (!inputs.viewports || !inputs.size) {
     return {
       measure: null,
       source: 'default',
@@ -135,7 +132,7 @@ export function pageScaleOf(inputs: PageScaleInputs): PageScale {
     };
   }
   return {
-    ...selectPageScale(inputs.viewports, inputs.crop, inputs.fallback, inputs.persistent),
+    ...selectPageScale(inputs.viewports, inputs.size, inputs.fallback, inputs.persistent),
     ...error,
   };
 }

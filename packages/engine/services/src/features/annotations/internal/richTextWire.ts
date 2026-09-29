@@ -177,15 +177,25 @@ export function parseEngineRichText(json: string): RichTextDocument | null {
     source?: unknown;
   };
   void _source;
-  const body = bodyRest as unknown as RichTextBody;
+  const body = withLowercaseColor(bodyRest) as unknown as RichTextBody;
   const paragraphs: RichTextParagraph[] = raw.paragraphs.map((p) => {
     const { runs, ...props } = p;
     return {
       ...(props as Partial<RichTextParagraph>),
-      runs: (runs ?? []).map((r) => r as unknown as RichTextParagraph['runs'][number]),
+      runs: (runs ?? []).map((r) => {
+        const run = r as { style?: Record<string, unknown> };
+        return (run.style
+          ? { ...run, style: withLowercaseColor(run.style) }
+          : run) as unknown as RichTextParagraph['runs'][number];
+      }),
     } as RichTextParagraph;
   });
   return { body, paragraphs };
+}
+
+/** A style's color as the engine gives every color: `'#rrggbb'`, lowercase. */
+function withLowercaseColor(style: Record<string, unknown>): Record<string, unknown> {
+  return typeof style.color === 'string' ? { ...style, color: style.color.toLowerCase() } : style;
 }
 
 /** Read an annotation's rich text through `EPDFAnnot_GetRichTextJSON`. */

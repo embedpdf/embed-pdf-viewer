@@ -95,7 +95,7 @@ describe('pages kept between jobs (wasm engine)', () => {
       await doc.page(page).annotations.create({
         subtype: 'redact',
         rect: { x: 100, y: 100, width: 100, height: 100 },
-        interiorColor: { r: 0, g: 0, b: 0 },
+        interiorColor: '#000000',
       });
       await doc.redaction!.apply({ pages: [page] });
     };

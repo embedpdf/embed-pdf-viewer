@@ -1,6 +1,6 @@
 import type { WidgetAppearance } from '../annotation/kinds/widget.shared';
 import type { PageRef } from '../identity/PageRef';
-import type { Coordinates, PdfCoordinates } from '../pageSpace/coordinates';
+import type { Coordinates, PageCoordinates } from '../pageSpace/coordinates';
 
 export type { WidgetAppearance } from '../annotation/kinds/widget.shared';
 
@@ -9,7 +9,7 @@ export type { WidgetAppearance } from '../annotation/kinds/widget.shared';
  * this is an annotation create + `attachWidget`, composed in one atomic
  * engine job.
  */
-export interface WidgetPlacement<C extends Coordinates = PdfCoordinates> {
+export interface WidgetPlacement<C extends Coordinates = PageCoordinates> {
   page: PageRef;
   rect: C['box'];
   /**
@@ -44,44 +44,54 @@ interface FormFieldDraftBase {
   mappingName?: string;
 }
 
-export interface TextFieldDraft extends FormFieldDraftBase {
+export interface TextFieldDraft<
+  C extends Coordinates = PageCoordinates,
+> extends FormFieldDraftBase {
   family: 'text';
   defaultValue?: string;
   maxLength?: number;
   multiline?: boolean;
   password?: boolean;
   comb?: boolean;
-  widget?: WidgetPlacement;
+  widget?: WidgetPlacement<C>;
 }
 
-export interface CheckboxFieldDraft extends FormFieldDraftBase {
+export interface CheckboxFieldDraft<
+  C extends Coordinates = PageCoordinates,
+> extends FormFieldDraftBase {
   family: 'checkbox';
-  widget?: WidgetPlacement;
+  widget?: WidgetPlacement<C>;
 }
 
 /** One field, N widgets — the ISO radio model. */
-export interface RadioFieldDraft extends FormFieldDraftBase {
+export interface RadioFieldDraft<
+  C extends Coordinates = PageCoordinates,
+> extends FormFieldDraftBase {
   family: 'radio';
   radiosInUnison?: boolean;
   noToggleToOff?: boolean;
   /** Each placement must carry its `onState`. */
-  widgets?: WidgetPlacement[];
+  widgets?: WidgetPlacement<C>[];
 }
 
-export interface ComboBoxFieldDraft extends FormFieldDraftBase {
+export interface ComboBoxFieldDraft<
+  C extends Coordinates = PageCoordinates,
+> extends FormFieldDraftBase {
   family: 'combobox';
   /** Free text allowed in addition to the options. */
   edit?: boolean;
   options?: FormFieldOptionInput[];
   defaultValue?: string;
-  widget?: WidgetPlacement;
+  widget?: WidgetPlacement<C>;
 }
 
-export interface ListBoxFieldDraft extends FormFieldDraftBase {
+export interface ListBoxFieldDraft<
+  C extends Coordinates = PageCoordinates,
+> extends FormFieldDraftBase {
   family: 'listbox';
   multiSelect?: boolean;
   options?: FormFieldOptionInput[];
-  widget?: WidgetPlacement;
+  widget?: WidgetPlacement<C>;
 }
 
 /**
@@ -89,19 +99,21 @@ export interface ListBoxFieldDraft extends FormFieldDraftBase {
  * signing it is `doc.signatures`' job, drawing a mark into it without
  * signing is `doc.forms.setSignatureAppearance`.
  */
-export interface SignatureFieldDraft extends FormFieldDraftBase {
+export interface SignatureFieldDraft<
+  C extends Coordinates = PageCoordinates,
+> extends FormFieldDraftBase {
   family: 'signature';
-  widget?: WidgetPlacement;
+  widget?: WidgetPlacement<C>;
 }
 
 /**
  * What `doc.forms.createField` takes: per-family, mirroring the DTO union.
  * Push buttons are not authorable.
  */
-export type FormFieldDraft =
-  | TextFieldDraft
-  | CheckboxFieldDraft
-  | RadioFieldDraft
-  | ComboBoxFieldDraft
-  | ListBoxFieldDraft
-  | SignatureFieldDraft;
+export type FormFieldDraft<C extends Coordinates = PageCoordinates> =
+  | TextFieldDraft<C>
+  | CheckboxFieldDraft<C>
+  | RadioFieldDraft<C>
+  | ComboBoxFieldDraft<C>
+  | ListBoxFieldDraft<C>
+  | SignatureFieldDraft<C>;

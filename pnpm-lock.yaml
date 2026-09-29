@@ -918,9 +918,6 @@ importers:
 
   packages/core/main:
     dependencies:
-      '@embedpdf/core-geometry':
-        specifier: workspace:*
-        version: link:../geometry
       '@embedpdf/engine-core':
         specifier: workspace:*
         version: link:../../engine/core

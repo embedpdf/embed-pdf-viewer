@@ -1,4 +1,4 @@
-import type { WidgetPlacement } from '@embedpdf/engine-core/runtime';
+import type { PdfCoordinates, WidgetPlacement } from '@embedpdf/engine-core/runtime';
 import { EngineError, EngineErrorCode } from '@embedpdf/engine-core/runtime';
 import { NULL_PTR, type PdfRuntimeModule, type Ptr } from '@embedpdf/engine-runtime';
 
@@ -18,7 +18,7 @@ export function createUnattachedWidget(
   runtime: PdfRuntimeModule,
   docPtr: Ptr,
   pageIndex: number,
-  placement: WidgetPlacement,
+  placement: WidgetPlacement<PdfCoordinates>,
 ): number {
   const { fn, mem } = runtime;
   const annotPtr = fn.EPDFPage_CreateAnnotRaw(docPtr, pageIndex, WIDGET_SUBTYPE_CODE);

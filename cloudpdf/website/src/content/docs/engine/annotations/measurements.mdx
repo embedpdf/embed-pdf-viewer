@@ -185,12 +185,12 @@ const { viewports } = await page.measure.listViewports();
 A page can have several measured regions, called viewports, each with its own scale: a plan and a
 detail at another scale on one sheet. `listViewports()` returns them in the order they're drawn:
 
-| Field     | What it is                                            |
-| :-------- | :---------------------------------------------------- |
-| `bbox`    | The region, `{ left, bottom, right, top }` in points. |
-| `measure` | Its scale, or `null`.                                 |
-| `name`    | Its name, or `null`.                                  |
-| `owned`   | `true` for the one `setScale()` writes.               |
+| Field     | What it is                                       |
+| :-------- | :----------------------------------------------- |
+| `bbox`    | The region, `{ x, y, width, height }` in points. |
+| `measure` | Its scale, or `null`.                            |
+| `name`    | Its name, or `null`.                             |
+| `owned`   | `true` for the one `setScale()` writes.          |
 
 `setScale()` writes one region of its own that covers the whole page; other apps' regions stay as
 they are. When regions overlap, the last one that contains a point is the one for that point:

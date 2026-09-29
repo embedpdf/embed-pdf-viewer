@@ -8,6 +8,7 @@ import {
   type LinePoints,
   type PdfPoint,
   type PdfRect,
+  rgbOf,
 } from '@embedpdf/engine-core/runtime';
 import {
   NULL_PTR,
@@ -44,7 +45,8 @@ export function setAnnotColor(
   color: Color,
   type: number = FPDFANNOT_COLORTYPE.Color,
 ): void {
-  const ok = fn.EPDFAnnot_SetColor(annotPtr, type, color.r & 0xff, color.g & 0xff, color.b & 0xff);
+  const { r, g, b } = rgbOf(color);
+  const ok = fn.EPDFAnnot_SetColor(annotPtr, type, r, g, b);
   if (!ok) {
     throw new EngineError(EngineErrorCode.Unknown, 'EPDFAnnot_SetColor returned false');
   }
@@ -349,16 +351,8 @@ export function setDefaultAppearance(
   fontSize: number,
   color: Color,
 ): void {
-  if (
-    !fn.EPDFAnnot_SetDefaultAppearance(
-      annotPtr,
-      fontCode,
-      fontSize,
-      color.r & 0xff,
-      color.g & 0xff,
-      color.b & 0xff,
-    )
-  ) {
+  const { r, g, b } = rgbOf(color);
+  if (!fn.EPDFAnnot_SetDefaultAppearance(annotPtr, fontCode, fontSize, r, g, b)) {
     throw new EngineError(EngineErrorCode.Unknown, 'EPDFAnnot_SetDefaultAppearance returned false');
   }
 }
@@ -377,16 +371,8 @@ export function setDefaultAppearanceRegisteredFont(
   fontSize: number,
   color: Color,
 ): void {
-  if (
-    !fn.EPDFAnnot_SetDefaultAppearanceRegisteredFont(
-      annotPtr,
-      fontId,
-      fontSize,
-      color.r & 0xff,
-      color.g & 0xff,
-      color.b & 0xff,
-    )
-  ) {
+  const { r, g, b } = rgbOf(color);
+  if (!fn.EPDFAnnot_SetDefaultAppearanceRegisteredFont(annotPtr, fontId, fontSize, r, g, b)) {
     throw new EngineError(
       EngineErrorCode.Unknown,
       'EPDFAnnot_SetDefaultAppearanceRegisteredFont returned false',

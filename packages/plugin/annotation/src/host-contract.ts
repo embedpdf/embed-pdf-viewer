@@ -23,7 +23,6 @@ import type {
   PageMeasurementViewport,
   PageRef,
   PdfMeasure,
-  PdfPoint,
   RichTextParagraph,
   SerializedEngineError,
 } from '@embedpdf/engine-core/runtime';
@@ -67,9 +66,8 @@ export interface RecalibrationReport {
 export interface CapturedAnnotationDraft {
   tool: string;
   page: PageRef;
-  /** In the file's coordinates, as the page's measure viewports are read. */
-  from: PdfPoint;
-  to: PdfPoint;
+  from: Point;
+  to: Point;
 }
 
 /**

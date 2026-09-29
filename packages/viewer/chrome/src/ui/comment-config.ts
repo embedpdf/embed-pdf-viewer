@@ -23,10 +23,6 @@ export interface CommentTypeConfig {
   label: string;
 }
 
-/** `/C`-style Color → CSS. */
-export const cssColor = (color: Color | null | undefined): string | undefined =>
-  color ? `rgb(${color.r}, ${color.g}, ${color.b})` : undefined;
-
 const TYPE_CONFIG: Record<string, CommentTypeConfig> = {
   text: { icon: 'message', labelKey: 'annotation.comment', label: 'Comment' },
   highlight: { icon: 'highlight', labelKey: 'annotation.highlight', label: 'Highlight' },
@@ -65,9 +61,10 @@ export const commentTypeConfig = (dto: AnnotationDTO): CommentTypeConfig =>
  * its `fontColor` override, since that is the color a reader actually sees.
  */
 export const commentIconAccent = (dto: AnnotationDTO): IconAccent => {
+  // Engine colors are `'#rrggbb'`, which CSS takes as they are.
   const anyA = dto as { color?: Color; interiorColor?: Color | null; fontColor?: Color };
-  const primary = cssColor(anyA.fontColor ?? anyA.color);
-  const secondary = cssColor(anyA.interiorColor);
+  const primary = anyA.fontColor ?? anyA.color;
+  const secondary = anyA.interiorColor ?? undefined;
   return {
     ...(primary ? { primary } : {}),
     ...(secondary ? { secondary } : {}),

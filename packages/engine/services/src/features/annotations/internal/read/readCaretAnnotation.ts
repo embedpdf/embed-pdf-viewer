@@ -11,7 +11,7 @@ import { readAnnotationBox } from './readAnnotationTurn';
 import { caretIntentFromName } from '../textEditIntent';
 
 /** Default `/C` colour when a caret has none (matches the writer default). */
-const DEFAULT_CARET_COLOR: Color = { r: 255, g: 0, b: 0 };
+const DEFAULT_CARET_COLOR: Color = '#ff0000';
 
 export function readCaret(
   fn: PdfFunctions,
@@ -19,7 +19,7 @@ export function readCaret(
   annotPtr: Ptr,
   base: AnnotationBase<PdfCoordinates>,
 ): CaretAnnotationDTO<PdfCoordinates> {
-  const color = readAnnotColor(fn, mem, annotPtr) ?? { ...DEFAULT_CARET_COLOR };
+  const color = readAnnotColor(fn, mem, annotPtr) ?? DEFAULT_CARET_COLOR;
   const ca = readAnnotOpacity(fn, mem, annotPtr);
   const opacity = ca == null ? 1 : Math.max(0, Math.min(1, ca));
   const intent = caretIntentFromName(readIntent(fn, mem, annotPtr));

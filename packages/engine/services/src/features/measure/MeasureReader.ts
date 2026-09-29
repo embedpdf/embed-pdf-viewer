@@ -1,4 +1,8 @@
-import type { PageMeasurementViewport, PageObjectNumber } from '@embedpdf/engine-core/runtime';
+import type {
+  PageMeasurementViewport,
+  PageObjectNumber,
+  PdfCoordinates,
+} from '@embedpdf/engine-core/runtime';
 import type { PdfRuntimeModule } from '@embedpdf/engine-runtime';
 import type { DocumentSession } from '../../document-session/DocumentSession';
 import { throwIfAborted } from '../../shared/abort';
@@ -9,7 +13,10 @@ export class MeasureReader {
     private readonly runtime: PdfRuntimeModule,
     private readonly session: DocumentSession,
   ) {}
-  viewports(pageObjectNumber: PageObjectNumber, signal: AbortSignal): PageMeasurementViewport[] {
+  viewports(
+    pageObjectNumber: PageObjectNumber,
+    signal: AbortSignal,
+  ): PageMeasurementViewport<PdfCoordinates>[] {
     throwIfAborted(signal);
     const pool = this.session.pagePool(),
       page = pool.acquire(pageObjectNumber);

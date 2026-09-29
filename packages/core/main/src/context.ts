@@ -1,5 +1,4 @@
 import { pageRefsEqual, type DocumentHandle, type PageRef } from '@embedpdf/engine-core/runtime';
-import { pageSpace, type PageSpace } from '@embedpdf/core-geometry';
 
 import { isDev } from './env';
 import { PluginError } from './errors';
@@ -158,20 +157,6 @@ export function createPluginContext(
   const metaOf = (): DocumentMeta | null =>
     session ? (store.getCore().documents[session.id] ?? session.stagedMeta) : null;
 
-  const spaces = new Map<string, PageSpace>();
-  const tryForPage = (ref: PageRef): PageSpace | null => {
-    const meta = metaOf();
-    const page = meta?.pages.find((pageInfo) => pageRefsEqual(pageInfo.ref, ref));
-    if (!meta || !page) return null;
-    const key = `${meta.revision}:${ref.pageObjectNumber}`;
-    let space = spaces.get(key);
-    if (!space) {
-      if (spaces.size > 4096) spaces.clear();
-      space = pageSpace(page.pdfCropBox);
-      spaces.set(key, space);
-    }
-    return space;
-  };
   const notFound = (ref: PageRef) =>
     new PluginError(
       'not-found',
@@ -225,14 +210,6 @@ export function createPluginContext(
     assertPageRef: (ref) => {
       if (!metaOf()?.pages.some((pageInfo) => pageRefsEqual(pageInfo.ref, ref)))
         throw notFound(ref);
-    },
-    geometry: {
-      tryForPage,
-      forPage: (ref) => {
-        const space = tryForPage(ref);
-        if (!space) throw notFound(ref);
-        return space;
-      },
     },
 
     get: <T>(token: CapabilityToken<T>): T => (

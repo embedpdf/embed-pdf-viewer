@@ -10,7 +10,7 @@ import { normalizeQuad } from '@embedpdf/core-geometry';
 import type { AnnotationDTO, PageBox, PageQuad } from '@embedpdf/engine-core/runtime';
 
 import type { KindProjection } from '../projection';
-import { boxGeomFields, colorToCss } from '../seam';
+import { boxGeomFields } from '../seam';
 
 /**
  * Imported `/QuadPoints` → semantic TextQuads. `normalizeQuad` is a
@@ -119,7 +119,7 @@ export const redact: KindProjection = {
       text: {
         fontFamily: redactDto.fontFamily,
         fontSize: redactDto.fontSize,
-        fontColor: colorToCss(redactDto.fontColor),
+        fontColor: redactDto.fontColor,
         textAlign: redactDto.textAlign,
       },
       ...(redactDto.overlayText

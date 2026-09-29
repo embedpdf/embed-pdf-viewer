@@ -12,7 +12,7 @@ const { field } = await doc.forms.create({
   family: 'text',
   name: 'customer.email',
   maxLength: 60,
-  widgets: [{ page: page.ref, rect: { left: 72, bottom: 600, right: 300, top: 624 } }],
+  widgets: [{ page: page.ref, rect: { x: 72, y: 168, width: 228, height: 24 } }],
 });
 
 await doc.forms.setValue(field.ref, { value: 'ada@example.com' });
@@ -37,16 +37,16 @@ field can have widgets on several pages that all show the same value.
 pages, one entry per place it shows; leave it out to create a field that isn't on any page yet,
 and [add a widget](#add-a-widget) later.
 
-| Field            | What it is                                                                                                          | Default    |
-| :--------------- | :------------------------------------------------------------------------------------------------------------------ | :--------- |
-| `family`         | `'text'`, `'checkbox'`, `'radio'`, `'combobox'`, `'listbox'` or `'signature'`                                       |            |
-| `name`           | The full name. Dots make groups: `customer.email` creates `customer` if it's new.                                   |            |
-| `widgets`        | Where it shows: a list of `{ page, rect }`, `rect` in PDF points, each with the [widget's look](#the-widgets-look). | not placed |
-| `flags.readOnly` | PDF apps don't let the user change it.                                                                              | `false`    |
-| `flags.required` | PDF apps ask for a value before the form is submitted.                                                              | `false`    |
-| `flags.noExport` | Left out when the form is submitted.                                                                                | `false`    |
-| `alternateName`  | The tooltip PDF apps show, also read by screen readers.                                                             | none       |
-| `mappingName`    | A second name, for other apps that export the form's data.                                                          | none       |
+| Field            | What it is                                                                                                                               | Default    |
+| :--------------- | :--------------------------------------------------------------------------------------------------------------------------------------- | :--------- |
+| `family`         | `'text'`, `'checkbox'`, `'radio'`, `'combobox'`, `'listbox'` or `'signature'`                                                            |            |
+| `name`           | The full name. Dots make groups: `customer.email` creates `customer` if it's new.                                                        |            |
+| `widgets`        | Where it shows: a list of `{ page, rect }`, `rect` in points from the page's top-left, each with the [widget's look](#the-widgets-look). | not placed |
+| `flags.readOnly` | PDF apps don't let the user change it.                                                                                                   | `false`    |
+| `flags.required` | PDF apps ask for a value before the form is submitted.                                                                                   | `false`    |
+| `flags.noExport` | Left out when the form is submitted.                                                                                                     | `false`    |
+| `alternateName`  | The tooltip PDF apps show, also read by screen readers.                                                                                  | none       |
+| `mappingName`    | A second name, for other apps that export the form's data.                                                                               | none       |
 
 `flags` is `{ readOnly, required, noExport }`, the same shape as a field's `flags` when you read
 it.
@@ -79,10 +79,10 @@ const { field } = await doc.forms.create({
   widgets: [
     {
       page: page.ref,
-      rect: { left: 72, bottom: 640, right: 88, top: 656 },
+      rect: { x: 72, y: 136, width: 16, height: 16 },
       exportValue: 'monthly',
     },
-    { page: page.ref, rect: { left: 72, bottom: 610, right: 88, top: 626 }, exportValue: 'yearly' },
+    { page: page.ref, rect: { x: 72, y: 166, width: 16, height: 16 }, exportValue: 'yearly' },
   ],
 });
 
@@ -102,7 +102,7 @@ await doc.forms.create({
     { label: 'Belgium', value: 'BE' },
   ],
   defaultValue: 'NL',
-  widgets: [{ page: page.ref, rect: { left: 72, bottom: 520, right: 220, top: 540 } }],
+  widgets: [{ page: page.ref, rect: { x: 72, y: 252, width: 148, height: 20 } }],
 });
 ```
 
@@ -113,7 +113,7 @@ fields you change later with `page.annotations.update()`:
 
 | Field           | What it is                                                          |
 | :-------------- | :------------------------------------------------------------------ |
-| `color`         | Border color, `{ r, g, b }` from 0 to 255                           |
+| `color`         | Border color, `'#rrggbb'`                                           |
 | `interiorColor` | Background color                                                    |
 | `strokeWidth`   | Border width in points                                              |
 | `borderStyle`   | `'solid'`, `'dashed'`, `'beveled'` or `'inset'`                     |
@@ -126,9 +126,9 @@ fields you change later with `page.annotations.update()`:
 widgets: [
   {
     page: page.ref,
-    rect: { left: 72, bottom: 560, right: 300, top: 584 },
-    color: { r: 31, g: 111, b: 235 },
-    interiorColor: { r: 246, g: 248, b: 250 },
+    rect: { x: 72, y: 208, width: 228, height: 24 },
+    color: '#1f6feb',
+    interiorColor: '#f6f8fa',
     fontSize: 10,
   },
 ],
@@ -172,7 +172,7 @@ To show a field in one more place, give `addWidget()` the place, the same shape 
 ```ts
 const { field: updated } = await doc.forms.addWidget(field.ref, {
   page: page.ref,
-  rect: { left: 300, bottom: 660, right: 450, top: 680 },
+  rect: { x: 300, y: 112, width: 150, height: 20 },
 });
 ```
 
@@ -202,8 +202,8 @@ fields to change. The engine redraws the widget:
 
 ```ts
 await page.annotations.update(widget.ref, {
-  rect: { left: 300, bottom: 640, right: 480, top: 664 },
-  interiorColor: { r: 255, g: 247, b: 219 },
+  rect: { x: 300, y: 128, width: 180, height: 24 },
+  interiorColor: '#fff7db',
 });
 ```
 

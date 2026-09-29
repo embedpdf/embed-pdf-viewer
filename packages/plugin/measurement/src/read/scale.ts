@@ -23,7 +23,6 @@ export function createScaleReads(
   config: MeasurementConfig,
   { scaleOf }: Pick<MeasurementViewportSync, 'scaleOf'>,
 ) {
-  const { toPdf } = store;
   const { annotation } = siblings;
   const presets = config.presets ?? DEFAULT_PRESETS;
   const state = () => ctx.state.get();
@@ -41,7 +40,7 @@ export function createScaleReads(
       subtype: 'line',
       intent: 'line-dimension',
       measure: scaleOf(page).measure,
-      linePoints: { start: toPdf(page, from), end: toPdf(page, to) },
+      linePoints: { start: from, end: to },
     });
   const measureArea = (
     page: PageRef,
@@ -51,7 +50,7 @@ export function createScaleReads(
       subtype: 'polygon',
       intent: 'polygon-dimension',
       measure: scaleOf(page).measure,
-      vertices: vertices.map((vertex) => toPdf(page, vertex)),
+      vertices: [...vertices],
     });
 
   return {

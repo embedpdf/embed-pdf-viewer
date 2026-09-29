@@ -31,7 +31,7 @@ describe('annotations in page space', () => {
       rect: { left: 95, bottom: 595, right: 155, top: 655 },
       box: { left: 100, bottom: 600, right: 150, top: 650 },
       rotation: 30,
-      color: { r: 255, g: 0, b: 0 },
+      color: '#ff0000',
       strokeWidth: 5,
       actions: null,
     });
@@ -41,7 +41,7 @@ describe('annotations in page space', () => {
       rect: { x: 45, y: 77, width: 60, height: 60 },
       box: { x: 50, y: 82, width: 50, height: 50 },
       rotation: 30,
-      color: { r: 255, g: 0, b: 0 },
+      color: '#ff0000',
       strokeWidth: 5,
       actions: null,
     });
@@ -181,7 +181,7 @@ describe('annotations in page space', () => {
         {
           box: { x: 50, y: 82, width: 50, height: 50 },
           rotation: null,
-          color: { r: 0, g: 0, b: 0 },
+          color: '#000000',
         },
         visible,
         boxOf,
@@ -189,7 +189,7 @@ describe('annotations in page space', () => {
     ).toEqual({
       box: { left: 100, right: 150, bottom: 600, top: 650 },
       rotation: null,
-      color: { r: 0, g: 0, b: 0 },
+      color: '#000000',
     });
   });
 

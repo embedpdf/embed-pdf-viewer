@@ -2,9 +2,7 @@ import {
   creationDraftAnchor,
   type CreationDraftAnchor,
   type Model,
-  type Point,
 } from '@embedpdf/core-annotation';
-import { pageSpace } from '@embedpdf/core-geometry';
 
 import type { AnnotationServices } from '../services';
 import { createdRefOf } from './outcomes';
@@ -14,11 +12,7 @@ import { createdRefOf } from './outcomes';
  * builds, its commit and cancel doors, and the captured-draft seam the
  * measurement plugin calibrates from.
  */
-export function createDrafts({
-  store,
-  geometry,
-  events,
-}: Pick<AnnotationServices, 'store' | 'geometry' | 'events'>) {
+export function createDrafts({ store, events }: Pick<AnnotationServices, 'store' | 'events'>) {
   let anchorCache: { model: Model; v: CreationDraftAnchor | null } | null = null;
   const draftAnchorOf = (): CreationDraftAnchor | null => {
     const model = store.model();
@@ -29,16 +23,14 @@ export function createDrafts({
   };
 
   // A capture-only tool (the measurement calibration line) reports its draft
-  // in PDF user space instead of creating anything.
+  // instead of creating anything.
   store.onEffect('captured', (effect) => {
-    const crop = geometry.cropOf(effect.page.pageObjectNumber);
-    if (crop && effect.geometry.kind === 'line') {
-      const pdf = (point: Point) => pageSpace(crop).pageToPdf(point);
+    if (effect.geometry.kind === 'line') {
       events.draftCaptured.emit({
         tool: effect.tool,
         page: effect.page,
-        from: pdf(effect.geometry.a),
-        to: pdf(effect.geometry.b),
+        from: effect.geometry.a,
+        to: effect.geometry.b,
       });
     }
   });

@@ -17,8 +17,7 @@ export function createPageLookup(ctx: Pick<AnnotationContext, 'document'>) {
     ctx.document()?.pages.find((pageInfo) => pageInfo.ref.pageObjectNumber === pageObjectNumber);
   const sizeOf = (pageObjectNumber: number): PdfSize | null =>
     layoutOf(pageObjectNumber)?.size ?? null;
-  /** The crop box in the file's numbers: for Acrobat scripts, which speak them,
-   *  and the measure viewports, which are still read in them. */
+  /** The crop box in the file's numbers, for Acrobat scripts, which speak them. */
   const cropOf = (pageObjectNumber: number): PdfRect | null =>
     layoutOf(pageObjectNumber)?.pdfCropBox ?? null;
   /** The page's box — the box pointer gestures clamp to, so annotations stay

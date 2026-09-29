@@ -41,7 +41,7 @@ await page.annotations.create(
 | `file.mimeType`    | The file's type, such as `'text/csv'`.                                           | the `File`'s or `Blob`'s type, or `null` |
 | `file.description` | A short description of the file.                                                 | `null`                                   |
 | `icon`             | `'paperclip'`, `'push-pin'`, `'graph'` or `'tag'`                                | `'paperclip'`                            |
-| `color`            | The icon's color, `{ r, g, b }` from 0 to 255                                    | yellow                                   |
+| `color`            | The icon's color, `'#rrggbb'`                                                    | yellow                                   |
 | `opacity`          | From `0` (invisible) to `1` (solid)                                              | `1`                                      |
 
 The icon fills `rect`, as in every PDF app; 20 × 20 points is the usual size. Move or resize the

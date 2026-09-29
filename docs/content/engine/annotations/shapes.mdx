@@ -13,7 +13,7 @@ the style you choose.
 await page.annotations.create({
   subtype: 'square',
   box: { x: 72, y: 92, width: 200, height: 100 },
-  color: { r: 220, g: 20, b: 60 },
+  color: '#dc143c',
   strokeWidth: 2,
 });
 ```
@@ -30,7 +30,7 @@ out, a shape is a solid red line, 1 point wide, with no fill.
 await page.annotations.create({
   subtype: 'circle',
   box: { x: 300, y: 112, width: 120, height: 80 },
-  interiorColor: { r: 255, g: 235, b: 150 },
+  interiorColor: '#ffeb96',
 });
 ```
 
@@ -86,7 +86,7 @@ await page.annotations.create({
     { x: 170, y: 332 },
     { x: 120, y: 252 },
   ],
-  interiorColor: { r: 200, g: 230, b: 255 },
+  interiorColor: '#c8e6ff',
 });
 
 await page.annotations.create({

@@ -3,14 +3,13 @@ import { describe, expect, test } from 'vitest';
 import { pdfAppearanceTurnOf } from '../../src/annotation/appearanceTurn';
 import { pdfDrawnPointsOf } from '../../src/annotation/drawnPoints';
 import type { AnnotationDTO } from '../../src/annotation/kinds';
-import type { PdfViewport } from '../../src/dto/Measure';
 import {
   glyphLooseBounds,
   glyphLooseQuad,
   type PageGeometryRun,
 } from '../../src/dto/PageGeometrySnapshot';
 import { pdfQuadBounds, pdfQuadCorners, pdfRectTurnedBounds } from '../../src/geometry/convert';
-import { pageBoxOf, pagePointOf, pageQuadOf, type PagePoint } from '../../src/geometry/pageSpace';
+import { pageBoxOf, pagePointOf, pageQuadOf } from '../../src/geometry/pageSpace';
 import {
   pdfPointsBounds,
   pdfPointTurned,
@@ -18,7 +17,6 @@ import {
   pdfTurnOfUpright,
 } from '../../src/geometry/pointTurn';
 import type { PdfPoint, PdfRect } from '../../src/geometry/primitives';
-import { viewportForPoint } from '../../src/measure/viewport';
 import { pageAnnotationOf } from '../../src/pageSpace/annotations';
 import type { PdfCoordinates } from '../../src/pageSpace/coordinates';
 import {
@@ -32,7 +30,6 @@ import {
   pageQuadCorners,
   pageTurnOfDrawn,
   pageTurnOfUpright,
-  pageViewportForPoint,
 } from '../../src/pageSpace/helpers';
 import { pageGeometryOf } from '../../src/pageSpace/text';
 
@@ -168,23 +165,6 @@ describe('page-space helpers agree with the originals', () => {
           box: pageBoxOf(box, visible),
         }),
       ).toBe(pdfAppearanceTurnOf(annotation));
-    }
-  });
-
-  test('the viewport under a point', () => {
-    const viewports: PdfViewport[] = [
-      { bbox: { left: -300, bottom: -300, right: 0, top: 0 }, name: 'a', measure: null },
-      { bbox: { left: -100, bottom: -100, right: 200, top: 200 }, name: 'b', measure: null },
-    ];
-    const pageViewports = viewports.map((viewport) => ({
-      ...viewport,
-      bbox: pageBoxOf(viewport.bbox, visible),
-    }));
-    for (let n = 0; n < 100; n++) {
-      const point = pointAt();
-      const found = viewportForPoint(viewports, point);
-      const pageFound = pageViewportForPoint(pageViewports, toPage(point) as PagePoint);
-      expect(pageFound?.name).toBe(found?.name);
     }
   });
 });

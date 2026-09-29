@@ -9,13 +9,13 @@ import { pageSpaceBoxesOf } from '@embedpdf/engine-core/runtime';
 /**
  * The `create()` hook end to end: cheap eager construction in dependency
  * order, `connect` after every dependency exists, events disposed with the
- * instance, geometry and page-ref checks bound to this document.
+ * instance, page lookups and page-ref checks bound to this document.
  */
 
 interface Api {
   ping(): string;
   onPinged: ReturnType<PluginContext<unknown>['events']['source']>['on'];
-  pageX(pageObjectNumber: number): number;
+  cropLeft(pageObjectNumber: number): number | null;
   check(pageObjectNumber: number): void;
   wait(): Promise<void>;
   bump(): void;
@@ -35,10 +35,8 @@ function probePlugin(log: string[]): AnyPlugin {
       const api: Api = {
         ping: () => (pinged.emit('ping'), 'pong'),
         onPinged: pinged.on,
-        pageX: (pageObjectNumber) =>
-          ctx.geometry
-            .forPage({ kind: 'objectNumber', pageObjectNumber })
-            .pdfToPage({ x: 40, y: 280 }).x,
+        cropLeft: (pageObjectNumber) =>
+          ctx.getPage({ kind: 'objectNumber', pageObjectNumber })?.pdfCropBox.left ?? null,
         check: (pageObjectNumber) => ctx.assertPageRef({ kind: 'objectNumber', pageObjectNumber }),
         wait: () => ctx.waitFor(() => ctx.state.get().count > 0),
         bump: () => ctx.state.update(bump),
@@ -83,9 +81,9 @@ describe('create() controller hook', () => {
     expect(api.ping()).toBe('pong');
     expect(listener).toHaveBeenCalledWith('ping');
 
-    // geometry is this document's, with the crop offset applied
-    expect(api.pageX(7)).toBe(30);
-    expect(() => api.pageX(99)).toThrow(expect.objectContaining({ code: 'not-found' }));
+    // pages are this document's
+    expect(api.cropLeft(7)).toBe(10);
+    expect(api.cropLeft(99)).toBeNull();
     expect(() => api.check(7)).not.toThrow();
     expect(() => api.check(99)).toThrow(expect.objectContaining({ code: 'not-found' }));
 

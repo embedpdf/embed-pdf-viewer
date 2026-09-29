@@ -43,7 +43,7 @@ const squareDTO = (annotObjectNumber: number): FileAnnotation =>
     subtype: 'square',
     rect: { left: 40, bottom: 270, right: 60, top: 280 },
     box: { left: 40, bottom: 270, right: 60, top: 280 },
-    color: { r: 0, g: 0, b: 0 },
+    color: '#000000',
     strokeWidth: 1,
     opacity: 1,
     interiorColor: null,
@@ -78,7 +78,7 @@ describe('create() in page space', () => {
     expect(harness.create.mock.calls[0]![0]).toMatchObject({
       subtype: 'square',
       box: { x: 30, y: 40, width: 20, height: 10 },
-      color: { r: 255, g: 0, b: 0 },
+      color: '#ff0000',
       print: true,
     });
     // reconciled: the optimistic id is gone, the durable record is in the model

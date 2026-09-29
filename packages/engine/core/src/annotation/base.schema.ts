@@ -25,11 +25,9 @@ export const PointSchema = PdfPointSchema;
 /** @deprecated Use `PdfRectSchema` from `../geometry/schemas`. */
 export const RectSchema = PdfRectSchema;
 
-export const ColorSchema: z.ZodType<Color> = z.object({
-  r: z.number().int().min(0).max(255),
-  g: z.number().int().min(0).max(255),
-  b: z.number().int().min(0).max(255),
-});
+export const ColorSchema: z.ZodType<Color> = z
+  .string()
+  .regex(/^#[0-9a-fA-F]{6}$/, "expected a color as '#rrggbb'");
 
 export const AnnotationBorderStyleSchema: z.ZodType<AnnotationBorderStyle> = z.enum([
   'solid',

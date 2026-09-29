@@ -7297,26 +7297,8 @@
                 "nullable": true
               },
               "color": {
-                "type": "object",
-                "properties": {
-                  "r": {
-                    "type": "integer",
-                    "minimum": 0,
-                    "maximum": 255
-                  },
-                  "g": {
-                    "type": "integer",
-                    "minimum": 0,
-                    "maximum": 255
-                  },
-                  "b": {
-                    "type": "integer",
-                    "minimum": 0,
-                    "maximum": 255
-                  }
-                },
-                "required": ["r", "g", "b"],
-                "additionalProperties": false
+                "type": "string",
+                "pattern": "^#[0-9a-fA-F]{6}$"
               },
               "opacity": {
                 "type": "number",
@@ -9993,8 +9975,7 @@
                         "minimum": 0
                       },
                       "color": {
-                        "type": "string",
-                        "pattern": "^#[0-9a-fA-F]{6}$"
+                        "$ref": "#/components/schemas/Annotation/anyOf/0/properties/color"
                       },
                       "decoration": {
                         "type": "array",
@@ -10116,7 +10097,7 @@
                                     "$ref": "#/components/schemas/Annotation/anyOf/11/properties/richText/properties/body/properties/size"
                                   },
                                   "color": {
-                                    "$ref": "#/components/schemas/Annotation/anyOf/11/properties/richText/properties/body/properties/color"
+                                    "$ref": "#/components/schemas/Annotation/anyOf/0/properties/color"
                                   },
                                   "decoration": {
                                     "$ref": "#/components/schemas/Annotation/anyOf/11/properties/richText/properties/body/properties/decoration"
@@ -23029,20 +23010,22 @@
                 "bbox": {
                   "type": "object",
                   "properties": {
-                    "left": {
+                    "x": {
                       "type": "number"
                     },
-                    "bottom": {
+                    "y": {
                       "type": "number"
                     },
-                    "right": {
-                      "type": "number"
+                    "width": {
+                      "type": "number",
+                      "minimum": 0
                     },
-                    "top": {
-                      "type": "number"
+                    "height": {
+                      "type": "number",
+                      "minimum": 0
                     }
                   },
-                  "required": ["left", "bottom", "right", "top"],
+                  "required": ["x", "y", "width", "height"],
                   "additionalProperties": false
                 },
                 "name": {

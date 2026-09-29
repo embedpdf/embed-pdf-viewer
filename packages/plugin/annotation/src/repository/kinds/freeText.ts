@@ -20,7 +20,7 @@ import type {
 
 import { richDocOf } from '../../rich-text';
 import { boxEmit, type KindProjection, type Wire } from '../projection';
-import { boxGeomFields, colorToCss } from '../seam';
+import { boxGeomFields } from '../seam';
 
 type FreeTextDTO = Extract<AnnotationDTO, { subtype: 'free-text' }>;
 
@@ -33,7 +33,7 @@ function textFromDTO(dto: FreeTextDTO): TextStyle {
   return {
     fontFamily: dto.fontFamily,
     fontSize: dto.fontSize,
-    fontColor: colorToCss(dto.fontColor ?? dto.color),
+    fontColor: dto.fontColor ?? dto.color,
     textAlign: dto.textAlign,
     ...(body && body.weight >= 600 ? { bold: true } : {}),
     ...(body?.italic ? { italic: true } : {}),

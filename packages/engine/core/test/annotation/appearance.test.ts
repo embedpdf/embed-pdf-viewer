@@ -73,7 +73,7 @@ const squareDto = (over: Record<string, unknown> = {}) =>
     rect: rect(100, 100, 200, 200),
     box: rect(100, 100, 200, 200),
     rotation: null,
-    color: { r: 0, g: 128, b: 0 },
+    color: '#008000',
     interiorColor: null,
     opacity: 1,
     strokeWidth: 2,
@@ -87,7 +87,7 @@ const fullSquarePatch = (over: Record<string, unknown> = {}) =>
   patch({
     subtype: 'square',
     box: rect(100, 100, 200, 200),
-    color: { r: 0, g: 128, b: 0 },
+    color: '#008000',
     interiorColor: null,
     opacity: 1,
     strokeWidth: 2,

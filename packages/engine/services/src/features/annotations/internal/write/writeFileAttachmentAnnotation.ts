@@ -19,7 +19,7 @@ import { applyAnnotationBaseDraft, applyAnnotationBasePatch } from './writeAnnot
 import { writeUtf16String } from '../../../../runtime/memory/strings';
 
 /** Default `/C` — the generator's default icon fill, set explicitly so reads round-trip. */
-const DEFAULT_FILE_ATTACHMENT_COLOR: Color = { r: 255, g: 255, b: 0 };
+const DEFAULT_FILE_ATTACHMENT_COLOR: Color = '#ffff00';
 
 const DEFAULT_OPACITY = 1;
 

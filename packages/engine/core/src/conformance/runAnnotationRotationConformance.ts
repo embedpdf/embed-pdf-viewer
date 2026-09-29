@@ -152,7 +152,7 @@ export function runAnnotationRotationConformance(
         const turned = await textBoxOf(page, 'test 123');
         const { annotation } = await page.annotations.update(turned.ref, {
           subtype: 'free-text',
-          color: { r: 200, g: 230, b: 255 },
+          color: '#c8e6ff',
         });
         const updated = annotation as FreeText;
         expect(updated.rotation).toBe(270);
@@ -239,8 +239,8 @@ export function runAnnotationRotationConformance(
           subtype: 'square',
           box,
           rotation: 30,
-          color: { r: 0, g: 0, b: 255 },
-          interiorColor: { r: 0, g: 0, b: 255 },
+          color: '#0000ff',
+          interiorColor: '#0000ff',
         });
         // A square turned clockwise has its highest corner left of its middle.
         const area = { x: 150, y: 250, width: 200, height: 200 };

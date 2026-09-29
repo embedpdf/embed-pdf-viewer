@@ -23,10 +23,10 @@ import {
 
 /** Default `/C` marking outline (red) — the redaction marking convention and
  *  the AP generator's default. */
-const DEFAULT_REDACT_COLOR: Color = { r: 255, g: 0, b: 0 };
+const DEFAULT_REDACT_COLOR: Color = '#ff0000';
 
 /** Default label colour (black) when a redaction carries no `/DA`. */
-const DEFAULT_LABEL_COLOR: Color = { r: 0, g: 0, b: 0 };
+const DEFAULT_LABEL_COLOR: Color = '#000000';
 
 /** Default label size when there is no `/DA`. When a `/DA` is present its
  *  size is kept verbatim — including `0`, which means auto-fit for a
@@ -41,9 +41,8 @@ export function readRedact(
   _subtypeCode?: number,
   ctx?: AnnotationReadContext,
 ): RedactAnnotationDTO<PdfCoordinates> {
-  const color = readAnnotColor(fn, mem, annotPtr, FPDFANNOT_COLORTYPE.Color) ?? {
-    ...DEFAULT_REDACT_COLOR,
-  };
+  const color =
+    readAnnotColor(fn, mem, annotPtr, FPDFANNOT_COLORTYPE.Color) ?? DEFAULT_REDACT_COLOR;
   const ca = readAnnotOpacity(fn, mem, annotPtr);
   const opacity = ca == null ? 1 : Math.max(0, Math.min(1, ca));
   const interiorColor =
@@ -64,7 +63,7 @@ export function readRedact(
       ? standardFontFromCode(da.fontCode)
       : DEFAULT_STANDARD_FONT;
   const fontSize = da ? da.fontSize : DEFAULT_FONT_SIZE;
-  const fontColor = da?.color ?? { ...DEFAULT_LABEL_COLOR };
+  const fontColor = da?.color ?? DEFAULT_LABEL_COLOR;
 
   return {
     ...base,

@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import { ColorSchema } from '../../base.schema';
 import type {
   RichTextDocument,
   RichTextDocumentInput,
@@ -7,13 +8,12 @@ import type {
   RichTextRunStyle,
 } from '../../../dto/RichText';
 
-const HexColorSchema = z.string().regex(/^#[0-9a-fA-F]{6}$/);
 const RichTextRunStyleShape = {
   family: z.string().min(1),
   weight: z.number().int().min(100).max(900),
   italic: z.boolean(),
   size: z.number().nonnegative(),
-  color: HexColorSchema,
+  color: ColorSchema,
   decoration: z.array(z.enum(['underline', 'line-through', 'word'])),
   script: z.enum(['normal', 'sub', 'super']),
   letterSpacing: z.number(),

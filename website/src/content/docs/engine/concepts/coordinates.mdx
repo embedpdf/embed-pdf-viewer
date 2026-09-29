@@ -1,0 +1,98 @@
+---
+title: Coordinates
+description: Where the engine measures positions from, which way angles turn, how colors are spelled, and how to meet tools that use the PDF file's own numbers.
+---
+
+{/* Generated from docs/content — edit there, then `pnpm docs:sync`. */}
+
+# Coordinates
+
+Every position the engine gives or takes is in **page space**: annotations, text, search matches,
+render areas, form widgets, measurement regions and link destinations. You can pass a value from
+one call straight to another, and to the screen.
+
+## The rules
+
+1. **Positions** are points (1/72 inch) from the top-left corner of the page, with y going down,
+   as on a screen.
+2. **Shapes:** a point is `{ x, y }`, a box is `{ x, y, width, height }` with `x, y` its top-left
+   corner, and a quad is four points `p1` to `p4`.
+3. **Angles** are degrees, clockwise as you see the page, as CSS `rotate()` turns.
+4. **Colors** are `'#rrggbb'`, as in CSS: lowercase when the engine gives one, either case when it
+   takes one. Transparency is the separate `opacity`.
+
+## Which page, and which corner
+
+"The page" is what the page shows: its crop box, cut back to its media box where it reaches past
+it. `page.size` is that area's width and height, and `boxes.crop` is always
+`{ x: 0, y: 0, width, height }`. A file whose media box starts at a negative corner, or whose crop
+box sits inside the page, still has its top-left at `0, 0`. See [Pages](/docs/engine/documents/pages).
+
+Positions are on the page as the file stores it, before the page's `rotation`. A page shown turned
+by 90° keeps its numbers; renders and the page transform apply the turn for you.
+
+A link's destination is measured on the page it goes to, not on the page the link sits on.
+
+## An example with numbers
+
+A file stores a page with a media box of `[0 0 612 792]` and a crop box of `[50 60 562 732]`. The
+page shows the crop box: 512 × 672 points. In the file's own numbers, y goes up from the bottom of
+the media box, so its top-left corner is at `50, 732`.
+
+A highlight the file stores at `left 100, bottom 600, right 150, top 650` reads as:
+
+```ts
+highlight.rect; // { x: 50, y: 82, width: 50, height: 50 }
+```
+
+`x` is 100 − 50: from the left edge of what the page shows. `y` is 732 − 650: from its top edge,
+down to the highlight's top.
+
+## What never changes
+
+- **Lengths** are the same numbers in every space: `strokeWidth`, `dashArray`, font sizes, a
+  measurement's `leader` lengths and `captionOffset`, `cloudyIntensity`.
+- **Sides along a line.** A positive `leader.length`, and a positive
+  `captionOffset.perpendicular`, point to the left of the line as you go from its start to its
+  end, as the page shows it: above a line drawn from left to right. `captionOffset.along` runs
+  from the start toward the end.
+- **Order.** The points of a quad, a polygon, a polyline or an ink stroke keep the order they
+  have in the file. Quads the engine makes from text (search matches, selections) name their
+  corners by what you see: `p1` and `p2` are the top edge from where the text starts, `p3` and
+  `p4` the bottom edge. A quad another app wrote keeps whatever order it had.
+
+## Colors in the file
+
+A PDF can store a color as gray, RGB or CMYK. It reads as the same color in `'#rrggbb'`. A color
+you send back unchanged stays as the file has it, so passing an annotation you read straight back
+to `update()` rewrites nothing. A color you change is written as RGB.
+
+## Tools that use the file's numbers
+
+Tools that work on the file itself, such as iText, PDFBox or Acrobat JavaScript, use the file's
+own numbers: y goes up, a box is `{ left, bottom, right, top }`, and a page can sit anywhere in
+them. Each page's `pdfCropBox` says where the page sits, and the engine converts both ways:
+
+```ts
+import { pageBoxOf, pdfRectOf } from '@embedpdf/engine';
+
+const inTheFile = pdfRectOf(highlight.rect, page.pdfCropBox);
+// { left: 100, bottom: 600, right: 150, top: 650 }
+const onThePage = pageBoxOf(inTheFile, page.pdfCropBox);
+// { x: 50, y: 82, width: 50, height: 50 }
+```
+
+| Page space → the file's numbers | The file's numbers → page space |
+| :------------------------------ | :------------------------------ |
+| `pdfPointOf(point, box)`        | `pagePointOf(point, box)`       |
+| `pdfRectOf(box, box)`           | `pageBoxOf(rect, box)`          |
+| `pdfQuadOf(quad, box)`          | `pageQuadOf(quad, box)`         |
+| `pdfDestinationOf(dest, box)`   | `pageDestinationOf(dest, box)`  |
+
+For a destination, pass the `pdfCropBox` of the page it goes to.
+
+## Pixels
+
+Pixels depend on the zoom and the turn, so the engine never gives or takes them. Every rendered
+image has the transform it was drawn with, which converts between its pixels and page space; see
+[Rendering](/docs/engine/documents/rendering#from-image-pixels-to-page-points).

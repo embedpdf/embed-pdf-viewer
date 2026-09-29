@@ -1,4 +1,8 @@
-import { normalizePdfRect, type PageMeasurementViewport } from '@embedpdf/engine-core/runtime';
+import {
+  normalizePdfRect,
+  type PageMeasurementViewport,
+  type PdfCoordinates,
+} from '@embedpdf/engine-core/runtime';
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
 import { withScratch } from '../../../runtime/memory/scratch';
 import { readUtf16String } from '../../../runtime/memory/strings';
@@ -10,8 +14,8 @@ export function readViewports(
   fn: PdfFunctions,
   mem: PdfRuntimeMemory,
   page: Ptr,
-): PageMeasurementViewport[] {
-  const viewports: PageMeasurementViewport[] = [];
+): PageMeasurementViewport<PdfCoordinates>[] {
+  const viewports: PageMeasurementViewport<PdfCoordinates>[] = [];
   for (let i = 0; i < fn.EPDFPage_CountViewports(page); i++) {
     const viewport = fn.EPDFPage_GetViewport(page, i);
     if (!viewport) continue;

@@ -151,7 +151,7 @@ describe('measurement arithmetic and formatting', () => {
   });
   test('viewport selection is last-containing, foreign included', () => {
     const a: PdfViewport = {
-      bbox: { left: -20, right: 100, bottom: -40, top: 100 },
+      bbox: { x: -20, y: -40, width: 120, height: 140 },
       name: null,
       measure: { subtype: 'geospatial' },
     };

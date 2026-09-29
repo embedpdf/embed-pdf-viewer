@@ -12,7 +12,7 @@ import { AnnotationFlattenResultSchema } from '../wire/schemas';
 const square = (x: number, y: number): SquareDraft => ({
   subtype: 'square',
   box: { x, y, width: 40, height: 40 },
-  color: { r: 20, g: 40, b: 220 },
+  color: '#1428dc',
   strokeWidth: 2,
 });
 

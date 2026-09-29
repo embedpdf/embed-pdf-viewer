@@ -46,7 +46,7 @@ export function createScaleWrites(
   }: Pick<MeasurementViewportSync, 'ensureLoaded' | 'refresh' | 'scaleOf'>,
 ) {
   const { scaleChanged, calibrationCompleted } = events;
-  const { requirePage, assertAllowed, targets, toPdf } = store;
+  const { requirePage, assertAllowed, targets } = store;
   const { annotation } = siblings;
 
   /** Write one page's scale (`null` = back to the default) and re-measure. */
@@ -73,7 +73,14 @@ export function createScaleWrites(
       ctx.state.update(setLocalViewports, page.pageObjectNumber, [
         ...kept,
         ...(scale
-          ? [{ bbox: layout.pdfCropBox, name: 'EmbedPDF', owned: true, measure: scale }]
+          ? [
+              {
+                bbox: { x: 0, y: 0, ...layout.size },
+                name: 'EmbedPDF',
+                owned: true,
+                measure: scale,
+              },
+            ]
           : []),
       ]);
       await refresh(page);
@@ -145,8 +152,8 @@ export function createScaleWrites(
     input: CalibrateInput,
     options: ScaleChangeOptions & { applyTo?: PageTarget } = {},
   ): Promise<readonly ScaleChangeReport[]> => {
-    const start = measurementPoint(toPdf(input.page, input.from));
-    const end = measurementPoint(toPdf(input.page, input.to));
+    const start = measurementPoint(input.from);
+    const end = measurementPoint(input.to);
     let scale: PdfMeasure;
     try {
       scale = measureFromKnownLength(Math.hypot(end.x - start.x, end.y - start.y), input.distance);

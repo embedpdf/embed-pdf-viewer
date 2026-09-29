@@ -208,7 +208,10 @@ export class FormMutator {
    * (the field is unlinked from an existing parent, then a checkpoint rolls
    * back the rest), so a rejected draft creates nothing.
    */
-  createField(draft: FormFieldDraft, signal: AbortSignal): { field: FormFieldDTO<PdfCoordinates> } {
+  createField(
+    draft: FormFieldDraft<PdfCoordinates>,
+    signal: AbortSignal,
+  ): { field: FormFieldDTO<PdfCoordinates> } {
     throwIfAborted(signal);
     const { fn } = this.runtime;
     const docPtr = this.session.requireDocPtr();
@@ -293,7 +296,7 @@ export class FormMutator {
   }
 
   /** Check a widget placement before anything is written; returns its page index. */
-  private preflightPlacement(placement: WidgetPlacement): number {
+  private preflightPlacement(placement: WidgetPlacement<PdfCoordinates>): number {
     const record = this.session.resolvePageRef(placement.page);
     const { left, bottom, right, top } = placement.rect;
     if (![left, bottom, right, top].every(Number.isFinite)) {
@@ -305,7 +308,7 @@ export class FormMutator {
   }
 
   /** The native field node, linked into the tree. */
-  private createFieldNode(draft: FormFieldDraft): number {
+  private createFieldNode(draft: FormFieldDraft<PdfCoordinates>): number {
     const { fn, mem } = this.runtime;
     const namePtr = mem.writeU16String(draft.name);
     let fieldObjectNumber: number;
@@ -328,7 +331,10 @@ export class FormMutator {
   }
 
   /** The draft's field-plane settings, on a field just created. */
-  private configureNewField(draft: FormFieldDraft, fieldObjectNumber: number): void {
+  private configureNewField(
+    draft: FormFieldDraft<PdfCoordinates>,
+    fieldObjectNumber: number,
+  ): void {
     const { fn } = this.runtime;
     const docPtr = this.session.requireDocPtr();
 
@@ -626,7 +632,7 @@ export class FormMutator {
     };
   }
 
-  private placementsOf(draft: FormFieldDraft): WidgetPlacement[] {
+  private placementsOf(draft: FormFieldDraft<PdfCoordinates>): WidgetPlacement<PdfCoordinates>[] {
     if (draft.family === 'radio') {
       return draft.widgets ?? [];
     }

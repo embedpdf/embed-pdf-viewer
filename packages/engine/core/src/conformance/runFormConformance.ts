@@ -8,6 +8,8 @@ import type { Engine } from '../engine/Engine';
 import { EngineErrorCode } from '../errors/EngineErrorCode';
 import type { DocumentEvent } from '../events/DocumentEvent';
 import type { FormFieldDTO } from '../forms/field';
+import type { AnnotationRef } from '../identity/AnnotationRef';
+import { annotationKey } from '../identity/annotationKey';
 import { toFieldRef } from '../identity/FormFieldRef';
 import { toPageRef } from '../identity/PageRef';
 import {
@@ -419,14 +421,14 @@ export function runFormConformance(
         const created = await page.annotations.create({
           subtype: 'widget',
           rect: { x: 20, y: 20, width: 180, height: 24 },
-          interiorColor: { r: 246, g: 248, b: 250 },
-          color: { r: 31, g: 111, b: 235 },
+          interiorColor: '#f6f8fa',
+          color: '#1f6feb',
           strokeWidth: 1,
           fontSize: 10,
         });
         if (created.annotation.subtype !== 'widget') throw new Error('expected widget DTO');
         expect(created.annotation.fieldObjectNumber).toBe(0); // inert
-        expect(created.annotation.interiorColor).toEqual({ r: 246, g: 248, b: 250 });
+        expect(created.annotation.interiorColor).toEqual('#f6f8fa');
         const widgetRef = created.annotation.ref;
         if (widgetRef.kind !== 'objectNumber') throw new Error('expected durable ref');
 
@@ -445,10 +447,10 @@ export function runFormConformance(
         // 3. Restyled/moved through the same annotation path as every kind.
         const patched = await page.annotations.update(widgetRef, {
           subtype: 'widget',
-          interiorColor: { r: 255, g: 247, b: 219 },
+          interiorColor: '#fff7db',
         });
         if (patched.annotation.subtype !== 'widget') throw new Error('expected widget DTO');
-        expect(patched.annotation.interiorColor).toEqual({ r: 255, g: 247, b: 219 });
+        expect(patched.annotation.interiorColor).toEqual('#fff7db');
 
         // 4. Deleting an attached widget is refused - the field-tree owns it.
         await expect(page.annotations.delete(widgetRef)).rejects.toMatchObject({
@@ -478,13 +480,13 @@ export function runFormConformance(
           widgets: [
             {
               page: toPageRef(pageObjectNumber),
-              rect: { left: 20, bottom: 60, right: 40, top: 80 },
+              rect: { x: 20, y: 60, width: 20, height: 20 },
               onState: 'yes',
-              appearance: { color: { r: 0, g: 0, b: 0 }, strokeWidth: 1 },
+              appearance: { color: '#000000', strokeWidth: 1 },
             },
             {
               page: toPageRef(pageObjectNumber),
-              rect: { left: 60, bottom: 60, right: 80, top: 80 },
+              rect: { x: 60, y: 60, width: 20, height: 20 },
               onState: 'no',
             },
           ],
@@ -492,6 +494,14 @@ export function runFormConformance(
         if (created.field.family !== 'radio') throw new Error('expected radio');
         expect(created.field.noToggleToOff).toBe(true);
         expect(created.field.widgets.map((w) => w.onState)).toEqual(['yes', 'no']);
+        // Each widget lands where it was placed, measured from the page's top-left.
+        const placed = await doc.page(toPageRef(pageObjectNumber)).annotations.list();
+        const rectOf = (ref: AnnotationRef | null) =>
+          placed.annotations.find((a) => ref && annotationKey(a.ref) === annotationKey(ref))?.rect;
+        expect(created.field.widgets.map((w) => rectOf(w.ref))).toEqual([
+          { x: 20, y: 60, width: 20, height: 20 },
+          { x: 60, y: 60, width: 20, height: 20 },
+        ]);
 
         // The newborn group fills through the normal value path.
         const filled = await doc.forms.setValue(created.field.ref, {
@@ -538,7 +548,7 @@ export function runFormConformance(
       try {
         const namesBefore = await names();
         const widgetsBefore = await widgetCount();
-        const placed = { page, rect: { left: 20, bottom: 100, right: 120, top: 120 } };
+        const placed = { page, rect: { x: 20, y: 100, width: 100, height: 20 } };
 
         // Checked before anything is written.
         await expect(

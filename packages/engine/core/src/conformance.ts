@@ -75,6 +75,11 @@ export {
   type PageSpaceConformanceOptions,
 } from './conformance/runPageSpaceConformance';
 export {
+  COLOR_FIXTURE_PDF,
+  runColorConformance,
+  type ColorConformanceOptions,
+} from './conformance/runColorConformance';
+export {
   PAGE_SPACE_FIXTURES,
   type PageSpaceFixture,
   type PageSpaceFixturePage,

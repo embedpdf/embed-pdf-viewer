@@ -20,7 +20,7 @@ const page = doc.page(pageRef);
 const { annotation } = await page.annotations.create({
   subtype: 'square',
   box: { x: 72, y: 92, width: 200, height: 100 },
-  color: { r: 0, g: 120, b: 255 },
+  color: '#0078ff',
 });
 
 await page.annotations.update(annotation.ref, { contents: 'Check this table' });
@@ -100,7 +100,7 @@ address). Keep the `ref`: it's how you change or delete the annotation later.
 
 Positions are in points from the top-left corner of the page, with y going down, like every
 position in the engine: a box is `{ x, y, width, height }` and a point `{ x, y }`. See
-[Pages](/docs/engine/documents/pages).
+[Coordinates](/docs/engine/concepts/coordinates).
 
 ```ts
 for (const annotation of annotations) {
@@ -137,7 +137,7 @@ Each annotation also has the [flags](#flags) and the fields that say [who wrote 
 const { annotation } = await page.annotations.create({
   subtype: 'circle',
   box: { x: 60, y: 392, width: 120, height: 100 },
-  interiorColor: { r: 30, g: 144, b: 255 },
+  interiorColor: '#1e90ff',
 });
 ```
 
@@ -154,7 +154,7 @@ argument; see [Stamps](/docs/engine/annotations/stamps) and
 
 ```ts
 await page.annotations.update(annotation.ref, {
-  color: { r: 220, g: 20, b: 60 },
+  color: '#dc143c',
   contents: 'Reviewed',
 });
 ```
@@ -235,16 +235,20 @@ Most kinds share the same style fields:
 
 | Field           | What it is                                         | Default   |
 | :-------------- | :------------------------------------------------- | :-------- |
-| `color`         | Line color, `{ r, g, b }` from 0 to 255            | per kind  |
+| `color`         | Line color, such as `'#1e90ff'`                    | per kind  |
 | `interiorColor` | Fill color of closed shapes, or `null` for no fill | no fill   |
 | `opacity`       | From `0` (invisible) to `1` (solid)                | `1`       |
 | `strokeWidth`   | Line width in points                               | `1`       |
 | `borderStyle`   | `'solid'`, `'dashed'`, `'beveled'` or `'inset'`    | `'solid'` |
 | `dashArray`     | The dash pattern for `'dashed'`, such as `[3, 2]`  | `[3]`     |
 
-Colors never include transparency: that's what `opacity` is for. The default color depends on
-the kind (yellow for a highlight, red for a shape, black for free text); each kind's page lists
-its defaults.
+Colors are `'#rrggbb'`, as in CSS: the engine gives them in lowercase and takes either case. They
+never include transparency: that's what `opacity` is for. The default color depends on the kind
+(yellow for a highlight, red for a shape, black for free text); each kind's page lists its
+defaults.
+
+A PDF can store a color as gray or CMYK. It reads as the same color in `'#rrggbb'`, and sent back
+unchanged it stays as the file has it, so passing a read straight back rewrites nothing.
 
 ## Who wrote it
 

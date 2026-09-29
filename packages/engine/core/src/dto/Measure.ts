@@ -1,5 +1,5 @@
 import type { PdfPoint } from '../geometry/primitives';
-import type { Coordinates, PdfCoordinates } from '../pageSpace/coordinates';
+import type { Coordinates, PageCoordinates } from '../pageSpace/coordinates';
 
 export type MeasureFraction = 'decimal' | 'fraction' | 'round' | 'truncate';
 
@@ -52,13 +52,13 @@ export interface PdfForeignMeasure {
 }
 export type PdfMeasurement = PdfMeasure | PdfForeignMeasure;
 /** A page's `/VP` entry. `name` and `measure` are `null` when the PDF has none. */
-export interface PdfViewport<C extends Coordinates = PdfCoordinates> {
+export interface PdfViewport<C extends Coordinates = PageCoordinates> {
   bbox: C['box'];
   name: string | null;
   measure: PdfMeasurement | null;
 }
 export interface PageMeasurementViewport<
-  C extends Coordinates = PdfCoordinates,
+  C extends Coordinates = PageCoordinates,
 > extends PdfViewport<C> {
   owned: boolean;
 }

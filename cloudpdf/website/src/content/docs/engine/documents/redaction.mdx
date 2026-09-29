@@ -16,7 +16,7 @@ then you apply the marks:
 const { annotation } = await page.annotations.create({
   subtype: 'redact',
   rect: { x: 72, y: 132, width: 248, height: 20 },
-  interiorColor: { r: 0, g: 0, b: 0 },
+  interiorColor: '#000000',
 });
 
 // 2. Apply: remove what's under it
@@ -43,7 +43,7 @@ for (const match of matches) {
   await doc.page(match.page).annotations.create({
     subtype: 'redact',
     quadPoints: match.segments.map((segment) => segment.quad),
-    interiorColor: { r: 0, g: 0, b: 0 },
+    interiorColor: '#000000',
   });
 }
 ```
@@ -58,7 +58,7 @@ After the content is removed, the engine paints the area. These fields say what 
 
 | Field           | What it is                                                                                                | Default       |
 | :-------------- | :-------------------------------------------------------------------------------------------------------- | :------------ |
-| `interiorColor` | The fill, `{ r, g, b }` from 0 to 255                                                                     | no fill       |
+| `interiorColor` | The fill, `'#rrggbb'`                                                                                     | no fill       |
 | `overlayText`   | Text on top of the fill, such as `'REDACTED'`                                                             | none          |
 | `repeat`        | Repeat `overlayText` to fill the whole area                                                               | `false`       |
 | `fontFamily`    | The font of `overlayText`, such as `'times-roman'`; see [Fonts](/docs/engine/annotations/free-text#fonts) | `'helvetica'` |

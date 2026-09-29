@@ -7,7 +7,6 @@
  * The kernel adds *document scope*: plugins declare a scope and the kernel
  * multiplexes document-scoped plugins per document.
  */
-import type { PageSpace } from '@embedpdf/core-geometry';
 import type { EventHook } from './event-hook';
 import type { Mirror, MirrorSpec } from './mirror';
 import type { PageMirror, PageMirrorSpec } from './page-mirror';
@@ -240,13 +239,6 @@ export interface PluginContext<S = unknown> {
   getPage(ref: PageRef): PageInfo | null;
   /** Throw `not-found` unless the ref names a page of this document. */
   assertPageRef(ref: PageRef): void;
-  /** Page ↔ PDF conversion for a page of this document, cached per registry
-   *  revision. `forPage` throws `not-found` for a foreign ref; `tryForPage`
-   *  answers null (reads that tolerate a page not laid out yet). */
-  readonly geometry: {
-    forPage(ref: PageRef): PageSpace;
-    tryForPage(ref: PageRef): PageSpace | null;
-  };
 
   // ── capabilities ──
   get<T>(token: CapabilityToken<T>): T;

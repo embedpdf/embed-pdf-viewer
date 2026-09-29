@@ -22,9 +22,9 @@ import type {
   Engine,
   PageLayout,
   PageRef,
+  PdfRect,
 } from '@embedpdf/engine-core/runtime';
 import { pageRefsEqual, subscribeToType } from '@embedpdf/engine-core/runtime';
-import { pageSpace, type PageSpace, type PdfEdges } from '@embedpdf/core-geometry';
 
 import { PluginError } from './errors';
 import { createEventHook } from './event-hook';
@@ -49,7 +49,7 @@ export interface TestPage {
   readonly ref: PageRef;
   /** Page size in points (default 612 × 792, or the crop's extent); the crop box is `[0, 0, w, h]` unless given. */
   readonly size?: { readonly width: number; readonly height: number };
-  readonly crop?: PdfEdges;
+  readonly crop?: PdfRect;
   readonly rotation?: PageLayout['rotation'];
   readonly userUnit?: number;
   readonly label?: string | null;
@@ -222,17 +222,6 @@ export function createTestContext<S = void>(options: TestContextOptions<S> = {})
   if (!capabilities.has(DocumentsToken as CapabilityToken<unknown>)) {
     capabilities.set(DocumentsToken as CapabilityToken<unknown>, testDocuments(meta));
   }
-  const spaces = new Map<number, PageSpace>();
-  const tryForPage = (ref: PageRef): PageSpace | null => {
-    const page = pages.find((pageInfo) => pageRefsEqual(pageInfo.ref, ref));
-    if (!page) return null;
-    let space = spaces.get(ref.pageObjectNumber);
-    if (!space) {
-      space = pageSpace(page.pdfCropBox);
-      spaces.set(ref.pageObjectNumber, space);
-    }
-    return space;
-  };
   const notFound = (ref: PageRef) =>
     new PluginError('not-found', id, `page ${ref.pageObjectNumber} is not in this document`);
   const resolve = <T>(token: CapabilityToken<T>): T | null =>
@@ -302,14 +291,6 @@ export function createTestContext<S = void>(options: TestContextOptions<S> = {})
         return hook;
       },
     },
-    geometry: {
-      tryForPage,
-      forPage: (ref) => {
-        const space = tryForPage(ref);
-        if (!space) throw notFound(ref);
-        return space;
-      },
-    },
     listen: (source, listener) => {
       const off = typeof source === 'function' ? source(listener) : source.subscribe(listener);
       cleanups.push(off);
@@ -353,7 +334,7 @@ export function createTestContext<S = void>(options: TestContextOptions<S> = {})
       return resource;
     },
     assertPageRef: (ref) => {
-      if (!tryForPage(ref)) throw notFound(ref);
+      if (!pages.some((pageInfo) => pageRefsEqual(pageInfo.ref, ref))) throw notFound(ref);
     },
     getPage: (ref): PageInfo | null =>
       pages.find((pageInfo) => pageRefsEqual(pageInfo.ref, ref)) ?? null,

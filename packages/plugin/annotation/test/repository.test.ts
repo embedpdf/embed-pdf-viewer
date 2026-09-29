@@ -98,7 +98,7 @@ function squareDTO(
     box: { left: 100, bottom: 100, right: 200, top: 200 },
     rotation: null,
     cloudyIntensity: null,
-    color: { r: 0, g: 0, b: 0 },
+    color: '#000000',
     interiorColor: null,
     strokeWidth: 2,
     opacity: 1,
@@ -163,7 +163,7 @@ describe('repository — Ink Highlight intent and blend', () => {
     actions: null,
     subtype: 'ink',
     intent: 'ink-highlight',
-    color: { r: 255, g: 205, b: 69 },
+    color: '#ffcd45',
     opacity: 1,
     strokeWidth: 14,
     borderStyle: 'solid',
@@ -319,7 +319,7 @@ function calloutDTO(annotObjectNumber = 20): AnnotationDTO<PdfCoordinates> {
     fontFamily: 'helvetica',
     fontSize: 14,
     textAlign: 'left',
-    color: { r: 200, g: 0, b: 0 },
+    color: '#c80000',
     interiorColor: null,
     opacity: 1,
     strokeWidth: 1,
@@ -382,7 +382,7 @@ function rotatedPolylineDTO(
     importedBy: null,
     actions: null,
     subtype: 'polyline',
-    color: { r: 0, g: 0, b: 0 },
+    color: '#000000',
     interiorColor: null,
     strokeWidth: 2,
     opacity: 1,
@@ -556,11 +556,11 @@ describe('repository — free-text style + font round-trip', () => {
       AnnotationPatch<PdfCoordinates>,
       { subtype?: 'free-text' }
     >;
-    expect(patch.color).toEqual({ r: 0, g: 0, b: 255 });
-    expect(patch.interiorColor).toEqual({ r: 255, g: 255, b: 0 });
+    expect(patch.color).toEqual('#0000ff');
+    expect(patch.interiorColor).toEqual('#ffff00');
     expect(patch.opacity).toBe(0.5);
     expect(patch.fontSize).toBe(22);
-    expect(patch.fontColor).toEqual({ r: 0, g: 255, b: 0 });
+    expect(patch.fontColor).toEqual('#00ff00');
     expect(patch.textAlign).toBe('center');
     expect(patch.fontFamily).toBe('helvetica');
     // contents is owned by the debounced text-edit write — never duplicated here
@@ -628,7 +628,7 @@ function polygonDTO(
     importedBy: null,
     actions: null,
     subtype: 'polygon',
-    color: { r: 0, g: 0, b: 0 },
+    color: '#000000',
     interiorColor: null,
     strokeWidth: 2,
     opacity: 1,
@@ -826,7 +826,7 @@ describe('repository — line endings leave /Rect to the engine', () => {
       importedBy: null,
       actions: null,
       subtype: 'line',
-      color: { r: 0, g: 0, b: 0 },
+      color: '#000000',
       interiorColor: null,
       strokeWidth: 4,
       opacity: 1,

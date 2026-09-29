@@ -36,7 +36,7 @@ import { applyBorderDraft, applyBorderPatch, DEFAULT_OPACITY } from './writeStyl
  * the geometric families (which default to red `/C`), a text box reads best
  * with a black mark.
  */
-const DEFAULT_FREETEXT_COLOR: Color = { r: 0, g: 0, b: 0 };
+const DEFAULT_FREETEXT_COLOR: Color = '#000000';
 
 /**
  * Write rich text through the engine's rich writer: `/RC`, `/DS`, `/DA`,
@@ -58,14 +58,8 @@ function writeRichText(
   }
 }
 
-/** `#RRGGBB` for a rich body colour. */
-function hexColor(color: Color): string {
-  const hex = (n: number) =>
-    Math.max(0, Math.min(255, Math.round(n)))
-      .toString(16)
-      .padStart(2, '0');
-  return `#${hex(color.r)}${hex(color.g)}${hex(color.b)}`.toUpperCase();
-}
+/** `#RRGGBB` for a rich body colour, as Acrobat writes it. */
+const hexColor = (color: Color): string => color.toUpperCase();
 
 /**
  * Apply a free-text draft to a freshly-created annotation. Colour model:

@@ -32,12 +32,12 @@ import {
 
 /** Default `/C` marking outline: red — the redaction marking convention (and
  *  the AP generator's default). */
-const DEFAULT_REDACT_COLOR: Color = { r: 255, g: 0, b: 0 };
+const DEFAULT_REDACT_COLOR: Color = '#ff0000';
 
 /** Default `/DA` label colour: black, mirroring free text. Tools that pair a
  *  label with a dark `interiorColor` should set a light `fontColor`
  *  explicitly. */
-const DEFAULT_LABEL_COLOR: Color = { r: 0, g: 0, b: 0 };
+const DEFAULT_LABEL_COLOR: Color = '#000000';
 
 const DEFAULT_FONT_SIZE = 12;
 

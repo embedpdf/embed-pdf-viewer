@@ -19,10 +19,10 @@ export namespace DocPagesViewports200Response {
 
         export namespace Item {
             export interface Bbox {
-                left: number;
-                bottom: number;
-                right: number;
-                top: number;
+                x: number;
+                y: number;
+                width: number;
+                height: number;
             }
         }
     }

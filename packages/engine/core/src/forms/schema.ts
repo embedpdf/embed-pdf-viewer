@@ -3,7 +3,7 @@ import { AnnotationRefSchema } from '../annotation/base.schema';
 import { z } from 'zod';
 
 import { WidgetAppearanceSchema } from '../annotation/kinds/widget.shared';
-import { PdfRectSchema } from '../geometry/schemas';
+import { PageBoxSchema } from '../geometry/schemas';
 import type { FormFieldRef, FormWidget } from '../identity/FormFieldRef';
 import type { FormFieldDraft, FormFieldOptionInput, WidgetPlacement } from './draft';
 import type { FormFieldPatch } from './patch';
@@ -152,7 +152,7 @@ export { WidgetAppearanceSchema };
 
 export const WidgetPlacementSchema: z.ZodType<WidgetPlacement> = z.object({
   page: PageRefSchema,
-  rect: PdfRectSchema,
+  rect: PageBoxSchema,
   onState: z.string().min(1).optional(),
   appearance: WidgetAppearanceSchema.optional(),
 });

@@ -1,6 +1,7 @@
 import { scriptColorToRgb } from '@embedpdf/core-acrojs';
 import type { ScriptAnnotEffect, ScriptColorArray } from '@embedpdf/core-acrojs';
 import {
+  colorOf,
   pageBoxOf,
   toPageRef,
   type AnnotationPatch,
@@ -25,13 +26,7 @@ const engineScriptPatch = (
   const out: Record<string, unknown> = { subtype };
   const toEngineColor = (color: ScriptColorArray) => {
     const rgb = scriptColorToRgb(color);
-    return rgb
-      ? {
-          r: Math.round(rgb.r * 255),
-          g: Math.round(rgb.g * 255),
-          b: Math.round(rgb.b * 255),
-        }
-      : null;
+    return rgb ? colorOf(rgb.r * 255, rgb.g * 255, rgb.b * 255) : null;
   };
   if (patch.strokeColor) {
     const color = toEngineColor(patch.strokeColor);

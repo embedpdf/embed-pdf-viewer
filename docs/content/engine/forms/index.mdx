@@ -76,8 +76,8 @@ A field shows on a page through a **widget**: the box you see and click. Most fi
 radio group is one field with a widget per button, and a field repeated on every page (a
 reference number in the header, say) has a widget per page, all showing the same value.
 
-Each widget in `field.widgets` has its `page`, its `rect` (in PDF points) and a `ref`, so one read
-is enough to draw your own form layer over a page:
+Each widget in `field.widgets` has its `page`, its `rect` (in points from the page's top-left)
+and a `ref`, so one read is enough to draw your own form layer over a page:
 
 ```ts
 const { fields } = await doc.forms.list();

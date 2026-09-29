@@ -19,13 +19,9 @@ export interface Size {
   height: number;
 }
 /**
- * A rectangle in the viewer's coordinates: top-left origin, y-down, PDF-point
- * scale. What every viewer API speaks — `stage.reveal`, selection and search
- * rects, render boxes.
- *
- * The rule: shown on screen → `Rect`; stored in the file → the engine's y-up
- * `PdfRect` (`{left, bottom, right, top}`). The shapes are incompatible on
- * purpose — passing one where the other goes doesn't compile.
+ * A rectangle in page space: top-left origin, y-down, in points. What every
+ * viewer and engine API speaks — annotation rects, `stage.reveal`, selection
+ * and search rects, render boxes.
  */
 export interface Rect {
   x: number;
@@ -165,10 +161,9 @@ export function deviceHeightForWidth(pageSize: Size, deviceWidth: number): numbe
 }
 
 /**
- * The single per-page bridge between the viewer's three coordinate spaces. NB:
- * these are all viewer spaces — top-left origin, y-down. They are not the
- * engine's PDF user space (`Pdf*`, bottom-left origin, y-up); the engine→content
- * hop (the y-flip + crop offset) is a separate matrix (`pageGeometry`).
+ * The single per-page bridge between the viewer's three coordinate spaces, all
+ * top-left origin, y-down. Content space is the engine's page space, so
+ * engine values need no hop of their own.
  *
  *   content space  page-local points, top-left, y-down — un-rotated page frame
  *   view space     platform logical px (web: CSS px) — layout, DOM, pointer events
@@ -349,16 +344,16 @@ export function pageTransform(input: {
  * ──────────────────────────────────────────────────────────────────────────── */
 
 /**
- * The coordinate spaces a viewer touches. `pdf` is the engine's PDF user space
- * (y-up, origin at the crop box bottom-left); the rest are viewer-local, y-down.
+ * The coordinate spaces a viewer touches, all y-down. `content` is the
+ * engine's page space: points from the top-left of the visible page.
  */
-export type Space = 'pdf' | 'content' | 'view' | 'screen';
+export type Space = 'content' | 'view' | 'screen';
 
 /**
  * Phantom space brand. It is optional so plain `{ x, y }` / `{ x, y, w, h }`
  * literals stay assignable day-to-day (terse), but a value explicitly tagged
  * with the wrong space is rejected — and `Mat2D<From, To>` enforces the hop at
- * the matrix, so you cannot `applyRect` a `pdf` rect with a `content→view`
+ * the matrix, so you cannot `applyRect` a `view` rect with a `content→view`
  * matrix. The brand is type-only; it carries no runtime field.
  */
 interface SpaceBrand<S extends Space> {
@@ -370,8 +365,7 @@ export type PointIn<S extends Space> = Point & SpaceBrand<S>;
 /**
  * An axis-aligned rect tagged with its space, as min-corner + positive extent:
  * `(x, y)` is the corner with the smallest coordinates and `(x+width, y+height)`
- * the largest. In `pdf` space (y-up) that corner is bottom-left (`x=left`,
- * `y=bottom`); in the y-down viewer spaces it is top-left.
+ * the largest: in every space here, the top-left.
  */
 export type RectIn<S extends Space> = Rect & SpaceBrand<S>;
 
@@ -433,7 +427,7 @@ export function compose<A extends Space, B extends Space, C extends Space>(
   ] as Mat2D<A, C>;
 }
 
-/** Invert a transform — `invert(pdfToView)` is `viewToPdf`, i.e. hit-testing for free. */
+/** Invert a transform — `invert(contentToView)` is `viewToContent`, i.e. hit-testing for free. */
 export function invert<F extends Space, T extends Space>(matrix: Mat2D<F, T>): Mat2D<T, F> {
   const [a, b, c, d, e, f] = matrix;
   const det = a * d - b * c;
@@ -513,8 +507,7 @@ export function matrixToCss(matrix: Mat2D): string {
  *
  * Convention: a viewer content space is y-down, so `rotate(rad)` —
  * `[cos, sin, -sin, cos, 0, 0]` — turns clockwise on screen (matching the
- * viewer's page-rotation direction). The PDF (y-up) flip, when one is needed,
- * is a separate hop applied once at the engine boundary.
+ * viewer's page-rotation direction). The engine works in the same frame.
  * ──────────────────────────────────────────────────────────────────────────── */
 
 /** Translate within a space. */
@@ -587,70 +580,6 @@ export function rotateScaleMatrix(
     default:
       return [scale, 0, 0, scale, 0, 0] as Mat2D;
   }
-}
-
-/**
- * The per-page geometry input. Structurally a subset of the engine's
- * `PageLayout` (so a layout can be passed straight in), but defined here to keep
- * this package dependency-free — the same reason {@link PageRotation} is a
- * structural twin of the engine's rotation.
- */
-export interface PageGeometryInput {
-  /** Effective crop box in PDF user space (y-up edges); origin preserved, so
-   *  `left`/`bottom` may be non-zero or negative. */
-  crop: { left: number; bottom: number; right: number; top: number };
-  /** Persistent page rotation (the document's `/Rotate`). */
-  rotation: PageRotation;
-  /** PDF `userUnit` (§14.11.6): scales PDF points into the layout. 1 for most docs. */
-  userUnit: number;
-}
-
-/** The matrices bridging one page's spaces — every other matrix composes from these. */
-export interface PageGeometry {
-  /** PDF user space (y-up, crop-relative) → content space (y-down, crop top-left, unscaled points). */
-  readonly pdfToContent: Mat2D<'pdf', 'content'>;
-  /** Content → view: scale (zoom × userUnit) + the page's quarter-turn rotation. */
-  readonly contentToView: Mat2D<'content', 'view'>;
-  /** PDF → view, precomposed. */
-  readonly pdfToView: Mat2D<'pdf', 'view'>;
-  /** View → PDF, the inverse — hit-testing for free. */
-  readonly viewToPdf: Mat2D<'view', 'pdf'>;
-}
-
-/**
- * PDF user space (y-up, origin = crop bottom-left) → content space (y-down,
- * origin = crop top-left, unscaled points). The single encoding of the engine→
- * content y-flip + crop offset: `pageGeometry` composes its `pdfToContent` from
- * this, and pure annotation geometry (content-space editing) reuses it too, so
- * the rule can never be hand-written twice and drift.
- */
-export function pdfToContentMatrix(crop: { left: number; top: number }): Mat2D<'pdf', 'content'> {
-  return [1, 0, 0, -1, -crop.left, crop.top] as Mat2D<'pdf', 'content'>;
-}
-
-/**
- * Build a page's space matrices from its crop box, rotation, and `userUnit` plus
- * the viewer `zoom`. This is the one function that knows the y-flip, crop origin,
- * `userUnit`, and rotation; everything else composes from its output. The engine
- * never emits these — they bake in viewer state (zoom, later scroll/dpr) — so the
- * boundary stays clean: engine owns `Pdf*` truth, the viewer composes the rest.
- */
-export function pageGeometry(input: PageGeometryInput, zoom: number): PageGeometry {
-  const { crop, rotation, userUnit } = input;
-  const pxPerPoint = zoom * userUnit; // view px per PDF point — userUnit folded in here, once
-
-  // PDF user space (y-up, origin = crop bottom-left) → content (y-down, origin = crop top-left).
-  const pdfToContent = pdfToContentMatrix(crop);
-
-  // Content → view: scale + integer quarter-turn, from the shared builder (the
-  // one quarter-turn encoding). `Wc`/`Hc` are the unrotated content's view-px
-  // extents (the builder places the footprint in the box's positive quadrant).
-  const Wc = (crop.right - crop.left) * pxPerPoint;
-  const Hc = (crop.top - crop.bottom) * pxPerPoint;
-  const contentToView = rotateScaleMatrix(pxPerPoint, Wc, Hc, rotation) as Mat2D<'content', 'view'>;
-
-  const pdfToView = compose(contentToView, pdfToContent);
-  return { pdfToContent, contentToView, pdfToView, viewToPdf: invert(pdfToView) };
 }
 
 /* ── TextQuad — corner-named quads for text-anchored geometry ──────────────

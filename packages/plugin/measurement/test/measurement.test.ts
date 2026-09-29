@@ -13,13 +13,13 @@ import { createMeasurementController } from '../src/controller';
 import { initialMeasurementState, type MeasurementState } from '../src/model';
 
 const PAGE = toPageRef(1);
-const CROP = { left: 0, bottom: 0, right: 600, top: 800 };
+const PAGE_BOX = { x: 0, y: 0, width: 600, height: 800 };
 const LOCAL_ORIGIN = { kind: 'local', sessionId: 'session-a', sub: null, ts: 0, serverId: null };
 const REMOTE_ORIGIN = { kind: 'remote', sessionId: 'session-b', sub: 'user-b', ts: 0, serverId: 3 };
 const ONE_TO_HUNDRED = measureFromRatio(1, 100, 'm');
 
 const owned = (measure: PdfMeasure): PageMeasurementViewport => ({
-  bbox: CROP,
+  bbox: PAGE_BOX,
   name: 'EmbedPDF',
   owned: true,
   measure,
@@ -187,8 +187,8 @@ describe('measurement', () => {
     draftCaptured.emit({
       tool: 'calibrate',
       page: PAGE,
-      from: { x: 0, y: 700 },
-      to: { x: 72, y: 700 },
+      from: { x: 0, y: 100 },
+      to: { x: 72, y: 100 },
     });
 
     const request = measurement.getCalibrationRequest();

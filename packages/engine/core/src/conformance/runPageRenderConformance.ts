@@ -133,8 +133,8 @@ export function runPageRenderConformance(
       const { annotation } = await page.annotations.create({
         subtype: 'square',
         box: SQUARE_ON_PAGE,
-        color: { r: 255, g: 0, b: 0 },
-        interiorColor: { r: 255, g: 0, b: 0 },
+        color: '#ff0000',
+        interiorColor: '#ff0000',
       });
       try {
         const { appearances } = await page.annotations.renderAppearances({ format: 'png' });

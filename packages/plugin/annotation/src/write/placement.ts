@@ -9,7 +9,7 @@ import type {
   PageBox,
 } from '@embedpdf/engine-core/runtime';
 
-import { cssToColor } from '../repository';
+import { hexColorOf } from '../repository';
 
 /**
  * Per-kind code for the click-to-place icon kinds (note / file attachment)
@@ -34,9 +34,8 @@ export const isIconPlaceKind = (subtype: Subtype): subtype is IconPlaceKind =>
  * Build the engine create for a placed icon annotation: its data, and for a
  * file attachment the file's bytes as the `file` resource. `geometry` is the
  * icon's `rect`; `defaults` is the tool's resolved flat props bag
- * (`defaultsFor`) — the
- * colour seam is crossed here via the repository's `cssToColor`, and the
- * icon falls back to the kind's own default when the bag carries none.
+ * (`defaultsFor`); the icon falls back to the kind's own default when the
+ * bag carries none.
  */
 export function iconPlacement(
   subtype: IconPlaceKind,
@@ -47,7 +46,7 @@ export function iconPlacement(
 ): { data: AnnotationDraft; resources?: AnnotationResources } {
   const shared = {
     ...geometry,
-    color: cssToColor(defaults.color),
+    color: hexColorOf(defaults.color),
     opacity: defaults.opacity,
     // A fresh placement carries print (Acrobat parity) plus the tool's seed
     // (the note/attachment tools pass noZoom + noRotate).

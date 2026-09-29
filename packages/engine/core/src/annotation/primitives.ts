@@ -23,18 +23,14 @@ export type Size = PdfSize;
 export type Rotation = PdfRotation;
 
 /**
- * sRGB color. Components are 0..255 integers. Engines normalize PDFium's
- * device color space into sRGB at read time.
+ * An sRGB color as `'#rrggbb'`: lowercase when the engine gives one, either
+ * case when it takes one. A gray or CMYK color in the file reads as its sRGB
+ * equivalent, and sent back unchanged it stays as the file has it.
  *
- * Colour carries no alpha: annotation transparency is a separate concern
- * stored in `/CA` and surfaced as the `opacity` style field, so there is a
- * single source of truth for transparency. See `ColorStyleFields.opacity`.
+ * A color carries no alpha: transparency is the separate `opacity` field
+ * (`/CA`), so there is one source of truth for it.
  */
-export interface Color {
-  r: number;
-  g: number;
-  b: number;
-}
+export type Color = string;
 
 /**
  * /LE entries (line endings). Maps PDFium FPDFAnnot_GetLineEndings codes

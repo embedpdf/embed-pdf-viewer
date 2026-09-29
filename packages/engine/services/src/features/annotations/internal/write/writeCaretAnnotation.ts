@@ -12,7 +12,7 @@ import { applyAnnotationBoxPatch, writeAnnotationBox } from './writeAnnotationBo
 import { caretIntentToName } from '../textEditIntent';
 
 /** Default `/C` colour when a caret draft omits it (engine-wide default mark). */
-const DEFAULT_CARET_COLOR: Color = { r: 255, g: 0, b: 0 };
+const DEFAULT_CARET_COLOR: Color = '#ff0000';
 
 /** Default opacity, set explicitly so reads always round-trip the same value. */
 const DEFAULT_OPACITY = 1;

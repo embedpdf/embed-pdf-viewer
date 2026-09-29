@@ -4,6 +4,7 @@ import type {
   WidgetAnnotationDTO,
   PdfCoordinates,
 } from '@embedpdf/engine-core/runtime';
+import { colorOf } from '@embedpdf/engine-core/runtime';
 import { type PdfFunctions, type PdfRuntimeMemory, type Ptr } from '@embedpdf/engine-runtime';
 
 import { withScratchN } from '../../../../runtime/memory/scratch';
@@ -25,11 +26,7 @@ function readMKColor(
 ): Color | null {
   return withScratchN(mem, [I32_BYTES, I32_BYTES, I32_BYTES], ([r, g, b]) => {
     if (!fn.EPDFAnnot_GetMKColor(annotPtr, which, r, g, b)) return null;
-    return {
-      r: readI32(mem, r) & 0xff,
-      g: readI32(mem, g) & 0xff,
-      b: readI32(mem, b) & 0xff,
-    };
+    return colorOf(readI32(mem, r) & 0xff, readI32(mem, g) & 0xff, readI32(mem, b) & 0xff);
   });
 }
 

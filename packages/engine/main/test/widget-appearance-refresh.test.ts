@@ -101,7 +101,7 @@ describe('widget appearance refresh across planes (engine-local, wasm)', () => {
   test('an annotation-plane style patch shows up in the appearance render', async () => {
     await doc.page(toPageRef(pageObjectNumber)).annotations.update(widgetRef, {
       subtype: 'widget',
-      interiorColor: { r: 255, g: 213, b: 0 },
+      interiorColor: '#ffd500',
     });
     const raster = await widgetRaster();
     expect(raster, 'style patch must produce a renderable /AP').not.toBeNull();

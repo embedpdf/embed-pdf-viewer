@@ -17,7 +17,7 @@ import {
 } from './annotationReadPrimitives';
 
 /** Default `/C` — matches the generator's yellow note fill and the writer default. */
-const DEFAULT_NOTE_COLOR: Color = { r: 255, g: 255, b: 0 };
+const DEFAULT_NOTE_COLOR: Color = '#ffff00';
 
 /** An absent or foreign `/Name` reads as 'note' (ISO 32000 §12.5.6.4 default). */
 const DEFAULT_NOTE_ICON: NoteIcon = 'note';
@@ -28,7 +28,7 @@ export function readText(
   annotPtr: Ptr,
   base: AnnotationBase<PdfCoordinates>,
 ): TextAnnotationDTO<PdfCoordinates> {
-  const color = readAnnotColor(fn, mem, annotPtr) ?? { ...DEFAULT_NOTE_COLOR };
+  const color = readAnnotColor(fn, mem, annotPtr) ?? DEFAULT_NOTE_COLOR;
   const ca = readAnnotOpacity(fn, mem, annotPtr);
   const opacity = ca == null ? 1 : Math.max(0, Math.min(1, ca));
   const icon = NOTE_NAME_TO_ICON[readAnnotName(fn, mem, annotPtr) ?? ''] ?? DEFAULT_NOTE_ICON;

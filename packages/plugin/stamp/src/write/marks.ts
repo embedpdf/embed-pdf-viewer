@@ -11,12 +11,13 @@ import type { AddAssetInput, MarkSource } from '../contract';
 import type { StampServices } from '../services';
 import { stampError } from '../services/errors';
 
-/** `#rrggbb` as the engine's sRGB triplet. */
-const hexColor = (hex: string): { r: number; g: number; b: number } => {
-  const match = /^#?([0-9a-f]{6})$/i.exec(hex.trim());
-  if (!match) throw stampError('invalid-input', `mark color must be #rrggbb, got '${hex}'`);
-  const value = parseInt(match[1], 16);
-  return { r: (value >> 16) & 0xff, g: (value >> 8) & 0xff, b: value & 0xff };
+/** A mark's `#rrggbb` color, checked before anything is drawn. */
+const hexColor = (hex: string): string => {
+  const color = hex.trim();
+  if (!/^#[0-9a-f]{6}$/i.test(color)) {
+    throw stampError('invalid-input', `mark color must be #rrggbb, got '${hex}'`);
+  }
+  return color;
 };
 
 /** An exact ArrayBuffer over a view (the engine's binary idiom). */

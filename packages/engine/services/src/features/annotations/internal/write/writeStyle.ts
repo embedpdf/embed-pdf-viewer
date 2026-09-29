@@ -30,7 +30,7 @@ export type BorderDraftFields = Pick<
  */
 export const DEFAULT_OPACITY = 1;
 export const DEFAULT_STROKE_WIDTH = 1;
-export const DEFAULT_COLOR: Color = { r: 255, g: 0, b: 0 };
+export const DEFAULT_COLOR: Color = '#ff0000';
 
 /**
  * Apply the geometry styling (`/C`, `/CA`, `/BS`, dash) from a draft to a

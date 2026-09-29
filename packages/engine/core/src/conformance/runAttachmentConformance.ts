@@ -252,7 +252,7 @@ export function runAttachmentConformance(
               description: 'attachment conformance payload',
             },
             icon: 'paperclip',
-            color: { r: 220, g: 38, b: 38 },
+            color: '#dc2626',
             contents: 'conformance attachment',
           },
           { file: data },
@@ -262,7 +262,7 @@ export function runAttachmentConformance(
         const dto = created as FileAttachmentAnnotationDTO;
         expect(dto.subtype).toBe('file-attachment');
         expect(dto.icon).toBe('paperclip');
-        expect(dto.color).toEqual({ r: 220, g: 38, b: 38 });
+        expect(dto.color).toEqual('#dc2626');
         const file = dto.file!;
         expect(file.name).toBe('conformance.bin');
         expect(file.mimeType).toBe('application/octet-stream');
@@ -288,13 +288,13 @@ export function runAttachmentConformance(
           subtype: 'text',
           rect: iconRect(100, 120),
           icon: 'comment',
-          color: { r: 250, g: 204, b: 21 },
+          color: '#facc15',
           contents: 'conformance note',
         });
         const dto = created as TextAnnotationDTO;
         expect(dto.subtype).toBe('text');
         expect(dto.icon).toBe('comment');
-        expect(dto.color).toEqual({ r: 250, g: 204, b: 21 });
+        expect(dto.color).toEqual('#facc15');
         expect(dto.contents).toBe('conformance note');
 
         // Icon is patchable; the file half of an attachment is not, and

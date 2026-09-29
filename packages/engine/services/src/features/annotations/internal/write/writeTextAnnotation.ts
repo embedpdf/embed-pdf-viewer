@@ -21,7 +21,7 @@ import {
 import { applyAnnotationBaseDraft, applyAnnotationBasePatch } from './writeAnnotationBase';
 
 /** Default `/C` — the generator's yellow note fill, set explicitly so reads round-trip. */
-const DEFAULT_NOTE_COLOR: Color = { r: 255, g: 255, b: 0 };
+const DEFAULT_NOTE_COLOR: Color = '#ffff00';
 
 const DEFAULT_OPACITY = 1;
 

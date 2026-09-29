@@ -133,7 +133,7 @@ const match = matches[0];
 await doc.page(match.page).annotations.create({
   subtype: 'highlight',
   quadPoints: match.segments.map((segment) => segment.quad),
-  color: { r: 255, g: 215, b: 0 },
+  color: '#ffd700',
 });
 ```
 

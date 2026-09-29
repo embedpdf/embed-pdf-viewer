@@ -35,9 +35,8 @@ export function createFieldWrites(
 
   const placeField = async (input: CreateFieldInput): Promise<CreatedField> => {
     const page = input.page;
-    const space = ctx.geometry.tryForPage(page);
     const bounds = getPageBox(page);
-    if (!space || !bounds) {
+    if (!bounds) {
       throw new PluginError('not-ready', 'form', 'createField: the page is not laid out');
     }
     // Placement is page-bound: intersect a (possibly overshooting) drag box
@@ -62,7 +61,7 @@ export function createFieldWrites(
     const name = input.name ?? autoName(family);
     const placement = {
       page,
-      rect: space.pageRectToPdf(box),
+      rect: box,
       ...(appearance ? { appearance } : {}),
     };
     const draft: FormFieldDraft =

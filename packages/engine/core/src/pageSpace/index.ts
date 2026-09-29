@@ -33,6 +33,7 @@ export {
   pageFieldActionsOf,
   pageFormFieldOf,
   pageFormSnapshotOf,
+  pdfFormFieldDraftOf,
   pdfWidgetPlacementOf,
 } from './forms';
 export { pageMeasureOf, pageViewportsOf, pdfMeasureOf } from './measure';
@@ -50,6 +51,5 @@ export {
   pageQuadFromCorners,
   pageTurnOfDrawn,
   pageTurnOfUpright,
-  pageViewportForPoint,
   shapeForRect,
 } from './helpers';

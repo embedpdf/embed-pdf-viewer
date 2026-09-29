@@ -1,7 +1,6 @@
-/** The page registry, page ⇄ PDF point conversion, the authority guards, and the page-target expansion. */
+/** The page registry, the authority guards, and the page-target expansion. */
 import { PluginError } from '@embedpdf/core';
-import type { Point } from '@embedpdf/core-geometry';
-import type { PageRef, PdfPoint } from '@embedpdf/engine-core/runtime';
+import type { PageRef } from '@embedpdf/engine-core/runtime';
 
 import type { PageTarget } from '../contract';
 import type { MeasurementContext } from './context';
@@ -28,11 +27,6 @@ export function createStore(ctx: MeasurementContext) {
       : Array.isArray(pages)
         ? (pages as readonly PageRef[])
         : [pages as PageRef];
-  /** Page space ↔ PDF user space: the kernel's page geometry, never re-derived here. */
-  const toPdf = (page: PageRef, point: Point): PdfPoint =>
-    ctx.geometry.forPage(page).pageToPdf(point);
-  const toPage = (page: PageRef, point: PdfPoint): Point =>
-    ctx.geometry.forPage(page).pdfToPage(point);
-  return { requirePage, canCalibrate, assertAllowed, targets, toPdf, toPage };
+  return { requirePage, canCalibrate, assertAllowed, targets };
 }
 export type MeasurementStore = ReturnType<typeof createStore>;

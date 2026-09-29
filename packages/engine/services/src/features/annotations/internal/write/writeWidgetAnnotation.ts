@@ -4,6 +4,7 @@ import type {
   WidgetStyleDraftFields,
   PdfCoordinates,
 } from '@embedpdf/engine-core/runtime';
+import { rgbOf } from '@embedpdf/engine-core/runtime';
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
 
 import { borderStyleToCode } from '../shapeBorderStyle';
@@ -33,18 +34,14 @@ export function applyWidgetStyle(
   if (style.color === null) {
     fn.EPDFAnnot_ClearMKColor(annotPtr, MK_BORDER_COLOR);
   } else if (style.color) {
-    fn.EPDFAnnot_SetMKColor(annotPtr, MK_BORDER_COLOR, style.color.r, style.color.g, style.color.b);
+    const { r, g, b } = rgbOf(style.color);
+    fn.EPDFAnnot_SetMKColor(annotPtr, MK_BORDER_COLOR, r, g, b);
   }
   if (style.interiorColor === null) {
     fn.EPDFAnnot_ClearMKColor(annotPtr, MK_BACKGROUND_COLOR);
   } else if (style.interiorColor) {
-    fn.EPDFAnnot_SetMKColor(
-      annotPtr,
-      MK_BACKGROUND_COLOR,
-      style.interiorColor.r,
-      style.interiorColor.g,
-      style.interiorColor.b,
-    );
+    const { r, g, b } = rgbOf(style.interiorColor);
+    fn.EPDFAnnot_SetMKColor(annotPtr, MK_BACKGROUND_COLOR, r, g, b);
   }
 
   if (style.strokeWidth !== undefined || style.borderStyle !== undefined) {
@@ -60,14 +57,14 @@ export function applyWidgetStyle(
     style.fontSize !== undefined ||
     style.fontColor !== undefined
   ) {
-    const color = style.fontColor ?? { r: 0, g: 0, b: 0 };
+    const { r, g, b } = rgbOf(style.fontColor ?? '#000000');
     fn.EPDFAnnot_SetDefaultAppearance(
       annotPtr,
       standardFontToCode(style.fontFamily ?? 'helvetica'),
       style.fontSize ?? 12,
-      color.r,
-      color.g,
-      color.b,
+      r,
+      g,
+      b,
     );
   }
 

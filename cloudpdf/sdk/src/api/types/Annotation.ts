@@ -57,7 +57,7 @@ export namespace Annotation {
         modifiedBy: string | null;
         importedBy: string | null;
         actions: CloudPDF.PdfAnnotationActions | null;
-        color: AnnotationHighlight.Color;
+        color: string;
         opacity: number;
         quadPoints: AnnotationHighlight.QuadPoints.Item[];
     }
@@ -119,12 +119,6 @@ export namespace Annotation {
                 Group: "group",
             } as const;
             export type Type = (typeof Type)[keyof typeof Type];
-        }
-
-        export interface Color {
-            r: number;
-            g: number;
-            b: number;
         }
 
         export type QuadPoints = QuadPoints.Item[];
@@ -193,7 +187,7 @@ export namespace Annotation {
         modifiedBy: string | null;
         importedBy: string | null;
         actions: CloudPDF.PdfAnnotationActions | null;
-        color: AnnotationUnderline.Color;
+        color: string;
         opacity: number;
         quadPoints: AnnotationUnderline.QuadPoints.Item[];
     }
@@ -255,12 +249,6 @@ export namespace Annotation {
                 Group: "group",
             } as const;
             export type Type = (typeof Type)[keyof typeof Type];
-        }
-
-        export interface Color {
-            r: number;
-            g: number;
-            b: number;
         }
 
         export type QuadPoints = QuadPoints.Item[];
@@ -329,7 +317,7 @@ export namespace Annotation {
         modifiedBy: string | null;
         importedBy: string | null;
         actions: CloudPDF.PdfAnnotationActions | null;
-        color: AnnotationSquiggly.Color;
+        color: string;
         opacity: number;
         quadPoints: AnnotationSquiggly.QuadPoints.Item[];
     }
@@ -391,12 +379,6 @@ export namespace Annotation {
                 Group: "group",
             } as const;
             export type Type = (typeof Type)[keyof typeof Type];
-        }
-
-        export interface Color {
-            r: number;
-            g: number;
-            b: number;
         }
 
         export type QuadPoints = QuadPoints.Item[];
@@ -465,7 +447,7 @@ export namespace Annotation {
         modifiedBy: string | null;
         importedBy: string | null;
         actions: CloudPDF.PdfAnnotationActions | null;
-        color: AnnotationStrikeout.Color;
+        color: string;
         opacity: number;
         quadPoints: AnnotationStrikeout.QuadPoints.Item[];
         intent: AnnotationStrikeout.Intent | null;
@@ -528,12 +510,6 @@ export namespace Annotation {
                 Group: "group",
             } as const;
             export type Type = (typeof Type)[keyof typeof Type];
-        }
-
-        export interface Color {
-            r: number;
-            g: number;
-            b: number;
         }
 
         export type QuadPoints = QuadPoints.Item[];
@@ -607,12 +583,12 @@ export namespace Annotation {
         modifiedBy: string | null;
         importedBy: string | null;
         actions: CloudPDF.PdfAnnotationActions | null;
-        color: AnnotationCircle.Color;
+        color: string;
         opacity: number;
         strokeWidth: number;
         borderStyle: AnnotationCircle.BorderStyle;
         dashArray: number[] | null;
-        interiorColor: AnnotationCircle.InteriorColor | null;
+        interiorColor: string | null;
         box: AnnotationCircle.Box;
         rotation: number | null;
         cloudyIntensity: number | null;
@@ -677,12 +653,6 @@ export namespace Annotation {
             export type Type = (typeof Type)[keyof typeof Type];
         }
 
-        export interface Color {
-            r: number;
-            g: number;
-            b: number;
-        }
-
         export const BorderStyle = {
             Solid: "solid",
             Dashed: "dashed",
@@ -690,12 +660,6 @@ export namespace Annotation {
             Inset: "inset",
         } as const;
         export type BorderStyle = (typeof BorderStyle)[keyof typeof BorderStyle];
-
-        export interface InteriorColor {
-            r: number;
-            g: number;
-            b: number;
-        }
 
         export interface Box {
             x: number;
@@ -737,12 +701,12 @@ export namespace Annotation {
         modifiedBy: string | null;
         importedBy: string | null;
         actions: CloudPDF.PdfAnnotationActions | null;
-        color: AnnotationSquare.Color;
+        color: string;
         opacity: number;
         strokeWidth: number;
         borderStyle: AnnotationSquare.BorderStyle;
         dashArray: number[] | null;
-        interiorColor: AnnotationSquare.InteriorColor | null;
+        interiorColor: string | null;
         box: AnnotationSquare.Box;
         rotation: number | null;
         cloudyIntensity: number | null;
@@ -807,12 +771,6 @@ export namespace Annotation {
             export type Type = (typeof Type)[keyof typeof Type];
         }
 
-        export interface Color {
-            r: number;
-            g: number;
-            b: number;
-        }
-
         export const BorderStyle = {
             Solid: "solid",
             Dashed: "dashed",
@@ -820,12 +778,6 @@ export namespace Annotation {
             Inset: "inset",
         } as const;
         export type BorderStyle = (typeof BorderStyle)[keyof typeof BorderStyle];
-
-        export interface InteriorColor {
-            r: number;
-            g: number;
-            b: number;
-        }
 
         export interface Box {
             x: number;
@@ -867,12 +819,12 @@ export namespace Annotation {
         modifiedBy: string | null;
         importedBy: string | null;
         actions: CloudPDF.PdfAnnotationActions | null;
-        color: AnnotationPolygon.Color;
+        color: string;
         opacity: number;
         strokeWidth: number;
         borderStyle: AnnotationPolygon.BorderStyle;
         dashArray: number[] | null;
-        interiorColor: AnnotationPolygon.InteriorColor | null;
+        interiorColor: string | null;
         vertices: AnnotationPolygon.Vertices.Item[];
         rotation: number | null;
         captionEnabled: boolean | null;
@@ -941,12 +893,6 @@ export namespace Annotation {
             export type Type = (typeof Type)[keyof typeof Type];
         }
 
-        export interface Color {
-            r: number;
-            g: number;
-            b: number;
-        }
-
         export const BorderStyle = {
             Solid: "solid",
             Dashed: "dashed",
@@ -954,13 +900,6 @@ export namespace Annotation {
             Inset: "inset",
         } as const;
         export type BorderStyle = (typeof BorderStyle)[keyof typeof BorderStyle];
-
-        export interface InteriorColor {
-            r: number;
-            g: number;
-            b: number;
-        }
-
         export type Vertices = Vertices.Item[];
 
         export namespace Vertices {
@@ -1014,12 +953,12 @@ export namespace Annotation {
         modifiedBy: string | null;
         importedBy: string | null;
         actions: CloudPDF.PdfAnnotationActions | null;
-        color: AnnotationPolyline.Color;
+        color: string;
         opacity: number;
         strokeWidth: number;
         borderStyle: AnnotationPolyline.BorderStyle;
         dashArray: number[] | null;
-        interiorColor: AnnotationPolyline.InteriorColor | null;
+        interiorColor: string | null;
         vertices: AnnotationPolyline.Vertices.Item[];
         rotation: number | null;
         captionEnabled: boolean | null;
@@ -1088,12 +1027,6 @@ export namespace Annotation {
             export type Type = (typeof Type)[keyof typeof Type];
         }
 
-        export interface Color {
-            r: number;
-            g: number;
-            b: number;
-        }
-
         export const BorderStyle = {
             Solid: "solid",
             Dashed: "dashed",
@@ -1101,13 +1034,6 @@ export namespace Annotation {
             Inset: "inset",
         } as const;
         export type BorderStyle = (typeof BorderStyle)[keyof typeof BorderStyle];
-
-        export interface InteriorColor {
-            r: number;
-            g: number;
-            b: number;
-        }
-
         export type Vertices = Vertices.Item[];
 
         export namespace Vertices {
@@ -1194,12 +1120,12 @@ export namespace Annotation {
         modifiedBy: string | null;
         importedBy: string | null;
         actions: CloudPDF.PdfAnnotationActions | null;
-        color: AnnotationLine.Color;
+        color: string;
         opacity: number;
         strokeWidth: number;
         borderStyle: AnnotationLine.BorderStyle;
         dashArray: number[] | null;
-        interiorColor: AnnotationLine.InteriorColor | null;
+        interiorColor: string | null;
         linePoints: AnnotationLine.LinePoints;
         lineEndings: AnnotationLine.LineEndings;
         rotation: number | null;
@@ -1270,12 +1196,6 @@ export namespace Annotation {
             export type Type = (typeof Type)[keyof typeof Type];
         }
 
-        export interface Color {
-            r: number;
-            g: number;
-            b: number;
-        }
-
         export const BorderStyle = {
             Solid: "solid",
             Dashed: "dashed",
@@ -1283,12 +1203,6 @@ export namespace Annotation {
             Inset: "inset",
         } as const;
         export type BorderStyle = (typeof BorderStyle)[keyof typeof BorderStyle];
-
-        export interface InteriorColor {
-            r: number;
-            g: number;
-            b: number;
-        }
 
         export interface LinePoints {
             start: LinePoints.Start;
@@ -1491,7 +1405,7 @@ export namespace Annotation {
         modifiedBy: string | null;
         importedBy: string | null;
         actions: CloudPDF.PdfAnnotationActions | null;
-        color: AnnotationInk.Color;
+        color: string;
         opacity: number;
         strokeWidth: number;
         borderStyle: AnnotationInk.BorderStyle;
@@ -1560,12 +1474,6 @@ export namespace Annotation {
             export type Type = (typeof Type)[keyof typeof Type];
         }
 
-        export interface Color {
-            r: number;
-            g: number;
-            b: number;
-        }
-
         export const BorderStyle = {
             Solid: "solid",
             Dashed: "dashed",
@@ -1627,9 +1535,9 @@ export namespace Annotation {
         fontSize: number;
         textAlign: AnnotationFreeText.TextAlign;
         richText: AnnotationFreeText.RichText;
-        color: AnnotationFreeText.Color;
-        fontColor: AnnotationFreeText.FontColor | null;
-        interiorColor: AnnotationFreeText.InteriorColor | null;
+        color: string;
+        fontColor: string | null;
+        interiorColor: string | null;
         opacity: number;
         strokeWidth: number;
         borderStyle: AnnotationFreeText.BorderStyle;
@@ -1860,24 +1768,6 @@ export namespace Annotation {
             }
         }
 
-        export interface Color {
-            r: number;
-            g: number;
-            b: number;
-        }
-
-        export interface FontColor {
-            r: number;
-            g: number;
-            b: number;
-        }
-
-        export interface InteriorColor {
-            r: number;
-            g: number;
-            b: number;
-        }
-
         export const BorderStyle = {
             Solid: "solid",
             Dashed: "dashed",
@@ -1932,7 +1822,7 @@ export namespace Annotation {
         modifiedBy: string | null;
         importedBy: string | null;
         actions: CloudPDF.PdfAnnotationActions | null;
-        color: AnnotationCaret.Color;
+        color: string;
         opacity: number;
         box: AnnotationCaret.Box;
         rotation: number | null;
@@ -1998,12 +1888,6 @@ export namespace Annotation {
             export type Type = (typeof Type)[keyof typeof Type];
         }
 
-        export interface Color {
-            r: number;
-            g: number;
-            b: number;
-        }
-
         export interface Box {
             x: number;
             y: number;
@@ -2049,7 +1933,7 @@ export namespace Annotation {
         modifiedBy: string | null;
         importedBy: string | null;
         actions: CloudPDF.PdfAnnotationActions | null;
-        color: AnnotationText.Color;
+        color: string;
         opacity: number;
         icon: AnnotationText.Icon;
         state: string | null;
@@ -2113,12 +1997,6 @@ export namespace Annotation {
                 Group: "group",
             } as const;
             export type Type = (typeof Type)[keyof typeof Type];
-        }
-
-        export interface Color {
-            r: number;
-            g: number;
-            b: number;
         }
 
         export const Icon = {
@@ -2278,7 +2156,7 @@ export namespace Annotation {
         modifiedBy: string | null;
         importedBy: string | null;
         actions: CloudPDF.PdfAnnotationActions | null;
-        color: AnnotationFileAttachment.Color;
+        color: string;
         opacity: number;
         icon: AnnotationFileAttachment.Icon;
         file: AnnotationFileAttachment.File_ | null;
@@ -2343,12 +2221,6 @@ export namespace Annotation {
             export type Type = (typeof Type)[keyof typeof Type];
         }
 
-        export interface Color {
-            r: number;
-            g: number;
-            b: number;
-        }
-
         export const Icon = {
             PushPin: "push-pin",
             Paperclip: "paperclip",
@@ -2400,13 +2272,13 @@ export namespace Annotation {
         modifiedBy: string | null;
         importedBy: string | null;
         actions: CloudPDF.PdfAnnotationActions | null;
-        color: AnnotationWidget.Color | null;
-        interiorColor: AnnotationWidget.InteriorColor | null;
+        color: string | null;
+        interiorColor: string | null;
         strokeWidth: number;
         borderStyle: AnnotationWidget.BorderStyle;
         fontFamily: AnnotationWidget.FontFamily | null;
         fontSize: number | null;
-        fontColor: AnnotationWidget.FontColor | null;
+        fontColor: string | null;
         textAlign: AnnotationWidget.TextAlign;
         fieldObjectNumber: number;
         fieldFamily: AnnotationWidget.FieldFamily;
@@ -2471,18 +2343,6 @@ export namespace Annotation {
             export type Type = (typeof Type)[keyof typeof Type];
         }
 
-        export interface Color {
-            r: number;
-            g: number;
-            b: number;
-        }
-
-        export interface InteriorColor {
-            r: number;
-            g: number;
-            b: number;
-        }
-
         export const BorderStyle = {
             Solid: "solid",
             Dashed: "dashed",
@@ -2507,13 +2367,6 @@ export namespace Annotation {
             ZapfDingbats: "zapf-dingbats",
         } as const;
         export type FontFamily = (typeof FontFamily)[keyof typeof FontFamily];
-
-        export interface FontColor {
-            r: number;
-            g: number;
-            b: number;
-        }
-
         export const TextAlign = {
             Left: "left",
             Center: "center",
@@ -2565,15 +2418,15 @@ export namespace Annotation {
         modifiedBy: string | null;
         importedBy: string | null;
         actions: CloudPDF.PdfAnnotationActions | null;
-        color: AnnotationRedact.Color;
+        color: string;
         opacity: number;
         quadPoints: AnnotationRedact.QuadPoints.Item[];
-        interiorColor: AnnotationRedact.InteriorColor | null;
+        interiorColor: string | null;
         overlayText: string | null;
         repeat: boolean;
         fontFamily: string;
         fontSize: number;
-        fontColor: AnnotationRedact.FontColor;
+        fontColor: string;
         textAlign: AnnotationRedact.TextAlign;
     }
 
@@ -2636,12 +2489,6 @@ export namespace Annotation {
             export type Type = (typeof Type)[keyof typeof Type];
         }
 
-        export interface Color {
-            r: number;
-            g: number;
-            b: number;
-        }
-
         export type QuadPoints = QuadPoints.Item[];
 
         export namespace QuadPoints {
@@ -2673,18 +2520,6 @@ export namespace Annotation {
                     y: number;
                 }
             }
-        }
-
-        export interface InteriorColor {
-            r: number;
-            g: number;
-            b: number;
-        }
-
-        export interface FontColor {
-            r: number;
-            g: number;
-            b: number;
         }
 
         export const TextAlign = {

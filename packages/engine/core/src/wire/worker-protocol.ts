@@ -525,12 +525,12 @@ export interface FormsRepairWorkerRequest {
   artifactPath?: string;
 }
 
-export interface FormsCreateFieldWorkerRequest {
+export interface FormsCreateFieldWorkerRequest<C extends Coordinates = PageCoordinates> {
   kind: 'forms.createField';
   jobId: WorkerJobId;
   docId: string;
   layerName?: string;
-  draft: FormFieldDraft;
+  draft: FormFieldDraft<C>;
   artifactPath?: string;
 }
 
@@ -1170,7 +1170,7 @@ export type WorkerRequest<C extends Coordinates = PageCoordinates> =
   | FormsExportWorkerRequest
   | FormsImportWorkerRequest
   | FormsRepairWorkerRequest
-  | FormsCreateFieldWorkerRequest
+  | FormsCreateFieldWorkerRequest<C>
   | FormsUpdateFieldWorkerRequest
   | FormsSetSignatureAppearanceWorkerRequest
   | FormsDeleteFieldWorkerRequest
@@ -1476,7 +1476,7 @@ export type WorkerResultPayload<C extends Coordinates = PageCoordinates> =
       artifact?: LayerArtifactWorkerPayload;
       artifactFile?: LayerArtifactFileWorkerPayload;
     }
-  | { tag: 'measure.viewports'; viewports: PageMeasurementViewport[] }
+  | { tag: 'measure.viewports'; page: PageRef; viewports: PageMeasurementViewport<C>[] }
   | {
       tag: 'measure.setScale';
       result: PageScaleResult;

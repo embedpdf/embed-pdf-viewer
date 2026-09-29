@@ -63,7 +63,7 @@ each from that page's range.
 | Field        | What it is                                                          | Default                                             |
 | :----------- | :------------------------------------------------------------------ | :-------------------------------------------------- |
 | `quadPoints` | Where the text is: one quad per line piece. Required, at least one. |                                                     |
-| `color`      | The mark's color, `{ r, g, b }` from 0 to 255.                      | yellow for a highlight, black for the others        |
+| `color`      | The mark's color, `'#rrggbb'`.                                      | yellow for a highlight, black for the others        |
 | `opacity`    | From `0` (invisible) to `1` (solid).                                | `1`                                                 |
 | `blendMode`  | How the color mixes with the page under it.                         | `'multiply'` for a highlight, `'normal'` for others |
 | `contents`   | A comment, which PDF apps show with the mark.                       | none                                                |
@@ -77,7 +77,7 @@ The fields every annotation has (flags, `subject`, who wrote it) are on the
 ## Color
 
 ```ts
-await page.annotations.update(highlight.ref, { color: { r: 144, g: 238, b: 144 } });
+await page.annotations.update(highlight.ref, { color: '#90ee90' });
 ```
 
 A highlight multiplies its color with the page, like a real marker: the text under it stays dark

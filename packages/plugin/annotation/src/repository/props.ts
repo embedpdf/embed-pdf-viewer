@@ -8,7 +8,7 @@
 import { initialTextStyle, type ModelAnnotation, type PropKey } from '@embedpdf/core-annotation';
 
 import type { Wire } from './projection';
-import { cssToColor } from './seam';
+import { hexColorOf } from './seam';
 
 /** /BS slice of the style — a cloudy border keeps a solid underlying stroke
  *  (the scallops are the /BE effect, layered on by the shape kinds). */
@@ -22,19 +22,19 @@ export const borderSlice = (style: ModelAnnotation['style']): Wire => ({
 const textOf = (annotation: ModelAnnotation) => annotation.text ?? initialTextStyle;
 
 export const GENERIC_PROPS: Partial<Record<PropKey, (annotation: ModelAnnotation) => Wire>> = {
-  color: (annotation) => ({ color: cssToColor(annotation.style.color) }),
+  color: (annotation) => ({ color: hexColorOf(annotation.style.color) }),
   opacity: (annotation) => ({ opacity: annotation.style.opacity }),
   blendMode: (annotation) => ({ blendMode: annotation.style.blendMode }),
   interiorColor: (annotation) => ({
     interiorColor: annotation.style.interiorColor
-      ? cssToColor(annotation.style.interiorColor)
+      ? hexColorOf(annotation.style.interiorColor)
       : null,
   }),
   strokeWidth: (annotation) => ({ strokeWidth: annotation.style.strokeWidth }),
   border: (annotation) => borderSlice(annotation.style),
   fontFamily: (annotation) => ({ fontFamily: textOf(annotation).fontFamily }),
   fontSize: (annotation) => ({ fontSize: textOf(annotation).fontSize }),
-  fontColor: (annotation) => ({ fontColor: cssToColor(textOf(annotation).fontColor) }),
+  fontColor: (annotation) => ({ fontColor: hexColorOf(textOf(annotation).fontColor) }),
   textAlign: (annotation) => ({ textAlign: textOf(annotation).textAlign }),
   icon: (annotation) => (annotation.icon !== undefined ? { icon: annotation.icon } : {}),
   // A non-link kind's `link` prop is not wire data on the parent: it

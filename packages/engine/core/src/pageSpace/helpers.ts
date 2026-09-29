@@ -13,7 +13,6 @@ import { pdfAppearanceTurnOf } from '../annotation/appearanceTurn';
 import { pdfDrawnPointsOf } from '../annotation/drawnPoints';
 import type { AnnotationDTO } from '../annotation/kinds';
 import { DRAWN_RECT_KINDS, pdfShapeForRect, shapeFieldsOf } from '../annotation/shapeForRect';
-import type { PdfViewport } from '../dto/Measure';
 import {
   glyphLooseBounds,
   glyphLooseQuad,
@@ -41,7 +40,6 @@ import {
   type PdfPointTurn,
 } from '../geometry/pointTurn';
 import type { PdfRect } from '../geometry/primitives';
-import { viewportForPoint } from '../measure/viewport';
 
 /** A turn in page space: degrees clockwise, as the page shows it, about `center`. */
 export interface PagePointTurn {
@@ -188,19 +186,6 @@ export function appearanceTurnOf(annotation: {
     rect: mirroredRect(annotation.rect),
     box: annotation.box ? mirroredRect(annotation.box) : annotation.box,
   });
-}
-
-/** The last viewport whose box holds `point` (the one drawn on top), or `undefined`. */
-export function pageViewportForPoint<Viewport extends PdfViewport<PageCoordinates>>(
-  viewports: readonly Viewport[],
-  point: PagePoint,
-): Viewport | undefined {
-  const mirrored = viewports.map((viewport) => ({
-    ...viewport,
-    bbox: mirroredRect(viewport.bbox),
-  }));
-  const found = viewportForPoint(mirrored, mirroredPoint(point));
-  return found ? viewports[mirrored.indexOf(found)] : undefined;
 }
 
 /** Page space with its origin as the file's: turning one into the other is the mirror. */

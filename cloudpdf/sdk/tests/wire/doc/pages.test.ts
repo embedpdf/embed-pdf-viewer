@@ -116,7 +116,7 @@ describe("PagesClient", () => {
         const rawResponseBody = {
             viewports: [
                 {
-                    bbox: { left: 1.1, bottom: 1.1, right: 1.1, top: 1.1 },
+                    bbox: { x: 1.1, y: 1.1, width: 1.1, height: 1.1 },
                     name: "name",
                     measure: {
                         subtype: "rectilinear",

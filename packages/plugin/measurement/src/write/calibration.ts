@@ -1,6 +1,5 @@
 /** The calibrate flow: arm the tool, turn a captured distance draft into a
  *  request (page space), and dismiss it. */
-import type { Point } from '@embedpdf/core-geometry';
 import { measurementPoint } from '@embedpdf/engine-core/runtime';
 
 import type { MeasurementCapability } from '../contract';
@@ -12,7 +11,7 @@ export function createCalibration(
   { events, store, siblings }: Pick<MeasurementServices, 'events' | 'store' | 'siblings'>,
 ) {
   const { calibrationRequested, calibrationDismissed } = events;
-  const { canCalibrate, toPage } = store;
+  const { canCalibrate } = store;
   const { annotation, interaction } = siblings;
 
   const startCalibration = (): void => {
@@ -30,18 +29,10 @@ export function createCalibration(
   const connect = (): void => {
     ctx.listen(annotation.onDraftCaptured, (draft) => {
       if (draft.tool !== 'calibrate' || !canCalibrate()) return;
-      const start = measurementPoint(draft.from);
-      const end = measurementPoint(draft.to);
-      const userSpaceLength = Math.hypot(end.x - start.x, end.y - start.y);
+      const from = measurementPoint(draft.from);
+      const to = measurementPoint(draft.to);
+      const userSpaceLength = Math.hypot(to.x - from.x, to.y - from.y);
       if (!(userSpaceLength > 0)) return;
-      let from: Point;
-      let to: Point;
-      try {
-        from = toPage(draft.page, start);
-        to = toPage(draft.page, end);
-      } catch {
-        return; // the page left the registry mid-drag
-      }
       const request = { page: draft.page, from, to, userSpaceLength };
       interaction.activateTool('pointer');
       ctx.state.update(setCalibration, request);

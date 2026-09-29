@@ -61,9 +61,9 @@ export function runRedactionApplyConformance(
         const marked = await page.annotations.create({
           subtype: 'redact',
           rect: REDACT_RECT,
-          interiorColor: { r: 0, g: 0, b: 0 },
+          interiorColor: '#000000',
           overlayText: 'REDACTED',
-          fontColor: { r: 255, g: 255, b: 255 },
+          fontColor: '#ffffff',
         } satisfies RedactDraft);
         expect(marked.annotation.subtype).toBe('redact');
         // The mark's own popup, away from the region: it goes with the mark.
@@ -113,7 +113,7 @@ export function runRedactionApplyConformance(
         await page.annotations.create({
           subtype: 'redact',
           rect: REDACT_RECT,
-          interiorColor: { r: 0, g: 0, b: 0 },
+          interiorColor: '#000000',
         } satisfies RedactDraft);
 
         const events: DocumentEvent[] = [];

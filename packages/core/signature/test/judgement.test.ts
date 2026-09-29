@@ -47,7 +47,7 @@ async function inkOn(doc: Awaited<ReturnType<Engine['open']>>) {
         { x: 140, y: 15 },
       ],
     ],
-    color: { r: 0, g: 0, b: 0 },
+    color: '#000000',
     strokeWidth: 2,
   } as never);
 }
@@ -145,8 +145,8 @@ describe('what a validator concludes', () => {
       const page = (await doc.pages.list()).pages[0]!;
       const created = await doc.page(page.ref).annotations.create({
         subtype: 'square',
-        box: { left: 10, bottom: 600, right: 200, top: 700 },
-        color: { r: 0, g: 0, b: 0 },
+        box: { x: 10, y: 92, width: 190, height: 100 },
+        color: '#000000',
         strokeWidth: 2,
       } as never);
       let [verdict] = await validateSignatures(doc, { trust, until: 'working-copy' });
@@ -197,8 +197,8 @@ describe('what a validator concludes', () => {
       pageRef = page2.ref;
       const created = await doc.page(pageRef).annotations.create({
         subtype: 'square',
-        box: { left: 20, bottom: 20, right: 120, top: 60 },
-        color: { r: 1, g: 0, b: 0 },
+        box: { x: 20, y: 732, width: 100, height: 40 },
+        color: '#010000',
         strokeWidth: 2,
       } as never);
       ref = created.annotation.ref;
@@ -241,7 +241,7 @@ describe('what a validator concludes', () => {
         name: 'sig2',
         widget: {
           page: page.ref,
-          rect: { left: 300, bottom: 50, right: 500, top: 120 },
+          rect: { x: 300, y: 672, width: 200, height: 70 },
         },
       } as never);
       await sign(doc, { field: { kind: 'fqn', name: 'sig2' }, key: signer });
@@ -251,8 +251,8 @@ describe('what a validator concludes', () => {
 
       const created = await doc.page(page.ref).annotations.create({
         subtype: 'square',
-        box: { left: 10, bottom: 600, right: 200, top: 700 },
-        color: { r: 0, g: 0, b: 0 },
+        box: { x: 10, y: 92, width: 190, height: 100 },
+        color: '#000000',
         strokeWidth: 2,
       } as never);
       verdicts = await validateSignatures(doc, { trust, until: 'working-copy' });

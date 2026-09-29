@@ -10,7 +10,7 @@ import type { ModelAnnotation, TextStyle } from '@embedpdf/core-annotation';
 import type { AnnotationDTO } from '@embedpdf/engine-core/runtime';
 
 import { boxEmit, type KindProjection } from '../projection';
-import { boxGeomFromDTO, colorToCss, writableTarget } from '../seam';
+import { boxGeomFromDTO, writableTarget } from '../seam';
 
 const rectGeometry = (annotation: ModelAnnotation) =>
   'rect' in annotation.geometry ? { rect: annotation.geometry.rect } : null;
@@ -89,7 +89,7 @@ function widgetTextFromDTO(dto: Extract<AnnotationDTO, { subtype: 'widget' }>): 
   return {
     fontFamily: dto.fontFamily ?? 'helvetica',
     fontSize: dto.fontSize ?? 0, // 0 = auto-size
-    fontColor: dto.fontColor ? colorToCss(dto.fontColor) : '#000000',
+    fontColor: dto.fontColor ? dto.fontColor : '#000000',
     textAlign: dto.textAlign,
   };
 }

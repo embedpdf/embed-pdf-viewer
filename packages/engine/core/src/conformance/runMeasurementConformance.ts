@@ -142,7 +142,7 @@ export function runMeasurementConformance(
           expect(captionOf(a)).toEqual(captionOf(before));
           const result = await page.annotations.update(a.ref, {
             subtype: a.subtype,
-            color: { r: 0, g: 0, b: 255 },
+            color: '#0000ff',
           });
           expect(result.annotation.contents).toBe(before.contents);
         }

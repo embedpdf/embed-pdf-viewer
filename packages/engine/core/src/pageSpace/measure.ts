@@ -1,4 +1,4 @@
-import type { PageCoordinates } from './coordinates';
+import type { PageCoordinates, PdfCoordinates } from './coordinates';
 import type { PdfMeasurement, PageMeasurementViewport } from '../dto/Measure';
 import { pageBoxOf, pagePointOf, pdfPointOf, type PagePoint } from '../geometry/pageSpace';
 import type { PdfPoint, PdfRect } from '../geometry/primitives';
@@ -29,7 +29,7 @@ export function pdfMeasureOf<Measure extends PdfMeasurement>(
 
 /** A page's measurement viewports in page space. */
 export function pageViewportsOf(
-  viewports: readonly PageMeasurementViewport[],
+  viewports: readonly PageMeasurementViewport<PdfCoordinates>[],
   visible: PdfRect,
 ): PageMeasurementViewport<PageCoordinates>[] {
   return viewports.map((viewport) => ({

@@ -1,6 +1,8 @@
 import type { z } from 'zod';
 
 import { semanticEqual } from './appearance';
+import { ColorSchema } from './base.schema';
+import { sameColor } from './color';
 import {
   declarationOf,
   FileAnnotationDraftSchema,
@@ -10,6 +12,7 @@ import {
   type AnnotationDTO,
   type AnnotationPatch,
 } from './kinds';
+import type { KindFields } from './declaration';
 import { DRAWN_RECT_KINDS, pdfShapeForRect, shapeFieldsOf } from './shapeForRect';
 import { EngineError } from '../errors/EngineError';
 import { EngineErrorCode } from '../errors/EngineErrorCode';
@@ -49,8 +52,10 @@ export function assertAnnotationDraft(
 /**
  * The patch to write for `current`: a `readBack()` value sent back
  * unchanged is dropped (the annotation keeps it), a changed one is refused,
- * and the rest is checked against the kind's update schema. A drawn kind's
- * `rect` (one the engine works out) puts the shape there (`pdfShapeForRect`).
+ * and the rest is checked against the kind's update schema. A color sent
+ * back as it reads is dropped too, so the file keeps it as it has it. A drawn
+ * kind's `rect` (one the engine works out) puts the shape there
+ * (`pdfShapeForRect`).
  */
 export function checkAnnotationPatch(
   current: AnnotationDTO<PdfCoordinates>,
@@ -58,7 +63,7 @@ export function checkAnnotationPatch(
 ): AnnotationPatch<PdfCoordinates> {
   if (current.subtype === 'unsupported') return patch;
   const readBackWrites = KIND_BY_SUBTYPE[current.subtype].readBackWrites;
-  let checked = putShapeAtRect(current, patch);
+  let checked = withoutUnchangedColors(current, putShapeAtRect(current, patch));
   for (const [name, write] of Object.entries(readBackWrites)) {
     const value = (checked as Record<string, unknown>)[name];
     if (value === undefined || write?.safeParse(value).success) continue;
@@ -77,6 +82,29 @@ export function checkAnnotationPatch(
   const parsed = fileAnnotationPatchSchemaOf(current.subtype).safeParse(checked);
   if (!parsed.success) throw invalidWrite(parsed.error, `${current.subtype} update`);
   return checked;
+}
+
+/**
+ * The patch without the colors it sends back as they read. A gray or CMYK
+ * color in the file reads as its sRGB equivalent; writing that back would
+ * store it as sRGB, so leaving it out keeps the file as it is.
+ */
+function withoutUnchangedColors(
+  current: AnnotationDTO<PdfCoordinates>,
+  patch: AnnotationPatch<PdfCoordinates>,
+): AnnotationPatch<PdfCoordinates> {
+  const fields: KindFields = declarationOf(current.subtype)?.fields ?? {};
+  const read = current as unknown as Record<string, unknown>;
+  let kept = patch as Record<string, unknown>;
+  for (const [name, spec] of Object.entries(fields)) {
+    const value = kept[name];
+    const was = read[name];
+    if (spec.read !== ColorSchema || typeof value !== 'string' || typeof was !== 'string') continue;
+    if (!sameColor(value, was)) continue;
+    const { [name]: _unchanged, ...rest } = kept;
+    kept = rest;
+  }
+  return kept as AnnotationPatch<PdfCoordinates>;
 }
 
 /**

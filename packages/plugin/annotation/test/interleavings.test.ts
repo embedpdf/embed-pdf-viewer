@@ -42,14 +42,6 @@ interface EngineState {
   print: boolean;
 }
 
-const rgb = (hex: string) => ({
-  r: parseInt(hex.slice(1, 3), 16),
-  g: parseInt(hex.slice(3, 5), 16),
-  b: parseInt(hex.slice(5, 7), 16),
-});
-const hex = ({ r, g, b }: { r: number; g: number; b: number }) =>
-  `#${[r, g, b].map((channel) => channel.toString(16).padStart(2, '0')).join('')}`;
-
 const squareOf = (state: EngineState): FileAnnotation =>
   ({
     ref: REF,
@@ -68,7 +60,7 @@ const squareOf = (state: EngineState): FileAnnotation =>
     subtype: 'square',
     rect: { left: 100, bottom: 700, right: 180, top: 760 },
     box: { left: 100, bottom: 700, right: 180, top: 760 },
-    color: rgb(state.color),
+    color: state.color,
     interiorColor: null,
     opacity: 1,
     strokeWidth: 2,
@@ -97,7 +89,7 @@ function random(seed: number) {
 
 /** One write the fake engine holds until the test answers it. */
 interface HeldWrite {
-  patch: { color?: { r: number; g: number; b: number }; print?: boolean };
+  patch: { color?: string; print?: boolean };
   resolve(result: unknown): void;
   reject(error: unknown): void;
 }
@@ -189,7 +181,7 @@ async function play(seed: number, steps: number) {
       const change = inFlight.splice(index, 1)[0]!;
       const [write] = held.splice(index, 1);
       if (rng.next() < 0.75) {
-        if (write!.patch.color) engine.color = hex(write!.patch.color);
+        if (write!.patch.color) engine.color = write!.patch.color;
         if (write!.patch.print !== undefined) engine.print = write!.patch.print;
         change.state = 'accepted';
         write!.resolve({ annotation: squareOf(engine) });
@@ -226,7 +218,7 @@ async function play(seed: number, steps: number) {
     const index = Math.floor(rng.next() * held.length);
     const change = inFlight.splice(index, 1)[0]!;
     const [write] = held.splice(index, 1);
-    if (write!.patch.color) engine.color = hex(write!.patch.color);
+    if (write!.patch.color) engine.color = write!.patch.color;
     if (write!.patch.print !== undefined) engine.print = write!.patch.print;
     change.state = 'accepted';
     write!.resolve({ annotation: squareOf(engine) });

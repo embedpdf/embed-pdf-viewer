@@ -53,7 +53,7 @@ describe('changes faster than the engine answers (local engine)', () => {
       const raw = (await doc.page(ref.page).annotations.list()).annotations.find(
         (dto) => annotationKey(dto.ref) === annotationKey(ref),
       );
-      expect(raw && 'color' in raw ? raw.color : null).toEqual({ r: 0, g: 255, b: 0 });
+      expect(raw && 'color' in raw ? raw.color : null).toEqual('#00ff00');
       expect(
         annotation
           .list()

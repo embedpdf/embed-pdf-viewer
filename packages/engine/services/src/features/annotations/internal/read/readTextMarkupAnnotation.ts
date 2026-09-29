@@ -18,8 +18,8 @@ import {
 } from './annotationReadPrimitives';
 import { strikeoutIntentFromName } from '../textEditIntent';
 
-const DEFAULT_HIGHLIGHT_COLOR: Color = { r: 255, g: 255, b: 0 };
-const DEFAULT_TEXT_MARKUP_COLOR: Color = { r: 0, g: 0, b: 0 };
+const DEFAULT_HIGHLIGHT_COLOR: Color = '#ffff00';
+const DEFAULT_TEXT_MARKUP_COLOR: Color = '#000000';
 
 /**
  * Shared reader for the four text-markup subtypes. Wires color, opacity,
@@ -36,7 +36,7 @@ export function readTextMarkupExtras(
   opacity: number;
   quadPoints: PdfQuad[];
 } {
-  const color = readAnnotColor(fn, mem, annotPtr) ?? { ...fallbackColor };
+  const color = readAnnotColor(fn, mem, annotPtr) ?? fallbackColor;
   const ca = readAnnotOpacity(fn, mem, annotPtr);
   const opacity = ca == null ? 1 : Math.max(0, Math.min(1, ca));
   const quadPoints = readQuadPoints(fn, mem, annotPtr);

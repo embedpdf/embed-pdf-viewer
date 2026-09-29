@@ -211,7 +211,7 @@ describe.each(['wasm', 'native'] as const)('measurement engine (%s)', (prefer) =
       expect(viewports).toHaveLength(2);
       expect(viewports[1]).toMatchObject({
         owned: true,
-        bbox: { left: -20, bottom: -40, right: 592, top: 752 },
+        bbox: { x: 0, y: 0, width: 612, height: 792 },
       });
       await doc.page(toPageRef(3)).measure!.setScale(null);
       expect((await doc.page(toPageRef(3)).measure!.listViewports()).viewports).toEqual([
@@ -239,7 +239,7 @@ describe.each(['wasm', 'native'] as const)('measurement engine (%s)', (prefer) =
       expect(a.contents).toBe(created.contents);
       const changed = await doc
         .page(toPageRef(3))
-        .annotations.update(a.ref, { subtype: 'line', color: { r: 0, g: 0, b: 255 } });
+        .annotations.update(a.ref, { subtype: 'line', color: '#0000ff' });
       expect(changed.annotation.contents).toBe(created.contents);
     } finally {
       await doc.close();
@@ -305,7 +305,7 @@ describe.each(['wasm', 'native'] as const)('measurement engine (%s)', (prefer) =
             expect(a.captionEnabled).toBe(null);
           const updated = await doc.page(toPageRef(pageObjectNumber)).annotations.update(a.ref, {
             subtype: a.subtype,
-            color: { r: 0, g: 0, b: 255 },
+            color: '#0000ff',
           } as never);
           expect(updated.annotation.contents).toBe(a.contents);
         }
@@ -336,7 +336,7 @@ describe.each(['wasm', 'native'] as const)('measurement engine (%s)', (prefer) =
       const kept = await page.annotations.update(before[2].ref, {
         subtype: 'line',
         measure: foreign,
-        color: { r: 0, g: 0, b: 255 },
+        color: '#0000ff',
       });
       expect(kept.annotation.subtype === 'line' && kept.annotation.measure).toEqual({
         subtype: 'geospatial',

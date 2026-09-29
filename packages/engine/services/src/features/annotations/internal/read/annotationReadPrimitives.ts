@@ -8,6 +8,7 @@ import type {
   PdfQuad,
   PdfRect,
 } from '@embedpdf/engine-core/runtime';
+import { colorOf } from '@embedpdf/engine-core/runtime';
 import {
   NULL_PTR,
   type PdfFunctions,
@@ -84,11 +85,7 @@ export function readAnnotColor(
 ): Color | null {
   return withScratchN(mem, [I32_BYTES, I32_BYTES, I32_BYTES], ([r, g, b]) => {
     if (!fn.EPDFAnnot_GetColor(annotPtr, type, r, g, b)) return null;
-    return {
-      r: readI32(mem, r) & 0xff,
-      g: readI32(mem, g) & 0xff,
-      b: readI32(mem, b) & 0xff,
-    };
+    return colorOf(readI32(mem, r) & 0xff, readI32(mem, g) & 0xff, readI32(mem, b) & 0xff);
   });
 }
 
@@ -322,11 +319,7 @@ export function readDefaultAppearance(
       return {
         fontCode: readI32(mem, font),
         fontSize: readF32(mem, size),
-        color: {
-          r: readI32(mem, r) & 0xff,
-          g: readI32(mem, g) & 0xff,
-          b: readI32(mem, b) & 0xff,
-        },
+        color: colorOf(readI32(mem, r) & 0xff, readI32(mem, g) & 0xff, readI32(mem, b) & 0xff),
       };
     },
   );

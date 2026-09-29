@@ -43,7 +43,7 @@ function annot(
     modifiedAt: null,
     reply: rel.reply ?? null,
     subtype: 'highlight',
-    color: { r: 0, g: 0, b: 0 },
+    color: '#000000',
     opacity: 1,
     quadPoints: [],
   } as unknown as AnnotationDTO;

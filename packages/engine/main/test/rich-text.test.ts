@@ -96,7 +96,7 @@ describe('rich text FreeText (local engine)', () => {
       fontSize: 12,
       textAlign: 'left',
       box: RECT,
-      color: { r: 0, g: 0, b: 255 },
+      color: '#0000ff',
       richText: {
         body: { family: 'Helvetica', size: 18, color: '#102030' },
         paragraphs: [
@@ -116,12 +116,12 @@ describe('rich text FreeText (local engine)', () => {
     // The body became the /DA font and size; the /DA colour stayed the draft's.
     expect(dto.fontFamily).toBe('helvetica');
     expect(dto.fontSize).toBe(18);
-    expect(dto.color).toEqual({ r: 0, g: 0, b: 255 });
+    expect(dto.color).toEqual('#0000ff');
     expect(dto.richText.body.color).toBe('#102030');
     expect(dto.richText.paragraphs[0]!.runs).toEqual([
       { text: 'Hello ' },
       { text: 'bold', style: { weight: 700 } },
-      { text: ' red', style: { color: '#FF0000' } },
+      { text: ' red', style: { color: '#ff0000' } },
     ]);
     expect(dto.richText.paragraphs[1]!.align).toBe('center');
     expect(dto.richText.paragraphs[1]!.runs[1]).toEqual({ text: '2', style: { script: 'sub' } });
@@ -224,13 +224,13 @@ describe('rich text FreeText (local engine)', () => {
     const updated = await doc.page(toPageRef(PAGE)).annotations.update(ref, {
       subtype: 'free-text',
       fontSize: 20,
-      fontColor: { r: 255, g: 0, b: 0 },
+      fontColor: '#ff0000',
       fontFamily: 'times-bold',
     });
     const dto = updated.annotation as FreeTextAnnotationDTO;
     expect(dto.fontSize).toBe(20);
     expect(dto.fontFamily).toBe('times-bold');
-    expect(dto.richText.body.color).toBe('#FF0000');
+    expect(dto.richText.body.color).toBe('#ff0000');
     expect(dto.richText.body.family).toBe('Times');
     expect(dto.richText.body.weight).toBe(700);
     expect(dto.richText.paragraphs[0]!.runs[1]).toEqual({ text: 'b', style: { size: 30 } });

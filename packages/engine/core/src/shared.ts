@@ -171,6 +171,7 @@ export {
 } from './revision/WeakAnnotationState';
 export type { WeakAnnotationState } from './revision/WeakAnnotationState';
 
+export { colorOf, rgbOf, sameColor } from './annotation/color';
 export type {
   Color,
   Point,

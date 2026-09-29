@@ -38,8 +38,8 @@ const DEFAULT_OPACITY = 1;
  * Default fill colour per text-markup subtype. Matches the read-side
  * fallback in `readers/annotations/text-markup.ts`.
  */
-const DEFAULT_HIGHLIGHT_COLOR: Color = { r: 255, g: 255, b: 0 };
-const DEFAULT_TEXT_MARKUP_COLOR: Color = { r: 0, g: 0, b: 0 };
+const DEFAULT_HIGHLIGHT_COLOR: Color = '#ffff00';
+const DEFAULT_TEXT_MARKUP_COLOR: Color = '#000000';
 
 export type TextMarkupDraft =
   | HighlightDraft<PdfCoordinates>

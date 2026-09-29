@@ -297,8 +297,8 @@ export function connectLink(ctx: PluginContext<void>): void {
 - `ctx.document()` is the page registry (`DocumentMeta`: pages, revision,
   render policy). `ctx.getPage(ref)` returns one page or `null`;
   `ctx.assertPageRef(ref)` throws `not-found` for a foreign page.
-- `ctx.geometry.forPage(ref)` converts between PDF space and page space for
-  one page (throws `not-found`); `tryForPage` returns `null` instead.
+- Engine values are in page space, the space plugins work in, so nothing
+  converts them.
 
 ## Lifetime and async
 

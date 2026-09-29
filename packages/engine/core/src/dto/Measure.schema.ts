@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { PdfRectSchema } from '../geometry/schemas';
+import { PageBoxSchema } from '../geometry/schemas';
 import { validNumberFormat } from '../measure/format';
 
 const float = z
@@ -55,7 +55,7 @@ export const PdfMeasurementSchema = z.discriminatedUnion('subtype', [
   unknownMeasure,
 ]);
 export const PageMeasurementViewportSchema = z.object({
-  bbox: PdfRectSchema,
+  bbox: PageBoxSchema,
   name: z.string().nullable(),
   measure: PdfMeasurementSchema.nullable(),
   owned: z.boolean(),

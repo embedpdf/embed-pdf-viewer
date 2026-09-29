@@ -65,7 +65,7 @@ const freeTextDTO = (
       },
       paragraphs,
     },
-    color: { r: 0, g: 0, b: 0 },
+    color: '#000000',
     interiorColor: null,
     opacity: 1,
     strokeWidth: 1,

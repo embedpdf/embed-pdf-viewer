@@ -51,8 +51,8 @@ function RichTextToolbar() {
       fontFamily: 'helvetica',
       fontSize: 16,
       textAlign: 'left',
-      color: { r: 30, g: 30, b: 30 },
-      interiorColor: { r: 255, g: 250, b: 205 },
+      color: '#1e1e1e',
+      interiorColor: '#fffacd',
       richText: {
         body: { family: 'Helvetica', size: 16 },
         paragraphs: [

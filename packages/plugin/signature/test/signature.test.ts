@@ -596,7 +596,7 @@ describe('judging what a save would write', () => {
               { x: 80, y: 60 },
             ],
           ],
-          color: { r: 0, g: 0, b: 0 },
+          color: '#000000',
           strokeWidth: 2,
         } as never);
       const stroke = await ink();

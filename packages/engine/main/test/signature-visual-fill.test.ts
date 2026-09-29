@@ -60,7 +60,7 @@ describe('signature fields in the viewer phase', () => {
         name: 'sig2',
         widget: {
           page: page.ref,
-          rect: { left: 50, bottom: 50, right: 250, top: 120 },
+          rect: { x: 50, y: page.size.height - 120, width: 200, height: 70 },
         },
       });
       expect(created.field.family).toBe('signature');

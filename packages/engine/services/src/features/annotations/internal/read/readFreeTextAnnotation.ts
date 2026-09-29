@@ -5,6 +5,7 @@ import type {
   FreeTextAnnotationDTO,
   PdfCoordinates,
 } from '@embedpdf/engine-core/runtime';
+import { sameColor } from '@embedpdf/engine-core/runtime';
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
 
 import { FPDFANNOT_COLORTYPE } from '../colorType';
@@ -26,14 +27,10 @@ import { readAnnotationBox } from './readAnnotationTurn';
 import { readBorderFields } from './readStyle';
 
 /** Default `/DA` colour (black) when an annotation has no default appearance. */
-const DEFAULT_FREETEXT_COLOR: Color = { r: 0, g: 0, b: 0 };
+const DEFAULT_FREETEXT_COLOR: Color = '#000000';
 
 /** Default font size when `/DA` has none (or an unusable 0). */
 const DEFAULT_FONT_SIZE = 12;
-
-function colorsEqual(a: Color, b: Color): boolean {
-  return a.r === b.r && a.g === b.g && a.b === b.b;
-}
 
 export function readFreeText(
   fn: PdfFunctions,
@@ -44,7 +41,7 @@ export function readFreeText(
   ctx?: AnnotationReadContext,
 ): FreeTextAnnotationDTO<PdfCoordinates> {
   const da = readDefaultAppearance(fn, mem, annotPtr);
-  const color = da?.color ?? { ...DEFAULT_FREETEXT_COLOR };
+  const color = da?.color ?? DEFAULT_FREETEXT_COLOR;
   // The rich text is always there: the annotation's own /RC, else a one-run
   // document the engine synthesises from /Contents + /DA. Its body is the
   // face the /DA names, resolved by identity — so a registered font reads
@@ -85,7 +82,7 @@ export function readFreeText(
   // `TextColor` overrides text only; surface it as `fontColor` solely when it
   // is present and differs from the `/DA` colour (otherwise text follows `color`).
   const textColor = readAnnotColor(fn, mem, annotPtr, FPDFANNOT_COLORTYPE.TextColor);
-  const fontColor = textColor && !colorsEqual(textColor, color) ? textColor : undefined;
+  const fontColor = textColor && !sameColor(textColor, color) ? textColor : undefined;
 
   // For free text `/C` (color type 0) is the box background, not a stroke.
   const background = readAnnotColor(fn, mem, annotPtr, FPDFANNOT_COLORTYPE.Color);

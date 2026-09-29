@@ -2,7 +2,7 @@ import type { PageCoordinates, PdfCoordinates } from './coordinates';
 import { mapFieldActions, pageDestinationOf, type VisibleBoxOf } from './destinations';
 import type { PdfFieldActions } from '../dto/PdfAction';
 import type { PageDestination, PdfDestination } from '../dto/PdfDestination';
-import type { WidgetPlacement } from '../forms/draft';
+import type { FormFieldDraft, WidgetPlacement } from '../forms/draft';
 import type { FormFieldDTO } from '../forms/field';
 import type { FormSnapshot } from '../forms/snapshot';
 import { pdfRectOf } from '../geometry/pageSpace';
@@ -11,8 +11,24 @@ import { pdfRectOf } from '../geometry/pageSpace';
 export function pdfWidgetPlacementOf(
   placement: WidgetPlacement<PageCoordinates>,
   boxOf: VisibleBoxOf,
-): WidgetPlacement {
+): WidgetPlacement<PdfCoordinates> {
   return { ...placement, rect: pdfRectOf(placement.rect, boxOf(placement.page)) };
+}
+
+/** A field draft in the file's coordinates: each widget measured on its own page. */
+export function pdfFormFieldDraftOf(
+  draft: FormFieldDraft<PageCoordinates>,
+  boxOf: VisibleBoxOf,
+): FormFieldDraft<PdfCoordinates> {
+  if (draft.family === 'radio') {
+    if (!draft.widgets) return draft as FormFieldDraft<PdfCoordinates>;
+    return {
+      ...draft,
+      widgets: draft.widgets.map((widget) => pdfWidgetPlacementOf(widget, boxOf)),
+    };
+  }
+  if (!draft.widget) return draft as FormFieldDraft<PdfCoordinates>;
+  return { ...draft, widget: pdfWidgetPlacementOf(draft.widget, boxOf) };
 }
 
 /** A field's actions in page space, each destination measured on its page. */

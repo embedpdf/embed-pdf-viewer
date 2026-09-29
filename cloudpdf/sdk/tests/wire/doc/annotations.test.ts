@@ -58,7 +58,7 @@ describe("AnnotationsClient", () => {
                     modifiedBy: "modifiedBy",
                     importedBy: "importedBy",
                     actions: {},
-                    color: { r: 1, g: 1, b: 1 },
+                    color: "color",
                     opacity: 1.1,
                     quadPoints: [
                         {
@@ -196,7 +196,7 @@ describe("AnnotationsClient", () => {
                     modifiedBy: "modifiedBy",
                     importedBy: "importedBy",
                     actions: {},
-                    color: { r: 1, g: 1, b: 1 },
+                    color: "color",
                     opacity: 1.1,
                     quadPoints: [
                         {
@@ -325,7 +325,7 @@ describe("AnnotationsClient", () => {
                     pageVisible: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
                     pageInvisible: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
                 },
-                color: { r: 1, g: 1, b: 1 },
+                color: "color",
                 opacity: 1.1,
                 quadPoints: [
                     { p1: { x: 1.1, y: 1.1 }, p2: { x: 1.1, y: 1.1 }, p3: { x: 1.1, y: 1.1 }, p4: { x: 1.1, y: 1.1 } },
@@ -587,7 +587,7 @@ describe("AnnotationsClient", () => {
                     pageVisible: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
                     pageInvisible: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
                 },
-                color: { r: 1, g: 1, b: 1 },
+                color: "color",
                 opacity: 1.1,
                 quadPoints: [
                     { p1: { x: 1.1, y: 1.1 }, p2: { x: 1.1, y: 1.1 }, p3: { x: 1.1, y: 1.1 }, p4: { x: 1.1, y: 1.1 } },

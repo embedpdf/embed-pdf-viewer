@@ -194,7 +194,7 @@ export function runAnnotationMutationConformance(
         const draft: HighlightDraft = {
           subtype: 'highlight',
           contents: 'mutation conformance: created',
-          color: { r: 200, g: 100, b: 50 },
+          color: '#c86432',
           opacity: 0.5,
           quadPoints: quad,
         };
@@ -239,7 +239,7 @@ export function runAnnotationMutationConformance(
         const draft: HighlightDraft = {
           subtype: 'highlight',
           contents: 'mutation conformance: flags',
-          color: { r: 10, g: 20, b: 30 },
+          color: '#0a141e',
           opacity: 1,
           quadPoints: quad,
           print: true,
@@ -271,8 +271,8 @@ export function runAnnotationMutationConformance(
           subtype: 'circle',
           contents: 'mutation conformance: circle',
           box: shapeRect,
-          interiorColor: { r: 255, g: 0, b: 0 },
-          color: { r: 0, g: 0, b: 255 },
+          interiorColor: '#ff0000',
+          color: '#0000ff',
           strokeWidth: 3,
           borderStyle: 'solid',
           opacity: 0.6,
@@ -283,8 +283,8 @@ export function runAnnotationMutationConformance(
         expect(circle.annotation.identityQuality).toBe('durable');
         expect(circle.annotation.ref.kind).toBe('objectNumber');
         if (circle.annotation.subtype === 'circle') {
-          expect(circle.annotation.interiorColor).toMatchObject({ r: 255, g: 0, b: 0 });
-          expect(circle.annotation.color).toMatchObject({ r: 0, g: 0, b: 255 });
+          expect(circle.annotation.interiorColor).toBe('#ff0000');
+          expect(circle.annotation.color).toBe('#0000ff');
           expect(circle.annotation.strokeWidth).toBe(3);
           expect(circle.annotation.borderStyle).toBe('solid');
           // /CA stored as f32 — compare at 2dp to absorb float drift.
@@ -301,7 +301,7 @@ export function runAnnotationMutationConformance(
           contents: 'mutation conformance: square',
           box: shapeRect,
           interiorColor: null,
-          color: { r: 0, g: 128, b: 0 },
+          color: '#008000',
           strokeWidth: 2,
           borderStyle: 'dashed',
           dashArray: [3, 2],
@@ -313,7 +313,7 @@ export function runAnnotationMutationConformance(
         if (square.annotation.subtype === 'square') {
           // interiorColor omitted/null => no fill.
           expect(square.annotation.interiorColor).toBe(null);
-          expect(square.annotation.color).toMatchObject({ r: 0, g: 128, b: 0 });
+          expect(square.annotation.color).toBe('#008000');
           expect(square.annotation.borderStyle).toBe('dashed');
           expect(square.annotation.dashArray).toEqual([3, 2]);
         }
@@ -342,7 +342,7 @@ export function runAnnotationMutationConformance(
           subtype: 'square',
           contents: 'mutation conformance: cloudy border',
           box: shapeRect,
-          color: { r: 0, g: 128, b: 0 },
+          color: '#008000',
           strokeWidth: 2,
           borderStyle: 'solid',
           opacity: 1,
@@ -391,7 +391,7 @@ export function runAnnotationMutationConformance(
           subtype: 'polygon',
           contents: 'mutation conformance: polygon cloudy tri-state',
           vertices,
-          color: { r: 0, g: 0, b: 255 },
+          color: '#0000ff',
           strokeWidth: 2,
           borderStyle: 'solid',
           opacity: 1,
@@ -423,7 +423,7 @@ export function runAnnotationMutationConformance(
           subtype: 'square',
           contents: 'mutation conformance: appearance echo',
           box: shapeRect,
-          color: { r: 200, g: 0, b: 0 },
+          color: '#c80000',
           strokeWidth: 2,
           borderStyle: 'solid',
           opacity: 1,
@@ -437,7 +437,7 @@ export function runAnnotationMutationConformance(
         const moved = await page.annotations.update(created.annotation.ref, {
           subtype: 'square',
           box: { ...shapeRect, x: shapeRect.x + 12, y: shapeRect.y + 8 },
-          color: { r: 200, g: 0, b: 0 },
+          color: '#c80000',
           strokeWidth: 2,
           opacity: 1,
         });
@@ -453,7 +453,7 @@ export function runAnnotationMutationConformance(
         // A real style edit re-bakes and says so.
         const restyled = await page.annotations.update(created.annotation.ref, {
           subtype: 'square',
-          interiorColor: { r: 255, g: 214, b: 0 },
+          interiorColor: '#ffd600',
         });
         expect(restyled.appearance).toEqual({ action: 'regenerated', changed: true });
 
@@ -480,7 +480,7 @@ export function runAnnotationMutationConformance(
           fontFamily: 'times-roman',
           fontSize: 14,
           textAlign: 'left',
-          color: { r: 200, g: 0, b: 0 },
+          color: '#c80000',
         };
         const created = await page.annotations.create(draft);
         // `/DA` packs font+size+colour into one string; the writer must
@@ -498,16 +498,16 @@ export function runAnnotationMutationConformance(
         if (sized.annotation.subtype === 'free-text') {
           expect(sized.annotation.fontFamily).toBe('times-roman');
           expect(sized.annotation.fontSize).toBe(18);
-          expect(sized.annotation.color).toMatchObject({ r: 200, g: 0, b: 0 });
+          expect(sized.annotation.color).toBe('#c80000');
         }
         const recolored = await page.annotations.update(created.annotation.ref, {
           subtype: 'free-text',
-          color: { r: 0, g: 0, b: 200 },
+          color: '#0000c8',
         });
         if (recolored.annotation.subtype === 'free-text') {
           expect(recolored.annotation.fontFamily).toBe('times-roman');
           expect(recolored.annotation.fontSize).toBe(18);
-          expect(recolored.annotation.color).toMatchObject({ r: 0, g: 0, b: 200 });
+          expect(recolored.annotation.color).toBe('#0000c8');
         }
       } finally {
         await doc.close();
@@ -522,7 +522,7 @@ export function runAnnotationMutationConformance(
           subtype: 'square',
           contents: 'transform tri-state',
           box: shapeRect,
-          color: { r: 0, g: 0, b: 255 },
+          color: '#0000ff',
           strokeWidth: 2,
           borderStyle: 'solid',
           opacity: 1,
@@ -601,7 +601,7 @@ export function runAnnotationMutationConformance(
           page.annotations.create({
             subtype: 'line',
             linePoints,
-            color: { r: 0, g: 0, b: 0 },
+            color: '#000000',
             strokeWidth: 2,
             lineEndings,
           } satisfies LineDraft);
@@ -617,7 +617,7 @@ export function runAnnotationMutationConformance(
           page.annotations.create({
             subtype: 'ink',
             inkList: inkStrokes,
-            color: { r: 29, g: 78, b: 216 },
+            color: '#1d4ed8',
             strokeWidth,
           } satisfies InkDraft);
         const thin = (await ink(1)).annotation;
@@ -651,7 +651,7 @@ export function runAnnotationMutationConformance(
         const created = await page.annotations.create({
           subtype: 'polygon',
           vertices,
-          color: { r: 0, g: 0, b: 255 },
+          color: '#0000ff',
           strokeWidth: 2,
           rotation: 90,
         } satisfies PolygonDraft);
@@ -765,7 +765,7 @@ export function runAnnotationMutationConformance(
           await page.annotations.create({
             subtype: 'line',
             linePoints,
-            color: { r: 0, g: 0, b: 0 },
+            color: '#000000',
           } satisfies LineDraft)
         ).annotation;
         if (created.subtype !== 'line') throw new Error('expected a line');
@@ -835,7 +835,7 @@ export function runAnnotationMutationConformance(
           await page.annotations.create({
             subtype: 'highlight',
             quadPoints: quad,
-            color: { r: 255, g: 255, b: 0 },
+            color: '#ffff00',
           } satisfies HighlightDraft)
         ).annotation;
         const highlightTo = offset(highlight.rect, 10, 15);
@@ -857,7 +857,7 @@ export function runAnnotationMutationConformance(
             subtype: 'square',
             box: shapeRect,
             rotation: 30,
-            color: { r: 0, g: 0, b: 255 },
+            color: '#0000ff',
           } satisfies SquareDraft)
         ).annotation;
         if (turned.subtype !== 'square') throw new Error('expected a square');
@@ -889,8 +889,8 @@ export function runAnnotationMutationConformance(
           subtype: 'polygon',
           contents: 'mutation conformance: polygon',
           vertices,
-          interiorColor: { r: 255, g: 200, b: 0 },
-          color: { r: 0, g: 0, b: 255 },
+          interiorColor: '#ffc800',
+          color: '#0000ff',
           strokeWidth: 2,
           borderStyle: 'solid',
           opacity: 0.8,
@@ -900,8 +900,8 @@ export function runAnnotationMutationConformance(
         expect(polygon.annotation.subtype).toBe('polygon');
         if (polygon.annotation.subtype === 'polygon') {
           expect(polygon.annotation.vertices.length).toBe(vertices.length);
-          expect(polygon.annotation.color).toMatchObject({ r: 0, g: 0, b: 255 });
-          expect(polygon.annotation.interiorColor).toMatchObject({ r: 255, g: 200, b: 0 });
+          expect(polygon.annotation.color).toBe('#0000ff');
+          expect(polygon.annotation.interiorColor).toBe('#ffc800');
         }
 
         const polylineDraft: PolylineDraft = {
@@ -909,7 +909,7 @@ export function runAnnotationMutationConformance(
           contents: 'mutation conformance: polyline',
           vertices,
           interiorColor: null,
-          color: { r: 200, g: 0, b: 0 },
+          color: '#c80000',
           strokeWidth: 2,
           borderStyle: 'solid',
           opacity: 1,
@@ -929,7 +929,7 @@ export function runAnnotationMutationConformance(
           contents: 'mutation conformance: line',
           linePoints,
           interiorColor: null,
-          color: { r: 0, g: 128, b: 128 },
+          color: '#008080',
           strokeWidth: 2,
           borderStyle: 'solid',
           opacity: 1,
@@ -951,7 +951,7 @@ export function runAnnotationMutationConformance(
           subtype: 'ink',
           contents: 'mutation conformance: ink',
           inkList: inkStrokes,
-          color: { r: 29, g: 78, b: 216 },
+          color: '#1d4ed8',
           strokeWidth: 3,
           borderStyle: 'solid',
           opacity: 1,
@@ -962,7 +962,7 @@ export function runAnnotationMutationConformance(
         if (ink.annotation.subtype === 'ink') {
           expect(ink.annotation.inkList.length).toBe(inkStrokes.length);
           expect(ink.annotation.inkList[0]!.length).toBe(inkStrokes[0]!.length);
-          expect(ink.annotation.color).toMatchObject({ r: 29, g: 78, b: 216 });
+          expect(ink.annotation.color).toBe('#1d4ed8');
           expect(ink.annotation.intent).toBe(null);
           expect(ink.annotation.blendMode).toBe('normal');
           // Ink has a stroke but no /IC.
@@ -994,8 +994,8 @@ export function runAnnotationMutationConformance(
           fontFamily: 'helvetica',
           fontSize: 14,
           textAlign: 'center',
-          color: { r: 20, g: 40, b: 60 },
-          interiorColor: { r: 250, g: 250, b: 210 },
+          color: '#14283c',
+          interiorColor: '#fafad2',
           opacity: 1,
           strokeWidth: 1,
           borderStyle: 'solid',
@@ -1008,8 +1008,8 @@ export function runAnnotationMutationConformance(
           expect(freeText.annotation.fontFamily).toBe('helvetica');
           expect(freeText.annotation.fontSize).toBe(14);
           expect(freeText.annotation.textAlign).toBe('center');
-          expect(freeText.annotation.color).toMatchObject({ r: 20, g: 40, b: 60 });
-          expect(freeText.annotation.interiorColor).toMatchObject({ r: 250, g: 250, b: 210 });
+          expect(freeText.annotation.color).toBe('#14283c');
+          expect(freeText.annotation.interiorColor).toBe('#fafad2');
           // No override sent => text follows `color`, so fontColor is omitted.
           expect(freeText.annotation.fontColor).toBe(null);
         }
@@ -1024,8 +1024,8 @@ export function runAnnotationMutationConformance(
           fontFamily: 'times-roman',
           fontSize: 12,
           textAlign: 'left',
-          color: { r: 0, g: 0, b: 0 },
-          fontColor: { r: 200, g: 0, b: 0 },
+          color: '#000000',
+          fontColor: '#c80000',
           interiorColor: null,
           opacity: 1,
           strokeWidth: 1,
@@ -1040,8 +1040,8 @@ export function runAnnotationMutationConformance(
           expect(callout.annotation.intent).toBe('free-text-callout');
           expect(callout.annotation.interiorColor).toBe(null);
           // fontColor differs from color => surfaced as an override.
-          expect(callout.annotation.fontColor).toMatchObject({ r: 200, g: 0, b: 0 });
-          expect(callout.annotation.color).toMatchObject({ r: 0, g: 0, b: 0 });
+          expect(callout.annotation.fontColor).toBe('#c80000');
+          expect(callout.annotation.color).toBe('#000000');
           expect(callout.annotation.calloutLine?.length).toBe(DEFAULT_CALLOUT_LINE.length);
           expect(callout.annotation.lineEnding).toBe('open-arrow');
           // The box is the text box; `rect` holds it, the line and its arrow.
@@ -1073,7 +1073,7 @@ export function runAnnotationMutationConformance(
           fontFamily: 'helvetica',
           fontSize: 12,
           textAlign: 'left',
-          color: { r: 0, g: 0, b: 0 },
+          color: '#000000',
           interiorColor: null,
           opacity: 1,
           strokeWidth: 1,
@@ -1086,16 +1086,16 @@ export function runAnnotationMutationConformance(
           textAlign: 'right',
           fontFamily: 'helvetica',
           fontSize: 18,
-          color: { r: 0, g: 80, b: 160 },
-          interiorColor: { r: 240, g: 240, b: 240 },
+          color: '#0050a0',
+          interiorColor: '#f0f0f0',
         });
         expect(AnnotationUpdateResultSchema.safeParse(result).success).toBe(true);
         expect(result.annotation.subtype).toBe('free-text');
         if (result.annotation.subtype === 'free-text') {
           expect(result.annotation.textAlign).toBe('right');
           expect(result.annotation.fontSize).toBe(18);
-          expect(result.annotation.color).toMatchObject({ r: 0, g: 80, b: 160 });
-          expect(result.annotation.interiorColor).toMatchObject({ r: 240, g: 240, b: 240 });
+          expect(result.annotation.color).toBe('#0050a0');
+          expect(result.annotation.interiorColor).toBe('#f0f0f0');
         }
         // Update never bumps the revision.
         expect(result.meta.affectedPages[0].revision.generation).toBe(
@@ -1126,7 +1126,7 @@ export function runAnnotationMutationConformance(
           fontFamily: 'helvetica-bold',
           fontSize: 18,
           textAlign: 'center',
-          color: { r: 0, g: 0, b: 0 },
+          color: '#000000',
         } satisfies FreeTextDraft);
         expect(created.annotation.subtype).toBe('free-text');
         if (created.annotation.subtype === 'free-text') {
@@ -1160,7 +1160,7 @@ export function runAnnotationMutationConformance(
           fontFamily: 'helvetica',
           fontSize: 12,
           textAlign: 'left',
-          color: { r: 0, g: 0, b: 255 },
+          color: '#0000ff',
           richText: {
             body: { family: 'Helvetica', size: 18, color: '#102030' },
             paragraphs: [
@@ -1184,12 +1184,12 @@ export function runAnnotationMutationConformance(
           // The body became the /DA font and size; the /DA colour stayed the draft's.
           expect(dto.fontFamily).toBe('helvetica');
           expect(dto.fontSize).toBe(18);
-          expect(dto.color).toMatchObject({ r: 0, g: 0, b: 255 });
+          expect(dto.color).toBe('#0000ff');
           expect(dto.richText.body.color).toBe('#102030');
           expect(dto.richText.paragraphs[0]!.runs).toEqual([
             { text: 'Hello ' },
             { text: 'bold', style: { weight: 700 } },
-            { text: ' red', style: { color: '#FF0000' } },
+            { text: ' red', style: { color: '#ff0000' } },
           ]);
           expect(dto.richText.paragraphs[1]!.align).toBe('center');
           expect(dto.richText.paragraphs[1]!.runs[1]).toEqual({
@@ -1224,7 +1224,7 @@ export function runAnnotationMutationConformance(
           fontFamily: 'helvetica',
           fontSize: 14,
           textAlign: 'center',
-          color: { r: 0, g: 0, b: 0 },
+          color: '#000000',
           richText: {
             body: { family: 'Helvetica', size: 14 },
             paragraphs: [{ runs: [{ text: 'a' }, { text: 'b', style: { weight: 700 } }] }],
@@ -1283,7 +1283,7 @@ export function runAnnotationMutationConformance(
           fontFamily: 'helvetica',
           fontSize: 14,
           textAlign: 'left',
-          color: { r: 0, g: 0, b: 0 },
+          color: '#000000',
           richText: {
             body: { family: 'Helvetica', size: 14 },
             paragraphs: [{ runs: [{ text: 'a' }, { text: 'b', style: { size: 30 } }] }],
@@ -1292,7 +1292,7 @@ export function runAnnotationMutationConformance(
         const updated = await page.annotations.update(created.annotation.ref, {
           subtype: 'free-text',
           fontSize: 20,
-          fontColor: { r: 255, g: 0, b: 0 },
+          fontColor: '#ff0000',
           fontFamily: 'times-bold',
         });
         expect(updated.annotation.subtype).toBe('free-text');
@@ -1301,7 +1301,7 @@ export function runAnnotationMutationConformance(
           expect(dto.fontSize).toBe(20);
           expect(dto.fontFamily).toBe('times-bold');
           expect(dto.richText.body.size).toBe(20);
-          expect(dto.richText.body.color).toBe('#FF0000');
+          expect(dto.richText.body.color).toBe('#ff0000');
           expect(dto.richText.body.family).toBe('Times');
           expect(dto.richText.body.weight).toBe(700);
           // The run's own size is a delta over the body: it survives the move.
@@ -1324,7 +1324,7 @@ export function runAnnotationMutationConformance(
           fontFamily: 'helvetica',
           fontSize: 14,
           textAlign: 'left',
-          color: { r: 0, g: 0, b: 0 },
+          color: '#000000',
         } satisfies FreeTextDraft);
         const ref = created.annotation.ref;
         let caught: unknown;
@@ -1374,14 +1374,14 @@ export function runAnnotationMutationConformance(
           subtype: 'redact',
           contents: 'mutation conformance: area redact',
           rect: shapeRect,
-          color: { r: 228, g: 66, b: 52 },
+          color: '#e44234',
           opacity: 1,
-          interiorColor: { r: 0, g: 0, b: 0 },
+          interiorColor: '#000000',
           overlayText: 'CONFIDENTIAL',
           repeat: true,
           fontFamily: 'helvetica',
           fontSize: 10,
-          fontColor: { r: 255, g: 255, b: 255 },
+          fontColor: '#ffffff',
           textAlign: 'center',
         };
         const area = await page.annotations.create(areaDraft);
@@ -1389,13 +1389,13 @@ export function runAnnotationMutationConformance(
         expect(area.annotation.subtype).toBe('redact');
         if (area.annotation.subtype === 'redact') {
           expect(area.annotation.quadPoints.length).toBe(0);
-          expect(area.annotation.color).toMatchObject({ r: 228, g: 66, b: 52 });
-          expect(area.annotation.interiorColor).toMatchObject({ r: 0, g: 0, b: 0 });
+          expect(area.annotation.color).toBe('#e44234');
+          expect(area.annotation.interiorColor).toBe('#000000');
           expect(area.annotation.overlayText).toBe('CONFIDENTIAL');
           expect(area.annotation.repeat).toBe(true);
           expect(area.annotation.fontFamily).toBe('helvetica');
           expect(area.annotation.fontSize).toBe(10);
-          expect(area.annotation.fontColor).toMatchObject({ r: 255, g: 255, b: 255 });
+          expect(area.annotation.fontColor).toBe('#ffffff');
           expect(area.annotation.textAlign).toBe('center');
         }
 
@@ -1416,7 +1416,7 @@ export function runAnnotationMutationConformance(
           expect(text.annotation.overlayText).toBe(null);
           expect(text.annotation.repeat).toBe(false);
           // Default marking outline is the red redaction convention.
-          expect(text.annotation.color).toMatchObject({ r: 255, g: 0, b: 0 });
+          expect(text.annotation.color).toBe('#ff0000');
         }
       } finally {
         await doc.close();
@@ -1431,11 +1431,11 @@ export function runAnnotationMutationConformance(
           subtype: 'redact',
           contents: 'redact-update-base',
           rect: shapeRect,
-          interiorColor: { r: 0, g: 0, b: 0 },
+          interiorColor: '#000000',
           overlayText: 'DRAFT',
           fontFamily: 'helvetica',
           fontSize: 8,
-          fontColor: { r: 255, g: 255, b: 255 },
+          fontColor: '#ffffff',
         } satisfies RedactDraft);
         const before = await page.annotations.list();
 
@@ -1447,9 +1447,9 @@ export function runAnnotationMutationConformance(
           repeat: true,
           fontFamily: 'helvetica',
           fontSize: 0,
-          fontColor: { r: 255, g: 240, b: 240 },
+          fontColor: '#fff0f0',
           textAlign: 'right',
-          interiorColor: { r: 10, g: 10, b: 10 },
+          interiorColor: '#0a0a0a',
         });
         expect(AnnotationUpdateResultSchema.safeParse(restyled).success).toBe(true);
         expect(restyled.annotation.subtype).toBe('redact');
@@ -1457,9 +1457,9 @@ export function runAnnotationMutationConformance(
           expect(restyled.annotation.overlayText).toBe('REDACTED');
           expect(restyled.annotation.repeat).toBe(true);
           expect(restyled.annotation.fontSize).toBe(0);
-          expect(restyled.annotation.fontColor).toMatchObject({ r: 255, g: 240, b: 240 });
+          expect(restyled.annotation.fontColor).toBe('#fff0f0');
           expect(restyled.annotation.textAlign).toBe('right');
-          expect(restyled.annotation.interiorColor).toMatchObject({ r: 10, g: 10, b: 10 });
+          expect(restyled.annotation.interiorColor).toBe('#0a0a0a');
         }
 
         // Clear the label and the fill: null wipes /OverlayText and /IC.
@@ -1496,7 +1496,7 @@ export function runAnnotationMutationConformance(
           intent: 'replace',
           contents: 'mutation conformance: caret',
           box: shapeRect,
-          color: { r: 0, g: 128, b: 255 },
+          color: '#0080ff',
           opacity: 0.7,
         };
         const caret = await page.annotations.create(caretDraft);
@@ -1506,7 +1506,7 @@ export function runAnnotationMutationConformance(
         expect(caret.annotation.ref.kind).toBe('objectNumber');
         if (caret.annotation.subtype === 'caret') {
           expect(caret.annotation.intent).toBe('replace');
-          expect(caret.annotation.color).toMatchObject({ r: 0, g: 128, b: 255 });
+          expect(caret.annotation.color).toBe('#0080ff');
           expect(Math.round(caret.annotation.opacity * 100) / 100).toBe(0.7);
           // Caret carries no border or quads.
           expect('strokeWidth' in caret.annotation).toBe(false);
@@ -1522,12 +1522,12 @@ export function runAnnotationMutationConformance(
         const before = await page.annotations.list();
         const result = await page.annotations.update(caret.annotation.ref, {
           subtype: 'caret',
-          color: { r: 255, g: 0, b: 0 },
+          color: '#ff0000',
         });
         expect(AnnotationUpdateResultSchema.safeParse(result).success).toBe(true);
         expect(result.annotation.subtype).toBe('caret');
         if (result.annotation.subtype === 'caret') {
-          expect(result.annotation.color).toMatchObject({ r: 255, g: 0, b: 0 });
+          expect(result.annotation.color).toBe('#ff0000');
           expect(result.annotation.box).toEqual(shapeRect);
         }
         // Update never bumps the revision.
@@ -1551,7 +1551,7 @@ export function runAnnotationMutationConformance(
           subtype: 'ink',
           contents: 'ink-update-base',
           inkList: inkStrokes,
-          color: { r: 0, g: 0, b: 0 },
+          color: '#000000',
           strokeWidth: 2,
           borderStyle: 'solid',
           opacity: 1,
@@ -1568,13 +1568,13 @@ export function runAnnotationMutationConformance(
         const result = await page.annotations.update(created.annotation.ref, {
           subtype: 'ink',
           inkList: newStrokes,
-          color: { r: 220, g: 20, b: 60 },
+          color: '#dc143c',
         });
         expect(AnnotationUpdateResultSchema.safeParse(result).success).toBe(true);
         expect(result.annotation.subtype).toBe('ink');
         if (result.annotation.subtype === 'ink') {
           expect(result.annotation.inkList.length).toBe(newStrokes.length);
-          expect(result.annotation.color).toMatchObject({ r: 220, g: 20, b: 60 });
+          expect(result.annotation.color).toBe('#dc143c');
         }
         // Update never bumps the revision.
         expect(result.meta.affectedPages[0].revision.generation).toBe(
@@ -1595,7 +1595,7 @@ export function runAnnotationMutationConformance(
           intent: 'ink-highlight',
           blendMode: 'multiply',
           inkList: inkStrokes,
-          color: { r: 255, g: 205, b: 69 },
+          color: '#ffcd45',
           strokeWidth: 14,
           borderStyle: 'solid',
           opacity: 1,
@@ -1607,7 +1607,7 @@ export function runAnnotationMutationConformance(
 
         const recolored = await page.annotations.update(created.annotation.ref, {
           subtype: 'ink',
-          color: { r: 250, g: 190, b: 40 },
+          color: '#fabe28',
         });
         expect(recolored.annotation.subtype).toBe('ink');
         expect(recolored.annotation.blendMode).toBe('multiply');
@@ -1632,7 +1632,7 @@ export function runAnnotationMutationConformance(
           contents: 'polyline-update-base',
           vertices,
           interiorColor: null,
-          color: { r: 0, g: 0, b: 0 },
+          color: '#000000',
           strokeWidth: 1,
           borderStyle: 'solid',
           opacity: 1,
@@ -1674,8 +1674,8 @@ export function runAnnotationMutationConformance(
           subtype: 'circle',
           contents: 'shape-update-base',
           box: shapeRect,
-          interiorColor: { r: 10, g: 20, b: 30 },
-          color: { r: 0, g: 0, b: 0 },
+          interiorColor: '#0a141e',
+          color: '#000000',
           strokeWidth: 1,
           borderStyle: 'solid',
           opacity: 1,
@@ -1684,13 +1684,13 @@ export function runAnnotationMutationConformance(
 
         const result = await page.annotations.update(created.annotation.ref, {
           subtype: 'circle',
-          interiorColor: { r: 200, g: 100, b: 50 },
+          interiorColor: '#c86432',
           strokeWidth: 4,
         });
         expect(AnnotationUpdateResultSchema.safeParse(result).success).toBe(true);
         expect(result.annotation.subtype).toBe('circle');
         if (result.annotation.subtype === 'circle') {
-          expect(result.annotation.interiorColor).toMatchObject({ r: 200, g: 100, b: 50 });
+          expect(result.annotation.interiorColor).toBe('#c86432');
           expect(result.annotation.strokeWidth).toBe(4);
           // Unpatched fields are preserved.
           expect(result.annotation.borderStyle).toBe('solid');
@@ -1714,8 +1714,8 @@ export function runAnnotationMutationConformance(
             subtype: 'circle',
             contents: 'appearance-gen',
             box: shapeRect,
-            interiorColor: { r: 255, g: 0, b: 0 },
-            color: { r: 0, g: 0, b: 0 },
+            interiorColor: '#ff0000',
+            color: '#000000',
             strokeWidth: 2,
             borderStyle: 'solid',
             opacity: 1,
@@ -2384,7 +2384,7 @@ export function runAnnotationMutationConformance(
           subtype: 'caret',
           contents: '',
           box: shapeRect,
-          color: { r: 0, g: 0, b: 0 },
+          color: '#000000',
           opacity: 1,
           reply: { to: primary.annotation.ref, type: 'group' },
         } satisfies CaretDraft);
@@ -2640,14 +2640,14 @@ export function runAnnotationMutationConformance(
           intent: 'replace',
           contents: 'replacement text',
           box: shapeRect,
-          color: { r: 228, g: 66, b: 52 },
+          color: '#e44234',
           opacity: 1,
         } satisfies CaretDraft);
         const strikeout = await page.annotations.create({
           subtype: 'strikeout',
           intent: 'strikeout-text-edit',
           quadPoints: quad,
-          color: { r: 228, g: 66, b: 52 },
+          color: '#e44234',
           opacity: 1,
           reply: { to: caret.annotation.ref, type: 'group' },
         } satisfies StrikeoutDraft);

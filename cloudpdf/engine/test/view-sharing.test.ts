@@ -123,7 +123,7 @@ describe('plane-scoped view sharing (cloud SDK, real runtime)', () => {
       const created = await page.annotations.create({
         subtype: 'highlight',
         contents: 'view-sharing: carol diverges',
-        color: { r: 200, g: 100, b: 50 },
+        color: '#c86432',
         opacity: 0.5,
         quadPoints: [
           {

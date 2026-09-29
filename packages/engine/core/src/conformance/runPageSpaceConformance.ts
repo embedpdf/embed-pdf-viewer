@@ -170,8 +170,8 @@ export function runPageSpaceConformance(
             const { annotation } = await handle.annotations.create({
               subtype: 'square',
               box: spot,
-              color: { r: 0, g: 0, b: 0 },
-              interiorColor: { r: 0, g: 0, b: 0 },
+              color: '#000000',
+              interiorColor: '#000000',
             });
             try {
               const read = annotation.rect;
@@ -185,6 +185,37 @@ export function runPageSpaceConformance(
               expect(darkAt(raster, middleOf(spot), scale)).toBe(true);
             } finally {
               await handle.annotations.delete(annotation.ref);
+            }
+          });
+        });
+
+        // Widgets are read like every annotation (checked against the pixels
+        // above), so reading back the rect that was asked shows where it went.
+        test("a form field's widget is placed where it was put", async () => {
+          await eachShownPage(async (page, layout) => {
+            const visible = page.expected.visible;
+            const spot: PageBox = {
+              x: width(visible) / 2 - 30,
+              y: height(visible) / 2 - 10,
+              width: 60,
+              height: 20,
+            };
+            const { field } = await doc.forms.create({
+              family: 'text',
+              name: `placed_${layout.ref.pageObjectNumber}`,
+              widget: { page: layout.ref, rect: spot },
+            });
+            try {
+              const widget = field.widgets[0]!;
+              const { annotations } = await doc.page(layout.ref).annotations.list();
+              const read = annotations.find(
+                (a) =>
+                  a.ref.kind === 'objectNumber' &&
+                  a.ref.annotObjectNumber === widget.annotObjectNumber,
+              );
+              expect(read?.rect).toEqual(spot);
+            } finally {
+              await doc.forms.delete(field.ref);
             }
           });
         });

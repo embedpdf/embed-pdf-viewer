@@ -1,5 +1,5 @@
 import type { MeasurementAppearance, Subtype, Point } from '@embedpdf/core-annotation';
-import { pageSpace, type PageRotation } from '@embedpdf/core-geometry';
+import type { PageRotation } from '@embedpdf/core-geometry';
 import {
   isDimension,
   isReadout,
@@ -115,7 +115,7 @@ export function createPointer(
       // apart. Unknown id → treat it as a bare subtype (headless/programmatic).
       // The tool's `upright` policy + the sample's display rotation ride the
       // input bag; the core captures them on the draft at down.
-      const crop = geometry.cropOf(pageObjectNumber);
+      const laidOut = geometry.sizeOf(pageObjectNumber) !== null;
       const cache = measurement.viewportsOf(pageObjectNumber);
       const draft = store.model().draft;
       const continuingMeasurement =
@@ -123,15 +123,18 @@ export function createPointer(
         draft.page.pageObjectNumber === pageObjectNumber &&
         draft.preset === (resolvedTool?.preset ?? tool);
       const dimension = resolvedTool && isDimension(resolvedTool);
-      if (dimension && phase === 'down' && !continuingMeasurement && (!crop || !cache?.viewports)) {
+      if (
+        dimension &&
+        phase === 'down' &&
+        !continuingMeasurement &&
+        (!laidOut || !cache?.viewports)
+      ) {
         return;
       }
       const viewport =
-        crop && cache?.viewports
-          ? viewportForPoint(cache.viewports, pageSpace(crop).pageToPdf(point))
-          : undefined;
+        laidOut && cache?.viewports ? viewportForPoint(cache.viewports, point) : undefined;
       const measure: MeasurementAppearance | undefined =
-        dimension && crop && cache
+        dimension && laidOut && cache
           ? {
               intent: resolvedTool.intent as MeasurementAppearance['intent'],
               measure: viewport ? (viewport.measure ?? null) : cache.fallback,

@@ -11,6 +11,7 @@ const PON2 = 2;
 const PAGE = toPageRef(PON);
 const PAGE2 = toPageRef(PON2);
 const CROP = { left: 0, bottom: 0, right: 600, top: 800 };
+const PAGE_BOX = { x: 0, y: 0, width: 600, height: 800 };
 const NO_FLAGS: AnnotationFlags = {
   invisible: false,
   hidden: false,
@@ -53,7 +54,7 @@ const caretDTO = (): FileAnnotation =>
     rect: { left: 85, bottom: 745, right: 95, top: 755 },
     box: { left: 85, bottom: 745, right: 95, top: 755 },
     rotation: null,
-    color: { r: 239, g: 68, b: 68 },
+    color: '#ef4444',
     opacity: 1,
     reply: null,
     popup: null,
@@ -77,7 +78,7 @@ const strikeoutDTO = (): FileAnnotation => {
     subtype: 'strikeout',
     intent: 'strikeout-text-edit',
     rect: { left: 10, bottom: 765, right: 90, top: 780 },
-    color: { r: 239, g: 68, b: 68 },
+    color: '#ef4444',
     opacity: 1,
     quadPoints: [quad],
     reply: { to: ref(10), type: 'group' },
@@ -158,7 +159,7 @@ describe('annotation flags', () => {
       subtype: 'square',
       rect: { left: 100, bottom: 700, right: 180, top: 760 },
       box: { left: 100, bottom: 700, right: 180, top: 760 },
-      color: { r: 0, g: 0, b: 0 },
+      color: '#000000',
       opacity: 1,
       strokeWidth: 2,
       reply: null,
@@ -281,7 +282,7 @@ const hydrationSquare = (objectNumber: number): FileAnnotation =>
     subtype: 'square',
     rect: { left: 100, bottom: 700, right: 180, top: 760 },
     box: { left: 100, bottom: 700, right: 180, top: 760 },
-    color: { r: 0, g: 0, b: 0 },
+    color: '#000000',
     opacity: 1,
     strokeWidth: 2,
     reply: null,
@@ -577,7 +578,7 @@ describe('conversation plane at the capability boundary', () => {
       ...base(81),
       subtype: 'text',
       rect: { left: 100, bottom: 700, right: 120, top: 720 },
-      color: { r: 255, g: 255, b: 0 },
+      color: '#ffff00',
       opacity: 1,
       icon: 'note',
       state: 'accepted',
@@ -609,7 +610,7 @@ describe('the comments lens', () => {
       ...base(objectNumber),
       subtype: 'text',
       rect: NOTE_RECT,
-      color: { r: 255, g: 255, b: 0 },
+      color: '#ffff00',
       opacity: 1,
       icon: 'note',
       state: null,
@@ -1044,7 +1045,7 @@ describe.each([
     intent,
     rect: { left: 100, bottom: 680, right: 300, top: 700 },
     linePoints: { start: { x: 100, y: 700 }, end: { x: 300, y: 700 } },
-    color: { r: 0, g: 0, b: 0 },
+    color: '#000000',
     strokeWidth: 1,
     interiorColor: null,
     borderStyle: 'solid',
@@ -1119,7 +1120,7 @@ describe('distance authoring and recalibration', () => {
         {
           name: null,
           owned: false,
-          bbox: { left: 0, right: 60, bottom: 700, top: 800 },
+          bbox: { x: 0, y: 0, width: 60, height: 100 },
           measure: region,
         },
       ],
@@ -1127,7 +1128,7 @@ describe('distance authoring and recalibration', () => {
     );
     const dto = {
       ...base(71),
-      color: { r: 0, g: 0, b: 0 },
+      color: '#000000',
       strokeWidth: 1,
       opacity: 1,
       borderStyle: 'solid',
@@ -1171,8 +1172,8 @@ describe('distance authoring and recalibration', () => {
     harness.capability.setPageViewports(
       PAGE,
       [
-        { name: null, owned: true, bbox: CROP, measure: measureFromRatio(1, 1, 'm') },
-        { name: null, owned: false, bbox: CROP, measure: { subtype: 'geospatial' } },
+        { name: null, owned: true, bbox: PAGE_BOX, measure: measureFromRatio(1, 1, 'm') },
+        { name: null, owned: false, bbox: PAGE_BOX, measure: { subtype: 'geospatial' } },
       ],
       measureFromRatio(1, 1, 'm'),
     );
@@ -1190,8 +1191,8 @@ describe('distance authoring and recalibration', () => {
     expect(captured).toHaveBeenCalledWith({
       tool: 'calibrate',
       page: PAGE,
-      from: { x: 20, y: 780 },
-      to: { x: 120, y: 780 },
+      from: { x: 20, y: 20 },
+      to: { x: 120, y: 20 },
     });
     expect(harness.create).not.toHaveBeenCalled();
     harness.allows.mockReturnValue(false);
@@ -1206,7 +1207,7 @@ describe('distance authoring and recalibration', () => {
       (objectNumber) =>
         ({
           ...base(objectNumber),
-          color: { r: 0, g: 0, b: 0 },
+          color: '#000000',
           strokeWidth: 1,
           opacity: 1,
           borderStyle: 'solid',
@@ -1253,7 +1254,7 @@ describe.each(['area', 'perimeter'])('%s scale resolution', (tool) => {
         {
           name: null,
           owned: false,
-          bbox: { left: 0, right: 60, bottom: 700, top: 800 },
+          bbox: { x: 0, y: 0, width: 60, height: 100 },
           measure: region,
         },
       ],
@@ -1273,7 +1274,7 @@ describe.each(['area', 'perimeter'])('%s scale resolution', (tool) => {
         intent: tool === 'area' ? 'polygon-dimension' : 'polyline-dimension',
         measure: region,
         captionEnabled: true,
-        color: { r: 239, g: 68, b: 68 },
+        color: '#ef4444',
         strokeWidth: 1,
         opacity: 1,
       },
@@ -1303,7 +1304,7 @@ describe.each(['area', 'perimeter'])('%s scale resolution', (tool) => {
     expect(harness.model().draft).toBeNull();
     harness.capability.setPageViewports(
       PAGE,
-      [{ name: null, owned: false, bbox: CROP, measure: { subtype: 'geospatial' } }],
+      [{ name: null, owned: false, bbox: PAGE_BOX, measure: { subtype: 'geospatial' } }],
       measureFromRatio(1, 1, 'm'),
     );
     harness.capability.createPointer(tool, 'down', PAGE, { x: 20, y: 20 });

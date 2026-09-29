@@ -13,7 +13,7 @@ import { FILE_NAME_TO_ICON } from '../annotationIcon';
 import { readAnnotColor, readAnnotOpacity, readAnnotName } from './annotationReadPrimitives';
 
 /** Default `/C` — matches the generator's default icon fill and the writer default. */
-const DEFAULT_FILE_ATTACHMENT_COLOR: Color = { r: 255, g: 255, b: 0 };
+const DEFAULT_FILE_ATTACHMENT_COLOR: Color = '#ffff00';
 
 /** An absent or foreign `/Name` reads as 'push-pin' (ISO 32000 §12.5.6.15 default). */
 const DEFAULT_FILE_ATTACHMENT_ICON: FileAttachmentIcon = 'push-pin';
@@ -31,7 +31,7 @@ export function readFileAttachment(
   annotPtr: Ptr,
   base: AnnotationBase<PdfCoordinates>,
 ): FileAttachmentAnnotationDTO<PdfCoordinates> {
-  const color = readAnnotColor(fn, mem, annotPtr) ?? { ...DEFAULT_FILE_ATTACHMENT_COLOR };
+  const color = readAnnotColor(fn, mem, annotPtr) ?? DEFAULT_FILE_ATTACHMENT_COLOR;
   const ca = readAnnotOpacity(fn, mem, annotPtr);
   const opacity = ca == null ? 1 : Math.max(0, Math.min(1, ca));
   const icon =

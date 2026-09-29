@@ -49,8 +49,7 @@ import { annotationKey, flagsOf, styleFromDTO } from './seam';
 
 export {
   boxGeomFields,
-  colorToCss,
-  cssToColor,
+  hexColorOf,
   annotationKey,
   styleFromDTO,
   widgetAppearanceFromProps,

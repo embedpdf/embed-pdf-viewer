@@ -8,8 +8,11 @@ import {
   pageGeometryOf,
   pageListOf,
   pageSearchSliceOf,
+  pageViewportsOf,
   pdfAnnotationDraftOf,
   pdfAnnotationPatchOf,
+  pdfFormFieldDraftOf,
+  pdfMeasureOf,
   pdfRenderTargetOf,
   type AnnotationDTO,
   type PageRef,
@@ -93,6 +96,8 @@ export function resultInPageSpace(
         ...payload,
         result: { ...payload.result, annotations: payload.result.annotations.map(annotation) },
       };
+    case 'measure.viewports':
+      return { ...payload, viewports: pageViewportsOf(payload.viewports, boxOf(payload.page)) };
     case 'forms.list':
       return { ...payload, snapshot: pageFormSnapshotOf(payload.snapshot, boxOf) };
     case 'forms.import':
@@ -145,6 +150,10 @@ export function requestInFileSpace(job: PageSpaceJob, boxOf: VisibleBoxOf): File
       return { ...job, draft: pdfAnnotationDraftOf(job.draft, boxOf(job.page), boxOf) };
     case 'annotations.update':
       return { ...job, patch: pdfAnnotationPatchOf(job.patch, boxOf(job.ref.page), boxOf) };
+    case 'forms.createField':
+      return { ...job, draft: pdfFormFieldDraftOf(job.draft, boxOf) };
+    case 'measure.setScale':
+      return job.measure ? { ...job, measure: pdfMeasureOf(job.measure, boxOf(job.page)) } : job;
     case 'pages.render':
       return withRenderOptionsInFileSpace(job, boxOf);
     case 'pages.renderEncoded':
