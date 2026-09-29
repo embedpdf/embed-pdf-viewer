@@ -91,7 +91,7 @@ function annotation(index: number) {
     ref: {
       kind: 'objectNumber',
       page: toPageRef(PAGE_OBJECT_NUMBER),
-      annotObjectNumber: 10_000 + index,
+      objectNumber: 10_000 + index,
     },
     page: toPageRef(PAGE_OBJECT_NUMBER),
     index,
@@ -180,7 +180,6 @@ function metadataSnapshot(title: string | null) {
     createdAt: null,
     modifiedAt: null,
     trapped: 'unknown' as const,
-    custom: {},
   };
 }
 
@@ -241,6 +240,7 @@ function buildStub(initial: ServerState): StubbedFixture {
           metadataVersion: state.metadataVersion,
           auditHead: 0,
           baseSha: 'stub-sha',
+          protection: null,
           pages: [
             {
               state: pageState(),
@@ -406,7 +406,7 @@ function buildStub(initial: ServerState): StubbedFixture {
               ],
             },
             affectedPages: [pageState()],
-            changed: [{ kind: 'objectNumber', value: created.ref.annotObjectNumber }],
+            changed: [{ kind: 'objectNumber', objectNumber: created.ref.objectNumber }],
             weakRefsInvalidated: false,
             shouldRefetch: null,
           },
@@ -553,7 +553,7 @@ describe('CloudPageTextService — end-to-end transparent retry', () => {
     const doc = await engine.open({ kind: 'token', token: docToken() });
     try {
       const list = await doc.pages.list();
-      expect(list.pages.map((page) => page.ref.pageObjectNumber)).toEqual([PAGE_OBJECT_NUMBER]);
+      expect(list.pages.map((page) => page.ref.objectNumber)).toEqual([PAGE_OBJECT_NUMBER]);
       const paths = fx.calls.map((call) => call.path);
       // pages.list reads layoutVersion off the (seeded) manifest, then fetches
       // the content-addressed /layout leaf — no extra /head.
@@ -570,15 +570,25 @@ describe('CloudPageTextService — end-to-end transparent retry', () => {
   });
 
   test('stale open seed falls back to /head before surfacing pages.list', async () => {
+    // A change lands between open()'s /head and its first manifest read (the
+    // manifest it fetches up front for the document's protection).
+    let raced = false;
+    const racingFetch: typeof globalThis.fetch = async (input, init) => {
+      const response = await fx.fetch(input, init);
+      if (!raced && String(input).endsWith('/head')) {
+        raced = true;
+        fx.bump({ docVersion: 2, pageContentVersion: 2, pageAnnotationVersion: 2 });
+      }
+      return response;
+    };
     const engine = cloudEngine({
       baseUrl: 'http://stub',
-      fetch: fx.fetch,
+      fetch: racingFetch,
     });
     const doc = await engine.open({ kind: 'token', token: docToken() });
     try {
-      fx.bump({ docVersion: 2, pageContentVersion: 2, pageAnnotationVersion: 2 });
       const list = await doc.pages.list();
-      expect(list.pages.map((page) => page.ref.pageObjectNumber)).toEqual([PAGE_OBJECT_NUMBER]);
+      expect(list.pages.map((page) => page.ref.objectNumber)).toEqual([PAGE_OBJECT_NUMBER]);
       const paths = fx.calls.map((call) => call.path);
       // Stale seed → manifest ladder refreshes to docVersion=2 first, then the /layout
       // leaf is fetched at the refreshed layoutVersion.
@@ -892,6 +902,7 @@ describe('CloudEngine schema parity — DocumentHeadSchema / DocumentManifestSch
       metadataVersion: 1,
       auditHead: 0,
       baseSha: 'sha',
+      protection: null,
       pages: [
         {
           state: {

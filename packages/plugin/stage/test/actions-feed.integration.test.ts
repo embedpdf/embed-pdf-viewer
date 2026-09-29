@@ -72,7 +72,7 @@ async function boot() {
       ref: {
         kind: 'objectNumber',
         page: toPageRef(firstPageObjectNumber),
-        annotObjectNumber: 999,
+        objectNumber: 999,
       },
       page: toPageRef(firstPageObjectNumber),
     });

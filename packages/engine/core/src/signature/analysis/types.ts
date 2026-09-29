@@ -7,6 +7,7 @@ import type {
   ModificationLevel,
   SignatureDTO,
 } from '../types';
+import type { PdfCoordinates } from '../../pageSpace/coordinates';
 
 /**
  * The shallow serialisation of a PDF object as the fork's revision diff
@@ -138,7 +139,8 @@ export interface RevisionStructure {
   pagesRoot: number;
   pages: number[];
   fields: RevisionField[];
-  signatures: SignatureDTO[];
+  /** In the file's coordinates: a past revision's pages may not be the document's now. */
+  signatures: SignatureDTO<PdfCoordinates>[];
 }
 
 export interface ChangeFinding {

@@ -39,8 +39,8 @@ import { Icon } from './icons';
 import { restoreStampLibrariesOnce } from './stamp-store';
 
 const fieldLabel = (
-  field: { kind: 'fqn'; name: string } | { kind: 'objectNumber'; fieldObjectNumber: number },
-): string => (field.kind === 'fqn' ? field.name : `#${field.fieldObjectNumber}`);
+  field: { kind: 'fqn'; name: string } | { kind: 'objectNumber'; objectNumber: number },
+): string => (field.kind === 'fqn' ? field.name : `#${field.objectNumber}`);
 
 export function SignaturesPanel() {
   const t = useT();
@@ -351,8 +351,7 @@ function DocumentSignatures() {
     !!target &&
     (target.kind === 'fqn'
       ? target.name === dto.fieldName
-      : target.fieldObjectNumber ===
-        (dto.field.kind === 'objectNumber' ? dto.field.fieldObjectNumber : -1));
+      : target.objectNumber === (dto.field.kind === 'objectNumber' ? dto.field.objectNumber : -1));
   const validate = () => {
     setValidating(true);
     void signature.validate().finally(() => setValidating(false));

@@ -11,13 +11,13 @@ export namespace DocAnnotationsFlatten200ResponseResultsItemRef {
     export interface ObjectNumber {
         kind: "objectNumber";
         page: DocAnnotationsFlatten200ResponseResultsItemRefObjectNumber.Page;
-        annotObjectNumber: number;
+        objectNumber: number;
     }
 
     export namespace DocAnnotationsFlatten200ResponseResultsItemRefObjectNumber {
         export interface Page {
             kind: Page.Kind;
-            pageObjectNumber: number;
+            objectNumber: number;
         }
 
         export namespace Page {
@@ -37,7 +37,7 @@ export namespace DocAnnotationsFlatten200ResponseResultsItemRef {
     export namespace DocAnnotationsFlatten200ResponseResultsItemRefNm {
         export interface Page {
             kind: Page.Kind;
-            pageObjectNumber: number;
+            objectNumber: number;
         }
 
         export namespace Page {
@@ -58,7 +58,7 @@ export namespace DocAnnotationsFlatten200ResponseResultsItemRef {
     export namespace DocAnnotationsFlatten200ResponseResultsItemRefIndex {
         export interface Page {
             kind: Page.Kind;
-            pageObjectNumber: number;
+            objectNumber: number;
         }
 
         export namespace Page {
@@ -77,7 +77,7 @@ export namespace DocAnnotationsFlatten200ResponseResultsItemRef {
         export namespace Revision {
             export interface Page {
                 kind: Page.Kind;
-                pageObjectNumber: number;
+                objectNumber: number;
             }
 
             export namespace Page {

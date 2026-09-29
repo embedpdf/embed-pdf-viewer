@@ -29,6 +29,7 @@ import {
 } from '../stage/_shared/chrome';
 
 const engine = localEngine();
+const assetEngine = engine; // signature marks are drawn as PDFs; they open here too
 // [!signer]
 // A throwaway key for the demo. Bring your own with `webCryptoSigner`, a
 // service with `remoteSigner`, or a persisted personal one with `personalSigner`.
@@ -40,7 +41,7 @@ const plugins = [
   interactionPlugin(),
   annotationPlugin(),
   formPlugin(),
-  stampPlugin({ assetEngine: engine }),
+  stampPlugin({ assetEngine }),
   signaturePlugin({
     key: () => signer,
     // Trust the demo key itself, so its signatures validate as 'valid'.

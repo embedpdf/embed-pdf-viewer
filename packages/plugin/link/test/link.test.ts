@@ -43,7 +43,7 @@ const linkDto = (
   rect: { x: number; y: number; width: number; height: number },
   target: unknown,
 ) => ({
-  ref: { kind: 'objectNumber', page: toPageRef(pageObjectNumber), annotObjectNumber },
+  ref: { kind: 'objectNumber', page: toPageRef(pageObjectNumber), objectNumber: annotObjectNumber },
   page: toPageRef(pageObjectNumber),
   index: annotObjectNumber,
   subtype: 'link',
@@ -89,13 +89,13 @@ async function boot() {
       list: () => Promise.resolve({ pageCount: 2, pages: [pageLayout(1, 0), pageLayout(2, 1)] }),
     },
     security: { allows: () => true },
-    page: (ref: { pageObjectNumber: number }) => ({
+    page: (ref: { objectNumber: number }) => ({
       annotations: {
         list: () => {
-          reads.push(ref.pageObjectNumber);
+          reads.push(ref.objectNumber);
           if (failing) return Promise.reject(new Error('read failed'));
           return Promise.resolve({
-            annotations: ref.pageObjectNumber === 1 ? PAGE_ONE_LINKS : [],
+            annotations: ref.objectNumber === 1 ? PAGE_ONE_LINKS : [],
           });
         },
       },
@@ -126,7 +126,7 @@ describe('link plugin', () => {
   it('loads a page once, announces it, and lists page-space links', async () => {
     const harness = await boot();
     const loaded: number[] = [];
-    harness.link.onLoaded((event) => loaded.push(event.page.pageObjectNumber));
+    harness.link.onLoaded((event) => loaded.push(event.page.objectNumber));
     expect(harness.link.isLoaded(toPageRef(1))).toBe(false);
     expect(harness.link.getStatus(toPageRef(1))).toBe('idle');
     await Promise.all([
@@ -270,7 +270,7 @@ describe('link plugin', () => {
   it('reports a failed first read as an error, never as an empty loaded page', async () => {
     const harness = await boot();
     const loaded: number[] = [];
-    harness.link.onLoaded((event) => loaded.push(event.page.pageObjectNumber));
+    harness.link.onLoaded((event) => loaded.push(event.page.objectNumber));
     harness.failReads(true);
     await expect(harness.link.ensureLoaded(toPageRef(1))).rejects.toBeDefined();
     expect(harness.link.getStatus(toPageRef(1))).toBe('error');
@@ -289,7 +289,7 @@ describe('link plugin', () => {
   it('does not announce a failed re-read after an annotation change', async () => {
     const harness = await boot();
     const loaded: number[] = [];
-    harness.link.onLoaded((event) => loaded.push(event.page.pageObjectNumber));
+    harness.link.onLoaded((event) => loaded.push(event.page.objectNumber));
     await harness.link.ensureLoaded(toPageRef(1));
     const links = harness.link.listLinks(toPageRef(1));
     expect(loaded).toEqual([1]);

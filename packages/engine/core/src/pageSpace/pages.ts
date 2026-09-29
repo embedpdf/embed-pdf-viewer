@@ -45,14 +45,14 @@ export function pageLayoutOf(
 /** Every page's visible box, by page, from the pages' layouts. */
 export function visibleBoxesOf(pages: readonly PageLayout<PdfCoordinates>[]): VisibleBoxOf {
   const boxes = new Map<number, PdfRect>(
-    pages.map((page) => [page.ref.pageObjectNumber, page.boxes.crop]),
+    pages.map((page) => [page.ref.objectNumber, page.boxes.crop]),
   );
   return (page) => {
-    const box = boxes.get(page.pageObjectNumber);
+    const box = boxes.get(page.objectNumber);
     if (!box) {
       throw new EngineError(
         EngineErrorCode.InvalidArg,
-        `No page ${page.pageObjectNumber} in this document`,
+        `No page ${page.objectNumber} in this document`,
       );
     }
     return box;

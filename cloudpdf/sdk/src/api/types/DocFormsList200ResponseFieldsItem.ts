@@ -16,10 +16,11 @@ export namespace DocFormsList200ResponseFieldsItem {
     export interface Text {
         family: "text";
         ref: CloudPDF.DocFormsList200ResponseFieldsItemTextRef;
-        fieldObjectNumber: number;
         name: string;
         origin: DocFormsList200ResponseFieldsItemText.Origin;
-        flags: DocFormsList200ResponseFieldsItemText.Flags;
+        readOnly: boolean;
+        required: boolean;
+        noExport: boolean;
         alternateName: string | null;
         mappingName: string | null;
         valueEntry: CloudPDF.DocFormsList200ResponseFieldsItemTextValueEntry;
@@ -40,27 +41,20 @@ export namespace DocFormsList200ResponseFieldsItem {
             Recovered: "recovered",
         } as const;
         export type Origin = (typeof Origin)[keyof typeof Origin];
-
-        export interface Flags {
-            readOnly: boolean;
-            required: boolean;
-            noExport: boolean;
-            raw: number;
-        }
-
         export type Widgets = Widgets.Item[];
 
         export namespace Widgets {
             export interface Item {
                 ref: CloudPDF.DocFormsList200ResponseFieldsItemTextWidgetsItemRef | null;
-                annotObjectNumber: number;
+                objectNumber: number;
                 page: Item.Page | null;
+                rect: Item.Rect | null;
             }
 
             export namespace Item {
                 export interface Page {
                     kind: Page.Kind;
-                    pageObjectNumber: number;
+                    objectNumber: number;
                 }
 
                 export namespace Page {
@@ -69,6 +63,13 @@ export namespace DocFormsList200ResponseFieldsItem {
                     } as const;
                     export type Kind = (typeof Kind)[keyof typeof Kind];
                 }
+
+                export interface Rect {
+                    x: number;
+                    y: number;
+                    width: number;
+                    height: number;
+                }
             }
         }
     }
@@ -76,10 +77,11 @@ export namespace DocFormsList200ResponseFieldsItem {
     export interface Checkbox {
         family: "checkbox";
         ref: CloudPDF.DocFormsList200ResponseFieldsItemCheckboxRef;
-        fieldObjectNumber: number;
         name: string;
         origin: DocFormsList200ResponseFieldsItemCheckbox.Origin;
-        flags: DocFormsList200ResponseFieldsItemCheckbox.Flags;
+        readOnly: boolean;
+        required: boolean;
+        noExport: boolean;
         alternateName: string | null;
         mappingName: string | null;
         valueEntry: CloudPDF.DocFormsList200ResponseFieldsItemCheckboxValueEntry;
@@ -96,21 +98,14 @@ export namespace DocFormsList200ResponseFieldsItem {
             Recovered: "recovered",
         } as const;
         export type Origin = (typeof Origin)[keyof typeof Origin];
-
-        export interface Flags {
-            readOnly: boolean;
-            required: boolean;
-            noExport: boolean;
-            raw: number;
-        }
-
         export type Widgets = Widgets.Item[];
 
         export namespace Widgets {
             export interface Item {
                 ref: CloudPDF.DocFormsList200ResponseFieldsItemCheckboxWidgetsItemRef | null;
-                annotObjectNumber: number;
+                objectNumber: number;
                 page: Item.Page | null;
+                rect: Item.Rect | null;
                 onState: string;
                 exportValue: string;
                 checked: boolean;
@@ -119,7 +114,7 @@ export namespace DocFormsList200ResponseFieldsItem {
             export namespace Item {
                 export interface Page {
                     kind: Page.Kind;
-                    pageObjectNumber: number;
+                    objectNumber: number;
                 }
 
                 export namespace Page {
@@ -128,6 +123,13 @@ export namespace DocFormsList200ResponseFieldsItem {
                     } as const;
                     export type Kind = (typeof Kind)[keyof typeof Kind];
                 }
+
+                export interface Rect {
+                    x: number;
+                    y: number;
+                    width: number;
+                    height: number;
+                }
             }
         }
     }
@@ -135,10 +137,11 @@ export namespace DocFormsList200ResponseFieldsItem {
     export interface Radio {
         family: "radio";
         ref: CloudPDF.DocFormsList200ResponseFieldsItemRadioRef;
-        fieldObjectNumber: number;
         name: string;
         origin: DocFormsList200ResponseFieldsItemRadio.Origin;
-        flags: DocFormsList200ResponseFieldsItemRadio.Flags;
+        readOnly: boolean;
+        required: boolean;
+        noExport: boolean;
         alternateName: string | null;
         mappingName: string | null;
         valueEntry: CloudPDF.DocFormsList200ResponseFieldsItemRadioValueEntry;
@@ -156,21 +159,14 @@ export namespace DocFormsList200ResponseFieldsItem {
             Recovered: "recovered",
         } as const;
         export type Origin = (typeof Origin)[keyof typeof Origin];
-
-        export interface Flags {
-            readOnly: boolean;
-            required: boolean;
-            noExport: boolean;
-            raw: number;
-        }
-
         export type Widgets = Widgets.Item[];
 
         export namespace Widgets {
             export interface Item {
                 ref: CloudPDF.DocFormsList200ResponseFieldsItemRadioWidgetsItemRef | null;
-                annotObjectNumber: number;
+                objectNumber: number;
                 page: Item.Page | null;
+                rect: Item.Rect | null;
                 onState: string;
                 exportValue: string;
                 checked: boolean;
@@ -179,7 +175,7 @@ export namespace DocFormsList200ResponseFieldsItem {
             export namespace Item {
                 export interface Page {
                     kind: Page.Kind;
-                    pageObjectNumber: number;
+                    objectNumber: number;
                 }
 
                 export namespace Page {
@@ -188,6 +184,13 @@ export namespace DocFormsList200ResponseFieldsItem {
                     } as const;
                     export type Kind = (typeof Kind)[keyof typeof Kind];
                 }
+
+                export interface Rect {
+                    x: number;
+                    y: number;
+                    width: number;
+                    height: number;
+                }
             }
         }
     }
@@ -195,10 +198,11 @@ export namespace DocFormsList200ResponseFieldsItem {
     export interface Combobox {
         family: "combobox";
         ref: CloudPDF.DocFormsList200ResponseFieldsItemComboboxRef;
-        fieldObjectNumber: number;
         name: string;
         origin: DocFormsList200ResponseFieldsItemCombobox.Origin;
-        flags: DocFormsList200ResponseFieldsItemCombobox.Flags;
+        readOnly: boolean;
+        required: boolean;
+        noExport: boolean;
         alternateName: string | null;
         mappingName: string | null;
         valueEntry: CloudPDF.DocFormsList200ResponseFieldsItemComboboxValueEntry;
@@ -217,27 +221,20 @@ export namespace DocFormsList200ResponseFieldsItem {
             Recovered: "recovered",
         } as const;
         export type Origin = (typeof Origin)[keyof typeof Origin];
-
-        export interface Flags {
-            readOnly: boolean;
-            required: boolean;
-            noExport: boolean;
-            raw: number;
-        }
-
         export type Widgets = Widgets.Item[];
 
         export namespace Widgets {
             export interface Item {
                 ref: CloudPDF.DocFormsList200ResponseFieldsItemComboboxWidgetsItemRef | null;
-                annotObjectNumber: number;
+                objectNumber: number;
                 page: Item.Page | null;
+                rect: Item.Rect | null;
             }
 
             export namespace Item {
                 export interface Page {
                     kind: Page.Kind;
-                    pageObjectNumber: number;
+                    objectNumber: number;
                 }
 
                 export namespace Page {
@@ -245,6 +242,13 @@ export namespace DocFormsList200ResponseFieldsItem {
                         ObjectNumber: "objectNumber",
                     } as const;
                     export type Kind = (typeof Kind)[keyof typeof Kind];
+                }
+
+                export interface Rect {
+                    x: number;
+                    y: number;
+                    width: number;
+                    height: number;
                 }
             }
         }
@@ -263,10 +267,11 @@ export namespace DocFormsList200ResponseFieldsItem {
     export interface Listbox {
         family: "listbox";
         ref: CloudPDF.DocFormsList200ResponseFieldsItemListboxRef;
-        fieldObjectNumber: number;
         name: string;
         origin: DocFormsList200ResponseFieldsItemListbox.Origin;
-        flags: DocFormsList200ResponseFieldsItemListbox.Flags;
+        readOnly: boolean;
+        required: boolean;
+        noExport: boolean;
         alternateName: string | null;
         mappingName: string | null;
         valueEntry: CloudPDF.DocFormsList200ResponseFieldsItemListboxValueEntry;
@@ -274,6 +279,7 @@ export namespace DocFormsList200ResponseFieldsItem {
         actions?: CloudPDF.PdfFieldActions | undefined;
         widgets: DocFormsList200ResponseFieldsItemListbox.Widgets.Item[];
         selectedValues: string[];
+        defaultValue: string[];
         multiSelect: boolean;
         options: DocFormsList200ResponseFieldsItemListbox.Options.Item[];
     }
@@ -284,27 +290,20 @@ export namespace DocFormsList200ResponseFieldsItem {
             Recovered: "recovered",
         } as const;
         export type Origin = (typeof Origin)[keyof typeof Origin];
-
-        export interface Flags {
-            readOnly: boolean;
-            required: boolean;
-            noExport: boolean;
-            raw: number;
-        }
-
         export type Widgets = Widgets.Item[];
 
         export namespace Widgets {
             export interface Item {
                 ref: CloudPDF.DocFormsList200ResponseFieldsItemListboxWidgetsItemRef | null;
-                annotObjectNumber: number;
+                objectNumber: number;
                 page: Item.Page | null;
+                rect: Item.Rect | null;
             }
 
             export namespace Item {
                 export interface Page {
                     kind: Page.Kind;
-                    pageObjectNumber: number;
+                    objectNumber: number;
                 }
 
                 export namespace Page {
@@ -312,6 +311,13 @@ export namespace DocFormsList200ResponseFieldsItem {
                         ObjectNumber: "objectNumber",
                     } as const;
                     export type Kind = (typeof Kind)[keyof typeof Kind];
+                }
+
+                export interface Rect {
+                    x: number;
+                    y: number;
+                    width: number;
+                    height: number;
                 }
             }
         }
@@ -330,10 +336,11 @@ export namespace DocFormsList200ResponseFieldsItem {
     export interface Pushbutton {
         family: "pushbutton";
         ref: CloudPDF.DocFormsList200ResponseFieldsItemPushbuttonRef;
-        fieldObjectNumber: number;
         name: string;
         origin: DocFormsList200ResponseFieldsItemPushbutton.Origin;
-        flags: DocFormsList200ResponseFieldsItemPushbutton.Flags;
+        readOnly: boolean;
+        required: boolean;
+        noExport: boolean;
         alternateName: string | null;
         mappingName: string | null;
         valueEntry: CloudPDF.DocFormsList200ResponseFieldsItemPushbuttonValueEntry;
@@ -348,27 +355,20 @@ export namespace DocFormsList200ResponseFieldsItem {
             Recovered: "recovered",
         } as const;
         export type Origin = (typeof Origin)[keyof typeof Origin];
-
-        export interface Flags {
-            readOnly: boolean;
-            required: boolean;
-            noExport: boolean;
-            raw: number;
-        }
-
         export type Widgets = Widgets.Item[];
 
         export namespace Widgets {
             export interface Item {
                 ref: CloudPDF.DocFormsList200ResponseFieldsItemPushbuttonWidgetsItemRef | null;
-                annotObjectNumber: number;
+                objectNumber: number;
                 page: Item.Page | null;
+                rect: Item.Rect | null;
             }
 
             export namespace Item {
                 export interface Page {
                     kind: Page.Kind;
-                    pageObjectNumber: number;
+                    objectNumber: number;
                 }
 
                 export namespace Page {
@@ -377,6 +377,13 @@ export namespace DocFormsList200ResponseFieldsItem {
                     } as const;
                     export type Kind = (typeof Kind)[keyof typeof Kind];
                 }
+
+                export interface Rect {
+                    x: number;
+                    y: number;
+                    width: number;
+                    height: number;
+                }
             }
         }
     }
@@ -384,10 +391,11 @@ export namespace DocFormsList200ResponseFieldsItem {
     export interface Signature {
         family: "signature";
         ref: CloudPDF.DocFormsList200ResponseFieldsItemSignatureRef;
-        fieldObjectNumber: number;
         name: string;
         origin: DocFormsList200ResponseFieldsItemSignature.Origin;
-        flags: DocFormsList200ResponseFieldsItemSignature.Flags;
+        readOnly: boolean;
+        required: boolean;
+        noExport: boolean;
         alternateName: string | null;
         mappingName: string | null;
         valueEntry: CloudPDF.DocFormsList200ResponseFieldsItemSignatureValueEntry;
@@ -402,27 +410,20 @@ export namespace DocFormsList200ResponseFieldsItem {
             Recovered: "recovered",
         } as const;
         export type Origin = (typeof Origin)[keyof typeof Origin];
-
-        export interface Flags {
-            readOnly: boolean;
-            required: boolean;
-            noExport: boolean;
-            raw: number;
-        }
-
         export type Widgets = Widgets.Item[];
 
         export namespace Widgets {
             export interface Item {
                 ref: CloudPDF.DocFormsList200ResponseFieldsItemSignatureWidgetsItemRef | null;
-                annotObjectNumber: number;
+                objectNumber: number;
                 page: Item.Page | null;
+                rect: Item.Rect | null;
             }
 
             export namespace Item {
                 export interface Page {
                     kind: Page.Kind;
-                    pageObjectNumber: number;
+                    objectNumber: number;
                 }
 
                 export namespace Page {
@@ -431,6 +432,13 @@ export namespace DocFormsList200ResponseFieldsItem {
                     } as const;
                     export type Kind = (typeof Kind)[keyof typeof Kind];
                 }
+
+                export interface Rect {
+                    x: number;
+                    y: number;
+                    width: number;
+                    height: number;
+                }
             }
         }
     }
@@ -438,10 +446,11 @@ export namespace DocFormsList200ResponseFieldsItem {
     export interface Unknown {
         family: "unknown";
         ref: CloudPDF.DocFormsList200ResponseFieldsItemUnknownRef;
-        fieldObjectNumber: number;
         name: string;
         origin: DocFormsList200ResponseFieldsItemUnknown.Origin;
-        flags: DocFormsList200ResponseFieldsItemUnknown.Flags;
+        readOnly: boolean;
+        required: boolean;
+        noExport: boolean;
         alternateName: string | null;
         mappingName: string | null;
         valueEntry: CloudPDF.DocFormsList200ResponseFieldsItemUnknownValueEntry;
@@ -457,27 +466,20 @@ export namespace DocFormsList200ResponseFieldsItem {
             Recovered: "recovered",
         } as const;
         export type Origin = (typeof Origin)[keyof typeof Origin];
-
-        export interface Flags {
-            readOnly: boolean;
-            required: boolean;
-            noExport: boolean;
-            raw: number;
-        }
-
         export type Widgets = Widgets.Item[];
 
         export namespace Widgets {
             export interface Item {
                 ref: CloudPDF.DocFormsList200ResponseFieldsItemUnknownWidgetsItemRef | null;
-                annotObjectNumber: number;
+                objectNumber: number;
                 page: Item.Page | null;
+                rect: Item.Rect | null;
             }
 
             export namespace Item {
                 export interface Page {
                     kind: Page.Kind;
-                    pageObjectNumber: number;
+                    objectNumber: number;
                 }
 
                 export namespace Page {
@@ -485,6 +487,13 @@ export namespace DocFormsList200ResponseFieldsItem {
                         ObjectNumber: "objectNumber",
                     } as const;
                     export type Kind = (typeof Kind)[keyof typeof Kind];
+                }
+
+                export interface Rect {
+                    x: number;
+                    y: number;
+                    width: number;
+                    height: number;
                 }
             }
         }

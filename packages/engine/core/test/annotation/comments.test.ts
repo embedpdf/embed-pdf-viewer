@@ -9,8 +9,8 @@ import type { AnnotationDTO, AnnotationRef } from '../../src/shared';
 
 const ref = (n: number): AnnotationRef => ({
   kind: 'objectNumber',
-  page: { kind: 'objectNumber', pageObjectNumber: 1 },
-  annotObjectNumber: n,
+  page: { kind: 'objectNumber', objectNumber: 1 },
+  objectNumber: n,
 });
 
 let autoIndex = 0;
@@ -18,7 +18,7 @@ const annot = (n: number, over: Record<string, unknown> = {}): AnnotationDTO =>
   ({
     subtype: 'highlight',
     ref: ref(n),
-    page: { kind: 'objectNumber', pageObjectNumber: 1 },
+    page: { kind: 'objectNumber', objectNumber: 1 },
     index: autoIndex++,
     nm: null,
     contents: `annot ${n}`,
@@ -52,7 +52,7 @@ const state = (
     modifiedAt: fields.at ?? null,
   });
 
-const num = (r: AnnotationRef): number => (r.kind === 'objectNumber' ? r.annotObjectNumber : -1);
+const num = (r: AnnotationRef): number => (r.kind === 'objectNumber' ? r.objectNumber : -1);
 
 describe('isStateAnnotation', () => {
   it('requires a text subtype with a non-empty state or stateModel', () => {
@@ -141,7 +141,7 @@ describe('buildCommentThreads — threading', () => {
       annot(1, { nm: 'root-nm' }),
       reply(2, 0, {
         reply: {
-          to: { kind: 'nm', page: { kind: 'objectNumber', pageObjectNumber: 1 }, nm: 'root-nm' },
+          to: { kind: 'nm', page: { kind: 'objectNumber', objectNumber: 1 }, nm: 'root-nm' },
           type: 'reply',
         },
       }),

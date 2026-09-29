@@ -25,17 +25,18 @@ import {
 import { fillItemForWidget, fillItems } from '../src/read/fill-items';
 
 const text = (over: Partial<Extract<FormFieldDTO, { family: 'text' }>> = {}): FormFieldDTO => ({
-  ref: { kind: 'objectNumber', fieldObjectNumber: 4 },
-  fieldObjectNumber: 4,
+  ref: { kind: 'objectNumber', objectNumber: 4 },
   name: 'maxlen_text',
   family: 'text',
   origin: 'acroform',
-  flags: { readOnly: false, required: false, noExport: false, raw: 0 },
+  readOnly: false,
+  required: false,
+  noExport: false,
   alternateName: null,
   mappingName: null,
   valueEntry: { kind: 'scalar', value: over.value ?? 'abc' },
   defaultValueEntry: { kind: 'scalar', value: '' },
-  widgets: [formWidget(4, toPageRef(3))],
+  widgets: [{ ...formWidget(4, toPageRef(3)), rect: null }],
   value: 'abc',
   defaultValue: '',
   maxLength: 5,
@@ -74,10 +75,9 @@ describe('field index', () => {
     expect((fieldByKey(index, 'obj:4') as { value: string }).value).toBe('abcde');
 
     const other = text({
-      ref: { kind: 'objectNumber', fieldObjectNumber: 7 },
-      fieldObjectNumber: 7,
+      ref: { kind: 'objectNumber', objectNumber: 7 },
       name: 'other',
-      widgets: [formWidget(8, toPageRef(3))],
+      widgets: [{ ...formWidget(8, toPageRef(3)), rect: null }],
     });
     index = foldFormEvent(index, event({ type: 'forms.created', field: other })) as FieldIndex;
     expect(fieldForWidget(index, 8)?.name).toBe('other');
@@ -98,9 +98,9 @@ describe('field index', () => {
       index,
       event({
         type: 'forms.deleted',
-        deleted: { kind: 'objectNumber', fieldObjectNumber: 7 },
+        deleted: { kind: 'objectNumber', objectNumber: 7 },
         meta: {
-          changedFields: [{ kind: 'objectNumber', fieldObjectNumber: 7 }],
+          changedFields: [{ kind: 'objectNumber', objectNumber: 7 }],
           changedWidgets: [],
         },
       }),
@@ -161,7 +161,7 @@ describe('fill projection', () => {
   });
 
   test('read-only and in-flight fields project as disabled', () => {
-    const readOnly = text({ flags: { readOnly: true, required: false, noExport: false, raw: 1 } });
+    const readOnly = text({ readOnly: true });
     expect(fillItems(indexFields(snapshot([readOnly])), 3, BOXES, NO_WRITES)[0]!.disabled).toBe(
       true,
     );
@@ -173,17 +173,18 @@ describe('fill projection', () => {
 const signature = (
   over: Partial<Extract<FormFieldDTO, { family: 'signature' }>> = {},
 ): FormFieldDTO => ({
-  ref: { kind: 'objectNumber', fieldObjectNumber: 9 },
-  fieldObjectNumber: 9,
+  ref: { kind: 'objectNumber', objectNumber: 9 },
   name: 'sig',
   family: 'signature',
   origin: 'acroform',
-  flags: { readOnly: false, required: false, noExport: false, raw: 0 },
+  readOnly: false,
+  required: false,
+  noExport: false,
   alternateName: 'Sign here',
   mappingName: null,
   valueEntry: { kind: 'none' },
   defaultValueEntry: { kind: 'none' },
-  widgets: [formWidget(9, toPageRef(3))],
+  widgets: [{ ...formWidget(9, toPageRef(3)), rect: null }],
   ...over,
 });
 
@@ -203,7 +204,7 @@ describe('signature widgets', () => {
 
   test('widgetAt resolves the smallest containing widget from loaded geometry', () => {
     const index = indexFields(
-      snapshot([text(), signature({ widgets: [formWidget(9, toPageRef(3))] })]),
+      snapshot([text(), signature({ widgets: [{ ...formWidget(9, toPageRef(3)), rect: null }] })]),
     );
     expect(widgetAt(index, undefined, { x: 10, y: 10 })).toBeNull();
     const boxes = {

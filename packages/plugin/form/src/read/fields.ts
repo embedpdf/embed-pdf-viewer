@@ -13,24 +13,28 @@ import type { FormServices } from '../services';
 export const widgetObjectOf = (widget: WidgetAddress): number =>
   'kind' in widget
     ? widget.kind === 'objectNumber'
-      ? widget.annotObjectNumber
+      ? widget.objectNumber
       : 0
-    : widget.annotObjectNumber;
+    : widget.objectNumber;
 
 /** A field's value in the write vocabulary, or null for a valueless or unsupported entry. */
 export function valueOf(field: FormFieldDTO): FormFieldValue | null {
   const entry = field.valueEntry;
   if (entry.kind === 'none' || entry.kind === 'unsupported') return null;
-  if (field.family === 'checkbox' || field.family === 'radio') {
-    return {
-      type: 'toggle',
-      state: entry.kind === 'scalar' ? entry.value : (entry.values[0] ?? null),
-    };
+  switch (field.family) {
+    case 'text':
+      return { value: field.value };
+    case 'checkbox':
+      return { checked: field.checked };
+    case 'radio':
+      return { value: field.value === 'Off' ? null : field.value };
+    case 'combobox':
+      return { value: field.value === '' ? null : field.value };
+    case 'listbox':
+      return { selectedValues: [...field.selectedValues] };
+    default:
+      return null;
   }
-  if (field.family === 'combobox' || field.family === 'listbox') {
-    return { type: 'choice', values: entry.kind === 'scalar' ? [entry.value] : [...entry.values] };
-  }
-  return { type: 'text', value: entry.kind === 'scalar' ? entry.value : entry.values.join('\n') };
 }
 
 export function createFieldReads({ fields, keyOf }: Pick<FormServices, 'fields' | 'keyOf'>) {

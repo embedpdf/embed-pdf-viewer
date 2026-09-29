@@ -89,7 +89,7 @@ async function boot(scope?: string[]) {
   const triggerRef: AnnotationRef = {
     kind: 'objectNumber',
     page,
-    annotObjectNumber: trigger.widgets[0]!.annotObjectNumber,
+    objectNumber: trigger.widgets[0]!.objectNumber,
   };
   const notify = (event: 'cursorEnter' | 'cursorExit') =>
     form.notifyWidgetEvent(trigger.ref, triggerRef, event);
@@ -97,7 +97,7 @@ async function boot(scope?: string[]) {
     actions.dispatch({
       scope: 'annotation',
       event: 'cursorEnter',
-      ref: { kind: 'objectNumber', page: toPageRef(999), annotObjectNumber: 1 },
+      ref: { kind: 'objectNumber', page: toPageRef(999), objectNumber: 1 },
       page: toPageRef(999),
     });
   const statusValue = () => {

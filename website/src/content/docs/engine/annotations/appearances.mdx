@@ -22,7 +22,7 @@ const pageImage = await page.render.image({
   includeAnnotations: false,
 }); // the page on its own
 
-const { appearances } = await page.annotations.renderAppearancesRaw({
+const { appearances } = await page.annotations.renderAppearances({
   viewport: { kind: 'scale', scale: 2 },
 });
 
@@ -43,12 +43,12 @@ for (const appearance of appearances) {
 `renderAppearances()` draws every annotation of the page that has an appearance, each as its own
 image:
 
-| Field   | What it is                                                 |
-| :------ | :--------------------------------------------------------- |
-| `ref`   | Which annotation it is.                                    |
-| `rect`  | Where the image goes, in page space.                       |
-| `mode`  | Which look it is: `'normal'` unless you asked for others.  |
-| `image` | The image; `image.objectUrl()` gives a URL for an `<img>`. |
+| Field   | What it is                                                                           |
+| :------ | :----------------------------------------------------------------------------------- |
+| `ref`   | Which annotation it is.                                                              |
+| `rect`  | Where the image goes, in page space.                                                 |
+| `mode`  | Which look it is: `'normal'` unless you asked for others.                            |
+| `image` | The image; `image.objectUrl()` gives a URL for an `<img>`, `image.blob()` its bytes. |
 
 | Option     | What it is                                                                                                                                                         | Default   |
 | :--------- | :----------------------------------------------------------------------------------------------------------------------------------------------------------------- | :-------- |
@@ -198,7 +198,8 @@ so you never see the stored number.
 Annotations with only a position ref are rendered too. See
 [Refs & identity](/docs/engine/concepts/identity).
 
-### New annotations print
+### What prints
 
-New annotations have `print` on unless you set it off, as Acrobat creates them, so `usage: 'print'`
-includes them. Set `print: false` on an annotation that should show on screen only.
+New annotations print unless you create them with `print: false`, so `usage: 'print'` includes
+them. Annotations from other apps may have `print` off; set `print: true` on the ones that should
+print, or flatten with `'display'`.

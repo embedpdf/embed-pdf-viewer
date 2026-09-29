@@ -22,7 +22,7 @@ export function diffAnnotationList(a: AnnotationList, b: AnnotationList): string
   }
   const onPage = (list: AnnotationList, state: PageState) =>
     list.annotations.filter(
-      (annotation) => annotation.page.pageObjectNumber === state.page.pageObjectNumber,
+      (annotation) => annotation.page.objectNumber === state.page.objectNumber,
     );
   const n = Math.min(a.pages.length, b.pages.length);
   for (let i = 0; i < n; i++) {
@@ -42,9 +42,9 @@ function diffPage(
   b: AnnotationDTO[],
 ): string[] {
   const errs: string[] = [];
-  if (stateA.page.pageObjectNumber !== stateB.page.pageObjectNumber) {
+  if (stateA.page.objectNumber !== stateB.page.objectNumber) {
     errs.push(
-      `page.pageObjectNumber mismatch: ${stateA.page.pageObjectNumber} vs ${stateB.page.pageObjectNumber}`,
+      `page.pageObjectNumber mismatch: ${stateA.page.objectNumber} vs ${stateB.page.objectNumber}`,
     );
   }
   if (JSON.stringify(stateA.weakAnnotationState) !== JSON.stringify(stateB.weakAnnotationState)) {
@@ -81,9 +81,9 @@ function diffAnnotation(i: number, a: AnnotationDTO, b: AnnotationDTO, errs: str
     errs.push(`annotations[${i}].ref.kind mismatch: ${a.ref.kind} vs ${b.ref.kind}`);
   }
   if (a.ref.kind === 'objectNumber' && b.ref.kind === 'objectNumber') {
-    if (a.ref.annotObjectNumber !== b.ref.annotObjectNumber) {
+    if (a.ref.objectNumber !== b.ref.objectNumber) {
       errs.push(
-        `annotations[${i}].ref.annotObjectNumber mismatch: ${a.ref.annotObjectNumber} vs ${b.ref.annotObjectNumber}`,
+        `annotations[${i}].ref.annotObjectNumber mismatch: ${a.ref.objectNumber} vs ${b.ref.objectNumber}`,
       );
     }
   }

@@ -36,7 +36,7 @@ export const DOCS_OVERVIEW_PATHS: readonly DocsOverviewPath[] = [
     title: 'Headless Components',
     eyebrow: 'Recommended for customization',
     description: 'Compose your own viewer UI from plugins, components, and reactive bindings.',
-    href: '/docs/headless/react/getting-started',
+    href: '/docs/headless/react',
     cta: 'Start with Headless',
     illustration: '/illustration-headless.svg',
     features: ['Own every pixel', 'Composable feature plugins', 'One API across frameworks'],

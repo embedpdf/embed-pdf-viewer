@@ -5,7 +5,6 @@ import type {
   FreeTextAnnotationDTO,
   PdfCoordinates,
 } from '@embedpdf/engine-core/runtime';
-import { sameColor } from '@embedpdf/engine-core/runtime';
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
 
 import { FPDFANNOT_COLORTYPE } from '../colorType';
@@ -13,10 +12,12 @@ import { freeTextIntentFromName } from '../freeTextIntent';
 import { freeTextFontForFace, readEngineRichText } from '../richTextWire';
 import { standardFontFromCode, DEFAULT_STANDARD_FONT } from '../standardFont';
 import { textAlignmentFromCode } from '../textAlignment';
+import { VERTICAL_ALIGNMENT_KEY, verticalAlignmentFromCode } from '../verticalAlignment';
 import type { AnnotationReadContext } from './annotationReadContext';
 import {
   readAnnotColor,
   readAnnotOpacity,
+  readBorderEffect,
   readCalloutLine,
   readDefaultAppearance,
   readIntent,
@@ -24,6 +25,7 @@ import {
   readTextAlignment,
 } from './annotationReadPrimitives';
 import { readAnnotationBox } from './readAnnotationTurn';
+import { readEmbedMetadataNumber } from './readEmbedMetadata';
 import { readBorderFields } from './readStyle';
 
 /** Default `/DA` colour (black) when an annotation has no default appearance. */
@@ -68,7 +70,7 @@ export function readFreeText(
       weight: 400,
       italic: false,
       size: fontSize,
-      color: '#000000',
+      color,
       decoration: [],
       script: 'normal',
       letterSpacing: 0,
@@ -79,10 +81,9 @@ export function readFreeText(
     paragraphs: [{ runs: [{ text: base.contents ?? '' }] }],
   };
 
-  // `TextColor` overrides text only; surface it as `fontColor` solely when it
-  // is present and differs from the `/DA` colour (otherwise text follows `color`).
-  const textColor = readAnnotColor(fn, mem, annotPtr, FPDFANNOT_COLORTYPE.TextColor);
-  const fontColor = textColor && !sameColor(textColor, color) ? textColor : undefined;
+  // The text is the rich text body's color, as Acrobat draws it; `/DA`'s
+  // is the border's (a plain box's body takes it from `/DA`).
+  const fontColor = richText.body.color.toLowerCase() as Color;
 
   // For free text `/C` (color type 0) is the box background, not a stroke.
   const background = readAnnotColor(fn, mem, annotPtr, FPDFANNOT_COLORTYPE.Color);
@@ -91,10 +92,11 @@ export function readFreeText(
   const opacity = ca == null ? 1 : Math.max(0, Math.min(1, ca));
 
   // The rich body's alignment is what the appearance paints (it wins over
-  // /Q); a plain box's synthesised body carries /Q, so both agree. Justify
-  // has no /Q value and reads back as the /Q alignment.
-  const quadding = textAlignmentFromCode(readTextAlignment(fn, annotPtr));
-  const textAlign = rich && rich.body.align !== 'justify' ? rich.body.align : quadding;
+  // /Q, which has no justify); a plain box's synthesised body carries /Q.
+  const textAlign = rich ? rich.body.align : textAlignmentFromCode(readTextAlignment(fn, annotPtr));
+  const verticalAlign = verticalAlignmentFromCode(
+    readEmbedMetadataNumber(fn, mem, annotPtr, VERTICAL_ALIGNMENT_KEY),
+  );
   const intent = freeTextIntentFromName(readIntent(fn, mem, annotPtr));
 
   const points = readCalloutLine(fn, mem, annotPtr);
@@ -113,12 +115,14 @@ export function readFreeText(
     fontFamily,
     fontSize,
     textAlign,
+    verticalAlign,
     richText,
     color,
-    fontColor: fontColor ?? null,
+    fontColor,
     interiorColor: background ?? null,
     opacity,
     ...readBorderFields(fn, mem, annotPtr),
+    cloudyIntensity: readBorderEffect(fn, mem, annotPtr),
     ...readAnnotationBox(fn, mem, annotPtr),
     calloutLine: calloutLine ?? null,
     lineEnding: calloutLine !== undefined && leaderEnd !== 'none' ? leaderEnd : null,

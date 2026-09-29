@@ -1,6 +1,6 @@
 import { mdast, type AstNode } from '@embedpdf/docs-kit';
 
-import { DOCS_INTEGRATION_LABELS } from './docs-integrations';
+import { DOCS_INTEGRATION_LABELS, docsEntryHref } from './docs-integrations';
 import {
   DOCS_ENGINE_FOUNDATION,
   DOCS_OVERVIEW_INTEGRATIONS_LEAD,
@@ -30,7 +30,7 @@ export function projectDocsOverview(absoluteContentUrl: (url: string) => string)
           listItem([
             paragraph([
               link(
-                absoluteContentUrl(`/docs/${path.id}/${integration}/getting-started`),
+                absoluteContentUrl(docsEntryHref(path.id, integration)),
                 DOCS_INTEGRATION_LABELS[integration],
               ),
             ]),

@@ -51,7 +51,7 @@ export function distancePointer(
   }
 
   // Even the final placement click belongs to the draft's original page.
-  if (input.page.pageObjectNumber !== draft.page.pageObjectNumber) {
+  if (input.page.objectNumber !== draft.page.objectNumber) {
     return [model, []];
   }
 

@@ -32,7 +32,7 @@ import {
   type FlattenOptions,
   type AnnotationUpdateResult,
   type CollabTarget,
-  type PageAnnotationsService,
+  type LocalPageAnnotationsService as LocalPageAnnotationsServiceContract,
   type PageRef,
   checkImageQuality,
 } from '@embedpdf/engine-core/runtime';
@@ -59,7 +59,7 @@ interface DocClosedView {
  * Every mutation publishes its result to the document's event stream
  * after the worker confirms — ground truth, never optimistic.
  */
-export class LocalPageAnnotationsService implements PageAnnotationsService {
+export class LocalPageAnnotationsService implements LocalPageAnnotationsServiceContract {
   constructor(
     private readonly docId: string,
     private readonly ref: PageRef,
@@ -570,7 +570,7 @@ export class LocalPageAnnotationsService implements PageAnnotationsService {
     const match = (await this.pageAnnotations(ref.page, signal)).find((a) => {
       switch (ref.kind) {
         case 'objectNumber':
-          return a.ref.kind === 'objectNumber' && a.ref.annotObjectNumber === ref.annotObjectNumber;
+          return a.ref.kind === 'objectNumber' && a.ref.objectNumber === ref.objectNumber;
         case 'nm':
           return a.nm === ref.nm;
         case 'index':

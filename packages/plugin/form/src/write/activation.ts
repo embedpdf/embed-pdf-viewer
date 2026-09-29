@@ -21,7 +21,7 @@ import type { FormContext, FormServices } from '../services';
 const sameAnnotationRef = (left: AnnotationRef, right: AnnotationRef): boolean => {
   if (left.kind !== right.kind || !pageRefsEqual(left.page, right.page)) return false;
   if (left.kind === 'objectNumber' && right.kind === 'objectNumber') {
-    return left.annotObjectNumber === right.annotObjectNumber;
+    return left.objectNumber === right.objectNumber;
   }
   if (left.kind === 'nm' && right.kind === 'nm') return left.nm === right.nm;
   return (

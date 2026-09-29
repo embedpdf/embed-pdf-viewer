@@ -39,19 +39,19 @@ Each kind has its own page with an example and its fields:
     href="/docs/engine/annotations/text-markup"
   />
   <GridCard
-    icon="annotation"
+    icon="note"
     title="Notes & replies"
     description="Sticky notes, their popups, and threads of replies."
     href="/docs/engine/annotations/notes-and-replies"
   />
   <GridCard
-    icon="annotation"
+    icon="free-text"
     title="Free text"
     description="Text boxes and callouts, with fonts and rich text."
     href="/docs/engine/annotations/free-text"
   />
   <GridCard
-    icon="annotation"
+    icon="shape"
     title="Shapes & drawing"
     description="Rectangles, ellipses, lines, polygons and freehand ink."
     href="/docs/engine/annotations/shapes"
@@ -63,19 +63,19 @@ Each kind has its own page with an example and its fields:
     href="/docs/engine/annotations/stamps"
   />
   <GridCard
-    icon="annotation"
+    icon="link"
     title="Links"
     description="Areas that go to another page or open a website."
     href="/docs/engine/annotations/links"
   />
   <GridCard
-    icon="annotation"
+    icon="attachment"
     title="File attachments"
     description="A file pinned to a spot on the page."
     href="/docs/engine/annotations/file-attachments"
   />
   <GridCard
-    icon="annotation"
+    icon="measurement"
     title="Measurements"
     description="Distances, perimeters and areas at a real-world scale."
     href="/docs/engine/annotations/measurements"
@@ -233,14 +233,19 @@ moves one annotation (or several next to each other) to a new position in that o
 
 Most kinds share the same style fields:
 
-| Field           | What it is                                         | Default   |
-| :-------------- | :------------------------------------------------- | :-------- |
-| `color`         | Line color, such as `'#1e90ff'`                    | per kind  |
-| `interiorColor` | Fill color of closed shapes, or `null` for no fill | no fill   |
-| `opacity`       | From `0` (invisible) to `1` (solid)                | `1`       |
-| `strokeWidth`   | Line width in points                               | `1`       |
-| `borderStyle`   | `'solid'`, `'dashed'`, `'beveled'` or `'inset'`    | `'solid'` |
-| `dashArray`     | The dash pattern for `'dashed'`, such as `[3, 2]`  | `[3]`     |
+| Field           | What it is                                              | Default   |
+| :-------------- | :------------------------------------------------------ | :-------- |
+| `color`         | Line color, such as `'#1e90ff'`                         | per kind  |
+| `interiorColor` | Fill color of closed shapes, or `null` for no fill      | no fill   |
+| `opacity`       | From `0` (invisible) to `1` (solid)                     | `1`       |
+| `strokeWidth`   | Line width in points                                    | `1`       |
+| `borderStyle`   | `'solid'` or `'dashed'`                                 | `'solid'` |
+| `dashArray`     | The pattern a `'dashed'` border draws, such as `[3, 2]` | `[3]`     |
+
+A pattern alone doesn't make a border dashed: a `'solid'` border keeps its `dashArray` and draws
+solid. `dashArray: null` on a dashed border draws the default `[3]`, 3 points on and 3 off. A
+border from another app can read `'beveled'` or `'inset'`; only form widgets draw those, so a
+write takes them only sent back unchanged.
 
 Colors are `'#rrggbb'`, as in CSS: the engine gives them in lowercase and takes either case. They
 never include transparency: that's what `opacity` is for. The default color depends on the kind
@@ -281,9 +286,9 @@ The user comes from the identity in their token; see
 
 ## Flags
 
-Every annotation has the standard PDF flags as `true`/`false` fields. Set the ones you need. On
-create, a new annotation prints and every other flag stays off; on update, a flag you leave out
-keeps its value:
+Every annotation has the standard PDF flags as `true`/`false` fields. Set the ones you need; the
+rest stay off (on create) or keep their value (on update). The exception is `print`: a new
+annotation prints unless you set `print: false`, as in Acrobat. A popup doesn't print.
 
 ```ts
 await page.annotations.update(annotation.ref, { print: true, locked: true });

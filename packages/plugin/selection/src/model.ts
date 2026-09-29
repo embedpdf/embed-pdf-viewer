@@ -40,7 +40,7 @@ export const initialSelectionState = (): SelectionState => ({
 });
 
 const samePosition = (left: GlyphPosition, right: GlyphPosition): boolean =>
-  left.glyph === right.glyph && left.page.pageObjectNumber === right.page.pageObjectNumber;
+  left.glyph === right.glyph && left.page.objectNumber === right.page.objectNumber;
 
 const sameRange = (left: SelectionRange | null, right: SelectionRange | null): boolean =>
   left === right ||

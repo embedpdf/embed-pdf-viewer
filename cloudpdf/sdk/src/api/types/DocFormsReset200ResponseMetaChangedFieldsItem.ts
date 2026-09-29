@@ -9,7 +9,7 @@ export type DocFormsReset200ResponseMetaChangedFieldsItem =
 export namespace DocFormsReset200ResponseMetaChangedFieldsItem {
     export interface ObjectNumber {
         kind: "objectNumber";
-        fieldObjectNumber: number;
+        objectNumber: number;
     }
 
     export interface Fqn {

@@ -9,7 +9,7 @@ export type DocFormsImportData200ResponseFormFieldsItemComboboxRef =
 export namespace DocFormsImportData200ResponseFormFieldsItemComboboxRef {
     export interface ObjectNumber {
         kind: "objectNumber";
-        fieldObjectNumber: number;
+        objectNumber: number;
     }
 
     export interface Fqn {

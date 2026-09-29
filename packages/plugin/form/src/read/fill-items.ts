@@ -7,7 +7,12 @@
  * Geometry comes from the widget plane (widgets are annotations; their
  * records carry `/Rect`), identity, value and behavior from the field plane.
  */
-import type { AnnotationRef, FormFieldDTO, FormFieldOption, FormFieldRef } from '@embedpdf/engine-core/runtime';
+import type {
+  AnnotationRef,
+  FormFieldDTO,
+  FormFieldOption,
+  FormFieldRef,
+} from '@embedpdf/engine-core/runtime';
 
 import {
   fieldForWidget,
@@ -46,7 +51,13 @@ export type FillItem = FillItemBase &
         maxLength: number | null;
         comb: boolean;
       }
-    | { control: 'toggle'; kind: 'checkbox' | 'radio'; checked: boolean; onState: string }
+    | {
+        control: 'toggle';
+        kind: 'checkbox' | 'radio';
+        checked: boolean;
+        /** The export value that checks this widget. */
+        exportValue: string;
+      }
     | {
         control: 'choice';
         kind: 'combo' | 'list';
@@ -86,9 +97,9 @@ export function projectWidget(
     fieldRef: field.ref,
     annotObjectNumber,
     annotationRef:
-      field.widgets.find((widget) => widget.annotObjectNumber === annotObjectNumber)?.ref ?? null,
+      field.widgets.find((widget) => widget.objectNumber === annotObjectNumber)?.ref ?? null,
     box,
-    disabled: field.flags.readOnly || writing[key] === true,
+    disabled: field.readOnly || writing[key] === true,
     label: field.alternateName ?? field.name,
   };
   switch (field.family) {
@@ -103,23 +114,23 @@ export function projectWidget(
         comb: field.comb,
       };
     case 'checkbox': {
-      const toggle = field.widgets.find((widget) => widget.annotObjectNumber === annotObjectNumber);
+      const toggle = field.widgets.find((widget) => widget.objectNumber === annotObjectNumber);
       return {
         ...base,
         control: 'toggle',
         kind: 'checkbox',
         checked: field.checked,
-        onState: toggle && 'onState' in toggle ? toggle.onState : 'Yes',
+        exportValue: toggle && 'exportValue' in toggle ? toggle.exportValue : field.exportValue,
       };
     }
     case 'radio': {
-      const toggle = field.widgets.find((widget) => widget.annotObjectNumber === annotObjectNumber);
+      const toggle = field.widgets.find((widget) => widget.objectNumber === annotObjectNumber);
       return {
         ...base,
         control: 'toggle',
         kind: 'radio',
         checked: toggle && 'checked' in toggle ? toggle.checked : false,
-        onState: toggle && 'onState' in toggle ? toggle.onState : '',
+        exportValue: toggle && 'exportValue' in toggle ? toggle.exportValue : '',
       };
     }
     case 'combobox':
@@ -166,10 +177,10 @@ export function fillItems(
   const items: FillItem[] = [];
   for (const field of index.snapshot.fields) {
     for (const widget of field.widgets) {
-      if (widget.page?.pageObjectNumber !== pageObjectNumber) continue;
-      const box = boxes[widget.annotObjectNumber];
+      if (widget.page?.objectNumber !== pageObjectNumber) continue;
+      const box = boxes[widget.objectNumber];
       if (!box) continue;
-      const item = projectWidget(field, widget.annotObjectNumber, writing, box);
+      const item = projectWidget(field, widget.objectNumber, writing, box);
       if (item) items.push(item);
     }
   }
@@ -191,7 +202,6 @@ export function fillItemForWidget(
 ): FillItem | null {
   const field = fieldForWidget(index, annotObjectNumber);
   if (!field) return null;
-  if (!field.widgets.some((widget) => widget.annotObjectNumber === annotObjectNumber)) return null;
+  if (!field.widgets.some((widget) => widget.objectNumber === annotObjectNumber)) return null;
   return projectWidget(field, annotObjectNumber, writing, box);
 }
-

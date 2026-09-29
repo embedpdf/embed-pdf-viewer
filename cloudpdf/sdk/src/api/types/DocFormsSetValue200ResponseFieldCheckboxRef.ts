@@ -9,7 +9,7 @@ export type DocFormsSetValue200ResponseFieldCheckboxRef =
 export namespace DocFormsSetValue200ResponseFieldCheckboxRef {
     export interface ObjectNumber {
         kind: "objectNumber";
-        fieldObjectNumber: number;
+        objectNumber: number;
     }
 
     export interface Fqn {

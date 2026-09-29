@@ -63,7 +63,7 @@ export class CloudDocumentSearchService implements DocumentSearchService {
       const query = canonicalSearchQuery(request);
       // The search token (the URL, the cache key) pins the scan origin by
       // the page's object number.
-      const from = request.from?.pageObjectNumber;
+      const from = request.from?.objectNumber;
 
       if (request.cursor !== undefined) {
         let token: SearchToken;

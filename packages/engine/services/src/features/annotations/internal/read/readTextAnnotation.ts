@@ -10,6 +10,7 @@ import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runti
 import { NOTE_NAME_TO_ICON } from '../annotationIcon';
 import { stateFromPdf, stateModelFromPdf } from '../annotationState';
 import {
+  readAnnotBoolean,
   readAnnotColor,
   readAnnotOpacity,
   readAnnotString,
@@ -43,9 +44,21 @@ export function readText(
     ...base,
     subtype: 'text',
     icon,
+    open: readAnnotBoolean(fn, mem, annotPtr, 'Open') ?? readPopupOpen(fn, mem, annotPtr) ?? false,
     color,
     opacity,
     state: stateRaw === null ? null : stateFromPdf(stateRaw),
     stateModel: stateModelRaw === null ? null : stateModelFromPdf(stateModelRaw),
   };
+}
+
+/** The note's popup's `/Open`, which a note without its own `/Open` shows. */
+function readPopupOpen(fn: PdfFunctions, mem: PdfRuntimeMemory, annotPtr: Ptr): boolean | null {
+  const popupPtr = fn.FPDFAnnot_GetLinkedAnnot(annotPtr, 'Popup');
+  if (!popupPtr) return null;
+  try {
+    return readAnnotBoolean(fn, mem, popupPtr, 'Open');
+  } finally {
+    fn.FPDFPage_CloseAnnot(popupPtr);
+  }
 }

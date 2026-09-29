@@ -1,5 +1,4 @@
 import type { DocumentHandle } from './DocumentHandle';
-import type { FontService } from './FontService';
 import type { OpenInput, OpenOptions } from '../dto/OpenInput';
 import { AbortablePromise } from '../promise/AbortablePromise';
 
@@ -8,7 +7,8 @@ import { AbortablePromise } from '../promise/AbortablePromise';
  * `@cloudpdf/engine`. Both implementations expose the same
  * `open()` surface and return the same {@link DocumentHandle} shape;
  * the only observable difference is transport — local goes through a
- * Worker + WASM PDFium, cloud goes through HTTPS to a remote server.
+ * Worker + WASM PDFium, cloud goes through HTTPS to a remote server. What
+ * only the local engine can do lives on `LocalEngine` (see `isLocalEngine`).
  *
  * Authorization parity:
  *   - Cloud reads scope + identity from the doc-scoped JWT it gets at
@@ -26,24 +26,6 @@ import { AbortablePromise } from '../promise/AbortablePromise';
 export interface Engine {
   open(input: OpenInput, options?: OpenOptions): AbortablePromise<DocumentHandle>;
   destroy(): AbortablePromise<void>;
-
-  /**
-   * Start booting the engine's backing resources (Worker spawn, WASM compile,
-   * transport connect) without performing any work. Optional because some
-   * engines have nothing to warm (cloud). Idempotent and non-blocking:
-   * engines that boot lazily do so on first use anyway — calling `warmup()`
-   * just overlaps that boot with app/plugin initialization instead of paying
-   * for it on the first `open()`.
-   */
-  warmup?(): void;
-
-  /**
-   * Runtime font registration + fallback configuration. Present on the local
-   * (WASM) engine only; `undefined` on the cloud engine, where fallback fonts
-   * are a server-side policy decision and cannot be configured from the
-   * client. See {@link FontService}.
-   */
-  readonly fonts?: FontService;
 }
 
 /**

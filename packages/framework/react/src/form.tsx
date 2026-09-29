@@ -213,7 +213,7 @@ interface WidgetProps<C extends FillItem['control']> {
  * renderer props — no geometry is read from the form model here.
  */
 function FormWidget({ item, page, appearance }: AnnotationRendererProps) {
-  const annotation = item.ref?.kind === 'objectNumber' ? item.ref.annotObjectNumber : 0;
+  const annotation = item.ref?.kind === 'objectNumber' ? item.ref.objectNumber : 0;
   // Reference-stable per model change, so the default Object.is equality holds.
   const fill = useSelector(FormToken, (form) =>
     annotation > 0 ? form.getFillItem(annotation) : null,
@@ -463,7 +463,7 @@ function ToggleWidget({ fill, item, page, appearance }: WidgetProps<'toggle'>) {
   const frame = viewBox(item.box, page);
   const press = () => {
     // Checkbox: click toggles on/off (null clears). Radio: click always
-    // selects its own on-state — no untoggle, per PDF/Acrobat convention.
+    // selects its own button — no untoggle, per PDF/Acrobat convention.
     // Acrobat's order: the value change first, then the /A — so an /A
     // script reads the post-toggle state. A read-only toggle still
     // activates (it just doesn't flip).
@@ -471,7 +471,7 @@ function ToggleWidget({ fill, item, page, appearance }: WidgetProps<'toggle'>) {
       ? undefined
       : form.setChecked(
           fill.fieldRef,
-          fill.kind === 'checkbox' && fill.checked ? null : fill.onState,
+          fill.kind === 'checkbox' && fill.checked ? null : fill.exportValue,
         );
     void Promise.resolve(flipped).then(activate, activate);
   };
@@ -694,12 +694,12 @@ function FillEventBox({
   const events = useWidgetEvents(item.fieldRef, {
     kind: 'objectNumber',
     page: page.ref,
-    annotObjectNumber: item.annotObjectNumber,
+    objectNumber: item.annotObjectNumber,
   });
   const onActivate = useWidgetActivation({
     kind: 'objectNumber',
     page: page.ref,
-    annotObjectNumber: item.annotObjectNumber,
+    objectNumber: item.annotObjectNumber,
   });
   const css = fillBox(item, page);
   return (
@@ -791,7 +791,7 @@ function FillToggle({
   const activate = useWidgetActivation({
     kind: 'objectNumber',
     page: page.ref,
-    annotObjectNumber: item.annotObjectNumber,
+    objectNumber: item.annotObjectNumber,
   });
   const css = fillBox(item, page);
   const glyphSize = Math.min(css.width, css.height) * 0.72;
@@ -813,7 +813,7 @@ function FillToggle({
           void Promise.resolve(
             form.setChecked(
               item.fieldRef,
-              item.kind === 'checkbox' && item.checked ? null : item.onState,
+              item.kind === 'checkbox' && item.checked ? null : item.exportValue,
             ),
           ).then(activate, activate);
         }}
@@ -913,7 +913,7 @@ function FillButton({
           void form.activateWidget({
             kind: 'objectNumber',
             page: page.ref,
-            annotObjectNumber: item.annotObjectNumber,
+            objectNumber: item.annotObjectNumber,
           })
         }
         style={{
@@ -1034,7 +1034,7 @@ export function useFormSnapshot() {
 
 /** One field's current value, subscribed (null for an unknown field). */
 export function useFormValue(ref: FormFieldRef): FormFieldValue | null {
-  const key = ref.kind === 'fqn' ? `n:${ref.name}` : `o:${ref.fieldObjectNumber}`;
+  const key = ref.kind === 'fqn' ? `n:${ref.name}` : `o:${ref.objectNumber}`;
   const stable = useMemo(() => ref, [key]);
   return useSelector(FormPublicToken, (form) => form.getValue(stable));
 }
@@ -1048,8 +1048,8 @@ export function useFormField(): FormFieldDTO | null {
   const selected = useAnnotationSelected();
   const widget =
     selected.length === 1 && selected[0]!.subtype.startsWith('widget') ? selected[0]! : null;
-  const objnum = widget && widget.ref.kind === 'objectNumber' ? widget.ref.annotObjectNumber : 0;
+  const objnum = widget && widget.ref.kind === 'objectNumber' ? widget.ref.objectNumber : 0;
   return useSelector(FormToken, (form) =>
-    objnum > 0 ? form.getFieldForWidget({ annotObjectNumber: objnum }) : null,
+    objnum > 0 ? form.getFieldForWidget({ objectNumber: objnum }) : null,
   );
 }

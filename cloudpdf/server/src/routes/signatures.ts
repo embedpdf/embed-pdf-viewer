@@ -230,10 +230,7 @@ export async function registerSignatureRoutes(
       if (resource.mimeType !== 'application/pdf') {
         throw new EngineError(EngineErrorCode.InvalidArg, 'the appearance resource must be a PDF');
       }
-      input.appearance = {
-        pdf: new Uint8Array(resource.bytes),
-        ...(appearance.pageIndex !== undefined ? { pageIndex: appearance.pageIndex } : {}),
-      };
+      input.appearance = { pdf: new Uint8Array(resource.bytes) };
     }
     setNoStore(reply);
     const prepared = await layerService.prepareSignature(

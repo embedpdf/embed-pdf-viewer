@@ -97,7 +97,7 @@ async function boot(
     page: (ref: PageRef) => ({
       render: {
         image: (imageOptions: Record<string, unknown>) => {
-          imageCalls.push({ pageObjectNumber: ref.pageObjectNumber, options: imageOptions });
+          imageCalls.push({ pageObjectNumber: ref.objectNumber, options: imageOptions });
           const pending = makeTask();
           tasks.push(pending);
           return pending.task;
@@ -145,7 +145,7 @@ describe('the ledger — confirmed events and the invalidate verb', () => {
     fixture.render.onInvalidated((event) =>
       seen.push(
         `${event.scope}:${event.origin?.locality ?? 'caller'}:` +
-          event.pages.map((page) => page.pageObjectNumber),
+          event.pages.map((page) => page.objectNumber),
       ),
     );
     fixture.emit(
@@ -360,10 +360,8 @@ describe('the public door — exact sizes', () => {
     await vi.waitFor(() => expect(fixture.tasks).toHaveLength(3));
     fixture.tasks[2]!.reject(new Error('engine said no'));
     const result = await batch;
-    expect(result.applied.map((entry) => entry.page.pageObjectNumber)).toEqual([22]);
-    expect(
-      result.failed.map((failure) => [failure.ref.pageObjectNumber, failure.error.code]),
-    ).toEqual([
+    expect(result.applied.map((entry) => entry.page.objectNumber)).toEqual([22]);
+    expect(result.failed.map((failure) => [failure.ref.objectNumber, failure.error.code])).toEqual([
       [99, 'not-found'],
       [33, 'operation-failed'],
     ]);
@@ -376,9 +374,9 @@ describe('the public door — exact sizes', () => {
       code: 'not-found',
     });
     const log: string[] = [];
-    fixture.render.onRenderCompleted((event) => log.push(`ok:${event.page.pageObjectNumber}`));
+    fixture.render.onRenderCompleted((event) => log.push(`ok:${event.page.objectNumber}`));
     fixture.render.onRenderFailed((event) =>
-      log.push(`fail:${event.page.pageObjectNumber}:${event.error.code}`),
+      log.push(`fail:${event.page.objectNumber}:${event.error.code}`),
     );
     const ok = fixture.render.renderPage(toPageRef(11));
     fixture.tasks[0]!.resolve(image());

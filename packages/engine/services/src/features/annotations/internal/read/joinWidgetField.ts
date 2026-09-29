@@ -26,7 +26,7 @@ export function resolveWidgetFieldObjectNumber(
   return runtime.fn.EPDFForm_GetFieldObjNum(model, fieldIndex);
 }
 
-/** Stamp `fieldObjectNumber` onto every widget DTO in a freshly read list. */
+/** Stamp the field ref and family onto every widget DTO in a freshly read list. */
 export function joinWidgetFieldNumbers(
   runtime: PdfRuntimeModule,
   session: DocumentSession,
@@ -38,14 +38,17 @@ export function joinWidgetFieldNumbers(
     const model = acquireFormModel(runtime, session);
     const fieldIndex = runtime.fn.EPDFForm_GetFieldIndexForWidget(
       model,
-      annotation.ref.annotObjectNumber,
+      annotation.ref.objectNumber,
     );
-    if (fieldIndex < 0) {
-      annotation.fieldObjectNumber = 0;
+    const fieldObjectNumber =
+      fieldIndex < 0 ? 0 : runtime.fn.EPDFForm_GetFieldObjNum(model, fieldIndex);
+    if (fieldObjectNumber <= 0) {
+      // In no field, or in one stored inline, which no ref can address.
+      annotation.field = null;
       annotation.fieldFamily = 'unknown';
       continue;
     }
-    annotation.fieldObjectNumber = runtime.fn.EPDFForm_GetFieldObjNum(model, fieldIndex);
+    annotation.field = { kind: 'objectNumber', objectNumber: fieldObjectNumber };
     annotation.fieldFamily =
       FAMILY_BY_CODE[runtime.fn.EPDFForm_GetFieldFamily(model, fieldIndex)] ?? 'unknown';
   }

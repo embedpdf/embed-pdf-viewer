@@ -1,0 +1,254 @@
+---
+title: Search
+description: Find text in the document, highlight every match on the page, step through them, and show a list of results.
+---
+
+# Search
+
+The search plugin finds text in the whole document and highlights every match. Register
+`searchPlugin()`, put a `<SearchLayer>` in each page, and search from your own search box:
+
+```tsx
+import { SearchLayer, searchPlugin, useSearch, useSearchState } from '@embedpdf/react/search';
+
+const plugins = [stagePlugin(), renderPlugin(), searchPlugin()];
+
+function SearchBox() {
+  const search = useSearch();
+  const { hitCount, activeHitIndex, status } = useSearchState();
+
+  return (
+    <form onSubmit={(event) => event.preventDefault()}>
+      <input onChange={(event) => search.search({ text: event.target.value })} />
+      {status === 'searching' && <span>Searching…</span>}
+      {hitCount > 0 && (
+        <span>
+          {activeHitIndex + 1} of {hitCount}
+        </span>
+      )}
+      <button onClick={() => search.previousHit()}>↑</button>
+      <button onClick={() => search.nextHit()}>↓</button>
+    </form>
+  );
+}
+
+<Stage>
+  {() => (
+    <>
+      <RenderLayer />
+      <SearchLayer />
+    </>
+  )}
+</Stage>;
+```
+
+- **Matches appear as they're found.** Large documents are searched a few pages at a time, and the
+  count and the highlights grow as the search goes.
+- **Searching again replaces the search.** Type another letter and the old search stops; an empty
+  `text` clears it.
+- **The first match becomes the active one** without moving the view. `nextHit()`, `previousHit()`
+  and `goToHit(index)` move to a match and bring it into view, and wrap around at the ends.
+
+## Search options
+
+```ts
+search.search({ text: 'invoice total', wholeWord: true, matchCase: false });
+```
+
+| Option             | What it does                                                 | Default  |
+| :----------------- | :----------------------------------------------------------- | :------- |
+| `text`             | What to find                                                 | required |
+| `matchCase`        | `Invoice` doesn't match `invoice`                            | `false`  |
+| `wholeWord`        | `cat` doesn't match `category`                               | `false`  |
+| `matchDiacritics`  | `resume` doesn't match `résumé`                              | `false`  |
+| `ignoreWhitespace` | `invoice` also finds `i n v o i c e`, for text with odd spacing | `false`  |
+| `regex`            | `text` is a regular expression                               | `false`  |
+
+A search starts from the page the reader is on, and `{ from: page.ref }` starts it elsewhere.
+
+## A list of results
+
+`useSearchHits()` gives you every match found so far, each with a few words around it:
+
+```tsx
+function Results() {
+  const search = useSearch();
+  const hits = useSearchHits();
+
+  return (
+    <ol>
+      {hits.map((hit, index) => (
+        <li key={index}>
+          <button onClick={() => search.goToHit(index)}>
+            Page {hit.pageIndex + 1}: …{hit.snippet?.before}
+            <mark>{hit.snippet?.match}</mark>
+            {hit.snippet?.after}…
+          </button>
+        </li>
+      ))}
+    </ol>
+  );
+}
+```
+
+`useSearchHits(page.ref)` gives the matches on one page, for a count per thumbnail.
+
+| Field       | What it is                                                           |
+| :---------- | :------------------------------------------------------------------- |
+| `page`      | The page it's on                                                     |
+| `pageIndex` | That page's position, from 0                                         |
+| `start`, `count` | The characters it covers: a range you can select or highlight   |
+| `bounds`    | A box around it, in page coordinates                                 |
+| `segments`  | One piece per line it covers, each with its four corners             |
+| `snippet`   | The words `before`, the `match` and the words `after`                |
+
+## Highlight or select a match
+
+A match is a range of characters, the same kind a selection and a highlight use, so it goes straight
+into either:
+
+```ts
+const hit = search.getActiveHit();
+
+selection.select(hit); // select it
+await annotation.create(hit.page, {
+  subtype: 'highlight',
+  quadPoints: hit.segments.map((segment) => segment.quad),
+}); // highlight it
+```
+
+## Search without showing it
+
+`findAll()` searches the whole document and gives you the matches, without touching the search box's
+results or the highlights:
+
+```ts
+const hits = await search.findAll({ text: 'confidential', wholeWord: true });
+```
+
+Use it for a "mark every occurrence" feature, or to [redact](../annotations/redaction) every match.
+
+## Change how matches look
+
+```tsx
+<SearchLayer color="#ffd500" activeColor="#ff9632" blendMode="multiply" />
+```
+
+| Prop          | What it is                                         | Default      |
+| :------------ | :------------------------------------------------- | :----------- |
+| `color`       | The highlight of every match                       | `'#ffd500'`  |
+| `activeColor` | The highlight of the active match                  | `'#ff9632'`  |
+| `blendMode`   | How the highlight mixes with the page              | `'multiply'` |
+| `onHitClick`  | Called with the match someone clicks               | —            |
+
+## Methods
+
+Everything `useSearch()` gives you.
+
+| Method                                     | What it does                                                                                                                                                                     |
+| :----------------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `search(query, { from? })`                 | Starts a search, replacing the one before, and highlights the matches as they're found. Resolves `{ status, hitCount }` when it's done, replaced or cancelled. An empty `text` clears. [Search options](#search-options) |
+| `nextHit(reveal?)`, `previousHit(reveal?)` | Makes the next or previous match the active one and scrolls to it, wrapping at the ends. Returns the match, or `null` when there is none.                                          |
+| `goToHit(index, reveal?)`                  | Makes one match the active one and scrolls to it. [A list of results](#a-list-of-results)                                                                                         |
+| `revealActiveHit(reveal?)`                 | Scrolls back to the active match without changing it                                                                                                                             |
+| `listHits({ page? })`                      | Every match found so far, or the ones on one page. In a component, use `useSearchHits(page?)`.                                                                                     |
+| `listPagesWithHits()`                      | The pages that have a match, in document order                                                                                                                                   |
+| `cancel()`                                 | Stops searching and keeps the matches found so far                                                                                                                               |
+| `clear()`                                  | Stops searching and removes the matches and their highlights                                                                                                                     |
+| `refresh()`                                | Runs the current search again from the start. The plugin does this by itself when the document changes.                                                                           |
+| `findAll(query, { snippets? })`            | Finds every match without showing them or touching the current search. `snippets: false` leaves out the words around each match. [Search without showing it](#search-without-showing-it) |
+| `canSearch({ snippets? })`                 | Whether searching is allowed; with `snippets: true`, whether matches carry the words around them. [Permissions](#permissions)                                                      |
+
+`reveal` is `{ anchor, behavior }`, the [`reveal` setting](#settings) for one call. Every method that
+returns a promise also takes a `signal` in its options, to cancel it.
+
+## State
+
+Everything `useSearchState()` gives you. Your component re-renders when a value changes. Outside a
+component, read the same value with the method in the last column.
+
+| Field            | What it is                                                             | Outside a component                                  |
+| :--------------- | :--------------------------------------------------------------------- | :--------------------------------------------------- |
+| `query`          | The last search, with its options, or `null`                           | `getQuery()`                                         |
+| `status`         | `'idle'`, `'searching'`, `'complete'`, `'cancelled'` or `'error'`      | `getStatus()`                                        |
+| `hitCount`       | How many matches were found so far                                     | `getHitCount()`, or `getHitCount(page)` for one page |
+| `activeHitIndex` | The active match's place in the list, from 0, or `-1`                  | `getActiveHitIndex()`                                |
+| `activeHit`      | The active match, or `null`                                            | `getActiveHit()`                                     |
+| `progress`       | How far the search got: `pagesSearched` of `pageCount`                 | `getProgress()`                                      |
+| `error`          | Why the search failed, when `status` is `'error'`                      | `getError()`                                         |
+
+The matches themselves come from `useSearchHits()`, so a component that only shows the count doesn't
+re-render for every match that arrives.
+
+## Settings
+
+Set them when you register the plugin.
+
+| Setting           | What it does                                                      | Default                       |
+| :---------------- | :---------------------------------------------------------------- | :---------------------------- |
+| `reveal.anchor`   | Where a match lands in the view when you move to it               | `{ y: 0.35 }`, like a browser |
+| `reveal.behavior` | Glide there (`'smooth'`) or jump (`'instant'`)                    | `'smooth'`                    |
+
+## Events
+
+```ts
+useSearchEvent(
+  (search) => search.onCompleted,
+  ({ hitCount }) => announce(`${hitCount} matches`),
+);
+```
+
+| Event                | Fires when                                              | Carries                   |
+| :------------------- | :------------------------------------------------------ | :------------------------ |
+| `onStarted`          | A search started                                        | `query`                   |
+| `onProgressChanged`  | More pages were searched                                | `hitCount`, `pagesSearched`, `pageCount` |
+| `onCompleted`        | The whole document was searched                         | `hitCount`                |
+| `onCancelled`        | A search stopped before the end                         | `reason`                  |
+| `onFailed`           | A search failed                                         | `error`                   |
+| `onActiveHitChanged` | Another match became the active one                     | `index`, `hit`            |
+| `onCleared`          | The search was cleared                                  | —                         |
+
+## Permissions
+
+| Permission        | What it allows                                        | Check                               |
+| :---------------- | :---------------------------------------------------- | :---------------------------------- |
+| `doc.text.search` | Searching                                             | `search.canSearch()`                |
+| `doc.text.copy`   | The words around each match (`snippet`)               | `search.canSearch({ snippets: true })` |
+
+Without `doc.text.copy`, search still finds and highlights every match, but a match has no
+snippet.
+
+## Good to know
+
+### Searches stay up to date
+
+When the document changes, for example when pages are inserted or text is redacted, the current
+search runs again, so the matches and the count stay right.
+
+### Searching large documents
+
+<Engine local>
+
+The local engine searches the file in the browser. Big documents are searched a few pages at a time,
+so the page stays responsive and results arrive as they're found.
+
+<CloudPdfCallout
+  title="Search without handing out the text"
+  href="https://www.cloudpdf.com/docs/headless/text/search"
+  cta="Search with CloudPDF"
+>
+
+With CloudPDF, the server searches the document. A user who may search but not copy gets where each
+match is, and nothing of the text around it, so the text of a view-only document never reaches the
+browser.
+
+</CloudPdfCallout>
+
+</Engine>
+
+<Engine cloud>
+
+Your server searches the document, a few pages at a time, and the results arrive as they're found. A
+user who may search but not copy gets where each match is, without the text around it.
+
+</Engine>

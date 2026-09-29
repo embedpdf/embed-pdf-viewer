@@ -1,3 +1,4 @@
+import { appearanceRaster } from './appearanceRasters';
 import { iconRect } from './creatables';
 import type {
   ConformanceTestRunner,
@@ -82,14 +83,6 @@ export interface AnnotationMutationConformanceFixture extends ConformanceFixture
 
 export interface AnnotationMutationConformanceOptions extends Omit<ConformanceOptions, 'fixture'> {
   fixture: AnnotationMutationConformanceFixture;
-  /**
-   * `true` for engines that expose the raw RGBA appearance rasters
-   * (`renderAppearancesRaw`). When set, the shape-create test additionally
-   * asserts that creating a shape produces a baked `/AP` the appearance
-   * reader can rasterize. The cloud engine ships encoded images instead
-   * and leaves this `false`.
-   */
-  supportsAppearanceRasters?: boolean;
 }
 
 /** Its top corners first, as a text selection's quads are. */
@@ -201,7 +194,7 @@ export function runAnnotationMutationConformance(
         const result = await page.annotations.create(draft);
         expect(AnnotationCreateResultSchema.safeParse(result).success).toBe(true);
         expect(result.meta.affectedPages.length).toBe(1);
-        expect(result.meta.affectedPages[0].page.pageObjectNumber).toBe(fix.pageObjectNumber);
+        expect(result.meta.affectedPages[0].page.objectNumber).toBe(fix.pageObjectNumber);
         expect('cacheDelta' in result.meta).toBe(true);
 
         // Always durable (engine uses the EPDFPage_CreateAnnot fork helper).
@@ -985,7 +978,8 @@ export function runAnnotationMutationConformance(
       try {
         const page = doc.page(toPageRef(fix.pageObjectNumber));
 
-        // Plain free text, no fontColor override => text follows `color`.
+        // Plain free text: `color` is the border; the text is black unless
+        // `fontColor` says otherwise.
         const freeTextDraft: FreeTextDraft = {
           subtype: 'free-text',
           intent: 'free-text',
@@ -1010,12 +1004,11 @@ export function runAnnotationMutationConformance(
           expect(freeText.annotation.textAlign).toBe('center');
           expect(freeText.annotation.color).toBe('#14283c');
           expect(freeText.annotation.interiorColor).toBe('#fafad2');
-          // No override sent => text follows `color`, so fontColor is omitted.
-          expect(freeText.annotation.fontColor).toBe(null);
+          expect(freeText.annotation.fontColor).toBe('#000000');
         }
 
-        // Callout: intent + /CL leader + /LE ending, explicit fontColor
-        // override, transparent (null) background.
+        // Callout: intent + /CL leader + /LE ending, its own text color,
+        // transparent (null) background.
         const calloutDraft: FreeTextDraft = {
           subtype: 'free-text',
           intent: 'free-text-callout',
@@ -1039,7 +1032,6 @@ export function runAnnotationMutationConformance(
         if (callout.annotation.subtype === 'free-text') {
           expect(callout.annotation.intent).toBe('free-text-callout');
           expect(callout.annotation.interiorColor).toBe(null);
-          // fontColor differs from color => surfaced as an override.
           expect(callout.annotation.fontColor).toBe('#c80000');
           expect(callout.annotation.color).toBe('#000000');
           expect(callout.annotation.calloutLine?.length).toBe(DEFAULT_CALLOUT_LINE.length);
@@ -1157,10 +1149,8 @@ export function runAnnotationMutationConformance(
           subtype: 'free-text',
           intent: 'free-text',
           box: shapeRect,
-          fontFamily: 'helvetica',
-          fontSize: 12,
-          textAlign: 'left',
           color: '#0000ff',
+          // The body carries the size; a `fontSize` beside it would win.
           richText: {
             body: { family: 'Helvetica', size: 18, color: '#102030' },
             paragraphs: [
@@ -1181,10 +1171,12 @@ export function runAnnotationMutationConformance(
           const dto = created.annotation;
           // `contents` is the projection: paragraphs joined by \r, runs concatenated.
           expect(dto.contents).toBe('Hello bold red\rH2');
-          // The body became the /DA font and size; the /DA colour stayed the draft's.
+          // The body became the /DA font and size; the /DA colour, the border's,
+          // stayed the draft's, and the text is the body's color.
           expect(dto.fontFamily).toBe('helvetica');
           expect(dto.fontSize).toBe(18);
           expect(dto.color).toBe('#0000ff');
+          expect(dto.fontColor).toBe('#102030');
           expect(dto.richText.body.color).toBe('#102030');
           expect(dto.richText.paragraphs[0]!.runs).toEqual([
             { text: 'Hello ' },
@@ -1705,41 +1697,30 @@ export function runAnnotationMutationConformance(
       }
     });
 
-    if (opts.supportsAppearanceRasters) {
-      test('creating a shape bakes an /AP appearance the reader can rasterize', async () => {
-        const doc = await openFixture(engine, opts);
-        try {
-          const page = doc.page(toPageRef(fix.pageObjectNumber));
-          const created = await page.annotations.create({
-            subtype: 'circle',
-            contents: 'appearance-gen',
-            box: shapeRect,
-            interiorColor: '#ff0000',
-            color: '#000000',
-            strokeWidth: 2,
-            borderStyle: 'solid',
-            opacity: 1,
-          } satisfies CircleDraft);
+    test('creating a shape bakes an /AP appearance the reader can rasterize', async () => {
+      const doc = await openFixture(engine, opts);
+      try {
+        const page = doc.page(toPageRef(fix.pageObjectNumber));
+        const created = await page.annotations.create({
+          subtype: 'circle',
+          contents: 'appearance-gen',
+          box: shapeRect,
+          interiorColor: '#ff0000',
+          color: '#000000',
+          strokeWidth: 2,
+          borderStyle: 'solid',
+          opacity: 1,
+        } satisfies CircleDraft);
 
-          const appearances = await page.annotations.renderAppearancesRaw({
-            viewport: { kind: 'scale', scale: 1 },
-          });
-          const match = appearances.appearances.find(
-            (a) =>
-              a.ref.kind === 'objectNumber' &&
-              created.annotation.ref.kind === 'objectNumber' &&
-              a.ref.annotObjectNumber === created.annotation.ref.annotObjectNumber,
-          );
-          // The freshly created shape must carry a baked /AP (generated by
-          // the mutator), so the appearance reader emits a non-empty raster.
-          expect(match !== undefined).toBe(true);
-          expect((match?.raster.width ?? 0) > 0).toBeTruthy();
-          expect((match?.raster.height ?? 0) > 0).toBeTruthy();
-        } finally {
-          await doc.close();
-        }
-      });
-    }
+        // The freshly created shape must carry a baked /AP (generated by
+        // the mutator), so the appearance reader draws a non-empty raster.
+        const raster = await appearanceRaster(page, created.annotation.ref);
+        expect(raster.width > 0).toBeTruthy();
+        expect(raster.height > 0).toBeTruthy();
+      } finally {
+        await doc.close();
+      }
+    });
 
     test('update on a durable annotation is non-structural and never touches /NM', async () => {
       const doc = await openFixture(engine, opts);
@@ -1761,7 +1742,7 @@ export function runAnnotationMutationConformance(
         const result = await page.annotations.update(ref, patch);
         expect(AnnotationUpdateResultSchema.safeParse(result).success).toBe(true);
         expect(result.meta.affectedPages.length).toBe(1);
-        expect(result.meta.affectedPages[0].page.pageObjectNumber).toBe(fix.pageObjectNumber);
+        expect(result.meta.affectedPages[0].page.objectNumber).toBe(fix.pageObjectNumber);
         expect('cacheDelta' in result.meta).toBe(true);
 
         // Same identity, /NM untouched.
@@ -1801,7 +1782,7 @@ export function runAnnotationMutationConformance(
           const result = await page.annotations.update(weak.ref, patch);
           expect(AnnotationUpdateResultSchema.safeParse(result).success).toBe(true);
           expect(result.meta.affectedPages.length).toBe(1);
-          expect(result.meta.affectedPages[0].page.pageObjectNumber).toBe(fix.pageObjectNumber);
+          expect(result.meta.affectedPages[0].page.objectNumber).toBe(fix.pageObjectNumber);
           expect('cacheDelta' in result.meta).toBe(true);
 
           // The ref is upgraded to durable. Either nm (engine-stamped) or
@@ -1861,12 +1842,12 @@ export function runAnnotationMutationConformance(
             [
               {
                 kind: 'objectNumber',
-                value: (created.annotation.ref as { annotObjectNumber: number }).annotObjectNumber,
+                objectNumber: (created.annotation.ref as { objectNumber: number }).objectNumber,
               },
             ],
           ]);
           expect(result.meta.affectedPages.length).toBe(1);
-          expect(result.meta.affectedPages[0].page.pageObjectNumber).toBe(fix.pageObjectNumber);
+          expect(result.meta.affectedPages[0].page.objectNumber).toBe(fix.pageObjectNumber);
           expect('cacheDelta' in result.meta).toBe(true);
 
           // Its stable id is in meta (we created it; it's durable).
@@ -1911,7 +1892,7 @@ export function runAnnotationMutationConformance(
             ).toBe(true);
             expect(result.meta.changed.length <= 1).toBe(true);
             expect(result.meta.affectedPages.length).toBe(1);
-            expect(result.meta.affectedPages[0].page.pageObjectNumber).toBe(fix.pageObjectNumber);
+            expect(result.meta.affectedPages[0].page.objectNumber).toBe(fix.pageObjectNumber);
             expect('cacheDelta' in result.meta).toBe(true);
 
             // The page had weak refs before, structural mutation,
@@ -2018,13 +1999,13 @@ export function runAnnotationMutationConformance(
           (x) =>
             x.ref.kind === 'objectNumber' &&
             a.annotation.ref.kind === 'objectNumber' &&
-            x.ref.annotObjectNumber === a.annotation.ref.annotObjectNumber,
+            x.ref.objectNumber === a.annotation.ref.objectNumber,
         );
         const bIdx = list.annotations.findIndex(
           (x) =>
             x.ref.kind === 'objectNumber' &&
             b.annotation.ref.kind === 'objectNumber' &&
-            x.ref.annotObjectNumber === b.annotation.ref.annotObjectNumber,
+            x.ref.objectNumber === b.annotation.ref.objectNumber,
         );
         expect(aIdx >= 0 && bIdx >= 0).toBe(true);
         expect(aIdx < bIdx).toBe(true);
@@ -2038,7 +2019,7 @@ export function runAnnotationMutationConformance(
         try {
           expect(AnnotationMoveResultSchema.safeParse(result).success).toBe(true);
           expect(result.meta.affectedPages.length).toBe(1);
-          expect(result.meta.affectedPages[0].page.pageObjectNumber).toBe(fix.pageObjectNumber);
+          expect(result.meta.affectedPages[0].page.objectNumber).toBe(fix.pageObjectNumber);
           expect('cacheDelta' in result.meta).toBe(true);
           expect(result.annotations.length).toBe(1);
 
@@ -2047,9 +2028,9 @@ export function runAnnotationMutationConformance(
 
           // The moved DTO sits at toIndex.
           if (result.annotations[0].ref.kind === 'objectNumber') {
-            const movedObjNum = result.annotations[0].ref.annotObjectNumber;
+            const movedObjNum = result.annotations[0].ref.objectNumber;
             if (a.annotation.ref.kind === 'objectNumber') {
-              expect(movedObjNum).toBe(a.annotation.ref.annotObjectNumber);
+              expect(movedObjNum).toBe(a.annotation.ref.objectNumber);
             }
           }
 
@@ -2099,10 +2080,10 @@ export function runAnnotationMutationConformance(
             ids[2].annotation.ref,
             ids[0].annotation.ref,
             ids[1].annotation.ref,
-          ].map((r) => (r.kind === 'objectNumber' ? r.annotObjectNumber : null));
+          ].map((r) => (r.kind === 'objectNumber' ? r.objectNumber : null));
 
           const movedObjNums = result.annotations.map((d) =>
-            d.ref.kind === 'objectNumber' ? d.ref.annotObjectNumber : null,
+            d.ref.kind === 'objectNumber' ? d.ref.objectNumber : null,
           );
           for (let i = 0; i < expectedOrder.length; i++) {
             expect(movedObjNums[i]).toBe(expectedOrder[i]);
@@ -2169,7 +2150,7 @@ export function runAnnotationMutationConformance(
           (x) =>
             x.ref.kind === 'objectNumber' &&
             a.annotation.ref.kind === 'objectNumber' &&
-            x.ref.annotObjectNumber === a.annotation.ref.annotObjectNumber,
+            x.ref.objectNumber === a.annotation.ref.objectNumber,
         );
         if (aIdx < 0) return;
 
@@ -2296,7 +2277,7 @@ export function runAnnotationMutationConformance(
         // we exercise the cross-page case; fall back to the host itself for
         // single-page fixtures).
         const mover =
-          list.pages.find((pg) => pg.ref.pageObjectNumber !== fix.pageObjectNumber)?.ref ??
+          list.pages.find((pg) => pg.ref.objectNumber !== fix.pageObjectNumber)?.ref ??
           toPageRef(fix.pageObjectNumber);
         await doc.pages.move([mover], 0);
 
@@ -2344,10 +2325,8 @@ export function runAnnotationMutationConformance(
           reply.annotation.reply?.to.kind === 'objectNumber' &&
           parent.annotation.ref.kind === 'objectNumber'
         ) {
-          expect(reply.annotation.reply!.to.annotObjectNumber).toBe(
-            parent.annotation.ref.annotObjectNumber,
-          );
-          expect(reply.annotation.reply!.to.page.pageObjectNumber).toBe(fix.pageObjectNumber);
+          expect(reply.annotation.reply!.to.objectNumber).toBe(parent.annotation.ref.objectNumber);
+          expect(reply.annotation.reply!.to.page.objectNumber).toBe(fix.pageObjectNumber);
         }
         // The parent (already durable) is reported alongside the new reply.
         expect(reply.meta.changed.length).toBe(2);
@@ -2361,7 +2340,7 @@ export function runAnnotationMutationConformance(
           (a) =>
             a.ref.kind === 'objectNumber' &&
             reply.annotation.ref.kind === 'objectNumber' &&
-            a.ref.annotObjectNumber === reply.annotation.ref.annotObjectNumber,
+            a.ref.objectNumber === reply.annotation.ref.objectNumber,
         );
         expect(readReply?.reply?.type).toBe('reply');
         expect(readReply?.reply?.to !== undefined).toBe(true);
@@ -2397,7 +2376,7 @@ export function runAnnotationMutationConformance(
           (a) =>
             a.ref.kind === 'objectNumber' &&
             caret.annotation.ref.kind === 'objectNumber' &&
-            a.ref.annotObjectNumber === caret.annotation.ref.annotObjectNumber,
+            a.ref.objectNumber === caret.annotation.ref.objectNumber,
         );
         expect(readCaret?.reply?.type).toBe('group');
       } finally {
@@ -2455,7 +2434,7 @@ export function runAnnotationMutationConformance(
             const dest = xyz.annotation.target.destination;
             expect(dest.kind).toBe('xyz');
             if (dest.kind === 'xyz') {
-              expect(dest.page.pageObjectNumber).toBe(fix.pageObjectNumber);
+              expect(dest.page.objectNumber).toBe(fix.pageObjectNumber);
               expect(dest.x).toBe(30);
               expect(dest.y).toBe(300);
               expect(dest.zoom).toBe(null);
@@ -2564,7 +2543,7 @@ export function runAnnotationMutationConformance(
           (a) =>
             a.ref.kind === 'objectNumber' &&
             created.annotation.ref.kind === 'objectNumber' &&
-            a.ref.annotObjectNumber === created.annotation.ref.annotObjectNumber,
+            a.ref.objectNumber === created.annotation.ref.objectNumber,
         );
         expect(readBack?.subtype).toBe('link');
         if (readBack?.subtype === 'link') expect(readBack.target).toBe(null);
@@ -2608,9 +2587,7 @@ export function runAnnotationMutationConformance(
           link.annotation.reply?.to.kind === 'objectNumber' &&
           parent.annotation.ref.kind === 'objectNumber'
         ) {
-          expect(link.annotation.reply!.to.annotObjectNumber).toBe(
-            parent.annotation.ref.annotObjectNumber,
-          );
+          expect(link.annotation.reply!.to.objectNumber).toBe(parent.annotation.ref.objectNumber);
         }
 
         // Both the relationship and the target survive a fresh read.
@@ -2619,7 +2596,7 @@ export function runAnnotationMutationConformance(
           (a) =>
             a.ref.kind === 'objectNumber' &&
             link.annotation.ref.kind === 'objectNumber' &&
-            a.ref.annotObjectNumber === link.annotation.ref.annotObjectNumber,
+            a.ref.objectNumber === link.annotation.ref.objectNumber,
         );
         expect(readLink?.subtype).toBe('link');
         expect(readLink?.reply?.type).toBe('group');
@@ -2666,13 +2643,13 @@ export function runAnnotationMutationConformance(
           (a) =>
             a.ref.kind === 'objectNumber' &&
             caret.annotation.ref.kind === 'objectNumber' &&
-            a.ref.annotObjectNumber === caret.annotation.ref.annotObjectNumber,
+            a.ref.objectNumber === caret.annotation.ref.objectNumber,
         );
         const readStrikeout = after.annotations.find(
           (a) =>
             a.ref.kind === 'objectNumber' &&
             strikeout.annotation.ref.kind === 'objectNumber' &&
-            a.ref.annotObjectNumber === strikeout.annotation.ref.annotObjectNumber,
+            a.ref.objectNumber === strikeout.annotation.ref.objectNumber,
         );
         expect(readCaret?.subtype === 'caret' && readCaret.intent).toBe('replace');
         expect(readStrikeout?.subtype === 'strikeout' && readStrikeout.intent).toBe(
@@ -2730,7 +2707,7 @@ export function runAnnotationMutationConformance(
         const crossPageRef: AnnotationRef = {
           kind: 'objectNumber',
           page: toPageRef(fix.pageObjectNumber + 2),
-          annotObjectNumber: parent.annotation.ref.annotObjectNumber,
+          objectNumber: parent.annotation.ref.objectNumber,
         };
         let caught: unknown;
         try {
@@ -2761,7 +2738,7 @@ export function runAnnotationMutationConformance(
         });
         // A name is unique per page (ISO 32000-2 §12.5.2): another page may use it.
         const { pages } = await doc.pages.list();
-        const other = pages.find((entry) => entry.ref.pageObjectNumber !== fix.pageObjectNumber);
+        const other = pages.find((entry) => entry.ref.objectNumber !== fix.pageObjectNumber);
         if (!other) return;
         const elsewhere = await doc.page(other.ref).annotations.create(draft);
         expect(elsewhere.annotation.nm).toBe('taken');
@@ -2819,7 +2796,7 @@ export function runAnnotationMutationConformance(
           (a) =>
             a.ref.kind === 'objectNumber' &&
             status.annotation.ref.kind === 'objectNumber' &&
-            a.ref.annotObjectNumber === status.annotation.ref.annotObjectNumber,
+            a.ref.objectNumber === status.annotation.ref.objectNumber,
         );
         expect(read?.subtype).toBe('text');
         if (read?.subtype === 'text') {
@@ -2906,7 +2883,7 @@ export function runAnnotationMutationConformance(
           (a) =>
             a.ref.kind === 'objectNumber' &&
             note.annotation.ref.kind === 'objectNumber' &&
-            a.ref.annotObjectNumber === note.annotation.ref.annotObjectNumber,
+            a.ref.objectNumber === note.annotation.ref.objectNumber,
         );
         expect(read?.contents).toBe(null);
         expect(read?.subject).toBe(null);
@@ -2939,7 +2916,7 @@ export function runAnnotationMutationConformance(
           (a) =>
             a.ref.kind === 'objectNumber' &&
             custom.annotation.ref.kind === 'objectNumber' &&
-            a.ref.annotObjectNumber === custom.annotation.ref.annotObjectNumber,
+            a.ref.objectNumber === custom.annotation.ref.objectNumber,
         );
         if (read?.subtype === 'text') {
           expect(read.state).toBe('in-progress');

@@ -1,5 +1,5 @@
 import type { AnnotationRef } from '../identity/AnnotationRef';
-import type { FormFieldDraft } from '../forms/draft';
+import type { FormFieldDraft, WidgetPlacement } from '../forms/draft';
 import type { FormFieldDTO } from '../forms/field';
 import type { FormFieldPatch } from '../forms/patch';
 import type { FormSnapshot } from '../forms/snapshot';
@@ -15,6 +15,7 @@ import type {
   FormFieldUpdateResult,
   FormImportResult,
   FormRepairResult,
+  FormResetResult,
   FormSetValueResult,
   FormWidgetLinkResult,
 } from '../mutation/FormMutationResults';
@@ -36,7 +37,7 @@ export interface FormRepairOptions {
  * fields hold the values and widget annotations are their page-scoped
  * views. Filling mutates the field plane; rendering only ever reads the
  * widget plane (through the annotation subsystem — join widgets to
- * annotations via `FormWidget.annotObjectNumber`).
+ * annotations via `FormWidget.ref`).
  *
  * Reads are gated by `doc.forms.read`, value writes and imports by
  * `doc.forms.fill`, and repair by `doc.forms.modify`. On layer documents
@@ -59,19 +60,24 @@ export interface DocumentFormsService {
   get(ref: FormFieldRef): AbortablePromise<FormFieldDTO>;
 
   /**
-   * Write one field's value. The value's `type` must match the field
-   * family (see {@link FormFieldValue}). Validation happens before any
-   * write — a failed call leaves the document untouched. Appearance
-   * streams regenerate for text/choice widgets; toggles flip their
-   * appearance state. Emits `forms.valueSet`.
+   * Write one field's value, in the fields a read of it returns (see
+   * {@link FormFieldValue}). Validation happens before any write — a failed
+   * call leaves the document untouched. Appearance streams regenerate for
+   * text/choice widgets; toggles flip their appearance state. Emits
+   * `forms.valueSet`.
    */
   setValue(ref: FormFieldRef, value: FormFieldValue): AbortablePromise<FormSetValueResult>;
 
   /**
-   * Restore a field to its default value (/DV), or clear it when no
-   * default exists. Emits `forms.valueSet`.
+   * Put fields back to their default value (/DV), or empty them when they
+   * have none: the whole form without an argument, else the fields named.
+   * Fields that hold no value (push buttons, signature fields) are skipped,
+   * and so, in a whole-form reset, are fields a signature locked; naming a
+   * locked field fails with `ProtectedDocument`. The result lists the
+   * fields that changed. Emits one `forms.valueSet` per changed field,
+   * sharing `origin.tx`.
    */
-  reset(ref: FormFieldRef): AbortablePromise<FormSetValueResult>;
+  reset(fields?: FormFieldRef | FormFieldRef[]): AbortablePromise<FormResetResult>;
 
   /**
    * Apply one script run's ordered effects as one worker/cloud job. The batch
@@ -150,22 +156,17 @@ export interface DocumentFormsService {
   delete(ref: FormFieldRef): AbortablePromise<FormFieldDeleteResult>;
 
   /**
-   * Adopt an existing, unattached widget annotation as a view of the
-   * field. `onState` names the checked appearance state and is required
-   * for radio groups (checkboxes default to "Yes"). Attaching into a
-   * legacy merged field splits it — the field object number never
-   * changes; widget identity may. Emits `forms.widgetAdded`.
+   * Show the field in one more place: a new widget, placed and styled like
+   * an entry of a draft's `widgets`, in one change. A radio button needs
+   * its `exportValue`. Adding a widget to a legacy merged field splits it —
+   * the field object number never changes. Emits `forms.widgetAdded`.
    */
-  addWidget(
-    ref: FormFieldRef,
-    widget: AnnotationRef,
-    options?: { onState?: string },
-  ): AbortablePromise<FormWidgetLinkResult>;
+  addWidget(ref: FormFieldRef, placement: WidgetPlacement): AbortablePromise<FormWidgetLinkResult>;
 
   /**
-   * The inverse of {@link addWidget}: the widget keeps its page
-   * placement and last appearance but becomes an ordinary, inert
-   * annotation (deletable through the annotation APIs). The field
+   * Take a widget out of its field: it keeps its page placement and last
+   * appearance but becomes an ordinary, inert widget annotation (its
+   * `field` is `null`, deletable through the annotation APIs). The field
    * survives, "unplaced" when this was its last widget. Emits
    * `forms.widgetRemoved`.
    */

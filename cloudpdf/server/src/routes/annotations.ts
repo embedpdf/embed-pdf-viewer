@@ -20,6 +20,7 @@ import {
   type AnnotationRef,
   type CollabTarget,
   type PageNetworkRenderFormat,
+  type DocumentProtection,
   type PdfBits,
   type PageRef,
   type WorkerJobId,
@@ -457,7 +458,15 @@ export async function registerAnnotationRoutes(
     const { docId, layerName } = req.params as { docId: string; layerName: string };
     const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
     const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
-    const ctx = requireLayerCapability(req, docId, layerName, 'doc.annotate.modify', pdfBits);
+    const protection = await documentService.getProtection(accessCtx, docId, layerName);
+    const ctx = requireLayerCapability(
+      req,
+      docId,
+      layerName,
+      'doc.annotate.modify',
+      pdfBits,
+      protection,
+    );
     setNoStore(reply);
     const body = parseOrInvalidArg(
       WeakAnnotationSessionPagesRequestSchema,
@@ -484,7 +493,15 @@ export async function registerAnnotationRoutes(
       };
       const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
       const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
-      const ctx = requireLayerCapability(req, docId, layerName, 'doc.annotate.modify', pdfBits);
+      const protection = await documentService.getProtection(accessCtx, docId, layerName);
+      const ctx = requireLayerCapability(
+        req,
+        docId,
+        layerName,
+        'doc.annotate.modify',
+        pdfBits,
+        protection,
+      );
       setNoStore(reply);
       const body = parseOrInvalidArg(
         WeakAnnotationSessionPagesRequestSchema,
@@ -513,7 +530,15 @@ export async function registerAnnotationRoutes(
       };
       const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
       const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
-      const ctx = requireLayerCapability(req, docId, layerName, 'doc.annotate.modify', pdfBits);
+      const protection = await documentService.getProtection(accessCtx, docId, layerName);
+      const ctx = requireLayerCapability(
+        req,
+        docId,
+        layerName,
+        'doc.annotate.modify',
+        pdfBits,
+        protection,
+      );
       setNoStore(reply);
       return requireWeakAnnotationSessions(weakAnnotationSessions).heartbeat(
         { tenantId: ctx.tenantId, sub: ctx.sub },
@@ -532,7 +557,15 @@ export async function registerAnnotationRoutes(
       };
       const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
       const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
-      const ctx = requireLayerCapability(req, docId, layerName, 'doc.annotate.modify', pdfBits);
+      const protection = await documentService.getProtection(accessCtx, docId, layerName);
+      const ctx = requireLayerCapability(
+        req,
+        docId,
+        layerName,
+        'doc.annotate.modify',
+        pdfBits,
+        protection,
+      );
       await requireWeakAnnotationSessions(weakAnnotationSessions).release(
         { tenantId: ctx.tenantId, sub: ctx.sub },
         { docId, layerName, sessionId },
@@ -549,6 +582,7 @@ export async function registerAnnotationRoutes(
     const { docId, layerName } = req.params as { docId: string; layerName: string };
     const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
     const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
+    const protection = await documentService.getProtection(accessCtx, docId, layerName);
     const idempotencyKey = idempotencyKeyOf(req.headers['idempotency-key']);
     const limits = bundleLimits;
     const { manifest, resources } = await readAnnotationImportRequest(req, limits);
@@ -558,8 +592,15 @@ export async function registerAnnotationRoutes(
     if (attribution === 'restore') {
       // Restoring writes attribution that isn't the caller's, groups
       // included, so it takes the capabilities instead of per-group checks.
-      requireLayerCapability(req, docId, layerName, 'doc.annotate.modify', pdfBits);
-      ctx = requireLayerCapability(req, docId, layerName, 'doc.annotate.import', pdfBits);
+      requireLayerCapability(req, docId, layerName, 'doc.annotate.modify', pdfBits, protection);
+      ctx = requireLayerCapability(
+        req,
+        docId,
+        layerName,
+        'doc.annotate.import',
+        pdfBits,
+        protection,
+      );
     } else {
       // Each annotation is made as a create makes it, so each group the
       // items name takes the authority a create in it would, and nothing
@@ -577,7 +618,15 @@ export async function registerAnnotationRoutes(
       for (const groupId of groups) {
         const group = createGroupOf(accessCtx.jwt, { groupId } as AnnotationDraft, pdfBits);
         const target = targetForSelfCreate(accessCtx.jwt, group);
-        checked = requireLayerCollabAction(req, docId, layerName, 'create', target, pdfBits);
+        checked = requireLayerCollabAction(
+          req,
+          docId,
+          layerName,
+          'create',
+          target,
+          pdfBits,
+          protection,
+        );
       }
       ctx = checked!;
     }
@@ -612,6 +661,7 @@ export async function registerAnnotationRoutes(
       const pageObjectNumber = resolvePageKeyParam(pageKey);
       const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
       const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
+      const protection = await documentService.getProtection(accessCtx, docId, layerName);
       const envelope = await readMutationEnvelope(req, annotationBinaryPolicy);
       const draft = parseOrInvalidArg<AnnotationDraft>(
         AnnotationDraftSchema as unknown as SchemaLike<AnnotationDraft>,
@@ -628,7 +678,15 @@ export async function registerAnnotationRoutes(
       // is present.
       const groupId = createGroupOf(accessCtx.jwt, draft, pdfBits);
       const target = targetForSelfCreate(accessCtx.jwt, groupId);
-      const ctx = requireLayerCollabAction(req, docId, layerName, 'create', target, pdfBits);
+      const ctx = requireLayerCollabAction(
+        req,
+        docId,
+        layerName,
+        'create',
+        target,
+        pdfBits,
+        protection,
+      );
       const actor = actorFromJwt(ctx.jwt, groupId);
 
       setNoStore(reply);
@@ -658,7 +716,15 @@ export async function registerAnnotationRoutes(
       const pageObjectNumber = resolvePageKeyParam(pageKey);
       const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
       const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
-      const ctx = requireLayerCapability(req, docId, layerName, 'doc.annotate.modify', pdfBits);
+      const protection = await documentService.getProtection(accessCtx, docId, layerName);
+      const ctx = requireLayerCapability(
+        req,
+        docId,
+        layerName,
+        'doc.annotate.modify',
+        pdfBits,
+        protection,
+      );
       const body = req.body as Record<string, unknown> | null | undefined;
       const rawRefs = body?.refs;
       const rawToIndex = body?.toIndex;
@@ -707,8 +773,16 @@ export async function registerAnnotationRoutes(
       const pageObjectNumber = resolvePageKeyParam(pageKey);
       const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
       const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
-      const ctx = requireLayerCapability(req, docId, layerName, 'doc.pages.modify', pdfBits);
-      requireLayerCapability(req, docId, layerName, 'doc.annotate.modify', pdfBits);
+      const protection = await documentService.getProtection(accessCtx, docId, layerName);
+      const ctx = requireLayerCapability(
+        req,
+        docId,
+        layerName,
+        'doc.pages.modify',
+        pdfBits,
+        protection,
+      );
+      requireLayerCapability(req, docId, layerName, 'doc.annotate.modify', pdfBits, protection);
       const raw = (req.body ?? {}) as { refs?: unknown; usage?: unknown };
       const body = parseOrInvalidArg<AnnotationFlattenInput>(
         AnnotationFlattenInputSchema as unknown as SchemaLike<AnnotationFlattenInput>,
@@ -803,6 +877,7 @@ export async function registerAnnotationRoutes(
       const pageObjectNumber = resolvePageKeyParam(pageKey);
       const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
       const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
+      const protection = await documentService.getProtection(accessCtx, docId, layerName);
       const envelope = await readMutationEnvelope(req, annotationBinaryPolicy);
       const body = envelope.body as Record<string, unknown> | null | undefined;
       const resources = annotationResourcesOf(envelope);
@@ -824,7 +899,14 @@ export async function registerAnnotationRoutes(
         const action = body?.op === 'delete' ? 'delete' : 'update';
         if (action === 'delete') {
           setNoStore(reply);
-          return deleteWithThread(req, accessCtx, pdfBits, { docId, layerName, ref }, signal);
+          return deleteWithThread(
+            req,
+            accessCtx,
+            pdfBits,
+            protection,
+            { docId, layerName, ref },
+            signal,
+          );
         }
         // Use the outer accessCtx (already JWT-verified, no capability
         // check) for the layer open the target lookup needs to perform.
@@ -836,7 +918,15 @@ export async function registerAnnotationRoutes(
           ref,
           signal,
         );
-        const ctx = requireLayerCollabAction(req, docId, layerName, action, target, pdfBits);
+        const ctx = requireLayerCollabAction(
+          req,
+          docId,
+          layerName,
+          action,
+          target,
+          pdfBits,
+          protection,
+        );
 
         const patch = parseOrInvalidArg<AnnotationPatch>(
           patchSchemaFor(target.subtype),
@@ -861,7 +951,15 @@ export async function registerAnnotationRoutes(
         ref,
         signal,
       );
-      const ctx = requireLayerCollabAction(req, docId, layerName, 'update', target, pdfBits);
+      const ctx = requireLayerCollabAction(
+        req,
+        docId,
+        layerName,
+        'update',
+        target,
+        pdfBits,
+        protection,
+      );
       const patch = parseOrInvalidArg<AnnotationPatch>(
         patchSchemaFor(target.subtype),
         body?.patch,
@@ -889,6 +987,7 @@ export async function registerAnnotationRoutes(
       const pageObjectNumber = resolvePageKeyParam(pageKey);
       const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
       const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
+      const protection = await documentService.getProtection(accessCtx, docId, layerName);
 
       if (annotKey === 'index') {
         throw new EngineError(
@@ -900,7 +999,14 @@ export async function registerAnnotationRoutes(
       const signal = abortSignalOf(reply);
       const ref = refFromKey(annotKey, pageObjectNumber);
       setNoStore(reply);
-      return deleteWithThread(req, accessCtx, pdfBits, { docId, layerName, ref }, signal);
+      return deleteWithThread(
+        req,
+        accessCtx,
+        pdfBits,
+        protection,
+        { docId, layerName, ref },
+        signal,
+      );
     },
   );
 
@@ -912,6 +1018,7 @@ export async function registerAnnotationRoutes(
     req: FastifyRequest,
     accessCtx: ReturnType<typeof requireLayerDocAccessOnly>,
     pdfBits: PdfBits,
+    protection: DocumentProtection | null,
     input: { docId: string; layerName: string; ref: AnnotationRef },
     signal: AbortSignal,
   ): Promise<AnnotationDeleteResult> {
@@ -919,7 +1026,7 @@ export async function registerAnnotationRoutes(
       accessCtx,
       input.docId,
       input.layerName,
-      input.ref.page.pageObjectNumber,
+      input.ref.page.objectNumber,
       input.ref,
       signal,
     );
@@ -930,6 +1037,7 @@ export async function registerAnnotationRoutes(
       'delete',
       members,
       pdfBits,
+      protection,
     );
     return layerService.deleteAnnotation(
       ctx,
@@ -1599,10 +1707,10 @@ async function readAnnotationsAll(input: {
     // manifest that certified the pin (toManifestPage already scope-stamped
     // the revision tokens).
     const stateByPageObjectNumber = new Map(
-      manifest.pages.map((page) => [page.state.page.pageObjectNumber, page.state]),
+      manifest.pages.map((page) => [page.state.page.objectNumber, page.state]),
     );
     const list = input.revisionBridge.decorateAnnotationList(result.list, (page) =>
-      stateByPageObjectNumber.get(page.pageObjectNumber),
+      stateByPageObjectNumber.get(page.objectNumber),
     );
 
     input.requestedVersion === undefined ? setNoStore(input.reply) : setImmutableCache(input.reply);
@@ -1628,7 +1736,7 @@ async function resolvePageForRead(input: {
           input.scope.layerName,
         )
       : await input.documentService.getManifest(input.scope.ctx, input.scope.docId);
-  const page = manifest.pages.find((p) => p.state.page.pageObjectNumber === input.pageObjectNumber);
+  const page = manifest.pages.find((p) => p.state.page.objectNumber === input.pageObjectNumber);
   if (page) {
     return page;
   }

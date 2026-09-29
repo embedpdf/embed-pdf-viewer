@@ -1,3 +1,4 @@
+import type { Coordinates } from '../../pageSpace/coordinates';
 import type { DocumentFieldLock, ModificationLevel, SignatureDTO } from '../types';
 import { APPROVAL_BASELINE, levelFromPermission, minLevel } from '../protection';
 import type { RestrictionAnchor, RevisionStructure } from './types';
@@ -17,7 +18,7 @@ import type { RestrictionAnchor, RevisionStructure } from './types';
  */
 export function restrictionsFor(
   before: RevisionStructure,
-  judged: SignatureDTO | null,
+  judged: SignatureDTO<Coordinates> | null,
 ): { anchors: RestrictionAnchor[]; level: ModificationLevel; locks: DocumentFieldLock[] } {
   const anchors: RestrictionAnchor[] = [];
   const locks: DocumentFieldLock[] = [];

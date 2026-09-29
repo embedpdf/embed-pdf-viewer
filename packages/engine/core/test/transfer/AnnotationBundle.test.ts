@@ -7,7 +7,7 @@ import {
   type AnnotationBundle,
 } from '../../src/transfer/AnnotationBundle';
 
-const page = { kind: 'objectNumber', pageObjectNumber: 3 } as const;
+const page = { kind: 'objectNumber', objectNumber: 3 } as const;
 const size = { width: 612, height: 792 };
 const drawing = new TextEncoder().encode('%PDF-1.7 a drawing');
 
@@ -23,7 +23,7 @@ async function bundleWith(
       {
         data: {
           subtype: 'stamp',
-          ref: { kind: 'objectNumber', page, annotObjectNumber: 12 },
+          ref: { kind: 'objectNumber', page, objectNumber: 12 },
         } as unknown as AnnotationDTO,
         resources: { appearance: id },
       },
@@ -78,7 +78,7 @@ describe('assertAnnotationBundle', () => {
       (bundle: Record<string, unknown>) => {
         bundle.pages = [
           { page, position: 0, size },
-          { page: { kind: 'objectNumber', pageObjectNumber: 4 }, position: 0, size },
+          { page: { kind: 'objectNumber', objectNumber: 4 }, position: 0, size },
         ];
       },
       'position 0 is listed twice',

@@ -3,6 +3,8 @@ import {
   EngineError,
   EngineErrorCode,
   deletedFieldOf,
+  formResetFacts,
+  generateUuid,
   wirePack,
   type DocumentFormsService,
   type FormDataExport,
@@ -18,6 +20,8 @@ import {
   type FormWidgetLinkResult,
   type AnnotationRef,
   type FormFieldValue,
+  type FormResetResult,
+  type WidgetPlacement,
   type FormImportResult,
   type FormRepairOptions,
   type FormRepairResult,
@@ -73,14 +77,14 @@ export class LocalDocumentFormsService implements DocumentFormsService {
       const snapshot = await this.forwardAbort(this.list(), signal);
       const field = snapshot.fields.find((f) =>
         ref.kind === 'objectNumber'
-          ? f.fieldObjectNumber === ref.fieldObjectNumber
+          ? f.ref.kind === 'objectNumber' && f.ref.objectNumber === ref.objectNumber
           : f.name === ref.name,
       );
       if (!field) {
         throw new EngineError(
           EngineErrorCode.NotFound,
           ref.kind === 'objectNumber'
-            ? `form field not found: object ${ref.fieldObjectNumber}`
+            ? `form field not found: object ${ref.objectNumber}`
             : `form field not found: "${ref.name}"`,
         );
       }
@@ -104,18 +108,28 @@ export class LocalDocumentFormsService implements DocumentFormsService {
     });
   }
 
-  reset(ref: FormFieldRef): AbortablePromise<FormSetValueResult> {
+  reset(fields?: FormFieldRef | FormFieldRef[]): AbortablePromise<FormResetResult> {
     const rejected = this.gate('doc.forms.fill');
     if (rejected) return rejected;
     const docId = this.docId;
+    const refs = fields === undefined ? undefined : Array.isArray(fields) ? fields : [fields];
     const submission = this.queue.enqueue<WorkerResultPayload>(
       {
-        buildPack: (jobId: JobId) => wirePack({ kind: 'forms.reset', jobId, docId, ref }),
+        buildPack: (jobId: JobId) =>
+          wirePack({ kind: 'forms.reset', jobId, docId, ...(refs ? { refs } : {}) }),
       },
       { priority: Priority.HIGH },
     );
     return this.await(submission, 'forms.reset', (payload) => {
-      this.publisher.publishLocal({ type: 'forms.valueSet', ...payload.result });
+      // One event per field that changed, sharing one transaction.
+      const facts = formResetFacts(payload.result);
+      const id = generateUuid();
+      facts.forEach((fact, index) => {
+        this.publisher.publishLocal(
+          { type: 'forms.valueSet', ...fact },
+          { id, index, count: facts.length },
+        );
+      });
       return payload.result;
     });
   }
@@ -203,13 +217,10 @@ export class LocalDocumentFormsService implements DocumentFormsService {
     if (rejected) return rejected;
     const docId = this.docId;
     const pdf = appearance.pdf.slice().buffer as ArrayBuffer;
-    const pageIndex = appearance.pageIndex ?? 0;
     const submission = this.queue.enqueue<WorkerResultPayload>(
       {
         buildPack: (jobId: JobId) =>
-          wirePack({ kind: 'forms.setSignatureAppearance', jobId, docId, ref, pdf, pageIndex }, [
-            pdf,
-          ]),
+          wirePack({ kind: 'forms.setSignatureAppearance', jobId, docId, ref, pdf }, [pdf]),
       },
       { priority: Priority.HIGH },
     );
@@ -256,30 +267,18 @@ export class LocalDocumentFormsService implements DocumentFormsService {
     });
   }
 
-  addWidget(
-    ref: FormFieldRef,
-    widget: AnnotationRef,
-    options?: { onState?: string },
-  ): AbortablePromise<FormWidgetLinkResult> {
+  addWidget(ref: FormFieldRef, placement: WidgetPlacement): AbortablePromise<FormWidgetLinkResult> {
     const rejected = this.gate('doc.forms.modify');
     if (rejected) return rejected;
     const docId = this.docId;
-    const onState = options?.onState;
     const submission = this.queue.enqueue<WorkerResultPayload>(
       {
         buildPack: (jobId: JobId) =>
-          wirePack({
-            kind: 'forms.attachWidget',
-            jobId,
-            docId,
-            ref,
-            widget,
-            ...(onState ? { onState } : {}),
-          }),
+          wirePack({ kind: 'forms.addWidget', jobId, docId, ref, placement }),
       },
       { priority: Priority.HIGH },
     );
-    return this.await(submission, 'forms.attachWidget', (payload) => {
+    return this.await(submission, 'forms.addWidget', (payload) => {
       this.publisher.publishLocal({ type: 'forms.widgetAdded', ...payload.result });
       return payload.result;
     });

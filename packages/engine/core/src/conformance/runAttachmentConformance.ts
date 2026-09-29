@@ -48,7 +48,7 @@ export function runAttachmentConformance(
       const probe = await openFixture(engine, opts);
       docSupported = probe.attachments !== undefined;
       const pages = await probe.pages.list();
-      firstPageObjectNumber = pages.pages[0].ref.pageObjectNumber;
+      firstPageObjectNumber = pages.pages[0].ref.objectNumber;
       annotSupported =
         probe.page(toPageRef(firstPageObjectNumber)).annotations.downloadResource !== undefined;
       await probe.close();

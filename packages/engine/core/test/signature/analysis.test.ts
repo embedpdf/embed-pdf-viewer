@@ -7,6 +7,7 @@ import {
   stableStringify,
   type ObjectChange,
   type ObjectReferrer,
+  type PdfCoordinates,
   type RevisionStructure,
   type SignatureDTO,
 } from '../../src/shared';
@@ -97,11 +98,11 @@ function change(
 function signature(
   index: number,
   fieldObjectNumber: number,
-  extra: Partial<SignatureDTO> = {},
-): SignatureDTO {
+  extra: Partial<SignatureDTO<PdfCoordinates>> = {},
+): SignatureDTO<PdfCoordinates> {
   return {
     index,
-    field: { kind: 'objectNumber', fieldObjectNumber },
+    field: { kind: 'objectNumber', objectNumber: fieldObjectNumber },
     fieldName: `sig${index}`,
     widget: null,
     signed: true,

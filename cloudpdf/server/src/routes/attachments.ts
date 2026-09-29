@@ -266,7 +266,15 @@ export async function registerAttachmentRoutes(
     const { docId, layerName } = req.params as { docId: string; layerName: string };
     const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
     const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
-    const ctx = requireLayerCapability(req, docId, layerName, 'doc.attachments.modify', pdfBits);
+    const protection = await documentService.getProtection(accessCtx, docId, layerName);
+    const ctx = requireLayerCapability(
+      req,
+      docId,
+      layerName,
+      'doc.attachments.modify',
+      pdfBits,
+      protection,
+    );
     // Attachments accept any binary format — that is the point of the
     // kind — so every resource part rides the 'any' policy.
     const { body, resources } = await readMutationEnvelope(req, () => 'any');
@@ -293,7 +301,15 @@ export async function registerAttachmentRoutes(
     };
     const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
     const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
-    const ctx = requireLayerCapability(req, docId, layerName, 'doc.attachments.modify', pdfBits);
+    const protection = await documentService.getProtection(accessCtx, docId, layerName);
+    const ctx = requireLayerCapability(
+      req,
+      docId,
+      layerName,
+      'doc.attachments.modify',
+      pdfBits,
+      protection,
+    );
     const ref = attachmentRefFromPath(fileKey);
     setNoStore(reply);
     return layerService.deleteAttachment(ctx, { docId, layerName, ref }, abortSignalOf(reply));

@@ -73,6 +73,8 @@ const INERT_KEYS: ReadonlySet<string> = new Set([
   'reply',
   'popup',
   'parent',
+  // Whether a comment window shows open: the window's state, never painted.
+  'open',
   'groupId',
   'subject',
   'state',

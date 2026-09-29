@@ -3,7 +3,7 @@ import type {
   DocumentProtection,
   SignatureDTO,
 } from '@embedpdf/engine-core/runtime';
-import { EngineError, EngineErrorCode } from '@embedpdf/engine-core/runtime';
+import { EngineError, EngineErrorCode, pageSignatureOf } from '@embedpdf/engine-core/runtime';
 import type { PdfRuntimeModule } from '@embedpdf/engine-runtime';
 
 import { writeContentsIntoFile } from './internal/candidateStore';
@@ -14,6 +14,7 @@ import { DocumentSession } from '../../document-session/DocumentSession';
 import type { BaseDocumentRegistry } from '../../document-session/lifecycle/BaseDocumentRegistry';
 import { openLayerDocument } from '../../document-session/lifecycle/PdfDocumentOpener';
 import { generateUuid } from '../../shared/uuid';
+import { visibleBoxReader } from '../pages/PagesReader';
 
 export interface FinalizeCandidateInput {
   /** The rebuilt candidate on this filesystem; patched in place. */
@@ -26,6 +27,7 @@ export interface FinalizeCandidateInput {
 }
 
 export interface FinalizedCandidate {
+  /** In page space: no session outlives the finalize to measure it later. */
   signature: SignatureDTO;
   protection: DocumentProtection;
   version: BaseVersionInfo;
@@ -99,10 +101,13 @@ export class CandidateFinalizer {
       const reader = new SignatureReader(this.runtime, session);
       const snapshot = reader.readSnapshot();
       const signature = snapshot.signatures.find(
-        (s) =>
-          s.field.kind === 'objectNumber' && s.field.fieldObjectNumber === input.fieldObjectNumber,
+        (s) => s.field.kind === 'objectNumber' && s.field.objectNumber === input.fieldObjectNumber,
       )!;
-      return { signature, protection: snapshot.protection, version: reader.version() };
+      return {
+        signature: pageSignatureOf(signature, visibleBoxReader(this.runtime, session)),
+        protection: snapshot.protection,
+        version: reader.version(),
+      };
     } finally {
       // Releases the base acquisition through the handle's close stack.
       session.close();

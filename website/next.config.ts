@@ -11,7 +11,7 @@ import { remarkEngineAxis } from '@embedpdf/docs-kit/mdx';
 import { remarkInstallChannel } from '@embedpdf/docs-kit/mdx/install-channel';
 
 import { DOCS_SITE } from './src/docs-site';
-import { engineDocsRedirects } from '../docs/content/redirects.mjs';
+import { docsRedirects } from '../docs/content/redirects.mjs';
 import { rehypeCodeExample } from './src/lib/rehype-code-example';
 import { remarkCodeExample } from './src/lib/remark-code-example';
 
@@ -118,9 +118,9 @@ const withNextra = nextra({
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
-  // The engine docs' pages that moved (docs/content/redirects.mjs).
+  // The docs pages that moved (docs/content/redirects.mjs).
   async redirects() {
-    return engineDocsRedirects(DOCS_SITE.engine);
+    return docsRedirects(DOCS_SITE.engine);
   },
   // The docs kit ships raw TypeScript source (workspace package).
   transpilePackages: ['@embedpdf/docs-kit'],

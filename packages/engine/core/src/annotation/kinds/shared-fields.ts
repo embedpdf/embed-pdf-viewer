@@ -12,6 +12,7 @@ import { PdfPointSchema, PdfQuadSchema, PdfRectSchema } from '../../geometry/sch
 import { PageRefSchema } from '../../identity/PageRef.schema';
 import {
   AnnotationBorderStyleSchema,
+  DrawnBorderStyleSchema,
   AnnotationRefSchema,
   BlendModeSchema,
   ColorSchema,
@@ -89,7 +90,12 @@ export const colorStyleFields = {
 export const geometryStyleFields = {
   ...colorStyleFields,
   strokeWidth: field.data(z.number().nonnegative()).optional(),
-  borderStyle: field.data(AnnotationBorderStyleSchema).optional(),
+  /** `beveled` and `inset` are read from other apps' files and kept; only widgets draw them. */
+  borderStyle: field
+    .data(AnnotationBorderStyleSchema)
+    .writes(DrawnBorderStyleSchema)
+    .readBack()
+    .optional(),
   dashArray: field.data(z.array(z.number().nonnegative())).nullable().optional(),
 };
 

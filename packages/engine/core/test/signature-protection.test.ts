@@ -2,15 +2,18 @@ import { describe, expect, test } from 'vitest';
 
 import {
   deriveProtection,
+  describeProtection,
+  isProtectableCapability,
   protectedCapabilities,
   APPROVAL_BASELINE,
+  PROTECTABLE_CAPABILITIES,
   SIGNATURE_POLICY_VERSION,
 } from '../src/signature/protection';
 import type { SignatureDTO } from '../src/signature/types';
 
 const sig = (over: Partial<SignatureDTO>): SignatureDTO => ({
   index: 0,
-  field: { kind: 'objectNumber', fieldObjectNumber: 10 },
+  field: { kind: 'objectNumber', objectNumber: 10 },
   fieldName: 'sig',
   widget: null,
   signed: true,
@@ -86,5 +89,22 @@ describe('deriveProtection: enforced vs judged', () => {
     const p = deriveProtection([sig({ signed: false, lock: { action: 'all', fields: [] } })]);
     expect(p.fieldLocks).toEqual([]);
     expect(p.judged).toBeNull();
+  });
+
+  test('the protectable capabilities are exactly what the strictest protection removes', () => {
+    const strictest = deriveProtection([sig({ catalogCertification: true, docMdp: 1 })]);
+    expect([...protectedCapabilities(strictest)].sort()).toEqual(
+      [...PROTECTABLE_CAPABILITIES].sort(),
+    );
+    expect(isProtectableCapability('doc.forms.fill')).toBe(true);
+    expect(isProtectableCapability('doc.forms.read')).toBe(false);
+    expect(isProtectableCapability('doc.sign')).toBe(false);
+  });
+
+  test('a refusal names the certification and the capability', () => {
+    const p2 = deriveProtection([sig({ index: 0, catalogCertification: true, docMdp: 2 })]);
+    expect(describeProtection('doc.annotate.modify', p2)).toBe(
+      "the document is signed: certification signature 0 (permission 2) forbids 'doc.annotate.modify'",
+    );
   });
 });

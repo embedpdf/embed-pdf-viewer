@@ -33,14 +33,13 @@ const META = (over: Partial<DocumentMetadata> = {}): DocumentMetadata => ({
   createdAt: null,
   modifiedAt: null,
   trapped: 'unknown',
-  custom: {},
   ...over,
 });
 
 const box = { left: 0, bottom: 0, right: 600, top: 800 } as const;
 const page: PageLayout = {
   index: 0,
-  ref: { kind: 'objectNumber', pageObjectNumber: 1 },
+  ref: { kind: 'objectNumber', objectNumber: 1 },
   label: null,
   size: { width: 600, height: 800 },
   rotation: 0,
@@ -60,7 +59,10 @@ function deferred<T>() {
 }
 
 /** A document handle whose reads are controllable and whose writes emit the confirmed event. */
-function fakeDocument(options: { allowEdit?: boolean; readRejects?: unknown } = {}) {
+function fakeDocument(
+  options: { allowEdit?: boolean; readRejects?: unknown; custom?: Record<string, string> } = {},
+) {
+  let customKeys: Record<string, string> = { ...options.custom };
   const listeners = new Set<(event: unknown) => void>();
   const reads: Array<ReturnType<typeof deferred<DocumentMetadata>>> = [];
   const emit = (event: unknown) => listeners.forEach((listener) => listener(event));
@@ -90,6 +92,20 @@ function fakeDocument(options: { allowEdit?: boolean; readRejects?: unknown } = 
         emit({ type: 'metadata.updated', origin, ...result });
         return result;
       }),
+      custom: {
+        get: () => Promise.resolve({ ...customKeys }),
+        update: vi.fn(async (patch: Record<string, string | null>) => {
+          const next = { ...customKeys };
+          for (const [key, value] of Object.entries(patch)) {
+            if (value === null) delete next[key];
+            else next[key] = value;
+          }
+          customKeys = next;
+          const result = { custom: next, meta: { affectedPages: [], cacheDelta: null } };
+          emit({ type: 'metadata.customUpdated', origin, ...result });
+          return result;
+        }),
+      },
     },
     close: () => Promise.resolve(),
   } as unknown as DocumentHandle;
@@ -105,11 +121,11 @@ const open = (kernel: ReturnType<typeof createKernel>) =>
 const tick = () => new Promise((resolve) => setTimeout(resolve));
 
 describe('model', () => {
-  it('changedKeys is shallow, with custom compared by entries', () => {
-    const metadata = META({ title: 'x', custom: { k: '1' } });
+  it('changedKeys compares shallowly and counts removed keys', () => {
+    const metadata = META({ title: 'x' });
     expect(changedKeys(null, metadata)).toHaveLength(Object.keys(metadata).length);
-    expect(changedKeys(metadata, META({ title: 'y', custom: { k: '1' } }))).toEqual(['title']);
-    expect(changedKeys(metadata, META({ title: 'x', custom: { k: '2' } }))).toEqual(['custom']);
+    expect(changedKeys(metadata, META({ title: 'y' }))).toEqual(['title']);
+    expect(changedKeys({ a: '1', b: '2' }, { a: '1', c: '3' })).toEqual(['b', 'c']);
   });
 });
 
@@ -236,6 +252,59 @@ describe('metadata controller', () => {
       (error) =>
         isPluginError(error, 'instance-closed') || isPluginError(error, 'permission-denied'),
     );
+    await kernel.destroy();
+  });
+});
+
+describe('custom metadata', () => {
+  it('seeds its own snapshot, separate from the standard fields', async () => {
+    const doc = fakeDocument({ custom: { reviewedBy: 'dana' } });
+    const kernel = createKernel({ engine: doc.engine, plugins: [metadataPlugin()] });
+    await kernel.start();
+    await open(kernel);
+    const api = kernel.capability(MetadataToken, 'doc');
+    await tick();
+    expect(api.custom.getStatus()).toBe('ready');
+    expect(api.custom.getSnapshot()).toEqual({ reviewedBy: 'dana' });
+    expect(api.getSnapshot()).toBeNull(); // the standard read is still pending
+    await kernel.destroy();
+  });
+
+  it('update(): a key left out stays, null removes, and onUpdated names every changed key', async () => {
+    const doc = fakeDocument({ custom: { reviewedBy: 'dana', draftOwner: 'sam', keep: 'me' } });
+    const kernel = createKernel({ engine: doc.engine, plugins: [metadataPlugin()] });
+    await kernel.start();
+    await open(kernel);
+    const api = kernel.capability(MetadataToken, 'doc');
+    await tick();
+
+    const order: string[] = [];
+    api.custom.onUpdated((event) =>
+      order.push(`event:${event.changedKeys.join(',')}:${event.origin.locality}`),
+    );
+    const standard = vi.fn();
+    api.onUpdated(standard);
+    const result = await api.custom
+      .update({ reviewedBy: 'lee', draftOwner: null })
+      .then((updateResult) => (order.push('resolved'), updateResult));
+
+    expect(result.custom).toEqual({ reviewedBy: 'lee', keep: 'me' });
+    expect(api.custom.getSnapshot()).toEqual({ reviewedBy: 'lee', keep: 'me' });
+    expect(order).toEqual(['event:reviewedBy,draftOwner:local', 'resolved']);
+    expect(standard).not.toHaveBeenCalled();
+    await kernel.destroy();
+  });
+
+  it('update() refuses without doc.metadata.modify, like the standard fields', async () => {
+    const doc = fakeDocument({ allowEdit: false });
+    const kernel = createKernel({ engine: doc.engine, plugins: [metadataPlugin()] });
+    await kernel.start();
+    await open(kernel);
+    const api = kernel.capability(MetadataToken, 'doc');
+    await expect(api.custom.update({ k: 'v' })).rejects.toSatisfy((error) =>
+      isPluginError(error, 'permission-denied'),
+    );
+    expect(doc.handle.metadata.custom.update).not.toHaveBeenCalled();
     await kernel.destroy();
   });
 });

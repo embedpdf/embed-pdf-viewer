@@ -75,8 +75,8 @@ export class CloudPageTextService implements PageTextService {
   }
 
   private leafPath(leaf: 'text' | 'geometry', manifest: DocumentManifest): string {
-    const pageObjectNumber = this.pageRef.pageObjectNumber;
-    const page = manifest.pages.find((p) => p.state.page.pageObjectNumber === pageObjectNumber);
+    const pageObjectNumber = this.pageRef.objectNumber;
+    const page = manifest.pages.find((p) => p.state.page.objectNumber === pageObjectNumber);
     if (!page) {
       throw new EngineError(
         EngineErrorCode.NotFound,

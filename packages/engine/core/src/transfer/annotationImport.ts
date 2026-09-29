@@ -2,9 +2,11 @@ import type { AnnotationBundle } from './AnnotationBundle';
 import { mapPageRefs, pageRefsIn } from './pageRefs';
 import {
   AnnotationDraftSchema,
+  declarationOf,
   type AnnotationDraft,
   type AnnotationDTO,
 } from '../annotation/kinds';
+import type { KindFields } from '../annotation/declaration';
 import type { AnnotationReplyType } from '../annotation/primitives';
 import type { PdfActionTree } from '../dto/PdfAction';
 import { EngineError } from '../errors/EngineError';
@@ -71,12 +73,20 @@ export type AnnotationDropReason =
    * that no field of the kind writes.
    */
   | 'unsupported-action'
+  /**
+   * A value another app wrote that a write can't make: a shape's beveled or
+   * inset border, a typewriter's intent, a polyline of one point. An
+   * optional field is left out; an item whose shape it is, is left out.
+   */
+  | 'unsupported-value'
   /** Its `nm` is used on the target page already, or by an earlier item. */
   | 'name-conflict'
   /** Its `reply.to` or `parent` is an item that was left out. */
   | 'parent-dropped'
   /** Its `reply.to` or `parent` is no item of the bundle on its page. */
-  | 'parent-missing';
+  | 'parent-missing'
+  /** A popup whose parent has another, an earlier item: an annotation has one popup. */
+  | 'popup-taken';
 
 export interface AnnotationImportDrop {
   /** The annotation, as the bundle names it. */
@@ -109,14 +119,14 @@ export function annotationImportFacts(
     const { page } = annotation.ref;
     const id: AnnotationStableId =
       annotation.ref.kind === 'objectNumber'
-        ? { kind: 'objectNumber', value: annotation.ref.annotObjectNumber }
-        : { kind: 'nm', value: annotation.nm! };
+        ? { kind: 'objectNumber', objectNumber: annotation.ref.objectNumber }
+        : { kind: 'nm', nm: annotation.nm! };
     return {
       page,
       annotation,
       meta: {
         affectedPages: result.meta.affectedPages.filter(
-          (state) => state.page.pageObjectNumber === page.pageObjectNumber,
+          (state) => state.page.objectNumber === page.objectNumber,
         ),
         cacheDelta: index === last ? result.meta.cacheDelta : null,
         changed: [id],
@@ -209,7 +219,7 @@ export function planAnnotationImport(input: {
       drops.set(index, 'unsupported-kind');
       return;
     }
-    if (data.subtype === 'widget' && data.fieldObjectNumber > 0) {
+    if (data.subtype === 'widget' && data.field !== null) {
       drops.set(index, 'form-field');
       return;
     }
@@ -218,7 +228,12 @@ export function planAnnotationImport(input: {
       drops.set(index, 'parent-missing');
       return;
     }
-    const markers = fieldMarkersOf(data);
+    const unwritable = unwritableValuesOf(data);
+    if (unwritable === 'item') {
+      drops.set(index, 'unsupported-value');
+      return;
+    }
+    const markers = [...fieldMarkersOf(data), ...unwritable];
     if (markers.length > 0) fieldDrops.set(index, markers);
     drafts.set(index, draftOf(data, markers, mapPage, index));
   });
@@ -244,6 +259,14 @@ export function planAnnotationImport(input: {
     if (linksOf(data).some((ref) => resolve(ref, index) === undefined)) {
       drops.set(index, 'parent-missing');
     }
+  });
+
+  const popupOf = new Map<number, number>();
+  items.forEach((data, index) => {
+    if (drops.has(index) || data.subtype !== 'popup' || !data.parent) return;
+    const parent = resolve(data.parent, index)!;
+    if (popupOf.has(parent)) drops.set(index, 'popup-taken');
+    else popupOf.set(parent, index);
   });
 
   const claimed = new Set<string>();
@@ -353,7 +376,7 @@ function fieldMarkersOf(
   if (measure?.subtype === 'geospatial') markers.push({ field: 'measure', reason: 'geospatial' });
   if (measure?.subtype === 'unknown') markers.push({ field: 'measure', reason: 'unknown-measure' });
   const target = data.subtype === 'link' ? data.target : null;
-  const carriedTarget = !!target && WRITABLE_LINK_TARGETS.has(target.kind);
+  const carriedTarget = !!target && isWritableLinkTarget(target);
   if (target && !carriedTarget) markers.push({ field: 'target', reason: 'unsupported-action' });
   // `actions` reads `/A` and `/AA`, and no write takes it. A copy has only
   // the `/A` a link's target writes: one go-to or URI action, without a
@@ -366,6 +389,27 @@ function fieldMarkersOf(
   return markers;
 }
 
+/**
+ * The values `data` reads that a write can't make (a `readBack()` field's
+ * read-only values), each left out; `'item'` when one is a field every
+ * create needs. A link's target is reported by {@link fieldMarkersOf}.
+ */
+function unwritableValuesOf(
+  data: AnnotationDTO,
+): Array<{ field: string; reason: AnnotationDropReason }> | 'item' {
+  const unwritable: Array<{ field: string; reason: AnnotationDropReason }> = [];
+  const declaration = declarationOf(data.subtype);
+  for (const [name, spec] of Object.entries(declaration?.fields ?? {})) {
+    const { owner, readBack, required } = spec.traits;
+    if (owner !== 'data' || !readBack || name === 'target') continue;
+    const value = (data as unknown as Record<string, unknown>)[name];
+    if (value == null || spec.write.safeParse(value).success) continue;
+    if (required) return 'item';
+    unwritable.push({ field: name, reason: 'unsupported-value' });
+  }
+  return unwritable;
+}
+
 /** Whether a link's `/A` is what writing its target writes again. */
 function writtenAsIs<Destination>(tree: PdfActionTree<Destination> | undefined): boolean {
   const root = tree?.root;
@@ -373,8 +417,19 @@ function writtenAsIs<Destination>(tree: PdfActionTree<Destination> | undefined):
   return !(root.type === 'uri' && root.isMap);
 }
 
-/** The link targets a write can make; the others read as markers. */
-const WRITABLE_LINK_TARGETS: ReadonlySet<string> = new Set(['goto', 'uri']);
+/** Whether a write can make a link's target; the others read as markers. */
+function isWritableLinkTarget(target: { kind: string; name?: string }): boolean {
+  return target.kind === 'named'
+    ? STANDARD_NAMED_ACTIONS.has(target.name ?? '')
+    : target.kind === 'goto' || target.kind === 'uri';
+}
+
+const STANDARD_NAMED_ACTIONS: ReadonlySet<string> = new Set([
+  'NextPage',
+  'PrevPage',
+  'FirstPage',
+  'LastPage',
+]);
 
 /** The create an item becomes, checked against its kind's create schema. */
 function draftOf(
@@ -385,8 +440,13 @@ function draftOf(
 ): AnnotationDraft {
   const fields = { ...data } as Record<string, unknown>;
   delete fields.reply;
-  // `null` is absent: the field is not written.
-  for (const { field } of markers) fields[field] = null;
+  // Left out, the field is not written: `null` where a write takes it,
+  // else the kind's default.
+  const declared: KindFields = declarationOf(data.subtype)?.fields ?? {};
+  for (const { field } of markers) {
+    if (declared[field]?.traits.writeNullable) fields[field] = null;
+    else delete fields[field];
+  }
   // Checked with the popup's `parent`, which the import then links itself.
   const checked = AnnotationDraftSchema.safeParse(fields);
   if (data.subtype === 'popup') delete fields.parent;

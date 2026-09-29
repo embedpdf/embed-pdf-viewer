@@ -42,7 +42,7 @@ export function readEmbedMetadata(
 ): EmbedMetadata | null {
   if (!fn.EPDFAnnot_HasEmbedMetadata(annotPtr)) return null;
 
-  const schemaVersion = readMetaNumber(fn, mem, annotPtr, 'SchemaVersion');
+  const schemaVersion = readEmbedMetadataNumber(fn, mem, annotPtr, 'SchemaVersion');
   const userId = readEmbedMetadataString(fn, mem, annotPtr, 'UserID');
   const groupId = readEmbedMetadataString(fn, mem, annotPtr, 'GroupID');
   const createdBy = readEmbedMetadataString(fn, mem, annotPtr, 'CreatedBy');
@@ -85,7 +85,8 @@ export function readEmbedMetadataString(
   }
 }
 
-function readMetaNumber(
+/** A number of /EMBD_Metadata, or `undefined` when it has none under `key`. */
+export function readEmbedMetadataNumber(
   fn: PdfFunctions,
   mem: PdfRuntimeMemory,
   annotPtr: Ptr,

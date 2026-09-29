@@ -187,4 +187,4 @@ export { InteractionToken } from './token';
  */
 export const samplePointOn = (sample: PointerSample, page: PageRef): Point | null =>
   sample.project?.(page) ??
-  (sample.page?.ref.pageObjectNumber === page.pageObjectNumber ? sample.page.point : null);
+  (sample.page?.ref.objectNumber === page.objectNumber ? sample.page.point : null);

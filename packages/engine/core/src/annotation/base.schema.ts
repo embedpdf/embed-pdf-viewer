@@ -6,6 +6,7 @@ import type {
   BlendMode,
   CaretIntent,
   Color,
+  DrawnBorderStyle,
   FreeTextIntent,
   InkIntent,
   LineEnding,
@@ -13,6 +14,7 @@ import type {
   StandardFont,
   StrikeoutIntent,
   TextAlignment,
+  VerticalAlignment,
 } from './primitives';
 import { STANDARD_FONTS } from './primitives';
 import { PdfPointSchema, PdfRectSchema } from '../geometry/schemas';
@@ -35,6 +37,9 @@ export const AnnotationBorderStyleSchema: z.ZodType<AnnotationBorderStyle> = z.e
   'beveled',
   'inset',
 ]);
+
+/** What a write takes for a border that isn't a widget's. */
+export const DrawnBorderStyleSchema: z.ZodType<DrawnBorderStyle> = z.enum(['solid', 'dashed']);
 
 export const LineEndingSchema: z.ZodType<LineEnding> = z.enum([
   'none',
@@ -61,6 +66,17 @@ export const TextAlignmentSchema: z.ZodType<TextAlignment> = z.enum(['left', 'ce
 export const FreeTextIntentSchema: z.ZodType<FreeTextIntent> = z.enum([
   'free-text',
   'free-text-callout',
+  'free-text-typewriter',
+]);
+
+/** The intents a write makes: a typewriter is only sent back as read. */
+export const FreeTextIntentWriteSchema: z.ZodType<Exclude<FreeTextIntent, 'free-text-typewriter'>> =
+  z.enum(['free-text', 'free-text-callout']);
+
+export const VerticalAlignmentSchema: z.ZodType<VerticalAlignment> = z.enum([
+  'top',
+  'middle',
+  'bottom',
 ]);
 
 export const CaretIntentSchema: z.ZodType<CaretIntent> = z.literal('replace');
@@ -91,8 +107,8 @@ export const BlendModeSchema: z.ZodType<BlendMode> = z.enum([
 export const AnnotationStableIdSchema: z.ZodType<AnnotationStableId> = z.discriminatedUnion(
   'kind',
   [
-    z.object({ kind: z.literal('objectNumber'), value: z.number().int().nonnegative() }),
-    z.object({ kind: z.literal('nm'), value: z.string() }),
+    z.object({ kind: z.literal('objectNumber'), objectNumber: z.number().int().nonnegative() }),
+    z.object({ kind: z.literal('nm'), nm: z.string() }),
   ],
 );
 
@@ -106,7 +122,7 @@ export const AnnotationRefSchema: z.ZodType<AnnotationRef> = z.discriminatedUnio
   z.object({
     kind: z.literal('objectNumber'),
     page: PageRefSchema,
-    annotObjectNumber: z.number().int().positive(),
+    objectNumber: z.number().int().positive(),
   }),
   z.object({
     kind: z.literal('nm'),

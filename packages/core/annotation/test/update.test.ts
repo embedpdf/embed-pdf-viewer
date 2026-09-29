@@ -23,7 +23,7 @@ const editPtr = (phase: 'down' | 'move' | 'up', x: number, y: number): Message =
 const square = (id: string, x: number): ModelAnnotation =>
   record({
     id,
-    ref: { kind: 'objectNumber', page: PAGE, annotObjectNumber: Number(id.slice(4)) },
+    ref: { kind: 'objectNumber', page: PAGE, objectNumber: Number(id.slice(4)) },
     page: PAGE,
     subtype: 'square',
     geometry: {

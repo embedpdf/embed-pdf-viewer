@@ -13,6 +13,13 @@ export type { AbortableExecutor } from './promise/AbortablePromise';
 export { AbortError, isAbortError } from './promise/AbortError';
 
 export type { Engine, EngineFactory } from './engine/Engine';
+export { isLocalEngine } from './engine/LocalEngine';
+export type { LocalEngine } from './engine/LocalEngine';
+export { isLocalDocument } from './engine/LocalDocumentHandle';
+export type { LocalDocumentHandle } from './engine/LocalDocumentHandle';
+export { isLocalPage } from './engine/LocalPageHandle';
+export type { LocalPageHandle } from './engine/LocalPageHandle';
+export { LOCAL_ENGINE_BRAND } from './engine/localEngineBrand';
 export type { FontService } from './engine/FontService';
 export type { DocumentFontSettings, FontEmbeddingPolicy } from './engine/DocumentFontSettings';
 export type { DocumentHandle } from './engine/DocumentHandle';
@@ -59,6 +66,7 @@ export { passwordPromptFromState } from './engine/passwordPrompt';
 export type { PasswordPrompt } from './engine/passwordPrompt';
 export type { DocumentCapabilities } from './engine/DocumentHandle';
 export type { MetadataService } from './engine/MetadataService';
+export type { CustomMetadataService } from './engine/CustomMetadataService';
 export type { PageHandle } from './engine/PageHandle';
 export type { PageMeasureService } from './engine/PageMeasureService';
 export type {
@@ -73,7 +81,10 @@ export type { WeakAnnotationEditSession } from './engine/DocumentAnnotationsServ
 export type { DocumentPagesService } from './engine/DocumentPagesService';
 export type { DocumentRedactionService } from './engine/DocumentRedactionService';
 export type { DocumentSignaturesService } from './engine/DocumentSignaturesService';
-export type { PageAnnotationsService } from './engine/PageAnnotationsService';
+export type {
+  LocalPageAnnotationsService,
+  PageAnnotationsService,
+} from './engine/PageAnnotationsService';
 export type { DocumentAttachmentsService } from './engine/DocumentAttachmentsService';
 export type {
   PieceInfoDeleteResult,
@@ -87,7 +98,7 @@ export type {
   PieceInfoSnapshot,
 } from './dto/PieceInfo';
 export type { PageTextService } from './engine/PageTextService';
-export type { PageRenderService } from './engine/PageRenderService';
+export type { LocalPageRenderService, PageRenderService } from './engine/PageRenderService';
 
 export { wirePack, EMPTY_TRANSFER } from './wire/WirePack';
 export type { WirePack } from './wire/WirePack';
@@ -105,6 +116,8 @@ export type {
   LayerOpenSource,
   MetadataReadWorkerRequest,
   MetadataUpdateWorkerRequest,
+  MetadataReadCustomWorkerRequest,
+  MetadataUpdateCustomWorkerRequest,
   ActionsReadWorkerRequest,
   AnnotationsListWorkerRequest,
   AnnotationsRenderAppearancesWorkerRequest,
@@ -169,7 +182,7 @@ export type {
   FormsUpdateFieldWorkerRequest,
   FormsSetSignatureAppearanceWorkerRequest,
   FormsDeleteFieldWorkerRequest,
-  FormsAttachWidgetWorkerRequest,
+  FormsAddWidgetWorkerRequest,
   FormsDetachWidgetWorkerRequest,
   FontsRegisterWorkerRequest,
   FontsAddFallbackWorkerRequest,

@@ -11,13 +11,13 @@ export namespace DocFormsList200ResponseFieldsItemComboboxWidgetsItemRef {
     export interface ObjectNumber {
         kind: "objectNumber";
         page: DocFormsList200ResponseFieldsItemComboboxWidgetsItemRefObjectNumber.Page;
-        annotObjectNumber: number;
+        objectNumber: number;
     }
 
     export namespace DocFormsList200ResponseFieldsItemComboboxWidgetsItemRefObjectNumber {
         export interface Page {
             kind: Page.Kind;
-            pageObjectNumber: number;
+            objectNumber: number;
         }
 
         export namespace Page {
@@ -37,7 +37,7 @@ export namespace DocFormsList200ResponseFieldsItemComboboxWidgetsItemRef {
     export namespace DocFormsList200ResponseFieldsItemComboboxWidgetsItemRefNm {
         export interface Page {
             kind: Page.Kind;
-            pageObjectNumber: number;
+            objectNumber: number;
         }
 
         export namespace Page {
@@ -58,7 +58,7 @@ export namespace DocFormsList200ResponseFieldsItemComboboxWidgetsItemRef {
     export namespace DocFormsList200ResponseFieldsItemComboboxWidgetsItemRefIndex {
         export interface Page {
             kind: Page.Kind;
-            pageObjectNumber: number;
+            objectNumber: number;
         }
 
         export namespace Page {
@@ -77,7 +77,7 @@ export namespace DocFormsList200ResponseFieldsItemComboboxWidgetsItemRef {
         export namespace Revision {
             export interface Page {
                 kind: Page.Kind;
-                pageObjectNumber: number;
+                objectNumber: number;
             }
 
             export namespace Page {

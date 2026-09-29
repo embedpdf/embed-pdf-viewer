@@ -82,8 +82,7 @@ export function createScriptEffects(
           continue;
         }
         const loaded = store.model().byId[`obj:${entry.annotObjectNumber}`];
-        const pageObjectNumber =
-          loaded?.annotation.page.pageObjectNumber ?? entry.page?.pageObjectNumber;
+        const pageObjectNumber = loaded?.annotation.page.objectNumber ?? entry.page?.objectNumber;
         let ref = refOf(loaded);
         let subtype: string | undefined = loaded?.annotation.subtype;
         if ((!ref || !subtype) && pageObjectNumber !== undefined) {
@@ -93,7 +92,7 @@ export function createScriptEffects(
             const dto = annotations.find(
               (candidate) =>
                 candidate.ref.kind === 'objectNumber' &&
-                candidate.ref.annotObjectNumber === entry.annotObjectNumber,
+                candidate.ref.objectNumber === entry.annotObjectNumber,
             );
             if (dto) {
               ref = dto.ref;

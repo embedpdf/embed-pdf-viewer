@@ -1,0 +1,241 @@
+---
+title: Opening documents
+description: Open PDFs in the viewer, show loading states and errors, ask for passwords, and say who the user is and what they may do.
+---
+
+{/* Generated from docs/content — edit there, then `pnpm docs:sync`. */}
+
+# Opening documents
+
+Give the viewer the documents to open when it starts, and `<DocumentGate>` shows your content once
+the document is ready:
+
+<Engine local>
+
+```tsx
+<Viewer
+  engine={engine}
+  plugins={plugins}
+  initialDocuments={[{ source: { kind: 'url', url: '/files/contract.pdf' } }]}
+>
+  <DocumentGate fallback={<Spinner />}>
+    <Stage>{() => <RenderLayer />}</Stage>
+  </DocumentGate>
+</Viewer>
+```
+
+</Engine>
+
+<Engine cloud>
+
+```tsx
+<Viewer
+  engine={engine}
+  plugins={plugins}
+  initialDocuments={[{ source: { kind: 'token', token: () => fetchDocumentToken('contract') } }]}
+>
+  <DocumentGate fallback={<Spinner />}>
+    <Stage>{() => <RenderLayer />}</Stage>
+  </DocumentGate>
+</Viewer>
+```
+
+</Engine>
+
+The viewer is on screen at once; the document opens in the background. Components outside
+`<DocumentGate>`, such as your toolbar's frame, render right away.
+
+## Open a document later
+
+`useDocuments()` opens documents while the app runs, for example one the user picked:
+
+```tsx
+function OpenButton() {
+  const documents = useDocuments();
+
+  const onPick = async (file: File) => {
+    await documents.open({ kind: 'bytes', bytes: await file.arrayBuffer() }, { name: file.name });
+  };
+
+  return <input type="file" accept="application/pdf" onChange={(e) => onPick(e.target.files![0])} />;
+}
+```
+
+`open()` resolves with `{ document }` once it's open, and the new document becomes the active one.
+Pass `{ activate: false }` to open it in the background.
+
+## Where a document comes from
+
+<Engine local>
+
+| Source                              | What it is                                                        |
+| :---------------------------------- | :---------------------------------------------------------------- |
+| `{ kind: 'url', url }`              | A file the viewer fetches. The URL can be relative to your site.  |
+| `{ kind: 'bytes', bytes }`          | A file you already have: an upload, a file picker, a download.    |
+| `async (signal) => source`          | Anything else: a function that returns one of the above.          |
+
+A function is how you add your own fetch, such as one with a login header. The viewer calls it
+under the document's loading state, and `signal` cancels the download if the user closes the
+document first:
+
+```ts
+const source = async (signal: AbortSignal) => {
+  const response = await fetch(`/api/files/${id}`, { headers: { authorization }, signal });
+  return { kind: 'bytes', bytes: await response.arrayBuffer() };
+};
+```
+
+</Engine>
+
+<Engine cloud>
+
+| Source                                   | What it is                                                         |
+| :--------------------------------------- | :----------------------------------------------------------------- |
+| `{ kind: 'token', token }`               | A document your backend gave the user a token for.                 |
+| `{ kind: 'share', shareToken }`          | A document opened with a public share link.                        |
+| `{ kind: 'id', id }`                     | A document by its id, when the engine has a token for the user.    |
+
+Pass `token` as a function, so a long session always has a fresh one. See
+[Authentication](/docs/engine/authentication).
+
+</Engine>
+
+## Loading, errors and passwords
+
+`<DocumentGate>` has something to show for each state a document can be in:
+
+```tsx
+<DocumentGate
+  fallback={<Spinner />}
+  locked={(document) => <PasswordForm document={document} />}
+  error={(document) => <p>Couldn't open {document.name}: {document.error.message}</p>}
+>
+  <Stage>{() => <RenderLayer />}</Stage>
+</DocumentGate>
+```
+
+A password-protected PDF opens **locked**. Ask for the password and unlock it:
+
+```tsx
+function PasswordForm({ document }: { document: DocumentInfo }) {
+  const documents = useDocuments();
+  const [wrong, setWrong] = useState(false);
+
+  const submit = async (password: string) => {
+    try {
+      await documents.unlock(document.id, { password });
+    } catch {
+      setWrong(true); // it stays locked; ask again
+    }
+  };
+
+  return <PasswordPrompt onSubmit={submit} wrong={wrong} />;
+}
+```
+
+After an error, such as a network failure, `documents.retry(id)` tries again.
+
+To show the state yourself, for example on a tab, `useDocument()` gives you the document's
+`status`: `'loading'`, `'locked'`, `'ready'` or `'error'`.
+
+## Who the user is and what they may do
+
+<Engine local>
+
+Tell the viewer who the user is and what they may do, once. Every document it opens uses them:
+
+```tsx
+<Viewer
+  engine={engine}
+  plugins={plugins}
+  identity={{ userId: 'u_381', displayName: 'Dana Smith' }}
+  scope={['doc.open', 'doc.render', 'doc.text.select', 'doc.annotate.read', 'annotations:create:self']}
+/>
+```
+
+- **`identity`** is who the user is. Their `displayName` becomes the author of the annotations they
+  make.
+- **`scope`** is what they may do, as a list of permissions. Leave it out and they may do
+  everything; the engine reminds you once in the console.
+
+A document can have its own, which replace the viewer's for that document:
+
+```tsx
+initialDocuments={[{ source, scope: ['doc.open', 'doc.render'] }]} // this one is read-only
+```
+
+[Permissions](../concepts/permissions) lists every permission.
+
+</Engine>
+
+<Engine cloud>
+
+Who the user is and what they may do come from the document's token, so the server decides. See
+[What a token carries](/docs/engine/authentication#what-a-token-carries).
+
+</Engine>
+
+## Close a document
+
+```ts
+await documents.close(document.id);
+```
+
+Closing frees the document's memory in the engine. The next document becomes the active one.
+
+## Events
+
+```ts
+useDocumentsEvent(
+  (documents) => documents.onOpenFailed,
+  ({ error }) => toast(`Couldn't open the file: ${error.message}`),
+);
+```
+
+| Event            | Fires when                                          | Carries                     |
+| :--------------- | :-------------------------------------------------- | :-------------------------- |
+| `onOpened`       | A document is open and ready                        | `documentId`, `info`        |
+| `onOpenFailed`   | A document couldn't be opened                       | `documentId`, `error`       |
+| `onLocked`       | A document needs a password                         | `documentId`, `passwordProvided` |
+| `onClosed`       | A document was closed                               | `documentId`                |
+| `onActiveChanged`| Another document became the active one              | `documentId`, `previousDocumentId` |
+| `onPagesChanged` | Pages were added, removed, moved or rotated         | `documentId`, `pages`       |
+
+## Good to know
+
+### Opening large files
+
+<Engine local>
+
+The local engine needs the whole file before it can show the first page, so a large PDF on a slow
+connection takes as long as its download.
+
+<CloudPdfCallout
+  title="Open a 500 MB PDF in a second"
+  href="https://www.cloudpdf.com/docs/headless/documents/opening"
+  cta="Open documents with CloudPDF"
+>
+
+With CloudPDF, the file stays on your server. The viewer asks only for the pages on screen, as
+images, so the first page shows at once whatever the file's size, and a user who may not download
+the file never receives it.
+
+</CloudPdfCallout>
+
+</Engine>
+
+<Engine cloud>
+
+The file stays on your server: the viewer asks only for the pages on screen, so the first page shows
+at once whatever the file's size.
+
+</Engine>
+
+### `initialDocuments` is read once
+
+Like `engine` and `plugins`, the viewer reads `initialDocuments` when it mounts. To open another
+document later, use `documents.open()`.
+
+### Several documents
+
+A viewer can hold several documents at once, like tabs. See [Several documents](tabs).

@@ -54,13 +54,13 @@ async function boot(file: string, options?: { config?: ActionsConfig }) {
     actions.dispatch({
       scope: 'annotation',
       event: 'cursorEnter',
-      ref: { kind: 'objectNumber', page: toPageRef(firstPage), annotObjectNumber: 999 },
+      ref: { kind: 'objectNumber', page: toPageRef(firstPage), objectNumber: 999 },
       page: toPageRef(firstPage),
     });
   const ref = (annotObjectNumber: number): AnnotationRef => ({
     kind: 'objectNumber',
     page: toPageRef(firstPage),
-    annotObjectNumber,
+    objectNumber: annotObjectNumber,
   });
 
   return {

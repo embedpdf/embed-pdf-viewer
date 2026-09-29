@@ -181,9 +181,19 @@ const CASES: PredictionCase[] = [
   },
   { name: 'free text: a new color', draft: FREE_TEXT, patch: { color: '#0000ff' } },
   {
-    name: 'free text: the text color handed back to color',
-    draft: { ...FREE_TEXT, fontColor: '#ff0000' } as AnnotationDraft,
-    patch: { fontColor: null },
+    name: "free text: a new text color leaves the border's",
+    draft: { ...FREE_TEXT, color: '#0000ff' } as AnnotationDraft,
+    patch: { fontColor: '#ff0000' },
+  },
+  {
+    name: 'free text: a partial rich body merges over the current one',
+    draft: FREE_TEXT,
+    patch: {
+      richText: {
+        body: { size: 20, align: 'center' },
+        paragraphs: [{ runs: [{ text: 'Bigger' }] }],
+      },
+    },
   },
   { name: 'free text: a new alignment', draft: FREE_TEXT, patch: { textAlign: 'center' } },
   {
@@ -304,7 +314,7 @@ const CREATE_CASES: CreateCase[] = [
   { name: 'squiggly, as little as it takes', draft: { subtype: 'squiggly', quadPoints: [QUAD] } },
   { name: 'strikeout, as little as it takes', draft: { subtype: 'strikeout', quadPoints: [QUAD] } },
   { name: 'caret, as little as it takes', draft: { subtype: 'caret', box: BOX } },
-  { name: 'free text, as little as it takes', draft: { ...FREE_TEXT, contents: undefined } },
+  { name: 'free text, as little as it takes', draft: { subtype: 'free-text', box: BOX } },
   { name: 'note, as little as it takes', draft: { subtype: 'text', rect: iconRect(400, 72) } },
   { name: 'link, as little as it takes', draft: { subtype: 'link', rect: BOX, target: null } },
   { name: 'redaction, as little as it takes', draft: { subtype: 'redact', rect: BOX } },
@@ -366,6 +376,7 @@ const CREATE_CASES: CreateCase[] = [
     },
   },
   { name: 'a callout', draft: CALLOUT },
+  { name: 'a callout without an intent', draft: { ...CALLOUT, intent: undefined } },
   {
     name: 'a distance',
     draft: {
@@ -518,7 +529,7 @@ export function runAnnotationPredictionConformance(
       engine = await opts.makeEngine();
       doc = await opts.open(engine);
       const { pages } = await doc.pages.list();
-      page = doc.page(toPageRef(pages[0]!.ref.pageObjectNumber));
+      page = doc.page(toPageRef(pages[0]!.ref.objectNumber));
     });
 
     afterAll(async () => {

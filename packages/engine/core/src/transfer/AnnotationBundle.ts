@@ -210,8 +210,8 @@ function isPageRef(value: unknown): value is PageRef {
   return (
     isRecord(value) &&
     value.kind === 'objectNumber' &&
-    Number.isInteger(value.pageObjectNumber) &&
-    (value.pageObjectNumber as number) > 0
+    Number.isInteger(value.objectNumber) &&
+    (value.objectNumber as number) > 0
   );
 }
 

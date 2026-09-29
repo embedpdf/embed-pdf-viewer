@@ -54,8 +54,8 @@ export function runPageExtractConformance(
 
         // Extract is a read: the source layout is exactly what it was.
         const after = await doc.pages.list();
-        expect(after.pages.map((p) => p.ref.pageObjectNumber)).toEqual(
-          before.pages.map((p) => p.ref.pageObjectNumber),
+        expect(after.pages.map((p) => p.ref.objectNumber)).toEqual(
+          before.pages.map((p) => p.ref.objectNumber),
         );
         expect(after.pageCount).toBe(before.pageCount);
       } finally {
@@ -105,7 +105,7 @@ export function runPageExtractConformance(
       const doc = await openFixture(engine, opts);
       try {
         const list = await doc.pages.list();
-        const pageObjectNumber = list.pages[0].ref.pageObjectNumber;
+        const pageObjectNumber = list.pages[0].ref.objectNumber;
         let caught: unknown;
         try {
           await doc.pages.extract([toPageRef(pageObjectNumber), toPageRef(pageObjectNumber)]);
@@ -123,7 +123,7 @@ export function runPageExtractConformance(
       try {
         const list = await doc.pages.list();
         let bogus = 0;
-        for (const p of list.pages) bogus = Math.max(bogus, p.ref.pageObjectNumber);
+        for (const p of list.pages) bogus = Math.max(bogus, p.ref.objectNumber);
         bogus += 9999;
 
         let caught: unknown;

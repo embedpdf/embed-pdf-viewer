@@ -16,7 +16,7 @@ export namespace DocPagesRemoveName200ResponseLayoutNamedPagesItemTarget {
     export namespace DocPagesRemoveName200ResponseLayoutNamedPagesItemTargetPage {
         export interface Page {
             kind: Page.Kind;
-            pageObjectNumber: number;
+            objectNumber: number;
         }
 
         export namespace Page {

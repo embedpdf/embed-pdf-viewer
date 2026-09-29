@@ -55,7 +55,7 @@ describe('recalculation', () => {
     });
     const before = await doc.forms.list();
     const guests = before.fields.find((field) => field.name === 'guests')!;
-    const result = await controller.commit(guests.ref, { type: 'text', value: '50' });
+    const result = await controller.commit(guests.ref, { value: '50' });
     expect(result.status).toBe('applied');
     expect(result.error ?? null).toBeNull();
     expect(result.diagnostics).toEqual([]);

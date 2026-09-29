@@ -17,7 +17,7 @@ const second = toPageRef(7);
 const refOf = (page: PageRef, annotObjectNumber: number): AnnotationRef => ({
   kind: 'objectNumber',
   page,
-  annotObjectNumber,
+  objectNumber: annotObjectNumber,
 });
 
 /** An annotation as a read returns it, with the fields the plan looks at. */
@@ -45,9 +45,7 @@ function annotation(
 
 function bundleOf(...items: AnnotationDTO[]): Pick<AnnotationBundle, 'pages' | 'items'> {
   const pages = [first, second]
-    .filter((page) =>
-      items.some((item) => item.ref.page.pageObjectNumber === page.pageObjectNumber),
-    )
+    .filter((page) => items.some((item) => item.ref.page.objectNumber === page.objectNumber))
     .map((page, position) => ({ page, position: position === 0 ? 0 : 4, size }));
   return { pages, items: items.map((data) => ({ data, resources: {} })) };
 }
@@ -278,12 +276,12 @@ describe('planAnnotationImport', () => {
   test("leaves out a form field's widget, which travels with its field", () => {
     const field = annotation(first, 10, 0, {
       subtype: 'widget',
-      fieldObjectNumber: 44,
+      field: { kind: 'objectNumber', objectNumber: 44 },
       fieldFamily: 'text',
     });
     const inert = annotation(first, 11, 1, {
       subtype: 'widget',
-      fieldObjectNumber: 0,
+      field: null,
       fieldFamily: 'unknown',
     });
     const { creates, dropped } = plan(bundleOf(field, inert));

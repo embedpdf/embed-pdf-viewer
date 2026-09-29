@@ -1,0 +1,262 @@
+---
+title: Setup
+description: Install the headless packages for your framework, create the engine once, and use them with server-side rendering.
+---
+
+{/* Generated from docs/content — edit there, then `pnpm docs:sync`. */}
+
+import { Callout } from '@/components/docs/callout';
+
+# Setup
+
+A headless viewer needs two packages: the one for your framework, and an engine. This page
+installs them, creates the engine for your whole app, and covers server-side rendering, bundlers
+and fonts.
+
+## Install
+
+<Fw only="react">
+<Engine local>
+```sh npm2yarn
+npm install @embedpdf/react @embedpdf/engine
+```
+</Engine>
+<Engine cloud>
+```sh npm2yarn
+npm install @embedpdf/react @cloudpdf/engine
+```
+</Engine>
+</Fw>
+
+<Fw only="vue">
+<Engine local>
+```sh npm2yarn
+npm install @embedpdf/vue @embedpdf/engine
+```
+</Engine>
+<Engine cloud>
+```sh npm2yarn
+npm install @embedpdf/vue @cloudpdf/engine
+```
+</Engine>
+</Fw>
+
+<Fw only="svelte">
+<Engine local>
+```sh npm2yarn
+npm install @embedpdf/svelte @embedpdf/engine
+```
+</Engine>
+<Engine cloud>
+```sh npm2yarn
+npm install @embedpdf/svelte @cloudpdf/engine
+```
+</Engine>
+</Fw>
+
+<Fw only="angular">
+<Engine local>
+```sh npm2yarn
+npm install @embedpdf/angular @embedpdf/engine
+```
+</Engine>
+<Engine cloud>
+```sh npm2yarn
+npm install @embedpdf/angular @cloudpdf/engine
+```
+</Engine>
+</Fw>
+
+The framework package holds every plugin, one import path each (`@embedpdf/react/search`,
+`@embedpdf/react/annotation`). A plugin you don't import isn't in your bundle.
+
+## Create the engine once
+
+Create one engine when your app starts, and share it with every viewer:
+
+<Engine local>
+
+```ts
+// pdf.ts
+import { localEngine } from '@embedpdf/engine';
+
+export const engine = localEngine();
+```
+
+Creating the engine is instant and allocates nothing. The viewer starts it when it mounts, and
+PDFium boots in a Web Worker in the background.
+
+</Engine>
+
+<Engine cloud>
+
+```ts
+// pdf.ts
+import { cloudEngine } from '@cloudpdf/engine';
+
+export const engine = cloudEngine({ baseUrl: 'https://pdf.example.com' });
+```
+
+`baseUrl` is your CloudPDF server. Creating the engine makes no request.
+
+</Engine>
+
+`<Viewer>` can also own the engine. Pass a function, and the viewer creates the engine when it
+mounts and destroys it when it unmounts:
+
+<Engine local>
+
+```tsx
+<Viewer engine={() => localEngine()} plugins={plugins} />
+```
+
+</Engine>
+
+<Engine cloud>
+
+```tsx
+<Viewer engine={() => cloudEngine({ baseUrl: 'https://pdf.example.com' })} plugins={plugins} />
+```
+
+</Engine>
+
+An engine you pass in yourself is never destroyed by the viewer, so one engine can serve every
+viewer in your app.
+
+## Register the plugins
+
+Plugins are a list you create once, next to the engine:
+
+```ts
+import { stagePlugin } from '@embedpdf/react/stage';
+import { renderPlugin } from '@embedpdf/react/render';
+import { interactionPlugin } from '@embedpdf/react/interaction';
+import { selectionPlugin } from '@embedpdf/react/selection';
+
+export const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), selectionPlugin()];
+```
+
+The viewer reads `engine` and `plugins` once, when it mounts. Creating the list inside a component
+would make a new list on every render; the viewer ignores it and warns you while you develop.
+
+Order doesn't matter, and a plugin that needs another says so when the app starts: the annotation
+plugin, for example, needs the interaction plugin.
+
+## Server-side rendering
+
+The headless packages render nothing on the server that needs the engine: the engine starts in the
+browser, when the viewer mounts. So a module-level engine is safe everywhere.
+
+<Fw only="react">
+
+In the Next.js App Router, mark the component that renders `<Viewer>` as a client component:
+
+```tsx
+'use client';
+
+import { Viewer } from '@embedpdf/react/runtime';
+import { engine, plugins } from './pdf';
+
+export function DocumentViewer() {
+  return <Viewer engine={engine} plugins={plugins}>{/* … */}</Viewer>;
+}
+```
+
+</Fw>
+
+<Fw only="vue">
+
+In Nuxt, render the viewer on the client only, inside `<ClientOnly>`.
+
+</Fw>
+
+<Fw only="svelte">
+
+In SvelteKit, render the viewer in the browser only, for example behind `{#if browser}` with
+`browser` from `$app/environment`.
+
+</Fw>
+
+<Fw only="angular">
+
+With Angular SSR, render the viewer in the browser only, with `@defer` or behind
+`isPlatformBrowser`.
+
+</Fw>
+
+<Engine local>
+
+## Bundlers and self-hosting
+
+The engine's worker and WebAssembly ship inside the package. Vite, webpack 5 (and Next.js), Rollup
+and Parcel pick them up with no configuration: nothing to copy, and nothing is fetched from a CDN.
+The engine loads from your own site, so it works offline and behind a firewall.
+
+If your setup can't bundle a worker, for example with a strict Content Security Policy, host the
+files yourself: [Self-hosting](/docs/viewer/self-hosting) lists every option.
+
+## Fonts
+
+Text the engine draws, such as a text box or a filled form field, needs a font with its characters.
+For languages the built-in fonts don't cover, give the engine a fallback font:
+
+```ts
+export const engine = localEngine({
+  fallbackFonts: [{ key: 'noto-cjk', familyName: 'Noto Sans CJK', url: '/fonts/NotoSansCJK.ttf' }],
+});
+```
+
+[Fonts](/docs/engine/documents/fonts) covers registering fonts and using them by name. Every other
+engine option is in the engine's [Setup](/docs/engine/setup#options).
+
+<CloudPdfCallout
+  title="The same viewer, on your server"
+  href="https://www.cloudpdf.com/docs/headless/setup"
+  cta="Set up CloudPDF"
+>
+
+Move a headless viewer to CloudPDF by changing one line: `localEngine()` becomes
+`cloudEngine({ baseUrl })`. Your plugins, components and hooks stay as they are. Files stay on
+your server, the first page shows without downloading the PDF, and fonts, limits and storage are
+the server's to configure.
+
+</CloudPdfCallout>
+
+</Engine>
+
+<Engine cloud>
+
+## Tokens
+
+Each document opens with a token your backend creates: it says who the user is and what they may
+do. Pass a function, so a long session gets fresh tokens:
+
+```tsx
+<Viewer
+  engine={engine}
+  plugins={plugins}
+  initialDocuments={[{ source: { kind: 'token', token: () => fetchDocumentToken(documentId) } }]}
+/>
+```
+
+[Authentication](/docs/engine/authentication) covers the three ways to open a document and what a
+token carries. Fonts, limits and storage are your server's configuration.
+
+</Engine>
+
+## Good to know
+
+### One viewer, many documents
+
+A viewer can hold several open documents at once, like tabs. See
+[Several documents](documents/tabs).
+
+### Changing `engine` or `plugins`
+
+Both are read once. To use another engine or another set of plugins, mount a new `<Viewer>`, for
+example by giving it a new `key`.
+
+<Callout type="info">
+  The ready-made [Viewer](/docs/viewer) uses these same packages. If you start there, everything on
+  these pages still applies when you move to headless.
+</Callout>

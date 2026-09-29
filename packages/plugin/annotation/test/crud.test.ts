@@ -27,11 +27,11 @@ const NO_FLAGS: AnnotationFlags = {
   lockedContents: false,
 };
 
-const squareDTO = (annotObjectNumber: number): FileAnnotation =>
+const squareDTO = (objectNumber: number): FileAnnotation =>
   ({
-    ref: { kind: 'objectNumber', page: PAGE, annotObjectNumber },
+    ref: { kind: 'objectNumber', page: PAGE, objectNumber },
     page: PAGE,
-    index: annotObjectNumber,
+    index: objectNumber,
     identityQuality: 'durable',
     nm: null,
     ...NO_FLAGS,

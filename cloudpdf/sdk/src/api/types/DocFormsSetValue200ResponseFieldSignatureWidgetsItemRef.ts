@@ -11,13 +11,13 @@ export namespace DocFormsSetValue200ResponseFieldSignatureWidgetsItemRef {
     export interface ObjectNumber {
         kind: "objectNumber";
         page: DocFormsSetValue200ResponseFieldSignatureWidgetsItemRefObjectNumber.Page;
-        annotObjectNumber: number;
+        objectNumber: number;
     }
 
     export namespace DocFormsSetValue200ResponseFieldSignatureWidgetsItemRefObjectNumber {
         export interface Page {
             kind: Page.Kind;
-            pageObjectNumber: number;
+            objectNumber: number;
         }
 
         export namespace Page {
@@ -37,7 +37,7 @@ export namespace DocFormsSetValue200ResponseFieldSignatureWidgetsItemRef {
     export namespace DocFormsSetValue200ResponseFieldSignatureWidgetsItemRefNm {
         export interface Page {
             kind: Page.Kind;
-            pageObjectNumber: number;
+            objectNumber: number;
         }
 
         export namespace Page {
@@ -58,7 +58,7 @@ export namespace DocFormsSetValue200ResponseFieldSignatureWidgetsItemRef {
     export namespace DocFormsSetValue200ResponseFieldSignatureWidgetsItemRefIndex {
         export interface Page {
             kind: Page.Kind;
-            pageObjectNumber: number;
+            objectNumber: number;
         }
 
         export namespace Page {
@@ -77,7 +77,7 @@ export namespace DocFormsSetValue200ResponseFieldSignatureWidgetsItemRef {
         export namespace Revision {
             export interface Page {
                 kind: Page.Kind;
-                pageObjectNumber: number;
+                objectNumber: number;
             }
 
             export namespace Page {

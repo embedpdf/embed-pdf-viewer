@@ -141,7 +141,7 @@ export function createRenderController(ctx: PluginContext<RenderState>, config: 
     return info!.size.width;
   };
   const allPageObjectNumbers = (): PageObjectNumber[] =>
-    (ctx.document()?.pages ?? []).map((info) => info.ref.pageObjectNumber);
+    (ctx.document()?.pages ?? []).map((info) => info.ref.objectNumber);
 
   // The one base-sizing path: renderSource, getSourceKey, conformViewport,
   // and (through the tile manager) engagement all go through baseAskWidth.
@@ -231,7 +231,7 @@ export function createRenderController(ctx: PluginContext<RenderState>, config: 
     const viewport = conformViewport(page, scale);
     const strategy = currentStrategy();
     const key = rasterKey(
-      page.pageObjectNumber,
+      page.objectNumber,
       viewport.kind === 'width' ? viewport.width : 0,
       annotations,
       strategy.format,
@@ -265,7 +265,7 @@ export function createRenderController(ctx: PluginContext<RenderState>, config: 
     // Exact-size renders share the store with the conformed door: a width
     // that matches a conformed raster (same format, default quality) is the
     // same key, so the cached image serves it.
-    const key = rasterKey(page.pageObjectNumber, width, annotations, format, options.quality);
+    const key = rasterKey(page.objectNumber, width, annotations, format, options.quality);
     return acquireRaster(
       page,
       key,
@@ -294,8 +294,8 @@ export function createRenderController(ctx: PluginContext<RenderState>, config: 
     };
     await Promise.all(Array.from({ length: Math.min(concurrency, queue.length) }, worker));
     // Report in input order, whatever the completion order was.
-    const inputOrder = new Map(pages.map((page, index) => [page.pageObjectNumber, index] as const));
-    const orderOf = (page: PageRef) => inputOrder.get(page.pageObjectNumber) ?? 0;
+    const inputOrder = new Map(pages.map((page, index) => [page.objectNumber, index] as const));
+    const orderOf = (page: PageRef) => inputOrder.get(page.objectNumber) ?? 0;
     applied.sort((left, right) => orderOf(left.page) - orderOf(right.page));
     failed.sort((left, right) => orderOf(left.ref) - orderOf(right.ref));
     return { applied, skipped: [], failed };
@@ -321,7 +321,7 @@ export function createRenderController(ctx: PluginContext<RenderState>, config: 
 
   function invalidate({ pages, scope = 'content' }: InvalidateOptions = {}): void {
     publishInvalidation(
-      pages?.map((page) => page.pageObjectNumber) ?? allPageObjectNumbers(),
+      pages?.map((page) => page.objectNumber) ?? allPageObjectNumbers(),
       scope,
       null,
     );
@@ -406,19 +406,19 @@ export function createRenderController(ctx: PluginContext<RenderState>, config: 
     const pages = new Map<PageObjectNumber, PageDemand>();
     const handle: ViewDemand = {
       setDemand: (page, demand, options) => {
-        const pageObjectNumber = page.pageObjectNumber;
+        const pageObjectNumber = page.objectNumber;
         const includeAnnotations = options?.includeAnnotations ?? true;
         const previous = pages.get(pageObjectNumber);
         const plan = tiles.plan(viewId, pageObjectNumber, demand, includeAnnotations);
         pages.set(pageObjectNumber, { demand, includeAnnotations, plan });
         if (plan !== previous?.plan) ctx.notify();
       },
-      getPlan: (page) => pages.get(page.pageObjectNumber)?.plan ?? EMPTY_TILE_PLAN,
-      markPainted: (page, key) => tiles.sourcePainted(viewId, page.pageObjectNumber, key),
-      markUnpainted: (page, key) => tiles.sourceUnpainted(viewId, page.pageObjectNumber, key),
+      getPlan: (page) => pages.get(page.objectNumber)?.plan ?? EMPTY_TILE_PLAN,
+      markPainted: (page, key) => tiles.sourcePainted(viewId, page.objectNumber, key),
+      markUnpainted: (page, key) => tiles.sourceUnpainted(viewId, page.objectNumber, key),
       release: (page) => {
-        pages.delete(page.pageObjectNumber);
-        tiles.releasePage(viewId, page.pageObjectNumber);
+        pages.delete(page.objectNumber);
+        tiles.releasePage(viewId, page.objectNumber);
       },
       dispose: () => {
         const view = views.get(viewId);
@@ -452,7 +452,7 @@ export function createRenderController(ctx: PluginContext<RenderState>, config: 
     renderPages,
     getRenderPolicy: renderPolicy,
     getRenderEpoch: (page, includeAnnotations = true) =>
-      epochOf(page.pageObjectNumber, includeAnnotations),
+      epochOf(page.objectNumber, includeAnnotations),
     invalidate,
     onInvalidated: invalidated.on,
 
@@ -461,7 +461,7 @@ export function createRenderController(ctx: PluginContext<RenderState>, config: 
     getSourceKey: (page, { scale, includeAnnotations }) => {
       const viewport = conformViewport(page, scale);
       return rasterKey(
-        page.pageObjectNumber,
+        page.objectNumber,
         viewport.kind === 'width' ? viewport.width : 0,
         includeAnnotations ?? true,
         currentStrategy().format,

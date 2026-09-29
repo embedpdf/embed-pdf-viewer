@@ -12,8 +12,8 @@ const PAGE = 1;
 function objRef(objNum: number): AnnotationRef {
   return {
     kind: 'objectNumber',
-    page: { kind: 'objectNumber', pageObjectNumber: PAGE },
-    annotObjectNumber: objNum,
+    page: { kind: 'objectNumber', objectNumber: PAGE },
+    objectNumber: objNum,
   };
 }
 
@@ -31,7 +31,7 @@ function annot(
 ): AnnotationDTO {
   return {
     ref: objRef(objNum),
-    page: { kind: 'objectNumber', pageObjectNumber: PAGE },
+    page: { kind: 'objectNumber', objectNumber: PAGE },
     index: 0,
     identityQuality: 'durable',
     nm: rel.nm ?? null,
@@ -71,14 +71,14 @@ describe('annotationKey', () => {
     expect(
       annotationKey({
         kind: 'nm',
-        page: { kind: 'objectNumber', pageObjectNumber: PAGE },
+        page: { kind: 'objectNumber', objectNumber: PAGE },
         nm: 'abc',
       }),
     ).toBe('nm:1:abc');
     expect(
       annotationKey({
         kind: 'index',
-        page: { kind: 'objectNumber', pageObjectNumber: PAGE },
+        page: { kind: 'objectNumber', objectNumber: PAGE },
         index: 3,
         revision: 'r1' as never,
       }),
@@ -86,14 +86,14 @@ describe('annotationKey', () => {
   });
 
   it('agrees with the wire member key for durable object numbers', () => {
-    // encodeStableIdKey({ kind: 'objectNumber', value: 7 }) === 'obj:7'
+    // encodeStableIdKey({ kind: 'objectNumber', objectNumber: 7 }) === 'obj:7'
     expect(annotationKey(objRef(7))).toBe('obj:7');
   });
 
   it('refFromStableId rebuilds the address an event split into page + stable id', () => {
-    const page = { kind: 'objectNumber' as const, pageObjectNumber: PAGE };
-    expect(refFromStableId(page, { kind: 'objectNumber', value: 7 })).toEqual(objRef(7));
-    expect(annotationKey(refFromStableId(page, { kind: 'nm', value: 'abc' }))).toBe('nm:1:abc');
+    const page = { kind: 'objectNumber' as const, objectNumber: PAGE };
+    expect(refFromStableId(page, { kind: 'objectNumber', objectNumber: 7 })).toEqual(objRef(7));
+    expect(annotationKey(refFromStableId(page, { kind: 'nm', nm: 'abc' }))).toBe('nm:1:abc');
   });
 });
 
@@ -144,7 +144,7 @@ describe('buildThreads', () => {
       reply: {
         to: {
           kind: 'nm',
-          page: { kind: 'objectNumber', pageObjectNumber: PAGE },
+          page: { kind: 'objectNumber', objectNumber: PAGE },
           nm: 'parent-nm',
         },
         type: 'reply',

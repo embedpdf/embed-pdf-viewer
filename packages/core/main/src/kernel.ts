@@ -37,6 +37,7 @@ import {
 } from './types';
 import {
   CONTINUOUS_RENDER_POLICY,
+  isLocalDocument,
   pageRefsEqual,
   type DocumentEvent,
   type EngineRenderPolicy,
@@ -872,11 +873,9 @@ export function createKernel(config: {
     saveLayer: (id) => {
       const handle = documentHandle(id);
       if (!handle) return Promise.reject(new Error('[documents] no document to download'));
-      if (!handle.downloadLayer) {
+      if (!isLocalDocument(handle)) {
         return Promise.reject(
-          new Error(
-            '[documents] this engine cannot export a layer (open with a layer on the local engine)',
-          ),
+          new Error('[documents] only the local engine can export a layer (open with a layer)'),
         );
       }
       return handle.downloadLayer();

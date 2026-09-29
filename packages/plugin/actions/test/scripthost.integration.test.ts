@@ -83,7 +83,7 @@ const hoverContext = {
   origin: 'hover' as const,
   source: {
     kind: 'annotation' as const,
-    annotation: { kind: 'objectNumber' as const, page: toPageRef(3), annotObjectNumber: 5 },
+    annotation: { kind: 'objectNumber' as const, page: toPageRef(3), objectNumber: 5 },
     page: toPageRef(3),
   },
   event: { scope: 'annotation' as const, name: 'cursorEnter' as const },

@@ -118,7 +118,7 @@ export function createResetWrites(
       options.fields?.map(
         (ref): PdfActionTargetRef =>
           ref.kind === 'objectNumber'
-            ? { kind: 'objectNumber', objectNumber: ref.fieldObjectNumber }
+            ? { kind: 'objectNumber', objectNumber: ref.objectNumber }
             : { kind: 'name', name: ref.name },
       ) ?? null;
     const snapshot = fields.get().snapshot ?? (await ctx.doc.forms.list());

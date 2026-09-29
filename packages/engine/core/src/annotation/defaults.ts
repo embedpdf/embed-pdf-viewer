@@ -26,7 +26,7 @@ const RED: Color = '#ff0000';
 const BLACK: Color = '#000000';
 const YELLOW: Color = '#ffff00';
 
-/** Every kind: printed (as Acrobat creates them), no other flag set, normal blending. */
+/** Every kind: printed (as Acrobat creates them), no other flag set, normal blending. A popup doesn't print. */
 const BASE = {
   invisible: false,
   hidden: false,
@@ -71,12 +71,18 @@ export const ANNOTATION_DEFAULTS = {
   'free-text': {
     ...BASE,
     contents: '',
+    intent: 'free-text',
+    fontFamily: 'helvetica',
+    fontSize: 12,
+    textAlign: 'left',
+    verticalAlign: 'top',
     color: BLACK,
+    fontColor: BLACK,
     opacity: 1,
     strokeWidth: 1,
     borderStyle: 'solid',
   },
-  text: { ...BASE, icon: 'note', color: YELLOW, opacity: 1 },
+  text: { ...BASE, icon: 'note', open: false, color: YELLOW, opacity: 1 },
   'file-attachment': { ...BASE, icon: 'paperclip', color: YELLOW, opacity: 1 },
   link: BASE,
   redact: {
@@ -93,7 +99,7 @@ export const ANNOTATION_DEFAULTS = {
   // A stamp another tool made reads `fit: null`; one the engine creates records its fit.
   stamp: { ...BASE, fit: 'contain', opacity: 1 },
   widget: { ...BASE, strokeWidth: 1, borderStyle: 'solid', textAlign: 'left' },
-  popup: { ...BASE, open: false },
+  popup: { ...BASE, print: false, open: false },
 } satisfies { readonly [S in WritableSubtype]: AnnotationDefaults<S> };
 
 /** What a create of `subtype` reads back for each data field it leaves out. */

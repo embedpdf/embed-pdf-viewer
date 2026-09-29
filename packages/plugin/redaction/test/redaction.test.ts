@@ -20,7 +20,7 @@ import { initialRedactionState, type RedactionState } from '../src/model';
 
 const PAGE = toPageRef(7);
 const OTHER_PAGE = toPageRef(8);
-const MARK: AnnotationRef = { kind: 'objectNumber', annotObjectNumber: 41, page: PAGE };
+const MARK: AnnotationRef = { kind: 'objectNumber', objectNumber: 41, page: PAGE };
 const LOCAL_ORIGIN = {
   kind: 'local',
   sessionId: 'session-a',
@@ -64,11 +64,11 @@ function fakeAnnotation(options: { canCreate?: boolean; raws?: AnnotationDTO[] }
   return {
     canCreate: () => options.canCreate ?? true,
     createFromSelection: vi.fn(async () => [MARK]),
-    list: ({ page }: { page: { pageObjectNumber: number } }) => {
-      let list = lists.get(page.pageObjectNumber);
+    list: ({ page }: { page: { objectNumber: number } }) => {
+      let list = lists.get(page.objectNumber);
       if (!list) {
-        list = raws.filter((raw) => raw.ref.page.pageObjectNumber === page.pageObjectNumber);
-        lists.set(page.pageObjectNumber, list);
+        list = raws.filter((raw) => raw.ref.page.objectNumber === page.objectNumber);
+        lists.set(page.objectNumber, list);
       }
       return list;
     },
@@ -214,7 +214,7 @@ describe('the pending view', () => {
     const { redaction, annotation } = harness();
     const pages: number[] = [];
     redaction.onPendingChanged((event) =>
-      pages.push(...event.pages.map((page) => page.pageObjectNumber)),
+      pages.push(...event.pages.map((page) => page.objectNumber)),
     );
     const changed = (subtype: string) =>
       ({ annotation: { ref: MARK, page: PAGE, subtype } }) as unknown as AnnotationChangedEvent;

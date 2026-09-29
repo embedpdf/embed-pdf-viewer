@@ -78,7 +78,7 @@ describe('corpus acceptance (skips without the local JS tests folder)', () => {
         await actions.dispatch({
           scope: 'annotation',
           event: 'cursorEnter',
-          ref: { kind: 'objectNumber', page: toPageRef(999), annotObjectNumber: 1 },
+          ref: { kind: 'objectNumber', page: toPageRef(999), objectNumber: 1 },
           page: toPageRef(999),
         });
         await settle();
@@ -140,7 +140,7 @@ describe('corpus acceptance (skips without the local JS tests folder)', () => {
           actions.dispatch({
             scope: 'annotation',
             event: 'cursorEnter',
-            ref: { kind: 'objectNumber', page: toPageRef(999), annotObjectNumber: 1 },
+            ref: { kind: 'objectNumber', page: toPageRef(999), objectNumber: 1 },
             page: toPageRef(999),
           });
         // The first field in 02 is `hoverTarget`'s trigger (obj:5, /AA E/X JS).
@@ -149,7 +149,7 @@ describe('corpus acceptance (skips without the local JS tests folder)', () => {
           {
             kind: 'objectNumber',
             page,
-            annotObjectNumber: trigger.widgets[0]!.annotObjectNumber,
+            objectNumber: trigger.widgets[0]!.objectNumber,
           },
           'cursorEnter',
         );
@@ -193,13 +193,13 @@ describe('corpus acceptance (skips without the local JS tests folder)', () => {
         const target = field('nativeTarget');
         const page = trigger.widgets[0]!.page!;
         await annotation.whenSynced();
-        const targetId = `obj:${target.widgets[0]!.annotObjectNumber}`;
+        const targetId = `obj:${target.widgets[0]!.objectNumber}`;
         const painted = () => annotation.listPageItems(page).map((item) => item.id);
         const drain = () =>
           actions.dispatch({
             scope: 'annotation',
             event: 'cursorEnter',
-            ref: { kind: 'objectNumber', page: toPageRef(999), annotObjectNumber: 1 },
+            ref: { kind: 'objectNumber', page: toPageRef(999), objectNumber: 1 },
             page: toPageRef(999),
           });
         const notify = (event: 'cursorEnter' | 'cursorExit') =>
@@ -208,7 +208,7 @@ describe('corpus acceptance (skips without the local JS tests folder)', () => {
             {
               kind: 'objectNumber',
               page,
-              annotObjectNumber: trigger.widgets[0]!.annotObjectNumber,
+              objectNumber: trigger.widgets[0]!.objectNumber,
             },
             event,
           );

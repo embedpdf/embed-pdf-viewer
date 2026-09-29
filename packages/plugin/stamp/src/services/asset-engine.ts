@@ -1,11 +1,15 @@
 /**
  * The asset engine port and the canonical-library services every write
- * needs: opening library bytes as a document, import-time previews, the
- * canonical-services check, and the import-support fact learned from the
- * first failed open.
+ * needs: opening library bytes as a document on a local engine, import-time
+ * previews, and the import-support fact learned from the first import.
  */
-import { EngineError, EngineErrorCode } from '@embedpdf/engine-core/runtime';
-import type { DocumentHandle, Engine, PageImageHandle } from '@embedpdf/engine-core/runtime';
+import { isLocalEngine } from '@embedpdf/engine-core/runtime';
+import type {
+  Engine,
+  LocalDocumentHandle,
+  LocalPageHandle,
+  PageImageHandle,
+} from '@embedpdf/engine-core/runtime';
 
 import type { StampAssetPreview, StampConfig } from '../contract';
 import type { StampContext } from './context';
@@ -20,14 +24,14 @@ export const uid = (prefix: string): string =>
   `${prefix}-${Date.now().toString(36)}-${(idCounter++).toString(36)}`;
 
 export function createAssetEngine(ctx: StampContext, config: StampConfig) {
-  /** Set once an import proves the engine cannot open local bytes (cloud). */
+  /** Set once an import finds the asset engine is not local (cloud). */
   let importSupported: boolean | null = null;
 
   // The asset engine port. A configured factory is called (and memoized) on
   // the first import, not at viewer start; a configured instance is used
   // as-is; nothing configured falls back to the kernel's engine: correct for
-  // local deployments, and rejected with an actionable error by cloud engines
-  // at the first `open({ kind: 'bytes' })`.
+  // local deployments, and refused with an actionable error at the first
+  // import when it is a cloud engine.
   let assetEngineRef: Engine | Promise<Engine> | null = null;
   const assetEngine = (): Engine | Promise<Engine> => {
     if (!assetEngineRef) {
@@ -41,26 +45,22 @@ export function createAssetEngine(ctx: StampContext, config: StampConfig) {
     return assetEngineRef;
   };
 
-  const openAssetDocument = async (bytes: Uint8Array): Promise<DocumentHandle> => {
-    try {
-      return await (
-        await assetEngine()
-      ).open({ kind: 'bytes', id: uid('stamp-import'), bytes }, { scope: ['*'] });
-    } catch (error) {
-      // A cloud kernel engine rejects 'bytes' with InvalidArg: turn the
-      // generic contract error into the configuration fix.
-      if (!config.assetEngine && EngineError.is(error, EngineErrorCode.InvalidArg)) {
-        if (importSupported !== false) {
-          importSupported = false;
-          ctx.notify();
-        }
-        throw stampError(
-          'unsupported',
-          "importing a library PDF needs an engine that can open local bytes, and this viewer's engine cannot (cloud). Pass stampPlugin({ assetEngine: () => import('@embedpdf/engine').then((module) => module.createLocalEngine()) }): it loads lazily, on first import.",
-        );
+  /** Library PDFs are sliced and tagged (`/PieceInfo`) on a local engine only. */
+  const openAssetDocument = async (bytes: Uint8Array): Promise<LocalDocumentHandle> => {
+    const engine = await assetEngine();
+    if (!isLocalEngine(engine)) {
+      if (importSupported !== false) {
+        importSupported = false;
+        ctx.notify();
       }
-      throw error;
+      throw stampError(
+        'unsupported',
+        config.assetEngine
+          ? "the stamp plugin's assetEngine must be a local engine (createLocalEngine())"
+          : "importing a library PDF needs a local engine, and this viewer's engine is a cloud engine. Pass stampPlugin({ assetEngine: () => import('@embedpdf/engine').then((module) => module.createLocalEngine()) }): it loads lazily, on first import.",
+      );
     }
+    return engine.open({ kind: 'bytes', id: uid('stamp-import'), bytes }, { scope: ['*'] });
   };
 
   /** Import-time preview render to bytes. The asset engine is local by
@@ -76,9 +76,7 @@ export function createAssetEngine(ctx: StampContext, config: StampConfig) {
   };
 
   /** Thumbnail render of one library page (the small picker image). */
-  const renderThumbnail = async (
-    handle: ReturnType<DocumentHandle['page']>,
-  ): Promise<StampAssetPreview> =>
+  const renderThumbnail = async (handle: LocalPageHandle): Promise<StampAssetPreview> =>
     imageToPreview(
       await handle.render.image({
         viewport: { kind: 'width', width: config.previewWidth ?? DEFAULT_PREVIEW_WIDTH },
@@ -87,21 +85,6 @@ export function createAssetEngine(ctx: StampContext, config: StampConfig) {
         format: 'png',
       }),
     );
-
-  const requireCanonicalServices = (doc: DocumentHandle): void => {
-    if (!doc.pieceInfo) {
-      throw stampError(
-        'unsupported',
-        'canonical PDF libraries need an asset engine with pieceInfo',
-      );
-    }
-    if (!doc.pages.setName || !doc.pages.removeName) {
-      throw stampError(
-        'unsupported',
-        'canonical PDF libraries need an asset engine with named pages (pages.setName)',
-      );
-    }
-  };
 
   ctx.cleanup(() => {
     const ownedAssetEngine = typeof config.assetEngine === 'function' ? assetEngineRef : null;
@@ -117,8 +100,7 @@ export function createAssetEngine(ctx: StampContext, config: StampConfig) {
     openAssetDocument,
     imageToPreview,
     renderThumbnail,
-    requireCanonicalServices,
-    /** Optimistic until an import proves the engine cannot open local bytes (cloud). */
+    /** Optimistic until an import finds the asset engine is not local (cloud). */
     canImport: (): boolean => importSupported !== false,
   };
 }

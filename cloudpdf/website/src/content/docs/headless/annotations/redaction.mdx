@@ -1,0 +1,178 @@
+---
+title: Redaction
+description: Mark text and areas for removal, review the marks, then remove the content for good.
+---
+
+{/* Generated from docs/content — edit there, then `pnpm docs:sync`. */}
+
+# Redaction
+
+Redaction removes content for good: the text, images and drawings under a mark are deleted from the
+file, not just covered up. It happens in two steps, as in Acrobat: first people **mark** what should
+go, and review it; then they **apply** the marks, and the content is gone.
+
+Register `redactionPlugin()` with the annotation plugin, and use the `redact` tool: select text to
+mark it, or drag to mark an area:
+
+```tsx
+import { redactionPlugin, useRedaction, useRedactionState } from '@embedpdf/react/redaction';
+
+const plugins = [/* … */ interactionPlugin(), annotationPlugin(), redactionPlugin()];
+
+function RedactBar() {
+  const interaction = useInteraction();
+  const redaction = useRedaction();
+  const { pendingCount, applying } = useRedactionState();
+
+  return (
+    <>
+      <button onClick={() => interaction.activateTool('redact')}>Mark for redaction</button>
+      <button disabled={!pendingCount || applying} onClick={() => redaction.applyAll()}>
+        Redact {pendingCount} marks
+      </button>
+    </>
+  );
+}
+```
+
+A mark is an annotation, so until it's applied, people can move it, resize it, delete it, and see it
+in other PDF apps. Applying it is what removes the content.
+
+## Mark from code
+
+```ts
+const redaction = useRedaction();
+
+await redaction.markSelection(); // the selected text
+await redaction.markArea(page.ref, { x: 72, y: 100, width: 200, height: 40 });
+await redaction.markPage(page.ref); // the whole page
+await redaction.markMatches({ text: 'Jane Doe' }); // every match in the document
+await redaction.markMatches({ text: '\\d{3}-\\d{2}-\\d{4}', regex: true }); // like a social security number
+```
+
+`markMatches` takes the same query as [search](../text/search), and resolves with `{ marks }`, one per
+match.
+
+## Review the marks
+
+`usePendingRedactions()` lists the marks that haven't been applied yet, for a review panel:
+
+```tsx
+function Pending() {
+  const stage = useStage();
+  const redaction = useRedaction();
+  const marks = usePendingRedactions();
+
+  return marks.map((mark) => (
+    <li key={annotationKey(mark.ref)}>
+      <button onClick={() => stage.reveal(mark.page, { rect: mark.bounds })}>
+        Page {mark.pageIndex + 1}: {mark.kind === 'text' ? 'text' : 'area'}
+      </button>
+      <button onClick={() => redaction.unmark([mark.ref])}>Remove</button>
+    </li>
+  ));
+}
+```
+
+`redaction.clearPending()` removes every mark. `usePendingRedactions({ page: page.ref })` lists one
+page's.
+
+## Apply
+
+```ts
+const result = await redaction.applyAll(); // every mark
+await redaction.apply([mark.ref]); // some marks
+await redaction.applyPages([page.ref]); // the marks on some pages
+```
+
+This can't be undone. Ask first, and say what else goes with it: annotations a mark overlaps are
+removed too, because they could show what was there. `estimateCollateral()` tells you how many:
+
+```ts
+const { count } = redaction.estimateCollateral();
+if (!(await confirm(`Redact? ${count} annotations under the marks will be removed too.`))) return;
+await redaction.applyAll();
+```
+
+After applying, download the document with `{ mode: 'rewrite' }`, so the removed content isn't left in
+an earlier revision of the file. See [Saving & downloading](../documents/saving).
+
+## What shows in place of the content
+
+By default a redacted area is black. Give it a label, such as "Classified", on a mark:
+
+```ts
+await redaction.updateLabel(mark.ref, { overlayText: 'Classified', repeat: true });
+```
+
+`repeat` fills the area with the label over and over; otherwise it shows once. The color and font of
+every mark are settings.
+
+## Settings
+
+Set them when you register the plugin.
+
+| Setting                | What it does                                     | Default     |
+| :--------------------- | :----------------------------------------------- | :---------- |
+| `overlay.fill`         | The color of a redacted area                     | `'#000000'` |
+| `overlay.text.color`   | The color of a label                             | `'#ffffff'` |
+| `overlay.text.fontFamily` | The label's font                              | Helvetica   |
+| `overlay.text.fontSize`   | The label's size, or `0` to fit the area      | `0`         |
+
+## Events
+
+```ts
+useRedactionEvent(
+  (redaction) => redaction.onApplied,
+  ({ result }) => auditLog.record('redacted', result),
+);
+```
+
+| Event              | Fires when                                      | Carries             |
+| :----------------- | :---------------------------------------------- | :------------------ |
+| `onApplied`        | Marks were applied and the content is gone      | `result`, `origin`  |
+| `onPendingChanged` | A mark was added, changed or removed            | `pages`             |
+
+## Permissions
+
+| Permission            | What it allows                          | Check                   |
+| :-------------------- | :-------------------------------------- | :---------------------- |
+| `annotations:create`  | Marking                                 | `redaction.canMark()`   |
+| `doc.redact`          | Applying                                | `redaction.canApply()`  |
+
+A reviewer who may mark but not apply can prepare redactions for someone else to approve.
+
+## Good to know
+
+### What is removed
+
+The characters under a mark are removed, so they can't be selected, searched or copied; the pixels
+of images inside it are erased; and the parts of lines, shapes and fills inside it are cut away. See
+[Redaction](/docs/engine/documents/redaction) for the details.
+
+### Where the original is
+
+<Engine local>
+
+The local engine redacts a copy of the file the browser already has, so the original was on the
+user's device before it was redacted.
+
+<CloudPdfCallout
+  title="Redact before anyone receives the file"
+  href="https://www.cloudpdf.com/docs/headless/annotations/redaction"
+  cta="Redact with CloudPDF"
+>
+
+With CloudPDF, redaction happens on your server. People who may only see the redacted version never
+receive the original: not the file, not its text, not its images.
+
+</CloudPdfCallout>
+
+</Engine>
+
+<Engine cloud>
+
+Redaction happens on your server, and people who may only see the redacted version never receive the
+original.
+
+</Engine>

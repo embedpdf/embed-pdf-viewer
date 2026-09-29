@@ -1,6 +1,7 @@
 /**
- * Where the engine docs' old URLs went (Sep 2026 restructure), per engine
- * flavor. Both sites' next.config import this, so a moved page is one edit.
+ * Where the docs' old URLs went (Sep 2026 restructures of the engine and
+ * headless docs), per engine flavor. Both sites' next.config import this, so a
+ * moved page is one edit.
  * Each old path also redirects its Markdown twin (`<path>.md`).
  */
 const MOVED = {
@@ -33,9 +34,29 @@ const MOVED_BY_ENGINE = {
   },
 };
 
-/** Next.js `redirects()` entries for the engine docs on a site of `engine` flavor. */
-export function engineDocsRedirects(engine) {
+/**
+ * Where the headless docs' old pages went (Sep 2026: from one Plugins section
+ * to sections by task), below `/docs/headless/<framework>/`.
+ */
+const HEADLESS_MOVED = {
+  'getting-started': 'quick-start',
+  plugins: '',
+  'plugins/stage': 'viewing/stage',
+  'plugins/render': 'viewing/render',
+  'plugins/selection': 'text/selection',
+  'plugins/page-edit': 'documents/pages',
+  'plugins/stamp': 'annotations/stamps',
+  'plugins/signature': 'forms/signatures',
+};
+
+const HEADLESS_ROOT = '/docs/headless/:framework(react|vue|svelte|angular)';
+
+/** Next.js `redirects()` entries for the docs on a site of `engine` flavor. */
+export function docsRedirects(engine) {
   const moved = { ...MOVED, ...MOVED_BY_ENGINE[engine] };
+  for (const [from, to] of Object.entries(HEADLESS_MOVED)) {
+    moved[`${HEADLESS_ROOT}/${from}`] = to ? `/docs/headless/:framework/${to}` : '/docs/headless/:framework';
+  }
   return Object.entries(moved).flatMap(([source, destination]) => [
     { source, destination, permanent: true },
     { source: `${source}.md`, destination: `${destination}.md`, permanent: true },

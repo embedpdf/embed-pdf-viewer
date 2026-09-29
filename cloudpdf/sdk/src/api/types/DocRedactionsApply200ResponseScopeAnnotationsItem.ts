@@ -11,13 +11,13 @@ export namespace DocRedactionsApply200ResponseScopeAnnotationsItem {
     export interface ObjectNumber {
         kind: "objectNumber";
         page: DocRedactionsApply200ResponseScopeAnnotationsItemObjectNumber.Page;
-        annotObjectNumber: number;
+        objectNumber: number;
     }
 
     export namespace DocRedactionsApply200ResponseScopeAnnotationsItemObjectNumber {
         export interface Page {
             kind: Page.Kind;
-            pageObjectNumber: number;
+            objectNumber: number;
         }
 
         export namespace Page {
@@ -37,7 +37,7 @@ export namespace DocRedactionsApply200ResponseScopeAnnotationsItem {
     export namespace DocRedactionsApply200ResponseScopeAnnotationsItemNm {
         export interface Page {
             kind: Page.Kind;
-            pageObjectNumber: number;
+            objectNumber: number;
         }
 
         export namespace Page {
@@ -58,7 +58,7 @@ export namespace DocRedactionsApply200ResponseScopeAnnotationsItem {
     export namespace DocRedactionsApply200ResponseScopeAnnotationsItemIndex {
         export interface Page {
             kind: Page.Kind;
-            pageObjectNumber: number;
+            objectNumber: number;
         }
 
         export namespace Page {
@@ -77,7 +77,7 @@ export namespace DocRedactionsApply200ResponseScopeAnnotationsItem {
         export namespace Revision {
             export interface Page {
                 kind: Page.Kind;
-                pageObjectNumber: number;
+                objectNumber: number;
             }
 
             export namespace Page {

@@ -45,7 +45,7 @@ export function runAnnotationAppearanceExportConformance(
       const doc = await openFixture(engine, opts);
       let exported: DocumentHandle | null = null;
       try {
-        const pageObjectNumber = (await doc.pages.list()).pages[0].ref.pageObjectNumber;
+        const pageObjectNumber = (await doc.pages.list()).pages[0].ref.objectNumber;
         const page = doc.page(toPageRef(pageObjectNumber));
         if (!page.annotations.exportAppearance) return;
         const a = (await page.annotations.create(square(20, 20))).annotation.ref;

@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
-import type { DocumentHandle, Engine, PageRaster } from '@embedpdf/engine-core/runtime';
+import type { LocalDocumentHandle, LocalEngine, PageRaster } from '@embedpdf/engine-core/runtime';
 import { toPageRef } from '@embedpdf/engine-core/runtime';
 import { createLocalEngine } from '../src/index';
 
@@ -58,13 +58,13 @@ function pixel(raster: PageRaster, x: number, y: number): number[] {
   return [...new Uint8Array(raster.data).slice(index, index + 4)];
 }
 
-async function appearance(doc: DocumentHandle, index = 0): Promise<PageRaster> {
+async function appearance(doc: LocalDocumentHandle, index = 0): Promise<PageRaster> {
   return (await doc.page(toPageRef(3)).annotations.renderAppearancesRaw()).appearances[index]!
     .raster;
 }
 
 describe('vector stamp resizing (wasm)', () => {
-  let engine: Engine;
+  let engine: LocalEngine;
   beforeAll(async () => {
     engine = await createLocalEngine({ runtime: { prefer: 'wasm' } });
   });
@@ -72,7 +72,7 @@ describe('vector stamp resizing (wasm)', () => {
     await engine.destroy();
   });
 
-  async function open(bytes: Uint8Array): Promise<DocumentHandle> {
+  async function open(bytes: Uint8Array): Promise<LocalDocumentHandle> {
     return engine.open({ kind: 'bytes', id: 'stamp-resize', bytes }, { scope: ['*'] });
   }
 
@@ -92,7 +92,7 @@ describe('vector stamp resizing (wasm)', () => {
       // Render the full annotation through the page renderer: appearance
       // thumbnails deliberately remove rotation for the viewer to apply it.
       const area = { x: 0, y: 0, width: 520, height: 270 };
-      const render = async (document: DocumentHandle) =>
+      const render = async (document: LocalDocumentHandle) =>
         document.page(toPageRef(3)).render.raw({
           includeAnnotations: true,
           target: { kind: 'rect', rect: area },

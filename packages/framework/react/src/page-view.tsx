@@ -71,13 +71,13 @@ export function PageView(props: PageViewProps) {
   // The page-registry entry, subscribed: a rotate or a reorder re-renders
   // this surface like it re-renders a Stage page. Entries are reference-
   // stable per page in the registry, so identity is the right equality.
-  const wantedPageObjectNumber = wantedRef?.pageObjectNumber ?? null;
+  const wantedPageObjectNumber = wantedRef?.objectNumber ?? null;
   const base = useKernelValue((kernel) => {
     if (!docId) return null;
     const pages = kernel.documents.listPages(docId);
     const found =
       wantedPageObjectNumber !== null
-        ? pages.find((pageInfo) => pageInfo.ref.pageObjectNumber === wantedPageObjectNumber)
+        ? pages.find((pageInfo) => pageInfo.ref.objectNumber === wantedPageObjectNumber)
         : pages[wantedIndex ?? 0];
     return found ?? null;
   });
@@ -87,7 +87,7 @@ export function PageView(props: PageViewProps) {
   // surface renders the fallback before that anyway. Memoized by the number so
   // the context's `ref` stays identity-stable across re-renders (layers key
   // effects on it).
-  const pageObjectNumber = base?.ref.pageObjectNumber ?? wantedPageObjectNumber ?? page + 1;
+  const pageObjectNumber = base?.ref.objectNumber ?? wantedPageObjectNumber ?? page + 1;
   const pageRef = useMemo(() => toPageRef(pageObjectNumber), [pageObjectNumber]);
   const rotation = base?.rotation ?? 0;
   const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;

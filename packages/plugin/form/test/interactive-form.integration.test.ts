@@ -34,12 +34,12 @@ async function activationFor(
   field: FormFieldDTO,
 ): Promise<PdfActionTree<unknown>> {
   const widget = field.widgets[0];
-  if (!widget || widget.annotObjectNumber <= 0 || !widget.page) {
+  if (!widget || widget.objectNumber <= 0 || !widget.page) {
     throw new Error(`field '${field.name}' has no addressable widget`);
   }
   const { annotations } = await doc.page(widget.page).annotations.list();
   const annotation = annotations.find(
-    ({ ref }) => ref.kind === 'objectNumber' && ref.annotObjectNumber === widget.annotObjectNumber,
+    ({ ref }) => ref.kind === 'objectNumber' && ref.objectNumber === widget.objectNumber,
   );
   const action = annotation?.actions?.activate;
   if (!action) throw new Error(`field '${field.name}' has no activation action`);
@@ -151,14 +151,8 @@ describe('interactive form JavaScript acceptance', () => {
       const premium = packageField.options.find(({ label }) => label === 'Premium - $900');
       if (!premium) throw new Error('Premium package option is missing');
 
-      await controller.commit(packageField.ref, {
-        type: 'choice',
-        values: [premium.value],
-      });
-      await controller.commit(recording.ref, {
-        type: 'toggle',
-        state: recording.exportValue,
-      });
+      await controller.commit(packageField.ref, { value: premium.value });
+      await controller.commit(recording.ref, { checked: true });
 
       const beforeReset = await doc.forms.list();
       const resetButton = beforeReset.fields.find(({ name }) => name === 'btn_reset');
@@ -186,7 +180,7 @@ describe('interactive form JavaScript acceptance', () => {
 
       const confirmation = afterReset.fields.find(({ name }) => name === 'confirmation');
       if (confirmation?.family !== 'text') throw new Error('confirmation field is missing');
-      await controller.commit(confirmation.ref, { type: 'text', value: 'CONFIRM' });
+      await controller.commit(confirmation.ref, { value: 'CONFIRM' });
 
       const beforeConfirm = await doc.forms.list();
       const confirmButton = beforeConfirm.fields.find(({ name }) => name === 'btn_confirm');

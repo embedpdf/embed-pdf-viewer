@@ -15,9 +15,9 @@ describe("SignaturesClient", () => {
             signatures: [
                 {
                     index: 1,
-                    field: { kind: "objectNumber", fieldObjectNumber: 1 },
+                    field: { kind: "objectNumber", objectNumber: 1 },
                     fieldName: "fieldName",
-                    widget: { ref: null, annotObjectNumber: 1, page: null },
+                    widget: { ref: null, objectNumber: 1, page: null, rect: null },
                     signed: true,
                     kind: "signature",
                     filter: "filter",
@@ -143,16 +143,13 @@ describe("SignaturesClient", () => {
             status: "completed",
             signature: {
                 index: 1,
-                field: { kind: "objectNumber", fieldObjectNumber: 1 },
+                field: { kind: "objectNumber", objectNumber: 1 },
                 fieldName: "fieldName",
                 widget: {
-                    ref: {
-                        kind: "objectNumber",
-                        page: { kind: "objectNumber", pageObjectNumber: 1 },
-                        annotObjectNumber: 1,
-                    },
-                    annotObjectNumber: 1,
-                    page: { kind: "objectNumber", pageObjectNumber: 1 },
+                    ref: { kind: "objectNumber", page: { kind: "objectNumber", objectNumber: 1 }, objectNumber: 1 },
+                    objectNumber: 1,
+                    page: { kind: "objectNumber", objectNumber: 1 },
+                    rect: { x: 1.1, y: 1.1, width: 1.1, height: 1.1 },
                 },
                 signed: true,
                 kind: "signature",
@@ -197,10 +194,10 @@ describe("SignaturesClient", () => {
             meta: {
                 affectedPages: [
                     {
-                        page: { kind: "objectNumber", pageObjectNumber: 1 },
+                        page: { kind: "objectNumber", objectNumber: 1 },
                         revision: {
                             docSessionId: "docSessionId",
-                            page: { kind: "objectNumber", pageObjectNumber: 1 },
+                            page: { kind: "objectNumber", objectNumber: 1 },
                             generation: 1,
                         },
                         weakAnnotationState: { kind: "unknown" },
@@ -217,7 +214,7 @@ describe("SignaturesClient", () => {
                     working: true,
                     pages: [
                         {
-                            page: { kind: "objectNumber", pageObjectNumber: 1 },
+                            page: { kind: "objectNumber", objectNumber: 1 },
                             cache: { contentVersion: 1, annotationVersion: 1 },
                         },
                     ],

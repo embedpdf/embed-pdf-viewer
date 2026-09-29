@@ -73,6 +73,18 @@ export function integrationForProduct(
   return DEFAULT_PRODUCT_INTEGRATION[product];
 }
 
+/**
+ * Where each fanned-out product starts, below its integration segment: the
+ * Viewer at its getting-started page, Headless at its overview (like Engine).
+ */
+export const DOCS_ENTRY_TOPIC = { viewer: 'getting-started', headless: '' } as const;
+
+/** The concrete entry URL of a fanned-out product for one integration. */
+export function docsEntryHref(product: 'viewer' | 'headless', integration: DocsIntegration): string {
+  const topic = DOCS_ENTRY_TOPIC[product];
+  return `/docs/${product}/${integration}${topic ? `/${topic}` : ''}`;
+}
+
 /** Rewrites a canonical or concrete product route to one integration sibling. */
 export function docsIntegrationHref(route: string, preferred: DocsIntegration): string {
   const segments = route.split('/');

@@ -43,7 +43,7 @@ export function readAnnotationIdentity(
       ref: {
         kind: 'objectNumber',
         page,
-        annotObjectNumber: objectNumber,
+        objectNumber,
       },
       identityQuality: 'durable',
       nm: nm ?? null,

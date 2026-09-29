@@ -23,7 +23,7 @@ const fixturePath = resolve(here, 'fixtures', 'EmbedPDF_Dynamic_Approval_Stamp.p
 
 function sameRef(left: FormFieldRef, right: FormFieldRef): boolean {
   return left.kind === 'objectNumber' && right.kind === 'objectNumber'
-    ? left.fieldObjectNumber === right.fieldObjectNumber
+    ? left.objectNumber === right.objectNumber
     : left.kind === 'fqn' && right.kind === 'fqn'
       ? left.name === right.name
       : false;
@@ -42,12 +42,13 @@ function applyOverlay(fields: ScriptFieldInput[], effects: FormEffect[]): void {
     if (!field) continue;
     if (effect.kind === 'setDisplay') field.display = effect.display;
     if (effect.kind === 'setValue') {
+      const value = effect.value;
       field.value =
-        effect.value.type === 'text'
-          ? effect.value.value
-          : effect.value.type === 'toggle'
-            ? effect.value.state
-            : [...effect.value.values];
+        'selectedValues' in value
+          ? [...value.selectedValues]
+          : 'checked' in value
+            ? value.checked
+            : value.value;
     }
   }
 }

@@ -69,7 +69,7 @@ export function createCrud(
       throw new PluginError(
         'not-found',
         'annotation',
-        `page ${page.pageObjectNumber} is not in this document`,
+        `page ${page.objectNumber} is not in this document`,
       );
     }
     const stated = options.tool ? withTool(draft, options.tool) : draft;

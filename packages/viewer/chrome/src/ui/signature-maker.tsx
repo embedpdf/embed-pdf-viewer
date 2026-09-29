@@ -7,7 +7,7 @@
  * (`props.libraryId`) it only adds the missing initials.
  */
 import { useEffect, useRef, useState } from 'react';
-import { useKernel } from '@embedpdf/react/runtime';
+import { isLocalEngine, useKernel } from '@embedpdf/react/runtime';
 import { useSurface } from '@embedpdf/react/shell';
 import { useT } from '@embedpdf/react/i18n';
 import { useStamp, type MarkSource } from '@embedpdf/react/stamp';
@@ -225,10 +225,11 @@ export function SignatureMakerModal() {
   // authors with (the viewer's own) the first time a typed mark uses it.
   const registerFont = async (key: string) => {
     const spec = config.fonts?.find((font) => font.key === key);
-    if (!spec || registered.current.has(key) || !kernel.engine.fonts) return;
+    const engine = kernel.engine;
+    if (!spec || registered.current.has(key) || !isLocalEngine(engine)) return;
     const response = await fetch(spec.url);
     if (!response.ok) throw new Error(`${spec.url}: HTTP ${response.status}`);
-    await kernel.engine.fonts.register({ key, data: new Uint8Array(await response.arrayBuffer()) });
+    await engine.fonts.register({ key, data: new Uint8Array(await response.arrayBuffer()) });
     registered.current.add(key);
   };
 

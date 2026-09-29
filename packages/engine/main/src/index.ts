@@ -59,12 +59,8 @@ export { LazyTransport } from './transport/LazyTransport';
 export { Priority } from './worker/Priority';
 export type { WorkerRequest, WorkerResponse } from './worker/protocol';
 export type { EngineWorkerInit } from './worker/bootstrap';
-export { LocalDocumentHandle } from './document/LocalDocumentHandle';
 export { LocalDocumentAnnotationsService } from './document/LocalDocumentAnnotationsService';
 export { LocalDocumentPagesService } from './document/LocalDocumentPagesService';
-export { LocalPageHandle } from './document/LocalPageHandle';
-export { LocalPageAnnotationsService } from './document/LocalPageAnnotationsService';
-export { LocalPageRenderService } from './document/LocalPageRenderService';
 export { BrowserImageEncoder } from './render/BrowserImageEncoder';
 export { PortableImageEncoder, encodePng } from './render/PortableImageEncoder';
 export type {

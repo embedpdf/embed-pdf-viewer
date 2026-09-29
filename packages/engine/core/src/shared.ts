@@ -22,6 +22,8 @@ export type {
 } from './dto/OpenInput';
 export type { DocumentMetadata, DocumentMetadataTrapped } from './dto/DocumentMetadata';
 export type { MetadataPatch } from './dto/MetadataPatch';
+export type { CustomMetadata } from './dto/CustomMetadata';
+export type { CustomMetadataPatch } from './dto/CustomMetadataPatch';
 export type { PageListSnapshot } from './dto/PageListSnapshot';
 export type { NamedPageEntry, NamedPageTarget } from './dto/NamedPage';
 export type { PageLayout, PageBoxes } from './dto/PageLayout';
@@ -76,6 +78,11 @@ export {
   pdfTurnOfDrawn,
   pdfTurnOfUpright,
   renderSize,
+  pageTransform,
+  renderAreaTransform,
+  renderMatrix,
+  renderTargetArea,
+  renderTransform,
   DEFAULT_MEDIA_BOX,
   pageBoxesOf,
   pageRotationOf,
@@ -102,7 +109,9 @@ export type {
   PageRenderBackground,
   PageRenderEncodedFormat,
   PageRenderFormat,
+  PageRenderImage,
   PageRenderOptions,
+  PageRenderRaster,
   PageRenderQuery,
   PageRenderTarget,
   PageRenderViewport,
@@ -186,9 +195,11 @@ export type {
   AnnotationFlags,
   AnnotationReplyType,
   AnnotationBorderStyle,
+  DrawnBorderStyle,
   StandardFont,
   FreeTextFont,
   TextAlignment,
+  VerticalAlignment,
   FreeTextIntent,
   CaretIntent,
   StrikeoutIntent,
@@ -422,7 +433,11 @@ export type {
 export type { DocumentManifest, ManifestPage } from './dto/DocumentManifest';
 export type { LayerScopes, LayerScopePlane } from './dto/LayerScopes';
 export type { PageDestination, PdfDestination } from './dto/PdfDestination';
-export type { PdfLinkTarget, PdfLinkTargetWritable } from './dto/PdfLinkTarget';
+export type {
+  PdfLinkTarget,
+  PdfLinkTargetWritable,
+  PdfStandardNamedAction,
+} from './dto/PdfLinkTarget';
 export type { CacheDelta, MutationMeta } from './mutation/MutationMeta';
 export type { AnnotationListMutationMeta } from './mutation/AnnotationListMutationMeta';
 export {
@@ -474,6 +489,14 @@ export {
 
 // Page space: positions from the top-left of a page's visible box, y down.
 export type { PageBox, PagePoint, PageQuad } from './geometry';
+export type {
+  PageRenderMatrix,
+  PageRenderTransform,
+  PageTransformOptions,
+  PixelBox,
+  PixelPoint,
+  PixelQuad,
+} from './geometry';
 export { pageBoxOf, pagePointOf, pageQuadOf, pdfPointOf, pdfQuadOf, pdfRectOf } from './geometry';
 export * from './pageSpace';
 export type { FormFieldRef, FormWidget } from './identity/FormFieldRef';
@@ -482,8 +505,8 @@ export { encodeFieldRefKey, decodeFieldRefKey } from './identity/FormFieldRef';
 export type {
   FormFieldFamily,
   FormFieldOrigin,
-  FormFieldFlags,
   ToggleFieldWidget,
+  FormFieldWidget,
   FormFieldOption,
   FormFieldBase,
   TextFieldDTO,
@@ -501,10 +524,10 @@ export type {
   WidgetStyleFields,
   WidgetStyleDraftFields,
   WidgetStylePatchFields,
+  WidgetAppearance,
 } from './annotation/kinds/widget.shared';
 export type { FormKind, FormSnapshot } from './forms/snapshot';
 export type {
-  WidgetAppearance,
   WidgetPlacement,
   FormFieldOptionInput,
   TextFieldDraft,
@@ -603,9 +626,12 @@ export {
 } from './signature/analysis';
 export type { EdgeResolverBudget, ResolvedUsage } from './signature/analysis';
 export {
+  PROTECTABLE_CAPABILITIES,
   SIGNATURE_POLICY_VERSION,
   deriveProtection,
+  describeProtection,
   fieldLockFor,
+  isProtectableCapability,
   levelAllows,
   levelFromPermission,
   lockCovers,
@@ -613,10 +639,12 @@ export {
   minLevel,
   protectedCapabilities,
 } from './signature/protection';
-export { deletedFieldOf } from './mutation/FormMutationResults';
+export type { ProtectableCapability } from './signature/protection';
+export { deletedFieldOf, formResetFacts } from './mutation/FormMutationResults';
 export type {
   FormMutationMeta,
   FormSetValueResult,
+  FormResetResult,
   FormImportResult,
   FormDataExport,
   FormRepairResult,
@@ -700,6 +728,7 @@ export type {
   RedactionApplyResult,
 } from './mutation/RedactionApplyResult';
 export type { MetadataUpdateResult } from './mutation/MetadataUpdateResult';
+export type { CustomMetadataUpdateResult } from './mutation/CustomMetadataUpdateResult';
 
 export type {
   AnnotationActor,

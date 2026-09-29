@@ -24,7 +24,7 @@ export namespace PageDestination {
     export namespace PageDestinationXyz {
         export interface Page {
             kind: Page.Kind;
-            pageObjectNumber: number;
+            objectNumber: number;
         }
 
         export namespace Page {
@@ -43,7 +43,7 @@ export namespace PageDestination {
     export namespace PageDestinationFit {
         export interface Page {
             kind: Page.Kind;
-            pageObjectNumber: number;
+            objectNumber: number;
         }
 
         export namespace Page {
@@ -63,7 +63,7 @@ export namespace PageDestination {
     export namespace PageDestinationFitH {
         export interface Page {
             kind: Page.Kind;
-            pageObjectNumber: number;
+            objectNumber: number;
         }
 
         export namespace Page {
@@ -83,7 +83,7 @@ export namespace PageDestination {
     export namespace PageDestinationFitV {
         export interface Page {
             kind: Page.Kind;
-            pageObjectNumber: number;
+            objectNumber: number;
         }
 
         export namespace Page {
@@ -106,7 +106,7 @@ export namespace PageDestination {
     export namespace PageDestinationFitR {
         export interface Page {
             kind: Page.Kind;
-            pageObjectNumber: number;
+            objectNumber: number;
         }
 
         export namespace Page {
@@ -125,7 +125,7 @@ export namespace PageDestination {
     export namespace PageDestinationFitB {
         export interface Page {
             kind: Page.Kind;
-            pageObjectNumber: number;
+            objectNumber: number;
         }
 
         export namespace Page {
@@ -145,7 +145,7 @@ export namespace PageDestination {
     export namespace PageDestinationFitBh {
         export interface Page {
             kind: Page.Kind;
-            pageObjectNumber: number;
+            objectNumber: number;
         }
 
         export namespace Page {
@@ -165,7 +165,7 @@ export namespace PageDestination {
     export namespace PageDestinationFitBv {
         export interface Page {
             kind: Page.Kind;
-            pageObjectNumber: number;
+            objectNumber: number;
         }
 
         export namespace Page {

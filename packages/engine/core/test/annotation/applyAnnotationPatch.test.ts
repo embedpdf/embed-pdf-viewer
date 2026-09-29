@@ -5,10 +5,10 @@ import { applyAnnotationPatch, resolveAnnotationPatch } from '../../src/pageSpac
 const base = {
   ref: {
     kind: 'objectNumber',
-    page: { kind: 'objectNumber', pageObjectNumber: 3 },
-    annotObjectNumber: 9,
+    page: { kind: 'objectNumber', objectNumber: 3 },
+    objectNumber: 9,
   },
-  page: { kind: 'objectNumber', pageObjectNumber: 3 },
+  page: { kind: 'objectNumber', objectNumber: 3 },
   index: 0,
   identityQuality: 'durable',
   nm: 'shape',

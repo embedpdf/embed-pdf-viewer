@@ -1709,7 +1709,7 @@ await client.tokens.revoke({
 <dl>
 <dd>
 
-Returns one entry per page plus the audit-log cursor for reconciling subsequent document events. Page order is unspecified; join by `pageState.pageObjectNumber` when display order matters.
+Returns one entry per page plus the audit-log cursor for reconciling subsequent document events. Page order is unspecified; join by `page` (a `PageRef`) when display order matters.
 </dd>
 </dl>
 </dd>
@@ -2325,59 +2325,6 @@ await client.doc.forms.importData({
 </dl>
 </details>
 
-<details><summary><code>client.doc.forms.<a href="/src/api/resources/doc/resources/forms/client/Client.ts">reset</a>({ ...params }) -> CloudPDF.DocFormsReset200Response</code></summary>
-<dl>
-<dd>
-
-#### 🔌 Usage
-
-<dl>
-<dd>
-
-<dl>
-<dd>
-
-```typescript
-await client.doc.forms.reset({
-    docId: "docId",
-    layerName: "layerName",
-    fieldKey: "fieldKey"
-});
-
-```
-</dd>
-</dl>
-</dd>
-</dl>
-
-#### ⚙️ Parameters
-
-<dl>
-<dd>
-
-<dl>
-<dd>
-
-**request:** `CloudPDF.doc.ResetFormsRequest` 
-    
-</dd>
-</dl>
-
-<dl>
-<dd>
-
-**requestOptions:** `FormsClient.RequestOptions` 
-    
-</dd>
-</dl>
-</dd>
-</dl>
-
-
-</dd>
-</dl>
-</details>
-
 <details><summary><code>client.doc.forms.<a href="/src/api/resources/doc/resources/forms/client/Client.ts">setValue</a>({ ...params }) -> CloudPDF.DocFormsSetValue200Response</code></summary>
 <dl>
 <dd>
@@ -2415,6 +2362,58 @@ await client.doc.forms.setValue({
 <dd>
 
 **request:** `CloudPDF.doc.SetValueFormsRequest` 
+    
+</dd>
+</dl>
+
+<dl>
+<dd>
+
+**requestOptions:** `FormsClient.RequestOptions` 
+    
+</dd>
+</dl>
+</dd>
+</dl>
+
+
+</dd>
+</dl>
+</details>
+
+<details><summary><code>client.doc.forms.<a href="/src/api/resources/doc/resources/forms/client/Client.ts">reset</a>({ ...params }) -> CloudPDF.DocFormsReset200Response</code></summary>
+<dl>
+<dd>
+
+#### 🔌 Usage
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+```typescript
+await client.doc.forms.reset({
+    docId: "docId",
+    layerName: "layerName"
+});
+
+```
+</dd>
+</dl>
+</dd>
+</dl>
+
+#### ⚙️ Parameters
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+**request:** `CloudPDF.doc.DocFormsResetRequest` 
     
 </dd>
 </dl>
@@ -2661,7 +2660,7 @@ await client.doc.pages.delete({
 <dl>
 <dd>
 
-A read, not a mutation: the source document is untouched and no event is published. Body is `{"pageObjectNumbers": number[]}`; the response body is the new PDF.
+A read, not a mutation: the source document is untouched and no event is published. Body is `{"pages": PageRef[]}`; the response body is the new PDF.
 </dd>
 </dl>
 </dd>
@@ -3922,6 +3921,59 @@ await client.doc.versions.signatureDigest({
 <dd>
 
 **requestOptions:** `VersionsClient.RequestOptions` 
+    
+</dd>
+</dl>
+</dd>
+</dl>
+
+
+</dd>
+</dl>
+</details>
+
+## Doc Metadata Custom
+<details><summary><code>client.doc.metadata.custom.<a href="/src/api/resources/doc/resources/metadata/resources/custom/client/Client.ts">get</a>({ ...params }) -> CloudPDF.DocMetadataCustomGet200Response</code></summary>
+<dl>
+<dd>
+
+#### 🔌 Usage
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+```typescript
+await client.doc.metadata.custom.get({
+    docId: "docId",
+    layerName: "layerName"
+});
+
+```
+</dd>
+</dl>
+</dd>
+</dl>
+
+#### ⚙️ Parameters
+
+<dl>
+<dd>
+
+<dl>
+<dd>
+
+**request:** `CloudPDF.doc.metadata.GetCustomRequest` 
+    
+</dd>
+</dl>
+
+<dl>
+<dd>
+
+**requestOptions:** `CustomClient.RequestOptions` 
     
 </dd>
 </dl>

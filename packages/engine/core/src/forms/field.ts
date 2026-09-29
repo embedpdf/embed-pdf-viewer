@@ -31,32 +31,23 @@ export type FormFieldFamily =
 export type FormFieldOrigin = 'acroform' | 'recovered';
 
 /**
- * The /Ff flags every field family shares. Family-specific flags (comb,
- * multi-select, radios-in-unison, ...) live as plain booleans on the
- * family DTOs where they are always meaningful.
+ * A widget of a field: its address, and where it shows. `rect` is `null`
+ * for a widget on no page.
  */
-export interface FormFieldFlags {
-  /**
-   * The user must not change the value. The engine's write transactions
-   * still accept programmatic writes to read-only fields (calculated
-   * fields are read-only yet script-written); enforcing fill policy is
-   * the application's job.
-   */
-  readOnly: boolean;
-  required: boolean;
-  noExport: boolean;
-  /** The raw /Ff integer, for anything not surfaced. */
-  raw: number;
+export interface FormFieldWidget<C extends Coordinates = PageCoordinates> extends FormWidget {
+  rect: C['box'] | null;
 }
 
 /**
  * A widget of a toggle (checkbox/radio) field. Toggle widgets always carry
  * their appearance-state machinery — no nullable fields to probe.
  */
-export interface ToggleFieldWidget extends FormWidget {
+export interface ToggleFieldWidget<
+  C extends Coordinates = PageCoordinates,
+> extends FormFieldWidget<C> {
   /**
-   * The widget's appearance state name (the non-"Off" key of its /AP /N
-   * dictionary) — the token toggle writes address widgets by.
+   * The widget's appearance state name in the file (the non-"Off" key of
+   * its /AP /N dictionary), usually its export value. Writes never need it.
    */
   onState: string;
   /**
@@ -82,18 +73,29 @@ export interface FormFieldOption {
  * The trunk every field family shares: identity, provenance, universal
  * flags, and widget placement. A logical field is the document-scoped
  * record that holds the value; its widgets are page-scoped views — join
- * them to the annotation subsystem via `annotObjectNumber`.
+ * them to the annotation subsystem via each widget's `ref`.
  */
 export interface FormFieldBase<C extends Coordinates = PageCoordinates> {
-  /** Durable ref (`objectNumber` whenever the field dictionary is indirect). */
+  /**
+   * Durable ref: the field dictionary's object number, or its full name when
+   * the dictionary is a direct object (spec-violating) and has no number.
+   */
   ref: FormFieldRef;
-  /** Field dictionary object number; `0` for direct (spec-violating) dicts. */
-  fieldObjectNumber: number;
   /** Fully qualified name, e.g. `"billing.name"`. */
   name: string;
   family: FormFieldFamily;
   origin: FormFieldOrigin;
-  flags: FormFieldFlags;
+  /**
+   * The user must not change the value. The engine's write transactions
+   * still accept programmatic writes to read-only fields (calculated
+   * fields are read-only yet script-written); enforcing fill policy is
+   * the application's job.
+   */
+  readOnly: boolean;
+  /** PDF apps ask for a value before the form is submitted. */
+  required: boolean;
+  /** Left out when the form is submitted or exported. */
+  noExport: boolean;
   /** /TU — the accessible tooltip / alternate name. */
   alternateName: string | null;
   /** /TM — the export mapping name. */
@@ -105,10 +107,10 @@ export interface FormFieldBase<C extends Coordinates = PageCoordinates> {
   /** Effective inherited field `/AA` actions. */
   actions?: PdfFieldActions<C['destination']>;
   /** The field's widget annotations, in control order. May be empty ("unplaced"). */
-  widgets: FormWidget[];
+  widgets: FormFieldWidget<C>[];
 }
 
-/** A text field. Write with `{ type: 'text', value }`. */
+/** A text field. Write with `{ value }`. */
 export interface TextFieldDTO<C extends Coordinates = PageCoordinates> extends FormFieldBase<C> {
   family: 'text';
   value: string;
@@ -122,7 +124,7 @@ export interface TextFieldDTO<C extends Coordinates = PageCoordinates> extends F
   comb: boolean;
 }
 
-/** A checkbox. Write with `{ type: 'toggle', state: onState | null }`. */
+/** A checkbox. Write with `{ checked }`, or `{ value }` naming a widget's export value. */
 export interface CheckboxFieldDTO<
   C extends Coordinates = PageCoordinates,
 > extends FormFieldBase<C> {
@@ -130,10 +132,10 @@ export interface CheckboxFieldDTO<
   checked: boolean;
   /** The export value reported while checked ("Off" is never exported). */
   exportValue: string;
-  widgets: ToggleFieldWidget[];
+  widgets: ToggleFieldWidget<C>[];
 }
 
-/** A radio group: One field, N widgets. Write with `{ type: 'toggle', state }`. */
+/** A radio group: One field, N widgets. Write with `{ value }`, a button's export value. */
 export interface RadioFieldDTO<C extends Coordinates = PageCoordinates> extends FormFieldBase<C> {
   family: 'radio';
   /** The checked widget's export value, or `"Off"` when the group is clear. */
@@ -142,10 +144,10 @@ export interface RadioFieldDTO<C extends Coordinates = PageCoordinates> extends 
   radiosInUnison: boolean;
   /** The group cannot be cleared once a choice is made. */
   noToggleToOff: boolean;
-  widgets: ToggleFieldWidget[];
+  widgets: ToggleFieldWidget<C>[];
 }
 
-/** A combo box (dropdown). Write with `{ type: 'choice', values: [v] }`. */
+/** A combo box (dropdown). Write with `{ value }`. */
 export interface ComboBoxFieldDTO<
   C extends Coordinates = PageCoordinates,
 > extends FormFieldBase<C> {
@@ -159,11 +161,13 @@ export interface ComboBoxFieldDTO<
   options: FormFieldOption[];
 }
 
-/** A list box. Write with `{ type: 'choice', values }`. */
+/** A list box. Write with `{ selectedValues }`. */
 export interface ListBoxFieldDTO<C extends Coordinates = PageCoordinates> extends FormFieldBase<C> {
   family: 'listbox';
   /** Selected option export values, in option order. */
   selectedValues: string[];
+  /** /DV — the option values `reset()` selects. */
+  defaultValue: string[];
   /** Whether several options may be selected at once. */
   multiSelect: boolean;
   options: FormFieldOption[];

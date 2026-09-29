@@ -12,9 +12,12 @@ import {
   AnnotationUpdateResultSchema,
   DocumentHeadSchema,
   DocumentManifestSchema,
+  CustomMetadataSchema,
   DocumentMetadataSchema,
   EngineErrorPayloadSchema,
   FormImportResultSchema,
+  FormResetBodySchema,
+  FormResetResultSchema,
   FormSetValueResultSchema,
   FormSnapshotSchema,
   IdentitySchema,
@@ -1428,6 +1431,23 @@ export const docOperations = {
       404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
     },
   },
+  'doc.metadata.custom.get': {
+    operationId: 'doc.metadata.custom.get',
+    title: 'Get custom keys',
+    summary:
+      "The Info dictionary's own keys for a layer: every key but the standard fields, as { key: value }.",
+    method: 'GET',
+    path: wireTemplates.layerCustomMetadata,
+    credentials: docCredentials,
+    scope: [],
+    docCapabilities: ['doc.open'],
+    requestHeaders: [documentPasswordHeader],
+    params: DocLayerParamsSchema,
+    responses: {
+      200: { contentType: 'application/json', schema: CustomMetadataSchema },
+      404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
+    },
+  },
   'doc.signatures.list': {
     operationId: 'doc.signatures.list',
     title: 'List signatures',
@@ -1721,7 +1741,7 @@ export const docOperations = {
     requestHeaders: [documentPasswordHeader],
     params: DocLayerParamsSchema,
     notes:
-      'Returns one entry per page plus the audit-log cursor for reconciling subsequent document events. Page order is unspecified; join by `pageState.pageObjectNumber` when display order matters.',
+      'Returns one entry per page plus the audit-log cursor for reconciling subsequent document events. Page order is unspecified; join by `page` (a `PageRef`) when display order matters.',
     responses: {
       200: { contentType: 'application/json', schema: AnnotationListSchema },
       404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
@@ -1875,17 +1895,20 @@ export const docOperations = {
   },
   'doc.forms.reset': {
     operationId: 'doc.forms.reset',
-    title: 'Reset form field',
-    summary: 'Reset one form field to its default value.',
+    title: 'Reset form',
+    summary:
+      'Reset the fields named in `refs` to their default values, or the whole form without it. Returns the fields that changed.',
     method: 'POST',
-    path: wireTemplates.layerFormFieldReset,
+    path: wireTemplates.layerFormReset,
     credentials: docCredentials,
     scope: [],
     docCapabilities: ['doc.forms.fill'],
     requestHeaders: [documentPasswordHeader],
-    params: DocFieldParamsSchema,
+    params: DocLayerParamsSchema,
+    body: { contentType: 'application/json', schema: FormResetBodySchema },
     responses: {
-      200: { contentType: 'application/json', schema: FormSetValueResultSchema },
+      200: { contentType: 'application/json', schema: FormResetResultSchema },
+      400: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
       404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
     },
   },
@@ -2128,7 +2151,7 @@ export const docOperations = {
       404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
     },
     notes:
-      'A read, not a mutation: the source document is untouched and no event is published. Body is `{"pageObjectNumbers": number[]}`; the response body is the new PDF.',
+      'A read, not a mutation: the source document is untouched and no event is published. Body is `{"pages": PageRef[]}`; the response body is the new PDF.',
   },
   'doc.redactions.apply': {
     operationId: 'doc.redactions.apply',
@@ -2193,6 +2216,7 @@ export const docsGroups = {
   'doc.annotations': { title: 'Annotations' },
   'doc.forms': { title: 'Forms' },
   'doc.metadata': { title: 'Metadata' },
+  'doc.metadata.custom': { title: 'Custom keys' },
   'doc.pages': { title: 'Pages' },
   'doc.redactions': { title: 'Redactions' },
   'doc.signatures': { title: 'Digital signatures' },

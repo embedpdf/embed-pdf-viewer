@@ -16,7 +16,7 @@ export namespace DocPagesRotate200ResponseLayoutNamedPagesItemTarget {
     export namespace DocPagesRotate200ResponseLayoutNamedPagesItemTargetPage {
         export interface Page {
             kind: Page.Kind;
-            pageObjectNumber: number;
+            objectNumber: number;
         }
 
         export namespace Page {

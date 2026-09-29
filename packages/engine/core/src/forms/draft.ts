@@ -1,24 +1,23 @@
-import type { WidgetAppearance } from '../annotation/kinds/widget.shared';
+import type { WidgetStyleDraftFields } from '../annotation/kinds/widget.shared';
 import type { PageRef } from '../identity/PageRef';
 import type { Coordinates, PageCoordinates } from '../pageSpace/coordinates';
 
-export type { WidgetAppearance } from '../annotation/kinds/widget.shared';
-
 /**
- * Where (and how) a widget is born during `createField`. Under the hood
- * this is an annotation create + `attachWidget`, composed in one atomic
- * engine job.
+ * Where a widget goes and how it looks: its page, its box, and the same
+ * style fields a widget annotation's update takes. `create()` places a
+ * field's widgets with these, and `addWidget()` adds one.
  */
-export interface WidgetPlacement<C extends Coordinates = PageCoordinates> {
+export interface WidgetPlacement<
+  C extends Coordinates = PageCoordinates,
+> extends WidgetStyleDraftFields {
   page: PageRef;
   rect: C['box'];
   /**
-   * Toggles: this widget's checked appearance-state name (the token
-   * toggle writes address). Required per widget for radio groups;
-   * defaults to `"Yes"` for checkboxes. Ignored for other families.
+   * A checkbox or radio widget's export value: what the form data holds
+   * while it's checked. Required for a radio button (and never `'Off'`);
+   * `'Yes'` for a checkbox when left out. Other families take none.
    */
-  onState?: string;
-  appearance?: WidgetAppearance;
+  exportValue?: string;
 }
 
 /** An option of a choice field at authoring time. */
@@ -53,14 +52,14 @@ export interface TextFieldDraft<
   multiline?: boolean;
   password?: boolean;
   comb?: boolean;
-  widget?: WidgetPlacement<C>;
+  widgets?: WidgetPlacement<C>[];
 }
 
 export interface CheckboxFieldDraft<
   C extends Coordinates = PageCoordinates,
 > extends FormFieldDraftBase {
   family: 'checkbox';
-  widget?: WidgetPlacement<C>;
+  widgets?: WidgetPlacement<C>[];
 }
 
 /** One field, N widgets — the ISO radio model. */
@@ -70,7 +69,7 @@ export interface RadioFieldDraft<
   family: 'radio';
   radiosInUnison?: boolean;
   noToggleToOff?: boolean;
-  /** Each placement must carry its `onState`. */
+  /** One per button, each with its `exportValue`. */
   widgets?: WidgetPlacement<C>[];
 }
 
@@ -82,7 +81,7 @@ export interface ComboBoxFieldDraft<
   edit?: boolean;
   options?: FormFieldOptionInput[];
   defaultValue?: string;
-  widget?: WidgetPlacement<C>;
+  widgets?: WidgetPlacement<C>[];
 }
 
 export interface ListBoxFieldDraft<
@@ -91,7 +90,9 @@ export interface ListBoxFieldDraft<
   family: 'listbox';
   multiSelect?: boolean;
   options?: FormFieldOptionInput[];
-  widget?: WidgetPlacement<C>;
+  /** Option values `reset()` selects. */
+  defaultValue?: string[];
+  widgets?: WidgetPlacement<C>[];
 }
 
 /**
@@ -103,7 +104,7 @@ export interface SignatureFieldDraft<
   C extends Coordinates = PageCoordinates,
 > extends FormFieldDraftBase {
   family: 'signature';
-  widget?: WidgetPlacement<C>;
+  widgets?: WidgetPlacement<C>[];
 }
 
 /**

@@ -25,7 +25,11 @@ const recordOn = (
   extra: Record<string, unknown> = {},
 ): AnnotationDTO =>
   ({
-    ref: { kind: 'objectNumber', page: toPageRef(pageObjectNumber), annotObjectNumber },
+    ref: {
+      kind: 'objectNumber',
+      page: toPageRef(pageObjectNumber),
+      objectNumber: annotObjectNumber,
+    },
     page: toPageRef(pageObjectNumber),
     index: annotObjectNumber,
     subtype: 'square',
@@ -63,7 +67,7 @@ describe('foldRecords', () => {
       event({
         type: 'annotations.deleted',
         page: one.page,
-        deleted: [{ kind: 'objectNumber', value: 1 }],
+        deleted: [{ kind: 'objectNumber', objectNumber: 1 }],
       }),
     );
     expect(records).toEqual(NO_RECORDS);
@@ -245,7 +249,7 @@ describe('weak annotations (addressed by position)', () => {
         page,
         annotation: recordOn(11, 7),
         appearance: { changed: false },
-        meta: { changed: [{ kind: 'objectNumber', value: 7 }], shouldRefetch: null },
+        meta: { changed: [{ kind: 'objectNumber', objectNumber: 7 }], shouldRefetch: null },
       }),
     );
     expect(next).not.toEqual(reload({ pages: [page] }));
@@ -271,8 +275,8 @@ describe('weak annotations (addressed by position)', () => {
       annotation: reply,
       meta: {
         changed: [
-          { kind: 'objectNumber', value: 9 },
-          { kind: 'nm', value: 'u-2' },
+          { kind: 'objectNumber', objectNumber: 9 },
+          { kind: 'nm', nm: 'u-2' },
         ],
         shouldRefetch: null,
       },
@@ -288,7 +292,7 @@ describe('weak annotations (addressed by position)', () => {
         type: 'annotations.created',
         page,
         annotation: recordOn(11, 9),
-        meta: { changed: [{ kind: 'nm', value: 'elsewhere' }], shouldRefetch: null },
+        meta: { changed: [{ kind: 'nm', nm: 'elsewhere' }], shouldRefetch: null },
       }),
     );
     expect((next as AnnotationRecords).order).toEqual(['obj:7', 'obj:9']);

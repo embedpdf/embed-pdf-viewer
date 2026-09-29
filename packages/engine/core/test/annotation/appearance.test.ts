@@ -130,7 +130,7 @@ describe('appearanceImpactOf — value diffing (inert)', () => {
   it('fields a write accepts but never applies are inert, so a read can be sent back', () => {
     const p = patch({
       subtype: 'square',
-      page: { kind: 'objectNumber', pageObjectNumber: 3 },
+      page: { kind: 'objectNumber', objectNumber: 3 },
       index: 7,
       identityQuality: 'durable',
       author: 'Someone else',

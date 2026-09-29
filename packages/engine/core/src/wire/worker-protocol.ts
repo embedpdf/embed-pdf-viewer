@@ -8,6 +8,8 @@ import type {
   AnnotationAppearancesResult,
 } from '../dto/AnnotationRender';
 import type { Attachment, AttachmentRef, WireAttachmentFile } from '../dto/Attachment';
+import type { CustomMetadata } from '../dto/CustomMetadata';
+import type { CustomMetadataPatch } from '../dto/CustomMetadataPatch';
 import type { DocumentMetadata } from '../dto/DocumentMetadata';
 import type { FontIdentityInfo } from '../dto/FontSpec';
 import type { PdfMeasure, PageMeasurementViewport } from '../dto/Measure';
@@ -22,7 +24,7 @@ import type { PieceInfoPatch, PieceInfoSnapshot } from '../dto/PieceInfo';
 import type { SessionKind } from '../dto/SessionKind';
 import type { PieceInfoDeleteResult, PieceInfoUpdateResult } from '../engine/PieceInfoService';
 import type { SerializedEngineError } from '../errors/EngineError';
-import type { FormFieldDraft } from '../forms/draft';
+import type { FormFieldDraft, WidgetPlacement } from '../forms/draft';
 import type { FormEffect, FormEffectsResult } from '../forms/effects';
 import type { FormFieldPatch } from '../forms/patch';
 import type { FormSnapshot } from '../forms/snapshot';
@@ -42,12 +44,14 @@ import type {
   AttachmentCreateResult,
   AttachmentDeleteResult,
 } from '../mutation/AttachmentMutationResults';
+import type { CustomMetadataUpdateResult } from '../mutation/CustomMetadataUpdateResult';
 import type {
   FormFieldCreateResult,
   FormFieldDeleteResult,
   FormFieldUpdateResult,
   FormImportResult,
   FormRepairResult,
+  FormResetResult,
   FormSetValueResult,
   FormWidgetLinkResult,
 } from '../mutation/FormMutationResults';
@@ -279,6 +283,22 @@ export interface MetadataUpdateWorkerRequest {
   artifactPath?: string;
 }
 
+export interface MetadataReadCustomWorkerRequest {
+  kind: 'metadata.readCustom';
+  jobId: WorkerJobId;
+  docId: string;
+  layerName?: string;
+}
+
+export interface MetadataUpdateCustomWorkerRequest {
+  kind: 'metadata.updateCustom';
+  jobId: WorkerJobId;
+  docId: string;
+  layerName?: string;
+  patch: CustomMetadataPatch;
+  artifactPath?: string;
+}
+
 export interface ActionsReadWorkerRequest {
   kind: 'actions.read';
   jobId: WorkerJobId;
@@ -483,7 +503,8 @@ export interface FormsResetWorkerRequest {
   jobId: WorkerJobId;
   docId: string;
   layerName?: string;
-  ref: FormFieldRef;
+  /** The fields to reset; absent resets the whole form. */
+  refs?: FormFieldRef[];
   artifactPath?: string;
 }
 
@@ -552,7 +573,6 @@ export interface FormsSetSignatureAppearanceWorkerRequest {
   layerName?: string;
   ref: FormFieldRef;
   pdf: ArrayBuffer;
-  pageIndex: number;
   artifactPath?: string;
 }
 
@@ -565,14 +585,13 @@ export interface FormsDeleteFieldWorkerRequest {
   artifactPath?: string;
 }
 
-export interface FormsAttachWidgetWorkerRequest {
-  kind: 'forms.attachWidget';
+export interface FormsAddWidgetWorkerRequest<C extends Coordinates = PageCoordinates> {
+  kind: 'forms.addWidget';
   jobId: WorkerJobId;
   docId: string;
   layerName?: string;
   ref: FormFieldRef;
-  widget: AnnotationRef;
-  onState?: string;
+  placement: WidgetPlacement<C>;
   artifactPath?: string;
 }
 
@@ -1155,6 +1174,8 @@ export type WorkerRequest<C extends Coordinates = PageCoordinates> =
   | OpenWorkerRequest
   | MetadataReadWorkerRequest
   | MetadataUpdateWorkerRequest
+  | MetadataReadCustomWorkerRequest
+  | MetadataUpdateCustomWorkerRequest
   | ActionsReadWorkerRequest
   | AnnotationsListWorkerRequest
   | AnnotationsRenderAppearancesWorkerRequest
@@ -1174,7 +1195,7 @@ export type WorkerRequest<C extends Coordinates = PageCoordinates> =
   | FormsUpdateFieldWorkerRequest
   | FormsSetSignatureAppearanceWorkerRequest
   | FormsDeleteFieldWorkerRequest
-  | FormsAttachWidgetWorkerRequest
+  | FormsAddWidgetWorkerRequest<C>
   | FormsDetachWidgetWorkerRequest
   | PagesListWorkerRequest
   | PagesMoveWorkerRequest
@@ -1251,7 +1272,7 @@ export type WorkerResultPayload<C extends Coordinates = PageCoordinates> =
       /** A locked open whose password was given and wrong. */
       passwordRejected?: boolean;
     }
-  | { tag: 'signatures.list'; snapshot: SignatureSnapshot }
+  | { tag: 'signatures.list'; snapshot: SignatureSnapshot<C> }
   | { tag: 'signatures.contents'; bytes: ArrayBuffer }
   | { tag: 'signatures.digest'; digest: ArrayBuffer }
   | { tag: 'signatures.revisionBytes'; bytes: ArrayBuffer; size: number }
@@ -1259,7 +1280,7 @@ export type WorkerResultPayload<C extends Coordinates = PageCoordinates> =
   | { tag: 'signatures.prepare'; result: SignaturePrepared }
   | {
       tag: 'signatures.complete';
-      result: SignatureCompleteResult;
+      result: SignatureCompleteResult<C>;
       artifact?: LayerArtifactWorkerPayload;
       artifactFile?: LayerArtifactFileWorkerPayload;
     }
@@ -1267,7 +1288,10 @@ export type WorkerResultPayload<C extends Coordinates = PageCoordinates> =
   | { tag: 'signatures.analyze'; analysis: ChangeAnalysis }
   | {
       tag: 'signatures.finalizeCandidate';
-      /** The installed signature as the sealed file reports it. */
+      /**
+       * The installed signature as the sealed file reports it, in page space:
+       * the finalizer measures it while its own session is open.
+       */
       signature: SignatureDTO;
       /** What the sealed file's signatures forbid from now on. */
       protection: DocumentProtection;
@@ -1279,6 +1303,13 @@ export type WorkerResultPayload<C extends Coordinates = PageCoordinates> =
   | {
       tag: 'metadata.update';
       result: MetadataUpdateResult;
+      artifact?: LayerArtifactWorkerPayload;
+      artifactFile?: LayerArtifactFileWorkerPayload;
+    }
+  | { tag: 'metadata.readCustom'; custom: CustomMetadata }
+  | {
+      tag: 'metadata.updateCustom';
+      result: CustomMetadataUpdateResult;
       artifact?: LayerArtifactWorkerPayload;
       artifactFile?: LayerArtifactFileWorkerPayload;
     }
@@ -1340,7 +1371,7 @@ export type WorkerResultPayload<C extends Coordinates = PageCoordinates> =
     }
   | {
       tag: 'forms.reset';
-      result: FormSetValueResult<C>;
+      result: FormResetResult<C>;
       artifact?: LayerArtifactWorkerPayload;
       artifactFile?: LayerArtifactFileWorkerPayload;
     }
@@ -1390,7 +1421,7 @@ export type WorkerResultPayload<C extends Coordinates = PageCoordinates> =
       artifactFile?: LayerArtifactFileWorkerPayload;
     }
   | {
-      tag: 'forms.attachWidget';
+      tag: 'forms.addWidget';
       result: FormWidgetLinkResult<C>;
       artifact?: LayerArtifactWorkerPayload;
       artifactFile?: LayerArtifactFileWorkerPayload;
@@ -1499,7 +1530,13 @@ export type WorkerResultPayload<C extends Coordinates = PageCoordinates> =
     }
   | { tag: 'pages.text'; snapshot: PageTextSnapshot }
   | { tag: 'pages.geometry'; page: PageRef; snapshot: PageGeometrySnapshot<C> }
-  | { tag: 'pages.render'; raster: PageRaster }
+  | {
+      tag: 'pages.render';
+      page: PageRef;
+      /** The area of the page the pixels show. */
+      area: C['box'];
+      raster: PageRaster;
+    }
   | { tag: 'pages.renderEncoded'; image: EncodedImageWire }
   | { tag: 'search.query'; slice: SearchSlice<C> }
   | { tag: 'document.saveBuffer'; bytes: ArrayBuffer; size: number }

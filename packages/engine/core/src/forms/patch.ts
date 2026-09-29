@@ -55,6 +55,13 @@ export interface ListBoxFieldPatch extends FormFieldPatchBase {
   family?: 'listbox';
   multiSelect?: boolean;
   options?: FormFieldOptionInput[];
+  /** Option values `reset()` selects; `null` removes the default. */
+  defaultValue?: string[] | null;
+}
+
+/** A signature field: only the settings every field has. Signing is `doc.signatures`'. */
+export interface SignatureFieldPatch extends FormFieldPatchBase {
+  family?: 'signature';
 }
 
 /** What `doc.forms.update` takes. */
@@ -63,4 +70,5 @@ export type FormFieldPatch =
   | CheckboxFieldPatch
   | RadioFieldPatch
   | ComboBoxFieldPatch
-  | ListBoxFieldPatch;
+  | ListBoxFieldPatch
+  | SignatureFieldPatch;

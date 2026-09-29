@@ -34,6 +34,7 @@ export function applyTextDraft(
   setAnnotColor(fn, annotPtr, draft.color ?? DEFAULTS.color);
   setAnnotOpacity(fn, annotPtr, draft.opacity ?? DEFAULTS.opacity);
   setNoteIcon(fn, annotPtr, draft.icon ?? DEFAULTS.icon);
+  if (draft.open !== undefined) setOpen(fn, annotPtr, draft.open);
   // `pdfResolveAnnotationDraft` filled in a standard state's model.
   if (draft.stateModel != null) {
     writeAnnotString(fn, mem, annotPtr, 'StateModel', stateModelToPdf(draft.stateModel));
@@ -60,6 +61,8 @@ export function applyTextPatch(
   if (patch.icon !== undefined) {
     setNoteIcon(fn, annotPtr, patch.icon);
   }
+  // The popup's `/Open` follows in the mutator, which can reach it.
+  if (patch.open !== undefined) setOpen(fn, annotPtr, patch.open);
   // Three-state; `pdfResolveAnnotationPatch` filled in a new state's model.
   if (patch.stateModel !== undefined) {
     writeAnnotStringOrClear(
@@ -78,6 +81,12 @@ export function applyTextPatch(
       'State',
       patch.state === null ? null : stateToPdf(patch.state),
     );
+  }
+}
+
+function setOpen(fn: PdfFunctions, annotPtr: Ptr, open: boolean): void {
+  if (!fn.EPDFAnnot_SetBooleanValue(annotPtr, 'Open', open)) {
+    throw new EngineError(EngineErrorCode.Unknown, 'EPDFAnnot_SetBooleanValue returned false');
   }
 }
 

@@ -187,11 +187,9 @@ export function createSelectionWrites(
       const model = store.model();
       const members = annotations.selectedCommitted();
       if (members.length < 2) return;
-      const pageObjectNumber = members[0].annotation.page.pageObjectNumber;
+      const pageObjectNumber = members[0].annotation.page.objectNumber;
       if (
-        members.some(
-          (annotation) => annotation.annotation.page.pageObjectNumber !== pageObjectNumber,
-        )
+        members.some((annotation) => annotation.annotation.page.objectNumber !== pageObjectNumber)
       )
         return; // groups are page-local
       const ordered = [...members].sort(
@@ -223,8 +221,7 @@ export function createSelectionWrites(
       if (
         members.some(
           (annotation) =>
-            annotation.annotation.page.pageObjectNumber !==
-            members[0].annotation.page.pageObjectNumber,
+            annotation.annotation.page.objectNumber !== members[0].annotation.page.objectNumber,
         )
       )
         return false;

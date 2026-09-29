@@ -18,9 +18,10 @@ function manifest(
     layerVersion: 0,
     working: false,
     baseByteLength: 0,
+    protection: null,
     pages: pages.map(([pageObjectNumber, contentVersion]) => ({
       state: {
-        page: { kind: 'objectNumber', pageObjectNumber },
+        page: { kind: 'objectNumber', objectNumber: pageObjectNumber },
       } as DocumentManifest['pages'][number]['state'],
       cache: { contentVersion } as DocumentManifest['pages'][number]['cache'],
     })),

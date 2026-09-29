@@ -3,20 +3,22 @@ import type {
   FormFieldDTO,
   FormFieldFamily,
   FormFieldOption,
+  FormFieldWidget,
   FormKind,
   FormSnapshot,
   FormValueEntry,
-  FormWidget,
   PageRef,
   PdfCoordinates,
   PdfDestination,
   PdfFieldActions,
   ToggleFieldWidget,
 } from '@embedpdf/engine-core/runtime';
-import { formWidget, toPageRef } from '@embedpdf/engine-core/runtime';
+import { formWidget, normalizePdfRect, toPageRef } from '@embedpdf/engine-core/runtime';
 import type { PdfRuntimeModule, Ptr } from '@embedpdf/engine-runtime';
 
+import { withScratch } from '../../../runtime/memory/scratch';
 import { readUtf16String, readUtf8String } from '../../../runtime/memory/strings';
+import { RECTF_BYTES, readRectF } from '../../../runtime/memory/structs';
 import { ActionReadBudgetTracker, readActionModel } from '../../actions/ActionModelReader';
 
 // Mirrors EPDF_FORMFIELD_FAMILY_* in public/epdf_form.h.
@@ -61,20 +63,39 @@ function readWideOrNull(
   return readUtf16String(runtime.mem, call, null);
 }
 
+/** One widget of a field: its address and its /Rect (none on no page, or without one). */
+function readWidgetAt(
+  runtime: PdfRuntimeModule,
+  model: Ptr,
+  fieldIndex: number,
+  w: number,
+): FormFieldWidget<PdfCoordinates> {
+  const { fn, mem } = runtime;
+  const widget = formWidget(
+    fn.EPDFForm_GetFieldWidgetObjNum(model, fieldIndex, w),
+    widgetPageRef(fn.EPDFForm_GetFieldWidgetPageObjNum(model, fieldIndex, w)),
+  );
+  const rect = widget.page
+    ? withScratch(mem, RECTF_BYTES, (buf) =>
+        fn.EPDFForm_GetFieldWidgetRect(model, fieldIndex, w, buf)
+          ? normalizePdfRect(readRectF(mem, buf))
+          : null,
+      )
+    : null;
+  return { ...widget, rect };
+}
+
 function readToggleWidgets(
   runtime: PdfRuntimeModule,
   model: Ptr,
   fieldIndex: number,
-): ToggleFieldWidget[] {
+): ToggleFieldWidget<PdfCoordinates>[] {
   const { fn } = runtime;
   const count = fn.EPDFForm_CountFieldWidgets(model, fieldIndex);
-  const widgets: ToggleFieldWidget[] = [];
+  const widgets: ToggleFieldWidget<PdfCoordinates>[] = [];
   for (let w = 0; w < count; w++) {
     widgets.push({
-      ...formWidget(
-        fn.EPDFForm_GetFieldWidgetObjNum(model, fieldIndex, w),
-        widgetPageRef(fn.EPDFForm_GetFieldWidgetPageObjNum(model, fieldIndex, w)),
-      ),
+      ...readWidgetAt(runtime, model, fieldIndex, w),
       onState:
         readUtf8String(runtime.mem, (buf, cap) =>
           fn.EPDFForm_GetFieldWidgetOnState(model, fieldIndex, w, buf, cap),
@@ -88,18 +109,14 @@ function readToggleWidgets(
   return widgets;
 }
 
-function readPlainWidgets(runtime: PdfRuntimeModule, model: Ptr, fieldIndex: number): FormWidget[] {
-  const { fn } = runtime;
-  const count = fn.EPDFForm_CountFieldWidgets(model, fieldIndex);
-  const widgets: FormWidget[] = [];
-  for (let w = 0; w < count; w++) {
-    widgets.push(
-      formWidget(
-        fn.EPDFForm_GetFieldWidgetObjNum(model, fieldIndex, w),
-        widgetPageRef(fn.EPDFForm_GetFieldWidgetPageObjNum(model, fieldIndex, w)),
-      ),
-    );
-  }
+function readPlainWidgets(
+  runtime: PdfRuntimeModule,
+  model: Ptr,
+  fieldIndex: number,
+): FormFieldWidget<PdfCoordinates>[] {
+  const count = runtime.fn.EPDFForm_CountFieldWidgets(model, fieldIndex);
+  const widgets: FormFieldWidget<PdfCoordinates>[] = [];
+  for (let w = 0; w < count; w++) widgets.push(readWidgetAt(runtime, model, fieldIndex, w));
   return widgets;
 }
 
@@ -142,17 +159,15 @@ export function readFieldAt(
 
   const base: FormFieldBase<PdfCoordinates> = {
     ref:
-      fieldObjectNumber > 0 ? { kind: 'objectNumber', fieldObjectNumber } : { kind: 'fqn', name },
-    fieldObjectNumber,
+      fieldObjectNumber > 0
+        ? { kind: 'objectNumber', objectNumber: fieldObjectNumber }
+        : { kind: 'fqn', name },
     name,
     family,
     origin: fn.EPDFForm_GetFieldOrigin(model, fieldIndex) === 1 ? 'recovered' : 'acroform',
-    flags: {
-      readOnly: (rawFlags & FF_READ_ONLY) !== 0,
-      required: (rawFlags & FF_REQUIRED) !== 0,
-      noExport: (rawFlags & FF_NO_EXPORT) !== 0,
-      raw: rawFlags,
-    },
+    readOnly: (rawFlags & FF_READ_ONLY) !== 0,
+    required: (rawFlags & FF_REQUIRED) !== 0,
+    noExport: (rawFlags & FF_NO_EXPORT) !== 0,
     alternateName: readWideOrNull(runtime, (buf, cap) =>
       fn.EPDFForm_GetFieldAlternateName(model, fieldIndex, buf, cap),
     ),
@@ -220,6 +235,7 @@ export function readFieldAt(
         ...base,
         family,
         selectedValues: options.filter((o) => o.selected).map((o) => o.value),
+        defaultValue: entryValues(defaultValueEntry),
         multiSelect: (rawFlags & FF_MULTI_SELECT) !== 0,
         options,
         widgets: readPlainWidgets(runtime, model, fieldIndex),
@@ -303,6 +319,13 @@ function entryScalar(entry: FormValueEntry): string {
   if (entry.kind === 'scalar') return entry.value;
   if (entry.kind === 'array') return entry.values[0] ?? '';
   return '';
+}
+
+/** The values an entry holds: a scalar is one, an array its members. */
+function entryValues(entry: FormValueEntry): string[] {
+  if (entry.kind === 'scalar') return [entry.value];
+  if (entry.kind === 'array') return [...entry.values];
+  return [];
 }
 
 function readFieldActions(

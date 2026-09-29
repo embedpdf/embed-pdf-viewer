@@ -1,4 +1,5 @@
 import type {
+  PdfCoordinates,
   AnalyzeInput,
   ChangeAnalysis,
   DocumentFieldLock,
@@ -31,6 +32,7 @@ import { deriveProtection } from '@embedpdf/engine-core/runtime';
 import { NULL_PTR, type PdfRuntimeModule, type Ptr } from '@embedpdf/engine-runtime';
 
 import { SignatureReader } from './SignatureReader';
+import { withWidgetRects } from '../forms/internal/widgetRects';
 import type { DocumentSession } from '../../document-session/DocumentSession';
 import {
   CloseStack,
@@ -94,7 +96,7 @@ export class SignatureAnalyzer {
    * over the loaded bytes. Identical to the loaded-bytes snapshot when
    * nothing is unsaved.
    */
-  readWorkingCopySnapshot(): SignatureSnapshot {
+  readWorkingCopySnapshot(): SignatureSnapshot<PdfCoordinates> {
     const stack = new CloseStack();
     try {
       const copy = this.openWorkingCopy(stack);
@@ -104,7 +106,9 @@ export class SignatureAnalyzer {
       const target = copy.target;
       return withSignatureModel(this.runtime, target, (model) => {
         const chainValid = this.runtime.fn.EPDFSig_IsRevisionChainValid(model);
-        const signatures = readSignaturesFromModel(this.runtime, model);
+        const signatures = withWidgetRects(this.runtime, target, (rectOf) =>
+          readSignaturesFromModel(this.runtime, model, rectOf),
+        );
         const revisions = chainValid ? readRevisions(this.runtime, target, signatures) : [];
         return { chainValid, revisions, signatures, protection: deriveProtection(signatures) };
       });
@@ -156,7 +160,8 @@ export class SignatureAnalyzer {
             rule: 'revision-chain',
             verdict: 'incomplete' as const,
             objectNumber: 0,
-            detail: 'the cross-reference chain is broken or was rebuilt: no revision can be told from another',
+            detail:
+              'the cross-reference chain is broken or was rebuilt: no revision can be told from another',
           },
         ],
         method: 'net-state' as const,
@@ -301,7 +306,10 @@ export class SignatureAnalyzer {
   private openPrefix(target: Ptr, revisions: PdfRevision[], index: number, stack: CloseStack): Ptr {
     const prefix = this.runtime.fn.EPDFDoc_OpenRevision(target, BigInt(revisions[index].end));
     if (prefix === NULL_PTR) {
-      throw new EngineError(EngineErrorCode.MalformedPdf, `revision ${index} does not open as a document`);
+      throw new EngineError(
+        EngineErrorCode.MalformedPdf,
+        `revision ${index} does not open as a document`,
+      );
     }
     stack.push(() => this.runtime.fn.FPDF_CloseDocument(prefix));
     return prefix;
@@ -319,7 +327,11 @@ export class SignatureAnalyzer {
     since: number,
     until: number,
     sealedStructure: RevisionStructure,
-    restrictions: { level: ModificationLevel; locks: DocumentFieldLock[]; levelOverride?: ModificationLevel },
+    restrictions: {
+      level: ModificationLevel;
+      locks: DocumentFieldLock[];
+      levelOverride?: ModificationLevel;
+    },
   ): RevisionAnalysis[] {
     const { fn } = this.runtime;
     const steps: RevisionAnalysis[] = [];
@@ -327,7 +339,10 @@ export class SignatureAnalyzer {
     let olderStructure = sealedStructure;
     try {
       for (let r = since + 1; r <= until; r++) {
-        const newer = r === revisions.length - 1 ? target : this.openPrefix(target, revisions, r, new CloseStack());
+        const newer =
+          r === revisions.length - 1
+            ? target
+            : this.openPrefix(target, revisions, r, new CloseStack());
         try {
           const newerStructure = readStructure(this.runtime, newer);
           const { changes, health } = this.compare(older, newer, olderStructure, newerStructure);

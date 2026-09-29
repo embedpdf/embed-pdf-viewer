@@ -29,7 +29,7 @@ const NO_FLAGS: AnnotationFlags = {
 const ref = (annotObjectNumber: number): AnnotationRef => ({
   kind: 'objectNumber',
   page: PAGE,
-  annotObjectNumber,
+  objectNumber: annotObjectNumber,
 });
 
 const base = (annotObjectNumber: number) => ({
@@ -333,7 +333,7 @@ const deletedEvent = (annotObjectNumber: number, serverId: number): DocumentEven
     type: 'annotations.deleted',
     page: PAGE,
     origin: remoteOrigin(serverId),
-    deleted: [{ kind: 'objectNumber', value: annotObjectNumber }],
+    deleted: [{ kind: 'objectNumber', objectNumber: annotObjectNumber }],
     meta: META,
   }) as unknown as DocumentEvent;
 
@@ -486,7 +486,7 @@ describe('links lens — substrate children, no ledger', () => {
     harness.emit({
       type: 'annotations.deleted',
       page: PAGE,
-      deleted: [{ kind: 'objectNumber', value: 21 }],
+      deleted: [{ kind: 'objectNumber', objectNumber: 21 }],
       meta: META,
       origin: { kind: 'remote', sub: 'alice' },
       ts: Date.now(),
@@ -630,7 +630,7 @@ describe('the comments lens', () => {
   const page2Root = (objectNumber: number): FileAnnotation =>
     ({
       ...hydrationSquare(objectNumber),
-      ref: { kind: 'objectNumber', page: PAGE2, annotObjectNumber: objectNumber },
+      ref: { kind: 'objectNumber', page: PAGE2, objectNumber: objectNumber },
       page: PAGE2,
     }) as FileAnnotation;
 
@@ -665,7 +665,7 @@ describe('the comments lens', () => {
     // Page 1 first (top-of-page before lower), then page 2.
     expect(
       threads.map((thread) =>
-        thread.root.ref.kind === 'objectNumber' ? thread.root.ref.annotObjectNumber : -1,
+        thread.root.ref.kind === 'objectNumber' ? thread.root.ref.objectNumber : -1,
       ),
     ).toEqual([20, 25, 30]);
     const t20 = threads[0]!;
@@ -1226,8 +1226,7 @@ describe('distance authoring and recalibration', () => {
       (_action, target) => target.userId !== 'other',
     );
     harness.update.mockImplementation(async (ref: AnnotationRef) => {
-      if (ref.kind === 'objectNumber' && ref.annotObjectNumber === 84)
-        throw new Error('write failed');
+      if (ref.kind === 'objectNumber' && ref.objectNumber === 84) throw new Error('write failed');
       return { annotation: dtos[0], appearance: { changed: true } };
     });
     const report = await harness.capability.remeasurePage(PAGE, scale);

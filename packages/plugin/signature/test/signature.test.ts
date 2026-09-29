@@ -91,17 +91,18 @@ const SIG: FormFieldRef = { kind: 'fqn', name: 'sig' };
 
 function signatureField(overrides: Partial<FormFieldDTO> = {}): FormFieldDTO {
   return {
-    ref: { kind: 'objectNumber', fieldObjectNumber: 9 },
-    fieldObjectNumber: 9,
+    ref: { kind: 'objectNumber', objectNumber: 9 },
     name: 'sig',
     family: 'signature',
     origin: 'acroform',
-    flags: { readOnly: false, required: false, noExport: false, raw: 0 },
+    readOnly: false,
+    required: false,
+    noExport: false,
     alternateName: null,
     mappingName: null,
     valueEntry: { kind: 'none' },
     defaultValueEntry: { kind: 'none' },
-    widgets: [{ annotObjectNumber: 9, page: toPageRef(3) }],
+    widgets: [{ objectNumber: 9, page: toPageRef(3) }],
     ...overrides,
   } as FormFieldDTO;
 }
@@ -146,7 +147,7 @@ const stampStub = (bytes: Uint8Array) => ({
   disarm: vi.fn(),
   placeAsset: vi.fn(async () => ({
     kind: 'objectNumber',
-    annotObjectNumber: 1,
+    objectNumber: 1,
     page: toPageRef(3),
   })),
 });
@@ -243,8 +244,7 @@ describe('signing', () => {
         coverage: 'whole-revision',
       });
       expect(
-        signature.getSignature({ annotObjectNumber: result.signature.widget!.annotObjectNumber })
-          ?.signed,
+        signature.getSignature({ objectNumber: result.signature.widget!.objectNumber })?.signed,
       ).toBe(true);
       const signedEvents = events.filter((event) => event.type === 'signed');
       expect(signedEvents).toHaveLength(1);

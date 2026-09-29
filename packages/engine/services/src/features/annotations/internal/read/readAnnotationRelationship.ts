@@ -83,7 +83,7 @@ function readParentRef(
     return {
       kind: 'objectNumber',
       page: toPageRef(pageObjectNumber),
-      annotObjectNumber: objectNumber,
+      objectNumber,
     };
   }
   const nm = readAnnotString(fn, mem, parentPtr, 'NM');

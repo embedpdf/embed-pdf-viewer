@@ -21,7 +21,7 @@ export interface PixelChange {
 }
 
 const placedPages = (widgets: ReadonlyArray<{ page: PageRef | null }>): PageObjectNumber[] =>
-  widgets.flatMap((widget) => (widget.page ? [widget.page.pageObjectNumber] : []));
+  widgets.flatMap((widget) => (widget.page ? [widget.page.objectNumber] : []));
 
 const annotations = (pages: readonly PageObjectNumber[]): PixelChange | null =>
   pages.length ? { pages, scope: 'annotations' } : null;
@@ -38,7 +38,7 @@ export function pixelChangeOf(
     case 'annotations.updated':
     case 'annotations.deleted':
     case 'annotations.moved': // z-order move: baked stacking can change
-      return annotations([event.page.pageObjectNumber]);
+      return annotations([event.page.objectNumber]);
     // A field's widgets can live on several pages; `meta.changedWidgets`
     // names exactly the widgets whose appearance changed, each with its page.
     // An unplaced widget (`page: null`) has no pixels to repaint.
@@ -64,12 +64,12 @@ export function pixelChangeOf(
       return content(
         event.results
           .filter((result) => result.status === 'applied')
-          .map((result) => result.page.pageObjectNumber),
+          .map((result) => result.page.objectNumber),
       );
     case 'annotations.flattened':
       return content(
         event.results.some((result) => result.status === 'applied')
-          ? [event.page.pageObjectNumber]
+          ? [event.page.objectNumber]
           : [],
       );
     // The stream lost events that will never arrive: any page may be stale.

@@ -15,6 +15,7 @@ export interface DocManifest200Response {
     working?: boolean | undefined;
     baseByteLength?: number | undefined;
     scopes?: DocManifest200Response.Scopes | undefined;
+    protection: DocManifest200Response.Protection | null;
     pages: DocManifest200Response.Pages.Item[];
 }
 
@@ -59,6 +60,69 @@ export namespace DocManifest200Response {
             Layer: "layer",
         } as const;
         export type Actions = (typeof Actions)[keyof typeof Actions];
+    }
+
+    export interface Protection {
+        enforced: Protection.Enforced | null;
+        judged: Protection.Judged | null;
+        certification: Protection.Certification | null;
+        fieldLocks: Protection.FieldLocks.Item[];
+        policyVersion: number;
+    }
+
+    export namespace Protection {
+        export const Enforced = {
+            None: "none",
+            Lta: "lta",
+            Fill: "fill",
+            Annotate: "annotate",
+        } as const;
+        export type Enforced = (typeof Enforced)[keyof typeof Enforced];
+        export const Judged = {
+            None: "none",
+            Lta: "lta",
+            Fill: "fill",
+            Annotate: "annotate",
+        } as const;
+        export type Judged = (typeof Judged)[keyof typeof Judged];
+
+        export interface Certification {
+            signatureIndex: number;
+            permission: number;
+        }
+
+        export type FieldLocks = FieldLocks.Item[];
+
+        export namespace FieldLocks {
+            export interface Item {
+                signatureIndex: number;
+                source: Item.Source;
+                spec: Item.Spec;
+            }
+
+            export namespace Item {
+                export const Source = {
+                    Fieldmdp: "fieldmdp",
+                    Lock: "lock",
+                } as const;
+                export type Source = (typeof Source)[keyof typeof Source];
+
+                export interface Spec {
+                    action: Spec.Action;
+                    fields: string[];
+                    permission?: number | undefined;
+                }
+
+                export namespace Spec {
+                    export const Action = {
+                        All: "all",
+                        Include: "include",
+                        Exclude: "exclude",
+                    } as const;
+                    export type Action = (typeof Action)[keyof typeof Action];
+                }
+            }
+        }
     }
 
     export type Pages = Pages.Item[];

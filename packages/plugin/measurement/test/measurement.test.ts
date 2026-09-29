@@ -63,7 +63,7 @@ function harness(
       leader: { length: 12, extension: 5, offset: 0 },
     }),
     create: vi.fn(async () => ({
-      annotation: { ref: { kind: 'objectNumber', annotObjectNumber: 9, page: PAGE } },
+      annotation: { ref: { kind: 'objectNumber', objectNumber: 9, page: PAGE } },
     })),
   };
   const interaction = { activateTool: vi.fn() };
@@ -171,7 +171,7 @@ describe('measurement', () => {
         { x: 10, y: 0 },
       ],
     });
-    expect(ref).toMatchObject({ annotObjectNumber: 9 });
+    expect(ref).toMatchObject({ objectNumber: 9 });
     // A dimension line: the tool's style, caption and leader, and the page's scale.
     expect(annotation.create).toHaveBeenCalledWith(
       PAGE,

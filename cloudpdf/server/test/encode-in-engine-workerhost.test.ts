@@ -127,10 +127,10 @@ describe('encoded kinds through the real WorkerHost (native runtime + sharp)', (
     });
     const list = (await resolved({ kind: 'pages.list', jobId: nextJob++, docId })).result as {
       tag: string;
-      snapshot: { pages: Array<{ ref: { pageObjectNumber: number } }> };
+      snapshot: { pages: Array<{ ref: { objectNumber: number } }> };
     };
     expect(list.tag).toBe('pages.list');
-    const pageObjectNumber = list.snapshot.pages[0]!.ref.pageObjectNumber;
+    const pageObjectNumber = list.snapshot.pages[0]!.ref.objectNumber;
 
     const { result, transfer } = await resolved({
       kind: 'pages.renderEncoded',
@@ -182,13 +182,13 @@ describe('encoded kinds through the real WorkerHost (native runtime + sharp)', (
     });
     const payload = result as {
       tag: string;
-      page: { pageObjectNumber: number };
+      page: { objectNumber: number };
       pageCount: number;
       image: { bytes: Uint8Array };
     };
     expect(payload.tag).toBe('document.renderPageFileEncoded');
     expect(payload.pageCount).toBe(1);
-    expect(payload.page.pageObjectNumber).toBeGreaterThan(0);
+    expect(payload.page.objectNumber).toBeGreaterThan(0);
     expect(isWebp(payload.image.bytes)).toBe(true);
     expect(transfer[0]).toBe(payload.image.bytes.buffer);
   }, 30_000);

@@ -46,7 +46,7 @@ function annotation(pageObjectNumber: number, index: number) {
     ref: {
       kind: 'objectNumber',
       page: toPageRef(pageObjectNumber),
-      annotObjectNumber: pageObjectNumber * 1000 + index,
+      objectNumber: pageObjectNumber * 1000 + index,
     },
     page: toPageRef(pageObjectNumber),
     index,
@@ -94,6 +94,7 @@ function headPayload(docVersion: number) {
   return {
     id: DOC_ID,
     baseSha: 'stub-sha',
+    protection: null,
     storageSizeBytes: 1024,
     docVersion,
     state: 'ready',
@@ -160,6 +161,7 @@ function buildStub(overrides: Partial<StubState> = {}): Stub {
         annotationsVersion: state.annotationsVersion,
         auditHead: state.auditHead,
         baseSha: 'stub-sha',
+        protection: null,
         pages: PAGE_OBJECT_NUMBERS.map((pageObjectNumber) => ({
           state: pageState(pageObjectNumber),
           cache: {
@@ -238,7 +240,7 @@ describe('annotations.list() — one bulk read at the manifest pin', () => {
 
       expect(snap.pages).toHaveLength(PAGE_OBJECT_NUMBERS.length);
       expect(snap.auditHead).toBe(40);
-      expect(new Set(snap.pages.map((p) => p.page.pageObjectNumber))).toEqual(
+      expect(new Set(snap.pages.map((p) => p.page.objectNumber))).toEqual(
         new Set(PAGE_OBJECT_NUMBERS),
       );
       // Exactly one items request — the versioned bulk leaf; the per-page

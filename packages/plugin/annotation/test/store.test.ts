@@ -21,16 +21,16 @@ const FLAGS = {
   lockedContents: false,
 };
 
-const refOf = (annotObjectNumber: number): AnnotationRef => ({
+const refOf = (objectNumber: number): AnnotationRef => ({
   kind: 'objectNumber',
   page: PAGE,
-  annotObjectNumber,
+  objectNumber,
 });
 
-const base = (annotObjectNumber: number) => ({
-  ref: refOf(annotObjectNumber),
+const base = (objectNumber: number) => ({
+  ref: refOf(objectNumber),
   page: PAGE,
-  index: annotObjectNumber,
+  index: objectNumber,
   identityQuality: 'durable',
   nm: null,
   ...FLAGS,
@@ -50,9 +50,9 @@ const base = (annotObjectNumber: number) => ({
   actions: null,
 });
 
-const square = (annotObjectNumber: number, color = '#000000'): FileAnnotation =>
+const square = (objectNumber: number, color = '#000000'): FileAnnotation =>
   ({
-    ...base(annotObjectNumber),
+    ...base(objectNumber),
     subtype: 'square',
     rect: { left: 100, bottom: 600, right: 200, top: 660 },
     box: { left: 100, bottom: 600, right: 200, top: 660 },
@@ -66,9 +66,9 @@ const square = (annotObjectNumber: number, color = '#000000'): FileAnnotation =>
     cloudyIntensity: null,
   }) as unknown as FileAnnotation;
 
-const stamp = (annotObjectNumber: number): FileAnnotation =>
+const stamp = (objectNumber: number): FileAnnotation =>
   ({
-    ...base(annotObjectNumber),
+    ...base(objectNumber),
     subtype: 'stamp',
     rect: { left: 100, bottom: 600, right: 200, top: 660 },
     box: { left: 100, bottom: 600, right: 200, top: 660 },

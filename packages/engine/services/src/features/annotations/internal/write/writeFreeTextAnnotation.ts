@@ -6,6 +6,7 @@ import {
   type FreeTextPatch,
   type RichTextDocumentInput,
   type PdfCoordinates,
+  type VerticalAlignment,
 } from '@embedpdf/engine-core/runtime';
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
 
@@ -13,13 +14,16 @@ import { FPDFANNOT_COLORTYPE } from '../colorType';
 import { freeTextIntentToName } from '../freeTextIntent';
 import { readDefaultAppearance } from '../read/annotationReadPrimitives';
 import { engineRichTextJson } from '../richTextWire';
-import { DEFAULT_STANDARD_FONT, standardFontFromCode } from '../standardFont';
+import { standardFontFromCode } from '../standardFont';
 import { textAlignmentToCode } from '../textAlignment';
+import { VERTICAL_ALIGNMENT_KEY, verticalAlignmentToCode } from '../verticalAlignment';
 import type { AnnotationWriteContext } from './annotationWriteContext';
 import {
   clearAnnotColor,
+  clearBorderEffect,
   setAnnotColor,
   setAnnotOpacity,
+  setBorderEffect,
   setCalloutLine,
   setIntent,
   setLineEndings,
@@ -30,13 +34,15 @@ import { applyAnnotationBoxPatch, writeAnnotationBox } from './writeAnnotationBo
 import { applyDefaultAppearance } from './writeDefaultAppearance';
 import { applyBorderDraft, applyBorderPatch } from './writeStyle';
 
-/** A free text's defaults (`annotation/defaults.ts`): a black border and text. */
+/** A free text's defaults (`annotation/defaults.ts`): a black border and text, Helvetica 12 pt. */
 const DEFAULTS = ANNOTATION_DEFAULTS['free-text'];
 
 /**
  * Write rich text through the engine's rich writer: `/RC`, `/DS`, `/DA`,
  * `/Contents` and the appearance, all or nothing. Faces in the input are
  * resolved from keys / standard names to the identities the engine names.
+ * The body's missing properties take the engine's defaults (Helvetica 12 pt
+ * black, left-aligned).
  */
 function writeRichText(
   fn: PdfFunctions,
@@ -53,24 +59,29 @@ function writeRichText(
   }
 }
 
+function setVerticalAlign(fn: PdfFunctions, annotPtr: Ptr, align: VerticalAlignment): void {
+  if (
+    !fn.EPDFAnnot_SetEmbedMetadataNumber(
+      annotPtr,
+      VERTICAL_ALIGNMENT_KEY,
+      verticalAlignmentToCode(align),
+    )
+  ) {
+    throw new EngineError(
+      EngineErrorCode.Unknown,
+      'EPDFAnnot_SetEmbedMetadataNumber returned false',
+    );
+  }
+}
+
 /**
- * Apply a free-text draft to a freshly-created annotation. Colour model:
- *   - `color` -> `/DA` colour = border + default text colour.
- *   - `fontColor` (optional) -> `TextColor` channel, overriding text only;
- *     written after `/DA` so the override wins.
+ * Apply a resolved free-text draft (`pdfResolveAnnotationDraft`) to a
+ * freshly-created annotation. The draft states its intent, and its text as
+ * rich text whose body carries the text style. Colour model, as Acrobat
+ * draws it:
+ *   - `color` -> the `/DA` colour: the border and a callout's line.
+ *   - `fontColor` -> the rich text body's colour: the text.
  *   - `interiorColor` -> `/C` box background (`null`/omitted clears it).
- *
- * Order:
- *   1. base author-metadata (contents/nm/flags)
- *   2. the text box and its turn (a callout's turn is its text box's; the
- *      appearance then takes in the line and writes `/Rect` and `/RD`)
- *   3. `/C` background (set or clear) + `/CA` opacity
- *   4. `/BS` border (style + width + dash)
- *   5. `/DA` default appearance (font + size + `color`)
- *   6. `TextColor` override (only when `fontColor` is given)
- *   7. `/Q` text alignment
- *   8. `/IT` intent
- *   9. callout `/CL` + leader `/LE` ending (only for callouts with geometry)
  */
 export function applyFreeTextDraft(
   fn: PdfFunctions,
@@ -91,15 +102,25 @@ export function applyFreeTextDraft(
   setAnnotOpacity(fn, annotPtr, draft.opacity ?? DEFAULTS.opacity);
 
   applyBorderDraft(fn, mem, annotPtr, draft);
+  if (draft.cloudyIntensity != null) setBorderEffect(fn, annotPtr, draft.cloudyIntensity);
 
-  const daColor = draft.color ?? DEFAULTS.color;
-  applyDefaultAppearance(fn, annotPtr, draft.fontFamily, draft.fontSize, daColor, ctx);
-  if (draft.fontColor != null) {
-    setAnnotColor(fn, annotPtr, draft.fontColor, FPDFANNOT_COLORTYPE.TextColor);
+  // The rich text writer below sets the /DA font and size from the body and
+  // keeps this colour: the border's.
+  applyDefaultAppearance(
+    fn,
+    annotPtr,
+    draft.fontFamily ?? DEFAULTS.fontFamily,
+    draft.fontSize ?? DEFAULTS.fontSize,
+    draft.color ?? DEFAULTS.color,
+    ctx,
+  );
+
+  const richText = draft.richText!;
+  setTextAlignment(fn, annotPtr, textAlignmentToCode(richText.body?.align ?? DEFAULTS.textAlign));
+  setIntent(fn, annotPtr, freeTextIntentToName(draft.intent ?? DEFAULTS.intent));
+  if (draft.verticalAlign !== undefined && draft.verticalAlign !== DEFAULTS.verticalAlign) {
+    setVerticalAlign(fn, annotPtr, draft.verticalAlign);
   }
-
-  setTextAlignment(fn, annotPtr, textAlignmentToCode(draft.textAlign));
-  setIntent(fn, annotPtr, freeTextIntentToName(draft.intent));
 
   if (draft.calloutLine != null) {
     setCalloutLine(fn, mem, annotPtr, draft.calloutLine);
@@ -109,24 +130,18 @@ export function applyFreeTextDraft(
   }
 
   // Rich text last, always: a box is born with all four forms (/RC, /DS,
-  // /DA, /Contents) and its appearance, Acrobat's shape. The resolved draft
-  // states it (`pdfResolveAnnotationDraft`: the draft's rich document, else
-  // its plain contents as body-style paragraphs). A body becomes the body
-  // style (the /DA font and size follow it; the /DA colour written above is
-  // kept). Must come after the geometry, which the layout needs.
-  writeRichText(fn, annotPtr, draft.richText!, ctx);
+  // /DA, /Contents) and its appearance, Acrobat's shape. Must come after the
+  // geometry, which the layout needs.
+  writeRichText(fn, annotPtr, richText, ctx);
 }
 
 /**
  * Apply a resolved free-text patch (`pdfResolveAnnotationPatch`) to an
- * existing annotation: only present fields are touched, and every text change
- * arrives as the rich text to write. `/DA` packs the font, size and `color`
- * into one string, so a `color` patch keeps the current font and size by
- * reading the triple first (the same read-modify-write as
- * {@link applyBorderPatch}'s shared `/BS` call).
- *
- * `fontColor` here only sets an override; clearing it back to "follow
- * `color`" is out of scope this iteration.
+ * existing annotation: only present fields are touched. Every text change
+ * (new contents, rich text, font, size, text colour or alignment) arrives as
+ * the complete rich text to write, with the alignment stated beside it for
+ * `/Q`. `color` rewrites the `/DA` colour (the border), keeping its font and
+ * size.
  */
 export function applyFreeTextPatch(
   fn: PdfFunctions,
@@ -151,27 +166,21 @@ export function applyFreeTextPatch(
   }
 
   applyBorderPatch(fn, mem, annotPtr, patch);
+  if (patch.cloudyIntensity !== undefined) {
+    if (patch.cloudyIntensity === null) clearBorderEffect(fn, annotPtr);
+    else setBorderEffect(fn, annotPtr, patch.cloudyIntensity);
+  }
 
-  // Every text write goes through the rich document: the body style lives
-  // there and the engine derives /DA from it. `pdfResolveAnnotationPatch`
-  // already turned new contents, a new font, size, text color or alignment
-  // into the rich text to write, so the /DA read-modify-write below only
-  // carries the DA colour (the border and leader).
   if (patch.color !== undefined) {
     const cur = readDefaultAppearance(fn, mem, annotPtr);
     applyDefaultAppearance(
       fn,
       annotPtr,
-      cur ? standardFontFromCode(cur.fontCode) : DEFAULT_STANDARD_FONT,
-      cur && cur.fontSize > 0 ? cur.fontSize : 12,
+      cur ? standardFontFromCode(cur.fontCode) : DEFAULTS.fontFamily,
+      cur && cur.fontSize > 0 ? cur.fontSize : DEFAULTS.fontSize,
       patch.color,
       ctx,
     );
-  }
-  if (patch.fontColor === null) {
-    clearAnnotColor(fn, annotPtr, FPDFANNOT_COLORTYPE.TextColor);
-  } else if (patch.fontColor !== undefined) {
-    setAnnotColor(fn, annotPtr, patch.fontColor, FPDFANNOT_COLORTYPE.TextColor);
   }
   if (patch.richText !== undefined) {
     // Everything regenerated: /RC, /DS, /DA, /Contents and the appearance.
@@ -183,6 +192,9 @@ export function applyFreeTextPatch(
   }
   if (patch.intent !== undefined) {
     setIntent(fn, annotPtr, freeTextIntentToName(patch.intent));
+  }
+  if (patch.verticalAlign !== undefined) {
+    setVerticalAlign(fn, annotPtr, patch.verticalAlign);
   }
 
   if (patch.calloutLine === null) {

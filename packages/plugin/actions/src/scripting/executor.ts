@@ -75,7 +75,7 @@ export function registerScriptExecutor(
         });
       } else {
         const entries: AnnotCommitEntry[] = output.annotEffects.map((effect) => ({
-          annotObjectNumber: effect.ref.kind === 'objectNumber' ? effect.ref.annotObjectNumber : -1,
+          annotObjectNumber: effect.ref.kind === 'objectNumber' ? effect.ref.objectNumber : -1,
           ...(effect.ref.kind === 'objectNumber' ? { page: effect.ref.page } : {}),
           patch: effect.patch,
         }));
@@ -102,12 +102,12 @@ export function registerScriptExecutor(
     }
     budget.scriptNodes += 1;
     const source = actionContext.source;
-    const firstPage = ctx.document()?.pages[0]?.ref.pageObjectNumber;
+    const firstPage = ctx.document()?.pages[0]?.ref.objectNumber;
     const pageObjectNumber =
       source.kind === 'widget' || source.kind === 'page'
-        ? source.page.pageObjectNumber
+        ? source.page.objectNumber
         : source.kind === 'link' || source.kind === 'annotation'
-          ? (source.page?.pageObjectNumber ?? firstPage)
+          ? (source.page?.objectNumber ?? firstPage)
           : firstPage;
     if (pageObjectNumber === undefined) {
       return { status: 'inert', reason: 'no page to anchor the world on' };

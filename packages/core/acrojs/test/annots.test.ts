@@ -18,7 +18,7 @@ const annotation = (
   objectNumber: number,
   overrides: Partial<ScriptAnnotInput> = {},
 ): ScriptAnnotInput => ({
-  ref: { kind: 'objectNumber', page: toPageRef(3), annotObjectNumber: objectNumber },
+  ref: { kind: 'objectNumber', page: toPageRef(3), objectNumber },
   name,
   subtype: 'square',
   page: 0,
@@ -84,7 +84,7 @@ describe('the annots plane', () => {
     expect(output.error).toBeUndefined();
     expect(output.annotEffects).toEqual([
       {
-        ref: { kind: 'objectNumber', page: toPageRef(3), annotObjectNumber: 21 },
+        ref: { kind: 'objectNumber', page: toPageRef(3), objectNumber: 21 },
         patch: {
           strokeColor: ['RGB', 0.14, 0.43, 0.89],
           fillColor: ['RGB', 0.86, 0.93, 1],
@@ -133,11 +133,11 @@ describe('the annots plane', () => {
     );
     expect(output.annotEffects).toEqual([
       {
-        ref: { kind: 'objectNumber', page: toPageRef(3), annotObjectNumber: 21 },
+        ref: { kind: 'objectNumber', page: toPageRef(3), objectNumber: 21 },
         patch: { opacity: 0.7, flags: { hidden: true, noView: true } },
       },
       {
-        ref: { kind: 'objectNumber', page: toPageRef(3), annotObjectNumber: 22 },
+        ref: { kind: 'objectNumber', page: toPageRef(3), objectNumber: 22 },
         patch: { contents: 'annotated' },
       },
     ]);
@@ -162,7 +162,7 @@ describe('the annots plane', () => {
     expect(output.error).toBeUndefined();
     expect(output.annotEffects).toEqual([
       {
-        ref: { kind: 'objectNumber', page: toPageRef(3), annotObjectNumber: 22 },
+        ref: { kind: 'objectNumber', page: toPageRef(3), objectNumber: 22 },
         patch: { flags: { hidden: true } },
       },
     ]);
@@ -206,7 +206,7 @@ describe('the annots plane', () => {
     );
     expect(output.annotEffects).toEqual([
       {
-        ref: { kind: 'objectNumber', page: toPageRef(3), annotObjectNumber: 21 },
+        ref: { kind: 'objectNumber', page: toPageRef(3), objectNumber: 21 },
         patch: { strokeColor: ['RGB', 1, 0, 0] },
       },
     ]);

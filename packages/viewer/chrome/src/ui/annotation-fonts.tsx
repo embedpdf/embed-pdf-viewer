@@ -8,7 +8,7 @@
  * once both have happened — an offered key always resolves on write.
  */
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
-import { useKernel } from '@embedpdf/react/runtime';
+import { isLocalEngine, useKernel } from '@embedpdf/react/runtime';
 import { mountWebFont } from '@embedpdf/web';
 import { useAnnotationsConfig } from '../config-context';
 
@@ -25,10 +25,10 @@ export function AnnotationFontsProvider({ children }: { children: ReactNode }) {
   const [loaded, setLoaded] = useState<readonly LoadedAnnotationFont[]>([]);
 
   useEffect(() => {
-    const engineFonts = kernel.engine.fonts;
     // The cloud engine registers no fonts (a server policy), so a key could
     // never resolve on write: offer nothing rather than a font that fails.
-    if (!fonts?.length || !engineFonts) return;
+    if (!fonts?.length || !isLocalEngine(kernel.engine)) return;
+    const engineFonts = kernel.engine.fonts;
     let cancelled = false;
     const unmounts: Array<() => void> = [];
     void (async () => {

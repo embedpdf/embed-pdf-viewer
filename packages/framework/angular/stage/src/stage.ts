@@ -72,7 +72,7 @@ const frameEqual = (left: PageFrame, right: PageFrame) =>
   },
   template: `
     @if (pageTemplate(); as tpl) {
-      @for (visiblePage of pages(); track visiblePage.ref.pageObjectNumber) {
+      @for (visiblePage of pages(); track visiblePage.ref.objectNumber) {
         <epdf-page-surface
           [vp]="visiblePage"
           [frame]="frame()"

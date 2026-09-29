@@ -12,7 +12,7 @@ const pages = [first, second];
 const refOf = (page: PageRef, annotObjectNumber: number): AnnotationRef => ({
   kind: 'objectNumber',
   page,
-  annotObjectNumber,
+  objectNumber: annotObjectNumber,
 });
 
 /** An annotation as a read returns it, with only what the closure looks at. */
@@ -53,11 +53,11 @@ const document: Record<number, AnnotationDTO[]> = {
 function exported(selection: Parameters<typeof closeExportSelection>[0]) {
   const reads: number[] = [];
   const annotations = closeExportSelection(selection, pages, (page) => {
-    reads.push(page.pageObjectNumber);
-    return document[page.pageObjectNumber] ?? [];
+    reads.push(page.objectNumber);
+    return document[page.objectNumber] ?? [];
   });
   const objectNumbers = annotations.map((item) =>
-    item.ref.kind === 'objectNumber' ? item.ref.annotObjectNumber : -1,
+    item.ref.kind === 'objectNumber' ? item.ref.objectNumber : -1,
   );
   return { objectNumbers, reads };
 }
@@ -104,7 +104,7 @@ describe('closeExportSelection', () => {
       annotation(first, 10, 0, { nm: 'note', popup: refOf(first, 11) }),
       ...document[3]!.slice(1),
     ];
-    const read = (page: PageRef) => named[page.pageObjectNumber] ?? [];
+    const read = (page: PageRef) => named[page.objectNumber] ?? [];
     const byName = closeExportSelection(
       { refs: [{ kind: 'nm', page: first, nm: 'note' }], include: 'references' },
       pages,

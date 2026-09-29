@@ -18,7 +18,7 @@ export function readPopup(
   return {
     ...base,
     subtype: 'popup',
-    parent: readLinkedAnnotationRef(fn, mem, annotPtr, 'Parent', base.page.pageObjectNumber),
+    parent: readLinkedAnnotationRef(fn, mem, annotPtr, 'Parent', base.page.objectNumber),
     open: readAnnotBoolean(fn, mem, annotPtr, 'Open') ?? false,
   };
 }

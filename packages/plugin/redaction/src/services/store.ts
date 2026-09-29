@@ -26,9 +26,9 @@ export function createStore(ctx: RedactionContext) {
   /** Page object number → display index, rebuilt only when the page registry changes. */
   const indexByPage = memo(
     () => [ctx.document()?.pages] as const,
-    (layouts) => new Map((layouts ?? []).map((page) => [page.ref.pageObjectNumber, page.index])),
+    (layouts) => new Map((layouts ?? []).map((page) => [page.ref.objectNumber, page.index])),
   );
-  const pageIndexOf = (page: PageRef): number => indexByPage().get(page.pageObjectNumber) ?? -1;
+  const pageIndexOf = (page: PageRef): number => indexByPage().get(page.objectNumber) ?? -1;
   const canApply = (): boolean =>
     ctx.doc.redaction !== undefined &&
     APPLY_CAPABILITIES.every((capability) => ctx.doc.security.allows(capability));

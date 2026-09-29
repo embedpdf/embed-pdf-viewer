@@ -1,6 +1,6 @@
 ---
 title: Rich text
-description: How free-text annotations are edited — a rich document of runs, one shared editor binding, and a plugin that routes formatting to the selected text or the whole box.
+description: "Text boxes can mix styles, like a bold word or a red sentence. How they're stored, how your toolbar formats them, and how to show your own fonts."
 ---
 
 {/* Generated from docs/content — edit there, then `pnpm docs:sync`. */}
@@ -9,132 +9,105 @@ import { Callout } from '@/components/docs/callout';
 
 # Rich text
 
-A free-text annotation carries a rich document: a **body** style and
-**paragraphs of runs**, where a run's `style` holds only what it overrides
-(a bold word in a regular box is one run with `{ weight: 700 }`). The engine
-stores it the way Acrobat does (`/RC` + `/DS`), lays it out, and reads it
-back as `richText` on every free text — see
-[Free text](/docs/engine/annotations/free-text#rich-text)
-for the model and the patch rules. This page is about _editing_ it in the
-browser.
-
-The example puts a formatted box on the page; double-click it, select a
-word, and use the buttons — or `Ctrl`/`Cmd`+`B`, `I`, `U` while typing:
+A text box (a free text annotation) can mix styles: a bold word, a red sentence, a bigger heading.
+Double-click the box below, select a word, and use the buttons, or press `Ctrl`/`Cmd` with `B`, `I`
+or `U` while you type:
 
 <Example name="annotation/rich-text" mode="open" />
 
-## One editor, every framework
+## How it's stored
 
-Editing is split in three layers, so no framework carries its own text
-editor:
+A text box has a **body style**, which is how its text looks by default, and **paragraphs** of
+**runs**. A run is a piece of text with the styles it changes, and nothing else: a bold word in a
+regular box is one run with `{ weight: 700 }`.
 
-- **The plugin decides** (`@embedpdf/plugin-annotation`, DOM-free). Its
-  `textItems(page)` projection hands the framework one editable element per
-  free text: the box, `richText.paragraphs`, and the body as ready-to-spread
-  CSS (font, size, colour, weight, style, decoration, alignment, the text
-  inset). It owns the text truth, the debounced engine write, and where a
-  formatting change lands.
-- **The binding does the DOM** (`attachRichTextEditor` in `@embedpdf/web`).
-  It renders paragraphs as blocks and styled runs as inline-styled spans,
-  serialises typing back into runs from inline styles, maps the selection to
-  flat offsets and back, keeps the caret across a restyle, holds still during
-  IME composition, pastes as plain text and forwards the format shortcuts.
-  It knows nothing about plugins: it talks to a small structural host.
-- **The framework glues** (~50 lines). React's `AnnotationLayer` renders a
-  `FreeText` element that attaches the binding once, updates it when the
-  item changes, and keeps focus in step with the plugin's edit state. Angular,
-  Vue and Svelte do the same with their own effects — the binding's handle is
-  already shaped like a Svelte action (`{ update, detach }`).
+```ts
+annotation.richText;
+// {
+//   body: { family: 'Helvetica', size: 12, color: '#000000' },
+//   paragraphs: [{ runs: [{ text: 'Paid ' }, { text: 'in full', style: { weight: 700 } }] }],
+// }
+```
 
-## Formatting the selection
+The engine writes it the way Acrobat does, so the formatting is the same there. The engine docs
+have the full model: [Free text](/docs/engine/annotations/free-text#rich-text).
 
-Everything a toolbar needs is on the public annotation capability and works
-the same whether the user is typing or has a box selected:
+## Format from your toolbar
+
+The same calls work while someone types in a box and when boxes are only selected:
 
 ```ts
 const annotation = useAnnotation();
 
-// The engine's field names: free text declares bold/italic/underline next to
-// fontFamily/fontSize/fontColor, so a schema-driven panel renders the toggles
-// from `getSelectionFields().fields` with no new code.
-annotation.updateSelection({ fontSize: 24, fontColor: '#c00000' });
-
-// Flip a format: reads the state `getSelectionFields` reports, writes its inverse.
-annotation.toggleTextFormat('bold');
+await annotation.selection.update({ bold: true });
+await annotation.selection.update({ fontSize: 24, fontColor: '#c00000' });
+await annotation.text.toggleFormat('italic'); // italic on, or off if it already is
 ```
 
-The routing rule: **while the text editor holds a non-empty selection, the
-font, size and colour (`fontFamily`, `fontSize`, `fontColor`) and the formats
-(`toggleTextFormat`) restyle that range's runs; otherwise they restyle the body
-of every selected free text.** `getSelectionFields()` reports the same way: with
-a range held, `values.bold` is whether every selected run is bold and `mixed`
-lists the fields the runs disagree on; a bare caret and a selected box report the
-body. Fields that aren't text (opacity, border, background) always apply to
-the annotation.
+Where a change lands depends on what's selected:
 
-A formatting change on the body is written as a rich body patch; a change on
-a range commits the paragraphs and keeps the body. Typing commits the
-paragraphs after a short pause, on every restyle, and when editing ends —
-the engine never sees a half-typed document.
+- **Words selected while typing**: the change styles those words.
+- **Otherwise**: it styles the whole text of every selected box.
+
+A property that isn't about text, such as opacity or the border, always applies to the whole box.
+
+To show the state in your toolbar, [`useSelectionFields()`](../annotations/selecting#a-style-panel)
+reports it the same way. With words selected, `values.bold` is true when every selected word is
+bold, and `mixed` lists what the words disagree on. With a caret or a selected box, it reports the
+box's own style. Text boxes also give you `textFormat` fields, so a style panel shows the bold,
+italic and underline buttons without extra code.
 
 <Callout type="info">
-  A run that already overrides a property keeps its override when the body moves: turn the whole box
-  red and the one blue word stays blue. Clearing a run's override (so it follows the body again) is
-  a deliberate act — write the paragraphs without that property.
+  A word with its own style keeps it when the box changes: turn the whole box red, and the one blue
+  word stays blue. To make a word follow the box again, write the paragraphs without that style.
 </Callout>
 
-## Fonts in the DOM
+## When it's saved
 
-The engine embeds a registered font in the PDF; the browser needs the same
-face as a `@font-face` under the font's **key**, which is the CSS family the
-plugin emits for it. `mountWebFont` from `@embedpdf/web` does that with the
-bytes you registered:
+Typing is written after a short pause, at every format change, and when editing ends, so the engine
+never gets half a word. `documents.download()` waits for the last write, so the file you download has
+everything the user typed.
+
+## Show your own fonts
+
+The engine puts a font into the PDF, but the browser draws the text while people type, so it needs
+the same font. Register the font with the engine, and give the browser the same file under the same
+key:
 
 ```ts
-import { mountWebFont } from '@embedpdf/web';
+import { mountWebFont } from '@embedpdf/react/runtime';
 
 await engine.fonts.register({ key: 'brand-sans', data });
 const unmount = await mountWebFont('brand-sans', data);
 ```
 
-Standard PDF fonts use browser font stacks (Helvetica →
-`Helvetica, Arial, sans-serif`, and so on).
+The key is the font's name in both places: `fontFamily: 'brand-sans'` on a text box. The standard
+PDF fonts need nothing: Helvetica shows as `Helvetica, Arial, sans-serif`, and so on. More in
+[Fonts](/docs/engine/documents/fonts).
 
-<Engine local>
+## Draw your own text box
 
-The full viewer does the fetch, the registration and the mount from one
-`annotations.fonts` option — see
-[Fonts](/docs/engine/documents/fonts#show-the-font-in-the-browser-too).
+The annotation layer's text box already edits rich text. If you [draw text boxes
+yourself](../annotations/custom-rendering), `useRichTextEditor()` makes your element the editor:
+it draws the runs, turns typing back into runs, keeps the caret when the style changes, and handles
+pasting, input methods and the format shortcuts:
 
-</Engine>
+```tsx
+import { useRichTextEditor, type AnnotationRendererProps } from '@embedpdf/react/annotation';
 
-## Writing the glue for another framework
+function BrandedTextBox({ annotation, box, page }: AnnotationRendererProps) {
+  const editor = useRichTextEditor(annotation, page);
+  const { x, y, width, height } = page.transform.pageToViewRect(box);
 
-If you render free text yourself, the plugin's host lens gives you the three
-calls the binding's host needs, and the binding gives you the rest:
-
-```ts
-import { attachRichTextEditor } from '@embedpdf/web';
-
-const binding = attachRichTextEditor(
-  element,
-  {
-    onInput: (doc) => anno.draftRichText(item.ref, doc), // typing → shown at once, written after a pause
-    onSelectionChange: (range) => anno.setTextSelection(item.ref, range), // the range the toolbar restyles
-    onCommand: (format) => anno.toggleTextFormat(format), // Ctrl/Cmd+B/I/U
-    cssFontFamily: (family) => anno.cssFontFamily(family), // a run's face → a CSS family list
-  },
-  { document: item.richText, scale },
-);
-
-// Later, when the item or the zoom changes (the binding skips its own echo,
-// so the caret never jumps while typing):
-binding.update({ document: item.richText, scale });
-// On teardown:
-binding.detach();
+  return (
+    <div
+      ref={editor.ref}
+      className={editor.editing ? 'text-box editing' : 'text-box'}
+      style={{ position: 'absolute', left: x, top: y, width, height, ...editor.style }}
+    />
+  );
+}
 ```
 
-Set `contentEditable` from `item.editing`, focus the element when the plugin
-enters edit, and stop `pointerdown` from bubbling to the stage so the browser
-owns caret placement inside the box. That is the whole per-framework
-surface; the React version in `@embedpdf/react` is the reference.
+`editor.style` is the box's body style as CSS: font, size, color and alignment. The formatting
+calls above work on your element as they do on the built-in one.

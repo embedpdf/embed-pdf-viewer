@@ -11,7 +11,7 @@ export function sameAnchor(
   if (left === right) return true;
   if (!left || !right) return false;
   return (
-    left.page.pageObjectNumber === right.page.pageObjectNumber &&
+    left.page.objectNumber === right.page.objectNumber &&
     left.bounds.x === right.bounds.x &&
     left.bounds.y === right.bounds.y &&
     left.bounds.width === right.bounds.width &&
@@ -30,7 +30,7 @@ export function sameCreationDraftAnchor(
   return (
     left.kind === right.kind &&
     left.subtype === right.subtype &&
-    left.page.pageObjectNumber === right.page.pageObjectNumber &&
+    left.page.objectNumber === right.page.objectNumber &&
     left.pointCount === right.pointCount &&
     left.minPoints === right.minPoints &&
     left.canFinish === right.canFinish &&

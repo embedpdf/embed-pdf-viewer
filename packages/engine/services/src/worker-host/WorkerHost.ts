@@ -18,7 +18,7 @@ import {
   type DocumentSaveBufferWorkerRequest,
   type DocumentSaveFileWorkerRequest,
   type DocumentSaveLayerBufferWorkerRequest,
-  type FormsAttachWidgetWorkerRequest,
+  type FormsAddWidgetWorkerRequest,
   type FormsCreateFieldWorkerRequest,
   type FormsDeleteFieldWorkerRequest,
   type FormsDetachWidgetWorkerRequest,
@@ -56,6 +56,8 @@ import {
   type LayerCloseWorkerRequest,
   type MetadataReadWorkerRequest,
   type MetadataUpdateWorkerRequest,
+  type MetadataReadCustomWorkerRequest,
+  type MetadataUpdateCustomWorkerRequest,
   type ActionsReadWorkerRequest,
   type OpenWorkerRequest,
   type PagesListWorkerRequest,
@@ -417,6 +419,12 @@ export class WorkerHost {
         case 'metadata.update':
           resultPack = this.handleMetadataUpdate(msg, ctrl.signal);
           break;
+        case 'metadata.readCustom':
+          resultPack = this.handleMetadataReadCustom(msg, ctrl.signal);
+          break;
+        case 'metadata.updateCustom':
+          resultPack = this.handleMetadataUpdateCustom(msg, ctrl.signal);
+          break;
         case 'actions.read':
           resultPack = this.handleActionsRead(msg, ctrl.signal);
           break;
@@ -501,8 +509,8 @@ export class WorkerHost {
         case 'forms.deleteField':
           resultPack = this.handleFormsDeleteField(msg, ctrl.signal);
           break;
-        case 'forms.attachWidget':
-          resultPack = this.handleFormsAttachWidget(msg, ctrl.signal);
+        case 'forms.addWidget':
+          resultPack = this.handleFormsAddWidget(msg, ctrl.signal);
           break;
         case 'forms.detachWidget':
           resultPack = this.handleFormsDetachWidget(msg, ctrl.signal);
@@ -960,6 +968,25 @@ export class WorkerHost {
     const mutator = new MetadataMutator(this.runtime, session);
     const result = mutator.update(req.patch, signal);
     return this.finishMutation(session, { tag: 'metadata.update', result }, req.artifactPath);
+  }
+
+  private handleMetadataReadCustom(
+    req: MetadataReadCustomWorkerRequest,
+    signal: AbortSignal,
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
+    const session = this.requireSession(req);
+    const custom = new MetadataReader(this.runtime, session).readCustom(signal);
+    return wirePack({ tag: 'metadata.readCustom', custom });
+  }
+
+  private handleMetadataUpdateCustom(
+    req: MetadataUpdateCustomWorkerRequest,
+    signal: AbortSignal,
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
+    const session = this.requireSession(req);
+    const mutator = new MetadataMutator(this.runtime, session);
+    const result = mutator.updateCustom(req.patch, signal);
+    return this.finishMutation(session, { tag: 'metadata.updateCustom', result }, req.artifactPath);
   }
 
   private handleActionsRead(
@@ -1448,13 +1475,13 @@ export class WorkerHost {
   ): Promise<WirePack<WorkerResultPayload<PdfCoordinates>>> {
     const session = this.requireSession(req);
     const reader = new PageRenderReader(this.runtime, session);
-    const raster = await reader.render(
+    const { raster, area } = await reader.render(
       session.resolvePageRef(req.page).pageObjectNumber,
       req.options ?? {},
       signal,
       this.renderSlices,
     );
-    return wirePack({ tag: 'pages.render', raster }, [raster.data]);
+    return wirePack({ tag: 'pages.render', page: req.page, area, raster }, [raster.data]);
   }
 
   /**
@@ -1739,8 +1766,8 @@ export class WorkerHost {
       }
       // No session carried this document to the boundary, so the target
       // converts here, on the page it opened.
-      const raster = await new PageRenderReader(this.runtime, session).render(
-        page.ref.pageObjectNumber,
+      const { raster } = await new PageRenderReader(this.runtime, session).render(
+        page.ref.objectNumber,
         renderOptionsInFileSpace(req.options ?? {}, () => page.pdfCropBox),
         signal,
         this.renderSlices,
@@ -1958,7 +1985,7 @@ export class WorkerHost {
   ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
     const mutator = new FormMutator(this.runtime, session);
-    const result = mutator.reset(req.ref, signal);
+    const result = mutator.reset(req.refs, signal);
     return this.finishMutation(session, { tag: 'forms.reset', result }, req.artifactPath);
   }
 
@@ -2049,7 +2076,6 @@ export class WorkerHost {
     const { field } = new FormMutator(this.runtime, session).setSignatureAppearance(
       req.ref,
       new Uint8Array(req.pdf),
-      req.pageIndex,
       signal,
     );
     const meta = formMutationMeta(session, [field.ref], field.widgets);
@@ -2075,17 +2101,17 @@ export class WorkerHost {
     );
   }
 
-  private handleFormsAttachWidget(
-    req: FormsAttachWidgetWorkerRequest,
+  private handleFormsAddWidget(
+    req: FormsAddWidgetWorkerRequest<PdfCoordinates>,
     signal: AbortSignal,
   ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
     const mutator = new FormMutator(this.runtime, session);
-    const { field, widget } = mutator.attachWidget(req.ref, req.widget, req.onState, signal);
+    const { field, widget } = mutator.addWidget(req.ref, req.placement, signal);
     const meta = formMutationMeta(session, [field.ref], [widget]);
     return this.finishMutation(
       session,
-      { tag: 'forms.attachWidget', result: { field, meta } },
+      { tag: 'forms.addWidget', result: { field, meta } },
       req.artifactPath,
     );
   }
@@ -2152,6 +2178,7 @@ const BASE_SESSION_SUFFIX = '__base__';
 /** Every request kind that writes to a session's document. */
 const MUTATING_KINDS: ReadonlySet<WorkerRequest['kind']> = new Set<WorkerRequest['kind']>([
   'metadata.update',
+  'metadata.updateCustom',
   'annotations.create',
   'annotations.update',
   'annotations.delete',
@@ -2167,7 +2194,7 @@ const MUTATING_KINDS: ReadonlySet<WorkerRequest['kind']> = new Set<WorkerRequest
   'forms.updateField',
   'forms.setSignatureAppearance',
   'forms.deleteField',
-  'forms.attachWidget',
+  'forms.addWidget',
   'forms.detachWidget',
   'pages.move',
   'pages.rotate',

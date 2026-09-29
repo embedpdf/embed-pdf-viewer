@@ -239,10 +239,10 @@ export class AnnotationFlattener {
       throw new EngineError(EngineErrorCode.InvalidArg, `${op} requires at least one ref`);
     }
     for (const ref of refs) {
-      if (ref.page.pageObjectNumber !== pageObjectNumber) {
+      if (ref.page.objectNumber !== pageObjectNumber) {
         throw new EngineError(
           EngineErrorCode.InvalidArg,
-          `${op} refs must all target page ${pageObjectNumber}; got ref on page ${ref.page.pageObjectNumber}`,
+          `${op} refs must all target page ${pageObjectNumber}; got ref on page ${ref.page.objectNumber}`,
         );
       }
     }

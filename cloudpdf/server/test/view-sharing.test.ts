@@ -99,6 +99,7 @@ describe('plane-scoped view sharing', () => {
       `/v1/docs/${docId}/text/pages/obj:1/data@contentVersion=1`,
       `/v1/docs/${docId}/actions@actionsVersion=1`,
       `/v1/docs/${docId}/metadata@metadataVersion=1`,
+      `/v1/docs/${docId}/metadata/custom@metadataVersion=1`,
     ];
     for (const path of sharedReads) {
       const a = await fetch(`${fx.baseUrl}${path}`, {
@@ -153,7 +154,7 @@ describe('plane-scoped view sharing', () => {
 
     const manifest = await fetchLayerManifest(fx, tenantId, docId, 'alice');
     expect(manifest.scopes).toEqual({ ...ALL_BASE, annotations: 'layer' });
-    const page1 = manifest.pages.find((p) => p.state.page.pageObjectNumber === 1)!;
+    const page1 = manifest.pages.find((p) => p.state.page.objectNumber === 1)!;
     expect(page1.cache.annotationVersion).toBeGreaterThan(1);
     expect(page1.cache.contentVersion).toBe(1);
 
@@ -499,6 +500,60 @@ describe('attachments plane (independent axis)', () => {
     expect(grant.resourceIds).toEqual(expect.arrayContaining(['page-render', 'layer-attachments']));
   });
 
+  test('a metadata write flips the metadata plane for both halves of the Info dict', async () => {
+    const tenantId = 'tenant-metaflip';
+    const docId = 'docmetaflip01';
+    await seedDocument(fx, tenantId, docId);
+
+    // Mint alice's layer row via an annotation write, then simulate a
+    // metadata write's version bump: standard fields and custom keys live in
+    // one Info dict, so either write moves the one metadataVersion pointer.
+    const created = await fetch(
+      `${fx.baseUrl}/v1/docs/${docId}/layers/alice/annotations/pages/obj:1/items`,
+      {
+        method: 'POST',
+        headers: {
+          ...auth(docToken(tenantId, docId, 'alice')),
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(highlightDraft()),
+      },
+    );
+    expect(created.status).toBe(200);
+    await fx.db
+      .updateTable('layers')
+      .set({ metadata_version: 2 })
+      .where('doc_id', '=', docId)
+      .where('name', '=', 'alice')
+      .execute();
+
+    const alice = await fetchLayerManifest(fx, tenantId, docId, 'alice');
+    expect(alice.scopes).toEqual({ ...ALL_BASE, annotations: 'layer', metadata: 'layer' });
+
+    // Origin: both base halves refused for alice, granted for bob.
+    for (const path of ['metadata', 'metadata/custom']) {
+      const url = `${fx.baseUrl}/v1/docs/${docId}/${path}@metadataVersion=1`;
+      const aliceRead = await fetch(url, { headers: auth(docToken(tenantId, docId, 'alice')) });
+      expect(aliceRead.status, path).toBe(404);
+      const bobRead = await fetch(url, { headers: auth(docToken(tenantId, docId, 'bob')) });
+      expect(bobRead.status, path).toBe(200);
+    }
+
+    // Edge grant mirrors: the base pair withheld, the layer pair kept.
+    const res = await fetch(`${fx.baseUrl}/v1/access`, {
+      method: 'POST',
+      headers: { ...auth(docToken(tenantId, docId, 'alice')), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ docId, layerName: 'alice' }),
+    });
+    expect(res.status).toBe(200);
+    const grant = fx.coverageLog[fx.coverageLog.length - 1]!;
+    expect(grant.resourceIds).not.toEqual(expect.arrayContaining(['metadata']));
+    expect(grant.resourceIds).not.toEqual(expect.arrayContaining(['metadata-custom']));
+    expect(grant.resourceIds).toEqual(
+      expect.arrayContaining(['layer-metadata', 'layer-metadata-custom']),
+    );
+  });
+
   test('a CONTENT op leaves attachment sharing intact (cross-plane independence)', async () => {
     const tenantId = 'tenant-attkeep';
     const docId = 'docattkeep001';
@@ -676,7 +731,7 @@ async function seedDocument(
 interface WireManifest {
   scopes?: Record<string, string>;
   pages: Array<{
-    state: { page: { pageObjectNumber: number } };
+    state: { page: { objectNumber: number } };
     cache: { contentVersion: number; annotationVersion: number };
   }>;
 }

@@ -83,11 +83,11 @@ export function runAnnotationReadConformance(
           expect(Number.isInteger(list.auditHead) && list.auditHead >= 0).toBe(true);
         }
         const target = list.pages.find(
-          (p) => p.page.pageObjectNumber === opts.fixture.pageObjectNumber,
+          (p) => p.page.objectNumber === opts.fixture.pageObjectNumber,
         );
         expect(target !== undefined).toBe(true);
         const onTarget = list.annotations.filter(
-          (a) => a.page.pageObjectNumber === opts.fixture.pageObjectNumber,
+          (a) => a.page.objectNumber === opts.fixture.pageObjectNumber,
         );
         expect(onTarget.length).toBe(opts.fixture.expectedAnnotationCount);
       } finally {
@@ -102,9 +102,7 @@ export function runAnnotationReadConformance(
           pages: [toPageRef(opts.fixture.pageObjectNumber)],
         });
         expect(AnnotationListSchema.safeParse(snap).success).toBe(true);
-        expect(snap.pages.map((p) => p.page.pageObjectNumber)).toEqual([
-          opts.fixture.pageObjectNumber,
-        ]);
+        expect(snap.pages.map((p) => p.page.objectNumber)).toEqual([opts.fixture.pageObjectNumber]);
         expect(snap.annotations.length).toBe(opts.fixture.expectedAnnotationCount);
         const highlights = snap.annotations.filter((a) => a.subtype === 'highlight');
         expect(highlights.length >= opts.fixture.minHighlightCount).toBe(true);
@@ -239,7 +237,11 @@ export function runAnnotationReadConformance(
     test('AnnotationDTOSchema rejects an annotation with a foreign subtype', () => {
       const bogus: unknown = {
         subtype: 'pretend-not-real',
-        ref: { kind: 'objectNumber', pageObjectNumber: 1, annotObjectNumber: 1 },
+        ref: {
+          kind: 'objectNumber',
+          page: { kind: 'objectNumber', objectNumber: 1 },
+          objectNumber: 1,
+        },
         pageObjectNumber: 1,
         index: 0,
         identityQuality: 'durable',

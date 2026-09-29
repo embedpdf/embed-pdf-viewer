@@ -54,6 +54,7 @@ import { generateAppearance } from './internal/write/generateAppearance';
 import { writeAnnotationModified } from './internal/write/writeAnnotationBase';
 import {
   writeAnnotationRelationship,
+  writeLinkedOpen,
   writePopupParent,
 } from './internal/write/writeAnnotationRelationship';
 import { applyEmbedMetadataOnUpdate } from './internal/write/writeEmbedMetadata';
@@ -171,7 +172,7 @@ export class AnnotationMutator {
     throwIfAborted(signal);
     const { fn, mem } = this.runtime;
     const pool = this.session.pagePool();
-    const pagePtr = pool.acquire(ref.page.pageObjectNumber);
+    const pagePtr = pool.acquire(ref.page.objectNumber);
     let annotPtr: Ptr | null = null;
     try {
       annotPtr = resolveAnnotPtr(this.runtime, this.session, pagePtr, ref);
@@ -179,8 +180,8 @@ export class AnnotationMutator {
 
       const writeCtx = this.writeContext(pagePtr, resources);
 
-      this.ensureKnownWeakStateFromPage(ref.page.pageObjectNumber, pagePtr);
-      const pageStateBefore = this.session.pageState(ref.page.pageObjectNumber);
+      this.ensureKnownWeakStateFromPage(ref.page.objectNumber, pagePtr);
+      const pageStateBefore = this.session.pageState(ref.page.objectNumber);
 
       // Blend mode lives inside the existing /AP graphics state rather than in
       // the annotation dictionary. Capture it before re-baking so an unrelated
@@ -201,7 +202,7 @@ export class AnnotationMutator {
         fn,
         mem,
         annotPtr,
-        ref.page.pageObjectNumber,
+        ref.page.objectNumber,
         preIndex,
         pageStateBefore.revision,
         readContextFor(this.session, this.fonts),
@@ -254,27 +255,51 @@ export class AnnotationMutator {
           this.session,
           pagePtr,
           annotPtr,
-          ref.page.pageObjectNumber,
+          ref.page.objectNumber,
           patch.reply === null
             ? { inReplyTo: null }
             : { inReplyTo: patch.reply.to, replyType: patch.reply.type ?? 'reply' },
         );
       }
+      let relinked = false;
       if (
         patch.subtype === 'popup' &&
         currentDto.subtype === 'popup' &&
         patch.parent !== undefined &&
         !sameRef(patch.parent, currentDto.parent)
       ) {
+        relinked = true;
         linkedParentId = writePopupParent(
           this.runtime,
           this.session,
           pagePtr,
           annotPtr,
-          ref.page.pageObjectNumber,
+          ref.page.objectNumber,
           patch.parent,
           currentDto.parent,
         );
+      }
+      // A note and its popup hold one `/Open`: writing it on one writes the
+      // other (a relink has made them equal already).
+      let linkedOpenId: AnnotationStableId | null = null;
+      const open = (patch as { open?: boolean }).open;
+      if (open !== undefined && !relinked) {
+        const other =
+          currentDto.subtype === 'text'
+            ? currentDto.popup
+            : currentDto.subtype === 'popup'
+              ? currentDto.parent
+              : null;
+        if (other) {
+          linkedOpenId = writeLinkedOpen(
+            this.runtime,
+            this.session,
+            pagePtr,
+            other,
+            open,
+            currentDto.subtype === 'popup',
+          );
+        }
       }
       // Refresh standard /M (modified date) on every update — independent
       // of whether the patch touched any subtype-specific field. Then
@@ -338,25 +363,31 @@ export class AnnotationMutator {
         fn,
         mem,
         annotPtr,
-        ref.page.pageObjectNumber,
+        ref.page.objectNumber,
         newIndex,
         pageStateBefore.revision,
         readContextFor(this.session, this.fonts),
       );
       joinWidgetFieldNumbers(this.runtime, this.session, [dto]);
 
-      this.recordWeakStateFromPage(ref.page.pageObjectNumber, pagePtr);
-      const pageStateAfter = this.session.pageState(ref.page.pageObjectNumber);
+      this.recordWeakStateFromPage(ref.page.objectNumber, pagePtr);
+      const pageStateAfter = this.session.pageState(ref.page.objectNumber);
       const meta = computeMutationImpact({
         mutation: 'update',
         pageStateBefore,
         pageStateAfter,
-        changed: linkedParentId ? [stableId, linkedParentId] : [stableId],
+        changed: [
+          ...new Set(
+            [stableId, linkedParentId, linkedOpenId].filter(
+              (id): id is AnnotationStableId => id !== null,
+            ),
+          ),
+        ],
       });
       return { annotation: dto, appearance, meta };
     } finally {
       if (annotPtr !== null) fn.FPDFPage_CloseAnnot(annotPtr);
-      pool.release(ref.page.pageObjectNumber);
+      pool.release(ref.page.objectNumber);
     }
   }
 
@@ -407,7 +438,7 @@ export class AnnotationMutator {
     throwIfAborted(signal);
     const { fn } = this.runtime;
     const docPtr = this.session.requireDocPtr();
-    const pageObjectNumber = ref.page.pageObjectNumber;
+    const pageObjectNumber = ref.page.objectNumber;
     const { pageIndex } = this.session.resolvePageRef(ref.page);
     if (ref.kind === 'index') this.session.validateRevision(ref.revision);
     // Raw handles off the document, never a loaded page: a page loaded
@@ -516,11 +547,11 @@ export class AnnotationMutator {
   ): AnnotationDeleteResult {
     const { fn, mem } = this.runtime;
     const pool = this.session.pagePool();
-    const pagePtr = pool.acquire(ref.page.pageObjectNumber);
+    const pagePtr = pool.acquire(ref.page.objectNumber);
     let bumpRequested = false;
     try {
-      this.ensureKnownWeakStateFromPage(ref.page.pageObjectNumber, pagePtr);
-      const pageStateBefore = this.session.pageState(ref.page.pageObjectNumber);
+      this.ensureKnownWeakStateFromPage(ref.page.objectNumber, pagePtr);
+      const pageStateBefore = this.session.pageState(ref.page.objectNumber);
 
       let deleted: AnnotationStableId | null;
       let ok = false;
@@ -530,11 +561,11 @@ export class AnnotationMutator {
           // does its own existence check too, but we want a clean
           // NotFound up front rather than a "false" return code we'd have
           // to translate.
-          const probe = fn.EPDFPage_GetAnnotByObjectNumber(pagePtr, ref.annotObjectNumber);
+          const probe = fn.EPDFPage_GetAnnotByObjectNumber(pagePtr, ref.objectNumber);
           if (!probe) {
             throw new EngineError(
               EngineErrorCode.NotFound,
-              `no annotation with object number ${ref.annotObjectNumber} on page ${ref.page.pageObjectNumber}`,
+              `no annotation with object number ${ref.objectNumber} on page ${ref.page.objectNumber}`,
             );
           }
           try {
@@ -543,8 +574,8 @@ export class AnnotationMutator {
             fn.FPDFPage_CloseAnnot(probe);
           }
           bumpRequested = true;
-          ok = fn.EPDFPage_RemoveAnnotByObjectNumber(pagePtr, ref.annotObjectNumber);
-          deleted = { kind: 'objectNumber', value: ref.annotObjectNumber };
+          ok = fn.EPDFPage_RemoveAnnotByObjectNumber(pagePtr, ref.objectNumber);
+          deleted = { kind: 'objectNumber', objectNumber: ref.objectNumber };
           break;
         }
         case 'nm': {
@@ -554,7 +585,7 @@ export class AnnotationMutator {
             if (!probe) {
               throw new EngineError(
                 EngineErrorCode.NotFound,
-                `no annotation with /NM '${ref.nm}' on page ${ref.page.pageObjectNumber}`,
+                `no annotation with /NM '${ref.nm}' on page ${ref.page.objectNumber}`,
               );
             }
             try {
@@ -567,7 +598,7 @@ export class AnnotationMutator {
           } finally {
             mem.free(namePtr);
           }
-          deleted = { kind: 'nm', value: ref.nm };
+          deleted = { kind: 'nm', nm: ref.nm };
           break;
         }
         case 'index': {
@@ -576,7 +607,7 @@ export class AnnotationMutator {
           if (!annotPtr) {
             throw new EngineError(
               EngineErrorCode.InvalidReference,
-              `index ${ref.index} out of range on page ${ref.page.pageObjectNumber}`,
+              `index ${ref.index} out of range on page ${ref.page.objectNumber}`,
             );
           }
           let probedObjNum: number;
@@ -589,9 +620,9 @@ export class AnnotationMutator {
           }
           deleted =
             probedObjNum > 0
-              ? { kind: 'objectNumber', value: probedObjNum }
+              ? { kind: 'objectNumber', objectNumber: probedObjNum }
               : probedNm !== null && probedNm.length > 0
-                ? { kind: 'nm', value: probedNm }
+                ? { kind: 'nm', nm: probedNm }
                 : null;
           bumpRequested = true;
           // EPDFPage_RemoveAnnot is the fork helper that also cleans up
@@ -609,10 +640,10 @@ export class AnnotationMutator {
       // the finally-bump. Do not gate this on the page's current weak state:
       // old snapshots can still hold index refs from before annotations were
       // strengthened, and delete/move can make those refs point elsewhere.
-      this.session.bumpRevision(ref.page.pageObjectNumber);
+      this.session.bumpRevision(ref.page.objectNumber);
       bumpRequested = false;
-      this.recordWeakStateFromPage(ref.page.pageObjectNumber, pagePtr);
-      const pageStateAfter = this.session.pageState(ref.page.pageObjectNumber);
+      this.recordWeakStateFromPage(ref.page.objectNumber, pagePtr);
+      const pageStateAfter = this.session.pageState(ref.page.objectNumber);
 
       const meta = computeMutationImpact({
         mutation: 'delete',
@@ -622,8 +653,8 @@ export class AnnotationMutator {
       });
       return { meta };
     } finally {
-      if (bumpRequested) this.session.bumpRevision(ref.page.pageObjectNumber);
-      pool.release(ref.page.pageObjectNumber);
+      if (bumpRequested) this.session.bumpRevision(ref.page.objectNumber);
+      pool.release(ref.page.objectNumber);
     }
   }
 
@@ -676,10 +707,10 @@ export class AnnotationMutator {
       );
     }
     for (const r of refs) {
-      if (r.page.pageObjectNumber !== pageObjectNumber) {
+      if (r.page.objectNumber !== pageObjectNumber) {
         throw new EngineError(
           EngineErrorCode.InvalidArg,
-          `move refs must all target page ${pageObjectNumber}; got ref on page ${r.page.pageObjectNumber}`,
+          `move refs must all target page ${pageObjectNumber}; got ref on page ${r.page.objectNumber}`,
         );
       }
     }
@@ -869,12 +900,12 @@ export class AnnotationMutator {
 
 /** `NotFound` for a ref by number or name, `InvalidReference` for a position out of range. */
 function missingAnnotation(ref: AnnotationRef): EngineError {
-  const page = ref.page.pageObjectNumber;
+  const page = ref.page.objectNumber;
   switch (ref.kind) {
     case 'objectNumber':
       return new EngineError(
         EngineErrorCode.NotFound,
-        `no annotation with object number ${ref.annotObjectNumber} on page ${page}`,
+        `no annotation with object number ${ref.objectNumber} on page ${page}`,
       );
     case 'nm':
       return new EngineError(
@@ -891,8 +922,9 @@ function missingAnnotation(ref: AnnotationRef): EngineError {
 
 /** What `meta.changed` names an annotation by; a weak one has no stable id. */
 function stableIdOf(ref: AnnotationRef): AnnotationStableId[] {
-  if (ref.kind === 'objectNumber') return [{ kind: 'objectNumber', value: ref.annotObjectNumber }];
-  if (ref.kind === 'nm') return [{ kind: 'nm', value: ref.nm }];
+  if (ref.kind === 'objectNumber')
+    return [{ kind: 'objectNumber', objectNumber: ref.objectNumber }];
+  if (ref.kind === 'nm') return [{ kind: 'nm', nm: ref.nm }];
   return [];
 }
 

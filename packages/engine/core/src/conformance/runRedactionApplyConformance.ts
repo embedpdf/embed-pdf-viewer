@@ -49,7 +49,7 @@ export function runRedactionApplyConformance(
       try {
         if (!doc.redaction) return;
         const layoutBefore = await doc.pages.list();
-        const pageObjectNumber = layoutBefore.pages[0].ref.pageObjectNumber;
+        const pageObjectNumber = layoutBefore.pages[0].ref.objectNumber;
         const page = doc.page(toPageRef(pageObjectNumber));
 
         const collateral = await page.annotations.create({
@@ -82,7 +82,7 @@ export function runRedactionApplyConformance(
         const result = await doc.redaction.apply({ annotations: [marked.annotation.ref] });
         expect(RedactionApplyResultSchema.safeParse(result).success).toBe(true);
         expect(result.results).toHaveLength(1);
-        expect(result.results[0].page.pageObjectNumber).toBe(pageObjectNumber);
+        expect(result.results[0].page.objectNumber).toBe(pageObjectNumber);
         expect(result.results[0].status).toBe('applied');
         // The highlight and the mark's popup count: the consumed redact never does.
         expect(result.results[0].removedAnnotationCount).toBe(2);
@@ -107,7 +107,7 @@ export function runRedactionApplyConformance(
       try {
         if (!doc.redaction) return;
         const layout = await doc.pages.list();
-        const pageObjectNumber = layout.pages[0].ref.pageObjectNumber;
+        const pageObjectNumber = layout.pages[0].ref.objectNumber;
         const page = doc.page(toPageRef(pageObjectNumber));
 
         await page.annotations.create({

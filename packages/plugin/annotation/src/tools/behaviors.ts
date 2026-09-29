@@ -29,7 +29,7 @@ export function createBehaviors(store: AnnotationStore) {
     let out: Set<Id> | undefined;
     for (const id of model.order) {
       const annotation = model.byId[id];
-      if (!annotation || annotation.annotation.page.pageObjectNumber !== pageObjectNumber) continue;
+      if (!annotation || annotation.annotation.page.objectNumber !== pageObjectNumber) continue;
       if (
         behaviors.some((behavior) =>
           matches(behavior, { subtype: kindOf(annotation.annotation), ref: refOf(annotation) }),

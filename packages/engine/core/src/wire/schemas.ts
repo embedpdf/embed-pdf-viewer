@@ -21,6 +21,8 @@ import { AttachmentRefSchema, AttachmentSchema } from '../dto/Attachment.schema'
 import type { CachePins } from '../dto/CachePins';
 import type { DocumentManifest, ManifestPage } from '../dto/DocumentManifest';
 import type { LayerScopes } from '../dto/LayerScopes';
+import type { CustomMetadata } from '../dto/CustomMetadata';
+import type { CustomMetadataPatch } from '../dto/CustomMetadataPatch';
 import type { DocumentMetadata } from '../dto/DocumentMetadata';
 import type { MetadataPatch } from '../dto/MetadataPatch';
 import type { AnalyzeInput, ChangeAnalysis } from '../signature/analysis/types';
@@ -50,7 +52,12 @@ import type { DocumentSecurityState, PdfPermissionInfo } from '../engine/Documen
 import type { SerializedEngineError } from '../errors/EngineError';
 import { EngineErrorCode } from '../errors/EngineErrorCode';
 import type { FormEffectsResult, FormEffect } from '../forms/effects';
-import { FormFieldDTOSchema, FormSnapshotSchema, FormWidgetSchema } from '../forms/schema';
+import {
+  FormFieldDTOSchema,
+  FormFieldWidgetSchema,
+  FormSnapshotSchema,
+  FormWidgetSchema,
+} from '../forms/schema';
 import { FormFieldRefSchema, FormFieldValueSchema } from '../forms/schema';
 import {
   PageBoxSchema,
@@ -81,9 +88,11 @@ import type {
   FormImportResult,
   FormRepairResult,
   FormMutationMeta,
+  FormResetResult,
   FormSetValueResult,
   FormWidgetLinkResult,
 } from '../mutation/FormMutationResults';
+import type { CustomMetadataUpdateResult } from '../mutation/CustomMetadataUpdateResult';
 import type { MetadataUpdateResult } from '../mutation/MetadataUpdateResult';
 import type { CacheDelta, MutationMeta } from '../mutation/MutationMeta';
 import type { PageDeleteInput } from '../mutation/PageDeleteInput';
@@ -147,13 +156,11 @@ export const DocumentMetadataSchema: z.ZodType<DocumentMetadata> = z.object({
   createdAt: IsoDateTimeSchema.nullable(),
   modifiedAt: IsoDateTimeSchema.nullable(),
   trapped: z.enum(['true', 'false', 'unknown']),
-  custom: z.record(z.string(), z.string()),
 });
 
 /**
  * Three-state metadata patch. Mirrors annotation patch semantics:
- * `undefined` leaves a field, `null` clears it, a value sets it. `custom`
- * is a per-key three-state map (string set / null clear / absent leave).
+ * `undefined` leaves a field, `null` clears it, a value sets it.
  */
 export const MetadataPatchSchema: z.ZodType<MetadataPatch> = z
   .object({
@@ -166,9 +173,21 @@ export const MetadataPatchSchema: z.ZodType<MetadataPatch> = z
     createdAt: DateInputSchema.nullable().optional(),
     modifiedAt: DateInputSchema.nullable().optional(),
     trapped: z.enum(['true', 'false', 'unknown']).optional(),
-    custom: z.record(z.string(), z.string().nullable()).optional(),
   })
   .strict();
+
+/** The Info dict's other keys, `{ key: value }`. */
+export const CustomMetadataSchema: z.ZodType<CustomMetadata> = z.record(z.string(), z.string());
+
+/**
+ * A custom-key patch: every key is a field (string sets, `null` removes, left
+ * out stays). Which keys a PDF can hold is the engine's check, so a refusal
+ * names the key the same way on both engines.
+ */
+export const CustomMetadataPatchSchema: z.ZodType<CustomMetadataPatch> = z.record(
+  z.string(),
+  z.string().nullable(),
+);
 
 export const OpenDocumentResponseSchema = z.object({
   id: z.string(),
@@ -351,6 +370,8 @@ export const AccessResponseSchema = z.object({
    * detection.
    */
   effectiveScope: z.array(z.string()),
+  /** What the document's signatures forbid; `effectiveScope` already leaves it out. */
+  protection: z.lazy(() => DocumentProtectionSchema).nullable(),
   identity: IdentitySchema,
   originPasswordPolicy: z.object({
     mode: z.enum(['not-needed', 'client-retry', 'server-session']),
@@ -515,6 +536,8 @@ export const DocumentManifestSchema = z.object({
   baseByteLength: z.number().int().nonnegative().default(0),
   // Plane scopes: layer manifests only; absent = all-'layer'.
   scopes: LayerScopesSchema.optional(),
+  // Defined further down; lazy so this schema can come first.
+  protection: z.lazy(() => DocumentProtectionSchema).nullable(),
   pages: z.array(ManifestPageSchema),
 }) as unknown as z.ZodType<DocumentManifest>;
 export type { DocumentManifest } from '../dto/DocumentManifest';
@@ -923,9 +946,11 @@ export const AnnotationImportResultSchema: z.ZodType<AnnotationImportResult> = z
         'geospatial',
         'unknown-measure',
         'unsupported-action',
+        'unsupported-value',
         'name-conflict',
         'parent-dropped',
         'parent-missing',
+        'popup-taken',
       ]),
     }),
   ),
@@ -983,6 +1008,16 @@ export const FormSetValueResultSchema: z.ZodType<FormSetValueResult> = z.object(
   field: FormFieldDTOSchema,
   meta: FormMutationMetaSchema,
 });
+
+export const FormResetResultSchema: z.ZodType<FormResetResult> = z.object({
+  fields: z.array(FormFieldDTOSchema),
+  meta: FormMutationMetaSchema,
+});
+
+/** What `reset` takes on the wire: the fields to reset, or none for the whole form. */
+export const FormResetBodySchema = z
+  .object({ refs: z.array(FormFieldRefSchema).optional() })
+  .strict();
 
 export const FormEffectSchema: z.ZodType<FormEffect> = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('setValue'), ref: FormFieldRefSchema, value: FormFieldValueSchema }),
@@ -1366,6 +1401,11 @@ export const MetadataUpdateResultSchema: z.ZodType<MetadataUpdateResult> = z.obj
   meta: MutationMetaSchema,
 });
 
+export const CustomMetadataUpdateResultSchema: z.ZodType<CustomMetadataUpdateResult> = z.object({
+  custom: CustomMetadataSchema,
+  meta: MutationMetaSchema,
+});
+
 export const WeakAnnotationSessionResponseSchema = z.object({
   sessionId: z.string().min(1),
   expiresAt: z.number().int().positive(),
@@ -1469,7 +1509,7 @@ export const SignatureDTOSchema: z.ZodType<SignatureDTO> = z.object({
   index: z.number().int().nonnegative(),
   field: FormFieldRefSchema,
   fieldName: z.string(),
-  widget: FormWidgetSchema.nullable(),
+  widget: FormFieldWidgetSchema.nullable(),
   signed: z.boolean(),
   kind: z.enum(['signature', 'timestamp']),
   filter: z.string().nullable(),
@@ -1599,10 +1639,9 @@ const SignatureSignerInputSchema = z.object({
   signedAt: IsoDateTimeSchema.optional(),
 });
 
-/** The JSON part of a visual signature fill (multipart envelope): which resource part holds the PDF, and its page. */
+/** The JSON part of a visual signature fill (multipart envelope): which resource part holds the one-page PDF. */
 export const SignatureAppearanceBodySchema = z.object({
   resource: z.string().min(1),
-  pageIndex: z.number().int().nonnegative().optional(),
 });
 export type SignatureAppearanceBody = z.infer<typeof SignatureAppearanceBodySchema>;
 
@@ -1620,9 +1659,7 @@ export const SignaturePrepareBodySchema = z.object({
   signer: SignatureSignerInputSchema.optional(),
   certify: z.object({ permission: DocMdpPermissionSchema }).optional(),
   lock: FieldLockSpecSchema.optional(),
-  appearance: z
-    .object({ resource: z.string().min(1), pageIndex: z.number().int().nonnegative().optional() })
-    .optional(),
+  appearance: z.object({ resource: z.string().min(1) }).optional(),
 });
 export type SignaturePrepareBody = z.infer<typeof SignaturePrepareBodySchema>;
 

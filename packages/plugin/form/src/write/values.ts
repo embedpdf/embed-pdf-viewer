@@ -8,16 +8,19 @@ import { toPluginError, toPluginErrorInfo, type BatchResult } from '@embedpdf/co
 import type { FormFieldRef, FormFieldValue } from '@embedpdf/engine-core/runtime';
 
 import type { FormCapability, FormCommitResult, SetValueResult } from '../contract';
-import { beginWrite, endWrite } from '../model';
+import { beginWrite, endWrite, fieldByKey } from '../model';
 import type { FormContext, FormServices } from '../services';
 
 export function createValueWrites(
   ctx: FormContext,
-  services: Pick<FormServices, 'events' | 'authority' | 'scripting' | 'enqueue' | 'keyOf'>,
+  services: Pick<
+    FormServices,
+    'events' | 'authority' | 'scripting' | 'enqueue' | 'keyOf' | 'fields'
+  >,
 ) {
   const { validationRejected } = services.events;
   const { assertFill } = services.authority;
-  const { enqueue, keyOf } = services;
+  const { enqueue, keyOf, fields } = services;
   const scripting = services.scripting.controller;
   const surfaceViaActions = services.scripting.surface;
 
@@ -91,9 +94,15 @@ export function createValueWrites(
   return {
     api: {
       setValue: write,
-      setText: (ref, text) => write(ref, { type: 'text', value: text }),
-      setChecked: (ref, onState) => write(ref, { type: 'toggle', state: onState }),
-      setChoice: (ref, values) => write(ref, { type: 'choice', values: [...values] }),
+      setText: (ref, text) => write(ref, { value: text }),
+      setChecked: (ref, exportValue) => write(ref, { value: exportValue }),
+      setChoice: (ref, values) =>
+        write(
+          ref,
+          fieldByKey(fields.get(), keyOf(ref))?.family === 'combobox'
+            ? { value: values[0] ?? null }
+            : { selectedValues: [...values] },
+        ),
       setValueRaw: (ref, value) => enqueue(() => ctx.doc.forms.setValue(ref, value)),
       setValues: async (entries) => {
         const result = await writeBatch(

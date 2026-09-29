@@ -5,6 +5,7 @@ import type {
   RevisionToken,
   SessionKind,
   SignatureCompleteResult,
+  PdfCoordinates,
   SignaturePrepared,
   SignedDocumentPolicy,
   WeakAnnotationState,
@@ -68,7 +69,7 @@ export interface PendingSigning {
 export interface SigningCompletion {
   readonly signingId: string;
   readonly cms: Uint8Array;
-  readonly result: SignatureCompleteResult;
+  readonly result: SignatureCompleteResult<PdfCoordinates>;
 }
 
 export class DocumentSession {
@@ -353,7 +354,7 @@ export class DocumentSession {
    * unknown page.
    */
   resolvePageRef(ref: PageRef): PageRecord {
-    return this.recordByObjectNumber(ref.pageObjectNumber);
+    return this.recordByObjectNumber(ref.objectNumber);
   }
 
   /** `resolvePageRef` over a batch, preserving order. */

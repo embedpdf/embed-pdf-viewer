@@ -142,7 +142,7 @@ export function createScriptWorld(ctx: PluginContext<void>) {
     const targetField = targetRef
       ? snapshot.fields.find((field) =>
           targetRef.kind === 'objectNumber' && field.ref.kind === 'objectNumber'
-            ? field.ref.fieldObjectNumber === targetRef.fieldObjectNumber
+            ? field.ref.objectNumber === targetRef.objectNumber
             : targetRef.kind === 'fqn' && field.name === targetRef.name,
         )
       : undefined;

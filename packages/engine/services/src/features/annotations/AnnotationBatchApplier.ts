@@ -318,12 +318,12 @@ export class AnnotationBatchApplier {
       return target.planned;
     }
     const { existing } = target;
-    if (existing.page.pageObjectNumber !== page.pageObjectNumber) {
+    if (existing.page.objectNumber !== page.objectNumber) {
       throw new EngineError(
         EngineErrorCode.InvalidArg,
         link === 'reply'
-          ? `/IRT parent must be on the same page as the reply (parent page ${existing.page.pageObjectNumber}, reply page ${page.pageObjectNumber})`
-          : `a popup's parent must be on the same page (parent page ${existing.page.pageObjectNumber}, popup page ${page.pageObjectNumber})`,
+          ? `/IRT parent must be on the same page as the reply (parent page ${existing.page.objectNumber}, reply page ${page.objectNumber})`
+          : `a popup's parent must be on the same page (parent page ${existing.page.objectNumber}, popup page ${page.objectNumber})`,
       );
     }
     return resolveAnnotIndexRaw(this.runtime, this.session, existing);
@@ -426,7 +426,9 @@ function metaOf(
     affectedPages: pages.map((page) => session.pageState(page)),
     cacheDelta: null,
     changed: [
-      ...placed.map((at): AnnotationStableId => ({ kind: 'objectNumber', value: at.objectNumber })),
+      ...placed.map(
+        (at): AnnotationStableId => ({ kind: 'objectNumber', objectNumber: at.objectNumber }),
+      ),
       ...linked,
     ],
     weakRefsInvalidated: false,

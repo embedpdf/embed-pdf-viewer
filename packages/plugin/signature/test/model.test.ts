@@ -27,7 +27,7 @@ const origin: EventOrigin = {
   ts: 0,
   serverId: null,
 };
-const field = { kind: 'objectNumber', fieldObjectNumber: 9 } as const;
+const field = { kind: 'objectNumber', objectNumber: 9 } as const;
 /** A prepared signing; the fold reads only its id. */
 const prepared = (signingId: string) => ({ signingId }) as SignaturePrepared;
 const unsigned = { index: 0, field, fieldName: 'sig', signed: false } as unknown as SignatureDTO;
@@ -61,7 +61,7 @@ describe('session transitions', () => {
     const targeted = setTarget(state, field);
     expect(targeted.target).toBe(field);
     // The same field by another ref object is no change.
-    expect(setTarget(targeted, { kind: 'objectNumber', fieldObjectNumber: 9 })).toBe(targeted);
+    expect(setTarget(targeted, { kind: 'objectNumber', objectNumber: 9 })).toBe(targeted);
     expect(setBusy(state, true).busy).toBe(true);
   });
 

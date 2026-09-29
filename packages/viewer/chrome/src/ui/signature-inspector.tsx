@@ -63,9 +63,7 @@ export function SignatureInspector() {
   const verdict = field ? signature.getVerdict(field) : null;
   const widget = dto?.widget ?? null;
   const box = useSelector(FormHostToken, (form) =>
-    widget && widget.annotObjectNumber > 0
-      ? (form.getFillItem(widget.annotObjectNumber)?.box ?? null)
-      : null,
+    widget && widget.objectNumber > 0 ? (form.getFillItem(widget.objectNumber)?.box ?? null) : null,
   );
 
   // Open on a field never validated: judge it now.

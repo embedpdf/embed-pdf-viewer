@@ -136,7 +136,7 @@ export function recordOfRef(model: Model, ref: AnnotationRef): ModelAnnotation |
     if (
       record &&
       record.annotation.nm === ref.nm &&
-      record.annotation.page.pageObjectNumber === ref.page.pageObjectNumber
+      record.annotation.page.objectNumber === ref.page.objectNumber
     ) {
       return record;
     }
@@ -159,7 +159,7 @@ function statedChangeOf(
     const ref: AnnotationRef = { kind: 'nm', page: change.page, nm };
     const draft = { ...change.draft, nm } as AnnotationDraft;
     const onPage = model.order.filter(
-      (id) => model.byId[id]?.annotation.page.pageObjectNumber === change.page.pageObjectNumber,
+      (id) => model.byId[id]?.annotation.page.objectNumber === change.page.objectNumber,
     ).length;
     // The annotations it links to are the engine's to look up as it writes
     // (as a change set links them): predicted without them, then stated.

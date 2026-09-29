@@ -103,14 +103,14 @@ export function runPageReorderConformance(
           // Strictly contiguous, 0..N-1.
           expect(list.pages[i].index).toBe(i);
           // Pages are durable by construction; page object number > 0.
-          expect(list.pages[i].ref.pageObjectNumber > 0).toBe(true);
+          expect(list.pages[i].ref.objectNumber > 0).toBe(true);
         }
 
         // page object numbers are unique across the document.
         const seen = new Set<number>();
         for (const p of list.pages) {
-          expect(seen.has(p.ref.pageObjectNumber)).toBe(false);
-          seen.add(p.ref.pageObjectNumber);
+          expect(seen.has(p.ref.objectNumber)).toBe(false);
+          seen.add(p.ref.objectNumber);
         }
       } finally {
         await doc.close();
@@ -123,7 +123,7 @@ export function runPageReorderConformance(
         const before = await doc.pages.list();
         if (before.pages.length < 3) return;
         const pageObjectNumbers = pickReorderPageObjectNumbers(
-          before.pages.map((p) => p.ref.pageObjectNumber),
+          before.pages.map((p) => p.ref.objectNumber),
           fix,
         );
         if (!pageObjectNumbers) return;
@@ -137,14 +137,14 @@ export function runPageReorderConformance(
         // indices, moved page leads.
         const after = result.layout;
         expect(after.pages.length).toBe(before.pages.length);
-        expect(after.pages[0].ref.pageObjectNumber).toBe(target);
+        expect(after.pages[0].ref.objectNumber).toBe(target);
         for (let i = 0; i < after.pages.length; i++) {
           expect(after.pages[i].index).toBe(i);
         }
 
         // Set of page object numbers is preserved (no page lost or fabricated).
-        const beforePageObjectNumbers = new Set(before.pages.map((p) => p.ref.pageObjectNumber));
-        const afterPageObjectNumbers = new Set(after.pages.map((p) => p.ref.pageObjectNumber));
+        const beforePageObjectNumbers = new Set(before.pages.map((p) => p.ref.objectNumber));
+        const afterPageObjectNumbers = new Set(after.pages.map((p) => p.ref.objectNumber));
         expect(beforePageObjectNumbers.size).toBe(afterPageObjectNumbers.size);
         for (const pageObjectNumber of beforePageObjectNumbers)
           expect(afterPageObjectNumbers.has(pageObjectNumber)).toBe(true);
@@ -152,8 +152,8 @@ export function runPageReorderConformance(
         // A subsequent `pages.list()` agrees with the returned layout
         // (the move result is not a one-off view).
         const relisted = await doc.pages.list();
-        expect(relisted.pages.map((p) => p.ref.pageObjectNumber)).toEqual(
-          after.pages.map((p) => p.ref.pageObjectNumber),
+        expect(relisted.pages.map((p) => p.ref.objectNumber)).toEqual(
+          after.pages.map((p) => p.ref.objectNumber),
         );
       } finally {
         await doc.close();
@@ -171,7 +171,7 @@ export function runPageReorderConformance(
         // (so we use its index ref via FPDFPage_GetAnnot, which yields
         // a working index-style ref bound to the current revision).
         const hostPageObjectNumber =
-          fix.weakRefHostPageObjectNumber ?? list.pages[0].ref.pageObjectNumber;
+          fix.weakRefHostPageObjectNumber ?? list.pages[0].ref.objectNumber;
         const hostPage = doc.page(toPageRef(hostPageObjectNumber));
         const beforePageList = await hostPage.annotations.list();
 
@@ -193,7 +193,7 @@ export function runPageReorderConformance(
           (a) =>
             a.ref.kind === 'objectNumber' &&
             created.annotation.ref.kind === 'objectNumber' &&
-            a.ref.annotObjectNumber === created.annotation.ref.annotObjectNumber,
+            a.ref.objectNumber === created.annotation.ref.objectNumber,
         );
         expect(targetIndex >= 0).toBe(true);
 
@@ -207,8 +207,8 @@ export function runPageReorderConformance(
         // Move some other page (not the host page) to the front. The
         // host page's revision must stay put.
         const otherPageObjectNumber = list.pages.find(
-          (p) => p.ref.pageObjectNumber !== hostPageObjectNumber,
-        )?.ref.pageObjectNumber;
+          (p) => p.ref.objectNumber !== hostPageObjectNumber,
+        )?.ref.objectNumber;
         if (otherPageObjectNumber === undefined) return;
         await doc.pages.move([toPageRef(otherPageObjectNumber)], 0);
 
@@ -276,7 +276,7 @@ export function runPageReorderConformance(
         const list = await doc.pages.list();
         // Pick a page object number that is guaranteed to not exist.
         let bogus = 0;
-        for (const p of list.pages) bogus = Math.max(bogus, p.ref.pageObjectNumber);
+        for (const p of list.pages) bogus = Math.max(bogus, p.ref.objectNumber);
         bogus += 9999;
 
         let caught: unknown;

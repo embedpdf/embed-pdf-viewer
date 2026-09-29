@@ -16,12 +16,13 @@ const field = (
   }> = {},
 ): FormFieldDTO =>
   ({
-    ref: { kind: 'objectNumber', fieldObjectNumber: overrides.fieldObjectNumber ?? 0 },
-    fieldObjectNumber: overrides.fieldObjectNumber ?? 0,
+    ref: { kind: 'objectNumber', objectNumber: overrides.fieldObjectNumber ?? 0 },
     name,
     family: overrides.family ?? 'text',
     origin: 'acroform',
-    flags: { readOnly: false, required: false, noExport: overrides.noExport ?? false, raw: 0 },
+    readOnly: false,
+    required: false,
+    noExport: overrides.noExport ?? false,
     alternateName: null,
     mappingName: null,
     valueEntry: overrides.valueEntry ?? { kind: 'scalar', value: `${name}-value` },

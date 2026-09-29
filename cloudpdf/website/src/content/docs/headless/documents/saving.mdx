@@ -1,0 +1,161 @@
+---
+title: Saving & downloading
+description: Get the PDF with every change, let the user download or print it, keep only the changes, and warn before unsaved changes are lost.
+---
+
+{/* Generated from docs/content — edit there, then `pnpm docs:sync`. */}
+
+# Saving & downloading
+
+Everything people do in the viewer, such as annotations, form values and page edits, is part of the
+document. `download()` gives you the PDF with all of it, as bytes, and `saveFile()` hands them to
+the browser as a download:
+
+```tsx
+import { saveFile, useDocuments } from '@embedpdf/react/runtime';
+
+function DownloadButton() {
+  const documents = useDocuments();
+  return (
+    <button onClick={async () => saveFile(await documents.download(), 'contract.pdf')}>
+      Download
+    </button>
+  );
+}
+```
+
+`download()` waits for changes still on their way, such as the last words someone typed in a text
+box, so the file has everything the user sees. Without an id it downloads the active document;
+`documents.download(id)` picks another.
+
+## Send it to your server
+
+The bytes are a normal PDF. Upload them like any file:
+
+```ts
+const bytes = await documents.download();
+await fetch(`/api/files/${fileId}`, { method: 'PUT', body: bytes });
+```
+
+## A quick save or a full rewrite
+
+```ts
+await documents.download(); // appends the changes to the original file
+await documents.download(undefined, { mode: 'rewrite' }); // writes a fresh, compact file
+```
+
+The default, `'incremental'`, keeps the original bytes and adds the changes after them: it's fast,
+and it keeps existing digital signatures valid. `'rewrite'` writes a new file without old
+revisions; use it after [redaction](../annotations/redaction), so removed content can't be recovered
+from an earlier revision. See [Saving](/docs/engine/documents/saving).
+
+## Print
+
+`print()` prints the document, not your app: its pages, at print quality, through the browser's
+print dialog.
+
+```ts
+await documents.print();
+```
+
+When the [actions plugin](actions) is registered, the PDF's own print actions run too, as they would
+in Acrobat.
+
+<Engine local>
+
+## Keep only the changes
+
+Sometimes the original file is fixed, such as a file on a shared drive, and you want to store only
+what the user changed. Open the document with a **layer**: the changes go into it, and
+`downloadLayer()` gives you just those:
+
+```ts
+const layer = await documents.downloadLayer();
+await api.put(`/reviews/${fileId}`, layer);
+
+// later: the original, with the stored changes on top
+await documents.open({ kind: 'layerBytes', baseBytes: original, layer });
+```
+
+A layer is small, since it holds only the changes, and each user can have their own. For annotations
+only, as data rather than PDF bytes, see [Export and import](../annotations/saving#export-and-import).
+
+</Engine>
+
+## Warn before changes are lost
+
+`useDocument()` tells you whether the document has changes that haven't been downloaded yet:
+
+```tsx
+function UnsavedWarning() {
+  const { hasUnsavedChanges } = useDocument();
+
+  useEffect(() => {
+    if (!hasUnsavedChanges) return;
+    const warn = (event: BeforeUnloadEvent) => event.preventDefault();
+    window.addEventListener('beforeunload', warn);
+    return () => window.removeEventListener('beforeunload', warn);
+  }, [hasUnsavedChanges]);
+
+  return hasUnsavedChanges ? <span>Unsaved changes</span> : null;
+}
+```
+
+It becomes `false` again after a `download()`.
+
+<Engine cloud>
+
+On CloudPDF, changes are stored on your server as people make them, so `hasUnsavedChanges` stays
+`false`: there's nothing to lose. Download when you want the file itself.
+
+</Engine>
+
+## Events
+
+```ts
+useDocumentsEvent(
+  (documents) => documents.onUnsavedChangesChanged,
+  ({ hasUnsavedChanges }) => setTitleDot(hasUnsavedChanges),
+);
+```
+
+| Event                     | Fires when                                                | Carries                             |
+| :------------------------ | :-------------------------------------------------------- | :---------------------------------- |
+| `onUnsavedChangesChanged` | The document gets its first unsaved change, or is downloaded | `documentId`, `hasUnsavedChanges` |
+
+## Permissions
+
+| Permission     | What it allows                        | Check                       |
+| :------------- | :------------------------------------ | :-------------------------- |
+| `doc.download` | `download()` and `downloadLayer()`    | `documents.canDownload()`   |
+| `doc.print`    | `print()`                             | `documents.canPrint()`      |
+
+Hide the buttons when the check says no. The engine refuses the call anyway.
+
+## Good to know
+
+<Engine local>
+
+### Where your changes are
+
+Until you download, the changes are in the engine, in this browser tab. Closing the tab loses them,
+which is what the warning above is for.
+
+<CloudPdfCallout
+  title="Never lose a change"
+  href="https://www.cloudpdf.com/docs/headless/documents/saving"
+  cta="Store changes with CloudPDF"
+>
+
+With CloudPDF, every annotation, form value and page edit is stored on your server the moment it's
+made, and everyone with the document open sees it. There's no save button to forget, and a
+closed tab loses nothing.
+
+</CloudPdfCallout>
+
+</Engine>
+
+### Signed documents
+
+An incremental download keeps existing signatures valid, as long as the changes are ones the
+signature allows. See [Signatures](../forms/signatures).

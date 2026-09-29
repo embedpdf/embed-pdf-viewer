@@ -53,7 +53,7 @@ describe('selection authoring bridge', () => {
         },
         direction: 'forward' as const,
       }),
-      listSegments: (page: PageRef) => (page.pageObjectNumber === 1 ? page1 : page2),
+      listSegments: (page: PageRef) => (page.objectNumber === 1 ? page1 : page2),
       setHighlightVisible: vi.fn(),
       clear: vi.fn(),
       onChanged: (callback: () => void) => {

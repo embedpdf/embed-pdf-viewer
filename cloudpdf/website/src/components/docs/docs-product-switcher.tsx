@@ -29,7 +29,7 @@ const PRODUCTS: DocsProductItem[] = [
   {
     key: 'headless',
     label: 'Headless',
-    href: '/docs/headless/getting-started',
+    href: '/docs/headless',
     icon: <PuzzleBadgeIcon />,
     tintClass: 'bg-[#EEE5FF] text-[#7C3AED]',
   },

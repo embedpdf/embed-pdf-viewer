@@ -1,8 +1,9 @@
-import type { SignatureDTO } from '@embedpdf/engine-core/runtime';
+import type { PdfCoordinates, SignatureDTO } from '@embedpdf/engine-core/runtime';
 import { EngineError, EngineErrorCode } from '@embedpdf/engine-core/runtime';
 import type { PdfRuntimeModule, Ptr } from '@embedpdf/engine-runtime';
 
 import { readContentsAt, readRevisions, readSignaturesFromModel } from './readSignatureModel';
+import { withWidgetRects } from '../../forms/internal/widgetRects';
 
 /** What a completion installed, as the sealed bytes must report it back. */
 export interface SealExpectation {
@@ -28,13 +29,14 @@ export function assertSealedSignature(
   docPtr: Ptr,
   model: Ptr,
   expected: SealExpectation,
-): SignatureDTO {
+): SignatureDTO<PdfCoordinates> {
   const refuse = (why: string) =>
     new EngineError(EngineErrorCode.SignatureRefused, `the sealed bytes ${why}`);
-  const signatures = readSignaturesFromModel(runtime, model);
+  const signatures = withWidgetRects(runtime, docPtr, (rectOf) =>
+    readSignaturesFromModel(runtime, model, rectOf),
+  );
   const signature = signatures.find(
-    (s) =>
-      s.field.kind === 'objectNumber' && s.field.fieldObjectNumber === expected.fieldObjectNumber,
+    (s) => s.field.kind === 'objectNumber' && s.field.objectNumber === expected.fieldObjectNumber,
   );
   if (!signature) throw refuse('lost the signature field');
   if (!signature.signed || signature.coverage !== 'whole-revision' || !signature.byteRange) {

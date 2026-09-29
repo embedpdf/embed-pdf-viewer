@@ -119,11 +119,11 @@ async function boot(fixtures: PageFixture[], allow = ALL) {
     },
     pages: { list: () => Promise.resolve({ pageCount: pages.length, pages: layout() }) },
     security: { allows: (scope: string) => allow.has(scope) },
-    page: (ref: { pageObjectNumber: number }) => ({
+    page: (ref: { objectNumber: number }) => ({
       text: {
-        get: () => textReads(ref.pageObjectNumber),
+        get: () => textReads(ref.objectNumber),
         layout: () =>
-          geometryReads(ref.pageObjectNumber).then((geometry) =>
+          geometryReads(ref.objectNumber).then((geometry) =>
             createTextLayout(pageGeometryOf(geometry, crop)),
           ),
       },

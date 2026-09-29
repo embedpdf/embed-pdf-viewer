@@ -123,7 +123,7 @@ export class CloudDocumentAnnotationsService implements DocumentAnnotationsServi
    *  (404 → refresh the manifest → once). */
   private readPage(page: PageRef, signal: AbortSignal): Promise<AnnotationList> {
     return this.http.getJsonWithRefresh(
-      async (s) => this.versionedPagePath(await this.manifest.get(s), page.pageObjectNumber),
+      async (s) => this.versionedPagePath(await this.manifest.get(s), page.objectNumber),
       (raw) => AnnotationListSchema.parse(raw),
       async (s) => {
         await this.manifest.refresh(s);
@@ -294,7 +294,7 @@ export class CloudDocumentAnnotationsService implements DocumentAnnotationsServi
     manifest: DocumentManifest,
     pageObjectNumber: PageObjectNumber,
   ): string {
-    const page = manifest.pages.find((p) => p.state.page.pageObjectNumber === pageObjectNumber);
+    const page = manifest.pages.find((p) => p.state.page.objectNumber === pageObjectNumber);
     if (!page) {
       throw new EngineError(
         EngineErrorCode.NotFound,
@@ -359,7 +359,7 @@ class CloudWeakAnnotationEditSession implements WeakAnnotationEditSession {
   }
 
   covers(page: PageRef): boolean {
-    return this.response.pages.some((p) => p.pageObjectNumber === page.pageObjectNumber);
+    return this.response.pages.some((p) => p.objectNumber === page.objectNumber);
   }
 
   updatePages(pages: readonly PageRef[]): AbortablePromise<void> {

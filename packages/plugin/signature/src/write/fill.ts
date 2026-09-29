@@ -31,7 +31,7 @@ export function createFills(
     if (signature?.signed) {
       throw new PluginError('conflict', 'signature', `'${signature.fieldName}' is signed`);
     }
-    await forms.setSignatureAppearance(field, { pdf, pageIndex: 0 });
+    await forms.setSignatureAppearance(field, { pdf });
   };
 
   const fillField = (field: FormFieldRef, mark: Mark): Promise<void> =>

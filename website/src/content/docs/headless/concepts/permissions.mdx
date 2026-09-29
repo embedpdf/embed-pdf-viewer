@@ -1,111 +1,158 @@
 ---
 title: Permissions
-description: How EmbedPDF answers "may this session do that?" — one rule, every plugin.
+description: "A document can be opened with less than full power. Every plugin tells you what the user may do, so your UI only offers what works."
 ---
 
 {/* Generated from docs/content — edit there, then `pnpm docs:sync`. */}
 
 # Permissions
 
-A document can be opened with less than full power: a share link that only
-lets people read and comment, a signing session that only fills forms, a
-reviewer token that can't download. The engine enforces those limits on
-every call — this page is about building UI that **tells the truth about
-them** instead of offering buttons that fail.
+A document can be opened with less than full power: a link that lets people read and comment, a
+signing session that only fills in fields, a reviewer who may not download. The engine refuses
+everything else. This page is about building a UI that **shows only what works**, instead of buttons
+that fail.
 
-## Every verb has a twin
+## Every verb has a check
 
-Any capability method that can be refused ships a boolean twin named
-`can` + the verb, answering one question: *would this succeed right now,
-for this session?*
+Every call that can be refused has a check next to it, named `can` and the verb. It answers one
+question: would this work right now, for this user?
 
 ```ts
-annotation.canCreate(); // may I draw new annotations?
-annotation.canEdit(ref); // may I move/restyle THIS one?
-annotation.canDelete(ref); // …delete this one?
+annotation.canCreate(); // may they draw new annotations?
+annotation.canUpdate(ref); // may they change this one?
 selection.canCopy(); // may selected text leave the document?
-search.canSearch(); // would a search return hits?
-search.canSearch({ snippets: true }); // …with text snippets? (needs copy too)
-form.canFill(); // may I write field values?
-form.canDesign(); // may I add/edit/delete fields?
-pageEdit.canEdit(); // may I rotate/reorder/insert/delete pages?
-redaction.canMark(); // may I propose redaction marks?
-redaction.canApply(); // may I burn them in?
-render.canRender(); // will page images be served at all?
+form.canFill(); // may they fill in fields?
+documents.canDownload(); // may they download the file?
 ```
 
-A twin already composes everything its verb checks — the session's grant,
-the document's own flags (a `locked` annotation, a read-only field), and
-structure (what's selected). You never combine them yourself, and you never
-look at scope strings: what a verb requires is the plugin's knowledge, not
-yours.
+A check already includes everything its call looks at: the user's permissions, the flags on the
+document (a locked annotation, a read-only field) and what's selected. You never combine them
+yourself, and you never read permission names: which permission a call needs is the plugin's
+business, not yours.
 
-> **The rule:** render an affordance if and only if its twin is true.
-> Subscribe to the twin like any other state — answers change when the
-> selection changes or access is refreshed.
+> **The rule:** show a button when its check is true. Read the check while you render, like any
+> other state: the answer changes when the selection changes or the user gets new permissions.
 
 ```tsx
 const annotation = useAnnotation();
 
-{annotation.canCreate() && <DrawingToolbar />}
+{annotation.canCreate() && <DrawingTools />}
 <button disabled={!annotation.canDelete(ref)}>Delete</button>
 ```
 
-## Per-record answers
+## One answer per annotation
 
-Twins that take a ref answer **per record**. In a collaborative document a
-session may hold `annotations:update:self` — edit your own, read everyone
-else's. You don't have to handle that: another person's annotation answers
-`canEdit(ref) === false` and already renders the way a locked one renders —
-selectable, commentable, no drag handles. The same fusion drives forms:
-a field you can't fill renders inert, exactly like a read-only field.
+Checks that take a `ref` answer for that one annotation, field or comment. In a shared document, a
+user may hold `annotations:update:self`: change their own annotations, and only look at the rest.
+You don't handle that yourself. Someone else's annotation answers `canUpdate(ref) === false`, and
+shows the way a locked one does: it can be selected and commented on, but has no handles. Forms work
+the same: a field the user may not fill shows as read-only.
 
 ## Calling anyway is safe
 
-Twins are for honest pixels, not safety — enforcement never depends on
-them. A refused verb rejects with the same shape everywhere:
+Checks are there to keep your UI honest; the engine doesn't rely on them. A refused call rejects,
+the same way in every plugin:
 
 ```ts
-import { isPluginError } from '@embedpdf/core';
+import { isPluginError } from '@embedpdf/react/runtime';
 
 try {
-  await form.setText(key, 'value');
-} catch (err) {
-  if (isPluginError(err, 'permission-denied')) {
-    // err.details.required — the capability that was missing, e.g. 'doc.forms.fill'
+  await form.setValue(toFieldRef('total'), { value: '120.00' });
+} catch (error) {
+  if (isPluginError(error, 'permission-denied')) {
+    console.log(error.permission); // what was missing, such as 'doc.forms.fill'
   }
 }
 ```
 
 The local and the cloud engine refuse the same way, so this one check covers both.
 
-Gesture-driven verbs go quietly inert instead of throwing — a drawing
-gesture without create authority paints nothing and sends nothing.
+What people do with the mouse fails quietly instead: without permission to create, drawing with a
+tool paints nothing and saves nothing.
 
 ## Where the limits come from
 
-Power is granted when the document opens. On the local engine you pass it
-directly; a cloud session carries it in the token:
+A document gets its permissions when it opens, together with who the user is.
 
-```ts
-const doc = await engine.open(source, {
-  scope: ['doc.open', 'doc.render', 'doc.text.select', 'doc.annotate.read'],
-});
+<Engine local>
+
+On the local engine you give both. Once on the viewer, for every document it opens, and per document
+when one needs something else:
+
+```tsx
+<Viewer
+  engine={engine}
+  plugins={plugins}
+  identity={{ userId: 'u_381', displayName: 'Dana Smith' }}
+  scope={[
+    'doc.open',
+    'doc.render',
+    'doc.text.select',
+    'doc.annotate.read',
+    'annotations:create:self',
+    'annotations:update:self',
+    'annotations:delete:self',
+  ]}
+  initialDocuments={[
+    { source: report },
+    { source: archive, scope: ['doc.open', 'doc.render'] }, // this one is read-only
+  ]}
+/>
 ```
 
-Omitting `scope` on the local engine grants everything (with a console
-warning) — handy in development, but pass the scope your deployment will
-really issue so the twins show you the UI your users will get.
+- **A document's own `scope` replaces the viewer's.** It's the whole list for that document, not an
+  addition, so it means exactly what it says. The same goes for `identity`.
+- **`identity` is who the user is.** Permissions that say "their own" (`:self`) or "their group"
+  (`:group`) are checked against it, so they need one: opening without it fails.
+- **A document keeps what it opened with.** Change the viewer's `scope` or `identity`, and the
+  documents you open after that get the new values.
 
-## Cheat sheet
+Code that opens documents itself passes the same options to
+`documents.open(source, { scope, identity })`.
 
-| Plugin     | Twins                                                     |
-| ---------- | --------------------------------------------------------- |
-| annotation | `canRead()` `canCreate()` `canEdit(ref)` `canDelete(ref)` `canGroup()` `canUngroup()` |
-| selection  | `canSelect()` `canCopy()`                                 |
-| search     | `canSearch({ snippets? })` — `snippets: true` asks about snippets |
-| render     | `canRender()`                                             |
-| page-edit  | `canEdit()` — one answer for all page structure edits     |
-| form       | `canRead()` `canFill()` `canDesign()`                     |
-| redaction  | `canMark()` `canApply()`                                  |
-| documents  | `allows(cap)` — kernel verbs only (print, download)       |
+Leave `scope` out and the user may do everything, with a warning in the console. That's handy while
+you build, but pass the scope your users will really get, so the checks show you the UI they'll see.
+
+<CloudPdfCallout
+  title="Limits that hold on the server"
+  href="https://www.cloudpdf.com/docs/headless/concepts/permissions"
+  cta="See how CloudPDF checks permissions"
+>
+
+On the local engine the checks run in the browser, and the browser already has the file. With
+CloudPDF, the server checks every call: a user who may not download never receives the file, and
+one who may not copy gets where the text is, not the text itself.
+
+</CloudPdfCallout>
+
+</Engine>
+
+<Engine cloud>
+
+On CloudPDF, the user's token carries both, so your server decides and the viewer takes nothing. See
+[What a token carries](/docs/engine/authentication#what-a-token-carries).
+
+</Engine>
+
+## Every check
+
+Each plugin's page has a Permissions section with the permission behind each check.
+
+| Plugin                                           | Checks                                                                                                    |
+| :----------------------------------------------- | :-------------------------------------------------------------------------------------------------------- |
+| [Documents](../documents/saving#permissions)     | `canDownload()` `canPrint()`                                                                              |
+| [Rendering](../viewing/render#permissions)       | `canRender()`                                                                                             |
+| [Page editing](../documents/pages#permissions)   | `canEdit()`, one answer for every page change; `canExtract()` for copying pages out                       |
+| [Metadata](../documents/metadata#permissions)    | `canUpdate()`                                                                                             |
+| [Selection](../text/selection#permissions)       | `canSelect()` `canCopy()`                                                                                 |
+| [Search](../text/search#permissions)             | `canSearch()`, and `canSearch({ snippets: true })` for the words around each match                         |
+| [Annotations](../annotations/with-code#permissions) | `canRead()` `canCreate()` `canUpdate(ref)` `canDelete(ref)`; `selection.canGroup()` `selection.canUngroup()` |
+| [Comments](../annotations/comments#permissions)  | `canReply(ref)` `canSetText(ref)` `canSetStatus(ref)` `canSetMarked(ref)` `canDelete(ref)` `canDeleteThread(ref)` |
+| [Stamps](../annotations/stamps#permissions)      | `canPlace()` `canCreateFromAnnotations()`                                                                 |
+| [Measurements](../annotations/measurements#permissions) | `canMeasure(page)` `canCalibrate()`                                                                |
+| [Redaction](../annotations/redaction#permissions) | `canMark()` `canApply()`                                                                                 |
+| [Forms](../forms#permissions)                    | `canRead()` `canFill()`; [building forms](../forms/building#permissions): `canDesign()`                  |
+| [Signatures](../forms/signatures#permissions)    | `canSign()` `canCertify()` `canFill()` `canReadRevision()`                                               |
+
+A [command](../ui/commands)'s `enabled` is where these checks go, so every toolbar button and
+shortcut follows them.

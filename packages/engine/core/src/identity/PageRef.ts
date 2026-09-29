@@ -24,16 +24,16 @@ import { isValidPageObjectNumber } from './PageObjectNumber';
  * results, destinations, search matches) carry the same `page: PageRef`;
  * `toPageRef()` builds one from a page number you already hold.
  */
-export type PageRef = { kind: 'objectNumber'; pageObjectNumber: PageObjectNumber };
+export type PageRef = { kind: 'objectNumber'; objectNumber: PageObjectNumber };
 
 /** Build the address for a page from its object number. */
 export function toPageRef(pageObjectNumber: PageObjectNumber): PageRef {
-  return { kind: 'objectNumber', pageObjectNumber };
+  return { kind: 'objectNumber', objectNumber: pageObjectNumber };
 }
 
 /** Structural equality for two page addresses. */
 export function pageRefsEqual(a: PageRef, b: PageRef): boolean {
-  return a.kind === b.kind && a.pageObjectNumber === b.pageObjectNumber;
+  return a.kind === b.kind && a.objectNumber === b.objectNumber;
 }
 
 /**
@@ -42,18 +42,18 @@ export function pageRefsEqual(a: PageRef, b: PageRef): boolean {
  * `nm:…`) and `encodeFieldRefKey` (`obj:12` / `fqn:…`), so every identity
  * reads the same on the wire:
  *
- *   `{ kind: 'objectNumber', pageObjectNumber: 3 }` -> `'obj:3'`
+ *   `{ kind: 'objectNumber', objectNumber: 3 }` -> `'obj:3'`
  *
  * The caller is responsible for `encodeURIComponent`-ing the result before
  * splicing it into a URL path; the `wirePaths` builders already do that.
  */
 export function encodePageKey(ref: PageRef): string {
-  if (!isValidPageObjectNumber(ref.pageObjectNumber)) {
+  if (!isValidPageObjectNumber(ref.objectNumber)) {
     throw new RangeError(
-      `encodePageKey: pageObjectNumber must be a positive integer, got ${ref.pageObjectNumber}`,
+      `encodePageKey: objectNumber must be a positive integer, got ${ref.objectNumber}`,
     );
   }
-  return `obj:${ref.pageObjectNumber}`;
+  return `obj:${ref.objectNumber}`;
 }
 
 /**
@@ -67,5 +67,5 @@ export function decodePageKey(key: string): PageRef | null {
   const rest = key.slice('obj:'.length);
   const n = Number.parseInt(rest, 10);
   if (!Number.isInteger(n) || n <= 0 || String(n) !== rest) return null;
-  return { kind: 'objectNumber', pageObjectNumber: n };
+  return { kind: 'objectNumber', objectNumber: n };
 }

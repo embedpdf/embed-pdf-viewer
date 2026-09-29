@@ -67,11 +67,8 @@ function harness(config?: ActionsConfig, fields: Array<{ name: string; widgets: 
         list: async () => ({
           fields: fields.map(({ name, widgets }, index) => ({
             name,
-            fieldObjectNumber: 100 + index,
-            widgets: widgets.map((annotObjectNumber) => ({
-              annotObjectNumber,
-              page: toPageRef(3),
-            })),
+            ref: { kind: 'objectNumber', objectNumber: 100 + index },
+            widgets: widgets.map((objectNumber) => ({ objectNumber, page: toPageRef(3) })),
           })),
         }),
       },
@@ -234,7 +231,7 @@ describe('actions dispatcher', () => {
       for (const effect of effects) {
         if (effect.kind === 'setDisplay' && effect.ref.kind === 'objectNumber') {
           displays.push({
-            fieldObjectNumber: effect.ref.fieldObjectNumber,
+            fieldObjectNumber: effect.ref.objectNumber,
             display: effect.display,
           });
         }

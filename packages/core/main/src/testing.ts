@@ -26,6 +26,10 @@ import type {
 } from '@embedpdf/engine-core/runtime';
 import { pageRefsEqual, subscribeToType } from '@embedpdf/engine-core/runtime';
 
+/** Brand a fake engine or handle as local (`[LOCAL_ENGINE_BRAND]: true`) so
+ *  `isLocalEngine` and `isLocalDocument` accept it. */
+export { LOCAL_ENGINE_BRAND } from '@embedpdf/engine-core/runtime';
+
 import { PluginError } from './errors';
 import { createEventHook } from './event-hook';
 import { createLatestLane, type LatestLane } from './lanes';
@@ -223,7 +227,7 @@ export function createTestContext<S = void>(options: TestContextOptions<S> = {})
     capabilities.set(DocumentsToken as CapabilityToken<unknown>, testDocuments(meta));
   }
   const notFound = (ref: PageRef) =>
-    new PluginError('not-found', id, `page ${ref.pageObjectNumber} is not in this document`);
+    new PluginError('not-found', id, `page ${ref.objectNumber} is not in this document`);
   const resolve = <T>(token: CapabilityToken<T>): T | null =>
     capabilities.has(token as CapabilityToken<unknown>)
       ? (capabilities.get(token as CapabilityToken<unknown>) as T)

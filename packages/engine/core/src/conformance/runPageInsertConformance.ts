@@ -41,7 +41,7 @@ export function runPageInsertConformance(
       const doc = await openFixture(engine, opts);
       try {
         const before = await doc.pages.list();
-        const beforePageObjectNumbers = before.pages.map((p) => p.ref.pageObjectNumber);
+        const beforePageObjectNumbers = before.pages.map((p) => p.ref.objectNumber);
         // Self-source: extract the first page, insert it back (append).
         const single = await doc.pages.extract([toPageRef(beforePageObjectNumbers[0])]);
 
@@ -50,14 +50,12 @@ export function runPageInsertConformance(
         expect(result.layout.pageCount).toBe(before.pageCount + 1);
         // Existing pages: same identity, same leading positions.
         expect(
-          result.layout.pages.slice(0, before.pageCount).map((p) => p.ref.pageObjectNumber),
+          result.layout.pages.slice(0, before.pageCount).map((p) => p.ref.objectNumber),
         ).toEqual(beforePageObjectNumbers);
         // The appended copy is a fresh object number at the tail.
-        const newPageObjectNumber = result.insertedPages[0].pageObjectNumber;
+        const newPageObjectNumber = result.insertedPages[0].objectNumber;
         expect(beforePageObjectNumbers.includes(newPageObjectNumber)).toBe(false);
-        expect(result.layout.pages[before.pageCount].ref.pageObjectNumber).toBe(
-          newPageObjectNumber,
-        );
+        expect(result.layout.pages[before.pageCount].ref.objectNumber).toBe(newPageObjectNumber);
         // The copy inherits the source page's geometry.
         expect(result.layout.pages[before.pageCount].size).toEqual(before.pages[0].size);
       } finally {
@@ -70,7 +68,7 @@ export function runPageInsertConformance(
       try {
         const before = await doc.pages.list();
         if (before.pages.length < 2) return;
-        const beforePageObjectNumbers = before.pages.map((p) => p.ref.pageObjectNumber);
+        const beforePageObjectNumbers = before.pages.map((p) => p.ref.objectNumber);
         const two = await doc.pages.extract([
           toPageRef(beforePageObjectNumbers[0]),
           toPageRef(beforePageObjectNumbers[1]),
@@ -78,10 +76,10 @@ export function runPageInsertConformance(
 
         const result = await doc.pages.insert(two, 1);
         expect(result.insertedPages.length).toBe(2);
-        const pageObjectNumbers = result.layout.pages.map((p) => p.ref.pageObjectNumber);
+        const pageObjectNumbers = result.layout.pages.map((p) => p.ref.objectNumber);
         expect(pageObjectNumbers[0]).toBe(beforePageObjectNumbers[0]);
         expect(pageObjectNumbers.slice(1, 3)).toEqual(
-          result.insertedPages.map((p) => p.pageObjectNumber),
+          result.insertedPages.map((p) => p.objectNumber),
         );
         expect(pageObjectNumbers.slice(3)).toEqual(beforePageObjectNumbers.slice(1));
       } finally {

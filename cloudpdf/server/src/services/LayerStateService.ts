@@ -2,6 +2,7 @@ import type {
   AnnotationMutationKind,
   CacheDelta,
   DocumentManifest,
+  DocumentProtection,
   LayerScopes,
   ManifestPage,
   PageState,
@@ -156,7 +157,7 @@ export class LayerStateService {
     await this.documentPages.upsertForDocument(
       docId,
       observed.map((page) => ({
-        pageObjectNumber: page.page.pageObjectNumber,
+        pageObjectNumber: page.page.objectNumber,
         hasWeakAnnotations: requireKnownWeakAnnotationBoolean(page),
       })),
     );
@@ -261,6 +262,8 @@ export class LayerStateService {
     pages: DurablePageRow[],
     /** The head version's facts: its plane pointers are what the base view publishes (law 9). */
     version: BaseVersionFacts,
+    /** What the head version's signatures forbid. */
+    protection: DocumentProtection | null,
   ): DocumentManifest {
     return {
       docVersion: head.docVersion,
@@ -278,6 +281,7 @@ export class LayerStateService {
       layerVersion: 0,
       working: false,
       baseByteLength: version.byteLength,
+      protection,
       pages: pages.map((page) => this.toManifestPage(`cloud:base:${head.id}`, page)),
     };
   }
@@ -286,6 +290,8 @@ export class LayerStateService {
     docId: string,
     /** The layer's base version (behind the head after a sibling published). */
     base: Pick<BaseVersionFacts, 'sha256' | 'byteLength'>,
+    /** What the base version's signatures forbid. */
+    protection: DocumentProtection | null,
     layerName: string,
     layer: Pick<
       LayerRow,
@@ -324,6 +330,7 @@ export class LayerStateService {
       working: layer.currentArtifactKey !== null,
       baseByteLength: base.byteLength,
       scopes,
+      protection,
       pages: pages.map((page) =>
         this.toManifestPage(this.layerRevisionScopeId(docId, layerName), page),
       ),
@@ -542,7 +549,7 @@ export class LayerStateService {
 function requireKnownWeakAnnotationBoolean(page: PageState): boolean {
   if (page.weakAnnotationState.kind !== 'known') {
     throw new Error(
-      `cannot initialize durable manifest state from unknown weak annotation state for page ${page.page.pageObjectNumber}`,
+      `cannot initialize durable manifest state from unknown weak annotation state for page ${page.page.objectNumber}`,
     );
   }
   return page.weakAnnotationState.hasAnyWeakAnnotations;

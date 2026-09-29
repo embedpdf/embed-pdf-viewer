@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createStageSurface } from '../src/stage-surface';
 import type { StageSurfaceHost, StageSurfaceHub, StageSurfaceSample } from '../src/stage-surface';
 
-const PAGE_7 = { kind: 'objectNumber', pageObjectNumber: 7 } as const;
+const PAGE_7 = { kind: 'objectNumber', objectNumber: 7 } as const;
 
 // Fake element/window/observers (the repo's fake-DOM pattern — no jsdom): the
 // binding's whole environment is hand-fired, so viewport reporting, DPR

@@ -1,4 +1,5 @@
 import type {
+  PageBox,
   PageRaster,
   PageRenderBackground,
   PageRenderViewport,
@@ -9,7 +10,9 @@ import {
   EngineError,
   EngineErrorCode,
   normalizePdfRect,
+  renderMatrix,
   renderSize,
+  type PageRenderMatrix,
 } from '@embedpdf/engine-core/runtime';
 import type { PdfRuntimeModule, Ptr } from '@embedpdf/engine-runtime';
 
@@ -21,8 +24,8 @@ import { readRectF } from '../../runtime/memory/structs';
  *
  * Every PDFium rasterizer — `PageRenderReader`, `AnnotationAppearanceReader`,
  * and any future one (thumbnails, stamps, flatten) — composes these three
- * pieces and supplies only its own `draw` call. The geometry is a pure affine
- * (the engine twin of the viewer's `Mat2D`/`rotateScaleMatrix`); the bitmap
+ * pieces and supplies only its own `draw` call. The geometry is engine-core's
+ * `renderMatrix`, the matrix a page transform reports; the bitmap
  * lifecycle (alloc → fill → draw → read back → free) lives in `rasterize` and,
  * for a draw that awaits, `rasterizeAsync`.
  */
@@ -30,45 +33,6 @@ import { readRectF } from '../../runtime/memory/structs';
 const FPDF_BITMAP_BGRA = 4;
 /** Emit RGBA byte order (vs PDFium's native BGRA) so callers get `rgba8` directly. */
 export const FPDF_REVERSE_BYTE_ORDER = 0x10;
-
-/** A 2D affine as the same six numbers as the viewer `Mat2D`, CSS `matrix()`, FS_MATRIX. */
-export type Mat2D = readonly [a: number, b: number, c: number, d: number, e: number, f: number];
-
-/**
- * Map a normalized post-`GetDisplayMatrix()` display-space rect onto an
- * `outW × outH` device bitmap, baking in the caller's viewport rotation.
- *
- * PDFium's page and annotation renderers pre-apply `CPDF_Page::GetDisplayMatrix()`
- * before concatenating the caller matrix. That display matrix has already
- * converted PDF page coordinates (y-up) into bitmap/display coordinates
- * (y-down), so the caller matrix must target that post-display rect.
- */
-export function displayRectToDeviceMatrix(
-  rect: PdfRect,
-  rotation: PdfRotation,
-  outW: number,
-  outH: number,
-): Mat2D {
-  const left = rect.left;
-  const bottom = rect.bottom;
-  const width = rect.right - rect.left;
-  const height = rect.top - rect.bottom;
-  const sx0 = outW / width;
-  const sy0 = outH / height;
-  const sx90 = outW / height;
-  const sy90 = outH / width;
-
-  switch (rotation) {
-    case 90:
-      return [0, sy90, -sx90, 0, sx90 * (bottom + height), -sy90 * left];
-    case 180:
-      return [-sx0, 0, 0, -sy0, sx0 * (left + width), sy0 * (bottom + height)];
-    case 270:
-      return [0, -sy90, sx90, 0, -sx90 * bottom, sy90 * (left + width)];
-    case 0:
-      return [sx0, 0, 0, sy0, -sx0 * left, -sy0 * bottom];
-  }
-}
 
 /**
  * Device pixel size for a region under a rotation + viewport (engine-core
@@ -212,7 +176,13 @@ function allocateRaster(
     );
 
     matrixPtr = mem.alloc(6 * 4);
-    pokeMat2D(mem, matrixPtr, displayRectToDeviceMatrix(displayRect, rotation, width, height));
+    // The page's display matrix already turned PDF space into page space (the
+    // display rect), so this is the matrix a page transform reports.
+    pokeMatrix(
+      mem,
+      matrixPtr,
+      renderMatrix(pageBoxOfDisplayRect(displayRect), rotation, width, height),
+    );
 
     clipPtr = mem.alloc(4 * 4);
     mem.poke(clipPtr, 'f32', 0, 0);
@@ -261,6 +231,16 @@ export function readPageBox(runtime: PdfRuntimeModule, pagePtr: Ptr): PdfRect {
   };
 }
 
+/** A display rect (edges, y down) as a page-space box. */
+function pageBoxOfDisplayRect(rect: PdfRect): PageBox {
+  return {
+    x: rect.left,
+    y: rect.bottom,
+    width: rect.right - rect.left,
+    height: rect.top - rect.bottom,
+  };
+}
+
 /** A PDF user-space rect in display space: from the page box's top-left, y down. */
 function pdfRectToDisplayRect(rect: PdfRect, page: PdfRect): PdfRect {
   return {
@@ -271,7 +251,7 @@ function pdfRectToDisplayRect(rect: PdfRect, page: PdfRect): PdfRect {
   };
 }
 
-function pokeMat2D(mem: PdfRuntimeModule['mem'], ptr: Ptr, m: Mat2D): void {
+function pokeMatrix(mem: PdfRuntimeModule['mem'], ptr: Ptr, m: PageRenderMatrix): void {
   for (let i = 0; i < 6; i++) mem.poke(ptr, 'f32', m[i], i * 4);
 }
 

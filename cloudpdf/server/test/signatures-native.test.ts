@@ -183,7 +183,7 @@ describe('digital signatures over the wire (native runtime)', () => {
         `${layer}/form/fields/${encodeURIComponent('fqn:group.total')}/value`,
         docId,
         'alice',
-        JSON.stringify({ value: { type: 'text', value: 'wire' } }),
+        JSON.stringify({ value: { value: 'wire' } }),
         'application/json',
       ),
     );
@@ -218,7 +218,7 @@ describe('digital signatures over the wire (native runtime)', () => {
       `${layer}/form/fields/${encodeURIComponent('fqn:group.total')}/value`,
       docId,
       'alice',
-      JSON.stringify({ value: { type: 'text', value: 'nope' } }),
+      JSON.stringify({ value: { value: 'nope' } }),
       'application/json',
     );
     expect(blocked.status).toBe(409);
@@ -556,7 +556,7 @@ describe('digital signatures over the wire (native runtime)', () => {
         `${bob}/form/fields/${encodeURIComponent('fqn:group.total')}/value`,
         docId,
         'bob',
-        JSON.stringify({ value: { type: 'text', value: 'bob' } }),
+        JSON.stringify({ value: { value: 'bob' } }),
         'application/json',
       ),
     );
@@ -641,7 +641,7 @@ describe('digital signatures over the wire (native runtime)', () => {
         `${alice}/form/fields/${encodeURIComponent('fqn:group.total')}/value`,
         docId,
         'alice',
-        JSON.stringify({ value: { type: 'text', value: 'after expiry' } }),
+        JSON.stringify({ value: { value: 'after expiry' } }),
         'application/json',
       ),
     );

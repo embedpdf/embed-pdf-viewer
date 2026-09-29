@@ -4,6 +4,7 @@ import { StrictMode } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import { toPageRef } from '@embedpdf/core';
+import { LOCAL_ENGINE_BRAND } from '@embedpdf/core/testing';
 import type { DocumentHandle, Engine, PageLayout } from '@embedpdf/core';
 import { Viewer, useKernel, DocumentGate } from '../src/runtime';
 import type { AnyPlugin, PluginContext } from '@embedpdf/core';
@@ -61,7 +62,8 @@ function makeHandle(id: string) {
   return { handle: handle as unknown as DocumentHandle, close: handle.close };
 }
 
-function countingEngine() {
+/** A fake engine; `local: false` leaves off the local brand, as a cloud engine does. */
+function countingEngine({ local = true }: { local?: boolean } = {}) {
   const handles: ReturnType<typeof makeHandle>[] = [];
   const open = vi.fn((input: { id?: string }) => {
     const made = makeHandle(input.id ?? '?');
@@ -71,7 +73,7 @@ function countingEngine() {
   const destroy = vi.fn(() => Promise.resolve());
   const warmup = vi.fn();
   return {
-    engine: { open, destroy, warmup } as unknown as Engine,
+    engine: { [LOCAL_ENGINE_BRAND]: local, open, destroy, warmup } as unknown as Engine,
     open,
     destroy,
     warmup,
@@ -234,6 +236,20 @@ describe('<Viewer> engine ownership', () => {
 
     view.unmount();
     await waitFor(() => expect(destroy).toHaveBeenCalledTimes(1));
+  });
+
+  it('only a local engine is warmed up', async () => {
+    const { engine, warmup } = countingEngine({ local: false });
+
+    const view = render(
+      <Viewer engine={engine} plugins={[]} initialDocuments={[{ source: bytesInput('a') }]}>
+        <div data-testid="shell">shell</div>
+      </Viewer>,
+    );
+
+    await waitFor(() => expect(screen.getByTestId('shell')).toBeTruthy());
+    expect(warmup).not.toHaveBeenCalled();
+    view.unmount();
   });
 
   it('a live instance is borrowed: warmed up on mount, never destroyed', async () => {

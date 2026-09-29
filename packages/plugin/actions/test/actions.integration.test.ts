@@ -116,7 +116,7 @@ describe('plugin-actions integration (real engine)', () => {
     );
     const { pages } = await opened.pages.list();
     const page = pages[0];
-    firstPage = page.ref.pageObjectNumber;
+    firstPage = page.ref.objectNumber;
     const { annotations } = await opened.page(toPageRef(firstPage)).annotations.list();
     const byNm = new Map(annotations.map((annotation) => [annotation.nm, annotation]));
     treeOf = (nm: string) => {

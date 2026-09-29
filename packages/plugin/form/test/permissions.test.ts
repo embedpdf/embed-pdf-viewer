@@ -13,17 +13,18 @@ import { fieldRef } from '../src/host-contract';
 import { initialFormState } from '../src/model';
 
 const field = (): FormFieldDTO => ({
-  ref: { kind: 'objectNumber', fieldObjectNumber: 5 },
-  fieldObjectNumber: 5,
+  ref: { kind: 'objectNumber', objectNumber: 5 },
   name: 'name',
   family: 'text',
   origin: 'acroform',
-  flags: { readOnly: false, required: false, noExport: false, raw: 0 },
+  readOnly: false,
+  required: false,
+  noExport: false,
   alternateName: null,
   mappingName: null,
   valueEntry: { kind: 'scalar', value: '' },
   defaultValueEntry: { kind: 'scalar', value: '' },
-  widgets: [formWidget(9, toPageRef(1))],
+  widgets: [{ ...formWidget(9, toPageRef(1)), rect: null }],
   value: '',
   defaultValue: '',
   maxLength: null,

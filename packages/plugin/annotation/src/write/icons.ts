@@ -101,12 +101,12 @@ export function createIcons(
 
   const api = {
     placeAt: (page: PageRef, point: Point, displayRotation?: number) =>
-      placeAt(page.pageObjectNumber, point, displayRotation),
+      placeAt(page.objectNumber, point, displayRotation),
     createAttachment: async (page: PageRef, at: Point, file: AttachmentFileSource) => {
       authority.assertCreate();
       authority.assertPage(page);
       const doc = ctx.doc;
-      const pageObjectNumber = page.pageObjectNumber;
+      const pageObjectNumber = page.objectNumber;
       const size = geometry.sizeOf(pageObjectNumber);
       const tool = tools.get('attachment');
       if (!doc || !size || !tool || !isIconPlaceKind(tool.subtype)) {

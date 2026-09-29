@@ -61,7 +61,7 @@ export function createSigning(
         signer,
         certify: input.certify,
         lock: input.lock,
-        appearance: { pdf: appearance, pageIndex: 0 },
+        appearance: { pdf: appearance },
       });
       target.clearIfTarget(input.field);
       return result;
@@ -78,7 +78,7 @@ export function createSigning(
         lock: input.lock,
         subFilter: input.subFilter,
         digest: input.digest,
-        ...(appearance ? { appearance: { pdf: appearance, pageIndex: 0 } } : {}),
+        ...(appearance ? { appearance: { pdf: appearance } } : {}),
       });
       prepared.set(result.signingId, result);
       return result;

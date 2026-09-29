@@ -182,9 +182,9 @@ export function createView(
       const pages = new Map<number, ModelAnnotation[]>();
       for (const id of whole.order) {
         const record = whole.byId[id]!;
-        const list = pages.get(record.annotation.page.pageObjectNumber);
+        const list = pages.get(record.annotation.page.objectNumber);
         if (list) list.push(record);
-        else pages.set(record.annotation.page.pageObjectNumber, [record]);
+        else pages.set(record.annotation.page.objectNumber, [record]);
       }
       return pages;
     },
@@ -203,8 +203,7 @@ export function createView(
     const cached = pageSlices.get(pageObjectNumber);
     if (cached?.whole === whole) return cached.model;
     const records = recordsByPage().get(pageObjectNumber) ?? NO_RECORDS;
-    const onPage = (id: Id) =>
-      whole.byId[id]?.annotation.page.pageObjectNumber === pageObjectNumber;
+    const onPage = (id: Id) => whole.byId[id]?.annotation.page.objectNumber === pageObjectNumber;
     const draft = whole.draft;
     const parts: PageParts = {
       records,
@@ -214,7 +213,7 @@ export function createView(
       draft:
         draft &&
         ('page' in draft
-          ? draft.page.pageObjectNumber === pageObjectNumber
+          ? draft.page.objectNumber === pageObjectNumber
           : 'ids' in draft
             ? draft.ids.some(onPage)
             : onPage(draft.id))

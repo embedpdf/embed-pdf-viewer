@@ -477,7 +477,7 @@ async function main(): Promise<void> {
       wirePack({ kind: 'pages.list' as const, jobId, docId: docIds[0]! }),
     );
     if (list.tag !== 'pages.list') throw new Error(`unexpected ${list.tag}`);
-    const pageObjectNumbers = list.snapshot.pages.slice(0, 8).map((p) => p.ref.pageObjectNumber);
+    const pageObjectNumbers = list.snapshot.pages.slice(0, 8).map((p) => p.ref.objectNumber);
     e2ePageObjectNumber = pageObjectNumbers[0]!;
     // eslint-disable-next-line no-console
     console.log(

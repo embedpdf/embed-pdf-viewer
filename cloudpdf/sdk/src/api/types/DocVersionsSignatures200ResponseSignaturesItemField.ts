@@ -9,7 +9,7 @@ export type DocVersionsSignatures200ResponseSignaturesItemField =
 export namespace DocVersionsSignatures200ResponseSignaturesItemField {
     export interface ObjectNumber {
         kind: "objectNumber";
-        fieldObjectNumber: number;
+        objectNumber: number;
     }
 
     export interface Fqn {

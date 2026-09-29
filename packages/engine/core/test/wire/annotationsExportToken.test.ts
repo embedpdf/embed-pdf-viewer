@@ -8,7 +8,7 @@ const page = toPageRef(3);
 const byNumber = (annotObjectNumber: number): AnnotationRef => ({
   kind: 'objectNumber',
   page,
-  annotObjectNumber,
+  objectNumber: annotObjectNumber,
 });
 
 describe('the annotation export token', () => {

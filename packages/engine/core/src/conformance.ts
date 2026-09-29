@@ -80,6 +80,12 @@ export {
   type ColorConformanceOptions,
 } from './conformance/runColorConformance';
 export {
+  DRAWING_FIXTURE_PDF,
+  runDrawingDetailsConformance,
+  type DrawingDetailsConformanceOptions,
+  type DrawingDetailsFixture,
+} from './conformance/runDrawingDetailsConformance';
+export {
   PAGE_SPACE_FIXTURES,
   type PageSpaceFixture,
   type PageSpaceFixturePage,
@@ -94,7 +100,10 @@ export { runPageExtractConformance } from './conformance/runPageExtractConforman
 export { runAttachmentConformance } from './conformance/runAttachmentConformance';
 export { runPageInsertConformance } from './conformance/runPageInsertConformance';
 export { runPageInsertBlankConformance } from './conformance/runPageInsertBlankConformance';
-export { runPieceInfoConformance } from './conformance/runPieceInfoConformance';
+export {
+  runPieceInfoConformance,
+  type PieceInfoConformanceOptions,
+} from './conformance/runPieceInfoConformance';
 export { runDocumentEventsConformance } from './conformance/runDocumentEventsConformance';
 export { runPageTextConformance } from './conformance/runPageTextConformance';
 export type {

@@ -1,4 +1,5 @@
 import {
+  formResetFacts,
   annotationImportFacts,
   deletedAnnotationsOf,
   deletedAttachmentOf,
@@ -19,9 +20,11 @@ import {
   type FormEffectsResult,
   type FormImportResult,
   type FormRepairResult,
+  type FormResetResult,
   type FormSetValueResult,
   type FormWidgetLinkResult,
   type MetadataUpdateResult,
+  type CustomMetadataUpdateResult,
   type PageDeleteResult,
   type PageFlattenResult,
   type PageInsertResult,
@@ -53,7 +56,8 @@ export interface AuditEventRow {
 /**
  * Translate a remote audit row into the `DocumentEvent`s it records — pure,
  * so the exactly-once and verbatim-payload invariants are unit-testable
- * without a server. Most rows are one fact; an import is one
+ * without a server. Most rows are one fact; a form reset is one
+ * `forms.valueSet` per field it changed, and an import is one
  * `annotations.created` per annotation, sharing `origin.tx` (its id the
  * request's `Idempotency-Key`). Returns none for an own echo and for kinds
  * this engine version doesn't know (a newer server's events degrade to
@@ -85,6 +89,16 @@ export function auditRowToEvents(row: AuditEventRow, mySessionId: string): Docum
     const id = row.idempotencyKey ?? `audit:${row.id}`;
     return facts.map((fact, index) => ({
       type: 'annotations.created',
+      origin: { ...origin, tx: { id, index, count: facts.length } },
+      ...fact,
+    }));
+  }
+  if (row.kind === 'form.reset') {
+    // One `forms.valueSet` per field the reset changed, as locally.
+    const facts = formResetFacts(row.payload as FormResetResult);
+    const id = row.idempotencyKey ?? `audit:${row.id}`;
+    return facts.map((fact, index) => ({
+      type: 'forms.valueSet',
       origin: { ...origin, tx: { id, index, count: facts.length } },
       ...fact,
     }));
@@ -151,7 +165,7 @@ function eventOf(row: AuditEventRow, origin: EventOrigin): DocumentEvent | null 
     case 'pages.rotate': {
       const payload = row.payload as PageRotateResult;
       const rotation = (payload.layout.pages.find(
-        (page) => page.ref.pageObjectNumber === row.affectedPages[0],
+        (page) => page.ref.objectNumber === row.affectedPages[0],
       )?.rotation ?? 0) as PdfRotation;
       return {
         type: 'pages.rotated',
@@ -192,6 +206,12 @@ function eventOf(row: AuditEventRow, origin: EventOrigin): DocumentEvent | null 
         origin,
         ...(row.payload as MetadataUpdateResult),
       };
+    case 'metadata.updateCustom':
+      return {
+        type: 'metadata.customUpdated',
+        origin,
+        ...(row.payload as CustomMetadataUpdateResult),
+      };
     case 'attachment.create':
       return {
         type: 'attachments.created',
@@ -205,11 +225,9 @@ function eventOf(row: AuditEventRow, origin: EventOrigin): DocumentEvent | null 
         deleted: deletedAttachmentOf(row.payload as AttachmentDeleteResult),
         ...(row.payload as AttachmentDeleteResult),
       };
-    // Form mutations: two audit kinds share the `forms.valueSet` event
-    // (setValue and reset produce the same result shape) — the audit log
-    // keeps them distinct for history, the event stream cares about effect.
+    // A value write is one `forms.valueSet`; a reset is one per field it
+    // changed (above).
     case 'form.setValue':
-    case 'form.reset':
       return { type: 'forms.valueSet', origin, ...(row.payload as FormSetValueResult) };
     case 'form.import':
       return { type: 'forms.imported', origin, ...(row.payload as FormImportResult) };
@@ -224,7 +242,7 @@ function eventOf(row: AuditEventRow, origin: EventOrigin): DocumentEvent | null 
       const result = row.payload as FormFieldDeleteResult;
       return { type: 'forms.deleted', origin, deleted: deletedFieldOf(result), ...result };
     }
-    case 'form.attachWidget':
+    case 'form.addWidget':
       return { type: 'forms.widgetAdded', origin, ...(row.payload as FormWidgetLinkResult) };
     case 'form.detachWidget':
       return { type: 'forms.widgetRemoved', origin, ...(row.payload as FormWidgetLinkResult) };

@@ -113,8 +113,7 @@ export function registerEffectRunners(
       !primary ||
       records.some(
         (record) =>
-          !record ||
-          record.annotation.page.pageObjectNumber !== primary.annotation.page.pageObjectNumber,
+          !record || record.annotation.page.objectNumber !== primary.annotation.page.objectNumber,
       )
     ) {
       return;

@@ -50,7 +50,7 @@ const goto = (pageObjectNumber: number, next: PdfActionNode[] = []): PdfActionNo
 const ref = (pageObjectNumber: number, objectNumber: number): AnnotationRef => ({
   kind: 'objectNumber',
   page: toPageRef(pageObjectNumber),
-  annotObjectNumber: objectNumber,
+  objectNumber,
 });
 
 interface FakeAnnotation {
@@ -82,7 +82,7 @@ function harness(options?: {
     id: 'actions',
     pages: pages.map((page) => ({ ref: toPageRef(page.pageObjectNumber) })),
     doc: {
-      page: ({ pageObjectNumber }: PageRef) => ({
+      page: ({ objectNumber: pageObjectNumber }: PageRef) => ({
         annotations: {
           list: async () => {
             listCalls.push(pageObjectNumber);
@@ -113,9 +113,7 @@ function harness(options?: {
   });
   // The pages' own /AA trees, as the kernel's page registry carries them.
   for (const layout of ctx.document()!.pages) {
-    const page = pages.find(
-      (candidate) => candidate.pageObjectNumber === layout.ref.pageObjectNumber,
-    );
+    const page = pages.find((candidate) => candidate.pageObjectNumber === layout.ref.objectNumber);
     if (page?.actions) Object.assign(layout, { actions: page.actions });
   }
 
@@ -128,7 +126,7 @@ function harness(options?: {
   });
   capability.registerExecutor('goto', (node) => {
     seam.push(
-      `goto:${node.type === 'goto' && 'page' in node.destination ? node.destination.page.pageObjectNumber : '?'}`,
+      `goto:${node.type === 'goto' && 'page' in node.destination ? node.destination.page.objectNumber : '?'}`,
     );
     return { status: 'executed' };
   });

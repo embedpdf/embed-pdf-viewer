@@ -1,0 +1,151 @@
+---
+title: Translations
+description: "Show your viewer in the user's language: pick it, load its strings only when needed, add your own, and support right-to-left languages."
+---
+
+# Translations
+
+The translations plugin holds your viewer's text in every language you support, and switches between
+them while the app runs. Register it with the user's language, and translate with `useT()`:
+
+```tsx
+import { i18nPlugin, negotiateLocale, useT } from '@embedpdf/react/i18n';
+
+const locale = negotiateLocale(['en', 'nl', 'de'], navigator.languages) ?? 'en';
+
+const plugins = [
+  /* … */
+  i18nPlugin({
+    locale,
+    locales: [{ code: 'en', name: 'English', translations: en }],
+    loaders: {
+      nl: () => import('./locales/nl').then((module) => module.default),
+      de: () => import('./locales/de').then((module) => module.default),
+    },
+  }),
+];
+
+function SaveButton() {
+  const t = useT();
+  return <button>{t('toolbar.save')}</button>;
+}
+```
+
+`negotiateLocale` picks the best language you have for what the browser asks, such as `nl` for a
+browser set to `nl-BE`. A language in `loaders` is loaded the first time someone switches to it, so
+your bundle carries only the one you start with.
+
+## Strings
+
+A language's `translations` are your strings, grouped however you like:
+
+```ts
+export default {
+  toolbar: { save: 'Opslaan', zoomIn: 'Inzoomen' },
+  search: {
+    results: { one: '{count} resultaat', other: '{count} resultaten' },
+  },
+};
+```
+
+```ts
+t('toolbar.save'); // 'Opslaan'
+t('search.results', { params: { count: 3 } }); // '3 resultaten'
+```
+
+- **`{name}`** is filled in from `params`.
+- **Plurals**: a string with `one` and `other` picks by `params.count`.
+- **Missing strings** fall back to the fallback language (English unless you set another), then to
+  `fallback` if you pass one, then to the key itself. You get a warning in the console once, so you
+  notice.
+
+## Switch the language
+
+```tsx
+function LanguagePicker() {
+  const i18n = useI18n();
+  const { locale, locales, loading } = useI18nState();
+
+  return (
+    <select value={locale} disabled={loading} onChange={(event) => i18n.setLocale(event.target.value)}>
+      {locales.map((language) => (
+        <option key={language.code} value={language.code}>
+          {language.name}
+        </option>
+      ))}
+    </select>
+  );
+}
+```
+
+`setLocale()` loads the language if it needs to, then switches. Everything that uses `useT()`
+re-renders in the new language.
+
+## Add strings later
+
+For a plugin of your own, or strings from your server, add them to a language while the app runs:
+
+```ts
+i18n.addTranslations('nl', { review: { approve: 'Goedkeuren' } });
+i18n.addTranslations('nl', { 'review.reject': 'Afwijzen' }); // a dotted key works too
+```
+
+`registerLocale()` adds a whole new language, and returns a function that removes it again.
+
+## EmbedPDF's own text
+
+Commands have labels, and the [standard commands](commands#the-standard-commands) come translated in
+English, Dutch, German, French, Spanish, Chinese, Swedish and Japanese, the languages of the standard
+stamps. Change any of them with `addTranslations`, under the same keys.
+
+## Right-to-left languages
+
+A language can say it reads right to left with `dir: 'rtl'`. `useI18nState().direction` tells you,
+so you can set it on your viewer's root:
+
+```tsx
+const { direction } = useI18nState();
+
+return <div dir={direction}>{/* your viewer */}</div>;
+```
+
+For documents that read right to left, such as a book in Arabic, set the Stage's `direction` too, so
+pages and spreads run from right to left.
+
+## Settings
+
+Set them when you register the plugin.
+
+| Setting          | What it does                                               | Default          |
+| :--------------- | :--------------------------------------------------------- | :--------------- |
+| `locale`         | The language to start with                                 | `fallbackLocale` |
+| `fallbackLocale` | The language to use for strings another language misses    | `'en'`           |
+| `locales`        | Languages loaded from the start                            | none             |
+| `loaders`        | Languages loaded when someone switches to them             | none             |
+
+## Events
+
+```ts
+useI18nEvent(
+  (i18n) => i18n.onLocaleChanged,
+  ({ locale }) => document.documentElement.setAttribute('lang', locale),
+);
+```
+
+| Event                | Fires when                               | Carries                     |
+| :------------------- | :--------------------------------------- | :-------------------------- |
+| `onLocaleChanged`    | The language changed                     | `locale`, `previousLocale`  |
+| `onLocaleLoadFailed` | A language couldn't be loaded            | `code`, `error`             |
+
+## Good to know
+
+### Before a document opens
+
+The plugin needs no engine and no document, so your loading screen, a password prompt and an empty
+viewer can be translated too.
+
+### A language that fails to load
+
+When a language in `loaders` can't be loaded, for example because the user is offline, the viewer
+stays in the language it had, and `onLocaleLoadFailed` tells you why. Call `setLocale()` again to
+try once more.

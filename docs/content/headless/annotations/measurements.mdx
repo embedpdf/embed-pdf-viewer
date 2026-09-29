@@ -1,0 +1,167 @@
+---
+title: Measurements
+description: Measure distances, perimeters and areas on drawings and plans at a real-world scale, and calibrate a page from a known length.
+---
+
+# Measurements
+
+On a floor plan or a technical drawing, people want real sizes: how long this wall is, how big this
+room. The measurement plugin adds the tools for it, and keeps each page's scale, so a line of 3
+centimeters on the page reads as 3 meters in the room. Register it with the annotation and interaction
+plugins, and turn on a tool:
+
+```tsx
+import { measurementPlugin } from '@embedpdf/react/measurement';
+
+const plugins = [/* … */ interactionPlugin(), annotationPlugin(), measurementPlugin()];
+
+<button onClick={() => interaction.activateTool('distance')}>Measure</button>;
+```
+
+| Tool        | Measures                                      | How                                     |
+| :---------- | :-------------------------------------------- | :-------------------------------------- |
+| `distance`  | The length of a line                          | Drag from one point to the other        |
+| `perimeter` | The length of a path of several lines         | Click each point, double-click to end   |
+| `area`      | The area of a shape                           | Click each corner, double-click to end  |
+
+Each measurement is an annotation with its value as a label, so it shows the same in Acrobat and other
+PDF apps, and you can select, move and restyle it like any annotation.
+
+## Set the scale
+
+A page starts at the default scale, 1:1 in meters, unless the PDF already has one. Most plans say
+their scale, such as 1:100. Pick it from a list:
+
+```ts
+const measurement = useMeasurement();
+
+measurement.listPresets(); // 1:1, 1:10, 1:20, 1:50, 1:100, 1:200, ¼″ = 1′, ⅛″ = 1′
+await measurement.setPreset([page.ref], 'metric-100');
+await measurement.setPreset('all', 'metric-100'); // every page
+```
+
+Measurements already on the page are recalculated for the new scale.
+
+## Calibrate from a known length
+
+When the scale isn't printed, measure something you know, such as a door that's 90 centimeters wide:
+
+```ts
+measurement.startCalibration(); // the next line the user draws is the known length
+```
+
+The plugin asks your UI for the real length, through `useMeasurementState().calibrationRequest`:
+
+```tsx
+function CalibrationDialog() {
+  const measurement = useMeasurement();
+  const { calibrationRequest } = useMeasurementState();
+  if (!calibrationRequest) return null;
+
+  const apply = (value: number) =>
+    measurement.calibrate({ ...calibrationRequest, distance: { value, unit: 'cm' } });
+
+  return <LengthPrompt onSubmit={apply} onCancel={() => measurement.dismissCalibration()} />;
+}
+```
+
+`calibrate()` sets the page's scale from the two points and the length you give. Pass
+`{ applyTo: 'all' }` to use the same scale on every page.
+
+## Units and precision
+
+```ts
+await measurement.setUnit([page.ref], 'ft');
+await measurement.setAreaUnit([page.ref], 'ft2'); // or 'm2', 'ha', 'acre'
+await measurement.setPrecision([page.ref], 100); // two decimals
+```
+
+`listUnits()` and `listAreaUnits()` give you the choices for a menu. Precision is 1, 10, 100 and so on:
+the number of steps per unit.
+
+## Read a measurement
+
+```tsx
+const readout = useMeasurementReadout(ref);
+// { kind: 'distance', value: 3.42, label: '3.42 m' }
+```
+
+`label` is the text shown on the page, in the page's units. Without a scale to compute from, a
+readout says why: `{ unavailable: 'no-scale' }`.
+
+To measure without drawing anything, for a tooltip that follows the pointer:
+
+```ts
+measurement.measureDistance(page.ref, from, to); // { value, label }
+measurement.measureArea(page.ref, corners);
+```
+
+`usePageScale(page.ref)` gives you a page's scale, for a scale bar or a "1:100" badge.
+
+## Measure from code
+
+```ts
+const { annotation } = await measurement.createMeasurement({
+  kind: 'area',
+  page: page.ref,
+  points: [
+    { x: 100, y: 100 },
+    { x: 300, y: 100 },
+    { x: 300, y: 250 },
+  ],
+});
+```
+
+It makes the same annotation the tool would, with the page's scale and the tool's style.
+
+## Settings
+
+Set them when you register the plugin.
+
+| Setting        | What it does                                                  | Default                     |
+| :------------- | :------------------------------------------------------------ | :-------------------------- |
+| `defaultScale` | The scale of a page that has none: `'metric'`, `'imperial'`, or a scale of your own | `'metric'` (1:1 in meters) |
+| `presets`      | The scales `listPresets()` offers                             | the eight above             |
+
+A measurement's look, such as its line, arrows and label position, is its tool's defaults; see
+[Tools & defaults](tools).
+
+## Events
+
+```ts
+useMeasurementEvent(
+  (measurement) => measurement.onScaleChanged,
+  ({ page }) => refreshScaleBar(page),
+);
+```
+
+| Event                    | Fires when                                         | Carries           |
+| :----------------------- | :------------------------------------------------- | :---------------- |
+| `onScaleChanged`         | A page's scale changed                             | `page`, `report`  |
+| `onCalibrationRequested` | The user drew a known length, and your UI should ask for it | `request` |
+| `onCalibrationCompleted` | A page was calibrated                              | `page`            |
+| `onCalibrationDismissed` | Calibrating was cancelled                          | —                 |
+
+`report` lists the measurements recalculated for the new scale, and any that couldn't be.
+
+## Permissions
+
+| Permission            | What it allows                             | Check                              |
+| :-------------------- | :----------------------------------------- | :--------------------------------- |
+| `doc.annotate.modify` | Setting a page's scale and calibrating     | `measurement.canCalibrate()`       |
+| `annotations:create`  | Measuring                                  | `measurement.canMeasure(page.ref)` |
+
+`canMeasure` is also false while a page's scale is still loading.
+
+## Good to know
+
+### The scale is in the PDF
+
+A page's scale is saved in the file, in the form Acrobat and Bluebeam use, so their measuring tools
+read the same scale, and yours read theirs.
+
+### Scales from map software
+
+A few PDFs, such as maps, carry a geographic scale. It's kept as it is, and measurements on such a
+page say `{ unavailable: 'foreign-measure' }`. See [Measurements](/docs/engine/annotations/measurements)
+for how scales and labels are stored.

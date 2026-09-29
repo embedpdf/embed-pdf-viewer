@@ -9,11 +9,11 @@ export type AnnotationMutationMetaChangedItem =
 export namespace AnnotationMutationMetaChangedItem {
     export interface ObjectNumber {
         kind: "objectNumber";
-        value: number;
+        objectNumber: number;
     }
 
     export interface Nm {
         kind: "nm";
-        value: string;
+        nm: string;
     }
 }

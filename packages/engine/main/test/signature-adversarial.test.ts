@@ -60,7 +60,7 @@ async function sign(
       field: { kind: 'fqn', name: opts.fieldName ?? 'sig' },
       ...(opts.permission ? { certify: { permission: opts.permission } } : {}),
       ...(opts.lock ? { lock: opts.lock } : {}),
-      ...(opts.appearance ? { appearance: { pdf: opts.appearance, pageIndex: 0 } } : {}),
+      ...(opts.appearance ? { appearance: { pdf: opts.appearance } } : {}),
     });
     await doc.signatures.complete({
       signingId: prepared.signingId,
@@ -411,7 +411,7 @@ describe('analysis: our own signing output is judged permitted', () => {
     const signed = await sign(unsigned, { permission: 2 });
     const doc = await open(signed);
     try {
-      await doc.forms.setValue({ kind: 'fqn', name: 'group.total' }, { type: 'text', value: '42' });
+      await doc.forms.setValue({ kind: 'fqn', name: 'group.total' }, { value: '42' });
       const working = await doc.signatures.analyze({
         since: { signatureIndex: 0 },
         until: 'working-copy',

@@ -103,7 +103,35 @@ The image tells you what you got:
 | `contentType`     | The MIME type, such as `'image/webp'`              |
 | `width`, `height` | The image's size in pixels                         |
 | `objectUrl()`     | A URL for `<img>`, and `revoke()` to free it       |
+| `blob()`          | The image's bytes, as a `Blob` (below)             |
 | `transform`       | Converts between its pixels and page space (below) |
+
+## The image's bytes
+
+`blob()` gives the image as a `Blob`, typed with its `contentType`. It's the same call on every
+engine, so use it to upload the image, save it or decode it:
+
+```ts
+const image = await page.render.image({ viewport: { kind: 'width', width: 800 }, format: 'png' });
+const blob = await image.blob();
+
+const bitmap = await createImageBitmap(blob);
+```
+
+Cancel it with `.abort()`, like a render.
+
+<Engine local>
+
+The image's `source` is `{ kind: 'bytes', bytes }`: the same bytes, without making a `Blob`.
+
+</Engine>
+
+<Engine cloud>
+
+The image's `source` is `{ kind: 'url', url }`, an address that needs the document's token.
+`blob()` fetches it with the token, and asks again when the document changed in the meantime.
+
+</Engine>
 
 ## Background and annotations
 
@@ -164,7 +192,10 @@ const image = await page.render.image({ viewport: { kind: 'width', width: 800 } 
 
 img.addEventListener('click', (event) => {
   const scale = image.width / img.clientWidth; // image pixels per CSS pixel
-  const point = image.transform.pixelsToPage({ x: event.offsetX * scale, y: event.offsetY * scale });
+  const point = image.transform.pixelsToPage({
+    x: event.offsetX * scale,
+    y: event.offsetY * scale,
+  });
   // point is { x, y } in page space, ready for layout.charAt() or an annotation
 });
 
@@ -317,7 +348,7 @@ const viewport = snapFullPageViewport(
 await doc.page(pages[0].ref).render.image({ viewport });
 ```
 
-The [render plugin](/docs/headless/plugins/render) does all of this for you, and adds tiles when
+The [render plugin](/docs/headless/viewing/render) does all of this for you, and adds tiles when
 the user zooms in far.
 
 <Engine cloud>
@@ -325,7 +356,7 @@ the user zooms in far.
 ### When the image downloads
 
 `render.image()` resolves as soon as the engine knows the image's address. The image itself
-downloads when you call `objectUrl()`, so an image you never show costs nothing. Renders are cached
+downloads when you call `objectUrl()` or `blob()`, so an image you never show costs nothing. Renders are cached
 on the server with the page, and change only when the page or its annotations do.
 
 </Engine>

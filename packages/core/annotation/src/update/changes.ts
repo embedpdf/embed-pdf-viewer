@@ -116,7 +116,7 @@ export function newRecord(
     source: 'vector',
   };
   const onPage = model.order.filter(
-    (id) => model.byId[id]?.annotation.page.pageObjectNumber === page.pageObjectNumber,
+    (id) => model.byId[id]?.annotation.page.objectNumber === page.objectNumber,
   ).length;
   const annotation = annotationOfRecord(record, {
     ref,

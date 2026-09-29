@@ -50,5 +50,4 @@ runAnnotationTransferConformance(runner, {
       },
       { scope: ['*'] },
     ),
-  rawAppearances: true,
 });

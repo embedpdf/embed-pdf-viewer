@@ -102,9 +102,14 @@ export type TextAlignment = 'left' | 'center' | 'right';
 
 /**
  * Free-text `/IT` intent. `free-text` is a plain text box; `free-text-callout`
- * adds a `/CL` leader line pointing at the called-out region.
+ * adds a `/CL` leader line pointing at the called-out region;
+ * `free-text-typewriter` is a typewriter box another app made, read and kept
+ * but not created.
  */
-export type FreeTextIntent = 'free-text' | 'free-text-callout';
+export type FreeTextIntent = 'free-text' | 'free-text-callout' | 'free-text-typewriter';
+
+/** Where a free text's lines sit in its box, top to bottom. */
+export type VerticalAlignment = 'top' | 'middle' | 'bottom';
 
 /** Caret `/IT` intent used by an Acrobat-compatible replace-text edit. */
 export type CaretIntent = 'replace';
@@ -148,6 +153,9 @@ export type BlendMode =
  * the engine maps these onto PDFium's integer codes at write time.
  */
 export type AnnotationBorderStyle = 'solid' | 'dashed' | 'beveled' | 'inset';
+
+/** The border styles an annotation other than a widget draws: `beveled` and `inset` are read, not written. */
+export type DrawnBorderStyle = Extract<AnnotationBorderStyle, 'solid' | 'dashed'>;
 
 /**
  * The `/RT` (reply type) relationship an annotation declares toward the

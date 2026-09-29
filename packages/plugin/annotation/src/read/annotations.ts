@@ -69,7 +69,7 @@ export function createAnnotationReads(
       filter.author === undefined &&
       !filter.group
     ) {
-      const pageObjectNumber = filter.page.pageObjectNumber;
+      const pageObjectNumber = filter.page.objectNumber;
       const hit = pageListMemo.get(pageObjectNumber);
       if (hit?.model === model) return hit.v;
       const pageList = annotationsOf(listAnnots(filter));

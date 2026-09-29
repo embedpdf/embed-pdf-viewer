@@ -135,7 +135,7 @@ describe('pending changes', () => {
   });
 
   it('followRecord moves changes, the vector preference and the text range; answers follow', () => {
-    const REF = { kind: 'objectNumber', page: PAGE, annotObjectNumber: 9 } as const;
+    const REF = { kind: 'objectNumber', page: PAGE, objectNumber: 9 } as const;
     const primary = record('s-1');
     const member = record('s-2', { to: named('s-1'), type: 'group' });
     const state = followRecord(
@@ -184,7 +184,7 @@ describe('pending changes', () => {
 
   it('followRecord leaves a state with nothing of the record alone', () => {
     const state = withPending([edit(1, 'a', {})]);
-    const REF = { kind: 'objectNumber', page: PAGE, annotObjectNumber: 3 } as const;
+    const REF = { kind: 'objectNumber', page: PAGE, objectNumber: 3 } as const;
     expect(followRecord(state, 'b', 'obj:3', REF)).toBe(state);
   });
 });

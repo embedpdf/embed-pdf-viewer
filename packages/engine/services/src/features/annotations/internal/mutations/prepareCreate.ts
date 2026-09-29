@@ -22,7 +22,10 @@ export function prepareCreate(
   // What the draft means, stated whole: the one resolution a viewer's
   // pending create shares (`annotationOfDraft`). A change set carries
   // `reply` and a popup's `parent` beside the draft.
-  const resolved = pdfResolveAnnotationDraft(draft, { linked: ['reply', 'parent'] });
+  const resolved = pdfResolveAnnotationDraft(draft, {
+    linked: ['reply', 'parent'],
+    describeFont: ctx.describeRegisteredFont,
+  });
   assertAnnotationResources(resolved.subtype, resources, 'create');
   preflightDraft(resolved, ctx);
   return resolved;

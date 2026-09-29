@@ -6,6 +6,7 @@ import {
   StandardFontSchema,
   TextAlignmentSchema,
 } from '../../base.schema';
+import { FormFieldRefSchema } from '../../../identity/FormFieldRef.schema';
 import { defineKind, field } from '../../declaration';
 import { annotationBaseFields } from '../shared-fields';
 
@@ -19,7 +20,9 @@ export const WidgetDeclaration = defineKind('widget', {
   fontSize: field.data(z.number().nonnegative()).nullable().optional(),
   fontColor: field.data(ColorSchema).nullable().optional(),
   textAlign: field.data(TextAlignmentSchema).optional(),
-  fieldObjectNumber: field.engine(z.number().int().nonnegative()),
+  /** The field the widget belongs to, or `null` when it's in none. */
+  field: field.engine(FormFieldRefSchema).nullable(),
+  /** Its field's family, so a widget reads as what it is without the form. */
   fieldFamily: field.engine(
     z.enum([
       'text',

@@ -119,6 +119,7 @@ export class CloudDocumentHandle implements DocumentHandle {
   private pendingInitialHead: DocumentHead | null;
 
   private readonly manifestAccessor: ManifestAccessor;
+  private readonly cloudSecurity: CloudDocumentSecurityService;
 
   constructor(
     private readonly http: HttpClient,
@@ -148,6 +149,7 @@ export class CloudDocumentHandle implements DocumentHandle {
       initialToken,
     );
     this.security = security;
+    this.cloudSecurity = security;
     // The deployment's render lattice rides /v1/access (mutable policy
     // never lives in immutable manifests). Reuse the cached access block
     // when present; otherwise establish access on demand — the same call
@@ -324,6 +326,21 @@ export class CloudDocumentHandle implements DocumentHandle {
   }
 
   /**
+   * Learn what the document's signatures forbid before the caller's first
+   * question: the manifest carries it, so `open()` fetches it up front and
+   * `security.allows()` answers as the server would from the start. A locked
+   * document, which the server won't describe yet, learns it from `unlock()`.
+   */
+  async learnProtection(signal: AbortSignal): Promise<void> {
+    try {
+      await this.getManifest(signal);
+    } catch (error) {
+      if (EngineError.is(error, EngineErrorCode.DocPasswordRequired)) return;
+      throw error;
+    }
+  }
+
+  /**
    * Return the cached manifest, fetching cold-cache once if needed.
    * Concurrent callers share a single inflight request (singleflight)
    * so an N-page handle that opens N services in parallel still
@@ -391,12 +408,12 @@ export class CloudDocumentHandle implements DocumentHandle {
     }
 
     const byPageObjectNumber = new Map(
-      this.manifestCache.pages.map((page) => [page.state.page.pageObjectNumber, page]),
+      this.manifestCache.pages.map((page) => [page.state.page.objectNumber, page]),
     );
     for (const pageState of meta.affectedPages) {
-      const existing = byPageObjectNumber.get(pageState.page.pageObjectNumber);
+      const existing = byPageObjectNumber.get(pageState.page.objectNumber);
       if (existing) {
-        byPageObjectNumber.set(pageState.page.pageObjectNumber, {
+        byPageObjectNumber.set(pageState.page.objectNumber, {
           ...existing,
           state: pageState,
         });
@@ -404,9 +421,9 @@ export class CloudDocumentHandle implements DocumentHandle {
     }
     if (delta) {
       for (const page of delta.pages) {
-        const existing = byPageObjectNumber.get(page.page.pageObjectNumber);
+        const existing = byPageObjectNumber.get(page.page.objectNumber);
         if (existing) {
-          byPageObjectNumber.set(page.page.pageObjectNumber, {
+          byPageObjectNumber.set(page.page.objectNumber, {
             ...existing,
             cache: page.cache,
           });
@@ -438,7 +455,7 @@ export class CloudDocumentHandle implements DocumentHandle {
       // (/layout). Keep a deterministic order by page object number so cache merges are
       // stable; display order is the SDK's concern via PageLayout.index.
       pages: Array.from(byPageObjectNumber.values()).sort(
-        (a, b) => a.state.page.pageObjectNumber - b.state.page.pageObjectNumber,
+        (a, b) => a.state.page.objectNumber - b.state.page.objectNumber,
       ),
     };
   }
@@ -454,12 +471,10 @@ export class CloudDocumentHandle implements DocumentHandle {
   private absorbPageDelete(meta: MutationMeta, deletedPages: readonly PageRef[]): void {
     this.absorbMutation(meta, ['layout', 'content', 'annotations']);
     if (!this.manifestCache) return;
-    const deleted = new Set(deletedPages.map((page) => page.pageObjectNumber));
+    const deleted = new Set(deletedPages.map((page) => page.objectNumber));
     this.manifestCache = {
       ...this.manifestCache,
-      pages: this.manifestCache.pages.filter(
-        (page) => !deleted.has(page.state.page.pageObjectNumber),
-      ),
+      pages: this.manifestCache.pages.filter((page) => !deleted.has(page.state.page.objectNumber)),
     };
   }
 
@@ -494,6 +509,7 @@ export class CloudDocumentHandle implements DocumentHandle {
           (!this.manifestCache || manifest.docVersion >= this.manifestCache.docVersion)
         ) {
           this.manifestCache = manifest;
+          this.cloudSecurity.setProtection(manifest.protection);
         }
       })
       .catch(() => undefined)
@@ -640,6 +656,7 @@ export class CloudDocumentHandle implements DocumentHandle {
         this.absorbPageInsert(event.meta);
         return;
       case 'metadata.updated':
+      case 'metadata.customUpdated':
         this.absorbMutation(event.meta, ['metadata']);
         return;
       case 'attachments.created':

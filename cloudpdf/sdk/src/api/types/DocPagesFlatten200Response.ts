@@ -15,7 +15,7 @@ export namespace DocPagesFlatten200Response {
     export namespace Pages {
         export interface Item {
             kind: Item.Kind;
-            pageObjectNumber: number;
+            objectNumber: number;
         }
 
         export namespace Item {
@@ -43,7 +43,7 @@ export namespace DocPagesFlatten200Response {
         export namespace Item {
             export interface Page {
                 kind: Page.Kind;
-                pageObjectNumber: number;
+                objectNumber: number;
             }
 
             export namespace Page {
@@ -136,7 +136,7 @@ export namespace DocPagesFlatten200Response {
                 export namespace Item {
                     export interface Page {
                         kind: Page.Kind;
-                        pageObjectNumber: number;
+                        objectNumber: number;
                     }
 
                     export namespace Page {

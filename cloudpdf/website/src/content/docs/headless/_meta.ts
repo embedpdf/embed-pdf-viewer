@@ -1,6 +1,13 @@
 // Generated from docs/content — edit there, then `pnpm docs:sync`.
 export default {
-  'getting-started': 'Get Started',
-  concepts: 'Concepts',
-  plugins: 'Plugins',
+  index: 'Overview',
+  'quick-start': 'Quick start',
+  setup: 'Setup',
+  viewing: 'Viewing',
+  documents: 'Documents',
+  text: 'Text',
+  annotations: 'Annotations',
+  forms: 'Forms & signatures',
+  ui: "Your app's UI",
+  concepts: 'Good to know',
 };

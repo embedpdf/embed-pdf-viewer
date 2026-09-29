@@ -31,9 +31,7 @@ describe('Adobe boot-script boilerplate (i-140, hybrid-XFA AcroForm)', () => {
       doc = await engine.open({ kind: 'bytes', id: 'i-140-boot', bytes });
       const snapshot = await doc.forms.list();
       expect(snapshot.formKind).toBe('xfa'); // hybrid: filled via its AcroForm plane
-      const text = snapshot.fields.find(
-        (field) => field.family === 'text' && !field.flags.readOnly,
-      )!;
+      const text = snapshot.fields.find((field) => field.family === 'text' && !field.readOnly)!;
 
       // The scripting controller runs inside a realm (sandbox + budget +
       // transaction): the same standalone realm the other integration suites use.
@@ -46,7 +44,6 @@ describe('Adobe boot-script boilerplate (i-140, hybrid-XFA AcroForm)', () => {
         budget: realm.budget,
       });
       const result = await controller.commit(text.ref, {
-        type: 'text',
         value: 'FAMILY-NAME',
       });
       controller.dispose();
@@ -63,9 +60,7 @@ describe('Adobe boot-script boilerplate (i-140, hybrid-XFA AcroForm)', () => {
 
       // And the value really landed engine-side.
       const after = await doc.forms.list();
-      const same = after.fields.find(
-        (field) => field.fieldObjectNumber === text.fieldObjectNumber,
-      )!;
+      const same = after.fields.find((field) => field.name === text.name)!;
       expect(same.valueEntry).toEqual({ kind: 'scalar', value: 'FAMILY-NAME' });
     } finally {
       await doc?.close().catch(() => {});

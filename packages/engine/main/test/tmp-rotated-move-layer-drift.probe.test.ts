@@ -131,7 +131,7 @@ describe('rotated circle move drift probe — LAYER pipeline', () => {
       opacity: 1,
     });
     await dump('AFTER CREATE (session 0)', doc);
-    let artifact = await doc.downloadLayer!();
+    let artifact = await doc.downloadLayer();
     await doc.close();
 
     for (let move = 1; move <= 3; move++) {
@@ -160,7 +160,7 @@ describe('rotated circle move drift probe — LAYER pipeline', () => {
         JSON.stringify((res as { appearance?: unknown }).appearance),
       );
       await dump(`AFTER MOVE ${move} (same session)`, doc);
-      artifact = await doc.downloadLayer!();
+      artifact = await doc.downloadLayer();
       await doc.close();
     }
 

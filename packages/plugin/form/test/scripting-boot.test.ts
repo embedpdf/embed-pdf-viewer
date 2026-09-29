@@ -52,15 +52,16 @@ function failingBootSandbox(): ScriptSandbox {
 
 function textField(objnum: number, name: string) {
   return {
-    ref: { kind: 'objectNumber' as const, fieldObjectNumber: objnum },
-    fieldObjectNumber: objnum,
+    ref: { kind: 'objectNumber' as const, objectNumber: objnum },
     name,
     family: 'text' as const,
     origin: 'acroform' as const,
-    flags: { readOnly: false, required: false, noExport: false, raw: 0 },
+    readOnly: false,
+    required: false,
+    noExport: false,
     alternateName: null,
     mappingName: null,
-    widgets: [{ annotObjectNumber: objnum + 100, page: toPageRef(3) }],
+    widgets: [{ objectNumber: objnum + 100, page: toPageRef(3) }],
     value: '',
     defaultValue: '',
     valueEntry: { kind: 'none' as const },
@@ -127,15 +128,15 @@ describe('FormScriptingController — boot failures degrade, never brick', () =>
     });
 
     const first = await controller.commit(
-      { kind: 'objectNumber', fieldObjectNumber: 7 },
-      { type: 'text', value: 'HELLO' },
+      { kind: 'objectNumber', objectNumber: 7 },
+      { value: 'HELLO' },
     );
     expect(first.status).toBe('applied');
     expect(applied[0]).toEqual([
       {
         kind: 'setValue',
-        ref: { kind: 'objectNumber', fieldObjectNumber: 7 },
-        value: { type: 'text', value: 'HELLO' },
+        ref: { kind: 'objectNumber', objectNumber: 7 },
+        value: { value: 'HELLO' },
       },
     ]);
     // The failure is surfaced, not swallowed — and not fatal.
@@ -145,8 +146,8 @@ describe('FormScriptingController — boot failures degrade, never brick', () =>
 
     // Boot ran once; the next commit neither retries nor fails.
     const second = await controller.commit(
-      { kind: 'objectNumber', fieldObjectNumber: 7 },
-      { type: 'text', value: 'WORLD' },
+      { kind: 'objectNumber', objectNumber: 7 },
+      { value: 'WORLD' },
     );
     expect(second.status).toBe('applied');
     expect(second.diagnostics.some((diagnostic) => diagnostic.code === 'script-error')).toBe(false);
@@ -170,8 +171,8 @@ describe('FormScriptingController — boot failures degrade, never brick', () =>
       budget: realm.budget,
     });
     const result = await controller.commit(
-      { kind: 'objectNumber', fieldObjectNumber: 7 },
-      { type: 'text', value: 'HELLO' },
+      { kind: 'objectNumber', objectNumber: 7 },
+      { value: 'HELLO' },
     );
     expect(result.status).toBe('applied');
     expect(result.diagnostics.some((diagnostic) => diagnostic.code === 'script-error')).toBe(true);

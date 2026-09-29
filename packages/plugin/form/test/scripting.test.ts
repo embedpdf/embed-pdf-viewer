@@ -25,7 +25,10 @@ import { createSerialQueue } from '@embedpdf/core';
 import { createFormScriptingController } from '../src/scripting/controller';
 import { standaloneRealm } from './helpers/standalone-realm';
 
-const ref = (fieldObjectNumber: number) => ({ kind: 'objectNumber' as const, fieldObjectNumber });
+const ref = (fieldObjectNumber: number) => ({
+  kind: 'objectNumber' as const,
+  objectNumber: fieldObjectNumber,
+});
 
 const action = (script: string): PdfActionTree => ({
   root: { type: 'javascript', subtype: 'JavaScript', script, next: [] },
@@ -41,11 +44,12 @@ const text = (
   actions?: FormFieldDTO['actions'],
 ): FormFieldDTO => ({
   ref: ref(fieldObjectNumber),
-  fieldObjectNumber,
   name,
   family: 'text',
   origin: 'acroform',
-  flags: { readOnly: false, required: false, noExport: false, raw: 0 },
+  readOnly: false,
+  required: false,
+  noExport: false,
   alternateName: null,
   mappingName: null,
   valueEntry: { kind: 'scalar', value },
@@ -56,22 +60,23 @@ const text = (
   multiline: false,
   password: false,
   comb: false,
-  widgets: [formWidget(fieldObjectNumber, toPageRef(10))],
+  widgets: [{ ...formWidget(fieldObjectNumber, toPageRef(10)), rect: null }],
   ...(actions ? { actions } : {}),
 });
 
 const pushbutton = (fieldObjectNumber: number, name: string): FormFieldDTO => ({
   ref: ref(fieldObjectNumber),
-  fieldObjectNumber,
   name,
   family: 'pushbutton',
   origin: 'acroform',
-  flags: { readOnly: false, required: false, noExport: false, raw: 0 },
+  readOnly: false,
+  required: false,
+  noExport: false,
   alternateName: null,
   mappingName: null,
   valueEntry: { kind: 'none' },
   defaultValueEntry: { kind: 'none' },
-  widgets: [formWidget(fieldObjectNumber, toPageRef(10))],
+  widgets: [{ ...formWidget(fieldObjectNumber, toPageRef(10)), rect: null }],
 });
 
 class NodeSandbox implements ScriptSandbox {
@@ -174,16 +179,16 @@ describe('form scripting transaction', () => {
     };
     const fx = harness(snapshot, `getField('status').value = 'initialized';`);
 
-    const result = await fx.controller.commit(ref(2), { type: 'text', value: '3' });
+    const result = await fx.controller.commit(ref(2), { value: '3' });
 
     expect(result.status).toBe('applied');
     expect(fx.readActions).toHaveBeenCalledTimes(1);
     expect(fx.factory).toHaveBeenCalledTimes(1);
     expect(fx.batches).toEqual([
       [
-        { kind: 'setValue', ref: ref(1), value: { type: 'text', value: 'initialized' } },
-        { kind: 'setValue', ref: ref(2), value: { type: 'text', value: '3' } },
-        { kind: 'setValue', ref: ref(3), value: { type: 'text', value: '6' } },
+        { kind: 'setValue', ref: ref(1), value: { value: 'initialized' } },
+        { kind: 'setValue', ref: ref(2), value: { value: '3' } },
+        { kind: 'setValue', ref: ref(3), value: { value: '6' } },
         { kind: 'setAppearanceText', ref: ref(3), text: '$6' },
       ],
     ]);
@@ -205,7 +210,6 @@ describe('form scripting transaction', () => {
     const fx = harness(snapshot);
 
     const result = await fx.controller.commit(ref(2), {
-      type: 'text',
       value: 'invalid',
     });
 
@@ -229,11 +233,9 @@ describe('form scripting transaction', () => {
     };
     const fx = harness(snapshot);
 
-    await fx.controller.commit(ref(2), { type: 'text', value: 'abc' });
+    await fx.controller.commit(ref(2), { value: 'abc' });
 
-    expect(fx.batches[0]).toEqual([
-      { kind: 'setValue', ref: ref(2), value: { type: 'text', value: 'ABC' } },
-    ]);
+    expect(fx.batches[0]).toEqual([{ kind: 'setValue', ref: ref(2), value: { value: 'ABC' } }]);
   });
 
   it('executes widget activation in the same isolated transaction and surfaces UI effects', async () => {
@@ -264,7 +266,7 @@ describe('form scripting transaction', () => {
         {
           kind: 'setValue',
           ref: ref(1),
-          value: { type: 'text', value: 'Mouse Up:Field' },
+          value: { value: 'Mouse Up:Field' },
         },
       ],
     ]);
@@ -283,8 +285,8 @@ describe('form scripting transaction', () => {
     };
     const fx = harness(snapshot, `throw new Error('boot failed');`);
 
-    const first = await fx.controller.commit(ref(2), { type: 'text', value: 'a' });
-    const second = await fx.controller.commit(ref(2), { type: 'text', value: 'b' });
+    const first = await fx.controller.commit(ref(2), { value: 'a' });
+    const second = await fx.controller.commit(ref(2), { value: 'b' });
 
     expect(first.status).toBe('applied');
     expect(first.error).toBeUndefined();

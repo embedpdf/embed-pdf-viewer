@@ -318,5 +318,8 @@ export function annotationOfDraft(
   draft: AnnotationDraft,
   context: DraftContext<PageBox>,
 ): AnnotationDTO {
-  return annotationOfResolvedDraft(resolveAnnotationDraft(draft), context);
+  return annotationOfResolvedDraft(
+    resolveAnnotationDraft(draft, { describeFont: context.describeFont }),
+    context,
+  );
 }

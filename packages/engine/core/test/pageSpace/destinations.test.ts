@@ -18,7 +18,7 @@ const boxes = new Map<number, PdfRect>([
   [4, { left: 0, bottom: 0, right: 612, top: 792 }],
   [6, { left: -300, bottom: -390, right: 300, top: 390 }],
 ]);
-const boxOf = (page: { pageObjectNumber: number }) => boxes.get(page.pageObjectNumber)!;
+const boxOf = (page: { objectNumber: number }) => boxes.get(page.objectNumber)!;
 
 describe('destinations in page space', () => {
   const cases: Array<[PdfDestination, PageDestination]> = [

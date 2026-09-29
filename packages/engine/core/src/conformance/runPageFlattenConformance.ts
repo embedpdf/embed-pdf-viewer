@@ -29,7 +29,7 @@ export function runPageFlattenConformance(
       try {
         if (!doc.pages.flatten) return;
         const layoutBefore = await doc.pages.list();
-        const pageObjectNumber = layoutBefore.pages[0].ref.pageObjectNumber;
+        const pageObjectNumber = layoutBefore.pages[0].ref.objectNumber;
         const annotationsBefore = await doc.page(toPageRef(pageObjectNumber)).annotations.list();
         const events: DocumentEvent[] = [];
         const unsubscribe = doc.events.subscribe((event) => {

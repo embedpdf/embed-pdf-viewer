@@ -8,7 +8,8 @@ import {
   type DocumentAnnotationsService,
   type DocumentActionsService,
   type DocumentEventStream,
-  type DocumentHandle,
+  LOCAL_ENGINE_BRAND,
+  type LocalDocumentHandle as LocalDocumentHandleContract,
   type DocumentPagesService,
   type DocumentRedactionService,
   CONTINUOUS_RENDER_POLICY,
@@ -16,7 +17,6 @@ import {
   type DocumentSecurityProbeInfo,
   type EngineRenderPolicy,
   type MetadataService,
-  type PageHandle,
   type DownloadOptions,
   type PdfSaveMode,
   type PageRef,
@@ -42,7 +42,8 @@ import { Priority } from '../worker/Priority';
 import type { JobId, WorkerResultPayload } from '../worker/protocol';
 import type { WorkerQueue } from '../worker/WorkerQueue';
 
-export class LocalDocumentHandle implements DocumentHandle {
+export class LocalDocumentHandle implements LocalDocumentHandleContract {
+  readonly [LOCAL_ENGINE_BRAND] = true;
   readonly capabilities = {
     weakAnnotationEditSessions: 'not-needed',
   } as const;
@@ -144,7 +145,7 @@ export class LocalDocumentHandle implements DocumentHandle {
    * round-trip either. Display order is geometry, not liveness: clients read
    * it from `pages.list()` (each `PageLayout.index`), joined by `ref`.
    */
-  page(ref: PageRef): PageHandle {
+  page(ref: PageRef): LocalPageHandle {
     return new LocalPageHandle(
       ref,
       this.id,

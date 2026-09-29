@@ -36,8 +36,10 @@ function probePlugin(log: string[]): AnyPlugin {
         ping: () => (pinged.emit('ping'), 'pong'),
         onPinged: pinged.on,
         cropLeft: (pageObjectNumber) =>
-          ctx.getPage({ kind: 'objectNumber', pageObjectNumber })?.pdfCropBox.left ?? null,
-        check: (pageObjectNumber) => ctx.assertPageRef({ kind: 'objectNumber', pageObjectNumber }),
+          ctx.getPage({ kind: 'objectNumber', objectNumber: pageObjectNumber })?.pdfCropBox.left ??
+          null,
+        check: (pageObjectNumber) =>
+          ctx.assertPageRef({ kind: 'objectNumber', objectNumber: pageObjectNumber }),
         wait: () => ctx.waitFor(() => ctx.state.get().count > 0),
         bump: () => ctx.state.update(bump),
       };

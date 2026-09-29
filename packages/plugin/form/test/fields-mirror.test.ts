@@ -37,15 +37,16 @@ const page: PageLayout = {
 
 const textField = (value: string): FormFieldDTO =>
   ({
-    ref: { kind: 'objectNumber', fieldObjectNumber: 5 },
-    fieldObjectNumber: 5,
+    ref: { kind: 'objectNumber', objectNumber: 5 },
     name: 'name',
     family: 'text',
     origin: 'acroform',
-    flags: { readOnly: false, required: false, noExport: false, raw: 0 },
+    readOnly: false,
+    required: false,
+    noExport: false,
     alternateName: null,
     mappingName: null,
-    widgets: [{ annotObjectNumber: 9, page: toPageRef(1) }],
+    widgets: [{ objectNumber: 9, page: toPageRef(1) }],
     value,
     valueEntry: { kind: 'scalar', value },
     defaultValue: '',
@@ -119,7 +120,7 @@ async function boot() {
 
 const settle = () => new Promise((resolve) => setTimeout(resolve));
 const nameValue = (form: { getValue(ref: never): unknown }) =>
-  form.getValue({ kind: 'objectNumber', fieldObjectNumber: 5 } as never);
+  form.getValue({ kind: 'objectNumber', objectNumber: 5 } as never);
 
 describe('form fields mirror', () => {
   it('reads the field tree once and applies own and remote writes from their events', async () => {
@@ -130,16 +131,15 @@ describe('form fields mirror', () => {
     expect(harness.form.getStatus()).toBe('ready');
 
     const written = harness.form.setValueRaw(
-      { kind: 'objectNumber', fieldObjectNumber: 5 },
+      { kind: 'objectNumber', objectNumber: 5 },
       {
-        type: 'text',
         value: 'own',
       },
     );
     await settle();
     harness.writes[0]!();
     await written;
-    expect(nameValue(harness.form as never)).toEqual({ type: 'text', value: 'own' });
+    expect(nameValue(harness.form as never)).toEqual({ value: 'own' });
 
     harness.emit({
       type: 'forms.valueSet',
@@ -147,7 +147,7 @@ describe('form fields mirror', () => {
       field: textField('remote'),
       meta: NOTHING_CHANGED,
     });
-    expect(nameValue(harness.form as never)).toEqual({ type: 'text', value: 'remote' });
+    expect(nameValue(harness.form as never)).toEqual({ value: 'remote' });
     expect(harness.reads).toHaveLength(1);
     await harness.kernel.destroy();
   });
@@ -156,7 +156,7 @@ describe('form fields mirror', () => {
     const harness = await boot();
     harness.reads[0]!(snapshot('initial'));
     await settle();
-    const written = harness.form.setText({ kind: 'objectNumber', fieldObjectNumber: 5 }, 'typed');
+    const written = harness.form.setText({ kind: 'objectNumber', objectNumber: 5 }, 'typed');
     await settle();
     harness.emit({
       type: 'forms.valueSet',
@@ -184,7 +184,7 @@ describe('form fields mirror', () => {
     harness.reads[2]!(snapshot('after desync'));
     await settle();
     expect(harness.reads).toHaveLength(3);
-    expect(nameValue(harness.form as never)).toEqual({ type: 'text', value: 'after desync' });
+    expect(nameValue(harness.form as never)).toEqual({ value: 'after desync' });
     await harness.kernel.destroy();
   });
 });

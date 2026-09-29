@@ -2,7 +2,7 @@ import { describe, expect, test } from 'vitest';
 import type { AnnotationRef } from '../../src/identity/AnnotationRef';
 import { annotationOfDraft, resolveAnnotationDraft } from '../../src/pageSpace/helpers';
 
-const page = { kind: 'objectNumber', pageObjectNumber: 3 } as const;
+const page = { kind: 'objectNumber', objectNumber: 3 } as const;
 const ref: AnnotationRef = { kind: 'nm', page, nm: 'pending-1' };
 const box = { x: 72, y: 72, width: 120, height: 80 };
 
@@ -36,7 +36,7 @@ describe('annotationOfDraft', () => {
     });
   });
 
-  test('a pending free text: its rich text, and the body its style makes', () => {
+  test("a pending free text: its rich text carries its text style; color is the border's", () => {
     const text = annotationOfDraft(
       {
         subtype: 'free-text',
@@ -56,11 +56,12 @@ describe('annotationOfDraft', () => {
         family: 'Times',
         weight: 700,
         size: 20,
-        color: '#0000ff',
+        color: '#000000',
         align: 'center',
       }),
       paragraphs: [{ runs: [{ text: 'One' }] }, { runs: [{ text: 'Two' }] }],
     });
+    expect(text).toMatchObject({ color: '#0000FF', fontColor: '#000000', intent: 'free-text' });
   });
 
   test('a note’s standard review state brings its model; a custom one without is refused', () => {

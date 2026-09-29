@@ -68,7 +68,6 @@ runAnnotationExportConformance(runner, {
     await seedDocumentFromBytes(fx, TENANT_ID, id, fixtures[fixture], 1);
     return engine.open({ kind: 'id', id });
   },
-  rawAppearances: false,
 });
 
 describe('annotation export on the cloud engine', () => {

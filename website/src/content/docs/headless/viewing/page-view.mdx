@@ -1,0 +1,131 @@
+---
+title: Single pages & thumbnails
+description: Show one page on its own, anywhere in your app, and build a thumbnail strip that follows the reader.
+---
+
+{/* Generated from docs/content — edit there, then `pnpm docs:sync`. */}
+
+# Single pages & thumbnails
+
+`<PageView>` shows one page on its own, without scrolling or zoom: a preview in a card, a page
+picker in a dialog, the page a comment belongs to. Give it a page and a width:
+
+```tsx
+import { PageView } from '@embedpdf/react/page-view';
+
+<PageView page={page.ref} width={240}>
+  <RenderLayer />
+</PageView>;
+```
+
+Every layer works in a `PageView` as it does on the Stage: selection, annotations, search
+highlights. So does a menu anchored to the page. The page keeps its rotation and redraws when it
+changes.
+
+## Pick the page
+
+`page` takes a page's `ref` or its index:
+
+```tsx
+<PageView page={0} width={320}>{/* the first page */}</PageView>
+```
+
+`usePageList()` gives you every page of the document, in order, to map over:
+
+```tsx
+import { usePageList } from '@embedpdf/react/runtime';
+
+function PagePicker({ onPick }: { onPick: (page: PageRef) => void }) {
+  const pages = usePageList();
+  return pages.map((page) => (
+    <button key={page.index} onClick={() => onPick(page.ref)}>
+      <PageView page={page.ref} width={120}>
+        <RenderLayer />
+      </PageView>
+      {page.label ?? page.index + 1}
+    </button>
+  ));
+}
+```
+
+A page's `label` is the page number the PDF defines, such as `'iv'` or `'A-2'`, when it has one.
+
+## A thumbnail strip
+
+For a strip next to the main view, with many pages that scroll, use a second Stage rather than many
+`PageView`s: it mounts only the thumbnails you can see, and it can follow the page the reader is on.
+
+```ts
+export const ThumbsToken = createCapabilityToken<StageCapability>('stage-thumbs');
+
+const plugins = [
+  stagePlugin(),
+  stagePlugin({
+    id: 'stage-thumbs',
+    token: ThumbsToken,
+    zoom: { pageWidth: 120 },
+    gap: { px: 12 },
+    pageFrame: { bottom: 20 }, // room for the page number
+  }),
+];
+```
+
+```tsx
+function Thumbnails() {
+  const main = useStage();
+  const thumbs = useStage(ThumbsToken);
+  const { currentPageIndex } = useStageState();
+
+  // Keep the current page's thumbnail in view as the reader moves
+  useEffect(() => {
+    thumbs.reveal(currentPageIndex);
+  }, [thumbs, currentPageIndex]);
+
+  return (
+    <Stage
+      token={ThumbsToken}
+      interaction={false}
+      zoomGestures={false}
+      pageChrome={(page) => <span className="label">{page.index + 1}</span>}
+    >
+      {(page) => (
+        <button onClick={() => main.goToPage(page.ref)} aria-current={page.index === currentPageIndex}>
+          <RenderLayer />
+        </button>
+      )}
+    </Stage>
+  );
+}
+```
+
+- **`interaction={false}`** keeps a drag on the strip from selecting text in the document.
+- **`zoomGestures={false}`** keeps the thumbnails their size under a pinch.
+- **`reveal()`** scrolls the strip only as far as needed, so it follows without jumping.
+
+See [Two views of one document](stage#two-views-of-one-document) for everything a second Stage can
+do.
+
+## Props
+
+| Prop         | What it is                                                              | Default          |
+| :----------- | :---------------------------------------------------------------------- | :--------------- |
+| `page`       | The page, as its `ref` or its index                                     | required         |
+| `width`      | The width of the page, in pixels                                        | `240`            |
+| `documentId` | Which document                                                          | the active one   |
+| `fallback`   | What to show until the page is ready                                    | nothing          |
+| `pageFrame`  | Space reserved around the page for your own labels, in pixels per side  | `0`              |
+| `pageChrome` | What to draw in that space                                              | —                |
+| `className`, `style` | For the outer box                                               | —                |
+
+## Good to know
+
+### Menus inside a page view
+
+A menu anchored to the page, such as the selection menu, is placed above everything else on the
+page, so a card or a scrolling list can't cut it off.
+
+### Pointer input
+
+A `PageView` takes pointer input for the tools when the interaction plugin is registered, so text
+selection and annotation editing work in it too. On a touch screen, the Stage is the better choice:
+it has the gestures.

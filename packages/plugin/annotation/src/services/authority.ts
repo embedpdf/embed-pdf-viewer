@@ -56,7 +56,7 @@ export function createAuthority(
       throw new PluginError(
         'not-found',
         'annotation',
-        `page ${page.pageObjectNumber} is not in this document`,
+        `page ${page.objectNumber} is not in this document`,
       );
     }
   };

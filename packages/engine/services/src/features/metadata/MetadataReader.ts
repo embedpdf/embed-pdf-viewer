@@ -1,4 +1,4 @@
-import type { DocumentMetadata } from '@embedpdf/engine-core/runtime';
+import type { CustomMetadata, DocumentMetadata } from '@embedpdf/engine-core/runtime';
 import type { PdfRuntimeModule } from '@embedpdf/engine-runtime';
 
 import { readAllCustomMeta } from './internal/readCustomMetadata';
@@ -45,8 +45,6 @@ export class MetadataReader {
     const modRaw = readMetaText(fn, mem, doc, 'ModDate');
     throwIfAborted(signal);
     const trapped = readTrapped(fn, doc);
-    throwIfAborted(signal);
-    const custom = readAllCustomMeta(fn, mem, doc);
 
     return {
       title,
@@ -58,7 +56,13 @@ export class MetadataReader {
       createdAt: creationRaw ? pdfDateToIso(creationRaw) : null,
       modifiedAt: modRaw ? pdfDateToIso(modRaw) : null,
       trapped,
-      custom,
     };
+  }
+
+  /** The Info dict's custom keys: every key but the standard ones. */
+  readCustom(signal: AbortSignal): CustomMetadata {
+    throwIfAborted(signal);
+    const { fn, mem } = this.runtime;
+    return readAllCustomMeta(fn, mem, this.session.requireDocPtr());
   }
 }

@@ -42,13 +42,13 @@ export class CloudRevisionBridge {
     const states = new Map<number, PageState>();
     for (const { page } of list.pages) {
       const state = stateOf(page);
-      if (state) states.set(page.pageObjectNumber, state);
+      if (state) states.set(page.objectNumber, state);
     }
     return {
       ...list,
-      pages: list.pages.map((state) => states.get(state.page.pageObjectNumber) ?? state),
+      pages: list.pages.map((state) => states.get(state.page.objectNumber) ?? state),
       annotations: list.annotations.map((annotation) => {
-        const state = states.get(annotation.page.pageObjectNumber);
+        const state = states.get(annotation.page.objectNumber);
         return state ? this.decorateAnnotationRef(state, annotation) : annotation;
       }),
     };
@@ -117,7 +117,7 @@ export class CloudRevisionBridge {
       (opts?.aliasDocSessionIds?.includes(ref.revision.docSessionId) ?? false);
     if (
       !scopeMatches ||
-      ref.revision.page.pageObjectNumber !== ref.page.pageObjectNumber ||
+      ref.revision.page.objectNumber !== ref.page.objectNumber ||
       ref.revision.generation !== pageState.revision.generation
     ) {
       throw new EngineError(EngineErrorCode.InvalidReference, 'revision token is stale', {

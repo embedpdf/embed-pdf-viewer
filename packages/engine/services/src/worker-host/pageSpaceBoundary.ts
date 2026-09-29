@@ -2,6 +2,7 @@ import {
   mapDocumentActions,
   pageAnnotationOf,
   pageAppearancesOf,
+  pageBoxOf,
   pageDestinationOf,
   pageFormFieldOf,
   pageFormSnapshotOf,
@@ -13,6 +14,9 @@ import {
   pdfAnnotationPatchOf,
   pdfFormFieldDraftOf,
   pdfMeasureOf,
+  pdfWidgetPlacementOf,
+  pageSignatureCompleteOf,
+  pageSignatureSnapshotOf,
   pdfRenderTargetOf,
   type AnnotationDTO,
   type PageRef,
@@ -59,6 +63,8 @@ export function resultInPageSpace(
       } as WorkerResultPayload;
     case 'pages.geometry':
       return { ...payload, snapshot: pageGeometryOf(payload.snapshot, boxOf(payload.page)) };
+    case 'pages.render':
+      return { ...payload, area: pageBoxOf(payload.area, boxOf(payload.page)) };
     case 'search.query':
       return { ...payload, slice: pageSearchSliceOf(payload.slice, boxOf) };
     case 'annotations.renderAppearances': {
@@ -117,16 +123,27 @@ export function resultInPageSpace(
         },
       };
     case 'forms.setValue':
-    case 'forms.reset':
     case 'forms.createField':
     case 'forms.updateField':
     case 'forms.setSignatureAppearance':
-    case 'forms.attachWidget':
+    case 'forms.addWidget':
     case 'forms.detachWidget':
       return {
         ...payload,
         result: { ...payload.result, field: pageFormFieldOf(payload.result.field, boxOf) },
       } as WorkerResultPayload;
+    case 'forms.reset':
+      return {
+        ...payload,
+        result: {
+          ...payload.result,
+          fields: payload.result.fields.map((field) => pageFormFieldOf(field, boxOf)),
+        },
+      };
+    case 'signatures.list':
+      return { ...payload, snapshot: pageSignatureSnapshotOf(payload.snapshot, boxOf) };
+    case 'signatures.complete':
+      return { ...payload, result: pageSignatureCompleteOf(payload.result, boxOf) };
     default:
       return payload;
   }
@@ -152,6 +169,8 @@ export function requestInFileSpace(job: PageSpaceJob, boxOf: VisibleBoxOf): File
       return { ...job, patch: pdfAnnotationPatchOf(job.patch, boxOf(job.ref.page), boxOf) };
     case 'forms.createField':
       return { ...job, draft: pdfFormFieldDraftOf(job.draft, boxOf) };
+    case 'forms.addWidget':
+      return { ...job, placement: pdfWidgetPlacementOf(job.placement, boxOf) };
     case 'measure.setScale':
       return job.measure ? { ...job, measure: pdfMeasureOf(job.measure, boxOf(job.page)) } : job;
     case 'pages.render':

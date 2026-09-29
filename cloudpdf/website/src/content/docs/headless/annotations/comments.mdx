@@ -1,0 +1,166 @@
+---
+title: Comments & replies
+description: Build a comments sidebar with threads, replies, review states and jumping to a comment.
+---
+
+{/* Generated from docs/content — edit there, then `pnpm docs:sync`. */}
+
+# Comments & replies
+
+Any annotation can carry a comment, its `contents`, and people can reply to it. Together they
+make a **thread**: the first comment and its replies, in order. `useCommentThreads()` gives you
+every thread in the document, ready for a sidebar:
+
+```tsx
+import { annotationKey, useCommentThreads } from '@embedpdf/react/annotation';
+
+function Comments() {
+  const threads = useCommentThreads();
+
+  return threads.map((thread) => (
+    <article key={annotationKey(thread.root.ref)}>
+      <p>
+        {thread.root.author}, page {thread.pageLabel}: {thread.root.contents}
+      </p>
+      {thread.replies.map((reply) => (
+        <p key={annotationKey(reply.ref)}>
+          {reply.author}: {reply.contents}
+        </p>
+      ))}
+    </article>
+  ));
+}
+```
+
+Threads come in reading order: by page, then from the top of the page. The list updates by itself
+when anyone adds, changes or deletes a comment, on this screen or, on a shared document, on
+someone else's.
+
+A thread has:
+
+| Field       | What it is                                                                                        |
+| :---------- | :------------------------------------------------------------------------------------------------ |
+| `root`      | The annotation that starts the thread: a note, a highlight, a shape.                              |
+| `replies`   | Every reply, oldest first. Replies to replies are included.                                       |
+| `review`    | The review states people set, such as accepted or rejected (see [Review states](#review-states)). |
+| `page`      | The page it's on.                                                                                 |
+| `pageLabel` | The page's label to show, such as `'iv'` or `'7'`.                                                |
+
+## Reply, edit and delete
+
+```ts
+const comments = useComments();
+
+const { annotation: reply } = await comments.reply(thread.root.ref, 'Checked, looks right.');
+await comments.setText(reply.ref, 'Checked against the invoice, looks right.');
+await comments.delete(reply.ref); // one comment
+await comments.deleteThread(thread.root.ref); // the whole thread
+```
+
+A reply always goes to the thread's first comment, whichever comment you pass. It's saved the way
+Acrobat saves replies, so they show up as replies there too.
+
+Deleting the first comment of a thread deletes the whole thread, as Acrobat does. `deleteThread()`
+says what it deleted, and what it couldn't (someone else's reply you may not delete).
+
+## Review states
+
+A review state is a verdict on a thread: accepted, rejected, cancelled or completed. Each person
+sets their own, and a check mark is separate:
+
+```ts
+await comments.setStatus(thread.root.ref, 'accepted');
+await comments.setMarked(thread.root.ref, true); // check it off
+
+thread.review.lastChange?.state; // the latest verdict, from anyone
+thread.review.byReviewer; // each person's latest verdict
+thread.review.markedBy; // who has checked it off
+```
+
+States are saved as the PDF's own review states, so Acrobat shows them in its comment list.
+
+## Jump to a comment
+
+The thread's `root` has a page and a `rect`, which is where the view should go:
+
+```ts
+const stage = useStage();
+
+stage.reveal(thread.page, { rect: thread.root.rect });
+annotation.selection.set([thread.root.ref]); // and select it
+```
+
+## Permissions
+
+Every comment verb has a check that answers for one comment, so you show only the buttons that work:
+
+```tsx
+<button disabled={!comments.canReply(thread.root.ref)}>Reply</button>
+<button disabled={!comments.canDeleteThread(thread.root.ref)}>Delete thread</button>
+```
+
+| Permission           | What it allows                                                     | Check                                     |
+| :------------------- | :----------------------------------------------------------------- | :---------------------------------------- |
+| `annotations:create` | Replying, setting a review state, checking a comment off            | `canReply(ref)`, `canSetStatus(ref)`, `canSetMarked(ref)` |
+| `annotations:update` | Changing a comment's text                                          | `canSetText(ref)`                         |
+| `annotations:delete` | Deleting a comment, or every comment in a thread                   | `canDelete(ref)`, `canDeleteThread(ref)`  |
+
+A review state and a check mark are small replies of their own, the way Acrobat stores them, so they
+need the right to create, not to change. The checks also follow the comment's own flags:
+`lockedContents` stops text edits, and `locked` stops deleting.
+
+## Events
+
+```ts
+useAnnotationEvent(
+  (annotation) => annotation.comments.onThreadChanged,
+  ({ rootRef, change }) => change === 'reply' && notifyThreadAuthor(rootRef),
+);
+```
+
+| Event                      | Fires when                                         | Carries              |
+| :------------------------- | :------------------------------------------------- | :------------------- |
+| `comments.onThreadChanged` | A thread changed through this viewer               | `rootRef`, `change`  |
+
+`change` is `'reply'`, `'text'`, `'status'`, `'marked'` or `'deleted'`. For every change, including
+other people's, use the annotation events; see [Events, saving & sharing](saving#events).
+
+## Good to know
+
+### Comments without a note
+
+Any annotation can start a thread. A highlight with a comment is a thread whose `root` is the
+highlight. A plain note (the `note` tool) is a thread with an icon on the page.
+
+### Loading
+
+`useAnnotationState().status` is `'loading'` until every annotation is in. Show a loading state in your
+sidebar until then, so an empty list doesn't look like "no comments".
+
+### Reviewing together
+
+<Engine local>
+
+On the local engine, a review stays with the file: the next person sees the comments once they have
+the downloaded PDF.
+
+<CloudPdfCallout
+  title="Turn comments into a live review"
+  href="https://www.cloudpdf.com/docs/headless/annotations/comments"
+  cta="Review with CloudPDF"
+>
+
+With CloudPDF, everyone with the document open sees new comments, replies and review states as they
+happen, and the server checks who may reply, change or delete what. Your sidebar stays the same:
+`useCommentThreads()` updates by itself.
+
+</CloudPdfCallout>
+
+</Engine>
+
+<Engine cloud>
+
+Everyone with the document open sees new comments, replies and review states as they happen:
+`useCommentThreads()` updates by itself.
+
+</Engine>

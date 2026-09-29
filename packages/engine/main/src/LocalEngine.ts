@@ -7,11 +7,11 @@ import {
   decodePdfBits,
   EngineError,
   EngineErrorCode,
+  LOCAL_ENGINE_BRAND,
   PermissionDenied,
   wirePack,
-  type DocumentHandle,
-  type Engine,
   type EngineRenderPolicy,
+  type LocalEngine as LocalEngineContract,
   type OpenInput,
   type OpenOptions,
 } from '@embedpdf/engine-core/runtime';
@@ -65,7 +65,8 @@ export interface LocalEngineOptions {
  * but routes everything through a WorkerQueue + Transport (Web Worker or
  * inline) backed by a WASM PDFium runtime.
  */
-export class LocalEngine implements Engine {
+export class LocalEngine implements LocalEngineContract {
+  readonly [LOCAL_ENGINE_BRAND] = true;
   static fromTransport(opts: LocalEngineOptions): LocalEngine {
     return new LocalEngine(
       opts.transport,
@@ -125,7 +126,7 @@ export class LocalEngine implements Engine {
     void this.transport.start?.();
   }
 
-  open(input: OpenInput, options?: OpenOptions): AbortablePromise<DocumentHandle> {
+  open(input: OpenInput, options?: OpenOptions): AbortablePromise<LocalDocumentHandle> {
     if (this.destroyed) {
       return AbortablePromise.rejectReason(
         new EngineError(EngineErrorCode.RuntimeUnavailable, 'engine destroyed'),
@@ -167,7 +168,7 @@ export class LocalEngine implements Engine {
   private openLayerFile(
     input: Extract<OpenInput, { kind: 'layerFile' }>,
     options?: OpenOptions,
-  ): AbortablePromise<DocumentHandle> {
+  ): AbortablePromise<LocalDocumentHandle> {
     const queue = this.queue;
     const password = options?.password ?? null;
     const docId = input.id ?? generateUuid();
@@ -211,7 +212,7 @@ export class LocalEngine implements Engine {
   private openBytes(
     input: Extract<OpenInput, { kind: 'bytes' }>,
     options?: OpenOptions,
-  ): AbortablePromise<DocumentHandle> {
+  ): AbortablePromise<LocalDocumentHandle> {
     const queue = this.queue;
     const password = options?.password ?? null;
     const buffer = toArrayBuffer(input.bytes);
@@ -249,7 +250,7 @@ export class LocalEngine implements Engine {
   private openLayerBytes(
     input: Extract<OpenInput, { kind: 'layerBytes' }>,
     options?: OpenOptions,
-  ): AbortablePromise<DocumentHandle> {
+  ): AbortablePromise<LocalDocumentHandle> {
     const queue = this.queue;
     const password = options?.password ?? null;
     const docId = input.id ?? generateUuid();
@@ -290,10 +291,10 @@ export class LocalEngine implements Engine {
   private openResult(
     submission: AbortablePromise<WorkerResultPayload>,
     options?: OpenOptions,
-  ): AbortablePromise<DocumentHandle> {
+  ): AbortablePromise<LocalDocumentHandle> {
     const queue = this.queue;
     const imageEncoder = this.imageEncoder;
-    return AbortablePromise.run<DocumentHandle>(async (signal) => {
+    return AbortablePromise.run<LocalDocumentHandle>(async (signal) => {
       const onAbort = () => submission.abort(signal.reason);
       if (signal.aborted) onAbort();
       else signal.addEventListener('abort', onAbort, { once: true });

@@ -49,7 +49,6 @@ runAnnotationExportConformance(runner, {
       },
       { scope: ['*'] },
     ),
-  rawAppearances: true,
 });
 
 /** A 30 × 10 PNG of three bands. */

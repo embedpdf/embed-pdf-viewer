@@ -91,12 +91,9 @@ describe('rich text FreeText (local engine)', () => {
     const doc = await engine.open({ kind: 'bytes', id: 'rt-draft', bytes: annotationsPdf });
     const created = await doc.page(toPageRef(PAGE)).annotations.create({
       subtype: 'free-text',
-      intent: 'free-text',
-      fontFamily: 'helvetica',
-      fontSize: 12,
-      textAlign: 'left',
       box: RECT,
       color: '#0000ff',
+      // The body carries the size; a `fontSize` beside it would win.
       richText: {
         body: { family: 'Helvetica', size: 18, color: '#102030' },
         paragraphs: [
@@ -113,10 +110,12 @@ describe('rich text FreeText (local engine)', () => {
     });
     const dto = created.annotation as FreeTextAnnotationDTO;
     expect(dto.contents).toBe('Hello bold red\rH2');
-    // The body became the /DA font and size; the /DA colour stayed the draft's.
+    // The body became the /DA font and size; the /DA colour, the border's,
+    // stayed the draft's, and the text is the body's color.
     expect(dto.fontFamily).toBe('helvetica');
     expect(dto.fontSize).toBe(18);
     expect(dto.color).toEqual('#0000ff');
+    expect(dto.fontColor).toBe('#102030');
     expect(dto.richText.body.color).toBe('#102030');
     expect(dto.richText.paragraphs[0]!.runs).toEqual([
       { text: 'Hello ' },
@@ -330,7 +329,7 @@ describe('rich text FreeText (local engine)', () => {
     // program on the next regeneration (streams are compressed on save, so
     // the two saves are compared, not the raw font size).
     const subsetSave = await doc.download();
-    await doc.fonts!.setEmbeddingPolicy('full');
+    await doc.fonts.setEmbeddingPolicy('full');
     await doc.page(toPageRef(PAGE)).annotations.update(created.annotation.ref, {
       subtype: 'free-text',
       contents: 'Whole program',
@@ -338,7 +337,7 @@ describe('rich text FreeText (local engine)', () => {
     const fullSave = await doc.download();
     expect(fullSave.byteLength).toBeGreaterThan(subsetSave.byteLength * 3);
 
-    await doc.fonts!.setTypographicFeatures(true);
+    await doc.fonts.setTypographicFeatures(true);
     await doc.close();
   });
 
@@ -376,7 +375,7 @@ describe('rich text FreeText (local engine)', () => {
       (a) =>
         a.ref.kind === 'objectNumber' &&
         created.annotation.ref.kind === 'objectNumber' &&
-        a.ref.annotObjectNumber === created.annotation.ref.annotObjectNumber,
+        a.ref.objectNumber === created.annotation.ref.objectNumber,
     );
     expect(match).toBeDefined();
     const raster = match!.raster;

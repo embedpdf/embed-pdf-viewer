@@ -27,7 +27,7 @@ try {
         return [
           pageObjectNumber,
           {
-            pageObjectNumber: state.page.pageObjectNumber,
+            pageObjectNumber: state.page.objectNumber,
             hasAnyWeakAnnotations:
               state.weakAnnotationState.kind === 'known'
                 ? state.weakAnnotationState.hasAnyWeakAnnotations

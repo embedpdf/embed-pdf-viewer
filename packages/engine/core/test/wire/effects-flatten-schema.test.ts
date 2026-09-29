@@ -25,13 +25,13 @@ describe('batch mutation wire schemas', () => {
   test('keeps flatten request context self-describing for audit replay', () => {
     const result = {
       pages: [
-        { kind: 'objectNumber', pageObjectNumber: 12 },
-        { kind: 'objectNumber', pageObjectNumber: 18 },
+        { kind: 'objectNumber', objectNumber: 12 },
+        { kind: 'objectNumber', objectNumber: 18 },
       ],
       usage: 'print' as const,
       results: [
-        { page: { kind: 'objectNumber', pageObjectNumber: 12 }, status: 'applied' as const },
-        { page: { kind: 'objectNumber', pageObjectNumber: 18 }, status: 'unchanged' as const },
+        { page: { kind: 'objectNumber', objectNumber: 12 }, status: 'applied' as const },
+        { page: { kind: 'objectNumber', objectNumber: 18 }, status: 'unchanged' as const },
       ],
       meta: { affectedPages: [], cacheDelta: null },
     };

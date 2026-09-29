@@ -80,13 +80,13 @@ function sessionKey(msg) {
   return msg.layerName ? `${msg.docId}::layer:${msg.layerName}` : msg.docId;
 }
 
-// Page addresses arrive as `PageRef`s (`{ kind: 'objectNumber', pageObjectNumber }`),
+// Page addresses arrive as `PageRef`s (`{ kind: 'objectNumber', objectNumber }`),
 // the wire vocabulary of every `/pages/{pageKey}` route and page body.
 function ponOf(page) {
-  return page.pageObjectNumber;
+  return page.objectNumber;
 }
 function pageRef(pon) {
-  return { kind: 'objectNumber', pageObjectNumber: pon };
+  return { kind: 'objectNumber', objectNumber: pon };
 }
 function ponsOf(msg) {
   return msg.pages.map(ponOf);
@@ -165,7 +165,7 @@ function pageLayout(pon, index, rotation = 0) {
   const box = [0, 0, 612, 792];
   return {
     index,
-    ref: { kind: 'objectNumber', pageObjectNumber: pon },
+    ref: { kind: 'objectNumber', objectNumber: pon },
     label: null,
     width: 612,
     height: 792,
@@ -193,7 +193,7 @@ function annotationDto(a, index) {
     ref: {
       kind: 'objectNumber',
       page: pageRef(a.pon),
-      annotObjectNumber: OBJECT_NUMBER_BASE + a.seq,
+      objectNumber: OBJECT_NUMBER_BASE + a.seq,
     },
     page: pageRef(a.pon),
     index,
@@ -239,7 +239,7 @@ function pageAnnotationDtos(meta, pon) {
 function resolveRef(meta, ref) {
   const annots = meta.annots ?? [];
   if (ref.kind === 'objectNumber') {
-    return annots.find((a) => OBJECT_NUMBER_BASE + a.seq === ref.annotObjectNumber) ?? null;
+    return annots.find((a) => OBJECT_NUMBER_BASE + a.seq === ref.objectNumber) ?? null;
   }
   if (ref.kind === 'nm') {
     return annots.find((a) => a.pon === ponOf(ref.page) && a.nm === ref.nm) ?? null;
@@ -253,7 +253,7 @@ function mutationMeta(pon, generation, changedValue, hasWeak = false) {
   return {
     affectedPages: [state],
     cacheDelta: null,
-    changed: [{ kind: 'objectNumber', value: changedValue }],
+    changed: [{ kind: 'objectNumber', objectNumber: changedValue }],
     weakRefsInvalidated: false,
     shouldRefetch: null,
   };
@@ -533,9 +533,20 @@ parentPort.on('message', (msg) => {
             createdAt: null,
             modifiedAt: null,
             trapped: 'unknown',
-            custom: {},
           },
         },
+      });
+      return;
+    }
+    case 'metadata.readCustom': {
+      if (!openDocs.get(sessionKey(msg))) {
+        rejectNotOpen(msg);
+        return;
+      }
+      parentPort.postMessage({
+        kind: 'resolve',
+        jobId: msg.jobId,
+        result: { tag: 'metadata.readCustom', custom: {} },
       });
       return;
     }
@@ -677,7 +688,7 @@ parentPort.on('message', (msg) => {
         tag: 'annotations.update',
         result: {
           annotation: ann,
-          meta: mutationMeta(pon, 0, ann.ref.annotObjectNumber, false),
+          meta: mutationMeta(pon, 0, ann.ref.objectNumber, false),
         },
         artifact: layerArtifact(msg, meta),
       });
@@ -910,7 +921,7 @@ parentPort.on('message', (msg) => {
               pageState: pageState(pon),
               appearances: [
                 {
-                  ref: { kind: 'objectNumber', page: pageRef(pon), annotObjectNumber: 9001 },
+                  ref: { kind: 'objectNumber', page: pageRef(pon), objectNumber: 9001 },
                   mode: 'normal',
                   rect: { x: 0, y: 0, width: 8, height: 8 },
                   raster: { width: side, height: side, data: data.buffer },
@@ -973,7 +984,7 @@ parentPort.on('message', (msg) => {
                   pageState: pageState(pon),
                   appearances: [
                     {
-                      ref: { kind: 'objectNumber', page: pageRef(pon), annotObjectNumber: 9001 },
+                      ref: { kind: 'objectNumber', page: pageRef(pon), objectNumber: 9001 },
                       mode: 'normal',
                       rect: { x: 0, y: 0, width: 8, height: 8 },
                       image,

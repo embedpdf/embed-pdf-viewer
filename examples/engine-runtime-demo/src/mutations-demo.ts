@@ -316,7 +316,7 @@ export function summarizeMutations(result: MutationsDemoResult) {
 function refSummary(ref: AnnotationRef): string {
   switch (ref.kind) {
     case 'objectNumber':
-      return `objectNumber=${ref.annotObjectNumber}`;
+      return `objectNumber=${ref.objectNumber}`;
     case 'nm':
       return `nm=${ref.nm}`;
     case 'index':

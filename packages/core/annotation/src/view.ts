@@ -207,7 +207,7 @@ function textIsLive(model: Model, id: Id): boolean {
 }
 
 export function pageItems(model: Model, page: PageRef, view?: ViewEnv): RenderItem[] {
-  const pageObjectNumber = page.pageObjectNumber;
+  const pageObjectNumber = page.objectNumber;
   const items: RenderItem[] = [];
   // `paintOrder` puts text-layer markups beneath every other kind (back→front),
   // so a highlight drawn after a circle still paints under it — and culls what
@@ -257,7 +257,7 @@ export function pageItems(model: Model, page: PageRef, view?: ViewEnv): RenderIt
       draft?.kind === 'create-distance' ||
       draft?.kind === 'create-poly' ||
       draft?.kind === 'create-ink') &&
-    draft.page.pageObjectNumber === pageObjectNumber
+    draft.page.objectNumber === pageObjectNumber
   ) {
     // Preview with the tool's resolved defaults (base + per-subtype override), so the
     // ghost is a faithful WYSIWYG of what will commit — not the bare base style. The
@@ -313,7 +313,7 @@ export function pageItems(model: Model, page: PageRef, view?: ViewEnv): RenderIt
   }
   // Callout creation ghost: the in-progress leader (tip → cur, then tip → knee →
   // box) and the text-box preview, painted through the same vector scene.
-  if (draft?.kind === 'create-callout' && draft.page.pageObjectNumber === pageObjectNumber) {
+  if (draft?.kind === 'create-callout' && draft.page.objectNumber === pageObjectNumber) {
     const tool = toolStyleOf(model, draft.subtype, draft.preset);
     const style = tool.style;
     const ending = tool.lineEnding !== 'none' ? tool.lineEnding : 'open-arrow';
@@ -373,12 +373,12 @@ export interface TextBox {
 
 /** The free-text boxes on a page — the text counterpart of `pageItems`. */
 export function textBoxes(model: Model, page: PageRef, view?: ViewEnv): TextBox[] {
-  const pageObjectNumber = page.pageObjectNumber;
+  const pageObjectNumber = page.objectNumber;
   const out: TextBox[] = [];
   for (const id of model.order) {
     const annotation = model.byId[id];
     if (
-      annotation.annotation.page.pageObjectNumber !== pageObjectNumber ||
+      annotation.annotation.page.objectNumber !== pageObjectNumber ||
       fieldsOf(annotation).geometry.kind !== 'text-box'
     )
       continue;
@@ -444,11 +444,11 @@ function unionBoundsOf(
   geomOf: (id: Id) => ModelGeometry,
   view?: ViewEnv,
 ): Rect | null {
-  const pageObjectNumber = page.pageObjectNumber;
+  const pageObjectNumber = page.objectNumber;
   const corners: Point[] = [];
   for (const id of model.selected) {
     const annotation = model.byId[id];
-    if (!annotation || annotation.annotation.page.pageObjectNumber !== pageObjectNumber) continue;
+    if (!annotation || annotation.annotation.page.objectNumber !== pageObjectNumber) continue;
     corners.push(...effectiveSelectionFrame(model, id, geomOf(id), view).corners);
   }
   return corners.length ? unionRect(corners) : null;
@@ -465,11 +465,10 @@ function placeSelectionKnob(
   geomOf: (id: Id) => ModelGeometry,
   view?: ViewEnv,
 ): { at: Point; from: Point } | null {
-  const pageObjectNumber = page.pageObjectNumber;
+  const pageObjectNumber = page.objectNumber;
   const selection = model.selected.filter(
     (id) =>
-      isSelectable(model, id) &&
-      model.byId[id].annotation.page.pageObjectNumber === pageObjectNumber,
+      isSelectable(model, id) && model.byId[id].annotation.page.objectNumber === pageObjectNumber,
   );
   if (selection.length === 1) {
     const annotation = model.byId[selection[0]];
@@ -517,7 +516,7 @@ export function selectionKnob(
   const draft = model.draft;
   if (
     draft?.kind === 'rotate' &&
-    model.byId[draft.ids[0]]?.annotation.page.pageObjectNumber === page.pageObjectNumber
+    model.byId[draft.ids[0]]?.annotation.page.objectNumber === page.objectNumber
   ) {
     const rest = placeSelectionKnob(
       model,
@@ -551,9 +550,9 @@ export function chrome(
   knobOffset: number = ROTATE_KNOB_OFFSET,
   view?: ViewEnv,
 ): ChromeNode[] {
-  const pageObjectNumber = page.pageObjectNumber;
+  const pageObjectNumber = page.objectNumber;
   const nodes: ChromeNode[] = [];
-  if (model.draft?.kind === 'marquee' && model.draft.page.pageObjectNumber === pageObjectNumber) {
+  if (model.draft?.kind === 'marquee' && model.draft.page.objectNumber === pageObjectNumber) {
     nodes.push({ kind: 'marquee', rect: rectFromPoints(model.draft.from, model.draft.to) });
   }
   // Live alignment guides of a snapped move (the gesture lives on one page —
@@ -561,7 +560,7 @@ export function chrome(
   if (
     model.draft?.kind === 'move' &&
     model.draft.guides.length &&
-    model.byId[model.draft.ids[0]]?.annotation.page.pageObjectNumber === pageObjectNumber
+    model.byId[model.draft.ids[0]]?.annotation.page.objectNumber === pageObjectNumber
   ) {
     for (const guide of model.draft.guides)
       nodes.push({ kind: 'guide', axis: guide.axis, at: guide.at, lo: guide.lo, hi: guide.hi });
@@ -572,7 +571,7 @@ export function chrome(
   // affordances are noise; "how far am I" feedback is everything.
   const rd =
     model.draft?.kind === 'rotate' &&
-    model.byId[model.draft.ids[0]]?.annotation.page.pageObjectNumber === pageObjectNumber
+    model.byId[model.draft.ids[0]]?.annotation.page.objectNumber === pageObjectNumber
       ? model.draft
       : null;
   if (rd) {
@@ -596,8 +595,7 @@ export function chrome(
   }
   const selection = model.selected.filter(
     (id) =>
-      isSelectable(model, id) &&
-      model.byId[id].annotation.page.pageObjectNumber === pageObjectNumber,
+      isSelectable(model, id) && model.byId[id].annotation.page.objectNumber === pageObjectNumber,
   );
   if (selection.length === 1) {
     const annotation = model.byId[selection[0]];
@@ -661,11 +659,10 @@ export function chrome(
  *  the page holds none. This is the same box the chrome outline draws, so a
  *  floating menu sits exactly on the selection. */
 export function selectionBoundsOnPage(model: Model, page: PageRef, view?: ViewEnv): Rect | null {
-  const pageObjectNumber = page.pageObjectNumber;
+  const pageObjectNumber = page.objectNumber;
   const selection = model.selected.filter(
     (id) =>
-      isSelectable(model, id) &&
-      model.byId[id].annotation.page.pageObjectNumber === pageObjectNumber,
+      isSelectable(model, id) && model.byId[id].annotation.page.objectNumber === pageObjectNumber,
   );
   if (selection.length === 0) return null;
   // The rotated AABB: the axis-aligned box that encloses the oriented selection

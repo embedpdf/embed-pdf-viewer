@@ -37,8 +37,8 @@ export function createPageLifecycle(
 
   const emitForReport = (report: PageStateReport): void => {
     if (report.cause === 'user') cascadeRounds = 0;
-    const current = report.currentPage === null ? null : report.currentPage.pageObjectNumber;
-    const nextVisible = new Set(report.visiblePages.map((page) => page.pageObjectNumber));
+    const current = report.currentPage === null ? null : report.currentPage.objectNumber;
+    const nextVisible = new Set(report.visiblePages.map((page) => page.objectNumber));
     const changedCurrent = current !== lastEmitted.current;
     const leaving = [...lastEmitted.visible].filter(
       (pageObjectNumber) => !nextVisible.has(pageObjectNumber),
@@ -101,7 +101,7 @@ export function createPageLifecycle(
         // before a restored view reports would be exactly the phantom open
         // the coordinator exists to prevent; a stage-less 'auto' embedder
         // drives page triggers itself or declares headless.
-        const first = ctx.document()?.pages[0]?.ref.pageObjectNumber;
+        const first = ctx.document()?.pages[0]?.ref.objectNumber;
         if (first !== undefined) {
           lastEmitted = { current: first, visible: lastEmitted.visible };
           void dispatch({ scope: 'page', event: 'open', page: toPageRef(first) });

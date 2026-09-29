@@ -16,8 +16,8 @@ export function linksOf(annotations: readonly AnnotationDTO[], page: PageRef): r
     links.push({
       id:
         dto.ref.kind === 'objectNumber'
-          ? `obj:${dto.ref.annotObjectNumber}`
-          : `idx:${page.pageObjectNumber}:${dto.index}`,
+          ? `obj:${dto.ref.objectNumber}`
+          : `idx:${page.objectNumber}:${dto.index}`,
       bounds: dto.rect,
       target: dto.target,
       ...(dto.actions?.activate ? { activate: dto.actions.activate } : {}),

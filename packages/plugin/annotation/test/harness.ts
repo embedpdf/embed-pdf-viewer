@@ -46,7 +46,7 @@ export type FileAnnotation = AnnotationDTO<PdfCoordinates>;
 /** The whole-document list `listAll` resolves with: the records and their pages. */
 export const snapshotOf = (records: readonly FileAnnotation[], auditHead?: number) => {
   const pages = new Map<number, PageRef>();
-  for (const record of records) pages.set(record.page.pageObjectNumber, record.page);
+  for (const record of records) pages.set(record.page.objectNumber, record.page);
   return {
     annotations: [...records],
     pages: [...pages.values()].map((page) => ({ page })),
@@ -63,7 +63,7 @@ const DEFAULT_CROP: PdfRect = { left: 0, bottom: 0, right: 600, top: 800 };
 
 export function annotationHarness(options: AnnotationHarnessOptions = {}) {
   const cropOf = (page: PageRef): PdfRect =>
-    page.pageObjectNumber === PAGE.pageObjectNumber ? (options.crop ?? DEFAULT_CROP) : DEFAULT_CROP;
+    page.objectNumber === PAGE.objectNumber ? (options.crop ?? DEFAULT_CROP) : DEFAULT_CROP;
   /** A read as the engine hands it out. */
   const read = (annotation: FileAnnotation): AnnotationDTO =>
     pageAnnotationOf(annotation, cropOf(annotation.page), cropOf);
@@ -146,9 +146,9 @@ export function annotationHarness(options: AnnotationHarnessOptions = {}) {
               origin: localOrigin,
               deleted:
                 ref.kind === 'objectNumber'
-                  ? [{ kind: 'objectNumber', value: ref.annotObjectNumber }]
+                  ? [{ kind: 'objectNumber', objectNumber: ref.objectNumber }]
                   : ref.kind === 'nm'
-                    ? [{ kind: 'nm', value: ref.nm }]
+                    ? [{ kind: 'nm', nm: ref.nm }]
                     : [],
               meta: metaOf(weak),
             } as unknown as DocumentEvent);

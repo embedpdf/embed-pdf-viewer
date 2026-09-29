@@ -34,7 +34,7 @@ describe('enrichCommentThreads', () => {
     const after = enrichCommentThreads([thread(10)], [page(30, 0), page(10, 1)]);
     expect(before[0]!.pageIndex).toBe(0);
     expect(after[0]!.pageIndex).toBe(1);
-    expect(after[0]!.page.pageObjectNumber).toBe(10);
+    expect(after[0]!.page.objectNumber).toBe(10);
   });
 
   it('a thread on a deleted page renders as -1/"?" instead of throwing', () => {

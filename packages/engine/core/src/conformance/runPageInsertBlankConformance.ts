@@ -46,20 +46,20 @@ export function runPageInsertBlankConformance(
       const doc = await openFixture(engine, opts);
       try {
         const before = await doc.pages.list();
-        const beforePageObjectNumbers = before.pages.map((p) => p.ref.pageObjectNumber);
+        const beforePageObjectNumbers = before.pages.map((p) => p.ref.objectNumber);
 
         const result = await doc.pages.insertBlank({ size: SIZE });
         expect(result.insertedPages.length).toBe(1);
         expect(result.layout.pageCount).toBe(before.pageCount + 1);
         // Existing pages: same identity, same leading positions.
         expect(
-          result.layout.pages.slice(0, before.pageCount).map((p) => p.ref.pageObjectNumber),
+          result.layout.pages.slice(0, before.pageCount).map((p) => p.ref.objectNumber),
         ).toEqual(beforePageObjectNumbers);
         // The appended page is a fresh object number at the tail.
-        const newPageObjectNumber = result.insertedPages[0].pageObjectNumber;
+        const newPageObjectNumber = result.insertedPages[0].objectNumber;
         expect(beforePageObjectNumbers.includes(newPageObjectNumber)).toBe(false);
         const appended = result.layout.pages[before.pageCount];
-        expect(appended.ref.pageObjectNumber).toBe(newPageObjectNumber);
+        expect(appended.ref.objectNumber).toBe(newPageObjectNumber);
         expect(appended.size).toEqual(SIZE);
         expect(appended.rotation).toBe(0);
       } finally {
@@ -72,17 +72,17 @@ export function runPageInsertBlankConformance(
       try {
         const before = await doc.pages.list();
         if (before.pages.length < 2) return;
-        const beforePageObjectNumbers = before.pages.map((p) => p.ref.pageObjectNumber);
+        const beforePageObjectNumbers = before.pages.map((p) => p.ref.objectNumber);
 
         const result = await doc.pages.insertBlank({ size: SIZE, count: 2 }, 1);
         expect(result.insertedPages.length).toBe(2);
-        expect(
-          result.insertedPages[0].pageObjectNumber === result.insertedPages[1].pageObjectNumber,
-        ).toBe(false);
-        const pageObjectNumbers = result.layout.pages.map((p) => p.ref.pageObjectNumber);
+        expect(result.insertedPages[0].objectNumber === result.insertedPages[1].objectNumber).toBe(
+          false,
+        );
+        const pageObjectNumbers = result.layout.pages.map((p) => p.ref.objectNumber);
         expect(pageObjectNumbers[0]).toBe(beforePageObjectNumbers[0]);
         expect(pageObjectNumbers.slice(1, 3)).toEqual(
-          result.insertedPages.map((p) => p.pageObjectNumber),
+          result.insertedPages.map((p) => p.objectNumber),
         );
         expect(pageObjectNumbers.slice(3)).toEqual(beforePageObjectNumbers.slice(1));
         expect(result.layout.pages[1].size).toEqual(SIZE);
@@ -141,8 +141,8 @@ export function runPageInsertBlankConformance(
         // Untouched after every rejection.
         const list = await doc.pages.list();
         expect(list.pageCount).toBe(before.pageCount);
-        expect(list.pages.map((p) => p.ref.pageObjectNumber)).toEqual(
-          before.pages.map((p) => p.ref.pageObjectNumber),
+        expect(list.pages.map((p) => p.ref.objectNumber)).toEqual(
+          before.pages.map((p) => p.ref.objectNumber),
         );
       } finally {
         await doc.close();

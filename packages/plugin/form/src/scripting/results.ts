@@ -29,9 +29,7 @@ export function pageNumberFor(
 ): number {
   const placed = field.widgets.find((widget) => widget.page !== null)?.page;
   if (!meta || !placed) return 0;
-  const index = meta.pages.findIndex(
-    (page) => page.ref.pageObjectNumber === placed.pageObjectNumber,
-  );
+  const index = meta.pages.findIndex((page) => page.ref.objectNumber === placed.objectNumber);
   return Math.max(0, index);
 }
 

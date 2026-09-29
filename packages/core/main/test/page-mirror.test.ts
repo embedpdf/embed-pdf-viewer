@@ -9,7 +9,10 @@ import type { PageMirrorSpec } from '../src/index';
  * deleted pages, and re-read everything loaded on a resync.
  */
 
-const pageRef = (pageObjectNumber: number): PageRef => ({ kind: 'objectNumber', pageObjectNumber });
+const pageRef = (pageObjectNumber: number): PageRef => ({
+  kind: 'objectNumber',
+  objectNumber: pageObjectNumber,
+});
 const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
 const origin = { kind: 'remote', sessionId: 'them', sub: null, ts: 0, serverId: null };
 const touched = (pageObjectNumber: number) =>
@@ -24,7 +27,7 @@ function setup(spec: Partial<PageMirrorSpec<string>> = {}) {
   const reads: { page: number; resolve(value: string): void }[] = [];
   const load = vi.fn(
     (_doc: unknown, page: PageRef) =>
-      new Promise<string>((resolve) => reads.push({ page: page.pageObjectNumber, resolve })),
+      new Promise<string>((resolve) => reads.push({ page: page.objectNumber, resolve })),
   );
   const mirror = ctx.pageMirror<string>({
     name: 'text',

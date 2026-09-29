@@ -1,7 +1,8 @@
 import {
   CONTINUOUS_RENDER_POLICY,
+  LOCAL_ENGINE_BRAND,
   type EngineRenderPolicy,
-  type PageHandle,
+  type LocalPageHandle as LocalPageHandleContract,
   type PageObjectNumber,
   type PageRef,
 } from '@embedpdf/engine-core/runtime';
@@ -25,7 +26,8 @@ interface DocClosedView {
  * services each own their queue interaction; the handle is otherwise
  * stateless.
  */
-export class LocalPageHandle implements PageHandle {
+export class LocalPageHandle implements LocalPageHandleContract {
+  readonly [LOCAL_ENGINE_BRAND] = true;
   readonly annotations: LocalPageAnnotationsService;
   readonly text: LocalPageTextService;
   readonly render: LocalPageRenderService;

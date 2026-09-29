@@ -1,10 +1,13 @@
-import { DEFAULT_RICH_TEXT_BODY, type RichTextDocument } from '../../dto/RichText';
+import {
+  DEFAULT_RICH_TEXT_BODY,
+  type RichTextBody,
+  type RichTextDocument,
+} from '../../dto/RichText';
 import type { AnnotationRef } from '../../identity/AnnotationRef';
 import type { Coordinates } from '../../pageSpace/coordinates';
 import { annotationDefaultsOf } from '../defaults';
-import { faceForFreeTextFont, type DescribeFont } from '../fontFaces';
+import type { DescribeFont } from '../fontFaces';
 import { declarationOf, type AnnotationDraft, type AnnotationDTO } from '../kinds';
-import type { FreeTextFont } from '../primitives';
 import { actionTreeOf, readValueOf } from './applyAnnotationPatch';
 
 /** Who the engine stamps as creating an annotation, and when. */
@@ -37,21 +40,19 @@ export interface DraftContext<Box = unknown> {
 const NO_BOX = { x: 0, y: 0, width: 0, height: 0 };
 
 /**
- * The rich body a free text's font, size, colors and alignment make: the
- * body its rich text takes when it states none.
+ * A free text's rich text as a read spells it, and the text style it reads
+ * back with: the resolved body over the engine's defaults, and its size,
+ * text color and alignment beside it. The font keeps the name the draft
+ * gave, or the default.
  */
-function bodyOfStyle(draft: Record<string, unknown>, describe?: DescribeFont) {
-  const face = faceForFreeTextFont(draft.fontFamily as FreeTextFont, describe);
-  const color = (draft.fontColor ?? draft.color ?? DEFAULT_RICH_TEXT_BODY.color) as string;
-  return {
-    ...DEFAULT_RICH_TEXT_BODY,
-    family: face.family,
-    ...(face.weight !== undefined ? { weight: face.weight } : {}),
-    ...(face.italic !== undefined ? { italic: face.italic } : {}),
-    size: draft.fontSize as number,
-    color: color.toLowerCase(),
-    align: draft.textAlign as RichTextDocument['body']['align'],
-  };
+function freeTextReadOf(given: Record<string, unknown>, read: Record<string, unknown>) {
+  const richText = given.richText as { body?: Partial<RichTextBody> } | undefined;
+  const body = { ...DEFAULT_RICH_TEXT_BODY, ...richText?.body };
+  body.color = body.color.toLowerCase();
+  read.richText = { ...(read.richText as RichTextDocument), body };
+  read.fontSize = body.size;
+  read.fontColor = body.color;
+  read.textAlign = body.align;
 }
 
 /**
@@ -87,15 +88,7 @@ export function annotationOfResolvedDraft<C extends Coordinates>(
   read.identityQuality = 'durable';
   if (read.rect === null) read.rect = context.rect ?? given.rect ?? given.box ?? NO_BOX;
 
-  if (subtype === 'free-text') {
-    const richText = given.richText as { body?: object } | undefined;
-    if (richText && !richText.body) {
-      read.richText = {
-        ...(read.richText as RichTextDocument),
-        body: bodyOfStyle(given, context.describeFont),
-      };
-    }
-  }
+  if (subtype === 'free-text') freeTextReadOf(given, read);
   if (subtype === 'link') {
     const target = given.target as { kind: string } | null | undefined;
     read.actions =
@@ -104,8 +97,7 @@ export function annotationOfResolvedDraft<C extends Coordinates>(
         : null;
   }
   if (subtype === 'widget') {
-    // A widget created on its own belongs to no field until a form adopts it.
-    read.fieldObjectNumber = 0;
+    // A widget created on its own belongs to no field (`field: null`) until a form adopts it.
     read.fieldFamily = 'unknown';
   }
   return read as unknown as AnnotationDTO<C>;

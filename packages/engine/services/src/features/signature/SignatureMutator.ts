@@ -1,4 +1,5 @@
 import type {
+  PdfCoordinates,
   DigestAlgorithm,
   DocumentVersionRef,
   SignatureCancelResult,
@@ -203,13 +204,7 @@ export class SignatureMutator {
         );
       }
       if (input.appearance && field.widget) {
-        bakeWidgetAppearance(
-          this.runtime,
-          candidate.docPtr,
-          field.widget,
-          input.appearance.pdf,
-          input.appearance.pageIndex ?? 0,
-        );
+        bakeWidgetAppearance(this.runtime, candidate.docPtr, field.widget, input.appearance.pdf);
       }
 
       const store = this.storeFor();
@@ -244,7 +239,7 @@ export class SignatureMutator {
     }
   }
 
-  complete(input: SignatureCompleteInput): SignatureCompleteResult {
+  complete(input: SignatureCompleteInput): SignatureCompleteResult<PdfCoordinates> {
     const pending = this.session.pendingSigning;
     if (!pending || pending.prepared.signingId !== input.signingId) {
       const last = this.session.lastCompletion;
@@ -298,8 +293,7 @@ export class SignatureMutator {
     const reader = new SignatureReader(this.runtime, this.session);
     const snapshot = reader.readSnapshot();
     const signature = snapshot.signatures.find(
-      (s) =>
-        s.field.kind === 'objectNumber' && s.field.fieldObjectNumber === pending.fieldObjectNumber,
+      (s) => s.field.kind === 'objectNumber' && s.field.objectNumber === pending.fieldObjectNumber,
     );
     if (!signature) {
       throw new EngineError(
@@ -307,7 +301,7 @@ export class SignatureMutator {
         'the installed document lost the signature field',
       );
     }
-    const result: SignatureCompleteResult = {
+    const result: SignatureCompleteResult<PdfCoordinates> = {
       status: 'completed',
       signature,
       version: reader.version(),

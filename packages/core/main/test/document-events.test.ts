@@ -133,10 +133,10 @@ describe('kernel: document events → page registry', () => {
 
     const after = capture.ctx().document()!;
     expect(after.revision).toBe(1); // registry version advanced
-    expect(after.pages.find((pageInfo) => pageInfo.ref.pageObjectNumber === 1)!.rotation).toBe(90);
+    expect(after.pages.find((pageInfo) => pageInfo.ref.objectNumber === 1)!.rotation).toBe(90);
     expect(after.pageCount).toBe(3); // rotate keeps the page set
     // Identity preserved: same pages, same order.
-    expect(after.pages.map((pageInfo) => pageInfo.ref.pageObjectNumber)).toEqual([1, 2, 3]);
+    expect(after.pages.map((pageInfo) => pageInfo.ref.objectNumber)).toEqual([1, 2, 3]);
   });
 
   it('a pages.deleted event shrinks the registry', async () => {
@@ -156,7 +156,7 @@ describe('kernel: document events → page registry', () => {
     const after = capture.ctx().document()!;
     expect(after.revision).toBe(1);
     expect(after.pageCount).toBe(2);
-    expect(after.pages.map((pageInfo) => pageInfo.ref.pageObjectNumber)).toEqual([1, 3]);
+    expect(after.pages.map((pageInfo) => pageInfo.ref.objectNumber)).toEqual([1, 3]);
   });
 
   it('an annotation event does NOT touch the registry (origin-agnostic, structure-only)', async () => {

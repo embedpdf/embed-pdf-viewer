@@ -26,7 +26,7 @@ async function opaquePixels(
     .page(toPageRef(pageObjectNumber))
     .annotations.renderAppearancesRaw({ viewport: { kind: 'scale', scale: 2 } });
   const ap = appearances.find(
-    (a) => a.ref.kind === 'objectNumber' && a.ref.annotObjectNumber === annotObjectNumber,
+    (a) => a.ref.kind === 'objectNumber' && a.ref.objectNumber === annotObjectNumber,
   );
   if (!ap) return 0;
   const px = new Uint8Array(ap.raster.data);
@@ -58,10 +58,12 @@ describe('signature fields in the viewer phase', () => {
       const created = await doc.forms.create({
         family: 'signature',
         name: 'sig2',
-        widget: {
-          page: page.ref,
-          rect: { x: 50, y: page.size.height - 120, width: 200, height: 70 },
-        },
+        widgets: [
+          {
+            page: page.ref,
+            rect: { x: 50, y: page.size.height - 120, width: 200, height: 70 },
+          },
+        ],
       });
       expect(created.field.family).toBe('signature');
       expect(created.field.widgets).toHaveLength(1);
@@ -77,17 +79,13 @@ describe('signature fields in the viewer phase', () => {
         { pdf: artwork },
       );
       expect(filled.field.name).toBe('sig2');
-      expect(filled.meta.affectedPages.map((p) => p.page.pageObjectNumber)).toEqual([
-        page.ref.pageObjectNumber,
+      expect(filled.meta.affectedPages.map((p) => p.page.objectNumber)).toEqual([
+        page.ref.objectNumber,
       ]);
       // The mark is actually drawn: the widget's appearance renders opaque pixels
       // (the fork wraps the page into a child form; the outer stream must place it).
       expect(
-        await opaquePixels(
-          doc,
-          page.ref.pageObjectNumber,
-          filled.field.widgets[0]!.annotObjectNumber,
-        ),
+        await opaquePixels(doc, page.ref.objectNumber, filled.field.widgets[0]!.objectNumber),
       ).toBeGreaterThan(50);
       expect(
         (await doc.signatures.list()).signatures.find((s) => s.fieldName === 'sig2')?.signed,
@@ -114,11 +112,7 @@ describe('signature fields in the viewer phase', () => {
         location: 'Amsterdam',
       });
       expect(
-        await opaquePixels(
-          doc,
-          page.ref.pageObjectNumber,
-          result.signature.widget!.annotObjectNumber,
-        ),
+        await opaquePixels(doc, page.ref.objectNumber, result.signature.widget!.objectNumber),
       ).toBeGreaterThan(50);
       // A signed field's appearance is sealed with the signature.
       await expect(

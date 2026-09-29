@@ -79,6 +79,20 @@ Every call is async, can be cancelled, and fails with a typed error you can bran
 code runs on the local engine and on the CloudPDF engine: only how you create the engine and
 open a file differs.
 
+A few things exist only on the local engine: its fonts, `warmup()`, raw pixels, and saving a
+document's layer or to a file. A document opened with `localEngine()` has them. Code that takes
+any engine checks first:
+
+```ts
+import { isLocalDocument } from '@embedpdf/engine';
+
+if (isLocalDocument(doc)) {
+  const layer = await doc.downloadLayer();
+}
+```
+
+`isLocalEngine(engine)` does the same for an engine.
+
 <Engine local>
 
 ## Local or cloud

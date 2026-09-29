@@ -487,7 +487,10 @@ export const PAGE_SPACE_FIXTURES: readonly PageSpaceFixture[] = [
   }),
   build({
     name: 'odd-rotate',
-    about: '/Rotate that is not a multiple of 90 (broken): no turn, as Acrobat shows it',
+    // Acrobat draws the content upright too, but on a sheet with width and height swapped; we keep
+    // the page as the file stores it.
+    about:
+      '/Rotate that is not a multiple of 90 (broken): no turn, the content upright as in Acrobat',
     source: 'recovery',
     pages: ([45, 135] as const).map((turn) =>
       markedPage(`/MediaBox [0 0 612 792] /Rotate ${turn}`, LETTER, {

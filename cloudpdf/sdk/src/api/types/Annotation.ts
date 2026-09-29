@@ -65,7 +65,7 @@ export namespace Annotation {
     export namespace AnnotationHighlight {
         export interface Page {
             kind: Page.Kind;
-            pageObjectNumber: number;
+            objectNumber: number;
         }
 
         export namespace Page {
@@ -195,7 +195,7 @@ export namespace Annotation {
     export namespace AnnotationUnderline {
         export interface Page {
             kind: Page.Kind;
-            pageObjectNumber: number;
+            objectNumber: number;
         }
 
         export namespace Page {
@@ -325,7 +325,7 @@ export namespace Annotation {
     export namespace AnnotationSquiggly {
         export interface Page {
             kind: Page.Kind;
-            pageObjectNumber: number;
+            objectNumber: number;
         }
 
         export namespace Page {
@@ -456,7 +456,7 @@ export namespace Annotation {
     export namespace AnnotationStrikeout {
         export interface Page {
             kind: Page.Kind;
-            pageObjectNumber: number;
+            objectNumber: number;
         }
 
         export namespace Page {
@@ -597,7 +597,7 @@ export namespace Annotation {
     export namespace AnnotationCircle {
         export interface Page {
             kind: Page.Kind;
-            pageObjectNumber: number;
+            objectNumber: number;
         }
 
         export namespace Page {
@@ -715,7 +715,7 @@ export namespace Annotation {
     export namespace AnnotationSquare {
         export interface Page {
             kind: Page.Kind;
-            pageObjectNumber: number;
+            objectNumber: number;
         }
 
         export namespace Page {
@@ -837,7 +837,7 @@ export namespace Annotation {
     export namespace AnnotationPolygon {
         export interface Page {
             kind: Page.Kind;
-            pageObjectNumber: number;
+            objectNumber: number;
         }
 
         export namespace Page {
@@ -971,7 +971,7 @@ export namespace Annotation {
     export namespace AnnotationPolyline {
         export interface Page {
             kind: Page.Kind;
-            pageObjectNumber: number;
+            objectNumber: number;
         }
 
         export namespace Page {
@@ -1140,7 +1140,7 @@ export namespace Annotation {
     export namespace AnnotationLine {
         export interface Page {
             kind: Page.Kind;
-            pageObjectNumber: number;
+            objectNumber: number;
         }
 
         export namespace Page {
@@ -1316,7 +1316,7 @@ export namespace Annotation {
     export namespace AnnotationLink {
         export interface Page {
             kind: Page.Kind;
-            pageObjectNumber: number;
+            objectNumber: number;
         }
 
         export namespace Page {
@@ -1418,7 +1418,7 @@ export namespace Annotation {
     export namespace AnnotationInk {
         export interface Page {
             kind: Page.Kind;
-            pageObjectNumber: number;
+            objectNumber: number;
         }
 
         export namespace Page {
@@ -1534,14 +1534,16 @@ export namespace Annotation {
         fontFamily: string;
         fontSize: number;
         textAlign: AnnotationFreeText.TextAlign;
+        verticalAlign: AnnotationFreeText.VerticalAlign;
         richText: AnnotationFreeText.RichText;
         color: string;
-        fontColor: string | null;
+        fontColor: string;
         interiorColor: string | null;
         opacity: number;
         strokeWidth: number;
         borderStyle: AnnotationFreeText.BorderStyle;
         dashArray: number[] | null;
+        cloudyIntensity: number | null;
         calloutLine: unknown[] | null;
         lineEnding: AnnotationFreeText.LineEnding | null;
     }
@@ -1549,7 +1551,7 @@ export namespace Annotation {
     export namespace AnnotationFreeText {
         export interface Page {
             kind: Page.Kind;
-            pageObjectNumber: number;
+            objectNumber: number;
         }
 
         export namespace Page {
@@ -1615,14 +1617,22 @@ export namespace Annotation {
         export const Intent = {
             FreeText: "free-text",
             FreeTextCallout: "free-text-callout",
+            FreeTextTypewriter: "free-text-typewriter",
         } as const;
         export type Intent = (typeof Intent)[keyof typeof Intent];
         export const TextAlign = {
             Left: "left",
             Center: "center",
             Right: "right",
+            Justify: "justify",
         } as const;
         export type TextAlign = (typeof TextAlign)[keyof typeof TextAlign];
+        export const VerticalAlign = {
+            Top: "top",
+            Middle: "middle",
+            Bottom: "bottom",
+        } as const;
+        export type VerticalAlign = (typeof VerticalAlign)[keyof typeof VerticalAlign];
 
         export interface RichText {
             body: RichText.Body;
@@ -1832,7 +1842,7 @@ export namespace Annotation {
     export namespace AnnotationCaret {
         export interface Page {
             kind: Page.Kind;
-            pageObjectNumber: number;
+            objectNumber: number;
         }
 
         export namespace Page {
@@ -1936,6 +1946,7 @@ export namespace Annotation {
         color: string;
         opacity: number;
         icon: AnnotationText.Icon;
+        open: boolean;
         state: string | null;
         stateModel: string | null;
     }
@@ -1943,7 +1954,7 @@ export namespace Annotation {
     export namespace AnnotationText {
         export interface Page {
             kind: Page.Kind;
-            pageObjectNumber: number;
+            objectNumber: number;
         }
 
         export namespace Page {
@@ -2053,7 +2064,7 @@ export namespace Annotation {
     export namespace AnnotationStamp {
         export interface Page {
             kind: Page.Kind;
-            pageObjectNumber: number;
+            objectNumber: number;
         }
 
         export namespace Page {
@@ -2165,7 +2176,7 @@ export namespace Annotation {
     export namespace AnnotationFileAttachment {
         export interface Page {
             kind: Page.Kind;
-            pageObjectNumber: number;
+            objectNumber: number;
         }
 
         export namespace Page {
@@ -2280,14 +2291,14 @@ export namespace Annotation {
         fontSize: number | null;
         fontColor: string | null;
         textAlign: AnnotationWidget.TextAlign;
-        fieldObjectNumber: number;
+        field: CloudPDF.AnnotationWidgetField | null;
         fieldFamily: AnnotationWidget.FieldFamily;
     }
 
     export namespace AnnotationWidget {
         export interface Page {
             kind: Page.Kind;
-            pageObjectNumber: number;
+            objectNumber: number;
         }
 
         export namespace Page {
@@ -2433,7 +2444,7 @@ export namespace Annotation {
     export namespace AnnotationRedact {
         export interface Page {
             kind: Page.Kind;
-            pageObjectNumber: number;
+            objectNumber: number;
         }
 
         export namespace Page {
@@ -2569,7 +2580,7 @@ export namespace Annotation {
     export namespace AnnotationPopup {
         export interface Page {
             kind: Page.Kind;
-            pageObjectNumber: number;
+            objectNumber: number;
         }
 
         export namespace Page {
@@ -2665,7 +2676,7 @@ export namespace Annotation {
     export namespace AnnotationUnsupported {
         export interface Page {
             kind: Page.Kind;
-            pageObjectNumber: number;
+            objectNumber: number;
         }
 
         export namespace Page {

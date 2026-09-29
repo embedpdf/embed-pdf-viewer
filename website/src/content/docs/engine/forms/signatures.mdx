@@ -75,7 +75,7 @@ the engine prepared, `sign()` fails with `SignatureRefused` and the message says
 | `field`        | The signature field to sign. It must not be signed yet.                           |                                               |
 | `kind`         | `'signature'`, or `'timestamp'` for a [document timestamp](#document-timestamps). | `'signature'`                                 |
 | `signer`       | `{ name, reason, location, contactInfo, signedAt }`, written into the signature.  | none; `signedAt` now                          |
-| `appearance`   | `{ pdf }`: a PDF whose first page is drawn into the field's box.                  | none                                          |
+| `appearance`   | `{ pdf }`: a one-page PDF, drawn into the field's box.                            | none                                          |
 | `certify`      | `{ permission: 1 \| 2 \| 3 }`: [certify](#certify-a-document) the document.       | not certified                                 |
 | `lock`         | Fields this signature [locks](#lock-fields).                                      | none                                          |
 | `digest`       | `'sha256'`, `'sha384'` or `'sha512'`.                                             | `'sha256'`, or the `key`'s hash with `sign()` |
@@ -83,7 +83,9 @@ the engine prepared, `sign()` fails with `SignatureRefused` and the message says
 | `contentsSize` | Bytes reserved for the signature, from 256 to 4 MiB.                              | `8192`                                        |
 
 The field needs a widget to carry an `appearance`; without one, the call fails with
-`SignatureRefused`.
+`SignatureRefused`. A PDF with more than one page fails with `InvalidArg`, as for a
+[stamp](/docs/engine/annotations/stamps); take the page you want out first with
+`doc.pages.extract()`.
 
 ## Sign in two steps
 

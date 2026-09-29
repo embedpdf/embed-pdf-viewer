@@ -115,20 +115,18 @@ export function createPlacement(
           ? layout.pageCount === 1
             ? layout.pages[0]
             : undefined
-          : layout.pages.find(({ ref }) => ref.pageObjectNumber === asset.page.pageObjectNumber);
+          : layout.pages.find(({ ref }) => ref.objectNumber === asset.page.objectNumber);
       if (!selectedPage) {
         throw stampError(
           'invalid-input',
           canonicalBytes
-            ? `canonical page ${asset.page?.pageObjectNumber ?? 'unknown'} no longer exists`
+            ? `canonical page ${asset.page?.objectNumber ?? 'unknown'} no longer exists`
             : 'a loose dynamic stamp asset must contain exactly one page',
         );
       }
       const snapshot = await doc.forms.list();
       const hasSelectedPageField = snapshot.fields.some((field) =>
-        field.widgets.some(
-          ({ page }) => page?.pageObjectNumber === selectedPage.ref.pageObjectNumber,
-        ),
+        field.widgets.some(({ page }) => page?.objectNumber === selectedPage.ref.objectNumber),
       );
       if (!hasSelectedPageField) return binary;
       if (!doc.pages.flatten || !doc.pages.extract) {
@@ -174,7 +172,7 @@ export function createPlacement(
       if (failed) {
         throw stampError(
           'operation-failed',
-          `dynamic stamp flatten failed for page ${failed.page.pageObjectNumber}`,
+          `dynamic stamp flatten failed for page ${failed.page.objectNumber}`,
         );
       }
 

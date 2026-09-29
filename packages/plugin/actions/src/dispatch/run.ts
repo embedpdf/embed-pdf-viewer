@@ -4,7 +4,7 @@
  * external effects deferred until every document node succeeded.
  */
 import type { PluginContext } from '@embedpdf/core';
-import type { PdfActionNode, PdfActionTree } from '@embedpdf/engine-core/runtime';
+import type { FormFieldRef, PdfActionNode, PdfActionTree } from '@embedpdf/engine-core/runtime';
 
 import type {
   ActionContext,
@@ -78,7 +78,7 @@ export function createRunner(
       node: Extract<PdfActionNode, { type: 'hide' }>,
     ): Promise<{ status: ActionNodeStatus; detail?: string }> => {
       const display = node.hide ? ('hidden' as const) : ('visible' as const);
-      const fieldRefs: Array<{ kind: 'objectNumber'; fieldObjectNumber: number }> = [];
+      const fieldRefs: FormFieldRef[] = [];
       const annotEntries: AnnotCommitEntry[] = [];
       const names: string[] = [];
       const bareObjectNumbers: number[] = [];
@@ -94,16 +94,16 @@ export function createRunner(
             diagnose({ code: 'unresolved-target', message: `hide: no field named '${name}'` });
             continue;
           }
-          fieldRefs.push({ kind: 'objectNumber', fieldObjectNumber: field.fieldObjectNumber });
+          fieldRefs.push(field.ref);
         }
         for (const objectNumber of bareObjectNumbers) {
           // A bare object number may be a widget (its field's display) or a
           // plain annotation (its own flags): the forms snapshot decides.
           const owner = snapshot.fields.find((field) =>
-            field.widgets.some((widget) => widget.annotObjectNumber === objectNumber),
+            field.widgets.some((widget) => widget.objectNumber === objectNumber),
           );
           if (owner) {
-            fieldRefs.push({ kind: 'objectNumber', fieldObjectNumber: owner.fieldObjectNumber });
+            fieldRefs.push(owner.ref);
           } else {
             annotEntries.push({
               annotObjectNumber: objectNumber,

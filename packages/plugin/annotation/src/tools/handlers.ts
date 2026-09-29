@@ -30,7 +30,7 @@ const isCalloutTool = (subtype: Subtype): boolean => subtype === 'free-text-call
  */
 const pointOn = (sample: PointerSample, page: PageRef): Point | null =>
   sample.project?.(page) ??
-  (sample.page?.ref.pageObjectNumber === page.pageObjectNumber ? sample.page.point : null);
+  (sample.page?.ref.objectNumber === page.objectNumber ? sample.page.point : null);
 
 /**
  * Click-to-place for every payload-carrying tool (stamp / note / file
@@ -447,7 +447,7 @@ export function createDrawHandler(
       if (st === 'ink' && pendingInk) {
         if (
           pendingInk.tool === tool &&
-          pendingInk.page.pageObjectNumber === sample.page.ref.pageObjectNumber
+          pendingInk.page.objectNumber === sample.page.ref.objectNumber
         ) {
           clearTimeout(pendingInk.timer);
           pendingInk = null;

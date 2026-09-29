@@ -30,8 +30,6 @@ export interface AnnotationTransferConformanceOptions {
   fixtures: readonly string[];
   /** Open a fresh copy of a fixture, with every scope, `doc.annotate.import` included. */
   open: (engine: Engine, fixture: string) => Promise<DocumentHandle>;
-  /** Whether the engine renders raw appearance rasters (local) or only encoded images (cloud). */
-  rawAppearances: boolean;
 }
 
 type Attribution = 'restore' | 'stamp';
@@ -97,7 +95,7 @@ export function runAnnotationTransferConformance(
       const doc = await opts.open(engine, fixture);
       const kept = new Set<string>();
       const pages = (await doc.pages.list()).pages.map((entry) =>
-        toPageRef(entry.ref.pageObjectNumber),
+        toPageRef(entry.ref.objectNumber),
       );
       const session = await doc.annotations.beginEdit(pages);
       try {
@@ -217,10 +215,10 @@ export function runAnnotationTransferConformance(
               result.refMap.map(({ from, to }) => [annotationKey(from), to] as const),
             );
             for (const entry of bundle.pages) {
-              const drawn = await appearanceRasters(source.page(entry.page), opts.rawAppearances);
-              const copies = await appearanceRasters(copy.page(entry.page), opts.rawAppearances);
+              const drawn = await appearanceRasters(source.page(entry.page));
+              const copies = await appearanceRasters(copy.page(entry.page));
               for (const { data } of bundle.items) {
-                if (data.ref.page.pageObjectNumber !== entry.page.pageObjectNumber) continue;
+                if (data.ref.page.objectNumber !== entry.page.objectNumber) continue;
                 if (fixture !== 'authoring' && data.subtype !== 'stamp') continue;
                 const to = copyOf.get(annotationKey(data.ref));
                 const original = drawn.get(annotationKey(data.ref));
@@ -294,7 +292,7 @@ function geometryOf(data: AnnotationDTO): Array<{ x: number; y: number }> {
 
 /** A form field's widget: it stays with its field. */
 function isFieldWidget(annotation: AnnotationDTO): boolean {
-  return annotation.subtype === 'widget' && annotation.fieldObjectNumber > 0;
+  return annotation.subtype === 'widget' && annotation.field !== null;
 }
 
 /** A bundle without the items `keys` name, and without what only they named. */
@@ -376,18 +374,17 @@ function normalized(bundle: AnnotationBundle, attribution: Attribution) {
   const pagePosition = new Map(
     bundle.pages.map((entry) => [encodePageKey(entry.page), entry.position]),
   );
-  const pages = (value: unknown): unknown => {
+  // A page ref sits under a `page` key (a field ref has the same shape).
+  const pages = (value: unknown, key?: string): unknown => {
     if (typeof value !== 'object' || value === null) return value;
-    if (Array.isArray(value)) return value.map(pages);
+    if (Array.isArray(value)) return value.map((child) => pages(child));
     const record = value as Record<string, unknown>;
-    if (
-      Object.keys(record).length === 2 &&
-      record.kind === 'objectNumber' &&
-      'pageObjectNumber' in record
-    ) {
+    if (key === 'page' && record.kind === 'objectNumber') {
       return { position: pagePosition.get(encodePageKey(record as unknown as PageRef)) };
     }
-    return Object.fromEntries(Object.entries(record).map(([key, child]) => [key, pages(child)]));
+    return Object.fromEntries(
+      Object.entries(record).map(([name, child]) => [name, pages(child, name)]),
+    );
   };
   return {
     pages: bundle.pages.map(({ position, size }) => ({ position, size })),
@@ -434,7 +431,7 @@ function normalized(bundle: AnnotationBundle, attribution: Attribution) {
 /** Fill our own file: every kind a create makes, stamps sharing a drawing, a thread, a link. */
 async function fill(doc: DocumentHandle): Promise<void> {
   const { pages } = await doc.pages.list();
-  const pageRef = toPageRef(pages[0]!.ref.pageObjectNumber);
+  const pageRef = toPageRef(pages[0]!.ref.objectNumber);
   const page = doc.page(pageRef);
   const create = async (
     draft: Parameters<PageHandle['annotations']['create']>[0],

@@ -43,8 +43,6 @@ export interface AnnotationResourceConformanceOptions {
   makeEngine: () => Promise<Engine> | Engine;
   /** Open a fresh copy of a fixture, with `doc.download` among its scopes. */
   open: (engine: Engine, fixture: AnnotationResourceFixture) => Promise<DocumentHandle>;
-  /** Whether the engine renders raw appearance rasters (local) or only encoded images (cloud). */
-  rawAppearances: boolean;
 }
 
 /**
@@ -85,8 +83,7 @@ export function runAnnotationResourceConformance(
       }
     };
 
-    const rasterOf = (page: PageHandle, ref: AnnotationRef) =>
-      appearanceRaster(page, ref, opts.rawAppearances);
+    const rasterOf = (page: PageHandle, ref: AnnotationRef) => appearanceRaster(page, ref);
 
     const expectSameDrawing = (actual: Raster, expected: Raster) => {
       expect([actual.width, actual.height]).toEqual([expected.width, expected.height]);
@@ -594,5 +591,5 @@ function pageSize(pdf: Uint8Array): [number, number] | null {
 async function firstPage(doc: DocumentHandle): Promise<PageRef> {
   const { pages } = await doc.pages.list();
   if (!pages[0]) throw new Error('the document has no pages');
-  return toPageRef(pages[0].ref.pageObjectNumber);
+  return toPageRef(pages[0].ref.objectNumber);
 }

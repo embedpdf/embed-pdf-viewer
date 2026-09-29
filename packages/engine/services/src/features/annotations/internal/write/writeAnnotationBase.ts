@@ -44,7 +44,8 @@ export function applyAnnotationBaseDraft(
   if (draft.nm) {
     writeAnnotString(fn, mem, annotPtr, 'NM', draft.nm);
   }
-  // A flag the draft leaves out is its kind's default: a new annotation prints.
+  // A flag the draft leaves out is its kind's default: a new annotation
+  // prints, except a popup.
   const subtype = (draft as { subtype?: AnnotationSubtype }).subtype;
   const flags = flagFieldsOf({ ...(subtype ? annotationDefaultsOf(subtype) : {}), ...draft });
   if (flags) setAnnotFlags(fn, annotPtr, flags);

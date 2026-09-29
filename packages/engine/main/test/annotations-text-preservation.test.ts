@@ -1,8 +1,8 @@
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import type {
   CalloutLine,
-  DocumentHandle,
-  Engine,
+  LocalDocumentHandle,
+  LocalEngine,
   FreeTextAnnotationDTO,
   FreeTextPatch,
 } from '@embedpdf/engine-core/runtime';
@@ -37,7 +37,7 @@ function fixture(legacy: boolean, callout: boolean): Uint8Array {
   return new TextEncoder().encode(text);
 }
 
-async function annotation(doc: DocumentHandle): Promise<FreeTextAnnotationDTO> {
+async function annotation(doc: LocalDocumentHandle): Promise<FreeTextAnnotationDTO> {
   return (await doc.page(toPageRef(3)).annotations.list()).annotations[0] as FreeTextAnnotationDTO;
 }
 
@@ -47,7 +47,7 @@ function expectText(dto: FreeTextAnnotationDTO): void {
 }
 
 describe('FreeText and Callout partial updates preserve text (wasm)', () => {
-  let engine: Engine;
+  let engine: LocalEngine;
   beforeAll(async () => {
     engine = await createLocalEngine({ runtime: { prefer: 'wasm' } });
   });

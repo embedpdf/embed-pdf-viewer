@@ -445,7 +445,7 @@ export class DerivedRenderService {
             );
           }
           encoded = { bytes: payload.image.bytes, contentType: payload.image.contentType };
-          pageObjectNumber = payload.page.pageObjectNumber;
+          pageObjectNumber = payload.page.objectNumber;
         } else {
           const payload = await pool.runAdHoc(
             input.baseSha,
@@ -468,7 +468,7 @@ export class DerivedRenderService {
             );
           }
           encoded = await encoder.encodeToBuffer(payload.raster, { format: 'webp' });
-          pageObjectNumber = payload.page.pageObjectNumber;
+          pageObjectNumber = payload.page.objectNumber;
         }
         const finalKey = this.baseKey(input.tenantId, input.baseSha, pageObjectNumber, token);
         await this.getOrRender(finalKey, async () => ({

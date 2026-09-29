@@ -91,10 +91,10 @@ const NO_FLAGS: AnnotationFlags = {
 
 /** A minimal committed square DTO, with optional relationship fields. */
 function squareDTO(
-  annotObjectNumber: number,
+  objectNumber: number,
   reply: { to: AnnotationRef; type: 'reply' | 'group' } | null = null,
 ): AnnotationDTO<PdfCoordinates> {
-  const ref: AnnotationRef = { kind: 'objectNumber', page: toPageRef(1), annotObjectNumber };
+  const ref: AnnotationRef = { kind: 'objectNumber', page: toPageRef(1), objectNumber };
   return {
     ref,
     page: toPageRef(1),
@@ -139,7 +139,7 @@ describe('fromDTO — group/relationship mapping', () => {
     const primary: AnnotationRef = {
       kind: 'objectNumber',
       page: toPageRef(1),
-      annotObjectNumber: 10,
+      objectNumber: 10,
     };
     const sub = fromDTO(fromFile(squareDTO(11, { to: primary, type: 'group' })));
     expect(irtOf(sub.annotation)).toBe(annotationKey(primary));
@@ -150,7 +150,7 @@ describe('fromDTO — group/relationship mapping', () => {
     const parent: AnnotationRef = {
       kind: 'objectNumber',
       page: toPageRef(1),
-      annotObjectNumber: 10,
+      objectNumber: 10,
     };
     const reply = fromDTO(fromFile(squareDTO(12, { to: parent, type: 'reply' })));
     expect(irtOf(reply.annotation)).toBe(annotationKey(parent));
@@ -160,7 +160,7 @@ describe('fromDTO — group/relationship mapping', () => {
 
 describe('record — Ink Highlight intent and blend', () => {
   const dto = (): AnnotationDTO<PdfCoordinates> => ({
-    ref: { kind: 'objectNumber', page: toPageRef(1), annotObjectNumber: 20 },
+    ref: { kind: 'objectNumber', page: toPageRef(1), objectNumber: 20 },
     page: toPageRef(1),
     index: 0,
     identityQuality: 'durable',
@@ -311,8 +311,8 @@ const CL: CalloutLine = [
   { x: 200, y: 630 }, // connection (ignored on read)
 ];
 
-function calloutDTO(annotObjectNumber = 20): AnnotationDTO<PdfCoordinates> {
-  const ref: AnnotationRef = { kind: 'objectNumber', page: toPageRef(1), annotObjectNumber };
+function calloutDTO(objectNumber = 20): AnnotationDTO<PdfCoordinates> {
+  const ref: AnnotationRef = { kind: 'objectNumber', page: toPageRef(1), objectNumber };
   return {
     ref,
     page: toPageRef(1),
@@ -341,20 +341,24 @@ function calloutDTO(annotObjectNumber = 20): AnnotationDTO<PdfCoordinates> {
     fontFamily: 'helvetica',
     fontSize: 14,
     textAlign: 'left',
+    verticalAlign: 'top',
     color: '#c80000',
+    fontColor: '#1e1e1e',
     interiorColor: null,
     opacity: 1,
     strokeWidth: 1,
     borderStyle: 'solid',
+    dashArray: null,
+    cloudyIntensity: null,
     calloutLine: CL,
     lineEnding: 'open-arrow',
   } as AnnotationDTO<PdfCoordinates>;
 }
 
 /** A plain free-text DTO (no leader) for the contrast case. */
-function plainFreeTextDTO(annotObjectNumber = 21): AnnotationDTO<PdfCoordinates> {
+function plainFreeTextDTO(objectNumber = 21): AnnotationDTO<PdfCoordinates> {
   return {
-    ...calloutDTO(annotObjectNumber),
+    ...calloutDTO(objectNumber),
     intent: 'free-text',
     rect: BOX_PDF,
     calloutLine: null,
@@ -368,20 +372,17 @@ function plainFreeTextDTO(annotObjectNumber = 21): AnnotationDTO<PdfCoordinates>
  * before the turn (`rect` is the engine's upright box around it); vertex
  * kinds keep an advisory scalar only (the points are already rotated).
  */
-function rotatedSquareDTO(rotation: number, annotObjectNumber = 30): AnnotationDTO<PdfCoordinates> {
+function rotatedSquareDTO(rotation: number, objectNumber = 30): AnnotationDTO<PdfCoordinates> {
   return {
-    ...squareDTO(annotObjectNumber),
+    ...squareDTO(objectNumber),
     // For a square turned 90° the upright box around it is the box itself.
     rect: { left: 100, bottom: 100, right: 200, top: 200 },
     rotation,
   } as AnnotationDTO<PdfCoordinates>;
 }
 
-function rotatedPolylineDTO(
-  rotation: number,
-  annotObjectNumber = 31,
-): AnnotationDTO<PdfCoordinates> {
-  const ref: AnnotationRef = { kind: 'objectNumber', page: toPageRef(1), annotObjectNumber };
+function rotatedPolylineDTO(rotation: number, objectNumber = 31): AnnotationDTO<PdfCoordinates> {
+  const ref: AnnotationRef = { kind: 'objectNumber', page: toPageRef(1), objectNumber };
   return {
     ref,
     page: toPageRef(1),
@@ -557,12 +558,12 @@ describe('record — free-text callout mapping', () => {
 });
 
 describe('record — free-text style + font round-trip', () => {
-  it('fromDTO projects the /DA font fields into `text` (fontColor falls back to /DA colour)', () => {
+  it('fromDTO projects the text fields into `text`: fontColor is the text, never the border', () => {
     const annotation = fromDTO(fromFile(calloutDTO()));
     expect(fieldsOf(annotation).text).toEqual({
       fontFamily: 'helvetica',
       fontSize: 14,
-      fontColor: '#c80000', // no explicit fontColor → the /DA colour {200,0,0}
+      fontColor: '#1e1e1e', // the text's; the border's `color` is '#c80000'
       textAlign: 'left',
     });
   });
@@ -639,9 +640,9 @@ describe('record — free-text style + font round-trip', () => {
  */
 function polygonDTO(
   cloudyIntensity: number | undefined,
-  annotObjectNumber = 40,
+  objectNumber = 40,
 ): AnnotationDTO<PdfCoordinates> {
-  const ref: AnnotationRef = { kind: 'objectNumber', page: toPageRef(1), annotObjectNumber };
+  const ref: AnnotationRef = { kind: 'objectNumber', page: toPageRef(1), objectNumber };
   return {
     ref,
     page: toPageRef(1),
@@ -827,7 +828,7 @@ describe('record — withFields (a change is its write)', () => {
 describe('record — line endings leave /Rect to the engine', () => {
   const lineDTO = (lineEndings: { start: string; end: string }): AnnotationDTO<PdfCoordinates> =>
     ({
-      ref: { kind: 'objectNumber', page: toPageRef(1), annotObjectNumber: 77 },
+      ref: { kind: 'objectNumber', page: toPageRef(1), objectNumber: 77 },
       page: toPageRef(1),
       index: 0,
       identityQuality: 'durable',
@@ -890,8 +891,8 @@ describe('record — line endings leave /Rect to the engine', () => {
 });
 
 describe('record — shape cloudy border tri-state', () => {
-  const cloudySquare = (annotObjectNumber = 45): AnnotationDTO<PdfCoordinates> =>
-    ({ ...squareDTO(annotObjectNumber), cloudyIntensity: 2 }) as AnnotationDTO<PdfCoordinates>;
+  const cloudySquare = (objectNumber = 45): AnnotationDTO<PdfCoordinates> =>
+    ({ ...squareDTO(objectNumber), cloudyIntensity: 2 }) as AnnotationDTO<PdfCoordinates>;
 
   it("fromDTO reads /BE intensity into a cloudy border; the shape's box is the engine's box", () => {
     const annotation = fromDTO(fromFile(cloudySquare()));
@@ -931,12 +932,12 @@ describe('record — shape cloudy border tri-state', () => {
 
 describe('record — attached links (fold + desired state + link kind mapping)', () => {
   const linkDTO = (
-    annotObjectNumber: number,
+    objectNumber: number,
     target: import('@embedpdf/engine-core/runtime').PdfLinkTarget | null,
     reply?: { to: AnnotationRef; type: 'group' | 'reply' },
   ): AnnotationDTO<PdfCoordinates> =>
     ({
-      ...squareDTO(annotObjectNumber, reply ?? null),
+      ...squareDTO(objectNumber, reply ?? null),
       subtype: 'link',
       target,
     }) as unknown as AnnotationDTO<PdfCoordinates>;
@@ -945,7 +946,7 @@ describe('record — attached links (fold + desired state + link kind mapping)',
   const parentRef: AnnotationRef = {
     kind: 'objectNumber',
     page: toPageRef(1),
-    annotObjectNumber: 10,
+    objectNumber: 10,
   };
 
   // Minimal Model for lens reads (order + byId are all the lens touches).
@@ -977,7 +978,7 @@ describe('record — attached links (fold + desired state + link kind mapping)',
     const orphan = fromDTO(
       fromFile(
         linkDTO(12, URI, {
-          to: { kind: 'objectNumber', page: toPageRef(1), annotObjectNumber: 99 },
+          to: { kind: 'objectNumber', page: toPageRef(1), objectNumber: 99 },
           type: 'group',
         }),
       ),
@@ -1144,7 +1145,7 @@ describe('record — every field a kind takes writes only fields its engine kind
       it(`${subtype}: ${spec.key}`, () => {
         const before = record({
           id: 'obj:1',
-          ref: { kind: 'objectNumber', page: PAGE, annotObjectNumber: 1 },
+          ref: { kind: 'objectNumber', page: PAGE, objectNumber: 1 },
           page: PAGE,
           subtype,
           geometry: geometryOf(subtype),

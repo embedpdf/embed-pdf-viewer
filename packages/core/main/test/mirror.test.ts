@@ -249,7 +249,7 @@ describe('ctx.mirror', () => {
       loads: [first],
       fold: (value, event) =>
         (event as { type: string }).type === 'redaction.applied'
-          ? reload({ pages: [{ kind: 'objectNumber', pageObjectNumber: 3 }] })
+          ? reload({ pages: [{ kind: 'objectNumber', objectNumber: 3 }] })
           : value,
       loadPages,
     });
@@ -264,7 +264,7 @@ describe('ctx.mirror', () => {
     expect(load).toHaveBeenCalledTimes(1);
     expect(loadPages).toHaveBeenCalledTimes(1);
     expect(mirror.get()).toEqual({ a: 'A', page: 'reloaded' });
-    expect(changes.at(-1)?.pages).toEqual([{ kind: 'objectNumber', pageObjectNumber: 3 }]);
+    expect(changes.at(-1)?.pages).toEqual([{ kind: 'objectNumber', objectNumber: 3 }]);
   });
 
   it('reports a failed page reload as error until a full load succeeds', async () => {
@@ -277,7 +277,7 @@ describe('ctx.mirror', () => {
       loads: [first, second],
       fold: (value, event) =>
         (event as { type: string }).type === 'redaction.applied'
-          ? reload({ pages: [{ kind: 'objectNumber', pageObjectNumber: 3 }] })
+          ? reload({ pages: [{ kind: 'objectNumber', objectNumber: 3 }] })
           : value,
       loadPages,
     });

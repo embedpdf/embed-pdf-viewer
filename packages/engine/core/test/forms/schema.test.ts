@@ -8,16 +8,17 @@ import {
 import type { FormFieldDTO, FormSnapshot } from '../../src/shared';
 
 const BASE = {
-  fieldObjectNumber: 6,
   origin: 'acroform',
-  flags: { readOnly: false, required: false, noExport: false, raw: 32768 },
+  readOnly: false,
+  required: false,
+  noExport: false,
   alternateName: null,
   mappingName: null,
 } as const;
 
 const RADIO: FormFieldDTO = {
   ...BASE,
-  ref: { kind: 'objectNumber', fieldObjectNumber: 6 },
+  ref: { kind: 'objectNumber', objectNumber: 6 },
   name: 'gender',
   family: 'radio',
   valueEntry: { kind: 'scalar', value: 'male' },
@@ -29,39 +30,41 @@ const RADIO: FormFieldDTO = {
     {
       ref: {
         kind: 'objectNumber',
-        page: { kind: 'objectNumber', pageObjectNumber: 3 },
-        annotObjectNumber: 8,
+        page: { kind: 'objectNumber', objectNumber: 3 },
+        objectNumber: 8,
       },
-      annotObjectNumber: 8,
-      page: { kind: 'objectNumber', pageObjectNumber: 3 },
+      objectNumber: 8,
+      page: { kind: 'objectNumber', objectNumber: 3 },
       onState: 'male',
       exportValue: 'male',
       checked: true,
+      rect: { x: 72, y: 100, width: 12, height: 12 },
     },
     {
       ref: {
         kind: 'objectNumber',
-        page: { kind: 'objectNumber', pageObjectNumber: 3 },
-        annotObjectNumber: 9,
+        page: { kind: 'objectNumber', objectNumber: 3 },
+        objectNumber: 9,
       },
-      annotObjectNumber: 9,
-      page: { kind: 'objectNumber', pageObjectNumber: 3 },
+      objectNumber: 9,
+      page: { kind: 'objectNumber', objectNumber: 3 },
       onState: 'female',
       exportValue: 'female',
       checked: false,
+      rect: { x: 72, y: 120, width: 12, height: 12 },
     },
   ],
 };
 
 const LISTBOX: FormFieldDTO = {
   ...BASE,
-  ref: { kind: 'objectNumber', fieldObjectNumber: 9 },
-  fieldObjectNumber: 9,
+  ref: { kind: 'objectNumber', objectNumber: 9 },
   name: 'fruits',
   family: 'listbox',
   valueEntry: { kind: 'array', values: ['Apple', 'Cherry'] },
   defaultValueEntry: { kind: 'array', values: ['Apple'] },
   selectedValues: ['Apple', 'Cherry'],
+  defaultValue: ['Apple'],
   multiSelect: true,
   options: [
     { label: 'Apple', value: 'Apple', selected: true },
@@ -72,11 +75,12 @@ const LISTBOX: FormFieldDTO = {
     {
       ref: {
         kind: 'objectNumber',
-        page: { kind: 'objectNumber', pageObjectNumber: 3 },
-        annotObjectNumber: 9,
+        page: { kind: 'objectNumber', objectNumber: 3 },
+        objectNumber: 9,
       },
-      annotObjectNumber: 9,
-      page: { kind: 'objectNumber', pageObjectNumber: 3 },
+      objectNumber: 9,
+      page: { kind: 'objectNumber', objectNumber: 3 },
+      rect: null,
     },
   ],
 };
@@ -104,19 +108,15 @@ describe('form schemas', () => {
     expect(FormSnapshotSchema.parse(snapshot)).toEqual(snapshot);
   });
 
-  test('typed values parse and reject mismatched shapes', () => {
-    expect(FormFieldValueSchema.parse({ type: 'text', value: 'Bob' })).toEqual({
-      type: 'text',
-      value: 'Bob',
+  test('values parse in the shapes a read has, and nothing else', () => {
+    expect(FormFieldValueSchema.parse({ value: 'Bob' })).toEqual({ value: 'Bob' });
+    expect(FormFieldValueSchema.parse({ value: null })).toEqual({ value: null });
+    expect(FormFieldValueSchema.parse({ checked: true })).toEqual({ checked: true });
+    expect(FormFieldValueSchema.parse({ selectedValues: ['A', 'B'] })).toEqual({
+      selectedValues: ['A', 'B'],
     });
-    expect(FormFieldValueSchema.parse({ type: 'toggle', state: null })).toEqual({
-      type: 'toggle',
-      state: null,
-    });
-    expect(FormFieldValueSchema.parse({ type: 'choice', values: ['A', 'B'] })).toEqual({
-      type: 'choice',
-      values: ['A', 'B'],
-    });
-    expect(() => FormFieldValueSchema.parse({ type: 'text', values: ['A'] })).toThrow();
+    expect(() => FormFieldValueSchema.parse({ type: 'text', value: 'A' })).toThrow();
+    expect(() => FormFieldValueSchema.parse({ value: 'A', checked: true })).toThrow();
+    expect(() => FormFieldValueSchema.parse({ selectedValues: 'A' })).toThrow();
   });
 });

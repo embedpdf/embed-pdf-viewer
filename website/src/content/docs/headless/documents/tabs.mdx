@@ -1,0 +1,146 @@
+---
+title: Several documents
+description: "Open several documents at once: tabs, side-by-side panes, and which document each part of your UI talks to."
+---
+
+{/* Generated from docs/content — edit there, then `pnpm docs:sync`. */}
+
+# Several documents
+
+A viewer can hold several documents at once, like tabs in a browser. One of them is the active
+document, and every component talks to it unless you say otherwise:
+
+```tsx
+function Tabs() {
+  const documents = useDocuments();
+  const { documents: open, activeId } = useDocumentsState();
+
+  return (
+    <div role="tablist">
+      {open.map((document) => (
+        <button
+          key={document.id}
+          role="tab"
+          aria-selected={document.id === activeId}
+          onClick={() => documents.setActive(document.id)}
+        >
+          {document.name}
+          <span onClick={() => documents.close(document.id)}>×</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+```
+
+Each document keeps its own state: its zoom and scroll position, its selection, its search and its
+active tool. Switch tabs and back, and everything is where you left it.
+
+## Manage the tabs
+
+```ts
+documents.setActive(id);
+documents.rename(id, 'Signed contract');
+documents.move(id, 0); // to the front
+await documents.close(id);
+```
+
+Each entry in `useDocumentsState().documents` has the document's `id`, its `name`, and its
+`status`: `'loading'`, `'locked'`, `'ready'` or `'error'`, so a tab can show a spinner or a lock.
+
+## Talk to a specific document
+
+A component talks to the active document. Inside a `<DocumentScope>`, it talks to the one you name,
+whatever is active:
+
+```tsx
+<DocumentScope id={documentId}>
+  <Stage>{() => <RenderLayer />}</Stage>
+  <ZoomControls />
+</DocumentScope>
+```
+
+Every hook inside, such as `useStage()` or `useSearch()`, uses that document. That's how you show
+two documents at once, or a preview of one while another is active.
+
+## Side by side
+
+The view manager arranges documents into panes, each with its own tabs, like split editors in a
+code editor. Register `viewManagerPlugin()`, then render one Stage per pane:
+
+```tsx
+import { useViewManager, useViewManagerState } from '@embedpdf/react/view-manager';
+
+function Panes() {
+  const views = useViewManager();
+  const { panes, focusedPaneId } = useViewManagerState();
+
+  return (
+    <div className="panes">
+      {panes.map((pane) => (
+        <section key={pane.id} data-focused={pane.id === focusedPaneId} onFocus={() => views.setFocusedPane(pane.id)}>
+          <PaneTabs pane={pane} />
+          {pane.activeDocumentId && (
+            <DocumentScope id={pane.activeDocumentId}>
+              <Stage>{() => <RenderLayer />}</Stage>
+            </DocumentScope>
+          )}
+        </section>
+      ))}
+    </div>
+  );
+}
+```
+
+| Call                                        | What it does                                              |
+| :------------------------------------------ | :-------------------------------------------------------- |
+| `views.splitPane(documentId)`               | Opens the document in a new pane beside the focused one   |
+| `views.removePane(paneId)`                  | Closes a pane; its documents move to another pane         |
+| `views.setActiveDocument(paneId, id)`       | Shows another of the pane's documents                     |
+| `views.moveDocumentBetween(id, from, to)`   | Drags a tab from one pane to another                      |
+| `views.setFocusedPane(paneId)`              | Makes a pane the one new documents open in                |
+
+A document opened with `documents.open()` lands in the focused pane.
+
+## Events
+
+```ts
+useDocumentsEvent(
+  (documents) => documents.onActiveChanged,
+  ({ documentId }) => router.replace(`/documents/${documentId}`),
+);
+```
+
+| Event                        | Fires when                              | Carries                                 |
+| :--------------------------- | :-------------------------------------- | :-------------------------------------- |
+| `onActiveChanged`            | Another document became the active one  | `documentId`, `previousDocumentId`      |
+| View manager `onPaneCreated` | A pane was added                        | `paneId`                                |
+| View manager `onPaneRemoved` | A pane was closed                       | `paneId`                                |
+| View manager `onFocusChanged`| Another pane got the focus              | `paneId`                                |
+| View manager `onDocumentMoved` | A document moved between panes        | `documentId`, `from`, `to`              |
+
+The view manager's events come from `useViewManagerEvent()`. Opening and closing documents are on
+[Opening documents](opening#events).
+
+## Good to know
+
+### Memory
+
+<Engine local>
+
+Each open document holds its file in the engine's memory. Close documents the user is done with,
+especially large ones.
+
+</Engine>
+
+<Engine cloud>
+
+Each open document is a session on your server. Close documents the user is done with.
+
+</Engine>
+
+### One Stage per view
+
+A Stage shows one document. For two documents at once, render two Stages, each in its own
+`<DocumentScope>`. For two views of one document, see
+[Two views of one document](../viewing/stage#two-views-of-one-document).

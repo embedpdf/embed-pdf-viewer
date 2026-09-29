@@ -1,6 +1,7 @@
 import type { ConformanceFixture, ConformanceTestRunner } from './runMetadataConformance';
 import type { DocumentHandle } from '../engine/DocumentHandle';
 import type { Engine } from '../engine/Engine';
+import { isLocalDocument, type LocalDocumentHandle } from '../engine/LocalDocumentHandle';
 import { EngineError } from '../errors/EngineError';
 import { EngineErrorCode } from '../errors/EngineErrorCode';
 
@@ -97,7 +98,7 @@ export function runSignatureConformance(
         expect(snapshot.protection.certification).toBeNull();
         expect(snapshot.protection.fieldLocks).toEqual([]);
         expect(doc.security.allows('doc.pages.assemble')).toBe(true);
-        if (doc.version) {
+        if (isLocalDocument(doc)) {
           const version = await doc.version();
           expect(version.byteLength).toBe(bytes.byteLength);
           expect(version.sha256).toBe(await sha256Hex(bytes));
@@ -176,20 +177,16 @@ export function runSignatureConformance(
         const fields = await doc.forms.list();
         const text = fields.fields.find((f) => f.name === fixture.textField)!;
         expect(text).toBeTruthy();
-        await doc.forms.setValue(
-          { kind: 'objectNumber', fieldObjectNumber: text.fieldObjectNumber },
-          {
-            type: 'text',
-            value: 'unsaved',
-          },
-        );
+        await doc.forms.setValue(text.ref, {
+          value: 'unsaved',
+        });
         const again = await doc.signatures.list();
         expect(again.revisions).toEqual(snapshot.revisions);
         expect(again.signatures.map((s) => [s.coverage, s.revisionIndex, s.byteRange])).toEqual(
           snapshot.signatures.map((s) => [s.coverage, s.revisionIndex, s.byteRange]),
         );
         expect(toHex(await doc.signatures.getDigest(first.field, 'sha256'))).toBe(toHex(digest));
-        if (doc.version) {
+        if (isLocalDocument(doc)) {
           expect((await doc.version()).sha256).toBe(await sha256Hex(bytes));
         }
       } finally {
@@ -288,14 +285,14 @@ export function runSignatureConformance(
         expect(doc.security.allows('doc.forms.fill')).toBe(true);
         let caught: unknown;
         try {
-          await doc.forms.setValue(lockedRef, { type: 'text', value: 'changed' });
+          await doc.forms.setValue(lockedRef, { value: 'changed' });
         } catch (err) {
           caught = err;
         }
         expect(EngineError.is(caught, EngineErrorCode.ProtectedDocument)).toBe(true);
         // A script's effects can't reach it either: the effect is rejected.
         const effects = await doc.forms.applyEffects([
-          { kind: 'setValue', ref: lockedRef, value: { type: 'text', value: 'changed' } },
+          { kind: 'setValue', ref: lockedRef, value: { value: 'changed' } },
         ]);
         expect(effects.results[0]).toMatchObject({
           status: 'rejected',
@@ -322,7 +319,6 @@ export function runSignatureConformance(
       const permitted = await open(permitEngine, opts, fixture);
       try {
         const result = await permitted.forms.setValue(lockedRef, {
-          type: 'text',
           value: 'changed',
         });
         expect(result.field.name).toBe(fixture.lockedField);
@@ -447,10 +443,7 @@ function runAnalysisTests(
       });
       expect(clean.steps).toHaveLength(0);
       expect(clean.verdict).toBe('unchanged');
-      await doc.forms.setValue(
-        { kind: 'fqn', name: fx.textField },
-        { type: 'text', value: 'draft' },
-      );
+      await doc.forms.setValue({ kind: 'fqn', name: fx.textField }, { value: 'draft' });
       const persisted = await doc.signatures.analyze({ since: { signatureIndex: 0 } });
       expect(persisted.steps).toHaveLength(0);
       const working = await doc.signatures.analyze({
@@ -519,7 +512,7 @@ function runAnalysisTests(
     try {
       await locked.forms.setValue(
         { kind: 'fqn', name: opts.fixtures.fieldMdp.lockedField },
-        { type: 'text', value: 'tampered' },
+        { value: 'tampered' },
       );
       const working = await locked.signatures.analyze({
         since: { signatureIndex: 0 },
@@ -559,12 +552,12 @@ function runSigningTests(
   test('sign: prepare seals a candidate, complete installs it, download returns it verbatim', async () => {
     if (!supported()) return;
     const engine = engineOf();
-    const doc = await open(engine, opts, fx());
+    const doc = await openLocal(engine, opts, fx());
     const events: string[] = [];
     const unsubscribe = doc.events.subscribe((event) => events.push(event.type));
     let reopened: DocumentHandle | null = null;
     try {
-      const v0 = await doc.version!();
+      const v0 = await doc.version();
       const before = await doc.signatures.list();
       expect(before.revisions).toHaveLength(1);
       expect(before.signatures).toHaveLength(1);
@@ -590,13 +583,13 @@ function runSigningTests(
       expect(await caughtCode(() => doc.signatures.prepare({ field: sigRef() }))).toBe(
         EngineErrorCode.SigningPending,
       );
-      expect(
-        await caughtCode(() => doc.forms.setValue(textRef(), { type: 'text', value: 'x' })),
-      ).toBe(EngineErrorCode.SigningPending);
+      expect(await caughtCode(() => doc.forms.setValue(textRef(), { value: 'x' }))).toBe(
+        EngineErrorCode.SigningPending,
+      );
       // The live document is untouched.
       const during = await doc.signatures.list();
       expect(during.signatures[0].signed).toBe(false);
-      expect((await doc.version!()).sha256).toBe(v0.sha256);
+      expect((await doc.version()).sha256).toBe(v0.sha256);
 
       // A stale expectedVersion cannot complete.
       expect(
@@ -632,7 +625,7 @@ function runSigningTests(
       expect(result.meta.affectedPages.length >= 1).toBe(true);
 
       // The session is on the new version, and every byte fact follows.
-      expect(await doc.version!()).toEqual(result.version);
+      expect(await doc.version()).toEqual(result.version);
       const after = await doc.signatures.list();
       expect(after.revisions).toHaveLength(2);
       expect(after.signatures[0].signed).toBe(true);
@@ -665,7 +658,7 @@ function runSigningTests(
       expect(replay.version).toEqual(result.version);
       expect((await doc.signatures.cancel(prepared.signingId)).status).toBe('already-completed');
       expect((await doc.signatures.cancel('never-prepared')).status).toBe('unknown');
-      await doc.forms.setValue(textRef(), { type: 'text', value: 'after' });
+      await doc.forms.setValue(textRef(), { value: 'after' });
       // Signing the same field again is refused: it is signed.
       expect(await caughtCode(() => doc.signatures.prepare({ field: sigRef() }))).toBe(
         EngineErrorCode.SignatureRefused,
@@ -683,9 +676,9 @@ function runSigningTests(
 
   test("sign: unsaved edits are sealed in the signature's own revision (layer session)", async () => {
     if (!supported()) return;
-    const doc = await open(engineOf(), opts, fx());
+    const doc = await openLocal(engineOf(), opts, fx());
     try {
-      await doc.forms.setValue(textRef(), { type: 'text', value: 'unsaved' });
+      await doc.forms.setValue(textRef(), { value: 'unsaved' });
       const prepared = await doc.signatures.prepare({ field: sigRef() });
       const result = await doc.signatures.complete({
         signingId: prepared.signingId,
@@ -709,7 +702,7 @@ function runSigningTests(
 
   test('sign: a certification protects the document from the moment it completes', async () => {
     if (!supported()) return;
-    const doc = await open(engineOf(), opts, fx());
+    const doc = await openLocal(engineOf(), opts, fx());
     try {
       expect(doc.security.allows('doc.pages.assemble')).toBe(true);
       const prepared = await doc.signatures.prepare({
@@ -740,7 +733,7 @@ function runSigningTests(
         EngineErrorCode.ProtectedDocument,
       );
       // Filling is still permitted (P = 2), and the certification survives it.
-      await doc.forms.setValue(textRef(), { type: 'text', value: 'filled' });
+      await doc.forms.setValue(textRef(), { value: 'filled' });
       const after = await doc.signatures.list();
       expect(after.signatures[0].coverage).toBe('whole-revision');
     } finally {
@@ -750,7 +743,7 @@ function runSigningTests(
 
   test('sign: a lock freezes the named fields and is mirrored on the field', async () => {
     if (!supported()) return;
-    const doc = await open(engineOf(), opts, fx());
+    const doc = await openLocal(engineOf(), opts, fx());
     try {
       const prepared = await doc.signatures.prepare({
         field: sigRef(),
@@ -764,9 +757,9 @@ function runSigningTests(
       expect(result.signature.fieldMdp).toEqual({ action: 'include', fields: [fx().textField] });
       expect(result.signature.lock).toEqual({ action: 'include', fields: [fx().textField] });
       expect(result.protection.fieldLocks.length >= 1).toBe(true);
-      expect(
-        await caughtCode(() => doc.forms.setValue(textRef(), { type: 'text', value: 'nope' })),
-      ).toBe(EngineErrorCode.ProtectedDocument);
+      expect(await caughtCode(() => doc.forms.setValue(textRef(), { value: 'nope' }))).toBe(
+        EngineErrorCode.ProtectedDocument,
+      );
     } finally {
       await doc.close();
     }
@@ -774,14 +767,14 @@ function runSigningTests(
 
   test('sign: cancel discards the candidate and lifts the fence', async () => {
     if (!supported()) return;
-    const doc = await open(engineOf(), opts, fx());
+    const doc = await openLocal(engineOf(), opts, fx());
     try {
-      const v0 = await doc.version!();
+      const v0 = await doc.version();
       const prepared = await doc.signatures.prepare({ field: sigRef() });
       expect((await doc.signatures.cancel(prepared.signingId)).status).toBe('cancelled');
       expect((await doc.signatures.list()).signatures[0].signed).toBe(false);
-      expect((await doc.version!()).sha256).toBe(v0.sha256);
-      await doc.forms.setValue(textRef(), { type: 'text', value: 'free again' });
+      expect((await doc.version()).sha256).toBe(v0.sha256);
+      await doc.forms.setValue(textRef(), { value: 'free again' });
       expect(
         await caughtCode(() =>
           doc.signatures.complete({
@@ -798,12 +791,12 @@ function runSigningTests(
 
   test('sign: artwork from a PDF page lands on the widget', async () => {
     if (!supported()) return;
-    const doc = await open(engineOf(), opts, fx());
+    const doc = await openLocal(engineOf(), opts, fx());
     try {
       const artwork = await opts.fixtures.artwork.bytes();
       const prepared = await doc.signatures.prepare({
         field: sigRef(),
-        appearance: { pdf: artwork, pageIndex: 0 },
+        appearance: { pdf: artwork },
       });
       const result = await doc.signatures.complete({
         signingId: prepared.signingId,
@@ -817,7 +810,7 @@ function runSigningTests(
       const widget = annots.annotations.find(
         (a) =>
           a.ref.kind === 'objectNumber' &&
-          a.ref.annotObjectNumber === result.signature.widget!.annotObjectNumber,
+          a.ref.objectNumber === result.signature.widget!.objectNumber,
       );
       expect(widget).toBeTruthy();
     } finally {
@@ -828,7 +821,7 @@ function runSigningTests(
   if (opts.openKind === 'layerBytes') {
     test('sign: a layer session keeps its kind, with an empty layer over the new base', async () => {
       if (!supported()) return;
-      const doc = await open(engineOf(), opts, fx());
+      const doc = await openLocal(engineOf(), opts, fx());
       try {
         const prepared = await doc.signatures.prepare({ field: sigRef() });
         const result = await doc.signatures.complete({
@@ -836,7 +829,7 @@ function runSigningTests(
           cms: FAKE_CMS,
           expectedVersion: prepared.expectedVersion,
         });
-        const layer = await doc.downloadLayer!();
+        const layer = await doc.downloadLayer();
         expect(layer.byteLength > 0).toBe(true);
         expect(await sha256Hex(await doc.download())).toBe(result.version.sha256);
       } finally {
@@ -856,6 +849,17 @@ async function reopen(
     return engine.open({ kind: 'layerBytes', id, baseBytes: bytes });
   }
   return engine.open({ kind: 'bytes', id, bytes });
+}
+
+/** A document the signing tests open: they run on the local engine, which has `version()` and layers. */
+async function openLocal(
+  engine: Engine,
+  opts: SignatureConformanceOptions,
+  fixture: ConformanceFixture,
+): Promise<LocalDocumentHandle> {
+  const doc = await open(engine, opts, fixture);
+  if (!isLocalDocument(doc)) throw new Error('the signing tests run on the local engine');
+  return doc;
 }
 
 async function open(

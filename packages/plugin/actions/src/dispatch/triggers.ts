@@ -18,13 +18,13 @@ import type { ActionsConfig, ActionSource, ActionTrigger } from '../contract';
 
 export const sameRef = (left: AnnotationRef, right: AnnotationRef): boolean => {
   if (left.kind === 'objectNumber' && right.kind === 'objectNumber') {
-    return left.annotObjectNumber === right.annotObjectNumber;
+    return left.objectNumber === right.objectNumber;
   }
   if (left.kind === 'nm' && right.kind === 'nm') {
-    return left.page.pageObjectNumber === right.page.pageObjectNumber && left.nm === right.nm;
+    return left.page.objectNumber === right.page.objectNumber && left.nm === right.nm;
   }
   if (left.kind === 'index' && right.kind === 'index') {
-    return left.page.pageObjectNumber === right.page.pageObjectNumber && left.index === right.index;
+    return left.page.objectNumber === right.page.objectNumber && left.index === right.index;
   }
   return false;
 };
@@ -82,7 +82,7 @@ export function createTriggers(ctx: PluginContext<void>, config: ActionsConfig) 
   const lifecycleReads = new Map<PageObjectNumber, Promise<readonly LifecycleAnnotation[]>>();
 
   const lifecycleAnnotationsOf = (page: PageRef): Promise<readonly LifecycleAnnotation[]> => {
-    const key = page.pageObjectNumber;
+    const key = page.objectNumber;
     const cached = lifecycleReads.get(key);
     if (cached) return cached;
     const read = ctx.doc
@@ -112,7 +112,7 @@ export function createTriggers(ctx: PluginContext<void>, config: ActionsConfig) 
   const invalidate = (event: DocumentEvent): void => {
     const pages = annotationPagesOf(event);
     if (pages === 'all') lifecycleReads.clear();
-    else if (pages) for (const page of pages) lifecycleReads.delete(page.pageObjectNumber);
+    else if (pages) for (const page of pages) lifecycleReads.delete(page.objectNumber);
   };
 
   /**

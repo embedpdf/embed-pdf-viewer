@@ -9,7 +9,7 @@ export type DocFormsSetValue200ResponseFieldRadioRef =
 export namespace DocFormsSetValue200ResponseFieldRadioRef {
     export interface ObjectNumber {
         kind: "objectNumber";
-        fieldObjectNumber: number;
+        objectNumber: number;
     }
 
     export interface Fqn {

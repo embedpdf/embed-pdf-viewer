@@ -43,7 +43,11 @@ export function readDestination(
       return { code, params };
     },
   );
-  const at = (i: number): number | null => (i < view.params.length ? view.params[i]! : null);
+  // A null param (the viewer keeps its value) reads as `null`, not the 0
+  // `FPDFDest_GetView` reports for it.
+  const nulls = fn.EPDFDest_GetViewNullParams(destPtr);
+  const at = (i: number): number | null =>
+    i < view.params.length && (nulls & (1 << i)) === 0 ? view.params[i]! : null;
 
   switch (view.code) {
     case DEST_VIEW.xyz:

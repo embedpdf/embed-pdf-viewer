@@ -17,7 +17,7 @@ export interface RevisionToken {
 export function revisionTokensEqual(a: RevisionToken, b: RevisionToken): boolean {
   return (
     a.docSessionId === b.docSessionId &&
-    a.page.pageObjectNumber === b.page.pageObjectNumber &&
+    a.page.objectNumber === b.page.objectNumber &&
     a.generation === b.generation
   );
 }

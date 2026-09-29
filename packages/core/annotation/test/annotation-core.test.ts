@@ -2360,7 +2360,7 @@ describe('annotation-core — rotation', () => {
       ref: {
         kind: 'objectNumber',
         page: PAGE,
-        annotObjectNumber: Number(id.slice(1)),
+        objectNumber: Number(id.slice(1)),
       } as RecordFields['ref'],
       page: PAGE,
       subtype: 'square',
@@ -2492,7 +2492,7 @@ describe('annotation-core — rotation-aware selection (grab + menu + group)', (
       ref: {
         kind: 'objectNumber',
         page: PAGE,
-        annotObjectNumber: Number(id.slice(1)),
+        objectNumber: Number(id.slice(1)),
       } as RecordFields['ref'],
       page: PAGE,
       subtype,
@@ -2570,7 +2570,7 @@ describe('annotation-core — rotation pivots about the rect centre', () => {
       ref: {
         kind: 'objectNumber',
         page: PAGE,
-        annotObjectNumber: Number(id.slice(1)),
+        objectNumber: Number(id.slice(1)),
       } as RecordFields['ref'],
       page: PAGE,
       subtype,
@@ -2690,7 +2690,7 @@ describe('annotation-core — selectionAnchor carries the knob alongside a centr
       ref: {
         kind: 'objectNumber',
         page: PAGE,
-        annotObjectNumber: Number(id.slice(1)),
+        objectNumber: Number(id.slice(1)),
       } as RecordFields['ref'],
       page: PAGE,
       subtype,
@@ -2916,7 +2916,7 @@ describe('annotation-core opaqueBody (stamp) gestures', () => {
   const stamp = (): ModelAnnotation =>
     record({
       id: 'S1',
-      ref: { kind: 'objectNumber', page: PAGE, annotObjectNumber: 900 },
+      ref: { kind: 'objectNumber', page: PAGE, objectNumber: 900 },
       page: PAGE,
       subtype: 'stamp',
       geometry: { kind: 'box', box: { ...STAMP_RECT }, rotation: 0, ellipse: false },
@@ -3151,7 +3151,7 @@ describe('annotation-core — snapping', () => {
       ref: {
         kind: 'objectNumber',
         page: PAGE,
-        annotObjectNumber: Number(id.slice(1)),
+        objectNumber: Number(id.slice(1)),
       } as RecordFields['ref'],
       page: PAGE,
       subtype: 'square',
@@ -3398,7 +3398,7 @@ describe('page-bound rotate knob', () => {
   const stampAt = (id: string, rect: Box, rot = 0, objectNumber = 900): ModelAnnotation =>
     record({
       id,
-      ref: { kind: 'objectNumber', page: PAGE, annotObjectNumber: objectNumber },
+      ref: { kind: 'objectNumber', page: PAGE, objectNumber: objectNumber },
       page: PAGE,
       subtype: 'stamp',
       geometry: { kind: 'box', box: { ...rect }, ellipse: false, rotation: rot ?? 0 },
@@ -3583,7 +3583,7 @@ describe('rotate guides (live rotate chrome mode)', () => {
   const stampAt = (rect: Box): ModelAnnotation =>
     record({
       id: 'S1',
-      ref: { kind: 'objectNumber', page: PAGE, annotObjectNumber: 900 },
+      ref: { kind: 'objectNumber', page: PAGE, objectNumber: 900 },
       page: PAGE,
       subtype: 'stamp',
       geometry: { kind: 'box', box: { ...rect }, rotation: 0, ellipse: false },
@@ -3693,7 +3693,7 @@ describe('group chrome rides live gestures', () => {
   const stampAt = (id: string, rect: Box, objectNumber: number): ModelAnnotation =>
     record({
       id,
-      ref: { kind: 'objectNumber', page: PAGE, annotObjectNumber: objectNumber },
+      ref: { kind: 'objectNumber', page: PAGE, objectNumber: objectNumber },
       page: PAGE,
       subtype: 'stamp',
       geometry: { kind: 'box', box: { ...rect }, rotation: 0, ellipse: false },
@@ -3799,7 +3799,7 @@ describe('marquee vs rotated shapes', () => {
   // AABB spans ≈(122..278, 32..188).
   const bar = record({
     id: 'R1',
-    ref: { kind: 'objectNumber', page: PAGE, annotObjectNumber: 900 },
+    ref: { kind: 'objectNumber', page: PAGE, objectNumber: 900 },
     page: PAGE,
     subtype: 'square',
     geometry: {
@@ -4080,7 +4080,7 @@ describe('render source after an edit (what keeps a raster, what renders live)',
   const committed = (subtype: 'stamp' | 'square'): Model => {
     const annotation = record({
       id: 'A1',
-      ref: { kind: 'objectNumber', annotObjectNumber: 7, page: PAGE },
+      ref: { kind: 'objectNumber', objectNumber: 7, page: PAGE },
       page: PAGE,
       subtype,
       geometry: {
@@ -4168,7 +4168,7 @@ describe('render source after an edit (what keeps a raster, what renders live)',
   it('setFields keeps opaque-body kinds BAKED (a widget restyle re-fetches, never flips)', () => {
     const annotation = record({
       id: 'W1',
-      ref: { kind: 'objectNumber', annotObjectNumber: 9, page: PAGE },
+      ref: { kind: 'objectNumber', objectNumber: 9, page: PAGE },
       page: PAGE,
       subtype: 'widget-text',
       geometry: {
@@ -4220,8 +4220,8 @@ describe('render source after an edit (what keeps a raster, what renders live)',
 });
 
 describe('link prop (attached children in the substrate, read via linkOf)', () => {
-  const REF = { kind: 'objectNumber', page: PAGE, annotObjectNumber: 40 } as const;
-  const CHILD_REF = { kind: 'objectNumber', page: PAGE, annotObjectNumber: 41 } as const;
+  const REF = { kind: 'objectNumber', page: PAGE, objectNumber: 40 } as const;
+  const CHILD_REF = { kind: 'objectNumber', page: PAGE, objectNumber: 41 } as const;
   // The square's key, as the engine keys `REF`: an attached child's `/IRT` finds it by this.
   const S1 = annotationKey(REF);
   const URI = { kind: 'uri', uri: 'https://www.embedpdf.com/' } as const;
@@ -4348,7 +4348,7 @@ describe('link prop (attached children in the substrate, read via linkOf)', () =
 
   it('a REAL visual group keeps working; its attached link child stays excluded', () => {
     const primary = committedSquare();
-    const subRef = { kind: 'objectNumber', page: PAGE, annotObjectNumber: 42 } as const;
+    const subRef = { kind: 'objectNumber', page: PAGE, objectNumber: 42 } as const;
     const P2 = annotationKey(subRef);
     const sub = committedSquare({ id: P2, ref: subRef, annotation: answering(REF, 'group') });
     const child = record({

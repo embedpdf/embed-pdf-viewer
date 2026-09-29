@@ -47,11 +47,11 @@ export function runNamedPagesConformance(
         const layout = await doc.pages.list();
         PageListSnapshotSchema.parse(layout);
         expect(Array.isArray(layout.namedPages)).toBe(true);
-        const pageObjectNumbers = new Set(layout.pages.map((page) => page.ref.pageObjectNumber));
+        const pageObjectNumbers = new Set(layout.pages.map((page) => page.ref.objectNumber));
         for (const entry of layout.namedPages) {
           expect(entry.name.length > 0).toBe(true);
           if (entry.target.kind === 'page') {
-            expect(pageObjectNumbers.has(entry.target.page.pageObjectNumber)).toBe(true);
+            expect(pageObjectNumbers.has(entry.target.page.objectNumber)).toBe(true);
           }
         }
       } finally {
@@ -76,7 +76,7 @@ export function runNamedPagesConformance(
         expect(created.layout.pages.length).toBe(before.pages.length);
         expect(find(created, 'Approved=Goedgekeurd')).toEqual({
           kind: 'page',
-          page: toPageRef(first.ref.pageObjectNumber),
+          page: toPageRef(first.ref.objectNumber),
         });
         expect(created.layout.namedPages.length).toBe(baseline + 1);
         const delta = created.meta.cacheDelta;
@@ -96,7 +96,7 @@ export function runNamedPagesConformance(
         });
         expect(find(replaced, 'Approved=Goedgekeurd')).toEqual({
           kind: 'page',
-          page: toPageRef(second.ref.pageObjectNumber),
+          page: toPageRef(second.ref.objectNumber),
         });
         expect(replaced.layout.namedPages.length).toBe(baseline + 1);
 
@@ -109,7 +109,7 @@ export function runNamedPagesConformance(
         expect(find(renamed, 'Approved=Goedgekeurd')).toBe(undefined);
         expect(find(renamed, 'Approved=Approved')).toEqual({
           kind: 'page',
-          page: toPageRef(second.ref.pageObjectNumber),
+          page: toPageRef(second.ref.objectNumber),
         });
         expect(renamed.layout.namedPages.length).toBe(baseline + 1);
       } finally {
@@ -129,7 +129,7 @@ export function runNamedPagesConformance(
         });
         expect(find(result, key)).toEqual({
           kind: 'page',
-          page: toPageRef(before.pages[0].ref.pageObjectNumber),
+          page: toPageRef(before.pages[0].ref.objectNumber),
         });
         const listed = await doc.pages.list();
         expect(listed.namedPages.some((entry) => entry.name === key)).toBe(true);

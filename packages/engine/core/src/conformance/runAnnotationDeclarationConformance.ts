@@ -244,8 +244,12 @@ export function runAnnotationDeclarationConformance(
         expect(closed.subtype === 'popup' && closed.open).toBe(false);
         const opened = await page.annotations.update(closed.ref, { open: true });
         expect(opened.annotation.subtype === 'popup' && opened.annotation.open).toBe(true);
+        // An annotation has one popup: another note gets the next.
+        const other = (
+          await page.annotations.create({ subtype: 'text', rect: iconRect(rect.x, rect.y + 60) })
+        ).annotation;
         const created = (
-          await page.annotations.create({ subtype: 'popup', rect, parent: note.ref, open: true })
+          await page.annotations.create({ subtype: 'popup', rect, parent: other.ref, open: true })
         ).annotation;
         expect(created.subtype === 'popup' && created.open).toBe(true);
       });
@@ -279,11 +283,9 @@ export function runAnnotationDeclarationConformance(
             subtype: 'free-text',
             box: rect,
             contents: 'x',
-            intent: 'free-text',
-            fontSize: 12,
-            textAlign: 'left',
+            verticalAlign: 'center',
           } as never),
-        ).rejects.toMatchObject(refused('fontFamily'));
+        ).rejects.toMatchObject(refused('verticalAlign'));
         await expect(
           page.annotations.create({
             subtype: 'link',
@@ -492,7 +494,10 @@ export function runAnnotationDeclarationConformance(
           link!.target,
         );
         await expect(
-          page.annotations.update(link!.ref, { target: { kind: 'named', name: 'PrevPage' } }),
+          // Another app's own verb is read, not written (the four page verbs are).
+          page.annotations.update(link!.ref, {
+            target: { kind: 'named', name: 'GoBack' },
+          } as never),
         ).rejects.toMatchObject({ code: EngineErrorCode.InvalidArg, details: { field: 'target' } });
       } finally {
         await doc.close();

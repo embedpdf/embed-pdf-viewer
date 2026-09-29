@@ -202,7 +202,7 @@ describe('what a validator concludes', () => {
         strokeWidth: 2,
       } as never);
       ref = created.annotation.ref;
-      artifact = await doc.downloadLayer!();
+      artifact = await doc.downloadLayer();
     } finally {
       await doc.close();
     }

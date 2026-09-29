@@ -63,7 +63,7 @@ function PlaceByCode() {
       rotation,
     });
     setStatus(
-      `placed ${asset.label} on page ${ref.page.pageObjectNumber === page.ref.pageObjectNumber ? currentPage + 1 : '?'}`,
+      `placed ${asset.label} on page ${ref.page.objectNumber === page.ref.objectNumber ? currentPage + 1 : '?'}`,
     );
   };
 

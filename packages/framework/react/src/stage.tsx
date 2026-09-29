@@ -75,7 +75,7 @@ function PageSurface({
   // The page address this surface hands its layers. The stage rebuilds
   // `VisiblePage.ref` every camera frame, so it is memoized by the number:
   // identity-stable per page, safe for layers to key effects on.
-  const pageObjectNumber = page.ref.pageObjectNumber;
+  const pageObjectNumber = page.ref.objectNumber;
   const pageRef = useMemo(() => toPageRef(pageObjectNumber), [pageObjectNumber]);
   // The page-view demand is a pull: the getter closes over
   // stable references (capability + page address) and reads the stage's live state at
@@ -98,7 +98,7 @@ function PageSurface({
         () => {
           const live = stage
             .listVisiblePages()
-            .find((visiblePage) => visiblePage.ref.pageObjectNumber === pageObjectNumber);
+            .find((visiblePage) => visiblePage.ref.objectNumber === pageObjectNumber);
           return live
             ? { desiredDeviceWidth: live.transform.deviceWidth, visibleRect: live.visibleRect }
             : {
@@ -337,7 +337,7 @@ export function Stage({
       <StageScope token={token}>
         {pages.map((visiblePage) => (
           <PageSurface
-            key={visiblePage.ref.pageObjectNumber} // durable page identity — survives move/delete (matches Angular's `track visiblePage.ref.pageObjectNumber`)
+            key={visiblePage.ref.objectNumber} // durable page identity — survives move/delete (matches Angular's `track visiblePage.ref.objectNumber`)
             documentId={docId ?? ''}
             page={visiblePage}
             frame={frame}
@@ -439,7 +439,7 @@ export function usePageList(explicitToken?: StageTokenProp) {
       left.length === right.length &&
       left.every(
         (pageInfo, i) =>
-          pageInfo.ref.pageObjectNumber === right[i].ref.pageObjectNumber &&
+          pageInfo.ref.objectNumber === right[i].ref.objectNumber &&
           pageInfo.label === right[i].label,
       ),
   );

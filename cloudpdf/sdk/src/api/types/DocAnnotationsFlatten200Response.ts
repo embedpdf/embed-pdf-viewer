@@ -12,7 +12,7 @@ export interface DocAnnotationsFlatten200Response {
 export namespace DocAnnotationsFlatten200Response {
     export interface Page {
         kind: Page.Kind;
-        pageObjectNumber: number;
+        objectNumber: number;
     }
 
     export namespace Page {
@@ -74,7 +74,7 @@ export namespace DocAnnotationsFlatten200Response {
                 export namespace Item {
                     export interface Page {
                         kind: Page.Kind;
-                        pageObjectNumber: number;
+                        objectNumber: number;
                     }
 
                     export namespace Page {

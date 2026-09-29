@@ -72,7 +72,7 @@ describe('Phase 5 layer mutation pipeline', () => {
           previousDocVersion: number;
           docVersion: number;
           pages: Array<{
-            page: { pageObjectNumber: number };
+            page: { objectNumber: number };
             cache: {
               annotationVersion: number;
               contentVersion: number;
@@ -80,12 +80,12 @@ describe('Phase 5 layer mutation pipeline', () => {
           }>;
         };
         affectedPages: Array<{
-          page: { pageObjectNumber: number };
+          page: { objectNumber: number };
           revision: { generation: number };
         }>;
       };
     };
-    expect(body.meta.affectedPages[0]?.page.pageObjectNumber).toBe(1);
+    expect(body.meta.affectedPages[0]?.page.objectNumber).toBe(1);
     expect(body.meta.affectedPages[0]?.revision.generation).toBe(0);
     expect(body.meta.cacheDelta).toMatchObject({
       previousDocVersion: 1,
@@ -214,12 +214,12 @@ describe('Phase 5 layer mutation pipeline', () => {
     expect(fresh.status).toBe(200);
     const manifest = (await fresh.json()) as {
       pages: Array<{
-        state: { page: { pageObjectNumber: number } };
+        state: { page: { objectNumber: number } };
         cache: { annotationVersion: number };
       }>;
     };
     expect(
-      manifest.pages.find((p) => p.state.page.pageObjectNumber === 1)?.cache.annotationVersion,
+      manifest.pages.find((p) => p.state.page.objectNumber === 1)?.cache.annotationVersion,
     ).toBe(2);
   });
 
@@ -533,7 +533,7 @@ describe('Phase 5 layer mutation pipeline', () => {
     const body = (await res.json()) as {
       layout: {
         pageCount: number;
-        pages: Array<{ ref: { pageObjectNumber: number }; index: number }>;
+        pages: Array<{ ref: { objectNumber: number }; index: number }>;
       };
       meta: {
         cacheDelta: {
@@ -545,7 +545,7 @@ describe('Phase 5 layer mutation pipeline', () => {
     };
     // A move returns the new geometry (order), not liveness.
     expect(body.layout.pageCount).toBe(3);
-    expect(body.layout.pages.map((page) => page.ref.pageObjectNumber)).toEqual([3, 1, 2]);
+    expect(body.layout.pages.map((page) => page.ref.objectNumber)).toEqual([3, 1, 2]);
     expect(body.layout.pages.map((page) => page.index)).toEqual([0, 1, 2]);
     // Cloud coherence pins: docVersion + layoutVersion both advance by one,
     // no per-page pin changes.
@@ -603,7 +603,7 @@ describe('Phase 5 layer mutation pipeline', () => {
     const body = (await res.json()) as {
       layout: {
         pageCount: number;
-        pages: Array<{ ref: { pageObjectNumber: number }; rotation: number }>;
+        pages: Array<{ ref: { objectNumber: number }; rotation: number }>;
       };
       meta: {
         cacheDelta: {
@@ -615,7 +615,7 @@ describe('Phase 5 layer mutation pipeline', () => {
     };
     // Rotation is presentation metadata: same pages, same order, new values.
     expect(body.layout.pageCount).toBe(3);
-    expect(body.layout.pages.map((page) => [page.ref.pageObjectNumber, page.rotation])).toEqual([
+    expect(body.layout.pages.map((page) => [page.ref.objectNumber, page.rotation])).toEqual([
       [1, 90],
       [2, 90],
       [3, 0],
@@ -674,7 +674,7 @@ describe('Phase 5 layer mutation pipeline', () => {
     const body = (await res.json()) as {
       layout: {
         pageCount: number;
-        pages: Array<{ ref: { pageObjectNumber: number }; index: number }>;
+        pages: Array<{ ref: { objectNumber: number }; index: number }>;
       };
       meta: {
         cacheDelta: {
@@ -685,7 +685,7 @@ describe('Phase 5 layer mutation pipeline', () => {
       };
     };
     expect(body.layout.pageCount).toBe(2);
-    expect(body.layout.pages.map((page) => page.ref.pageObjectNumber)).toEqual([1, 3]);
+    expect(body.layout.pages.map((page) => page.ref.objectNumber)).toEqual([1, 3]);
     expect(body.layout.pages.map((page) => page.index)).toEqual([0, 1]);
     expect(body.meta.cacheDelta).toEqual({
       previousDocVersion: 1,
@@ -979,7 +979,7 @@ async function beginWeakAnnotationSession(
   layerName: string,
   pageObjectNumbers: number[],
   sub = 'user-1',
-): Promise<{ sessionId: string; pages: Array<{ pageObjectNumber: number }> }> {
+): Promise<{ sessionId: string; pages: Array<{ objectNumber: number }> }> {
   const res = await fetch(
     `${fx.baseUrl}/v1/docs/${docId}/layers/${layerName}/weak-annotation-sessions`,
     {
@@ -992,7 +992,7 @@ async function beginWeakAnnotationSession(
     },
   );
   expect(res.status).toBe(200);
-  return (await res.json()) as { sessionId: string; pages: Array<{ pageObjectNumber: number }> };
+  return (await res.json()) as { sessionId: string; pages: Array<{ objectNumber: number }> };
 }
 
 function cloudIndexRef(

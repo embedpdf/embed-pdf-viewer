@@ -24,7 +24,7 @@ describe('link kind schemas', () => {
     expect(
       PdfDestinationSchema.safeParse({
         kind: 'xyz',
-        page: { kind: 'objectNumber', pageObjectNumber: 12 },
+        page: { kind: 'objectNumber', objectNumber: 12 },
         left: null,
         top: 640,
         zoom: null,
@@ -33,13 +33,13 @@ describe('link kind schemas', () => {
     expect(
       PdfDestinationSchema.safeParse({
         kind: 'fit',
-        page: { kind: 'objectNumber', pageObjectNumber: 3 },
+        page: { kind: 'objectNumber', objectNumber: 3 },
       }).success,
     ).toBe(true);
     expect(
       PdfDestinationSchema.safeParse({
         kind: 'fitR',
-        page: { kind: 'objectNumber', pageObjectNumber: 3 },
+        page: { kind: 'objectNumber', objectNumber: 3 },
         left: 0,
         bottom: 0,
         right: 200,
@@ -50,7 +50,7 @@ describe('link kind schemas', () => {
     expect(
       PdfDestinationSchema.safeParse({
         kind: 'fitR',
-        page: { kind: 'objectNumber', pageObjectNumber: 3 },
+        page: { kind: 'objectNumber', objectNumber: 3 },
       }).success,
     ).toBe(false);
   });
@@ -59,7 +59,7 @@ describe('link kind schemas', () => {
     const arms: PdfLinkTarget[] = [
       {
         kind: 'goto',
-        destination: { kind: 'fit', page: { kind: 'objectNumber', pageObjectNumber: 5 } },
+        destination: { kind: 'fit', page: { kind: 'objectNumber', objectNumber: 5 } },
       },
       { kind: 'uri', uri: 'https://embedpdf.com' },
       { kind: 'goto-remote', file: 'other.pdf' },
@@ -96,8 +96,8 @@ describe('link kind schemas', () => {
       reply: {
         to: {
           kind: 'objectNumber',
-          page: { kind: 'objectNumber', pageObjectNumber: 4 },
-          annotObjectNumber: 77,
+          page: { kind: 'objectNumber', objectNumber: 4 },
+          objectNumber: 77,
         },
         type: 'group',
       },
@@ -123,7 +123,7 @@ describe('link kind schemas', () => {
       subtype: 'link',
       target: {
         kind: 'goto',
-        destination: { kind: 'xyz', page: { kind: 'objectNumber', pageObjectNumber: 9 }, y: 92 },
+        destination: { kind: 'xyz', page: { kind: 'objectNumber', objectNumber: 9 }, y: 92 },
       },
     };
     const clear: LinkPatch = { subtype: 'link', target: null };
@@ -136,30 +136,37 @@ describe('link kind schemas', () => {
 
   test('a read-only target sent back unchanged is kept; a changed one is refused', () => {
     // The engine checks a patch in the file's coordinates, after converting it.
+    // `GoBack` is another app's own verb: read, and kept as it is.
     const current = {
       subtype: 'link',
       rect: { left: 10, bottom: 80, right: 110, top: 100 },
-      target: { kind: 'named', name: 'NextPage' },
+      target: { kind: 'named', name: 'GoBack' },
     } as unknown as AnnotationDTO<PdfCoordinates>;
     // The patch schema takes what a read returns, so a read DTO passes.
-    expect(LinkPatchSchema.safeParse({ target: { kind: 'named', name: 'NextPage' } }).success).toBe(
+    expect(LinkPatchSchema.safeParse({ target: { kind: 'named', name: 'GoBack' } }).success).toBe(
       true,
     );
     const kept = pdfResolveAnnotationPatch(current, {
       subtype: 'link',
-      contents: 'Next',
-      target: { name: 'NextPage', kind: 'named' },
+      contents: 'Back',
+      target: { name: 'GoBack', kind: 'named' },
     });
-    expect(kept).toEqual({ subtype: 'link', contents: 'Next' });
+    expect(kept).toEqual({ subtype: 'link', contents: 'Back' });
     expect(() =>
       pdfResolveAnnotationPatch(current, {
         subtype: 'link',
-        target: { kind: 'named', name: 'PrevPage' },
+        target: { kind: 'named', name: 'Print' },
       }),
     ).toThrow(expect.objectContaining({ code: 'InvalidArg', details: { field: 'target' } }));
     expect(() =>
       pdfResolveAnnotationPatch(current, { subtype: 'link', target: { kind: 'javascript' } }),
     ).toThrow(expect.objectContaining({ code: 'InvalidArg' }));
+    // The four standard page-turning verbs are written like any target.
+    const next = pdfResolveAnnotationPatch(current, {
+      subtype: 'link',
+      target: { kind: 'named', name: 'NextPage' },
+    });
+    expect(next).toEqual({ subtype: 'link', target: { kind: 'named', name: 'NextPage' } });
     // A writable target replaces it.
     const uri = pdfResolveAnnotationPatch(current, {
       subtype: 'link',

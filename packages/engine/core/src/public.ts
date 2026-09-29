@@ -12,6 +12,11 @@ export { AbortError, isAbortError } from './promise/AbortError';
 export { EngineError } from './errors/EngineError';
 export { EngineErrorCode } from './errors/EngineErrorCode';
 
+// Local engine.
+export { isLocalEngine } from './engine/LocalEngine';
+export { isLocalDocument } from './engine/LocalDocumentHandle';
+export { isLocalPage } from './engine/LocalPageHandle';
+
 // Refs.
 export { toPageRef, pageRefsEqual } from './identity/PageRef';
 export { toFieldRef } from './identity/FormFieldRef';
@@ -50,6 +55,7 @@ export {
 
 // Rendering.
 export { snapFullPageViewport } from './engine/DocumentRenderService';
+export { pageTransform } from './geometry/pageTransform';
 
 // Page space and PDF space: for working beside a tool that reads the file's own numbers.
 export {
@@ -69,6 +75,9 @@ export type {
   DocumentHandle,
   DocumentCapabilities,
   PageHandle,
+  LocalEngine,
+  LocalDocumentHandle,
+  LocalPageHandle,
   OpenInput,
   OpenInputBytes,
   OpenInputLayerBytes,
@@ -82,11 +91,14 @@ export type {
   DocCapability,
   // Services.
   MetadataService,
+  CustomMetadataService,
   DocumentPagesService,
   DocumentAnnotationsService,
   PageAnnotationsService,
+  LocalPageAnnotationsService,
   PageTextService,
   PageRenderService,
+  LocalPageRenderService,
   DocumentSecurityService,
   DocumentSecurityState,
   DocumentUnlockInput,
@@ -121,6 +133,14 @@ export type {
   PageImageOptions,
   PageImageHandle,
   PageRaster,
+  PageRenderImage,
+  PageRenderRaster,
+  PageRenderTransform,
+  PageRenderMatrix,
+  PageTransformOptions,
+  PixelPoint,
+  PixelBox,
+  PixelQuad,
   AnnotationRef,
   AnnotationDTO,
   AnnotationDraft,

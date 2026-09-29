@@ -154,7 +154,7 @@ describe('search session', () => {
     expect(first.segments[0].quad.lowerRight).toEqual({ x: 50, y: 50 });
     expect(api.listHits({ page: toPageRef(5) })).toBe(api.listHits({ page: toPageRef(5) }));
     expect(api.getHitCount(toPageRef(5))).toBe(2);
-    expect(api.listPagesWithHits().map((page) => page.pageObjectNumber)).toEqual([5, 7]);
+    expect(api.listPagesWithHits().map((page) => page.objectNumber)).toEqual([5, 7]);
     expect(api.getActiveHitIndex()).toBe(0);
     await kernel.destroy();
   });
@@ -173,7 +173,7 @@ describe('search session', () => {
     await expect(first).resolves.toEqual({ status: 'superseded', hitCount: expect.any(Number) });
     await expect(second).resolves.toEqual({ status: 'complete', hitCount: 1 });
     expect(api.getQuery()?.text).toBe('second');
-    expect(api.listHits().map((hit) => hit.page.pageObjectNumber)).toEqual([7]);
+    expect(api.listHits().map((hit) => hit.page.objectNumber)).toEqual([7]);
     expect(cancelledEvents).toEqual(['superseded']);
     await kernel.destroy();
   });

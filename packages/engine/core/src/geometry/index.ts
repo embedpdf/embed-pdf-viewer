@@ -40,6 +40,21 @@ export {
   pdfTurnOfUpright,
 } from './pointTurn';
 export { renderSize } from './renderSize';
+export type {
+  PageRenderMatrix,
+  PageRenderTransform,
+  PageTransformOptions,
+  PixelBox,
+  PixelPoint,
+  PixelQuad,
+} from './pageTransform';
+export {
+  pageTransform,
+  renderAreaTransform,
+  renderMatrix,
+  renderTargetArea,
+  renderTransform,
+} from './pageTransform';
 export type { WrittenPageBoxes } from './pageBoxes';
 export type { PageBox, PagePoint, PageQuad } from './pageSpace';
 export { pageBoxOf, pagePointOf, pageQuadOf, pdfPointOf, pdfQuadOf, pdfRectOf } from './pageSpace';

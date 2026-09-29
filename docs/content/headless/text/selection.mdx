@@ -1,0 +1,243 @@
+---
+title: Selecting & copying
+description: Let people select text with the pointer or a finger, select text from code, copy it, and show a menu next to the selection.
+---
+
+# Selecting & copying
+
+The selection plugin lets people select text with the mouse or a finger, and lets your code select the
+same text. Register `interactionPlugin()` and `selectionPlugin()`, and put a `<SelectionLayer>`
+above the page:
+
+<Example name="selection/basic" mode="open" />
+
+> **Try it:** drag over text, double-click a word, or triple-click a line. A selection can run from
+> one page onto the next. On a touch screen, long-press a word and drag the handles.
+
+`interactionPlugin()` is the input system every tool shares: the Stage passes the pointer to it,
+the selection plugin handles it, and `<SelectionLayer>` draws the result. So you can restyle or
+replace the highlight without touching how selecting works.
+
+Selecting uses where the characters are on the page, not the text itself. Nothing reads the page's
+text until your code asks for it, and a document can allow selecting while it forbids copying (see
+[Permissions](#permissions)).
+
+## Select text from code
+
+`useSelection()` does from code what the pointer does, and the highlight follows:
+
+<Example name="selection/programmatic" />
+
+```ts
+const selection = useSelection();
+
+selection.select({ page: page.ref, start: 20, count: 40 }); // 40 characters on one page
+selection.selectWordAt(page.ref, { x: 120, y: 80 }); // the word at a point
+selection.selectLineAt(page.ref, { x: 120, y: 80 }); // the line at a point
+selection.selectPage(page.ref);
+selection.selectAll();
+selection.clear();
+```
+
+A search result is already a range, so selecting it takes no conversion:
+
+```ts
+selection.select(hit); // { page, start, count }
+```
+
+For a selection across pages, give where it starts and where it ends:
+
+```ts
+selection.select({
+  start: { page: firstPage.ref, index: 120 },
+  end: { page: lastPage.ref, index: 35 },
+});
+```
+
+Ranges include `start` and stop before `end`, and they count characters as the page stores them,
+not JavaScript string positions. `selection.extendTo(page.ref, point)` grows the current selection
+to a point on a page, as dragging a handle does.
+
+## Show the selection in your UI
+
+`useSelectionState()` gives you what to show, and re-renders when it changes:
+
+```tsx
+const { hasSelection, isSelecting, pages } = useSelectionState();
+
+return <button disabled={!hasSelection}>Highlight</button>;
+```
+
+Every field is listed under [State](#state). For drawing your own highlight, `selection.listSegments(page.ref)` gives you each selected line as
+four corners, turned with the text, and `selection.listRects(page.ref)` a plain box per line.
+
+## Copy the selected text
+
+Reading the text and using the clipboard are two steps:
+
+```ts
+const text = await selection.readText();
+```
+
+`readText()` reads only the selected characters and gives them to you; it doesn't touch the
+clipboard. Lines on different pages are joined with a new line, and with nothing selected it's an
+empty string. `readTextInRange(range)` reads any range without selecting it.
+
+For the clipboard, the React package has a button helper and one component that makes Ctrl+C and
+the browser's Copy menu work:
+
+```tsx
+import { SelectionClipboard, copySelection, useSelection, useSelectionState } from '@embedpdf/react/selection';
+
+function CopyButton() {
+  const selection = useSelection();
+  const { hasSelection } = useSelectionState();
+
+  return (
+    <button disabled={!hasSelection || !selection.canCopy()} onClick={() => copySelection(selection)}>
+      Copy
+    </button>
+  );
+}
+
+// Once per document view: Ctrl+C / Cmd+C and the browser's Copy menu
+<SelectionClipboard />;
+```
+
+`<SelectionClipboard>` reads the text as soon as a selection settles, so the browser's copy can
+answer at once. Pass `prefetch={false}` to read text only when someone copies.
+
+## Add a selection menu
+
+`<SelectionMenu>` places your own UI next to the selection. It hides while the user drags and
+appears when the selection settles:
+
+<Example name="selection/menu" />
+
+Mount it in the Stage's `overlay`, and it stays attached to the text while the user scrolls and zooms.
+The menu only places things; what's in it is yours: copy, comment, highlight, redact. `placement`
+is `'top'`, `'bottom'`, `'left'` or `'right'`, and `gap` the space in pixels.
+
+## On touch screens
+
+A finger has no text cursor, so selection works as it does elsewhere on a phone: **long-press a word,
+then drag the handles.** Add `<SelectionHandles>` to the Stage's overlay, next to your menu:
+
+```tsx
+<Stage
+  overlay={
+    <>
+      <SelectionMenu>
+        <CopyButton />
+      </SelectionMenu>
+      <SelectionHandles />
+    </>
+  }
+>
+  {() => (
+    <>
+      <RenderLayer />
+      <SelectionLayer />
+    </>
+  )}
+</Stage>
+```
+
+Each handle is the selection's own edge, with a round grip. Dragging one grows the selection from the
+other end, across pages too. Grabbing a handle never scrolls the page, and everywhere else a finger
+still scrolls and pinch-zooms. For the small tick a native app gives on long-press, see
+[haptic feedback](../ui/tools#haptic-feedback).
+
+## Methods
+
+Everything `useSelection()` gives you.
+
+| Method                          | What it does                                                                                                                              |
+| :------------------------------ | :---------------------------------------------------------------------------------------------------------------------------------------- |
+| `select(range)`                 | Selects `{ page, start, count }` on one page, or `{ start, end }` across pages. An empty range clears. [Select text from code](#select-text-from-code) |
+| `selectWordAt(page, point)`     | Selects the word at a point, like a double-click. Returns `false` when there's no text there.                                             |
+| `selectLineAt(page, point)`     | Selects the line at a point, like a triple-click. Returns `false` when there's no text there.                                             |
+| `selectPage(page)`              | Selects every character on a page                                                                                                         |
+| `selectAll()`                   | Selects the whole document                                                                                                                |
+| `extendTo(page, point)`         | Grows the selection to a point, as dragging a handle does                                                                                 |
+| `clear()`                       | Clears the selection. Always allowed.                                                                                                     |
+| `readText()`                    | The selected text, or `''` with nothing selected. Needs permission to copy. [Copy the selected text](#copy-the-selected-text)              |
+| `readTextInRange(range)`        | The text of any range, without selecting it                                                                                               |
+| `listSegments(page)`            | Each selected line on a page, as four corners turned with the text                                                                        |
+| `listRects(page)`               | A plain box around each selected line on a page                                                                                           |
+| `getAnchor()`                   | Where a menu attaches: `{ page, bounds }` on the page where the selection ends, or `null`. `<SelectionMenu>` uses it.                      |
+| `getSnapshot()`                 | Everything at once: each page's lines, both ends with their direction, and the range. For drawing your own highlight and handles.         |
+| `canSelect()`, `canCopy()`      | Whether selecting, and reading the selected text, are allowed. [Permissions](#permissions)                                                 |
+
+Every method that returns a promise also takes a `signal` in its options, to cancel it.
+
+## State
+
+Everything `useSelectionState()` gives you. Your component re-renders when a value changes. Outside a
+component, read the same value with the method in the last column.
+
+| Field          | What it is                                                                  | Outside a component   |
+| :------------- | :-------------------------------------------------------------------------- | :-------------------- |
+| `hasSelection` | Whether anything is selected                                                | `hasSelection()`      |
+| `isSelecting`  | Whether the user is still dragging                                          | `isSelecting()`       |
+| `range`        | The selection as `{ start, end }`, to store and pass back to `select()`, or `null` | `getRange()`   |
+| `pages`        | The pages the selection is on, in document order                            | `listSelectedPages()` |
+
+## Settings
+
+Set them when you register the plugin.
+
+| Setting         | What it does                                                | Default |
+| :-------------- | :---------------------------------------------------------- | :------ |
+| `dragThreshold` | How far, in pixels, the pointer moves before a drag selects | `4`     |
+
+The components take their colors as props: `<SelectionLayer color>` (default a translucent blue)
+and `<SelectionHandles color>`.
+
+## Events
+
+```ts
+useSelectionEvent(
+  (selection) => selection.onCommitted,
+  () => prefetchTranslation(),
+);
+```
+
+| Event         | Fires when                                                  | Carries          |
+| :------------ | :---------------------------------------------------------- | :--------------- |
+| `onChanged`   | The selection changed, while dragging too                   | `range`, `pages` |
+| `onCommitted` | A drag or a tap finished selecting                          | `range`          |
+| `onCleared`   | The selection was cleared                                   | —                |
+
+Use `onChanged` for things that follow the selection as it grows, and `onCommitted` for things that
+should happen once, such as creating a highlight.
+
+## Permissions
+
+Selecting and copying are two permissions:
+
+| Permission        | What it allows                                | Check                  |
+| :---------------- | :-------------------------------------------- | :--------------------- |
+| `doc.text.select` | Selecting text, and highlighting it            | `selection.canSelect()` |
+| `doc.text.copy`   | Reading the selected text with `readText()`   | `selection.canCopy()`   |
+
+Without `doc.text.select`, pointer selection does nothing and `select()` is refused; `clear()` always
+works. Without `doc.text.copy`, people can still select and highlight, but `readText()` is refused
+and no page text is sent. So a document can allow markup without copy.
+
+## Good to know
+
+### Characters, not string positions
+
+A range counts characters as the page stores them. Search results, annotations and selections all use
+the same counting, so a range from one goes straight into another.
+
+### No HTML text layer
+
+The selection works from where each character is, so there's no hidden HTML text over the page. That
+keeps large documents fast, and it's why a document can allow selecting without giving away its text.
+
+### Outside the browser
+
+The selection plugin itself has no clipboard or HTML in it, so `readText()` also works in tests and in
+Node. The clipboard is the React package's job.

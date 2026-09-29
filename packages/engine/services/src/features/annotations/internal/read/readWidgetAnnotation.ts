@@ -33,7 +33,7 @@ function readMKColor(
 /**
  * Widget-plane read: /MK colours, /BS border, /DA text defaults, /Q, and
  * the field join. Field-plane data (value, options, flags) lives on
- * `doc.forms` — join via `fieldObjectNumber`.
+ * `doc.forms` — join via `field`, the field's ref.
  */
 export function readWidget(
   fn: PdfFunctions,
@@ -56,7 +56,7 @@ export function readWidget(
     textAlign: textAlignmentFromCode(readTextAlignment(fn, annotPtr)),
     // Joined by the caller (joinWidgetFieldNumbers): the /Parent target is
     // a field dictionary, which annotation-plane primitives cannot follow.
-    fieldObjectNumber: 0,
+    field: null,
     fieldFamily: 'unknown',
   };
 }

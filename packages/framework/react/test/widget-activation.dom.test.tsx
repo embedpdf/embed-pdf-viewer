@@ -122,7 +122,7 @@ describe('widget activation through the DOM (the fake-button pattern)', () => {
         await form.refresh();
         const snapshot = form.getSnapshot();
         const fake = snapshot?.fields.find((field) => field.name === 'fakeButton');
-        expect(fake?.flags.readOnly).toBe(true); // the Test Lab shape, pinned
+        expect(fake?.readOnly).toBe(true); // the Test Lab shape, pinned
         const page = fake!.widgets[0]!.page!;
 
         const dispatched: ActionDispatchEvent[] = [];

@@ -127,6 +127,7 @@ export class CloudEngine implements Engine {
         this.handles.add(handle);
         try {
           await maybeAutoEstablishAccess(handle, head, signal, effectivePassword);
+          await handle.learnProtection(signal);
         } catch (error) {
           await handle.close();
           throw error;
@@ -177,6 +178,7 @@ export class CloudEngine implements Engine {
         this.handles.add(handle);
         try {
           await maybeAutoEstablishAccess(handle, head, signal, effectivePassword);
+          await handle.learnProtection(signal);
         } catch (error) {
           await handle.close();
           throw error;

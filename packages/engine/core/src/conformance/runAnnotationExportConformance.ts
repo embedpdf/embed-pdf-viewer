@@ -47,7 +47,7 @@ export function runAnnotationExportConformance(
       const doc = await opts.open(engine, fixture);
       try {
         const { pages } = await doc.pages.list();
-        const pageRef = toPageRef(pages[0]!.ref.pageObjectNumber);
+        const pageRef = toPageRef(pages[0]!.ref.objectNumber);
         await run(doc.page(pageRef), doc, pageRef);
       } finally {
         await doc.close();
@@ -130,8 +130,8 @@ export function runAnnotationExportConformance(
     // or to the canonical drawing, changes these on purpose: update them here.
     test('exports a document to the same file on every engine', async () => {
       const expected = {
-        'acrobat-stamps': 'df9a5ec066203aa4dae25cc22e5cfb00f97bf6852ab330a8e4e8de1e45de13e1',
-        'acrobat-rewrapped': '729b682bcd5c2d70b0f896dbda4897c3c80ae556e310a244b30f33d772c0a194',
+        'acrobat-stamps': 'c6f5c816a83a0c0c7e591e29dd1dafaeaf589497b36ddc2ee374d22f74d247d1',
+        'acrobat-rewrapped': '1f8eee9a81661decdedd6de35a4b5eff220d4c1b4d6a1fabf6f5e457088d4b5a',
       } as const;
       for (const [fixture, hash] of Object.entries(expected)) {
         await onPage(fixture as AnnotationResourceFixture, async (_page, doc) => {
@@ -236,7 +236,7 @@ export function runAnnotationExportConformance(
         );
         await expect(
           doc.annotations.export({
-            refs: [{ kind: 'objectNumber', page: pageRef, annotObjectNumber: 999_999 }],
+            refs: [{ kind: 'objectNumber', page: pageRef, objectNumber: 999_999 }],
           }),
         ).rejects.toMatchObject(missing);
       });

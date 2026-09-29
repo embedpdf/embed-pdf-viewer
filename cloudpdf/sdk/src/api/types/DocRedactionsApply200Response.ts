@@ -21,7 +21,7 @@ export namespace DocRedactionsApply200Response {
         export namespace Pages {
             export interface Item {
                 kind: Item.Kind;
-                pageObjectNumber: number;
+                objectNumber: number;
             }
 
             export namespace Item {
@@ -46,7 +46,7 @@ export namespace DocRedactionsApply200Response {
         export namespace Item {
             export interface Page {
                 kind: Page.Kind;
-                pageObjectNumber: number;
+                objectNumber: number;
             }
 
             export namespace Page {
@@ -139,7 +139,7 @@ export namespace DocRedactionsApply200Response {
                 export namespace Item {
                     export interface Page {
                         kind: Page.Kind;
-                        pageObjectNumber: number;
+                        objectNumber: number;
                     }
 
                     export namespace Page {

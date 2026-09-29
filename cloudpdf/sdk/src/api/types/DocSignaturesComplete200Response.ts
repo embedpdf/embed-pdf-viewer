@@ -42,14 +42,15 @@ export namespace DocSignaturesComplete200Response {
     export namespace Signature {
         export interface Widget {
             ref: CloudPDF.DocSignaturesComplete200ResponseSignatureWidgetRef | null;
-            annotObjectNumber: number;
+            objectNumber: number;
             page: Widget.Page | null;
+            rect: Widget.Rect | null;
         }
 
         export namespace Widget {
             export interface Page {
                 kind: Page.Kind;
-                pageObjectNumber: number;
+                objectNumber: number;
             }
 
             export namespace Page {
@@ -57,6 +58,13 @@ export namespace DocSignaturesComplete200Response {
                     ObjectNumber: "objectNumber",
                 } as const;
                 export type Kind = (typeof Kind)[keyof typeof Kind];
+            }
+
+            export interface Rect {
+                x: number;
+                y: number;
+                width: number;
+                height: number;
             }
         }
 
@@ -226,7 +234,7 @@ export namespace DocSignaturesComplete200Response {
                 export namespace Item {
                     export interface Page {
                         kind: Page.Kind;
-                        pageObjectNumber: number;
+                        objectNumber: number;
                     }
 
                     export namespace Page {
