@@ -12,6 +12,7 @@ import {
   toPageRef,
   wirePack,
   type DocumentSecurityState,
+  type CustomMetadata,
   type DocumentMetadata,
   type DocumentActionsSnapshot,
   type DocumentSecurityProbeInfo,
@@ -911,6 +912,33 @@ export class DocumentService {
       );
     }
     return result.metadata;
+  }
+
+  /** The Info dict's custom keys, read the same way as `readLayerMetadata`. */
+  async readLayerCustomMetadata(
+    ctx: OpenContext,
+    docId: string,
+    /** Omit for the base view (shared reads use no layer session). */
+    layerName?: string,
+    signal?: AbortSignal,
+  ): Promise<CustomMetadata> {
+    if (layerName !== undefined) await this.ensureLayerOnPool(ctx, docId, layerName);
+    else await this.openOnPool(ctx, docId);
+    const build = (jobId: WorkerJobId) =>
+      wirePack({
+        kind: 'metadata.readCustom' as const,
+        jobId,
+        docId,
+        ...(layerName !== undefined ? { layerName } : {}),
+      });
+    const result = await this.readOnPool(ctx, docId, layerName, build, signal);
+    if (result.tag !== 'metadata.readCustom') {
+      throw new EngineError(
+        EngineErrorCode.WireFormat,
+        `unexpected custom metadata payload: ${result.tag}`,
+      );
+    }
+    return result.custom;
   }
 
   /**

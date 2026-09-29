@@ -15,13 +15,9 @@ import type { DateInput } from './IsoDateTime';
  * (`D:YYYYMMDD...`), keeping a string's offset.
  *
  * `trapped` has no clear-form (it is a tri-valued enum, always present);
- * omit it to leave it untouched.
- *
- * `custom` is a per-key three-state map over non-standard Info entries:
- * a string sets the key, `null` removes it, an absent key leaves it
- * untouched. A standard key (`Title`, …) or one a PDF name can't hold is
- * `InvalidArg` naming it, and nothing is written. `''` is a value
- * everywhere: it reads back `''`, not `null`.
+ * omit it to leave it untouched. `''` is a value everywhere: it reads back
+ * `''`, not `null`. The dict's other keys change through
+ * {@link CustomMetadataPatch}.
  */
 export interface MetadataPatch {
   title?: string | null;
@@ -35,5 +31,4 @@ export interface MetadataPatch {
   /** `/ModDate`. */
   modifiedAt?: DateInput | null;
   trapped?: DocumentMetadataTrapped;
-  custom?: Record<string, string | null>;
 }

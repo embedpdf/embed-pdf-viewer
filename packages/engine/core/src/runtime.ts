@@ -59,6 +59,7 @@ export { passwordPromptFromState } from './engine/passwordPrompt';
 export type { PasswordPrompt } from './engine/passwordPrompt';
 export type { DocumentCapabilities } from './engine/DocumentHandle';
 export type { MetadataService } from './engine/MetadataService';
+export type { CustomMetadataService } from './engine/CustomMetadataService';
 export type { PageHandle } from './engine/PageHandle';
 export type { PageMeasureService } from './engine/PageMeasureService';
 export type {
@@ -105,6 +106,8 @@ export type {
   LayerOpenSource,
   MetadataReadWorkerRequest,
   MetadataUpdateWorkerRequest,
+  MetadataReadCustomWorkerRequest,
+  MetadataUpdateCustomWorkerRequest,
   ActionsReadWorkerRequest,
   AnnotationsListWorkerRequest,
   AnnotationsRenderAppearancesWorkerRequest,

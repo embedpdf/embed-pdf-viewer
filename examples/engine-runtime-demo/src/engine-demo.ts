@@ -50,18 +50,5 @@ export function diffMetadata(a: DocumentMetadata, b: DocumentMetadata): string[]
   for (const k of keys) {
     if (a[k] !== b[k]) diffs.push(`${k}: ${JSON.stringify(a[k])} !== ${JSON.stringify(b[k])}`);
   }
-  const aKeys = Object.keys(a.custom).sort();
-  const bKeys = Object.keys(b.custom).sort();
-  if (aKeys.join(',') !== bKeys.join(',')) {
-    diffs.push(`custom keys differ: ${JSON.stringify(aKeys)} vs ${JSON.stringify(bKeys)}`);
-  } else {
-    for (const k of aKeys) {
-      if (a.custom[k] !== b.custom[k]) {
-        diffs.push(
-          `custom.${k}: ${JSON.stringify(a.custom[k])} !== ${JSON.stringify(b.custom[k])}`,
-        );
-      }
-    }
-  }
   return diffs;
 }

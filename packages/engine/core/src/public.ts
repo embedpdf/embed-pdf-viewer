@@ -72,6 +72,7 @@ export type {
   DocCapability,
   // Services.
   MetadataService,
+  CustomMetadataService,
   DocumentPagesService,
   DocumentAnnotationsService,
   PageAnnotationsService,

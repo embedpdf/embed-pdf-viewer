@@ -157,4 +157,44 @@ describe('remote events: two engines, one document (the collaboration loop)', ()
       await engineB.destroy();
     }
   });
+
+  test("custom keys: B hears A's write as metadata.customUpdated and its next read sees it", async () => {
+    if (!fx) throw new Error('fixture not initialised');
+    const engineA = cloudEngine({
+      baseUrl: fx.baseUrl,
+      token: docScopedToken(fx, TENANT_ID, DOC_ID),
+    });
+    const engineB = cloudEngine({
+      baseUrl: fx.baseUrl,
+      token: docScopedToken(fx, TENANT_ID, DOC_ID),
+    });
+    const docA = await engineA.open({ kind: 'id', id: DOC_ID });
+    const docB = await engineB.open({ kind: 'id', id: DOC_ID });
+    try {
+      // B reads first, so its cached manifest points at the old leaf.
+      const before = await docB.metadata.custom.get();
+      expect(before['RemoteKey']).toBeUndefined();
+      const eventsB: DocumentEvent[] = [];
+      docB.events.subscribe((event) => eventsB.push(event));
+      await new Promise((r) => setTimeout(r, 300));
+
+      const written = await docA.metadata.custom.update({ RemoteKey: 'from A' });
+
+      await waitFor(() => eventsB.length >= 1, "B's remote custom-metadata event");
+      const remote = eventsB[0];
+      expect(remote.origin.kind).toBe('remote');
+      expect(remote.type).toBe('metadata.customUpdated');
+      if (remote.type === 'metadata.customUpdated') {
+        expect(remote.custom).toEqual(written.custom);
+        expect(remote.meta).toEqual(written.meta);
+      }
+      // The event's pins moved B to the new leaf: no manual refresh.
+      expect((await docB.metadata.custom.get())['RemoteKey']).toBe('from A');
+    } finally {
+      await docA.close();
+      await docB.close();
+      await engineA.destroy();
+      await engineB.destroy();
+    }
+  });
 });

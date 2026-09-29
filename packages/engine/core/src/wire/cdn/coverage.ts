@@ -79,6 +79,7 @@ const RESOURCE_PLANES: Partial<Record<DocResourceId, readonly LayerScopePlane[]>
   'annotations-export': ['annotations', 'layout'],
   layout: ['layout'],
   metadata: ['metadata'],
+  'metadata-custom': ['metadata'],
   actions: ['actions'],
   attachments: ['attachments'],
   'attachment-files': ['attachments'],

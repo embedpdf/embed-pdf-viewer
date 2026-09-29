@@ -22,6 +22,7 @@ import type { AnalysisToken, AnnotationsExportToken } from './tokens';
  *   /v1/docs/{id}/geometry/pages/{N}/data@{ver}              — geometry is its own prefix
  *   /v1/docs/{id}/layers/{L}/manifest@{ver}
  *   /v1/docs/{id}/layers/{L}/metadata@{ver}
+ *   /v1/docs/{id}/layers/{L}/metadata/custom@{ver}                — the Info dict's own keys
  *   /v1/docs/{id}/layers/{L}/render/pages/{N}/data@{ver}
  *   /v1/docs/{id}/layers/{L}/text/pages/{N}/data@{ver}
  *   /v1/docs/{id}/layers/{L}/geometry/pages/{N}/data@{ver}
@@ -164,6 +165,21 @@ export const wirePaths = {
   docMetadata: (docId: string, metadataVersion: number) =>
     `/v1/docs/${encodeURIComponent(docId)}/metadata@${encodeMetadataToken(metadataVersion)}`,
 
+  /**
+   * GET: the Info dict's custom keys for the layer at a specific
+   * `metadataVersion` — the same version pointer as `layerMetadata`, since
+   * both halves live in one dict. Content-addressed like it.
+   */
+  layerCustomMetadata: (docId: string, layerName: string, metadataVersion: number) =>
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/metadata/custom@${encodeMetadataToken(metadataVersion)}`,
+
+  layerCustomMetadataCurrent: (docId: string, layerName: string) =>
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/metadata/custom`,
+
+  /** Immutable base custom keys: the shared-URL twin of `layerCustomMetadata`. */
+  docCustomMetadata: (docId: string, metadataVersion: number) =>
+    `/v1/docs/${encodeURIComponent(docId)}/metadata/custom@${encodeMetadataToken(metadataVersion)}`,
+
   /** Immutable catalog-owned actions, independently pinned in the manifest. */
   layerActions: (docId: string, layerName: string, actionsVersion: number) =>
     `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/actions@${encodeActionsToken(actionsVersion)}`,
@@ -233,6 +249,10 @@ export const wirePaths = {
   /** POST: rewrite the document Info dict for the layer (metadata edit). */
   layerMetadataUpdate: (docId: string, layerName: string) =>
     `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/metadata`,
+
+  /** POST: set and remove the Info dict's custom keys for the layer. */
+  layerCustomMetadataUpdate: (docId: string, layerName: string) =>
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/metadata/custom`,
 
   /**
    * Immutable base /EmbeddedFiles listing: the shared-URL variant an
@@ -663,6 +683,7 @@ export const wireTemplates = {
   docHead: '/v1/docs/:docId/head',
   layerManifest: '/v1/docs/:docId/layers/:layerName/manifest',
   layerMetadata: '/v1/docs/:docId/layers/:layerName/metadata',
+  layerCustomMetadata: '/v1/docs/:docId/layers/:layerName/metadata/custom',
   layerRenderPage: '/v1/docs/:docId/layers/:layerName/render/pages/:pageKey/data',
   layerTextPage: '/v1/docs/:docId/layers/:layerName/text/pages/:pageKey/data',
   layerAnnotationItemsAll: '/v1/docs/:docId/layers/:layerName/annotations/items',
