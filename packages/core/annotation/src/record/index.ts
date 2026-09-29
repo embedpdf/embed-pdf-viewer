@@ -30,7 +30,15 @@ import {
 import { FLAG_KEYS } from '../flags';
 import { geomRotation, geomVisualBounds } from '../geometry';
 import { fieldsFor } from '../kinds';
-import type { ModelAnnotation, ModelGeometry, RecordFields, Style, TextStyle } from '../types';
+import type {
+  Id,
+  ModelAnnotation,
+  ModelGeometry,
+  RecordFields,
+  Style,
+  Subtype,
+  TextStyle,
+} from '../types';
 import { freeText } from './kinds/freeText';
 import {
   circle,
@@ -41,13 +49,15 @@ import {
   textNote,
   unsupported,
   widget,
-  widgetKindOf,
 } from './kinds/box';
 import { caret, highlight, redact, squiggly, strikeout, underline } from './kinds/quads';
 import { captionFieldsFor, ink, line, polygon, polyline } from './kinds/stroke';
 import type { KindProjection, LoweredKey, Wire } from './projection';
 import { GENERIC_PROPS } from './props';
+import { groupOf, irtOf, kindOf, refOf } from './identity';
 import { annotationKey, flagsOf, styleFromDTO } from './seam';
+
+export { groupOf, irtOf, kindOf, refOf } from './identity';
 
 export {
   boxGeomFields,
@@ -96,10 +106,6 @@ const wireSubtypeOf = (annotation: RecordFields): string =>
 
 /* ── DTO → model ──────────────────────────────────────────────────────────── */
 
-/** The client kind of a read: its subtype, or a widget's field family. */
-const kindOf = (dto: AnnotationDTO): string =>
-  dto.subtype === 'widget' ? widgetKindOf(dto.fieldFamily) : dto.subtype;
-
 /**
  * Engine DTO → ModelAnnotation, rendering from the engine's
  * appearance raster (`source: 'baked'`, placed by `apBox`). Whether this
@@ -115,23 +121,15 @@ export function fromDTO(dto: AnnotationDTO): ModelAnnotation {
   const strippedRect = 'box' in dto && appearanceTurnOf(dto) !== null ? dto.box : undefined;
   return {
     id: annotationKey(dto.ref),
-    ref: dto.ref,
-    page: dto.page,
-    subtype: kindOf(dto),
     source: 'baked',
     annotation: dto,
-    // Relationship to a parent annotation. `irt` mirrors `/IRT`; `group` is the
-    // primary's key for `/RT /Group` subordinates only (a visual group acts as
-    // a unit). `/RT /R` (comment replies) keep `irt` but are not a visual group.
-    ...(dto.reply ? { irt: annotationKey(dto.reply.to) } : {}),
-    ...(dto.reply?.type === 'group' ? { group: annotationKey(dto.reply.to) } : {}),
     apBox: strippedRect ?? dto.rect,
     ...(strippedRect ? { apRot: geomRotation(projected(dto).geometry) } : {}),
   };
 }
 
-/** What `fieldsOf` works out from an annotation, beside the record's own keys. */
-type Projected = Omit<RecordFields, keyof ModelAnnotation>;
+/** What `fieldsOf` works out from an annotation, beside the record's own keys and its ref. */
+type Projected = Omit<RecordFields, keyof ModelAnnotation | 'ref'>;
 
 const projections = new WeakMap<AnnotationDTO, Projected>();
 
@@ -139,7 +137,13 @@ const projections = new WeakMap<AnnotationDTO, Projected>();
 function projected(dto: AnnotationDTO): Projected {
   const cached = projections.get(dto);
   if (cached) return cached;
+  const irt = irtOf(dto);
+  const group = groupOf(dto);
   const fields: Projected = {
+    page: dto.page,
+    subtype: kindOf(dto),
+    ...(irt !== undefined ? { irt } : {}),
+    ...(group !== undefined ? { group } : {}),
     // `/F` verbatim — every behavioral question (visible? selectable? frozen?)
     // is answered by the core's flag predicates, never derived here.
     flags: flagsOf(dto),
@@ -160,27 +164,23 @@ const recordFields = new WeakMap<ModelAnnotation, RecordFields>();
 export function fieldsOf(record: ModelAnnotation): RecordFields {
   const cached = recordFields.get(record);
   if (cached) return cached;
-  const fields: RecordFields = { ...record, ...projected(record.annotation) };
+  const fields: RecordFields = { ...record, ref: refOf(record), ...projected(record.annotation) };
   recordFields.set(record, fields);
   return fields;
 }
 
-/** The record `fields` describe, holding `annotation`: its keys and how it is drawn, beside it. */
+/** The record `fields` describe, holding `annotation`: its key and how it is drawn, beside it. */
 export function recordOf(fields: RecordFields, annotation: AnnotationDTO): ModelAnnotation {
-  const { id, ref, page, subtype, source, apBox, apRot, apVersion, authority, irt, group } = fields;
+  const { id, ref, source, apBox, apRot, apVersion, authority } = fields;
   return {
     id,
-    ref,
-    page,
-    subtype,
+    ...(ref === null ? { unconfirmed: true as const } : {}),
     source,
     annotation,
     ...(apBox ? { apBox } : {}),
     ...(apRot !== undefined ? { apRot } : {}),
     ...(apVersion !== undefined ? { apVersion } : {}),
     ...(authority ? { authority } : {}),
-    ...(irt !== undefined ? { irt } : {}),
-    ...(group !== undefined ? { group } : {}),
   };
 }
 

@@ -6,7 +6,7 @@
  * when editing ends) and sends the latest text, so it carries every keystroke
  * that waited for it: they settle together, accepted or refused.
  */
-import { richDocOf, type Id, type Point } from '@embedpdf/core-annotation';
+import { type Id, type Point, refOf, richDocOf } from '@embedpdf/core-annotation';
 import {
   annotationKey,
   type AnnotationRef,
@@ -131,7 +131,7 @@ export function createTextEditing(
     },
     getEditingRef: () => {
       const model = store.model();
-      return model.editing ? (model.byId[model.editing]?.ref ?? null) : null;
+      return model.editing ? refOf(model.byId[model.editing]) : null;
     },
     getEditingId: () => store.model().editing,
     draftContents: (ref: AnnotationRef, text: string) => {

@@ -78,7 +78,7 @@ export function computeMoveSnap(
       .filter(
         (id) =>
           !moving.has(id) &&
-          model.byId[id].page.pageObjectNumber === pageObjectNumber &&
+          model.byId[id].annotation.page.pageObjectNumber === pageObjectNumber &&
           isSelectable(model, id) &&
           !anchorModeOf(model.byId[id]),
       )

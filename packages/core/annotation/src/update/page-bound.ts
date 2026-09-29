@@ -96,5 +96,5 @@ export function clampMoveDelta(
 /** The page an edit draft is anchored to — every edit gesture lives on one page. */
 export function editDraftPage(model: Model, draft: Draft): PageRef | null {
   const id = 'id' in draft ? draft.id : 'ids' in draft && draft.ids.length ? draft.ids[0] : null;
-  return id != null ? (model.byId[id]?.page ?? null) : null;
+  return id != null ? (model.byId[id]?.annotation.page ?? null) : null;
 }

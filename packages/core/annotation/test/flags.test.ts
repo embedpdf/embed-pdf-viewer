@@ -230,13 +230,13 @@ describe('flag-driven behavior in the model', () => {
   });
 
   it('setFlags on a record not yet confirmed still asks for the write (it follows the create)', () => {
-    const created = square('new:1', DRAWN_FLAGS, { ref: null });
+    const created = square('nm:1:new-1', DRAWN_FLAGS, { ref: null });
     let model = loaded([created]);
-    model = { ...model, selected: ['new:1'] };
+    model = { ...model, selected: ['nm:1:new-1'] };
     const [next, fx] = step(model, { type: 'setFlags', patch: { locked: true } });
-    expect(next.byId['new:1'].annotation.locked).toBe(true);
+    expect(next.byId['nm:1:new-1'].annotation.locked).toBe(true);
     expect(fx).toEqual([
-      { type: 'patch', id: 'new:1', patch: { subtype: 'square', locked: true } },
+      { type: 'patch', id: 'nm:1:new-1', patch: { subtype: 'square', locked: true } },
     ]);
   });
 

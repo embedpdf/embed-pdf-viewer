@@ -1,17 +1,19 @@
 import { pageRefsEqual } from '@embedpdf/core';
 import {
+  type AnnotationFlags,
   applyStyleToRange,
   expandGroups,
   fieldsOf,
+  type FieldValues,
   geomVisualBounds,
   groupKeyOf,
-  isSelectable,
-  richDocOf,
-  type FieldValues,
+  groupOf,
   type Id,
+  isSelectable,
   type ModelAnnotation,
-  type AnnotationFlags,
   type Rect,
+  refOf,
+  richDocOf,
 } from '@embedpdf/core-annotation';
 import { intersectRects } from '@embedpdf/core-geometry';
 import {
@@ -117,7 +119,9 @@ export function createSelectionWrites(
       const ids = model.order.filter((id) => {
         const annotation = model.byId[id];
         return (
-          !!annotation && (!page || pageRefsEqual(annotation.page, page)) && isSelectable(model, id)
+          !!annotation &&
+          (!page || pageRefsEqual(annotation.annotation.page, page)) &&
+          isSelectable(model, id)
         );
       });
       store.commit({ type: 'select', ids });
@@ -126,7 +130,11 @@ export function createSelectionWrites(
       const model = store.model();
       const ids = model.order.filter((id) => {
         const annotation = model.byId[id];
-        if (!annotation || !pageRefsEqual(annotation.page, page) || !isSelectable(model, id))
+        if (
+          !annotation ||
+          !pageRefsEqual(annotation.annotation.page, page) ||
+          !isSelectable(model, id)
+        )
           return false;
         const { geometry, style } = fieldsOf(annotation);
         const hit = intersectRects(
@@ -179,14 +187,18 @@ export function createSelectionWrites(
       const model = store.model();
       const members = annotations.selectedCommitted();
       if (members.length < 2) return;
-      const pageObjectNumber = members[0].page.pageObjectNumber;
-      if (members.some((annotation) => annotation.page.pageObjectNumber !== pageObjectNumber))
+      const pageObjectNumber = members[0].annotation.page.pageObjectNumber;
+      if (
+        members.some(
+          (annotation) => annotation.annotation.page.pageObjectNumber !== pageObjectNumber,
+        )
+      )
         return; // groups are page-local
       const ordered = [...members].sort(
         (left, right) => model.order.indexOf(left.id) - model.order.indexOf(right.id),
       );
       const [primary, ...rest] = ordered;
-      const primaryRef = primary.ref;
+      const primaryRef = refOf(primary);
       if (!primaryRef) return;
       await Promise.all(
         rest.map((annotation) =>
@@ -200,7 +212,7 @@ export function createSelectionWrites(
         .map((id) => model.byId[id])
         .filter(
           (annotation): annotation is ModelAnnotation =>
-            !!annotation && !!annotation.ref && !!annotation.group,
+            !!annotation && !!refOf(annotation) && !!groupOf(annotation.annotation),
         );
       await Promise.all(subs.map((annotation) => links.writeRelationship(annotation, null)));
     },
@@ -210,17 +222,19 @@ export function createSelectionWrites(
       if (members.length < 2) return false;
       if (
         members.some(
-          (annotation) => annotation.page.pageObjectNumber !== members[0].page.pageObjectNumber,
+          (annotation) =>
+            annotation.annotation.page.pageObjectNumber !==
+            members[0].annotation.page.pageObjectNumber,
         )
       )
         return false;
       // Grouping writes a relationship onto every member — each must
       // pass the per-record update check.
       if (
-        !members.every(
-          (annotation) =>
-            annotation.ref != null && authority.allowsMutation('update', annotation.ref),
-        )
+        !members.every((annotation) => {
+          const ref = refOf(annotation);
+          return ref != null && authority.allowsMutation('update', ref);
+        })
       )
         return false;
       // Already exactly one complete group → nothing to do.
@@ -234,13 +248,16 @@ export function createSelectionWrites(
       // selected group — same per-record write gate as `ungroup` hits.
       const subs = expandGroups(model, model.selected)
         .map((id) => model.byId[id])
-        .filter((annotation): annotation is ModelAnnotation => !!annotation && !!annotation.group);
+        .filter(
+          (annotation): annotation is ModelAnnotation =>
+            !!annotation && !!groupOf(annotation.annotation),
+        );
       return (
         subs.length > 0 &&
-        subs.every(
-          (annotation) =>
-            annotation.ref != null && authority.allowsMutation('update', annotation.ref),
-        )
+        subs.every((annotation) => {
+          const ref = refOf(annotation);
+          return ref != null && authority.allowsMutation('update', ref);
+        })
       );
     },
   };

@@ -6,7 +6,7 @@
  */
 import type { DocumentEvent } from '@embedpdf/core';
 import type { AnnotationFlags, AnnotationRef } from '@embedpdf/engine-core/runtime';
-import { toPageRef } from '@embedpdf/engine-core/runtime';
+import { annotationKey, toPageRef } from '@embedpdf/engine-core/runtime';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { fieldsOf, type Message } from '@embedpdf/core-annotation';
@@ -35,6 +35,9 @@ const drawSquare = (harness: AnnotationHarness) => {
   harness.commit(draw('move', 60, 50));
   return createdRefOf(harness.commit(draw('up', 60, 50)));
 };
+/** The key of the first record a session creates: the `nm` ref it is written under. */
+const firstCreated = (harness: AnnotationHarness) =>
+  annotationKey({ kind: 'nm', page: PAGE, nm: `${harness.state().session.namePrefix}1` });
 const NO_FLAGS: AnnotationFlags = {
   invisible: false,
   hidden: false,
@@ -261,7 +264,7 @@ describe('what the capability says about a write', () => {
     harness.capability.onWriteFailed(failures);
 
     const created = drawSquare(harness);
-    expect(harness.model().order).toEqual(['new:1']);
+    expect(harness.model().order).toEqual([firstCreated(harness)]);
 
     await expect(created).rejects.toMatchObject({ code: 'operation-failed' });
     expect(harness.model().order).toEqual([]);
@@ -442,8 +445,8 @@ describe('a new record before the engine confirms it', () => {
     });
 
     const restyle = harness.capability.updateSelection({ color: '#00ff00' });
-    expect(harness.model().order).toEqual(['new:1']);
-    expect(fieldsOf(harness.model().byId['new:1']!).style.color).toBe('#00ff00');
+    expect(harness.model().order).toEqual([firstCreated(harness)]);
+    expect(fieldsOf(harness.model().byId[firstCreated(harness)]!).style.color).toBe('#00ff00');
     expect(harness.update).not.toHaveBeenCalled();
 
     confirm();

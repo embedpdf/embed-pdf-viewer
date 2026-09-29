@@ -125,7 +125,7 @@ describe('Replace Text grouped persistence', () => {
       print: true,
     });
     const [caretId, strikeoutId] = harness.model().order;
-    expect(harness.model().byId[strikeoutId]).toMatchObject({
+    expect(fieldsOf(harness.model().byId[strikeoutId]!)).toMatchObject({
       irt: caretId,
       group: caretId,
     });
@@ -409,7 +409,7 @@ describe('the records mirror', () => {
       { glyphQuad: quadFromRect(rect), advance: 1 },
       'replace-text',
     );
-    const newIds = harness.model().order.filter((id) => id.startsWith('new:'));
+    const newIds = harness.model().order.filter((id) => id.startsWith('nm:'));
     expect(newIds.length).toBeGreaterThan(0);
 
     // obj:41 was deleted while the stream could not be trusted.

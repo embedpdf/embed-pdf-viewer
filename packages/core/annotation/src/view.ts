@@ -52,7 +52,7 @@ import type {
   Point,
 } from './types';
 import type { CreationDraftAnchor } from './types';
-import { fieldsOf } from './record';
+import { fieldsOf, kindOf, refOf } from './record';
 
 const DRAFT_ID = '__draft__';
 const PREVIEW_ID = '__markup_preview__';
@@ -149,7 +149,7 @@ function effStyle(annotation: ModelAnnotation, view: ViewEnv | undefined): Style
  *  `apRot` — so a baked noZoom/noRotate body renders screen-constant too. */
 function effAp(model: Model, id: Id, view: ViewEnv | undefined): { box?: Rect; rot?: number } {
   const annotation = model.byId[id];
-  if (capsFor(annotation.subtype).opaqueBody) {
+  if (capsFor(kindOf(annotation.annotation)).opaqueBody) {
     const geometry = effGeom(model, id, view);
     return {
       box: geometry.kind === 'box' ? geometry.box : annotation.apBox,
@@ -180,7 +180,7 @@ function effSource(model: Model, id: Id): 'baked' | 'vector' {
   // `opaqueBody` kinds have no vector render: they stay baked through every
   // gesture — the bitmap stretches with `effApBox` and tilts via the item's
   // live `rot`, then the engine's re-fit appearance replaces it on commit.
-  if (capsFor(annotation.subtype).opaqueBody) return annotation.source;
+  if (capsFor(kindOf(annotation.annotation)).opaqueBody) return annotation.source;
   // A text box under text edit renders fully live (scene fill/border — and a
   // callout's leader — + DOM text): the flat baked raster can't hide just
   // its text, so any blend doubles it. Geometry gestures flip below; editing
@@ -233,8 +233,8 @@ export function pageItems(model: Model, page: PageRef, view?: ViewEnv): RenderIt
     const distance = measure && measurementLayout(geometry, measure, style);
     items.push({
       id,
-      ref: annotation.ref,
-      subtype: annotation.subtype,
+      ref: refOf(annotation),
+      subtype: kindOf(annotation.annotation),
       geometry,
       box: distance?.visualBounds ?? geomVisualBounds(geometry, style.strokeWidth, style.border),
       apBox: ap.box,
@@ -378,7 +378,7 @@ export function textBoxes(model: Model, page: PageRef, view?: ViewEnv): TextBox[
   for (const id of model.order) {
     const annotation = model.byId[id];
     if (
-      annotation.page.pageObjectNumber !== pageObjectNumber ||
+      annotation.annotation.page.pageObjectNumber !== pageObjectNumber ||
       fieldsOf(annotation).geometry.kind !== 'text-box'
     )
       continue;
@@ -407,8 +407,8 @@ export function selectedItems(model: Model, view?: ViewEnv): RenderItem[] {
     const style = effStyle(annotation, view);
     items.push({
       id,
-      ref: annotation.ref,
-      subtype: annotation.subtype,
+      ref: refOf(annotation),
+      subtype: kindOf(annotation.annotation),
       geometry,
       box: geomVisualBounds(geometry, style.strokeWidth, style.border),
       style,
@@ -448,7 +448,7 @@ function unionBoundsOf(
   const corners: Point[] = [];
   for (const id of model.selected) {
     const annotation = model.byId[id];
-    if (!annotation || annotation.page.pageObjectNumber !== pageObjectNumber) continue;
+    if (!annotation || annotation.annotation.page.pageObjectNumber !== pageObjectNumber) continue;
     corners.push(...effectiveSelectionFrame(model, id, geomOf(id), view).corners);
   }
   return corners.length ? unionRect(corners) : null;
@@ -467,7 +467,9 @@ function placeSelectionKnob(
 ): { at: Point; from: Point } | null {
   const pageObjectNumber = page.pageObjectNumber;
   const selection = model.selected.filter(
-    (id) => isSelectable(model, id) && model.byId[id].page.pageObjectNumber === pageObjectNumber,
+    (id) =>
+      isSelectable(model, id) &&
+      model.byId[id].annotation.page.pageObjectNumber === pageObjectNumber,
   );
   if (selection.length === 1) {
     const annotation = model.byId[selection[0]];
@@ -477,7 +479,8 @@ function placeSelectionKnob(
     // (`noRotate` only exempts it from the page's rotation). The obb takes
     // the projected stroke width (`effStyle`) — with the raw width, the knob
     // drifts off the outline as zoom grows.
-    if (!capsFor(annotation.subtype).rotatable || !annotTransformable(annotation)) return null;
+    if (!capsFor(kindOf(annotation.annotation)).rotatable || !annotTransformable(annotation))
+      return null;
     const frame = effectiveSelectionFrame(model, annotation.id, geomOf(annotation.id), view);
     return placeRotateKnob(frame.corners, knobOffset, pageBox);
   }
@@ -514,7 +517,7 @@ export function selectionKnob(
   const draft = model.draft;
   if (
     draft?.kind === 'rotate' &&
-    model.byId[draft.ids[0]]?.page.pageObjectNumber === page.pageObjectNumber
+    model.byId[draft.ids[0]]?.annotation.page.pageObjectNumber === page.pageObjectNumber
   ) {
     const rest = placeSelectionKnob(
       model,
@@ -558,7 +561,7 @@ export function chrome(
   if (
     model.draft?.kind === 'move' &&
     model.draft.guides.length &&
-    model.byId[model.draft.ids[0]]?.page.pageObjectNumber === pageObjectNumber
+    model.byId[model.draft.ids[0]]?.annotation.page.pageObjectNumber === pageObjectNumber
   ) {
     for (const guide of model.draft.guides)
       nodes.push({ kind: 'guide', axis: guide.axis, at: guide.at, lo: guide.lo, hi: guide.hi });
@@ -569,7 +572,7 @@ export function chrome(
   // affordances are noise; "how far am I" feedback is everything.
   const rd =
     model.draft?.kind === 'rotate' &&
-    model.byId[model.draft.ids[0]]?.page.pageObjectNumber === pageObjectNumber
+    model.byId[model.draft.ids[0]]?.annotation.page.pageObjectNumber === pageObjectNumber
       ? model.draft
       : null;
   if (rd) {
@@ -592,13 +595,15 @@ export function chrome(
     nodes.push({ kind: 'rotate-guides', center: rd.pivot, angle, lines });
   }
   const selection = model.selected.filter(
-    (id) => isSelectable(model, id) && model.byId[id].page.pageObjectNumber === pageObjectNumber,
+    (id) =>
+      isSelectable(model, id) &&
+      model.byId[id].annotation.page.pageObjectNumber === pageObjectNumber,
   );
   if (selection.length === 1) {
     const annotation = model.byId[selection[0]];
     const geometry = effGeom(model, selection[0], view);
     const style = effStyle(annotation, view);
-    const caps = capsFor(annotation.subtype);
+    const caps = capsFor(kindOf(annotation.annotation));
     const rot = geomRotation(geometry);
     const measure = effMeasure(model, annotation.id);
     const distance =
@@ -658,7 +663,9 @@ export function chrome(
 export function selectionBoundsOnPage(model: Model, page: PageRef, view?: ViewEnv): Rect | null {
   const pageObjectNumber = page.pageObjectNumber;
   const selection = model.selected.filter(
-    (id) => isSelectable(model, id) && model.byId[id].page.pageObjectNumber === pageObjectNumber,
+    (id) =>
+      isSelectable(model, id) &&
+      model.byId[id].annotation.page.pageObjectNumber === pageObjectNumber,
   );
   if (selection.length === 0) return null;
   // The rotated AABB: the axis-aligned box that encloses the oriented selection
@@ -687,7 +694,7 @@ export function selectionAnchor(
   if (model.draft?.kind === 'rotate') return null;
   const id = model.selected.find((selectedId) => isSelectable(model, selectedId));
   if (id == null) return null;
-  const page = model.byId[id].page;
+  const page = model.byId[id].annotation.page;
   const view = viewOf?.(page);
   const bounds = selectionBoundsOnPage(model, page, view);
   if (!bounds) return null;

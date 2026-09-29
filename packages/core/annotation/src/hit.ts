@@ -19,7 +19,7 @@ import {
   type Rect,
   type Point,
 } from './types';
-import { fieldsOf } from './record';
+import { fieldsOf, kindOf } from './record';
 
 export type Target =
   | { kind: 'handle'; id: Id; handle: string; cursor: Cursor }
@@ -45,10 +45,10 @@ export function paintOrder(model: Model, page: PageRef): Id[] {
   const other: Id[] = [];
   for (const id of model.order) {
     const annotation = model.byId[id];
-    if (!annotation || annotation.page.pageObjectNumber !== pageObjectNumber) continue;
+    if (!annotation || annotation.annotation.page.pageObjectNumber !== pageObjectNumber) continue;
     if (!viewable(annotation.annotation, model.selected.includes(id))) continue;
     if (isSubstrateOnly(annotation)) continue;
-    (isMarkup(annotation.subtype) ? markup : other).push(id);
+    (isMarkup(kindOf(annotation.annotation)) ? markup : other).push(id);
   }
   return [...markup, ...other];
 }
@@ -58,7 +58,11 @@ export function paintOrder(model: Model, page: PageRef): Id[] {
  *  just won't transform.) */
 export const isSelectable = (model: Model, id: Id): boolean => {
   const annotation = model.byId[id];
-  return !!annotation && annotInteractive(annotation) && capsFor(annotation.subtype).selectable;
+  return (
+    !!annotation &&
+    annotInteractive(annotation) &&
+    capsFor(kindOf(annotation.annotation)).selectable
+  );
 };
 
 /** An anchored kind's quad geometry is bound to underlying text — never moved
@@ -67,7 +71,7 @@ export const isSelectable = (model: Model, id: Id): boolean => {
  *  as fixed as classic markup. Markup kinds themselves have `movable: false`
  *  and never reach this gate. */
 const textBound = (annotation: ModelAnnotation): boolean =>
-  capsFor(annotation.subtype).anchored && fieldsOf(annotation).geometry.kind === 'quads';
+  capsFor(kindOf(annotation.annotation)).anchored && fieldsOf(annotation).geometry.kind === 'quads';
 
 /** Can this annotation be dragged by its body to move? (`locked` freezes it.) */
 export const canMove = (model: Model, id: Id): boolean => {
@@ -75,7 +79,7 @@ export const canMove = (model: Model, id: Id): boolean => {
   return (
     !!annotation &&
     annotTransformable(annotation) &&
-    capsFor(annotation.subtype).movable &&
+    capsFor(kindOf(annotation.annotation)).movable &&
     !textBound(annotation)
   );
 };
@@ -86,7 +90,7 @@ export const canMove = (model: Model, id: Id): boolean => {
  *  the display transform, they don't freeze its size or vertices. */
 const hasHandles = (model: Model, annotation: ModelAnnotation): boolean => {
   if (!annotTransformable(annotation) || textBound(annotation)) return false;
-  const caps = capsFor(annotation.subtype);
+  const caps = capsFor(kindOf(annotation.annotation));
   return caps.resizable || caps.vertexEditable;
 };
 
@@ -110,7 +114,7 @@ const isFilled = (annotation: ModelAnnotation): boolean => {
   return (
     style.interiorColor != null ||
     geometry.kind === 'quads' ||
-    capsFor(annotation.subtype).opaqueBody
+    capsFor(kindOf(annotation.annotation)).opaqueBody
   );
 };
 const inRect = (rect: Rect, point: Point): boolean =>
@@ -136,7 +140,7 @@ function selectionUnionBounds(model: Model, page: PageRef, view: ViewEnv | undef
   const pageObjectNumber = page.pageObjectNumber;
   const selection = model.selected.filter(
     (id) =>
-      model.byId[id]?.page.pageObjectNumber === pageObjectNumber &&
+      model.byId[id]?.annotation.page.pageObjectNumber === pageObjectNumber &&
       isSelectable(model, id) &&
       canMove(model, id),
   );
@@ -156,7 +160,7 @@ export function groupUnionBounds(model: Model, page: PageRef, view?: ViewEnv): R
   const corners: Point[] = [];
   for (const id of model.selected) {
     const annotation = model.byId[id];
-    if (!annotation || annotation.page.pageObjectNumber !== pageObjectNumber) continue;
+    if (!annotation || annotation.annotation.page.pageObjectNumber !== pageObjectNumber) continue;
     corners.push(...annotationSelectionFrame(annotation, view).corners);
   }
   return corners.length ? unionRect(corners) : null;
@@ -183,14 +187,14 @@ export function hitTest(
   const pageObjectNumber = page.pageObjectNumber;
   if (model.selected.length === 1 && isSelectable(model, model.selected[0])) {
     const annotation = model.byId[model.selected[0]];
-    if (annotation.page.pageObjectNumber === pageObjectNumber) {
+    if (annotation.annotation.page.pageObjectNumber === pageObjectNumber) {
       // The rotate knob (checked first — it floats outside the box, clear of
       // the handles), placed on the projected selection frame so it sits exactly
       // where the chrome drew it — a screen-anchored body rotates too (the
       // gesture edits its authored tilt; `noRotate` only exempts it from the
       // page's rotation). Locked suppresses it. `placeRotateKnob` keeps it
       // inside `pageBox`.
-      if (capsFor(annotation.subtype).rotatable && annotTransformable(annotation)) {
+      if (capsFor(kindOf(annotation.annotation)).rotatable && annotTransformable(annotation)) {
         const frame = annotationSelectionFrame(annotation, view);
         const knob = placeRotateKnob(frame.corners, chromeGeometry.knobOffset, pageBox);
         if (
@@ -268,7 +272,7 @@ export function hitTest(
           return {
             kind: 'rotate',
             ids: model.selected.filter(
-              (id) => model.byId[id]?.page.pageObjectNumber === pageObjectNumber,
+              (id) => model.byId[id]?.annotation.page.pageObjectNumber === pageObjectNumber,
             ),
             pivot,
           };
@@ -286,7 +290,7 @@ export function hitTest(
             return {
               kind: 'group-handle',
               ids: model.selected.filter(
-                (id) => model.byId[id]?.page.pageObjectNumber === pageObjectNumber,
+                (id) => model.byId[id]?.annotation.page.pageObjectNumber === pageObjectNumber,
               ),
               handle: handle.id,
               cursor: handle.cursor,

@@ -1,11 +1,12 @@
 import {
-  FLAG_KEYS,
   fieldsOf,
+  FLAG_KEYS,
+  kindOf,
   linkOf,
+  type Model,
+  type ModelAnnotation,
   richDocOf,
   sharedFields,
-  type ModelAnnotation,
-  type Model,
 } from '@embedpdf/core-annotation';
 
 import type { EditableFields, SelectionFlags } from '../contract';
@@ -38,7 +39,8 @@ export function createSelectionFieldsReads(
       ...(text ? { text } : {}),
       // Parents store no link: the committed children are the truth, read
       // through the lens. The link kind reads its own target.
-      link: annotation.subtype === 'link' ? (link ?? null) : linkOf(model, annotation.id),
+      link:
+        kindOf(annotation.annotation) === 'link' ? (link ?? null) : linkOf(model, annotation.id),
     };
   };
 
@@ -50,7 +52,7 @@ export function createSelectionFieldsReads(
     const members = model.selected
       .map((id) => model.byId[id])
       .filter((annotation): annotation is ModelAnnotation => !!annotation);
-    const fields = sharedFields(members.map((annotation) => annotation.subtype));
+    const fields = sharedFields(members.map((annotation) => kindOf(annotation.annotation)));
     const sources = members.map((annotation) => sourcesOf(model, annotation));
     const values = sources.length ? fieldValues(fields, sources[0]!) : {};
     const mixed: string[] = [];

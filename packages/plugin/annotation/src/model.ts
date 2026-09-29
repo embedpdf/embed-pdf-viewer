@@ -21,7 +21,13 @@
  */
 import { initialSession, sameSession } from '@embedpdf/core-annotation';
 import type { Id, ModelAnnotation, Session } from '@embedpdf/core-annotation';
-import { generateUuid, type AnnotationPatch } from '@embedpdf/engine-core/runtime';
+import {
+  annotationKey,
+  generateUuid,
+  type AnnotationDTO,
+  type AnnotationPatch,
+  type AnnotationRef,
+} from '@embedpdf/engine-core/runtime';
 
 import type { AnnotationConfig, ChromeSettings, ChromeSettingsPatch, ToolGhost } from './contract';
 import type { TextSelection } from './rich-text';
@@ -202,49 +208,64 @@ export function writeSettled(
   return { ...state, pending };
 }
 
+/** The `/IRT` a patch writes, if it writes one. */
+const replyOf = (patch: AnnotationPatch | undefined): { to: AnnotationRef } | null | undefined =>
+  (patch as { reply?: { to: AnnotationRef } | null } | undefined)?.reply;
+
 /**
- * A record got another key: a new record was confirmed (`new:<n>` becomes the
- * engine's key, and `ref` its engine ref), or the engine named a weak record.
+ * A record got another key: a new record was confirmed (the key of the `nm`
+ * ref it was written under becomes the engine's key, and `ref` its
+ * annotation's ref), or the engine named a weak record (`ref` its new ref).
  * Its pending changes, render preference and text range follow it, and so do
- * records that point at it. A new record's `create` change stays, under the
- * confirmed key, until its write settles: the records mirror may not hold the
- * record yet (a page read that started before the create is still running).
+ * the annotations that answer it: their `/IRT` names it by `ref`. A new
+ * record's `create` change stays, under the confirmed key, until its write
+ * settles: the records mirror may not hold the record yet (a page read that
+ * started before the create is still running).
  */
 export function followRecord(
   state: AnnotationState,
   from: Id,
   to: Id,
-  ref: ModelAnnotation['ref'],
+  ref: AnnotationRef,
 ): AnnotationState {
-  const points = (record: Partial<ModelAnnotation>) => record.irt === from || record.group === from;
-  const repoint = <T extends Partial<ModelAnnotation>>(record: T): T => ({
+  const answers = (reply: { to: AnnotationRef } | null | undefined): boolean =>
+    !!reply && annotationKey(reply.to) === from;
+  const answering = (annotation: AnnotationDTO): AnnotationDTO =>
+    annotation.reply && answers(annotation.reply)
+      ? { ...annotation, reply: { ...annotation.reply, to: ref } }
+      : annotation;
+  /** The new record `from`, confirmed: keyed `to`, its annotation under the engine's ref. */
+  const confirmed = ({ unconfirmed: _waiting, ...record }: ModelAnnotation): ModelAnnotation => ({
     ...record,
-    ...(record.irt === from ? { irt: to } : {}),
-    ...(record.group === from ? { group: to } : {}),
+    id: to,
+    annotation: { ...record.annotation, ref },
   });
   const touched = state.pending.some(
     (pending) =>
       pending.id === from ||
-      (pending.change.kind === 'create' && points(pending.change.record)) ||
-      (pending.change.kind === 'edit' && points(pending.change.fields)),
+      (pending.change.kind === 'create' && answers(pending.change.record.annotation.reply)) ||
+      (pending.change.kind === 'edit' && answers(replyOf(pending.change.patch))),
   );
   const textSelection =
     state.textSelection?.id === from ? { ...state.textSelection, id: to } : state.textSelection;
   if (!touched && !state.vector[from] && textSelection === state.textSelection) return state;
   const pending = state.pending.map((entry): PendingChange => {
     const { change } = entry;
+    const reply = change.kind === 'edit' ? replyOf(change.patch) : null;
     const followed: RecordChange =
-      change.kind === 'create' && (entry.id === from || points(change.record))
-        ? {
-            kind: 'create',
-            record: {
-              ...repoint(change.record),
-              ...(entry.id === from ? { id: to, ref: ref ?? change.record.ref } : {}),
-            },
-          }
-        : change.kind === 'edit' && points(change.fields)
-          ? { kind: 'edit', fields: repoint(change.fields) }
-          : change;
+      change.kind === 'create' && entry.id === from
+        ? { kind: 'create', record: confirmed(change.record) }
+        : change.kind === 'create' && answers(change.record.annotation.reply)
+          ? {
+              kind: 'create',
+              record: { ...change.record, annotation: answering(change.record.annotation) },
+            }
+          : change.kind === 'edit' && reply && answers(reply)
+            ? {
+                ...change,
+                patch: { ...change.patch, reply: { ...reply, to: ref } } as AnnotationPatch,
+              }
+            : change;
     const id = entry.id === from ? to : entry.id;
     return id === entry.id && followed === change ? entry : { ...entry, id, change: followed };
   });

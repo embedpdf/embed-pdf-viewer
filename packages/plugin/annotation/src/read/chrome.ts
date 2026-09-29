@@ -1,15 +1,16 @@
 import {
   canMove,
   chrome as coreChrome,
-  cursorAt,
-  hitTest,
-  selectionAnchor as coreSelectionAnchor,
   type ChromeGeometry,
   type ChromeNode,
+  cursorAt,
+  hitTest,
   type Id,
   type Model,
-  type Rect,
   type Point,
+  type Rect,
+  refOf,
+  selectionAnchor as coreSelectionAnchor,
 } from '@embedpdf/core-annotation';
 import type { PageRef } from '@embedpdf/engine-core/runtime';
 
@@ -173,7 +174,7 @@ export function createChromeReads(
     hitTestAt: (page: PageRef, point: Point) => {
       const model = store.model();
       const target = hitAt(page, point);
-      if (target.kind === 'annot') return model.byId[target.id]?.ref ?? null;
+      if (target.kind === 'annot') return refOf(model.byId[target.id]);
       if (target.kind === 'empty') return null;
       return refsOfIn(model, model.selected)[0] ?? null; // a handle or the knob belongs to the selection
     },

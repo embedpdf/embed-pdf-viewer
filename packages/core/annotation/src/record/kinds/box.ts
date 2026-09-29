@@ -13,6 +13,7 @@ import { readBox, writeBox } from '../../shapes/box';
 import type { RecordFields, TextStyle } from '../../types';
 import type { KindProjection, Wire } from '../projection';
 import { borderSlice } from '../props';
+import { widgetKindOf } from '../identity';
 import { writableTarget } from '../seam';
 
 /** The engine fields that state a box kind's shape. */
@@ -89,17 +90,6 @@ export const link: KindProjection = {
   draftExtras: (annotation) => ({ target: writableTarget(annotation.link) }),
 };
 
-/** One PDF `widget` subtype → per-family client kinds (radios have no font). */
-const WIDGET_KIND_BY_FAMILY: Record<string, string> = {
-  text: 'widget-text',
-  combobox: 'widget-choice',
-  listbox: 'widget-choice',
-  pushbutton: 'widget-button',
-  checkbox: 'widget-toggle',
-  radio: 'widget-toggle',
-};
-export const widgetKindOf = (family: string): string =>
-  WIDGET_KIND_BY_FAMILY[family] ?? 'widget-box';
 const WIDGET_TEXT_KINDS = new Set(['widget-text', 'widget-choice', 'widget-button']);
 
 export function widgetTextFromDTO(dto: Extract<AnnotationDTO, { subtype: 'widget' }>): TextStyle {

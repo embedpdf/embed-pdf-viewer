@@ -1,5 +1,6 @@
 import { PluginError, memo, pageRefsEqual } from '@embedpdf/core';
 import type { ModelAnnotation, Model } from '@embedpdf/core-annotation';
+import { groupOf, refOf } from '@embedpdf/core-annotation';
 import {
   annotationKey,
   type AnnotationDTO,
@@ -44,10 +45,10 @@ export function createAnnotationReads(
       .filter((record): record is ModelAnnotation => record !== undefined)
       .filter(
         (record) =>
-          (!filter?.page || pageRefsEqual(record.page, filter.page)) &&
+          (!filter?.page || pageRefsEqual(record.annotation.page, filter.page)) &&
           (!filter?.subtype || record.annotation.subtype === filter.subtype) &&
           (filter?.author === undefined || record.annotation.author === filter.author) &&
-          (!group || record.group === group || record.id === group),
+          (!group || groupOf(record.annotation) === group || record.id === group),
       );
   };
   const annotationsOf = (records: readonly ModelAnnotation[]): AnnotationDTO[] =>
@@ -96,21 +97,21 @@ export function createAnnotationReads(
 
   /** The page a ref lives on: where the record was read, else the ref's own page. */
   const pageOf = (ref: AnnotationRef): PageRef =>
-    store.model().byId[annotationKey(ref)]?.page ?? ref.page;
+    store.model().byId[annotationKey(ref)]?.annotation.page ?? ref.page;
 
-  const loadedOrThrow = (ref: AnnotationRef): ModelAnnotation & { ref: AnnotationRef } => {
+  const loadedOrThrow = (ref: AnnotationRef): ModelAnnotation => {
     const annotation = store.model().byId[annotationKey(ref)];
-    if (!annotation || !annotation.ref) {
+    if (!annotation || !refOf(annotation)) {
       throw new PluginError('not-found', 'annotation', 'annotation is not loaded in this document');
     }
-    return annotation as ModelAnnotation & { ref: AnnotationRef };
+    return annotation;
   };
   /** Committed, data-backed annotations in the current selection. */
   const selectedCommitted = (): ModelAnnotation[] => {
     const model = store.model();
     return model.selected
       .map((id) => model.byId[id])
-      .filter((annotation): annotation is ModelAnnotation => !!annotation && !!annotation.ref);
+      .filter((annotation): annotation is ModelAnnotation => !!annotation && !!refOf(annotation));
   };
 
   const api = {
@@ -121,7 +122,7 @@ export function createAnnotationReads(
     getSelection: (): AnnotationRef[] => {
       const model = store.model();
       return model.selected
-        .map((id) => model.byId[id]?.ref)
+        .map((id) => refOf(model.byId[id]))
         .filter((ref): ref is AnnotationRef => ref != null);
     },
   };

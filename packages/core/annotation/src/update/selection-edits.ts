@@ -24,7 +24,7 @@ import { groupUnionBounds } from '../hit';
 import { capsFor, fieldsFor } from '../kinds';
 import { linkChildrenOf } from '../links';
 import { kindTakesLink } from '../props';
-import { fieldsOf, withFields } from '../record';
+import { fieldsOf, kindOf, withFields } from '../record';
 import { annotationTurnPivot } from '../selection';
 import type { Effect, FieldValues, Id, Model, ModelAnnotation, Point } from '../types';
 import { ownGeometry, toVector, withoutRecords } from './changes';
@@ -76,7 +76,7 @@ export function setFields(
     if (!Object.keys(annotationPatchBetween(record.annotation, annotation)).length) continue;
     const next = { ...record, annotation };
     byId ??= { ...model.byId };
-    byId[id] = capsFor(record.subtype).opaqueBody ? next : toVector(next);
+    byId[id] = capsFor(kindOf(record.annotation)).opaqueBody ? next : toVector(next);
   }
   return byId ? [{ ...model, byId }, []] : [model, []];
 }
@@ -95,7 +95,7 @@ export function setTextFormat(
   for (const id of model.selected) {
     const record = model.byId[id];
     if (!record || !annotTransformable(record)) continue;
-    if (!fieldsFor(record.subtype).some((spec) => spec.key === format)) continue;
+    if (!fieldsFor(kindOf(record.annotation)).some((spec) => spec.key === format)) continue;
     const { text } = fieldsOf(record);
     if (!text || (text[format] ?? false) === on) continue;
     byId ??= { ...model.byId };
@@ -115,8 +115,9 @@ export function setLink(model: Model, target: PdfLinkTarget | null): [Model, Eff
   const fx: Effect[] = [];
   for (const id of model.selected) {
     const record = model.byId[id];
-    if (!record || !annotTransformable(record) || !kindTakesLink(record.subtype)) continue;
-    if (record.subtype !== 'link') {
+    if (!record || !annotTransformable(record) || !kindTakesLink(kindOf(record.annotation)))
+      continue;
+    if (kindOf(record.annotation) !== 'link') {
       fx.push({ type: 'syncLink', id, target });
       continue;
     }
@@ -174,7 +175,11 @@ export function setFlags(
 export function rotateSelection(model: Model, deltaDeg: number): [Model, Effect[]] {
   const ids = model.selected.filter((id) => {
     const annotation = model.byId[id];
-    return annotation && annotTransformable(annotation) && capsFor(annotation.subtype).rotatable;
+    return (
+      annotation &&
+      annotTransformable(annotation) &&
+      capsFor(kindOf(annotation.annotation)).rotatable
+    );
   });
   if (!ids.length) return [model, []];
   // pivot: where the engine turns a single shape (`turnPivotOf`: a box's
@@ -190,7 +195,7 @@ export function rotateSelection(model: Model, deltaDeg: number): [Model, Effect[
     const annotation = model.byId[ids[0]];
     pivot = annotationTurnPivot(annotation);
   } else {
-    const page = model.byId[ids[0]].page;
+    const page = model.byId[ids[0]].annotation.page;
     const union = groupUnionBounds({ ...model, selected: ids }, page);
     if (!union) return [model, []];
     pivot = { x: union.x + union.width / 2, y: union.y + union.height / 2 };

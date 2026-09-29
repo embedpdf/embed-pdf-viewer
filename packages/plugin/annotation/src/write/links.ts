@@ -1,4 +1,12 @@
-import { linkChildrenOf, linkOf, type ModelAnnotation, type Id } from '@embedpdf/core-annotation';
+import {
+  fieldsOf,
+  type Id,
+  kindOf,
+  linkChildrenOf,
+  linkOf,
+  type ModelAnnotation,
+  refOf,
+} from '@embedpdf/core-annotation';
 import {
   annotationKey,
   type AnnotationDraft,
@@ -12,7 +20,6 @@ import { linkChildRects, writableTarget } from '@embedpdf/core-annotation';
 import type { AnnotationContext, AnnotationServices } from '../services';
 import type { StoreChange } from '../services/store';
 import { appliedOrThrow, throwIfFailed } from './outcomes';
-import { fieldsOf } from '@embedpdf/core-annotation';
 
 /**
  * Attached links (a Link child riding an editable annotation) and group
@@ -51,7 +58,8 @@ export function createLinkWrites(
    */
   const reconcileChildren = async (id: Id, desired: PdfLinkTarget | null): Promise<void> => {
     const annotation = store.model().byId[id];
-    if (!ctx.doc || !annotation || !annotation.ref || annotation.subtype === 'link') return;
+    if (!ctx.doc || !annotation || !refOf(annotation) || kindOf(annotation.annotation) === 'link')
+      return;
     // Read-only target arms can't be (re)written: children keep their /A and
     // only their rects follow the parent.
     const target = writableTarget(desired);
@@ -69,12 +77,12 @@ export function createLinkWrites(
     for (let i = current.length; i < rects.length; i++) {
       changes.push({
         type: 'create',
-        page: annotation.page,
+        page: annotation.annotation.page,
         draft: {
           subtype: 'link',
           rect: rects[i],
           target,
-          reply: { to: annotation.ref, type: 'group' },
+          reply: { to: refOf(annotation), type: 'group' },
         } as AnnotationDraft,
       });
     }
@@ -127,9 +135,10 @@ export function createLinkWrites(
     record: ModelAnnotation,
     reply: { to: AnnotationRef; type?: 'group' } | null,
   ): Promise<void> => {
-    if (!record.ref) return;
+    const ref = refOf(record);
+    if (!ref) return;
     const patch = relationshipPatch(record.annotation.subtype, reply);
-    await appliedOrThrow(store.apply([{ type: 'update', ref: record.ref, patch }]));
+    await appliedOrThrow(store.apply([{ type: 'update', ref, patch }]));
   };
 
   // A restyle that set or cleared a link: the verb that made it waits for the
@@ -149,7 +158,7 @@ export function createLinkWrites(
         const model = store.model();
         const annotation = model.byId[annotationKey(ref)];
         if (!annotation) return null;
-        return annotation.subtype === 'link'
+        return kindOf(annotation.annotation) === 'link'
           ? (fieldsOf(annotation).link ?? null)
           : linkOf(model, annotation.id);
       },

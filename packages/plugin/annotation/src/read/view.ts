@@ -10,9 +10,10 @@
  */
 import { memo, type Mirror } from '@embedpdf/core';
 import {
-  capsFor,
   type AnnotationView,
+  capsFor,
   type Id,
+  kindOf,
   type Model,
   type ModelAnnotation,
 } from '@embedpdf/core-annotation';
@@ -78,7 +79,7 @@ export function createView(
     if (cached && cached.vector === vector) return cached.annotation;
     const projected = fromDTO(record.dto);
     // Opaque bodies (stamp images, widgets) have no live rendering: always the raster.
-    const live = vector && !capsFor(projected.subtype).opaqueBody;
+    const live = vector && !capsFor(kindOf(projected.annotation)).opaqueBody;
     const annotation: ModelAnnotation = {
       ...projected,
       source: live ? 'vector' : 'baked',
@@ -181,9 +182,9 @@ export function createView(
       const pages = new Map<number, ModelAnnotation[]>();
       for (const id of whole.order) {
         const record = whole.byId[id]!;
-        const list = pages.get(record.page.pageObjectNumber);
+        const list = pages.get(record.annotation.page.pageObjectNumber);
         if (list) list.push(record);
-        else pages.set(record.page.pageObjectNumber, [record]);
+        else pages.set(record.annotation.page.pageObjectNumber, [record]);
       }
       return pages;
     },
@@ -202,7 +203,8 @@ export function createView(
     const cached = pageSlices.get(pageObjectNumber);
     if (cached?.whole === whole) return cached.model;
     const records = recordsByPage().get(pageObjectNumber) ?? NO_RECORDS;
-    const onPage = (id: Id) => whole.byId[id]?.page.pageObjectNumber === pageObjectNumber;
+    const onPage = (id: Id) =>
+      whole.byId[id]?.annotation.page.pageObjectNumber === pageObjectNumber;
     const draft = whole.draft;
     const parts: PageParts = {
       records,

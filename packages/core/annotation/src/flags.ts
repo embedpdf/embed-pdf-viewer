@@ -18,8 +18,13 @@
  *   noZoom/noRotate — screen-anchored body (see anchor.ts)
  *   invisible       — legacy: hide unknown subtypes with no handler
  */
-import { NO_ANNOTATION_FLAGS, type AnnotationFlags } from '@embedpdf/engine-core/runtime';
+import {
+  NO_ANNOTATION_FLAGS,
+  type AnnotationDTO,
+  type AnnotationFlags,
+} from '@embedpdf/engine-core/runtime';
 import { capsFor } from './kinds';
+import { kindOf } from './record/identity';
 
 export type { AnnotationFlags };
 export { NO_ANNOTATION_FLAGS };
@@ -55,11 +60,10 @@ export const viewable = (flags: AnnotationFlags, engaged = false): boolean =>
 export const interactive = (flags: AnnotationFlags): boolean =>
   !flags.hidden && !flags.noView && !flags.readOnly;
 
-/** The subset of a ModelAnnotation these predicates read — keeps them testable bare. */
+/** The part of a ModelAnnotation these predicates read. */
 export interface FlagBearer {
-  subtype: string;
-  /** The record's annotation: its `/F` flags are read off it. */
-  annotation: AnnotationFlags;
+  /** The record's annotation: its kind and `/F` flags are read off it. */
+  annotation: AnnotationDTO;
   /** Session authority projected at ingest (permissions.md). Absent =
    *  unstamped (drafts, wildcard local engines, tests) = allowed. */
   authority?: { update: boolean; delete: boolean };
@@ -69,7 +73,7 @@ export interface FlagBearer {
  *  (ISO 32000 — a ReadOnly form field must still be movable by a form designer;
  *  the form-filling layer enforces field ReadOnly itself). */
 export const annotInteractive = (record: FlagBearer): boolean =>
-  capsFor(record.subtype).ignoresReadOnly
+  capsFor(kindOf(record.annotation)).ignoresReadOnly
     ? !record.annotation.hidden && !record.annotation.noView
     : interactive(record.annotation);
 

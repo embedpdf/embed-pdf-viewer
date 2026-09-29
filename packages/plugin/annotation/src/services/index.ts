@@ -1,5 +1,6 @@
 import type { Mirror } from '@embedpdf/core';
 import type { FontLookup } from '@embedpdf/core-annotation';
+import { refOf } from '@embedpdf/core-annotation';
 
 import type { AnnotationConfig } from '../contract';
 import { createAuthority, type Authority } from './authority';
@@ -51,8 +52,7 @@ export function createServices(
   const geometry = createPageLookup(ctx);
   const records = createRecordsMirror(ctx, events);
   const view = createView(ctx, records);
-  const refOf = (id: string) => view.model().byId[id]?.ref ?? null;
-  const intents = createIntents(ctx, records, events, refOf);
+  const intents = createIntents(ctx, records, events, (id) => refOf(view.model().byId[id]));
   const store = createStore(ctx, view, intents, events);
   const identity = createRecordIdentity(ctx, store, view, records);
   return {

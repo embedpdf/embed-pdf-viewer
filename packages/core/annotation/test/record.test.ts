@@ -26,12 +26,15 @@ import { DRAWN_FLAGS } from '../src/flags';
 import { linkChildrenOf, linkOf } from '../src/links';
 import { isAttachedLink } from '../src/plane';
 import type { Message, Model, ModelAnnotation, RecordFields } from '../src/types';
-import { modelWith, record } from './support';
+import { answering, modelWith, record } from './support';
 import { KINDS, type FieldSpec } from '../src/kinds';
 import { update } from '../src/update';
 import {
   fieldsOf,
   fromDTO,
+  groupOf,
+  irtOf,
+  kindOf,
   linkChildRects,
   toCreateDraft,
   toPatch,
@@ -128,8 +131,8 @@ function squareDTO(
 describe('fromDTO — group/relationship mapping', () => {
   it('leaves irt/group undefined for a top-level annotation', () => {
     const annotation = fromDTO(fromFile(squareDTO(10)));
-    expect(annotation.irt).toBeUndefined();
-    expect(annotation.group).toBeUndefined();
+    expect(irtOf(annotation.annotation)).toBeUndefined();
+    expect(groupOf(annotation.annotation)).toBeUndefined();
   });
 
   it('maps a `/RT /Group` subordinate to both irt and group (the primary key)', () => {
@@ -139,8 +142,8 @@ describe('fromDTO — group/relationship mapping', () => {
       annotObjectNumber: 10,
     };
     const sub = fromDTO(fromFile(squareDTO(11, { to: primary, type: 'group' })));
-    expect(sub.irt).toBe(annotationKey(primary));
-    expect(sub.group).toBe(annotationKey(primary)); // visual group → acts as a unit
+    expect(irtOf(sub.annotation)).toBe(annotationKey(primary));
+    expect(groupOf(sub.annotation)).toBe(annotationKey(primary)); // visual group → acts as a unit
   });
 
   it('maps a `/RT /R` comment reply to irt only, NOT group (not a visual group)', () => {
@@ -150,8 +153,8 @@ describe('fromDTO — group/relationship mapping', () => {
       annotObjectNumber: 10,
     };
     const reply = fromDTO(fromFile(squareDTO(12, { to: parent, type: 'reply' })));
-    expect(reply.irt).toBe(annotationKey(parent));
-    expect(reply.group).toBeUndefined();
+    expect(irtOf(reply.annotation)).toBe(annotationKey(parent));
+    expect(groupOf(reply.annotation)).toBeUndefined();
   });
 });
 
@@ -246,8 +249,7 @@ describe('record — Replace Text authoring', () => {
       style,
       flags: DRAWN_FLAGS,
       source: 'vector',
-      irt: caret.id,
-      group: caret.id,
+      annotation: answering(caret.annotation.ref, 'group'),
     });
 
     expect(draftToFile(toCreateDraft(fieldsOf(caret)))).toMatchObject({
@@ -955,7 +957,7 @@ describe('record — attached links (fold + desired state + link kind mapping)',
 
   it('fromDTO maps a link DTO target onto the link slot', () => {
     const annotation = fromDTO(fromFile(linkDTO(20, URI)));
-    expect(annotation.subtype).toBe('link');
+    expect(kindOf(annotation.annotation)).toBe('link');
     expect(fieldsOf(annotation).link).toEqual(URI);
   });
 

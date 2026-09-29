@@ -3,12 +3,14 @@
  * the records it works on, and each message's change set is laid on top of
  * those records.
  */
-import type { AnnotationDTO } from '@embedpdf/engine-core/runtime';
+import { annotationKey } from '@embedpdf/core';
+import type { AnnotationDTO, AnnotationRef, PageRef } from '@embedpdf/engine-core/runtime';
 
 import { annotationOfRecord, recordOf } from '../src/record';
 import type {
   Effect,
   FieldValues,
+  Id,
   Message,
   Model,
   ModelAnnotation,
@@ -19,10 +21,28 @@ import type {
 } from '../src/types';
 import { initialModel, sameSession, update } from '../src/update';
 
-/** A record's fields for a test, and any of its annotation's fields the test states. */
-export type RecordInput = Omit<RecordFields, 'annotation'> & {
+/**
+ * A record's fields for a test, and any of its annotation's fields the test
+ * states. The annotations it answers are the annotation's (`answering`).
+ */
+export type RecordInput = Omit<RecordFields, 'annotation' | 'irt' | 'group'> & {
   annotation?: Partial<AnnotationDTO>;
 };
+
+/**
+ * The key and ref of a confirmed test record named `name` on `page`: keyed as
+ * the engine keys it, so the records that answer it find it.
+ */
+export function named(name: string, page: PageRef): { id: Id; ref: AnnotationRef } {
+  const ref: AnnotationRef = { kind: 'nm', page, nm: name };
+  return { id: annotationKey(ref), ref };
+}
+
+/** The annotation fields of one answering `parent`: a comment reply, or a `/RT /Group` member. */
+export const answering = (
+  parent: AnnotationRef,
+  type: 'reply' | 'group' = 'reply',
+): Partial<AnnotationDTO> => ({ reply: { to: parent, type } });
 
 /**
  * A record as the plugin hands one to the core: its fields, and the

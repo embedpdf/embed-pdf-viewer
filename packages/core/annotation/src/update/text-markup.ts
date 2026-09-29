@@ -93,8 +93,6 @@ export function createReplaceText(
       geometry: { kind: 'quads', quadPoints: quads },
       style,
       flags: DRAWN_FLAGS,
-      irt: primaryId,
-      group: primaryId,
     },
     { offset: 2, reply: { to: caret.annotation.ref, type: 'group' } },
   );

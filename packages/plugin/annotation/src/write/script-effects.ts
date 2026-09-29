@@ -1,5 +1,6 @@
 import { scriptColorToRgb } from '@embedpdf/core-acrojs';
 import type { ScriptAnnotEffect, ScriptColorArray } from '@embedpdf/core-acrojs';
+import { refOf } from '@embedpdf/core-annotation';
 import {
   colorOf,
   pageBoxOf,
@@ -81,9 +82,10 @@ export function createScriptEffects(
           continue;
         }
         const loaded = store.model().byId[`obj:${entry.annotObjectNumber}`];
-        const pageObjectNumber = loaded?.page.pageObjectNumber ?? entry.page?.pageObjectNumber;
-        let ref = loaded?.ref ?? null;
-        let subtype: string | undefined = loaded?.subtype;
+        const pageObjectNumber =
+          loaded?.annotation.page.pageObjectNumber ?? entry.page?.pageObjectNumber;
+        let ref = refOf(loaded);
+        let subtype: string | undefined = loaded?.annotation.subtype;
         if ((!ref || !subtype) && pageObjectNumber !== undefined) {
           // Read the page from the engine when the model does not have the annotation.
           try {

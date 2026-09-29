@@ -1,4 +1,5 @@
 import type { Id, Model } from '@embedpdf/core-annotation';
+import { refOf } from '@embedpdf/core-annotation';
 import {
   compareIsoDateTime,
   annotationKey,
@@ -50,7 +51,7 @@ export function createThreadIndex(
     const dtos: AnnotationDTO[] = [];
     for (const id of model.order) {
       const record = model.byId[id];
-      if (record?.ref) dtos.push(record.annotation);
+      if (record && refOf(record)) dtos.push(record.annotation);
     }
     const threads = buildCommentThreads(dtos, { currentUserId: currentUserId() });
 

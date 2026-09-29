@@ -19,13 +19,15 @@ import { PluginError, toPluginError } from '@embedpdf/core';
 import {
   capsFor,
   creationDraftAnchor,
-  fromDTO,
-  update,
   type Effect,
+  fromDTO,
   type Id,
-  type Model,
+  kindOf,
   type Message,
+  type Model,
   type ModelAnnotation,
+  refOf,
+  update,
 } from '@embedpdf/core-annotation';
 import {
   annotationKey,
@@ -116,7 +118,7 @@ export interface AnnotationStore {
 
 /** The refs behind a list of model ids (records not yet confirmed have none). */
 export const refsOfIn = (model: Model, ids: readonly Id[]): AnnotationRef[] =>
-  ids.map((id) => model.byId[id]?.ref ?? null).filter((ref): ref is AnnotationRef => ref != null);
+  ids.map((id) => refOf(model.byId[id])).filter((ref): ref is AnnotationRef => ref != null);
 
 const sameIds = (left: readonly Id[], right: readonly Id[]): boolean =>
   left === right || (left.length === right.length && left.every((id, i) => id === right[i]));
@@ -134,41 +136,12 @@ export function recordOfRef(model: Model, ref: AnnotationRef): ModelAnnotation |
     if (
       record &&
       record.annotation.nm === ref.nm &&
-      record.page.pageObjectNumber === ref.page.pageObjectNumber
+      record.annotation.page.pageObjectNumber === ref.page.pageObjectNumber
     ) {
       return record;
     }
   }
   return null;
-}
-
-/** The fields a record reads as from its annotation: everything but its identity and rendering. */
-function fieldsOf(record: ModelAnnotation, annotation: ModelAnnotation['annotation']) {
-  const {
-    id: _id,
-    ref: _ref,
-    page: _page,
-    subtype: _subtype,
-    source: _source,
-    apBox: _apBox,
-    apRot: _apRot,
-    apVersion: _apVersion,
-    authority: _authority,
-    ...read
-  } = fromDTO(annotation);
-  // A field the new annotation no longer has goes (its reply, its measurement…).
-  return {
-    ...record,
-    irt: undefined,
-    group: undefined,
-    text: undefined,
-    label: undefined,
-    measure: undefined,
-    icon: undefined,
-    link: undefined,
-    intent: undefined,
-    ...read,
-  };
 }
 
 /**
@@ -186,7 +159,7 @@ function statedChangeOf(
     const ref: AnnotationRef = { kind: 'nm', page: change.page, nm };
     const draft = { ...change.draft, nm } as AnnotationDraft;
     const onPage = model.order.filter(
-      (id) => model.byId[id]?.page.pageObjectNumber === change.page.pageObjectNumber,
+      (id) => model.byId[id]?.annotation.page.pageObjectNumber === change.page.pageObjectNumber,
     ).length;
     // The annotations it links to are the engine's to look up as it writes
     // (as a change set links them): predicted without them, then stated.
@@ -199,14 +172,12 @@ function statedChangeOf(
       ...(reply ? { reply: { to: reply.to, type: reply.type ?? 'reply' } } : {}),
       ...(parent ? { parent } : {}),
     } as AnnotationDTO;
-    const read = fromDTO(annotation);
-    const id = annotationKey(ref);
     const record: ModelAnnotation = {
-      ...read,
-      id,
-      ref: null,
-      source: capsFor(read.subtype).opaqueBody ? 'baked' : 'vector',
+      ...fromDTO(annotation),
+      unconfirmed: true,
+      source: capsFor(kindOf(annotation)).opaqueBody ? 'baked' : 'vector',
     };
+    const id = record.id;
     return { id, change: { ...change, draft }, pending: { kind: 'create', record } };
   }
   const record = recordOfRef(model, change.ref);
@@ -217,17 +188,14 @@ function statedChangeOf(
   const noFields = Object.keys(change.patch).every((name) => name === 'subtype');
   // A patch that says nothing, with no bytes, is no write at all.
   if (noFields && !change.resources) return { id: record.id, change, pending: null };
-  // Code doesn't take the appearance over: the record renders as it did, and
-  // a raster is fetched again once the engine re-bakes it.
-  const shown = fieldsOf(record, applyAnnotationPatch(record.annotation, change.patch));
+  // The engine's resolve rules, run now: a patch it would refuse throws
+  // before anything shows. Code doesn't take the appearance over: the record
+  // renders as it did, and a raster is fetched again once the engine re-bakes it.
+  applyAnnotationPatch(record.annotation, change.patch);
   return {
     id: record.id,
     change,
-    pending: {
-      kind: 'edit',
-      patch: change.patch,
-      fields: { ...changedFields(record, shown), source: record.source },
-    },
+    pending: { kind: 'edit', patch: change.patch, fields: { source: record.source } },
   };
 }
 
@@ -289,7 +257,7 @@ export function createStore(
       events.draftChanged.emit({ draft: creationDraftAnchor(next) });
     if (previous.editing !== next.editing) {
       events.editingChanged.emit({
-        ref: next.editing ? (next.byId[next.editing]?.ref ?? null) : null,
+        ref: next.editing ? refOf(next.byId[next.editing]) : null,
       });
     }
   });

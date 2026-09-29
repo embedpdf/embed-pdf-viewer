@@ -1,8 +1,18 @@
+import { annotationKey } from '@embedpdf/core';
 import { quadFromRect } from '@embedpdf/core-geometry';
 import { ANNOTATION_DEFAULTS, toPageRef, type AnnotationDTO } from '@embedpdf/engine-core/runtime';
 import { describe, expect, it } from 'vitest';
 
-import { modelWith, record, step, type RecordInput, STYLE, restyle } from './support';
+import {
+  answering,
+  modelWith,
+  named,
+  record,
+  step,
+  type RecordInput,
+  STYLE,
+  restyle,
+} from './support';
 import { cloudyBorderExtent } from '../src/cloudy';
 import { annotDeletable, annotTransformable, DRAWN_FLAGS } from '../src/flags';
 import {
@@ -72,7 +82,7 @@ import {
   selectionKnob,
   textBoxes,
 } from '../src/view';
-import { fieldsOf, withFields } from '../src/record';
+import { fieldsOf, kindOf, withFields } from '../src/record';
 
 const PON = 1;
 const PAGE = toPageRef(PON);
@@ -1535,10 +1545,10 @@ describe('annotation-core', () => {
   });
 
   // ── group annotations ──────────────────────────────────────────────────────
-  const sq = (id: string, x: number, group?: string): ModelAnnotation =>
+  // Squares keyed as the engine keys them, so a member's `/IRT` finds its primary.
+  const sq = (name: string, x: number, primary?: string): ModelAnnotation =>
     record({
-      id,
-      ref: null,
+      ...named(name, PAGE),
       page: PAGE,
       subtype: 'square',
       geometry: {
@@ -1557,35 +1567,36 @@ describe('annotation-core', () => {
       },
       flags: DRAWN_FLAGS,
       source: 'vector',
-      ...(group ? { group } : {}),
+      ...(primary ? { annotation: answering(named(primary, PAGE).ref, 'group') } : {}),
     });
-  // A group: primary P, plus two subordinates pointing at it via `group: 'P'`.
+  const [P, C1, C2, S] = ['P', 'C1', 'C2', 'S'].map((name) => named(name, PAGE).id);
+  // A group: primary P, plus two subordinates answering it as `/RT /Group` members.
   const grouped = (): Model => modelWith([sq('P', 100), sq('C1', 200, 'P'), sq('C2', 300, 'P')]);
 
   it('groupMembers/groupKeyOf resolve a primary and its subordinates from either end', () => {
     const model = grouped();
-    // from a subordinate: its `group` field is the key (the primary id)
-    expect(groupKeyOf(model, 'C1')).toBe('P');
+    // from a subordinate: its `/IRT` is the key (the primary's)
+    expect(groupKeyOf(model, C1)).toBe(P);
     // from the primary: it is the target of subordinates → key is its own id
-    expect(groupKeyOf(model, 'P')).toBe('P');
+    expect(groupKeyOf(model, P)).toBe(P);
     // membership is the same set whichever member you ask about (primary first)
-    expect(groupMembers(model, 'C2')).toEqual(['P', 'C1', 'C2']);
-    expect(groupMembers(model, 'P')).toEqual(['P', 'C1', 'C2']);
+    expect(groupMembers(model, C2)).toEqual([P, C1, C2]);
+    expect(groupMembers(model, P)).toEqual([P, C1, C2]);
   });
 
   it('an ungrouped annotation is its own (singleton) group', () => {
     const model = modelWith([sq('S', 10)]);
-    expect(groupKeyOf(model, 'S')).toBeNull();
-    expect(groupMembers(model, 'S')).toEqual(['S']);
-    expect(expandGroups(model, ['S'])).toEqual(['S']);
+    expect(groupKeyOf(model, S)).toBeNull();
+    expect(groupMembers(model, S)).toEqual([S]);
+    expect(expandGroups(model, [S])).toEqual([S]);
   });
 
   it('clicking one member selects the WHOLE group', () => {
     let model = grouped();
     model = step(model, editPtr('down', 215, 215))[0]; // inside C1
-    expect(model.selected).toEqual(['P', 'C1', 'C2']);
+    expect(model.selected).toEqual([P, C1, C2]);
     // a move gesture is armed across all members (every square is movable)
-    expect(model.draft).toMatchObject({ kind: 'move', ids: ['P', 'C1', 'C2'] });
+    expect(model.draft).toMatchObject({ kind: 'move', ids: [P, C1, C2] });
   });
 
   it('dragging one member moves every member of the group together', () => {
@@ -1596,9 +1607,9 @@ describe('annotation-core', () => {
       editPtr('up', 135, 145),
     ]);
     // all three translate by the same delta (+20, +30)
-    expect(rectGeom(fieldsOf(model.byId['P']).geometry)).toMatchObject({ x: 120, y: 130 });
-    expect(rectGeom(fieldsOf(model.byId['C1']).geometry)).toMatchObject({ x: 220, y: 230 });
-    expect(rectGeom(fieldsOf(model.byId['C2']).geometry)).toMatchObject({ x: 320, y: 330 });
+    expect(rectGeom(fieldsOf(model.byId[P]).geometry)).toMatchObject({ x: 120, y: 130 });
+    expect(rectGeom(fieldsOf(model.byId[C1]).geometry)).toMatchObject({ x: 220, y: 230 });
+    expect(rectGeom(fieldsOf(model.byId[C2]).geometry)).toMatchObject({ x: 320, y: 330 });
   });
 
   it('deleting with a member selected removes the whole group', () => {
@@ -1609,16 +1620,16 @@ describe('annotation-core', () => {
     expect(next.selected).toEqual([]);
     // one engine delete per member, whether or not the engine confirmed it yet
     expect(fx).toEqual([
-      { type: 'delete', id: 'P' },
-      { type: 'delete', id: 'C1' },
-      { type: 'delete', id: 'C2' },
+      { type: 'delete', id: P },
+      { type: 'delete', id: C1 },
+      { type: 'delete', id: C2 },
     ]);
   });
 
   it('shift-clicking a member toggles the entire group out of the selection', () => {
     let model = grouped();
     model = step(model, editPtr('down', 215, 215))[0]; // group selected
-    expect(model.selected).toEqual(['P', 'C1', 'C2']);
+    expect(model.selected).toEqual([P, C1, C2]);
     model = step(model, editPtr('down', 315, 315, /* shift */ true))[0]; // shift-click C2
     expect(model.selected).toEqual([]); // the whole group dropped, not just C2
   });
@@ -1631,7 +1642,7 @@ describe('annotation-core', () => {
       marqueePtr('move', 345, 345),
       marqueePtr('up', 345, 345),
     ]);
-    expect(model.selected).toEqual(['P', 'C1', 'C2']);
+    expect(model.selected).toEqual([P, C1, C2]);
   });
 
   it('the gap inside a selected group is grabbable: a drag there moves every member', () => {
@@ -1639,7 +1650,7 @@ describe('annotation-core', () => {
     // the union box but in the empty gap between members (no member covers it).
     let model = grouped();
     model = run(model, [editPtr('down', 215, 215), editPtr('up', 215, 215)]); // select the whole group
-    expect(model.selected).toEqual(['P', 'C1', 'C2']);
+    expect(model.selected).toEqual([P, C1, C2]);
     // the gap is no longer "empty" — it hits a selected member so the group can drag
     expect(hitTest(model, PAGE, { x: 170, y: 170 }, DEFAULT_CHROME_GEOMETRY, 6).kind).toBe('annot');
     model = run(model, [
@@ -1648,9 +1659,9 @@ describe('annotation-core', () => {
       editPtr('up', 190, 200),
     ]);
     // every member translated by the same delta (+20, +30)
-    expect(rectGeom(fieldsOf(model.byId['P']).geometry)).toMatchObject({ x: 120, y: 130 });
-    expect(rectGeom(fieldsOf(model.byId['C1']).geometry)).toMatchObject({ x: 220, y: 230 });
-    expect(rectGeom(fieldsOf(model.byId['C2']).geometry)).toMatchObject({ x: 320, y: 330 });
+    expect(rectGeom(fieldsOf(model.byId[P]).geometry)).toMatchObject({ x: 120, y: 130 });
+    expect(rectGeom(fieldsOf(model.byId[C1]).geometry)).toMatchObject({ x: 220, y: 230 });
+    expect(rectGeom(fieldsOf(model.byId[C2]).geometry)).toMatchObject({ x: 320, y: 330 });
   });
 
   it('the gap inside a multi-selection shows the move cursor; outside the union still clears', () => {
@@ -1667,7 +1678,7 @@ describe('annotation-core', () => {
     // (no union fallback), so single-selection behaviour is unchanged.
     let model = modelWith([sq('S', 100)]);
     model = run(model, [editPtr('down', 115, 115), editPtr('up', 115, 115)]);
-    expect(model.selected).toEqual(['S']);
+    expect(model.selected).toEqual([S]);
     expect(hitTest(model, PAGE, { x: 300, y: 300 }, DEFAULT_CHROME_GEOMETRY, 6).kind).toBe('empty');
   });
 
@@ -1950,7 +1961,7 @@ describe('annotation-core callout', () => {
     ]);
     const annotation = model.byId[model.order[0]];
     const geometry = fieldsOf(annotation).geometry;
-    expect(annotation.subtype).toBe('free-text');
+    expect(kindOf(annotation.annotation)).toBe('free-text');
     expect(geometry.kind).toBe('text-box');
     if (geometry.kind !== 'text-box' || !geometry.calloutLine)
       throw new Error('expected callout geom');
@@ -2350,7 +2361,7 @@ describe('annotation-core — rotation', () => {
         kind: 'objectNumber',
         page: PAGE,
         annotObjectNumber: Number(id.slice(1)),
-      } as ModelAnnotation['ref'],
+      } as RecordFields['ref'],
       page: PAGE,
       subtype: 'square',
       geometry: { kind: 'box', box: rect, rotation: 0, ellipse: false },
@@ -2482,7 +2493,7 @@ describe('annotation-core — rotation-aware selection (grab + menu + group)', (
         kind: 'objectNumber',
         page: PAGE,
         annotObjectNumber: Number(id.slice(1)),
-      } as ModelAnnotation['ref'],
+      } as RecordFields['ref'],
       page: PAGE,
       subtype,
       geometry,
@@ -2560,7 +2571,7 @@ describe('annotation-core — rotation pivots about the rect centre', () => {
         kind: 'objectNumber',
         page: PAGE,
         annotObjectNumber: Number(id.slice(1)),
-      } as ModelAnnotation['ref'],
+      } as RecordFields['ref'],
       page: PAGE,
       subtype,
       geometry,
@@ -2680,7 +2691,7 @@ describe('annotation-core — selectionAnchor carries the knob alongside a centr
         kind: 'objectNumber',
         page: PAGE,
         annotObjectNumber: Number(id.slice(1)),
-      } as ModelAnnotation['ref'],
+      } as RecordFields['ref'],
       page: PAGE,
       subtype,
       geometry,
@@ -2995,7 +3006,7 @@ describe('page-bound gestures', () => {
     phase: 'down' | 'move' | 'up',
     x: number,
     y: number,
-    page: ModelAnnotation['page'] = PAGE,
+    page: RecordFields['page'] = PAGE,
   ): Message => ({
     type: 'editPointer',
     phase,
@@ -3011,7 +3022,7 @@ describe('page-bound gestures', () => {
     phase: 'down' | 'move' | 'up',
     x: number,
     y: number,
-    page: ModelAnnotation['page'] = PAGE,
+    page: RecordFields['page'] = PAGE,
   ): Message => ({
     type: 'marqueePointer',
     phase,
@@ -3141,7 +3152,7 @@ describe('annotation-core — snapping', () => {
         kind: 'objectNumber',
         page: PAGE,
         annotObjectNumber: Number(id.slice(1)),
-      } as ModelAnnotation['ref'],
+      } as RecordFields['ref'],
       page: PAGE,
       subtype: 'square',
       geometry: { kind: 'box', box: rect, ellipse: false, rotation: rot ?? 0 },
@@ -4148,7 +4159,7 @@ describe('render source after an edit (what keeps a raster, what renders live)',
     model = step(model, { type: 'select', ids: ['nope'] })[0];
     expect(model.selected).toEqual(['A1']);
     // `add` extends rather than replaces.
-    const annotation: ModelAnnotation = { ...model.byId['A1'], id: 'B1', ref: null };
+    const annotation: ModelAnnotation = { ...model.byId['A1'], id: 'B1' };
     model = { ...model, byId: { ...model.byId, B1: annotation }, order: [...model.order, 'B1'] };
     model = step(model, { type: 'select', ids: ['B1'], add: true })[0];
     expect([...model.selected].sort()).toEqual(['A1', 'B1']);
@@ -4211,6 +4222,8 @@ describe('render source after an edit (what keeps a raster, what renders live)',
 describe('link prop (attached children in the substrate, read via linkOf)', () => {
   const REF = { kind: 'objectNumber', page: PAGE, annotObjectNumber: 40 } as const;
   const CHILD_REF = { kind: 'objectNumber', page: PAGE, annotObjectNumber: 41 } as const;
+  // The square's key, as the engine keys `REF`: an attached child's `/IRT` finds it by this.
+  const S1 = annotationKey(REF);
   const URI = { kind: 'uri', uri: 'https://www.embedpdf.com/' } as const;
 
   const baseStyle = {
@@ -4224,7 +4237,7 @@ describe('link prop (attached children in the substrate, read via linkOf)', () =
 
   const committedSquare = (extra?: Partial<RecordInput>): ModelAnnotation =>
     record({
-      id: 'S1',
+      id: S1,
       ref: REF,
       page: PAGE,
       subtype: 'square',
@@ -4250,10 +4263,10 @@ describe('link prop (attached children in the substrate, read via linkOf)', () =
     const [next, fx] = step(model, { type: 'setLink', target: URI });
     // Parents store no link value — the committed children are the truth,
     // read back through `linkOf` once the reconciler's writes land.
-    expect(fieldsOf(next.byId['S1']).link).toBeUndefined();
+    expect(fieldsOf(next.byId[S1]).link).toBeUndefined();
     // A link-only change is not appearance: no patch, no vector flip.
-    expect(next.byId['S1'].source).toBe('baked');
-    expect(fx).toEqual([{ type: 'syncLink', id: 'S1', target: URI }]);
+    expect(next.byId[S1].source).toBe('baked');
+    expect(fx).toEqual([{ type: 'syncLink', id: S1, target: URI }]);
   });
 
   it('the link KIND takes setLink as a plain engine patch (its own /A)', () => {
@@ -4281,12 +4294,12 @@ describe('link prop (attached children in the substrate, read via linkOf)', () =
     expect(annotDeletable(foreign)).toBe(false);
     const selectedModel = {
       ...modelWith([foreign]),
-      selected: ['S1'],
+      selected: [S1],
     };
     expect(chrome(selectedModel, PAGE).filter((node) => node.kind === 'handle')).toHaveLength(0);
     // …and deletion refuses through the same split.
     const [next, fx] = step(selectedModel, { type: 'delete' });
-    expect(next.byId['S1']).toBeDefined();
+    expect(next.byId[S1]).toBeDefined();
     expect(fx).toEqual([]);
   });
 
@@ -4318,31 +4331,26 @@ describe('link prop (attached children in the substrate, read via linkOf)', () =
       style: { ...baseStyle },
       flags: DRAWN_FLAGS,
       source: 'baked',
-      group: 'S1',
-      irt: 'S1',
-      annotation: { target: URI },
+      annotation: { target: URI, ...answering(REF, 'group') },
     });
     const loaded = modelWith([parent, child]);
     // The wire mechanism is /RT /Group, but the semantics are plumbing: the
     // square is no group primary, the selection stays the square alone…
-    expect(groupKeyOf(loaded, 'S1')).toBe(null);
+    expect(groupKeyOf(loaded, S1)).toBe(null);
     expect(groupKeyOf(loaded, 'C1')).toBe(null);
-    expect(expandGroups(loaded, ['S1'])).toEqual(['S1']);
-    expect(groupMembers(loaded, 'S1')).toEqual(['S1']);
+    expect(expandGroups(loaded, [S1])).toEqual([S1]);
+    expect(groupMembers(loaded, S1)).toEqual([S1]);
     // …so the selection chrome shows the full 8 resize handles, exactly as
     // if no link were attached (the bug: a 2-member "group" with no handles).
-    const selectedModel = { ...loaded, selected: ['S1'] };
+    const selectedModel = { ...loaded, selected: [S1] };
     expect(chrome(selectedModel, PAGE).filter((node) => node.kind === 'handle')).toHaveLength(8);
   });
 
   it('a REAL visual group keeps working; its attached link child stays excluded', () => {
-    const primary = committedSquare({ id: 'P1' });
-    const sub = committedSquare({
-      id: 'P2',
-      ref: { kind: 'objectNumber', page: PAGE, annotObjectNumber: 42 },
-      group: 'P1',
-      irt: 'P1',
-    });
+    const primary = committedSquare();
+    const subRef = { kind: 'objectNumber', page: PAGE, annotObjectNumber: 42 } as const;
+    const P2 = annotationKey(subRef);
+    const sub = committedSquare({ id: P2, ref: subRef, annotation: answering(REF, 'group') });
     const child = record({
       id: 'C1',
       ref: CHILD_REF,
@@ -4357,17 +4365,15 @@ describe('link prop (attached children in the substrate, read via linkOf)', () =
       style: { ...baseStyle },
       flags: DRAWN_FLAGS,
       source: 'baked',
-      group: 'P1',
-      irt: 'P1',
-      annotation: { target: URI },
+      annotation: { target: URI, ...answering(REF, 'group') },
     });
     const model = modelWith([primary, sub, child]);
     // The pair is a group; the link child never appears among the members —
     // so the ungroup verb (which walks expandGroups) can never strip its
     // /IRT and orphan it into an unmanaged standalone link.
-    expect(groupKeyOf(model, 'P1')).toBe('P1');
-    expect(groupMembers(model, 'P1')).toEqual(['P1', 'P2']);
-    expect(expandGroups(model, ['P2'])).toEqual(['P1', 'P2']);
+    expect(groupKeyOf(model, S1)).toBe(S1);
+    expect(groupMembers(model, S1)).toEqual([S1, P2]);
+    expect(expandGroups(model, [P2])).toEqual([S1, P2]);
   });
 
   it('deleting a parent also deletes its attached link children (substrate)', () => {
@@ -4386,21 +4392,19 @@ describe('link prop (attached children in the substrate, read via linkOf)', () =
       style: { ...baseStyle },
       flags: DRAWN_FLAGS,
       source: 'baked',
-      group: 'S1',
-      irt: 'S1',
-      annotation: { target: URI },
+      annotation: { target: URI, ...answering(REF, 'group') },
     });
     const loaded = modelWith([parent, child]);
     // The child is substrate: readable through the lens, absent from paint.
-    expect(linkOf(loaded, 'S1')).toEqual(URI);
+    expect(linkOf(loaded, S1)).toEqual(URI);
     expect(pageItems(loaded, PAGE).some((item) => item.id === 'C1')).toBe(false);
-    const selectedModel = { ...loaded, selected: ['S1'] };
+    const selectedModel = { ...loaded, selected: [S1] };
     const [next, fx] = step(selectedModel, { type: 'delete' });
     // Parent and child leave the model through the one uniform delete path.
-    expect(next.byId['S1']).toBeUndefined();
+    expect(next.byId[S1]).toBeUndefined();
     expect(next.byId['C1']).toBeUndefined();
     expect(fx).toEqual([
-      { type: 'delete', id: 'S1' },
+      { type: 'delete', id: S1 },
       { type: 'delete', id: 'C1' },
     ]);
   });
@@ -4421,10 +4425,9 @@ describe('conversation plane — replies and review states never reach the page'
     rotation: 0,
     ellipse: false,
   });
-  const annotation = (id: string, over: Partial<RecordInput>): ModelAnnotation =>
+  const annotation = (name: string, over: Partial<RecordInput>): ModelAnnotation =>
     record({
-      id,
-      ref: null,
+      ...named(name, PAGE),
       page: PAGE,
       subtype: 'square',
       geometry: at(10, 10),
@@ -4437,12 +4440,15 @@ describe('conversation plane — replies and review states never reach the page'
     ({ state, stateModel }) as Partial<AnnotationDTO>;
 
   const root = annotation('root', {});
-  const reply = annotation('reply', { subtype: 'text', geometry: at(100, 10), irt: 'root' });
+  const reply = annotation('reply', {
+    subtype: 'text',
+    geometry: at(100, 10),
+    annotation: answering(root.annotation.ref),
+  });
   const subordinate = annotation('sub', {
     subtype: 'caret',
     geometry: { kind: 'caret', box: { x: 200, y: 10, width: 40, height: 30 }, rotation: 0 },
-    irt: 'root',
-    group: 'root',
+    annotation: answering(root.annotation.ref, 'group'),
   });
   const status = annotation('status', {
     subtype: 'text',
@@ -4472,8 +4478,8 @@ describe('conversation plane — replies and review states never reach the page'
   });
 
   it('paintOrder culls the conversation plane (paint AND hit share this cull)', () => {
-    expect(paintOrder(model(), PAGE)).toEqual(['root', 'sub']);
-    expect(pageItems(model(), PAGE).map((item) => item.id)).toEqual(['root', 'sub']);
+    expect(paintOrder(model(), PAGE)).toEqual([root.id, subordinate.id]);
+    expect(pageItems(model(), PAGE).map((item) => item.id)).toEqual([root.id, subordinate.id]);
   });
 
   it('the marquee cannot sweep up conversation-only annotations', () => {
@@ -4483,7 +4489,7 @@ describe('conversation plane — replies and review states never reach the page'
       marqueePtr('move', 400, 60),
       marqueePtr('up', 400, 60),
     ]);
-    expect([...swept.selected].sort()).toEqual(['root', 'sub']);
+    expect([...swept.selected].sort()).toEqual([root.id, subordinate.id].sort());
   });
 });
 

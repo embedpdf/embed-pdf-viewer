@@ -1,4 +1,4 @@
-import type { ModelAnnotation } from '@embedpdf/core-annotation';
+import { kindOf, refOf, type ModelAnnotation } from '@embedpdf/core-annotation';
 import { createHoverPump } from '@embedpdf/plugin-actions/contract';
 import type { ActionsCapability, HoverTarget } from '@embedpdf/plugin-actions/contract';
 
@@ -33,12 +33,14 @@ export function createAnnotationHoverFeed(
   const targetOf = (id: string | null): HoverTarget | null => {
     if (!id) return null;
     const annotation = annotOf(id);
-    if (!annotation?.ref) return null;
-    if (annotation.subtype.startsWith('widget') || annotation.subtype === 'link') return null;
+    const ref = annotation ? refOf(annotation) : null;
+    if (!annotation || !ref) return null;
+    const kind = kindOf(annotation.annotation);
+    if (kind.startsWith('widget') || kind === 'link') return null;
     const enter = Boolean(annotation.annotation.actions?.cursorEnter?.root);
     const exit = Boolean(annotation.annotation.actions?.cursorExit?.root);
     if (!enter && !exit) return null;
-    return { ref: annotation.ref, page: annotation.page, events: { enter, exit } };
+    return { ref, page: annotation.annotation.page, events: { enter, exit } };
   };
 
   return {

@@ -12,14 +12,22 @@ const tree = {
   warnings: [],
 };
 
-const annotation = (id: string, over: Partial<ModelAnnotation> = {}): ModelAnnotation =>
+/** The record `obj:<n>`: a square unless `over` (its annotation's fields) says otherwise. */
+const annotation = (
+  id: string,
+  over: Record<string, unknown> = {},
+  record: Partial<ModelAnnotation> = {},
+): ModelAnnotation =>
   ({
     id,
-    ref: { kind: 'objectNumber', page: toPageRef(7), annotObjectNumber: Number(id.slice(4)) },
-    page: toPageRef(7),
-    subtype: 'square',
-    annotation: {},
-    ...over,
+    source: 'baked',
+    annotation: {
+      ref: { kind: 'objectNumber', page: toPageRef(7), annotObjectNumber: Number(id.slice(4)) },
+      page: toPageRef(7),
+      subtype: 'square',
+      ...over,
+    },
+    ...record,
   }) as unknown as ModelAnnotation;
 
 function createHarness(annots: Record<string, ModelAnnotation>) {
@@ -43,9 +51,7 @@ const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
 describe('annotation hover feed', () => {
   it('dispatches E on enter and X on leave for a tree-bearing annotation', async () => {
     const harness = createHarness({
-      'obj:1': annotation('obj:1', {
-        annotation: { actions: { cursorEnter: tree, cursorExit: tree } },
-      } as unknown as Partial<ModelAnnotation>),
+      'obj:1': annotation('obj:1', { actions: { cursorEnter: tree, cursorExit: tree } }),
     });
     harness.feed.hover('obj:1');
     await settle();
@@ -57,15 +63,13 @@ describe('annotation hover feed', () => {
   it('never dispatches for tree-less, draft, widget, or link annotations', async () => {
     const harness = createHarness({
       'obj:1': annotation('obj:1'), // no trees
-      draft: annotation('draft', { ref: null } as unknown as Partial<ModelAnnotation>),
+      draft: annotation('draft', { actions: { cursorEnter: tree } }, { unconfirmed: true }),
       'obj:3': annotation('obj:3', {
         subtype: 'widget',
-        annotation: { actions: { cursorEnter: tree } },
-      } as unknown as Partial<ModelAnnotation>),
-      'obj:4': annotation('obj:4', {
-        subtype: 'link',
-        annotation: { actions: { cursorEnter: tree } },
-      } as unknown as Partial<ModelAnnotation>),
+        fieldFamily: 'text',
+        actions: { cursorEnter: tree },
+      }),
+      'obj:4': annotation('obj:4', { subtype: 'link', actions: { cursorEnter: tree } }),
     });
     for (const id of ['obj:1', 'draft', 'obj:3', 'obj:4', null]) {
       harness.feed.hover(id);
@@ -76,12 +80,8 @@ describe('annotation hover feed', () => {
 
   it('flags a lone /E or /X so the inert half never dispatches', async () => {
     const harness = createHarness({
-      'obj:1': annotation('obj:1', {
-        annotation: { actions: { cursorEnter: tree } }, // enter only
-      } as unknown as Partial<ModelAnnotation>),
-      'obj:2': annotation('obj:2', {
-        annotation: { actions: { cursorExit: tree } }, // exit only
-      } as unknown as Partial<ModelAnnotation>),
+      'obj:1': annotation('obj:1', { actions: { cursorEnter: tree } }), // enter only
+      'obj:2': annotation('obj:2', { actions: { cursorExit: tree } }), // exit only
     });
     harness.feed.hover('obj:1');
     await settle();

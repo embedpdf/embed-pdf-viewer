@@ -4,9 +4,12 @@
  * appearance after an edit (live rendering, or the raster box following the
  * geometry), the effect a geometry commit emits, and removing records.
  */
+import { annotationKey } from '@embedpdf/core';
+import type { AnnotationRef, PageRef } from '@embedpdf/engine-core/runtime';
+
 import { anchoredGeom, anchorModeOf, unanchoredGeom, type ViewEnv } from '../anchor';
 import { capsFor } from '../kinds';
-import { annotationOfRecord, fieldsOf, recordOf, type AnnotationPlace } from '../record';
+import { annotationOfRecord, type AnnotationPlace, fieldsOf, kindOf, recordOf } from '../record';
 import type {
   ModelGeometry,
   Id,
@@ -35,7 +38,7 @@ export const toVector = (annotation: ModelAnnotation): ModelAnnotation =>
  * DTO sync). Call with the new geometry already applied.
  */
 export const ownGeometry = (annotation: ModelAnnotation): ModelAnnotation => {
-  if (!capsFor(annotation.subtype).opaqueBody) return toVector(annotation);
+  if (!capsFor(kindOf(annotation.annotation)).opaqueBody) return toVector(annotation);
   const { geometry } = fieldsOf(annotation);
   return geometry.kind === 'box' ? { ...annotation, apBox: geometry.box } : annotation;
 };
@@ -68,17 +71,35 @@ export const commitViewGesture = (
 export const geomEqual = (left: ModelGeometry, right: ModelGeometry): boolean =>
   JSON.stringify(left) === JSON.stringify(right);
 
-/** The id of the `offset`-th record a message creates (`new:<n>`), counted from the session's `seq`. */
-export const newRecordId = (model: Model, offset = 1): Id => `new:${model.seq + offset}`;
+/**
+ * The ref the `offset`-th record a message creates is written under: its name
+ * `<namePrefix><n>` on `page`, counted from the session's `seq`.
+ */
+export const newRecordRef = (
+  model: Model,
+  page: PageRef,
+  offset = 1,
+): Extract<AnnotationRef, { kind: 'nm' }> => ({
+  kind: 'nm',
+  page,
+  nm: `${model.namePrefix}${model.seq + offset}`,
+});
 
-/** The fields a new record is made from: everything but what `newRecord` gives it. */
-export type NewRecordFields = Omit<RecordFields, 'id' | 'ref' | 'source' | 'annotation'>;
+/** The key of the `offset`-th record a message creates on `page`: its `nm` ref's. */
+export const newRecordId = (model: Model, page: PageRef, offset = 1): Id =>
+  annotationKey(newRecordRef(model, page, offset));
 
 /**
- * The `offset`-th record a message creates: id `new:<n>`, drawn live, and the
- * annotation its fields predict, under the name it will be written with
- * (`<namePrefix><n>`) and appended after the page's other records. `reply`
- * ties it to the annotation it belongs to.
+ * The fields a new record is made from: everything but what `newRecord` gives
+ * it (its key, ref and relationships — `reply` states the one it answers).
+ */
+export type NewRecordFields = Omit<RecordFields, 'id' | 'ref' | 'source' | 'irt' | 'group'>;
+
+/**
+ * The `offset`-th record a message creates: keyed by the `nm` ref it will be
+ * written under, drawn live, and holding the annotation its fields predict,
+ * appended after the page's other records. `reply` ties it to the annotation
+ * it belongs to.
  */
 export function newRecord(
   model: Model,
@@ -86,18 +107,19 @@ export function newRecord(
   options: { offset?: number; reply?: AnnotationPlace['reply'] } = {},
 ): ModelAnnotation {
   const offset = options.offset ?? 1;
+  const page = fields.page;
+  const ref = newRecordRef(model, page, offset);
   const record: RecordFields = {
     ...fields,
-    id: newRecordId(model, offset),
+    id: annotationKey(ref),
     ref: null,
     source: 'vector',
   };
-  const page = fields.page;
   const onPage = model.order.filter(
-    (id) => model.byId[id]?.page.pageObjectNumber === page.pageObjectNumber,
+    (id) => model.byId[id]?.annotation.page.pageObjectNumber === page.pageObjectNumber,
   ).length;
   const annotation = annotationOfRecord(record, {
-    ref: { kind: 'nm', page, nm: `${model.namePrefix}${model.seq + offset}` },
+    ref,
     index: onPage + offset - 1,
     ...(options.reply ? { reply: options.reply } : {}),
   });

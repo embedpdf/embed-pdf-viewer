@@ -1,4 +1,5 @@
 import type { Id, Subtype } from '@embedpdf/core-annotation';
+import { kindOf, refOf } from '@embedpdf/core-annotation';
 import type { AnnotationRef } from '@embedpdf/engine-core/runtime';
 
 import type { Behavior } from '../contract';
@@ -28,10 +29,10 @@ export function createBehaviors(store: AnnotationStore) {
     let out: Set<Id> | undefined;
     for (const id of model.order) {
       const annotation = model.byId[id];
-      if (!annotation || annotation.page.pageObjectNumber !== pageObjectNumber) continue;
+      if (!annotation || annotation.annotation.page.pageObjectNumber !== pageObjectNumber) continue;
       if (
         behaviors.some((behavior) =>
-          matches(behavior, { subtype: annotation.subtype, ref: annotation.ref }),
+          matches(behavior, { subtype: kindOf(annotation.annotation), ref: refOf(annotation) }),
         )
       ) {
         (out ??= new Set()).add(id);
@@ -59,7 +60,7 @@ export function createBehaviors(store: AnnotationStore) {
         return (
           annotation &&
           behaviors.some((behavior) =>
-            matches(behavior, { subtype: annotation.subtype, ref: annotation.ref }),
+            matches(behavior, { subtype: kindOf(annotation.annotation), ref: refOf(annotation) }),
           )
         );
       });

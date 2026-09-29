@@ -11,7 +11,7 @@ import { modelWith, record, step, STYLE, restyle } from './support';
 import { DRAWN_FLAGS } from '../src/flags';
 import type { Message, Model, ModelAnnotation, Point } from '../src/types';
 import { EMPTY_CHANGE, update } from '../src/update';
-import { fieldsOf } from '../src/record';
+import { fieldsOf, refOf } from '../src/record';
 
 const PAGE = toPageRef(1);
 const editPtr = (phase: 'down' | 'move' | 'up', x: number, y: number): Message => ({
@@ -94,11 +94,12 @@ describe('update', () => {
     expect(result.session.selected).toEqual([]);
   });
 
-  it('a new record gets a new: id from the session', () => {
+  it('a new record is keyed by the name it is written under', () => {
     const result = drawSquare(modelWith([]), { x: 0, y: 0 }, { x: 10, y: 10 });
-    expect(result.change.put.map((record) => record.id)).toEqual(['new:1']);
+    // `<namePrefix><seq + 1>` on its page, keyed as the engine keys an `nm` ref.
+    expect(result.change.put.map((record) => record.id)).toEqual(['nm:1:new-1']);
     expect(result.session.seq).toBe(1);
-    expect(result.effects).toEqual([{ type: 'create', id: 'new:1' }]);
+    expect(result.effects).toEqual([{ type: 'create', id: 'nm:1:new-1' }]);
   });
 
   it('typing puts the edited record and asks for a text write', () => {
@@ -138,7 +139,7 @@ describe('every record holds its annotation', () => {
 
   it('a new record predicts its annotation, named with the session’s prefix', () => {
     const record = created('session-a-');
-    expect(record.ref).toBeNull();
+    expect(refOf(record)).toBeNull();
     expect(record.annotation).toMatchObject({
       subtype: 'square',
       ref: { kind: 'nm', page: PAGE, nm: 'session-a-1' },

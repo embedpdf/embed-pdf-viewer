@@ -163,16 +163,24 @@ export type FieldValues = Readonly<Record<string, unknown>>;
 
 /**
  * One annotation as the core works on it: the engine's record, and how it is
- * drawn right now. The record is the only data; the core's gestures read it
- * through `fieldsOf` and change it through `withFields` (record/).
+ * drawn right now. The record is the only data: its ref, page, kind and
+ * relationships are read off it (`refOf`, `kindOf`, `irtOf`, `groupOf`), and
+ * the core's gestures read its fields through `fieldsOf` and change them
+ * through `withFields` (record/).
  */
 export interface ModelAnnotation {
+  /**
+   * The record's key: `annotationKey(annotation.ref)`. A record this session
+   * created is keyed by the `nm` ref it is written under until the engine
+   * confirms it, and by the engine's key from then on.
+   */
   id: Id;
-  ref: AnnotationRef | null;
-  /** The page this annotation lives on. Internals may key by
-   *  `page.pageObjectNumber`; the address itself is what callers pass around. */
-  page: PageRef;
-  subtype: Subtype;
+  /**
+   * A record this session created that the engine hasn't confirmed yet: it
+   * has no engine ref (`refOf` is `null`), and writes to it wait for its
+   * create. Its annotation's `ref` is the `nm` ref it is written under.
+   */
+  unconfirmed?: true;
   /**
    * How the record renders: `baked` blits the engine's appearance raster,
    * `vector` draws it live from its geometry and style. The core sets
@@ -226,15 +234,6 @@ export interface ModelAnnotation {
    * draws) and its attribution wait for the engine's answer.
    */
   annotation: AnnotationDTO;
-  /**
-   * Relationship to another annotation. `irt` ("in reply to") links a child to a
-   * parent — a reply in a comment thread, or a caret bound to its strikeout in a
-   * replace-text pair. `group` ties a set into one composite unit (created and,
-   * typically, deleted together). Both are record keys, so a record this
-   * session created is named by its `new:<n>` id.
-   */
-  irt?: Id;
-  group?: string;
 }
 
 /**
@@ -245,6 +244,20 @@ export interface ModelAnnotation {
  * create is what predicts one.
  */
 export interface RecordFields extends Omit<ModelAnnotation, 'annotation'> {
+  /** The engine's ref; `null` for a record this session created that the engine hasn't confirmed. */
+  ref: AnnotationRef | null;
+  /** The page this annotation lives on. */
+  page: PageRef;
+  /** Its kind: the subtype, or a widget's field family. */
+  subtype: Subtype;
+  /**
+   * Relationship to another annotation, as record keys. `irt` ("in reply to")
+   * links a child to a parent — a reply in a comment thread, or a caret bound
+   * to its strikeout in a replace-text pair. `group` ties a set into one
+   * composite unit (created and, typically, deleted together).
+   */
+  irt?: Id;
+  group?: Id;
   geometry: ModelGeometry;
   style: Style;
   /** Text styling — present only for text-editable kinds (free text). */
@@ -496,12 +509,15 @@ export interface Session {
   draft: Draft | null;
   /** Transient ghost of an in-progress markup selection (null when idle). */
   preview: MarkupPreview | null;
-  /** How many records this session has created; the next one is `new:<seq + 1>`. */
+  /**
+   * How many records this session has created; the next one is written under
+   * the name `<namePrefix><seq + 1>`.
+   */
   seq: number;
   /**
    * The start of the `/NM` name each record this session creates is written
-   * with: `<namePrefix><n>` for record `new:<n>`. A host gives each session
-   * its own, so two sessions never name two annotations alike.
+   * with: `<namePrefix><n>` for its `n`-th. A host gives each session its own,
+   * so two sessions never name two annotations alike.
    */
   namePrefix: string;
   /**

@@ -98,7 +98,7 @@ export function registerEffectRunners(
     const record = model.byId[effect.id];
     const draft = record ? toCreateDraft(fieldsOf(record)) : null;
     if (!record || !draft) return;
-    return createWrite(effect.id, record.page, draft);
+    return createWrite(effect.id, record.annotation.page, draft);
   });
 
   // A composite (a replace-text caret and its strikeout): the primary first,
@@ -112,7 +112,9 @@ export function registerEffectRunners(
     if (
       !primary ||
       records.some(
-        (record) => !record || record.page.pageObjectNumber !== primary.page.pageObjectNumber,
+        (record) =>
+          !record ||
+          record.annotation.page.pageObjectNumber !== primary.annotation.page.pageObjectNumber,
       )
     ) {
       return;
@@ -124,7 +126,7 @@ export function registerEffectRunners(
     return {
       ids,
       perform: async () => {
-        const page = ctx.doc.page(primary.page);
+        const page = ctx.doc.page(primary.annotation.page);
         const written: { id: string; ref: AnnotationRef }[] = [];
         try {
           for (const [index, id] of ids.entries()) {

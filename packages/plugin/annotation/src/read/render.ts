@@ -1,12 +1,15 @@
 import { CONTINUOUS_RENDER_POLICY, snapAppearanceScale } from '@embedpdf/core';
 import {
   fieldsOf,
+  groupOf,
   isSubstrateOnly,
+  kindOf,
+  type Model,
   pageItems as corePageItems,
+  refOf,
+  type RenderItem,
   toolStyleOf,
   viewable,
-  type Model,
-  type RenderItem,
   type ViewEnv,
 } from '@embedpdf/core-annotation';
 import type { PageRef } from '@embedpdf/engine-core/runtime';
@@ -113,8 +116,8 @@ export function createRenderReads(
       const annotation = model.byId[id];
       if (
         !annotation ||
-        annotation.page.pageObjectNumber !== pageObjectNumber ||
-        annotation.subtype !== 'link'
+        annotation.annotation.page.pageObjectNumber !== pageObjectNumber ||
+        kindOf(annotation.annotation) !== 'link'
       )
         continue;
       if (!viewable(annotation.annotation, false)) continue; // hidden links don't navigate
@@ -127,14 +130,14 @@ export function createRenderReads(
       const target = link ?? (record.subtype === 'link' ? (record.target ?? null) : null);
       if (target == null || geometry.kind !== 'box') continue;
       const activate = record.actions?.activate;
-      const ref = annotation.ref ?? undefined;
+      const ref = refOf(annotation) ?? undefined;
       const hoverEnter = Boolean(record.actions?.cursorEnter?.root);
       const hoverExit = Boolean(record.actions?.cursorExit?.root);
       items.push({
         id,
         bounds: geometry.box,
         target,
-        attached: annotation.group !== undefined,
+        attached: groupOf(annotation.annotation) !== undefined,
         ...(activate ? { activate } : {}),
         ...(ref ? { ref } : {}),
         ...(hoverEnter || hoverExit ? { hoverEvents: { enter: hoverEnter, exit: hoverExit } } : {}),
@@ -164,9 +167,9 @@ export function createRenderReads(
         const annotation = model.byId[id];
         if (
           !annotation ||
-          annotation.page.pageObjectNumber !== pageObjectNumber ||
+          annotation.annotation.page.pageObjectNumber !== pageObjectNumber ||
           annotation.source !== 'baked' ||
-          !annotation.ref
+          !refOf(annotation)
         )
           continue;
         // Conversation-plane annotations never paint — a remote reply or

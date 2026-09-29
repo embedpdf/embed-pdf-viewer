@@ -7,10 +7,11 @@
  */
 import {
   initialTextStyle,
+  type Model,
+  refOf,
   richDocOf,
   textBoxes,
   textPlateInset,
-  type Model,
   type ViewEnv,
 } from '@embedpdf/core-annotation';
 import type { PageRef } from '@embedpdf/engine-core/runtime';
@@ -35,7 +36,7 @@ export function buildTextItems(model: Model, page: PageRef, view?: ViewEnv): Tex
     const doc = fields ? richDocOf(fields) : null;
     return {
       id: tb.id,
-      ref: annotation?.ref ?? null,
+      ref: refOf(annotation),
       box: tb.box,
       contents: annotation?.annotation.contents ?? '',
       // Paragraph alignment/direction equal to the body's is inherited, not

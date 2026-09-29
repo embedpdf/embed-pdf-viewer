@@ -59,7 +59,7 @@ export function annotsInBox(
   return model.order.filter((id) => {
     const annotation = model.byId[id];
     if (
-      annotation?.page.pageObjectNumber !== pageObjectNumber ||
+      annotation?.annotation.page.pageObjectNumber !== pageObjectNumber ||
       inert?.has(id) ||
       !isSelectable(model, id)
     )

@@ -201,7 +201,7 @@ describe('store.apply', () => {
     const [id] = applied.ids;
     expect(id).toBe(annotationKey({ kind: 'nm', page: PAGE, nm }));
     expect(harness.model().byId[id!]).toMatchObject({
-      ref: null,
+      unconfirmed: true,
       annotation: { subtype: 'text', nm, contents: 'Check' },
     });
 

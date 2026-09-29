@@ -26,13 +26,11 @@ const nonEmpty = (value: string | null | undefined): value is string =>
 /** True when this annotation belongs to the conversation plane only —
  *  never painted, hit, marquee-selected, or counted into a page's
  *  appearance epoch. */
-export function isConversationOnly(
-  record: Pick<ModelAnnotation, 'irt' | 'group' | 'annotation'>,
-): boolean {
-  // A reply: `irt` without `group` (a grouped subordinate carries both).
-  if (record.irt !== undefined && record.group === undefined) return true;
-  // A state annotation: a text annot with a non-empty /State or /StateModel.
+export function isConversationOnly(record: Pick<ModelAnnotation, 'annotation'>): boolean {
   const annotation = record.annotation;
+  // A reply: `/IRT` that isn't a `/RT /Group` membership.
+  if (annotation.reply && annotation.reply.type !== 'group') return true;
+  // A state annotation: a text annot with a non-empty /State or /StateModel.
   if (annotation.subtype === 'text') {
     if (nonEmpty(annotation.state) || nonEmpty(annotation.stateModel)) return true;
   }
@@ -47,8 +45,8 @@ export function isConversationOnly(
  * as itself. Its rect is reconciled from the parent's geometry, so direct
  * manipulation would be overwritten anyway.
  */
-export function isAttachedLink(annotation: Pick<ModelAnnotation, 'subtype' | 'group'>): boolean {
-  return annotation.subtype === 'link' && annotation.group !== undefined;
+export function isAttachedLink(record: Pick<ModelAnnotation, 'annotation'>): boolean {
+  return record.annotation.subtype === 'link' && record.annotation.reply?.type === 'group';
 }
 
 /**
@@ -57,8 +55,6 @@ export function isAttachedLink(annotation: Pick<ModelAnnotation, 'subtype' | 'gr
  * states) and attached link children. Paint order, hit-testing, marquee
  * and the appearance epoch all filter through this, never the parts.
  */
-export function isSubstrateOnly(
-  annotation: Pick<ModelAnnotation, 'irt' | 'group' | 'subtype' | 'annotation'>,
-): boolean {
-  return isConversationOnly(annotation) || isAttachedLink(annotation);
+export function isSubstrateOnly(record: Pick<ModelAnnotation, 'annotation'>): boolean {
+  return isConversationOnly(record) || isAttachedLink(record);
 }

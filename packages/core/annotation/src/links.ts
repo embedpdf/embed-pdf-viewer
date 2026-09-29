@@ -13,6 +13,7 @@
 import type { PdfLinkTarget } from '@embedpdf/engine-core/runtime';
 
 import { isAttachedLink } from './plane';
+import { groupOf } from './record';
 import type { ModelAnnotation, Id, Model } from './types';
 
 /** Every attached link child of `parentId`, in z-order (multi-segment
@@ -21,7 +22,7 @@ export function linkChildrenOf(model: Model, parentId: Id): ModelAnnotation[] {
   const out: ModelAnnotation[] = [];
   for (const id of model.order) {
     const annotation = model.byId[id];
-    if (annotation && isAttachedLink(annotation) && annotation.group === parentId)
+    if (annotation && isAttachedLink(annotation) && groupOf(annotation.annotation) === parentId)
       out.push(annotation);
   }
   return out;

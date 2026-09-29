@@ -1,6 +1,7 @@
 /**
  * Drawing new annotations with the pointer: shapes, lines, ink and polygons.
- * A finished drawing becomes a new record (`new:<n>`) and a `create` effect.
+ * A finished drawing becomes a new record (keyed by the `nm` ref it is
+ * written under) and a `create` effect.
  * Callouts and distance measurements have their own gestures (draw-callout.ts,
  * draw-distance.ts).
  */

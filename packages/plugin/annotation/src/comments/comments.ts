@@ -1,4 +1,4 @@
-import { annotContentsEditable } from '@embedpdf/core-annotation';
+import { annotContentsEditable, refOf } from '@embedpdf/core-annotation';
 import {
   annotationKey,
   isDimension,
@@ -77,7 +77,7 @@ export function createComments(
       const record = store.model().byId[annotationKey(ref)];
       if (record && isDimension(record.annotation))
         throw new Error('[annotation] measurement contents are derived');
-      if (!record?.ref) throw new Error('[annotation] cannot edit an uncommitted annotation');
+      if (!refOf(record)) throw new Error('[annotation] cannot edit an uncommitted annotation');
       await crud.update(ref, {
         subtype: record.annotation.subtype,
         contents: text,
