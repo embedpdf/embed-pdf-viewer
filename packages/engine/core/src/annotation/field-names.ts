@@ -675,7 +675,7 @@ export const ANNOTATION_FIELD_NAMES: Readonly<Record<AnnotationSubtype, readonly
     'fontSize',
     'fontColor',
     'textAlign',
-    'fieldObjectNumber',
+    'field',
     'fieldFamily',
   ],
   redact: [

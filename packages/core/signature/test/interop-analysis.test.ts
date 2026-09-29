@@ -272,10 +272,7 @@ describe.skipIf(!OUT)('interop fixtures for the revision analysis (pyHanko)', ()
         const certified = await certify(base, 2);
         const doc = await open(certified);
         try {
-          await doc.forms.setValue(
-            { kind: 'fqn', name: 'text' },
-            { type: 'text', value: 'filled' },
-          );
+          await doc.forms.setValue({ kind: 'fqn', name: 'text' }, { value: 'filled' });
           return new Uint8Array(await doc.download());
         } finally {
           await doc.close();
@@ -342,10 +339,7 @@ describe.skipIf(!OUT)('interop fixtures for the revision analysis (pyHanko)', ()
         );
         let sealedPath: string;
         try {
-          await doc.forms.setValue(
-            { kind: 'fqn', name: 'text' },
-            { type: 'text', value: 'filled on disk' },
-          );
+          await doc.forms.setValue({ kind: 'fqn', name: 'text' }, { value: 'filled on disk' });
           const result = await sign(doc, {
             field: { kind: 'fqn', name: 'sig' },
             key: signer,

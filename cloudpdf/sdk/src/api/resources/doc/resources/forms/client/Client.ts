@@ -253,80 +253,6 @@ export class FormsClient {
     }
 
     /**
-     * @param {CloudPDF.doc.ResetFormsRequest} request
-     * @param {FormsClient.RequestOptions} requestOptions - Request-specific configuration.
-     *
-     * @throws {@link CloudPDF.NotFoundError}
-     * @throws {@link errors.CloudPDFError}
-     * @throws {@link errors.CloudPDFTimeoutError}
-     *
-     * @example
-     *     await client.doc.forms.reset({
-     *         docId: "docId",
-     *         layerName: "layerName",
-     *         fieldKey: "fieldKey"
-     *     })
-     */
-    public reset(
-        request: CloudPDF.doc.ResetFormsRequest,
-        requestOptions?: FormsClient.RequestOptions,
-    ): core.HttpResponsePromise<CloudPDF.DocFormsReset200Response> {
-        return core.HttpResponsePromise.fromPromise(this.__reset(request, requestOptions));
-    }
-
-    private async __reset(
-        request: CloudPDF.doc.ResetFormsRequest,
-        requestOptions?: FormsClient.RequestOptions,
-    ): Promise<core.WithRawResponse<CloudPDF.DocFormsReset200Response>> {
-        const { docId, layerName, fieldKey, "X-Document-Password": documentPassword } = request;
-        const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
-        const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
-            _authRequest.headers,
-            this._options?.headers,
-            mergeOnlyDefinedHeaders({ "X-Document-Password": documentPassword }),
-            requestOptions?.headers,
-        );
-        const _response = await core.fetcher({
-            url: core.url.join(
-                (await core.Supplier.get(this._options.baseUrl)) ??
-                    (await core.Supplier.get(this._options.environment)),
-                `v1/docs/${core.url.encodePathParam(docId)}/layers/${core.url.encodePathParam(layerName)}/form/fields/${core.url.encodePathParam(fieldKey)}/reset`,
-            ),
-            method: "POST",
-            headers: _headers,
-            queryString: core.url.queryBuilder().mergeAdditional(requestOptions?.queryParams).build(),
-            timeoutMs: (requestOptions?.timeoutInSeconds ?? this._options?.timeoutInSeconds ?? 60) * 1000,
-            maxRetries: requestOptions?.maxRetries ?? this._options?.maxRetries,
-            abortSignal: requestOptions?.abortSignal,
-            fetchFn: this._options?.fetch,
-            logging: this._options.logging,
-        });
-        if (_response.ok) {
-            return { data: _response.body as CloudPDF.DocFormsReset200Response, rawResponse: _response.rawResponse };
-        }
-
-        if (_response.error.reason === "status-code") {
-            switch (_response.error.statusCode) {
-                case 404:
-                    throw new CloudPDF.NotFoundError(_response.error.body as unknown, _response.rawResponse);
-                default:
-                    throw new errors.CloudPDFError({
-                        statusCode: _response.error.statusCode,
-                        body: _response.error.body,
-                        rawResponse: _response.rawResponse,
-                    });
-            }
-        }
-
-        return handleNonStatusCodeError(
-            _response.error,
-            _response.rawResponse,
-            "POST",
-            "/v1/docs/{docId}/layers/{layerName}/form/fields/{fieldKey}/reset",
-        );
-    }
-
-    /**
      * @param {CloudPDF.doc.SetValueFormsRequest} request
      * @param {FormsClient.RequestOptions} requestOptions - Request-specific configuration.
      *
@@ -406,6 +332,85 @@ export class FormsClient {
             _response.rawResponse,
             "POST",
             "/v1/docs/{docId}/layers/{layerName}/form/fields/{fieldKey}/value",
+        );
+    }
+
+    /**
+     * @param {CloudPDF.doc.DocFormsResetRequest} request
+     * @param {FormsClient.RequestOptions} requestOptions - Request-specific configuration.
+     *
+     * @throws {@link CloudPDF.BadRequestError}
+     * @throws {@link CloudPDF.NotFoundError}
+     * @throws {@link errors.CloudPDFError}
+     * @throws {@link errors.CloudPDFTimeoutError}
+     *
+     * @example
+     *     await client.doc.forms.reset({
+     *         docId: "docId",
+     *         layerName: "layerName"
+     *     })
+     */
+    public reset(
+        request: CloudPDF.doc.DocFormsResetRequest,
+        requestOptions?: FormsClient.RequestOptions,
+    ): core.HttpResponsePromise<CloudPDF.DocFormsReset200Response> {
+        return core.HttpResponsePromise.fromPromise(this.__reset(request, requestOptions));
+    }
+
+    private async __reset(
+        request: CloudPDF.doc.DocFormsResetRequest,
+        requestOptions?: FormsClient.RequestOptions,
+    ): Promise<core.WithRawResponse<CloudPDF.DocFormsReset200Response>> {
+        const { docId, layerName, "X-Document-Password": documentPassword, ..._body } = request;
+        const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
+        const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
+            _authRequest.headers,
+            this._options?.headers,
+            mergeOnlyDefinedHeaders({ "X-Document-Password": documentPassword }),
+            requestOptions?.headers,
+        );
+        const _response = await core.fetcher({
+            url: core.url.join(
+                (await core.Supplier.get(this._options.baseUrl)) ??
+                    (await core.Supplier.get(this._options.environment)),
+                `v1/docs/${core.url.encodePathParam(docId)}/layers/${core.url.encodePathParam(layerName)}/form/reset`,
+            ),
+            method: "POST",
+            headers: _headers,
+            contentType: "application/json",
+            queryString: core.url.queryBuilder().mergeAdditional(requestOptions?.queryParams).build(),
+            requestType: "json",
+            body: mergeAdditionalBodyParameters(_body, requestOptions?.additionalBodyParameters),
+            timeoutMs: (requestOptions?.timeoutInSeconds ?? this._options?.timeoutInSeconds ?? 60) * 1000,
+            maxRetries: requestOptions?.maxRetries ?? this._options?.maxRetries,
+            abortSignal: requestOptions?.abortSignal,
+            fetchFn: this._options?.fetch,
+            logging: this._options.logging,
+        });
+        if (_response.ok) {
+            return { data: _response.body as CloudPDF.DocFormsReset200Response, rawResponse: _response.rawResponse };
+        }
+
+        if (_response.error.reason === "status-code") {
+            switch (_response.error.statusCode) {
+                case 400:
+                    throw new CloudPDF.BadRequestError(_response.error.body as unknown, _response.rawResponse);
+                case 404:
+                    throw new CloudPDF.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                default:
+                    throw new errors.CloudPDFError({
+                        statusCode: _response.error.statusCode,
+                        body: _response.error.body,
+                        rawResponse: _response.rawResponse,
+                    });
+            }
+        }
+
+        return handleNonStatusCodeError(
+            _response.error,
+            _response.rawResponse,
+            "POST",
+            "/v1/docs/{docId}/layers/{layerName}/form/reset",
         );
     }
 }

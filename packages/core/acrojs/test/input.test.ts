@@ -18,7 +18,8 @@ describe('scriptFieldsFromSnapshot', () => {
         valueEntry: { kind: 'none' },
         defaultValueEntry: { kind: 'none' },
         flags: { readOnly: false, required: false },
-      } as FormFieldDTO;
+        widgets: [],
+      } as unknown as FormFieldDTO;
 
       expect(scriptFieldsFromSnapshot(snapshotWith(field))[0]).toMatchObject({
         value: 'Off',
@@ -26,6 +27,25 @@ describe('scriptFieldsFromSnapshot', () => {
       });
     },
   );
+
+  it("shows a toggle's export value, not its on-state name", () => {
+    const widget = (onState: string, exportValue: string) => ({ onState, exportValue });
+    const field = {
+      ref: { kind: 'objectNumber', fieldObjectNumber: 7 },
+      name: 'size',
+      family: 'radio',
+      valueEntry: { kind: 'scalar', value: '1' },
+      defaultValueEntry: { kind: 'scalar', value: '0' },
+      flags: { readOnly: false, required: false },
+      widgets: [widget('0', 'Small'), widget('1', 'Large')],
+    } as unknown as FormFieldDTO;
+
+    expect(scriptFieldsFromSnapshot(snapshotWith(field))[0]).toMatchObject({
+      value: 'Large',
+      defaultValue: 'Small',
+      exportValues: ['Small', 'Large'],
+    });
+  });
 
   it('keeps an absent text value as null', () => {
     const field = {

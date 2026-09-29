@@ -27,7 +27,7 @@ export type AuditMutationKind =
   | 'form.createField'
   | 'form.updateField'
   | 'form.deleteField'
-  | 'form.attachWidget'
+  | 'form.addWidget'
   | 'form.detachWidget'
   | 'form.applyEffects'
   | 'form.setSignatureAppearance'

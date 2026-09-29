@@ -128,14 +128,14 @@ describe('FormScriptingController — boot failures degrade, never brick', () =>
 
     const first = await controller.commit(
       { kind: 'objectNumber', fieldObjectNumber: 7 },
-      { type: 'text', value: 'HELLO' },
+      { value: 'HELLO' },
     );
     expect(first.status).toBe('applied');
     expect(applied[0]).toEqual([
       {
         kind: 'setValue',
         ref: { kind: 'objectNumber', fieldObjectNumber: 7 },
-        value: { type: 'text', value: 'HELLO' },
+        value: { value: 'HELLO' },
       },
     ]);
     // The failure is surfaced, not swallowed — and not fatal.
@@ -146,7 +146,7 @@ describe('FormScriptingController — boot failures degrade, never brick', () =>
     // Boot ran once; the next commit neither retries nor fails.
     const second = await controller.commit(
       { kind: 'objectNumber', fieldObjectNumber: 7 },
-      { type: 'text', value: 'WORLD' },
+      { value: 'WORLD' },
     );
     expect(second.status).toBe('applied');
     expect(second.diagnostics.some((diagnostic) => diagnostic.code === 'script-error')).toBe(false);
@@ -171,7 +171,7 @@ describe('FormScriptingController — boot failures degrade, never brick', () =>
     });
     const result = await controller.commit(
       { kind: 'objectNumber', fieldObjectNumber: 7 },
-      { type: 'text', value: 'HELLO' },
+      { value: 'HELLO' },
     );
     expect(result.status).toBe('applied');
     expect(result.diagnostics.some((diagnostic) => diagnostic.code === 'script-error')).toBe(true);

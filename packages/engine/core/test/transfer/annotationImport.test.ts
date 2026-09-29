@@ -278,12 +278,12 @@ describe('planAnnotationImport', () => {
   test("leaves out a form field's widget, which travels with its field", () => {
     const field = annotation(first, 10, 0, {
       subtype: 'widget',
-      fieldObjectNumber: 44,
+      field: { kind: 'objectNumber', fieldObjectNumber: 44 },
       fieldFamily: 'text',
     });
     const inert = annotation(first, 11, 1, {
       subtype: 'widget',
-      fieldObjectNumber: 0,
+      field: null,
       fieldFamily: 'unknown',
     });
     const { creates, dropped } = plan(bundleOf(field, inert));

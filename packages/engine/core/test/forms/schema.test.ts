@@ -37,6 +37,7 @@ const RADIO: FormFieldDTO = {
       onState: 'male',
       exportValue: 'male',
       checked: true,
+      rect: { x: 72, y: 100, width: 12, height: 12 },
     },
     {
       ref: {
@@ -49,6 +50,7 @@ const RADIO: FormFieldDTO = {
       onState: 'female',
       exportValue: 'female',
       checked: false,
+      rect: { x: 72, y: 120, width: 12, height: 12 },
     },
   ],
 };
@@ -62,6 +64,7 @@ const LISTBOX: FormFieldDTO = {
   valueEntry: { kind: 'array', values: ['Apple', 'Cherry'] },
   defaultValueEntry: { kind: 'array', values: ['Apple'] },
   selectedValues: ['Apple', 'Cherry'],
+  defaultValue: ['Apple'],
   multiSelect: true,
   options: [
     { label: 'Apple', value: 'Apple', selected: true },
@@ -77,6 +80,7 @@ const LISTBOX: FormFieldDTO = {
       },
       annotObjectNumber: 9,
       page: { kind: 'objectNumber', pageObjectNumber: 3 },
+      rect: null,
     },
   ],
 };
@@ -104,19 +108,15 @@ describe('form schemas', () => {
     expect(FormSnapshotSchema.parse(snapshot)).toEqual(snapshot);
   });
 
-  test('typed values parse and reject mismatched shapes', () => {
-    expect(FormFieldValueSchema.parse({ type: 'text', value: 'Bob' })).toEqual({
-      type: 'text',
-      value: 'Bob',
+  test('values parse in the shapes a read has, and nothing else', () => {
+    expect(FormFieldValueSchema.parse({ value: 'Bob' })).toEqual({ value: 'Bob' });
+    expect(FormFieldValueSchema.parse({ value: null })).toEqual({ value: null });
+    expect(FormFieldValueSchema.parse({ checked: true })).toEqual({ checked: true });
+    expect(FormFieldValueSchema.parse({ selectedValues: ['A', 'B'] })).toEqual({
+      selectedValues: ['A', 'B'],
     });
-    expect(FormFieldValueSchema.parse({ type: 'toggle', state: null })).toEqual({
-      type: 'toggle',
-      state: null,
-    });
-    expect(FormFieldValueSchema.parse({ type: 'choice', values: ['A', 'B'] })).toEqual({
-      type: 'choice',
-      values: ['A', 'B'],
-    });
-    expect(() => FormFieldValueSchema.parse({ type: 'text', values: ['A'] })).toThrow();
+    expect(() => FormFieldValueSchema.parse({ type: 'text', value: 'A' })).toThrow();
+    expect(() => FormFieldValueSchema.parse({ value: 'A', checked: true })).toThrow();
+    expect(() => FormFieldValueSchema.parse({ selectedValues: 'A' })).toThrow();
   });
 });

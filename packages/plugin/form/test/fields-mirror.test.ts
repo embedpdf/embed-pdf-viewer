@@ -132,14 +132,13 @@ describe('form fields mirror', () => {
     const written = harness.form.setValueRaw(
       { kind: 'objectNumber', fieldObjectNumber: 5 },
       {
-        type: 'text',
         value: 'own',
       },
     );
     await settle();
     harness.writes[0]!();
     await written;
-    expect(nameValue(harness.form as never)).toEqual({ type: 'text', value: 'own' });
+    expect(nameValue(harness.form as never)).toEqual({ value: 'own' });
 
     harness.emit({
       type: 'forms.valueSet',
@@ -147,7 +146,7 @@ describe('form fields mirror', () => {
       field: textField('remote'),
       meta: NOTHING_CHANGED,
     });
-    expect(nameValue(harness.form as never)).toEqual({ type: 'text', value: 'remote' });
+    expect(nameValue(harness.form as never)).toEqual({ value: 'remote' });
     expect(harness.reads).toHaveLength(1);
     await harness.kernel.destroy();
   });
@@ -184,7 +183,7 @@ describe('form fields mirror', () => {
     harness.reads[2]!(snapshot('after desync'));
     await settle();
     expect(harness.reads).toHaveLength(3);
-    expect(nameValue(harness.form as never)).toEqual({ type: 'text', value: 'after desync' });
+    expect(nameValue(harness.form as never)).toEqual({ value: 'after desync' });
     await harness.kernel.destroy();
   });
 });

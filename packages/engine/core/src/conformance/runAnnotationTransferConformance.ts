@@ -294,7 +294,7 @@ function geometryOf(data: AnnotationDTO): Array<{ x: number; y: number }> {
 
 /** A form field's widget: it stays with its field. */
 function isFieldWidget(annotation: AnnotationDTO): boolean {
-  return annotation.subtype === 'widget' && annotation.fieldObjectNumber > 0;
+  return annotation.subtype === 'widget' && annotation.field !== null;
 }
 
 /** A bundle without the items `keys` name, and without what only they named. */

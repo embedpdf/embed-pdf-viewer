@@ -35,10 +35,7 @@ describe('sign() and validateSignatures() over the local engine', () => {
   test('one call signs a field with a CAdES-B signature the engine and the validator both accept', async () => {
     const doc = await engine.open({ kind: 'bytes', id: 'cades', bytes });
     try {
-      await doc.forms.setValue(
-        { kind: 'fqn', name: 'group.total' },
-        { type: 'text', value: 'agreed' },
-      );
+      await doc.forms.setValue({ kind: 'fqn', name: 'group.total' }, { value: 'agreed' });
       const result = await sign(doc, {
         field: { kind: 'fqn', name: 'sig' },
         key: signer,
@@ -65,10 +62,7 @@ describe('sign() and validateSignatures() over the local engine', () => {
 
       // The locked field refuses writes.
       await expect(
-        doc.forms.setValue(
-          { kind: 'fqn', name: 'group.total' },
-          { type: 'text', value: 'changed' },
-        ),
+        doc.forms.setValue({ kind: 'fqn', name: 'group.total' }, { value: 'changed' }),
       ).rejects.toMatchObject({ code: 'ProtectedDocument' });
 
       if (DUMP_DIR)
@@ -96,10 +90,7 @@ describe('sign() and validateSignatures() over the local engine', () => {
       expect(verdict.summary).toBe('valid');
       expect(verdict.cms?.signingTime).toBeInstanceOf(Date);
       // A fill after the certification: bytes stay intact, the verdict is honest about the later revision.
-      await doc.forms.setValue(
-        { kind: 'fqn', name: 'group.total' },
-        { type: 'text', value: 'filled' },
-      );
+      await doc.forms.setValue({ kind: 'fqn', name: 'group.total' }, { value: 'filled' });
       const [after] = await validateSignatures(doc, {
         trust: { anchors: async () => [signer.certificate] },
       });
@@ -230,10 +221,7 @@ describe('sign() and validateSignatures() over the local engine', () => {
       const snapshot = await doc.signatures.list();
       expect(snapshot.signatures[0].signed).toBe(false);
       // The candidate was cancelled: the document is writable again.
-      await doc.forms.setValue(
-        { kind: 'fqn', name: 'group.total' },
-        { type: 'text', value: 'still free' },
-      );
+      await doc.forms.setValue({ kind: 'fqn', name: 'group.total' }, { value: 'still free' });
     } finally {
       await doc.close();
     }

@@ -44,6 +44,7 @@ export namespace DocSignaturesComplete200Response {
             ref: CloudPDF.DocSignaturesComplete200ResponseSignatureWidgetRef | null;
             annotObjectNumber: number;
             page: Widget.Page | null;
+            rect: Widget.Rect | null;
         }
 
         export namespace Widget {
@@ -57,6 +58,13 @@ export namespace DocSignaturesComplete200Response {
                     ObjectNumber: "objectNumber",
                 } as const;
                 export type Kind = (typeof Kind)[keyof typeof Kind];
+            }
+
+            export interface Rect {
+                x: number;
+                y: number;
+                width: number;
+                height: number;
             }
         }
 

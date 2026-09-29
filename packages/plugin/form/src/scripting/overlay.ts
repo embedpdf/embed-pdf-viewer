@@ -54,42 +54,53 @@ export function snapshotField(snapshot: FormSnapshot, ref: FormFieldRef): FormFi
   return snapshot.fields.find((field) => sameRef(field.ref, ref));
 }
 
+/** A written value as scripts see it: a toggle's export value (`'Off'` when clear). */
 export function scriptValueFromFormValue(
   field: ScriptFieldInput,
   value: FormFieldValue,
 ): ScriptValue {
-  if (field.family === 'text' && value.type === 'text') return value.value;
-  if ((field.family === 'checkbox' || field.family === 'radio') && value.type === 'toggle') {
-    return value.state ?? 'Off';
-  }
-  if (field.family === 'combobox' && value.type === 'choice') return value.values[0] ?? '';
-  if (field.family === 'listbox' && value.type === 'choice') return [...value.values];
-  throw new Error(`Form value type '${value.type}' does not match field family '${field.family}'`);
-}
-
-export function formValueFromScriptValue(field: ScriptFieldInput): FormFieldValue | null {
   switch (field.family) {
     case 'text':
-      return { type: 'text', value: String(field.value ?? '') };
+    case 'combobox':
+      if ('value' in value) return value.value ?? '';
+      break;
+    case 'radio':
+      if ('value' in value) return value.value ?? 'Off';
+      break;
+    case 'checkbox':
+      if ('value' in value) return value.value ?? 'Off';
+      if ('checked' in value) {
+        if (!value.checked) return 'Off';
+        const first = field.exportValues?.[0];
+        if (first === undefined)
+          throw new Error(`Form field '${field.name}' has no widget to check`);
+        return first;
+      }
+      break;
+    case 'listbox':
+      if ('selectedValues' in value) return [...value.selectedValues];
+      break;
+  }
+  throw new Error(`Form field '${field.name}' (${field.family}) does not take this value`);
+}
+
+/** A script value as the engine writes it, or null for a family that holds none. */
+export function formValueFromScriptValue(field: ScriptFieldInput): FormFieldValue | null {
+  const value = field.value;
+  switch (field.family) {
+    case 'text':
+      return { value: String(value ?? '') };
     case 'checkbox':
     case 'radio':
-      return {
-        type: 'toggle',
-        state:
-          field.value === null || field.value === undefined || String(field.value) === 'Off'
-            ? null
-            : String(field.value),
-      };
-    case 'combobox':
-      return {
-        type: 'choice',
-        values: Array.isArray(field.value) ? field.value.slice(0, 1) : [String(field.value ?? '')],
-      };
+      return { value: value === null || String(value) === 'Off' ? null : String(value) };
+    case 'combobox': {
+      const selected = Array.isArray(value) ? value[0] : value;
+      const text = selected === null || selected === undefined ? '' : String(selected);
+      return { value: text === '' ? null : text };
+    }
     case 'listbox':
-      return {
-        type: 'choice',
-        values: Array.isArray(field.value) ? [...field.value] : [String(field.value ?? '')],
-      };
+      if (Array.isArray(value)) return { selectedValues: [...value] };
+      return { selectedValues: value === null || value === '' ? [] : [String(value)] };
     default:
       return null;
   }

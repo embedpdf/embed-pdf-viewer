@@ -207,12 +207,13 @@ export interface FormCapability {
     options?: OperationOptions,
   ): Promise<BatchResult<FormFieldRef, FormFieldRef>>;
   setText(ref: FormFieldRef, text: string, options?: OperationOptions): Promise<SetValueResult>;
-  /** Check (`onState`) or clear (`null`) a checkbox or radio group. */
+  /** Check the widget with `exportValue`, or clear (`null`) a checkbox or radio group. */
   setChecked(
     ref: FormFieldRef,
-    onState: string | null,
+    exportValue: string | null,
     options?: OperationOptions,
   ): Promise<SetValueResult>;
+  /** Select option values: one for a combo box (none clears it), any for a list box. */
   setChoice(
     ref: FormFieldRef,
     values: readonly string[],
@@ -254,8 +255,6 @@ export interface FormCapability {
   updateField(ref: FormFieldRef, patch: FormFieldPatch, options?: OperationOptions): Promise<void>;
   /** The field and its widgets. */
   deleteField(ref: FormFieldRef, options?: OperationOptions): Promise<void>;
-  /** Link an inert widget annotation to a field. */
-  attachWidget(ref: FormFieldRef, widget: AnnotationRef, options?: OperationOptions): Promise<void>;
   detachWidget(ref: FormFieldRef, widget: AnnotationRef, options?: OperationOptions): Promise<void>;
 
   // ── twins ──

@@ -18,7 +18,7 @@ import {
   type DocumentSaveBufferWorkerRequest,
   type DocumentSaveFileWorkerRequest,
   type DocumentSaveLayerBufferWorkerRequest,
-  type FormsAttachWidgetWorkerRequest,
+  type FormsAddWidgetWorkerRequest,
   type FormsCreateFieldWorkerRequest,
   type FormsDeleteFieldWorkerRequest,
   type FormsDetachWidgetWorkerRequest,
@@ -501,8 +501,8 @@ export class WorkerHost {
         case 'forms.deleteField':
           resultPack = this.handleFormsDeleteField(msg, ctrl.signal);
           break;
-        case 'forms.attachWidget':
-          resultPack = this.handleFormsAttachWidget(msg, ctrl.signal);
+        case 'forms.addWidget':
+          resultPack = this.handleFormsAddWidget(msg, ctrl.signal);
           break;
         case 'forms.detachWidget':
           resultPack = this.handleFormsDetachWidget(msg, ctrl.signal);
@@ -1958,7 +1958,7 @@ export class WorkerHost {
   ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
     const mutator = new FormMutator(this.runtime, session);
-    const result = mutator.reset(req.ref, signal);
+    const result = mutator.reset(req.refs, signal);
     return this.finishMutation(session, { tag: 'forms.reset', result }, req.artifactPath);
   }
 
@@ -2075,17 +2075,17 @@ export class WorkerHost {
     );
   }
 
-  private handleFormsAttachWidget(
-    req: FormsAttachWidgetWorkerRequest,
+  private handleFormsAddWidget(
+    req: FormsAddWidgetWorkerRequest<PdfCoordinates>,
     signal: AbortSignal,
   ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
     const mutator = new FormMutator(this.runtime, session);
-    const { field, widget } = mutator.attachWidget(req.ref, req.widget, req.onState, signal);
+    const { field, widget } = mutator.addWidget(req.ref, req.placement, signal);
     const meta = formMutationMeta(session, [field.ref], [widget]);
     return this.finishMutation(
       session,
-      { tag: 'forms.attachWidget', result: { field, meta } },
+      { tag: 'forms.addWidget', result: { field, meta } },
       req.artifactPath,
     );
   }
@@ -2167,7 +2167,7 @@ const MUTATING_KINDS: ReadonlySet<WorkerRequest['kind']> = new Set<WorkerRequest
   'forms.updateField',
   'forms.setSignatureAppearance',
   'forms.deleteField',
-  'forms.attachWidget',
+  'forms.addWidget',
   'forms.detachWidget',
   'pages.move',
   'pages.rotate',

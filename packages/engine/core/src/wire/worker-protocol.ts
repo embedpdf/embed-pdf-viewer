@@ -22,7 +22,7 @@ import type { PieceInfoPatch, PieceInfoSnapshot } from '../dto/PieceInfo';
 import type { SessionKind } from '../dto/SessionKind';
 import type { PieceInfoDeleteResult, PieceInfoUpdateResult } from '../engine/PieceInfoService';
 import type { SerializedEngineError } from '../errors/EngineError';
-import type { FormFieldDraft } from '../forms/draft';
+import type { FormFieldDraft, WidgetPlacement } from '../forms/draft';
 import type { FormEffect, FormEffectsResult } from '../forms/effects';
 import type { FormFieldPatch } from '../forms/patch';
 import type { FormSnapshot } from '../forms/snapshot';
@@ -48,6 +48,7 @@ import type {
   FormFieldUpdateResult,
   FormImportResult,
   FormRepairResult,
+  FormResetResult,
   FormSetValueResult,
   FormWidgetLinkResult,
 } from '../mutation/FormMutationResults';
@@ -483,7 +484,8 @@ export interface FormsResetWorkerRequest {
   jobId: WorkerJobId;
   docId: string;
   layerName?: string;
-  ref: FormFieldRef;
+  /** The fields to reset; absent resets the whole form. */
+  refs?: FormFieldRef[];
   artifactPath?: string;
 }
 
@@ -565,14 +567,13 @@ export interface FormsDeleteFieldWorkerRequest {
   artifactPath?: string;
 }
 
-export interface FormsAttachWidgetWorkerRequest {
-  kind: 'forms.attachWidget';
+export interface FormsAddWidgetWorkerRequest<C extends Coordinates = PageCoordinates> {
+  kind: 'forms.addWidget';
   jobId: WorkerJobId;
   docId: string;
   layerName?: string;
   ref: FormFieldRef;
-  widget: AnnotationRef;
-  onState?: string;
+  placement: WidgetPlacement<C>;
   artifactPath?: string;
 }
 
@@ -1174,7 +1175,7 @@ export type WorkerRequest<C extends Coordinates = PageCoordinates> =
   | FormsUpdateFieldWorkerRequest
   | FormsSetSignatureAppearanceWorkerRequest
   | FormsDeleteFieldWorkerRequest
-  | FormsAttachWidgetWorkerRequest
+  | FormsAddWidgetWorkerRequest<C>
   | FormsDetachWidgetWorkerRequest
   | PagesListWorkerRequest
   | PagesMoveWorkerRequest
@@ -1251,7 +1252,7 @@ export type WorkerResultPayload<C extends Coordinates = PageCoordinates> =
       /** A locked open whose password was given and wrong. */
       passwordRejected?: boolean;
     }
-  | { tag: 'signatures.list'; snapshot: SignatureSnapshot }
+  | { tag: 'signatures.list'; snapshot: SignatureSnapshot<C> }
   | { tag: 'signatures.contents'; bytes: ArrayBuffer }
   | { tag: 'signatures.digest'; digest: ArrayBuffer }
   | { tag: 'signatures.revisionBytes'; bytes: ArrayBuffer; size: number }
@@ -1259,7 +1260,7 @@ export type WorkerResultPayload<C extends Coordinates = PageCoordinates> =
   | { tag: 'signatures.prepare'; result: SignaturePrepared }
   | {
       tag: 'signatures.complete';
-      result: SignatureCompleteResult;
+      result: SignatureCompleteResult<C>;
       artifact?: LayerArtifactWorkerPayload;
       artifactFile?: LayerArtifactFileWorkerPayload;
     }
@@ -1267,7 +1268,10 @@ export type WorkerResultPayload<C extends Coordinates = PageCoordinates> =
   | { tag: 'signatures.analyze'; analysis: ChangeAnalysis }
   | {
       tag: 'signatures.finalizeCandidate';
-      /** The installed signature as the sealed file reports it. */
+      /**
+       * The installed signature as the sealed file reports it, in page space:
+       * the finalizer measures it while its own session is open.
+       */
       signature: SignatureDTO;
       /** What the sealed file's signatures forbid from now on. */
       protection: DocumentProtection;
@@ -1340,7 +1344,7 @@ export type WorkerResultPayload<C extends Coordinates = PageCoordinates> =
     }
   | {
       tag: 'forms.reset';
-      result: FormSetValueResult<C>;
+      result: FormResetResult<C>;
       artifact?: LayerArtifactWorkerPayload;
       artifactFile?: LayerArtifactFileWorkerPayload;
     }
@@ -1390,7 +1394,7 @@ export type WorkerResultPayload<C extends Coordinates = PageCoordinates> =
       artifactFile?: LayerArtifactFileWorkerPayload;
     }
   | {
-      tag: 'forms.attachWidget';
+      tag: 'forms.addWidget';
       result: FormWidgetLinkResult<C>;
       artifact?: LayerArtifactWorkerPayload;
       artifactFile?: LayerArtifactFileWorkerPayload;

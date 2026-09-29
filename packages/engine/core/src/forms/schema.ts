@@ -1,28 +1,31 @@
+import { FormFieldRefSchema } from '../identity/FormFieldRef.schema';
 import { PageRefSchema } from '../identity/PageRef.schema';
 import { AnnotationRefSchema } from '../annotation/base.schema';
 import { z } from 'zod';
 
-import { WidgetAppearanceSchema } from '../annotation/kinds/widget.shared';
+import { WIDGET_STYLE_SHAPE, WidgetAppearanceSchema } from '../annotation/kinds/widget.shared';
 import { PageBoxSchema } from '../geometry/schemas';
-import type { FormFieldRef, FormWidget } from '../identity/FormFieldRef';
-import type { FormFieldDraft, FormFieldOptionInput, WidgetPlacement } from './draft';
+import type { FormWidget } from '../identity/FormFieldRef';
+import type {
+  FormFieldDraft,
+  FormFieldFlagsInput,
+  FormFieldOptionInput,
+  WidgetPlacement,
+} from './draft';
 import type { FormFieldPatch } from './patch';
-import type { FormFieldDTO, FormFieldFlags, FormFieldOption, ToggleFieldWidget } from './field';
+import type {
+  FormFieldDTO,
+  FormFieldFlags,
+  FormFieldOption,
+  FormFieldWidget,
+  ToggleFieldWidget,
+} from './field';
 import type { FormKind, FormSnapshot } from './snapshot';
 import type { FormDataFormat, FormFieldValue } from './value';
 import type { FormValueEntry } from './value-entry';
 import { PdfFieldActionsSchema } from '../dto/PdfAction.schema';
 
-export const FormFieldRefSchema: z.ZodType<FormFieldRef> = z.discriminatedUnion('kind', [
-  z.object({
-    kind: z.literal('objectNumber'),
-    fieldObjectNumber: z.number().int().positive(),
-  }),
-  z.object({
-    kind: z.literal('fqn'),
-    name: z.string().min(1),
-  }),
-]);
+export { FormFieldRefSchema };
 
 const FormWidgetShape = {
   // The annotation address, present exactly when the widget is indirect and placed.
@@ -34,6 +37,14 @@ const FormWidgetShape = {
 
 export const FormWidgetSchema: z.ZodType<FormWidget> = z.object(FormWidgetShape);
 
+const FormFieldWidgetShape = {
+  ...FormWidgetShape,
+  // Null for a widget on no page.
+  rect: PageBoxSchema.nullable(),
+};
+
+export const FormFieldWidgetSchema: z.ZodType<FormFieldWidget> = z.object(FormFieldWidgetShape);
+
 export const FormFieldFlagsSchema: z.ZodType<FormFieldFlags> = z.object({
   readOnly: z.boolean(),
   required: z.boolean(),
@@ -42,7 +53,7 @@ export const FormFieldFlagsSchema: z.ZodType<FormFieldFlags> = z.object({
 });
 
 export const ToggleFieldWidgetSchema: z.ZodType<ToggleFieldWidget> = z.object({
-  ...FormWidgetShape,
+  ...FormFieldWidgetShape,
   onState: z.string(),
   exportValue: z.string(),
   checked: z.boolean(),
@@ -72,7 +83,7 @@ const FormFieldBaseShape = {
   valueEntry: FormValueEntrySchema,
   defaultValueEntry: FormValueEntrySchema,
   actions: PdfFieldActionsSchema.optional(),
-  widgets: z.array(FormWidgetSchema),
+  widgets: z.array(FormFieldWidgetSchema),
 };
 
 export const FormFieldDTOSchema: z.ZodType<FormFieldDTO> = z.discriminatedUnion('family', [
@@ -113,6 +124,7 @@ export const FormFieldDTOSchema: z.ZodType<FormFieldDTO> = z.discriminatedUnion(
     ...FormFieldBaseShape,
     family: z.literal('listbox'),
     selectedValues: z.array(z.string()),
+    defaultValue: z.array(z.string()),
     multiSelect: z.boolean(),
     options: z.array(FormFieldOptionSchema),
   }),
@@ -140,22 +152,34 @@ export const FormSnapshotSchema: z.ZodType<FormSnapshot> = z.object({
   calculationOrder: z.array(FormFieldRefSchema.nullable()),
 });
 
-export const FormFieldValueSchema: z.ZodType<FormFieldValue> = z.discriminatedUnion('type', [
-  z.object({ type: z.literal('text'), value: z.string() }),
-  z.object({ type: z.literal('toggle'), state: z.string().nullable() }),
-  z.object({ type: z.literal('choice'), values: z.array(z.string()) }),
+export const FormFieldValueSchema: z.ZodType<FormFieldValue> = z.union([
+  z.object({ value: z.string().nullable() }).strict(),
+  z.object({ checked: z.boolean() }).strict(),
+  z.object({ selectedValues: z.array(z.string()) }).strict(),
 ]);
 
 export const FormDataFormatSchema: z.ZodType<FormDataFormat> = z.enum(['fdf', 'xfdf']);
 
 export { WidgetAppearanceSchema };
 
-export const WidgetPlacementSchema: z.ZodType<WidgetPlacement> = z.object({
-  page: PageRefSchema,
-  rect: PageBoxSchema,
-  onState: z.string().min(1).optional(),
-  appearance: WidgetAppearanceSchema.optional(),
-});
+export const WidgetPlacementSchema: z.ZodType<WidgetPlacement> = z
+  .object({
+    page: PageRefSchema,
+    rect: PageBoxSchema,
+    exportValue: z.string().min(1).optional(),
+    ...WIDGET_STYLE_SHAPE,
+  })
+  .strict() as unknown as z.ZodType<WidgetPlacement>;
+
+/** A read's `flags` sent back carry `raw`: taken, and ignored. */
+export const FormFieldFlagsInputSchema: z.ZodType<FormFieldFlagsInput> = z
+  .object({
+    readOnly: z.boolean().optional(),
+    required: z.boolean().optional(),
+    noExport: z.boolean().optional(),
+    raw: z.number().optional(),
+  })
+  .strict();
 
 export const FormFieldOptionInputSchema: z.ZodType<FormFieldOptionInput> = z.object({
   label: z.string(),
@@ -164,63 +188,58 @@ export const FormFieldOptionInputSchema: z.ZodType<FormFieldOptionInput> = z.obj
 
 const FormFieldDraftBaseShape = {
   name: z.string().min(1),
-  readOnly: z.boolean().optional(),
-  required: z.boolean().optional(),
-  noExport: z.boolean().optional(),
+  flags: FormFieldFlagsInputSchema.optional(),
   alternateName: z.string().optional(),
   mappingName: z.string().optional(),
+  widgets: z.array(WidgetPlacementSchema).optional(),
 };
 
+/** A draft that names a member its family doesn't have is refused, not trimmed. */
 export const FormFieldDraftSchema: z.ZodType<FormFieldDraft> = z.discriminatedUnion('family', [
-  z.object({
-    ...FormFieldDraftBaseShape,
-    family: z.literal('text'),
-    defaultValue: z.string().optional(),
-    maxLength: z.number().int().positive().optional(),
-    multiline: z.boolean().optional(),
-    password: z.boolean().optional(),
-    comb: z.boolean().optional(),
-    widget: WidgetPlacementSchema.optional(),
-  }),
-  z.object({
-    ...FormFieldDraftBaseShape,
-    family: z.literal('checkbox'),
-    widget: WidgetPlacementSchema.optional(),
-  }),
-  z.object({
-    ...FormFieldDraftBaseShape,
-    family: z.literal('radio'),
-    radiosInUnison: z.boolean().optional(),
-    noToggleToOff: z.boolean().optional(),
-    widgets: z.array(WidgetPlacementSchema).optional(),
-  }),
-  z.object({
-    ...FormFieldDraftBaseShape,
-    family: z.literal('combobox'),
-    edit: z.boolean().optional(),
-    options: z.array(FormFieldOptionInputSchema).optional(),
-    defaultValue: z.string().optional(),
-    widget: WidgetPlacementSchema.optional(),
-  }),
-  z.object({
-    ...FormFieldDraftBaseShape,
-    family: z.literal('listbox'),
-    multiSelect: z.boolean().optional(),
-    options: z.array(FormFieldOptionInputSchema).optional(),
-    widget: WidgetPlacementSchema.optional(),
-  }),
-  z.object({
-    ...FormFieldDraftBaseShape,
-    family: z.literal('signature'),
-    widget: WidgetPlacementSchema.optional(),
-  }),
+  z
+    .object({
+      ...FormFieldDraftBaseShape,
+      family: z.literal('text'),
+      defaultValue: z.string().optional(),
+      maxLength: z.number().int().positive().optional(),
+      multiline: z.boolean().optional(),
+      password: z.boolean().optional(),
+      comb: z.boolean().optional(),
+    })
+    .strict(),
+  z.object({ ...FormFieldDraftBaseShape, family: z.literal('checkbox') }).strict(),
+  z
+    .object({
+      ...FormFieldDraftBaseShape,
+      family: z.literal('radio'),
+      radiosInUnison: z.boolean().optional(),
+      noToggleToOff: z.boolean().optional(),
+    })
+    .strict(),
+  z
+    .object({
+      ...FormFieldDraftBaseShape,
+      family: z.literal('combobox'),
+      edit: z.boolean().optional(),
+      options: z.array(FormFieldOptionInputSchema).optional(),
+      defaultValue: z.string().optional(),
+    })
+    .strict(),
+  z
+    .object({
+      ...FormFieldDraftBaseShape,
+      family: z.literal('listbox'),
+      multiSelect: z.boolean().optional(),
+      options: z.array(FormFieldOptionInputSchema).optional(),
+      defaultValue: z.array(z.string()).optional(),
+    })
+    .strict(),
+  z.object({ ...FormFieldDraftBaseShape, family: z.literal('signature') }).strict(),
 ]) as unknown as z.ZodType<FormFieldDraft>;
 
 const FormFieldPatchBaseShape = {
   name: z.string().min(1).optional(),
-  readOnly: z.boolean().optional(),
-  required: z.boolean().optional(),
-  noExport: z.boolean().optional(),
+  flags: FormFieldFlagsInputSchema.optional(),
   alternateName: z.string().nullable().optional(),
   mappingName: z.string().nullable().optional(),
 };
@@ -233,8 +252,12 @@ const FormFieldPatchBaseShape = {
 export const FormFieldPatchSchema: z.ZodType<FormFieldPatch> = z
   .object({
     ...FormFieldPatchBaseShape,
-    family: z.enum(['text', 'checkbox', 'radio', 'combobox', 'listbox']).optional(),
-    defaultValue: z.string().nullable().optional(),
+    family: z.enum(['text', 'checkbox', 'radio', 'combobox', 'listbox', 'signature']).optional(),
+    // A string for text fields and dropdowns, option values for a list.
+    defaultValue: z
+      .union([z.string(), z.array(z.string())])
+      .nullable()
+      .optional(),
     maxLength: z.number().int().positive().nullable().optional(),
     multiline: z.boolean().optional(),
     password: z.boolean().optional(),

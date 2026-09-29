@@ -69,6 +69,8 @@ export {
   AnnotationMoveResultSchema,
   FormMutationMetaSchema,
   FormSetValueResultSchema,
+  FormResetResultSchema,
+  FormResetBodySchema,
   FormImportResultSchema,
   FormRepairResultSchema,
   FormFieldCreateResultSchema,

@@ -179,7 +179,6 @@ export function runSignatureConformance(
         await doc.forms.setValue(
           { kind: 'objectNumber', fieldObjectNumber: text.fieldObjectNumber },
           {
-            type: 'text',
             value: 'unsaved',
           },
         );
@@ -288,14 +287,14 @@ export function runSignatureConformance(
         expect(doc.security.allows('doc.forms.fill')).toBe(true);
         let caught: unknown;
         try {
-          await doc.forms.setValue(lockedRef, { type: 'text', value: 'changed' });
+          await doc.forms.setValue(lockedRef, { value: 'changed' });
         } catch (err) {
           caught = err;
         }
         expect(EngineError.is(caught, EngineErrorCode.ProtectedDocument)).toBe(true);
         // A script's effects can't reach it either: the effect is rejected.
         const effects = await doc.forms.applyEffects([
-          { kind: 'setValue', ref: lockedRef, value: { type: 'text', value: 'changed' } },
+          { kind: 'setValue', ref: lockedRef, value: { value: 'changed' } },
         ]);
         expect(effects.results[0]).toMatchObject({
           status: 'rejected',
@@ -322,7 +321,6 @@ export function runSignatureConformance(
       const permitted = await open(permitEngine, opts, fixture);
       try {
         const result = await permitted.forms.setValue(lockedRef, {
-          type: 'text',
           value: 'changed',
         });
         expect(result.field.name).toBe(fixture.lockedField);
@@ -447,10 +445,7 @@ function runAnalysisTests(
       });
       expect(clean.steps).toHaveLength(0);
       expect(clean.verdict).toBe('unchanged');
-      await doc.forms.setValue(
-        { kind: 'fqn', name: fx.textField },
-        { type: 'text', value: 'draft' },
-      );
+      await doc.forms.setValue({ kind: 'fqn', name: fx.textField }, { value: 'draft' });
       const persisted = await doc.signatures.analyze({ since: { signatureIndex: 0 } });
       expect(persisted.steps).toHaveLength(0);
       const working = await doc.signatures.analyze({
@@ -519,7 +514,7 @@ function runAnalysisTests(
     try {
       await locked.forms.setValue(
         { kind: 'fqn', name: opts.fixtures.fieldMdp.lockedField },
-        { type: 'text', value: 'tampered' },
+        { value: 'tampered' },
       );
       const working = await locked.signatures.analyze({
         since: { signatureIndex: 0 },
@@ -590,9 +585,9 @@ function runSigningTests(
       expect(await caughtCode(() => doc.signatures.prepare({ field: sigRef() }))).toBe(
         EngineErrorCode.SigningPending,
       );
-      expect(
-        await caughtCode(() => doc.forms.setValue(textRef(), { type: 'text', value: 'x' })),
-      ).toBe(EngineErrorCode.SigningPending);
+      expect(await caughtCode(() => doc.forms.setValue(textRef(), { value: 'x' }))).toBe(
+        EngineErrorCode.SigningPending,
+      );
       // The live document is untouched.
       const during = await doc.signatures.list();
       expect(during.signatures[0].signed).toBe(false);
@@ -665,7 +660,7 @@ function runSigningTests(
       expect(replay.version).toEqual(result.version);
       expect((await doc.signatures.cancel(prepared.signingId)).status).toBe('already-completed');
       expect((await doc.signatures.cancel('never-prepared')).status).toBe('unknown');
-      await doc.forms.setValue(textRef(), { type: 'text', value: 'after' });
+      await doc.forms.setValue(textRef(), { value: 'after' });
       // Signing the same field again is refused: it is signed.
       expect(await caughtCode(() => doc.signatures.prepare({ field: sigRef() }))).toBe(
         EngineErrorCode.SignatureRefused,
@@ -685,7 +680,7 @@ function runSigningTests(
     if (!supported()) return;
     const doc = await open(engineOf(), opts, fx());
     try {
-      await doc.forms.setValue(textRef(), { type: 'text', value: 'unsaved' });
+      await doc.forms.setValue(textRef(), { value: 'unsaved' });
       const prepared = await doc.signatures.prepare({ field: sigRef() });
       const result = await doc.signatures.complete({
         signingId: prepared.signingId,
@@ -740,7 +735,7 @@ function runSigningTests(
         EngineErrorCode.ProtectedDocument,
       );
       // Filling is still permitted (P = 2), and the certification survives it.
-      await doc.forms.setValue(textRef(), { type: 'text', value: 'filled' });
+      await doc.forms.setValue(textRef(), { value: 'filled' });
       const after = await doc.signatures.list();
       expect(after.signatures[0].coverage).toBe('whole-revision');
     } finally {
@@ -764,9 +759,9 @@ function runSigningTests(
       expect(result.signature.fieldMdp).toEqual({ action: 'include', fields: [fx().textField] });
       expect(result.signature.lock).toEqual({ action: 'include', fields: [fx().textField] });
       expect(result.protection.fieldLocks.length >= 1).toBe(true);
-      expect(
-        await caughtCode(() => doc.forms.setValue(textRef(), { type: 'text', value: 'nope' })),
-      ).toBe(EngineErrorCode.ProtectedDocument);
+      expect(await caughtCode(() => doc.forms.setValue(textRef(), { value: 'nope' }))).toBe(
+        EngineErrorCode.ProtectedDocument,
+      );
     } finally {
       await doc.close();
     }
@@ -781,7 +776,7 @@ function runSigningTests(
       expect((await doc.signatures.cancel(prepared.signingId)).status).toBe('cancelled');
       expect((await doc.signatures.list()).signatures[0].signed).toBe(false);
       expect((await doc.version!()).sha256).toBe(v0.sha256);
-      await doc.forms.setValue(textRef(), { type: 'text', value: 'free again' });
+      await doc.forms.setValue(textRef(), { value: 'free again' });
       expect(
         await caughtCode(() =>
           doc.signatures.complete({

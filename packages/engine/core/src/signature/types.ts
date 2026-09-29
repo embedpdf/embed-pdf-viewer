@@ -1,6 +1,8 @@
 import type { DateInput, IsoDateTime } from '../dto/IsoDateTime';
-import type { FormFieldRef, FormWidget } from '../identity/FormFieldRef';
+import type { FormFieldWidget } from '../forms/field';
+import type { FormFieldRef } from '../identity/FormFieldRef';
 import type { MutationMeta } from '../mutation/MutationMeta';
+import type { Coordinates, PageCoordinates } from '../pageSpace/coordinates';
 
 /**
  * Digital signatures, read side.
@@ -116,13 +118,14 @@ export interface SignatureSeedValue {
   unsupportedRequired: boolean;
 }
 
-export interface SignatureDTO {
+export interface SignatureDTO<C extends Coordinates = PageCoordinates> {
   /** Position in `SignatureSnapshot.signatures` (field order). */
   index: number;
   /** Always an `objectNumber` ref: the durable identity. */
   field: FormFieldRef;
   fieldName: string;
-  widget: FormWidget | null;
+  /** The field's widget, where the signature shows, or `null` when it has none. */
+  widget: FormFieldWidget<C> | null;
   signed: boolean;
   kind: SignatureKind;
   /** Raw `/Filter` and `/SubFilter` names. */
@@ -179,12 +182,12 @@ export interface DocumentProtection {
   policyVersion: number;
 }
 
-export interface SignatureSnapshot {
+export interface SignatureSnapshot<C extends Coordinates = PageCoordinates> {
   /** `false` when the cross-reference chain is broken or was rebuilt: every byte fact is then indeterminate. */
   chainValid: boolean;
   /** Oldest first. Empty when `chainValid` is false. */
   revisions: PdfRevision[];
-  signatures: SignatureDTO[];
+  signatures: SignatureDTO<C>[];
   protection: DocumentProtection;
 }
 
@@ -263,10 +266,10 @@ export interface SignatureCompleteInput {
   expectedVersion: DocumentVersionRef;
 }
 
-export interface SignatureCompleteResult {
+export interface SignatureCompleteResult<C extends Coordinates = PageCoordinates> {
   /** `already-completed` on an idempotent replay with the same CMS. */
   status: 'completed' | 'already-completed';
-  signature: SignatureDTO;
+  signature: SignatureDTO<C>;
   /** The version the sealed bytes became. */
   version: BaseVersionInfo;
   /** What it was built on. */

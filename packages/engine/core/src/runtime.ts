@@ -169,7 +169,7 @@ export type {
   FormsUpdateFieldWorkerRequest,
   FormsSetSignatureAppearanceWorkerRequest,
   FormsDeleteFieldWorkerRequest,
-  FormsAttachWidgetWorkerRequest,
+  FormsAddWidgetWorkerRequest,
   FormsDetachWidgetWorkerRequest,
   FontsRegisterWorkerRequest,
   FontsAddFallbackWorkerRequest,

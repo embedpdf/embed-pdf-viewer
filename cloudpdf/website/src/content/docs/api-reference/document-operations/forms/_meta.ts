@@ -3,6 +3,6 @@ export default {
   list: 'List',
   'export-data': 'Export Data',
   'import-data': 'Import Data',
-  reset: 'Reset',
   'set-value': 'Set Value',
+  reset: 'Reset',
 };

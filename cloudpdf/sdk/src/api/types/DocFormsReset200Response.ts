@@ -3,7 +3,7 @@
 import type * as CloudPDF from "../index.js";
 
 export interface DocFormsReset200Response {
-    field: CloudPDF.DocFormsReset200ResponseField;
+    fields: CloudPDF.DocFormsReset200ResponseFieldsItem[];
     meta: DocFormsReset200Response.Meta;
 }
 

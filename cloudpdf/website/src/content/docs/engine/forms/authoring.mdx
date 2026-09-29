@@ -51,7 +51,7 @@ and [add a widget](#add-a-widget) later.
 | `mappingName`    | A second name, for other apps that export the form's data.                                                                               | none       |
 
 `flags` is `{ readOnly, required, noExport }`, the same shape as a field's `flags` when you read
-it.
+it, so you can pass a read's `flags` back as it is.
 
 `create()` is one change: when any part of the draft is invalid, it fails with `InvalidArg` (or
 `NotFound` for a page that isn't there) and creates nothing. A name that's already taken fails
@@ -65,7 +65,7 @@ Each family adds its own settings:
 | `checkbox`  | Each widget's `exportValue`: what the form data holds when it's checked. Default `'Yes'`.              |
 | `radio`     | Each widget's `exportValue` (one widget per button), `noToggleToOff`, `radiosInUnison`                 |
 | `combobox`  | `options`, `defaultValue`, `edit` (the user may also type their own text)                              |
-| `listbox`   | `options`, `multiSelect`                                                                               |
+| `listbox`   | `options`, `multiSelect`, `defaultValue` (option values; more than one needs `multiSelect`)            |
 | `signature` | Only widgets. Signing it is on [Digital signatures](/docs/engine/forms/signatures).                    |
 
 ### A radio group
@@ -150,7 +150,9 @@ await doc.forms.update(field.ref, { flags: { ...field.flags, required: true }, m
 A setting you leave out keeps its value. `null` removes one: `{ maxLength: null }` for no limit,
 `{ defaultValue: null }` for no default, `{ alternateName: null }` for no tooltip.
 
-You can change the settings in the tables above, except the family and the widgets. Also:
+You can change the settings in the tables above, except the family and the widgets. A signature
+field takes the settings every field has: `name`, `flags`, `alternateName` and `mappingName`.
+Also:
 
 - `name` renames the last part of the name: `customer.email` renamed to `'contact'` becomes
   `customer.contact`. A name with dots, or one a sibling already has, fails with `InvalidArg`. A

@@ -472,6 +472,7 @@ export type {
   FormFieldOrigin,
   FormFieldFlags,
   ToggleFieldWidget,
+  FormFieldWidget,
   FormFieldOption,
   FormFieldBase,
   TextFieldDTO,
@@ -489,11 +490,12 @@ export type {
   WidgetStyleFields,
   WidgetStyleDraftFields,
   WidgetStylePatchFields,
+  WidgetAppearance,
 } from './annotation/kinds/widget.shared';
 export type { FormKind, FormSnapshot } from './forms/snapshot';
 export type {
-  WidgetAppearance,
   WidgetPlacement,
+  FormFieldFlagsInput,
   FormFieldOptionInput,
   TextFieldDraft,
   CheckboxFieldDraft,
@@ -605,10 +607,11 @@ export {
   protectedCapabilities,
 } from './signature/protection';
 export type { ProtectableCapability } from './signature/protection';
-export { deletedFieldOf } from './mutation/FormMutationResults';
+export { deletedFieldOf, formResetFacts } from './mutation/FormMutationResults';
 export type {
   FormMutationMeta,
   FormSetValueResult,
+  FormResetResult,
   FormImportResult,
   FormDataExport,
   FormRepairResult,

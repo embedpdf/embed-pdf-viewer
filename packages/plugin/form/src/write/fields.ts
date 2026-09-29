@@ -1,6 +1,6 @@
 /**
- * Design mode: fields and widgets are created, patched, deleted, attached and
- * detached through `doc.forms`. The fields and widget-geometry mirrors apply
+ * Design mode: fields are created, patched and deleted, and widgets detached,
+ * through `doc.forms`. The fields and widget-geometry mirrors apply
  * the confirmed results, and the annotation plugin applies the widget changes
  * from the same events.
  */
@@ -59,19 +59,15 @@ export function createFieldWrites(
     }
     const { family, appearance } = input;
     const name = input.name ?? autoName(family);
-    const placement = {
-      page,
-      rect: box,
-      ...(appearance ? { appearance } : {}),
-    };
+    const placement = { page, rect: box, ...appearance };
     const draft: FormFieldDraft =
       family === 'radio'
-        ? { family, name, widgets: [{ ...placement, onState: 'option1' }] }
+        ? { family, name, widgets: [{ ...placement, exportValue: 'option1' }] }
         : family === 'combobox' || family === 'listbox'
           ? {
               family,
               name,
-              widget: placement,
+              widgets: [placement],
               options: input.options
                 ? input.options.map((option) => ({ ...option }))
                 : [
@@ -79,7 +75,7 @@ export function createFieldWrites(
                     { label: 'Option 2', value: 'Option 2' },
                   ],
             }
-          : { family, name, widget: placement };
+          : { family, name, widgets: [placement] };
     const result = await ctx.doc.forms.create(draft);
     // Wait for the annotation plugin to read the new widget, so a caller can
     // select it right away.
@@ -105,10 +101,6 @@ export function createFieldWrites(
       detachWidget: (ref, widget) =>
         enqueue(async () => {
           await ctx.doc.forms.removeWidget(ref, widget);
-        }),
-      attachWidget: (ref, widget) =>
-        enqueue(async () => {
-          await ctx.doc.forms.addWidget(ref, widget);
         }),
     } satisfies Partial<FormCapability>,
   };

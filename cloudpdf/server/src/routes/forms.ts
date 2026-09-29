@@ -10,6 +10,7 @@ import {
   type FormFieldRef,
   type FormFieldValue,
   type AnnotationRef,
+  type WidgetPlacement,
 } from '@embedpdf/engine-core/runtime';
 import {
   FormDataFormatSchema,
@@ -17,8 +18,10 @@ import {
   FormFieldDraftSchema,
   FormFieldPatchSchema,
   FormFieldValueSchema,
+  FormResetBodySchema,
   AnnotationRefSchema,
   SignatureAppearanceBodySchema,
+  WidgetPlacementSchema,
 } from '@embedpdf/engine-core/wire';
 import { requireLayerCapability, requireLayerDocAccessOnly } from '../app/jwt-plugin';
 import type { DocumentService } from '../services/DocumentService';
@@ -248,9 +251,8 @@ export async function registerFormRoutes(app: FastifyInstance, deps: FormRouteDe
     return layerService.setFormValue(ctx, { docId, layerName, ref, value }, abortSignalOf(reply));
   });
 
-  app.post('/v1/docs/:docId/layers/:layerName/form/fields/:fieldKey/reset', async (req, reply) => {
+  app.post('/v1/docs/:docId/layers/:layerName/form/reset', async (req, reply) => {
     const { docId, layerName } = layerParams(req);
-    const ref = fieldRefFromParams(req);
     const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
     const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
     const protection = await documentService.getProtection(accessCtx, docId, layerName);
@@ -262,8 +264,17 @@ export async function registerFormRoutes(app: FastifyInstance, deps: FormRouteDe
       pdfBits,
       protection,
     );
+    const body = parseOrInvalidArg<{ refs?: FormFieldRef[] }>(
+      FormResetBodySchema as unknown as SchemaLike<{ refs?: FormFieldRef[] }>,
+      req.body ?? {},
+      'body',
+    );
     setNoStore(reply);
-    return layerService.resetFormField(ctx, { docId, layerName, ref }, abortSignalOf(reply));
+    return layerService.resetForm(
+      ctx,
+      { docId, layerName, ...(body.refs ? { refs: body.refs } : {}) },
+      abortSignalOf(reply),
+    );
   });
 
   app.post(
@@ -355,19 +366,15 @@ export async function registerFormRoutes(app: FastifyInstance, deps: FormRouteDe
         pdfBits,
         protection,
       );
-      const body = (req.body ?? {}) as { widget?: unknown; onState?: unknown };
-      const widget = parseOrInvalidArg<AnnotationRef>(
-        AnnotationRefSchema as unknown as SchemaLike<AnnotationRef>,
-        body.widget,
-        'body.widget',
+      const placement = parseOrInvalidArg<WidgetPlacement>(
+        WidgetPlacementSchema as unknown as SchemaLike<WidgetPlacement>,
+        req.body,
+        'body',
       );
-      if (body.onState !== undefined && typeof body.onState !== 'string') {
-        throw new EngineError(EngineErrorCode.InvalidArg, 'body.onState: expected string');
-      }
       setNoStore(reply);
-      return layerService.attachFormWidget(
+      return layerService.addFormWidget(
         ctx,
-        { docId, layerName, ref, widget, ...(body.onState ? { onState: body.onState } : {}) },
+        { docId, layerName, ref, placement },
         abortSignalOf(reply),
       );
     },

@@ -151,10 +151,7 @@ describe('digital signatures (cloud SDK, real runtime)', () => {
     const alice = await openLayer('alice');
     try {
       // Bob edits his own layer before Alice signs: he will be behind the head.
-      await bob.doc.forms.setValue(
-        { kind: 'fqn', name: 'group.total' },
-        { type: 'text', value: 'bob' },
-      );
+      await bob.doc.forms.setValue({ kind: 'fqn', name: 'group.total' }, { value: 'bob' });
       const bobBefore = await bob.doc.signatures.list();
       expect(bobBefore.signatures.some((s) => s.signed)).toBe(false);
 
@@ -162,10 +159,7 @@ describe('digital signatures (cloud SDK, real runtime)', () => {
       expect(before.chainValid).toBe(true);
       expect(before.signatures.map((s) => [s.fieldName, s.signed])).toEqual([['sig', false]]);
 
-      await alice.doc.forms.setValue(
-        { kind: 'fqn', name: 'group.total' },
-        { type: 'text', value: 'alice' },
-      );
+      await alice.doc.forms.setValue({ kind: 'fqn', name: 'group.total' }, { value: 'alice' });
       const result = await sign(alice.doc, {
         field: { kind: 'fqn', name: 'sig' },
         certify: { permission: 2 },
@@ -296,10 +290,7 @@ describe('digital signatures (cloud SDK, real runtime)', () => {
       expect(snapshot.protection.certification?.permission).toBe(2);
 
       // A form fill on a P=2 document is permitted; the working copy is judged at the layer URL.
-      await carol.doc.forms.setValue(
-        { kind: 'fqn', name: 'group.total' },
-        { type: 'text', value: 'carol' },
-      );
+      await carol.doc.forms.setValue({ kind: 'fqn', name: 'group.total' }, { value: 'carol' });
       const analysis = await carol.doc.signatures.analyze({
         since: { signatureIndex: 0 },
         until: 'working-copy',
@@ -333,9 +324,7 @@ describe('digital signatures (cloud SDK, real runtime)', () => {
       expect(prepared.expiresAt).not.toBeNull();
       // Pending: the layer is read-only.
       expect(
-        await errorCode(
-          doc.forms.setValue({ kind: 'fqn', name: 'group.total' }, { type: 'text', value: 'x' }),
-        ),
+        await errorCode(doc.forms.setValue({ kind: 'fqn', name: 'group.total' }, { value: 'x' })),
       ).toBe(EngineErrorCode.SigningPending);
       expect(await errorCode(doc.signatures.prepare({ field: { kind: 'fqn', name: 'sig' } }))).toBe(
         EngineErrorCode.SigningPending,
@@ -343,10 +332,7 @@ describe('digital signatures (cloud SDK, real runtime)', () => {
       expect((await doc.signatures.cancel(prepared.signingId)).status).toBe('cancelled');
       expect((await doc.signatures.cancel(prepared.signingId)).status).toBe('unknown');
       // Writable again; the cancelled candidate is gone for good.
-      await doc.forms.setValue(
-        { kind: 'fqn', name: 'group.total' },
-        { type: 'text', value: 'dave' },
-      );
+      await doc.forms.setValue({ kind: 'fqn', name: 'group.total' }, { value: 'dave' });
       expect(
         await errorCode(
           doc.signatures.complete({

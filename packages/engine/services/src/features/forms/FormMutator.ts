@@ -3,11 +3,13 @@ import type {
   FormFieldDraft,
   FormFieldDTO,
   FormFieldFamily,
+  FormFieldOptionInput,
   FormFieldPatch,
   FormFieldRef,
   FormFieldValue,
   FormImportResult,
   FormRepairResult,
+  FormResetResult,
   FormSetValueResult,
   FormWidget,
   MutationMeta,
@@ -36,6 +38,13 @@ import {
   readSignaturesFromModel,
   withSignatureModel,
 } from '../signature/internal/readSignatureModel';
+import {
+  applyNativeWrite,
+  isAtDefault,
+  nativeWriteOf,
+  valueEntriesEqual,
+  type NativeFieldWrite,
+} from './internal/fieldValues';
 import { withWideStringArray } from './internal/wideStringArray';
 import { readFieldAt, readFormSnapshot } from './internal/readFormSnapshot';
 import { resolveFieldRef, type ResolvedField } from './internal/resolveFieldRef';
@@ -65,11 +74,14 @@ const REPAIR_BAKE_APPEARANCES = 0x1;
  */
 const EMPTY_META: MutationMeta = { affectedPages: [], cacheDelta: null };
 
-const FAMILY_BY_VALUE_TYPE: Record<FormFieldValue['type'], readonly string[]> = {
-  text: ['text'],
-  toggle: ['checkbox', 'radio'],
-  choice: ['combobox', 'listbox'],
-};
+/** The families that hold a value: the ones `reset` puts back. */
+const VALUE_FAMILIES: ReadonlySet<FormFieldFamily> = new Set([
+  'text',
+  'checkbox',
+  'radio',
+  'combobox',
+  'listbox',
+]);
 
 /**
  * Write side of the forms feature. Every method is a validate-then-apply
@@ -99,37 +111,92 @@ export class FormMutator {
       resolved.fieldIndex,
       this.session.requireDocPtr(),
     );
-    const allowed = FAMILY_BY_VALUE_TYPE[value.type];
-    if (!allowed.includes(before.family)) {
-      throw new EngineError(
-        EngineErrorCode.InvalidArg,
-        `value type '${value.type}' does not apply to a '${before.family}' field`,
-      );
-    }
-
-    const changed = this.applyWrite(resolved.fieldObjectNumber, value);
+    const changed = this.applyWrite(resolved.fieldObjectNumber, nativeWriteOf(before, value));
     return this.readBack(resolved.fieldObjectNumber, changed);
   }
 
-  reset(ref: FormFieldRef, signal: AbortSignal): FormSetValueResult<PdfCoordinates> {
+  /**
+   * Put fields back to their default value: the ones named, or, with
+   * `refs` absent, every field of the form. Fields that hold no value are
+   * skipped; so, in a whole-form reset, are fields stored inline or locked
+   * by a signature (named, they are refused). Every field is checked before
+   * the first write. Returns the fields that changed.
+   */
+  reset(refs: FormFieldRef[] | undefined, signal: AbortSignal): FormResetResult<PdfCoordinates> {
     throwIfAborted(signal);
+    const { fn } = this.runtime;
+    const docPtr = this.session.requireDocPtr();
     const model = acquireFormModel(this.runtime, this.session);
-    const resolved = resolveFieldRef(this.runtime, model, ref);
-    this.assertWritable(resolved);
+    const targets =
+      refs === undefined ? this.wholeFormTargets(model) : this.namedTargets(model, refs);
+    throwIfAborted(signal);
 
-    const changed = this.withChangedWidgets((buf, cap, countPtr) =>
-      this.runtime.fn.EPDFForm_ResetField(
-        this.session.requireDocPtr(),
-        resolved.fieldObjectNumber,
-        buf,
-        cap,
-        countPtr,
-      ),
-    );
-    if (changed === null) {
-      throw new EngineError(EngineErrorCode.InvalidArg, 'form field cannot be reset');
+    // A field already at its default is left alone: a reset would only repaint it.
+    const written = targets
+      .filter((field) => !isAtDefault(field))
+      .map((before) => {
+        const changed = this.withChangedWidgets((buf, cap, countPtr) =>
+          fn.EPDFForm_ResetField(docPtr, before.fieldObjectNumber, buf, cap, countPtr),
+        );
+        if (changed === null) {
+          throw new EngineError(EngineErrorCode.Unknown, `'${before.name}' could not be reset`);
+        }
+        return { before, changed };
+      });
+    if (written.length > 0) this.session.noteMutation();
+
+    const fields: FormFieldDTO<PdfCoordinates>[] = [];
+    const changedWidgets: FormWidget[] = [];
+    for (const { before, changed } of written) {
+      const after = this.readBackField(before.fieldObjectNumber);
+      if (changed.length === 0 && valueEntriesEqual(before.valueEntry, after.valueEntry)) continue;
+      fields.push(after);
+      const changedSet = new Set(changed);
+      for (const widget of after.widgets) {
+        if (changedSet.has(widget.annotObjectNumber)) {
+          changedWidgets.push(formWidget(widget.annotObjectNumber, widget.page));
+        }
+      }
     }
-    return this.readBack(resolved.fieldObjectNumber, changed);
+    return {
+      fields,
+      meta: formMutationMeta(
+        this.session,
+        fields.map((field) => field.ref),
+        changedWidgets,
+      ),
+    };
+  }
+
+  /** Every field a whole-form reset puts back: those with a value, written directly, unlocked. */
+  private wholeFormTargets(model: Ptr): FormFieldDTO<PdfCoordinates>[] {
+    const docPtr = this.session.requireDocPtr();
+    const locks = readFieldLocks(this.runtime, this.session);
+    const targets: FormFieldDTO<PdfCoordinates>[] = [];
+    const count = this.runtime.fn.EPDFForm_CountFields(model);
+    for (let index = 0; index < count; index++) {
+      const field = readFieldAt(this.runtime, model, index, docPtr);
+      if (!VALUE_FAMILIES.has(field.family) || field.fieldObjectNumber === 0) continue;
+      if (locks?.(field.name)) continue;
+      targets.push(field);
+    }
+    return targets;
+  }
+
+  /** The named fields with a value, each once; one that can't be written is refused. */
+  private namedTargets(model: Ptr, refs: FormFieldRef[]): FormFieldDTO<PdfCoordinates>[] {
+    const docPtr = this.session.requireDocPtr();
+    const seen = new Set<number>();
+    const targets: FormFieldDTO<PdfCoordinates>[] = [];
+    for (const ref of refs) {
+      const resolved = resolveFieldRef(this.runtime, model, ref);
+      const field = readFieldAt(this.runtime, model, resolved.fieldIndex, docPtr);
+      if (!VALUE_FAMILIES.has(field.family) || seen.has(resolved.fieldObjectNumber)) continue;
+      this.assertWritable(resolved);
+      seen.add(resolved.fieldObjectNumber);
+      targets.push(field);
+    }
+    return targets;
   }
 
   importData(
@@ -216,17 +283,11 @@ export class FormMutator {
     const { fn } = this.runtime;
     const docPtr = this.session.requireDocPtr();
 
-    const placements = this.placementsOf(draft);
+    const placements = draft.widgets ?? [];
     const pageIndexes = placements.map((placement) => this.preflightPlacement(placement));
-    if (draft.family === 'radio') {
-      for (const placement of placements) {
-        if (!placement.onState || placement.onState === 'Off') {
-          throw new EngineError(
-            EngineErrorCode.InvalidArg,
-            'every radio widget needs a non-"Off" onState',
-          );
-        }
-      }
+    const onStates = placements.map((placement) => onStateOf(draft.family, placement));
+    if (draft.family === 'listbox' && draft.defaultValue !== undefined) {
+      assertListDefault(draft.defaultValue, draft.options ?? [], draft.multiSelect ?? false);
     }
     if ('maxLength' in draft && draft.maxLength !== undefined) {
       if (!Number.isInteger(draft.maxLength) || draft.maxLength <= 0) {
@@ -253,12 +314,7 @@ export class FormMutator {
           pageIndex,
           placement,
         );
-        const onState =
-          draft.family === 'radio'
-            ? placement.onState!
-            : draft.family === 'checkbox'
-              ? (placement.onState ?? 'Yes')
-              : '';
+        const onState = onStates[at]!;
         if (!fn.EPDFForm_AttachWidget(docPtr, fieldObjectNumber, widgetObjectNumber, onState)) {
           throw new EngineError(EngineErrorCode.Unknown, 'widget adoption failed');
         }
@@ -338,9 +394,10 @@ export class FormMutator {
     const { fn } = this.runtime;
     const docPtr = this.session.requireDocPtr();
 
-    const { setBits, clearBits } = flagMasks(
-      draft as unknown as Record<string, boolean | undefined>,
-    );
+    const { setBits, clearBits } = flagMasks({
+      ...(draft as unknown as Record<string, boolean | undefined>),
+      ...draft.flags,
+    });
     if (setBits !== 0 || clearBits !== 0) {
       fn.EPDFForm_SetFieldFlags(docPtr, fieldObjectNumber, setBits, clearBits);
     }
@@ -348,7 +405,8 @@ export class FormMutator {
       this.applyOptions(fieldObjectNumber, draft.options);
     }
     if ('defaultValue' in draft && draft.defaultValue !== undefined) {
-      this.applyDefaultValues(fieldObjectNumber, [draft.defaultValue]);
+      const values = Array.isArray(draft.defaultValue) ? draft.defaultValue : [draft.defaultValue];
+      if (values.length > 0) this.applyDefaultValues(fieldObjectNumber, values);
     }
     if ('maxLength' in draft && draft.maxLength !== undefined) {
       if (!fn.EPDFForm_SetFieldMaxLen(docPtr, fieldObjectNumber, draft.maxLength)) {
@@ -447,6 +505,13 @@ export class FormMutator {
       this.session.requireDocPtr(),
     );
     assertPatchFitsFamily(patch, before.family);
+    const listDefault = 'defaultValue' in patch ? patch.defaultValue : undefined;
+    if (before.family === 'listbox' && Array.isArray(listDefault)) {
+      const multiSelect =
+        ('multiSelect' in patch ? patch.multiSelect : undefined) ?? before.multiSelect;
+      const options = ('options' in patch ? patch.options : undefined) ?? before.options;
+      assertListDefault(listDefault, options, multiSelect);
+    }
     const fieldObjectNumber = resolved.fieldObjectNumber;
 
     if (patch.name !== undefined) {
@@ -457,9 +522,10 @@ export class FormMutator {
         `cannot rename to "${patch.name}" (sibling conflict or invalid)`,
       );
     }
-    const { setBits, clearBits } = flagMasks(
-      patch as unknown as Record<string, boolean | undefined>,
-    );
+    const { setBits, clearBits } = flagMasks({
+      ...(patch as unknown as Record<string, boolean | undefined>),
+      ...patch.flags,
+    });
     if (setBits !== 0 || clearBits !== 0) {
       if (!fn.EPDFForm_SetFieldFlags(docPtr, fieldObjectNumber, setBits, clearBits)) {
         throw new EngineError(EngineErrorCode.InvalidArg, 'flag update rejected');
@@ -474,12 +540,18 @@ export class FormMutator {
       }
     }
     if ('defaultValue' in patch && patch.defaultValue !== undefined) {
-      if (patch.defaultValue === null) {
+      const values =
+        patch.defaultValue === null
+          ? []
+          : Array.isArray(patch.defaultValue)
+            ? patch.defaultValue
+            : [patch.defaultValue];
+      if (values.length === 0) {
         if (!fn.EPDFForm_RemoveFieldDefaultValue(docPtr, fieldObjectNumber)) {
           throw new EngineError(EngineErrorCode.InvalidArg, 'default value removal rejected');
         }
       } else {
-        this.applyDefaultValues(fieldObjectNumber, [patch.defaultValue]);
+        this.applyDefaultValues(fieldObjectNumber, values);
       }
     }
     if (patch.alternateName !== undefined) {
@@ -551,49 +623,49 @@ export class FormMutator {
     return { deleted: before.ref, removedWidgets };
   }
 
-  attachWidget(
+  /**
+   * Show a field in one more place: create the widget where the placement
+   * says, styled by it, and add it to the field, as one change. A failure
+   * after the first write rolls the page and the form back.
+   */
+  addWidget(
     ref: FormFieldRef,
-    widget: AnnotationRef,
-    onState: string | undefined,
+    placement: WidgetPlacement<PdfCoordinates>,
     signal: AbortSignal,
   ): { field: FormFieldDTO<PdfCoordinates>; widget: FormWidget } {
     throwIfAborted(signal);
     const { fn } = this.runtime;
+    const docPtr = this.session.requireDocPtr();
     const model = acquireFormModel(this.runtime, this.session);
     const resolved = resolveFieldRef(this.runtime, model, ref);
     this.assertWritable(resolved);
-    const before = readFieldAt(
-      this.runtime,
-      model,
-      resolved.fieldIndex,
-      this.session.requireDocPtr(),
-    );
-    const toggle = before.family === 'checkbox' || before.family === 'radio';
-    const state = toggle ? (onState ?? (before.family === 'checkbox' ? 'Yes' : '')) : '';
-    if (toggle && (!state || state === 'Off')) {
-      throw new EngineError(
-        EngineErrorCode.InvalidArg,
-        'attaching to a radio group needs a non-"Off" onState',
-      );
+    const before = readFieldAt(this.runtime, model, resolved.fieldIndex, docPtr);
+    const pageIndex = this.preflightPlacement(placement);
+    const onState = onStateOf(before.family, placement);
+    throwIfAborted(signal);
+
+    const checkpoint = DocumentCheckpoint.begin(fn, docPtr);
+    try {
+      checkpoint.page(pageIndex);
+      const widgetObjectNumber = createUnattachedWidget(this.runtime, docPtr, pageIndex, placement);
+      if (
+        !fn.EPDFForm_AttachWidget(docPtr, resolved.fieldObjectNumber, widgetObjectNumber, onState)
+      ) {
+        throw new EngineError(EngineErrorCode.InvalidArg, 'the widget could not join the field');
+      }
+      this.session.noteMutation();
+      return {
+        field: this.readBackField(resolved.fieldObjectNumber),
+        widget: formWidget(widgetObjectNumber, placement.page),
+      };
+    } catch (error) {
+      checkpoint.rollback();
+      throw error;
+    } finally {
+      checkpoint.end();
+      // Written or rolled back, the form model must be read again.
+      this.session.noteMutation();
     }
-    if (
-      !fn.EPDFForm_AttachWidget(
-        this.session.requireDocPtr(),
-        resolved.fieldObjectNumber,
-        widgetObjectNumber(widget),
-        state,
-      )
-    ) {
-      throw new EngineError(
-        EngineErrorCode.InvalidArg,
-        'widget cannot be adopted (already attached, merged, or not a widget)',
-      );
-    }
-    this.session.noteMutation();
-    return {
-      field: this.readBackField(resolved.fieldObjectNumber),
-      widget: formWidget(widgetObjectNumber(widget), widget.page),
-    };
   }
 
   detachWidget(
@@ -630,13 +702,6 @@ export class FormMutator {
       field: this.readBackField(resolved.fieldObjectNumber),
       widget: formWidget(widgetObjectNumber(widget), widget.page),
     };
-  }
-
-  private placementsOf(draft: FormFieldDraft<PdfCoordinates>): WidgetPlacement<PdfCoordinates>[] {
-    if (draft.family === 'radio') {
-      return draft.widgets ?? [];
-    }
-    return draft.widget ? [draft.widget] : [];
   }
 
   private applyOptions(
@@ -721,52 +786,16 @@ export class FormMutator {
     assertFieldNotLocked(name, locks);
   }
 
-  /** Dispatch the typed native write. Returns the changed widget objnums. */
-  private applyWrite(fieldObjectNumber: number, value: FormFieldValue): number[] {
-    const { fn, mem } = this.runtime;
+  /** Run the native value write. Returns the changed widget objnums. */
+  private applyWrite(fieldObjectNumber: number, write: NativeFieldWrite): number[] {
     const docPtr = this.session.requireDocPtr();
-
-    const changed = this.withChangedWidgets((buf, cap, countPtr) => {
-      switch (value.type) {
-        default:
-          throw new EngineError(EngineErrorCode.InvalidArg, 'unknown form value type');
-        case 'text': {
-          const textPtr = mem.writeU16String(value.value);
-          try {
-            return fn.EPDFForm_SetTextValue(docPtr, fieldObjectNumber, textPtr, buf, cap, countPtr);
-          } finally {
-            mem.free(textPtr);
-          }
-        }
-        case 'toggle':
-          // Empty string clears the group, same as the C API's null.
-          return fn.EPDFForm_SetToggle(
-            docPtr,
-            fieldObjectNumber,
-            value.state ?? '',
-            buf,
-            cap,
-            countPtr,
-          );
-        case 'choice':
-          return withWideStringArray(this.runtime, value.values, (arrayPtr, count) =>
-            fn.EPDFForm_SetChoiceValues(
-              docPtr,
-              fieldObjectNumber,
-              arrayPtr,
-              count,
-              buf,
-              cap,
-              countPtr,
-            ),
-          );
-      }
-    });
-
+    const changed = this.withChangedWidgets((buf, cap, countPtr) =>
+      applyNativeWrite(this.runtime, docPtr, fieldObjectNumber, write, { buf, cap, countPtr }),
+    );
     if (changed === null) {
       throw new EngineError(
         EngineErrorCode.InvalidArg,
-        'form value rejected (unknown toggle state, length limit, or non-option choice)',
+        'form value rejected (a radio group that must keep a choice, or a length limit)',
       );
     }
     return changed;
@@ -819,22 +848,14 @@ export class FormMutator {
 }
 
 /** The patch members every family has. */
-const PATCH_BASE_MEMBERS = [
-  'family',
-  'name',
-  'readOnly',
-  'required',
-  'noExport',
-  'alternateName',
-  'mappingName',
-];
+const PATCH_BASE_MEMBERS = ['family', 'name', 'flags', 'alternateName', 'mappingName'];
 
 /** The members each family's patch adds; a family not listed takes the base only. */
 const PATCH_FAMILY_MEMBERS: Partial<Record<FormFieldFamily, readonly string[]>> = {
   text: ['defaultValue', 'maxLength', 'multiline', 'password', 'comb'],
   radio: ['radiosInUnison', 'noToggleToOff'],
   combobox: ['edit', 'defaultValue', 'options'],
-  listbox: ['multiSelect', 'options'],
+  listbox: ['multiSelect', 'options', 'defaultValue'],
 };
 
 /**
@@ -859,6 +880,65 @@ function assertPatchFitsFamily(patch: FormFieldPatch, family: FormFieldFamily): 
       );
     }
   }
+  // A list's default is option values; a text field's or a dropdown's, one string.
+  const defaultValue = 'defaultValue' in patch ? patch.defaultValue : undefined;
+  if (defaultValue !== undefined && defaultValue !== null) {
+    if (Array.isArray(defaultValue) !== (family === 'listbox')) {
+      throw new EngineError(
+        EngineErrorCode.InvalidArg,
+        family === 'listbox'
+          ? `a list's defaultValue is a list of option values`
+          : `a ${family} field's defaultValue is one string`,
+        { details: { field: 'defaultValue' } },
+      );
+    }
+  }
+}
+
+/**
+ * The on-state a new widget of a `family` field gets: its export value. A
+ * radio button needs one other than `'Off'`; a checkbox's is `'Yes'` when
+ * left out; other families take none.
+ */
+function onStateOf(family: FormFieldFamily, placement: WidgetPlacement<PdfCoordinates>): string {
+  const { exportValue } = placement;
+  if (family !== 'checkbox' && family !== 'radio') {
+    if (exportValue !== undefined) {
+      throw new EngineError(
+        EngineErrorCode.InvalidArg,
+        `'exportValue' applies to checkbox and radio widgets, not a ${family} field's`,
+        { details: { field: 'exportValue' } },
+      );
+    }
+    return '';
+  }
+  const value = exportValue ?? (family === 'checkbox' ? 'Yes' : undefined);
+  if (!value || value === 'Off') {
+    throw new EngineError(
+      EngineErrorCode.InvalidArg,
+      family === 'radio'
+        ? 'every radio button needs an exportValue other than "Off"'
+        : `a checkbox's exportValue can't be "Off"`,
+      { details: { field: 'exportValue' } },
+    );
+  }
+  return value;
+}
+
+/** A list's default: option values, each once, and one unless it's multi-select. */
+function assertListDefault(
+  values: readonly string[],
+  options: readonly FormFieldOptionInput[],
+  multiSelect: boolean,
+): void {
+  const invalid = (message: string) =>
+    new EngineError(EngineErrorCode.InvalidArg, message, { details: { field: 'defaultValue' } });
+  if (new Set(values).size !== values.length) throw invalid('the default values must not repeat');
+  if (!multiSelect && values.length > 1)
+    throw invalid('a list without multiSelect has one default');
+  const optionValues = new Set(options.map((option) => option.value));
+  const unknown = values.find((value) => !optionValues.has(value));
+  if (unknown !== undefined) throw invalid(`'${unknown}' is not an option value of the list`);
 }
 
 /** `%FDF-…` payloads are FDF; anything starting with markup is XFDF. */

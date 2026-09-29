@@ -50,7 +50,12 @@ import type { DocumentSecurityState, PdfPermissionInfo } from '../engine/Documen
 import type { SerializedEngineError } from '../errors/EngineError';
 import { EngineErrorCode } from '../errors/EngineErrorCode';
 import type { FormEffectsResult, FormEffect } from '../forms/effects';
-import { FormFieldDTOSchema, FormSnapshotSchema, FormWidgetSchema } from '../forms/schema';
+import {
+  FormFieldDTOSchema,
+  FormFieldWidgetSchema,
+  FormSnapshotSchema,
+  FormWidgetSchema,
+} from '../forms/schema';
 import { FormFieldRefSchema, FormFieldValueSchema } from '../forms/schema';
 import {
   PageBoxSchema,
@@ -81,6 +86,7 @@ import type {
   FormImportResult,
   FormRepairResult,
   FormMutationMeta,
+  FormResetResult,
   FormSetValueResult,
   FormWidgetLinkResult,
 } from '../mutation/FormMutationResults';
@@ -988,6 +994,16 @@ export const FormSetValueResultSchema: z.ZodType<FormSetValueResult> = z.object(
   meta: FormMutationMetaSchema,
 });
 
+export const FormResetResultSchema: z.ZodType<FormResetResult> = z.object({
+  fields: z.array(FormFieldDTOSchema),
+  meta: FormMutationMetaSchema,
+});
+
+/** What `reset` takes on the wire: the fields to reset, or none for the whole form. */
+export const FormResetBodySchema = z
+  .object({ refs: z.array(FormFieldRefSchema).optional() })
+  .strict();
+
 export const FormEffectSchema: z.ZodType<FormEffect> = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('setValue'), ref: FormFieldRefSchema, value: FormFieldValueSchema }),
   z.object({
@@ -1473,7 +1489,7 @@ export const SignatureDTOSchema: z.ZodType<SignatureDTO> = z.object({
   index: z.number().int().nonnegative(),
   field: FormFieldRefSchema,
   fieldName: z.string(),
-  widget: FormWidgetSchema.nullable(),
+  widget: FormFieldWidgetSchema.nullable(),
   signed: z.boolean(),
   kind: z.enum(['signature', 'timestamp']),
   filter: z.string().nullable(),

@@ -24,7 +24,7 @@ describe("FormsClient", () => {
                     mappingName: "mappingName",
                     valueEntry: { kind: "none" },
                     defaultValueEntry: { kind: "none" },
-                    widgets: [{ ref: null, annotObjectNumber: 1, page: null }],
+                    widgets: [{ ref: null, annotObjectNumber: 1, page: null, rect: null }],
                     value: "value",
                     defaultValue: "defaultValue",
                     maxLength: 1,
@@ -93,7 +93,7 @@ describe("FormsClient", () => {
                         mappingName: null,
                         valueEntry: { kind: "none" },
                         defaultValueEntry: { kind: "none" },
-                        widgets: [{ ref: null, annotObjectNumber: 1, page: null }],
+                        widgets: [{ ref: null, annotObjectNumber: 1, page: null, rect: null }],
                         value: "value",
                         defaultValue: "defaultValue",
                         maxLength: null,
@@ -212,108 +212,6 @@ describe("FormsClient", () => {
         }).rejects.toThrow(CloudPDF.NotFoundError);
     });
 
-    test("reset (1)", async () => {
-        const server = mockServerPool.createServer();
-        const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
-
-        const rawResponseBody = {
-            field: {
-                family: "text",
-                ref: { kind: "objectNumber", fieldObjectNumber: 1 },
-                fieldObjectNumber: 1,
-                name: "name",
-                origin: "acroform",
-                flags: { readOnly: true, required: true, noExport: true, raw: 1 },
-                alternateName: "alternateName",
-                mappingName: "mappingName",
-                valueEntry: { kind: "none" },
-                defaultValueEntry: { kind: "none" },
-                actions: {
-                    keystroke: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
-                    format: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
-                    validate: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
-                    calculate: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
-                },
-                widgets: [{ ref: null, annotObjectNumber: 1, page: null }],
-                value: "value",
-                defaultValue: "defaultValue",
-                maxLength: 1,
-                multiline: true,
-                password: true,
-                comb: true,
-            },
-            meta: {
-                affectedPages: [
-                    {
-                        page: { kind: "objectNumber", pageObjectNumber: 1 },
-                        revision: {
-                            docSessionId: "docSessionId",
-                            page: { kind: "objectNumber", pageObjectNumber: 1 },
-                            generation: 1,
-                        },
-                        weakAnnotationState: { kind: "unknown" },
-                    },
-                ],
-                cacheDelta: {
-                    previousDocVersion: 1,
-                    docVersion: 1,
-                    annotationsVersion: 1,
-                    layoutVersion: 1,
-                    metadataVersion: 1,
-                    attachmentsVersion: 1,
-                    layerVersion: 1,
-                    working: true,
-                    pages: [
-                        {
-                            page: { kind: "objectNumber", pageObjectNumber: 1 },
-                            cache: { contentVersion: 1, annotationVersion: 1 },
-                        },
-                    ],
-                },
-                changedFields: [{ kind: "objectNumber", fieldObjectNumber: 1 }],
-                changedWidgets: [{ ref: null, annotObjectNumber: 1, page: null }],
-            },
-        };
-
-        server
-            .mockEndpoint()
-            .post("/v1/docs/docId/layers/layerName/form/fields/fieldKey/reset")
-            .respondWith()
-            .statusCode(200)
-            .jsonBody(rawResponseBody)
-            .build();
-
-        const response = await client.doc.forms.reset({
-            docId: "docId",
-            layerName: "layerName",
-            fieldKey: "fieldKey",
-        });
-        expect(response).toEqual(rawResponseBody);
-    });
-
-    test("reset (2)", async () => {
-        const server = mockServerPool.createServer();
-        const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
-
-        const rawResponseBody = { key: "value" };
-
-        server
-            .mockEndpoint()
-            .post("/v1/docs/docId/layers/layerName/form/fields/fieldKey/reset")
-            .respondWith()
-            .statusCode(404)
-            .jsonBody(rawResponseBody)
-            .build();
-
-        await expect(async () => {
-            return await client.doc.forms.reset({
-                docId: "docId",
-                layerName: "layerName",
-                fieldKey: "fieldKey",
-            });
-        }).rejects.toThrow(CloudPDF.NotFoundError);
-    });
-
     test("setValue (1)", async () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
@@ -336,7 +234,7 @@ describe("FormsClient", () => {
                     validate: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
                     calculate: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
                 },
-                widgets: [{ ref: null, annotObjectNumber: 1, page: null }],
+                widgets: [{ ref: null, annotObjectNumber: 1, page: null, rect: null }],
                 value: "value",
                 defaultValue: "defaultValue",
                 maxLength: 1,
@@ -451,6 +349,127 @@ describe("FormsClient", () => {
                         key: "value",
                     },
                 },
+            });
+        }).rejects.toThrow(CloudPDF.NotFoundError);
+    });
+
+    test("reset (1)", async () => {
+        const server = mockServerPool.createServer();
+        const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
+        const rawRequestBody = {};
+        const rawResponseBody = {
+            fields: [
+                {
+                    family: "text",
+                    ref: { kind: "objectNumber", fieldObjectNumber: 1 },
+                    fieldObjectNumber: 1,
+                    name: "name",
+                    origin: "acroform",
+                    flags: { readOnly: true, required: true, noExport: true, raw: 1 },
+                    alternateName: "alternateName",
+                    mappingName: "mappingName",
+                    valueEntry: { kind: "none" },
+                    defaultValueEntry: { kind: "none" },
+                    widgets: [{ ref: null, annotObjectNumber: 1, page: null, rect: null }],
+                    value: "value",
+                    defaultValue: "defaultValue",
+                    maxLength: 1,
+                    multiline: true,
+                    password: true,
+                    comb: true,
+                },
+            ],
+            meta: {
+                affectedPages: [
+                    {
+                        page: { kind: "objectNumber", pageObjectNumber: 1 },
+                        revision: {
+                            docSessionId: "docSessionId",
+                            page: { kind: "objectNumber", pageObjectNumber: 1 },
+                            generation: 1,
+                        },
+                        weakAnnotationState: { kind: "unknown" },
+                    },
+                ],
+                cacheDelta: {
+                    previousDocVersion: 1,
+                    docVersion: 1,
+                    annotationsVersion: 1,
+                    layoutVersion: 1,
+                    metadataVersion: 1,
+                    attachmentsVersion: 1,
+                    layerVersion: 1,
+                    working: true,
+                    pages: [
+                        {
+                            page: { kind: "objectNumber", pageObjectNumber: 1 },
+                            cache: { contentVersion: 1, annotationVersion: 1 },
+                        },
+                    ],
+                },
+                changedFields: [{ kind: "objectNumber", fieldObjectNumber: 1 }],
+                changedWidgets: [{ ref: null, annotObjectNumber: 1, page: null }],
+            },
+        };
+
+        server
+            .mockEndpoint()
+            .post("/v1/docs/docId/layers/layerName/form/reset")
+            .jsonBody(rawRequestBody)
+            .respondWith()
+            .statusCode(200)
+            .jsonBody(rawResponseBody)
+            .build();
+
+        const response = await client.doc.forms.reset({
+            docId: "docId",
+            layerName: "layerName",
+        });
+        expect(response).toEqual(rawResponseBody);
+    });
+
+    test("reset (2)", async () => {
+        const server = mockServerPool.createServer();
+        const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
+        const rawRequestBody = {};
+        const rawResponseBody = { key: "value" };
+
+        server
+            .mockEndpoint()
+            .post("/v1/docs/docId/layers/layerName/form/reset")
+            .jsonBody(rawRequestBody)
+            .respondWith()
+            .statusCode(400)
+            .jsonBody(rawResponseBody)
+            .build();
+
+        await expect(async () => {
+            return await client.doc.forms.reset({
+                docId: "docId",
+                layerName: "layerName",
+            });
+        }).rejects.toThrow(CloudPDF.BadRequestError);
+    });
+
+    test("reset (3)", async () => {
+        const server = mockServerPool.createServer();
+        const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
+        const rawRequestBody = {};
+        const rawResponseBody = { key: "value" };
+
+        server
+            .mockEndpoint()
+            .post("/v1/docs/docId/layers/layerName/form/reset")
+            .jsonBody(rawRequestBody)
+            .respondWith()
+            .statusCode(404)
+            .jsonBody(rawResponseBody)
+            .build();
+
+        await expect(async () => {
+            return await client.doc.forms.reset({
+                docId: "docId",
+                layerName: "layerName",
             });
         }).rejects.toThrow(CloudPDF.NotFoundError);
     });

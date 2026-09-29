@@ -42,12 +42,13 @@ function applyOverlay(fields: ScriptFieldInput[], effects: FormEffect[]): void {
     if (!field) continue;
     if (effect.kind === 'setDisplay') field.display = effect.display;
     if (effect.kind === 'setValue') {
+      const value = effect.value;
       field.value =
-        effect.value.type === 'text'
-          ? effect.value.value
-          : effect.value.type === 'toggle'
-            ? effect.value.state
-            : [...effect.value.values];
+        'selectedValues' in value
+          ? [...value.selectedValues]
+          : 'checked' in value
+            ? value.checked
+            : value.value;
     }
   }
 }

@@ -39,11 +39,13 @@ import {
   type FormFieldValue,
   type FormImportResult,
   type FormRepairResult,
+  type FormResetResult,
   type FormSetValueResult,
   type FormSnapshot,
   type FormWidgetLinkResult,
   type FormWidget,
   type Identity,
+  type WidgetPlacement,
   type MetadataPatch,
   type MetadataUpdateResult,
   type CacheDelta,
@@ -189,7 +191,7 @@ const FORM_STRUCTURE_AUDIT_KINDS: ReadonlySet<string> = new Set([
   'form.createField',
   'form.updateField',
   'form.deleteField',
-  'form.attachWidget',
+  'form.addWidget',
   'form.detachWidget',
 ]);
 
@@ -1483,11 +1485,12 @@ export class LayerService {
     );
   }
 
-  async resetFormField(
+  /** Reset the fields named, or the whole form without `refs`. */
+  async resetForm(
     ctx: LayerWriteContext,
-    input: { docId: string; layerName: string; ref: FormFieldRef },
+    input: { docId: string; layerName: string; refs?: FormFieldRef[] },
     signal?: AbortSignal,
-  ): Promise<FormSetValueResult> {
+  ): Promise<FormResetResult> {
     return this.runFormMutation(
       ctx,
       {
@@ -1501,11 +1504,10 @@ export class LayerService {
             jobId,
             docId: input.docId,
             layerName: input.layerName,
-            ref: input.ref,
+            ...(input.refs ? { refs: input.refs } : {}),
             artifactPath,
           }),
-        impacts: (result: FormSetValueResult) =>
-          widgetImpacts(result.meta.changedWidgets, 'update'),
+        impacts: (result: FormResetResult) => widgetImpacts(result.meta.changedWidgets, 'update'),
       },
       signal,
     );
@@ -1760,15 +1762,10 @@ export class LayerService {
     );
   }
 
-  async attachFormWidget(
+  /** Add a widget to a field, created where its placement says. */
+  async addFormWidget(
     ctx: LayerWriteContext,
-    input: {
-      docId: string;
-      layerName: string;
-      ref: FormFieldRef;
-      widget: AnnotationRef;
-      onState?: string;
-    },
+    input: { docId: string; layerName: string; ref: FormFieldRef; placement: WidgetPlacement },
     signal?: AbortSignal,
   ): Promise<FormWidgetLinkResult> {
     return this.runFormMutation(
@@ -1776,20 +1773,21 @@ export class LayerService {
       {
         docId: input.docId,
         layerName: input.layerName,
-        tag: 'forms.attachWidget',
-        auditKind: 'form.attachWidget',
+        tag: 'forms.addWidget',
+        auditKind: 'form.addWidget',
         build: (jobId, artifactPath) =>
           wirePack({
-            kind: 'forms.attachWidget' as const,
+            kind: 'forms.addWidget' as const,
             jobId,
             docId: input.docId,
             layerName: input.layerName,
             ref: input.ref,
-            widget: input.widget,
-            ...(input.onState ? { onState: input.onState } : {}),
+            placement: input.placement,
             artifactPath,
           }),
-        impacts: () => widgetImpacts([widgetOfRef(input.widget)], 'update'),
+        // The new widget annotation is born on its page.
+        impacts: (result: FormWidgetLinkResult) =>
+          widgetImpacts(result.meta.changedWidgets, 'create'),
       },
       signal,
     );

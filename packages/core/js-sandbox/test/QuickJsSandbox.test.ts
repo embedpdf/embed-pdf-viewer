@@ -88,7 +88,7 @@ describe('QuickJsSandbox', () => {
       {
         kind: 'setValue',
         ref: ref('dynamic-label'),
-        value: { type: 'text', value: 'initialized' },
+        value: { value: 'initialized' },
       },
     ]);
     expect(vm.run(`stampLabel.call(this);`, input()).event.value).toBe('EmbedPDF');

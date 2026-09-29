@@ -1,4 +1,5 @@
 import type {
+  PdfCoordinates,
   DigestAlgorithm,
   DocumentVersionRef,
   SignatureCancelResult,
@@ -244,7 +245,7 @@ export class SignatureMutator {
     }
   }
 
-  complete(input: SignatureCompleteInput): SignatureCompleteResult {
+  complete(input: SignatureCompleteInput): SignatureCompleteResult<PdfCoordinates> {
     const pending = this.session.pendingSigning;
     if (!pending || pending.prepared.signingId !== input.signingId) {
       const last = this.session.lastCompletion;
@@ -307,7 +308,7 @@ export class SignatureMutator {
         'the installed document lost the signature field',
       );
     }
-    const result: SignatureCompleteResult = {
+    const result: SignatureCompleteResult<PdfCoordinates> = {
       status: 'completed',
       signature,
       version: reader.version(),

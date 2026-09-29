@@ -25,6 +25,8 @@ export interface ScriptFieldInput {
   readOnly: boolean;
   required: boolean;
   options?: ScriptFieldOption[];
+  /** A checkbox's or radio group's widget export values, in widget order (Acrobat `exportValues`). */
+  exportValues?: string[];
 }
 
 export interface ScriptIdentity {

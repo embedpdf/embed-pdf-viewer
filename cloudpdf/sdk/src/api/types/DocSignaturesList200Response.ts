@@ -50,6 +50,7 @@ export namespace DocSignaturesList200Response {
                 ref: CloudPDF.DocSignaturesList200ResponseSignaturesItemWidgetRef | null;
                 annotObjectNumber: number;
                 page: Widget.Page | null;
+                rect: Widget.Rect | null;
             }
 
             export namespace Widget {
@@ -63,6 +64,13 @@ export namespace DocSignaturesList200Response {
                         ObjectNumber: "objectNumber",
                     } as const;
                     export type Kind = (typeof Kind)[keyof typeof Kind];
+                }
+
+                export interface Rect {
+                    x: number;
+                    y: number;
+                    width: number;
+                    height: number;
                 }
             }
 

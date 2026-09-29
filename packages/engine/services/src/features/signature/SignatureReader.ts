@@ -1,4 +1,5 @@
 import type {
+  PdfCoordinates,
   BaseVersionInfo,
   DigestAlgorithm,
   DocumentProtection,
@@ -18,7 +19,9 @@ import {
   readContentsAt,
 } from './internal/readSignatureModel';
 import { acquireSignatureModel } from './internal/signatureModelCache';
+import { acquireFormModel } from '../forms/internal/formModelCache';
 import { widgetPageRef } from '../forms/internal/readFormSnapshot';
+import { formWidgetRect } from '../forms/internal/widgetRects';
 import type { DocumentSession } from '../../document-session/DocumentSession';
 import { withScratch, withScratchN } from '../../runtime/memory/scratch';
 import { readUtf16String } from '../../runtime/memory/strings';
@@ -50,10 +53,14 @@ export class SignatureReader {
     private readonly session: DocumentSession,
   ) {}
 
-  readSnapshot(): SignatureSnapshot {
+  readSnapshot(): SignatureSnapshot<PdfCoordinates> {
     const model = acquireSignatureModel(this.runtime, this.session);
     const chainValid = this.runtime.fn.EPDFSig_IsRevisionChainValid(model);
-    const signatures = readSignaturesFromModel(this.runtime, model);
+    // Widgets as the document shows them now, edits included.
+    const formModel = acquireFormModel(this.runtime, this.session);
+    const signatures = readSignaturesFromModel(this.runtime, model, (widgetObjectNumber) =>
+      formWidgetRect(this.runtime, formModel, widgetObjectNumber),
+    );
     const revisions = chainValid
       ? readRevisions(this.runtime, this.session.requireDocPtr(), signatures)
       : [];
@@ -128,7 +135,7 @@ export class SignatureReader {
   }
 
   /** One signature by field object number, from the current model. */
-  readSignatureByObjectNumber(fieldObjectNumber: number): SignatureDTO {
+  readSignatureByObjectNumber(fieldObjectNumber: number): SignatureDTO<PdfCoordinates> {
     const snapshot = this.readSnapshot();
     const found = snapshot.signatures.find(
       (s) => s.field.kind === 'objectNumber' && s.field.fieldObjectNumber === fieldObjectNumber,

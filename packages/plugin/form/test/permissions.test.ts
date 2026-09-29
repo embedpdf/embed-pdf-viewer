@@ -23,7 +23,7 @@ const field = (): FormFieldDTO => ({
   mappingName: null,
   valueEntry: { kind: 'scalar', value: '' },
   defaultValueEntry: { kind: 'scalar', value: '' },
-  widgets: [formWidget(9, toPageRef(1))],
+  widgets: [{ ...formWidget(9, toPageRef(1)), rect: null }],
   value: '',
   defaultValue: '',
   maxLength: null,

@@ -65,7 +65,7 @@ if (field.family === 'listbox') console.log(field.selectedValues); // string[]
 | `checkbox`   | `checked`                                                          | `exportValue`: what the form data holds while it's checked                      |
 | `radio`      | `value`: the export value of the chosen button, or `'Off'`         | `noToggleToOff`, `radiosInUnison`                                               |
 | `combobox`   | `value`                                                            | `options`, `edit` (free text allowed), `defaultValue`                           |
-| `listbox`    | `selectedValues`, in option order                                  | `options`, `multiSelect`                                                        |
+| `listbox`    | `selectedValues`, in option order                                  | `options`, `multiSelect`, `defaultValue` (option values)                        |
 | `pushbutton` | none: a button only runs an action                                 |                                                                                 |
 | `signature`  | none here: see [Digital signatures](/docs/engine/forms/signatures) |                                                                                 |
 
@@ -124,10 +124,10 @@ await doc.forms.setValue(toppings.ref, { selectedValues: ['cheese', 'olives'] })
 
 | Family     | Value                                                                           |
 | :--------- | :------------------------------------------------------------------------------ |
-| `text`     | `{ value }`                                                                     |
+| `text`     | `{ value }`; `null` empties it                                                  |
 | `checkbox` | `{ checked }`                                                                   |
 | `radio`    | `{ value }`: the export value of the button to choose; `'Off'` or `null` clears |
-| `combobox` | `{ value }`: an option value                                                    |
+| `combobox` | `{ value }`: an option value; `null` clears                                     |
 | `listbox`  | `{ selectedValues }`: option values; `[]` clears                                |
 
 `setValue()` returns the field as it is now:
@@ -168,7 +168,18 @@ await doc.forms.reset(name.ref);
 await doc.forms.reset([name.ref, email.ref]);
 ```
 
-Fields that hold no value, such as push buttons and signature fields, are skipped.
+It returns the fields it changed, as they are now. A field that already holds its default is
+left alone and isn't in the list:
+
+```ts
+const { fields } = await doc.forms.reset();
+
+console.log(`${fields.length} fields reset`);
+```
+
+Fields that hold no value, such as push buttons and signature fields, are skipped. Resetting the
+whole form also skips the fields a signature locked and [fields stored inline](#fields-stored-inline);
+name one of those yourself and the call fails, the same as a `setValue()` would.
 
 ## Import and export form data
 

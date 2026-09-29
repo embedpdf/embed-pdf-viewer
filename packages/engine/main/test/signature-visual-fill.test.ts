@@ -58,10 +58,12 @@ describe('signature fields in the viewer phase', () => {
       const created = await doc.forms.create({
         family: 'signature',
         name: 'sig2',
-        widget: {
-          page: page.ref,
-          rect: { x: 50, y: page.size.height - 120, width: 200, height: 70 },
-        },
+        widgets: [
+          {
+            page: page.ref,
+            rect: { x: 50, y: page.size.height - 120, width: 200, height: 70 },
+          },
+        ],
       });
       expect(created.field.family).toBe('signature');
       expect(created.field.widgets).toHaveLength(1);

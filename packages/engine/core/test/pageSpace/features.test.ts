@@ -140,8 +140,30 @@ describe('render, form and measure values', () => {
     const plain = {
       family: 'pushbutton',
       name: 'plain',
+      widgets: [],
     } as unknown as FormFieldDTO<PdfCoordinates>;
-    expect(pageFormFieldOf(plain, boxOf)).toBe(plain);
+    expect(pageFormFieldOf(plain, boxOf)).toEqual(plain);
+  });
+
+  test("a field's widgets are measured on their pages; one on no page has no rect", () => {
+    const boxOf = visibleBoxesOf([layout(4, crop)]);
+    const field = {
+      family: 'text',
+      name: 'placed',
+      widgets: [
+        {
+          annotObjectNumber: 8,
+          page: toPageRef(4),
+          ref: null,
+          rect: { left: 100, right: 150, bottom: 600, top: 650 },
+        },
+        { annotObjectNumber: 9, page: null, ref: null, rect: null },
+      ],
+    } as unknown as FormFieldDTO<PdfCoordinates>;
+    expect(pageFormFieldOf(field, boxOf).widgets.map((widget) => widget.rect)).toEqual([
+      { x: 50, y: 82, width: 50, height: 50 },
+      null,
+    ]);
   });
 
   test('a widget is placed on its own page', () => {

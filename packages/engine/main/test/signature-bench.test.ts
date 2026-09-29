@@ -128,7 +128,7 @@ describe.skipIf(!ENABLED)('signature analysis cost on a large multi-revision doc
         }),
       );
       await timed(`${label} download (no edits, verbatim)`, rows, () => doc.download());
-      await doc.forms.setValue({ kind: 'fqn', name: 'f3' }, { type: 'text', value: 'unsaved' });
+      await doc.forms.setValue({ kind: 'fqn', name: 'f3' }, { value: 'unsaved' });
       const working = await timed(`${label} analyze working-copy (1 unsaved edit)`, rows, () =>
         doc.signatures.analyze({ since: { signatureIndex: 0 }, until: 'working-copy' }),
       );

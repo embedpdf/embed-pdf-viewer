@@ -35,7 +35,7 @@ const text = (over: Partial<Extract<FormFieldDTO, { family: 'text' }>> = {}): Fo
   mappingName: null,
   valueEntry: { kind: 'scalar', value: over.value ?? 'abc' },
   defaultValueEntry: { kind: 'scalar', value: '' },
-  widgets: [formWidget(4, toPageRef(3))],
+  widgets: [{ ...formWidget(4, toPageRef(3)), rect: null }],
   value: 'abc',
   defaultValue: '',
   maxLength: 5,
@@ -77,7 +77,7 @@ describe('field index', () => {
       ref: { kind: 'objectNumber', fieldObjectNumber: 7 },
       fieldObjectNumber: 7,
       name: 'other',
-      widgets: [formWidget(8, toPageRef(3))],
+      widgets: [{ ...formWidget(8, toPageRef(3)), rect: null }],
     });
     index = foldFormEvent(index, event({ type: 'forms.created', field: other })) as FieldIndex;
     expect(fieldForWidget(index, 8)?.name).toBe('other');
@@ -183,7 +183,7 @@ const signature = (
   mappingName: null,
   valueEntry: { kind: 'none' },
   defaultValueEntry: { kind: 'none' },
-  widgets: [formWidget(9, toPageRef(3))],
+  widgets: [{ ...formWidget(9, toPageRef(3)), rect: null }],
   ...over,
 });
 
@@ -203,7 +203,7 @@ describe('signature widgets', () => {
 
   test('widgetAt resolves the smallest containing widget from loaded geometry', () => {
     const index = indexFields(
-      snapshot([text(), signature({ widgets: [formWidget(9, toPageRef(3))] })]),
+      snapshot([text(), signature({ widgets: [{ ...formWidget(9, toPageRef(3)), rect: null }] })]),
     );
     expect(widgetAt(index, undefined, { x: 10, y: 10 })).toBeNull();
     const boxes = {

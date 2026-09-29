@@ -116,7 +116,7 @@ describe('widget appearance refresh across planes (engine-local, wasm)', () => {
   test('a form-plane value write is visible in the SAME render pass, not one behind', async () => {
     await doc.forms.setValue(
       { kind: 'objectNumber', fieldObjectNumber: field.fieldObjectNumber },
-      { type: 'text', value: 'Hello' },
+      { value: 'Hello' },
     );
     const raster = await widgetRaster();
     expect(raster).not.toBeNull();

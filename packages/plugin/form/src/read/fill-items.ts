@@ -7,7 +7,12 @@
  * Geometry comes from the widget plane (widgets are annotations; their
  * records carry `/Rect`), identity, value and behavior from the field plane.
  */
-import type { AnnotationRef, FormFieldDTO, FormFieldOption, FormFieldRef } from '@embedpdf/engine-core/runtime';
+import type {
+  AnnotationRef,
+  FormFieldDTO,
+  FormFieldOption,
+  FormFieldRef,
+} from '@embedpdf/engine-core/runtime';
 
 import {
   fieldForWidget,
@@ -46,7 +51,13 @@ export type FillItem = FillItemBase &
         maxLength: number | null;
         comb: boolean;
       }
-    | { control: 'toggle'; kind: 'checkbox' | 'radio'; checked: boolean; onState: string }
+    | {
+        control: 'toggle';
+        kind: 'checkbox' | 'radio';
+        checked: boolean;
+        /** The export value that checks this widget. */
+        exportValue: string;
+      }
     | {
         control: 'choice';
         kind: 'combo' | 'list';
@@ -109,7 +120,7 @@ export function projectWidget(
         control: 'toggle',
         kind: 'checkbox',
         checked: field.checked,
-        onState: toggle && 'onState' in toggle ? toggle.onState : 'Yes',
+        exportValue: toggle && 'exportValue' in toggle ? toggle.exportValue : field.exportValue,
       };
     }
     case 'radio': {
@@ -119,7 +130,7 @@ export function projectWidget(
         control: 'toggle',
         kind: 'radio',
         checked: toggle && 'checked' in toggle ? toggle.checked : false,
-        onState: toggle && 'onState' in toggle ? toggle.onState : '',
+        exportValue: toggle && 'exportValue' in toggle ? toggle.exportValue : '',
       };
     }
     case 'combobox':
@@ -194,4 +205,3 @@ export function fillItemForWidget(
   if (!field.widgets.some((widget) => widget.annotObjectNumber === annotObjectNumber)) return null;
   return projectWidget(field, annotObjectNumber, writing, box);
 }
-

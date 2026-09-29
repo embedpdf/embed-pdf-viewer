@@ -463,7 +463,7 @@ function ToggleWidget({ fill, item, page, appearance }: WidgetProps<'toggle'>) {
   const frame = viewBox(item.box, page);
   const press = () => {
     // Checkbox: click toggles on/off (null clears). Radio: click always
-    // selects its own on-state — no untoggle, per PDF/Acrobat convention.
+    // selects its own button — no untoggle, per PDF/Acrobat convention.
     // Acrobat's order: the value change first, then the /A — so an /A
     // script reads the post-toggle state. A read-only toggle still
     // activates (it just doesn't flip).
@@ -471,7 +471,7 @@ function ToggleWidget({ fill, item, page, appearance }: WidgetProps<'toggle'>) {
       ? undefined
       : form.setChecked(
           fill.fieldRef,
-          fill.kind === 'checkbox' && fill.checked ? null : fill.onState,
+          fill.kind === 'checkbox' && fill.checked ? null : fill.exportValue,
         );
     void Promise.resolve(flipped).then(activate, activate);
   };
@@ -813,7 +813,7 @@ function FillToggle({
           void Promise.resolve(
             form.setChecked(
               item.fieldRef,
-              item.kind === 'checkbox' && item.checked ? null : item.onState,
+              item.kind === 'checkbox' && item.checked ? null : item.exportValue,
             ),
           ).then(activate, activate);
         }}

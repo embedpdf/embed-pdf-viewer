@@ -2280,7 +2280,7 @@ export namespace Annotation {
         fontSize: number | null;
         fontColor: string | null;
         textAlign: AnnotationWidget.TextAlign;
-        fieldObjectNumber: number;
+        field: CloudPDF.AnnotationWidgetField | null;
         fieldFamily: AnnotationWidget.FieldFamily;
     }
 

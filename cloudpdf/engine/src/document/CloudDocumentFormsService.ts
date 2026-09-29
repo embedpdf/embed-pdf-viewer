@@ -4,6 +4,8 @@ import {
   EngineErrorCode,
   deletedFieldOf,
   encodeFieldRefKey,
+  formResetFacts,
+  generateUuid,
   type DocumentEventInit,
   type DocumentFormsService,
   type FormDataExport,
@@ -27,6 +29,8 @@ import {
   type FormWidgetLinkResult,
   type AnnotationRef,
   type MutationMeta,
+  type FormResetResult,
+  type WidgetPlacement,
 } from '@embedpdf/engine-core/runtime';
 import {
   FormFieldCreateResultSchema,
@@ -36,6 +40,7 @@ import {
   FormEffectsResultSchema,
   FormImportResultSchema,
   FormRepairResultSchema,
+  FormResetResultSchema,
   FormSetValueResultSchema,
   FormSnapshotSchema,
   FormWidgetLinkResultSchema,
@@ -113,17 +118,28 @@ export class CloudDocumentFormsService implements DocumentFormsService {
     });
   }
 
-  reset(ref: FormFieldRef): AbortablePromise<FormSetValueResult> {
-    const rejected = this.rejectIfClosed<FormSetValueResult>();
+  reset(fields?: FormFieldRef | FormFieldRef[]): AbortablePromise<FormResetResult> {
+    const rejected = this.rejectIfClosed<FormResetResult>();
     if (rejected) return rejected;
-    return AbortablePromise.run<FormSetValueResult>(async (signal) => {
+    const refs = fields === undefined ? undefined : Array.isArray(fields) ? fields : [fields];
+    return AbortablePromise.run<FormResetResult>(async (signal) => {
       const result = await this.http.postJson(
-        wirePaths.layerFormFieldReset(this.docId, this.layerName, encodeFieldRefKey(ref)),
-        {},
-        (raw) => FormSetValueResultSchema.parse(raw),
+        wirePaths.layerFormReset(this.docId, this.layerName),
+        refs ? { refs } : {},
+        (raw) => FormResetResultSchema.parse(raw),
         signal,
       );
-      return this.absorbMutation(result, 'forms.valueSet');
+      this.manifest.apply(result.meta, ['annotations']);
+      // One event per field that changed, sharing one transaction.
+      const facts = formResetFacts(result);
+      const id = generateUuid();
+      facts.forEach((fact, index) => {
+        this.publisher.publishLocal(
+          { type: 'forms.valueSet', ...fact },
+          { id, index, count: facts.length },
+        );
+      });
+      return result;
     });
   }
 
@@ -252,18 +268,13 @@ export class CloudDocumentFormsService implements DocumentFormsService {
     });
   }
 
-  addWidget(
-    ref: FormFieldRef,
-    widget: AnnotationRef,
-    options?: { onState?: string },
-  ): AbortablePromise<FormWidgetLinkResult> {
+  addWidget(ref: FormFieldRef, placement: WidgetPlacement): AbortablePromise<FormWidgetLinkResult> {
     const rejected = this.rejectIfClosed<FormWidgetLinkResult>();
     if (rejected) return rejected;
-    const onState = options?.onState;
     return AbortablePromise.run<FormWidgetLinkResult>(async (signal) => {
       const result = await this.http.postJson(
         wirePaths.layerFormFieldWidgets(this.docId, this.layerName, encodeFieldRefKey(ref)),
-        { widget, ...(onState ? { onState } : {}) },
+        placement,
         (raw) => FormWidgetLinkResultSchema.parse(raw),
         signal,
       );

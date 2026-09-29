@@ -490,11 +490,11 @@ export const wirePaths = {
   layerFormFieldValue: (docId: string, layerName: string, fieldKey: string) =>
     `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/form/fields/${encodeURIComponent(fieldKey)}/value`,
 
-  /** POST: reset the field to /DV (or clear). Empty body. */
-  layerFormFieldReset: (docId: string, layerName: string, fieldKey: string) =>
-    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/form/fields/${encodeURIComponent(fieldKey)}/reset`,
+  /** POST: reset fields to /DV (or clear): `{ refs? }`, the whole form without `refs`. */
+  layerFormReset: (docId: string, layerName: string) =>
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/form/reset`,
 
-  /** POST: adopt an inert widget annotation (`{ widget, onState? }`). */
+  /** POST: add a widget to the field, the body its placement (`WidgetPlacement`). */
   layerFormFieldWidgets: (docId: string, layerName: string, fieldKey: string) =>
     `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/form/fields/${encodeURIComponent(fieldKey)}/widgets`,
 
@@ -677,7 +677,7 @@ export const wireTemplates = {
     '/v1/docs/:docId/layers/:layerName/annotations/pages/:pageKey/items/:annotKey/resources/appearance',
   layerForm: '/v1/docs/:docId/layers/:layerName/form',
   layerFormFieldValue: '/v1/docs/:docId/layers/:layerName/form/fields/:fieldKey/value',
-  layerFormFieldReset: '/v1/docs/:docId/layers/:layerName/form/fields/:fieldKey/reset',
+  layerFormReset: '/v1/docs/:docId/layers/:layerName/form/reset',
   layerFormFieldSignatureAppearance:
     '/v1/docs/:docId/layers/:layerName/form/fields/:fieldKey/signature-appearance',
   layerFormData: '/v1/docs/:docId/layers/:layerName/form/data',

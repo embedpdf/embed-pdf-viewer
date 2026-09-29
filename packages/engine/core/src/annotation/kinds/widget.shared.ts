@@ -22,10 +22,11 @@ export type WidgetStyleDraftFields = Pick<WidgetPatch, WidgetStyleName>;
 export type WidgetStylePatchFields = WidgetStyleDraftFields;
 export type WidgetAppearance = WidgetStyleDraftFields;
 
+/** The style fields' schemas, as a widget annotation's update takes them. */
+export const WIDGET_STYLE_SHAPE: Record<WidgetStyleName, z.ZodTypeAny> = Object.fromEntries(
+  WIDGET_STYLE_NAMES.map((name) => [name, WidgetDeclaration.shapes.update[name]!]),
+) as Record<WidgetStyleName, z.ZodTypeAny>;
+
 export const WidgetAppearanceSchema = z
-  .object(
-    Object.fromEntries(
-      WIDGET_STYLE_NAMES.map((name) => [name, WidgetDeclaration.shapes.update[name]!]),
-    ),
-  )
+  .object(WIDGET_STYLE_SHAPE)
   .strict() as unknown as z.ZodType<WidgetAppearance>;

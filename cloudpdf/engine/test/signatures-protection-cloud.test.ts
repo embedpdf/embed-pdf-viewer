@@ -145,9 +145,7 @@ describe('signature protection (cloud SDK, real runtime)', () => {
     try {
       const { doc } = signerSession;
       expect(doc.security.allows('doc.forms.fill')).toBe(true);
-      expect(await errorCode(doc.forms.setValue(field, { type: 'text', value: 'before' }))).toBe(
-        'ok',
-      );
+      expect(await errorCode(doc.forms.setValue(field, { value: 'before' }))).toBe('ok');
       await sign(doc, {
         field: { kind: 'fqn', name: 'sig' },
         certify: { permission: 1 },
@@ -157,7 +155,7 @@ describe('signature protection (cloud SDK, real runtime)', () => {
       // Permission 1: nothing may change, not even the form.
       expect(doc.security.allows('doc.forms.fill')).toBe(false);
       expect(doc.security.allows('doc.annotate.modify')).toBe(false);
-      expect(await errorCode(doc.forms.setValue(field, { type: 'text', value: 'after' }))).toBe(
+      expect(await errorCode(doc.forms.setValue(field, { value: 'after' }))).toBe(
         EngineErrorCode.ProtectedDocument,
       );
       const page = await firstPage(doc);
@@ -171,7 +169,7 @@ describe('signature protection (cloud SDK, real runtime)', () => {
     const later = await open(TO_CERTIFY, 'doc scoped');
     try {
       expect(later.doc.security.allows('doc.forms.fill')).toBe(false);
-      expect(await errorCode(later.doc.forms.setValue(field, { type: 'text', value: 'x' }))).toBe(
+      expect(await errorCode(later.doc.forms.setValue(field, { value: 'x' }))).toBe(
         EngineErrorCode.ProtectedDocument,
       );
     } finally {
@@ -186,9 +184,7 @@ describe('signature protection (cloud SDK, real runtime)', () => {
       expect(doc.security.allows('doc.annotate.modify')).toBe(true);
       expect(doc.security.allows('doc.forms.fill')).toBe(true);
       expect(
-        await errorCode(
-          doc.forms.setValue({ kind: 'fqn', name: 'Text Box' }, { type: 'text', value: 'x' }),
-        ),
+        await errorCode(doc.forms.setValue({ kind: 'fqn', name: 'Text Box' }, { value: 'x' })),
       ).toBe(EngineErrorCode.ProtectedDocument);
       const page = await firstPage(doc);
       expect(await errorCode(doc.page(page).annotations.create(square))).toBe('ok');

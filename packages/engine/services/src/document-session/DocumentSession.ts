@@ -5,6 +5,7 @@ import type {
   RevisionToken,
   SessionKind,
   SignatureCompleteResult,
+  PdfCoordinates,
   SignaturePrepared,
   SignedDocumentPolicy,
   WeakAnnotationState,
@@ -68,7 +69,7 @@ export interface PendingSigning {
 export interface SigningCompletion {
   readonly signingId: string;
   readonly cms: Uint8Array;
-  readonly result: SignatureCompleteResult;
+  readonly result: SignatureCompleteResult<PdfCoordinates>;
 }
 
 export class DocumentSession {

@@ -209,7 +209,7 @@ export function planAnnotationImport(input: {
       drops.set(index, 'unsupported-kind');
       return;
     }
-    if (data.subtype === 'widget' && data.fieldObjectNumber > 0) {
+    if (data.subtype === 'widget' && data.field !== null) {
       drops.set(index, 'form-field');
       return;
     }

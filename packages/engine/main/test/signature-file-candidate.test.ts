@@ -54,10 +54,7 @@ describe('file-backed signing candidate', () => {
       { scope: ['*'] },
     );
     try {
-      await doc.forms.setValue(
-        { kind: 'fqn', name: 'group.total' },
-        { type: 'text', value: 'on disk' },
-      );
+      await doc.forms.setValue({ kind: 'fqn', name: 'group.total' }, { value: 'on disk' });
       const prepared = await doc.signatures.prepare({
         field: { kind: 'fqn', name: 'sig' },
         certify: { permission: 2 },
@@ -134,10 +131,7 @@ describe('file-backed signing candidate', () => {
     );
     let artifact: Uint8Array;
     try {
-      await editing.forms.setValue(
-        { kind: 'fqn', name: 'group.total' },
-        { type: 'text', value: 'delta' },
-      );
+      await editing.forms.setValue({ kind: 'fqn', name: 'group.total' }, { value: 'delta' });
       artifact = new Uint8Array(await editing.downloadLayer!());
     } finally {
       await editing.close();

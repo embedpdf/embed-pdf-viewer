@@ -33,10 +33,7 @@ async function fillThenSign(engine: Engine, id: string) {
   const doc = await engine.open({ kind: 'bytes', id, bytes: unsigned }, { scope: ['*'] });
   try {
     const before = (await doc.signatures.list()).revisions.length;
-    await doc.forms.setValue(
-      { kind: 'fqn', name: 'group.total' },
-      { type: 'text', value: 'agreed' },
-    );
+    await doc.forms.setValue({ kind: 'fqn', name: 'group.total' }, { value: 'agreed' });
     const prepared = await doc.signatures.prepare({ field: { kind: 'fqn', name: 'sig' } });
     const result = await doc.signatures.complete({
       signingId: prepared.signingId,
@@ -91,7 +88,7 @@ describe("signing candidate over the session's own base", () => {
       const sealed = (await doc.signatures.list()).revisions.length;
       await doc.forms.setValue(
         { kind: 'fqn', name: 'group.total' },
-        { type: 'text', value: 'after certification' },
+        { value: 'after certification' },
       );
       const working = await doc.signatures.analyze({
         since: { signatureIndex: 0 },

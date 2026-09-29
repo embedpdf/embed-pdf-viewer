@@ -203,7 +203,7 @@ export function runPageSpaceConformance(
             const { field } = await doc.forms.create({
               family: 'text',
               name: `placed_${layout.ref.pageObjectNumber}`,
-              widget: { page: layout.ref, rect: spot },
+              widgets: [{ page: layout.ref, rect: spot }],
             });
             try {
               const widget = field.widgets[0]!;

@@ -151,14 +151,8 @@ describe('interactive form JavaScript acceptance', () => {
       const premium = packageField.options.find(({ label }) => label === 'Premium - $900');
       if (!premium) throw new Error('Premium package option is missing');
 
-      await controller.commit(packageField.ref, {
-        type: 'choice',
-        values: [premium.value],
-      });
-      await controller.commit(recording.ref, {
-        type: 'toggle',
-        state: recording.exportValue,
-      });
+      await controller.commit(packageField.ref, { value: premium.value });
+      await controller.commit(recording.ref, { checked: true });
 
       const beforeReset = await doc.forms.list();
       const resetButton = beforeReset.fields.find(({ name }) => name === 'btn_reset');
@@ -186,7 +180,7 @@ describe('interactive form JavaScript acceptance', () => {
 
       const confirmation = afterReset.fields.find(({ name }) => name === 'confirmation');
       if (confirmation?.family !== 'text') throw new Error('confirmation field is missing');
-      await controller.commit(confirmation.ref, { type: 'text', value: 'CONFIRM' });
+      await controller.commit(confirmation.ref, { value: 'CONFIRM' });
 
       const beforeConfirm = await doc.forms.list();
       const confirmButton = beforeConfirm.fields.find(({ name }) => name === 'btn_confirm');

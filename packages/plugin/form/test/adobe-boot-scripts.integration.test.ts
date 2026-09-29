@@ -46,7 +46,6 @@ describe('Adobe boot-script boilerplate (i-140, hybrid-XFA AcroForm)', () => {
         budget: realm.budget,
       });
       const result = await controller.commit(text.ref, {
-        type: 'text',
         value: 'FAMILY-NAME',
       });
       controller.dispose();

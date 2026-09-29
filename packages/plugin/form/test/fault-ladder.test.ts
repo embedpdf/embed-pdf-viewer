@@ -55,7 +55,7 @@ const text = (
   multiline: false,
   password: false,
   comb: false,
-  widgets: [formWidget(fieldObjectNumber, toPageRef(10))],
+  widgets: [{ ...formWidget(fieldObjectNumber, toPageRef(10)), rect: null }],
   ...(actions ? { actions } : {}),
 });
 
@@ -164,12 +164,10 @@ describe('script fault ladder', () => {
     };
     const fx = harness(snapshot);
 
-    const result = await fx.controller.commit(ref(2), { type: 'text', value: '42' });
+    const result = await fx.controller.commit(ref(2), { value: '42' });
 
     expect(result.status).toBe('applied');
-    expect(fx.batches[0]).toEqual([
-      { kind: 'setValue', ref: ref(2), value: { type: 'text', value: '42' } },
-    ]);
+    expect(fx.batches[0]).toEqual([{ kind: 'setValue', ref: ref(2), value: { value: '42' } }]);
     expect(
       result.diagnostics.filter(
         ({ code, message }) => code === 'script-error' && message.includes('Keystroke'),
@@ -188,7 +186,7 @@ describe('script fault ladder', () => {
     };
     const fx = harness(snapshot);
 
-    const rejected = await fx.controller.commit(ref(2), { type: 'text', value: 'abc' });
+    const rejected = await fx.controller.commit(ref(2), { value: 'abc' });
     expect(rejected.status).toBe('rejected');
     expect(rejected.uiEffects).toContainEqual(
       expect.objectContaining({
@@ -200,12 +198,11 @@ describe('script fault ladder', () => {
     expect(fx.batches).toEqual([]);
 
     const accepted = await fx.controller.commit(ref(2), {
-      type: 'text',
       value: '1,234.56',
     });
     expect(accepted.status).toBe('applied');
     expect(fx.batches[0]).toEqual([
-      { kind: 'setValue', ref: ref(2), value: { type: 'text', value: '1,234.56' } },
+      { kind: 'setValue', ref: ref(2), value: { value: '1,234.56' } },
     ]);
   });
 
@@ -218,12 +215,10 @@ describe('script fault ladder', () => {
     };
     const fx = harness(snapshot);
 
-    const result = await fx.controller.commit(ref(2), { type: 'text', value: '7' });
+    const result = await fx.controller.commit(ref(2), { value: '7' });
 
     expect(result.status).toBe('applied');
-    expect(fx.batches[0]).toEqual([
-      { kind: 'setValue', ref: ref(2), value: { type: 'text', value: '7' } },
-    ]);
+    expect(fx.batches[0]).toEqual([{ kind: 'setValue', ref: ref(2), value: { value: '7' } }]);
     expect(result.diagnostics).toContainEqual(expect.objectContaining({ code: 'script-error' }));
   });
 
@@ -242,12 +237,12 @@ describe('script fault ladder', () => {
     };
     const fx = harness(snapshot);
 
-    const result = await fx.controller.commit(ref(2), { type: 'text', value: '5' });
+    const result = await fx.controller.commit(ref(2), { value: '5' });
 
     expect(result.status).toBe('applied');
     expect(fx.batches[0]).toEqual([
-      { kind: 'setValue', ref: ref(2), value: { type: 'text', value: '5' } },
-      { kind: 'setValue', ref: ref(4), value: { type: 'text', value: '10' } },
+      { kind: 'setValue', ref: ref(2), value: { value: '5' } },
+      { kind: 'setValue', ref: ref(4), value: { value: '10' } },
     ]);
     expect(result.diagnostics).toContainEqual(expect.objectContaining({ code: 'script-error' }));
   });
@@ -261,12 +256,10 @@ describe('script fault ladder', () => {
     };
     const fx = harness(snapshot);
 
-    const result = await fx.controller.commit(ref(2), { type: 'text', value: '7' });
+    const result = await fx.controller.commit(ref(2), { value: '7' });
 
     expect(result.status).toBe('applied');
-    expect(fx.batches[0]).toEqual([
-      { kind: 'setValue', ref: ref(2), value: { type: 'text', value: '7' } },
-    ]);
+    expect(fx.batches[0]).toEqual([{ kind: 'setValue', ref: ref(2), value: { value: '7' } }]);
     expect(result.diagnostics).toContainEqual(expect.objectContaining({ code: 'script-error' }));
   });
 
@@ -279,7 +272,7 @@ describe('script fault ladder', () => {
     };
     const fx = harness(snapshot, new BudgetFaultSandbox());
 
-    const result = await fx.controller.commit(ref(2), { type: 'text', value: '5' });
+    const result = await fx.controller.commit(ref(2), { value: '5' });
 
     expect(result.status).toBe('failed');
     expect(result.error).toMatchObject({ kind: 'budget' });

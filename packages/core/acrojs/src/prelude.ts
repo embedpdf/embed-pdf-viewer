@@ -634,20 +634,24 @@ export function installAcroJs(globalObject: Record<string, unknown>): void {
 
   const formValue = (field: FieldRecord, value: unknown): AnyRecord | null => {
     const family = String(field.input.family);
-    if (family === 'text') return { type: 'text', value: String(value ?? '') };
+    if (family === 'text') return { value: String(value ?? '') };
     if (family === 'checkbox' || family === 'radio') {
-      const token =
-        value === null || value === undefined || String(value) === 'Off' ? null : String(value);
-      return { type: 'toggle', state: token };
+      // A toggle's script value is its export value, 'Off' when clear.
+      return {
+        value:
+          value === null || value === undefined || String(value) === 'Off' ? null : String(value),
+      };
     }
     if (family === 'combobox') {
-      const selected = Array.isArray(value) ? value.slice(0, 1).map(String) : [String(value ?? '')];
-      return { type: 'choice', values: selected };
+      const selected = Array.isArray(value) ? value[0] : value;
+      const text = selected === null || selected === undefined ? '' : String(selected);
+      return { value: text === '' ? null : text };
     }
     if (family === 'listbox') {
+      if (Array.isArray(value)) return { selectedValues: value.map(String) };
       return {
-        type: 'choice',
-        values: Array.isArray(value) ? value.map(String) : [String(value ?? '')],
+        selectedValues:
+          value === null || value === undefined || value === '' ? [] : [String(value)],
       };
     }
     diagnostic(

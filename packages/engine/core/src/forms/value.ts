@@ -1,22 +1,19 @@
 /**
- * A typed value write for one field. The `type` must match the target
- * field's family — the engine rejects mismatches with `InvalidArg` rather
- * than guessing:
+ * A value to write to one field, in the fields a read of it returns:
  *
- * - `text` → text-family fields. Values longer than /MaxLen are truncated.
- * - `toggle` → checkbox/radio. `state` is a widget's `onState` token and
- *   selects which widget of the group is checked; `null` clears the group
- *   (rejected for radios with `noToggleToOff`). Sibling widgets update
- *   together (checkboxes and in-unison radios check all widgets sharing
- *   the target's export value).
- * - `choice` → combo/list boxes, by option export value. Multiple values
- *   need a multi-select list box; an empty array clears the selection.
- *   Combo boxes with the `edit` flag accept one free-text value.
+ * - `{ value }`: a text field's text; a radio group's or a checkbox's
+ *   choice, by the export value of the widget to check (`'Off'` or `null`
+ *   clears it); a dropdown's option value (or free text when it allows
+ *   editing; `null` clears it). `null` empties a text field.
+ * - `{ checked }`: a checkbox. `true` checks its first widget.
+ * - `{ selectedValues }`: a list's option values; `[]` clears it.
+ *
+ * A shape the field's family doesn't take fails with `InvalidArg`.
  */
 export type FormFieldValue =
-  | { type: 'text'; value: string }
-  | { type: 'toggle'; state: string | null }
-  | { type: 'choice'; values: string[] };
+  | { value: string | null }
+  | { checked: boolean }
+  | { selectedValues: string[] };
 
 /** Serialized form-data interchange formats. */
 export type FormDataFormat = 'fdf' | 'xfdf';

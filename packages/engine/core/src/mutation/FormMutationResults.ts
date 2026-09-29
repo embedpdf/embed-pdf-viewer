@@ -24,6 +24,45 @@ export interface FormSetValueResult<C extends Coordinates = PageCoordinates> {
 }
 
 /**
+ * Result of `reset`: the fields that changed, read back, and one meta for
+ * all of them. An empty `fields` means every field was already at its
+ * default.
+ */
+export interface FormResetResult<C extends Coordinates = PageCoordinates> {
+  fields: FormFieldDTO<C>[];
+  meta: FormMutationMeta;
+}
+
+/**
+ * A reset as one value write per changed field: each field with the part of
+ * the meta that is its own. A reset's `forms.valueSet` events carry these.
+ */
+export function formResetFacts<C extends Coordinates>(
+  result: FormResetResult<C>,
+): FormSetValueResult<C>[] {
+  return result.fields.map((field) => {
+    const own = new Set(field.widgets.map((widget) => widget.annotObjectNumber));
+    const changedWidgets = result.meta.changedWidgets.filter((widget) =>
+      own.has(widget.annotObjectNumber),
+    );
+    const pages = new Set(
+      changedWidgets.flatMap((widget) => (widget.page ? [widget.page.pageObjectNumber] : [])),
+    );
+    return {
+      field,
+      meta: {
+        affectedPages: result.meta.affectedPages.filter((state) =>
+          pages.has(state.page.pageObjectNumber),
+        ),
+        cacheDelta: null,
+        changedFields: [field.ref],
+        changedWidgets,
+      },
+    };
+  });
+}
+
+/**
  * Result of applying an FDF/XFDF payload. Import is per-field: one bad
  * entry (unknown name, family mismatch, failed validation) is counted in
  * `skipped` and never poisons the rest.
