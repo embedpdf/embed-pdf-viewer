@@ -314,15 +314,16 @@ export function readStructure(runtime: PdfRuntimeModule, docPtr: Ptr): RevisionS
   if (formModel !== NULL_PTR) {
     try {
       const snapshot = readFormSnapshot(runtime, formModel, docPtr);
-      for (const f of snapshot.fields) {
+      // The snapshot lists the model's fields in model order.
+      snapshot.fields.forEach((f, index) => {
         fields.push({
           objectNumber: f.fieldObjectNumber,
           name: f.name,
           family: f.family,
           widgets: f.widgets.map((w) => w.annotObjectNumber),
-          flags: f.flags.raw,
+          flags: fn.EPDFForm_GetFieldFlags(formModel, index),
         });
-      }
+      });
     } finally {
       fn.EPDFForm_CloseModel(formModel);
     }

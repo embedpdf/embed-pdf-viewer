@@ -158,7 +158,7 @@ describe('action buttons e2e (scripting OFF — actions ≠ JavaScript)', () => 
     // ReadOnly flag are irrelevant to it.
     await using harness = await boot(false);
     const alphaId = `obj:${harness.fieldOf('alpha').widgets[0]!.annotObjectNumber}`;
-    expect(harness.fieldOf('fakeButton').flags.readOnly).toBe(true);
+    expect(harness.fieldOf('fakeButton').readOnly).toBe(true);
     expect(harness.paintedIds()).toContain(alphaId);
 
     const pressed = await harness.press('fakeButton');

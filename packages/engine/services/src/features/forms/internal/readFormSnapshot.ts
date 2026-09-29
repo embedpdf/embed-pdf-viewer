@@ -164,12 +164,9 @@ export function readFieldAt(
     name,
     family,
     origin: fn.EPDFForm_GetFieldOrigin(model, fieldIndex) === 1 ? 'recovered' : 'acroform',
-    flags: {
-      readOnly: (rawFlags & FF_READ_ONLY) !== 0,
-      required: (rawFlags & FF_REQUIRED) !== 0,
-      noExport: (rawFlags & FF_NO_EXPORT) !== 0,
-      raw: rawFlags,
-    },
+    readOnly: (rawFlags & FF_READ_ONLY) !== 0,
+    required: (rawFlags & FF_REQUIRED) !== 0,
+    noExport: (rawFlags & FF_NO_EXPORT) !== 0,
     alternateName: readWideOrNull(runtime, (buf, cap) =>
       fn.EPDFForm_GetFieldAlternateName(model, fieldIndex, buf, cap),
     ),

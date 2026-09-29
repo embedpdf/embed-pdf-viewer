@@ -20,15 +20,6 @@ export interface WidgetPlacement<
   exportValue?: string;
 }
 
-/** The flags every field has, as a write takes them: a flag left out keeps its value. */
-export interface FormFieldFlagsInput {
-  readOnly?: boolean;
-  required?: boolean;
-  noExport?: boolean;
-  /** A read's `raw` flags, sent back: ignored. */
-  raw?: number;
-}
-
 /** An option of a choice field at authoring time. */
 export interface FormFieldOptionInput {
   label: string;
@@ -43,7 +34,9 @@ interface FormFieldDraftBase {
    * `InvalidArg`.
    */
   name: string;
-  flags?: FormFieldFlagsInput;
+  readOnly?: boolean;
+  required?: boolean;
+  noExport?: boolean;
   /** /TU — the accessible tooltip. */
   alternateName?: string;
   /** /TM — the export mapping name. */

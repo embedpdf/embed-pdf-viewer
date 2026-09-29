@@ -149,7 +149,6 @@ export type {
 export {
   FormFieldRefSchema,
   FormWidgetSchema,
-  FormFieldFlagsSchema,
   ToggleFieldWidgetSchema,
   FormFieldOptionSchema,
   FormFieldDTOSchema,

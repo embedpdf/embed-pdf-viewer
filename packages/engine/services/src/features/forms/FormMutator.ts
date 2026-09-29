@@ -394,10 +394,9 @@ export class FormMutator {
     const { fn } = this.runtime;
     const docPtr = this.session.requireDocPtr();
 
-    const { setBits, clearBits } = flagMasks({
-      ...(draft as unknown as Record<string, boolean | undefined>),
-      ...draft.flags,
-    });
+    const { setBits, clearBits } = flagMasks(
+      draft as unknown as Record<string, boolean | undefined>,
+    );
     if (setBits !== 0 || clearBits !== 0) {
       fn.EPDFForm_SetFieldFlags(docPtr, fieldObjectNumber, setBits, clearBits);
     }
@@ -522,10 +521,9 @@ export class FormMutator {
         `cannot rename to "${patch.name}" (sibling conflict or invalid)`,
       );
     }
-    const { setBits, clearBits } = flagMasks({
-      ...(patch as unknown as Record<string, boolean | undefined>),
-      ...patch.flags,
-    });
+    const { setBits, clearBits } = flagMasks(
+      patch as unknown as Record<string, boolean | undefined>,
+    );
     if (setBits !== 0 || clearBits !== 0) {
       if (!fn.EPDFForm_SetFieldFlags(docPtr, fieldObjectNumber, setBits, clearBits)) {
         throw new EngineError(EngineErrorCode.InvalidArg, 'flag update rejected');
@@ -848,7 +846,15 @@ export class FormMutator {
 }
 
 /** The patch members every family has. */
-const PATCH_BASE_MEMBERS = ['family', 'name', 'flags', 'alternateName', 'mappingName'];
+const PATCH_BASE_MEMBERS = [
+  'family',
+  'name',
+  'readOnly',
+  'required',
+  'noExport',
+  'alternateName',
+  'mappingName',
+];
 
 /** The members each family's patch adds; a family not listed takes the base only. */
 const PATCH_FAMILY_MEMBERS: Partial<Record<FormFieldFamily, readonly string[]>> = {

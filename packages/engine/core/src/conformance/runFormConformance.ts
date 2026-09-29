@@ -697,12 +697,12 @@ export function runFormConformance(
             { label: 'C', value: 'c' },
           ],
           defaultValue: ['a', 'c'],
-          flags: { required: true },
+          required: true,
           widgets: [{ page, rect: { x: 20, y: 140, width: 100, height: 60 } }],
         });
         if (list.field.family !== 'listbox') throw new Error('expected listbox');
         expect(list.field.defaultValue).toEqual(['a', 'c']);
-        expect(list.field.flags.required).toBe(true);
+        expect(list.field).toMatchObject({ readOnly: false, required: true, noExport: false });
 
         // A default must be option values.
         await expect(
@@ -717,11 +717,21 @@ export function runFormConformance(
         if (restored?.family !== 'listbox') throw new Error('expected listbox');
         expect(restored.selectedValues).toEqual(['b']);
 
-        // Flags take a read's flags back as they are, raw bits included.
-        await doc.forms.update(list.field.ref, { flags: { readOnly: true, required: false } });
-        const locked = await doc.forms.get(list.field.ref);
-        expect(locked.flags).toMatchObject({ readOnly: true, required: false });
-        await doc.forms.update(list.field.ref, { flags: locked.flags });
+        // A flag left out keeps its value.
+        await doc.forms.update(list.field.ref, { readOnly: true });
+        expect(await doc.forms.get(list.field.ref)).toMatchObject({
+          readOnly: true,
+          required: true,
+        });
+        await doc.forms.update(list.field.ref, { required: false });
+        expect(await doc.forms.get(list.field.ref)).toMatchObject({
+          readOnly: true,
+          required: false,
+        });
+        // Flags are members of their own, not one object.
+        await expect(
+          doc.forms.update(list.field.ref, { flags: { required: true } } as never),
+        ).rejects.toMatchObject({ code: EngineErrorCode.InvalidArg });
 
         // A signature field takes the settings every field shares.
         const signature = await doc.forms.create({
@@ -732,13 +742,13 @@ export function runFormConformance(
         await doc.forms.update(signature.field.ref, {
           name: 'signed_here',
           alternateName: 'Sign here',
-          flags: { required: true },
+          required: true,
         });
         const renamed = await doc.forms.get(signature.field.ref);
         expect(renamed.family).toBe('signature');
         expect(renamed.name).toBe('signed_here');
         expect(renamed.alternateName).toBe('Sign here');
-        expect(renamed.flags.required).toBe(true);
+        expect(renamed.required).toBe(true);
         await expect(
           doc.forms.update(signature.field.ref, { multiline: true }),
         ).rejects.toMatchObject({ code: EngineErrorCode.InvalidArg });

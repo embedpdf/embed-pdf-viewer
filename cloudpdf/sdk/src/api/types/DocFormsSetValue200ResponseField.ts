@@ -19,7 +19,9 @@ export namespace DocFormsSetValue200ResponseField {
         fieldObjectNumber: number;
         name: string;
         origin: DocFormsSetValue200ResponseFieldText.Origin;
-        flags: DocFormsSetValue200ResponseFieldText.Flags;
+        readOnly: boolean;
+        required: boolean;
+        noExport: boolean;
         alternateName: string | null;
         mappingName: string | null;
         valueEntry: CloudPDF.DocFormsSetValue200ResponseFieldTextValueEntry;
@@ -40,14 +42,6 @@ export namespace DocFormsSetValue200ResponseField {
             Recovered: "recovered",
         } as const;
         export type Origin = (typeof Origin)[keyof typeof Origin];
-
-        export interface Flags {
-            readOnly: boolean;
-            required: boolean;
-            noExport: boolean;
-            raw: number;
-        }
-
         export type Widgets = Widgets.Item[];
 
         export namespace Widgets {
@@ -87,7 +81,9 @@ export namespace DocFormsSetValue200ResponseField {
         fieldObjectNumber: number;
         name: string;
         origin: DocFormsSetValue200ResponseFieldCheckbox.Origin;
-        flags: DocFormsSetValue200ResponseFieldCheckbox.Flags;
+        readOnly: boolean;
+        required: boolean;
+        noExport: boolean;
         alternateName: string | null;
         mappingName: string | null;
         valueEntry: CloudPDF.DocFormsSetValue200ResponseFieldCheckboxValueEntry;
@@ -104,14 +100,6 @@ export namespace DocFormsSetValue200ResponseField {
             Recovered: "recovered",
         } as const;
         export type Origin = (typeof Origin)[keyof typeof Origin];
-
-        export interface Flags {
-            readOnly: boolean;
-            required: boolean;
-            noExport: boolean;
-            raw: number;
-        }
-
         export type Widgets = Widgets.Item[];
 
         export namespace Widgets {
@@ -154,7 +142,9 @@ export namespace DocFormsSetValue200ResponseField {
         fieldObjectNumber: number;
         name: string;
         origin: DocFormsSetValue200ResponseFieldRadio.Origin;
-        flags: DocFormsSetValue200ResponseFieldRadio.Flags;
+        readOnly: boolean;
+        required: boolean;
+        noExport: boolean;
         alternateName: string | null;
         mappingName: string | null;
         valueEntry: CloudPDF.DocFormsSetValue200ResponseFieldRadioValueEntry;
@@ -172,14 +162,6 @@ export namespace DocFormsSetValue200ResponseField {
             Recovered: "recovered",
         } as const;
         export type Origin = (typeof Origin)[keyof typeof Origin];
-
-        export interface Flags {
-            readOnly: boolean;
-            required: boolean;
-            noExport: boolean;
-            raw: number;
-        }
-
         export type Widgets = Widgets.Item[];
 
         export namespace Widgets {
@@ -222,7 +204,9 @@ export namespace DocFormsSetValue200ResponseField {
         fieldObjectNumber: number;
         name: string;
         origin: DocFormsSetValue200ResponseFieldCombobox.Origin;
-        flags: DocFormsSetValue200ResponseFieldCombobox.Flags;
+        readOnly: boolean;
+        required: boolean;
+        noExport: boolean;
         alternateName: string | null;
         mappingName: string | null;
         valueEntry: CloudPDF.DocFormsSetValue200ResponseFieldComboboxValueEntry;
@@ -241,14 +225,6 @@ export namespace DocFormsSetValue200ResponseField {
             Recovered: "recovered",
         } as const;
         export type Origin = (typeof Origin)[keyof typeof Origin];
-
-        export interface Flags {
-            readOnly: boolean;
-            required: boolean;
-            noExport: boolean;
-            raw: number;
-        }
-
         export type Widgets = Widgets.Item[];
 
         export namespace Widgets {
@@ -298,7 +274,9 @@ export namespace DocFormsSetValue200ResponseField {
         fieldObjectNumber: number;
         name: string;
         origin: DocFormsSetValue200ResponseFieldListbox.Origin;
-        flags: DocFormsSetValue200ResponseFieldListbox.Flags;
+        readOnly: boolean;
+        required: boolean;
+        noExport: boolean;
         alternateName: string | null;
         mappingName: string | null;
         valueEntry: CloudPDF.DocFormsSetValue200ResponseFieldListboxValueEntry;
@@ -317,14 +295,6 @@ export namespace DocFormsSetValue200ResponseField {
             Recovered: "recovered",
         } as const;
         export type Origin = (typeof Origin)[keyof typeof Origin];
-
-        export interface Flags {
-            readOnly: boolean;
-            required: boolean;
-            noExport: boolean;
-            raw: number;
-        }
-
         export type Widgets = Widgets.Item[];
 
         export namespace Widgets {
@@ -374,7 +344,9 @@ export namespace DocFormsSetValue200ResponseField {
         fieldObjectNumber: number;
         name: string;
         origin: DocFormsSetValue200ResponseFieldPushbutton.Origin;
-        flags: DocFormsSetValue200ResponseFieldPushbutton.Flags;
+        readOnly: boolean;
+        required: boolean;
+        noExport: boolean;
         alternateName: string | null;
         mappingName: string | null;
         valueEntry: CloudPDF.DocFormsSetValue200ResponseFieldPushbuttonValueEntry;
@@ -389,14 +361,6 @@ export namespace DocFormsSetValue200ResponseField {
             Recovered: "recovered",
         } as const;
         export type Origin = (typeof Origin)[keyof typeof Origin];
-
-        export interface Flags {
-            readOnly: boolean;
-            required: boolean;
-            noExport: boolean;
-            raw: number;
-        }
-
         export type Widgets = Widgets.Item[];
 
         export namespace Widgets {
@@ -436,7 +400,9 @@ export namespace DocFormsSetValue200ResponseField {
         fieldObjectNumber: number;
         name: string;
         origin: DocFormsSetValue200ResponseFieldSignature.Origin;
-        flags: DocFormsSetValue200ResponseFieldSignature.Flags;
+        readOnly: boolean;
+        required: boolean;
+        noExport: boolean;
         alternateName: string | null;
         mappingName: string | null;
         valueEntry: CloudPDF.DocFormsSetValue200ResponseFieldSignatureValueEntry;
@@ -451,14 +417,6 @@ export namespace DocFormsSetValue200ResponseField {
             Recovered: "recovered",
         } as const;
         export type Origin = (typeof Origin)[keyof typeof Origin];
-
-        export interface Flags {
-            readOnly: boolean;
-            required: boolean;
-            noExport: boolean;
-            raw: number;
-        }
-
         export type Widgets = Widgets.Item[];
 
         export namespace Widgets {
@@ -498,7 +456,9 @@ export namespace DocFormsSetValue200ResponseField {
         fieldObjectNumber: number;
         name: string;
         origin: DocFormsSetValue200ResponseFieldUnknown.Origin;
-        flags: DocFormsSetValue200ResponseFieldUnknown.Flags;
+        readOnly: boolean;
+        required: boolean;
+        noExport: boolean;
         alternateName: string | null;
         mappingName: string | null;
         valueEntry: CloudPDF.DocFormsSetValue200ResponseFieldUnknownValueEntry;
@@ -514,14 +474,6 @@ export namespace DocFormsSetValue200ResponseField {
             Recovered: "recovered",
         } as const;
         export type Origin = (typeof Origin)[keyof typeof Origin];
-
-        export interface Flags {
-            readOnly: boolean;
-            required: boolean;
-            noExport: boolean;
-            raw: number;
-        }
-
         export type Widgets = Widgets.Item[];
 
         export namespace Widgets {

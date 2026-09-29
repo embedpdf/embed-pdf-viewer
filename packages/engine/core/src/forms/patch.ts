@@ -1,4 +1,4 @@
-import type { FormFieldFlagsInput, FormFieldOptionInput } from './draft';
+import type { FormFieldOptionInput } from './draft';
 
 /**
  * Patch-field semantics follow the annotation patches: `undefined` leaves
@@ -13,7 +13,9 @@ interface FormFieldPatchBase {
    * is not supported). A sibling name collision fails with `InvalidArg`.
    */
   name?: string;
-  flags?: FormFieldFlagsInput;
+  readOnly?: boolean;
+  required?: boolean;
+  noExport?: boolean;
   alternateName?: string | null;
   mappingName?: string | null;
 }

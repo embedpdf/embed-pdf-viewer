@@ -30,7 +30,9 @@ const text = (over: Partial<Extract<FormFieldDTO, { family: 'text' }>> = {}): Fo
   name: 'maxlen_text',
   family: 'text',
   origin: 'acroform',
-  flags: { readOnly: false, required: false, noExport: false, raw: 0 },
+  readOnly: false,
+  required: false,
+  noExport: false,
   alternateName: null,
   mappingName: null,
   valueEntry: { kind: 'scalar', value: over.value ?? 'abc' },
@@ -161,7 +163,7 @@ describe('fill projection', () => {
   });
 
   test('read-only and in-flight fields project as disabled', () => {
-    const readOnly = text({ flags: { readOnly: true, required: false, noExport: false, raw: 1 } });
+    const readOnly = text({ readOnly: true });
     expect(fillItems(indexFields(snapshot([readOnly])), 3, BOXES, NO_WRITES)[0]!.disabled).toBe(
       true,
     );
@@ -178,7 +180,9 @@ const signature = (
   name: 'sig',
   family: 'signature',
   origin: 'acroform',
-  flags: { readOnly: false, required: false, noExport: false, raw: 0 },
+  readOnly: false,
+  required: false,
+  noExport: false,
   alternateName: 'Sign here',
   mappingName: null,
   valueEntry: { kind: 'none' },

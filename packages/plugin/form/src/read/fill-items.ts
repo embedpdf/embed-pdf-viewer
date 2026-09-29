@@ -99,7 +99,7 @@ export function projectWidget(
     annotationRef:
       field.widgets.find((widget) => widget.annotObjectNumber === annotObjectNumber)?.ref ?? null,
     box,
-    disabled: field.flags.readOnly || writing[key] === true,
+    disabled: field.readOnly || writing[key] === true,
     label: field.alternateName ?? field.name,
   };
   switch (field.family) {

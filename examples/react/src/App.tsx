@@ -953,7 +953,7 @@ function FieldPanel() {
       <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#666' }}>
         <input
           type="checkbox"
-          checked={field.flags.required}
+          checked={field.required}
           onChange={(e) => patch({ required: e.target.checked })}
         />
         required

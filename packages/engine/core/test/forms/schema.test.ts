@@ -10,7 +10,9 @@ import type { FormFieldDTO, FormSnapshot } from '../../src/shared';
 const BASE = {
   fieldObjectNumber: 6,
   origin: 'acroform',
-  flags: { readOnly: false, required: false, noExport: false, raw: 32768 },
+  readOnly: false,
+  required: false,
+  noExport: false,
   alternateName: null,
   mappingName: null,
 } as const;

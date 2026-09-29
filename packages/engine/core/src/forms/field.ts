@@ -31,25 +31,6 @@ export type FormFieldFamily =
 export type FormFieldOrigin = 'acroform' | 'recovered';
 
 /**
- * The /Ff flags every field family shares. Family-specific flags (comb,
- * multi-select, radios-in-unison, ...) live as plain booleans on the
- * family DTOs where they are always meaningful.
- */
-export interface FormFieldFlags {
-  /**
-   * The user must not change the value. The engine's write transactions
-   * still accept programmatic writes to read-only fields (calculated
-   * fields are read-only yet script-written); enforcing fill policy is
-   * the application's job.
-   */
-  readOnly: boolean;
-  required: boolean;
-  noExport: boolean;
-  /** The raw /Ff integer, for anything not surfaced. */
-  raw: number;
-}
-
-/**
  * A widget of a field: its address, and where it shows. `rect` is `null`
  * for a widget on no page.
  */
@@ -103,7 +84,17 @@ export interface FormFieldBase<C extends Coordinates = PageCoordinates> {
   name: string;
   family: FormFieldFamily;
   origin: FormFieldOrigin;
-  flags: FormFieldFlags;
+  /**
+   * The user must not change the value. The engine's write transactions
+   * still accept programmatic writes to read-only fields (calculated
+   * fields are read-only yet script-written); enforcing fill policy is
+   * the application's job.
+   */
+  readOnly: boolean;
+  /** PDF apps ask for a value before the form is submitted. */
+  required: boolean;
+  /** Left out when the form is submitted or exported. */
+  noExport: boolean;
   /** /TU — the accessible tooltip / alternate name. */
   alternateName: string | null;
   /** /TM — the export mapping name. */

@@ -17,7 +17,8 @@ describe('scriptFieldsFromSnapshot', () => {
         family,
         valueEntry: { kind: 'none' },
         defaultValueEntry: { kind: 'none' },
-        flags: { readOnly: false, required: false },
+        readOnly: false,
+        required: false,
         widgets: [],
       } as unknown as FormFieldDTO;
 
@@ -36,7 +37,8 @@ describe('scriptFieldsFromSnapshot', () => {
       family: 'radio',
       valueEntry: { kind: 'scalar', value: '1' },
       defaultValueEntry: { kind: 'scalar', value: '0' },
-      flags: { readOnly: false, required: false },
+      readOnly: false,
+      required: false,
       widgets: [widget('0', 'Small'), widget('1', 'Large')],
     } as unknown as FormFieldDTO;
 
@@ -54,7 +56,8 @@ describe('scriptFieldsFromSnapshot', () => {
       family: 'text',
       valueEntry: { kind: 'none' },
       defaultValueEntry: { kind: 'none' },
-      flags: { readOnly: false, required: false },
+      readOnly: false,
+      required: false,
     } as FormFieldDTO;
 
     expect(scriptFieldsFromSnapshot(snapshotWith(field))[0]).toMatchObject({

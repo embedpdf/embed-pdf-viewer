@@ -27,13 +27,9 @@ export const resolveFieldSelection = <F extends { name: string; ref: FormFieldRe
   exclude: boolean,
 ): { selected: F[]; listed: (field: F) => boolean } => {
   if (targets === null) return { selected: [...all], listed: () => false };
-  const names = targets
-    .filter((target) => target.kind === 'name')
-    .map((target) => target.name);
+  const names = targets.filter((target) => target.kind === 'name').map((target) => target.name);
   const objectNumbers = new Set(
-    targets
-      .filter((target) => target.kind === 'objectNumber')
-      .map((target) => target.objectNumber),
+    targets.filter((target) => target.kind === 'objectNumber').map((target) => target.objectNumber),
   );
   const listed = (field: F): boolean =>
     (field.ref.kind === 'objectNumber' && objectNumbers.has(field.ref.fieldObjectNumber)) ||
@@ -80,7 +76,7 @@ export const buildSubmitEntries = (
       }
       continue;
     }
-    if (field.flags.noExport) {
+    if (field.noExport) {
       if (explicit) {
         diagnose({
           code: 'submit-entry-unsupported',

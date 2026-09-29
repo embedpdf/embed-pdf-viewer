@@ -472,7 +472,6 @@ export { encodeFieldRefKey, decodeFieldRefKey } from './identity/FormFieldRef';
 export type {
   FormFieldFamily,
   FormFieldOrigin,
-  FormFieldFlags,
   ToggleFieldWidget,
   FormFieldWidget,
   FormFieldOption,
@@ -497,7 +496,6 @@ export type {
 export type { FormKind, FormSnapshot } from './forms/snapshot';
 export type {
   WidgetPlacement,
-  FormFieldFlagsInput,
   FormFieldOptionInput,
   TextFieldDraft,
   CheckboxFieldDraft,

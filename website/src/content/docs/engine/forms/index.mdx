@@ -37,7 +37,9 @@ Every field has these:
 | `name`          | The full name, with the groups it's in: `billing.name`.                                                     |
 | `family`        | `'text'`, `'checkbox'`, `'radio'`, `'combobox'`, `'listbox'`, `'pushbutton'`, `'signature'` or `'unknown'`. |
 | `ref`           | Its address. Keep it: it's how you fill, reset or change the field.                                         |
-| `flags`         | `readOnly`, `required` and `noExport`, as `true`/`false`.                                                   |
+| `readOnly`      | `true` when PDF apps don't let the user change the value.                                                   |
+| `required`      | `true` when PDF apps ask for a value before the form is submitted.                                          |
+| `noExport`      | `true` when the field is left out when the form is submitted.                                               |
 | `alternateName` | The tooltip PDF apps show, also read by screen readers, or `null`.                                          |
 | `widgets`       | Where the field shows on the pages (see [Widgets](#widgets)).                                               |
 

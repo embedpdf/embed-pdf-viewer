@@ -19460,25 +19460,14 @@
                       "type": "string",
                       "enum": ["acroform", "recovered"]
                     },
-                    "flags": {
-                      "type": "object",
-                      "properties": {
-                        "readOnly": {
-                          "type": "boolean"
-                        },
-                        "required": {
-                          "type": "boolean"
-                        },
-                        "noExport": {
-                          "type": "boolean"
-                        },
-                        "raw": {
-                          "type": "integer",
-                          "minimum": 0
-                        }
-                      },
-                      "required": ["readOnly", "required", "noExport", "raw"],
-                      "additionalProperties": false
+                    "readOnly": {
+                      "type": "boolean"
+                    },
+                    "required": {
+                      "type": "boolean"
+                    },
+                    "noExport": {
+                      "type": "boolean"
                     },
                     "alternateName": {
                       "type": "string",
@@ -19715,7 +19704,9 @@
                     "fieldObjectNumber",
                     "name",
                     "origin",
-                    "flags",
+                    "readOnly",
+                    "required",
+                    "noExport",
                     "alternateName",
                     "mappingName",
                     "valueEntry",
@@ -19746,8 +19737,14 @@
                     "origin": {
                       "$ref": "#/components/schemas/DocFormsList200Response/properties/fields/items/anyOf/0/properties/origin"
                     },
-                    "flags": {
-                      "$ref": "#/components/schemas/DocFormsList200Response/properties/fields/items/anyOf/0/properties/flags"
+                    "readOnly": {
+                      "$ref": "#/components/schemas/DocFormsList200Response/properties/fields/items/anyOf/0/properties/readOnly"
+                    },
+                    "required": {
+                      "$ref": "#/components/schemas/DocFormsList200Response/properties/fields/items/anyOf/0/properties/required"
+                    },
+                    "noExport": {
+                      "$ref": "#/components/schemas/DocFormsList200Response/properties/fields/items/anyOf/0/properties/noExport"
                     },
                     "alternateName": {
                       "$ref": "#/components/schemas/DocFormsList200Response/properties/fields/items/anyOf/0/properties/alternateName"
@@ -19819,7 +19816,9 @@
                     "fieldObjectNumber",
                     "name",
                     "origin",
-                    "flags",
+                    "readOnly",
+                    "required",
+                    "noExport",
                     "alternateName",
                     "mappingName",
                     "valueEntry",
@@ -19846,8 +19845,14 @@
                     "origin": {
                       "$ref": "#/components/schemas/DocFormsList200Response/properties/fields/items/anyOf/0/properties/origin"
                     },
-                    "flags": {
-                      "$ref": "#/components/schemas/DocFormsList200Response/properties/fields/items/anyOf/0/properties/flags"
+                    "readOnly": {
+                      "$ref": "#/components/schemas/DocFormsList200Response/properties/fields/items/anyOf/0/properties/readOnly"
+                    },
+                    "required": {
+                      "$ref": "#/components/schemas/DocFormsList200Response/properties/fields/items/anyOf/0/properties/required"
+                    },
+                    "noExport": {
+                      "$ref": "#/components/schemas/DocFormsList200Response/properties/fields/items/anyOf/0/properties/noExport"
                     },
                     "alternateName": {
                       "$ref": "#/components/schemas/DocFormsList200Response/properties/fields/items/anyOf/0/properties/alternateName"
@@ -19889,7 +19894,9 @@
                     "fieldObjectNumber",
                     "name",
                     "origin",
-                    "flags",
+                    "readOnly",
+                    "required",
+                    "noExport",
                     "alternateName",
                     "mappingName",
                     "valueEntry",
@@ -19917,8 +19924,14 @@
                     "origin": {
                       "$ref": "#/components/schemas/DocFormsList200Response/properties/fields/items/anyOf/0/properties/origin"
                     },
-                    "flags": {
-                      "$ref": "#/components/schemas/DocFormsList200Response/properties/fields/items/anyOf/0/properties/flags"
+                    "readOnly": {
+                      "$ref": "#/components/schemas/DocFormsList200Response/properties/fields/items/anyOf/0/properties/readOnly"
+                    },
+                    "required": {
+                      "$ref": "#/components/schemas/DocFormsList200Response/properties/fields/items/anyOf/0/properties/required"
+                    },
+                    "noExport": {
+                      "$ref": "#/components/schemas/DocFormsList200Response/properties/fields/items/anyOf/0/properties/noExport"
                     },
                     "alternateName": {
                       "$ref": "#/components/schemas/DocFormsList200Response/properties/fields/items/anyOf/0/properties/alternateName"
@@ -19976,7 +19989,9 @@
                     "fieldObjectNumber",
                     "name",
                     "origin",
-                    "flags",
+                    "readOnly",
+                    "required",
+                    "noExport",
                     "alternateName",
                     "mappingName",
                     "valueEntry",
@@ -20005,8 +20020,14 @@
                     "origin": {
                       "$ref": "#/components/schemas/DocFormsList200Response/properties/fields/items/anyOf/0/properties/origin"
                     },
-                    "flags": {
-                      "$ref": "#/components/schemas/DocFormsList200Response/properties/fields/items/anyOf/0/properties/flags"
+                    "readOnly": {
+                      "$ref": "#/components/schemas/DocFormsList200Response/properties/fields/items/anyOf/0/properties/readOnly"
+                    },
+                    "required": {
+                      "$ref": "#/components/schemas/DocFormsList200Response/properties/fields/items/anyOf/0/properties/required"
+                    },
+                    "noExport": {
+                      "$ref": "#/components/schemas/DocFormsList200Response/properties/fields/items/anyOf/0/properties/noExport"
                     },
                     "alternateName": {
                       "$ref": "#/components/schemas/DocFormsList200Response/properties/fields/items/anyOf/0/properties/alternateName"
@@ -20057,7 +20078,9 @@
                     "fieldObjectNumber",
                     "name",
                     "origin",
-                    "flags",
+                    "readOnly",
+                    "required",
+                    "noExport",
                     "alternateName",
                     "mappingName",
                     "valueEntry",
@@ -20086,8 +20109,14 @@
                     "origin": {
                       "$ref": "#/components/schemas/DocFormsList200Response/properties/fields/items/anyOf/0/properties/origin"
                     },
-                    "flags": {
-                      "$ref": "#/components/schemas/DocFormsList200Response/properties/fields/items/anyOf/0/properties/flags"
+                    "readOnly": {
+                      "$ref": "#/components/schemas/DocFormsList200Response/properties/fields/items/anyOf/0/properties/readOnly"
+                    },
+                    "required": {
+                      "$ref": "#/components/schemas/DocFormsList200Response/properties/fields/items/anyOf/0/properties/required"
+                    },
+                    "noExport": {
+                      "$ref": "#/components/schemas/DocFormsList200Response/properties/fields/items/anyOf/0/properties/noExport"
                     },
                     "alternateName": {
                       "$ref": "#/components/schemas/DocFormsList200Response/properties/fields/items/anyOf/0/properties/alternateName"
@@ -20117,7 +20146,9 @@
                     "fieldObjectNumber",
                     "name",
                     "origin",
-                    "flags",
+                    "readOnly",
+                    "required",
+                    "noExport",
                     "alternateName",
                     "mappingName",
                     "valueEntry",
@@ -20142,8 +20173,14 @@
                     "origin": {
                       "$ref": "#/components/schemas/DocFormsList200Response/properties/fields/items/anyOf/0/properties/origin"
                     },
-                    "flags": {
-                      "$ref": "#/components/schemas/DocFormsList200Response/properties/fields/items/anyOf/0/properties/flags"
+                    "readOnly": {
+                      "$ref": "#/components/schemas/DocFormsList200Response/properties/fields/items/anyOf/0/properties/readOnly"
+                    },
+                    "required": {
+                      "$ref": "#/components/schemas/DocFormsList200Response/properties/fields/items/anyOf/0/properties/required"
+                    },
+                    "noExport": {
+                      "$ref": "#/components/schemas/DocFormsList200Response/properties/fields/items/anyOf/0/properties/noExport"
                     },
                     "alternateName": {
                       "$ref": "#/components/schemas/DocFormsList200Response/properties/fields/items/anyOf/0/properties/alternateName"
@@ -20173,7 +20210,9 @@
                     "fieldObjectNumber",
                     "name",
                     "origin",
-                    "flags",
+                    "readOnly",
+                    "required",
+                    "noExport",
                     "alternateName",
                     "mappingName",
                     "valueEntry",
@@ -20198,8 +20237,14 @@
                     "origin": {
                       "$ref": "#/components/schemas/DocFormsList200Response/properties/fields/items/anyOf/0/properties/origin"
                     },
-                    "flags": {
-                      "$ref": "#/components/schemas/DocFormsList200Response/properties/fields/items/anyOf/0/properties/flags"
+                    "readOnly": {
+                      "$ref": "#/components/schemas/DocFormsList200Response/properties/fields/items/anyOf/0/properties/readOnly"
+                    },
+                    "required": {
+                      "$ref": "#/components/schemas/DocFormsList200Response/properties/fields/items/anyOf/0/properties/required"
+                    },
+                    "noExport": {
+                      "$ref": "#/components/schemas/DocFormsList200Response/properties/fields/items/anyOf/0/properties/noExport"
                     },
                     "alternateName": {
                       "$ref": "#/components/schemas/DocFormsList200Response/properties/fields/items/anyOf/0/properties/alternateName"
@@ -20232,7 +20277,9 @@
                     "fieldObjectNumber",
                     "name",
                     "origin",
-                    "flags",
+                    "readOnly",
+                    "required",
+                    "noExport",
                     "alternateName",
                     "mappingName",
                     "valueEntry",
@@ -20368,25 +20415,14 @@
                     "type": "string",
                     "enum": ["acroform", "recovered"]
                   },
-                  "flags": {
-                    "type": "object",
-                    "properties": {
-                      "readOnly": {
-                        "type": "boolean"
-                      },
-                      "required": {
-                        "type": "boolean"
-                      },
-                      "noExport": {
-                        "type": "boolean"
-                      },
-                      "raw": {
-                        "type": "integer",
-                        "minimum": 0
-                      }
-                    },
-                    "required": ["readOnly", "required", "noExport", "raw"],
-                    "additionalProperties": false
+                  "readOnly": {
+                    "type": "boolean"
+                  },
+                  "required": {
+                    "type": "boolean"
+                  },
+                  "noExport": {
+                    "type": "boolean"
                   },
                   "alternateName": {
                     "type": "string",
@@ -20623,7 +20659,9 @@
                   "fieldObjectNumber",
                   "name",
                   "origin",
-                  "flags",
+                  "readOnly",
+                  "required",
+                  "noExport",
                   "alternateName",
                   "mappingName",
                   "valueEntry",
@@ -20654,8 +20692,14 @@
                   "origin": {
                     "$ref": "#/components/schemas/DocFormsSetValue200Response/properties/field/anyOf/0/properties/origin"
                   },
-                  "flags": {
-                    "$ref": "#/components/schemas/DocFormsSetValue200Response/properties/field/anyOf/0/properties/flags"
+                  "readOnly": {
+                    "$ref": "#/components/schemas/DocFormsSetValue200Response/properties/field/anyOf/0/properties/readOnly"
+                  },
+                  "required": {
+                    "$ref": "#/components/schemas/DocFormsSetValue200Response/properties/field/anyOf/0/properties/required"
+                  },
+                  "noExport": {
+                    "$ref": "#/components/schemas/DocFormsSetValue200Response/properties/field/anyOf/0/properties/noExport"
                   },
                   "alternateName": {
                     "$ref": "#/components/schemas/DocFormsSetValue200Response/properties/field/anyOf/0/properties/alternateName"
@@ -20727,7 +20771,9 @@
                   "fieldObjectNumber",
                   "name",
                   "origin",
-                  "flags",
+                  "readOnly",
+                  "required",
+                  "noExport",
                   "alternateName",
                   "mappingName",
                   "valueEntry",
@@ -20754,8 +20800,14 @@
                   "origin": {
                     "$ref": "#/components/schemas/DocFormsSetValue200Response/properties/field/anyOf/0/properties/origin"
                   },
-                  "flags": {
-                    "$ref": "#/components/schemas/DocFormsSetValue200Response/properties/field/anyOf/0/properties/flags"
+                  "readOnly": {
+                    "$ref": "#/components/schemas/DocFormsSetValue200Response/properties/field/anyOf/0/properties/readOnly"
+                  },
+                  "required": {
+                    "$ref": "#/components/schemas/DocFormsSetValue200Response/properties/field/anyOf/0/properties/required"
+                  },
+                  "noExport": {
+                    "$ref": "#/components/schemas/DocFormsSetValue200Response/properties/field/anyOf/0/properties/noExport"
                   },
                   "alternateName": {
                     "$ref": "#/components/schemas/DocFormsSetValue200Response/properties/field/anyOf/0/properties/alternateName"
@@ -20797,7 +20849,9 @@
                   "fieldObjectNumber",
                   "name",
                   "origin",
-                  "flags",
+                  "readOnly",
+                  "required",
+                  "noExport",
                   "alternateName",
                   "mappingName",
                   "valueEntry",
@@ -20825,8 +20879,14 @@
                   "origin": {
                     "$ref": "#/components/schemas/DocFormsSetValue200Response/properties/field/anyOf/0/properties/origin"
                   },
-                  "flags": {
-                    "$ref": "#/components/schemas/DocFormsSetValue200Response/properties/field/anyOf/0/properties/flags"
+                  "readOnly": {
+                    "$ref": "#/components/schemas/DocFormsSetValue200Response/properties/field/anyOf/0/properties/readOnly"
+                  },
+                  "required": {
+                    "$ref": "#/components/schemas/DocFormsSetValue200Response/properties/field/anyOf/0/properties/required"
+                  },
+                  "noExport": {
+                    "$ref": "#/components/schemas/DocFormsSetValue200Response/properties/field/anyOf/0/properties/noExport"
                   },
                   "alternateName": {
                     "$ref": "#/components/schemas/DocFormsSetValue200Response/properties/field/anyOf/0/properties/alternateName"
@@ -20884,7 +20944,9 @@
                   "fieldObjectNumber",
                   "name",
                   "origin",
-                  "flags",
+                  "readOnly",
+                  "required",
+                  "noExport",
                   "alternateName",
                   "mappingName",
                   "valueEntry",
@@ -20913,8 +20975,14 @@
                   "origin": {
                     "$ref": "#/components/schemas/DocFormsSetValue200Response/properties/field/anyOf/0/properties/origin"
                   },
-                  "flags": {
-                    "$ref": "#/components/schemas/DocFormsSetValue200Response/properties/field/anyOf/0/properties/flags"
+                  "readOnly": {
+                    "$ref": "#/components/schemas/DocFormsSetValue200Response/properties/field/anyOf/0/properties/readOnly"
+                  },
+                  "required": {
+                    "$ref": "#/components/schemas/DocFormsSetValue200Response/properties/field/anyOf/0/properties/required"
+                  },
+                  "noExport": {
+                    "$ref": "#/components/schemas/DocFormsSetValue200Response/properties/field/anyOf/0/properties/noExport"
                   },
                   "alternateName": {
                     "$ref": "#/components/schemas/DocFormsSetValue200Response/properties/field/anyOf/0/properties/alternateName"
@@ -20965,7 +21033,9 @@
                   "fieldObjectNumber",
                   "name",
                   "origin",
-                  "flags",
+                  "readOnly",
+                  "required",
+                  "noExport",
                   "alternateName",
                   "mappingName",
                   "valueEntry",
@@ -20994,8 +21064,14 @@
                   "origin": {
                     "$ref": "#/components/schemas/DocFormsSetValue200Response/properties/field/anyOf/0/properties/origin"
                   },
-                  "flags": {
-                    "$ref": "#/components/schemas/DocFormsSetValue200Response/properties/field/anyOf/0/properties/flags"
+                  "readOnly": {
+                    "$ref": "#/components/schemas/DocFormsSetValue200Response/properties/field/anyOf/0/properties/readOnly"
+                  },
+                  "required": {
+                    "$ref": "#/components/schemas/DocFormsSetValue200Response/properties/field/anyOf/0/properties/required"
+                  },
+                  "noExport": {
+                    "$ref": "#/components/schemas/DocFormsSetValue200Response/properties/field/anyOf/0/properties/noExport"
                   },
                   "alternateName": {
                     "$ref": "#/components/schemas/DocFormsSetValue200Response/properties/field/anyOf/0/properties/alternateName"
@@ -21025,7 +21101,9 @@
                   "fieldObjectNumber",
                   "name",
                   "origin",
-                  "flags",
+                  "readOnly",
+                  "required",
+                  "noExport",
                   "alternateName",
                   "mappingName",
                   "valueEntry",
@@ -21050,8 +21128,14 @@
                   "origin": {
                     "$ref": "#/components/schemas/DocFormsSetValue200Response/properties/field/anyOf/0/properties/origin"
                   },
-                  "flags": {
-                    "$ref": "#/components/schemas/DocFormsSetValue200Response/properties/field/anyOf/0/properties/flags"
+                  "readOnly": {
+                    "$ref": "#/components/schemas/DocFormsSetValue200Response/properties/field/anyOf/0/properties/readOnly"
+                  },
+                  "required": {
+                    "$ref": "#/components/schemas/DocFormsSetValue200Response/properties/field/anyOf/0/properties/required"
+                  },
+                  "noExport": {
+                    "$ref": "#/components/schemas/DocFormsSetValue200Response/properties/field/anyOf/0/properties/noExport"
                   },
                   "alternateName": {
                     "$ref": "#/components/schemas/DocFormsSetValue200Response/properties/field/anyOf/0/properties/alternateName"
@@ -21081,7 +21165,9 @@
                   "fieldObjectNumber",
                   "name",
                   "origin",
-                  "flags",
+                  "readOnly",
+                  "required",
+                  "noExport",
                   "alternateName",
                   "mappingName",
                   "valueEntry",
@@ -21106,8 +21192,14 @@
                   "origin": {
                     "$ref": "#/components/schemas/DocFormsSetValue200Response/properties/field/anyOf/0/properties/origin"
                   },
-                  "flags": {
-                    "$ref": "#/components/schemas/DocFormsSetValue200Response/properties/field/anyOf/0/properties/flags"
+                  "readOnly": {
+                    "$ref": "#/components/schemas/DocFormsSetValue200Response/properties/field/anyOf/0/properties/readOnly"
+                  },
+                  "required": {
+                    "$ref": "#/components/schemas/DocFormsSetValue200Response/properties/field/anyOf/0/properties/required"
+                  },
+                  "noExport": {
+                    "$ref": "#/components/schemas/DocFormsSetValue200Response/properties/field/anyOf/0/properties/noExport"
                   },
                   "alternateName": {
                     "$ref": "#/components/schemas/DocFormsSetValue200Response/properties/field/anyOf/0/properties/alternateName"
@@ -21140,7 +21232,9 @@
                   "fieldObjectNumber",
                   "name",
                   "origin",
-                  "flags",
+                  "readOnly",
+                  "required",
+                  "noExport",
                   "alternateName",
                   "mappingName",
                   "valueEntry",
@@ -21467,25 +21561,14 @@
                       "type": "string",
                       "enum": ["acroform", "recovered"]
                     },
-                    "flags": {
-                      "type": "object",
-                      "properties": {
-                        "readOnly": {
-                          "type": "boolean"
-                        },
-                        "required": {
-                          "type": "boolean"
-                        },
-                        "noExport": {
-                          "type": "boolean"
-                        },
-                        "raw": {
-                          "type": "integer",
-                          "minimum": 0
-                        }
-                      },
-                      "required": ["readOnly", "required", "noExport", "raw"],
-                      "additionalProperties": false
+                    "readOnly": {
+                      "type": "boolean"
+                    },
+                    "required": {
+                      "type": "boolean"
+                    },
+                    "noExport": {
+                      "type": "boolean"
                     },
                     "alternateName": {
                       "type": "string",
@@ -21722,7 +21805,9 @@
                     "fieldObjectNumber",
                     "name",
                     "origin",
-                    "flags",
+                    "readOnly",
+                    "required",
+                    "noExport",
                     "alternateName",
                     "mappingName",
                     "valueEntry",
@@ -21753,8 +21838,14 @@
                     "origin": {
                       "$ref": "#/components/schemas/DocFormsReset200Response/properties/fields/items/anyOf/0/properties/origin"
                     },
-                    "flags": {
-                      "$ref": "#/components/schemas/DocFormsReset200Response/properties/fields/items/anyOf/0/properties/flags"
+                    "readOnly": {
+                      "$ref": "#/components/schemas/DocFormsReset200Response/properties/fields/items/anyOf/0/properties/readOnly"
+                    },
+                    "required": {
+                      "$ref": "#/components/schemas/DocFormsReset200Response/properties/fields/items/anyOf/0/properties/required"
+                    },
+                    "noExport": {
+                      "$ref": "#/components/schemas/DocFormsReset200Response/properties/fields/items/anyOf/0/properties/noExport"
                     },
                     "alternateName": {
                       "$ref": "#/components/schemas/DocFormsReset200Response/properties/fields/items/anyOf/0/properties/alternateName"
@@ -21826,7 +21917,9 @@
                     "fieldObjectNumber",
                     "name",
                     "origin",
-                    "flags",
+                    "readOnly",
+                    "required",
+                    "noExport",
                     "alternateName",
                     "mappingName",
                     "valueEntry",
@@ -21853,8 +21946,14 @@
                     "origin": {
                       "$ref": "#/components/schemas/DocFormsReset200Response/properties/fields/items/anyOf/0/properties/origin"
                     },
-                    "flags": {
-                      "$ref": "#/components/schemas/DocFormsReset200Response/properties/fields/items/anyOf/0/properties/flags"
+                    "readOnly": {
+                      "$ref": "#/components/schemas/DocFormsReset200Response/properties/fields/items/anyOf/0/properties/readOnly"
+                    },
+                    "required": {
+                      "$ref": "#/components/schemas/DocFormsReset200Response/properties/fields/items/anyOf/0/properties/required"
+                    },
+                    "noExport": {
+                      "$ref": "#/components/schemas/DocFormsReset200Response/properties/fields/items/anyOf/0/properties/noExport"
                     },
                     "alternateName": {
                       "$ref": "#/components/schemas/DocFormsReset200Response/properties/fields/items/anyOf/0/properties/alternateName"
@@ -21896,7 +21995,9 @@
                     "fieldObjectNumber",
                     "name",
                     "origin",
-                    "flags",
+                    "readOnly",
+                    "required",
+                    "noExport",
                     "alternateName",
                     "mappingName",
                     "valueEntry",
@@ -21924,8 +22025,14 @@
                     "origin": {
                       "$ref": "#/components/schemas/DocFormsReset200Response/properties/fields/items/anyOf/0/properties/origin"
                     },
-                    "flags": {
-                      "$ref": "#/components/schemas/DocFormsReset200Response/properties/fields/items/anyOf/0/properties/flags"
+                    "readOnly": {
+                      "$ref": "#/components/schemas/DocFormsReset200Response/properties/fields/items/anyOf/0/properties/readOnly"
+                    },
+                    "required": {
+                      "$ref": "#/components/schemas/DocFormsReset200Response/properties/fields/items/anyOf/0/properties/required"
+                    },
+                    "noExport": {
+                      "$ref": "#/components/schemas/DocFormsReset200Response/properties/fields/items/anyOf/0/properties/noExport"
                     },
                     "alternateName": {
                       "$ref": "#/components/schemas/DocFormsReset200Response/properties/fields/items/anyOf/0/properties/alternateName"
@@ -21983,7 +22090,9 @@
                     "fieldObjectNumber",
                     "name",
                     "origin",
-                    "flags",
+                    "readOnly",
+                    "required",
+                    "noExport",
                     "alternateName",
                     "mappingName",
                     "valueEntry",
@@ -22012,8 +22121,14 @@
                     "origin": {
                       "$ref": "#/components/schemas/DocFormsReset200Response/properties/fields/items/anyOf/0/properties/origin"
                     },
-                    "flags": {
-                      "$ref": "#/components/schemas/DocFormsReset200Response/properties/fields/items/anyOf/0/properties/flags"
+                    "readOnly": {
+                      "$ref": "#/components/schemas/DocFormsReset200Response/properties/fields/items/anyOf/0/properties/readOnly"
+                    },
+                    "required": {
+                      "$ref": "#/components/schemas/DocFormsReset200Response/properties/fields/items/anyOf/0/properties/required"
+                    },
+                    "noExport": {
+                      "$ref": "#/components/schemas/DocFormsReset200Response/properties/fields/items/anyOf/0/properties/noExport"
                     },
                     "alternateName": {
                       "$ref": "#/components/schemas/DocFormsReset200Response/properties/fields/items/anyOf/0/properties/alternateName"
@@ -22064,7 +22179,9 @@
                     "fieldObjectNumber",
                     "name",
                     "origin",
-                    "flags",
+                    "readOnly",
+                    "required",
+                    "noExport",
                     "alternateName",
                     "mappingName",
                     "valueEntry",
@@ -22093,8 +22210,14 @@
                     "origin": {
                       "$ref": "#/components/schemas/DocFormsReset200Response/properties/fields/items/anyOf/0/properties/origin"
                     },
-                    "flags": {
-                      "$ref": "#/components/schemas/DocFormsReset200Response/properties/fields/items/anyOf/0/properties/flags"
+                    "readOnly": {
+                      "$ref": "#/components/schemas/DocFormsReset200Response/properties/fields/items/anyOf/0/properties/readOnly"
+                    },
+                    "required": {
+                      "$ref": "#/components/schemas/DocFormsReset200Response/properties/fields/items/anyOf/0/properties/required"
+                    },
+                    "noExport": {
+                      "$ref": "#/components/schemas/DocFormsReset200Response/properties/fields/items/anyOf/0/properties/noExport"
                     },
                     "alternateName": {
                       "$ref": "#/components/schemas/DocFormsReset200Response/properties/fields/items/anyOf/0/properties/alternateName"
@@ -22124,7 +22247,9 @@
                     "fieldObjectNumber",
                     "name",
                     "origin",
-                    "flags",
+                    "readOnly",
+                    "required",
+                    "noExport",
                     "alternateName",
                     "mappingName",
                     "valueEntry",
@@ -22149,8 +22274,14 @@
                     "origin": {
                       "$ref": "#/components/schemas/DocFormsReset200Response/properties/fields/items/anyOf/0/properties/origin"
                     },
-                    "flags": {
-                      "$ref": "#/components/schemas/DocFormsReset200Response/properties/fields/items/anyOf/0/properties/flags"
+                    "readOnly": {
+                      "$ref": "#/components/schemas/DocFormsReset200Response/properties/fields/items/anyOf/0/properties/readOnly"
+                    },
+                    "required": {
+                      "$ref": "#/components/schemas/DocFormsReset200Response/properties/fields/items/anyOf/0/properties/required"
+                    },
+                    "noExport": {
+                      "$ref": "#/components/schemas/DocFormsReset200Response/properties/fields/items/anyOf/0/properties/noExport"
                     },
                     "alternateName": {
                       "$ref": "#/components/schemas/DocFormsReset200Response/properties/fields/items/anyOf/0/properties/alternateName"
@@ -22180,7 +22311,9 @@
                     "fieldObjectNumber",
                     "name",
                     "origin",
-                    "flags",
+                    "readOnly",
+                    "required",
+                    "noExport",
                     "alternateName",
                     "mappingName",
                     "valueEntry",
@@ -22205,8 +22338,14 @@
                     "origin": {
                       "$ref": "#/components/schemas/DocFormsReset200Response/properties/fields/items/anyOf/0/properties/origin"
                     },
-                    "flags": {
-                      "$ref": "#/components/schemas/DocFormsReset200Response/properties/fields/items/anyOf/0/properties/flags"
+                    "readOnly": {
+                      "$ref": "#/components/schemas/DocFormsReset200Response/properties/fields/items/anyOf/0/properties/readOnly"
+                    },
+                    "required": {
+                      "$ref": "#/components/schemas/DocFormsReset200Response/properties/fields/items/anyOf/0/properties/required"
+                    },
+                    "noExport": {
+                      "$ref": "#/components/schemas/DocFormsReset200Response/properties/fields/items/anyOf/0/properties/noExport"
                     },
                     "alternateName": {
                       "$ref": "#/components/schemas/DocFormsReset200Response/properties/fields/items/anyOf/0/properties/alternateName"
@@ -22239,7 +22378,9 @@
                     "fieldObjectNumber",
                     "name",
                     "origin",
-                    "flags",
+                    "readOnly",
+                    "required",
+                    "noExport",
                     "alternateName",
                     "mappingName",
                     "valueEntry",
@@ -22586,25 +22727,14 @@
                           "type": "string",
                           "enum": ["acroform", "recovered"]
                         },
-                        "flags": {
-                          "type": "object",
-                          "properties": {
-                            "readOnly": {
-                              "type": "boolean"
-                            },
-                            "required": {
-                              "type": "boolean"
-                            },
-                            "noExport": {
-                              "type": "boolean"
-                            },
-                            "raw": {
-                              "type": "integer",
-                              "minimum": 0
-                            }
-                          },
-                          "required": ["readOnly", "required", "noExport", "raw"],
-                          "additionalProperties": false
+                        "readOnly": {
+                          "type": "boolean"
+                        },
+                        "required": {
+                          "type": "boolean"
+                        },
+                        "noExport": {
+                          "type": "boolean"
                         },
                         "alternateName": {
                           "type": "string",
@@ -22841,7 +22971,9 @@
                         "fieldObjectNumber",
                         "name",
                         "origin",
-                        "flags",
+                        "readOnly",
+                        "required",
+                        "noExport",
                         "alternateName",
                         "mappingName",
                         "valueEntry",
@@ -22872,8 +23004,14 @@
                         "origin": {
                           "$ref": "#/components/schemas/DocFormsImportData200Response/properties/form/properties/fields/items/anyOf/0/properties/origin"
                         },
-                        "flags": {
-                          "$ref": "#/components/schemas/DocFormsImportData200Response/properties/form/properties/fields/items/anyOf/0/properties/flags"
+                        "readOnly": {
+                          "$ref": "#/components/schemas/DocFormsImportData200Response/properties/form/properties/fields/items/anyOf/0/properties/readOnly"
+                        },
+                        "required": {
+                          "$ref": "#/components/schemas/DocFormsImportData200Response/properties/form/properties/fields/items/anyOf/0/properties/required"
+                        },
+                        "noExport": {
+                          "$ref": "#/components/schemas/DocFormsImportData200Response/properties/form/properties/fields/items/anyOf/0/properties/noExport"
                         },
                         "alternateName": {
                           "$ref": "#/components/schemas/DocFormsImportData200Response/properties/form/properties/fields/items/anyOf/0/properties/alternateName"
@@ -22945,7 +23083,9 @@
                         "fieldObjectNumber",
                         "name",
                         "origin",
-                        "flags",
+                        "readOnly",
+                        "required",
+                        "noExport",
                         "alternateName",
                         "mappingName",
                         "valueEntry",
@@ -22972,8 +23112,14 @@
                         "origin": {
                           "$ref": "#/components/schemas/DocFormsImportData200Response/properties/form/properties/fields/items/anyOf/0/properties/origin"
                         },
-                        "flags": {
-                          "$ref": "#/components/schemas/DocFormsImportData200Response/properties/form/properties/fields/items/anyOf/0/properties/flags"
+                        "readOnly": {
+                          "$ref": "#/components/schemas/DocFormsImportData200Response/properties/form/properties/fields/items/anyOf/0/properties/readOnly"
+                        },
+                        "required": {
+                          "$ref": "#/components/schemas/DocFormsImportData200Response/properties/form/properties/fields/items/anyOf/0/properties/required"
+                        },
+                        "noExport": {
+                          "$ref": "#/components/schemas/DocFormsImportData200Response/properties/form/properties/fields/items/anyOf/0/properties/noExport"
                         },
                         "alternateName": {
                           "$ref": "#/components/schemas/DocFormsImportData200Response/properties/form/properties/fields/items/anyOf/0/properties/alternateName"
@@ -23015,7 +23161,9 @@
                         "fieldObjectNumber",
                         "name",
                         "origin",
-                        "flags",
+                        "readOnly",
+                        "required",
+                        "noExport",
                         "alternateName",
                         "mappingName",
                         "valueEntry",
@@ -23043,8 +23191,14 @@
                         "origin": {
                           "$ref": "#/components/schemas/DocFormsImportData200Response/properties/form/properties/fields/items/anyOf/0/properties/origin"
                         },
-                        "flags": {
-                          "$ref": "#/components/schemas/DocFormsImportData200Response/properties/form/properties/fields/items/anyOf/0/properties/flags"
+                        "readOnly": {
+                          "$ref": "#/components/schemas/DocFormsImportData200Response/properties/form/properties/fields/items/anyOf/0/properties/readOnly"
+                        },
+                        "required": {
+                          "$ref": "#/components/schemas/DocFormsImportData200Response/properties/form/properties/fields/items/anyOf/0/properties/required"
+                        },
+                        "noExport": {
+                          "$ref": "#/components/schemas/DocFormsImportData200Response/properties/form/properties/fields/items/anyOf/0/properties/noExport"
                         },
                         "alternateName": {
                           "$ref": "#/components/schemas/DocFormsImportData200Response/properties/form/properties/fields/items/anyOf/0/properties/alternateName"
@@ -23102,7 +23256,9 @@
                         "fieldObjectNumber",
                         "name",
                         "origin",
-                        "flags",
+                        "readOnly",
+                        "required",
+                        "noExport",
                         "alternateName",
                         "mappingName",
                         "valueEntry",
@@ -23131,8 +23287,14 @@
                         "origin": {
                           "$ref": "#/components/schemas/DocFormsImportData200Response/properties/form/properties/fields/items/anyOf/0/properties/origin"
                         },
-                        "flags": {
-                          "$ref": "#/components/schemas/DocFormsImportData200Response/properties/form/properties/fields/items/anyOf/0/properties/flags"
+                        "readOnly": {
+                          "$ref": "#/components/schemas/DocFormsImportData200Response/properties/form/properties/fields/items/anyOf/0/properties/readOnly"
+                        },
+                        "required": {
+                          "$ref": "#/components/schemas/DocFormsImportData200Response/properties/form/properties/fields/items/anyOf/0/properties/required"
+                        },
+                        "noExport": {
+                          "$ref": "#/components/schemas/DocFormsImportData200Response/properties/form/properties/fields/items/anyOf/0/properties/noExport"
                         },
                         "alternateName": {
                           "$ref": "#/components/schemas/DocFormsImportData200Response/properties/form/properties/fields/items/anyOf/0/properties/alternateName"
@@ -23183,7 +23345,9 @@
                         "fieldObjectNumber",
                         "name",
                         "origin",
-                        "flags",
+                        "readOnly",
+                        "required",
+                        "noExport",
                         "alternateName",
                         "mappingName",
                         "valueEntry",
@@ -23212,8 +23376,14 @@
                         "origin": {
                           "$ref": "#/components/schemas/DocFormsImportData200Response/properties/form/properties/fields/items/anyOf/0/properties/origin"
                         },
-                        "flags": {
-                          "$ref": "#/components/schemas/DocFormsImportData200Response/properties/form/properties/fields/items/anyOf/0/properties/flags"
+                        "readOnly": {
+                          "$ref": "#/components/schemas/DocFormsImportData200Response/properties/form/properties/fields/items/anyOf/0/properties/readOnly"
+                        },
+                        "required": {
+                          "$ref": "#/components/schemas/DocFormsImportData200Response/properties/form/properties/fields/items/anyOf/0/properties/required"
+                        },
+                        "noExport": {
+                          "$ref": "#/components/schemas/DocFormsImportData200Response/properties/form/properties/fields/items/anyOf/0/properties/noExport"
                         },
                         "alternateName": {
                           "$ref": "#/components/schemas/DocFormsImportData200Response/properties/form/properties/fields/items/anyOf/0/properties/alternateName"
@@ -23243,7 +23413,9 @@
                         "fieldObjectNumber",
                         "name",
                         "origin",
-                        "flags",
+                        "readOnly",
+                        "required",
+                        "noExport",
                         "alternateName",
                         "mappingName",
                         "valueEntry",
@@ -23268,8 +23440,14 @@
                         "origin": {
                           "$ref": "#/components/schemas/DocFormsImportData200Response/properties/form/properties/fields/items/anyOf/0/properties/origin"
                         },
-                        "flags": {
-                          "$ref": "#/components/schemas/DocFormsImportData200Response/properties/form/properties/fields/items/anyOf/0/properties/flags"
+                        "readOnly": {
+                          "$ref": "#/components/schemas/DocFormsImportData200Response/properties/form/properties/fields/items/anyOf/0/properties/readOnly"
+                        },
+                        "required": {
+                          "$ref": "#/components/schemas/DocFormsImportData200Response/properties/form/properties/fields/items/anyOf/0/properties/required"
+                        },
+                        "noExport": {
+                          "$ref": "#/components/schemas/DocFormsImportData200Response/properties/form/properties/fields/items/anyOf/0/properties/noExport"
                         },
                         "alternateName": {
                           "$ref": "#/components/schemas/DocFormsImportData200Response/properties/form/properties/fields/items/anyOf/0/properties/alternateName"
@@ -23299,7 +23477,9 @@
                         "fieldObjectNumber",
                         "name",
                         "origin",
-                        "flags",
+                        "readOnly",
+                        "required",
+                        "noExport",
                         "alternateName",
                         "mappingName",
                         "valueEntry",
@@ -23324,8 +23504,14 @@
                         "origin": {
                           "$ref": "#/components/schemas/DocFormsImportData200Response/properties/form/properties/fields/items/anyOf/0/properties/origin"
                         },
-                        "flags": {
-                          "$ref": "#/components/schemas/DocFormsImportData200Response/properties/form/properties/fields/items/anyOf/0/properties/flags"
+                        "readOnly": {
+                          "$ref": "#/components/schemas/DocFormsImportData200Response/properties/form/properties/fields/items/anyOf/0/properties/readOnly"
+                        },
+                        "required": {
+                          "$ref": "#/components/schemas/DocFormsImportData200Response/properties/form/properties/fields/items/anyOf/0/properties/required"
+                        },
+                        "noExport": {
+                          "$ref": "#/components/schemas/DocFormsImportData200Response/properties/form/properties/fields/items/anyOf/0/properties/noExport"
                         },
                         "alternateName": {
                           "$ref": "#/components/schemas/DocFormsImportData200Response/properties/form/properties/fields/items/anyOf/0/properties/alternateName"
@@ -23358,7 +23544,9 @@
                         "fieldObjectNumber",
                         "name",
                         "origin",
-                        "flags",
+                        "readOnly",
+                        "required",
+                        "noExport",
                         "alternateName",
                         "mappingName",
                         "valueEntry",

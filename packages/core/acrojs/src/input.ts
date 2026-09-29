@@ -36,8 +36,8 @@ export function scriptFieldsFromSnapshot(snapshot: FormSnapshot): ScriptFieldInp
     // Form DTOs do not yet aggregate widget visibility; annotation joins may
     // override this when the orchestrator has that plane loaded.
     display: 'visible',
-    readOnly: field.flags.readOnly,
-    required: field.flags.required,
+    readOnly: field.readOnly,
+    required: field.required,
     ...('options' in field
       ? { options: field.options.map((option) => ({ label: option.label, value: option.value })) }
       : {}),

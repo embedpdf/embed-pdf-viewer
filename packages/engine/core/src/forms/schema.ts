@@ -6,20 +6,9 @@ import { z } from 'zod';
 import { WIDGET_STYLE_SHAPE, WidgetAppearanceSchema } from '../annotation/kinds/widget.shared';
 import { PageBoxSchema } from '../geometry/schemas';
 import type { FormWidget } from '../identity/FormFieldRef';
-import type {
-  FormFieldDraft,
-  FormFieldFlagsInput,
-  FormFieldOptionInput,
-  WidgetPlacement,
-} from './draft';
+import type { FormFieldDraft, FormFieldOptionInput, WidgetPlacement } from './draft';
 import type { FormFieldPatch } from './patch';
-import type {
-  FormFieldDTO,
-  FormFieldFlags,
-  FormFieldOption,
-  FormFieldWidget,
-  ToggleFieldWidget,
-} from './field';
+import type { FormFieldDTO, FormFieldOption, FormFieldWidget, ToggleFieldWidget } from './field';
 import type { FormKind, FormSnapshot } from './snapshot';
 import type { FormDataFormat, FormFieldValue } from './value';
 import type { FormValueEntry } from './value-entry';
@@ -44,13 +33,6 @@ const FormFieldWidgetShape = {
 };
 
 export const FormFieldWidgetSchema: z.ZodType<FormFieldWidget> = z.object(FormFieldWidgetShape);
-
-export const FormFieldFlagsSchema: z.ZodType<FormFieldFlags> = z.object({
-  readOnly: z.boolean(),
-  required: z.boolean(),
-  noExport: z.boolean(),
-  raw: z.number().int().nonnegative(),
-});
 
 export const ToggleFieldWidgetSchema: z.ZodType<ToggleFieldWidget> = z.object({
   ...FormFieldWidgetShape,
@@ -77,7 +59,9 @@ const FormFieldBaseShape = {
   fieldObjectNumber: z.number().int().nonnegative(),
   name: z.string(),
   origin: z.enum(['acroform', 'recovered']),
-  flags: FormFieldFlagsSchema,
+  readOnly: z.boolean(),
+  required: z.boolean(),
+  noExport: z.boolean(),
   alternateName: z.string().nullable(),
   mappingName: z.string().nullable(),
   valueEntry: FormValueEntrySchema,
@@ -171,16 +155,6 @@ export const WidgetPlacementSchema: z.ZodType<WidgetPlacement> = z
   })
   .strict() as unknown as z.ZodType<WidgetPlacement>;
 
-/** A read's `flags` sent back carry `raw`: taken, and ignored. */
-export const FormFieldFlagsInputSchema: z.ZodType<FormFieldFlagsInput> = z
-  .object({
-    readOnly: z.boolean().optional(),
-    required: z.boolean().optional(),
-    noExport: z.boolean().optional(),
-    raw: z.number().optional(),
-  })
-  .strict();
-
 export const FormFieldOptionInputSchema: z.ZodType<FormFieldOptionInput> = z.object({
   label: z.string(),
   value: z.string(),
@@ -188,7 +162,9 @@ export const FormFieldOptionInputSchema: z.ZodType<FormFieldOptionInput> = z.obj
 
 const FormFieldDraftBaseShape = {
   name: z.string().min(1),
-  flags: FormFieldFlagsInputSchema.optional(),
+  readOnly: z.boolean().optional(),
+  required: z.boolean().optional(),
+  noExport: z.boolean().optional(),
   alternateName: z.string().optional(),
   mappingName: z.string().optional(),
   widgets: z.array(WidgetPlacementSchema).optional(),
@@ -239,7 +215,9 @@ export const FormFieldDraftSchema: z.ZodType<FormFieldDraft> = z.discriminatedUn
 
 const FormFieldPatchBaseShape = {
   name: z.string().min(1).optional(),
-  flags: FormFieldFlagsInputSchema.optional(),
+  readOnly: z.boolean().optional(),
+  required: z.boolean().optional(),
+  noExport: z.boolean().optional(),
   alternateName: z.string().nullable().optional(),
   mappingName: z.string().nullable().optional(),
 };
