@@ -23,7 +23,7 @@ export type { LineEnding, LineEndings };
 
 export type { Point } from '@embedpdf/core-geometry';
 export type Rect = GeometryRect;
-/** Four positional content-space points — selection chrome / OBB corners.
+/** Four positional page-space points — selection chrome / OBB corners.
  *  Text-markup geometry uses the corner-named {@link TextQuad} instead. */
 export type Quad = [Point, Point, Point, Point];
 
@@ -79,7 +79,7 @@ export type Subtype =
   | (string & {});
 
 /**
- * Content-space geometry — the one thing hit-testing, editing, and rendering work
+ * Page-space geometry — the one thing hit-testing, editing, and rendering work
  * on. A small closed union covers every kind: shapes (rect/ellipse), line,
  * polygon/polyline (poly), text markup (quads), and caret.
  */
@@ -88,7 +88,7 @@ export type Subtype =
  * called-out point (the arrow is drawn here); `knee` is the optional elbow. The
  * point where the leader meets the text box (the third `/CL` point) is never
  * stored — it is derived from the box + the knee (see `calloutConnection`), so it
- * can't drift when the box or knee moves. Content space (y-down).
+ * can't drift when the box or knee moves. Page space (y-down).
  */
 export interface Callout {
   tip: Point;
@@ -97,8 +97,8 @@ export interface Callout {
 }
 
 /**
- * Rotation (degrees, clockwise in content space, normalized `[0,360)`) carried by
- * the rotatable `ContentGeometry` variants. The semantics differ by family, which is exactly
+ * Rotation (degrees, clockwise in page space, normalized `[0,360)`) carried by
+ * the rotatable `ModelGeometry` variants. The semantics differ by family, which is exactly
  * the box-vs-vertex split:
  *
  * - **Box** (`rect`, `text`): `rect` is the unrotated local box and `rot` is the
@@ -112,7 +112,7 @@ export interface Callout {
  *   selection box (`obbFromTheta`) and offer reset-to-0; it is inert for
  *   rendering (PDFium ignores a lone `Rotation` with no `UnrotatedRect`).
  */
-export type ContentGeometry =
+export type ModelGeometry =
   | { kind: 'rect'; rect: Rect; ellipse: boolean; rot?: number } // square / circle (rect = unrotated box)
   | { kind: 'line'; a: Point; b: Point; ends?: LineEndings; rot?: number } // line (points pre-rotated; rot advisory)
   | { kind: 'poly'; points: Point[]; closed: boolean; ends?: LineEndings; rot?: number } // polygon/polyline (pre-rotated; rot advisory)
@@ -151,7 +151,7 @@ export interface Style {
 export type TextAlign = 'left' | 'center' | 'right';
 
 /**
- * Content-space text styling for a text-editable kind (free text) — the text
+ * Page-space text styling for a text-editable kind (free text) — the text
  * counterpart of {@link Style}, projected from the DTO's `/DA` fields the same
  * way `style` is projected from `/C`/`/CA`/`/BS`. CSS colour string; the engine
  * `Color` seam is crossed only in the plugin repository.
@@ -232,10 +232,10 @@ export interface ModelAnnotation {
    *  `page.pageObjectNumber`; the address itself is what callers pass around. */
   page: PageRef;
   subtype: Subtype;
-  geometry: ContentGeometry;
+  geometry: ModelGeometry;
   style: Style;
   /** Text styling — present only for text-editable kinds (free text). Like
-   *  `style`, a content-space projection of `data`, editable via `setProps`. */
+   *  `style`, a page-space projection of `data`, editable via `setProps`. */
   text?: TextStyle;
   /** Redaction label (`/OverlayText` + `/Repeat`) — redact kind only. A
    *  projection of `data` like `text`; the hover preview scene draws it. */
@@ -261,7 +261,7 @@ export interface ModelAnnotation {
    */
   source: 'baked' | 'vector';
   /**
-   * Content-space box of the engine appearance raster (the AP `/Rect`), set when
+   * Page-space box of the engine appearance raster (the AP `/Rect`), set when
    * the annotation is derived from a DTO. While `source === 'baked'` the renderer
    * blits the engine bitmap into this box; a move translates it (a rigid shift
    * keeps the raster valid), so the bitmap rides along without re-rendering.
@@ -299,7 +299,7 @@ export interface ModelAnnotation {
   /**
    * The canonical engine DTO this annotation was derived from (PDF-space, sRGB)
    * — the single source of truth for its data. `geom` and `style` are
-   * content-space render projections of it, recomputed (never edited directly)
+   * page-space render projections of it, recomputed (never edited directly)
    * whenever `data` changes, so the two can't drift. Absent only for a record
    * this session created that the engine has not confirmed yet (no DTO exists).
    */
@@ -470,8 +470,8 @@ export type Draft =
       kind: 'handle';
       id: Id;
       handle: string;
-      base: ContentGeometry;
-      current: ContentGeometry;
+      base: ModelGeometry;
+      current: ModelGeometry;
       view?: ViewEnv;
     }
   // Rotate gesture (single or multi-target). `pivot` is the rotation centre
@@ -612,7 +612,7 @@ export interface ChromeGeometry {
 }
 
 export interface PointerInput {
-  /** The page the sample resolved against (its own content-space frame). */
+  /** The page the sample resolved against (its own page-space frame). */
   page: PageRef;
   point: Point;
   shift: boolean;
@@ -636,7 +636,7 @@ export interface PointerInput {
    * captures it on the draft (an `upright` commit counter-rotates against how
    * the page was displayed); edit gestures read it per sample, paired with
    * `scale`, so screen-anchored (`noZoom`/`noRotate`) annotations hit-test and
-   * clamp at their effective geometry. Content space itself never rotates.
+   * clamp at their effective geometry. Page space itself never rotates.
    */
   displayRotation?: PageRotation;
   /**
@@ -717,7 +717,7 @@ export type Message =
       type: 'createAnnot';
       page: PageRef;
       subtype: Subtype;
-      geometry: ContentGeometry;
+      geometry: ModelGeometry;
       preset?: string;
       props?: AnnotationPropsPatch;
       flags?: Partial<AnnotationFlags>;
@@ -806,7 +806,7 @@ export type Message =
   | { type: 'endTextEdit' };
 
 export type Effect =
-  | { type: 'captured'; tool: string; page: PageRef; geometry: ContentGeometry }
+  | { type: 'captured'; tool: string; page: PageRef; geometry: ModelGeometry }
   | { type: 'create'; id: Id }
   | { type: 'createGroup'; primary: Id; members: Id[] }
   /** Write the part of one record that `scope` names. Whether the engine's
@@ -835,16 +835,16 @@ export interface RenderItem {
   id: Id;
   ref: AnnotationRef | null;
   subtype: Subtype;
-  geometry: ContentGeometry;
+  geometry: ModelGeometry;
   /**
-   * The visual box (geometry + stroke + line endings) in content space — the same
+   * The visual box (geometry + stroke + line endings) in page space — the same
    * `geomVisualBounds` that feeds the engine `/Rect`. The renderer paints into this
    * box and does no bounds math of its own, so the on-screen box and the baked
    * appearance can never drift (the patch computes the rect).
    */
   box: Rect;
   /**
-   * Content-space box the engine appearance raster occupies (the AP `/Rect`),
+   * Page-space box the engine appearance raster occupies (the AP `/Rect`),
    * with the live move gesture applied — so a baked annotation's bitmap follows
    * a drag. Only meaningful when `source === 'baked'`; absent otherwise.
    */
@@ -884,7 +884,7 @@ export interface RenderItem {
   blend?: Exclude<BlendMode, 'normal'>;
 }
 
-/** The dumb draw vocabulary the framework renderer maps to SVG (content space).
+/** The dumb draw vocabulary the framework renderer maps to SVG (page space).
  *  A closed node (rect, ellipse, closed poly) takes the annotation's fill colour;
  *  an open node (line, open poly — open arrows, butt, slash) is stroke-only. The
  *  stroke colour applies to every node. Closed-ness is the only fill signal. */
@@ -893,7 +893,7 @@ export type RenderNode =
   | { kind: 'ellipse'; rect: Rect }
   | { kind: 'line'; a: Point; b: Point }
   | { kind: 'poly'; points: Point[]; closed: boolean }
-  // a precomputed closed path (cloudy border) — `d` is SVG data in content space
+  // a precomputed closed path (cloudy border) — `d` is SVG data in page space
   | { kind: 'path'; d: string };
 
 /**
@@ -961,7 +961,7 @@ export type ChromeNode =
   // A live alignment guide (see `Guide`) — drawn while a snapped move is active.
   | { kind: 'guide'; axis: 'x' | 'y'; at: number; lo: number; hi: number }
   // The live rotation readout while a rotate gesture is active: `at` is the
-  // pointer (content space), `angle` the selection's absolute angle (deg, CW).
+  // pointer (page space), `angle` the selection's absolute angle (deg, CW).
   | { kind: 'angle-chip'; at: Point; angle: number }
   // Rotation guides while a rotate gesture is active: finished line segments —
   // chords of the page through the pivot — so painters just draw. Two `axis`

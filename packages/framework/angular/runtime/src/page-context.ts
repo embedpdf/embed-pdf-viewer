@@ -12,7 +12,7 @@
  * Never rebuild the context or the injector per frame.
  *
  * Coordinate math lives in `@embedpdf/core-geometry`'s `PageTransform` — verified
- * once, not re-derived per framework adapter (`toContentPoint` mirrors React's
+ * once, not re-derived per framework adapter (`toPagePoint` mirrors React's
  * `makePageContext` exactly).
  */
 import { InjectionToken, inject, type Signal } from '@angular/core';
@@ -32,10 +32,10 @@ export interface EpdfPageContext {
    *  page. Layers do all coordinate work through it — never re-derive
    *  `x * scale` or `* dpr`. Updates per camera frame. */
   readonly transform: Signal<PageTransform>;
-  /** Client (screen) point → the viewer's coordinates (content point) — the
+  /** Client (screen) point → the viewer's coordinates (page point) — the
    *  one platform-bound hit-test. */
-  toContentPoint(clientX: number, clientY: number): Point;
-  /** Content point → client (screen) px — the exact inverse of `toContentPoint`. */
+  toPagePoint(clientX: number, clientY: number): Point;
+  /** Content point → client (screen) px — the exact inverse of `toPagePoint`. */
   toClientPoint(point: Point): Point;
   /** Content rect → client (screen) px AABB. */
   toClientRect(rect: Rect): Rect;
@@ -73,22 +73,22 @@ export function createPageContext(parts: {
     pageIndex: parts.pageIndex,
     frame: parts.frame,
     transform,
-    toContentPoint: (clientX, clientY) => {
+    toPagePoint: (clientX, clientY) => {
       // Client → box-local view px, then invert rotation + scale via the
       // transform (verified once in geometry, not re-derived per adapter).
       const rect = getRect();
-      return transform().viewToContent({ x: clientX - rect.left, y: clientY - rect.top });
+      return transform().viewToPage({ x: clientX - rect.left, y: clientY - rect.top });
     },
     toClientPoint: (point) => {
-      // Exact inverse of `toContentPoint`, offset by the same live display-box
+      // Exact inverse of `toPagePoint`, offset by the same live display-box
       // origin — the two can never drift.
       const rect = getRect();
-      const viewPoint = transform().contentToView(point);
+      const viewPoint = transform().pageToView(point);
       return { x: rect.left + viewPoint.x, y: rect.top + viewPoint.y };
     },
     toClientRect: (rect) => {
       const elementRect = getRect();
-      const viewRect = transform().contentToViewRect(rect);
+      const viewRect = transform().pageToViewRect(rect);
       return {
         x: elementRect.left + viewRect.x,
         y: elementRect.top + viewRect.y,

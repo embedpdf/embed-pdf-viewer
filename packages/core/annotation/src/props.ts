@@ -12,7 +12,7 @@ import type {
   ModelAnnotation,
   AnnotationProps,
   AnnotationPropsPatch,
-  ContentGeometry,
+  ModelGeometry,
   LineEndings,
   PropKey,
   Style,
@@ -57,8 +57,8 @@ export const kindTakesLink = (subtype: string): boolean =>
 
 /** A geom that carries `/LE` endings: a line, or an open poly (polyline). */
 const endingsGeom = (
-  geometry: ContentGeometry,
-): geometry is Extract<ContentGeometry, { kind: 'line' } | { kind: 'poly' }> =>
+  geometry: ModelGeometry,
+): geometry is Extract<ModelGeometry, { kind: 'line' } | { kind: 'poly' }> =>
   geometry.kind === 'line' || (geometry.kind === 'poly' && !geometry.closed);
 
 /**

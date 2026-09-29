@@ -9,7 +9,7 @@ import { PluginError, pageRefsEqual, type BatchResult } from '@embedpdf/core';
 import {
   FLAG_KEYS,
   applyProps,
-  type ContentGeometry,
+  type ModelGeometry,
   type ModelAnnotation,
   type Subtype,
 } from '@embedpdf/core-annotation';
@@ -122,7 +122,7 @@ export function createCrud(
         `page ${input.page.pageObjectNumber} is not in this document`,
       );
     }
-    const staged: { subtype: Subtype; geometry: ContentGeometry } = geometryFromInput(input);
+    const staged: { subtype: Subtype; geometry: ModelGeometry } = geometryFromInput(input);
     const tool = input.tool ? tools.get(input.tool) : undefined;
     if (input.tool && !tool) {
       throw new PluginError('not-found', 'annotation', `unknown tool '${input.tool}'`);

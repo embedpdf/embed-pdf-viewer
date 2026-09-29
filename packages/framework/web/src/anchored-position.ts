@@ -51,8 +51,8 @@ export interface AnchoredPosition {
  * mid-height for a `top` placement) the edge is untouched and the element
  * stays centred on `box`.
  */
-/** What anchored UI attaches to: a content-space rect on a page, plus
- *  optional content-space points the UI must clear (e.g. a rotate knob).
+/** What anchored UI attaches to: a page-space rect on a page, plus
+ *  optional page-space points the UI must clear (e.g. a rotate knob).
  *  Structural — plugin anchor reads satisfy it without importing this
  *  package. */
 export interface AnchorTarget {
@@ -62,7 +62,7 @@ export interface AnchorTarget {
 }
 
 /**
- * A page surface's projection snapshot: how a content-space rect on a page
+ * A page surface's projection snapshot: how a page-space rect on a page
  * becomes screen coordinates, right now. Provided by `<Stage>`
  * (camera-driven, pure state, no DOM reads) and `<PageView>` (DOM-measured).
  * Deliberately no subscribe here — when projection changes is a framework
@@ -78,7 +78,7 @@ export interface ViewProjector {
    *     position:fixed, so no ancestor overflow can clip. (PageView)
    */
   space: 'overlay' | 'client';
-  /** Content-space rect on a page → coords in `space`. Null: not projectable
+  /** Page-space rect on a page → coords in `space`. Null: not projectable
    *  right now (page not shown / not measurable yet). */
   toScreen(page: PageRef, rect: AnchoredRect): AnchoredRect | null;
   toScreenPoint(page: PageRef, at: AnchoredPoint): AnchoredPoint | null;

@@ -7,7 +7,7 @@ import {
   FLAG_KEYS,
   type AnnotationPropsPatch,
   type Border,
-  type ContentGeometry,
+  type ModelGeometry,
   type Rect,
   type Style,
 } from '@embedpdf/core-annotation';
@@ -66,7 +66,7 @@ export function boxGeomFields(rect: Rect, rot: number): { box: PageBox; rotation
 export function boxGeomFromDTO(
   dto: { box: PageBox; rotation: number | null },
   ellipse: boolean,
-): ContentGeometry {
+): ModelGeometry {
   const rot = dto.rotation ?? 0;
   return { kind: 'rect', rect: dto.box, ellipse, ...(rot ? { rot } : {}) };
 }
@@ -98,7 +98,7 @@ export const TEXT_MARKUP = new Set(['highlight', 'underline', 'squiggly', 'strik
 // here too (it has a stroke but no `/IC`, so its interiorColor reads back null).
 const STROKE_KINDS = new Set(['square', 'circle', 'line', 'polygon', 'polyline', 'ink']);
 
-/** Engine DTO → content-space `Style` (CSS colours, `Border` union). Exported so
+/** Engine DTO → page-space `Style` (CSS colours, `Border` union). Exported so
  *  selection-aware UIs can read display values straight off a {@link AnnotationDTO}
  *  without re-deriving the colour/border mapping. */
 export function styleFromDTO(dto: AnnotationDTO): Style {

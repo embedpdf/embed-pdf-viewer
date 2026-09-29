@@ -2,7 +2,7 @@
  * The React surface for @embedpdf/plugin-selection.
  *
  * <SelectionLayer> is a dumb renderer: it warms the page's geometry on mount,
- * reads the content-space highlight rects from the capability, and paints them —
+ * reads the page-space highlight rects from the capability, and paints them —
  * mapping each rect through PageContext.toPixels (the same path markers use).
  * Zero pointer handling here; that's the PagePointerSource + the hub.
  *
@@ -91,7 +91,7 @@ export function SelectionLayer({ color = 'rgba(33, 150, 243, 0.35)' }: Selection
       }}
     >
       {segments.map((segment, i) => {
-        // content space → un-rotated content view px (rides the page's CSS
+        // page space → un-rotated content view px (rides the page's CSS
         // rotation). An affine map, so mapping the four corners is exact —
         // upright segments render pixel-identical to the old div-per-rect.
         const ring = [

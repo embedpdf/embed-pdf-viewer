@@ -2,7 +2,7 @@
  * @embedpdf/core-geometry — the viewer's pure 2D coordinate primitives.
  *
  * The bottom of the pyramid: stage-core (layout), plugin-stage (`pageToWorld`),
- * and every framework adapter (`toContentPoint` hit-testing) all sit on these.
+ * and every framework adapter (`toPagePoint` hit-testing) all sit on these.
  * Zero dependencies, DOM-free, serializable — Rust-portable.
  *
  * The page-rotation transforms are the reason this package exists: the same
@@ -162,10 +162,10 @@ export function deviceHeightForWidth(pageSize: Size, deviceWidth: number): numbe
 
 /**
  * The single per-page bridge between the viewer's three coordinate spaces, all
- * top-left origin, y-down. Content space is the engine's page space, so
- * engine values need no hop of their own.
+ * top-left origin, y-down. Page space is the engine's own, so engine values
+ * need no hop of their own.
  *
- *   content space  page-local points, top-left, y-down — un-rotated page frame
+ *   page space     page-local points, top-left, y-down — un-rotated page frame
  *   view space     platform logical px (web: CSS px) — layout, DOM, pointer events
  *   device space   physical pixels — the rendered bitmap
  *
@@ -193,7 +193,7 @@ export interface PageTransform {
   readonly viewWidth: number;
   readonly viewHeight: number;
   /** The un-rotated content box in view px — the size of the wrapper the bitmap
-   *  and content-space overlays live in (before the wrapper's CSS rotation). */
+   *  and page-space overlays live in (before the wrapper's CSS rotation). */
   readonly contentWidth: number;
   readonly contentHeight: number;
   /** Render the (un-rotated) bitmap at exactly this — `viewport: {kind:'width', width: deviceWidth}`.
@@ -221,27 +221,27 @@ export interface PageTransform {
   /**
    * Content point → this page's pixels (the un-rotated content wrapper's local
    * px). The overlay author's converter: elements inside the wrapper ride its
-   * rotation, so they place in content points and only scale here. Convert at
+   * rotation, so they place in page points and only scale here. Convert at
    * the last moment — pixels are never stored.
    */
   toPixels(point: Point): Point;
-  /** Inverse of {@link toPixels}: wrapper-local px → content point (a pointer
+  /** Inverse of {@link toPixels}: wrapper-local px → page point (a pointer
    *  event inside the wrapper back to the viewer's coordinates). */
   fromPixels(point: Point): Point;
   /** Content point → page-local view px in the display box (rotation applied). For
    *  footprint-space layers (outside the wrapper). */
-  contentToView(point: Point): Point;
+  pageToView(point: Point): Point;
   /** Content rect → its axis-aligned view-px rect (exact for quarter-turns). */
-  contentToViewRect(rect: Rect): Rect;
-  /** Inverse — display-box view px (box-local) → content point. Hit-testing. */
-  viewToContent(point: Point): Point;
-  /** Inverse of {@link contentToViewRect}: display-box view-px rect → its content
+  pageToViewRect(rect: Rect): Rect;
+  /** Inverse — display-box view px (box-local) → page point. Hit-testing. */
+  viewToPage(point: Point): Point;
+  /** Inverse of {@link pageToViewRect}: display-box view-px rect → its content
    *  AABB (exact for quarter-turns). The visibility primitive — projecting a
    *  viewport rect into page points is this, never per-adapter corner math. */
-  viewToContentRect(rect: Rect): Rect;
-  /** CSS `matrix()` mapping content space → this page's display box. Drop it on
+  viewToPageRect(rect: Rect): Rect;
+  /** CSS `matrix()` mapping page space → this page's display box. Drop it on
    *  a footprint-space layer (`transform`, `transform-origin: 0 0`) and place
-   *  children in content points — rotation + scale handled for free. */
+   *  children in page points — rotation + scale handled for free. */
   readonly cssMatrix: string;
 }
 
@@ -278,7 +278,7 @@ export function pageTransform(input: {
 
   // The un-rotated content box in view px, taken from the snapped device dims so
   // every edge lands on a whole device pixel. The effective view scale is derived
-  // from it (not the raw `scale`) so `contentToView(pageWidth) === content edge`.
+  // from it (not the raw `scale`) so `pageToView(pageWidth) === content edge`.
   const content: Size = { width: deviceWidth / dpr, height: deviceHeight / dpr };
   const viewScale = content.width / pageSize.width;
   const baseScale = input.baseScale ?? scale;
@@ -289,9 +289,9 @@ export function pageTransform(input: {
   // The two affines this page needs, as Mat2D — the matrix is the source of
   // truth; the methods and `cssMatrix` below are sugar over it (so they can
   // never drift).
-  // content point (top-left, y-down) → content view px: pure isotropic scale.
+  // page point (top-left, y-down) → content view px: pure isotropic scale.
   const contentMat = [viewScale, 0, 0, viewScale, 0, 0] as Mat2D;
-  // content point → display-box view px: scale + the page's quarter-turn, from
+  // page point → display-box view px: scale + the page's quarter-turn, from
   // the shared builder (the one quarter-turn encoding).
   const viewMat = rotateScaleMatrix(viewScale, content.width, content.height, rotation);
   const invMat = invert(viewMat);
@@ -299,10 +299,10 @@ export function pageTransform(input: {
   const toPixels = (point: Point): Point => applyPoint(contentMat, point);
   const contentInv = invert(contentMat);
   const fromPixels = (point: Point): Point => applyPoint(contentInv, point);
-  const contentToView = (point: Point): Point => applyPoint(viewMat, point);
-  const viewToContent = (point: Point): Point => applyPoint(invMat, point);
-  const contentToViewRect = (rect: Rect): Rect => applyRect(viewMat, rect);
-  const viewToContentRect = (rect: Rect): Rect => applyRect(invMat, rect);
+  const pageToView = (point: Point): Point => applyPoint(viewMat, point);
+  const viewToPage = (point: Point): Point => applyPoint(invMat, point);
+  const pageToViewRect = (rect: Rect): Rect => applyRect(viewMat, rect);
+  const viewToPageRect = (rect: Rect): Rect => applyRect(invMat, rect);
   const cssMatrix = matrixToCss(viewMat);
 
   return {
@@ -319,10 +319,10 @@ export function pageTransform(input: {
     zoom,
     toPixels,
     fromPixels,
-    contentToView,
-    contentToViewRect,
-    viewToContent,
-    viewToContentRect,
+    pageToView,
+    pageToViewRect,
+    viewToPage,
+    viewToPageRect,
     cssMatrix,
   };
 }
@@ -347,7 +347,7 @@ export function pageTransform(input: {
  * The coordinate spaces a viewer touches, all y-down. `content` is the
  * engine's page space: points from the top-left of the visible page.
  */
-export type Space = 'content' | 'view' | 'screen';
+export type Space = 'page' | 'view' | 'screen';
 
 /**
  * Phantom space brand. It is optional so plain `{ x, y }` / `{ x, y, w, h }`
@@ -427,7 +427,7 @@ export function compose<A extends Space, B extends Space, C extends Space>(
   ] as Mat2D<A, C>;
 }
 
-/** Invert a transform — `invert(contentToView)` is `viewToContent`, i.e. hit-testing for free. */
+/** Invert a transform — `invert(pageToView)` is `viewToPage`, i.e. hit-testing for free. */
 export function invert<F extends Space, T extends Space>(matrix: Mat2D<F, T>): Mat2D<T, F> {
   const [a, b, c, d, e, f] = matrix;
   const det = a * d - b * c;
@@ -505,7 +505,7 @@ export function matrixToCss(matrix: Mat2D): string {
  * never know about annotations — they are the bottom-of-the-pyramid matrix math,
  * so it isn't hand-rolled (and drift) in every plugin.
  *
- * Convention: a viewer content space is y-down, so `rotate(rad)` —
+ * Convention: a viewer page space is y-down, so `rotate(rad)` —
  * `[cos, sin, -sin, cos, 0, 0]` — turns clockwise on screen (matching the
  * viewer's page-rotation direction). The engine works in the same frame.
  * ──────────────────────────────────────────────────────────────────────────── */
@@ -520,7 +520,7 @@ export function scale<S extends Space>(sx: number, sy: number): Mat2D<S, S> {
   return [sx, 0, 0, sy, 0, 0] as Mat2D<S, S>;
 }
 
-/** Rotate about the space origin (radians; clockwise in y-down content space). */
+/** Rotate about the space origin (radians; clockwise in y-down page space). */
 export function rotate<S extends Space>(rad: number): Mat2D<S, S> {
   const cosine = Math.cos(rad);
   const sine = Math.sin(rad);
@@ -548,13 +548,13 @@ export function scaleAbout<S extends Space>(
 }
 
 /** The rotation angle (radians) encoded in a matrix — `atan2(b, a)`. Positive is
- *  clockwise in y-down content space (the inverse of {@link rotate}). */
+ *  clockwise in y-down page space (the inverse of {@link rotate}). */
 export function angleOf(matrix: Mat2D): number {
   return Math.atan2(matrix[1], matrix[0]);
 }
 
 /**
- * The page's scale + integer quarter-turn as a `Mat2D`: a content point maps to
+ * The page's scale + integer quarter-turn as a `Mat2D`: a page point maps to
  * its place in the rotated display box. `scale` is output units per content
  * point; `boxW`/`boxH` are the un-rotated content's extents in those same output
  * units, and the offsets keep the footprint in the box's positive quadrant
@@ -594,7 +594,7 @@ export function rotateScaleMatrix(
  * `upper` is the ascent side, `lower` the baseline side, and `start` → `end`
  * runs along the frame's +x. Visual semantics — deliberately not reading
  * order: bidi/advance direction is a glyph-sequence concern carried
- * separately where consumers need it. In y-down content space an upright
+ * separately where consumers need it. In y-down page space an upright
  * TextQuad has `upper*` at the smaller y.
  */
 
@@ -723,7 +723,7 @@ function zigzagWellFormed([us, ue, ls, le]: QuadCornerList): boolean {
 
 /**
  * Interpret an arbitrary positional quad (an imported `/QuadPoints` entry,
- * already in content space) as a TextQuad — a normalizer, not a cast:
+ * already in page space) as a TextQuad — a normalizer, not a cast:
  *
  *   1. the de-facto zigzag order (US, UE, LS, LE) passes through untouched —
  *      this covers every well-formed writer, rotated quads included;

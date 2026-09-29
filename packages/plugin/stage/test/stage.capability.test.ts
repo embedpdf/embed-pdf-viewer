@@ -1653,7 +1653,7 @@ describe('viewRotation: the NON-persistent view rotation (Adobe "Rotate View")',
   it('hit-testing round-trips under rotation, and pageAt reports the display rotation', () => {
     const { stage } = harness(PORTRAIT);
     stage.setViewRotation(90);
-    const content = { x: 150, y: 400 }; // a content point on page 1 (un-rotated frame)
+    const content = { x: 150, y: 400 }; // a page point on page 1 (un-rotated frame)
     const world = stage.pageToWorld(toPageRef(1), content)!;
     const hit = stage.getPageAt(stage.worldToViewport(world))!;
     expect(hit.ref).toEqual(toPageRef(1));
@@ -2197,7 +2197,7 @@ describe('responsive settings (container queries for the settings bag)', () => {
 });
 
 describe('doubleTapZoom animation — the focal point holds still by construction', () => {
-  it('keeps the tapped content point stationary at EVERY tween frame', () => {
+  it('keeps the tapped page point stationary at EVERY tween frame', () => {
     const clock = manualScheduler();
     const { stage } = harness(PORTRAIT, { scheduler: clock.scheduler });
     const point = { x: 500, y: 350 };

@@ -14,11 +14,11 @@ import {
   moveDistanceCaption,
   type DistanceAppearance,
 } from '../src/measurement';
-import type { ModelAnnotation, ContentGeometry, Model, Message } from '../src/types';
+import type { ModelAnnotation, ModelGeometry, Model, Message } from '../src/types';
 import { initialModel, initialStyle } from '../src/update';
 import { pageItems, chrome } from '../src/view';
 const PAGE = toPageRef(1);
-const geom: ContentGeometry = {
+const geom: ModelGeometry = {
   kind: 'line',
   a: { x: 40, y: 100 },
   b: { x: 240, y: 100 },
@@ -87,7 +87,7 @@ describe('distance gestures and captions', () => {
     expect(effects).toEqual([{ type: 'patch', id: 'a', scope: { kind: 'caption' } }]);
   });
   it('keeps directed offset signs for a reversed diagonal', () => {
-    const geometry: ContentGeometry = { kind: 'line', a: { x: 100, y: 100 }, b: { x: 0, y: 0 } };
+    const geometry: ModelGeometry = { kind: 'line', a: { x: 100, y: 100 }, b: { x: 0, y: 0 } };
     const moved = moveDistanceCaption(geometry, measure, { x: -10, y: 0 });
     expect(moved.caption.offset?.along).toBeCloseTo(Math.sqrt(50));
     expect(moved.caption.offset?.perpendicular).toBeCloseTo(Math.sqrt(50));
@@ -235,7 +235,7 @@ describe('distance gestures and captions', () => {
       text: '1.75 m',
       leader: { length: -15, extension: 5 },
     };
-    const short: ContentGeometry = { ...geom, a: { x: 0, y: 0 }, b: { x: 49.7457, y: 0 } };
+    const short: ModelGeometry = { ...geom, a: { x: 0, y: 0 }, b: { x: 49.7457, y: 0 } };
     const layout = distanceLayout(short, fixtureMeasure, 1)!;
     expect(layout.arrowPlacement).toBe('outside');
     expect(layout.dimensionSegments).toEqual([
@@ -245,14 +245,14 @@ describe('distance gestures and captions', () => {
     expect(layout.caption!.center.y).toBe(26.5);
     expect(distanceHit(layout, { x: 24, y: 15 }, 1, 1)).toBe(false);
 
-    const longer: ContentGeometry = { ...short, b: { x: 56.9457, y: 0 } };
+    const longer: ModelGeometry = { ...short, b: { x: 56.9457, y: 0 } };
     expect(distanceLayout(longer, { ...fixtureMeasure, text: '2.01 m' }, 1)!.arrowPlacement).toBe(
       'inside',
     );
   });
 
   it('hit-tests the rotated caption rectangle rather than a circle around it', () => {
-    const diagonal: ContentGeometry = { kind: 'line', a: { x: 50, y: 50 }, b: { x: 250, y: 250 } };
+    const diagonal: ModelGeometry = { kind: 'line', a: { x: 50, y: 50 }, b: { x: 250, y: 250 } };
     const appearance = {
       ...measure,
       caption: { enabled: true, offset: { along: 0, perpendicular: 80 } },

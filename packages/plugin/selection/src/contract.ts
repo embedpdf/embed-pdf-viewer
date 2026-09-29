@@ -4,7 +4,7 @@
  * Selection ranges live in character space (half-open `TextRange`, the same
  * space search hits address). Geometry needs `doc.text.select`, text
  * extraction needs `doc.text.copy`, and neither permission implies the other.
- * Segments, endpoints and anchors are in page space (content space: y-down,
+ * Segments, endpoints and anchors are in page space (page space: y-down,
  * PDF units, crop-relative), the space every layer paints in.
  */
 import type { EventHook, OperationOptions, PageRef } from '@embedpdf/core';

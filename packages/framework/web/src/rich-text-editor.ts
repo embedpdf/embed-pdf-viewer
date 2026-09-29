@@ -92,7 +92,7 @@ export interface RichTextEditorHost {
 
 export interface RichTextEditorProps {
   document: RichTextEditorDocument;
-  /** Screen px per content unit (the page scale): sizes are content points. */
+  /** Screen px per page unit (the page scale): sizes are page points. */
   scale: number;
 }
 

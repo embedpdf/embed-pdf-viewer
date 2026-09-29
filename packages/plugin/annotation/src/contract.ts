@@ -21,7 +21,7 @@ import type {
   AnnotationPropsPatch,
   Callout,
   CreationDraftAnchor,
-  ContentGeometry,
+  ModelGeometry,
   Id,
   PropKey,
   PropSpec,
@@ -155,7 +155,7 @@ export interface ChromeSettingsPatch {
   guides?: Partial<ChromeSettings['guides']>;
 }
 
-/** The armed tool's would-be placement under the cursor (content space). */
+/** The armed tool's would-be placement under the cursor (page space). */
 export type ToolGhost = {
   page: PageRef;
   /** The exact box the click's placement would use. */
@@ -164,7 +164,7 @@ export type ToolGhost = {
   rot: number;
 } & (
   | { kind: 'image' } // the armed stamp raster — framework blits it
-  | { kind: 'vector'; toolId: string; geometry: ContentGeometry } // painted via pageItems/scene
+  | { kind: 'vector'; toolId: string; geometry: ModelGeometry } // painted via pageItems/scene
 );
 
 /** Registration options for {@link annotationPlugin} — the initial values of the
@@ -198,7 +198,7 @@ export interface AnnotationConfig {
 }
 
 /**
- * One clickable link area on a page (content space): a standalone link
+ * One clickable link area on a page (page space): a standalone link
  * annotation, or one segment of a parent's attached link. See
  * {@link AnnotationHostCapability.linkItemsOn}.
  */
@@ -258,7 +258,7 @@ export interface SelectionProps {
 export type SelectionFlags = { [K in keyof AnnotationFlags]: boolean | null };
 
 /**
- * A free-text annotation projected for the framework: the box (content space,
+ * A free-text annotation projected for the framework: the box (page space,
  * live gesture applied) + the plain text + an `editing` flag + a ready-to-spread
  * CSS style. The framework renders one editable element from this and nothing
  * more — all the mapping (fonts, colours, alignment) is done here, once. The
@@ -775,7 +775,7 @@ export type StampPreviewProvider = (devicePixelWidth: number) => Promise<ArmedSt
  */
 export interface StampPlacement {
   page: PageRef;
-  /** Anchor in page points (content space): the placement is centred here. */
+  /** Anchor in page points (page space): the placement is centred here. */
   at: Point;
   /** Placed width in PDF points; default the payload's intrinsic size. */
   targetWidth?: number;
@@ -798,7 +798,7 @@ export interface FilePromptRequest {
    *  the engine sniffs/validates the bytes for real. */
   accept?: string;
   page: PageRef;
-  /** The content-space point the placement is centred on. */
+  /** The page-space point the placement is centred on. */
   point: Point;
 }
 

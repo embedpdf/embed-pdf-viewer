@@ -146,7 +146,7 @@ export function createStamps(
     armChanged();
   };
 
-  /** Place a stamp of `desired` PDF-point size centred on a content point — the
+  /** Place a stamp of `desired` PDF-point size centred on a page point — the
    *  one engine-write both the armed and click-to-place paths funnel through.
    *  The size is fit to the page and clamped fully onto it (the rubber-stamp
    *  rule: never larger than the page, aspect preserved), and never spills off

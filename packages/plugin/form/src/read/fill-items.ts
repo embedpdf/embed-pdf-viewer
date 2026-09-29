@@ -1,6 +1,6 @@
 /**
  * The fill projection: what a framework paints for one page. Pure data in
- * content space (top-left origin, y-down PDF points), the same space
+ * page space (top-left origin, y-down PDF points), the same space
  * annotation render items use, so layers position with the page transform
  * and never re-derive scale.
  *

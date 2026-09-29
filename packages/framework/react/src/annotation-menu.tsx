@@ -35,7 +35,7 @@ export function AnnotationMenu({ children, gap = 15, placement = 'top' }: Annota
   // Reading the binding subscribes this component to projection changes
   // (its identity is the revision), so the anchor read below re-runs with
   // fresh view facts in the same commit as the surface — the knob offset is
-  // screen-constant, so its content-space position depends on the page's
+  // screen-constant, so its page-space position depends on the page's
   // live view scale.
   const { projector } = useProjectorBinding();
   const anchor = useSelector(

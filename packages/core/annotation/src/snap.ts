@@ -61,7 +61,7 @@ export function computeMoveSnap(
   const pageObjectNumber = page.pageObjectNumber;
   const moving = new Set(ids);
   // Screen-anchored (`noZoom`/`noRotate`) annotations sit outside the snapping
-  // system, both ways: their content-space footprint depends on the view, so
+  // system, both ways: their page-space footprint depends on the view, so
   // an alignment made at one zoom is a lie at every other zoom. A selection
   // that contains one doesn't snap; one that's parked on the page is never a
   // reference edge. (The page-edge clamp is unaffected — it uses projected

@@ -6,7 +6,7 @@
  * keep it because it visually matches what PDFium bakes into the `/BE` appearance
  * stream, so our live SVG preview and the saved PDF agree.
  *
- * This is a pure function. It takes a content-space box plus
+ * This is a pure function. It takes a page-space box plus
  * the border `intensity`/`strokeWidth` and returns SVG path data in absolute
  * content coordinates (the same space `geomScene`'s rect/ellipse nodes use). There
  * is no stored `/RD`, no border-style enum, no bbox bookkeeping — the inset is
@@ -14,7 +14,7 @@
  * on the box, so the box stays the annotation's outer boundary (its `/Rect`).
  *
  * The internal math runs in PDFBox's y-up frame; `PathBuilder` flips back to
- * y-down and translates into the box's content-space origin on the way out.
+ * y-down and translates into the box's page-space origin on the way out.
  */
 import type { Rect, Point } from './types';
 
@@ -33,7 +33,7 @@ const formatNumber = (value: number): string => Number(value.toFixed(4)).toStrin
 
 /**
  * Accumulates SVG path commands. Input is PDFBox's y-up frame; output is y-down
- * content space, offset into the box origin (ox, oy) so the `d` string is in the
+ * page space, offset into the box origin (ox, oy) so the `d` string is in the
  * same absolute coordinates as every other render node.
  */
 class PathBuilder {
@@ -520,7 +520,7 @@ export function cloudyBorderExtent(
  */
 export function cloudyPolyPath(points: Point[], intensity: number, strokeWidth: number): string {
   const out = new PathBuilder(0, 0);
-  // Content space is y-down; the PDFBox core runs y-up (PathBuilder flips back).
+  // Page space is y-down; the PDFBox core runs y-up (PathBuilder flips back).
   const ring = points.map((point) => ({ x: point.x, y: -point.y }));
   const first = ring[0];
   const last = ring[ring.length - 1];

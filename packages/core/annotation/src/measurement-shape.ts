@@ -4,7 +4,7 @@ import { geomRotation, pointInPoly, rotatePoint, selectionQuad, unionRect } from
 import { DISTANCE_CAPTION_SIZE, distanceCaptionWidth } from './measurement-font';
 import { distanceLayout, distanceSelectionQuad, moveDistanceCaption } from './measurement';
 import type { DistanceCaptionLayout, MeasurementAppearance } from './measurement';
-import type { ContentGeometry, Quad, Rect, Style, Point } from './types';
+import type { ModelGeometry, Quad, Rect, Style, Point } from './types';
 
 export interface ShapeMeasurementAppearance {
   intent: 'polyline-dimension' | 'polygon-dimension';
@@ -46,7 +46,7 @@ export function transformMeasurementCaption(
 }
 
 export function shapeMeasurementReadout(
-  geometry: ContentGeometry,
+  geometry: ModelGeometry,
   appearance: ShapeMeasurementAppearance,
 ) {
   return measurementReadout({
@@ -58,7 +58,7 @@ export function shapeMeasurementReadout(
 }
 
 export function shapeMeasurementLabel(
-  geometry: ContentGeometry,
+  geometry: ModelGeometry,
   appearance: ShapeMeasurementAppearance,
 ): string {
   const readout = shapeMeasurementReadout(geometry, appearance);
@@ -135,7 +135,7 @@ export function automaticShapeCaptionCenter(points: readonly Point[], closed: bo
 }
 
 export function shapeMeasurementLayout(
-  geometry: ContentGeometry,
+  geometry: ModelGeometry,
   appearance: ShapeMeasurementAppearance,
   style: Style,
 ): ShapeMeasurementLayout | null {
@@ -179,7 +179,7 @@ export function shapeMeasurementLayout(
 }
 
 export function measurementLayout(
-  geometry: ContentGeometry,
+  geometry: ModelGeometry,
   appearance: MeasurementAppearance,
   style: Style,
 ) {
@@ -189,7 +189,7 @@ export function measurementLayout(
 }
 
 export function measurementSelectionQuad(
-  geometry: ContentGeometry,
+  geometry: ModelGeometry,
   appearance: MeasurementAppearance,
   style: Style,
 ): Quad {
@@ -211,7 +211,7 @@ export function measurementSelectionQuad(
 }
 
 export function moveMeasurementCaption(
-  geometry: ContentGeometry,
+  geometry: ModelGeometry,
   appearance: MeasurementAppearance,
   delta: Point,
   style: Style,

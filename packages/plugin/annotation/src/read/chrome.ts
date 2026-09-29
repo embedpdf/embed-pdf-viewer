@@ -18,7 +18,7 @@ import type { AnnotationContext, AnnotationServices } from '../services';
 import { viewEnv } from '../services/geometry';
 import { refsOfIn } from '../services/store';
 
-/** The view a pointer sample arrives in: px per content unit, display rotation, relative zoom. */
+/** The view a pointer sample arrives in: px per page unit, display rotation, relative zoom. */
 export interface HitView {
   scale?: number;
   rotation?: number;
@@ -41,7 +41,7 @@ export function createChromeReads(
   const chromeSettings = (): ChromeSettings => ctx.state.get().chrome;
 
   /** The CSS-px chrome settings converted to content units by the page's view
-   *  scale (px per content unit) — screen-constant grab zones + stalk at every
+   *  scale (px per page unit) — screen-constant grab zones + stalk at every
    *  zoom. No scale → the values are read as content units (headless callers).
    *  `boost` widens the grab tolerances only (never the drawn chrome or the
    *  knob's position) — the touch path passes {@link TOUCH_GRAB_BOOST} so

@@ -3,7 +3,7 @@
  * rules keep them apart:
  *  1. Frame: a gesture is anchored to the page it started on. A sample resolved
  *     against another page is in a different coordinate frame (each page's
- *     content space has its own origin) — subtracting across frames would
+ *     page space has its own origin) — subtracting across frames would
  *     teleport the shape to the page top, so foreign-page samples are ignored.
  *  2. Clamp: within the home frame, geometry pins to the page box:
  *     an overshooting pointer slides the shape along the edge; a shape larger

@@ -5,7 +5,7 @@ import {
   readProp,
   type ModelAnnotation,
   type AnnotationProps,
-  type ContentGeometry,
+  type ModelGeometry,
   type Id,
   type Model,
 } from '@embedpdf/core-annotation';
@@ -43,7 +43,7 @@ export function createAnnotationReads(
 
   const refOfId = (id: Id): AnnotationRef | null => store.model().byId[id]?.ref ?? null;
 
-  const geometryOf = (geometry: ContentGeometry): AnnotationGeometry => {
+  const geometryOf = (geometry: ModelGeometry): AnnotationGeometry => {
     switch (geometry.kind) {
       case 'rect':
         return { kind: 'rect', bounds: geometry.rect, rotation: geometry.rot ?? 0 };

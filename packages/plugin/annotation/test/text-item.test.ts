@@ -2,7 +2,7 @@ import {
   initialModel,
   type ModelAnnotation,
   type AnnotationFlags,
-  type ContentGeometry,
+  type ModelGeometry,
   type Model,
 } from '@embedpdf/core-annotation';
 import { toPageRef } from '@embedpdf/engine-core/runtime';
@@ -42,7 +42,7 @@ const FLAGS: AnnotationFlags = {
 
 const freeText = (
   id: string,
-  geometry: Extract<ContentGeometry, { kind: 'text' }>,
+  geometry: Extract<ModelGeometry, { kind: 'text' }>,
   strokeWidth: number,
 ): ModelAnnotation => ({
   id,

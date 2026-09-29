@@ -2,20 +2,20 @@
  * Screen-anchored annotations — `noZoom` / `noRotate` (ISO 32000-2 §12.5.3).
  *
  * The mental model: these flags are display-transform exemptions, nothing
- * more. The view composes content space onto the screen with
+ * more. The view composes page space onto the screen with
  * `zoom × pageRotation`; a flagged annotation asks it to skip the zoom factor
  * (`noZoom`) and/or the page-rotation factor (`noRotate`), holding the
  * `/Rect` upper-left — the geometry's bounds top-left — fixed on the page.
  *
  * The flags do not restrict editing. The annotation keeps its full
- * content-space identity: a size (`/Rect`, which now reads as "screen size at
+ * page-space identity: a size (`/Rect`, which now reads as "screen size at
  * zoom 1") and an authored orientation (`rot` / rotated points, which now
  * reads as "screen tilt at every page rotation") — and both stay editable.
  * Edit restrictions come from kind caps (a note kind declares
  * `resizable: false`) and `locked`, never from here.
  *
  * Everything derives from one projection, {@link anchoredGeom}: the effective
- * content-space geometry of the body at the current view — a similarity
+ * page-space geometry of the body at the current view — a similarity
  * (uniform scale `1/s` + rotation `-r`) about the anchor. Rendering,
  * hit-testing, chrome, marquee, and clamping all read it, so what you see,
  * what you click, and what commits can never disagree. Compensating only in
@@ -43,7 +43,7 @@ import {
 } from './geometry';
 import { capsFor } from './kinds';
 import type { FlagBearer } from './flags';
-import type { ContentGeometry, Point, ViewEnv } from './types';
+import type { ModelGeometry, Point, ViewEnv } from './types';
 
 export type { ViewEnv };
 
@@ -67,23 +67,23 @@ export function anchorModeOf(annotation: FlagBearer): AnchorMode | null {
 }
 
 /**
- * The geometries the projection applies to: every kind with free content-space
+ * The geometries the projection applies to: every kind with free page-space
  * geometry — boxes and vertex kinds (line / poly / ink). Text-anchored
  * geometries (markup quads, carets) and callouts pass through: their position
  * is bound to page text, so a screen-constant body is meaningless there; the
  * flags still round-trip untouched.
  */
-const projectable = (geometry: ContentGeometry): boolean =>
+const projectable = (geometry: ModelGeometry): boolean =>
   geometry.kind === 'rect' ||
   geometry.kind === 'line' ||
   geometry.kind === 'poly' ||
   geometry.kind === 'ink' ||
   (geometry.kind === 'text' && !geometry.callout);
 
-/** The fixed page point: the geometry's bounds top-left in content space
+/** The fixed page point: the geometry's bounds top-left in page space
  *  (y-down) — which is the spec's "upper-left corner of the annotation
  *  rectangle", since `/Rect` is emitted from these bounds. */
-export const anchorOf = (geometry: ContentGeometry): Point => {
+export const anchorOf = (geometry: ModelGeometry): Point => {
   const rect = geomBounds(geometry);
   return { x: rect.x, y: rect.y };
 };
@@ -109,7 +109,7 @@ function factors(
 }
 
 /**
- * The effective content-space geometry of a screen-anchored body at `view`:
+ * The effective page-space geometry of a screen-anchored body at `view`:
  * the stored geometry scaled by `1/max(zoom, 1)` about the anchor (`zoom`
  * exemption, Adobe-clamped) and counter-rotated by `-rotation` about it
  * (`upright`), so that after the page's own display transform the body reads
@@ -118,14 +118,14 @@ function factors(
  * unconditionally.
  */
 export function anchoredGeom(
-  geometry: ContentGeometry,
+  geometry: ModelGeometry,
   mode: AnchorMode | null,
   view: ViewEnv | undefined,
-): ContentGeometry {
+): ModelGeometry {
   const projection = factors(mode, view);
   if (!projection || !projectable(geometry)) return geometry;
   const point = anchorOf(geometry);
-  let out: ContentGeometry = geometry;
+  let out: ModelGeometry = geometry;
   if (projection.s !== 1) out = geomScaleAbout(out, point, 1 / projection.s, 1 / projection.s);
   if (projection.r !== 0) out = geomRotateAbout(out, point, normalizeDeg(-projection.r));
   return out;
@@ -143,13 +143,13 @@ export function anchoredGeom(
  * what makes a released gesture commit exactly what its preview showed.
  */
 export function unanchoredGeom(
-  target: ContentGeometry,
+  target: ModelGeometry,
   mode: AnchorMode | null,
   view: ViewEnv | undefined,
-): ContentGeometry {
+): ModelGeometry {
   const projection = factors(mode, view);
   if (!projection || !projectable(target)) return target;
-  let lin: ContentGeometry = target;
+  let lin: ModelGeometry = target;
   if (projection.s !== 1) lin = geomScaleAbout(lin, ORIGIN, projection.s, projection.s);
   if (projection.r !== 0) lin = geomRotateAbout(lin, ORIGIN, projection.r);
   const point = anchorOf(lin);

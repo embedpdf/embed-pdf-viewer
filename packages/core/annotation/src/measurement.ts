@@ -8,7 +8,7 @@ import { endingNodes, endingPoints } from './endings';
 import { DISTANCE_CAPTION_SIZE as CAPTION_SIZE, distanceCaptionWidth } from './measurement-font';
 import { geomHit, geomRotation, rotatePoint, selectionQuad, unionRect } from './geometry';
 import type {
-  ContentGeometry,
+  ModelGeometry,
   Handle,
   Paint,
   Quad,
@@ -95,7 +95,7 @@ function lineAxes(start: Point, end: Point) {
   return { along, normal, length };
 }
 
-export function distanceLabel(geometry: ContentGeometry, appearance: DistanceAppearance): string {
+export function distanceLabel(geometry: ModelGeometry, appearance: DistanceAppearance): string {
   if (geometry.kind !== 'line') {
     return appearance.text;
   }
@@ -207,7 +207,7 @@ function dimensionSegments(
 }
 
 export function distanceLayout(
-  geometry: ContentGeometry,
+  geometry: ModelGeometry,
   appearance: DistanceAppearance,
   strokeWidth: number,
 ): DistanceLayout | null {
@@ -330,7 +330,7 @@ export function expandDistanceBounds(bounds: Rect, padding: number): Rect {
 }
 
 export function distanceSelectionQuad(
-  geometry: ContentGeometry,
+  geometry: ModelGeometry,
   appearance: DistanceAppearance,
   strokeWidth: number,
 ): Quad {
@@ -430,14 +430,14 @@ export function distanceHit(
 }
 
 export function distanceCaptionAt(
-  geometry: ContentGeometry,
+  geometry: ModelGeometry,
   appearance: DistanceAppearance,
   width: number,
 ): Point | null {
   return distanceLayout(geometry, appearance, width)?.caption?.center ?? null;
 }
 
-export function distanceLeaderLength(geometry: ContentGeometry, point: Point): number {
+export function distanceLeaderLength(geometry: ModelGeometry, point: Point): number {
   if (geometry.kind !== 'line') {
     return 0;
   }
@@ -447,7 +447,7 @@ export function distanceLeaderLength(geometry: ContentGeometry, point: Point): n
 }
 
 export function moveDistanceCaption(
-  geometry: ContentGeometry,
+  geometry: ModelGeometry,
   appearance: DistanceAppearance,
   delta: Point,
 ): DistanceAppearance {
@@ -471,7 +471,7 @@ export function moveDistanceCaption(
 }
 
 export function distanceScene(
-  geometry: ContentGeometry,
+  geometry: ModelGeometry,
   appearance: DistanceAppearance,
   style: Style,
 ): SceneNode[] {

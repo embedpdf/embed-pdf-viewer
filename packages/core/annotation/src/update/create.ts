@@ -4,7 +4,7 @@
  */
 import { DRAWN_FLAGS } from '../flags';
 import { applyProps, styleFromProps, textStyleFromProps } from '../props';
-import type { ContentGeometry, Effect, Message, Model, ModelAnnotation, Subtype } from '../types';
+import type { ModelGeometry, Effect, Message, Model, ModelAnnotation, Subtype } from '../types';
 import { newRecordId } from './changes';
 import { defaultsFor } from './session';
 
@@ -20,7 +20,7 @@ export function createAnnot(
 ): [Model, Effect[]] {
   const preset = (message.preset ?? message.subtype) as Subtype;
   const definition = defaultsFor(model, preset);
-  const geometry: ContentGeometry =
+  const geometry: ModelGeometry =
     (message.geometry.kind === 'line' ||
       (message.geometry.kind === 'poly' && !message.geometry.closed)) &&
     !message.geometry.ends

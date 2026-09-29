@@ -21,11 +21,11 @@ import { annotationKey } from './seam';
 const takesLink = (subtype: string): boolean =>
   propsFor(subtype).some((spec) => spec.key === 'link');
 
-/** Bounds of one quad (content space). */
+/** Bounds of one quad (page space). */
 const quadBounds = (quad: Quad): Rect => unionRect(quad);
 
 /**
- * The desired hit rects (content space) of a parent's attached link
+ * The desired hit rects (page space) of a parent's attached link
  * children — derived fresh from the parent's committed geometry, never
  * tracked: markup gets one child per quad (per-line hit areas), every
  * other kind one child over its visual bounds.

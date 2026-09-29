@@ -82,8 +82,8 @@ describe('TextQuad', () => {
   });
 
   test('applyTextQuad carries corner semantics through a rotation', () => {
-    const upright = textQuadFromRect({ x: 0, y: 0, width: 10, height: 4 }) as TextQuadIn<'content'>;
-    const turned = applyTextQuad(rotate<'content'>(Math.PI / 2), upright);
+    const upright = textQuadFromRect({ x: 0, y: 0, width: 10, height: 4 }) as TextQuadIn<'page'>;
+    const turned = applyTextQuad(rotate<'page'>(Math.PI / 2), upright);
     // Corner names stay attached to the same text corners regardless of
     // where the transform puts them on screen.
     expect(turned.upperStart.x).toBeCloseTo(0, 6);
@@ -115,14 +115,14 @@ describe('textQuadEdge', () => {
     expect(len(textQuadEdge(cell, 'start'))).toBeCloseTo(16, 9);
     for (const deg of [30, 45, 90, 180, 270]) {
       const turned = applyTextQuad(
-        rotate<'content'>((deg * Math.PI) / 180),
-        cell as TextQuadIn<'content'>,
+        rotate<'page'>((deg * Math.PI) / 180),
+        cell as TextQuadIn<'page'>,
       );
       expect(len(textQuadEdge(turned, 'start'))).toBeCloseTo(16, 9);
       expect(len(textQuadEdge(turned, 'end'))).toBeCloseTo(16, 9);
     }
     // …while the AABB height balloons with tilt — why it cannot size a caret
-    const tilted = applyTextQuad(rotate<'content'>(Math.PI / 4), cell as TextQuadIn<'content'>);
+    const tilted = applyTextQuad(rotate<'page'>(Math.PI / 4), cell as TextQuadIn<'page'>);
     expect(textQuadBounds(tilted).height).toBeCloseTo(76 / Math.SQRT2, 6);
   });
 
@@ -130,12 +130,12 @@ describe('textQuadEdge', () => {
     const angle = (edge: [Point, Point]) =>
       (Math.atan2(edge[1].y - edge[0].y, edge[1].x - edge[0].x) * 180) / Math.PI;
     expect(angle(textQuadEdge(cell, 'start'))).toBeCloseTo(90, 9); // straight down
-    const turned = applyTextQuad(rotate<'content'>(Math.PI / 4), cell as TextQuadIn<'content'>);
+    const turned = applyTextQuad(rotate<'page'>(Math.PI / 4), cell as TextQuadIn<'page'>);
     expect(angle(textQuadEdge(turned, 'start'))).toBeCloseTo(135, 9);
   });
 
   test('the two edges are parallel and span the cell', () => {
-    const turned = applyTextQuad(rotate<'content'>(0.7), cell as TextQuadIn<'content'>);
+    const turned = applyTextQuad(rotate<'page'>(0.7), cell as TextQuadIn<'page'>);
     const [us, ls] = textQuadEdge(turned, 'start');
     const [ue, le] = textQuadEdge(turned, 'end');
     // parallel: the cross product of the two edge vectors vanishes
@@ -162,8 +162,8 @@ describe('textQuadEquals', () => {
     // re-rendering must catch
     const center = { x: 130, y: 208 };
     const turned = applyTextQuad(
-      rotateAbout<'content'>(center as PointIn<'content'>, Math.PI / 6),
-      cell as TextQuadIn<'content'>,
+      rotateAbout<'page'>(center as PointIn<'page'>, Math.PI / 6),
+      cell as TextQuadIn<'page'>,
     );
     expect(textQuadEquals(cell, turned)).toBe(false);
   });

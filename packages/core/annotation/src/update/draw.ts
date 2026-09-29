@@ -21,7 +21,7 @@ import { clickCreateGeom, resolveClickPlacement } from '../placement';
 import { styleFromProps, textStyleFromProps } from '../props';
 import type {
   ClickCreate,
-  ContentGeometry,
+  ModelGeometry,
   Draft,
   Effect,
   InkStraightenOptions,
@@ -212,7 +212,7 @@ export function createPointer(
 
   const definition = defaultsFor(model, activeDraft.preset ?? activeDraft.subtype);
   const style = styleFromProps(definition);
-  let geometry: ContentGeometry | null = null;
+  let geometry: ModelGeometry | null = null;
   // The upright counter-rotation for a box commit (0 when the tool/page don't
   // ask for one). A dragged box keeps the on-screen footprint the author drew:
   // for a quarter-turn the unrotated box is the drag rect transposed about its
@@ -227,8 +227,8 @@ export function createPointer(
   // the same `resolveClickPlacement` the footprint ghost and the form plugin
   // consume, so preview ≡ commit by construction. The core only supplies the
   // kind-level fallback for free text (a click must always yield a typable
-  // box) and converts the placement to a ContentGeometry via `clickCreateGeom`.
-  const clickGeom = (policy: ClickCreate): ContentGeometry | null =>
+  // box) and converts the placement to a ModelGeometry via `clickCreateGeom`.
+  const clickGeom = (policy: ClickCreate): ModelGeometry | null =>
     clickCreateGeom(
       activeDraft.subtype,
       resolveClickPlacement(activeDraft.from, policy, {
@@ -367,7 +367,7 @@ export function finishPolyCreate(model: Model): [Model, Effect[]] {
   if (draft.points.length < minPoints) return [{ ...model, draft: null }, []];
 
   const definition = defaultsFor(model, draft.preset ?? draft.subtype);
-  const geometry: ContentGeometry = {
+  const geometry: ModelGeometry = {
     kind: 'poly',
     points: draft.points,
     closed: draft.closed,

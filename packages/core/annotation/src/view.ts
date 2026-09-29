@@ -48,7 +48,7 @@ import { calloutBox, calloutUprightRot, defaultsFor, rotateDraftDelta } from './
 import type {
   ModelAnnotation,
   ChromeNode,
-  ContentGeometry,
+  ModelGeometry,
   Id,
   Model,
   Rect,
@@ -120,7 +120,7 @@ function effMeasure(model: Model, id: Id) {
  * `unanchoredGeom`, so preview ≡ commit by construction. The geometry every
  * selector below hands out, so render/chrome/bounds agree with hit.
  */
-function effGeom(model: Model, id: Id, view: ViewEnv | undefined): ContentGeometry {
+function effGeom(model: Model, id: Id, view: ViewEnv | undefined): ModelGeometry {
   const annotation = model.byId[id];
   const geometry = anchoredGeom(annotation.geometry, anchorModeOf(annotation), view);
   const draft = model.draft;
@@ -284,7 +284,7 @@ export function pageItems(model: Model, page: PageRef, view?: ViewEnv): RenderIt
       style.interiorColor = style.color;
     }
     const dragged = draft.kind === 'create-rect' ? rectFromPoints(draft.from, draft.to) : null;
-    const geometry: ContentGeometry | null =
+    const geometry: ModelGeometry | null =
       draft.kind === 'create-rect'
         ? dragged && (dragged.width > 0 || dragged.height > 0)
           ? {
@@ -334,7 +334,7 @@ export function pageItems(model: Model, page: PageRef, view?: ViewEnv): RenderIt
     // The box preview carries the same upright rot the commit will apply, so
     // the ghost box (and its leader connection) is what you actually get.
     const rot = calloutUprightRot(draft);
-    const geometry: ContentGeometry =
+    const geometry: ModelGeometry =
       draft.step === 'knee'
         ? { kind: 'line', a: draft.tip, b: draft.current, ends: { start: ending, end: 'none' } }
         : {
@@ -358,7 +358,7 @@ export function pageItems(model: Model, page: PageRef, view?: ViewEnv): RenderIt
   // will become (same `scene()` paint as the committed annotation).
   const quads = model.preview?.byPage[pageObjectNumber];
   if (model.preview && quads?.length) {
-    const geometry: ContentGeometry = { kind: 'quads', quads };
+    const geometry: ModelGeometry = { kind: 'quads', quads };
     items.push({
       id: PREVIEW_ID,
       ref: null,
@@ -442,7 +442,7 @@ const boxCorners = (rect: Rect): [Point, Point, Point, Point] => [
 ];
 
 /** Project the complete annotation after applying the current gesture. */
-function effectiveSelectionFrame(model: Model, id: Id, geometry: ContentGeometry, view?: ViewEnv) {
+function effectiveSelectionFrame(model: Model, id: Id, geometry: ModelGeometry, view?: ViewEnv) {
   const annotation = model.byId[id];
   return annotationSelectionFrame({
     ...annotation,
@@ -456,7 +456,7 @@ function effectiveSelectionFrame(model: Model, id: Id, geometry: ContentGeometry
 function unionBoundsOf(
   model: Model,
   page: PageRef,
-  geomOf: (id: Id) => ContentGeometry,
+  geomOf: (id: Id) => ModelGeometry,
   view?: ViewEnv,
 ): Rect | null {
   const pageObjectNumber = page.pageObjectNumber;
@@ -477,7 +477,7 @@ function placeSelectionKnob(
   page: PageRef,
   pageBox: Rect | undefined,
   knobOffset: number,
-  geomOf: (id: Id) => ContentGeometry,
+  geomOf: (id: Id) => ModelGeometry,
   view?: ViewEnv,
 ): { at: Point; from: Point } | null {
   const pageObjectNumber = page.pageObjectNumber;
@@ -667,7 +667,7 @@ export function chrome(
   return nodes;
 }
 
-/** The content-space union of the selectable selected items on `page`, or null if
+/** The page-space union of the selectable selected items on `page`, or null if
  *  the page holds none. This is the same box the chrome outline draws, so a
  *  floating menu sits exactly on the selection. */
 export function selectionBoundsOnPage(model: Model, page: PageRef, view?: ViewEnv): Rect | null {

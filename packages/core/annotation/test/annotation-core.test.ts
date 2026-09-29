@@ -51,7 +51,7 @@ import { scene } from '../src/scene';
 import { computeMoveSnap } from '../src/snap';
 import type {
   ModelAnnotation,
-  ContentGeometry,
+  ModelGeometry,
   Draft,
   Model,
   Message,
@@ -111,7 +111,7 @@ const createPtr = (
 });
 const run = (model: Model, msgs: Message[]): Model =>
   msgs.reduce((acc, message) => step(acc, message)[0], model);
-const rectGeom = (geometry: ContentGeometry) => (geometry.kind === 'rect' ? geometry.rect : null);
+const rectGeom = (geometry: ModelGeometry) => (geometry.kind === 'rect' ? geometry.rect : null);
 // rotatedAabb goes through sin/cos, so a quarter-turn carries ~1e-14 fuzz —
 // compare the round-trip footprints field-wise, not with toEqual.
 const expectRectClose = (
@@ -465,7 +465,7 @@ describe('annotation-core', () => {
       rect: caretRectFromAnchor(upright),
     });
 
-    // 90°-CCW column in content space: baseline runs up-screen (lowerStart
+    // 90°-CCW column in page space: baseline runs up-screen (lowerStart
     // (100,80) → lowerEnd (100,56)), ascent points left toward x=88.
     const rotated = {
       glyphQuad: {
@@ -531,7 +531,7 @@ describe('annotation-core', () => {
   });
 
   it('obbFromGeom/geomResetRotation treat the caret as a box-family geom', () => {
-    const geometry: ContentGeometry = {
+    const geometry: ModelGeometry = {
       kind: 'caret',
       rect: { x: 94, y: 53, width: 6, height: 6 },
       rot: 270,
@@ -660,7 +660,7 @@ describe('annotation-core', () => {
   });
 
   it('an UNFILLED rect is hit only on its stroke; a filled one anywhere inside', () => {
-    const geometry: ContentGeometry = {
+    const geometry: ModelGeometry = {
       kind: 'rect',
       rect: { x: 100, y: 100, width: 100, height: 100 },
       ellipse: false,
@@ -671,7 +671,7 @@ describe('annotation-core', () => {
   });
 
   it('an UNFILLED circle is hit only near its outline', () => {
-    const geometry: ContentGeometry = {
+    const geometry: ModelGeometry = {
       kind: 'rect',
       rect: { x: 0, y: 0, width: 100, height: 100 },
       ellipse: true,
@@ -954,7 +954,7 @@ describe('annotation-core', () => {
   });
 
   it('the arrowhead is clickable, not just the stroke', () => {
-    const geometry: ContentGeometry = {
+    const geometry: ModelGeometry = {
       kind: 'line',
       a: { x: 60, y: 75 },
       b: { x: 545, y: 235 },
@@ -964,14 +964,14 @@ describe('annotation-core', () => {
     const onArrow = { x: 510, y: 242 }; // on the lower wing, ~19px off the a→b stroke band
     expect(geomHit(geometry, onArrow, 6, /* filled */ false, sw)).toBe(true);
     // the hit comes from the ending, not the line: with no endings that point misses
-    const noEnds: ContentGeometry = { kind: 'line', a: geometry.a, b: geometry.b };
+    const noEnds: ModelGeometry = { kind: 'line', a: geometry.a, b: geometry.b };
     expect(geomHit(noEnds, onArrow, 6, false, sw)).toBe(false);
     // and a point off both the line and the arrowhead still misses
     expect(geomHit(geometry, { x: 300, y: 360 }, 6, false, sw)).toBe(false);
   });
 
   it('geomScene fills by closed-ness: closed arrow → closed poly, open arrow → open poly', () => {
-    const line = (end: 'closed-arrow' | 'open-arrow'): ContentGeometry => ({
+    const line = (end: 'closed-arrow' | 'open-arrow'): ModelGeometry => ({
       kind: 'line',
       a: { x: 0, y: 0 },
       b: { x: 100, y: 0 },
@@ -985,7 +985,7 @@ describe('annotation-core', () => {
   });
 
   it('a shape rect is its OUTER box: visual bounds equal the box, the drawn path insets by half the stroke', () => {
-    const geometry: ContentGeometry = {
+    const geometry: ModelGeometry = {
       kind: 'rect',
       rect: { x: 100, y: 100, width: 80, height: 60 },
       ellipse: false,
@@ -997,7 +997,7 @@ describe('annotation-core', () => {
   });
 
   it('hit-testing follows the inset stroke: a thick stroke is clickable on its inner edge, the phantom band outside the box shrinks', () => {
-    const geometry: ContentGeometry = {
+    const geometry: ModelGeometry = {
       kind: 'rect',
       rect: { x: 100, y: 100, width: 100, height: 100 },
       ellipse: false,
@@ -1015,7 +1015,7 @@ describe('annotation-core', () => {
 
   it('a cloudy border insets its scallops within g.rect (the outer box); too-small falls back to a plain outline', () => {
     const box = { x: 100, y: 100, width: 120, height: 90 };
-    const geometry: ContentGeometry = { kind: 'rect', rect: box, ellipse: false };
+    const geometry: ModelGeometry = { kind: 'rect', rect: box, ellipse: false };
     const [node] = geomScene(geometry, 2, { kind: 'cloudy', intensity: 2 });
     expect(node.kind).toBe('path');
     const pathData = node.kind === 'path' ? node.d : '';
@@ -1029,7 +1029,7 @@ describe('annotation-core', () => {
     expect(Math.min(...ys)).toBeGreaterThanOrEqual(box.y - eps);
     expect(Math.max(...ys)).toBeLessThanOrEqual(box.y + box.height + eps);
     // a box too small to hold the scallops → plain rect node, never an inverted cloud
-    const tiny: ContentGeometry = {
+    const tiny: ModelGeometry = {
       kind: 'rect',
       rect: { x: 0, y: 0, width: 4, height: 4 },
       ellipse: false,
@@ -1104,7 +1104,7 @@ describe('annotation-core', () => {
   });
 
   it('scene() paints markup per subtype in the core (no framework logic): highlight fills+multiply, squiggly strokes a path', () => {
-    const quads: ContentGeometry = {
+    const quads: ModelGeometry = {
       kind: 'quads',
       quads: [textQuadFromRect({ x: 0, y: 0, width: 100, height: 12 })],
     };
@@ -1639,7 +1639,7 @@ describe('annotation-core callout', () => {
   });
   // A committed callout geom for the pure-geometry tests: box to the right of an
   // off-box tip, with an elbow between them.
-  const calloutGeom = (): Extract<ContentGeometry, { kind: 'text' }> => ({
+  const calloutGeom = (): Extract<ModelGeometry, { kind: 'text' }> => ({
     kind: 'text',
     rect: { x: 200, y: 100, width: 120, height: 40 },
     callout: { tip: { x: 40, y: 60 }, knee: { x: 120, y: 120 }, ending: 'open-arrow' },
@@ -1679,7 +1679,7 @@ describe('annotation-core callout', () => {
     // The live view paints what the AP generator bakes: the border inset by
     // half the stroke so its outer edge sits on the rect. The framework's
     // editable element owns only the text.
-    const plain: Extract<ContentGeometry, { kind: 'text' }> = {
+    const plain: Extract<ModelGeometry, { kind: 'text' }> = {
       kind: 'text',
       rect: { x: 100, y: 100, width: 200, height: 60 },
     };
@@ -2003,7 +2003,7 @@ describe('annotation-core callout — upright on a rotated page', () => {
   });
   // A committed upright callout: box {200,100,120,40} tilted 270° about its
   // centre (260,120) — its page-space footprint is the transposed {240,60,40,120}.
-  const rotCalloutGeom = (): Extract<ContentGeometry, { kind: 'text' }> => ({
+  const rotCalloutGeom = (): Extract<ModelGeometry, { kind: 'text' }> => ({
     kind: 'text',
     rect: { x: 200, y: 100, width: 120, height: 40 },
     rot: 270,
@@ -2219,7 +2219,7 @@ describe('annotation-core — rotation', () => {
   });
 
   it('box rotates about its own centre: rot adds, centre + size fixed', () => {
-    const geometry: ContentGeometry = {
+    const geometry: ModelGeometry = {
       kind: 'rect',
       rect: { x: 100, y: 100, width: 100, height: 50 },
       ellipse: false,
@@ -2238,7 +2238,7 @@ describe('annotation-core — rotation', () => {
       { x: 100, y: 0 },
       { x: 100, y: 40 },
     ];
-    const geometry: ContentGeometry = {
+    const geometry: ModelGeometry = {
       kind: 'poly',
       points: points.map((point) => ({ ...point })),
       closed: false,
@@ -2260,7 +2260,7 @@ describe('annotation-core — rotation', () => {
   });
 
   it('obbFromGeom reconstructs an oriented box from θ for both families', () => {
-    const box: ContentGeometry = {
+    const box: ModelGeometry = {
       kind: 'rect',
       rect: { x: 0, y: 0, width: 100, height: 100 },
       ellipse: false,
@@ -2271,7 +2271,7 @@ describe('annotation-core — rotation', () => {
     expect(obbBox?.corners).toHaveLength(4);
 
     // a vertex shape: spin the same points by 45° and the OBB tilts to match.
-    const base: ContentGeometry = {
+    const base: ModelGeometry = {
       kind: 'poly',
       points: [
         { x: 0, y: 0 },
@@ -2331,7 +2331,7 @@ describe('annotation-core — rotation', () => {
 });
 
 describe('annotation-core — rotation-aware selection (grab + menu + group)', () => {
-  const square = (id: string, geometry: ContentGeometry): ModelAnnotation => ({
+  const square = (id: string, geometry: ModelGeometry): ModelAnnotation => ({
     id,
     ref: {
       kind: 'objectNumber',
@@ -2345,7 +2345,7 @@ describe('annotation-core — rotation-aware selection (grab + menu + group)', (
     flags: DRAWN_FLAGS,
     source: 'baked',
   });
-  const rect = (x: number, y: number, width: number, height: number): ContentGeometry => ({
+  const rect = (x: number, y: number, width: number, height: number): ModelGeometry => ({
     kind: 'rect',
     rect: { x, y, width, height },
     ellipse: false,
@@ -2407,7 +2407,7 @@ describe('annotation-core — rotation-aware selection (grab + menu + group)', (
 });
 
 describe('annotation-core — rotation pivots about the rect centre', () => {
-  const square = (id: string, geometry: ContentGeometry): ModelAnnotation => ({
+  const square = (id: string, geometry: ModelGeometry): ModelAnnotation => ({
     id,
     ref: {
       kind: 'objectNumber',
@@ -2423,7 +2423,7 @@ describe('annotation-core — rotation pivots about the rect centre', () => {
   });
 
   it('turnPivotOf of a box is the rect centre, before AND after a quarter-turn', () => {
-    const geometry: ContentGeometry = {
+    const geometry: ModelGeometry = {
       kind: 'rect',
       rect: { x: 100, y: 100, width: 100, height: 50 },
       ellipse: false,
@@ -2438,7 +2438,7 @@ describe('annotation-core — rotation pivots about the rect centre', () => {
   it('a vertex shape spins in place about turnPivotOf, NOT its off-centre vertex mean', () => {
     // An L-shaped (asymmetric) polyline: its vertex mean sits well away from the
     // centre of the bounding rect.
-    const geometry: ContentGeometry = {
+    const geometry: ModelGeometry = {
       kind: 'poly',
       points: [
         { x: 0, y: 0 },
@@ -2468,7 +2468,7 @@ describe('annotation-core — rotation pivots about the rect centre', () => {
   });
 
   it('a rotate gesture on a vertex shape pivots about the middle of its upright points and keeps it fixed', () => {
-    const geometry: ContentGeometry = {
+    const geometry: ModelGeometry = {
       kind: 'poly',
       points: [
         { x: 0, y: 0 },
@@ -2523,7 +2523,7 @@ describe('annotation-core — rotation pivots about the rect centre', () => {
 });
 
 describe('annotation-core — selectionAnchor carries the knob alongside a centred box', () => {
-  const square = (id: string, geometry: ContentGeometry): ModelAnnotation => ({
+  const square = (id: string, geometry: ModelGeometry): ModelAnnotation => ({
     id,
     ref: {
       kind: 'objectNumber',
@@ -2537,7 +2537,7 @@ describe('annotation-core — selectionAnchor carries the knob alongside a centr
     flags: DRAWN_FLAGS,
     source: 'baked',
   });
-  const rect = (x: number, y: number, width: number, height: number): ContentGeometry => ({
+  const rect = (x: number, y: number, width: number, height: number): ModelGeometry => ({
     kind: 'rect',
     rect: { x, y, width, height },
     ellipse: false,
@@ -2571,7 +2571,7 @@ describe('annotation-core — selectionAnchor carries the knob alongside a centr
 });
 
 describe('annotation-core — join-aware stroke bounds', () => {
-  const poly = (points: Point[], closed: boolean): ContentGeometry => ({
+  const poly = (points: Point[], closed: boolean): ModelGeometry => ({
     kind: 'poly',
     points,
     closed,
@@ -2646,7 +2646,7 @@ describe('annotation-core — join-aware stroke bounds', () => {
   });
 
   it('ink bounds are unchanged — a plain half-width grow of the freehand hull (round, never spikes)', () => {
-    const geometry: ContentGeometry = {
+    const geometry: ModelGeometry = {
       kind: 'ink',
       strokes: [
         [
@@ -2670,7 +2670,7 @@ describe('annotation-core — join-aware stroke bounds', () => {
 
   it('a mitred arrowhead tip is fully enclosed — the box reaches ~sw past the tip vertex', () => {
     // Horizontal line pointing right, closed arrow at the tip (100,0).
-    const geometry: ContentGeometry = {
+    const geometry: ModelGeometry = {
       kind: 'line',
       a: { x: 0, y: 0 },
       b: { x: 100, y: 0 },
@@ -2684,7 +2684,7 @@ describe('annotation-core — join-aware stroke bounds', () => {
   });
 
   it('scene paint: only ink rounds its joins; shapes and polys stay sharp (miter)', () => {
-    const mk = (subtype: Subtype, geometry: ContentGeometry): RenderItem => ({
+    const mk = (subtype: Subtype, geometry: ModelGeometry): RenderItem => ({
       id: 'x',
       ref: null,
       subtype,
@@ -3182,7 +3182,7 @@ describe('annotation-core — snapping', () => {
   });
 
   it('geomHandles carries rotation-aware cursors (the hover-cursor fix)', () => {
-    const geometry: ContentGeometry = {
+    const geometry: ModelGeometry = {
       kind: 'rect',
       rect: { x: 0, y: 0, width: 100, height: 50 },
       ellipse: false,
@@ -3721,7 +3721,7 @@ describe('upright creation (counter-rotating the display rotation)', () => {
     subtype,
     in: { page: PAGE, point: { x, y }, shift: false, ...extra },
   });
-  const textGeom = (geometry: ContentGeometry) => (geometry.kind === 'text' ? geometry : null);
+  const textGeom = (geometry: ModelGeometry) => (geometry.kind === 'text' ? geometry : null);
 
   it('helpers: a quarter-turn about the centre lands exactly back on the source box', () => {
     const dragged = { x: 50, y: 60, width: 120, height: 40 };
@@ -4008,14 +4008,14 @@ describe('render source after an edit (what keeps a raster, what renders live)',
   });
 
   it('apSizeChanged: translation and rotation preserve the frame; scaling changes it', () => {
-    const box: ContentGeometry = {
+    const box: ModelGeometry = {
       kind: 'rect',
       rect: { x: 10, y: 10, width: 80, height: 40 },
       ellipse: false,
     };
     expect(apSizeChanged(box, geomTranslate(box, { x: 25, y: -5 }))).toBe(false);
     expect(apSizeChanged(box, geomRotateAbout(box, { x: 50, y: 30 }, 90))).toBe(false);
-    const wider: ContentGeometry = {
+    const wider: ModelGeometry = {
       kind: 'rect',
       rect: { x: 10, y: 10, width: 120, height: 40 },
       ellipse: false,
@@ -4291,7 +4291,7 @@ describe('conversation plane — replies and review states never reach the page'
 describe('callout ↔ AP-generator mirror', () => {
   // Box (200,100)+120×40; tip far left; knee below-left of the box centre →
   // conn = left-edge midpoint (200,120). Same fixture as the callout describe.
-  const calloutGeom = (): Extract<ContentGeometry, { kind: 'text' }> => ({
+  const calloutGeom = (): Extract<ModelGeometry, { kind: 'text' }> => ({
     kind: 'text',
     rect: { x: 200, y: 100, width: 120, height: 40 },
     callout: { tip: { x: 40, y: 60 }, knee: { x: 120, y: 120 }, ending: 'open-arrow' },

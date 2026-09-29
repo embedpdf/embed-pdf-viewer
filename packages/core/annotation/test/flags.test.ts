@@ -18,7 +18,7 @@ import {
 import { geomBounds, geomRotation } from '../src/geometry';
 import { hitTest, isSelectable, paintOrder } from '../src/hit';
 import { initialModel, DEFAULT_CHROME_GEOMETRY } from '../src/index';
-import type { ModelAnnotation, ContentGeometry, Model, Message, Point } from '../src/types';
+import type { ModelAnnotation, ModelGeometry, Model, Message, Point } from '../src/types';
 import { pageItems, chrome, textBoxes } from '../src/view';
 
 const PON = 1;
@@ -238,7 +238,7 @@ describe('flag-driven behavior in the model', () => {
 
 describe('screen-anchored bodies (noZoom / noRotate)', () => {
   const rect = { x: 100, y: 100, width: 40, height: 20 };
-  const geom: ContentGeometry = { kind: 'rect', rect, ellipse: false };
+  const geom: ModelGeometry = { kind: 'rect', rect, ellipse: false };
 
   it('anchorModeOf reads flags OR kind caps', () => {
     expect(anchorModeOf(square('a', DRAWN_FLAGS))).toBeNull();
@@ -306,7 +306,7 @@ describe('screen-anchored bodies (noZoom / noRotate)', () => {
   it('no view env / text-anchored geoms pass through untouched', () => {
     expect(anchoredGeom(geom, { zoom: true, upright: true }, undefined)).toBe(geom);
     // markup quads are bound to page text — no screen anchoring for them.
-    const quads: ContentGeometry = {
+    const quads: ModelGeometry = {
       kind: 'quads',
       quads: [textQuadFromRect({ x: 0, y: 0, width: 10, height: 5 })],
     };
@@ -316,7 +316,7 @@ describe('screen-anchored bodies (noZoom / noRotate)', () => {
   });
 
   it('VERTEX kinds project too: an ink body scales about its bounds top-left', () => {
-    const ink: ContentGeometry = {
+    const ink: ModelGeometry = {
       kind: 'ink',
       strokes: [
         [
@@ -336,7 +336,7 @@ describe('screen-anchored bodies (noZoom / noRotate)', () => {
     const view: ViewEnv = { zoom: 2, rotation: 90 };
     const mode = { zoom: true, upright: true };
     // Round-trip a plain box, a rotated box, and a polygon.
-    const shapes: ContentGeometry[] = [
+    const shapes: ModelGeometry[] = [
       geom,
       { kind: 'rect', rect: { x: 100, y: 100, width: 40, height: 20 }, ellipse: false, rot: 30 },
       {

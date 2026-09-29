@@ -472,9 +472,9 @@ describe('repository — free-text callout mapping', () => {
     expect(annotation.geometry.kind).toBe('text');
     if (annotation.geometry.kind !== 'text' || !annotation.geometry.callout)
       throw new Error('expected callout geom');
-    // the text box, in content space
+    // the text box, in page space
     expect(annotation.geometry.rect).toMatchObject({ x: 200, y: 140, width: 120, height: 60 });
-    // tip / knee map to content space (y flips about the 800-pt crop)
+    // tip / knee map to page space (y flips about the 800-pt crop)
     expect(annotation.geometry.callout.tip).toEqual({ x: 40, y: 60 });
     expect(annotation.geometry.callout.knee).toEqual({ x: 120, y: 100 });
     expect(annotation.geometry.callout.ending).toBe('open-arrow');

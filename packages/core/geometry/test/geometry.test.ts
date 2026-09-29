@@ -27,7 +27,7 @@ describe('displaySize: w↔h swap for quarter-turns', () => {
  * confirm `invert` is its exact inverse (the property that lets the forward
  * placement and the inverse hit-test share one source of truth).
  */
-describe('rotateScaleMatrix: content point → rotated display box', () => {
+describe('rotateScaleMatrix: page point → rotated display box', () => {
   const boxW = 600;
   const boxH = 800;
   // content corners, top-left origin: TL, TR, BL, BR.
@@ -62,7 +62,7 @@ describe('rotateScaleMatrix: content point → rotated display box', () => {
     expect(applyPoint(matrix, br)).toEqual({ x: 800, y: 0 });
   });
 
-  it('folds scale in (a content point → scaled, rotated box offset)', () => {
+  it('folds scale in (a page point → scaled, rotated box offset)', () => {
     // scale 2: box extents in output units are 1200×1600.
     const matrix = rotateScaleMatrix(2, 1200, 1600, 90);
     expect(applyPoint(matrix, { x: 300, y: 400 })).toEqual({ x: 1600 - 800, y: 600 });

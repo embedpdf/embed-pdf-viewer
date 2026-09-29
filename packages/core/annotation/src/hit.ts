@@ -19,7 +19,7 @@ import {
   type ModelAnnotation,
   type ChromeGeometry,
   type Cursor,
-  type ContentGeometry,
+  type ModelGeometry,
   type Id,
   type Model,
   type Rect,
@@ -98,7 +98,7 @@ const hasHandles = (model: Model, annotation: ModelAnnotation): boolean => {
 /** The geometry a pointer actually meets: the anchored (screen-constant)
  *  projection for `noZoom`/`noRotate` annotations, the stored geom otherwise.
  *  The same projection `pageItems` renders, so click matches paint. */
-const hitGeomOf = (annotation: ModelAnnotation, view: ViewEnv | undefined): ContentGeometry =>
+const hitGeomOf = (annotation: ModelAnnotation, view: ViewEnv | undefined): ModelGeometry =>
   anchoredGeom(annotation.geometry, anchorModeOf(annotation), view);
 
 /** Stroke width in effective content units (a noZoom body's line weight scales
@@ -164,7 +164,7 @@ export function groupUnionBounds(model: Model, page: PageRef, view?: ViewEnv): R
 }
 
 /**
- * What's under the content point.
+ * What's under the page point.
  *  1. a resize/vertex handle of the single selection,
  *  2. an editable annotation body — a selected one anywhere in its bounds (so you
  *     can drag to move it), an unselected one only on its stroke/fill (margin-aware,

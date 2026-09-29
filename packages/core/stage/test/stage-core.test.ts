@@ -687,7 +687,7 @@ describe('groupPages', () => {
 /*
  * PDF `/UserUnit` (§14.11.6): a userUnit-5 page is physically 5× its point size.
  * It folds into the page's measured layout size and its per-page
- * `contentScale`, so "world units per content point" stays true for every
+ * `contentScale`, so "world units per page point" stays true for every
  * page — the invariant every content→world mapping depends on.
  */
 describe('userUnit folds into layout size and per-page contentScale', () => {
@@ -702,7 +702,7 @@ describe('userUnit folds into layout size and per-page contentScale', () => {
     expect(plain.contentScale).toBe(1);
     expect(big.width).toBe(500); // lays out 5× larger, like Acrobat
     expect(big.height).toBe(1000);
-    expect(big.contentScale).toBe(5); // world per content point — per page
+    expect(big.contentScale).toBe(5); // world per page point — per page
     // the invariant: box extent ÷ contentScale recovers the point size
     expect(big.width / big.contentScale).toBe(100);
   });

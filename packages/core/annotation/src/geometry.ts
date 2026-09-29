@@ -1,8 +1,8 @@
 /**
- * Pure content-space geometry, dispatched on the `ContentGeometry` union. This is the whole
+ * Pure page-space geometry, dispatched on the `ModelGeometry` union. This is the whole
  * per-kind surface: bounds, hit-testing (stroke + fill, with a configurable
  * margin), handles (with cursors), translate, handle-drag, and the dumb scene.
- * Content space is the engine's page space: the same numbers, nothing to convert.
+ * The engine speaks page space too: the same numbers, nothing to convert.
  */
 import {
   applyPoint,
@@ -21,7 +21,7 @@ import { endingNodes, endingPoints } from './endings';
 import type {
   Border,
   Cursor,
-  ContentGeometry,
+  ModelGeometry,
   Handle,
   LineEnding,
   Quad,
@@ -152,8 +152,7 @@ export function pointInPoly(point: Point, points: readonly Point[]): boolean {
   }
   return inside;
 }
-const polyPoints = (geometry: Extract<ContentGeometry, { kind: 'poly' }>): Point[] =>
-  geometry.points;
+const polyPoints = (geometry: Extract<ModelGeometry, { kind: 'poly' }>): Point[] => geometry.points;
 
 export function unionRect(points: Point[]): Rect {
   let x0 = Infinity;
@@ -188,7 +187,7 @@ const rectCornerPoints = (rect: Rect): Point[] => [
  * primitives (`rotateAbout`). Box kinds carry an unrotated `rect` + a `rot`
  * angle; vertex kinds carry already-rotated points + an advisory `rot`. These
  * helpers know that split and compose the matrix builders — they never hand-roll
- * a rotation matrix. See `ContentGeometry` in types.ts.
+ * a rotation matrix. See `ModelGeometry` in types.ts.
  * ──────────────────────────────────────────────────────────────────────────── */
 
 const DEG2RAD = Math.PI / 180;
@@ -211,7 +210,7 @@ export const normalizeDeg = (degrees: number): number => ((degrees % 360) + 360)
  *  caret's `rot` is authoring metadata (its text's baseline tilt): reported
  *  here so the renderer and selection chrome follow it, while the caret's
  *  caps (not movable/resizable) keep every rotate gesture away from it. */
-export function geomRotation(geometry: ContentGeometry): number {
+export function geomRotation(geometry: ModelGeometry): number {
   if (
     geometry.kind === 'rect' ||
     geometry.kind === 'line' ||
@@ -229,15 +228,15 @@ const rectCenter = (rect: Rect): Point => ({
   y: rect.y + rect.height / 2,
 });
 
-const rotateAboutM = (pivot: Point, deg: number): Mat2D<'content', 'content'> =>
-  rotateAbout(pivot as PointIn<'content'>, deg * DEG2RAD);
+const rotateAboutM = (pivot: Point, deg: number): Mat2D<'page', 'page'> =>
+  rotateAbout(pivot as PointIn<'page'>, deg * DEG2RAD);
 
-/** Rotate one point about a pivot by `deg` (CW, content space). */
+/** Rotate one point about a pivot by `deg` (CW, page space). */
 export const rotatePoint = (point: Point, pivot: Point, deg: number): Point =>
-  applyPoint(rotateAboutM(pivot, deg), point as PointIn<'content'>);
+  applyPoint(rotateAboutM(pivot, deg), point as PointIn<'page'>);
 
 /** A box's centre, or the mean of a shape's points. */
-export function centroidOf(geometry: ContentGeometry): Point {
+export function centroidOf(geometry: ModelGeometry): Point {
   if (geometry.kind === 'rect' || geometry.kind === 'text' || geometry.kind === 'caret')
     return rectCenter(geometry.rect);
   if (geometry.kind === 'line')
@@ -265,7 +264,7 @@ export function centroidOf(geometry: ContentGeometry): Point {
  * where the upright points are, and a caption or an arrowhead never moves the
  * pivot.
  */
-export function turnPivotOf(geometry: ContentGeometry): Point {
+export function turnPivotOf(geometry: ModelGeometry): Point {
   const points =
     geometry.kind === 'line'
       ? [geometry.a, geometry.b]
@@ -285,7 +284,7 @@ export function turnPivotOf(geometry: ContentGeometry): Point {
  *  Orientation is a geometry fact; whether the user may rotate is the separate
  *  `caps.rotatable` gate — a caret is oriented (it rides its text's tilt) yet
  *  offers no rotate gesture. */
-export function isRotatableGeom(geometry: ContentGeometry): boolean {
+export function isRotatableGeom(geometry: ModelGeometry): boolean {
   return (
     geometry.kind === 'rect' ||
     geometry.kind === 'line' ||
@@ -309,10 +308,10 @@ export function isRotatableGeom(geometry: ContentGeometry): boolean {
  * clears it).
  */
 export function geomRotateAbout(
-  geometry: ContentGeometry,
+  geometry: ModelGeometry,
   pivot: Point,
   deltaDeg: number,
-): ContentGeometry {
+): ModelGeometry {
   if (deltaDeg === 0) return geometry;
   const nextRot = normalizeDeg(geomRotation(geometry) + deltaDeg);
   if (geometry.kind === 'rect') {
@@ -358,7 +357,7 @@ export function geomRotateAbout(
  * blit), the point bounds for vertex kinds (their points are the visual).
  * Position is deliberately absent — a translation never invalidates a raster.
  */
-function apFrameSize(geometry: ContentGeometry): Size {
+function apFrameSize(geometry: ModelGeometry): Size {
   if (geometry.kind === 'rect' || geometry.kind === 'text' || geometry.kind === 'caret')
     return { width: geometry.rect.width, height: geometry.rect.height };
   const points =
@@ -380,7 +379,7 @@ function apFrameSize(geometry: ContentGeometry): Size {
  * the frame (false), a resize/scale changes it (true). The 0.01pt tolerance
  * absorbs float noise from the gesture math.
  */
-export function apSizeChanged(before: ContentGeometry, after: ContentGeometry): boolean {
+export function apSizeChanged(before: ModelGeometry, after: ModelGeometry): boolean {
   const size = apFrameSize(before);
   const afterSize = apFrameSize(after);
   return (
@@ -398,7 +397,7 @@ export function rotatedAabb(rect: Rect, deg: number): Rect {
 /* ── upright placement (counter-rotating against the display rotation) ────────
  * An `upright` tool commits `rot = -displayRotation` so the annotation reads
  * horizontally on the rotated page. These two helpers are the only placement
- * math that rule needs; both are exact for quarter-turns and pure content-space
+ * math that rule needs; both are exact for quarter-turns and pure page-space
  * (they never know about the view).
  * ──────────────────────────────────────────────────────────────────────────── */
 
@@ -452,7 +451,7 @@ const clampScalar = (value: number, lo: number, hi: number): number =>
   Math.max(lo, Math.min(hi, value));
 
 /**
- * The logical (unrotated) content-space box for a stamp placed at `center`,
+ * The logical (unrotated) page-space box for a stamp placed at `center`,
  * sized `desired` (points), fit onto the page and clamped fully within it —
  * the rubber-stamp rule: keep the image's own size unless it would overflow
  * the page, then scale down (aspect preserved, never up) so it just fits.
@@ -483,7 +482,7 @@ export function fitStampBox(center: Point, desired: Size, page: Size, rotCW: num
 /** Reset a geom to its as-authored orientation (`rot → 0`). Box: drop `rot`.
  *  Vertex: spin the points by `-rot` about the supplied selection center.
  *  Geometry-only callers retain the centroid default. */
-export function geomResetRotation(geometry: ContentGeometry, pivot?: Point): ContentGeometry {
+export function geomResetRotation(geometry: ModelGeometry, pivot?: Point): ModelGeometry {
   const rot = geomRotation(geometry);
   if (!rot) return geometry;
   if (geometry.kind === 'rect' || geometry.kind === 'text' || geometry.kind === 'caret')
@@ -503,7 +502,7 @@ export function geomResetRotation(geometry: ContentGeometry, pivot?: Point): Con
  * rectangle. Returns null for non-rotatable kinds.
  */
 export function obbFromGeom(
-  geometry: ContentGeometry,
+  geometry: ModelGeometry,
   strokeWidth: number,
   border?: Border,
 ): { corners: [Point, Point, Point, Point]; angle: number } | null {
@@ -583,11 +582,11 @@ export function groupResizeFactors(base: Rect, current: Rect): { sx: number; sy:
  * (the anisotropic case) every point/extent scales directly.
  */
 export function geomScaleAbout(
-  geometry: ContentGeometry,
+  geometry: ModelGeometry,
   anchor: Point,
   sx: number,
   sy: number,
-): ContentGeometry {
+): ModelGeometry {
   const sp = (point: Point): Point => ({
     x: anchor.x + (point.x - anchor.x) * sx,
     y: anchor.y + (point.y - anchor.y) * sy,
@@ -740,7 +739,7 @@ export function calloutConnection(box: Rect, ref: Point, rot = 0): Point {
 
 /** The leader polyline `[tip, knee?, conn]`, with `conn` derived from the box
  *  (its rotated footprint when the box carries `rot`). */
-export function calloutLinePoints(geometry: Extract<ContentGeometry, { kind: 'text' }>): Point[] {
+export function calloutLinePoints(geometry: Extract<ModelGeometry, { kind: 'text' }>): Point[] {
   const callout = geometry.callout;
   if (!callout) return [];
   const conn = calloutConnection(geometry.rect, callout.knee ?? callout.tip, geometry.rot ?? 0);
@@ -829,14 +828,14 @@ const CARET_ROT_EPSILON = 0.05;
  * Caret geometry for a text-edit anchor: the box-family pair — an unrotated
  * box whose centre sits half a caret-size ascent-ward of the trailing
  * baseline corner, plus `rot` = the text's baseline tilt (deg, CW in y-down
- * content space). Rotating the box about its centre by `rot` lands it
+ * page space). Rotating the box about its centre by `rot` lands it
  * hugging the rotated baseline, symbol pointing at its text. For upright
  * anchors this degenerates exactly to {@link caretRectFromAnchor} with no
  * `rot` key — the dominant case is byte-identical.
  */
 export function caretGeomFromAnchor(
   anchor: TextEndAnchor,
-): Extract<ContentGeometry, { kind: 'caret' }> {
+): Extract<ModelGeometry, { kind: 'caret' }> {
   const quad = anchor.glyphQuad;
   const ink = Math.hypot(
     quad.lowerStart.x - quad.upperStart.x,
@@ -969,7 +968,7 @@ type EndingSeg = { tip: Point; angle: number; ending: LineEnding | undefined };
 
 /** The start/end tips of a line / open poly, each with the segment angle pointing
  *  Out of the body into the tip (so an arrowhead opens back toward the line). */
-function endingSegs(geometry: ContentGeometry): EndingSeg[] {
+function endingSegs(geometry: ModelGeometry): EndingSeg[] {
   if (geometry.kind === 'line' && geometry.ends) {
     return [
       {
@@ -1028,7 +1027,7 @@ function endingSegs(geometry: ContentGeometry): EndingSeg[] {
  * grows with them so the baked scallops are never clipped.
  */
 export function geomVisualBounds(
-  geometry: ContentGeometry,
+  geometry: ModelGeometry,
   strokeWidth: number,
   border?: Border,
 ): Rect {
@@ -1096,7 +1095,7 @@ export function geomVisualBounds(
  * they can never drift.
  */
 export function selectionBounds(
-  geometry: ContentGeometry,
+  geometry: ModelGeometry,
   strokeWidth: number,
   border?: Border,
 ): Rect {
@@ -1120,7 +1119,7 @@ export function selectionBounds(
  * the outline you see.
  */
 export function selectionQuad(
-  geometry: ContentGeometry,
+  geometry: ModelGeometry,
   strokeWidth: number,
   border?: Border,
 ): [Point, Point, Point, Point] {
@@ -1178,7 +1177,7 @@ export function quadIntersectsRect(quad: [Point, Point, Point, Point], rect: Rec
 }
 
 /**
- * Is the content point on a line/poly's drawn endings — so an arrowhead is as
+ * Is the page point on a line/poly's drawn endings — so an arrowhead is as
  * clickable as the stroke. Uses the same ending nodes the renderer draws: a closed
  * shape (closed arrow, circle, square, diamond) hits inside or near its edge; an
  * open one (open arrow, butt, slash) hits near its stroke. `tol` is the stroke
@@ -1209,7 +1208,7 @@ function endingNodesHit(nodes: RenderNode[], point: Point, tol: number): boolean
 }
 
 function endingHit(
-  geometry: ContentGeometry,
+  geometry: ModelGeometry,
   point: Point,
   tol: number,
   strokeWidth: number,
@@ -1222,7 +1221,7 @@ function endingHit(
 
 /* ── geom ops ─────────────────────────────────────────────────────────────── */
 
-export function geomBounds(geometry: ContentGeometry): Rect {
+export function geomBounds(geometry: ModelGeometry): Rect {
   if (geometry.kind === 'rect' || geometry.kind === 'text' || geometry.kind === 'caret')
     return geometry.rect;
   if (geometry.kind === 'line') return rectFromPoints(geometry.a, geometry.b);
@@ -1232,7 +1231,7 @@ export function geomBounds(geometry: ContentGeometry): Rect {
 }
 
 /**
- * Is the content point on the annotation: within `margin` of the stroke, or
+ * Is the page point on the annotation: within `margin` of the stroke, or
  * inside the fill (when `filled`). The stroke band widens with the stroke width.
  *
  * A shape's stroke is drawn inside its box, centred on `insetRect(rect, sw/2)`
@@ -1241,7 +1240,7 @@ export function geomBounds(geometry: ContentGeometry): Rect {
  * here; with their typically thin stroke the inset is sub-pixel, so this matches.)
  */
 export function geomHit(
-  geometry: ContentGeometry,
+  geometry: ModelGeometry,
   point: Point,
   margin: number,
   filled: boolean,
@@ -1348,7 +1347,7 @@ export function geomHit(
   return geometry.quads.some((quad) => pointInQuad(point, textQuadRing(quad)));
 }
 
-export function geomHandles(geometry: ContentGeometry): Handle[] {
+export function geomHandles(geometry: ModelGeometry): Handle[] {
   if (geometry.kind === 'rect' || geometry.kind === 'text') {
     const rot = geometry.rot ?? 0;
     const point = rectCenter(geometry.rect);
@@ -1383,7 +1382,7 @@ export function geomHandles(geometry: ContentGeometry): Handle[] {
   return []; // markup: move only
 }
 
-export function geomTranslate(geometry: ContentGeometry, delta: Point): ContentGeometry {
+export function geomTranslate(geometry: ModelGeometry, delta: Point): ModelGeometry {
   const mv = (vertex: Point): Point => ({ x: vertex.x + delta.x, y: vertex.y + delta.y });
   if (geometry.kind === 'text') {
     const rect = { ...geometry.rect, x: geometry.rect.x + delta.x, y: geometry.rect.y + delta.y };
@@ -1456,11 +1455,7 @@ function resizeRotatedRect(base: Rect, rot: number, handle: RectHandle, to: Poin
   };
 }
 
-export function geomDragHandle(
-  geometry: ContentGeometry,
-  handle: string,
-  to: Point,
-): ContentGeometry {
+export function geomDragHandle(geometry: ModelGeometry, handle: string, to: Point): ModelGeometry {
   if (geometry.kind === 'text') {
     if (handle === 'callout-tip' && geometry.callout)
       return { ...geometry, callout: { ...geometry.callout, tip: to } };
@@ -1508,8 +1503,8 @@ export function textPlateInset(strokeWidth: number): number {
  *  so the leader meets the border ink without an angular gap) + the arrow at
  *  its tip. */
 function calloutLeaderNodes(
-  geometry: Extract<ContentGeometry, { kind: 'text' }>,
-  callout: NonNullable<Extract<ContentGeometry, { kind: 'text' }>['callout']>,
+  geometry: Extract<ModelGeometry, { kind: 'text' }>,
+  callout: NonNullable<Extract<ModelGeometry, { kind: 'text' }>['callout']>,
   strokeWidth: number,
 ): RenderNode[] {
   const points = [...calloutLinePoints(geometry)];
@@ -1532,11 +1527,7 @@ function calloutLeaderNodes(
   return nodes;
 }
 
-export function geomScene(
-  geometry: ContentGeometry,
-  strokeWidth = 0,
-  border?: Border,
-): RenderNode[] {
+export function geomScene(geometry: ModelGeometry, strokeWidth = 0, border?: Border): RenderNode[] {
   // A text box's box — its fill and its border — is the scene's, plain box and
   // callout alike, so the live view paints exactly what the AP generator
   // bakes (`GenerateBorderAP`: the `/DA` colour at the `/BS` width, inset by

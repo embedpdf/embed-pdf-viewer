@@ -5,7 +5,7 @@ import {
   geomVisualBounds,
   resolveClickPlacement,
   styleFromProps,
-  type ContentGeometry,
+  type ModelGeometry,
   type Rect,
   type Point,
 } from '@embedpdf/core-annotation';
@@ -36,7 +36,7 @@ export function createGhost(
   const showVectorGhost = (
     pageObjectNumber: number,
     toolId: string,
-    geometry: ContentGeometry,
+    geometry: ModelGeometry,
   ): void => {
     const tool = tools.get(toolId);
     const style = styleFromProps(defaultsFor(store.model(), tool?.preset ?? toolId));
@@ -50,7 +50,7 @@ export function createGhost(
     });
   };
 
-  /** Move the hover footprint ghost to a content point. The box/geometry is
+  /** Move the hover footprint ghost to a page point. The box/geometry is
    *  computed by the same rules the click's placement uses (the stamp fit +
    *  clamp for an armed stamp; the click-create anchor + page clamp for a
    *  draw tool), so the ghost is the placement, not an approximation of it. */

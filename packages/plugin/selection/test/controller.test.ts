@@ -29,7 +29,7 @@ const glyph = (left: number, bottom: number, space = false, width = 8, height = 
 });
 
 /** One upright run of `count` glyphs starting at x=10, y-up row 90..100
- *  (content space: y 0..10). A space at `spaceAt` splits words. */
+ *  (page space: y 0..10). A space at `spaceAt` splits words. */
 const simpleGeometry = (count: number, spaceAt?: number): PageGeometrySnapshot<PdfCoordinates> => ({
   runs: [
     {

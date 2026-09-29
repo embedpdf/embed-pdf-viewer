@@ -45,7 +45,7 @@ export interface StageSurfaceHost extends StageGestureHost {
     rotation?: 0 | 90 | 180 | 270;
     zoom?: number;
   } | null;
-  /** Viewport point → a specific page's content space, unclamped (frame-stable projection). */
+  /** Viewport point → a specific page's page space, unclamped (frame-stable projection). */
   viewportToPage(page: PageRef, screen: SurfacePoint): SurfacePoint | null;
 }
 

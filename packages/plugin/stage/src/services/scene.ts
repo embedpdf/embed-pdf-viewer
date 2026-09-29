@@ -120,7 +120,7 @@ export function createScene(ctx: PluginContext<StageState>) {
     // rotation is its /Rotate plus this lens's viewRotation. Everything
     // downstream (the display-size swap, the page transform, hit-testing, fit
     // zoom, overlays) reads the composed rotation. `size` stays the page's
-    // own un-rotated points, so content space is view-rotation-invariant.
+    // own un-rotated points, so page space is view-rotation-invariant.
     const registryPages = ctx.document()?.pages ?? [];
     const viewRotation = settings.viewRotation;
     const pages =
@@ -244,7 +244,7 @@ export function createScene(ctx: PluginContext<StageState>) {
   };
 
   /**
-   * A content-space rect on a page → a world rect: the same quarter-turn
+   * A page-space rect on a page → a world rect: the same quarter-turn
    * matrix `pageRectToViewport` uses, minus the camera, so a positioned
    * reveal and the rendered overlay never disagree about where a rect is.
    */

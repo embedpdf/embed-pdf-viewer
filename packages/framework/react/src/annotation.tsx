@@ -172,7 +172,7 @@ function paintAttrs(paint: Paint) {
 
 /**
  * The dumb painter. The pure core computed `item.box` and the painted `scene`; we
- * size the <svg> to the box with a content-space `viewBox` and map each SceneNode
+ * size the <svg> to the box with a page-space `viewBox` and map each SceneNode
  * to one element, applying its `paint`. No per-kind logic, no bounds math — so
  * shapes, cloudy borders and every text-markup type all render here, and a Vue /
  * Svelte painter is the same ~10-line loop.
@@ -452,7 +452,7 @@ function Chrome({ page }: { page: PageContextValue }) {
             );
           }
           // An oriented selection box (a tilted shape/group): a closed quad through
-          // the four content-space corners — replaces the axis-aligned outline.
+          // the four page-space corners — replaces the axis-aligned outline.
           if (node.kind === 'obb') {
             const svgPoints = node.corners
               .map((point) => {

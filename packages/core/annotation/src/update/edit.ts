@@ -16,14 +16,14 @@ import { groupMembers } from '../group';
 import { canMove, hitTest } from '../hit';
 import { distanceLeaderLength } from '../measurement';
 import { computeMoveSnap } from '../snap';
-import type { ContentGeometry, Draft, Effect, Id, Model, Point, PointerInput } from '../types';
+import type { ModelGeometry, Draft, Effect, Id, Model, Point, PointerInput } from '../types';
 import { sub } from './changes';
 import { editUp } from './edit-commit';
 import { clampMoveDelta, clampPointToBox, editDraftPage, viewOf } from './page-bound';
 
 const RAD2DEG = 180 / Math.PI;
 
-/** The signed CW angle (deg) of `point` relative to `pivot`, in content space (y-down). */
+/** The signed CW angle (deg) of `point` relative to `pivot`, in page space (y-down). */
 const angleAt = (pivot: Point, point: Point): number =>
   Math.atan2(point.y - pivot.y, point.x - pivot.x) * RAD2DEG;
 
@@ -63,7 +63,7 @@ export function rotateDraftDelta(
  *  vertex member's advisory `rot` counts (preserves obbFromTheta + reset). */
 const selectionHasRotation = (model: Model, ids: Id[]): boolean =>
   ids.some(
-    (id) => geomRotation(model.byId[id]?.geometry ?? ({ kind: 'caret' } as ContentGeometry)) !== 0,
+    (id) => geomRotation(model.byId[id]?.geometry ?? ({ kind: 'caret' } as ModelGeometry)) !== 0,
   );
 
 export function editPointer(

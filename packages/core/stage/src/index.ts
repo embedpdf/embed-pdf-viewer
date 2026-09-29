@@ -45,7 +45,7 @@ export interface PageGeom {
    * PDF `/UserUnit` (§14.11.6): how many 1/72" units one point of this page
    * spans — the page is physically `userUnit ×` larger than its point size
    * says. Folded into the layout (a userUnit-5 page lays out 5× bigger, like
-   * Acrobat) and into its `contentScale`, so "world per content point" stays
+   * Acrobat) and into its `contentScale`, so "world per page point" stays
    * true per page. Default 1 (virtually every document).
    */
   userUnit?: number;
@@ -577,7 +577,7 @@ interface LocalBox {
   h: number;
   rotation: PageRotation;
   /** The page's `/UserUnit` — folded into its `contentScale` at placement, so
-   *  "world units per content point" stays true for every page of a spread. */
+   *  "world units per page point" stays true for every page of a spread. */
   userUnit: number;
 }
 

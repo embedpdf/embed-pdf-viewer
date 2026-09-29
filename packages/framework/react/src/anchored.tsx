@@ -3,7 +3,7 @@
  * page content (selection menus, draft menus, future popovers).
  *
  * The factoring:
- *   - plugins produce anchors (a content-space rect on a page, plus points
+ *   - plugins produce anchors (a page-space rect on a page, plus points
  *     to dodge) as capability reads.
  *   - The projection snapshot contract and the placement math are shared,
  *     framework-neutral, in `@embedpdf/web` ({@link ViewProjector},
@@ -87,7 +87,7 @@ export interface AnchoredProps {
 }
 
 /**
- * Position `children` around a content-space anchor, on whichever page
+ * Position `children` around a page-space anchor, on whichever page
  * surface is in scope. Projection runs during render from the shared pure
  * helper; pointer isolation keeps a click inside anchored UI from reaching
  * the surface's own listener (which would read it as click-outside).

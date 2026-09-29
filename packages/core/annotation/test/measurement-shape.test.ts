@@ -21,7 +21,7 @@ import {
 } from '../src/measurement-shape';
 import { scene } from '../src/scene';
 import { annotationSelectionFrame } from '../src/selection';
-import type { ModelAnnotation, ContentGeometry, Model, Message, Point } from '../src/types';
+import type { ModelAnnotation, ModelGeometry, Model, Message, Point } from '../src/types';
 import { initialModel, initialStyle } from '../src/update';
 import { chrome, creationDraftAnchor, pageItems } from '../src/view';
 
@@ -38,7 +38,7 @@ const points = [
   { x: 300, y: 200 },
   { x: 100, y: 200 },
 ];
-const geometry: ContentGeometry = { kind: 'poly', closed: true, points };
+const geometry: ModelGeometry = { kind: 'poly', closed: true, points };
 
 function annotation(measure = appearance, geom = geometry): ModelAnnotation {
   return {

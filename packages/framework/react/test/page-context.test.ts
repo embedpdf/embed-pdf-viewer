@@ -6,7 +6,7 @@ import { makePageContext, toPageRef } from '../src/runtime';
  * The rotation/scale math is exhaustively covered in @embedpdf/core-geometry's
  * pageTransform tests. Here we only verify the adapter wiring: `makePageContext`
  * turns a client point into a box-local point (client − the surface rect's
- * top-left) and feeds it to `transform.viewToContent`, and carries `transform` +
+ * top-left) and feeds it to `transform.viewToPage`, and carries `transform` +
  * `frame` through.
  */
 describe('makePageContext wiring', () => {
@@ -26,7 +26,7 @@ describe('makePageContext wiring', () => {
       }) as DOMRect;
   const NO_FRAME = { top: 0, right: 0, bottom: 0, left: 0 };
 
-  it('toContentPoint = transform.viewToContent(client − rect top-left), scale 2', () => {
+  it('toPagePoint = transform.viewToPage(client − rect top-left), scale 2', () => {
     const transform = pageTransform({
       pageSize: { width: 100, height: 200 },
       rotation: 0,
@@ -42,8 +42,8 @@ describe('makePageContext wiring', () => {
       transform,
       rectAt(10, 20, transform.viewWidth, transform.viewHeight),
     );
-    expect(ctx.toContentPoint(10, 20)).toEqual({ x: 0, y: 0 }); // box top-left → page origin
-    expect(ctx.toContentPoint(110, 220)).toEqual({ x: 50, y: 100 }); // (100,200) view px ÷ scale 2
+    expect(ctx.toPagePoint(10, 20)).toEqual({ x: 0, y: 0 }); // box top-left → page origin
+    expect(ctx.toPagePoint(110, 220)).toEqual({ x: 50, y: 100 }); // (100,200) view px ÷ scale 2
   });
 
   it('inverts a 90° rotation through the transform', () => {
@@ -63,7 +63,7 @@ describe('makePageContext wiring', () => {
       transform,
       rectAt(0, 0, transform.viewWidth, transform.viewHeight),
     );
-    const back = ctx.toContentPoint(200, 0);
+    const back = ctx.toPagePoint(200, 0);
     expect(back.x).toBeCloseTo(0, 4);
     expect(back.y).toBeCloseTo(0, 4);
   });
@@ -85,7 +85,7 @@ describe('makePageContext wiring', () => {
       rectAt(30, 40, transform.viewWidth, transform.viewHeight),
     );
     const rect = { x: 10, y: 20, width: 30, height: 40 };
-    const view = transform.contentToViewRect(rect);
+    const view = transform.pageToViewRect(rect);
 
     expect(ctx.toClientRect(rect)).toEqual({
       x: 30 + view.x,

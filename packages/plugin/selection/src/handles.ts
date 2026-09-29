@@ -24,19 +24,19 @@ import type { PageRef } from '@embedpdf/engine-core/runtime';
 
 /** What handle geometry & drags need from the hosting view. */
 export interface SelectionHandleView {
-  /** Page content point → overlay px. Must be point-exact (compose
+  /** Page page point → overlay px. Must be point-exact (compose
    *  `pageToWorld` with `toScreen`); an AABB projector loses orientation. */
   toOverlay(page: PageRef, point: Point): Point | null;
   /** Overlay px → the page under it, or null over a gap. */
   pageAt(overlay: Point): { ref: PageRef; point: Point } | null;
-  /** Overlay px → a specific page's content space, unclamped. */
+  /** Overlay px → a specific page's page space, unclamped. */
   pointOnPage(page: PageRef, overlay: Point): Point | null;
 }
 
 /** One selection boundary, as the handle needs it (a `SelectionEndpoint` slice). */
 export interface SelectionHandleEndpoint {
   page: PageRef;
-  /** The boundary glyph's own oriented cell, page content space. */
+  /** The boundary glyph's own oriented cell, page page space. */
   glyphQuad: TextQuad;
   /** Reading direction of its segment (+1 = the frame's +x) — decides which
    *  side of the cell is the selection's leading edge. */

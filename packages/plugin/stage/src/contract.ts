@@ -256,7 +256,7 @@ export interface StageSettings {
  *    `x/y/width/height` only to position the page container.
  *  - `transform`: presentation truth — the single bridge between PDF points,
  *    view px, and device px for this page. Plugins do all coordinate work
- *    through it (`contentToView` / `viewToContent` / `deviceWidth` / `cssMatrix`),
+ *    through it (`pageToView` / `viewToPage` / `deviceWidth` / `cssMatrix`),
  *    never by re-deriving `x * scale` / `* dpr`. Page-local, so it's
  *    camera/pan-invariant.
  */

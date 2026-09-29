@@ -19,7 +19,7 @@ import type {
   FormSnapshot,
 } from '@embedpdf/engine-core/runtime';
 
-/** A content-space box (top-left origin, y-down, PDF points). */
+/** A page-space box (top-left origin, y-down, PDF points). */
 export interface Box {
   readonly x: number;
   readonly y: number;
@@ -144,14 +144,14 @@ const valueEntryOf = (field: FormFieldDTO): unknown =>
 
 // ── widget geometry (the `widgetBoxes` page mirror) ──────────────────────────
 
-/** One page's widget geometry: widget annotation object number → content-space box. */
+/** One page's widget geometry: widget annotation object number → page-space box. */
 export type WidgetBoxes = Readonly<Record<number, Box>>;
 
 /** A widget hit: the annotation under the point and the field it belongs to. */
 export interface WidgetHit {
   readonly annotObjectNumber: number;
   readonly field: FormFieldDTO;
-  /** The widget's content-space box. */
+  /** The widget's page-space box. */
   readonly box: Box;
 }
 
@@ -161,7 +161,7 @@ export const boxContains = (box: Box, point: { x: number; y: number }): boolean 
   point.y >= box.y &&
   point.y <= box.y + box.height;
 
-/** The widget under a content-space point; nested widgets resolve to the smallest box. */
+/** The widget under a page-space point; nested widgets resolve to the smallest box. */
 export function widgetAt(
   index: FieldIndex,
   boxes: WidgetBoxes | undefined,

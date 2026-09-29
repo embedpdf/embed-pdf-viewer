@@ -5,7 +5,7 @@
  * the scattered `subtype`/`geom.t` switches and the old binary `EDITABLE_SUBTYPES`.
  *
  * Two layers meet here:
- *   • `variant` — which {@link ContentGeometry} primitive the kind renders/hit-tests as.
+ *   • `variant` — which {@link ModelGeometry} primitive the kind renders/hit-tests as.
  *     Several subtypes share one (square+circle → `rect`, the markups → `quads`).
  *   • `caps` — orthogonal capability flags. "Editable" was one boolean that
  *     conflated selectable / movable / resizable / vertex-editable; splitting it
@@ -16,7 +16,7 @@
  * kind (ink vs ink-highlight, line vs arrow). A kind is the editing/identity
  * surface; a tool is the authoring surface.
  */
-import type { ContentGeometry, Subtype } from './types';
+import type { ModelGeometry, Subtype } from './types';
 
 /**
  * One editable property of a kind, as a UI contract: which {@link AnnotationProps}
@@ -109,7 +109,7 @@ export interface AnnotationKind {
   subtype: Subtype;
   /** Future: PDF `/IT` intent (free-text vs callout, caret insert vs replace). */
   intent?: string;
-  variant: ContentGeometry['kind'];
+  variant: ModelGeometry['kind'];
   caps: KindCaps;
   /** The kind's editable properties, in display order — the contract a property
    *  sidebar renders from (see {@link PropSpec}). Empty = nothing to edit. */

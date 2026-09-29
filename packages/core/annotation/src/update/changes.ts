@@ -7,7 +7,7 @@
 import { anchoredGeom, anchorModeOf, unanchoredGeom, type ViewEnv } from '../anchor';
 import { capsFor } from '../kinds';
 import type {
-  ContentGeometry,
+  ModelGeometry,
   Effect,
   Id,
   Model,
@@ -66,13 +66,13 @@ export const translateRect = (rect: Rect, point: Point): Rect => ({
 export const commitViewGesture = (
   annotation: ModelAnnotation,
   view: ViewEnv | undefined,
-  op: (geometry: ContentGeometry) => ContentGeometry,
-): ContentGeometry => {
+  op: (geometry: ModelGeometry) => ModelGeometry,
+): ModelGeometry => {
   const mode = anchorModeOf(annotation);
   return unanchoredGeom(op(anchoredGeom(annotation.geometry, mode, view)), mode, view);
 };
 
-export const geomEqual = (left: ContentGeometry, right: ContentGeometry): boolean =>
+export const geomEqual = (left: ModelGeometry, right: ModelGeometry): boolean =>
   JSON.stringify(left) === JSON.stringify(right);
 
 /** The id of the `offset`-th record a message creates (`new:<n>`), counted from the session's `seq`. */

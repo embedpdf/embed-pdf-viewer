@@ -57,7 +57,7 @@ function Pin({ item, page }: AnnotationRendererProps) {
 
 Going the other way (a pointer event → page space) is
 `page.transform.fromPixels(px)`, and for raw client coordinates the page
-context has `page.toContentPoint(clientX, clientY)`.
+context has `page.toPagePoint(clientX, clientY)`.
 
 ## Tools that use the PDF file's numbers
 

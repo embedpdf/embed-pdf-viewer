@@ -4,7 +4,7 @@ import type { AnnotationFlags } from '@embedpdf/engine-core/runtime';
 import { DRAWN_FLAGS } from '../flags';
 import { distanceLeaderLength, type DistanceAppearance } from '../measurement';
 import { styleFromProps } from '../props';
-import type { ContentGeometry, Effect, Model, ModelAnnotation, PointerInput } from '../types';
+import type { ModelGeometry, Effect, Model, ModelAnnotation, PointerInput } from '../types';
 import { newRecordId } from './changes';
 import { MIN_DRAG } from './draw';
 import { defaultsFor } from './session';
@@ -79,7 +79,7 @@ export function distancePointer(
   }
 
   const defaults = defaultsFor(model, draft.preset);
-  const geometry: ContentGeometry = {
+  const geometry: ModelGeometry = {
     kind: 'line',
     a: draft.from,
     b: draft.to,

@@ -2,7 +2,7 @@
  * The React surface for @embedpdf/plugin-search.
  *
  * <SearchLayer> is a dumb renderer, the SelectionLayer's twin: it reads
- * the page's content-space hit rects from the capability and paints them
+ * the page's page-space hit rects from the capability and paints them
  * through PageContext.toPixels. The active hit gets its own colour.
  * No pointer handling, no engine calls — search is driven from app chrome
  * via useSearch().

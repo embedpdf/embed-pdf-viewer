@@ -11,7 +11,7 @@
  * It deliberately returns logical geometry: no annotation visual semantics
  * (no cloudy-border outer-box expansion, no ellipse) — a form field takes
  * `rect` straight to `doc.forms.createField`. The annotation-only conversion
- * to a committable/renderable `ContentGeometry` is {@link clickCreateGeom} below; that
+ * to a committable/renderable `ModelGeometry` is {@link clickCreateGeom} below; that
  * is where `shapeRectFor` and ellipse semantics apply.
  */
 import {
@@ -23,7 +23,7 @@ import {
 } from './geometry';
 import { styleFromProps } from './props';
 import type { PageRotation } from '@embedpdf/core-geometry';
-import type { AnnotationProps, ClickCreate, ContentGeometry, Rect, Subtype, Point } from './types';
+import type { AnnotationProps, ClickCreate, ModelGeometry, Rect, Subtype, Point } from './types';
 
 /** A resolved click placement: what the click will occupy, page-clamped. */
 export type ClickPlacement =
@@ -47,7 +47,7 @@ export const clampRectToBox = (rect: Rect, box: Rect | undefined): Rect => {
 };
 
 /**
- * Resolve a click-create policy at a content point. `anchor` defaults to
+ * Resolve a click-create policy at a page point. `anchor` defaults to
  * `center`; under `upright` a box counter-rotates against the page's display
  * rotation exactly as the drag commit would (centre-anchored boxes transpose
  * about their centre, top-left boxes anchor in the display frame).
@@ -91,7 +91,7 @@ export function resolveClickPlacement(
 }
 
 /**
- * Annotation-only: convert a placement into the `ContentGeometry` the commit stores and
+ * Annotation-only: convert a placement into the `ModelGeometry` the commit stores and
  * the ghost paints, for a routing kind. This is where annotation visual
  * semantics live — ellipse for circles, the cloudy outer-box via
  * `shapeRectFor`. Forms never call this; a field box is the placement rect
@@ -101,7 +101,7 @@ export function clickCreateGeom(
   subtype: Subtype,
   placement: ClickPlacement,
   definition: AnnotationProps,
-): ContentGeometry | null {
+): ModelGeometry | null {
   if (placement.kind === 'segment') {
     return subtype === 'line'
       ? { kind: 'line', a: placement.a, b: placement.b, ends: definition.lineEndings }

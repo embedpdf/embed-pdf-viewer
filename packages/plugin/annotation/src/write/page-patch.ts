@@ -4,15 +4,15 @@
  * patch that does not fit the record's geometry instead of guessing.
  */
 import { PluginError } from '@embedpdf/core';
-import type { ContentGeometry, Rect } from '@embedpdf/core-annotation';
+import type { ModelGeometry, Rect } from '@embedpdf/core-annotation';
 
 import type { AnnotationGeometryPatch } from '../contract';
 
 /** The geometry with `patch` in place of its own: the same kind, or an `invalid-input` refusal. */
 export function geometryWithPatch(
-  geometry: ContentGeometry,
+  geometry: ModelGeometry,
   patch: AnnotationGeometryPatch,
-): ContentGeometry {
+): ModelGeometry {
   const mismatch = (): never => {
     throw new PluginError(
       'invalid-input',
@@ -64,7 +64,7 @@ export function geometryWithPatch(
 }
 
 /** The geometry with new bounds; only box geometries have them. */
-export function geometryWithBounds(geometry: ContentGeometry, bounds: Rect): ContentGeometry {
+export function geometryWithBounds(geometry: ModelGeometry, bounds: Rect): ModelGeometry {
   if (geometry.kind === 'rect' || geometry.kind === 'text' || geometry.kind === 'caret')
     return { ...geometry, rect: bounds };
   throw new PluginError(
@@ -75,7 +75,7 @@ export function geometryWithBounds(geometry: ContentGeometry, bounds: Rect): Con
 }
 
 /** The geometry turned to `rotation` degrees; text markup and carets follow their text and never turn. */
-export function geometryWithRotation(geometry: ContentGeometry, rotation: number): ContentGeometry {
+export function geometryWithRotation(geometry: ModelGeometry, rotation: number): ModelGeometry {
   if (geometry.kind === 'quads' || geometry.kind === 'caret') {
     throw new PluginError(
       'unsupported',
@@ -87,5 +87,5 @@ export function geometryWithRotation(geometry: ContentGeometry, rotation: number
 }
 
 /** A record's rotation in degrees (0 for kinds without one). */
-export const rotationOf = (geometry: ContentGeometry): number =>
+export const rotationOf = (geometry: ModelGeometry): number =>
   'rot' in geometry ? (geometry.rot ?? 0) : 0;

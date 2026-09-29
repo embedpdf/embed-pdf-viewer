@@ -14,7 +14,7 @@ import { shapeMeasurementLayout } from './measurement-shape';
 import { textQuadBounds, textQuadRing } from '@embedpdf/core-geometry';
 import { geomScene } from './geometry';
 import type {
-  ContentGeometry,
+  ModelGeometry,
   Paint,
   Rect,
   RenderItem,
@@ -159,7 +159,7 @@ const rectRing = (rect: Rect): [Point, Point, Point, Point] => [
   { x: rect.x, y: rect.y + rect.height },
 ];
 
-function redactRegions(geometry: ContentGeometry): RedactRegion[] {
+function redactRegions(geometry: ModelGeometry): RedactRegion[] {
   if (geometry.kind === 'quads') {
     const out: RedactRegion[] = [];
     for (const quad of geometry.quads) {

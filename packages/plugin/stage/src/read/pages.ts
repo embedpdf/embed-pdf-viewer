@@ -102,7 +102,7 @@ export function createPageReads(
     );
     const visibleRect =
       onScreen.width > 0 && onScreen.height > 0
-        ? transform.viewToContentRect(onScreen)
+        ? transform.viewToPageRect(onScreen)
         : { x: 0, y: 0, width: 0, height: 0 };
     return {
       ...box,
@@ -201,7 +201,7 @@ export function createPageReads(
   const pageToWorld = (page: PageRef, point: Point): Point | null => {
     const frame = getPageFrame(page);
     if (!frame) return null;
-    // Place the content point into the page's display box through the same
+    // Place the page point into the page's display box through the same
     // quarter-turn matrix the layout and renderer use (`rotateScaleMatrix`),
     // so this forward transform and the adapter's inverse hit-test cannot
     // drift. `displaySize` is its own inverse, so it recovers the un-rotated
@@ -241,8 +241,8 @@ export function createPageReads(
       getPageFrame,
       getPageAt: (point) => {
         // Find the visible page whose device-snapped display box contains the
-        // point, then invert that page's transform: the same `viewToContent`
-        // the per-page context's `toContentPoint` uses, so the two never drift.
+        // point, then invert that page's transform: the same `viewToPage`
+        // the per-page context's `toPagePoint` uses, so the two never drift.
         for (const page of visiblePages()) {
           const localX = point.x - page.screenX;
           const localY = point.y - page.screenY;
@@ -254,7 +254,7 @@ export function createPageReads(
           ) {
             return {
               ref: page.ref,
-              point: page.transform.viewToContent({ x: localX, y: localY }),
+              point: page.transform.viewToPage({ x: localX, y: localY }),
               scale: page.transform.viewScale,
               rotation: page.rotation,
               zoom: page.transform.zoom,
@@ -270,7 +270,7 @@ export function createPageReads(
           (visiblePage) => visiblePage.ref.pageObjectNumber === page.pageObjectNumber,
         );
         if (!target) return null;
-        return target.transform.viewToContent({
+        return target.transform.viewToPage({
           x: point.x - target.screenX,
           y: point.y - target.screenY,
         });

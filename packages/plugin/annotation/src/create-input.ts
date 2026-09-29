@@ -3,7 +3,7 @@ import type {
   AnnotationFlags,
   AnnotationPropsPatch,
   Callout,
-  ContentGeometry,
+  ModelGeometry,
   Subtype,
 } from '@embedpdf/core-annotation';
 import type { Point, Rect, TextQuad } from '@embedpdf/core-geometry';
@@ -47,10 +47,10 @@ function invalid(message: string): PluginError {
   return new PluginError('invalid-input', 'annotation', message);
 }
 
-/** Page-space input → the core's content-space `ContentGeometry`. Validates finiteness and arity. */
+/** Page-space input → the core's page-space `ModelGeometry`. Validates finiteness and arity. */
 export function geometryFromInput(input: CreateAnnotationInput): {
   subtype: Subtype;
-  geometry: ContentGeometry;
+  geometry: ModelGeometry;
 } {
   switch (input.subtype) {
     case 'square':

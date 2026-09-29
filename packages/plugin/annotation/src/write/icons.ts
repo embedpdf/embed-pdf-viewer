@@ -51,7 +51,7 @@ export function createIcons(
       });
 
   /** Place an icon annotation (note / file attachment) at its usual size,
-   *  centred on a content point — the icon-kind sibling of the stamp
+   *  centred on a page point — the icon-kind sibling of the stamp
    *  placement. The engine draws the icon from /C + /Name, filling /Rect. */
   const placeIconAt = (
     tool: ResolvedTool,

@@ -2,7 +2,7 @@
  * Line endings (/LE) — the arrowheads and tip shapes drawn at the ends of line
  * and polyline annotations. One spec per ending kind drives both the rendered
  * geometry (`endingNodes`) and the bounding-box points (`endingPoints`), so the
- * visual and the engine `/Rect` can never drift. Pure content-space math (PDF
+ * visual and the engine `/Rect` can never drift. Pure page-space math (PDF
  * points, y-down) — no DOM, no SVG strings — so it ports to Rust like the rest.
  *
  * Convention: each spec is authored in a local frame with the tip at the origin
@@ -121,7 +121,7 @@ const rotateTranslate = (point: Point, angle: number, tip: Point): Point => {
 const specOf = (ending: LineEnding | undefined): EndingSpec | undefined =>
   ending && ending !== 'none' ? ENDINGS[ending] : undefined;
 
-/** Content-space points contributed by an ending — for the visual bounding box. */
+/** Page-space points contributed by an ending — for the visual bounding box. */
 export function endingPoints(
   tip: Point,
   angle: number,
@@ -134,7 +134,7 @@ export function endingPoints(
   return spec.points(strokeWidth).map((point) => rotateTranslate(point, rot, tip));
 }
 
-/** Content-space render nodes for an ending — what the framework renderer draws. */
+/** Page-space render nodes for an ending — what the framework renderer draws. */
 export function endingNodes(
   tip: Point,
   angle: number,

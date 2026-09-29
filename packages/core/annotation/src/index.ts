@@ -2,7 +2,7 @@
  * @embedpdf/core-annotation — the pure annotation brain.
  *
  * `update(model, message)` → { session, change, effects } · view (pageItems +
- * chrome). Per-kind content-space geometry (rect/ellipse · line · poly ·
+ * chrome). Per-kind page-space geometry (rect/ellipse · line · poly ·
  * quads), stroke+fill hit-testing, cursors, the select + create tools. No DOM,
  * no engine, no framework — the part that ports to Rust/Crux. See README.md.
  */
@@ -173,7 +173,7 @@ export type {
   CreationDraftAnchor,
   Draft,
   Effect,
-  ContentGeometry,
+  ModelGeometry,
   Guide,
   Handle,
   Id,

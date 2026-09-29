@@ -4,7 +4,7 @@ import { deviceHeightForWidth, pageTransform, type PageRotation } from '../src/i
 /**
  * `pageTransform` is the single per-page bridge: page points ↔ view px ↔ device px.
  * These pin (a) device snapping + the engine's width→height rule, (b) the rotation
- * math, (c) the contentToView/viewToContent round-trip, and (d) cssMatrix ≡ contentToView.
+ * math, (c) the pageToView/viewToPage round-trip, and (d) cssMatrix ≡ pageToView.
  */
 describe('pageTransform', () => {
   it('identity: scale 1, dpr 1, no rotation', () => {
@@ -19,8 +19,8 @@ describe('pageTransform', () => {
     expect(transform.deviceWidth).toBe(100);
     expect(transform.deviceHeight).toBe(200);
     expect(transform.renderScale).toBe(1);
-    expect(transform.contentToView({ x: 10, y: 20 })).toEqual({ x: 10, y: 20 });
-    expect(transform.viewToContent({ x: 10, y: 20 })).toEqual({ x: 10, y: 20 });
+    expect(transform.pageToView({ x: 10, y: 20 })).toEqual({ x: 10, y: 20 });
+    expect(transform.viewToPage({ x: 10, y: 20 })).toEqual({ x: 10, y: 20 });
     expect(transform.cssMatrix).toBe('matrix(1, 0, 0, 1, 0, 0)');
   });
 
@@ -35,7 +35,7 @@ describe('pageTransform', () => {
     expect(transform.deviceWidth).toBe(200);
     expect(transform.deviceHeight).toBe(400);
     expect(transform.renderScale).toBe(2);
-    expect(transform.contentToView({ x: 10, y: 20 })).toEqual({ x: 20, y: 40 });
+    expect(transform.pageToView({ x: 10, y: 20 })).toEqual({ x: 20, y: 40 });
   });
 
   it('dpr 2: the bitmap is 2× the view box (1:1 device → crisp)', () => {
@@ -52,10 +52,10 @@ describe('pageTransform', () => {
     expect(transform.deviceHeight).toBe(400);
     expect(transform.renderScale).toBe(2);
     // view-space coordinates are unaffected by dpr
-    expect(transform.contentToView({ x: 10, y: 20 })).toEqual({ x: 10, y: 20 });
+    expect(transform.pageToView({ x: 10, y: 20 })).toEqual({ x: 10, y: 20 });
   });
 
-  it('toPixels: content-space (un-rotated) scaling for in-wrapper overlays', () => {
+  it('toPixels: page-space (un-rotated) scaling for in-wrapper overlays', () => {
     // dpr 2: content box is 100×200 CSS (deviceWidth/dpr); scale stays 1 px/pt
     const transform = pageTransform({
       pageSize: { width: 100, height: 200 },
@@ -65,10 +65,10 @@ describe('pageTransform', () => {
     });
     expect(transform.contentWidth).toBe(100);
     expect(transform.contentHeight).toBe(200);
-    // content-space ignores rotation (the wrapper's CSS rotation carries it)
+    // page-space ignores rotation (the wrapper's CSS rotation carries it)
     expect(transform.toPixels({ x: 10, y: 20 })).toEqual({ x: 10, y: 20 });
-    // ...while contentToView applies it (content top-left → display top-right)
-    expect(transform.contentToView({ x: 0, y: 0 })).toEqual({ x: 200, y: 0 });
+    // ...while pageToView applies it (content top-left → display top-right)
+    expect(transform.pageToView({ x: 0, y: 0 })).toEqual({ x: 200, y: 0 });
   });
 
   it('snaps device dims to whole pixels (no fractional bitmap)', () => {
@@ -108,7 +108,7 @@ describe('pageTransform', () => {
       expect(transform.deviceWidth).toBe(100); // bitmap is the un-rotated content
       expect(transform.deviceHeight).toBe(200);
       // content top-left → display box top-right
-      expect(transform.contentToView({ x: 0, y: 0 })).toEqual({ x: 200, y: 0 });
+      expect(transform.pageToView({ x: 0, y: 0 })).toEqual({ x: 200, y: 0 });
       expect(transform.cssMatrix).toBe('matrix(0, 1, -1, 0, 200, 0)');
     });
 
@@ -119,7 +119,7 @@ describe('pageTransform', () => {
         scale: 1,
         dpr: 1,
       });
-      expect(transform.contentToViewRect({ x: 0, y: 0, width: 100, height: 200 })).toEqual({
+      expect(transform.pageToViewRect({ x: 0, y: 0, width: 100, height: 200 })).toEqual({
         x: 0,
         y: 0,
         width: 200,
@@ -127,7 +127,7 @@ describe('pageTransform', () => {
       });
     });
 
-    it('viewToContentRect is the exact inverse (the visibility primitive)', () => {
+    it('viewToPageRect is the exact inverse (the visibility primitive)', () => {
       const rotations: PageRotation[] = [0, 90, 180, 270];
       for (const rotation of rotations) {
         const transform = pageTransform({
@@ -137,7 +137,7 @@ describe('pageTransform', () => {
           dpr: 1,
         });
         // Whole footprint inverts to the whole page…
-        const whole = transform.viewToContentRect({
+        const whole = transform.viewToPageRect({
           x: 0,
           y: 0,
           width: transform.viewWidth,
@@ -147,11 +147,11 @@ describe('pageTransform', () => {
         expect(whole.y).toBeCloseTo(0);
         expect(whole.width).toBeCloseTo(100);
         expect(whole.height).toBeCloseTo(200);
-        // …and a round trip through contentToViewRect is the identity — the
-        // guarantee that lets the stage's visibleRect and toContentPoint hit
+        // …and a round trip through pageToViewRect is the identity — the
+        // guarantee that lets the stage's visibleRect and toPagePoint hit
         // the same coordinates for every quarter-turn.
         const rect = { x: 10, y: 20, width: 30, height: 40 };
-        const back = transform.viewToContentRect(transform.contentToViewRect(rect));
+        const back = transform.viewToPageRect(transform.pageToViewRect(rect));
         expect(back.x).toBeCloseTo(rect.x);
         expect(back.y).toBeCloseTo(rect.y);
         expect(back.width).toBeCloseTo(rect.width);
@@ -160,7 +160,7 @@ describe('pageTransform', () => {
     });
   });
 
-  describe('contentToView ∘ viewToContent is identity (every rotation × scale × dpr)', () => {
+  describe('pageToView ∘ viewToPage is identity (every rotation × scale × dpr)', () => {
     const rotations: PageRotation[] = [0, 90, 180, 270];
     const scales = [1, 2, 0.5, 1.333];
     const dprs = [1, 2];
@@ -180,7 +180,7 @@ describe('pageTransform', () => {
               dpr,
             });
             for (const point of points) {
-              const back = transform.viewToContent(transform.contentToView(point));
+              const back = transform.viewToPage(transform.pageToView(point));
               expect(back.x).toBeCloseTo(point.x, 4);
               expect(back.y).toBeCloseTo(point.y, 4);
             }

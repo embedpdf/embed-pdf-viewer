@@ -439,10 +439,10 @@ export interface PageContextValue {
    * page-relative sizing. Never re-derive `x * scale` or `* dpr`.
    */
   transform: PageTransform;
-  /** Client (screen) point → the viewer's coordinates (content point) — the
+  /** Client (screen) point → the viewer's coordinates (page point) — the
    *  one platform-bound hit-test. */
-  toContentPoint(clientX: number, clientY: number): Point;
-  /** Content point → client (screen) px — the exact inverse of `toContentPoint`
+  toPagePoint(clientX: number, clientY: number): Point;
+  /** Content point → client (screen) px — the exact inverse of `toPagePoint`
    *  (rotation applied). Lets viewport-space UI (e.g. a selection menu) anchor to a
    *  page point without a Stage camera, so it works the same in `<PageView>`. */
   toClientPoint(point: Point): Point;
@@ -499,25 +499,25 @@ export function makePageContext(
     frame,
     transform,
     ...(getViewDemand ? { getViewDemand } : {}),
-    toContentPoint: (cx, cy) => {
+    toPagePoint: (cx, cy) => {
       // `getRect()` is the rotated content wrapper's axis-aligned bounding box =
       // the page's display box on screen. Convert client → box-local view px,
       // then invert rotation + scale via the transform (verified once in geometry,
       // not re-derived per framework adapter).
       const rect = getRect();
-      return transform.viewToContent({ x: cx - rect.left, y: cy - rect.top });
+      return transform.viewToPage({ x: cx - rect.left, y: cy - rect.top });
     },
     toClientPoint: (point) => {
-      // Exact inverse of `toContentPoint`: page/content point → display-box view px
+      // Exact inverse of `toPagePoint`: page/page point → display-box view px
       // (rotation applied by the transform), offset by the same live display-box
       // origin. So the two can never drift, in either <Stage> or <PageView>.
       const rect = getRect();
-      const viewPoint = transform.contentToView(point);
+      const viewPoint = transform.pageToView(point);
       return { x: rect.left + viewPoint.x, y: rect.top + viewPoint.y };
     },
     toClientRect: (rect) => {
       const elementRect = getRect();
-      const viewRect = transform.contentToViewRect(rect);
+      const viewRect = transform.pageToViewRect(rect);
       return {
         x: elementRect.left + viewRect.x,
         y: elementRect.top + viewRect.y,
