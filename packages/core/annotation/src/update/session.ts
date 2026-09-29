@@ -34,6 +34,7 @@ export const initialSession: Session = {
   draft: null,
   preview: null,
   seq: 0,
+  namePrefix: 'new-',
   style: initialStyle,
   defaults: {},
   hitMargin: 6,

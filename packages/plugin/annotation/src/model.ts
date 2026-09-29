@@ -20,6 +20,7 @@
  */
 import { initialSession, sameSession } from '@embedpdf/core-annotation';
 import type { Id, ModelAnnotation, Session } from '@embedpdf/core-annotation';
+import { generateUuid } from '@embedpdf/engine-core/runtime';
 
 import type { AnnotationConfig, ChromeSettings, ChromeSettingsPatch, ToolGhost } from './contract';
 import type { TextSelection } from './rich-text';
@@ -102,7 +103,12 @@ export const mergeChrome = (base: ChromeSettings, patch: ChromeSettingsPatch): C
 
 /** The initial state; the registration config seeds the session's snapping and the chrome. */
 export const initialAnnotationState = (config: AnnotationConfig = {}): AnnotationState => ({
-  session: { ...initialSession, snap: { ...initialSession.snap, ...config.snap } },
+  session: {
+    ...initialSession,
+    // Each session names the annotations it creates apart from every other session's.
+    namePrefix: `${generateUuid()}-`,
+    snap: { ...initialSession.snap, ...config.snap },
+  },
   pending: [],
   vector: {},
   chrome: mergeChrome(DEFAULT_CHROME, config.chrome ?? {}),

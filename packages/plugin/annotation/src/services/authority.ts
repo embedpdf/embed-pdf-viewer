@@ -20,7 +20,7 @@ export function createAuthority(
   const canCreate = (): boolean => ctx.doc?.security.allowsAnnotation('create') ?? false;
 
   const mutationTarget = (ref: AnnotationRef): { userId?: string; groupId?: string } => {
-    const dto = store.model().byId[annotationKey(ref)]?.data;
+    const dto = store.model().byId[annotationKey(ref)]?.annotation;
     return {
       ...(dto?.userId != null ? { userId: dto.userId } : {}),
       ...(dto?.groupId != null ? { groupId: dto.groupId } : {}),

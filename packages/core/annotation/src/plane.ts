@@ -27,13 +27,14 @@ const nonEmpty = (value: string | null | undefined): value is string =>
  *  never painted, hit, marquee-selected, or counted into a page's
  *  appearance epoch. */
 export function isConversationOnly(
-  annotation: Pick<ModelAnnotation, 'irt' | 'group' | 'subtype' | 'data'>,
+  record: Pick<ModelAnnotation, 'irt' | 'group' | 'annotation'>,
 ): boolean {
   // A reply: `irt` without `group` (a grouped subordinate carries both).
-  if (annotation.irt !== undefined && annotation.group === undefined) return true;
+  if (record.irt !== undefined && record.group === undefined) return true;
   // A state annotation: a text annot with a non-empty /State or /StateModel.
-  if (annotation.subtype === 'text' && annotation.data?.subtype === 'text') {
-    if (nonEmpty(annotation.data.state) || nonEmpty(annotation.data.stateModel)) return true;
+  const annotation = record.annotation;
+  if (annotation.subtype === 'text') {
+    if (nonEmpty(annotation.state) || nonEmpty(annotation.stateModel)) return true;
   }
   return false;
 }
@@ -57,7 +58,7 @@ export function isAttachedLink(annotation: Pick<ModelAnnotation, 'subtype' | 'gr
  * and the appearance epoch all filter through this, never the parts.
  */
 export function isSubstrateOnly(
-  annotation: Pick<ModelAnnotation, 'irt' | 'group' | 'subtype' | 'data'>,
+  annotation: Pick<ModelAnnotation, 'irt' | 'group' | 'subtype' | 'annotation'>,
 ): boolean {
   return isConversationOnly(annotation) || isAttachedLink(annotation);
 }

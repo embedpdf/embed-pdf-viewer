@@ -6,7 +6,7 @@
  * the link target in link.ts).
  */
 import { initialTextStyle } from '../props';
-import type { ModelAnnotation, PropKey } from '../types';
+import type { ModelAnnotation, PropKey, RecordFields } from '../types';
 import type { Wire } from './projection';
 import { hexColorOf } from './seam';
 
@@ -19,9 +19,9 @@ export const borderSlice = (style: ModelAnnotation['style']): Wire => ({
 
 /** The `/DA`-styled text slice falls back to the draw-time seed exactly like
  *  the old projections did (a fresh draft may not carry `text` yet). */
-const textOf = (annotation: ModelAnnotation) => annotation.text ?? initialTextStyle;
+const textOf = (annotation: RecordFields) => annotation.text ?? initialTextStyle;
 
-export const GENERIC_PROPS: Partial<Record<PropKey, (annotation: ModelAnnotation) => Wire>> = {
+export const GENERIC_PROPS: Partial<Record<PropKey, (annotation: RecordFields) => Wire>> = {
   color: (annotation) => ({ color: hexColorOf(annotation.style.color) }),
   opacity: (annotation) => ({ opacity: annotation.style.opacity }),
   blendMode: (annotation) => ({ blendMode: annotation.style.blendMode }),

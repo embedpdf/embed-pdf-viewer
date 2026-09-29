@@ -35,8 +35,8 @@ export function createAnnotationHoverFeed(
     const annotation = annotOf(id);
     if (!annotation?.ref) return null;
     if (annotation.subtype.startsWith('widget') || annotation.subtype === 'link') return null;
-    const enter = Boolean(annotation.data?.actions?.cursorEnter?.root);
-    const exit = Boolean(annotation.data?.actions?.cursorExit?.root);
+    const enter = Boolean(annotation.annotation.actions?.cursorEnter?.root);
+    const exit = Boolean(annotation.annotation.actions?.cursorExit?.root);
     if (!enter && !exit) return null;
     return { ref: annotation.ref, page: annotation.page, events: { enter, exit } };
   };

@@ -1,7 +1,7 @@
 import type { AnnotationDTO } from '@embedpdf/engine-core/runtime';
 
 import { geomRotation } from '../geometry';
-import type { ModelAnnotation, PropKey } from '../types';
+import type { ModelAnnotation, PropKey, RecordFields } from '../types';
 import { boxGeomFields } from './seam';
 
 /** An untyped partial wire statement — merged fragments are cast to the
@@ -37,12 +37,12 @@ export interface KindProjection {
    * leader group, advisory rotation). `null` = the kind has no editable
    * geometry (text markup) — geometry statements fall back to the full patch.
    */
-  geometry(annotation: ModelAnnotation): Wire | null;
+  geometry(annotation: RecordFields): Wire | null;
   /** Kind-specific prop lowerings — only the exceptions; `props.ts` generic
    *  covers every 1:1 key. A kind's couplings live here, in its owner's file. */
-  prop?: Partial<Record<PropKey, (annotation: ModelAnnotation) => Wire>>;
+  prop?: Partial<Record<PropKey, (annotation: RecordFields) => Wire>>;
   /** Create-only statement extras (intent, quadPoints, contents seeds…). */
-  draftExtras?(annotation: ModelAnnotation): Wire | null;
+  draftExtras?(annotation: RecordFields): Wire | null;
   /** Kinds whose creates do not go through `toCreateDraft` (stamps carry a
    *  binary source and use their own create path; widgets are form-plane). */
   createable?: false;
@@ -50,7 +50,7 @@ export interface KindProjection {
 
 /** Box-kind geometry emission: the model's `rect` (its box before any turn) +
  *  its turn → `box` + `rotation`, total (null states the clear). */
-export const boxEmit = (annotation: ModelAnnotation): Wire => {
+export const boxEmit = (annotation: RecordFields): Wire => {
   const boxGeometry = annotation.geometry as Extract<
     ModelAnnotation['geometry'],
     { kind: 'rect' } | { kind: 'text' }

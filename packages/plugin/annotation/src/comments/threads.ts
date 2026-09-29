@@ -45,12 +45,12 @@ export function createThreadIndex(
 
   const computeIndex = (): ThreadsIndex => {
     const model = store.model();
-    // Records with engine data only: a new annotation has none until its
-    // create is confirmed, and joins the index then.
+    // Confirmed records only: a new annotation joins the index once the
+    // engine confirms its create.
     const dtos: AnnotationDTO[] = [];
     for (const id of model.order) {
-      const data = model.byId[id]?.data;
-      if (data) dtos.push(data);
+      const record = model.byId[id];
+      if (record?.ref) dtos.push(record.annotation);
     }
     const threads = buildCommentThreads(dtos, { currentUserId: currentUserId() });
 

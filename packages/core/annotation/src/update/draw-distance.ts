@@ -4,8 +4,8 @@ import type { AnnotationFlags } from '@embedpdf/engine-core/runtime';
 import { DRAWN_FLAGS } from '../flags';
 import { distanceLeaderLength, type DistanceAppearance } from '../measurement';
 import { styleFromProps } from '../props';
-import type { ModelGeometry, Effect, Model, ModelAnnotation, PointerInput } from '../types';
-import { newRecordId } from './changes';
+import type { ModelGeometry, Effect, Model, PointerInput } from '../types';
+import { newRecord } from './changes';
 import { MIN_DRAG } from './draw';
 import { defaultsFor } from './session';
 
@@ -97,10 +97,7 @@ export function distancePointer(
     return [{ ...model, draft: { ...draft, measure: appearance } }, []];
   }
 
-  const id = newRecordId(model);
-  const annotation: ModelAnnotation = {
-    id,
-    ref: null,
+  const annotation = newRecord(model, {
     page: draft.page,
     subtype: 'line',
     geometry,
@@ -110,8 +107,8 @@ export function distancePointer(
       interiorColor: defaults.interiorColor ?? defaults.color,
     },
     flags: { ...DRAWN_FLAGS, ...draft.flags },
-    source: 'vector',
-  };
+  });
+  const id = annotation.id;
 
   return [
     {

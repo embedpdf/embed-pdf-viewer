@@ -1,4 +1,9 @@
-import { DRAWN_FLAGS, initialSession, type ModelAnnotation } from '@embedpdf/core-annotation';
+import {
+  annotationOfRecord,
+  DRAWN_FLAGS,
+  initialSession,
+  type ModelAnnotation,
+} from '@embedpdf/core-annotation';
 import { toPageRef } from '@embedpdf/engine-core/runtime';
 import { describe, expect, it } from 'vitest';
 
@@ -37,17 +42,23 @@ describe('chrome settings state', () => {
 });
 
 describe('pending changes', () => {
-  const record = (id: string, extra: Partial<ModelAnnotation> = {}): ModelAnnotation => ({
-    id,
-    ref: null,
-    page: toPageRef(1),
-    subtype: 'square',
-    geometry: { kind: 'rect', rect: { x: 0, y: 0, width: 10, height: 10 }, ellipse: false },
-    style: initialSession.style,
-    flags: DRAWN_FLAGS,
-    source: 'baked',
-    ...extra,
-  });
+  const record = (id: string, extra: Partial<ModelAnnotation> = {}): ModelAnnotation => {
+    const fields = {
+      id,
+      ref: null,
+      page: toPageRef(1),
+      subtype: 'square',
+      geometry: { kind: 'rect', rect: { x: 0, y: 0, width: 10, height: 10 }, ellipse: false },
+      style: initialSession.style,
+      flags: DRAWN_FLAGS,
+      source: 'baked',
+    } as const;
+    const annotation = annotationOfRecord(fields, {
+      ref: { kind: 'nm', page: fields.page, nm: id },
+      index: 0,
+    });
+    return { ...fields, annotation, ...extra };
+  };
   const edit = (token: number, id: string, fields: Partial<ModelAnnotation>): PendingChange => ({
     token,
     id,

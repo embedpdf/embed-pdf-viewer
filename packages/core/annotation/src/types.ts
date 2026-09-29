@@ -297,13 +297,15 @@ export interface ModelAnnotation {
    */
   authority?: { update: boolean; delete: boolean };
   /**
-   * The canonical engine DTO this annotation was derived from (PDF-space, sRGB)
-   * — the single source of truth for its data. `geom` and `style` are
-   * page-space render projections of it, recomputed (never edited directly)
-   * whenever `data` changes, so the two can't drift. Absent only for a record
-   * this session created that the engine has not confirmed yet (no DTO exists).
+   * The annotation's data in the engine's shape: what the engine will read
+   * back once this session's writes land. A confirmed record's is the
+   * engine's own read; a record this session created predicts it from its
+   * create (`newRecord`); an edit brings it up to date with the fields the
+   * edit changed, at the end of `update`. The fields above are projections
+   * the gestures work on; its `rect` (for a kind the engine draws) and its
+   * attribution wait for the engine's answer.
    */
-  data?: AnnotationDTO;
+  annotation: AnnotationDTO;
   /** Normalized PDF `/IT` for intent-bearing annotations authored before a DTO exists. */
   intent?: CaretIntent | StrikeoutIntent | InkIntent;
   /**
@@ -325,6 +327,13 @@ export interface ModelAnnotation {
   irt?: Id;
   group?: string;
 }
+
+/**
+ * A record's fields, with or without its engine annotation: what its engine
+ * writes are made from (record/). A new record has none yet; its create is
+ * what predicts it.
+ */
+export type RecordFields = Omit<ModelAnnotation, 'annotation'> & { annotation?: AnnotationDTO };
 
 /** A draggable handle: a resize corner/edge (rect) or a vertex (line/poly). */
 export interface Handle {
@@ -549,6 +558,12 @@ export interface Session {
   preview: MarkupPreview | null;
   /** How many records this session has created; the next one is `new:<seq + 1>`. */
   seq: number;
+  /**
+   * The start of the `/NM` name each record this session creates is written
+   * with: `<namePrefix><n>` for record `new:<n>`. A host gives each session
+   * its own, so two sessions never name two annotations alike.
+   */
+  namePrefix: string;
   /** The base style new annotations inherit (per-tool `defaults` layer on top). */
   style: Style;
   /** Per-tool (keyed by subtype / tool id) property overrides for newly drawn

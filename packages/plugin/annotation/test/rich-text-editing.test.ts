@@ -86,7 +86,8 @@ async function loaded(dto: FileAnnotation) {
   return {
     ...harness,
     id,
-    data: () => harness.model().byId[id]!.data as Extract<AnnotationDTO, { subtype: 'free-text' }>,
+    data: () =>
+      harness.model().byId[id]!.annotation as Extract<AnnotationDTO, { subtype: 'free-text' }>,
   };
 }
 

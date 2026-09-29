@@ -175,7 +175,7 @@ describe('a free text’s document', () => {
       page: toPageRef(1),
       subtype: 'free-text',
       text,
-      data: { subtype: 'free-text', contents: 'a\rb' },
+      annotation: { subtype: 'free-text', contents: 'a\rb' },
     } as unknown as ModelAnnotation;
     const doc = richDocOf(annotation);
     expect(doc.paragraphs).toEqual([{ runs: [{ text: 'a' }] }, { runs: [{ text: 'b' }] }]);

@@ -124,10 +124,10 @@ export function createLinkWrites(
     record: ModelAnnotation,
     reply: { to: AnnotationRef; type?: 'group' } | null,
   ): Promise<void> => {
-    if (!record.ref || !record.data) return;
+    if (!record.ref) return;
     await ctx.doc
       .page(record.page)
-      .annotations.update(record.ref, relationshipPatch(record.data.subtype, reply));
+      .annotations.update(record.ref, relationshipPatch(record.annotation.subtype, reply));
   };
 
   // A restyle that set or cleared a link: the verb that made it waits for the

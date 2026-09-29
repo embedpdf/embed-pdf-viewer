@@ -35,7 +35,7 @@ export function buildTextItems(model: Model, page: PageRef, view?: ViewEnv): Tex
       id: tb.id,
       ref: annotation?.ref ?? null,
       box: tb.box,
-      contents: annotation?.data?.contents ?? '',
+      contents: annotation?.annotation.contents ?? '',
       // Paragraph alignment/direction equal to the body's is inherited, not
       // an override: the element carries the body's (`css.align`), so a
       // block must not pin itself to a resolved value — or the Align

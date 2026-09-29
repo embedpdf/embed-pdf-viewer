@@ -1,7 +1,7 @@
 import { measureFromKnownLength, toPageRef } from '@embedpdf/engine-core/runtime';
 import { describe, expect, it } from 'vitest';
 
-import { step } from './support';
+import { record, step } from './support';
 import { DRAWN_FLAGS } from '../src/flags';
 import { DEFAULT_CHROME_GEOMETRY } from '../src/geometry';
 import { hitTest } from '../src/hit';
@@ -31,7 +31,7 @@ const measure: DistanceAppearance = {
   leader: { length: 12, extension: 5 },
   text: 'stored',
 };
-const annotation: ModelAnnotation = {
+const annotation = record({
   id: 'a',
   ref: null,
   page: toPageRef(1),
@@ -41,7 +41,7 @@ const annotation: ModelAnnotation = {
   style: initialStyle,
   source: 'baked',
   flags: DRAWN_FLAGS,
-};
+});
 const model = (): Model => ({
   ...initialModel,
   byId: { a: annotation },

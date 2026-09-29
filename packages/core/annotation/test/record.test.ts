@@ -24,6 +24,7 @@ import { DRAWN_FLAGS } from '../src/flags';
 import { linkChildrenOf, linkOf } from '../src/links';
 import { isAttachedLink } from '../src/plane';
 import type { Model, ModelAnnotation } from '../src/types';
+import { record } from './support';
 import { fromDTO, linkChildRects, toCreateDraft, toPatch, toScopedPatch } from '../src/record';
 
 const CROP: PdfRect = { left: 0, bottom: 0, right: 600, top: 800 };
@@ -193,7 +194,7 @@ describe('record — Replace Text authoring', () => {
   };
 
   it('emits the normalized Caret and StrikeOut intents with print flags', () => {
-    const caret: ModelAnnotation = {
+    const caret = record({
       id: 'tmp:1',
       ref: null,
       page: toPageRef(1),
@@ -203,8 +204,8 @@ describe('record — Replace Text authoring', () => {
       style,
       flags: DRAWN_FLAGS,
       source: 'vector',
-    };
-    const strikeout: ModelAnnotation = {
+    });
+    const strikeout = record({
       id: 'tmp:2',
       ref: null,
       page: toPageRef(1),
@@ -219,7 +220,7 @@ describe('record — Replace Text authoring', () => {
       source: 'vector',
       irt: caret.id,
       group: caret.id,
-    };
+    });
 
     expect(draftToFile(toCreateDraft(caret))).toMatchObject({
       subtype: 'caret',
@@ -235,7 +236,7 @@ describe('record — Replace Text authoring', () => {
   });
 
   it('a rotated caret emits its box and its turn', () => {
-    const caret: ModelAnnotation = {
+    const caret = record({
       id: 'tmp:3',
       ref: null,
       page: toPageRef(1),
@@ -244,7 +245,7 @@ describe('record — Replace Text authoring', () => {
       style,
       flags: DRAWN_FLAGS,
       source: 'vector',
-    };
+    });
     // Clockwise 270° passes through with the box; the engine works out `rect`.
     const draft = draftToFile(toCreateDraft(caret));
     expect(draft).toMatchObject({

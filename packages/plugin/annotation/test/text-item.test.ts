@@ -1,4 +1,5 @@
 import {
+  annotationOfRecord,
   initialModel,
   type ModelAnnotation,
   type AnnotationFlags,
@@ -44,23 +45,29 @@ const freeText = (
   id: string,
   geometry: Extract<ModelGeometry, { kind: 'text' }>,
   strokeWidth: number,
-): ModelAnnotation => ({
-  id,
-  ref: null,
-  page: PAGE,
-  subtype: 'freeText',
-  geometry,
-  style: {
-    color: '#e07b39',
-    interiorColor: null,
-    strokeWidth,
-    opacity: 1,
-    blendMode: 'normal',
-    border: { kind: 'solid' },
-  },
-  flags: FLAGS,
-  source: 'baked',
-});
+): ModelAnnotation => {
+  const fields = {
+    id,
+    ref: null,
+    page: PAGE,
+    subtype: 'free-text',
+    geometry,
+    style: {
+      color: '#e07b39',
+      interiorColor: null,
+      strokeWidth,
+      opacity: 1,
+      blendMode: 'normal',
+      border: { kind: 'solid' },
+    },
+    flags: FLAGS,
+    source: 'baked',
+  } as const;
+  return {
+    ...fields,
+    annotation: annotationOfRecord(fields, { ref: { kind: 'nm', page: PAGE, nm: id }, index: 0 }),
+  };
+};
 
 describe('buildTextItems — text plate mirrors the AP generator', () => {
   it('the plate inset is twice the border width, callout and plain box alike', () => {
@@ -102,7 +109,7 @@ describe('buildTextItems — the editor document', () => {
       fontColor: '#000000',
       textAlign: 'center',
     };
-    (annotation as { data?: unknown }).data = {
+    (annotation as { annotation?: unknown }).annotation = {
       subtype: 'free-text',
       contents: 'one\rtwo',
       richText: {

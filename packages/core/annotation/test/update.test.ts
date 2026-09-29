@@ -3,10 +3,11 @@
  * and the effects. The core never keeps a record; these tests pin what it
  * reports about them.
  */
+import { textQuadFromRect } from '@embedpdf/core-geometry';
 import { toPageRef } from '@embedpdf/engine-core/runtime';
 import { describe, expect, it } from 'vitest';
 
-import { modelWith, step } from './support';
+import { modelWith, record, step } from './support';
 import { DRAWN_FLAGS } from '../src/flags';
 import type { Message, ModelAnnotation } from '../src/types';
 import { EMPTY_CHANGE, initialStyle, update } from '../src/update';
@@ -18,16 +19,17 @@ const editPtr = (phase: 'down' | 'move' | 'up', x: number, y: number): Message =
   in: { page: PAGE, point: { x, y }, shift: false },
 });
 
-const square = (id: string, x: number): ModelAnnotation => ({
-  id,
-  ref: { kind: 'objectNumber', page: PAGE, annotObjectNumber: Number(id.slice(4)) },
-  page: PAGE,
-  subtype: 'square',
-  geometry: { kind: 'rect', rect: { x, y: 100, width: 100, height: 60 }, ellipse: false },
-  style: { ...initialStyle, interiorColor: '#ffffff' },
-  flags: DRAWN_FLAGS,
-  source: 'baked',
-});
+const square = (id: string, x: number): ModelAnnotation =>
+  record({
+    id,
+    ref: { kind: 'objectNumber', page: PAGE, annotObjectNumber: Number(id.slice(4)) },
+    page: PAGE,
+    subtype: 'square',
+    geometry: { kind: 'rect', rect: { x, y: 100, width: 100, height: 60 }, ellipse: false },
+    style: { ...initialStyle, interiorColor: '#ffffff' },
+    flags: DRAWN_FLAGS,
+    source: 'baked',
+  });
 
 describe('update', () => {
   it('a pointer move during a drag changes the session only', () => {
@@ -75,19 +77,88 @@ describe('update', () => {
   });
 
   it('typing puts the edited record and asks for a text write', () => {
-    const record: ModelAnnotation = {
+    const box = record({
       ...square('obj:3', 100),
       subtype: 'free-text',
       geometry: { kind: 'text', rect: { x: 100, y: 100, width: 100, height: 60 } },
-      data: {
-        subtype: 'free-text',
-        contents: 'Hi',
-        richText: { body: {}, paragraphs: [] },
-      } as never,
-    };
-    const result = update(modelWith([record]), { type: 'setText', id: 'obj:3', text: 'Hi there' });
-    expect(result.change.put[0]!.data!.contents).toBe('Hi there');
+      annotation: undefined,
+    });
+    const result = update(modelWith([box]), { type: 'setText', id: 'obj:3', text: 'Hi there' });
+    expect(result.change.put[0]!.annotation.contents).toBe('Hi there');
     expect(result.change.put[0]!.source).toBe('vector');
     expect(result.effects).toEqual([{ type: 'text', id: 'obj:3' }]);
+  });
+});
+
+describe('every record holds its annotation', () => {
+  const created = (namePrefix: string) =>
+    update(modelWith([square('obj:1', 400)], { namePrefix }), {
+      type: 'createAnnot',
+      page: PAGE,
+      subtype: 'square',
+      geometry: { kind: 'rect', rect: { x: 10, y: 20, width: 30, height: 40 }, ellipse: false },
+      props: { color: '#123456', strokeWidth: 3 },
+    }).change.put[0]!;
+
+  it('a new record predicts its annotation, named with the session’s prefix', () => {
+    const record = created('session-a-');
+    expect(record.ref).toBeNull();
+    expect(record.annotation).toMatchObject({
+      subtype: 'square',
+      ref: { kind: 'nm', page: PAGE, nm: 'session-a-1' },
+      nm: 'session-a-1',
+      index: 1,
+      box: { x: 10, y: 20, width: 30, height: 40 },
+      rotation: null,
+      color: '#123456',
+      strokeWidth: 3,
+      print: true,
+    });
+    // The engine is asked to write that same name.
+    expect(created('session-b-').annotation.nm).toBe('session-b-1');
+  });
+
+  it('an edit brings the annotation up to date with the fields it changed', () => {
+    const model = modelWith([square('obj:1', 100)], { selected: ['obj:1'] });
+    const dragged = [editPtr('down', 150, 130), editPtr('move', 190, 160)].reduce(
+      (current, message) => step(current, message)[0],
+      model,
+    );
+    const moved = update(dragged, editPtr('up', 190, 160)).change.put[0]!;
+    expect(moved.annotation).toMatchObject({
+      box: { x: 140, y: 130, width: 100, height: 60 },
+      color: initialStyle.color,
+    });
+
+    const restyled = update(model, { type: 'setProps', patch: { color: '#00ff00' } }).change
+      .put[0]!;
+    expect(restyled.annotation).toMatchObject({ color: '#00ff00', box: { x: 100, y: 100 } });
+
+    const hidden = update(model, { type: 'setFlags', patch: { hidden: true } }).change.put[0]!;
+    expect(hidden.annotation).toMatchObject({ hidden: true, print: true });
+  });
+
+  it('a change the engine keeps nothing of leaves the annotation as it was', () => {
+    const model = modelWith([square('obj:1', 100)], { selected: ['obj:1'] });
+    const same = update(model, { type: 'setProps', patch: { color: initialStyle.color } });
+    expect(same.change.put).toHaveLength(1);
+    expect(same.change.put[0]!.annotation).toBe(model.byId['obj:1']!.annotation);
+  });
+
+  it('a replace-text strikeout replies to its caret by the caret’s name', () => {
+    const rect = { x: 20, y: 40, width: 80, height: 20 };
+    const [model] = step(modelWith([]), {
+      type: 'createReplaceText',
+      page: PAGE,
+      quads: [textQuadFromRect(rect)],
+      anchor: { glyphQuad: textQuadFromRect(rect), advance: 1 },
+    });
+    const [caret, strikeout] = model.order.map((id) => model.byId[id]!);
+    expect(caret!.annotation).toMatchObject({ subtype: 'caret', intent: 'replace', nm: 'new-1' });
+    expect(strikeout!.annotation).toMatchObject({
+      subtype: 'strikeout',
+      nm: 'new-2',
+      reply: { to: caret!.annotation.ref, type: 'group' },
+    });
   });
 });

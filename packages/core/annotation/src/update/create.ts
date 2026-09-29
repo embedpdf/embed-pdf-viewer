@@ -4,8 +4,9 @@
  */
 import { DRAWN_FLAGS } from '../flags';
 import { applyProps, styleFromProps, textStyleFromProps } from '../props';
-import type { ModelGeometry, Effect, Message, Model, ModelAnnotation, Subtype } from '../types';
-import { newRecordId } from './changes';
+import { annotationAfter } from '../record';
+import type { ModelGeometry, Effect, Message, Model, Subtype } from '../types';
+import { newRecord } from './changes';
 import { defaultsFor } from './session';
 
 /**
@@ -26,10 +27,7 @@ export function createAnnot(
     !message.geometry.ends
       ? { ...message.geometry, ends: definition.lineEndings }
       : message.geometry;
-  const id = newRecordId(model);
-  const base: ModelAnnotation = {
-    id,
-    ref: null,
+  const base = newRecord(model, {
     page: message.page,
     subtype: message.subtype,
     geometry,
@@ -37,9 +35,11 @@ export function createAnnot(
     ...(geometry.kind === 'text' ? { text: textStyleFromProps(definition) } : {}),
     ...(message.subtype === 'link' ? { link: definition.link ?? null } : {}),
     flags: { ...DRAWN_FLAGS, ...message.flags },
-    source: 'vector',
-  };
-  const annotation = message.props ? (applyProps(base, message.props) ?? base) : base;
+  });
+  const id = base.id;
+  // The props land on the new record's fields; its annotation follows them.
+  const styled = message.props ? applyProps(base, message.props) : null;
+  const annotation = styled ? { ...styled, annotation: annotationAfter(base, styled) } : base;
   return [
     {
       ...model,

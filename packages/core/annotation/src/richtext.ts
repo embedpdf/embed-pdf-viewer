@@ -22,7 +22,7 @@ import {
   type RichTextRunStyle,
 } from '@embedpdf/engine-core/runtime';
 
-import type { ModelAnnotation, TextStyle } from './types';
+import type { RecordFields, TextStyle } from './types';
 
 export type RichTextStyleDelta = Partial<RichTextRunStyle>;
 
@@ -318,10 +318,10 @@ export function bodyFromTextStyle(style: TextStyle, fonts?: FontLookup): RichTex
 
 /** The annotation's rich document: the DTO's, else one synthesised from
  *  its plain text and text style (a draft the engine has not echoed yet). */
-export function richDocOf(annotation: ModelAnnotation, fonts?: FontLookup): RichTextDocument {
-  if (annotation.data?.subtype === 'free-text' && annotation.data.richText)
-    return annotation.data.richText;
-  const style: TextStyle = annotation.text ?? {
+export function richDocOf(record: RecordFields, fonts?: FontLookup): RichTextDocument {
+  if (record.annotation?.subtype === 'free-text' && record.annotation.richText)
+    return record.annotation.richText;
+  const style: TextStyle = record.text ?? {
     fontFamily: 'helvetica',
     fontSize: 12,
     fontColor: '#000000',
@@ -329,6 +329,6 @@ export function richDocOf(annotation: ModelAnnotation, fonts?: FontLookup): Rich
   };
   return {
     body: bodyFromTextStyle(style, fonts),
-    paragraphs: paragraphsFromPlainText(annotation.data?.contents ?? ''),
+    paragraphs: paragraphsFromPlainText(record.annotation?.contents ?? ''),
   };
 }

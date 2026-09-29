@@ -14,7 +14,7 @@ import type {
 
 import { calloutLinePoints, geomRotation } from '../../geometry';
 import { richDocOf } from '../../richtext';
-import type { ModelAnnotation, TextStyle } from '../../types';
+import type { RecordFields, TextStyle } from '../../types';
 import { boxEmit, type KindProjection, type Wire } from '../projection';
 import { boxGeomFields } from '../seam';
 
@@ -44,7 +44,7 @@ function textFromDTO(dto: FreeTextDTO): TextStyle {
  * applied: a partial body means engine defaults, which would reset the
  * size, face and colour), so a patch of several merges cleanly.
  */
-const formattingBody = (annotation: ModelAnnotation): Wire => {
+const formattingBody = (annotation: RecordFields): Wire => {
   const doc = richDocOf(annotation);
   const style = annotation.text;
   return {
@@ -69,7 +69,7 @@ const formattingBody = (annotation: ModelAnnotation): Wire => {
  * text under an inline turn while the leader stays page-space. The turn is
  * total (null states the clear) like every box emission.
  */
-export function calloutFields(annotation: ModelAnnotation): {
+export function calloutFields(annotation: RecordFields): {
   box: PageBox;
   rotation: number | null;
   calloutLine: NonNullable<FreeTextDraft['calloutLine']>;
@@ -129,6 +129,6 @@ export const freeText: KindProjection = {
   // the debounced text-edit write owns `contents`.
   draftExtras: (annotation) => ({
     intent: calloutFields(annotation) ? 'free-text-callout' : 'free-text',
-    contents: annotation.data?.contents ?? '',
+    contents: annotation.annotation?.contents ?? '',
   }),
 };

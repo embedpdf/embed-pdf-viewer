@@ -30,6 +30,6 @@ export function linkChildrenOf(model: Model, parentId: Id): ModelAnnotation[] {
 /** The parent's link target, derived from its first attached child — the
  *  read side of the `syncLink` reconciler. Null when no child exists. */
 export function linkOf(model: Model, parentId: Id): PdfLinkTarget | null {
-  const data = linkChildrenOf(model, parentId)[0]?.data;
-  return data?.subtype === 'link' ? (data.target ?? null) : null;
+  const child = linkChildrenOf(model, parentId)[0]?.annotation;
+  return child?.subtype === 'link' ? (child.target ?? null) : null;
 }

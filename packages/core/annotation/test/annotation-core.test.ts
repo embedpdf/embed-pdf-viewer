@@ -1,8 +1,8 @@
 import { textQuadFromRect } from '@embedpdf/core-geometry';
-import { toPageRef } from '@embedpdf/engine-core/runtime';
+import { toPageRef, type AnnotationDTO } from '@embedpdf/engine-core/runtime';
 import { describe, expect, it } from 'vitest';
 
-import { modelWith, step } from './support';
+import { modelWith, record, step, type RecordInput } from './support';
 import { cloudyBorderExtent } from '../src/cloudy';
 import { annotDeletable, annotTransformable, DRAWN_FLAGS } from '../src/flags';
 import {
@@ -636,17 +636,18 @@ describe('annotation-core', () => {
   });
 
   it('forget drops the selection, hover, text editing and a gesture on records that left', () => {
-    const record = (id: string): ModelAnnotation => ({
-      id,
-      ref: null,
-      page: PAGE,
-      subtype: 'square',
-      geometry: { kind: 'rect', rect: { x: 0, y: 0, width: 10, height: 10 }, ellipse: false },
-      style: initialStyle,
-      flags: DRAWN_FLAGS,
-      source: 'vector',
-    });
-    const model = modelWith([record('a'), record('b')], {
+    const square = (id: string): ModelAnnotation =>
+      record({
+        id,
+        ref: null,
+        page: PAGE,
+        subtype: 'square',
+        geometry: { kind: 'rect', rect: { x: 0, y: 0, width: 10, height: 10 }, ellipse: false },
+        style: initialStyle,
+        flags: DRAWN_FLAGS,
+        source: 'vector',
+      });
+    const model = modelWith([square('a'), square('b')], {
       selected: ['a', 'b'],
       hovered: 'a',
       editing: 'a',
@@ -697,7 +698,7 @@ describe('annotation-core', () => {
   });
 
   it('a selected arrow is grabbable anywhere inside its outline box, not just on the thin stroke', () => {
-    const arrow: ModelAnnotation = {
+    const arrow = record({
       id: 'A1',
       ref: null,
       page: PAGE,
@@ -718,7 +719,7 @@ describe('annotation-core', () => {
       },
       flags: DRAWN_FLAGS,
       source: 'vector',
-    };
+    });
     const corner = { x: 290, y: 110 }; // inside the bbox, far from the diagonal stroke
     let model = modelWith([arrow]);
     // Unselected → only the painted region (stroke + arrowhead) hits; the corner misses
@@ -790,16 +791,17 @@ describe('annotation-core', () => {
   });
 
   it('marquee ignores INERT annotations (readOnly) but still takes locked ones', () => {
-    const square = (id: string, flags: ModelAnnotation['flags']): ModelAnnotation => ({
-      id,
-      ref: null,
-      page: PAGE,
-      subtype: 'square',
-      geometry: { kind: 'rect', rect: { x: 10, y: 10, width: 50, height: 50 }, ellipse: false },
-      style: initialModel.style,
-      flags,
-      source: 'vector',
-    });
+    const square = (id: string, flags: ModelAnnotation['flags']): ModelAnnotation =>
+      record({
+        id,
+        ref: null,
+        page: PAGE,
+        subtype: 'square',
+        geometry: { kind: 'rect', rect: { x: 10, y: 10, width: 50, height: 50 }, ellipse: false },
+        style: initialModel.style,
+        flags,
+        source: 'vector',
+      });
     // readOnly = no interaction at all (ISO 32000): the marquee skips it.
     let model = modelWith([square('ro', { ...DRAWN_FLAGS, readOnly: true })]);
     model = run(model, [
@@ -876,7 +878,7 @@ describe('annotation-core', () => {
   });
 
   it('pageItems hands the renderer the endings-aware box (geomVisualBounds), not the tight bounds', () => {
-    const line: ModelAnnotation = {
+    const line = record({
       id: 'L1',
       ref: null,
       page: PAGE,
@@ -897,7 +899,7 @@ describe('annotation-core', () => {
       },
       flags: DRAWN_FLAGS,
       source: 'vector',
-    };
+    });
     const model = modelWith([line]);
     const it = pageItems(model, PAGE)[0];
     // the render box is the same calculation that feeds the engine /Rect…
@@ -910,7 +912,7 @@ describe('annotation-core', () => {
   });
 
   it('the selection outline wraps the line endings; shape outlines stay tight (handles on the box)', () => {
-    const line: ModelAnnotation = {
+    const line = record({
       id: 'L1',
       ref: null,
       page: PAGE,
@@ -931,7 +933,7 @@ describe('annotation-core', () => {
       },
       flags: DRAWN_FLAGS,
       source: 'vector',
-    };
+    });
     const model = modelWith([line]);
     const selection = step(model, editPtr('down', 60, 75))[0]; // select the line
     const outlineRect = (mm: Model) => {
@@ -1289,7 +1291,7 @@ describe('annotation-core', () => {
   });
 
   it('a selected ink wraps its stroke: the outline expands by the stroke, not tight to the centerline', () => {
-    const ink: ModelAnnotation = {
+    const ink = record({
       id: 'I1',
       ref: null,
       page: PAGE,
@@ -1313,7 +1315,7 @@ describe('annotation-core', () => {
       },
       flags: DRAWN_FLAGS,
       source: 'vector',
-    };
+    });
     let model = modelWith([ink]);
     model = step(model, editPtr('down', 50, 40))[0]; // click on the stroke → selects it
     const outline = chrome(model, PAGE).find((node) => node.kind === 'outline');
@@ -1413,7 +1415,7 @@ describe('annotation-core', () => {
   });
 
   it('markup is selectable but anchored: it selects, shows a bare outline (no handles), and will not move', () => {
-    const hl: ModelAnnotation = {
+    const hl = record({
       id: 'H1',
       ref: null,
       page: PAGE,
@@ -1432,7 +1434,7 @@ describe('annotation-core', () => {
       },
       flags: DRAWN_FLAGS,
       source: 'baked',
-    };
+    });
     const m0 = modelWith([hl]);
     // clicking the markup selects it…
     expect(hitTest(m0, PAGE, { x: 50, y: 20 }, DEFAULT_CHROME_GEOMETRY, 6)).toEqual({
@@ -1449,24 +1451,25 @@ describe('annotation-core', () => {
   });
 
   // ── group annotations ──────────────────────────────────────────────────────
-  const sq = (id: string, x: number, group?: string): ModelAnnotation => ({
-    id,
-    ref: null,
-    page: PAGE,
-    subtype: 'square',
-    geometry: { kind: 'rect', rect: { x, y: x, width: 40, height: 40 }, ellipse: false },
-    style: {
-      color: '#000000',
-      interiorColor: '#eeeeee', // filled → hittable anywhere inside
-      strokeWidth: 2,
-      opacity: 1,
-      blendMode: 'normal',
-      border: { kind: 'solid' },
-    },
-    flags: DRAWN_FLAGS,
-    source: 'vector',
-    ...(group ? { group } : {}),
-  });
+  const sq = (id: string, x: number, group?: string): ModelAnnotation =>
+    record({
+      id,
+      ref: null,
+      page: PAGE,
+      subtype: 'square',
+      geometry: { kind: 'rect', rect: { x, y: x, width: 40, height: 40 }, ellipse: false },
+      style: {
+        color: '#000000',
+        interiorColor: '#eeeeee', // filled → hittable anywhere inside
+        strokeWidth: 2,
+        opacity: 1,
+        blendMode: 'normal',
+        border: { kind: 'solid' },
+      },
+      flags: DRAWN_FLAGS,
+      source: 'vector',
+      ...(group ? { group } : {}),
+    });
   // A group: primary P, plus two subordinates pointing at it via `group: 'P'`.
   const grouped = (): Model => modelWith([sq('P', 100), sq('C1', 200, 'P'), sq('C2', 300, 'P')]);
 
@@ -1580,7 +1583,7 @@ describe('annotation-core', () => {
   });
 
   it('markups always sit beneath other annotations, regardless of creation order', () => {
-    const square: ModelAnnotation = {
+    const square = record({
       id: 'S1',
       ref: null,
       page: PAGE,
@@ -1596,8 +1599,8 @@ describe('annotation-core', () => {
       },
       flags: DRAWN_FLAGS,
       source: 'vector',
-    };
-    const highlight: ModelAnnotation = {
+    });
+    const highlight = record({
       id: 'H1',
       ref: null,
       page: PAGE,
@@ -1616,7 +1619,7 @@ describe('annotation-core', () => {
       },
       flags: DRAWN_FLAGS,
       source: 'vector',
-    };
+    });
     // square added first, highlight second — naive creation order would paint the
     // highlight on top.
     const model = modelWith([square, highlight]);
@@ -2203,20 +2206,21 @@ describe('annotation-core — rotation', () => {
   const seededSquare = (
     id: string,
     rect: { x: number; y: number; width: number; height: number },
-  ): ModelAnnotation => ({
-    id,
-    ref: {
-      kind: 'objectNumber',
+  ): ModelAnnotation =>
+    record({
+      id,
+      ref: {
+        kind: 'objectNumber',
+        page: PAGE,
+        annotObjectNumber: Number(id.slice(1)),
+      } as ModelAnnotation['ref'],
       page: PAGE,
-      annotObjectNumber: Number(id.slice(1)),
-    } as ModelAnnotation['ref'],
-    page: PAGE,
-    subtype: 'square',
-    geometry: { kind: 'rect', rect, ellipse: false },
-    style: initialModel.style,
-    flags: DRAWN_FLAGS,
-    source: 'baked',
-  });
+      subtype: 'square',
+      geometry: { kind: 'rect', rect, ellipse: false },
+      style: initialModel.style,
+      flags: DRAWN_FLAGS,
+      source: 'baked',
+    });
 
   it('box rotates about its own centre: rot adds, centre + size fixed', () => {
     const geometry: ModelGeometry = {
@@ -2331,20 +2335,21 @@ describe('annotation-core — rotation', () => {
 });
 
 describe('annotation-core — rotation-aware selection (grab + menu + group)', () => {
-  const square = (id: string, geometry: ModelGeometry): ModelAnnotation => ({
-    id,
-    ref: {
-      kind: 'objectNumber',
+  const square = (id: string, geometry: ModelGeometry, subtype = 'square'): ModelAnnotation =>
+    record({
+      id,
+      ref: {
+        kind: 'objectNumber',
+        page: PAGE,
+        annotObjectNumber: Number(id.slice(1)),
+      } as ModelAnnotation['ref'],
       page: PAGE,
-      annotObjectNumber: Number(id.slice(1)),
-    } as ModelAnnotation['ref'],
-    page: PAGE,
-    subtype: 'square',
-    geometry,
-    style: initialModel.style,
-    flags: DRAWN_FLAGS,
-    source: 'baked',
-  });
+      subtype,
+      geometry,
+      style: initialModel.style,
+      flags: DRAWN_FLAGS,
+      source: 'baked',
+    });
   const rect = (x: number, y: number, width: number, height: number): ModelGeometry => ({
     kind: 'rect',
     rect: { x, y, width, height },
@@ -2407,20 +2412,21 @@ describe('annotation-core — rotation-aware selection (grab + menu + group)', (
 });
 
 describe('annotation-core — rotation pivots about the rect centre', () => {
-  const square = (id: string, geometry: ModelGeometry): ModelAnnotation => ({
-    id,
-    ref: {
-      kind: 'objectNumber',
+  const square = (id: string, geometry: ModelGeometry, subtype = 'square'): ModelAnnotation =>
+    record({
+      id,
+      ref: {
+        kind: 'objectNumber',
+        page: PAGE,
+        annotObjectNumber: Number(id.slice(1)),
+      } as ModelAnnotation['ref'],
       page: PAGE,
-      annotObjectNumber: Number(id.slice(1)),
-    } as ModelAnnotation['ref'],
-    page: PAGE,
-    subtype: 'square',
-    geometry,
-    style: initialModel.style,
-    flags: DRAWN_FLAGS,
-    source: 'baked',
-  });
+      subtype,
+      geometry,
+      style: initialModel.style,
+      flags: DRAWN_FLAGS,
+      source: 'baked',
+    });
 
   it('turnPivotOf of a box is the rect centre, before AND after a quarter-turn', () => {
     const geometry: ModelGeometry = {
@@ -2480,7 +2486,7 @@ describe('annotation-core — rotation pivots about the rect centre', () => {
       ],
       closed: false,
     };
-    const poly: ModelAnnotation = { ...square('s1', geometry), subtype: 'polyline' };
+    const poly = square('s1', geometry, 'polyline');
     const base = modelWith([poly]);
     const selectedModel = { ...base, selected: ['s1'] };
     const centre = turnPivotOf(geometry);
@@ -2523,20 +2529,21 @@ describe('annotation-core — rotation pivots about the rect centre', () => {
 });
 
 describe('annotation-core — selectionAnchor carries the knob alongside a centred box', () => {
-  const square = (id: string, geometry: ModelGeometry): ModelAnnotation => ({
-    id,
-    ref: {
-      kind: 'objectNumber',
+  const square = (id: string, geometry: ModelGeometry, subtype = 'square'): ModelAnnotation =>
+    record({
+      id,
+      ref: {
+        kind: 'objectNumber',
+        page: PAGE,
+        annotObjectNumber: Number(id.slice(1)),
+      } as ModelAnnotation['ref'],
       page: PAGE,
-      annotObjectNumber: Number(id.slice(1)),
-    } as ModelAnnotation['ref'],
-    page: PAGE,
-    subtype: 'square',
-    geometry,
-    style: initialModel.style,
-    flags: DRAWN_FLAGS,
-    source: 'baked',
-  });
+      subtype,
+      geometry,
+      style: initialModel.style,
+      flags: DRAWN_FLAGS,
+      source: 'baked',
+    });
   const rect = (x: number, y: number, width: number, height: number): ModelGeometry => ({
     kind: 'rect',
     rect: { x, y, width, height },
@@ -2554,13 +2561,11 @@ describe('annotation-core — selectionAnchor carries the knob alongside a centr
   });
 
   it('a non-rotatable selection (highlight) exposes a box but NO knob', () => {
-    const hi: ModelAnnotation = {
-      ...square('s2', {
-        kind: 'quads',
-        quads: [textQuadFromRect({ x: 10, y: 10, width: 80, height: 12 })],
-      }),
-      subtype: 'highlight',
-    };
+    const hi = square(
+      's2',
+      { kind: 'quads', quads: [textQuadFromRect({ x: 10, y: 10, width: 80, height: 12 })] },
+      'highlight',
+    );
     const base = modelWith([hi]);
     const selectedModel = { ...base, selected: ['s2'] };
     const anchor = selectionAnchor(selectedModel);
@@ -2748,24 +2753,25 @@ describe('annotation-core — join-aware stroke bounds', () => {
 
 describe('annotation-core opaqueBody (stamp) gestures', () => {
   const STAMP_RECT = { x: 100, y: 100, width: 100, height: 50 };
-  const stamp = (): ModelAnnotation => ({
-    id: 'S1',
-    ref: { kind: 'objectNumber', page: PAGE, annotObjectNumber: 900 },
-    page: PAGE,
-    subtype: 'stamp',
-    geometry: { kind: 'rect', rect: { ...STAMP_RECT }, ellipse: false },
-    style: {
-      color: '#000000',
-      interiorColor: null,
-      strokeWidth: 1,
-      opacity: 1,
-      blendMode: 'normal',
-      border: { kind: 'solid' },
-    },
-    flags: DRAWN_FLAGS,
-    source: 'baked',
-    apBox: { ...STAMP_RECT },
-  });
+  const stamp = (): ModelAnnotation =>
+    record({
+      id: 'S1',
+      ref: { kind: 'objectNumber', page: PAGE, annotObjectNumber: 900 },
+      page: PAGE,
+      subtype: 'stamp',
+      geometry: { kind: 'rect', rect: { ...STAMP_RECT }, ellipse: false },
+      style: {
+        color: '#000000',
+        interiorColor: null,
+        strokeWidth: 1,
+        opacity: 1,
+        blendMode: 'normal',
+        border: { kind: 'solid' },
+      },
+      flags: DRAWN_FLAGS,
+      source: 'baked',
+      apBox: { ...STAMP_RECT },
+    });
   const loadStamp = (): Model => modelWith([stamp()]);
 
   it('stays baked MID-resize with the raster box following the live geometry', () => {
@@ -2979,20 +2985,21 @@ describe('annotation-core — snapping', () => {
     id: string,
     rect: { x: number; y: number; width: number; height: number },
     rot?: number,
-  ): ModelAnnotation => ({
-    id,
-    ref: {
-      kind: 'objectNumber',
+  ): ModelAnnotation =>
+    record({
+      id,
+      ref: {
+        kind: 'objectNumber',
+        page: PAGE,
+        annotObjectNumber: Number(id.slice(1)),
+      } as ModelAnnotation['ref'],
       page: PAGE,
-      annotObjectNumber: Number(id.slice(1)),
-    } as ModelAnnotation['ref'],
-    page: PAGE,
-    subtype: 'square',
-    geometry: { kind: 'rect', rect, ellipse: false, ...(rot ? { rot } : {}) },
-    style: initialModel.style,
-    flags: DRAWN_FLAGS,
-    source: 'baked',
-  });
+      subtype: 'square',
+      geometry: { kind: 'rect', rect, ellipse: false, ...(rot ? { rot } : {}) },
+      style: initialModel.style,
+      flags: DRAWN_FLAGS,
+      source: 'baked',
+    });
   const seeded = (...annots: ModelAnnotation[]): Model => modelWith(annots);
   const moveDraft = (model: Model) => (model.draft?.kind === 'move' ? model.draft : null);
   /** `start - pivot` spun by `deg` Cw (y-down), re-anchored at the pivot — the
@@ -3227,24 +3234,25 @@ describe('page-bound rotate knob', () => {
   };
   // Stamps: rotatable + opaqueBody (grabbable anywhere inside), so one click at
   // the centre selects regardless of the shape's rotation.
-  const stampAt = (id: string, rect: Box, rot = 0, objectNumber = 900): ModelAnnotation => ({
-    id,
-    ref: { kind: 'objectNumber', page: PAGE, annotObjectNumber: objectNumber },
-    page: PAGE,
-    subtype: 'stamp',
-    geometry: { kind: 'rect', rect: { ...rect }, ellipse: false, ...(rot ? { rot } : {}) },
-    style: {
-      color: '#000000',
-      interiorColor: null,
-      strokeWidth: 1,
-      opacity: 1,
-      blendMode: 'normal',
-      border: { kind: 'solid' },
-    },
-    flags: DRAWN_FLAGS,
-    source: 'baked',
-    apBox: { ...rect },
-  });
+  const stampAt = (id: string, rect: Box, rot = 0, objectNumber = 900): ModelAnnotation =>
+    record({
+      id,
+      ref: { kind: 'objectNumber', page: PAGE, annotObjectNumber: objectNumber },
+      page: PAGE,
+      subtype: 'stamp',
+      geometry: { kind: 'rect', rect: { ...rect }, ellipse: false, ...(rot ? { rot } : {}) },
+      style: {
+        color: '#000000',
+        interiorColor: null,
+        strokeWidth: 1,
+        opacity: 1,
+        blendMode: 'normal',
+        border: { kind: 'solid' },
+      },
+      flags: DRAWN_FLAGS,
+      source: 'baked',
+      apBox: { ...rect },
+    });
   const loadSelect = (rect: Box, rot = 0): Model => {
     const model = modelWith([stampAt('S1', rect, rot)]);
     const cx = rect.x + rect.width / 2;
@@ -3411,24 +3419,25 @@ describe('rotate guides (live rotate chrome mode)', () => {
     expect(point.y).toBeGreaterThanOrEqual(BOX.y - 1e-9);
     expect(point.y).toBeLessThanOrEqual(BOX.y + BOX.height + 1e-9);
   };
-  const stampAt = (rect: Box): ModelAnnotation => ({
-    id: 'S1',
-    ref: { kind: 'objectNumber', page: PAGE, annotObjectNumber: 900 },
-    page: PAGE,
-    subtype: 'stamp',
-    geometry: { kind: 'rect', rect: { ...rect }, ellipse: false },
-    style: {
-      color: '#000000',
-      interiorColor: null,
-      strokeWidth: 1,
-      opacity: 1,
-      blendMode: 'normal',
-      border: { kind: 'solid' },
-    },
-    flags: DRAWN_FLAGS,
-    source: 'baked',
-    apBox: { ...rect },
-  });
+  const stampAt = (rect: Box): ModelAnnotation =>
+    record({
+      id: 'S1',
+      ref: { kind: 'objectNumber', page: PAGE, annotObjectNumber: 900 },
+      page: PAGE,
+      subtype: 'stamp',
+      geometry: { kind: 'rect', rect: { ...rect }, ellipse: false },
+      style: {
+        color: '#000000',
+        interiorColor: null,
+        strokeWidth: 1,
+        opacity: 1,
+        blendMode: 'normal',
+        border: { kind: 'solid' },
+      },
+      flags: DRAWN_FLAGS,
+      source: 'baked',
+      apBox: { ...rect },
+    });
   const loadSelect = (rect: Box): Model => {
     const model = modelWith([stampAt(rect)]);
     const cx = rect.x + rect.width / 2;
@@ -3520,24 +3529,25 @@ describe('rotate guides (live rotate chrome mode)', () => {
  */
 describe('group chrome rides live gestures', () => {
   type Box = { x: number; y: number; width: number; height: number };
-  const stampAt = (id: string, rect: Box, objectNumber: number): ModelAnnotation => ({
-    id,
-    ref: { kind: 'objectNumber', page: PAGE, annotObjectNumber: objectNumber },
-    page: PAGE,
-    subtype: 'stamp',
-    geometry: { kind: 'rect', rect: { ...rect }, ellipse: false },
-    style: {
-      color: '#000000',
-      interiorColor: null,
-      strokeWidth: 1,
-      opacity: 1,
-      blendMode: 'normal',
-      border: { kind: 'solid' },
-    },
-    flags: DRAWN_FLAGS,
-    source: 'baked',
-    apBox: { ...rect },
-  });
+  const stampAt = (id: string, rect: Box, objectNumber: number): ModelAnnotation =>
+    record({
+      id,
+      ref: { kind: 'objectNumber', page: PAGE, annotObjectNumber: objectNumber },
+      page: PAGE,
+      subtype: 'stamp',
+      geometry: { kind: 'rect', rect: { ...rect }, ellipse: false },
+      style: {
+        color: '#000000',
+        interiorColor: null,
+        strokeWidth: 1,
+        opacity: 1,
+        blendMode: 'normal',
+        border: { kind: 'solid' },
+      },
+      flags: DRAWN_FLAGS,
+      source: 'baked',
+      apBox: { ...rect },
+    });
   /** Two stamps side by side, both selected (click + shift-click). */
   const loadPair = (): Model => {
     const model = modelWith([
@@ -3626,7 +3636,7 @@ describe('marquee vs rotated shapes', () => {
   // A thin 200×20 bar rotated 45° about its centre (200,110): it occupies the
   // diagonal band from ≈(129,39) to ≈(271,181) and nothing else. Its rotated
   // AABB spans ≈(122..278, 32..188).
-  const bar: ModelAnnotation = {
+  const bar = record({
     id: 'R1',
     ref: { kind: 'objectNumber', page: PAGE, annotObjectNumber: 900 },
     page: PAGE,
@@ -3647,7 +3657,7 @@ describe('marquee vs rotated shapes', () => {
     },
     flags: DRAWN_FLAGS,
     source: 'vector',
-  };
+  });
   const model = modelWith([bar]);
 
   it('quadIntersectsRect: SAT on the four candidate axes', () => {
@@ -3907,7 +3917,7 @@ describe('render source after an edit (what keeps a raster, what renders live)',
   // (visual is the engine raster, stays baked through edits); squares flip to
   // vector on any geometry edit and render live.
   const committed = (subtype: 'stamp' | 'square'): Model => {
-    const annotation: ModelAnnotation = {
+    const annotation = record({
       id: 'A1',
       ref: { kind: 'objectNumber', annotObjectNumber: 7, page: PAGE },
       page: PAGE,
@@ -3917,7 +3927,7 @@ describe('render source after an edit (what keeps a raster, what renders live)',
       flags: DRAWN_FLAGS,
       source: 'baked',
       apBox: { x: 100, y: 100, width: 100, height: 60 },
-    };
+    });
     return { ...initialModel, byId: { A1: annotation }, order: ['A1'], selected: ['A1'] };
   };
 
@@ -3978,7 +3988,7 @@ describe('render source after an edit (what keeps a raster, what renders live)',
   });
 
   it('setProps keeps opaque-body kinds BAKED (a widget restyle re-fetches, never flips)', () => {
-    const annotation: ModelAnnotation = {
+    const annotation = record({
       id: 'W1',
       ref: { kind: 'objectNumber', annotObjectNumber: 9, page: PAGE },
       page: PAGE,
@@ -3988,7 +3998,7 @@ describe('render source after an edit (what keeps a raster, what renders live)',
       flags: DRAWN_FLAGS,
       source: 'baked',
       apBox: { x: 10, y: 10, width: 120, height: 24 },
-    };
+    });
     const model: Model = {
       ...initialModel,
       byId: { W1: annotation },
@@ -4038,17 +4048,18 @@ describe('link prop (attached children in the substrate, read via linkOf)', () =
     border: { kind: 'solid' },
   } as const;
 
-  const committedSquare = (extra?: Partial<ModelAnnotation>): ModelAnnotation => ({
-    id: 'S1',
-    ref: REF,
-    page: PAGE,
-    subtype: 'square',
-    geometry: { kind: 'rect', rect: { x: 10, y: 10, width: 50, height: 40 }, ellipse: false },
-    style: { ...baseStyle },
-    flags: DRAWN_FLAGS,
-    source: 'baked',
-    ...extra,
-  });
+  const committedSquare = (extra?: Partial<ModelAnnotation>): ModelAnnotation =>
+    record({
+      id: 'S1',
+      ref: REF,
+      page: PAGE,
+      subtype: 'square',
+      geometry: { kind: 'rect', rect: { x: 10, y: 10, width: 50, height: 40 }, ellipse: false },
+      style: { ...baseStyle },
+      flags: DRAWN_FLAGS,
+      source: 'baked',
+      ...extra,
+    });
 
   const withSelected = (annotation: ModelAnnotation): Model => {
     const model = modelWith([annotation]);
@@ -4124,7 +4135,7 @@ describe('link prop (attached children in the substrate, read via linkOf)', () =
 
   it('an attached link is NOT a visual-group member: single selection, handles, no Ungroup', () => {
     const parent = committedSquare();
-    const child: ModelAnnotation = {
+    const child = record({
       id: 'C1',
       ref: CHILD_REF,
       page: PAGE,
@@ -4135,8 +4146,8 @@ describe('link prop (attached children in the substrate, read via linkOf)', () =
       source: 'baked',
       group: 'S1',
       irt: 'S1',
-      data: { subtype: 'link', target: URI } as unknown as ModelAnnotation['data'],
-    };
+      annotation: { target: URI },
+    });
     const loaded = modelWith([parent, child]);
     // The wire mechanism is /RT /Group, but the semantics are plumbing: the
     // square is no group primary, the selection stays the square alone…
@@ -4158,7 +4169,7 @@ describe('link prop (attached children in the substrate, read via linkOf)', () =
       group: 'P1',
       irt: 'P1',
     });
-    const child: ModelAnnotation = {
+    const child = record({
       id: 'C1',
       ref: CHILD_REF,
       page: PAGE,
@@ -4169,8 +4180,8 @@ describe('link prop (attached children in the substrate, read via linkOf)', () =
       source: 'baked',
       group: 'P1',
       irt: 'P1',
-      data: { subtype: 'link', target: URI } as unknown as ModelAnnotation['data'],
-    };
+      annotation: { target: URI },
+    });
     const model = modelWith([primary, sub, child]);
     // The pair is a group; the link child never appears among the members —
     // so the ungroup verb (which walks expandGroups) can never strip its
@@ -4182,7 +4193,7 @@ describe('link prop (attached children in the substrate, read via linkOf)', () =
 
   it('deleting a parent also deletes its attached link children (substrate)', () => {
     const parent = committedSquare();
-    const child: ModelAnnotation = {
+    const child = record({
       id: 'C1',
       ref: CHILD_REF,
       page: PAGE,
@@ -4193,8 +4204,8 @@ describe('link prop (attached children in the substrate, read via linkOf)', () =
       source: 'baked',
       group: 'S1',
       irt: 'S1',
-      data: { subtype: 'link', target: URI } as unknown as ModelAnnotation['data'],
-    };
+      annotation: { target: URI },
+    });
     const loaded = modelWith([parent, child]);
     // The child is substrate: readable through the lens, absent from paint.
     expect(linkOf(loaded, 'S1')).toEqual(URI);
@@ -4225,32 +4236,33 @@ describe('conversation plane — replies and review states never reach the page'
     rect: { x, y, width: 40, height: 30 },
     ellipse: false,
   });
-  const annotation = (id: string, over: Partial<ModelAnnotation>): ModelAnnotation => ({
-    id,
-    ref: null,
-    page: PAGE,
-    subtype: 'square',
-    geometry: at(10, 10),
-    style: initialModel.style,
-    flags: DRAWN_FLAGS,
-    source: 'vector',
-    ...over,
-  });
-  const stateData = (state: string | null, stateModel: string | null): ModelAnnotation['data'] =>
-    ({ subtype: 'text', state, stateModel }) as unknown as ModelAnnotation['data'];
+  const annotation = (id: string, over: Partial<RecordInput>): ModelAnnotation =>
+    record({
+      id,
+      ref: null,
+      page: PAGE,
+      subtype: 'square',
+      geometry: at(10, 10),
+      style: initialModel.style,
+      flags: DRAWN_FLAGS,
+      source: 'vector',
+      ...over,
+    });
+  const stateData = (state: string | null, stateModel: string | null) =>
+    ({ state, stateModel }) as Partial<AnnotationDTO>;
 
   const root = annotation('root', {});
   const reply = annotation('reply', { subtype: 'text', geometry: at(100, 10), irt: 'root' });
   const subordinate = annotation('sub', {
     subtype: 'caret',
-    geometry: at(200, 10),
+    geometry: { kind: 'caret', rect: { x: 200, y: 10, width: 40, height: 30 } },
     irt: 'root',
     group: 'root',
   });
   const status = annotation('status', {
     subtype: 'text',
     geometry: at(300, 10),
-    data: stateData('accepted', 'review'),
+    annotation: stateData('accepted', 'review'),
   });
   const model = () => modelWith([root, reply, subordinate, status]);
 
@@ -4262,12 +4274,14 @@ describe('conversation plane — replies and review states never reach the page'
     // A plain sticky note (no state entries) is a page visual.
     expect(isConversationOnly(annotation('note', { subtype: 'text' }))).toBe(false);
     expect(
-      isConversationOnly(annotation('empty-state', { subtype: 'text', data: stateData('', '') })),
+      isConversationOnly(
+        annotation('empty-state', { subtype: 'text', annotation: stateData('', '') }),
+      ),
     ).toBe(false);
     // A model-defaulted state (stateModel only) is still a state annotation.
     expect(
       isConversationOnly(
-        annotation('model-only', { subtype: 'text', data: stateData(null, 'review') }),
+        annotation('model-only', { subtype: 'text', annotation: stateData(null, 'review') }),
       ),
     ).toBe(true);
   });
@@ -4321,11 +4335,11 @@ describe('callout ↔ AP-generator mirror', () => {
   });
 
   it('text edit renders the callout fully LIVE — never baked raster + DOM text', () => {
-    const callout: ModelAnnotation = {
+    const callout = record({
       id: 'C1',
       ref: null,
       page: PAGE,
-      subtype: 'freeText',
+      subtype: 'free-text',
       geometry: calloutGeom(),
       style: {
         color: '#e07b39',
@@ -4337,7 +4351,7 @@ describe('callout ↔ AP-generator mirror', () => {
       },
       flags: DRAWN_FLAGS,
       source: 'baked',
-    };
+    });
     let model = modelWith([callout]);
     // At rest: baked like any shape — one renderer, the engine raster.
     expect(pageItems(model, PAGE)[0]!.source).toBe('baked');

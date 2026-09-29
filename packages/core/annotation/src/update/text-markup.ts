@@ -8,8 +8,8 @@ import type { AnnotationFlags, PageRef } from '@embedpdf/engine-core/runtime';
 import { DRAWN_FLAGS } from '../flags';
 import { caretGeomFromAnchor } from '../geometry';
 import { styleFromProps } from '../props';
-import type { Effect, Model, ModelAnnotation, Subtype, TextEndAnchor, TextQuad } from '../types';
-import { newRecordId } from './changes';
+import type { Effect, Model, Subtype, TextEndAnchor, TextQuad } from '../types';
+import { newRecord } from './changes';
 import { defaultsFor } from './session';
 
 /** Drop degenerate segment quads (zero-length baseline or ink extent). Area is
@@ -38,17 +38,14 @@ export function createMarkup(
 ): [Model, Effect[]] {
   const quads = usableQuads(segmentQuads);
   if (!quads.length) return [model, []];
-  const id = newRecordId(model);
-  const annotation: ModelAnnotation = {
-    id,
-    ref: null,
+  const annotation = newRecord(model, {
     page,
     subtype,
     geometry: { kind: 'quads', quads },
     style: styleFromProps(defaultsFor(model, preset)),
     flags: { ...DRAWN_FLAGS, ...flags },
-    source: 'vector',
-  };
+  });
+  const id = annotation.id;
   return [
     {
       ...model,
@@ -78,33 +75,31 @@ export function createReplaceText(
 ): [Model, Effect[]] {
   const quads = usableQuads(segmentQuads);
   if (!quads.length) return [model, []];
-  const primaryId = newRecordId(model);
-  const strikeoutId = newRecordId(model, 2);
   const style = styleFromProps(defaultsFor(model, preset));
-  const caret: ModelAnnotation = {
-    id: primaryId,
-    ref: null,
+  const caret = newRecord(model, {
     page,
     subtype: 'caret',
     intent: 'replace',
     geometry: caretGeomFromAnchor(anchor),
     style,
     flags: DRAWN_FLAGS,
-    source: 'vector',
-  };
-  const strikeout: ModelAnnotation = {
-    id: strikeoutId,
-    ref: null,
-    page,
-    subtype: 'strikeout',
-    intent: 'strikeout-text-edit',
-    geometry: { kind: 'quads', quads },
-    style,
-    flags: DRAWN_FLAGS,
-    source: 'vector',
-    irt: primaryId,
-    group: primaryId,
-  };
+  });
+  const primaryId = caret.id;
+  const strikeout = newRecord(
+    model,
+    {
+      page,
+      subtype: 'strikeout',
+      intent: 'strikeout-text-edit',
+      geometry: { kind: 'quads', quads },
+      style,
+      flags: DRAWN_FLAGS,
+      irt: primaryId,
+      group: primaryId,
+    },
+    { offset: 2, reply: { to: caret.annotation.ref, type: 'group' } },
+  );
+  const strikeoutId = strikeout.id;
   return [
     {
       ...model,
@@ -127,18 +122,15 @@ export function createCaret(
 ): [Model, Effect[]] {
   const caretGeom = caretGeomFromAnchor(anchor);
   if (caretGeom.rect.width <= 0 || caretGeom.rect.height <= 0) return [model, []];
-  const id = newRecordId(model);
   const definition = defaultsFor(model, 'caret');
-  const annotation: ModelAnnotation = {
-    id,
-    ref: null,
+  const annotation = newRecord(model, {
     page,
     subtype: 'caret',
     geometry: caretGeom,
     style: styleFromProps(definition),
     flags: { ...DRAWN_FLAGS, ...flags },
-    source: 'vector',
-  };
+  });
+  const id = annotation.id;
   return [
     {
       ...model,

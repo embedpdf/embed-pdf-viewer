@@ -26,12 +26,11 @@ import type {
   Effect,
   InkStraightenOptions,
   Model,
-  ModelAnnotation,
   PointerInput,
   Rect,
   Subtype,
 } from '../types';
-import { isPolySubtype, newRecordId } from './changes';
+import { isPolySubtype, newRecord } from './changes';
 import { calloutPointer } from './draw-callout';
 import { distancePointer } from './draw-distance';
 import { clampPointToBox } from './page-bound';
@@ -290,10 +289,7 @@ export function createPointer(
       [{ type: 'captured', tool: activeDraft.capture, page: activeDraft.page, geometry }],
     ];
 
-  const id = newRecordId(model);
-  const annotation: ModelAnnotation = {
-    id,
-    ref: null,
+  const annotation = newRecord(model, {
     page: activeDraft.page,
     subtype: activeDraft.subtype,
     ...(activeDraft.kind === 'create-line' && activeDraft.measure
@@ -308,8 +304,8 @@ export function createPointer(
     // presets), or dead (`null` — the create-then-edit flow).
     ...(activeDraft.subtype === 'link' ? { link: definition.link ?? null } : {}),
     flags: { ...DRAWN_FLAGS, ...activeDraft.flags },
-    source: 'vector',
-  };
+  });
+  const id = annotation.id;
   return [
     {
       ...model,
@@ -335,18 +331,15 @@ export function finishInkCreate(model: Model): [Model, Effect[]] {
   const bounds = unionRect(points);
   if (Math.max(bounds.width, bounds.height) < MIN_DRAG) return [{ ...model, draft: null }, []];
 
-  const id = newRecordId(model);
-  const annotation: ModelAnnotation = {
-    id,
-    ref: null,
+  const annotation = newRecord(model, {
     page: draft.page,
     subtype: draft.subtype,
     geometry: { kind: 'ink', strokes: draft.strokes },
     style: styleFromProps(defaultsFor(model, draft.preset ?? draft.subtype)),
     ...(draft.intent ? { intent: draft.intent } : {}),
     flags: { ...DRAWN_FLAGS, ...draft.flags },
-    source: 'vector',
-  };
+  });
+  const id = annotation.id;
   return [
     {
       ...model,
@@ -376,18 +369,15 @@ export function finishPolyCreate(model: Model): [Model, Effect[]] {
   if (draft.measure && 'unavailable' in shapeMeasurementReadout(geometry, draft.measure))
     return [model, []];
 
-  const id = newRecordId(model);
-  const annotation: ModelAnnotation = {
-    id,
-    ref: null,
+  const annotation = newRecord(model, {
     page: draft.page,
     subtype: draft.subtype,
     geometry,
     measure: draft.measure,
     style: styleFromProps(definition),
     flags: { ...DRAWN_FLAGS, ...draft.flags },
-    source: 'vector',
-  };
+  });
+  const id = annotation.id;
   return [
     {
       ...model,

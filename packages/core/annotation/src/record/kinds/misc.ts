@@ -8,11 +8,11 @@
  */
 import type { AnnotationDTO } from '@embedpdf/engine-core/runtime';
 
-import type { ModelAnnotation, TextStyle } from '../../types';
+import type { RecordFields, TextStyle } from '../../types';
 import { boxEmit, type KindProjection } from '../projection';
 import { boxGeomFromDTO, writableTarget } from '../seam';
 
-const rectGeometry = (annotation: ModelAnnotation) =>
+const rectGeometry = (annotation: RecordFields) =>
   'rect' in annotation.geometry ? { rect: annotation.geometry.rect } : null;
 
 const iconProjection = (subtype: 'text' | 'file-attachment'): KindProjection => ({

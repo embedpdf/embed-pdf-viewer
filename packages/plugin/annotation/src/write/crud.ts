@@ -53,7 +53,7 @@ export function createCrud(
   };
 
   const wireSubtypeOf = (annotation: ModelAnnotation): AnnotationDTO['subtype'] =>
-    annotation.data?.subtype ?? (annotation.subtype as AnnotationDTO['subtype']);
+    annotation.annotation.subtype;
 
   const update = async (ref: AnnotationRef, patch: AnnotationPagePatch): Promise<void> => {
     const annotation = annotations.loadedOrThrow(ref);

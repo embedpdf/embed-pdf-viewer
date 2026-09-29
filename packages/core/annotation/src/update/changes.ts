@@ -6,6 +6,7 @@
  */
 import { anchoredGeom, anchorModeOf, unanchoredGeom, type ViewEnv } from '../anchor';
 import { capsFor } from '../kinds';
+import { annotationOfRecord, type AnnotationPlace } from '../record';
 import type {
   ModelGeometry,
   Effect,
@@ -77,6 +78,39 @@ export const geomEqual = (left: ModelGeometry, right: ModelGeometry): boolean =>
 
 /** The id of the `offset`-th record a message creates (`new:<n>`), counted from the session's `seq`. */
 export const newRecordId = (model: Model, offset = 1): Id => `new:${model.seq + offset}`;
+
+/** The fields a new record is made from: everything but what `newRecord` gives it. */
+export type NewRecordFields = Omit<ModelAnnotation, 'id' | 'ref' | 'source' | 'annotation'>;
+
+/**
+ * The `offset`-th record a message creates: id `new:<n>`, drawn live, and the
+ * annotation its fields predict, under the name it will be written with
+ * (`<namePrefix><n>`) and appended after the page's other records. `reply`
+ * ties it to the annotation it belongs to.
+ */
+export function newRecord(
+  model: Model,
+  fields: NewRecordFields,
+  options: { offset?: number; reply?: AnnotationPlace['reply'] } = {},
+): ModelAnnotation {
+  const offset = options.offset ?? 1;
+  const record = {
+    ...fields,
+    id: newRecordId(model, offset),
+    ref: null,
+    source: 'vector' as const,
+  };
+  const page = fields.page;
+  const onPage = model.order.filter(
+    (id) => model.byId[id]?.page.pageObjectNumber === page.pageObjectNumber,
+  ).length;
+  const annotation = annotationOfRecord(record, {
+    ref: { kind: 'nm', page, nm: `${model.namePrefix}${model.seq + offset}` },
+    index: onPage + offset - 1,
+    ...(options.reply ? { reply: options.reply } : {}),
+  });
+  return { ...record, annotation };
+}
 
 /** The model without these records, and without any session reference to them. */
 export function withoutRecords(model: Model, ids: readonly Id[]): Model {

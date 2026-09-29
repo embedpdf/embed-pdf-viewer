@@ -11,8 +11,8 @@ import {
 } from '../geometry';
 import { clampRectToBox } from '../placement';
 import { styleFromProps, textStyleFromProps } from '../props';
-import type { Draft, Effect, Model, ModelAnnotation, Point, PointerInput, Rect } from '../types';
-import { newRecordId } from './changes';
+import type { Draft, Effect, Model, Point, PointerInput, Rect } from '../types';
+import { newRecord } from './changes';
 import { MIN_DRAG } from './draw';
 import { defaultsFor } from './session';
 
@@ -147,10 +147,7 @@ export function calloutPointer(
   const rot = calloutUprightRot(draft);
   const definition = defaultsFor(model, draft.preset ?? 'free-text-callout');
   const ending = definition.lineEndings.end !== 'none' ? definition.lineEndings.end : 'open-arrow';
-  const id = newRecordId(model);
-  const annotation: ModelAnnotation = {
-    id,
-    ref: null,
+  const annotation = newRecord(model, {
     page: draft.page,
     subtype: 'free-text',
     geometry: {
@@ -162,8 +159,8 @@ export function calloutPointer(
     style: styleFromProps(definition),
     text: textStyleFromProps(definition),
     flags: { ...DRAWN_FLAGS, ...draft.flags },
-    source: 'vector',
-  };
+  });
+  const id = annotation.id;
   return [
     {
       ...model,

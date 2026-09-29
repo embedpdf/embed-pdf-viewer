@@ -159,6 +159,7 @@ export {
 // The engine's record and the model's entry, both ways: the entry a record
 // reads as, and the engine writes an entry states.
 export {
+  annotationOfRecord,
   boxGeomFields,
   fromDTO,
   hexColorOf,
@@ -169,6 +170,7 @@ export {
   toScopedPatch,
   widgetAppearanceFromProps,
   writableTarget,
+  type AnnotationPlace,
 } from './record';
 export { cloudyPath, cloudyBorderExtent } from './cloudy';
 export * from './measurement';
@@ -204,6 +206,7 @@ export type {
   PropKey,
   Quad,
   Rect,
+  RecordFields,
   LineEnding,
   LineEndings,
   Paint,

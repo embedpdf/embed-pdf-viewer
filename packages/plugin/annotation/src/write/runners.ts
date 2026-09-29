@@ -127,7 +127,7 @@ export function registerEffectRunners(
     const record = model.byId[effect.id];
     if (!record) return;
     const patch = {
-      subtype: record.data?.subtype ?? record.subtype,
+      subtype: record.annotation.subtype,
       ...record.flags,
     } as AnnotationPatch;
     return {

@@ -2,7 +2,7 @@ import { textQuadFromRect } from '@embedpdf/core-geometry';
 import { toPageRef } from '@embedpdf/engine-core/runtime';
 import { describe, expect, it } from 'vitest';
 
-import { modelWith, step } from './support';
+import { modelWith, record, step } from './support';
 import { anchoredGeom, anchorModeOf, anchorOf, unanchoredGeom, type ViewEnv } from '../src/anchor';
 import {
   DRAWN_FLAGS,
@@ -32,21 +32,22 @@ const square = (
   id: string,
   flags: AnnotationFlags = DRAWN_FLAGS,
   over: Partial<ModelAnnotation> = {},
-): ModelAnnotation => ({
-  id,
-  ref: {
-    kind: 'objectNumber',
+): ModelAnnotation =>
+  record({
+    id,
+    ref: {
+      kind: 'objectNumber',
+      page: PAGE,
+      annotObjectNumber: Number(id.replace(/\D/g, '') || 7),
+    },
     page: PAGE,
-    annotObjectNumber: Number(id.replace(/\D/g, '') || 7),
-  },
-  page: PAGE,
-  subtype: 'square',
-  geometry: { kind: 'rect', rect: { x: 100, y: 100, width: 80, height: 60 }, ellipse: false },
-  style: initialModel.style,
-  flags,
-  source: 'vector',
-  ...over,
-});
+    subtype: 'square',
+    geometry: { kind: 'rect', rect: { x: 100, y: 100, width: 80, height: 60 }, ellipse: false },
+    style: initialModel.style,
+    flags,
+    source: 'vector',
+    ...over,
+  });
 
 const loaded = (annots: ModelAnnotation[]): Model => modelWith(annots);
 const run = (model: Model, msgs: Message[]): Model =>

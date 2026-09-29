@@ -77,12 +77,14 @@ export function createComments(
 
     setText: async (ref, text) => {
       const root = threads.rootRefOf(ref);
-      const data = store.model().byId[annotationKey(ref)]?.data;
-      if (data && isDimension(data))
+      const record = store.model().byId[annotationKey(ref)];
+      if (record && isDimension(record.annotation))
         throw new Error('[annotation] measurement contents are derived');
-      const subtype = data?.subtype;
-      if (!subtype) throw new Error('[annotation] cannot edit an uncommitted annotation');
-      await crud.updateRaw(ref, { subtype, contents: text } as AnnotationPatch);
+      if (!record?.ref) throw new Error('[annotation] cannot edit an uncommitted annotation');
+      await crud.updateRaw(ref, {
+        subtype: record.annotation.subtype,
+        contents: text,
+      } as AnnotationPatch);
       announce(root, 'text');
     },
 
@@ -160,9 +162,7 @@ export function createComments(
         canEditText: (() => {
           const annotation = store.model().byId[annotationKey(ref)];
           return (
-            !!annotation &&
-            !(annotation.data && isDimension(annotation.data)) &&
-            annotContentsEditable(annotation)
+            !!annotation && !isDimension(annotation.annotation) && annotContentsEditable(annotation)
           );
         })(),
         canDelete: authority.canDelete(ref),

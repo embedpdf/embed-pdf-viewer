@@ -78,7 +78,7 @@ export function createAnnotationReads(
     if (!annotation.ref) return null;
     const hit = projections.get(annotation);
     if (hit) return hit;
-    const dto = annotation.data;
+    const dto = annotation.annotation;
     const pending = pendingIds().has(annotation.id);
     const projected: Annotation = {
       ref: annotation.ref,
@@ -120,7 +120,7 @@ export function createAnnotationReads(
         (annotation) =>
           (!filter?.page || pageRefsEqual(annotation.page, filter.page)) &&
           (!filter?.subtype || annotation.subtype === filter.subtype) &&
-          (filter?.author === undefined || annotation.data?.author === filter.author) &&
+          (filter?.author === undefined || annotation.annotation.author === filter.author) &&
           (!group || annotation.group === group || annotation.id === group),
       );
   };
@@ -182,10 +182,7 @@ export function createAnnotationReads(
     const model = store.model();
     return model.selected
       .map((id) => model.byId[id])
-      .filter(
-        (annotation): annotation is ModelAnnotation =>
-          !!annotation && !!annotation.ref && !!annotation.data,
-      );
+      .filter((annotation): annotation is ModelAnnotation => !!annotation && !!annotation.ref);
   };
 
   const api = {

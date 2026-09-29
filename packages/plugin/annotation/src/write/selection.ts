@@ -177,7 +177,7 @@ export function createSelectionWrites(
         .map((id) => model.byId[id])
         .filter(
           (annotation): annotation is ModelAnnotation =>
-            !!annotation && !!annotation.ref && !!annotation.data && !!annotation.group,
+            !!annotation && !!annotation.ref && !!annotation.group,
         );
       await Promise.all(subs.map((annotation) => links.writeRelationship(annotation, null)));
     },

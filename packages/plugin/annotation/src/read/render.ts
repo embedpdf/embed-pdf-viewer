@@ -122,14 +122,14 @@ export function createRenderReads(
       // carry the target on their DTO. Rects are the child's own committed
       // geometry — anchors render only in view contexts, where nothing is
       // mid-gesture, so no live parent-derivation is needed.
+      const record = annotation.annotation;
       const target =
-        annotation.link ??
-        (annotation.data?.subtype === 'link' ? (annotation.data.target ?? null) : null);
+        annotation.link ?? (record.subtype === 'link' ? (record.target ?? null) : null);
       if (target == null || annotation.geometry.kind !== 'rect') continue;
-      const activate = annotation.data?.actions?.activate;
-      const ref = annotation.ref ?? annotation.data?.ref ?? undefined;
-      const hoverEnter = Boolean(annotation.data?.actions?.cursorEnter?.root);
-      const hoverExit = Boolean(annotation.data?.actions?.cursorExit?.root);
+      const activate = record.actions?.activate;
+      const ref = annotation.ref ?? undefined;
+      const hoverEnter = Boolean(record.actions?.cursorEnter?.root);
+      const hoverExit = Boolean(record.actions?.cursorExit?.root);
       items.push({
         id,
         bounds: annotation.geometry.rect,

@@ -8,7 +8,7 @@
 import { normalizeQuad } from '@embedpdf/core-geometry';
 import type { AnnotationDTO, PageBox, PageQuad } from '@embedpdf/engine-core/runtime';
 
-import type { ModelAnnotation, TextQuad } from '../../types';
+import type { ModelAnnotation, RecordFields, TextQuad } from '../../types';
 import type { KindProjection } from '../projection';
 import { boxGeomFields } from '../seam';
 
@@ -24,7 +24,7 @@ const quadsFromDTO = (quadPoints: PageQuad[]): TextQuad[] => quadPoints.map(norm
 /** Content quads → engine `quadPoints`, in the zigzag slot order: p1..p4 =
  *  upper-start, upper-end, lower-start, lower-end (PDFium's documented TL,
  *  TR, BL, BR); null off quads geom. */
-export function quadPointsFor(annotation: ModelAnnotation): PageQuad[] | null {
+export function quadPointsFor(annotation: RecordFields): PageQuad[] | null {
   if (annotation.geometry.kind !== 'quads') return null;
   return annotation.geometry.quads.map((quad) => ({
     p1: quad.upperStart,
@@ -98,7 +98,9 @@ export const caret: KindProjection = {
   // The replace-text intent + seeded contents are create-only statements.
   draftExtras: (annotation) => ({
     ...(annotation.intent === 'replace' ? { intent: annotation.intent } : {}),
-    ...(annotation.data?.contents != null ? { contents: annotation.data.contents } : {}),
+    ...(annotation.annotation?.contents != null
+      ? { contents: annotation.annotation.contents }
+      : {}),
   }),
 };
 

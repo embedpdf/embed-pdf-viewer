@@ -1,7 +1,7 @@
 import { toPageRef } from '@embedpdf/engine-core/runtime';
 import { describe, expect, it } from 'vitest';
 
-import { step } from './support';
+import { record, step } from './support';
 import { DRAWN_FLAGS } from '../src/flags';
 import {
   DEFAULT_CHROME_GEOMETRY,
@@ -27,7 +27,7 @@ const appearance: DistanceAppearance = {
 };
 
 function measurement(overrides: Partial<ModelAnnotation> = {}): ModelAnnotation {
-  return {
+  return record({
     id: 'distance',
     ref: null,
     page: toPageRef(1),
@@ -43,7 +43,7 @@ function measurement(overrides: Partial<ModelAnnotation> = {}): ModelAnnotation 
     flags: DRAWN_FLAGS,
     measure: appearance,
     ...overrides,
-  };
+  });
 }
 
 function selected(annotation = measurement()): Model {
@@ -186,13 +186,14 @@ describe('measurement selection frame and rotation', () => {
     expect(annotsInBox(state, toPageRef(1), { x: 290, y: 340 }, { x: 325, y: 355 })).toEqual([
       'distance',
     ]);
-    const square: ModelAnnotation = {
+    const square = record({
       ...measurement(),
       id: 'square',
       subtype: 'square',
       geometry: { kind: 'rect', rect: { x: 400, y: 180, width: 80, height: 80 }, ellipse: false },
       measure: undefined,
-    };
+      annotation: undefined,
+    });
     state.byId.square = square;
     state.order.push(square.id);
     state.selected.push(square.id);

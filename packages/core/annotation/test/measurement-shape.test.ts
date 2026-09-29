@@ -1,7 +1,7 @@
 import { measureFromKnownLength, toPageRef } from '@embedpdf/engine-core/runtime';
 import { describe, expect, it } from 'vitest';
 
-import { step } from './support';
+import { record, step } from './support';
 import { DRAWN_FLAGS } from '../src/flags';
 import {
   DEFAULT_CHROME_GEOMETRY,
@@ -41,7 +41,7 @@ const points = [
 const geometry: ModelGeometry = { kind: 'poly', closed: true, points };
 
 function annotation(measure = appearance, geom = geometry): ModelAnnotation {
-  return {
+  return record({
     id: 'shape',
     ref: null,
     page: toPageRef(1),
@@ -51,7 +51,7 @@ function annotation(measure = appearance, geom = geometry): ModelAnnotation {
     style: initialStyle,
     flags: DRAWN_FLAGS,
     source: 'baked',
-  };
+  });
 }
 
 function selected(shape = annotation()): Model {

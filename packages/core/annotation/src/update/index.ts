@@ -20,6 +20,7 @@
 import { annotContentsEditable } from '../flags';
 import { expandGroups } from '../group';
 import { isSelectable } from '../hit';
+import { annotationAfter } from '../record';
 import type {
   ChangeSet,
   Effect,
@@ -63,6 +64,7 @@ const SESSION_FIELDS = {
   draft: true,
   preview: true,
   seq: true,
+  namePrefix: true,
   style: true,
   defaults: true,
   hitMargin: true,
@@ -78,6 +80,7 @@ const sessionOf = (model: Model): Session => ({
   draft: model.draft,
   preview: model.preview,
   seq: model.seq,
+  namePrefix: model.namePrefix,
   style: model.style,
   defaults: model.defaults,
   hitMargin: model.hitMargin,
@@ -92,13 +95,20 @@ export const sameSession = (left: Session, right: Session): boolean =>
 /** The change set of a message that changed no record. */
 export const EMPTY_CHANGE: ChangeSet = { put: [], drop: [] };
 
-/** The records a transition changed. Cheap when nothing changed: `byId` keeps its identity. */
+/**
+ * The records a transition changed, each with its annotation brought up to
+ * date with the fields the transition changed (a new record already carries
+ * the one it predicts). Cheap when nothing changed: `byId` keeps its identity.
+ */
 function changeBetween(before: Model, after: Model): ChangeSet {
   if (before.byId === after.byId) return EMPTY_CHANGE;
   const put: ModelAnnotation[] = [];
   for (const id of after.order) {
     const record = after.byId[id];
-    if (record && record !== before.byId[id]) put.push(record);
+    const previous = before.byId[id];
+    if (!record || record === previous) continue;
+    const annotation = previous ? annotationAfter(previous, record) : record.annotation;
+    put.push(annotation === record.annotation ? record : { ...record, annotation });
   }
   const drop = before.order.filter((id) => before.byId[id] && !after.byId[id]);
   return put.length || drop.length ? { put, drop } : EMPTY_CHANGE;

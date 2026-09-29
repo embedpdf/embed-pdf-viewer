@@ -10,7 +10,7 @@
 import type { AnnotationDTO } from '@embedpdf/engine-core/runtime';
 
 import { geomRotation, shapeBoxOf, shapeRectFor } from '../../geometry';
-import type { ModelAnnotation } from '../../types';
+import type { RecordFields } from '../../types';
 import type { KindProjection, Wire } from '../projection';
 import { borderSlice } from '../props';
 import { boxGeomFields, boxGeomFromDTO, styleFromDTO } from '../seam';
@@ -18,7 +18,7 @@ import { boxGeomFields, boxGeomFromDTO, styleFromDTO } from '../seam';
 type ShapeDTO = Extract<AnnotationDTO, { subtype: 'square' | 'circle' }>;
 
 /** The engine's box and turn for a rect shape: its model box less the cloud's reach. */
-function shapeGeometry(annotation: ModelAnnotation): Wire | null {
+function shapeGeometry(annotation: RecordFields): Wire | null {
   const geometry = annotation.geometry;
   if (geometry.kind !== 'rect') return null;
   const box = shapeBoxOf(geometry.rect, geometry.ellipse, annotation.style);
@@ -26,7 +26,7 @@ function shapeGeometry(annotation: ModelAnnotation): Wire | null {
 }
 
 /** `/BE` for a rect shape, total (`null` when plain), with the box it leaves. */
-export function cloudyExtras(annotation: ModelAnnotation): Wire {
+export function cloudyExtras(annotation: RecordFields): Wire {
   if (annotation.geometry.kind !== 'rect') return {};
   const border = annotation.style.border;
   return {

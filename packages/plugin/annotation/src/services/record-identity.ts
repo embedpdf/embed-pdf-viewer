@@ -48,8 +48,8 @@ function renamesBetween(previous: AnnotationView, next: AnnotationView): Map<Id,
   const appearedAt = new Map<string, Id>();
   for (const id of next.order) {
     const record = next.byId[id];
-    if (!(id in previous.byId) && record?.data) {
-      appearedAt.set(positionKey(record.page, record.data.index), id);
+    if (!(id in previous.byId) && record?.ref) {
+      appearedAt.set(positionKey(record.page, record.annotation.index), id);
     }
   }
   const renamed = new Map<Id, Id>();

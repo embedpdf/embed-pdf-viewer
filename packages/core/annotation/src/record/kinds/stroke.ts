@@ -20,7 +20,7 @@ import {
 import { geomRotation } from '../../geometry';
 import { distanceLabel } from '../../measurement';
 import { shapeMeasurementLabel } from '../../measurement-shape';
-import type { ModelAnnotation } from '../../types';
+import type { ModelAnnotation, RecordFields } from '../../types';
 import type { KindProjection, Wire } from '../projection';
 import { borderSlice } from '../props';
 import { rotFromDTO } from '../seam';
@@ -50,7 +50,7 @@ const rotationOf = (geometry: ModelAnnotation['geometry']): { rotation: number |
 /** `/BE` intensity for a closed poly (polygon): the curls are generated from
  *  /Vertices + /BE alone — per ISO 32000 no /RD applies — and the engine's
  *  `rect` takes in the outward cloud extent. */
-const polyCloudy = (annotation: ModelAnnotation): Wire =>
+const polyCloudy = (annotation: RecordFields): Wire =>
   annotation.geometry.kind === 'poly' && annotation.geometry.closed
     ? {
         cloudyIntensity:
@@ -228,14 +228,14 @@ function lineGeometryFromDTO(
 }
 
 /** The turn a poly's model points were drawn with, or `undefined` upright. */
-function modelTurnOf(annotation: ModelAnnotation): PagePointTurn | undefined {
+function modelTurnOf(annotation: RecordFields): PagePointTurn | undefined {
   const geometry = annotation.geometry;
   if (geometry.kind !== 'poly') return undefined;
   return turnOfModel(geometry.points, geomRotation(geometry));
 }
 
 /** A measurement's caption fields (none without a measurement), its center turned back upright. */
-export function captionFieldsFor(annotation: ModelAnnotation): Record<string, unknown> {
+export function captionFieldsFor(annotation: RecordFields): Record<string, unknown> {
   return annotation.measure ? captionFieldsOf(annotation.measure, modelTurnOf(annotation)) : {};
 }
 
