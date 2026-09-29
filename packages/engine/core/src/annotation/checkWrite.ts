@@ -63,7 +63,7 @@ export function checkAnnotationPatch(
 ): AnnotationPatch<PdfCoordinates> {
   if (current.subtype === 'unsupported') return patch;
   const readBackWrites = KIND_BY_SUBTYPE[current.subtype].readBackWrites;
-  let checked = withoutUnchangedColors(current, putShapeAtRect(current, patch));
+  let checked = withoutUnchangedColors(current, pdfResolveRectCommand(current, patch));
   for (const [name, write] of Object.entries(readBackWrites)) {
     const value = (checked as Record<string, unknown>)[name];
     if (value === undefined || write?.safeParse(value).success) continue;
@@ -108,11 +108,15 @@ function withoutUnchangedColors(
 }
 
 /**
- * A drawn kind's `rect` other than the one it read, as the shape fields that
- * put the drawing there. It can't come with a change to the shape itself:
- * which of the two to follow would be a guess.
+ * An update's `rect` on a drawn kind, resolved as a command: the rect it
+ * read, sent back, is dropped (nothing moves); another rect becomes the shape
+ * fields that put the drawing there. It can't come with a change to the shape
+ * itself: which of the two to follow would be a guess, so it is refused
+ * (`InvalidArg` on `rect`). A kind whose shape is its rect keeps it as a
+ * plain field. The page-space `resolveRectCommand` runs it on page-space
+ * values.
  */
-function putShapeAtRect(
+export function pdfResolveRectCommand(
   current: AnnotationDTO<PdfCoordinates>,
   patch: AnnotationPatch<PdfCoordinates>,
 ): AnnotationPatch<PdfCoordinates> {

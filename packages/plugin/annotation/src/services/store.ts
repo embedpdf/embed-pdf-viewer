@@ -28,6 +28,7 @@ import {
   refOf,
   sourceOfNew,
   update,
+  type UpdateResult,
 } from '@embedpdf/core-annotation';
 import {
   annotationKey,
@@ -45,7 +46,7 @@ import {
 import { changedFields, type RecordChange } from '../model';
 import type { AnnotationContext } from './context';
 import type { AnnotationEvents } from './events';
-import type { IntentOutcome, Intents, IntentWrite } from './intents';
+import type { CarriedWrite, IntentOutcome, Intents, IntentWrite } from './intents';
 import type { View } from '../read/view';
 
 /**
@@ -89,7 +90,17 @@ export type StoreChange =
 export interface Applied {
   readonly ids: readonly Id[];
   /** Settles when every engine write has settled. Never rejects. */
-  readonly written: Promise<IntentOutcome>;
+  readonly written: Promise<AppliedOutcome>;
+}
+
+/** How stated changes settled, and what the engine answered each. */
+export interface AppliedOutcome extends IntentOutcome {
+  /**
+   * What the engine wrote for each change, in order: the annotation a create
+   * or update left. `null` for a delete, a change with nothing to write, and
+   * a refused one.
+   */
+  readonly annotations: readonly (AnnotationDTO | null)[];
 }
 
 /**
@@ -101,7 +112,11 @@ export type ApplyWriter = (change: StoreChange, id: Id) => IntentWrite;
 export interface AnnotationStore {
   /** The current model: what every read and gesture works on. */
   model(): Model;
-  /** Run one message through the core, show its change, and start its engine writes. */
+  /**
+   * Run one message through the core, show its change, and start its engine
+   * writes. Throws, before anything shows, for a message the engine would
+   * refuse (a `rect` with a new shape), as `apply` does.
+   */
   commit(message: Message): Commit;
   /**
    * Show changes stated in code at once and start their engine writes, exactly
@@ -212,12 +227,23 @@ export function createStore(
 
   const commit = (message: Message): Commit => {
     const before = model();
-    const result = update(before, message);
+    // A message the engine would refuse (a `rect` with a new shape) throws
+    // before anything shows, as a stated change does.
+    let result: UpdateResult;
+    try {
+      result = update(before, message);
+    } catch (error) {
+      throw toPluginError('annotation', error);
+    }
     const staged = intents.begin(before, result);
-    const writes: IntentWrite[] = [];
+    // A message changes each record once: an effect's write carries the changes of the records it names.
+    const tokenOf = new Map(staged.map((change) => [change.id, change.token]));
+    const writes: CarriedWrite[] = [];
     for (const effect of result.effects) {
       const write = runners.get(effect.type)?.(effect, model());
-      if (write) writes.push(write);
+      if (!write) continue;
+      const tokens = write.ids.flatMap((id) => (tokenOf.has(id) ? [tokenOf.get(id)!] : []));
+      writes.push({ write, tokens });
     }
     return { effects: result.effects, written: intents.run(staged, writes) };
   };
@@ -231,13 +257,28 @@ export function createStore(
     } catch (error) {
       throw toPluginError('annotation', error);
     }
+    const withPending = stated.filter(({ pending }) => pending !== null);
     const staged = intents.beginStated(
-      stated.flatMap(({ id, pending }) => (pending ? [{ id, change: pending }] : [])),
+      withPending.map(({ id, pending }) => ({ id, change: pending! })),
     );
-    const writes = writer
-      ? stated.flatMap(({ id, change, pending }) => (pending ? [writer!(change, id)] : []))
+    // Each stated change is written by its own write, which settles exactly
+    // its change: two changes to one record settle apart.
+    const writes: CarriedWrite[] = writer
+      ? withPending.map(({ id, change }, index) => ({
+          write: writer!(change, id),
+          tokens: [staged[index]!.token],
+        }))
       : [];
-    return { ids: stated.map(({ id }) => id), written: intents.run(staged, writes) };
+    const written = intents.run(staged, writes).then(
+      (outcome): AppliedOutcome => ({
+        ...outcome,
+        annotations: stated.map((each) => {
+          const index = withPending.indexOf(each);
+          return index < 0 ? null : (outcome.answers[index]?.annotation ?? null);
+        }),
+      }),
+    );
+    return { ids: stated.map(({ id }) => id), written };
   };
 
   // The selection, draft and editing events, derived from each change of the

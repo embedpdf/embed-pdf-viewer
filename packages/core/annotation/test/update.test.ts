@@ -102,6 +102,24 @@ describe('update', () => {
     expect(result.effects).toEqual([{ type: 'create', id: 'nm:1:new-1' }]);
   });
 
+  it('a sidebar rect is a command: it moves the shape, and with a new shape it is refused', () => {
+    const model = modelWith([square('obj:3', 100)], { selected: ['obj:3'] });
+    const rect = model.byId['obj:3']!.annotation.rect;
+    const moved = { ...rect, x: rect.x + 50 };
+    const result = update(model, { type: 'setFields', patches: { 'obj:3': { rect: moved } } });
+    // The write is the shape that puts the square there: its box, not the rect.
+    expect(result.change.patches['obj:3']).toEqual({
+      subtype: 'square',
+      box: { x: 150, y: 100, width: 100, height: 60 },
+    });
+    expect(() =>
+      update(model, {
+        type: 'setFields',
+        patches: { 'obj:3': { rect: moved, box: { x: 0, y: 0, width: 10, height: 10 } } },
+      }),
+    ).toThrow(expect.objectContaining({ code: 'InvalidArg', details: { field: 'rect' } }));
+  });
+
   it('typing puts the edited record and asks for a text write', () => {
     const box = record({
       ...fieldsOf(square('obj:3', 100)),

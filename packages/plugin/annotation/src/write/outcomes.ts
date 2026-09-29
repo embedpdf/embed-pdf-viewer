@@ -4,15 +4,19 @@
  * refusal as an error.
  */
 import { PluginError, toPluginError, toPluginErrorInfo, type BatchResult } from '@embedpdf/core';
-import { annotationKey, type AnnotationRef } from '@embedpdf/engine-core/runtime';
+import {
+  annotationKey,
+  type AnnotationDTO,
+  type AnnotationRef,
+} from '@embedpdf/engine-core/runtime';
 
 import type { IntentOutcome } from '../services/intents';
-import type { Applied, Commit } from '../services/store';
+import type { Applied, AppliedOutcome, Commit } from '../services/store';
 
 /** The outcome over the refs a selection verb addressed: each applied, or failed with the refusal. */
 export function batchResultOf(
   refs: readonly AnnotationRef[],
-  outcome: IntentOutcome,
+  outcome: Pick<IntentOutcome, 'failed'>,
 ): BatchResult<AnnotationRef, AnnotationRef> {
   const errors = new Map<string, PluginError>();
   for (const { ids, error } of outcome.failed) for (const id of ids) errors.set(id, error);
@@ -50,10 +54,23 @@ export async function createdRefOf(commit: Commit): Promise<AnnotationRef> {
 }
 
 /** Wait for stated changes to be written; rejects with the first refusal. */
-export async function appliedOrThrow(applied: Applied): Promise<IntentOutcome> {
+export async function appliedOrThrow(applied: Applied): Promise<AppliedOutcome> {
   const outcome = await applied.written;
   throwIfFailed(outcome);
   return outcome;
+}
+
+/**
+ * What the engine wrote for stated change `index`: the annotation its create
+ * or update left, as the engine read it back; `null` when the change wrote
+ * nothing. Rejects with the first refusal.
+ */
+export async function appliedAnnotationOf(
+  applied: Applied,
+  index = 0,
+): Promise<AnnotationDTO | null> {
+  const outcome = await appliedOrThrow(applied);
+  return outcome.annotations[index] ?? null;
 }
 
 /** The ref of the record a stated create made, once the engine confirmed it. */

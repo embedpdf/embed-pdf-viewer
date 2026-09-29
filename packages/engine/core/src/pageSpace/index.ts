@@ -57,5 +57,6 @@ export {
   pageTurnOfUpright,
   resolveAnnotationDraft,
   resolveAnnotationPatch,
+  resolveRectCommand,
   shapeForRect,
 } from './helpers';

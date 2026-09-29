@@ -52,7 +52,7 @@ export function registerEffectRunners(
             .page(page)
             .annotations.create(create, resources);
           identity.confirm(id, created.ref);
-          return { [id]: created.ref };
+          return { created: { [id]: created.ref }, annotation: created };
         } catch (error) {
           identity.abandon(id);
           throw error;
@@ -70,11 +70,14 @@ export function registerEffectRunners(
     ids: [id],
     perform: () =>
       identity.withRef(id, async (ref) => {
-        await ctx.doc.page(ref.page).annotations.update(ref, patch, resources);
+        const { annotation } = await ctx.doc
+          .page(ref.page)
+          .annotations.update(ref, patch, resources);
         const parent = annotationKey(ref);
         if (linkChildrenOf(store.model(), parent).length) {
           void links.scheduleSync(parent, 'keep');
         }
+        return { annotation };
       }),
   });
 
@@ -140,7 +143,7 @@ export function registerEffectRunners(
             identity.confirm(id, created.ref);
             written.push({ id, ref: created.ref });
           }
-          return Object.fromEntries(written.map(({ id, ref }) => [id, ref]));
+          return { created: Object.fromEntries(written.map(({ id, ref }) => [id, ref])) };
         } catch (error) {
           for (const part of [...written].reverse()) {
             await page.annotations.delete(part.ref).catch(() => {});

@@ -7,6 +7,7 @@ import {
   ANNOTATION_FIELD_NAMES,
   annotationPatchBetween,
   mergeAnnotationPatch,
+  resolveRectCommand,
   type AnnotationFlags,
   type AnnotationPatch,
   type PdfLinkTarget,
@@ -54,8 +55,10 @@ function writableFields(record: ModelAnnotation, patch: FieldValues): Record<str
  * Write engine fields to records, a patch per id. Each record takes the
  * fields its kind has and may change now (`writableFields`) and ignores the
  * rest, so one message restyles a mixed selection. A value set to what it
- * was is no change. The tool defaults are never touched: editing existing
- * annotations doesn't change the next one drawn.
+ * was is no change. A `rect` is a command, resolved as an update resolves it
+ * (`resolveRectCommand`): one the engine would refuse throws, and nothing
+ * changes. The tool defaults are never touched: editing existing annotations
+ * doesn't change the next one drawn.
  */
 export function setFields(
   model: Model,
@@ -67,10 +70,13 @@ export function setFields(
     if (!record) continue;
     const fields = writableFields(record, patch);
     if (!Object.keys(fields).length) continue;
-    const annotation = mergeAnnotationPatch(record.annotation, {
+    // A `rect` is a command: the engine's own step turns it into the shape
+    // that puts the drawing there, or refuses it, exactly as an update does.
+    const stated = resolveRectCommand(record.annotation, {
       ...fields,
       subtype: record.annotation.subtype,
     } as AnnotationPatch);
+    const annotation = mergeAnnotationPatch(record.annotation, stated);
     if (!Object.keys(annotationPatchBetween(record.annotation, annotation)).length) continue;
     byId ??= { ...model.byId };
     byId[id] = { ...record, annotation };

@@ -55,10 +55,7 @@ export function createSelectionWrites(
   const commitOverSelection = async (commit: () => Commit[]) => {
     const refs = selectedRefs();
     const outcomes = await Promise.all(commit().map((committed) => committed.written));
-    return batchResultOf(refs, {
-      created: {},
-      failed: outcomes.flatMap((outcome) => outcome.failed),
-    });
+    return batchResultOf(refs, { failed: outcomes.flatMap((outcome) => outcome.failed) });
   };
 
   /**

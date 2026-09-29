@@ -147,6 +147,95 @@ describe('store.apply', () => {
     expect(harness.capability.listPageItems(PAGE)[0]!.source).toBe('vector');
   });
 
+  it('two changes to one record in one apply each settle with their own write', async () => {
+    const harness = annotationHarness();
+    await harness.load([square(20)]);
+    harness.update
+      .mockResolvedValueOnce({ annotation: square(20, '#00ff00') })
+      .mockResolvedValueOnce({ annotation: square(20, '#0000ff') });
+    const applied = harness.apply([
+      { type: 'update', ref: refOf(20), patch: { subtype: 'square', color: '#00ff00' } },
+      { type: 'update', ref: refOf(20), patch: { subtype: 'square', color: '#0000ff' } },
+    ]);
+    expect(harness.state().pending).toHaveLength(2);
+    const outcome = await applied.written;
+    expect(harness.state().pending).toEqual([]);
+    expect(outcome.annotations.map((annotation) => annotation && dataOf(annotation).color)).toEqual(
+      ['#00ff00', '#0000ff'],
+    );
+  });
+
+  it('repeated writes to one record where one fails: the right changes settle, each with its own answer', async () => {
+    const harness = annotationHarness();
+    await harness.load([square(20)]);
+    harness.update
+      .mockResolvedValueOnce({ annotation: square(20, '#00ff00') })
+      .mockRejectedValueOnce(new Error('Forbidden'));
+    const outcome = await harness.apply([
+      { type: 'update', ref: refOf(20), patch: { subtype: 'square', color: '#00ff00' } },
+      { type: 'update', ref: refOf(20), patch: { subtype: 'square', color: '#0000ff' } },
+    ]).written;
+    expect(harness.state().pending).toEqual([]);
+    expect(outcome.failed).toHaveLength(1);
+    expect(outcome.annotations[0] && dataOf(outcome.annotations[0]).color).toBe('#00ff00');
+    expect(outcome.annotations[1]).toBeNull();
+    // The view shows the engine's record: the change it accepted.
+    expect(dataOf(harness.capability.get(refOf(20))).color).toBe('#00ff00');
+  });
+
+  it('an update resolves with its own write’s answer, never another change still on its way', async () => {
+    const harness = annotationHarness();
+    await harness.load([square(20)]);
+    const green = held();
+    const blue = held();
+    harness.update.mockReturnValueOnce(green.promise).mockReturnValueOnce(blue.promise);
+    const toGreen = harness.capability.update(refOf(20), { subtype: 'square', color: '#00ff00' });
+    const toBlue = harness.capability.update(refOf(20), { subtype: 'square', color: '#0000ff' });
+    green.resolve({ annotation: square(20, '#00ff00') });
+    // Blue is still on its way (the view shows it) when green resolves.
+    expect(dataOf((await toGreen).annotation).color).toBe('#00ff00');
+    blue.reject(new Error('Forbidden'));
+    await expect(toBlue).rejects.toMatchObject({ code: 'operation-failed' });
+  });
+
+  it('updateSelection moves a square by its rect, as update does', async () => {
+    const harness = annotationHarness();
+    await harness.load([square(20)]);
+    harness.capability.select(refOf(20));
+    const read = dataOf(harness.capability.get(refOf(20)));
+    const rect = read.rect as { x: number; y: number; width: number; height: number };
+    const box = read.box as { x: number; y: number; width: number; height: number };
+    harness.update.mockResolvedValueOnce({
+      annotation: {
+        ...square(20),
+        rect: { left: 300, bottom: 600, right: 400, top: 660 },
+        box: { left: 300, bottom: 600, right: 400, top: 660 },
+      },
+    });
+    await harness.capability.updateSelection({ rect: { ...rect, x: rect.x + 200 } });
+    const written = harness.update.mock.calls[0]![1];
+    expect(written).toMatchObject({ subtype: 'square', box: { ...box, x: box.x + 200 } });
+    expect(written).not.toHaveProperty('rect');
+  });
+
+  it('a rect with a new shape is refused the same way from the sidebar and the API', async () => {
+    const harness = annotationHarness();
+    await harness.load([square(20)]);
+    harness.capability.select(refOf(20));
+    const read = dataOf(harness.capability.get(refOf(20)));
+    const rect = read.rect as { x: number; y: number; width: number; height: number };
+    const box = read.box as { x: number; y: number; width: number; height: number };
+    const conflict = { rect: { ...rect, x: rect.x + 200 }, box: { ...box, width: 10 } };
+    await expect(harness.capability.updateSelection(conflict)).rejects.toMatchObject({
+      code: 'invalid-input',
+    });
+    await expect(
+      harness.capability.update(refOf(20), { subtype: 'square', ...conflict }),
+    ).rejects.toMatchObject({ code: 'invalid-input' });
+    expect(harness.state().pending).toEqual([]);
+    expect(harness.update).not.toHaveBeenCalled();
+  });
+
   it('a refused update is dropped at once: the engine’s record shows again', async () => {
     const harness = annotationHarness();
     await harness.load([square(20)]);

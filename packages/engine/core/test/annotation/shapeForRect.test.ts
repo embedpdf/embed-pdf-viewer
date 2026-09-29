@@ -6,7 +6,7 @@ import type { AnnotationSubtype } from '../../src/annotation/subtype';
 import { EngineErrorCode } from '../../src/errors/EngineErrorCode';
 import type { PdfPoint, PdfRect } from '../../src/geometry/primitives';
 import type { PdfCoordinates } from '../../src/pageSpace/coordinates';
-import { shapeForRect } from '../../src/pageSpace/helpers';
+import { resolveRectCommand, shapeForRect } from '../../src/pageSpace/helpers';
 
 /** An annotation as a read returns it, with the fields the mapping looks at. */
 const read = (fields: Record<string, unknown>) =>
@@ -226,5 +226,57 @@ describe('shapeForRect', () => {
     expect(shapeForRect(link, { x: 0.1, y: 0.2, width: 0.3, height: 0.4 })).toEqual({
       rect: { x: 0.1, y: 0.2, width: 0.3, height: 0.4 },
     });
+  });
+});
+
+describe('resolveRectCommand', () => {
+  /** A square in page space, as a viewer reads it. */
+  const square = {
+    subtype: 'square',
+    rect: { x: 100, y: 100, width: 100, height: 60 },
+    box: { x: 100, y: 100, width: 100, height: 60 },
+    rotation: null,
+    color: '#ff0000',
+  } as unknown as Parameters<typeof resolveRectCommand>[0];
+
+  test('a new rect on a drawn kind becomes the shape that puts it there', () => {
+    expect(
+      resolveRectCommand(square, {
+        subtype: 'square',
+        rect: { x: 300, y: 100, width: 100, height: 60 },
+        color: '#00ff00',
+      }),
+    ).toEqual({
+      subtype: 'square',
+      box: { x: 300, y: 100, width: 100, height: 60 },
+      color: '#00ff00',
+    });
+  });
+
+  test('the rect it reads, sent back, moves nothing', () => {
+    expect(
+      resolveRectCommand(square, { subtype: 'square', rect: { ...square.rect }, color: '#00ff00' }),
+    ).toEqual({ subtype: 'square', color: '#00ff00' });
+  });
+
+  test('a new rect with a new shape is refused: which to follow would be a guess', () => {
+    expect(() =>
+      resolveRectCommand(square, {
+        subtype: 'square',
+        rect: { x: 300, y: 100, width: 100, height: 60 },
+        box: { x: 0, y: 0, width: 10, height: 10 },
+      }),
+    ).toThrow(
+      expect.objectContaining({ code: EngineErrorCode.InvalidArg, details: { field: 'rect' } }),
+    );
+  });
+
+  test('a kind whose shape is its rect keeps the rect as it is', () => {
+    const link = {
+      subtype: 'link',
+      rect: { x: 0, y: 0, width: 10, height: 10 },
+    } as unknown as Parameters<typeof resolveRectCommand>[0];
+    const patch = { subtype: 'link', rect: { x: 5, y: 5, width: 10, height: 10 } } as const;
+    expect(resolveRectCommand(link, patch)).toBe(patch);
   });
 });

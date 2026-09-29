@@ -27,6 +27,7 @@ import {
   pdfResolveAnnotationDraft,
   type DraftResolveOptions,
 } from '../annotation/resolve/resolveAnnotationDraft';
+import { pdfResolveRectCommand } from '../annotation/checkWrite';
 import { applyResolvedPatch } from '../annotation/resolve/applyAnnotationPatch';
 import {
   pdfResolveAnnotationPatch,
@@ -222,6 +223,58 @@ export function shapeForRect<A extends AnnotationDTO>(annotation: A, rect: PageB
     noOtherPage,
   );
   return fields as unknown as Partial<A>;
+}
+
+/**
+ * `patch` with its `rect` resolved as the engine resolves it on update (the
+ * same step, `pdfResolveRectCommand`):
+ *
+ * - the rect the annotation reads, sent back, is dropped: nothing moves;
+ * - on a drawn kind, another rect becomes the shape fields that put the
+ *   drawing there (`shapeForRect`);
+ * - a new rect with a changed shape field is refused (`InvalidArg` on
+ *   `rect`): which of the two to follow would be a guess.
+ *
+ * A kind whose shape is its rect keeps it as a plain field. A viewer runs
+ * this before it merges fields it writes itself, so a `rect` behaves the same
+ * from every door. Values `patch` gives come back as given.
+ */
+export function resolveRectCommand(
+  annotation: AnnotationDTO,
+  patch: AnnotationPatch,
+): AnnotationPatch {
+  const given = patch as Record<string, unknown>;
+  if (given.rect === undefined || !DRAWN_RECT_KINDS.has(annotation.subtype)) return patch;
+  const read = annotation as unknown as Record<string, unknown>;
+  const shapeNames = shapeFieldsOf(annotation.subtype);
+  const pick = (from: Record<string, unknown>, names: readonly string[]) =>
+    Object.fromEntries(
+      names.filter((name) => from[name] !== undefined).map((name) => [name, from[name]]),
+    );
+  const current = pdfAnnotationOf(
+    { subtype: annotation.subtype, ...pick(read, ['rect', ...shapeNames]) } as AnnotationDTO,
+    MIRROR,
+    noOtherPage,
+  );
+  const command = pdfAnnotationPatchOf(
+    { subtype: annotation.subtype, ...pick(given, ['rect', ...shapeNames]) } as AnnotationPatch,
+    MIRROR,
+    noOtherPage,
+  );
+  const { subtype: _kind, ...placed } = pageAnnotationPatchOf(
+    pdfResolveRectCommand(current, command),
+    MIRROR,
+    noOtherPage,
+  ) as Record<string, unknown>;
+  const { rect: _rect, ...rest } = given;
+  const out: Record<string, unknown> = { ...rest };
+  for (const [name, value] of Object.entries(placed)) {
+    // The round trip through the file's edges can move a last digit: a value
+    // the caller gave, that the command didn't change, is the caller's own.
+    out[name] =
+      given[name] !== undefined && semanticEqual(value, given[name]) ? given[name] : value;
+  }
+  return out as AnnotationPatch;
 }
 
 /**

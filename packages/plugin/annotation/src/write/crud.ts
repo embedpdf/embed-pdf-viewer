@@ -2,7 +2,8 @@
  * Create, update and delete: the public verbs, in the engine's own terms.
  * Each states its change through `store.apply`, so it shows at once and is
  * written, settled and refused exactly like a gesture's, and each resolves
- * with the engine's record once the engine answered.
+ * with what the engine wrote for it: its own write's answer, never another
+ * change still on its way.
  */
 import { PluginError, pageRefsEqual, type OperationOptions } from '@embedpdf/core';
 import { defaultsFor, fieldsOf, withFields } from '@embedpdf/core-annotation';
@@ -20,7 +21,7 @@ import {
 
 import type { AnnotationReads } from '../read/annotations';
 import type { AnnotationContext, AnnotationServices } from '../services';
-import { appliedOrThrow, appliedRefOf } from './outcomes';
+import { appliedAnnotationOf, appliedOrThrow } from './outcomes';
 import { geometryWithRotation } from './page-patch';
 
 export function createCrud(
@@ -28,8 +29,8 @@ export function createCrud(
   { store, authority, tools }: Pick<AnnotationServices, 'store' | 'authority' | 'tools'>,
   annotations: Pick<AnnotationReads, 'get' | 'loadedOrThrow'>,
 ) {
-  /** The annotation `ref` names, as the view holds it once its writes settled. */
-  const settled = (ref: AnnotationRef): { annotation: AnnotationDTO } => {
+  /** The annotation `ref` names, as the view holds it: for a change that wrote nothing. */
+  const current = (ref: AnnotationRef): { annotation: AnnotationDTO } => {
     const annotation = annotations.get(ref);
     if (!annotation) {
       throw new PluginError('not-found', 'annotation', `no annotation ${annotationKey(ref)}`);
@@ -77,7 +78,15 @@ export function createCrud(
       { type: 'create', page, draft: stated, ...(resources ? { resources } : {}) },
     ]);
     if (options.select) store.commit({ type: 'select', ids: [...applied.ids] });
-    return settled(await appliedRefOf(applied));
+    const annotation = await appliedAnnotationOf(applied);
+    if (!annotation) {
+      throw new PluginError(
+        'operation-failed',
+        'annotation',
+        'the annotation could not be created',
+      );
+    }
+    return { annotation };
   };
 
   const update = async (
@@ -85,10 +94,10 @@ export function createCrud(
     patch: AnnotationPatch,
     resources?: AnnotationResources,
   ): Promise<{ annotation: AnnotationDTO }> => {
-    await appliedOrThrow(
+    const annotation = await appliedAnnotationOf(
       store.apply([{ type: 'update', ref, patch, ...(resources ? { resources } : {}) }]),
     );
-    return settled(ref);
+    return annotation ? { annotation } : current(ref);
   };
 
   /** Turn one annotation to `degrees`: the patch the turn means. The selection's quarter turns use it. */
