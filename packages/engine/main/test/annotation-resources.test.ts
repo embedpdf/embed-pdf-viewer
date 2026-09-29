@@ -41,7 +41,6 @@ runAnnotationResourceConformance(runner, {
       },
       { scope: ['*'] },
     ),
-  rawAppearances: true,
 });
 
 // The same drawing is the same bytes on both runtimes, so a bundle made by the

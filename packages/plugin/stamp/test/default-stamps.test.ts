@@ -8,7 +8,8 @@ import { readFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import type { DocumentHandle, Engine, PageRef } from '@embedpdf/engine-core/runtime';
+import { LOCAL_ENGINE_BRAND } from '@embedpdf/engine-core/runtime';
+import type { DocumentHandle, Engine, LocalEngine, PageRef } from '@embedpdf/engine-core/runtime';
 import { createTestContext } from '@embedpdf/core/testing';
 import { createLocalEngine } from '@embedpdf/engine';
 import { LOCALES as SHIPPED, loadDefaultLibrary } from '@embedpdf/default-stamps/library';
@@ -238,12 +239,13 @@ const pngBytes = () => {
 
 /** Node has no PNG encoder: keep every PDF operation real and stub only the
  *  thumbnail encode at the asset-engine boundary. */
-function nodeAssetEngine(engine: Engine): Engine {
+function nodeAssetEngine(engine: Engine): LocalEngine {
   const bindAll = <T extends object>(target: T, key: PropertyKey) => {
     const value = Reflect.get(target, key, target);
     return typeof value === 'function' ? value.bind(target) : value;
   };
   return {
+    [LOCAL_ENGINE_BRAND]: true,
     open: async (input: Parameters<Engine['open']>[0], options?: Parameters<Engine['open']>[1]) => {
       const doc = await engine.open(input, options);
       return new Proxy(doc, {
@@ -272,11 +274,11 @@ function nodeAssetEngine(engine: Engine): Engine {
       }) as DocumentHandle;
     },
     destroy: () => engine.destroy(),
-  } as unknown as Engine;
+  } as unknown as LocalEngine;
 }
 
 /** The stamp capability with `engine` as its asset engine and no document open. */
-function makeStamp(engine: Engine) {
+function makeStamp(engine: LocalEngine) {
   const ctx = createTestContext({
     id: 'stamp',
     state: initialStampState(),
@@ -290,7 +292,7 @@ const libraryPdf = async (locale: string) =>
   new Uint8Array(await readFile(resolve(packageDir, locale, 'stamps.pdf')));
 
 describe('@embedpdf/default-stamps', () => {
-  let engine: Engine;
+  let engine: LocalEngine;
   beforeAll(async () => {
     engine = nodeAssetEngine(await createLocalEngine({ runtime: { prefer: 'wasm' } }));
   });

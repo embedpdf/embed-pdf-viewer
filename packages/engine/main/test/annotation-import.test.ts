@@ -56,7 +56,6 @@ runAnnotationImportConformance(runner, {
       },
       { scope: ['*'] },
     ),
-  rawAppearances: true,
 });
 
 /** hello_world.pdf's annotations of every kind a create makes, with a thread and a link, as a bundle. */

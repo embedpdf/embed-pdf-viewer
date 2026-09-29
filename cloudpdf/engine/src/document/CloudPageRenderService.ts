@@ -10,8 +10,6 @@ import {
   type PageNetworkRenderFormat,
   type PageRef,
   type PageRenderImage,
-  type PageRenderOptions,
-  type PageRenderRaster,
   type PageRenderService,
   type PageRenderTransform,
   renderAreaTransform,
@@ -131,15 +129,6 @@ export class CloudPageRenderService implements PageRenderService {
         ? renderTargetArea(target.rect)
         : { x: 0, y: 0, ...(await this.layout(signal)).size };
     return renderAreaTransform(area, options);
-  }
-
-  raw(_options?: PageRenderOptions): AbortablePromise<PageRenderRaster> {
-    return AbortablePromise.rejectReason(
-      new EngineError(
-        EngineErrorCode.NotImplemented,
-        'render.raw() is not available in the cloud engine; use render.image()',
-      ),
-    );
   }
 }
 

@@ -29,21 +29,11 @@ export interface PageAnnotationsService {
   list(): AbortablePromise<AnnotationList>;
   /**
    * Batch-render every annotation appearance (`/AP`) stream on the page into
-   * its own raw RGBA raster, sized to the annotation's `/Rect`. Read-only and
-   * gated by `doc.annotate.read` — reading an annotation implies you may see
-   * its rendered appearance (the Adobe boundary).
-   *
-   * Cloud engines do not expose the raw rasters (the HTTP surface ships
-   * encoded images); use {@link renderAppearances} there instead.
-   */
-  renderAppearancesRaw(
-    options?: AnnotationAppearanceRenderOptions,
-  ): AbortablePromise<AnnotationAppearancesResult>;
-  /**
-   * Encoded counterpart of {@link renderAppearancesRaw}: each raster is run
-   * through the engine's image encoder (local) or fetched as a
-   * `multipart/form-data` body (cloud) and returned as a lazily-resolved
-   * `PageImageHandle`. This is the cross-engine portable surface.
+   * its own image, sized to the annotation's `/Rect`: encoded by the engine's
+   * image encoder (local) or fetched as a `multipart/form-data` body (cloud),
+   * each a lazily-resolved `PageImageHandle`. Read-only and gated by
+   * `doc.annotate.read`: reading an annotation implies you may see its
+   * rendered appearance (the Adobe boundary).
    */
   renderAppearances(
     options?: AnnotationAppearanceImageOptions,
@@ -122,4 +112,15 @@ export interface PageAnnotationsService {
    * part would be worse than an error).
    */
   exportAppearance(refs: AnnotationRef[]): AbortablePromise<Uint8Array>;
+}
+
+/** A local engine page's annotations: the shared service and the raw appearance pixels. */
+export interface LocalPageAnnotationsService extends PageAnnotationsService {
+  /**
+   * The same appearances as `renderAppearances()`, each as its own raw RGBA
+   * raster instead of an encoded image.
+   */
+  renderAppearancesRaw(
+    options?: AnnotationAppearanceRenderOptions,
+  ): AbortablePromise<AnnotationAppearancesResult>;
 }

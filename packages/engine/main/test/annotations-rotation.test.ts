@@ -172,7 +172,7 @@ describe('annotation rotation (local engine) — save + reopen', () => {
       });
       expect(updated.appearance).toEqual({ action: 'preserved', changed: false });
 
-      artifact = await doc.downloadLayer!();
+      artifact = await doc.downloadLayer();
       await doc.close();
     }
 

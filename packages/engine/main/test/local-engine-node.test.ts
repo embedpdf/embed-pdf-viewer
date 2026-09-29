@@ -7,7 +7,14 @@ import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { crc32, inflateSync } from 'node:zlib';
 import { describe, expect, test } from 'vitest';
-import { EngineError, EngineErrorCode, localEngine } from '../src/index';
+import {
+  EngineError,
+  EngineErrorCode,
+  isLocalDocument,
+  isLocalEngine,
+  isLocalPage,
+  localEngine,
+} from '../src/index';
 
 const fixture = resolve(__dirname, 'fixtures', 'hello_world.pdf');
 
@@ -30,6 +37,23 @@ function pngChunks(bytes: Uint8Array): Map<string, Uint8Array[]> {
 }
 
 describe('localEngine() in Node', () => {
+  test('passes the local checks: engine, document and page', async () => {
+    const engine = localEngine();
+    try {
+      expect(isLocalEngine(engine)).toBe(true);
+      const doc = await engine.open({
+        kind: 'bytes',
+        id: 'local-checks',
+        bytes: new Uint8Array(await readFile(fixture)),
+      });
+      expect(isLocalDocument(doc)).toBe(true);
+      const { pages } = await doc.pages.list();
+      expect(isLocalPage(doc.page(pages[0]!.ref))).toBe(true);
+    } finally {
+      await engine.destroy();
+    }
+  });
+
   test('opens, renders a PNG with the pixels of the raw render, and destroys', async () => {
     expect(typeof Worker).toBe('undefined');
     const engine = localEngine();

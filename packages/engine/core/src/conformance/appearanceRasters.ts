@@ -1,3 +1,4 @@
+import { isLocalPage } from '../engine/LocalPageHandle';
 import type { PageHandle } from '../engine/PageHandle';
 import { annotationKey } from '../identity/annotationKey';
 import type { AnnotationRef } from '../identity/AnnotationRef';
@@ -16,12 +17,9 @@ export interface Raster {
 }
 
 /** Every normal appearance on a page, by annotation key, rendered at scale 1 in one call. */
-export async function appearanceRasters(
-  page: PageHandle,
-  raw: boolean,
-): Promise<Map<string, Raster>> {
+export async function appearanceRasters(page: PageHandle): Promise<Map<string, Raster>> {
   const rasters = new Map<string, Raster>();
-  if (raw) {
+  if (isLocalPage(page)) {
     const { appearances } = await page.annotations.renderAppearancesRaw({
       viewport: { kind: 'scale', scale: 1 },
     });
@@ -50,13 +48,9 @@ export async function appearanceRasters(
   return rasters;
 }
 
-export async function appearanceRaster(
-  page: PageHandle,
-  ref: AnnotationRef,
-  raw: boolean,
-): Promise<Raster> {
+export async function appearanceRaster(page: PageHandle, ref: AnnotationRef): Promise<Raster> {
   const key = annotationKey(ref);
-  if (raw) {
+  if (isLocalPage(page)) {
     const { appearances } = await page.annotations.renderAppearancesRaw({
       viewport: { kind: 'scale', scale: 1 },
     });

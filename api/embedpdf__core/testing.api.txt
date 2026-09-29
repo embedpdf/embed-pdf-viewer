@@ -1,5 +1,6 @@
 # @embedpdf/core — ./testing
 
+LOCAL_ENGINE_BRAND [VariableDeclaration] (from packages/engine/core/src/engine/localEngineBrand.ts): LOCAL_ENGINE_BRAND: unique symbol = Symbol.for('@embedpdf/engine/local')
 TestContext [InterfaceDeclaration]: export interface TestContext<S> extends PluginContext<S>{ readonly capabilities: Map<CapabilityToken<unknown>, unknown>; subscribe(listener: () => void): Unsubscribe; connect<C>(instance:{ api: C; connect?: () => void} ): C; emitDocumentEvent(event: DocumentEvent): void; dispose(): Promise<void>; }
 TestContextOptions [InterfaceDeclaration]: export interface TestContextOptions<S>{ readonly id?: string; readonly state?: S; readonly pages?: readonly TestPage[]; readonly documentId?: string; readonly capabilities?: ReadonlyArray<readonly [CapabilityToken<unknown>, unknown]>; readonly doc?: Partial<DocumentHandle> | null; readonly engine?: Partial<Engine>; }
 TestPage [InterfaceDeclaration]: export interface TestPage{ readonly ref: PageRef; readonly size?:{ readonly width: number; readonly height: number} ; readonly crop?: PdfRect; readonly rotation?: PageLayout['rotation']; readonly userUnit?: number; readonly label?: string | null; }

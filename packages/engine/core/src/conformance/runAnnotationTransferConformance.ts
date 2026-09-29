@@ -30,8 +30,6 @@ export interface AnnotationTransferConformanceOptions {
   fixtures: readonly string[];
   /** Open a fresh copy of a fixture, with every scope, `doc.annotate.import` included. */
   open: (engine: Engine, fixture: string) => Promise<DocumentHandle>;
-  /** Whether the engine renders raw appearance rasters (local) or only encoded images (cloud). */
-  rawAppearances: boolean;
 }
 
 type Attribution = 'restore' | 'stamp';
@@ -217,8 +215,8 @@ export function runAnnotationTransferConformance(
               result.refMap.map(({ from, to }) => [annotationKey(from), to] as const),
             );
             for (const entry of bundle.pages) {
-              const drawn = await appearanceRasters(source.page(entry.page), opts.rawAppearances);
-              const copies = await appearanceRasters(copy.page(entry.page), opts.rawAppearances);
+              const drawn = await appearanceRasters(source.page(entry.page));
+              const copies = await appearanceRasters(copy.page(entry.page));
               for (const { data } of bundle.items) {
                 if (data.ref.page.pageObjectNumber !== entry.page.pageObjectNumber) continue;
                 if (fixture !== 'authoring' && data.subtype !== 'stamp') continue;

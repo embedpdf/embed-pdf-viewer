@@ -65,12 +65,6 @@ export function createMarks({ assetEngine }: Pick<StampServices, 'assetEngine'>)
       const scratch = layout.pages[0];
       if (!scratch) throw stampError('operation-failed', 'the scratch document has no page');
       const page = doc.page(scratch.ref);
-      if (!page.annotations.exportAppearance) {
-        throw stampError(
-          'unsupported',
-          'authoring a mark needs an asset engine that can export annotation appearances',
-        );
-      }
       const color = hexColor(mark.color ?? '#1d2b53');
       const created =
         mark.kind === 'ink'

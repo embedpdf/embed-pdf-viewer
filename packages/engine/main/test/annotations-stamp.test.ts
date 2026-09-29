@@ -3,7 +3,11 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { deflateSync } from 'node:zlib';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
-import type { DocumentHandle, Engine, StampAnnotationDTO } from '@embedpdf/engine-core/runtime';
+import type {
+  LocalDocumentHandle,
+  LocalEngine,
+  StampAnnotationDTO,
+} from '@embedpdf/engine-core/runtime';
 import { EngineErrorCode, sniffBinaryMetadata, toPageRef } from '@embedpdf/engine-core/runtime';
 import { createLocalEngine } from '../src/index';
 
@@ -77,8 +81,8 @@ function makePng(
 }
 
 describe('stamp annotations: engine-local (inline transport, wasm runtime)', () => {
-  let engine: Engine;
-  let handle: DocumentHandle;
+  let engine: LocalEngine;
+  let handle: LocalDocumentHandle;
 
   beforeAll(async () => {
     engine = await createLocalEngine({ runtime: { prefer: 'wasm' } });

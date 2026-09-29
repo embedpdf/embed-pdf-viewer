@@ -329,7 +329,7 @@ describe('rich text FreeText (local engine)', () => {
     // program on the next regeneration (streams are compressed on save, so
     // the two saves are compared, not the raw font size).
     const subsetSave = await doc.download();
-    await doc.fonts!.setEmbeddingPolicy('full');
+    await doc.fonts.setEmbeddingPolicy('full');
     await doc.page(toPageRef(PAGE)).annotations.update(created.annotation.ref, {
       subtype: 'free-text',
       contents: 'Whole program',
@@ -337,7 +337,7 @@ describe('rich text FreeText (local engine)', () => {
     const fullSave = await doc.download();
     expect(fullSave.byteLength).toBeGreaterThan(subsetSave.byteLength * 3);
 
-    await doc.fonts!.setTypographicFeatures(true);
+    await doc.fonts.setTypographicFeatures(true);
     await doc.close();
   });
 

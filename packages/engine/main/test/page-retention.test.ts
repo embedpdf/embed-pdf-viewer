@@ -13,7 +13,7 @@ import { readFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { beforeAll, describe, expect, test } from 'vitest';
-import type { DocumentHandle, PageRaster, PageRef } from '@embedpdf/engine-core/runtime';
+import type { LocalDocumentHandle, PageRaster, PageRef } from '@embedpdf/engine-core/runtime';
 import { toPageRef } from '@embedpdf/engine-core/runtime';
 import { createLocalEngine } from '../src/index';
 
@@ -32,7 +32,7 @@ const digest = (raster: PageRaster) =>
 
 async function withDocument<T>(
   id: string,
-  run: (doc: DocumentHandle, page: PageRef) => Promise<T>,
+  run: (doc: LocalDocumentHandle, page: PageRef) => Promise<T>,
 ): Promise<T> {
   const engine = createLocalEngine({ runtime: { prefer: 'wasm' } });
   try {
@@ -48,13 +48,13 @@ async function withDocument<T>(
   }
 }
 
-const renderAt = (doc: DocumentHandle, page: PageRef, width: number) =>
+const renderAt = (doc: LocalDocumentHandle, page: PageRef, width: number) =>
   doc
     .page(page)
     .render.raw({ viewport: { kind: 'width', width } })
     .then(digest);
 
-const appearancesAt = async (doc: DocumentHandle, page: PageRef, scale: number) => {
+const appearancesAt = async (doc: LocalDocumentHandle, page: PageRef, scale: number) => {
   const result = await doc
     .page(page)
     .annotations.renderAppearancesRaw({ viewport: { kind: 'scale', scale } });
@@ -91,7 +91,7 @@ describe('pages kept between jobs (wasm engine)', () => {
   }, 120_000);
 
   test('show an image a redaction changed exactly as a document that never rendered it', async () => {
-    const redact = async (doc: DocumentHandle, page: PageRef) => {
+    const redact = async (doc: LocalDocumentHandle, page: PageRef) => {
       await doc.page(page).annotations.create({
         subtype: 'redact',
         rect: { x: 100, y: 100, width: 100, height: 100 },

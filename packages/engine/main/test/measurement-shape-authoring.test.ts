@@ -143,7 +143,7 @@ describe.each(['wasm', 'native'] as const)('shape authoring integration (%s)', (
             saved,
           );
         }
-        const layer = await doc.downloadLayer!();
+        const layer = await doc.downloadLayer();
         for (const source of [
           { kind: 'bytes' as const, id: `saved-${tool}-${prefer}`, bytes: saved },
           {

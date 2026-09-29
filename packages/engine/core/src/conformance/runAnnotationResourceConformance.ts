@@ -43,8 +43,6 @@ export interface AnnotationResourceConformanceOptions {
   makeEngine: () => Promise<Engine> | Engine;
   /** Open a fresh copy of a fixture, with `doc.download` among its scopes. */
   open: (engine: Engine, fixture: AnnotationResourceFixture) => Promise<DocumentHandle>;
-  /** Whether the engine renders raw appearance rasters (local) or only encoded images (cloud). */
-  rawAppearances: boolean;
 }
 
 /**
@@ -85,8 +83,7 @@ export function runAnnotationResourceConformance(
       }
     };
 
-    const rasterOf = (page: PageHandle, ref: AnnotationRef) =>
-      appearanceRaster(page, ref, opts.rawAppearances);
+    const rasterOf = (page: PageHandle, ref: AnnotationRef) => appearanceRaster(page, ref);
 
     const expectSameDrawing = (actual: Raster, expected: Raster) => {
       expect([actual.width, actual.height]).toEqual([expected.width, expected.height]);

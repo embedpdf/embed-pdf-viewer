@@ -1,4 +1,5 @@
 import type { Mirror } from '@embedpdf/core';
+import { isLocalEngine } from '@embedpdf/engine-core/runtime';
 
 import type { AnnotationConfig } from '../contract';
 import { createAuthority, type Authority } from './authority';
@@ -64,7 +65,7 @@ export function createServices(
     geometry,
     authority: createAuthority(ctx, store),
     filePicker: createFilePickerPort(ctx),
-    fonts: () => ctx.engine?.fonts?.list() ?? [],
+    fonts: () => (isLocalEngine(ctx.engine) ? ctx.engine.fonts.list() : []),
     tools: createToolRegistry(ctx, config, store),
     behaviors: createBehaviors(store),
   };

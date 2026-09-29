@@ -4,8 +4,10 @@ import type {
   ConformanceOptions,
 } from './runMetadataConformance';
 import type { AnnotationAppearanceMode } from '../dto/AnnotationRender';
+import { appearanceRasters } from './appearanceRasters';
 import type { DocumentHandle } from '../engine/DocumentHandle';
 import type { Engine } from '../engine/Engine';
+import { isLocalPage } from '../engine/LocalPageHandle';
 import type { AnnotationRef } from '../identity/AnnotationRef';
 import { toPageRef } from '../identity/PageRef';
 import { AbortError } from '../promise/AbortError';
@@ -35,13 +37,6 @@ export interface AnnotationAppearanceConformanceOptions extends Omit<
   'fixture'
 > {
   fixture: AnnotationAppearanceConformanceFixture;
-  /**
-   * `true` for engines that expose the raw RGBA rasters (`renderAppearancesRaw`).
-   * The local engine's encoder needs a browser Canvas, so under node it can
-   * only be exercised via the raw rasters; the cloud engine ships encoded
-   * images (`renderAppearances`) and leaves this `false`.
-   */
-  supportsRawRasters?: boolean;
 }
 
 const PNG_SIGNATURE = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
@@ -62,7 +57,6 @@ export function runAnnotationAppearanceConformance(
   opts: AnnotationAppearanceConformanceOptions,
 ): void {
   const { describe, test, beforeAll, afterAll, expect } = runner;
-  const useRaw = opts.supportsRawRasters === true;
 
   describe(`annotation appearance conformance: ${opts.label}`, () => {
     let engine: Engine;
@@ -78,7 +72,7 @@ export function runAnnotationAppearanceConformance(
     test('renders the expected set of appearances with valid output', async () => {
       const doc = await openFixture(engine, opts);
       try {
-        const { pageState, appearances } = await collect(doc, opts, useRaw);
+        const { pageState, appearances } = await collect(doc, opts);
 
         expect(pageState.page.pageObjectNumber).toBe(opts.fixture.pageObjectNumber);
         expect(appearances.length >= opts.fixture.minAppearanceCount).toBe(true);
@@ -104,7 +98,7 @@ export function runAnnotationAppearanceConformance(
       test('weak (index-only) annotations are emitted, not dropped', async () => {
         const doc = await openFixture(engine, opts);
         try {
-          const { appearances } = await collect(doc, opts, useRaw);
+          const { appearances } = await collect(doc, opts);
           const weak = appearances.find((a) => a.ref.kind === 'index');
           expect(weak !== undefined).toBe(true);
         } finally {
@@ -113,27 +107,28 @@ export function runAnnotationAppearanceConformance(
       });
     }
 
-    if (useRaw) {
-      test('rendered appearances are not blank (non-zero alpha)', async () => {
-        const doc = await openFixture(engine, opts);
-        try {
-          const { appearances } = await collect(doc, opts, useRaw);
-          // Guards the blank-render regression: at least one appearance must
-          // have a visible (non-transparent) pixel. Scanning the RGBA alpha
-          // byte is decoder-free and unambiguous.
-          const anyVisible = appearances.some((a) => a.raster !== null && hasOpaquePixel(a.raster));
-          expect(anyVisible).toBe(true);
-        } finally {
-          await doc.close();
-        }
-      });
-    }
+    test('rendered appearances are not blank (non-zero alpha)', async () => {
+      const doc = await openFixture(engine, opts);
+      try {
+        const page = doc.page(toPageRef(opts.fixture.pageObjectNumber));
+        // Guards the blank-render regression: at least one appearance must
+        // have a visible (non-transparent) pixel, as the engine gives it
+        // (raw locally, a decoded image on the cloud).
+        const rasters = await appearanceRasters(page);
+        const anyVisible = [...rasters.values()].some(({ rgba }) =>
+          rgba.some((byte, index) => index % 4 === 3 && byte !== 0),
+        );
+        expect(anyVisible).toBe(true);
+      } finally {
+        await doc.close();
+      }
+    });
 
     test('abort() rejects with AbortError', async () => {
       const doc = await openFixture(engine, opts);
       try {
         const page = doc.page(toPageRef(opts.fixture.pageObjectNumber));
-        const p = useRaw
+        const p = isLocalPage(page)
           ? page.annotations.renderAppearancesRaw({ viewport: { kind: 'scale', scale: 1 } })
           : page.annotations.renderAppearances({
               format: 'png',
@@ -148,13 +143,17 @@ export function runAnnotationAppearanceConformance(
   });
 }
 
+/**
+ * The page's appearances as the engine gives them: raw rasters locally (its
+ * encoder needs a browser canvas, which Node lacks), encoded images on the
+ * cloud.
+ */
 async function collect(
   doc: DocumentHandle,
   opts: AnnotationAppearanceConformanceOptions,
-  useRaw: boolean,
 ): Promise<{ pageState: PageState; appearances: NormalizedAppearance[] }> {
   const page = doc.page(toPageRef(opts.fixture.pageObjectNumber));
-  if (useRaw) {
+  if (isLocalPage(page)) {
     const result = await page.annotations.renderAppearancesRaw({
       viewport: { kind: 'scale', scale: 1 },
     });
@@ -185,22 +184,6 @@ async function collect(
       encoded: a.image.source.kind === 'bytes' ? a.image.source.bytes : new Uint8Array(),
     })),
   };
-}
-
-function hasOpaquePixel(raster: {
-  data: ArrayBuffer;
-  width: number;
-  height: number;
-  stride: number;
-}): boolean {
-  const bytes = new Uint8Array(raster.data);
-  for (let y = 0; y < raster.height; y++) {
-    const row = y * raster.stride;
-    for (let x = 0; x < raster.width; x++) {
-      if (bytes[row + x * 4 + 3] !== 0) return true;
-    }
-  }
-  return false;
 }
 
 async function openFixture(engine: Engine, opts: AnnotationAppearanceConformanceOptions) {

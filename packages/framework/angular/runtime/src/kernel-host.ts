@@ -30,7 +30,7 @@ import {
   type Signal,
 } from '@angular/core';
 import { isPlatformBrowser } from '@angular/common';
-import { createKernel } from '@embedpdf/core';
+import { createKernel, isLocalEngine } from '@embedpdf/core';
 import type {
   AnyPlugin,
   Engine,
@@ -52,7 +52,7 @@ export interface EmbedPdfConfig {
    *
    *   - An **instance** is borrowed: used as-is, never destroyed here. The
    *     common path — a module-scope `const engine = localEngine()` shared
-   *     across viewers and route changes. The host calls `engine.warmup?.()`
+   *     across viewers and route changes. The host warms up a local engine
    *     when the kernel materializes so the boot overlaps initialization.
    *   - A **thunk** (`() => localEngine()`) is host-owned: the host calls it
    *     when the kernel materializes and `destroy()`s the result on teardown.
@@ -142,9 +142,9 @@ export class EpdfKernelHost implements OnDestroy {
         throw error;
       }
       // Warm up only once the kernel exists (a plugin-planning throw must not
-      // start a boot we'd immediately have to unwind) — `warmup()` overlaps the
-      // WASM/transport boot with the rest of initialization.
-      this._engine.warmup?.();
+      // start a boot we'd immediately have to unwind) — a local engine's
+      // `warmup()` overlaps the WASM boot with the rest of initialization.
+      if (isLocalEngine(this._engine)) this._engine.warmup();
       this.initialDocuments = initialDocuments;
       this.unsubscribe = this._kernel.subscribe(() => this.tick.update((previous) => previous + 1));
     }

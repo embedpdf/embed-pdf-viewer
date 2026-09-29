@@ -4,7 +4,7 @@ import {
   EngineErrorCode,
   measureFromKnownLength,
   measurementReadout,
-  type Engine,
+  type LocalEngine,
   type LineDraft,
   type PolygonDraft,
   toPageRef,
@@ -47,7 +47,7 @@ const line = (): LineDraft => ({
 });
 
 describe.each(['wasm', 'native'] as const)('measurement engine (%s)', (prefer) => {
-  let engine: Engine;
+  let engine: LocalEngine;
   beforeAll(async () => {
     engine = await createLocalEngine({ runtime: { prefer } });
   });
@@ -193,7 +193,7 @@ describe.each(['wasm', 'native'] as const)('measurement engine (%s)', (prefer) =
         ],
         captionEnabled: true,
       });
-      const artifact = await doc.downloadLayer!();
+      const artifact = await doc.downloadLayer();
       await doc.close();
       doc = await engine.open(
         {

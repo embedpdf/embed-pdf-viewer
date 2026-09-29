@@ -11,7 +11,7 @@ import { readFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
-import type { DocumentHandle } from '@embedpdf/engine-core/runtime';
+import type { LocalDocumentHandle } from '@embedpdf/engine-core/runtime';
 import { toPageRef } from '@embedpdf/engine-core/runtime';
 import { createLocalEngine, type LocalEngine } from '../src/index';
 
@@ -29,7 +29,7 @@ const pdfPath = resolve(
 );
 
 let engine: LocalEngine;
-let doc: DocumentHandle;
+let doc: LocalDocumentHandle;
 let pageObjectNumber: number;
 
 beforeAll(async () => {

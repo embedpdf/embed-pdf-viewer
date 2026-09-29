@@ -12,8 +12,8 @@ import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import type {
   AnnotationRef,
-  DocumentHandle,
-  Engine,
+  LocalDocumentHandle,
+  LocalEngine,
   FormFieldDTO,
 } from '@embedpdf/engine-core/runtime';
 import { toPageRef } from '@embedpdf/engine-core/runtime';
@@ -57,8 +57,8 @@ function countPixels(
 }
 
 describe('widget appearance refresh across planes (engine-local, wasm)', () => {
-  let engine: Engine;
-  let doc: DocumentHandle;
+  let engine: LocalEngine;
+  let doc: LocalDocumentHandle;
   let field: FormFieldDTO;
   let widgetRef: AnnotationRef;
   let pageObjectNumber: number;

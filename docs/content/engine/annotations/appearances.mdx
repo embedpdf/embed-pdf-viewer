@@ -20,7 +20,7 @@ const pageImage = await page.render.image({
   includeAnnotations: false,
 }); // the page on its own
 
-const { appearances } = await page.annotations.renderAppearancesRaw({
+const { appearances } = await page.annotations.renderAppearances({
   viewport: { kind: 'scale', scale: 2 },
 });
 

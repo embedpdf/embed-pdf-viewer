@@ -5,7 +5,7 @@ import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import {
   EngineError,
   EngineErrorCode,
-  type DocumentHandle,
+  type LocalDocumentHandle,
   type EngineRenderPolicy,
   toPageRef,
 } from '@embedpdf/engine-core/runtime';
@@ -43,7 +43,7 @@ describe('local render policy (wasm runtime)', () => {
 
   let bytes: Uint8Array;
   let engine: LocalEngine;
-  let doc: DocumentHandle;
+  let doc: LocalDocumentHandle;
 
   beforeAll(async () => {
     bytes = new Uint8Array(await readFile(annotatedPath));
@@ -163,7 +163,7 @@ describe('local render policy (wasm runtime)', () => {
   }, 120_000);
 });
 
-async function firstPageObjectNumber(doc: DocumentHandle): Promise<never> {
+async function firstPageObjectNumber(doc: LocalDocumentHandle): Promise<never> {
   const pages = await doc.pages.list();
   return pages.pages[0]!.ref.pageObjectNumber as never;
 }

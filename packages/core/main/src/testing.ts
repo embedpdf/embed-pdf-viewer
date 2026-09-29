@@ -26,6 +26,10 @@ import type {
 } from '@embedpdf/engine-core/runtime';
 import { pageRefsEqual, subscribeToType } from '@embedpdf/engine-core/runtime';
 
+/** Brand a fake engine or handle as local (`[LOCAL_ENGINE_BRAND]: true`) so
+ *  `isLocalEngine` and `isLocalDocument` accept it. */
+export { LOCAL_ENGINE_BRAND } from '@embedpdf/engine-core/runtime';
+
 import { PluginError } from './errors';
 import { createEventHook } from './event-hook';
 import { createLatestLane, type LatestLane } from './lanes';

@@ -132,7 +132,7 @@ describe('file-backed signing candidate', () => {
     let artifact: Uint8Array;
     try {
       await editing.forms.setValue({ kind: 'fqn', name: 'group.total' }, { value: 'delta' });
-      artifact = new Uint8Array(await editing.downloadLayer!());
+      artifact = new Uint8Array(await editing.downloadLayer());
     } finally {
       await editing.close();
     }
@@ -147,7 +147,7 @@ describe('file-backed signing candidate', () => {
     );
     try {
       const target = join(dir, 'verbatim.pdf');
-      await doc.downloadToFile!(target);
+      await doc.downloadToFile(target);
       const written = await readFile(target);
       const downloaded = new Uint8Array(await doc.download());
       expect(sha256(new Uint8Array(written))).toBe(sha256(downloaded));

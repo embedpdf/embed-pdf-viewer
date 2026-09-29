@@ -29,7 +29,7 @@ export function createAssetWrites(
 ) {
   const { libraryChanged, assetCreated, assetUpdated, assetDeleted } = events;
   const { binaries: assetBinaries, libraryBinaries, ghostRenders, mutateLibrary } = binaries;
-  const { openAssetDocument, renderThumbnail, requireCanonicalServices } = assetEngine;
+  const { openAssetDocument, renderThumbnail } = assetEngine;
 
   const createAsset = async (input: AddAssetInput): Promise<string> => {
     if (input.libraryId && !ctx.state.get().libraries[input.libraryId]) {
@@ -100,7 +100,6 @@ export function createAssetWrites(
           }
         | undefined;
       try {
-        requireCanonicalServices(doc);
         let page: PageRef;
         if (isPdf) {
           const result = await doc.pages.insert(new Uint8Array(resolved.bytes));
@@ -137,14 +136,11 @@ export function createAssetWrites(
           (candidate) => candidate.ref.pageObjectNumber === page.pageObjectNumber,
         );
         const handle = doc.page(page);
-        if (!layout || !handle.pieceInfo) {
-          throw stampError(
-            'unsupported',
-            'canonical PDF libraries need page layout and pieceInfo support',
-          );
+        if (!layout) {
+          throw stampError('operation-failed', 'the new page is missing from the library layout');
         }
         // Insert copies the page only: register it in the same mutation.
-        await doc.pages.setName!({ name: stampKey(name, label), page });
+        await doc.pages.setName({ name: stampKey(name, label), page });
         const asset: StampAsset = {
           id: assetId,
           libraryId: liveLibrary.id,
@@ -189,12 +185,6 @@ export function createAssetWrites(
     const doc = ctx.documentHandle(documentId);
     if (!doc) throw stampError('not-found', `target document '${documentId}' is not open`);
     const handle = doc.page(page);
-    if (!handle.annotations.exportAppearance) {
-      throw stampError(
-        'unsupported',
-        "this document's engine cannot export annotation appearances",
-      );
-    }
     // The engine flattens the selection into a fresh single-page PDF: the
     // same placement whole-page flatten uses, aimed at a new page.
     const source = await handle.annotations.exportAppearance([...refs]);
@@ -264,17 +254,16 @@ export function createAssetWrites(
       const doc = await openAssetDocument(canonicalBytes);
       let rewritten: Uint8Array | undefined;
       try {
-        requireCanonicalServices(doc);
         if (next.label !== asset.label) {
           // A relabel is a registry rename: one job, the identifier untouched.
-          await doc.pages.setName!({
+          await doc.pages.setName({
             name: stampKey(asset.name, next.label),
             page: asset.page,
             replace: stampKey(asset.name, asset.label),
           });
         }
         const page = doc.page(asset.page);
-        await page.pieceInfo?.update(
+        await page.pieceInfo.update(
           STAMP_PIECEINFO_APP,
           stampPieceInfo(next.kind, { subject: next.subject, categories: next.categories }),
         );

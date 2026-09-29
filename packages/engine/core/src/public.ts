@@ -12,6 +12,11 @@ export { AbortError, isAbortError } from './promise/AbortError';
 export { EngineError } from './errors/EngineError';
 export { EngineErrorCode } from './errors/EngineErrorCode';
 
+// Local engine.
+export { isLocalEngine } from './engine/LocalEngine';
+export { isLocalDocument } from './engine/LocalDocumentHandle';
+export { isLocalPage } from './engine/LocalPageHandle';
+
 // Refs.
 export { toPageRef, pageRefsEqual } from './identity/PageRef';
 export { toFieldRef } from './identity/FormFieldRef';
@@ -60,6 +65,9 @@ export type {
   DocumentHandle,
   DocumentCapabilities,
   PageHandle,
+  LocalEngine,
+  LocalDocumentHandle,
+  LocalPageHandle,
   OpenInput,
   OpenInputBytes,
   OpenInputLayerBytes,
@@ -77,8 +85,10 @@ export type {
   DocumentPagesService,
   DocumentAnnotationsService,
   PageAnnotationsService,
+  LocalPageAnnotationsService,
   PageTextService,
   PageRenderService,
+  LocalPageRenderService,
   DocumentSecurityService,
   DocumentSecurityState,
   DocumentUnlockInput,

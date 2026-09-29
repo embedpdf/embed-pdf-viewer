@@ -80,5 +80,4 @@ runAnnotationTransferConformance(runner, {
     await seedDocumentFromBytes(fx, TENANT_ID, id, resolve(localFixtures, file), pages);
     return engine.open({ kind: 'id', id });
   },
-  rawAppearances: false,
 });

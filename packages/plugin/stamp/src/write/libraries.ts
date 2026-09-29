@@ -79,7 +79,7 @@ export function createLibraryWrites(
 ) {
   const { libraryChanged, libraryCreated, libraryUpdated, libraryDeleted, assetCreated } = events;
   const { binaries: assetBinaries, libraryBinaries, ghostRenders, mutateLibrary } = binaries;
-  const { openAssetDocument, renderThumbnail, requireCanonicalServices } = assetEngine;
+  const { openAssetDocument, renderThumbnail } = assetEngine;
 
   const createLibrary = async (
     name: string,
@@ -91,9 +91,8 @@ export function createLibraryWrites(
     const doc = await openAssetDocument(blankLibraryPdf());
     let bytes: Uint8Array;
     try {
-      requireCanonicalServices(doc);
       await doc.metadata.update({ title: name });
-      await doc.pieceInfo!.update(
+      await doc.pieceInfo.update(
         STAMP_LIBRARY_PIECEINFO_APP,
         stampLibraryPieceInfo(id, { kind, categories: options?.categories }),
       );
@@ -139,7 +138,6 @@ export function createLibraryWrites(
         }
       | undefined;
     try {
-      requireCanonicalServices(doc);
       const layout = await doc.pages.list();
       if (layout.pageCount === 0) {
         throw stampError(
@@ -152,7 +150,7 @@ export function createLibraryWrites(
       );
 
       // Library identity: /Title (Acrobat), then format version 1 PieceInfo, then the caller's fallback.
-      const catalogEntries = (await doc.pieceInfo!.get(STAMP_LIBRARY_PIECEINFO_APP))?.entries ?? {};
+      const catalogEntries = (await doc.pieceInfo.get(STAMP_LIBRARY_PIECEINFO_APP))?.entries ?? {};
       const takenLibraryIds = new Set(Object.keys(ctx.state.get().libraries));
       const libraryId = allocateId(entryString(catalogEntries, 'Id'), 'stamp-lib', takenLibraryIds);
       const docMeta = await doc.metadata.get();
@@ -216,7 +214,7 @@ export function createLibraryWrites(
         // (`Name`, `Subject`) name the stamps of a library without a registry.
         descriptors = [];
         for (const page of layout.pages) {
-          const version1Entries = (await doc.page(page.ref).pieceInfo?.get(STAMP_PIECEINFO_APP))
+          const version1Entries = (await doc.page(page.ref).pieceInfo.get(STAMP_PIECEINFO_APP))
             ?.entries;
           const name =
             (version1Entries && entryString(version1Entries, 'Name')) ?? `Stamp${page.index + 1}`;
@@ -227,14 +225,14 @@ export function createLibraryWrites(
           descriptors.push({ page: page.ref, index: page.index, name, label });
         }
         for (const descriptor of descriptors) {
-          await doc.pages.setName!({
+          await doc.pages.setName({
             name: stampKey(descriptor.name, descriptor.label),
             page: descriptor.page,
           });
         }
       }
 
-      await doc.pieceInfo!.update(
+      await doc.pieceInfo.update(
         STAMP_LIBRARY_PIECEINFO_APP,
         stampLibraryPieceInfo(libraryId, {
           kind: libraryKind,
@@ -246,9 +244,6 @@ export function createLibraryWrites(
       const assets: NonNullable<typeof imported>['assets'] = [];
       for (const descriptor of descriptors) {
         const handle = doc.page(descriptor.page);
-        if (!handle.pieceInfo) {
-          throw stampError('unsupported', 'canonical PDF libraries need page pieceInfo support');
-        }
         const entries = (await handle.pieceInfo.get(STAMP_PIECEINFO_APP))?.entries ?? {};
         const kind = options?.kind ?? kindFromPdfName(entryName(entries, 'Kind')) ?? 'stamp';
         const subject = entryString(entries, 'SubjectOverride');
@@ -346,10 +341,9 @@ export function createLibraryWrites(
       const doc = await openAssetDocument(canonicalBytes);
       let rewritten: Uint8Array | undefined;
       try {
-        requireCanonicalServices(doc);
         // The name is the PDF's /Title; kind, id, categories, locale ride PieceInfo.
         if (next.name !== library.name) await doc.metadata.update({ title: next.name });
-        await doc.pieceInfo!.update(
+        await doc.pieceInfo.update(
           STAMP_LIBRARY_PIECEINFO_APP,
           stampLibraryPieceInfo(id, {
             kind: next.kind,

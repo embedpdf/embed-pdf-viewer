@@ -2,10 +2,16 @@ import { readFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it, vi } from 'vitest';
-import { EngineError, EngineErrorCode, toPageRef } from '@embedpdf/engine-core/runtime';
+import {
+  EngineError,
+  EngineErrorCode,
+  LOCAL_ENGINE_BRAND,
+  toPageRef,
+} from '@embedpdf/engine-core/runtime';
 import type {
   DocumentHandle,
   Engine,
+  LocalEngine,
   PageRef,
   PieceInfoEntry,
   PieceInfoPatch,
@@ -252,7 +258,10 @@ function makeAssetEngine(
     download,
     close,
   };
-  const engine = { open: vi.fn(async () => handle) } as unknown as Engine;
+  const engine = {
+    [LOCAL_ENGINE_BRAND]: true,
+    open: vi.fn(async () => handle),
+  } as unknown as LocalEngine;
   return {
     engine,
     close,
@@ -688,15 +697,6 @@ describe('stamp plugin: from a selection', () => {
     expect(asset.label).toBe('My mark');
     expect(asset.libraryId).toBe(libraryId);
   });
-
-  it('a document that cannot export appearances reports unsupported', async () => {
-    const { engine } = makeAssetEngine(1);
-    const target = { page: () => ({ annotations: {} }) } as unknown as DocumentHandle;
-    const { stamp } = makeStamp(engine, { target: { id: 'doc-1', handle: target } });
-    await expect(
-      stamp.createAssetFromAnnotations('doc-1', toPageRef(5), [], { label: 'Mark' }),
-    ).rejects.toMatchObject({ name: 'PluginError', code: 'unsupported' });
-  });
 });
 
 describe('stamp plugin: placement', () => {
@@ -829,6 +829,7 @@ describe('stamp plugin: placement', () => {
     // Node has no canvas encoder. Keep every PDF operation real and replace
     // only the browser-only preview encoder at the asset-engine boundary.
     const previewEngine = {
+      [LOCAL_ENGINE_BRAND]: true,
       open: async (
         input: Parameters<Engine['open']>[0],
         options?: Parameters<Engine['open']>[1],
@@ -867,7 +868,7 @@ describe('stamp plugin: placement', () => {
         });
       },
       destroy: () => engine.destroy(),
-    } as unknown as Engine;
+    } as unknown as LocalEngine;
     const fixtureBytes = new Uint8Array(await readFile(dynamicStampFixture));
     const target = await engine.open(
       { kind: 'bytes', id: 'stamp-target', bytes: fixtureBytes },
@@ -1053,8 +1054,9 @@ describe('stamp plugin: library kinds', () => {
 });
 
 /** A real engine whose page renders answer a fixed PNG: Node has no canvas encoder, thumbnails do not matter here. */
-function withFakeRenders(engine: Engine): Engine {
+function withFakeRenders(engine: Engine): LocalEngine {
   return {
+    [LOCAL_ENGINE_BRAND]: true,
     open: async (input: Parameters<Engine['open']>[0], options?: Parameters<Engine['open']>[1]) => {
       const doc = await engine.open(input, options);
       return new Proxy(doc, {
@@ -1090,7 +1092,7 @@ function withFakeRenders(engine: Engine): Engine {
       });
     },
     destroy: () => engine.destroy(),
-  } as unknown as Engine;
+  } as unknown as LocalEngine;
 }
 
 describe('stamp plugin: authoring marks (real engine)', () => {

@@ -1,6 +1,11 @@
 /** @embedpdf/plugin-stamp/contract: the public stamp vocabulary. */
 import type { BatchResult, EventHook, OperationOptions } from '@embedpdf/core';
-import type { AnnotationRef, BinarySource, Engine, PageRef } from '@embedpdf/engine-core/runtime';
+import type {
+  AnnotationRef,
+  BinarySource,
+  LocalEngine,
+  PageRef,
+} from '@embedpdf/engine-core/runtime';
 import type { StampPlacement } from '@embedpdf/plugin-annotation/contract';
 
 export { StampToken } from './token';
@@ -106,13 +111,12 @@ export interface StampLibraryChange {
 
 export interface StampConfig {
   /**
-   * The asset engine port: any `Engine` that can open `{ kind: 'bytes' }`,
-   * used only to slice an imported library PDF into per-page assets and
-   * render their previews.
+   * The asset engine port: a local engine, used only to slice an imported
+   * library PDF into per-page assets and render their previews.
    *
    * Omitted: the kernel's own engine is used, which is exactly right for a
    * local deployment (same WASM instance, zero extra cost). In a cloud
-   * deployment the kernel engine cannot open local bytes, so pass a factory;
+   * deployment the kernel engine is not local, so pass a factory;
    * it is called (and memoized) on the first import, never at viewer boot:
    *
    * ```ts
@@ -121,7 +125,7 @@ export interface StampConfig {
    * })
    * ```
    */
-  assetEngine?: Engine | (() => Engine | Promise<Engine>);
+  assetEngine?: LocalEngine | (() => LocalEngine | Promise<LocalEngine>);
   /** Cached thumbnail width in device px (import-time render). Default 256. */
   previewWidth?: number;
   /**

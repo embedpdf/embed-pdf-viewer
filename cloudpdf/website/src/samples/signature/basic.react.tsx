@@ -17,6 +17,7 @@ import {
 } from '@embedpdf/react/signature';
 import type { SignerRow } from '@embedpdf/react/signature';
 import { cloudEngine } from '@cloudpdf/engine';
+import { localEngine } from '@embedpdf/engine';
 
 import {
   Button,
@@ -29,6 +30,7 @@ import {
 } from '../stage/_shared/chrome';
 
 const engine = cloudEngine({ baseUrl: 'https://engine.cloudpdf.com' });
+const assetEngine = localEngine();
 // [!signer]
 // A throwaway key for the demo. Bring your own with `webCryptoSigner`, a
 // service with `remoteSigner`, or a persisted personal one with `personalSigner`.
@@ -40,7 +42,7 @@ const plugins = [
   interactionPlugin(),
   annotationPlugin(),
   formPlugin(),
-  stampPlugin({ assetEngine: engine }),
+  stampPlugin({ assetEngine }),
   signaturePlugin({
     key: () => signer,
     // Trust the demo key itself, so its signatures validate as 'valid'.

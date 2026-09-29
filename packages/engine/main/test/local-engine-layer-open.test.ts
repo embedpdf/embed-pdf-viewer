@@ -170,7 +170,7 @@ describe('LocalEngine layer open', () => {
       layer: { kind: 'fresh' },
     });
 
-    const bytes = await handle.downloadLayer!();
+    const bytes = await handle.downloadLayer();
     expect(Array.from(bytes)).toEqual([5, 5, 5]);
 
     const saveReq = transport.sent.find((p) => p.payload.kind === 'document.saveLayerBuffer');

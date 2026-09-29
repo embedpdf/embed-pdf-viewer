@@ -11,7 +11,7 @@ import {
   type PageRenderImage,
   type PageRenderOptions,
   type PageRenderRaster,
-  type PageRenderService,
+  type LocalPageRenderService as LocalPageRenderServiceContract,
   type PageRef,
   checkImageQuality,
 } from '@embedpdf/engine-core/runtime';
@@ -27,7 +27,7 @@ interface DocClosedView {
   isClosed(): boolean;
 }
 
-export class LocalPageRenderService implements PageRenderService {
+export class LocalPageRenderService implements LocalPageRenderServiceContract {
   constructor(
     private readonly docId: string,
     private readonly ref: PageRef,

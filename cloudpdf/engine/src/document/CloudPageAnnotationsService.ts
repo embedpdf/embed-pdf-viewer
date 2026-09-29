@@ -14,8 +14,6 @@ import {
   type AnnotationAppearanceImage,
   type AnnotationAppearanceImageOptions,
   type AnnotationAppearanceImagesResult,
-  type AnnotationAppearanceRenderOptions,
-  type AnnotationAppearancesResult,
   type AnnotationDraft,
   type AnnotationList,
   type AnnotationPatch,
@@ -111,17 +109,6 @@ export class CloudPageAnnotationsService implements PageAnnotationsService {
         signal,
       );
     });
-  }
-
-  renderAppearancesRaw(
-    _options?: AnnotationAppearanceRenderOptions,
-  ): AbortablePromise<AnnotationAppearancesResult> {
-    return AbortablePromise.rejectReason(
-      new EngineError(
-        EngineErrorCode.NotImplemented,
-        'annotations.renderAppearancesRaw() raw rasters are not available in the cloud engine; use renderAppearances()',
-      ),
-    );
   }
 
   renderAppearances(

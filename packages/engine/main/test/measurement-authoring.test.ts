@@ -146,7 +146,7 @@ describe.each(['wasm', 'native'] as const)('distance authoring integration (%s)'
       if (process.env.EMBEDPDF_MEASUREMENT_OUTPUT) {
         await writeFile(`${process.env.EMBEDPDF_MEASUREMENT_OUTPUT}/${prefer}.pdf`, saved);
       }
-      const layerBytes = await doc.downloadLayer!();
+      const layerBytes = await doc.downloadLayer();
       const layered = await engine.open(
         {
           kind: 'layerBytes',

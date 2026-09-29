@@ -20,7 +20,7 @@ import {
   useState,
   useSyncExternalStore,
 } from 'react';
-import { createKernel, docInfoListEquals } from '@embedpdf/core';
+import { createKernel, docInfoListEquals, isLocalEngine } from '@embedpdf/core';
 import type {
   AnyPlugin,
   CapabilityToken,
@@ -266,7 +266,7 @@ export interface ViewerProps {
    *   - An **instance** (`engine={engine}`) is borrowed: the Viewer uses it and
    *     never destroys it, because you acquired it and therefore own it. The
    *     common path — a module-scope `const engine = localEngine()` shared
-   *     across viewers and route changes. The Viewer calls `engine.warmup?.()`
+   *     across viewers and route changes. The Viewer warms up a local engine
    *     on mount so the boot overlaps app initialization.
    *   - A **thunk** (`engine={() => localEngine()}`) is viewer-owned: the
    *     Viewer calls it on mount and `destroy()`s the result on unmount. Use it
@@ -315,8 +315,8 @@ type BootState =
  * setup constructs one engine (construction is synchronous and inert — boot
  * happens lazily inside the engine) and each cleanup destroys exactly that one
  * — after the kernel, so handles close first. When `engine` is an instance it
- * is borrowed and never destroyed here; the Viewer only calls `warmup?.()` so
- * the WASM/transport boot overlaps plugin initialization. StrictMode's
+ * is borrowed and never destroyed here; the Viewer only warms up a local
+ * engine so the WASM boot overlaps plugin initialization. StrictMode's
  * double-mount therefore constructs two independent thunk engines and tears
  * the first fully down, matching the kernel's own effect-scoped lifecycle.
  * That means dev-only double resource use (two worker spawns, two font
@@ -357,13 +357,13 @@ export const Viewer = forwardRef<Kernel | null, ViewerProps>(function Viewer(
     const captured = initial.current;
     // A thunk is viewer-owned: call it now, destroy on unmount. An instance is
     // borrowed: use as-is, never destroy. Construction is synchronous and inert
-    // either way — the engine boots lazily on first use — so kick `warmup()`
-    // to overlap the WASM/transport boot with plugin initialization.
+    // either way — the engine boots lazily on first use — so a local engine's
+    // `warmup()` overlaps the WASM boot with plugin initialization.
     const ownsEngine = typeof captured.engine === 'function';
     const engine: Engine = ownsEngine
       ? (captured.engine as EngineFactory)()
       : (captured.engine as Engine);
-    engine.warmup?.();
+    if (isLocalEngine(engine)) engine.warmup();
     let kernel: Kernel;
     try {
       kernel = createKernel({ engine, plugins: captured.plugins });
