@@ -1,5 +1,6 @@
 import { CONTINUOUS_RENDER_POLICY, snapAppearanceScale } from '@embedpdf/core';
 import {
+  geomRotation,
   groupOf,
   iconOf,
   isSubstrateOnly,
@@ -68,6 +69,7 @@ export function createRenderReads(
         box: ghost.box,
         style: styleOf(annotation),
         ...iconOf(annotation),
+        rot: geomRotation(ghost.geometry),
         source: 'ghost',
         selected: false,
       });

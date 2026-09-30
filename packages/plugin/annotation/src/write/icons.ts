@@ -1,5 +1,5 @@
 import { PluginError, toPluginError } from '@embedpdf/core';
-import { defaultsFor, fitStampBox, type Rect, type Point } from '@embedpdf/core-annotation';
+import { defaultsFor, type Point, type ViewEnv } from '@embedpdf/core-annotation';
 import {
   toPageRef,
   type AnnotationDraft,
@@ -10,10 +10,11 @@ import {
   type PageRef,
 } from '@embedpdf/engine-core/runtime';
 
-import { ICON_PLACE_SIZE, iconPlacement, isIconPlaceKind } from './placement';
+import { iconAnnotationOf, iconPlaceAt, iconPlacement, isIconPlaceKind } from './placement';
 import type { FilePickerProvider } from '../contract';
 import type { AnnotationReads } from '../read/annotations';
 import type { AnnotationContext, AnnotationServices } from '../services';
+import { viewEnv } from '../services/geometry';
 import { appliedRefOf } from './outcomes';
 import type { Stamps } from './stamps';
 import type { ResolvedTool } from '../tools/definitions';
@@ -48,22 +49,23 @@ export function createIcons(
   };
 
   /** Place an icon annotation (note / file attachment) at its usual size,
-   *  centred on a page point — the icon-kind sibling of the stamp
+   *  shown centred on a page point at the view the user sees (`iconPlaceAt`,
+   *  the same box the ghost drew) — the icon-kind sibling of the stamp
    *  placement. The engine draws the icon from /C + /Name, filling /Rect. */
   const placeIconAt = (
     tool: ResolvedTool,
     pageObjectNumber: number,
     point: Point,
-    rotCW: number,
+    view: ViewEnv | undefined,
     file: AttachmentFileSource | null,
   ): boolean => {
     const doc = ctx.doc;
     const page = geometry.sizeOf(pageObjectNumber);
     if (!doc || !page || !isIconPlaceKind(tool.subtype)) return false;
-    const box: Rect = fitStampBox(point, ICON_PLACE_SIZE, page, rotCW);
+    const { rect } = iconPlaceAt(iconAnnotationOf(store.model(), tool), point, page, view);
     const placement = iconPlacement(
       tool.subtype,
-      { rect: box },
+      { rect },
       defaultsFor(store.model(), tool.preset),
       tool.flags,
       file,
@@ -85,23 +87,30 @@ export function createIcons(
    *                    changed while the picker was open).
    * Returns whether the click was consumed.
    */
-  const placeAt = (pageObjectNumber: number, point: Point, displayRotation?: number): boolean => {
+  const placeAt = (
+    pageObjectNumber: number,
+    point: Point,
+    displayRotation?: number,
+    zoom?: number,
+  ): boolean => {
     if (stamps.placeArmedStamp(pageObjectNumber, point, displayRotation)) return true;
     const tool = tools.activeTool();
     if (!tool) return false;
     if (tool.subtype === 'stamp')
       return stamps.requestStampAt(pageObjectNumber, point, displayRotation);
     if (!isIconPlaceKind(tool.subtype)) return false;
-    const rotCW = tools.uprightRotFor(tool.upright ? displayRotation : undefined);
-    if (tool.subtype === 'text') return placeIconAt(tool, pageObjectNumber, point, rotCW, null);
+    // The view at the click: an attachment lands after its file is picked,
+    // where the click showed it.
+    const view = viewEnv(zoom, displayRotation);
+    if (tool.subtype === 'text') return placeIconAt(tool, pageObjectNumber, point, view, null);
     return filePicker.promptAt(tool, pageObjectNumber, point, (picked) =>
-      placeIconAt(tool, pageObjectNumber, point, rotCW, picked),
+      placeIconAt(tool, pageObjectNumber, point, view, picked),
     );
   };
 
   const api = {
-    placeAt: (page: PageRef, point: Point, displayRotation?: number) =>
-      placeAt(page.objectNumber, point, displayRotation),
+    placeAt: (page: PageRef, point: Point, displayRotation?: number, zoom?: number) =>
+      placeAt(page.objectNumber, point, displayRotation, zoom),
     createAttachment: async (page: PageRef, at: Point, file: AttachmentFileSource) => {
       authority.assertCreate();
       authority.assertPage(page);
@@ -112,10 +121,10 @@ export function createIcons(
       if (!doc || !size || !tool || !isIconPlaceKind(tool.subtype)) {
         throw new PluginError('unsupported', 'annotation', 'no attachment tool is registered');
       }
-      const box: Rect = fitStampBox(at, ICON_PLACE_SIZE, size, 0);
+      const { rect } = iconPlaceAt(iconAnnotationOf(store.model(), tool), at, size, undefined);
       const placement = iconPlacement(
         tool.subtype,
-        { rect: box },
+        { rect },
         defaultsFor(store.model(), tool.preset),
         tool.flags,
         file,

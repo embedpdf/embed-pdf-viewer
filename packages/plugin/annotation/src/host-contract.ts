@@ -196,7 +196,8 @@ export interface AnnotationHostCapability extends AnnotationCapability {
     displayRotation?: PageRotation,
   ): void;
   finishInkDraft(): void;
-  placeAt(page: PageRef, point: Point, displayRotation?: PageRotation): boolean;
+  /** Place with the active tool at a click; `displayRotation` and `zoom` are the page's view there. */
+  placeAt(page: PageRef, point: Point, displayRotation?: PageRotation, zoom?: number): boolean;
   placeArmedStamp(page: PageRef, point: Point, displayRotation?: PageRotation): boolean;
   requestStampAt(page: PageRef, point: Point, displayRotation?: PageRotation): boolean;
 
@@ -208,7 +209,14 @@ export interface AnnotationHostCapability extends AnnotationCapability {
   clearMarkupPreview(): void;
 
   // ── ghosts and previews ──
-  hoverGhostAt(toolId: string, page: PageRef, point: Point, displayRotation?: PageRotation): void;
+  /** Show the tool's ghost at a hover; `displayRotation` and `zoom` are the page's view there. */
+  hoverGhostAt(
+    toolId: string,
+    page: PageRef,
+    point: Point,
+    displayRotation?: PageRotation,
+    zoom?: number,
+  ): void;
   clearGhost(): void;
   setPlacementPreview(toolId: string, page: PageRef, box: Rect): void;
   clearPlacementPreview(): void;

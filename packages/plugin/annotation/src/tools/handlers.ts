@@ -56,7 +56,12 @@ export function createPlaceHandler(anno: AnnotationHostCapability): InteractionH
       if (!sample.page) return false;
       // The click sample's display rotation drives the tool's `upright` policy —
       // the placement lands reading horizontally on a rotated page/view.
-      return anno.placeAt(sample.page.ref, sample.page.point, sample.page.rotation);
+      return anno.placeAt(
+        sample.page.ref,
+        sample.page.point,
+        sample.page.rotation,
+        sample.page.zoom,
+      );
     },
   };
 }
@@ -80,6 +85,7 @@ export function createGhostHandler(
         sample.page.ref,
         sample.page.point,
         sample.page.rotation,
+        sample.page.zoom,
       );
     else anno.clearGhost();
   };

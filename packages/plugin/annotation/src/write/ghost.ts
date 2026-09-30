@@ -13,8 +13,9 @@ import {
 import type { PageRotation } from '@embedpdf/core-geometry';
 import { toPageRef, type PageRef } from '@embedpdf/engine-core/runtime';
 
-import { ICON_PLACE_SIZE, isIconPlaceKind } from './placement';
+import { iconAnnotationOf, iconPlaceAt, isIconPlaceKind } from './placement';
 import type { AnnotationContext, AnnotationServices } from '../services';
+import { viewEnv } from '../services/geometry';
 import type { Stamps } from './stamps';
 import { setToolGhost } from '../model';
 
@@ -56,6 +57,7 @@ export function createGhost(
     pageObjectNumber: number,
     point: Point,
     displayRotation?: number,
+    zoom?: number,
   ): void => {
     const tool = tools.get(toolId);
     const page = geometry.sizeOf(pageObjectNumber);
@@ -76,12 +78,16 @@ export function createGhost(
       });
       return;
     }
-    // Icon kinds: the fixed 20×20 footprint under the cursor — the same box
-    // the click's placement uses (fit + clamp), painted as a vector ghost.
+    // Icon kinds: the icon as the click will show it, centred on the cursor
+    // at this view (`iconPlaceAt`, the same box the placement uses).
     if (isIconPlaceKind(tool.subtype)) {
-      const rot = tools.uprightRotFor(displayRotation);
-      const box = fitStampBox(point, ICON_PLACE_SIZE, page, rot);
-      showVectorGhost(pageObjectNumber, toolId, { kind: 'box', box, rotation: 0, ellipse: false });
+      const { shown } = iconPlaceAt(
+        iconAnnotationOf(store.model(), tool),
+        point,
+        page,
+        viewEnv(zoom, displayRotation),
+      );
+      showVectorGhost(pageObjectNumber, toolId, shown);
       return;
     }
     // A click-create tool: the shared placement layer resolves where the click
@@ -135,8 +141,13 @@ export function createGhost(
   };
 
   const api = {
-    hoverGhostAt: (toolId: string, page: PageRef, point: Point, displayRotation?: number) =>
-      hoverAt(toolId, page.objectNumber, point, displayRotation),
+    hoverGhostAt: (
+      toolId: string,
+      page: PageRef,
+      point: Point,
+      displayRotation?: number,
+      zoom?: number,
+    ) => hoverAt(toolId, page.objectNumber, point, displayRotation, zoom),
     clearGhost,
     setPlacementPreview: (toolId: string, page: PageRef, box: Rect) =>
       setPlacementPreview(toolId, page.objectNumber, box),

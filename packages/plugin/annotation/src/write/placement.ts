@@ -1,6 +1,20 @@
-import type { FieldValues, KindName } from '@embedpdf/core-annotation';
+import {
+  anchoredGeom,
+  anchorModeOf,
+  fitStampBox,
+  toolAnnotation,
+  unanchoredGeom,
+  type BoxShape,
+  type FieldValues,
+  type KindName,
+  type Model,
+  type Point,
+  type Rect,
+  type ViewEnv,
+} from '@embedpdf/core-annotation';
 import type {
   AnnotationDraft,
+  AnnotationDTO,
   AnnotationFlags,
   AnnotationResources,
   AttachmentFileSource,
@@ -25,6 +39,47 @@ export type IconPlaceKind = 'text' | 'file-attachment';
 
 export const isIconPlaceKind = (subtype: KindName): subtype is IconPlaceKind =>
   subtype === 'text' || subtype === 'file-attachment';
+
+/** What an icon tool creates, read as an annotation: its defaults and its `/F` seed. */
+export const iconAnnotationOf = (
+  model: Model,
+  tool: { subtype: KindName; preset: string; flags?: Partial<AnnotationFlags> },
+): AnnotationDTO =>
+  ({ ...toolAnnotation(model, tool.subtype, tool.preset), ...tool.flags }) as AnnotationDTO;
+
+/**
+ * Where an icon placed at `point` goes, at the view the user sees. An icon is
+ * screen-anchored (`noZoom`, `noRotate`): it shows upright and at its usual
+ * size, hanging from its rect's upper-left corner. So the placement starts
+ * from how it shows, the icon centred on the pointer and kept on the page
+ * (`shown`, what the ghost draws), and stores the rect whose own display is
+ * exactly that (`rect`, through `unanchoredGeom`, the inverse gestures use).
+ * `annotation` is what the tool creates, read for its flags. Without a view
+ * the two are the same box.
+ */
+export function iconPlaceAt(
+  annotation: AnnotationDTO,
+  point: Point,
+  page: { width: number; height: number },
+  view: ViewEnv | undefined,
+): { shown: BoxShape; rect: Rect } {
+  const mode = anchorModeOf({ annotation });
+  // How an icon at its usual size shows at this view: its size and its turn.
+  const usual: BoxShape = {
+    kind: 'box',
+    box: { x: 0, y: 0, ...ICON_PLACE_SIZE },
+    rotation: 0,
+    ellipse: false,
+  };
+  const { box: size, rotation } = anchoredGeom(usual, mode, view) as BoxShape;
+  const shown: BoxShape = {
+    kind: 'box',
+    box: fitStampBox(point, { width: size.width, height: size.height }, page, rotation),
+    rotation,
+    ellipse: false,
+  };
+  return { shown, rect: (unanchoredGeom(shown, mode, view) as BoxShape).box };
+}
 
 /**
  * Build the engine create for a placed icon annotation: its data, and for a
