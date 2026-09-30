@@ -12,7 +12,7 @@ import { caret } from './caret';
 import { circle } from './circle';
 import { NO_CAPS, type AnnotationKind } from './define';
 import { fileAttachment } from './file-attachment';
-import { freeText } from './free-text';
+import { freeText, freeTextCallout } from './free-text';
 import { highlight } from './highlight';
 import { ink } from './ink';
 import { line } from './line';
@@ -48,6 +48,7 @@ export const KINDS: Readonly<Record<string, AnnotationKind>> = {
   [polyline.name]: polyline,
   [ink.name]: ink,
   [freeText.name]: freeText,
+  [freeTextCallout.name]: freeTextCallout,
   [highlight.name]: highlight,
   [underline.name]: underline,
   [squiggly.name]: squiggly,

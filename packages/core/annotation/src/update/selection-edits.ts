@@ -162,13 +162,15 @@ export function rotateSelection(model: Model, deltaDeg: number): [Model, Effect[
 
 /** Reset rotation on the selection to the as-authored orientation. For a
  *  screen-anchored annotation that is its on-screen orientation, so reset is
- *  as meaningful as for anyone else. */
+ *  as meaningful as for anyone else. A kind that doesn't turn keeps its turn:
+ *  a caret's follows its text, a callout's stands it upright. */
 export function resetRotation(model: Model): [Model, Effect[]] {
   const byId = { ...model.byId };
   let turned = false;
   for (const id of model.selected) {
     const record = byId[id];
-    if (!record || !annotTransformable(record)) continue;
+    if (!record || !annotTransformable(record) || !kindOf(record.annotation).caps.rotatable)
+      continue;
     const geometry = shapeOf(record.annotation);
     if (geomRotation(geometry) === 0) continue;
     const pivot = annotationTurnPivot(record);

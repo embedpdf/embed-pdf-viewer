@@ -11,12 +11,10 @@
  */
 import type { PageRef } from '@embedpdf/engine-core/runtime';
 
-import { anchoredGeom, anchoredStrokeWidth, anchorModeOf, type ViewEnv } from '../anchor';
-import { geomVisualBounds } from '../geometry';
+import { type ViewEnv } from '../anchor';
 import { unionRect } from '../rect';
 import { annotationSelectionFrame } from '../selection';
-import type { Draft, Id, Model, ModelAnnotation, Point, PointerInput, Rect } from '../types';
-import { shapeOf, styleOf } from '../record';
+import type { Draft, Id, Model, Point, PointerInput, Rect } from '../types';
 
 const clampAxis = (value: number, lo: number, hi: number): number =>
   Math.max(lo, Math.min(hi, value));
@@ -38,38 +36,15 @@ export const viewOf = (input: PointerInput): ViewEnv | undefined =>
     ? { zoom: input.zoom ?? 1, rotation: input.displayRotation ?? 0 }
     : undefined;
 
-/** Corners of the region a move must keep inside the page. Most annotations
- *  use the selection frame (the outline the user sees); a screen-anchored
- *  member counts at its view-projected footprint. A callout's frame is only
- *  the text box, so the clamp uses the visual bounds — box, leader, and
- *  arrowhead — and the arrow cannot leave the page. */
-function moveClampCorners(record: ModelAnnotation, view?: ViewEnv): Point[] {
-  const mode = anchorModeOf(record);
-  const stored = shapeOf(record.annotation);
-  const style = styleOf(record.annotation);
-  const geometry = anchoredGeom(stored, mode, view);
-  if (geometry.kind === 'text-box' && geometry.calloutLine) {
-    const visual = geomVisualBounds(geometry, {
-      ...style,
-      strokeWidth: anchoredStrokeWidth(style.strokeWidth, mode, view),
-    });
-    return [
-      { x: visual.x, y: visual.y },
-      { x: visual.x + visual.width, y: visual.y },
-      { x: visual.x + visual.width, y: visual.y + visual.height },
-      { x: visual.x, y: visual.y + visual.height },
-    ];
-  }
-  return [...annotationSelectionFrame(record, view).corners];
-}
-
-/** The union of the ids' move-clamp bounds. */
+/** The union of the ids' selection frames: what a move keeps inside the page.
+ *  A frame takes in everything an annotation paints (a callout's arrow too),
+ *  and a screen-anchored member counts at its view-projected footprint. */
 export function unionBoundsOf(model: Model, ids: Id[], view?: ViewEnv): Rect | null {
   const corners: Point[] = [];
   for (const id of ids) {
     const record = model.byId[id];
     if (!record) continue;
-    corners.push(...moveClampCorners(record, view));
+    corners.push(...annotationSelectionFrame(record, view).corners);
   }
   return corners.length ? unionRect(corners) : null;
 }

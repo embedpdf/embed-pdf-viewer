@@ -9,6 +9,11 @@
  * line now meets the box ({@link calloutEnd}); otherwise the stored end
  * stays. Only a plain text box turns with the rotate gesture; a callout's box
  * keeps the turn it was made with.
+ *
+ * A plain text box's selection frame is its box. A callout's frame is
+ * everything it paints (the box, the line and the ending), so it is grabbed,
+ * grouped and kept on the page as one object; its handles still act on the
+ * box, the tip and the knee.
  */
 import type { AnnotationDTO, LineEnding } from '@embedpdf/engine-core/runtime';
 
@@ -17,7 +22,6 @@ import {
   expandRect,
   insetRect,
   rectCenter,
-  rectContains,
   rectCornerPoints,
   rotatePoint,
   rotatedAabb,
@@ -32,6 +36,7 @@ import {
   boxRotateAbout,
   boxScaleAbout,
   boxTranslate,
+  isInTurnedBox,
   type TurnedBox,
 } from './box';
 import type { ShapeFamily } from './family';
@@ -236,9 +241,9 @@ function textBoxRect(shape: TextBoxShape, { strokeWidth }: Stroke): Rect {
   return unionRect([...rectCornerPoints(box), ...strokedOutlineOf(nodes, strokeWidth)]);
 }
 
-/** What a selection wraps: the box, or a turned callout box as the page shows it. */
-function textBoxSelectionBounds(shape: TextBoxShape): Rect {
-  return shape.calloutLine && shape.rotation ? rotatedAabb(shape.box, shape.rotation) : shape.box;
+/** What a selection wraps: a plain box, or everything a callout paints. */
+function textBoxSelectionBounds(shape: TextBoxShape, stroke: Stroke): Rect {
+  return shape.calloutLine ? textBoxRect(shape, stroke) : shape.box;
 }
 
 /**
@@ -251,8 +256,7 @@ function textBoxHit(
   margin: number,
   { strokeWidth }: Stroke,
 ): boolean {
-  const local = shape.rotation ? rotatePoint(point, rectCenter(shape.box), -shape.rotation) : point;
-  if (rectContains(expandRect(shape.box, margin), local)) return true;
+  if (isInTurnedBox(shape, point, margin)) return true;
   const line = shape.calloutLine;
   if (!line) return false;
   const tolerance = margin + strokeWidth / 2;
@@ -312,7 +316,7 @@ function textBoxScene(shape: TextBoxShape, { strokeWidth }: Stroke): RenderNode[
 /**
  * The text box family: a free text's box and turn, and a callout's line.
  * Only a plain box turns; a callout's box keeps the turn it was made with,
- * so a selection outlines it upright.
+ * and a selection outlines everything it paints, upright.
  */
 export const textBoxFamily: ShapeFamily<TextBoxShape> = {
   read: readTextBox,

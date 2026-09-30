@@ -10,13 +10,22 @@ import { kindNamed, widgetKindOf, type AnnotationKind } from '../kinds';
 import type { Id, ModelAnnotation } from '../types';
 
 /**
- * An annotation's kind (`kinds/`): the one its subtype names, or for a widget
- * the one its field family picks (`widget-text`…).
+ * An annotation's kind (`kinds/`): the one its subtype names; for a widget,
+ * the one its field family picks (`widget-text`…); for a free text with the
+ * callout intent, the callout.
  */
-export const kindOf = (annotation: AnnotationDTO): AnnotationKind =>
-  kindNamed(
-    annotation.subtype === 'widget' ? widgetKindOf(annotation.fieldFamily) : annotation.subtype,
-  );
+export function kindOf(annotation: AnnotationDTO): AnnotationKind {
+  switch (annotation.subtype) {
+    case 'widget':
+      return kindNamed(widgetKindOf(annotation.fieldFamily));
+    case 'free-text':
+      return kindNamed(
+        annotation.intent === 'free-text-callout' ? 'free-text-callout' : 'free-text',
+      );
+    default:
+      return kindNamed(annotation.subtype);
+  }
+}
 
 /**
  * A record's engine ref: `null` while a record this session created waits for

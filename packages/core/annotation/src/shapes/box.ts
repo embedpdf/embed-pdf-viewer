@@ -133,6 +133,12 @@ export function boxCorners(shape: TurnedBox): [Point, Point, Point, Point] {
   ) as [Point, Point, Point, Point];
 }
 
+/** Is `point` in the turned box, grown by `margin`? Tested in the box's own frame (the point turned back). */
+export function isInTurnedBox(shape: TurnedBox, point: Point, margin: number): boolean {
+  const local = shape.rotation ? rotatePoint(point, rectCenter(shape.box), -shape.rotation) : point;
+  return rectContains(expandRect(shape.box, margin), local);
+}
+
 /** The shape moved by `delta`. */
 export function boxTranslate<S extends TurnedBox>(shape: S, delta: Point): S {
   return { ...shape, box: { ...shape.box, x: shape.box.x + delta.x, y: shape.box.y + delta.y } };

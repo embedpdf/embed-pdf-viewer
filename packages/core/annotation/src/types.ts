@@ -67,7 +67,7 @@ export interface ViewEnv {
 
 /**
  * An annotation kind's name (`kinds/`): its PDF subtype, a widget's field
- * family (`widget-text`…), or a tool's own kind (`free-text-callout`).
+ * family (`widget-text`…), or a free text's callout (`free-text-callout`).
  */
 export type KindName =
   | 'highlight'

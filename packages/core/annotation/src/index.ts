@@ -42,7 +42,7 @@ export {
   rotationAnchor,
 } from './view';
 export type { TextBox } from './view';
-export { hitTest, cursorAt, isSelectable, canMove, type Target } from './hit';
+export { hitTest, cursorAt, isSelectable, canMove, isOnTextBox, type Target } from './hit';
 // Rich text run algebra (pure): what the editor binding and the plugin's
 // selection styling compute with.
 export {

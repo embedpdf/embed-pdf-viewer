@@ -6,6 +6,7 @@ import {
   cursorAt,
   hitTest,
   type Id,
+  isOnTextBox,
   type Model,
   type Point,
   type Rect,
@@ -82,6 +83,26 @@ export function createChromeReads(
       inert === undefined ? behaviors.engagedIdsOn(pageObjectNumber) : (inert ?? undefined),
       viewEnv(view.zoom, view.rotation),
     );
+  };
+
+  /**
+   * The text box whose box is under `point`: where a double-click edits its
+   * text. Its body or a resize handle on its border counts; a callout's line,
+   * its tip and knee, and the empty rest of its frame don't.
+   */
+  const textBoxAt = (page: PageRef, point: Point, view: HitView = {}): Id | null => {
+    const target = hitAt(page, point, view, 1, null);
+    const id = target.kind === 'annot' || target.kind === 'handle' ? target.id : null;
+    const record = id != null ? store.model().byId[id] : undefined;
+    const onBox =
+      !!record &&
+      isOnTextBox(
+        record,
+        point,
+        chromeGeomAt(view.scale).handleTol,
+        viewEnv(view.zoom, view.rotation),
+      );
+    return onBox ? id : null;
   };
 
   // Memoize the derived per-page arrays by input identity, so a selector returns
@@ -247,7 +268,7 @@ export function createChromeReads(
     },
   };
 
-  return { chromeSettings, chromeGeomAt, grabBoost, hitAt, api };
+  return { chromeSettings, chromeGeomAt, grabBoost, hitAt, textBoxAt, api };
 }
 
 export type ChromeReads = ReturnType<typeof createChromeReads>;

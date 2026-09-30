@@ -7,16 +7,9 @@
  */
 import type { AnnotationDTO } from '@embedpdf/engine-core/runtime';
 
-import {
-  expandRect,
-  normalizeDeg,
-  rectCenter,
-  rectContains,
-  rotatePoint,
-  rotatedAabb,
-} from '../rect';
-import type { Point, Rect, RenderNode, TextEndAnchor } from '../types';
-import { boxCorners, boxScaleAbout, boxTranslate, type TurnedBox } from './box';
+import { normalizeDeg, rectCenter, rotatedAabb } from '../rect';
+import type { Rect, RenderNode, TextEndAnchor } from '../types';
+import { boxCorners, boxScaleAbout, boxTranslate, isInTurnedBox, type TurnedBox } from './box';
 import type { ShapeFamily } from './family';
 
 /** A caret record's shape: the engine's box and its turn. */
@@ -86,12 +79,6 @@ export function caretFromAnchor(anchor: TextEndAnchor): CaretShape {
   };
 }
 
-/** Is `point` anywhere in the caret's box (plus `margin`), tested in the box's own frame? */
-function caretHit(shape: CaretShape, point: Point, margin: number): boolean {
-  const local = shape.rotation ? rotatePoint(point, rectCenter(shape.box), -shape.rotation) : point;
-  return rectContains(expandRect(shape.box, margin), local);
-}
-
 /** The width of the caret mark's outline, whatever the annotation's stroke. */
 export const CARET_STROKE_WIDTH = 0.5;
 
@@ -145,6 +132,7 @@ export const caretFamily: ShapeFamily<CaretShape> = {
   upright: (shape) => ({ ...shape, rotation: 0 }),
   handles: () => [],
   drag: (shape) => shape,
-  hit: (shape, point, margin) => caretHit(shape, point, margin),
+  // A caret is hit anywhere in its box: the mark is small.
+  hit: (shape, point, margin) => isInTurnedBox(shape, point, margin),
   scene: caretScene,
 };

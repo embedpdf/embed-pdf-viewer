@@ -212,7 +212,7 @@ export interface AnnotationToolDef<K extends ToolAuthoringKind = ToolAuthoringKi
    *  Defaults to the inherited kind, or the id when neither is given. */
   subtype?: KindName;
   /** The kind whose editable fields a style panel shows for this tool.
-   *  Defaults to `subtype` (a callout edits `free-text` fields, for example). */
+   *  Defaults to `subtype`. */
   fieldsKind?: string;
   /** Advanced: the `defaults` key this tool reads/writes. Defaults to the id, and
    *  that is almost always right — override it only to alias a shared defaults bag
@@ -499,14 +499,13 @@ export const DEFAULT_TOOLS: AnnotationToolInput[] = [
     clickCreate: { width: 180, height: 40, anchor: 'top-left' },
   },
   {
-    // Routes on the `free-text-callout` subtype token but authors a `free-text`
-    // annotation (leader + box). Its leader defaults to an open arrowhead.
+    // Authors the `free-text-callout` kind: a `free-text` annotation with a
+    // leader and a box. Its leader defaults to an open arrowhead.
     // `upright` applies to the text box only: on a rotated page it commits
     // counter-rotated (readable), while the leader tip/knee stay page-space
     // anchors — see the core's `calloutPointer`.
     id: 'free-text-callout',
     subtype: 'free-text-callout',
-    fieldsKind: 'free-text',
     cursor: 'crosshair',
     enables: DRAW_TAGS,
     defaults: { color: HOUSE_RED, strokeWidth: 6, lineEnding: 'open-arrow' },

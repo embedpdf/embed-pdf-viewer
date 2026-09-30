@@ -6,7 +6,7 @@
  * when editing ends) and sends the latest text, so it carries every keystroke
  * that waited for it: they settle together, accepted or refused.
  */
-import { type Id, type Point, refOf, richDocOf, shapeOf } from '@embedpdf/core-annotation';
+import { type Id, type Point, refOf, richDocOf } from '@embedpdf/core-annotation';
 import {
   annotationKey,
   type AnnotationRef,
@@ -29,7 +29,7 @@ interface Waiter {
 export function createTextEditing(
   ctx: Pick<AnnotationContext, 'doc' | 'state' | 'cleanup'>,
   { store, identity, fonts }: Pick<AnnotationServices, 'store' | 'identity' | 'fonts'>,
-  chrome: Pick<ChromeReads, 'hitAt'>,
+  chrome: Pick<ChromeReads, 'textBoxAt'>,
 ) {
   /** The pause timer of each record being typed in. */
   const timers = new Map<Id, ReturnType<typeof setTimeout>>();
@@ -110,14 +110,9 @@ export function createTextEditing(
       rotation?: number,
       zoom?: number,
     ) => {
-      const model = store.model();
-      const target = chrome.hitAt(page, point, { scale, rotation, zoom }, 1, null);
-      // A double-click on the box body or one of its resize handles both target the
-      // same annotation; either should open it for editing.
-      const id = target.kind === 'annot' || target.kind === 'handle' ? target.id : null;
-      const record = id != null ? model.byId[id] : undefined;
-      if (record && shapeOf(record.annotation).kind === 'text-box') {
-        store.commit({ type: 'beginTextEdit', id: record.id });
+      const id = chrome.textBoxAt(page, point, { scale, rotation, zoom });
+      if (id != null) {
+        store.commit({ type: 'beginTextEdit', id });
         return true;
       }
       // Nothing editable here — report it so the caller can fall through to a

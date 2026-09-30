@@ -25,6 +25,7 @@ import {
   type Point,
 } from './types';
 import { kindOf, shapeOf, styleOf } from './record';
+import { isInTurnedBox } from './shapes/box';
 
 export type Target =
   | { kind: 'handle'; id: Id; handle: string; cursor: Cursor }
@@ -101,6 +102,22 @@ const hasHandles = (model: Model, record: ModelAnnotation): boolean => {
 const hitGeomOf = (record: ModelAnnotation, view: ViewEnv | undefined): Shape =>
   anchoredGeom(shapeOf(record.annotation), anchorModeOf(record), view);
 
+/**
+ * Is `point` on a text box's own box, where its text is? Not on a callout's
+ * line, and not in the empty rest of its frame. `margin` reaches the resize
+ * handles on its border. The box is tested where the page shows it, as a
+ * click tests it.
+ */
+export function isOnTextBox(
+  record: ModelAnnotation,
+  point: Point,
+  margin: number,
+  view?: ViewEnv,
+): boolean {
+  const geometry = hitGeomOf(record, view);
+  return geometry.kind === 'text-box' && isInTurnedBox(geometry, point, margin);
+}
+
 /** Stroke width in effective content units (a noZoom body's line weight scales
  *  with its geometry). */
 const hitStrokeOf = (record: ModelAnnotation, view: ViewEnv | undefined): number =>
@@ -124,11 +141,10 @@ const inRect = (rect: Rect, point: Point): boolean =>
   point.x <= rect.x + rect.width &&
   point.y >= rect.y &&
   point.y <= rect.y + rect.height;
-// A selected annotation is grabbable from anywhere inside its selection region — the
-// Same oriented quad the chrome outlines — so the grab area matches what you see
-// highlighted, tilt included (a rotated box is grabbable across its tilted body, not
-// just its unrotated footprint; a thin arrow's whole outline box, arrowhead and all).
-const inBounds = (record: ModelAnnotation, point: Point, view: ViewEnv | undefined): boolean =>
+// Is the point inside the annotation's selection frame: the oriented quad the chrome
+// outlines, tilt included (a rotated box across its tilted body; a thin arrow's or a
+// callout's whole outline box, empty corners and all)?
+const inFrame = (record: ModelAnnotation, point: Point, view: ViewEnv | undefined): boolean =>
   pointInQuad(point, annotationSelectionFrame(record, view).corners);
 
 /**
@@ -316,9 +332,13 @@ export function hitTest(
     // `inert` ids (engaged Behaviors — form widgets under a fill tool) are
     // invisible here: their own DOM owns the pointer.
     if (!record || inert?.has(id) || !isSelectable(model, id)) continue;
-    // A selected annotation is sticky-grabbable from anywhere in its bounds, but
-    // only if it can actually move; otherwise it's grabbed on its stroke/fill like
-    // an unselected one (so a selectable-but-anchored kind still re-selects cleanly).
+    // A selected annotation that can move is grabbed anywhere in its frame as
+    // well as on what it paints, so selecting never shrinks where it is grabbed;
+    // any other is grabbed only on its stroke or fill (so a selectable but
+    // text-bound kind still re-selects cleanly).
+    if (model.selected.includes(id) && canMove(model, id) && inFrame(record, point, view)) {
+      return { kind: 'annot', id };
+    }
     const style = styleOf(record.annotation);
     const measure = measurementOf(record.annotation);
     const geometry = hitGeomOf(record, view);
@@ -328,14 +348,12 @@ export function hitTest(
     const layout = measure && measurementLayout(geometry, measure, { ...style, strokeWidth });
     const hit =
       (layout && distanceCaptionHit(layout, point, strokeMargin)) ||
-      (model.selected.includes(id) && canMove(model, id)
-        ? inBounds(record, point, view)
-        : distance
-          ? distanceHit(distance, point, strokeWidth, strokeMargin)
-          : geomHit(geometry, point, strokeMargin, isFilled(record), {
-              ...style,
-              strokeWidth: strokeWidth,
-            }));
+      (distance
+        ? distanceHit(distance, point, strokeWidth, strokeMargin)
+        : geomHit(geometry, point, strokeMargin, isFilled(record), {
+            ...style,
+            strokeWidth: strokeWidth,
+          }));
 
     if (hit) {
       return { kind: 'annot', id };

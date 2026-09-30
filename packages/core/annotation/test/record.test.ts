@@ -38,6 +38,7 @@ import {
 } from '../src/record';
 import { familyOf } from '../src/shapes';
 import { drawnStrokesOf } from '../src/shapes/points';
+import { calloutShape } from '../src/shapes/text-box';
 import type { FieldValues, Message, Model, ModelAnnotation, Shape } from '../src/types';
 import { update } from '../src/update';
 import { answering, modelWith, recordOf } from './support';
@@ -840,6 +841,8 @@ describe('record — every field a kind takes writes only fields its engine kind
     switch (subtype) {
       case 'free-text':
         return { kind: 'text-box', box: box, rotation: 0, calloutLine: null, lineEnding: null };
+      case 'free-text-callout':
+        return calloutShape(box, 0, { x: 40, y: 60 }, undefined, 'open-arrow');
       case 'line':
         return {
           kind: 'line',

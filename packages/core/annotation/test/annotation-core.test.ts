@@ -47,7 +47,7 @@ import {
 } from '../src/geometry';
 import { normalizeDeg, rotatedAabb, rotatedHandleCursor, transposedAboutCenter } from '../src/rect';
 import { caretFromAnchor, caretRectFromAnchor } from '../src/shapes/caret';
-import { calloutEnd, calloutShape, textPlateInset } from '../src/shapes/text-box';
+import { calloutEnd, calloutShape, textBoxFamily, textPlateInset } from '../src/shapes/text-box';
 import { expandGroups, groupKeyOf, groupMembers } from '../src/group';
 import { cursorAt, groupUnionBounds, hitTest, paintOrder } from '../src/hit';
 import { kindNamed } from '../src/kinds';
@@ -2160,7 +2160,8 @@ describe('annotation-core callout', () => {
     ]);
     const record = model.byId[model.order[0]];
     const geometry = shapeOf(record.annotation);
-    expect(kindOf(record.annotation).name).toBe('free-text');
+    expect(record.annotation.subtype).toBe('free-text');
+    expect(kindOf(record.annotation).name).toBe('free-text-callout');
     expect(geometry.kind).toBe('text-box');
     if (geometry.kind !== 'text-box' || !geometry.calloutLine)
       throw new Error('expected callout geom');
@@ -2317,7 +2318,8 @@ describe('annotation-core callout', () => {
     const a0Geometry = shapeOf(a0.annotation);
     if (a0Geometry.kind !== 'text-box' || !a0Geometry.calloutLine)
       throw new Error('expected callout');
-    const visual = geomVisualBounds(a0Geometry, styleOf(a0.annotation));
+    // The callout's frame is everything it paints: the arrow's ink stops at the edge.
+    const frame = selectionBounds(a0Geometry, styleOf(a0.annotation));
     const rect = a0Geometry.box;
     const grab = { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
     const edit = (phase: 'down' | 'move' | 'up', x: number, y: number): Message => ({
@@ -2328,7 +2330,7 @@ describe('annotation-core callout', () => {
     model = run(model, [edit('down', grab.x, grab.y), edit('move', -400, grab.y + 30)]);
     const draft = model.draft?.kind === 'move' ? model.draft : null;
     expect(draft).toBeTruthy();
-    expect(draft!.delta.x).toBeCloseTo(BOX.x - visual.x);
+    expect(draft!.delta.x).toBeCloseTo(BOX.x - frame.x);
     expect(draft!.delta.x).toBeGreaterThan(BOX.x - rect.x);
     expect(draft!.delta.y).toBe(30);
   });
@@ -2506,18 +2508,20 @@ describe('annotation-core callout — upright on a rotated page', () => {
     expect(geomHit(geometry, { x: 180, y: 120 }, 2, true, { strokeWidth: 1 })).toBe(true);
   });
 
-  it('geomVisualBounds and selectionBounds wrap the rotated footprint', () => {
+  it('geomVisualBounds and selectionBounds wrap the rotated footprint and the leader', () => {
     const geometry = rotCalloutGeom();
     const vb = geomVisualBounds(geometry, { strokeWidth: 0 });
     // reaches the footprint's top (y=60) and right (x=280) — not just the logical box
     expect(vb.y).toBeLessThanOrEqual(60);
     expect(vb.x + vb.width).toBeGreaterThanOrEqual(280);
-    expectRectClose(selectionBounds(geometry, { strokeWidth: 1 }), {
-      x: 240,
-      y: 60,
-      width: 40,
-      height: 120,
-    });
+    // The frame is everything the callout paints, the engine's rect: the turned
+    // box's footprint {240,60,40,120} and the leader out to its tip (40,60).
+    const frame = selectionBounds(geometry, { strokeWidth: 1 });
+    expect(frame).toEqual(textBoxFamily.rect(geometry, { strokeWidth: 1 }));
+    expect(frame.x).toBeLessThan(40);
+    expect(frame.y).toBeLessThan(60);
+    expect(frame.x + frame.width).toBeCloseTo(280, 6);
+    expect(frame.y + frame.height).toBeCloseTo(180, 6);
   });
 
   it('geomScene draws the tilted box as a CLOSED corner ring; the leader stays open', () => {
