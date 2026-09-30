@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useCapability, useSelector } from '@embedpdf/react/runtime';
-import { AnnotationToken } from '@embedpdf/react/annotation';
+import { AnnotationToken, useAnnotationSelection } from '@embedpdf/react/annotation';
 import { StageToken } from '@embedpdf/react/stage';
 import { useSurface } from '@embedpdf/react/shell';
 import {
@@ -58,7 +58,7 @@ export function MeasurementSection() {
 
   const scale = usePageScale(page);
   const anno = useCapability(AnnotationToken);
-  const selected = useSelector(AnnotationToken, (annotation) => annotation.getSelection());
+  const selected = useAnnotationSelection();
   const resettable = useSelector(
     AnnotationToken,
     (annotation) =>

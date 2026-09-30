@@ -9,7 +9,9 @@ import {
 import { styleOf } from '../record';
 import type { Shape, Effect, Model, PointerInput } from '../types';
 import { draftOf, newRecord } from './changes';
+import { measurementSelectionQuad } from '../measurement-shape';
 import { MIN_DRAG } from '../placement';
+import { fractionOnPage } from './page-bound';
 import { defaultsFor, lineEndingsOf, toolAnnotation } from './session';
 
 /**
@@ -88,19 +90,23 @@ export function distancePointer(
     lineEndings: lineEndingsOf(tool),
     rotation: 0,
   };
-  const appearance: DistanceAppearance = {
+  const style = styleOf(tool);
+  const withLeader = (length: number): DistanceAppearance => ({
     ...draft.measure,
-    leader: {
-      ...draft.measure.leader,
-      length: distanceLeaderLength(geometry, input.point),
-    },
-  };
+    leader: { ...draft.measure.leader, length },
+  });
+  // The dimension line goes out from the measured line toward the pointer,
+  // as far as the whole measurement stays on the page.
+  const wanted = distanceLeaderLength(geometry, input.point);
+  const fraction = fractionOnPage(input.pageBox, (part) =>
+    measurementSelectionQuad(geometry, withLeader(wanted * part), style),
+  );
+  const appearance = withLeader(wanted * fraction);
 
   if (phase === 'move') {
     return [{ ...model, draft: { ...draft, measure: appearance } }, []];
   }
 
-  const style = styleOf(tool);
   const created = newRecord(
     model,
     draft.page,

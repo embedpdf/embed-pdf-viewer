@@ -7,20 +7,30 @@ import { anchoredGeom, anchorModeOf } from '../anchor';
 import {
   DEFAULT_CHROME_GEOMETRY,
   geomDragHandle,
+  geomHandles,
   geomRotation,
   groupResizeAnchor,
   groupResizeBox,
 } from '../geometry';
-import { normalizeDeg } from '../rect';
 import { groupMembers } from '../group';
 import { canMove, hitTest } from '../hit';
-import { distanceLeaderLength } from '../measurement';
+import { distanceLeaderLength, measurementOf } from '../measurement';
+import { moveMeasurementCaption } from '../measurement-shape';
+import { shapeOf, styleOf } from '../record';
+import { normalizeDeg } from '../rect';
+import { annotationSelectionFrame } from '../selection';
 import { computeMoveSnap } from '../snap';
 import type { Draft, Effect, Id, Model, Point, PointerInput } from '../types';
 import { sub } from './changes';
 import { editUp } from './edit-commit';
-import { clampMoveDelta, clampPointToBox, editDraftPage, viewOf } from './page-bound';
-import { shapeOf } from '../record';
+import {
+  clampMoveDelta,
+  clampPointToBox,
+  deltaOnPage,
+  editDraftPage,
+  fractionOnPage,
+  viewOf,
+} from './page-bound';
 
 const RAD2DEG = 180 / Math.PI;
 
@@ -228,26 +238,51 @@ export function editMove(model: Model, input: PointerInput): [Model, Effect[]] {
     return [{ ...model, draft: { ...draft, delta, guides } }, []];
   }
   const point = clampPointToBox(input.point, input.pageBox);
+  // A reshaping gesture stops where the annotation would reach past the page
+  // (see `fractionOnPage`): the pointer's clamp alone lets a dimension line,
+  // a caption or an arrowhead built out from it leave the page.
   if (draft.kind === 'leader') {
-    const geometry = shapeOf(model.byId[draft.id].annotation);
-    const start = distanceLeaderLength(geometry, draft.start);
-    const current = distanceLeaderLength(geometry, point);
-
-    return [{ ...model, draft: { ...draft, delta: current - start } }, []];
+    const record = model.byId[draft.id];
+    const geometry = shapeOf(record.annotation);
+    const measure = measurementOf(record.annotation);
+    const wanted =
+      distanceLeaderLength(geometry, point) - distanceLeaderLength(geometry, draft.start);
+    if (measure?.intent !== 'line-dimension')
+      return [{ ...model, draft: { ...draft, delta: wanted } }, []];
+    const length = measure.leader?.length ?? 0;
+    const fraction = fractionOnPage(input.pageBox, (part) => {
+      const leader = { ...measure.leader, length: length + wanted * part };
+      return annotationSelectionFrame(record, undefined, { measure: { ...measure, leader } })
+        .corners;
+    });
+    return [{ ...model, draft: { ...draft, delta: wanted * fraction } }, []];
   }
-  if (draft.kind === 'caption')
-    return [
-      {
-        ...model,
-        draft: { ...draft, delta: { x: point.x - draft.start.x, y: point.y - draft.start.y } },
-      },
-      [],
-    ];
-  if (draft.kind === 'handle')
-    return [
-      { ...model, draft: { ...draft, current: geomDragHandle(draft.base, draft.handle, point) } },
-      [],
-    ];
+  if (draft.kind === 'caption') {
+    const record = model.byId[draft.id];
+    const geometry = shapeOf(record.annotation);
+    const measure = measurementOf(record.annotation);
+    const style = styleOf(record.annotation);
+    const wanted = sub(point, draft.start);
+    const delta = !measure
+      ? wanted
+      : deltaOnPage(input.pageBox, wanted, (moved) => {
+          const caption = moveMeasurementCaption(geometry, measure, moved, style);
+          return annotationSelectionFrame(record, undefined, caption).corners;
+        });
+    return [{ ...model, draft: { ...draft, delta } }, []];
+  }
+  if (draft.kind === 'handle') {
+    // From where the handle is to the pointer; the base is what the view shows.
+    const record = model.byId[draft.id];
+    const from = geomHandles(draft.base).find((handle) => handle.id === draft.handle)?.at ?? point;
+    const draggedBy = (delta: Point) =>
+      geomDragHandle(draft.base, draft.handle, { x: from.x + delta.x, y: from.y + delta.y });
+    const delta = deltaOnPage(input.pageBox, sub(point, from), (moved) => {
+      const geometry = draggedBy(moved);
+      return annotationSelectionFrame(record, undefined, { geometry }).corners;
+    });
+    return [{ ...model, draft: { ...draft, current: draggedBy(delta) } }, []];
+  }
   // Rotation reads the pointer as an angle about the pivot — the raw point is
   // valid (and better) outside the page; the geometry itself never translates.
   // `free` (shift) records the snap bypass for this sample.

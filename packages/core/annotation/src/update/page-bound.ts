@@ -8,6 +8,9 @@
  *  2. Clamp: within the home frame, geometry pins to the page box:
  *     an overshooting pointer slides the shape along the edge; a shape larger
  *     than the page pins to the page's top/left (lo wins when lo > hi).
+ *  3. Frame: a gesture that reshapes an annotation (a handle, a measurement's
+ *     leader or caption) stops where its frame would reach further past the
+ *     page's edge than it did when the gesture began ({@link fractionOnPage}).
  */
 import type { PageRef } from '@embedpdf/engine-core/runtime';
 
@@ -35,6 +38,63 @@ export const viewOf = (input: PointerInput): ViewEnv | undefined =>
   input.zoom != null || input.displayRotation != null
     ? { zoom: input.zoom ?? 1, rotation: input.displayRotation ?? 0 }
     : undefined;
+
+/** How far any of `corners` reaches past the page's edge: 0 when all are on it. */
+function overhangOf(corners: readonly Point[], page: Rect): number {
+  let overhang = 0;
+  for (const point of corners)
+    overhang = Math.max(
+      overhang,
+      page.x - point.x,
+      point.x - (page.x + page.width),
+      page.y - point.y,
+      point.y - (page.y + page.height),
+    );
+  return overhang;
+}
+
+/**
+ * How much of a gesture the page allows: 1 when all of it, otherwise the
+ * fraction of the way at which the annotation's frame (`cornersAt(fraction)`)
+ * would first reach further past the page's edge than it did at the start.
+ * An annotation on its page stays on it; one already past the edge is never
+ * pushed further out. A frame's overhang grows steadily along a straight
+ * gesture, so halving the way finds where it starts to.
+ */
+export function fractionOnPage(
+  page: Rect | undefined,
+  cornersAt: (fraction: number) => readonly Point[],
+): number {
+  if (!page) return 1;
+  const allowed = overhangOf(cornersAt(0), page) + 1e-9;
+  const fits = (fraction: number) => overhangOf(cornersAt(fraction), page) <= allowed;
+  if (fits(1)) return 1;
+  let inside = 0;
+  let outside = 1;
+  for (let i = 0; i < 30; i++) {
+    const middle = (inside + outside) / 2;
+    if (fits(middle)) inside = middle;
+    else outside = middle;
+  }
+  return inside;
+}
+
+/**
+ * How much of a two-way gesture `wanted` the page allows
+ * ({@link fractionOnPage}), across then up and down, so that a pointer past
+ * the edge slides the annotation along it instead of stopping it.
+ */
+export function deltaOnPage(
+  page: Rect | undefined,
+  wanted: Point,
+  cornersFor: (delta: Point) => readonly Point[],
+): Point {
+  const x =
+    wanted.x * fractionOnPage(page, (fraction) => cornersFor({ x: wanted.x * fraction, y: 0 }));
+  const y =
+    wanted.y * fractionOnPage(page, (fraction) => cornersFor({ x, y: wanted.y * fraction }));
+  return { x, y };
+}
 
 /** The union of the ids' selection frames: what a move keeps inside the page.
  *  A frame takes in everything an annotation paints (a callout's arrow too),
