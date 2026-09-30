@@ -50,6 +50,16 @@ const SECTOR_CURSORS: Cursor[] = [
  *  At `rot = 0` this reproduces {@link RECT_CURSOR} exactly. */
 export const rotatedHandleCursor = (handle: RectHandle, rot: number): Cursor =>
   SECTOR_CURSORS[Math.round(normalizeDeg(HANDLE_BASE_ANGLE[handle] + rot) / 45) % 8];
+/**
+ * A resize cursor as it points on screen, on a page shown turned `rotation`
+ * degrees clockwise (its display rotation): handles sit in page space, but
+ * the cursor follows what the user sees. Any other cursor stays as it is.
+ */
+export function cursorOnScreen(cursor: Cursor, rotation: number): Cursor {
+  const sector = SECTOR_CURSORS.indexOf(cursor);
+  if (sector < 0) return cursor;
+  return SECTOR_CURSORS[(sector + Math.round(normalizeDeg(rotation) / 45)) % 8]!;
+}
 const rectEdges = (handle: RectHandle) => ({
   w: handle === 'nw' || handle === 'w' || handle === 'sw',
   e: handle === 'ne' || handle === 'e' || handle === 'se',

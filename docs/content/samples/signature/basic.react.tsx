@@ -13,6 +13,7 @@ import {
   useSignature,
   useSignatureSnapshot,
   useSignatureTarget,
+  useSignatureVerdicts,
   useSignerRows,
 } from '@embedpdf/react/signature';
 import type { SignerRow } from '@embedpdf/react/signature';
@@ -126,9 +127,12 @@ function SignBar() {
   const person = usePerson();
   const signature = useSignature();
   const snapshot = useSignatureSnapshot();
+  const verdicts = useSignatureVerdicts();
   const { target, busy } = useSignatureTarget();
   const [error, setError] = useState<string | null>(null);
   const field = snapshot?.signatures[0] ?? null;
+  // The check runs after signing; its verdict arrives through the hook.
+  const verdict = field && verdicts?.find((v) => v.signature.index === field.index);
 
   const pick = (assetId: string) => {
     setError(null);
@@ -141,7 +145,6 @@ function SignBar() {
   };
 
   if (!person) return <Readout>Creating a signature…</Readout>;
-  const verdict = field && signature.getVerdict(field.field);
   return (
     <Toolbar>
       <Readout>{person.name}</Readout>

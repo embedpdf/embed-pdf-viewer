@@ -9,7 +9,7 @@ import {
 } from './measurement';
 import { measurementLayout } from './measurement-shape';
 import { geomHandles, geomHit, placeRotateKnob, pointInQuad, rectHandlesFor } from './geometry';
-import { unionRect } from './rect';
+import { cursorOnScreen, unionRect } from './rect';
 import { groupCaps } from './group';
 import { isSubstrateOnly } from './plane';
 import { annotInteractive, annotTransformable, viewable } from './flags';
@@ -247,7 +247,12 @@ export function hitTest(
             Math.abs(handle.at.x - point.x) <= chromeGeometry.handleTol &&
             Math.abs(handle.at.y - point.y) <= chromeGeometry.handleTol
           ) {
-            return { kind: 'handle', id: record.id, handle: handle.id, cursor: handle.cursor };
+            return {
+              kind: 'handle',
+              id: record.id,
+              handle: handle.id,
+              cursor: cursorOnScreen(handle.cursor, view?.rotation ?? 0),
+            };
           }
         }
       }
@@ -296,7 +301,7 @@ export function hitTest(
                 (id) => model.byId[id]?.annotation.page.objectNumber === pageObjectNumber,
               ),
               handle: handle.id,
-              cursor: handle.cursor,
+              cursor: cursorOnScreen(handle.cursor, view?.rotation ?? 0),
               box: union,
             };
           }

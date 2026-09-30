@@ -25,7 +25,7 @@ import {
   rectHandlesFor,
   ROTATE_KNOB_OFFSET,
 } from './geometry';
-import { rectFromPoints, rotatePoint, unionRect } from './rect';
+import { cursorOnScreen, rectFromPoints, rotatePoint, unionRect } from './rect';
 import { calloutShape } from './shapes/text-box';
 import { groupCaps } from './group';
 import { isSelectable, paintOrder } from './hit';
@@ -582,7 +582,7 @@ export function chrome(
         nodes.push({
           kind: 'handle',
           at: handle.at,
-          cursor: handle.cursor,
+          cursor: cursorOnScreen(handle.cursor, view?.rotation ?? 0),
           ...(rot ? { rot } : {}),
         });
       }
@@ -598,7 +598,11 @@ export function chrome(
       const gc = groupCaps(model, selection);
       if (gc.resizable) {
         for (const handle of rectHandlesFor(union))
-          nodes.push({ kind: 'handle', at: handle.at, cursor: handle.cursor });
+          nodes.push({
+            kind: 'handle',
+            at: handle.at,
+            cursor: cursorOnScreen(handle.cursor, view?.rotation ?? 0),
+          });
       }
     }
   }

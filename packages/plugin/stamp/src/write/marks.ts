@@ -36,7 +36,11 @@ const inkListOf = (
   return strokes.map((stroke) => stroke.map(({ x, y }) => ({ x, y })));
 };
 
-/** A generous box for typed text; the export crops to the glyphs. */
+/**
+ * A generous box for typed text. The export keeps the whole box, so the
+ * text is centered in it: the mark then sits in the middle of a preview
+ * or a signature field.
+ */
 const textBounds = (
   text: string,
   fontSize: number,
@@ -80,7 +84,8 @@ export function createMarks({ assetEngine }: Pick<StampServices, 'assetEngine'>)
               contents: mark.text,
               fontFamily: mark.fontFamily,
               fontSize: mark.fontSize ?? 36,
-              textAlign: 'left',
+              textAlign: 'center',
+              verticalAlign: 'middle',
               box: textBounds(mark.text, mark.fontSize ?? 36),
               fontColor: color,
               strokeWidth: 0,

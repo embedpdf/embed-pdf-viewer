@@ -954,6 +954,32 @@ describe('annotation-core', () => {
     expect(cursorAt(model, PAGE, { x: 600, y: 600 }, DEFAULT_CHROME_GEOMETRY, 6)).toBeNull(); // empty
   });
 
+  it('cursorAt: on a turned page, a handle’s cursor points the way it shows on screen', () => {
+    const model = run(initialModel, [
+      createPtr('square', 'down', 100, 100),
+      createPtr('square', 'move', 200, 200),
+      createPtr('square', 'up', 200, 200),
+    ]);
+    const cursor = (x: number, y: number, rotation: 0 | 90 | 180 | 270) =>
+      cursorAt(model, PAGE, { x, y }, DEFAULT_CHROME_GEOMETRY, 6, undefined, undefined, {
+        zoom: 1,
+        rotation,
+      });
+    // The page's right edge shows at the bottom on a page turned 90°, its top on the right.
+    expect(cursor(200, 150, 0)).toBe('ew-resize');
+    expect(cursor(200, 150, 90)).toBe('ns-resize');
+    expect(cursor(150, 100, 90)).toBe('ew-resize');
+    expect(cursor(200, 200, 90)).toBe('nesw-resize');
+    expect(cursor(200, 150, 180)).toBe('ew-resize');
+    // The chrome's handles carry the same cursors.
+    const handles = chrome(model, PAGE, undefined, undefined, { zoom: 1, rotation: 90 }).filter(
+      (node) => node.kind === 'handle',
+    );
+    expect(handles.find((node) => node.at.x === 200 && node.at.y === 150)?.cursor).toBe(
+      'ns-resize',
+    );
+  });
+
   it('view: a single selection emits 8 handles (carrying cursors)', () => {
     const model = run(initialModel, [
       createPtr('square', 'down', 100, 100),
