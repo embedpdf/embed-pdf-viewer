@@ -1,7 +1,7 @@
 /**
  * Whether a failed write broke a unique index, on either database:
  * better-sqlite3 reports `SQLITE_CONSTRAINT_UNIQUE` ("UNIQUE constraint
- * failed: …"), Postgres SQLSTATE 23505 ("duplicate key value violates
+ * failed: …"), Postgres error code 23505 ("duplicate key value violates
  * unique constraint …").
  */
 export function isUniqueViolation(err: unknown): boolean {

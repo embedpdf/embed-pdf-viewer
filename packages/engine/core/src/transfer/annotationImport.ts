@@ -151,9 +151,9 @@ export interface PlannedAnnotation {
   readonly page: PageRef;
   /** What `create` writes: the item's data, its pages mapped, without its links and dropped fields. */
   readonly draft: AnnotationDraft;
-  /** The planned annotation it replies to, by its place in the plan. */
+  /** The annotation it replies to, by its place in `creates`. */
   readonly replyTo?: { readonly planned: number; readonly type: AnnotationReplyType };
-  /** For a popup: the planned annotation it shows, by its place in the plan. */
+  /** For a popup: the annotation it shows, by its place in `creates`. */
   readonly parent?: number;
 }
 
@@ -172,7 +172,7 @@ export interface AnnotationImportPlan {
  *   page an item is on or points at maps to no target page (naming them);
  * - `NotFound` when a page list maps to a page the target doesn't have.
  *
- * What is left out (convention §2.11, §2.13), in this order:
+ * Unsupported items and unresolved relationships are left out in this order:
  *
  * 1. an item of an unsupported kind, and a form field's widget; a field
  *    marker leaves out only that field;

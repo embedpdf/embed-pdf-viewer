@@ -4,7 +4,7 @@
  *
  * Comments are read through the TypeScript parser (never by regex over code),
  * then checked for references a reader cannot follow: plans, phases,
- * decisions, internal section numbers, missing `.md` files, version history,
+ * decisions, requirement labels, internal section numbers, missing `.md` files, version history,
  * issue-less TODOs, and ALL-CAPS emphasis.
  *
  *   node scripts/check-comments.mjs            # fail on any finding
@@ -67,8 +67,9 @@ const RULES = [
     test: (line) =>
       /\b(Phase[- ]?\d|phase \d|WS-?\d|WP\d|umbrella|road-?to-?3|docs\/plans|the plan\b|the review\b|landing \d|round \d)/i.test(
         line,
-      ) || /\b[DG]\d{1,2}\b(?![-.]\d)/.test(line),
-    message: 'references a plan, phase, decision or gate',
+      ) || /\b[DG]\d{1,2}\b(?![-.]\d)/.test(line) ||
+      /\bR\d{1,2}(?::\s|[–-]R\d{1,2}\b)/.test(line),
+    message: 'references a plan, phase, decision, gate or requirement label',
   },
   {
     id: 'section-number',

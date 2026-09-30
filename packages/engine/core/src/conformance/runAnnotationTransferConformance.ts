@@ -38,29 +38,24 @@ type Attribution = 'restore' | 'stamp';
 const STAMPED = ['author', 'createdAt', 'modifiedAt', 'userId', 'createdBy', 'modifiedBy'];
 
 /**
- * The round-trip contract (transfer plan §4) over every fixture, on both
- * engines. `B` is the export of a document, `D2` a copy of it without its
- * annotations, and `B2` the export of `D2` after importing `B`:
+ * Check annotation transfer over every fixture on both engines. The source
+ * bundle is imported into a copy without annotations, then exported again:
  *
- * - R1: `N(B2)` equals `N(B')`, `B'` being `B` as the import took it, and
- *   every resource is the same bytes under the same id. A copy is drawn from
+ * - The normalized exports agree after unsupported fields are dropped, and
+ *   every resource has the same bytes under the same id. A copy is drawn from
  *   its data, as Acrobat's FDF and XFDF carry it: only a stamp carries its
  *   drawing. So where the data is points, the box is the frame of our
  *   drawing, which holds the points, and an icon's box is our icon at the
  *   same anchor;
- * - R2: restored attribution is the source's (in `N`), stamped attribution
+ * - Restored attribution is the source's, while stamped attribution is
  *   the session's;
- * - R3: every page keeps `B`'s order (the item order in `N`);
- * - R4: replies, popups, their parents and link destinations point at the
- *   copies (refs become positions in `N`);
- * - R5: a stamp draws as its source, and in our own file every kind does,
+ * - Every page keeps the source bundle's annotation order;
+ * - Replies, popups, their parents and link destinations point at the copies;
+ * - A stamp draws as its source, and in our own file every kind does,
  *   an edge moved by a fraction of a pixel aside (Acrobat moves a stamp's
  *   form by a fraction of a point, which the drawing leaves out);
- * - R7: a second import names nothing twice;
- * - R8: it adds no drawing `D2` already has.
- *
- * R6 is the export suite's golden files, and R9 the engines' forced-failure
- * tests.
+ * - A second import names nothing twice and adds no drawing already present.
+ * Export golden files and forced-failure tests cover the remaining cases.
  */
 export function runAnnotationTransferConformance(
   runner: ConformanceTestRunner,
@@ -79,7 +74,7 @@ export function runAnnotationTransferConformance(
       if (engine) await engine.destroy();
     });
 
-    /** The source document `D`, and its export `B`. */
+    /** Open the source document and export its annotations. */
     const exported = async (fixture: string) => {
       const doc = await opts.open(engine, fixture);
       if (fixture === 'authoring') await fill(doc);
@@ -87,9 +82,9 @@ export function runAnnotationTransferConformance(
     };
 
     /**
-     * `D2`: a fresh copy of the fixture, its annotations deleted, apart from
+     * A fresh copy of the fixture, its annotations deleted, apart from
      * form fields' widgets, which belong to their fields. The keys of those it
-     * kept are returned, so an export of `D2` can leave them out.
+     * kept are returned, so an export of the copy can leave them out.
      */
     const bare = async (fixture: string) => {
       const doc = await opts.open(engine, fixture);
@@ -126,7 +121,7 @@ export function runAnnotationTransferConformance(
         copy: DocumentHandle;
         result: AnnotationImportResult;
         again: AnnotationBundle;
-        /** The widgets `D2` kept: an export of `D2` leaves them out. */
+        /** The widgets the copy kept: its export leaves them out. */
         kept: ReadonlySet<string>;
       }) => Promise<void>,
     ) => {
@@ -317,7 +312,7 @@ function pruned(bundle: AnnotationBundle): AnnotationBundle {
 }
 
 /**
- * `B'`: the bundle as the import took it (transfer plan §4). The items left
+ * The bundle as the import took it. The items left
  * out go, a field left out reads `null`, and the resources and pages no item
  * still names go too.
  */
@@ -342,7 +337,7 @@ function asTaken(bundle: AnnotationBundle, dropped: readonly AnnotationImportDro
 }
 
 /**
- * `N(bundle)`: what two documents can agree on (transfer plan §4). Refs to
+ * What two documents can agree on after import. Refs to
  * annotations become positions in the bundle, pages their position in the
  * source document; `index`, `importedBy`, `identityQuality` (how the
  * source stored it) and a file's size and checksum (the bytes', which are
@@ -405,7 +400,7 @@ function normalized(bundle: AnnotationBundle, attribution: Attribution) {
         reply: reply ? { ...reply, to: at(reply.to) } : reply,
       };
       if (data.subtype === 'popup') fields.parent = at(data.parent);
-      // A copy is drawn from its data (§4): where the data is points, the
+      // A copy is drawn from its data: where the data is points, the
       // box is the frame of what we draw, checked to contain the points
       // (`expectFramesHoldGeometry`); a note's or a file's icon fills its
       // `rect`, which is compared as data.

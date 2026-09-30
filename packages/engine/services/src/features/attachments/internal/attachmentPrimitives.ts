@@ -85,7 +85,7 @@ export function writeAttachmentFilePayload(
   }
 
   // `FPDFAttachment_SetFile` dates the file in local time without an offset;
-  // a date the engine makes is UTC (convention §2.14).
+  // a date the engine makes is UTC so it is unambiguous across time zones.
   writeUtf16String(mem, formatPdfDate(new Date()), (ptr) =>
     fn.FPDFAttachment_SetStringValue(attachmentPtr, 'CreationDate', ptr),
   );

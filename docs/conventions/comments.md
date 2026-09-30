@@ -55,7 +55,7 @@ It is written for a developer who has only this repository in front of them.
 
 `pnpm check:comments` runs in CI. It reads comments with the TypeScript
 scanner and rejects:
-- plan and phase vocabulary;
+- plan and phase vocabulary, including numbered requirement labels;
 - internal section numbers (`§` without an ISO, PDF or RFC citation);
 - links to `.md` files that do not exist;
 - version-history references;

@@ -18,7 +18,7 @@ export interface RestoredAttribution extends RestoredEmbedMetadata {
 
 /**
  * Write the attribution an annotation had, instead of stamping the session
- * (convention §2.10): `/T`, `/CreationDate` and `/M` as given, `null` as
+ * on the imported record: `/T`, `/CreationDate` and `/M` as given, `null` as
  * absent, the dates keeping their offsets; and `/EMBD_Metadata` with
  * `importedBy`. It runs last, so `/M` is the date the annotation had, not the
  * time of the import.

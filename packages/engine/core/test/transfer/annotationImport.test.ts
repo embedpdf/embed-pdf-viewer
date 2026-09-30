@@ -20,7 +20,7 @@ const refOf = (page: PageRef, annotObjectNumber: number): AnnotationRef => ({
   objectNumber: annotObjectNumber,
 });
 
-/** An annotation as a read returns it, with the fields the plan looks at. */
+  /** An annotation as a read returns it, with the fields the import checks. */
 function annotation(
   page: PageRef,
   annotObjectNumber: number,

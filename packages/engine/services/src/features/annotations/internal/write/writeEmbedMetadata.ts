@@ -118,7 +118,7 @@ export interface RestoredEmbedMetadata {
 /**
  * Write `/EMBD_Metadata` on an imported annotation as the bundle has it, and
  * `/ImportedBy`, the importing session's user: what tells a reader the
- * attribution was supplied by an authorized importer (convention §5.4).
+ * attribution was supplied by an authorized importer.
  * Nothing is written for an annotation without either, as another tool's
  * annotation, imported by an anonymous session.
  */

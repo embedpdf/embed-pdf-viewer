@@ -21,3 +21,5 @@ Annotations stay in sync through one path for every origin: a records mirror loa
 - An annotation with a pending restyle keeps rendering live when another session updates it.
 - Every annotation the plugin creates carries an `/NM`.
 - A programmatic update keeps rendering from the engine's appearance and fetches it again when the engine re-bakes it.
+
+The public annotation API reads and writes the engine's kind-specific records and page-space geometry. New annotations use one set of defaults and retain the rect returned by the engine; the viewer, tools, and pending edits draw from that same confirmed shape. Annotation transfer, groups, text markup, and callouts follow the updated engine contract.

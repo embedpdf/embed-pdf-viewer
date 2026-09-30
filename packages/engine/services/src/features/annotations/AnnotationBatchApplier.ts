@@ -100,11 +100,11 @@ interface Existing {
 }
 
 /**
- * Applies a change set as one unit (the change-sets plan, §4.1): every item
+ * Applies a change set as one unit: every item
  * is checked before the first write, the writes run inside a
  * {@link DocumentCheckpoint}, and any failure, an abort included, returns
- * the document to where it was. Today it takes creates, which is what an
- * import is; update, delete and restore join it later.
+ * the document to where it was. It currently applies annotation creates
+ * for imports.
  *
  * No page is loaded or parsed. Each annotation is made on a raw handle
  * (`EPDFPage_CreateAnnotRaw`) and opened again the same way, by its place in

@@ -277,7 +277,7 @@ export const AdminImportSourceSchema = z
       ),
   ])
   .describe(
-    'Where CloudPDF pulls the bytes from. The two shapes differ in WHO supplies the authority to read, not in which storage vendor holds the file.',
+    'Where CloudPDF pulls the bytes from. The two shapes differ in who supplies the authority to read, not in which storage vendor holds the file.',
   );
 export type AdminImportSource = z.infer<typeof AdminImportSourceSchema>;
 
@@ -1212,7 +1212,7 @@ export const adminOperations = {
       404: { contentType: 'application/json', schema: AdminErrorPayloadSchema },
     },
     notes:
-      'The returned share id IS the public share token. Mounted only when the deployment can ' +
+      'The returned share id is the public share token. Mounted only when the deployment can ' +
       'sign (HS256 mode) — exchange mints session JWTs, so grants exist only where minting does.',
   },
   'shares.list': {
