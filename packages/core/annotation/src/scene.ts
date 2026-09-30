@@ -13,7 +13,8 @@ import { distanceScene, measurementCaptionScene } from './measurement';
 import { shapeMeasurementLayout } from './measurement-shape';
 import { quadBounds, quadRing } from '@embedpdf/core-geometry';
 import { geomScene } from './geometry';
-import { dashOf } from './kinds/styles';
+import { fileAttachmentIconScene, noteIconScene } from './icons';
+import { blendFor, dashOf } from './kinds/styles';
 import { CARET_STROKE_WIDTH } from './shapes/caret';
 import type {
   Shape,
@@ -33,11 +34,6 @@ const num = (value: number): number => Number(value.toFixed(3));
 /** Uniform paint for a shape/line/poly node. Fill only lands on closed nodes; the
  *  dash comes solely from the border style — so a live draft (ghost) previews
  *  exactly how the committed annotation will look, not as a dashed hint. */
-/** CSS mix-blend-mode for live vector paint. `normal` needs no style override. */
-export function blendFor(style: Style): Paint['blend'] {
-  return style.blendMode === 'normal' ? undefined : style.blendMode;
-}
-
 function shapePaint(style: Style, closed: boolean): Paint {
   return {
     fill: closed ? (style.interiorColor ?? undefined) : undefined,
@@ -262,10 +258,16 @@ function redactScene(item: RenderItem): SceneNode[] {
 
 /** The full painted scene for one annotation. */
 export function scene(item: RenderItem): SceneNode[] {
-  // Links paint nothing: an invisible hit rectangle is the norm (any visible
-  // border a PDF authored shows through the page raster). Selection chrome
-  // still outlines it, so an editable link is findable when selected.
+  // A link draws nothing live: its look, a border when the file gives it one,
+  // is the engine's raster (`rasterOnly`), and one being drawn shows as the
+  // rubber band. Selection chrome outlines it, so an editable link is
+  // findable when selected.
   if (item.subtype === 'link') return [];
+  // A note's or file attachment's icon fills its box.
+  if (item.geometry.kind === 'box' && item.subtype === 'text')
+    return noteIconScene(item.icon, item.geometry.box, item.style);
+  if (item.geometry.kind === 'box' && item.subtype === 'file-attachment')
+    return fileAttachmentIconScene(item.icon, item.geometry.box, item.style);
   if (item.measure?.intent === 'line-dimension')
     return distanceScene(item.geometry, item.measure, item.style);
   if (item.subtype === 'redact') return redactScene(item);

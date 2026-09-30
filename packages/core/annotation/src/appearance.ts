@@ -10,7 +10,7 @@
  * | Nothing visible (a lock, the author, a square's comment)    | Unchanged                                                      |
  * | A pure move                                                 | Unchanged; a baked raster moves the same distance              |
  * | Anything else visible (restyle, resize, turn, text, points) | Live                                                           |
- * | A stamp or a form widget (no live drawing)                  | Always the raster, drawn where its shape is                    |
+ * | A stamp, form widget or link (no live drawing)              | Always the raster, drawn where its shape is                    |
  *
  * The change is the engine's own verdict (`appearanceChangeOf`): where the
  * engine keeps the appearance it has, so does the view, so an imported
@@ -22,6 +22,11 @@
  *
  * A new record draws live: it has no raster until the engine bakes one. A
  * new stamp shows its image.
+ *
+ * A record with no appearance in the file (`hasAppearance` false) draws
+ * live: every viewer draws that one from its fields, so the engine's raster
+ * would be its drawing too, made in memory. A note or file attachment draws
+ * its icon.
  *
  * The plugin holds the rest (its `vector` preference): a record this session
  * drew live stays live for the session, and another session's edit hands it
@@ -43,12 +48,23 @@ import type { Id, Model, ModelAnnotation, Shape, Rect, ViewEnv } from './types';
 /** The part of a record that says how it is drawn. */
 export type DrawState = Pick<ModelAnnotation, 'source' | 'apBox'>;
 
-/** Has the annotation a live drawing? Stamps and form widgets don't: their raster is the drawing. */
-const drawsLive = (annotation: AnnotationDTO): boolean => !kindOf(annotation).caps.opaqueBody;
+/** Has the annotation a live drawing? Stamps, form widgets and links don't: their raster is the drawing. */
+const drawsLive = (annotation: AnnotationDTO): boolean => !kindOf(annotation).caps.rasterOnly;
 
 /** How a record this session creates is drawn at first. */
 export const sourceOfNew = (annotation: AnnotationDTO): ModelAnnotation['source'] =>
   drawsLive(annotation) ? 'vector' : 'baked';
+
+/**
+ * How a record the engine reports is drawn: live when this session drew it
+ * live (`vector`, the plugin's preference) or when the file holds no
+ * appearance for it; otherwise from the engine's raster.
+ */
+export const sourceOfConfirmed = (
+  annotation: AnnotationDTO,
+  vector: boolean,
+): ModelAnnotation['source'] =>
+  drawsLive(annotation) && (vector || !annotation.hasAppearance) ? 'vector' : 'baked';
 
 /**
  * What changes in how `record` is drawn once `patch` is written: the rule at

@@ -17,21 +17,23 @@ import {
   normalizePdfRect,
   subtypeFromCode,
 } from '@embedpdf/engine-core/runtime';
-import type { PdfRuntimeModule, Ptr } from '@embedpdf/engine-runtime';
+import type {
+  PdfFunctions,
+  PdfRuntimeMemory,
+  PdfRuntimeModule,
+  Ptr,
+} from '@embedpdf/engine-runtime';
 
 import { freeTextIntentFromName } from './internal/freeTextIntent';
 import type { DocumentSession } from '../../document-session/DocumentSession';
 import { withScratch } from '../../runtime/memory/scratch';
-import { RECTF_BYTES, writeRectF } from '../../runtime/memory/structs';
+import { RECTF_BYTES, readRectF, writeRectF } from '../../runtime/memory/structs';
 import { FPDF_REVERSE_BYTE_ORDER, rasterize, readPageBox } from '../render/deviceRaster';
 import { readAnnotRect, readIntent } from './internal/read/annotationReadPrimitives';
 import { readAnnotationIdentity } from './internal/read/readAnnotationIdentity';
 import { pdfFromClockwise } from './internal/read/readAnnotationTransformMetadata';
 import { throwIfAborted } from '../../shared/abort';
 import { readAnnotationTurn, type AnnotationTurn } from './internal/read/readAnnotationTurn';
-
-/** `FPDF_ANNOT_WIDGET` — form-field annotation subtype code. */
-const ANNOT_SUBTYPE_WIDGET = 20;
 
 /** `FPDF_ANNOT_FREETEXT` — free-text annotation subtype code. */
 const ANNOT_SUBTYPE_FREETEXT = 3;
@@ -61,13 +63,18 @@ const APPEARANCE_MODES: ReadonlyArray<{
 ];
 
 /**
- * Batch-renders the appearance streams (`/AP`) of every annotation on a page,
- * one bitmap per requested mode, in PDF user space and against the
- * `PdfRuntimeModule` (`fn` + `mem`).
+ * Batch-renders the appearances of every annotation on a page, one bitmap per
+ * requested mode, in PDF user space and against the `PdfRuntimeModule`
+ * (`fn` + `mem`).
  *
- * Each appearance bitmap is sized to its annotation's `/Rect` at the scale
- * the page has at `options.viewport`. The shared raster helper handles PDFium's display matrix
- * convention, so this reader stays in normalized PDF page coordinates.
+ * A stored appearance (`/AP`) renders into its annotation's `/Rect`. An
+ * annotation with no normal appearance renders as PDFium draws it in memory,
+ * into the box that drawing takes (`EPDFAnnot_GetDrawingRect`), which can
+ * reach past `/Rect`; nothing is written. One PDFium can draw only by
+ * generating an appearance into the file has no raster. Each bitmap is sized
+ * to its box at the scale the page has at `options.viewport`. The shared
+ * raster helper handles PDFium's display matrix convention, so this reader
+ * stays in normalized PDF page coordinates.
  */
 export class AnnotationAppearanceReader {
   constructor(
@@ -106,8 +113,9 @@ export class AnnotationAppearanceReader {
 
         try {
           const available = fn.EPDFAnnot_GetAvailableAppearanceModes(annotPtr);
-          // Skip annotations without any /AP sub-dictionary.
-          if (!available) continue;
+          // With no normal appearance stored, where the engine draws one in memory.
+          const drawn = available & NORMAL.bit ? null : readDrawingRect(fn, mem, annotPtr);
+          if (!available && !drawn) continue;
 
           const identity = readAnnotationIdentity(fn, mem, annotPtr, pageObjectNumber, i, revision);
           // Rotation-stripped rendering (`pdfAppearanceTurnOf`, the rule the
@@ -139,23 +147,25 @@ export class AnnotationAppearanceReader {
           const rect = stripped ? normalizePdfRect(stripped.box) : pageRect;
 
           for (const mode of modes) {
-            if (!(available & mode.bit)) continue;
+            const stored = !!(available & mode.bit);
+            const box = stored ? rect : mode === NORMAL ? drawn : null;
+            if (!box) continue;
             const raster = this.renderOne(
               pagePtr,
               annotPtr,
               mode.modeInt,
-              rect,
+              box,
               page,
               rotation,
               scale,
-              stripped,
+              stored ? stripped : undefined,
               options.maxOutputPixels,
             );
             if (!raster) continue;
             appearances.push({
               ref: identity.ref,
               mode: mode.name,
-              rect,
+              rect: box,
               raster,
             });
           }
@@ -171,9 +181,9 @@ export class AnnotationAppearanceReader {
   }
 
   /**
-   * Render a single annotation appearance into its own raster. Returns `null`
-   * when the mode has no appearance stream (a form widget's normal appearance
-   * is drawn in memory instead) or the render fails.
+   * Render a single annotation appearance into its own raster, sized to
+   * `rect`: the stored appearance, or the one PDFium draws in memory. Returns
+   * `null` when the render fails.
    */
   private renderOne(
     pagePtr: Ptr,
@@ -187,20 +197,6 @@ export class AnnotationAppearanceReader {
     maxOutputPixels?: number,
   ): PageRaster | null {
     const { fn } = this.runtime;
-
-    if (!fn.EPDFAnnot_HasAppearanceStream(annotPtr, modeInt)) {
-      // Form widgets frequently ship without an /AP: the renderer draws their
-      // normal appearance in memory, inside their /Rect, and writes nothing
-      // (a read never changes the file).
-      const subtype = fn.FPDFAnnot_GetSubtype(annotPtr);
-      if (
-        subtype !== ANNOT_SUBTYPE_WIDGET ||
-        modeInt !== 0 ||
-        fn.FPDFAnnot_HasKey(annotPtr, 'AP')
-      ) {
-        return null;
-      }
-    }
 
     // Safety clamp — an engine invariant, not an option: no single appearance
     // raster exceeds APPEARANCE_PIXEL_CLAMP output pixels. Appearance size is
@@ -255,6 +251,21 @@ export class AnnotationAppearanceReader {
             ),
     });
   }
+}
+
+/** The normal appearance (`/AP /N`): the one PDFium draws in memory when the file has none. */
+const NORMAL = APPEARANCE_MODES[0]!;
+
+/**
+ * Where PDFium draws the annotation's normal appearance in memory, in the
+ * file's coordinates; `null` when it can't without writing one.
+ */
+function readDrawingRect(fn: PdfFunctions, mem: PdfRuntimeMemory, annotPtr: Ptr): PdfRect | null {
+  return withScratch(mem, RECTF_BYTES, (buf) =>
+    fn.EPDFAnnot_GetDrawingRect(annotPtr, NORMAL.modeInt, buf)
+      ? normalizePdfRect(readRectF(mem, buf))
+      : null,
+  );
 }
 
 function resolveModes(

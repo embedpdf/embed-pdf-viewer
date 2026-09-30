@@ -14,6 +14,7 @@ const square = {
   page: { kind: 'objectNumber', objectNumber: 3 },
   index: 0,
   identityQuality: 'durable',
+  hasAppearance: true,
   nm: 'shape',
   contents: null,
   subject: null,

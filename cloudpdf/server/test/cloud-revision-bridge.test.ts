@@ -112,6 +112,7 @@ function annotation(ref: AnnotationRef): AnnotationDTO {
     page: toPageRef(3),
     index: ref.kind === 'index' ? ref.index : 0,
     identityQuality: ref.kind === 'index' ? 'weak' : 'durable',
+    hasAppearance: true,
     nm: null,
     invisible: false,
     hidden: false,

@@ -8,9 +8,11 @@ import type {
   AnnotationRef,
   BlendMode,
   Color,
+  FileAttachmentIcon,
   InkIntent,
   LineEnding,
   LineEndings,
+  NoteIcon,
   PageRef,
   PdfLinkTarget,
   RichTextDocumentInput,
@@ -781,7 +783,7 @@ export interface RenderItem {
   /**
    * Rotation (deg, CW) to apply to the baked raster as a view transform —
    * exactly the rotation the engine stripped from it (see `ModelAnnotation.apRot`).
-   * Live for `opaqueBody` kinds (a stamp spins with the rotate gesture);
+   * Live for `rasterOnly` kinds (a stamp spins with the rotate gesture);
    * absent when the raster already contains its rotation (vertex kinds).
    */
   apRot?: number;
@@ -797,6 +799,8 @@ export interface RenderItem {
   hovered?: boolean;
   /** Redaction label projection (redact kind only) — see {@link ModelAnnotation.label}. */
   label?: { text: string; repeat: boolean };
+  /** A note's or file attachment's icon (`/Name`), which its live drawing draws. */
+  icon?: NoteIcon | FileAttachmentIcon;
   measure?: MeasurementAppearance;
   /**
    * Applied rotation (deg, CW), or 0/undefined. For box kinds (`box`/`text-box`)
@@ -840,6 +844,7 @@ export interface Paint {
   blend?: Exclude<BlendMode, 'normal'>;
   lineCap?: 'round'; // stroke-linecap; omitted = the default butt. Round for freehand ink.
   join?: 'round'; // stroke-linejoin; omitted = the default miter. Round for freehand ink.
+  fillRule?: 'evenodd'; // fill-rule; omitted = the default nonzero. Even-odd punches icon holes.
 }
 
 /**

@@ -21,6 +21,7 @@ export const link = defineKind({
     resizable: true,
     groupMovable: true,
     opaqueBody: true,
+    rasterOnly: true,
   },
   fields: [LINKABLE],
 });

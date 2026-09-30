@@ -37,6 +37,7 @@ const base = (annotObjectNumber: number) => ({
   page: PAGE,
   index: annotObjectNumber,
   identityQuality: 'durable' as const,
+  hasAppearance: true,
   nm: null,
   ...NO_FLAGS,
   contents: null,

@@ -24,6 +24,7 @@ export const stamp = defineKind({
     groupRotatable: true,
     commentable: true,
     opaqueBody: true,
+    rasterOnly: true,
   },
   fields: [OPACITY, LINKABLE],
 });

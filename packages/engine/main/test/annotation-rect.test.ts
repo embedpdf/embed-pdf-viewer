@@ -7,7 +7,9 @@
  * every kind whose rect follows its drawing.
  *
  * And the rule around it: a move keeps the appearance an annotation has,
- * including none, and keeps its rect's padding; rendering never writes.
+ * including none, and keeps its rect's padding; rendering never writes. An
+ * annotation with no appearance still shows: the engine draws it in memory,
+ * in the box its drawing takes.
  */
 import { readFile } from 'node:fs/promises';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
@@ -27,6 +29,14 @@ import { lastObjectBody, pdf } from './helpers/miniPdf';
 
 /** A page-space box. */
 type Rect = { x: number; y: number; width: number; height: number };
+
+/** The object an annotation is, or -1 for one with no object of its own. */
+const objectNumberOf = (ref: AnnotationDTO['ref']): number =>
+  ref.kind === 'objectNumber' ? ref.objectNumber : -1;
+
+/** Has the raster a pixel that isn't transparent? */
+const visible = (raster: { data: ArrayBuffer | Uint8Array }): boolean =>
+  new Uint8Array(raster.data).some((byte, index) => index % 4 === 3 && byte !== 0);
 
 const at = (x: number, y: number) => ({ x, y });
 const quad = (x: number, y: number, width: number, height: number) => ({
@@ -317,6 +327,7 @@ describe.each(['wasm', 'native'] as const)('annotation rect (%s)', (prefer) => {
     test.each(KINDS)('%s: created', async (_name, draft) => {
       const { annotation, shown } = await create(draft);
       expectSameRect(shown.rect, annotation.rect);
+      expect(shown.hasAppearance).toBe(annotation.hasAppearance);
     });
 
     test.each(KINDS)('%s: moved', async (_name, draft) => {
@@ -324,6 +335,7 @@ describe.each(['wasm', 'native'] as const)('annotation rect (%s)', (prefer) => {
       const moved = await update(annotation, movedBy(annotation, 30, 20));
       expect(moved.appearance.action).toBe('preserved');
       expectSameRect(moved.shown.rect, moved.annotation.rect);
+      expect(moved.shown.hasAppearance).toBe(moved.annotation.hasAppearance);
     });
 
     test.each(KINDS)('%s: restyled', async (_name, draft, restyle) => {
@@ -332,7 +344,18 @@ describe.each(['wasm', 'native'] as const)('annotation rect (%s)', (prefer) => {
       const restyled = await update(annotation, patch);
       expect(restyled.appearance.action).toBe('regenerated');
       expectSameRect(restyled.shown.rect, restyled.annotation.rect);
+      expect(restyled.shown.hasAppearance).toBe(restyled.annotation.hasAppearance);
     });
+  });
+
+  test('a link is written with no border, so with no appearance', async () => {
+    const { annotation, shown } = await create({
+      subtype: 'link',
+      rect: BOX,
+      target: { kind: 'uri', uri: 'https://example.com' },
+    });
+    expect(annotation.hasAppearance).toBe(false);
+    expect(shown.hasAppearance).toBe(false);
   });
 });
 
@@ -409,6 +432,56 @@ describe.each(['wasm', 'native'] as const)('annotation rect: from another app (%
     expect((await page.annotations.list()).annotations.find((a) => a.nm === bare.nm)?.rect).toEqual(
       bare.rect,
     );
+    await doc.close();
+  });
+
+  test('reads whether the file holds an appearance', async () => {
+    const { bare, arrow } = await open();
+    expect(bare.hasAppearance).toBe(false);
+    expect(arrow.hasAppearance).toBe(true);
+    await doc.close();
+  });
+
+  test('an annotation with no appearance renders in the box its drawing takes', async () => {
+    const { bare, arrow } = await open();
+    const { appearances } = await page.annotations.renderAppearancesRaw({
+      viewport: { kind: 'scale', scale: 1 },
+    });
+    const of = (annotation: AnnotationDTO) =>
+      appearances.find(
+        (a) => a.mode === 'normal' && objectNumberOf(a.ref) === objectNumberOf(annotation.ref),
+      );
+    // The bare line's /Rect has no height; its drawing, the closed arrowhead, has.
+    const drawn = of(bare)!;
+    expect(drawn.rect.x).toBeCloseTo(100, 3);
+    expect(drawn.rect.x + drawn.rect.width).toBeGreaterThanOrEqual(250);
+    expect(drawn.rect.y).toBeLessThan(192);
+    expect(drawn.rect.y + drawn.rect.height).toBeGreaterThan(192);
+    expect(visible(drawn.raster)).toBe(true);
+    // A stored appearance fills its /Rect, padding and all.
+    expect(of(arrow)!.rect).toEqual(arrow.rect);
+    expect(await savedBody(4)).not.toContain('/AP');
+    await doc.close();
+  });
+
+  test('every kind with no appearance shows, and none is written', async () => {
+    doc = await engine.open(
+      { kind: 'bytes', id: `bare-${prefer}-${++opened}`, bytes: bareKindsPage() },
+      { scope: ['*'] },
+    );
+    page = doc.page((await doc.pages.list()).pages[0]!.ref);
+    const { appearances } = await page.annotations.renderAppearancesRaw({
+      viewport: { kind: 'scale', scale: 1 },
+    });
+    const drawn = appearances
+      .filter((a) => a.mode === 'normal' && visible(a.raster))
+      .map((a) => objectNumberOf(a.ref));
+    // Note, caret, square, text field, file attachment and a link with a border.
+    expect(drawn.sort((a, b) => a - b)).toEqual([4, 5, 6, 7, 9, 10]);
+    const saved = await doc.download({ mode: 'rewrite' });
+    for (const objectNumber of [4, 5, 6, 7, 9, 10]) {
+      expect(lastObjectBody(saved, objectNumber)).not.toContain('/AP');
+    }
     await doc.close();
   });
 

@@ -31,6 +31,7 @@ export namespace Annotation {
         page: AnnotationHighlight.Page;
         index: number;
         identityQuality: AnnotationHighlight.IdentityQuality;
+        hasAppearance: boolean;
         nm: string | null;
         rect: AnnotationHighlight.Rect;
         contents: string | null;
@@ -161,6 +162,7 @@ export namespace Annotation {
         page: AnnotationUnderline.Page;
         index: number;
         identityQuality: AnnotationUnderline.IdentityQuality;
+        hasAppearance: boolean;
         nm: string | null;
         rect: AnnotationUnderline.Rect;
         contents: string | null;
@@ -291,6 +293,7 @@ export namespace Annotation {
         page: AnnotationSquiggly.Page;
         index: number;
         identityQuality: AnnotationSquiggly.IdentityQuality;
+        hasAppearance: boolean;
         nm: string | null;
         rect: AnnotationSquiggly.Rect;
         contents: string | null;
@@ -421,6 +424,7 @@ export namespace Annotation {
         page: AnnotationStrikeout.Page;
         index: number;
         identityQuality: AnnotationStrikeout.IdentityQuality;
+        hasAppearance: boolean;
         nm: string | null;
         rect: AnnotationStrikeout.Rect;
         contents: string | null;
@@ -557,6 +561,7 @@ export namespace Annotation {
         page: AnnotationCircle.Page;
         index: number;
         identityQuality: AnnotationCircle.IdentityQuality;
+        hasAppearance: boolean;
         nm: string | null;
         rect: AnnotationCircle.Rect;
         contents: string | null;
@@ -675,6 +680,7 @@ export namespace Annotation {
         page: AnnotationSquare.Page;
         index: number;
         identityQuality: AnnotationSquare.IdentityQuality;
+        hasAppearance: boolean;
         nm: string | null;
         rect: AnnotationSquare.Rect;
         contents: string | null;
@@ -793,6 +799,7 @@ export namespace Annotation {
         page: AnnotationPolygon.Page;
         index: number;
         identityQuality: AnnotationPolygon.IdentityQuality;
+        hasAppearance: boolean;
         nm: string | null;
         rect: AnnotationPolygon.Rect;
         contents: string | null;
@@ -927,6 +934,7 @@ export namespace Annotation {
         page: AnnotationPolyline.Page;
         index: number;
         identityQuality: AnnotationPolyline.IdentityQuality;
+        hasAppearance: boolean;
         nm: string | null;
         rect: AnnotationPolyline.Rect;
         contents: string | null;
@@ -1094,6 +1102,7 @@ export namespace Annotation {
         page: AnnotationLine.Page;
         index: number;
         identityQuality: AnnotationLine.IdentityQuality;
+        hasAppearance: boolean;
         nm: string | null;
         rect: AnnotationLine.Rect;
         contents: string | null;
@@ -1284,6 +1293,7 @@ export namespace Annotation {
         page: AnnotationLink.Page;
         index: number;
         identityQuality: AnnotationLink.IdentityQuality;
+        hasAppearance: boolean;
         nm: string | null;
         rect: AnnotationLink.Rect;
         contents: string | null;
@@ -1379,6 +1389,7 @@ export namespace Annotation {
         page: AnnotationInk.Page;
         index: number;
         identityQuality: AnnotationInk.IdentityQuality;
+        hasAppearance: boolean;
         nm: string | null;
         rect: AnnotationInk.Rect;
         contents: string | null;
@@ -1502,6 +1513,7 @@ export namespace Annotation {
         page: AnnotationFreeText.Page;
         index: number;
         identityQuality: AnnotationFreeText.IdentityQuality;
+        hasAppearance: boolean;
         nm: string | null;
         rect: AnnotationFreeText.Rect;
         contents: string | null;
@@ -1806,6 +1818,7 @@ export namespace Annotation {
         page: AnnotationCaret.Page;
         index: number;
         identityQuality: AnnotationCaret.IdentityQuality;
+        hasAppearance: boolean;
         nm: string | null;
         rect: AnnotationCaret.Rect;
         contents: string | null;
@@ -1917,6 +1930,7 @@ export namespace Annotation {
         page: AnnotationText.Page;
         index: number;
         identityQuality: AnnotationText.IdentityQuality;
+        hasAppearance: boolean;
         nm: string | null;
         rect: AnnotationText.Rect;
         contents: string | null;
@@ -2028,6 +2042,7 @@ export namespace Annotation {
         page: AnnotationStamp.Page;
         index: number;
         identityQuality: AnnotationStamp.IdentityQuality;
+        hasAppearance: boolean;
         nm: string | null;
         rect: AnnotationStamp.Rect;
         contents: string | null;
@@ -2141,6 +2156,7 @@ export namespace Annotation {
         page: AnnotationFileAttachment.Page;
         index: number;
         identityQuality: AnnotationFileAttachment.IdentityQuality;
+        hasAppearance: boolean;
         nm: string | null;
         rect: AnnotationFileAttachment.Rect;
         contents: string | null;
@@ -2257,6 +2273,7 @@ export namespace Annotation {
         page: AnnotationWidget.Page;
         index: number;
         identityQuality: AnnotationWidget.IdentityQuality;
+        hasAppearance: boolean;
         nm: string | null;
         rect: AnnotationWidget.Rect;
         contents: string | null;
@@ -2403,6 +2420,7 @@ export namespace Annotation {
         page: AnnotationRedact.Page;
         index: number;
         identityQuality: AnnotationRedact.IdentityQuality;
+        hasAppearance: boolean;
         nm: string | null;
         rect: AnnotationRedact.Rect;
         contents: string | null;
@@ -2547,6 +2565,7 @@ export namespace Annotation {
         page: AnnotationPopup.Page;
         index: number;
         identityQuality: AnnotationPopup.IdentityQuality;
+        hasAppearance: boolean;
         nm: string | null;
         rect: AnnotationPopup.Rect;
         contents: string | null;
@@ -2643,6 +2662,7 @@ export namespace Annotation {
         page: AnnotationUnsupported.Page;
         index: number;
         identityQuality: AnnotationUnsupported.IdentityQuality;
+        hasAppearance: boolean;
         nm: string | null;
         rect: AnnotationUnsupported.Rect;
         contents: string | null;

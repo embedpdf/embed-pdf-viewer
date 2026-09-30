@@ -106,3 +106,35 @@ describe('annotationAfter: the rect follows the engine’s verdict on the change
     expect(annotationAfter(link, patch({ subtype: 'link', rect })).rect).toEqual(rect);
   });
 });
+
+describe('whether the file holds an appearance after the write', () => {
+  /** From another app, with no appearance in the file. */
+  const bare = (annotation: AnnotationDTO): AnnotationDTO => ({
+    ...annotation,
+    hasAppearance: false,
+  });
+
+  it('a create bakes one, except a link: it is written with no border to draw', () => {
+    expect(created(SQUARE).hasAppearance).toBe(true);
+    expect(created({ ...LINK, rect: { x: 5, y: 5, width: 20, height: 10 } }).hasAppearance).toBe(
+      false,
+    );
+  });
+
+  it('nothing visible, or a pure move, keeps none where there was none', () => {
+    const square = bare(created(SQUARE));
+    const commented = annotationAfter(square, patch({ subtype: 'square', contents: 'note' }));
+    const moved = annotationAfter(
+      square,
+      patch({ subtype: 'square', box: { ...SQUARE.box, x: SQUARE.box.x + 30 } }),
+    );
+    expect(commented.hasAppearance).toBe(false);
+    expect(moved.hasAppearance).toBe(false);
+  });
+
+  it('anything else visible bakes one', () => {
+    const square = bare(created(SQUARE));
+    const recoloured = annotationAfter(square, patch({ subtype: 'square', color: '#ff0000' }));
+    expect(recoloured.hasAppearance).toBe(true);
+  });
+});

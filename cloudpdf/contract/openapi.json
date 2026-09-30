@@ -7237,6 +7237,9 @@
                 "type": "string",
                 "enum": ["durable", "weak"]
               },
+              "hasAppearance": {
+                "type": "boolean"
+              },
               "nm": {
                 "type": "string",
                 "nullable": true
@@ -7439,6 +7442,7 @@
               "page",
               "index",
               "identityQuality",
+              "hasAppearance",
               "nm",
               "rect",
               "contents",
@@ -7490,6 +7494,9 @@
               "identityQuality": {
                 "$ref": "#/components/schemas/Annotation/anyOf/0/properties/identityQuality"
               },
+              "hasAppearance": {
+                "$ref": "#/components/schemas/Annotation/anyOf/0/properties/hasAppearance"
+              },
               "nm": {
                 "type": "string",
                 "nullable": true
@@ -7622,6 +7629,7 @@
               "page",
               "index",
               "identityQuality",
+              "hasAppearance",
               "nm",
               "rect",
               "contents",
@@ -7673,6 +7681,9 @@
               "identityQuality": {
                 "$ref": "#/components/schemas/Annotation/anyOf/0/properties/identityQuality"
               },
+              "hasAppearance": {
+                "$ref": "#/components/schemas/Annotation/anyOf/0/properties/hasAppearance"
+              },
               "nm": {
                 "type": "string",
                 "nullable": true
@@ -7805,6 +7816,7 @@
               "page",
               "index",
               "identityQuality",
+              "hasAppearance",
               "nm",
               "rect",
               "contents",
@@ -7855,6 +7867,9 @@
               },
               "identityQuality": {
                 "$ref": "#/components/schemas/Annotation/anyOf/0/properties/identityQuality"
+              },
+              "hasAppearance": {
+                "$ref": "#/components/schemas/Annotation/anyOf/0/properties/hasAppearance"
               },
               "nm": {
                 "type": "string",
@@ -7993,6 +8008,7 @@
               "page",
               "index",
               "identityQuality",
+              "hasAppearance",
               "nm",
               "rect",
               "contents",
@@ -8044,6 +8060,9 @@
               },
               "identityQuality": {
                 "$ref": "#/components/schemas/Annotation/anyOf/0/properties/identityQuality"
+              },
+              "hasAppearance": {
+                "$ref": "#/components/schemas/Annotation/anyOf/0/properties/hasAppearance"
               },
               "nm": {
                 "type": "string",
@@ -8211,6 +8230,7 @@
               "page",
               "index",
               "identityQuality",
+              "hasAppearance",
               "nm",
               "rect",
               "contents",
@@ -8267,6 +8287,9 @@
               },
               "identityQuality": {
                 "$ref": "#/components/schemas/Annotation/anyOf/0/properties/identityQuality"
+              },
+              "hasAppearance": {
+                "$ref": "#/components/schemas/Annotation/anyOf/0/properties/hasAppearance"
               },
               "nm": {
                 "type": "string",
@@ -8434,6 +8457,7 @@
               "page",
               "index",
               "identityQuality",
+              "hasAppearance",
               "nm",
               "rect",
               "contents",
@@ -8490,6 +8514,9 @@
               },
               "identityQuality": {
                 "$ref": "#/components/schemas/Annotation/anyOf/0/properties/identityQuality"
+              },
+              "hasAppearance": {
+                "$ref": "#/components/schemas/Annotation/anyOf/0/properties/hasAppearance"
               },
               "nm": {
                 "type": "string",
@@ -8804,6 +8831,7 @@
               "page",
               "index",
               "identityQuality",
+              "hasAppearance",
               "nm",
               "rect",
               "contents",
@@ -8864,6 +8892,9 @@
               },
               "identityQuality": {
                 "$ref": "#/components/schemas/Annotation/anyOf/0/properties/identityQuality"
+              },
+              "hasAppearance": {
+                "$ref": "#/components/schemas/Annotation/anyOf/0/properties/hasAppearance"
               },
               "nm": {
                 "type": "string",
@@ -9076,6 +9107,7 @@
               "page",
               "index",
               "identityQuality",
+              "hasAppearance",
               "nm",
               "rect",
               "contents",
@@ -9136,6 +9168,9 @@
               },
               "identityQuality": {
                 "$ref": "#/components/schemas/Annotation/anyOf/0/properties/identityQuality"
+              },
+              "hasAppearance": {
+                "$ref": "#/components/schemas/Annotation/anyOf/0/properties/hasAppearance"
               },
               "nm": {
                 "type": "string",
@@ -9360,6 +9395,7 @@
               "page",
               "index",
               "identityQuality",
+              "hasAppearance",
               "nm",
               "rect",
               "contents",
@@ -9422,6 +9458,9 @@
               },
               "identityQuality": {
                 "$ref": "#/components/schemas/Annotation/anyOf/0/properties/identityQuality"
+              },
+              "hasAppearance": {
+                "$ref": "#/components/schemas/Annotation/anyOf/0/properties/hasAppearance"
               },
               "nm": {
                 "type": "string",
@@ -9643,6 +9682,7 @@
               "page",
               "index",
               "identityQuality",
+              "hasAppearance",
               "nm",
               "rect",
               "contents",
@@ -9691,6 +9731,9 @@
               },
               "identityQuality": {
                 "$ref": "#/components/schemas/Annotation/anyOf/0/properties/identityQuality"
+              },
+              "hasAppearance": {
+                "$ref": "#/components/schemas/Annotation/anyOf/0/properties/hasAppearance"
               },
               "nm": {
                 "type": "string",
@@ -9854,6 +9897,7 @@
               "page",
               "index",
               "identityQuality",
+              "hasAppearance",
               "nm",
               "rect",
               "contents",
@@ -9909,6 +9953,9 @@
               },
               "identityQuality": {
                 "$ref": "#/components/schemas/Annotation/anyOf/0/properties/identityQuality"
+              },
+              "hasAppearance": {
+                "$ref": "#/components/schemas/Annotation/anyOf/0/properties/hasAppearance"
               },
               "nm": {
                 "type": "string",
@@ -10321,6 +10368,7 @@
               "page",
               "index",
               "identityQuality",
+              "hasAppearance",
               "nm",
               "rect",
               "contents",
@@ -10386,6 +10434,9 @@
               },
               "identityQuality": {
                 "$ref": "#/components/schemas/Annotation/anyOf/0/properties/identityQuality"
+              },
+              "hasAppearance": {
+                "$ref": "#/components/schemas/Annotation/anyOf/0/properties/hasAppearance"
               },
               "nm": {
                 "type": "string",
@@ -10528,6 +10579,7 @@
               "page",
               "index",
               "identityQuality",
+              "hasAppearance",
               "nm",
               "rect",
               "contents",
@@ -10580,6 +10632,9 @@
               },
               "identityQuality": {
                 "$ref": "#/components/schemas/Annotation/anyOf/0/properties/identityQuality"
+              },
+              "hasAppearance": {
+                "$ref": "#/components/schemas/Annotation/anyOf/0/properties/hasAppearance"
               },
               "nm": {
                 "type": "string",
@@ -10727,6 +10782,7 @@
               "page",
               "index",
               "identityQuality",
+              "hasAppearance",
               "nm",
               "rect",
               "contents",
@@ -10780,6 +10836,9 @@
               },
               "identityQuality": {
                 "$ref": "#/components/schemas/Annotation/anyOf/0/properties/identityQuality"
+              },
+              "hasAppearance": {
+                "$ref": "#/components/schemas/Annotation/anyOf/0/properties/hasAppearance"
               },
               "nm": {
                 "type": "string",
@@ -10925,6 +10984,7 @@
               "page",
               "index",
               "identityQuality",
+              "hasAppearance",
               "nm",
               "rect",
               "contents",
@@ -10977,6 +11037,9 @@
               },
               "identityQuality": {
                 "$ref": "#/components/schemas/Annotation/anyOf/0/properties/identityQuality"
+              },
+              "hasAppearance": {
+                "$ref": "#/components/schemas/Annotation/anyOf/0/properties/hasAppearance"
               },
               "nm": {
                 "type": "string",
@@ -11163,6 +11226,7 @@
               "page",
               "index",
               "identityQuality",
+              "hasAppearance",
               "nm",
               "rect",
               "contents",
@@ -11214,6 +11278,9 @@
               },
               "identityQuality": {
                 "$ref": "#/components/schemas/Annotation/anyOf/0/properties/identityQuality"
+              },
+              "hasAppearance": {
+                "$ref": "#/components/schemas/Annotation/anyOf/0/properties/hasAppearance"
               },
               "nm": {
                 "type": "string",
@@ -11447,6 +11514,7 @@
               "page",
               "index",
               "identityQuality",
+              "hasAppearance",
               "nm",
               "rect",
               "contents",
@@ -11504,6 +11572,9 @@
               },
               "identityQuality": {
                 "$ref": "#/components/schemas/Annotation/anyOf/0/properties/identityQuality"
+              },
+              "hasAppearance": {
+                "$ref": "#/components/schemas/Annotation/anyOf/0/properties/hasAppearance"
               },
               "nm": {
                 "type": "string",
@@ -11668,6 +11739,7 @@
               "page",
               "index",
               "identityQuality",
+              "hasAppearance",
               "nm",
               "rect",
               "contents",
@@ -11725,6 +11797,9 @@
               },
               "identityQuality": {
                 "$ref": "#/components/schemas/Annotation/anyOf/0/properties/identityQuality"
+              },
+              "hasAppearance": {
+                "$ref": "#/components/schemas/Annotation/anyOf/0/properties/hasAppearance"
               },
               "nm": {
                 "type": "string",
@@ -11860,6 +11935,7 @@
               "page",
               "index",
               "identityQuality",
+              "hasAppearance",
               "nm",
               "rect",
               "contents",
@@ -11909,6 +11985,9 @@
               },
               "identityQuality": {
                 "$ref": "#/components/schemas/Annotation/anyOf/0/properties/identityQuality"
+              },
+              "hasAppearance": {
+                "$ref": "#/components/schemas/Annotation/anyOf/0/properties/hasAppearance"
               },
               "nm": {
                 "type": "string",
@@ -12040,6 +12119,7 @@
               "page",
               "index",
               "identityQuality",
+              "hasAppearance",
               "nm",
               "rect",
               "contents",

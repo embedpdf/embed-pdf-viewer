@@ -91,8 +91,12 @@ export interface KindCaps {
   /** Can take a cloudy border effect (`/BE` — shapes). */
   hasCloudy: boolean;
   /** The whole body is visible content, so hit-testing grabs anywhere inside
-   *  the box (stamp images) — not just the stroke/fill like outline shapes. */
+   *  the box (stamp images, note icons) — not just the stroke/fill like
+   *  outline shapes. */
   opaqueBody: boolean;
+  /** Its raster is its only drawing: the viewer draws none of it live (a
+   *  stamp's image, a form widget, a link's border). */
+  rasterOnly: boolean;
   /** The `/F` ReadOnly flag is ignored for this kind (ISO 32000: widgets — a
    *  ReadOnly form field must still be movable by a form designer; the
    *  form-filling layer enforces field ReadOnly itself). */
@@ -124,6 +128,7 @@ export const NO_CAPS: KindCaps = {
   hasEndings: false,
   hasCloudy: false,
   opaqueBody: false,
+  rasterOnly: false,
   ignoresReadOnly: false,
   noZoom: false,
   noRotate: false,

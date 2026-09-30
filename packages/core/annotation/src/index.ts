@@ -192,7 +192,7 @@ export { cloudyPath, cloudyBorderExtent } from './cloudy';
 export * from './measurement';
 export * from './measurement-shape';
 // How an annotation is drawn: the engine's raster, or live (see appearance.ts).
-export { drawnAfter, sourceOfNew, type DrawState } from './appearance';
+export { drawnAfter, sourceOfConfirmed, sourceOfNew, type DrawState } from './appearance';
 export { annotationSelectionFrame, type SelectionFrame } from './selection';
 export { scene } from './scene';
 export { straightenInkStroke } from './ink';

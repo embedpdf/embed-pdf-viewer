@@ -45,6 +45,12 @@ export const annotationBaseFields = {
   /** Position in the page's `/Annots`, 0-based. */
   index: field.engine(z.number().int().nonnegative()),
   identityQuality: field.engine(z.enum(['durable', 'weak'])),
+  /**
+   * Whether the file holds its appearance (`/AP /N`). Without one, every
+   * viewer draws the annotation from its fields: the engine in memory, never
+   * written.
+   */
+  hasAppearance: field.engine(z.boolean()),
   nm: field.data(z.string()).nullable().optional().createOnly(),
   rect: field.data(PdfRectSchema).space('box'),
   contents: field.data(z.string()).nullable().optional(),
