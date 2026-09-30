@@ -35,6 +35,7 @@ export {
   selectionAnchor,
   selectionKnob,
   creationDraftAnchor,
+  rotationAnchor,
 } from './view';
 export type { TextBox } from './view';
 export { hitTest, cursorAt, isSelectable, canMove, type Target } from './hit';
@@ -206,6 +207,7 @@ export type {
   ChromeNode,
   Cursor,
   CreationDraftAnchor,
+  RotationAnchor,
   Draft,
   Effect,
   Shape,

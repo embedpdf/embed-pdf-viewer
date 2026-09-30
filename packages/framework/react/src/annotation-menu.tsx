@@ -12,8 +12,9 @@
  */
 import * as React from 'react';
 import { AnnotationToken } from '@embedpdf/plugin-annotation/contract';
-import type { CreationDraftAnchor } from '@embedpdf/core-annotation';
+import type { CreationDraftAnchor, RotationAnchor } from '@embedpdf/core-annotation';
 import { Anchored, useProjectorBinding, type AnchoredPlacement } from './anchored';
+import { useAnnotationRotation } from './annotation-hooks';
 import { useSelector } from './runtime';
 import { sameAnchor, sameCreationDraftAnchor } from './annotation-anchors';
 
@@ -90,6 +91,39 @@ export function AnnotationDraftMenu({
   return (
     <Anchored anchor={anchor} placement={placement} gap={gap}>
       {children(anchor)}
+    </Anchored>
+  );
+}
+
+export interface AnnotationRotationBadgeProps {
+  /** Render prop receiving the rotation in progress (`angle`, degrees
+   *  clockwise, as the commit will apply it). */
+  children: (rotation: RotationAnchor) => React.ReactNode;
+  /** Gap in screen px between the pointer and the badge (default 16). */
+  gap?: number;
+  /** Where to place the badge relative to the pointer. Default 'right'. */
+  placement?: AnchoredPlacement;
+}
+
+/**
+ * Follows the pointer while a selection is being turned, upright however the
+ * page is shown: it floats over the page like the menus, not in it. Shows
+ * nothing when no rotation is in progress.
+ */
+export function AnnotationRotationBadge({
+  children,
+  gap = 16,
+  placement = 'right',
+}: AnnotationRotationBadgeProps) {
+  const rotation = useAnnotationRotation();
+  if (!rotation) return null;
+  return (
+    <Anchored
+      anchor={{ page: rotation.page, bounds: { ...rotation.at, width: 0, height: 0 } }}
+      placement={placement}
+      gap={gap}
+    >
+      {children(rotation)}
     </Anchored>
   );
 }

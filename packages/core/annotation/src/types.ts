@@ -443,6 +443,17 @@ export interface MarkupPreview {
 }
 
 /** Anchor + affordance state for UI that controls an in-progress creation draft. */
+/**
+ * A rotation in progress, for the badge that follows the pointer: the page
+ * it runs on, the pointer there (page space) and the selection's angle as the
+ * commit will apply it (degrees clockwise, whole degrees).
+ */
+export interface RotationAnchor {
+  page: PageRef;
+  at: Point;
+  angle: number;
+}
+
 export interface CreationDraftAnchor {
   kind: 'poly';
   subtype: PolySubtype;
@@ -894,13 +905,11 @@ export type ChromeNode =
   | { kind: 'rotate-knob'; at: Point; from: Point }
   // A live alignment guide (see `Guide`) — drawn while a snapped move is active.
   | { kind: 'guide'; axis: 'x' | 'y'; at: number; lo: number; hi: number }
-  // The live rotation readout while a rotate gesture is active: `at` is the
-  // pointer (page space), `angle` the selection's absolute angle (deg, CW).
-  | { kind: 'angle-chip'; at: Point; angle: number }
   // Rotation guides while a rotate gesture is active: finished line segments —
   // chords of the page through the pivot — so painters just draw. Two `axis`
   // lines (the fixed 0°/90° reference cross) + one `indicator` at the live
-  // `angle` (the same snapped angle the chip shows and the commit applies).
+  // `angle` (the same snapped angle the rotation badge shows and the commit
+  // applies: `rotationAnchor`).
   | {
       kind: 'rotate-guides';
       center: Point;

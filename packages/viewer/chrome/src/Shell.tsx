@@ -46,6 +46,7 @@ import { AnnotationStrip } from './ui/annotation-strip';
 import { SelectionStrip } from './ui/selection-strip';
 import { TabBar } from './ui/tab-bar';
 import { ArmedToolCursor } from './ui/tool-cursor';
+import { RotationBadge } from './ui/rotation-badge';
 import { LeftSidebar, RightSidebar, PageControls } from './ui/panels';
 import { CalibrationDialog } from './ui/measurement';
 import { RedactConfirmModal } from './ui/redact-confirm';
@@ -191,6 +192,8 @@ export function Shell() {
                 overlay={
                   <>
                     <AnnotationStrip />
+                    {/* the angle a selection is being turned to, by the pointer */}
+                    <RotationBadge />
                     <SelectionStrip />
                     {/* a signed field's facts, anchored at its widget */}
                     <SignatureInspector />

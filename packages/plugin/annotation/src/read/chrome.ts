@@ -10,6 +10,8 @@ import {
   type Point,
   type Rect,
   refOf,
+  rotationAnchor,
+  type RotationAnchor,
   selectionAnchor as coreSelectionAnchor,
 } from '@embedpdf/core-annotation';
 import type { PageRef } from '@embedpdf/engine-core/runtime';
@@ -166,11 +168,22 @@ export function createChromeReads(
     return anchor;
   };
 
+  /** The rotation in progress, cached per model: the same object until it changes. */
+  let rotationCache: { model: Model; v: RotationAnchor | null } | null = null;
+  const rotationOf = (): RotationAnchor | null => {
+    const model = store.model();
+    if (rotationCache && rotationCache.model === model) return rotationCache.v;
+    const rotation = rotationAnchor(model);
+    rotationCache = { model, v: rotation };
+    return rotation;
+  };
+
   const api = {
     listChromeNodes: (page: PageRef, scale?: number, rotation?: number, zoom?: number) =>
       chromeNodesOf(page, scale, rotation, zoom),
     getSelectionAnchor: (view?: HitView) =>
       selectionAnchorOf(view?.scale, view?.rotation, view?.zoom),
+    getRotationAnchor: () => rotationOf(),
     hitTestAt: (page: PageRef, point: Point) => {
       const model = store.model();
       const target = hitAt(page, point);

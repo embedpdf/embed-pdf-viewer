@@ -82,6 +82,7 @@ import {
   chrome,
   creationDraftAnchor,
   pageItems,
+  rotationAnchor,
   selectionAnchor,
   selectionBoundsOnPage,
   selectionKnob,
@@ -3435,21 +3436,21 @@ describe('annotation-core — snapping', () => {
     expect(rotation.delta).toBeCloseTo(45); // raw 43 + adjust 2
   });
 
-  it('a rotate gesture commits the snapped angle and shows the chip while live', () => {
+  it('a rotate gesture commits the snapped angle and anchors the badge while live', () => {
     const m0 = seeded(seededSquare('s1', { x: 100, y: 100, width: 100, height: 100 }));
     const pivot = { x: 150, y: 150 };
     const start = { x: 150, y: 50 };
+    const current = curFor(pivot, start, 88);
     const live: Model = {
       ...m0,
       selected: ['s1'],
-      draft: { kind: 'rotate', ids: ['s1'], pivot, start, current: curFor(pivot, start, 88) },
+      draft: { kind: 'rotate', ids: ['s1'], pivot, start, current },
     };
-    const chip = chrome(live, PAGE).find((node) => node.kind === 'angle-chip');
-    expect(chip).toMatchObject({ kind: 'angle-chip', angle: 90 });
+    expect(rotationAnchor(live)).toEqual({ page: PAGE, at: current, angle: 90 });
     const [model, fx] = step(live, editPtr('up', 0, 0));
     expect(fx).toEqual([writes('s1', { rotation: expect.closeTo(90) })]);
     expect(geomRotation(shapeOf(model.byId['s1'].annotation))).toBeCloseTo(90);
-    expect(chrome(model, PAGE).some((node) => node.kind === 'angle-chip')).toBe(false);
+    expect(rotationAnchor(model)).toBeNull();
   });
 
   it('custom rotation angles + threshold are honoured; rotation:false disables', () => {
@@ -3805,14 +3806,13 @@ describe('rotate guides (live rotate chrome mode)', () => {
       inside(line.b);
     }
     // quarter turn (snaps to 270): the indicator rides the same angle rule as
-    // the chip — it turns vertical through the pivot
+    // the badge — it turns vertical through the pivot
     const pivot = draft.pivot;
     model = run(model, [editB('move', pivot.x + 100, pivot.y)]);
     const live2 = chrome(model, PAGE, BOX);
     const g2 = live2.find((node) => node.kind === 'rotate-guides');
-    const chip = live2.find((node) => node.kind === 'angle-chip');
-    if (g2?.kind !== 'rotate-guides' || chip?.kind !== 'angle-chip') throw new Error();
-    expect(Math.round(g2.angle)).toBe(chip.angle);
+    if (g2?.kind !== 'rotate-guides') throw new Error();
+    expect(Math.round(g2.angle)).toBe(rotationAnchor(model)?.angle);
     const ind = g2.lines.find((line) => line.role === 'indicator')!;
     expect(ind.a.x).toBeCloseTo(pivot.x, 4);
     expect(ind.b.x).toBeCloseTo(pivot.x, 4);

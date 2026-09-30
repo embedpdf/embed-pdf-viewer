@@ -105,7 +105,9 @@ example in dark mode:
 ## Click a match on the page
 
 Give `<SearchLayer onHitClick>` a function, and it's called with the match someone clicks, for
-example to make it the active one.
+example to make it the active one. The text under a match stays selectable: a drag that starts on a
+match selects text, and only a click calls the function. Without one, matches are only paint, and
+the pointer goes straight through to the page.
 
 ## Methods
 

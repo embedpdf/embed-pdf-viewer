@@ -18,6 +18,7 @@ import type {
 import type {
   AnnotationFlags,
   CreationDraftAnchor,
+  RotationAnchor,
   FieldSpec,
   FieldValues,
   Shape,
@@ -381,6 +382,9 @@ export interface AnnotationTool {
 /** The live multi-click draft (polygon / polyline): where it is and whether it can finish. */
 export type CreationDraft = CreationDraftAnchor;
 
+/** A rotation in progress: its page, the pointer there and the selection's angle (degrees clockwise). */
+export type AnnotationRotationAnchor = RotationAnchor;
+
 /** Where selection UI attaches: the primary page, the page-space bounds, and the rotate knob. */
 export interface AnnotationSelectionAnchor {
   page: PageRef;
@@ -548,6 +552,11 @@ export interface AnnotationCapability {
     rotation?: PageRotation;
     zoom?: number;
   }): AnnotationSelectionAnchor | null;
+  /**
+   * The rotation in progress, for a badge that follows the pointer
+   * (`<AnnotationRotationBadge>`): `null` when nothing is being turned.
+   */
+  getRotationAnchor(): AnnotationRotationAnchor | null;
   /**
    * Change the selection's fields: each member takes the ones its kind has.
    * A function patches each member relative to itself (one line ending

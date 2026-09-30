@@ -1,5 +1,5 @@
 import type { PageRef } from '@embedpdf/core';
-import type { CreationDraftAnchor, Rect, Point } from '@embedpdf/core-annotation';
+import type { CreationDraftAnchor, Rect, Point, RotationAnchor } from '@embedpdf/core-annotation';
 
 /** The annotation selection's menu anchor on its primary page, in page space. */
 export type AnnotationSelectionAnchor = { page: PageRef; bounds: Rect; knob?: Point };
@@ -38,5 +38,19 @@ export function sameCreationDraftAnchor(
     left.bounds.y === right.bounds.y &&
     left.bounds.width === right.bounds.width &&
     left.bounds.height === right.bounds.height
+  );
+}
+
+export function sameRotationAnchor(
+  left: RotationAnchor | null,
+  right: RotationAnchor | null,
+): boolean {
+  if (left === right) return true;
+  if (!left || !right) return false;
+  return (
+    left.page.objectNumber === right.page.objectNumber &&
+    left.at.x === right.at.x &&
+    left.at.y === right.at.y &&
+    left.angle === right.angle
   );
 }

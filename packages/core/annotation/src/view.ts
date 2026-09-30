@@ -50,7 +50,7 @@ import type {
   Style,
   Point,
 } from './types';
-import type { CreationDraftAnchor } from './types';
+import type { CreationDraftAnchor, RotationAnchor } from './types';
 import { kindOf, refOf, shapeOf, styleOf, textOf } from './record';
 
 const DRAFT_ID = '__draft__';
@@ -523,9 +523,10 @@ export function chrome(
       nodes.push({ kind: 'guide', axis: guide.axis, at: guide.at, lo: guide.lo, hi: guide.hi });
   }
   // A live rotate on this page's selection. While it runs, the chrome switches
-  // modes: the readout chip + full-bleed guides appear, and the
-  // handles/knob are suppressed below — the pointer holds capture, so grab
-  // affordances are noise; "how far am I" feedback is everything.
+  // modes: full-bleed guides appear (the angle is the rotation badge's, a
+  // screen overlay: `rotationAnchor`), and the handles/knob are suppressed
+  // below — the pointer holds capture, so grab affordances are noise; "how
+  // far am I" feedback is everything.
   const rd =
     model.draft?.kind === 'rotate' &&
     model.byId[model.draft.ids[0]]?.annotation.page.objectNumber === pageObjectNumber
@@ -533,9 +534,8 @@ export function chrome(
       : null;
   if (rd) {
     const { angle } = rotateDraftDelta(model, rd);
-    nodes.push({ kind: 'angle-chip', at: rd.current, angle: Math.round(angle) });
     // Guides as chords of the page through the pivot — the fixed 0°/90°
-    // reference cross + the live indicator at the same snapped angle the chip
+    // reference cross + the live indicator at the same snapped angle the badge
     // shows and the commit applies. Full-bleed beats a magic length constant;
     // no pageBox (headless) → a generous fixed span around the pivot.
     const span = pageBox ?? { x: rd.pivot.x - 300, y: rd.pivot.y - 300, width: 600, height: 600 };
@@ -672,6 +672,23 @@ export function selectionAnchor(
 /** Anchor for controls that finish/cancel an active multi-click creation draft.
  *  It is rect-based like selectionAnchor, using the committed vertices only so
  *  the menu remains stable while the hover preview follows the pointer. */
+/**
+ * The rotation in progress, for the badge that follows the pointer: `null`
+ * when nothing is being turned. The badge is a screen overlay, so it stays
+ * upright however the page is shown.
+ */
+export function rotationAnchor(model: Model): RotationAnchor | null {
+  const draft = model.draft;
+  if (draft?.kind !== 'rotate') return null;
+  const page = model.byId[draft.ids[0]]?.annotation.page;
+  if (!page) return null;
+  return {
+    page,
+    at: draft.current,
+    angle: Math.round(rotateDraftDelta(model, draft).angle),
+  };
+}
+
 export function creationDraftAnchor(model: Model): CreationDraftAnchor | null {
   const draft = model.draft;
   if (draft?.kind !== 'create-poly') return null;

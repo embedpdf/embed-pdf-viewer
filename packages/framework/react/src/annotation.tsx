@@ -83,7 +83,7 @@ export {
   sameCreationDraftAnchor,
   type AnnotationSelectionAnchor,
 } from './annotation-anchors';
-export { useAnnotationSelected } from './annotation-hooks';
+export { useAnnotationRotation, useAnnotationSelected } from './annotation-hooks';
 
 /** `#rrggbb` → `rgba(...)` — the marquee's translucent fill derives from the
  *  accent, so one `setChrome({ accent })` restyles every piece of chrome. */
@@ -400,152 +400,132 @@ function Chrome({ page }: { page: PageContextValue }) {
   // One outline style for the resting rect and the rotated obb — the selection
   // box must never flip dashed↔solid when a rotation starts.
   const outlineDash = cs.outline.style === 'dashed' ? '4 3' : undefined;
-  // The live rotation readout — an HTML chip (rounded box + padded text beats
-  // hand-rolling it in SVG), riding the pointer.
-  const chip = nodes.find((node) => node.kind === 'angle-chip');
-  const chipAt = chip ? page.transform.toPixels(chip.at) : null;
   return (
-    <>
-      <svg style={{ position: 'absolute', inset: 0, overflow: 'visible', pointerEvents: 'none' }}>
-        {nodes.map((node, i) => {
-          if (node.kind === 'angle-chip') return null; // rendered as HTML below
-          if (node.kind === 'handle') {
-            const point = page.transform.toPixels(node.at);
-            const hs = cs.handles.size;
-            return (
-              <rect
-                key={i}
-                x={point.x - hs / 2}
-                y={point.y - hs / 2}
-                width={hs}
-                height={hs}
-                fill={cs.handles.fill}
-                stroke={handleStroke}
-                strokeWidth={1.5}
-                // The square rides a rotated box's orientation (spin about itself).
-                {...(node.rot ? { transform: `rotate(${node.rot} ${point.x} ${point.y})` } : {})}
-              />
-            );
-          }
-          // A live alignment guide of a snapped move: a through-line at the snapped
-          // edge/center, spanning both shapes.
-          if (node.kind === 'guide') {
-            const start = page.transform.toPixels(
-              node.axis === 'x' ? { x: node.at, y: node.lo } : { x: node.lo, y: node.at },
-            );
-            const end = page.transform.toPixels(
-              node.axis === 'x' ? { x: node.at, y: node.hi } : { x: node.hi, y: node.at },
-            );
-            return (
-              <line
-                key={i}
-                x1={start.x}
-                y1={start.y}
-                x2={end.x}
-                y2={end.y}
-                stroke="#e91e63"
-                strokeWidth={1.5}
-                shapeRendering="crispEdges"
-              />
-            );
-          }
-          // An oriented selection box (a tilted shape/group): a closed quad through
-          // the four page-space corners — replaces the axis-aligned outline.
-          if (node.kind === 'obb') {
-            const svgPoints = node.corners
-              .map((point) => {
-                const pixel = page.transform.toPixels(point);
-                return `${pixel.x},${pixel.y}`;
-              })
-              .join(' ');
-            return (
-              <polygon
-                key={i}
-                points={svgPoints}
-                fill="none"
-                stroke={outlineStroke}
-                strokeWidth={cs.outline.width}
-                strokeDasharray={outlineDash}
-              />
-            );
-          }
-          // Rotation guides (live rotate only): the faint 0°/90° reference cross
-          // + the prominent indicator riding the angle — pre-cut page chords, so
-          // this is a dumb line loop.
-          if (node.kind === 'rotate-guides') {
-            const guideDash = cs.guides.style === 'dashed' ? '4 3' : undefined;
-            return (
-              <g key={i}>
-                {node.lines.map((chord, j) => {
-                  const start = page.transform.toPixels(chord.a);
-                  const end = page.transform.toPixels(chord.b);
-                  const axis = chord.role === 'axis';
-                  return (
-                    <line
-                      key={j}
-                      x1={start.x}
-                      y1={start.y}
-                      x2={end.x}
-                      y2={end.y}
-                      stroke={
-                        axis
-                          ? (cs.guides.axisColor ?? cs.accent)
-                          : (cs.guides.indicatorColor ?? cs.accent)
-                      }
-                      opacity={axis ? cs.guides.axisOpacity : cs.guides.indicatorOpacity}
-                      strokeWidth={cs.guides.width}
-                      strokeDasharray={guideDash}
-                    />
-                  );
-                })}
-              </g>
-            );
-          }
-          // The rotate knob: a stalk from the top-edge midpoint out to a grab dot.
-          if (node.kind === 'rotate-knob') {
-            const at = page.transform.toPixels(node.at);
-            const from = page.transform.toPixels(node.from);
-            return (
-              <g key={i}>
-                {cs.knob.stalk && (
+    <svg style={{ position: 'absolute', inset: 0, overflow: 'visible', pointerEvents: 'none' }}>
+      {nodes.map((node, i) => {
+        if (node.kind === 'handle') {
+          const point = page.transform.toPixels(node.at);
+          const hs = cs.handles.size;
+          return (
+            <rect
+              key={i}
+              x={point.x - hs / 2}
+              y={point.y - hs / 2}
+              width={hs}
+              height={hs}
+              fill={cs.handles.fill}
+              stroke={handleStroke}
+              strokeWidth={1.5}
+              // The square rides a rotated box's orientation (spin about itself).
+              {...(node.rot ? { transform: `rotate(${node.rot} ${point.x} ${point.y})` } : {})}
+            />
+          );
+        }
+        // A live alignment guide of a snapped move: a through-line at the snapped
+        // edge/center, spanning both shapes.
+        if (node.kind === 'guide') {
+          const start = page.transform.toPixels(
+            node.axis === 'x' ? { x: node.at, y: node.lo } : { x: node.lo, y: node.at },
+          );
+          const end = page.transform.toPixels(
+            node.axis === 'x' ? { x: node.at, y: node.hi } : { x: node.hi, y: node.at },
+          );
+          return (
+            <line
+              key={i}
+              x1={start.x}
+              y1={start.y}
+              x2={end.x}
+              y2={end.y}
+              stroke="#e91e63"
+              strokeWidth={1.5}
+              shapeRendering="crispEdges"
+            />
+          );
+        }
+        // An oriented selection box (a tilted shape/group): a closed quad through
+        // the four page-space corners — replaces the axis-aligned outline.
+        if (node.kind === 'obb') {
+          const svgPoints = node.corners
+            .map((point) => {
+              const pixel = page.transform.toPixels(point);
+              return `${pixel.x},${pixel.y}`;
+            })
+            .join(' ');
+          return (
+            <polygon
+              key={i}
+              points={svgPoints}
+              fill="none"
+              stroke={outlineStroke}
+              strokeWidth={cs.outline.width}
+              strokeDasharray={outlineDash}
+            />
+          );
+        }
+        // Rotation guides (live rotate only): the faint 0°/90° reference cross
+        // + the prominent indicator riding the angle — pre-cut page chords, so
+        // this is a dumb line loop.
+        if (node.kind === 'rotate-guides') {
+          const guideDash = cs.guides.style === 'dashed' ? '4 3' : undefined;
+          return (
+            <g key={i}>
+              {node.lines.map((chord, j) => {
+                const start = page.transform.toPixels(chord.a);
+                const end = page.transform.toPixels(chord.b);
+                const axis = chord.role === 'axis';
+                return (
                   <line
-                    x1={from.x}
-                    y1={from.y}
-                    x2={at.x}
-                    y2={at.y}
-                    stroke={knobStroke}
-                    strokeWidth={1}
+                    key={j}
+                    x1={start.x}
+                    y1={start.y}
+                    x2={end.x}
+                    y2={end.y}
+                    stroke={
+                      axis
+                        ? (cs.guides.axisColor ?? cs.accent)
+                        : (cs.guides.indicatorColor ?? cs.accent)
+                    }
+                    opacity={axis ? cs.guides.axisOpacity : cs.guides.indicatorOpacity}
+                    strokeWidth={cs.guides.width}
+                    strokeDasharray={guideDash}
                   />
-                )}
-                <circle
-                  cx={at.x}
-                  cy={at.y}
-                  r={cs.knob.size / 2}
-                  fill={cs.knob.fill}
+                );
+              })}
+            </g>
+          );
+        }
+        // The rotate knob: a stalk from the top-edge midpoint out to a grab dot.
+        if (node.kind === 'rotate-knob') {
+          const at = page.transform.toPixels(node.at);
+          const from = page.transform.toPixels(node.from);
+          return (
+            <g key={i}>
+              {cs.knob.stalk && (
+                <line
+                  x1={from.x}
+                  y1={from.y}
+                  x2={at.x}
+                  y2={at.y}
                   stroke={knobStroke}
-                  strokeWidth={1.5}
+                  strokeWidth={1}
                 />
-              </g>
-            );
-          }
-          const frame = boxOf(node.rect, page);
-          // The marquee rubber band keeps its own look (translucent accent fill,
-          // always dashed); the selection outline follows the settings.
-          if (node.kind === 'marquee') {
-            return (
-              <rect
-                key={i}
-                x={frame.left}
-                y={frame.top}
-                width={frame.width}
-                height={frame.height}
-                fill={rgba(cs.accent, 0.08)}
-                stroke={cs.accent}
-                strokeWidth={1}
-                strokeDasharray="4 3"
+              )}
+              <circle
+                cx={at.x}
+                cy={at.y}
+                r={cs.knob.size / 2}
+                fill={cs.knob.fill}
+                stroke={knobStroke}
+                strokeWidth={1.5}
               />
-            );
-          }
+            </g>
+          );
+        }
+        const frame = boxOf(node.rect, page);
+        // The marquee rubber band keeps its own look (translucent accent fill,
+        // always dashed); the selection outline follows the settings.
+        if (node.kind === 'marquee') {
           return (
             <rect
               key={i}
@@ -553,35 +533,28 @@ function Chrome({ page }: { page: PageContextValue }) {
               y={frame.top}
               width={frame.width}
               height={frame.height}
-              fill="none"
-              stroke={outlineStroke}
-              strokeWidth={cs.outline.width}
-              strokeDasharray={outlineDash}
+              fill={rgba(cs.accent, 0.08)}
+              stroke={cs.accent}
+              strokeWidth={1}
+              strokeDasharray="4 3"
             />
           );
-        })}
-      </svg>
-      {chip && chipAt && (
-        <div
-          style={{
-            position: 'absolute',
-            left: chipAt.x + 16,
-            top: chipAt.y - 28,
-            background: 'rgba(0,0,0,0.8)',
-            color: '#fff',
-            padding: '2px 6px',
-            borderRadius: 4,
-            fontSize: 12,
-            fontFamily: 'monospace',
-            pointerEvents: 'none',
-            whiteSpace: 'nowrap',
-            zIndex: 1,
-          }}
-        >
-          {chip.angle}°
-        </div>
-      )}
-    </>
+        }
+        return (
+          <rect
+            key={i}
+            x={frame.left}
+            y={frame.top}
+            width={frame.width}
+            height={frame.height}
+            fill="none"
+            stroke={outlineStroke}
+            strokeWidth={cs.outline.width}
+            strokeDasharray={outlineDash}
+          />
+        );
+      })}
+    </svg>
   );
 }
 
