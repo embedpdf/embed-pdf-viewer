@@ -175,13 +175,23 @@ annotationPlugin({
 });
 ```
 
-| Tool                 | A click makes                                     |
-| :------------------- | :------------------------------------------------ |
-| `square`, `circle`   | 80 × 60 points, centered on the click             |
-| `line`               | 80 points long, starting at the click             |
-| `free-text`          | 180 × 40 points, its top-left at the click        |
-| `note`, `attachment` | A 20 × 20 icon                                    |
-| `stamp`              | The stamp, 150 points wide, centered on the click |
+| Tool                 | A click makes                                         |
+| :------------------- | :---------------------------------------------------- |
+| `square`, `circle`   | 80 × 60 points, centered on the click                 |
+| `line`               | 80 points long, pointing right, centered on the click |
+| `free-text`          | 180 × 40 points, its top-left at the click            |
+| `note`, `attachment` | A 20 × 20 icon                                        |
+| `stamp`              | The stamp, 150 points wide, centered on the click     |
+
+`anchor` says which part of it lands on the click. A box takes `'center'` (the default) or
+`'top-left'`; a line takes `'center'` (the default), `'start'` or `'end'`. A line's `rotation` turns it
+clockwise from pointing right, in degrees. An arrow whose tip lands where you click, pointing down:
+
+```ts
+annotationPlugin({
+  tools: [{ id: 'arrow', clickCreate: { length: 80, rotation: 90, anchor: 'end' } }],
+});
+```
 
 What a click makes always stays on the page: near an edge, it's moved inside.
 
@@ -231,13 +241,21 @@ annotationPlugin({
 });
 ```
 
-The preview is drawn with the tool's current defaults, so it has the color the annotation will
-have. It's half see-through unless you set `opacity`; `--epdf-ghost-opacity` sets it from CSS for
-every tool (see [Colors & theming](../ui/theming)).
+The preview is the annotation the click will make, drawn with the tool's current defaults: its
+color, its width, an arrow's head, a form field's border and background. Change a default and the
+preview changes with it. It's half see-through unless you set `opacity`; `--epdf-ghost-opacity`
+sets it from CSS for every tool (see [Colors & theming](../ui/theming)).
+
+It shows only where a click would place something. Over an annotation the click selects it, and
+over text a text tool selects text, so the preview hides there. It hides too when the person may
+not create annotations. A tool whose click makes nothing, like ink, a polygon, or a tool with
+`clickCreate: false`, never shows one. While you press, the preview stays, since letting go is
+still a click; once you drag, the drawing takes its place.
 
 It's on by default for tools you use by clicking: stamps, notes, attachments, and the form
-plugin's field tools, which show the box a field will fill. It's off for tools you use by
-dragging, like shapes and ink: there, the size comes from the drag, not the click.
+plugin's field tools, which show the field a click places (a radio button round, as it will be).
+It's off for tools you mostly drag, like shapes and lines, since the size usually comes from the
+drag. `ghost: true` turns it on for them.
 
 The cursor and the preview do different jobs. The cursor says _which_ tool is active; the preview
 says _where_ the annotation will land. You can use either, or both.
@@ -281,18 +299,18 @@ For libraries of stamps, see [Stamps](stamps).
 What `useAnnotation()` gives you for tools and stamps: its `tools` and `stamps` parts. The rest is on
 [Annotations in code](with-code#methods).
 
-| Method                                 | What it does                                                                                                                                           |
-| :------------------------------------- | :----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `tools.list()`                         | Every tool, the built-in ones and yours, so a toolbar can build itself from it. [Make your own tool](#make-your-own-tool)                              |
-| `tools.get(id)`                        | One tool, or `null`                                                                                                                                    |
-| `tools.register(tool)`                 | Adds a tool while the app runs, or replaces the one with the same id, and returns a function that removes it                                           |
-| `tools.getDefaults(id)`                | The fields a tool's next annotation starts with. In a component, use `useAnnotationDefaults(id)`. [Let people change the defaults](#let-people-change-the-defaults) |
-| `tools.updateDefaults(id, changes)`    | Changes a tool's defaults for the drawings that follow. They stay in this viewer and are never shared.                                                 |
-| `tools.getProperties(id)`              | What a style panel for the tool shows: `{ properties, values, mixed }`, the same shape as for the [selection](selecting#a-style-panel)                  |
-| `stamps.arm(stamp)`, `stamps.disarm()` | Arms a stamp's bytes so the next click places them, as the `stamp` tool does after picking a file, or disarms them. For stamps from a library, use [Stamps](stamps). |
-| `stamps.isArmed()`                     | Whether a stamp is armed                                                                                                                               |
-| `stamps.place(stamp, { page, center })` | Places a stamp's bytes with its middle on `center`, without a click. Resolves `{ annotation }`.                                                                |
-| `setFilePickerProvider(provider)`      | Sets the function that gives the `stamp` and `attachment` tools their file, and returns a function that removes it. In a component, use `useFilePickerProvider()`. [Stamps and files](#stamps-and-files) |
+| Method                                  | What it does                                                                                                                                                                                             |
+| :-------------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `tools.list()`                          | Every tool, the built-in ones and yours, so a toolbar can build itself from it. [Make your own tool](#make-your-own-tool)                                                                                |
+| `tools.get(id)`                         | One tool, or `null`                                                                                                                                                                                      |
+| `tools.register(tool)`                  | Adds a tool while the app runs, or replaces the one with the same id, and returns a function that removes it                                                                                             |
+| `tools.getDefaults(id)`                 | The fields a tool's next annotation starts with. In a component, use `useAnnotationDefaults(id)`. [Let people change the defaults](#let-people-change-the-defaults)                                      |
+| `tools.updateDefaults(id, changes)`     | Changes a tool's defaults for the drawings that follow. They stay in this viewer and are never shared.                                                                                                   |
+| `tools.getProperties(id)`               | What a style panel for the tool shows: `{ properties, values, mixed }`, the same shape as for the [selection](selecting#a-style-panel)                                                                   |
+| `stamps.arm(stamp)`, `stamps.disarm()`  | Arms a stamp's bytes so the next click places them, as the `stamp` tool does after picking a file, or disarms them. For stamps from a library, use [Stamps](stamps).                                     |
+| `stamps.isArmed()`                      | Whether a stamp is armed                                                                                                                                                                                 |
+| `stamps.place(stamp, { page, center })` | Places a stamp's bytes with its middle on `center`, without a click. Resolves `{ annotation }`.                                                                                                          |
+| `setFilePickerProvider(provider)`       | Sets the function that gives the `stamp` and `attachment` tools their file, and returns a function that removes it. In a component, use `useFilePickerProvider()`. [Stamps and files](#stamps-and-files) |
 
 Every method that returns a promise also takes a `signal` in its options, to cancel it.
 
@@ -308,8 +326,10 @@ Every method that returns a promise also takes a `signal` in its options, to can
 
 ### Rotated pages
 
-On a rotated page, stamps and text boxes are turned so they read upright, as their author saw them.
-`upright: false` turns that off; `upright: true` turns it on for your own box tools.
+On a rotated page, what a tool places looks the way its author saw it. Stamps and text boxes are
+turned so they read upright. A clicked square or circle keeps its `clickCreate` size as the page
+shows (it isn't turned, its sides swap), and a clicked line points the way its `clickCreate` says.
+`upright: false` turns that off; `upright: true` turns it on for your own tools.
 
 ### Touch
 
@@ -318,16 +338,16 @@ zoom. Click tools (notes, stamps) place with a tap, and a drag still scrolls.
 
 ### Every option
 
-| Option        | What it is                                                               |
-| :------------ | :----------------------------------------------------------------------- |
-| `id`          | The tool's name, used with `interaction.activateTool(id)`.               |
-| `extends`     | A tool to start from.                                                    |
-| `subtype`     | The kind of annotation it draws, for a tool that doesn't extend another. |
-| `defaults`    | The fields every new annotation starts with.                             |
-| `cursor`      | The cursor while the tool is active.                                     |
-| `ghost`       | A preview that follows the pointer: `true`, `false` or `{ opacity }`.    |
-| `clickCreate` | What a single click makes, or `false` for drag only.                     |
-| `afterCreate` | Select the new annotation? Keep the tool? Start typing?                  |
-| `upright`     | Turn new annotations upright on rotated pages.                           |
-| `source`      | For stamp tools: fixed bytes, or ask for a file.                         |
-| `meta`        | Your own data, such as a label and an icon for a toolbar.                |
+| Option        | What it is                                                                              |
+| :------------ | :-------------------------------------------------------------------------------------- |
+| `id`          | The tool's name, used with `interaction.activateTool(id)`.                              |
+| `extends`     | A tool to start from.                                                                   |
+| `subtype`     | The kind of annotation it draws, for a tool that doesn't extend another.                |
+| `defaults`    | The fields every new annotation starts with.                                            |
+| `cursor`      | The cursor while the tool is active.                                                    |
+| `ghost`       | A preview that follows the pointer: `true`, `false` or `{ opacity }`.                   |
+| `clickCreate` | What a single click makes, and which part lands on the click, or `false` for drag only. |
+| `afterCreate` | Select the new annotation? Keep the tool? Start typing?                                 |
+| `upright`     | Turn new annotations upright on rotated pages.                                          |
+| `source`      | For stamp tools: fixed bytes, or ask for a file.                                        |
+| `meta`        | Your own data, such as a label and an icon for a toolbar.                               |

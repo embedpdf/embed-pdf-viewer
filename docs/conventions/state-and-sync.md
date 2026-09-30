@@ -333,6 +333,30 @@ session state is enough: the form plugin marks a field in `writing` for the
 duration of its write (`beginWrite` / `endWrite` in
 `packages/plugin/form/src/model.ts`), and a reload never touches that flag.
 
+## Held-back writes
+
+Some writes wait on purpose: the annotation plugin writes typed text once
+typing pauses, the ink tool waits for the next stroke of a drawing, a form
+field is written on blur. A write queue holds writes that are on their way.
+Before anything reads the whole file (`documents.save()`, `saveLayer()`), the
+kernel settles the document (`packages/core/main/src/settle.ts`): it runs every
+flush plugins registered with `ctx.onSettle(flush)` and waits for them, so the
+file has everything the user sees.
+
+- A flush sends what the plugin holds back and resolves once the engine has
+  it: `flushAllText()` for typed text, the ink draft finished between strokes
+  (never a stroke still being drawn), the field being typed in committed
+  (matches Acrobat: the field being edited is committed before a save).
+- A plugin whose queue carries document writes registers it:
+  `ctx.onSettle(() => queue.idle())`. A queue whose operations read the file
+  themselves is never registered: the actions plugin's queued
+  `runDocumentVerb('save', …)` calls `documents.save()` from inside its queue,
+  and waiting for that queue would wait for itself.
+- A failed flush is reported and does not stop the read: the file is then what
+  the engine has.
+- The caller's `signal`, or the document closing, cancels the wait with
+  `operation-cancelled`.
+
 ## Resources
 
 Anything that is not plain data is a resource: engine handles, rasters,

@@ -25,6 +25,8 @@ export function createApplying(
 ) {
   const { requireService, pages } = store;
   const queue = ctx.serialQueue('apply');
+  // A download waits for a redaction being applied: its content must not be in the file.
+  ctx.onSettle(() => queue.idle());
 
   /** Queue an apply whose scope is computed when its turn comes. */
   const runApply = (scopeOf: () => RedactionApplyScope): Promise<RedactionApplyResult> =>

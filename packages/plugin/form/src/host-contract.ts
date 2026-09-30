@@ -21,7 +21,7 @@ import type {
   SubmitIntent,
 } from '@embedpdf/plugin-actions/contract';
 
-import type { FormCapability, FormCommitResult } from './contract';
+import type { FormCapability, FormCommitResult, SetValueResult } from './contract';
 import type { Box } from './model';
 import type { FillItem } from './read/fill-items';
 import { FormToken as PublicFormToken } from './token';
@@ -58,6 +58,15 @@ export interface FormHostCapability extends FormCapability {
     diagnose: (diagnostic: ActionDiagnostic) => void,
   ): Promise<ActionSubmitRequest>;
   commitScriptFormEffects(effects: FormEffect[]): Promise<FormEffectsResult>;
+  /**
+   * The text someone is typing in a field, before it's written (write/typing.ts): a keystroke
+   * calls `draftText`, blur or Enter `commitDraftText` (the field's scripts run then), Escape
+   * `discardDraftText`. A download writes a draft first, like Acrobat commits the field being
+   * edited before it saves. `commitDraftText` resolves `null` when there's nothing to write.
+   */
+  draftText(field: FormFieldRef, text: string): void;
+  commitDraftText(field: FormFieldRef): Promise<SetValueResult | null>;
+  discardDraftText(field: FormFieldRef): void;
 }
 
 export const FormToken = createHostToken<FormHostCapability>(PublicFormToken);

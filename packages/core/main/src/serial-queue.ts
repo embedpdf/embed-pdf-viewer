@@ -7,9 +7,15 @@
  * enqueue into queue B and await it, but never the reverse on the same pair —
  * a B-operation enqueueing back into A self-deadlocks behind its caller.
  */
-export function createSerialQueue(): <T>(operation: () => Promise<T>) => Promise<T> {
+export interface SerialQueue {
+  <T>(operation: () => Promise<T>): Promise<T>;
+  /** Resolves once every operation queued so far has finished, however it ended. */
+  idle(): Promise<void>;
+}
+
+export function createSerialQueue(): SerialQueue {
   let tail: Promise<void> = Promise.resolve();
-  return <T>(operation: () => Promise<T>): Promise<T> => {
+  const queue = <T>(operation: () => Promise<T>): Promise<T> => {
     const result = tail.then(operation, operation);
     tail = result.then(
       () => undefined,
@@ -17,4 +23,5 @@ export function createSerialQueue(): <T>(operation: () => Promise<T>) => Promise
     );
     return result;
   };
+  return Object.assign(queue, { idle: () => tail });
 }

@@ -170,11 +170,32 @@ export function createIntents(
     return changes;
   };
 
+  /** Runs whose writes haven't all answered yet. */
+  const running = new Set<Promise<IntentOutcome>>();
+
   /**
    * Steps 2 and 3: run the writes and settle the changes each carried. A
    * staged change no write carries is dropped: nothing will write it.
    */
-  const run = async (
+  const run = (
+    staged: readonly PendingChange[],
+    writes: readonly CarriedWrite[],
+  ): Promise<IntentOutcome> => {
+    const done = runWrites(staged, writes);
+    running.add(done);
+    void done.finally(() => running.delete(done));
+    return done;
+  };
+
+  /**
+   * Resolves once every write started so far has its answer, and every write
+   * started while waiting too: what a download waits for (`ctx.onSettle`).
+   */
+  const idle = async (): Promise<void> => {
+    while (running.size) await Promise.allSettled([...running]);
+  };
+
+  const runWrites = async (
     staged: readonly PendingChange[],
     writes: readonly CarriedWrite[],
   ): Promise<IntentOutcome> => {
@@ -214,7 +235,7 @@ export function createIntents(
     return { created, failed, answers };
   };
 
-  return { begin, beginStated, run };
+  return { begin, beginStated, run, idle };
 }
 
 export type Intents = ReturnType<typeof createIntents>;

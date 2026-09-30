@@ -13,7 +13,10 @@ import type { EventHook, OperationOptions, PluginErrorInfo, Unsubscribe } from '
 
 export { I18nToken } from './token';
 
-/** Nested tree of translation strings. Leaves interpolate `{param}` slots. */
+/**
+ * Nested tree of translation strings. Leaves interpolate `{param}` slots. A dotted key is the
+ * same as a nested one: `{ 'review.reject': 'Reject' }` is `{ review: { reject: 'Reject' } }`.
+ */
 export interface TranslationDictionary {
   readonly [key: string]: string | TranslationDictionary;
 }
@@ -117,7 +120,11 @@ export interface I18nCapability {
   setLocale(code: string, options?: OperationOptions): Promise<void>;
   /** Register a pack at runtime (customer-supplied translations). The remover drops it again. */
   registerLocale(locale: Locale): Unsubscribe;
-  /** Merge keys into a registered pack (later keys win). Throws `not-found` for an unknown code. */
+  /**
+   * Merge keys into a pack (later keys win; dotted keys work). A lazy pack that hasn't loaded yet
+   * gets them when it loads, on top of its own strings. Throws `not-found` for a code that is
+   * neither registered nor has a loader.
+   */
   addTranslations(code: string, dictionary: TranslationDictionary): void;
   /** The current locale changed and is usable; never fires while a lazy pack is still loading. */
   readonly onLocaleChanged: EventHook<LocaleChangedEvent>;

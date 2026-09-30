@@ -201,6 +201,45 @@ describe('annotation draw handler — grouped ink', () => {
       vi.useRealTimers();
     }
   });
+
+  it('a download finishes the drawing waiting for its next stroke, never a stroke being drawn', () => {
+    vi.useFakeTimers();
+    try {
+      const calls: string[] = [];
+      const anno = {
+        ...GHOST_SEAMS,
+        getToolSubtype: () => 'ink',
+        getResolvedTool: () => ({ ink: { groupStrokesMs: 800 } }),
+        createPointer: (_tool: string, phase: string) => calls.push(phase),
+        finishInkDraft: () => calls.push('finish'),
+      } as unknown as AnnotationHostCapability;
+      const inkInteraction = {
+        getActiveToolId: () => 'ink',
+        hasCursorClaim: () => false,
+        onToolChanged: () => () => {},
+        claimCursor: () => {},
+      } as unknown as InteractionHostCapability;
+      let settle = () => {};
+      const handler = createDrawHandler(anno, inkInteraction, (flush) => {
+        settle = flush;
+      });
+      const at = (phase: PointerSample['phase'], x: number) =>
+        sample({ phase, page: { ref: PAGE_1, point: { x, y: 20 } } });
+
+      handler.onDown(at('down', 10));
+      handler.onMove?.(at('move', 30));
+      settle(); // mid-stroke: not what the user sees yet
+      expect(calls).not.toContain('finish');
+
+      handler.onUp?.(at('up', 30));
+      settle(); // between strokes: finished at once, not after the grouping window
+      expect(calls.filter((call) => call === 'finish')).toHaveLength(1);
+      vi.advanceTimersByTime(800);
+      expect(calls.filter((call) => call === 'finish')).toHaveLength(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
 
 describe('annotation edit handler — touch consent + cancel', () => {

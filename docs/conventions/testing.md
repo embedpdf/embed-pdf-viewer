@@ -49,6 +49,7 @@ The returned context adds:
 | `emitDocumentEvent(event)` | Delivers a confirmed document event through the default `doc.events`.                                              |
 | `subscribe(listener)`      | Observes the change stream (state updates and `notify`).                                                           |
 | `capabilities`             | The token map, to add or replace capabilities during a test.                                                       |
+| `settle(signal?)`          | Runs every `ctx.onSettle` flush and waits for them, as `documents.save()` does before it reads the file.           |
 | `dispose()`                | Aborts the lifetime and runs every registered cleanup.                                                             |
 
 Unless the test passes its own, `DocumentsToken` resolves to a read-only

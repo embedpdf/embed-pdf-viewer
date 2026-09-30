@@ -37,7 +37,7 @@ type Format = 'bold' | 'italic' | 'underline';
 function RichTextToolbar() {
   const annotation = useAnnotation();
   // The selection's editable fields: while the text editor holds a range
-  // these describe the RANGE (bold true = every selected run is bold, `mixed`
+  // these describe the whole range (bold true = every selected run is bold, `mixed`
   // when they disagree); otherwise the selected boxes' body style.
   const props = useSelectionFields();
   const { currentPage } = usePages();

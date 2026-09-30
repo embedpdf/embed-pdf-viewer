@@ -13,7 +13,7 @@ const ebook = async (): Promise<OpenInput> => {
 };
 // [!/doc-source]
 
-// Kernel readers live INSIDE <epdf-viewer>, where the host is injectable —
+// Kernel readers live inside <epdf-viewer>, where the host is injectable —
 // and document UI is gated on having a document.
 @Component({
   selector: 'demo-workspace',

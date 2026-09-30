@@ -8,7 +8,8 @@ import { createLatestLane, type LatestLane } from './lanes';
 import { createMirror, type MirrorEnvironment } from './mirror';
 import { createPageMirror } from './page-mirror';
 import type { Scope } from './scope';
-import { createSerialQueue } from './serial-queue';
+import { createSerialQueue, type SerialQueue } from './serial-queue';
+import type { SettleFlush } from './settle';
 import type { SliceLease, Store } from './store';
 import type {
   AnyPlugin,
@@ -43,6 +44,8 @@ export interface SessionRef {
   /** Aborted when close() begins. */
   readonly signal: AbortSignal;
   readonly leases: Map<AnyPlugin, SliceLease<unknown>>;
+  /** The flushes to run before the document's file is read (settle.ts). */
+  readonly settleFlushes: Set<SettleFlush>;
 }
 
 /**
@@ -160,7 +163,7 @@ export function createPluginContext(
   const notFound = (ref: PageRef) =>
     new PluginError('not-found', capability, `page ${ref.objectNumber} is not in this document`);
 
-  const queues = new Map<string, <T>(operation: () => Promise<T>) => Promise<T>>();
+  const queues = new Map<string, SerialQueue>();
   const lanes = new Map<string, LatestLane>();
 
   // Mirrors hold their values in store cells of their own, revoked with the
@@ -306,6 +309,17 @@ export function createPluginContext(
     },
 
     cleanup: (teardown) => scope.defer(teardown),
+    onSettle(flush) {
+      if (!session) {
+        throw new Error(
+          `[kernel] workspace plugin "${plugin.id}" has no document to settle; ctx.onSettle() is for document-scoped plugins.`,
+        );
+      }
+      session.settleFlushes.add(flush);
+      scope.defer(() => {
+        session.settleFlushes.delete(flush);
+      });
+    },
     async acquire(get, dispose) {
       const value = await get(lifetime);
       if (lifetime.aborted) {

@@ -10,6 +10,7 @@
 import type { EventHook } from './event-hook';
 import type { Mirror, MirrorSpec } from './mirror';
 import type { PageMirror, PageMirrorSpec } from './page-mirror';
+import type { SerialQueue } from './serial-queue';
 import type { PluginErrorInfo } from './errors';
 import type {
   DocumentHandle,
@@ -305,6 +306,15 @@ export interface PluginContext<S = unknown> {
    * immediately instead of dropping it, so a late registration cannot leak.
    */
   cleanup(fn: () => void | Promise<void>): void;
+  /**
+   * Register what this plugin holds back from the engine, such as text typed a moment ago or
+   * the writes in its write queue (`() => queue.idle()`). Before anything reads the whole
+   * document (`documents.save()`, `saveLayer()`), the kernel calls every plugin's `flush` and
+   * waits for it: send what's held back, and resolve once the engine has it. Document-scoped
+   * plugins only; unregistered when the instance closes. The rules are in
+   * `docs/conventions/state-and-sync.md`.
+   */
+  onSettle(flush: (signal: AbortSignal) => Promise<void> | void): void;
   /** Acquire a resource whose disposal the instance owns; a late arrival after close is disposed, not returned. */
   acquire<R>(
     get: (lifetime: AbortSignal) => Promise<R>,
@@ -313,7 +323,7 @@ export interface PluginContext<S = unknown> {
   /** Newest-wins lane for reads a newer call should cancel (visible search, validation). */
   latest(key: string): import('./lanes').LatestLane;
   /** Per-key submission-order queue for multi-step writes; failures do not poison later work. */
-  serialQueue(key?: string): <T>(operation: () => Promise<T>) => Promise<T>;
+  serialQueue(key?: string): SerialQueue;
 }
 
 /**
@@ -499,14 +509,17 @@ export interface DocumentsCapability {
    * The complete document (base + layer) as PDF bytes. `mode` is
    * `'incremental'` (append changes, original bytes preserved) or `'rewrite'`
    * (flatten to a fresh PDF). Defaults to the active document. Saving to
-   * disk is a web adapter verb (`saveAs`), not a kernel one.
+   * disk is a web adapter verb (`saveAs`), not a kernel one. It first waits
+   * for what plugins hold back (text typed a moment ago) and for writes on
+   * their way, so the file has everything the user sees (`ctx.onSettle`).
    */
   save(id?: string, options?: { mode?: PdfSaveMode } & OperationOptions): Promise<Uint8Array>;
   /**
    * Export just the document's layer artifact (re-openable via `OpenInputLayerBytes`).
    * Rejects when the document was opened without a layer, or the engine can't
    * export one (cloud manages layers server-side — `DocumentHandle.downloadLayer`
-   * is absent there). Defaults to the active document.
+   * is absent there). Defaults to the active document. Waits for held-back
+   * writes first, like `save`.
    */
   saveLayer(id?: string, options?: OperationOptions): Promise<Uint8Array>;
   /**

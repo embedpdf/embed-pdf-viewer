@@ -35,7 +35,8 @@ import { createEventHook } from './event-hook';
 import { createLatestLane, type LatestLane } from './lanes';
 import { createMirror, type MirrorController, type MirrorEnvironment } from './mirror';
 import { createPageMirror } from './page-mirror';
-import { createSerialQueue } from './serial-queue';
+import { createSerialQueue, type SerialQueue } from './serial-queue';
+import { settle, type SettleFlush } from './settle';
 import { createStore } from './store';
 import {
   DocumentsToken,
@@ -88,6 +89,8 @@ export interface TestContext<S> extends PluginContext<S> {
   connect<C>(instance: { api: C; connect?: () => void }): C;
   /** Deliver a confirmed document event, as the engine would (the default `doc.events`). */
   emitDocumentEvent(event: DocumentEvent): void;
+  /** What `documents.save()` does first: run every `onSettle` flush and wait for it (settle.ts). */
+  settle(signal?: AbortSignal): Promise<void>;
   /** Run the registered cleanups and abort the lifetime (the plugin's unmount). */
   dispose(): Promise<void>;
 }
@@ -174,6 +177,7 @@ export function createTestContext<S = void>(options: TestContextOptions<S> = {})
   const lease = store.lease<S>(id, options.state as S, instanceId);
   const cleanups: Array<() => void | Promise<void>> = [];
   const lifetime = new AbortController();
+  const settleFlushes = new Set<SettleFlush>();
   const pages = (options.pages ?? []).map(layoutOf);
   const capabilities = new Map<CapabilityToken<unknown>, unknown>(options.capabilities ?? []);
   const documentEvents = createEventHook<DocumentEvent>(report);
@@ -239,7 +243,7 @@ export function createTestContext<S = void>(options: TestContextOptions<S> = {})
     }
     return capability;
   };
-  const queues = new Map<string, <T>(operation: () => Promise<T>) => Promise<T>>();
+  const queues = new Map<string, SerialQueue>();
   const lanes = new Map<string, LatestLane>();
 
   const context: TestContext<S> = {
@@ -285,6 +289,12 @@ export function createTestContext<S = void>(options: TestContextOptions<S> = {})
     tryForDocument: (token) => resolve(token),
     cleanup: (fn) => {
       cleanups.push(fn);
+    },
+    onSettle: (flush) => {
+      settleFlushes.add(flush);
+      cleanups.push(() => {
+        settleFlushes.delete(flush);
+      });
     },
     events: {
       source: <T>() => {
@@ -349,6 +359,7 @@ export function createTestContext<S = void>(options: TestContextOptions<S> = {})
       return instance.api;
     },
     emitDocumentEvent: (event) => documentEvents.emit(event),
+    settle: (signal) => settle(settleFlushes, [signal, lifetime.signal], report),
     dispose: async () => {
       lifetime.abort();
       for (const fn of cleanups.splice(0).reverse()) await fn();

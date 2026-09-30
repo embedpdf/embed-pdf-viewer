@@ -3,7 +3,7 @@
  * re-measures the page's measurement annotations unless told not to. A
  * multi-page change reports per-page failures; a single-page change rejects.
  */
-import { PluginError, toPluginError } from '@embedpdf/core';
+import { PluginError, toPluginError, type SerialQueue } from '@embedpdf/core';
 import {
   assertWritableMeasure,
   measureFromKnownLength,
@@ -48,6 +48,21 @@ export function createScaleWrites(
   const { scaleChanged, calibrationCompleted } = events;
   const { requirePage, assertAllowed, targets } = store;
   const { annotation } = siblings;
+
+  /** One write queue per page, so a page's scale changes land in order. */
+  const pageQueues = new Map<number, SerialQueue>();
+  const queueOf = (page: PageRef): SerialQueue => {
+    let queue = pageQueues.get(page.objectNumber);
+    if (!queue) {
+      queue = ctx.serialQueue(`scale:${page.objectNumber}`);
+      pageQueues.set(page.objectNumber, queue);
+    }
+    return queue;
+  };
+  // A download waits for the scale changes on their way.
+  ctx.onSettle(async () => {
+    await Promise.all([...pageQueues.values()].map((queue) => queue.idle()));
+  });
 
   /** Write one page's scale (`null` = back to the default) and re-measure. */
   const save = async (
@@ -107,7 +122,7 @@ export function createScaleWrites(
     try {
       const reports = await Promise.all(
         target.map((page) =>
-          ctx.serialQueue(`scale:${page.objectNumber}`)(async (): Promise<ScaleChangeReport> => {
+          queueOf(page)(async (): Promise<ScaleChangeReport> => {
             try {
               await ensureLoaded(page);
               const scale = measure(page);

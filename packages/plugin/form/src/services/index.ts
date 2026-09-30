@@ -3,7 +3,7 @@
  * tree and per-page widget geometry), the events, authority, the sibling
  * plugins, the scripting seam, and the one write queue.
  */
-import type { Mirror, PageMirror } from '@embedpdf/core';
+import type { Mirror, PageMirror, SerialQueue } from '@embedpdf/core';
 
 import type { FormConfig } from '../contract';
 import { fieldKeyOfRef, type FieldIndex, type WidgetBoxes } from '../model';
@@ -28,7 +28,7 @@ export interface FormServices {
    * Every durable write rides one serial queue, so a write driven by the
    * actions plugin never interleaves with a user's in-flight commit.
    */
-  readonly enqueue: <T>(operation: () => Promise<T>) => Promise<T>;
+  readonly enqueue: SerialQueue;
   readonly keyOf: typeof fieldKeyOfRef;
 }
 

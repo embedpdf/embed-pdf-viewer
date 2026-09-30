@@ -148,8 +148,13 @@ export function createI18nController(ctx: PluginContext<I18nState>, config: I18n
       return () => ctx.state.update(unregisterLocale, locale.code);
     },
     addTranslations: (code, dictionary) => {
-      if (!state().locales[code]) {
-        throw new PluginError('not-found', 'i18n', `unknown locale '${code}'`);
+      // A lazy pack takes strings before it has loaded; they merge in when it does.
+      if (!state().locales[code] && !config.loaders?.[code]) {
+        throw new PluginError(
+          'not-found',
+          'i18n',
+          `unknown locale '${code}' — not registered and no loader configured`,
+        );
       }
       ctx.state.update(addTranslations, code, dictionary);
     },

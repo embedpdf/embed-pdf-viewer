@@ -306,14 +306,15 @@ Everything a plugin acquires is owned by its instance and released when the
 instance closes (a document plugin) or the kernel is destroyed (a workspace
 plugin).
 
-| Member                         | Behavior                                                                                                                                                                                               |
-| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `ctx.cleanup(teardown)`        | Run `teardown` at close. Asynchronous teardowns are awaited. Registering after the owner closed runs the teardown immediately.                                                                         |
-| `ctx.listen(source, listener)` | Subscribe to an `EventHook` or anything with `subscribe` for the instance's lifetime. The kernel owns the unsubscribe.                                                                                 |
-| `ctx.acquire(get, dispose)`    | `get(lifetime)` a resource and register `dispose`. A resource that arrives after close is disposed and the call rejects `instance-closed`.                                                             |
-| `ctx.latest(key)`              | A newest-wins lane: `lane.run(async (run) => …, options)`. Starting a run aborts the previous one; a superseded run cannot publish (`run.commit(fn)` returns false) and rejects `operation-cancelled`. |
-| `ctx.serialQueue(key?)`        | A per-key queue: operations run one at a time, in submission order, and a failure does not affect later operations.                                                                                    |
-| `ctx.events.source<T>()`       | An event source, disposed at close.                                                                                                                                                                    |
+| Member                         | Behavior                                                                                                                                                                                                  |
+| ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ctx.cleanup(teardown)`        | Run `teardown` at close. Asynchronous teardowns are awaited. Registering after the owner closed runs the teardown immediately.                                                                            |
+| `ctx.listen(source, listener)` | Subscribe to an `EventHook` or anything with `subscribe` for the instance's lifetime. The kernel owns the unsubscribe.                                                                                    |
+| `ctx.acquire(get, dispose)`    | `get(lifetime)` a resource and register `dispose`. A resource that arrives after close is disposed and the call rejects `instance-closed`.                                                                |
+| `ctx.latest(key)`              | A newest-wins lane: `lane.run(async (run) => …, options)`. Starting a run aborts the previous one; a superseded run cannot publish (`run.commit(fn)` returns false) and rejects `operation-cancelled`.    |
+| `ctx.serialQueue(key?)`        | A per-key queue: operations run one at a time, in submission order, and a failure does not affect later operations. `queue.idle()` resolves once everything queued so far has finished.                   |
+| `ctx.onSettle(flush)`          | Run `flush` before the document's file is read, and wait for it: send what the plugin holds back from the engine. Document plugins only. See [`state-and-sync.md`](./state-and-sync.md#held-back-writes). |
+| `ctx.events.source<T>()`       | An event source, disposed at close.                                                                                                                                                                       |
 
 - Queues come from `ctx.serialQueue(key)`, never from a local
   `createSerialQueue()`.

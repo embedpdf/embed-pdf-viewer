@@ -294,6 +294,49 @@ describe('typing', () => {
   });
 });
 
+describe('settle before a download', () => {
+  it('sends the text typed a moment ago without waiting for the pause', async () => {
+    vi.useFakeTimers();
+    const harness = annotationHarness();
+    await harness.load([freeText('Hello')]);
+    harness.update.mockResolvedValueOnce({ annotation: freeText('Hello world') });
+
+    harness.capability.draftContents(ref(30), 'Hello world'); // held back until typing pauses
+    expect(harness.update).not.toHaveBeenCalled();
+    const settled = harness.ctx.settle();
+    await vi.advanceTimersByTimeAsync(0); // no time passes: the pause never ends
+    await settled;
+
+    expect(harness.update).toHaveBeenCalledTimes(1);
+    expect(harness.update.mock.calls[0]![1]).toMatchObject({
+      richText: { paragraphs: [{ runs: [{ text: 'Hello world' }] }] },
+    });
+    await vi.advanceTimersByTimeAsync(300);
+    expect(harness.update).toHaveBeenCalledTimes(1); // the pause's own write is gone
+  });
+
+  it('waits for a write already on its way', async () => {
+    vi.useFakeTimers();
+    const harness = annotationHarness();
+    await harness.load([freeText('Hello')]);
+    const write = deferred<unknown>();
+    harness.update.mockReturnValueOnce(write.promise);
+    harness.capability.draftContents(ref(30), 'Hello w');
+    await vi.advanceTimersByTimeAsync(300); // the pause ended: the write is sent
+
+    let settled = false;
+    void harness.ctx.settle().then(() => {
+      settled = true;
+    });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(settled).toBe(false);
+
+    write.resolve({ annotation: freeText('Hello w') });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(settled).toBe(true);
+  });
+});
+
 describe('weak annotations (direct objects without /NM)', () => {
   it('an edit that makes the engine name the annotation keeps one record', async () => {
     const harness = annotationHarness();

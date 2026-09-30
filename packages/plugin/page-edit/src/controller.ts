@@ -26,6 +26,8 @@ const LETTER_SIZE: PdfSize = { width: 612, height: 792 };
 export function createPageEditController(ctx: PluginContext<void>) {
   /** Read-modify-write verbs run one at a time, in submission order. */
   const enqueue = ctx.serialQueue('mutations');
+  // A download waits for the page edits on their way.
+  ctx.onSettle(() => enqueue.idle());
 
   /** Engine calls outside the guarded `ctx.doc` (another document, a scratch document) map their errors here. */
   const mapErrors = async <T>(work: () => Promise<T>): Promise<T> => {

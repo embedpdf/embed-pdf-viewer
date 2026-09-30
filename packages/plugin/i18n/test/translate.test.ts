@@ -9,6 +9,7 @@ const stateWith = (overrides: Partial<I18nState> = {}): I18nState => ({
   fallbackLocale: 'en',
   locales: { en, es },
   loading: null,
+  waitingTranslations: {},
   ...overrides,
 });
 

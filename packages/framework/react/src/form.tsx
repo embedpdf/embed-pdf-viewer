@@ -346,8 +346,9 @@ function TextWidget({ fill, item, page, appearance }: WidgetProps<'text'>) {
   // The editor is always mounted: transparent over the picture
   // at rest, visible while focused. That makes the DOM the focus manager —
   // native Tab order reaches every field, focus enters edit, blur commits —
-  // with zero focus machinery of our own. The focused element holds the
-  // draft; the plugin model only learns a value on commit (see model.ts).
+  // with zero focus machinery of our own. The focused element shows the
+  // draft and the plugin keeps it (`draftText`), so a download can write it;
+  // the field's value changes only on commit (see model.ts).
   const [focused, setFocused] = useState(false);
   const [draft, setDraft] = useState(fill.value);
   const cancelled = useRef(false);
@@ -397,16 +398,20 @@ function TextWidget({ fill, item, page, appearance }: WidgetProps<'text'>) {
     'aria-label': fill.label,
     disabled: fill.disabled,
     onFocus: () => setFocused(true),
-    onChange: (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
-      setDraft(event.target.value),
+    onChange: (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+      setDraft(event.target.value);
+      form.draftText(fill.fieldRef, event.target.value);
+    },
     onBlur: () => {
       setFocused(false);
       if (cancelled.current) {
         cancelled.current = false;
+        form.discardDraftText(fill.fieldRef);
         setDraft(fill.value);
         return;
       }
-      if (draft !== fill.value) void form.setText(fill.fieldRef, draft);
+      if (draft !== fill.value) void form.commitDraftText(fill.fieldRef);
+      else form.discardDraftText(fill.fieldRef);
     },
     style: editorStyle,
   };
@@ -720,7 +725,7 @@ const fillControl: React.CSSProperties = {
   height: '100%',
 };
 
-/** Text control: keystrokes stay local (the input is the draft store);
+/** Text control: keystrokes go to the plugin's draft (a download writes it);
  *  the engine write happens on blur or Enter. */
 function FillText({
   item,
@@ -736,9 +741,13 @@ function FillText({
 
   const css = fillBox(item, page);
   const fontSize = Math.max(9, Math.min(css.height * 0.62, 24));
+  const type = (text: string) => {
+    setDraft(text);
+    form.draftText(item.fieldRef, text);
+  };
   const commit = () => {
-    if (draft !== item.value)
-      void form.setText(item.fieldRef, draft).catch(() => setDraft(item.value));
+    if (draft === item.value) form.discardDraftText(item.fieldRef);
+    else void form.commitDraftText(item.fieldRef).catch(() => setDraft(item.value));
   };
   const shared: React.CSSProperties = {
     ...controlBase,
@@ -757,7 +766,7 @@ function FillText({
           aria-label={item.label}
           value={draft}
           disabled={item.disabled}
-          onChange={(event) => setDraft(event.target.value)}
+          onChange={(event) => type(event.target.value)}
           onBlur={commit}
           style={{ ...shared, resize: 'none', ...editorGate }}
         />
@@ -768,7 +777,7 @@ function FillText({
           value={draft}
           maxLength={item.maxLength ?? undefined}
           disabled={item.disabled}
-          onChange={(event) => setDraft(event.target.value)}
+          onChange={(event) => type(event.target.value)}
           onBlur={commit}
           onKeyDown={(event) => {
             if (event.key === 'Enter') (event.target as HTMLInputElement).blur();

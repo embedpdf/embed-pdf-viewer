@@ -9,6 +9,7 @@ import {
 import type { SliceLease } from './store';
 import { createEventHook } from './event-hook';
 import { toPluginError, toPluginErrorInfo } from './errors';
+import { settle } from './settle';
 import { planPlugins } from './order';
 import { createScope, CancelledError, isCancelled, type Scope } from './scope';
 import {
@@ -296,6 +297,7 @@ export function createKernel(config: {
       capabilities: new Map(),
       connectors: new Map(),
       leases: new Map(),
+      settleFlushes: new Set(),
       close: () => closeSession(session),
     };
     return session;
@@ -446,6 +448,27 @@ export function createKernel(config: {
     if (!session) return null;
     return session.phase === 'bringup' || session.phase === 'ready' ? session.handle : null;
   };
+
+  /**
+   * The document's handle once it has settled: what its plugins held back is
+   * sent and answered, so reading the file now gives everything the user sees
+   * (settle.ts). Closing the document cancels the wait.
+   */
+  async function settledHandle(
+    documentId: string | undefined,
+    signal: AbortSignal | undefined,
+    verb: string,
+  ): Promise<DocumentHandle> {
+    const session = sessionOf(documentId);
+    if (!session || !documentHandle(documentId)) {
+      throw new Error(`[documents] no document to ${verb}`);
+    }
+    await settle(session.settleFlushes, [signal, session.signal], report);
+    // The same document, even if another became active while it settled.
+    const handle = documentHandle(session.id);
+    if (!handle) throw new Error(`[documents] no document to ${verb}`);
+    return handle;
+  }
 
   function buildDocumentCapability(plugin: AnyPlugin, session: DocumentSession): unknown {
     let capability = session.capabilities.get(plugin);
@@ -865,18 +888,14 @@ export function createKernel(config: {
       reorder(next);
     },
     // Document IO — siblings of open/close, straight to the live engine handle.
-    save: (id, options) => {
-      const handle = documentHandle(id);
-      if (!handle) return Promise.reject(new Error('[documents] no document to save'));
+    save: async (id, options) => {
+      const handle = await settledHandle(id, options?.signal, 'save');
       return handle.download(options?.mode !== undefined ? { mode: options.mode } : undefined);
     },
-    saveLayer: (id) => {
-      const handle = documentHandle(id);
-      if (!handle) return Promise.reject(new Error('[documents] no document to download'));
+    saveLayer: async (id, options) => {
+      const handle = await settledHandle(id, options?.signal, 'download');
       if (!isLocalDocument(handle)) {
-        return Promise.reject(
-          new Error('[documents] only the local engine can export a layer (open with a layer)'),
-        );
+        throw new Error('[documents] only the local engine can export a layer (open with a layer)');
       }
       return handle.downloadLayer();
     },

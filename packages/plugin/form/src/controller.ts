@@ -17,6 +17,7 @@ import { createFieldWrites } from './write/fields';
 import { createInterchange } from './write/interchange';
 import { createResetWrites } from './write/reset';
 import { createScriptEffects } from './write/script-effects';
+import { createTyping } from './write/typing';
 import { createValueWrites } from './write/values';
 
 export function createFormController(ctx: FormContext, config: FormConfig = {}) {
@@ -27,6 +28,7 @@ export function createFormController(ctx: FormContext, config: FormConfig = {}) 
   const widgets = createWidgetReads(ctx, services);
 
   const values = createValueWrites(ctx, services);
+  const typing = createTyping(ctx, services, values.api.setText);
   const resets = createResetWrites(ctx, services);
   const design = createFieldWrites(ctx, services, widgets);
   const interchange = createInterchange(ctx, services);
@@ -37,6 +39,7 @@ export function createFormController(ctx: FormContext, config: FormConfig = {}) 
     fields.api,
     widgets.api,
     values.api,
+    typing.api,
     resets.api,
     design.api,
     interchange.api,

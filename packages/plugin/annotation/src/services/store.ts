@@ -129,6 +129,8 @@ export interface AnnotationStore {
   onEffect<K extends Effect['type']>(kind: K, runner: EffectRunner<K>): void;
   /** Claim the engine writes of stated changes (one writer; last wins). */
   onApply(writer: ApplyWriter): void;
+  /** Resolves once every engine write started so far, and while waiting, has its answer. */
+  whenWritten(): Promise<void>;
 }
 
 /** The refs behind a list of model ids (records not yet confirmed have none). */
@@ -342,5 +344,6 @@ export function createStore(
         runner(effect as Extract<Effect, { type: typeof kind }>, current),
       );
     },
+    whenWritten: intents.idle,
   };
 }

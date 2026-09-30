@@ -1,6 +1,6 @@
 ---
 title: Building forms
-description: "Turn any PDF into a form: place text boxes, checkboxes, radio buttons, lists and signature fields, and change their settings."
+description: 'Turn any PDF into a form: place text boxes, checkboxes, radio buttons, lists and signature fields, and change their settings.'
 ---
 
 {/* Generated from docs/content — edit there, then `pnpm docs:sync`. */}
@@ -15,17 +15,17 @@ any document into a form. Switch to **design mode**, pick a field tool, and clic
 Building needs the [annotation plugin](../annotations) next to the form plugin: in design mode, fields
 are boxes you select, move, resize and style like any annotation.
 
-| Tool             | Places                              | A click makes |
-| :--------------- | :---------------------------------- | :------------ |
-| `form-text`      | A text box                          | 160 × 24      |
-| `form-checkbox`  | A checkbox                          | 18 × 18       |
-| `form-radio`     | A radio button                      | 18 × 18       |
-| `form-combobox`  | A dropdown                          | 140 × 24      |
-| `form-listbox`   | A list                              | 140 × 72      |
-| `form-signature` | A field someone signs later         | 160 × 48      |
+| Tool             | Places                      | A click makes |
+| :--------------- | :-------------------------- | :------------ |
+| `form-text`      | A text box                  | 160 × 24      |
+| `form-checkbox`  | A checkbox                  | 18 × 18       |
+| `form-radio`     | A radio button              | 18 × 18       |
+| `form-combobox`  | A dropdown                  | 140 × 24      |
+| `form-listbox`   | A list                      | 140 × 72      |
+| `form-signature` | A field someone signs later | 160 × 48      |
 
-A see-through preview of the field follows the pointer, so people see where it lands before they
-click. Drag instead of clicking for another size. The tool stays active, so placing ten checkboxes is ten
+A see-through preview of the field follows the pointer, drawn as the field will be, so people see
+where it lands before they click. Drag instead of clicking for another size. The tool stays active, so placing ten checkboxes is ten
 clicks.
 
 ## Design mode
@@ -56,15 +56,15 @@ interaction.activateTool('pointer'); // fill it in
 
 `update()` takes only what you change, with the same settings a field reads:
 
-| Setting         | What it is                                                         |
-| :-------------- | :----------------------------------------------------------------- |
-| `name`          | The full name. Dots make groups: `customer.email`                  |
-| `required`      | PDF apps ask for a value before the form is submitted              |
-| `readOnly`      | People can't change the value                                      |
-| `alternateName` | The tooltip, also read by screen readers                           |
-| `defaultValue`  | What a reset puts back                                             |
-| `options`       | For a dropdown or list: `{ label, value }` pairs                   |
-| `maxLength`, `multiline`, `password`, `comb` | For a text box                        |
+| Setting                                      | What it is                                            |
+| :------------------------------------------- | :---------------------------------------------------- |
+| `name`                                       | The full name. Dots make groups: `customer.email`     |
+| `required`                                   | PDF apps ask for a value before the form is submitted |
+| `readOnly`                                   | People can't change the value                         |
+| `alternateName`                              | The tooltip, also read by screen readers              |
+| `defaultValue`                               | What a reset puts back                                |
+| `options`                                    | For a dropdown or list: `{ label, value }` pairs      |
+| `maxLength`, `multiline`, `password`, `comb` | For a text box                                        |
 
 A field's look, such as its border, background and font, belongs to its box: change it like any
 annotation's, with the [style panel](../annotations/selecting#a-style-panel).
@@ -116,14 +116,14 @@ such as a reference number on every page, use `form.removeWidget(field.ref, widg
 What `useForm()` gives you for building forms. Reading, filling and the form's state are on
 [Filling forms](../forms#methods).
 
-| Method                      | What it does                                                                                                            |
-| :-------------------------- | :---------------------------------------------------------------------------------------------------------------------- |
-| `create(draft)`             | Adds a field, with a box for each place it shows. Resolves `{ field }`. [Add fields from code](#add-fields-from-code)    |
-| `update(ref, patch)`        | Changes a field's settings; pass only what changes. Resolves `{ field }`. [Change a field's settings](#change-a-fields-settings) |
-| `delete(ref)`               | Removes a field and every box it has. [Remove a field](#remove-a-field)                                                 |
-| `removeWidget(ref, widget)` | Removes one box of a field that shows in several places                                                                 |
+| Method                      | What it does                                                                                                                                                                                          |
+| :-------------------------- | :---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `create(draft)`             | Adds a field, with a box for each place it shows. Resolves `{ field }`. [Add fields from code](#add-fields-from-code)                                                                                 |
+| `update(ref, patch)`        | Changes a field's settings; pass only what changes. Resolves `{ field }`. [Change a field's settings](#change-a-fields-settings)                                                                      |
+| `delete(ref)`               | Removes a field and every box it has. [Remove a field](#remove-a-field)                                                                                                                               |
+| `removeWidget(ref, widget)` | Removes one box of a field that shows in several places                                                                                                                                               |
 | `repair(options?)`          | Fixes a form other PDF apps read differently, such as fields missing from the form's list, and resolves what it fixed. See [Repair a broken form](/docs/engine/forms/authoring#repair-a-broken-form). |
-| `canDesign()`               | Whether adding, changing and removing fields is allowed. [Permissions](#permissions)                                    |
+| `canDesign()`               | Whether adding, changing and removing fields is allowed. [Permissions](#permissions)                                                                                                                  |
 
 Every method that returns a promise also takes a `signal` in its options, to cancel it.
 
@@ -131,16 +131,16 @@ Every method that returns a promise also takes a `signal` in its options, to can
 
 <Snippet name="forms/select-new-field" />
 
-| Event            | Fires when                        | Carries            |
-| :--------------- | :-------------------------------- | :----------------- |
-| `onFieldCreated` | A field was added                 | `field`, `origin`  |
-| `onFieldUpdated` | A field's settings changed        | `field`, `origin`  |
-| `onFieldDeleted` | A field was removed               | `ref`, `origin`    |
+| Event            | Fires when                 | Carries           |
+| :--------------- | :------------------------- | :---------------- |
+| `onFieldCreated` | A field was added          | `field`, `origin` |
+| `onFieldUpdated` | A field's settings changed | `field`, `origin` |
+| `onFieldDeleted` | A field was removed        | `ref`, `origin`   |
 
 ## Permissions
 
-| Permission         | What it allows                          | Check               |
-| :----------------- | :-------------------------------------- | :------------------ |
+| Permission         | What it allows                                  | Check              |
+| :----------------- | :---------------------------------------------- | :----------------- |
 | `doc.forms.modify` | Adding, changing, removing and repairing fields | `form.canDesign()` |
 
 Hide the field tools when `canDesign()` is false.

@@ -49,6 +49,12 @@ export function createAnnotationController(ctx: AnnotationContext, config: Annot
   // Writes: every change goes through the store, a gesture's through `commit`,
   // one stated in code through `apply`, and each ends in the same writes.
   const text = createTextEditing(ctx, services, chrome);
+  // Before the document's file is read (a download), write the words typed in
+  // the last moment, and wait for every write on its way.
+  ctx.onSettle(async () => {
+    await Promise.all(text.flushAllText());
+    await services.store.whenWritten();
+  });
   const links = createLinkWrites(ctx, services);
   registerEffectRunners(ctx, services, links);
   const crud = createCrud(ctx, services, annotations);

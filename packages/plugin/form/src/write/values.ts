@@ -22,6 +22,8 @@ export function createValueWrites(
   const { assertFill } = services.authority;
   const { enqueue, keyOf, fields } = services;
   const scripting = services.scripting.controller;
+  // A download waits for the values on their way.
+  ctx.onSettle(() => enqueue.idle());
   const surfaceViaActions = services.scripting.surface;
 
   const commitValue = async (

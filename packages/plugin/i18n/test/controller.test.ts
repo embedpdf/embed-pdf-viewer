@@ -158,4 +158,26 @@ describe('i18n controller', () => {
     i18n.registerLocale(ar);
     expect(i18n.getTranslator()).not.toBe(extended);
   });
+
+  it('takes dotted keys in addTranslations', () => {
+    const i18n = harness({ locales: [en] });
+    i18n.addTranslations('en', { 'nested.second': 'B', 'review.reject': 'Reject' });
+    expect(i18n.t('nested.first')).toBe('A');
+    expect(i18n.t('nested.second')).toBe('B');
+    expect(i18n.t('review.reject')).toBe('Reject');
+  });
+
+  it('takes strings for a lazy pack before it loads, and uses them once it has', async () => {
+    const pack = deferred<Locale>();
+    const i18n = harness({ locales: [en], loaders: { nl: () => pack.promise } });
+    i18n.addTranslations('nl', { hi: 'Hoi', 'review.reject': 'Afwijzen' });
+    const switching = i18n.setLocale('nl');
+    pack.resolve(nl);
+    await switching;
+    expect(i18n.t('hi')).toBe('Hoi'); // the app's string replaces the pack's
+    expect(i18n.t('review.reject')).toBe('Afwijzen');
+    expect(() => i18n.addTranslations('fr', { hi: 'Salut' })).toThrow(
+      expect.objectContaining({ code: 'not-found' }),
+    );
+  });
 });

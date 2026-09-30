@@ -383,6 +383,7 @@ export function createMarqueeHandler(anno: AnnotationHostCapability): Interactio
 export function createDrawHandler(
   anno: AnnotationHostCapability,
   interaction: InteractionHostCapability,
+  onSettle?: (flush: () => void) => void,
 ): InteractionHandler {
   // The active tool id + its routing subtype. The id is what `createPointer` takes
   // (it resolves the defaults preset — arrow vs line); the subtype is what the
@@ -412,6 +413,9 @@ export function createDrawHandler(
     pendingInk = null;
     anno.finishInkDraft();
   };
+  // A download finishes the drawing waiting for its next stroke. A stroke still
+  // being drawn is left alone: it's not what the user sees yet.
+  onSettle?.(flushPendingInk);
   interaction.onToolChanged(() => {
     flushPendingInk();
     drawingPoly = false;
