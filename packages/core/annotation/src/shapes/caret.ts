@@ -7,9 +7,10 @@
  */
 import type { AnnotationDTO } from '@embedpdf/engine-core/runtime';
 
+import { bodyPieces } from '../painted';
 import { normalizeDeg, rectCenter, rotatedAabb } from '../rect';
 import type { Rect, RenderNode, TextEndAnchor } from '../types';
-import { boxCorners, boxScaleAbout, boxTranslate, isInTurnedBox, type TurnedBox } from './box';
+import { boxCorners, boxScaleAbout, boxTranslate, type TurnedBox } from './box';
 import type { ShapeFamily } from './family';
 
 /** A caret record's shape: the engine's box and its turn. */
@@ -132,7 +133,7 @@ export const caretFamily: ShapeFamily<CaretShape> = {
   upright: (shape) => ({ ...shape, rotation: 0 }),
   handles: () => [],
   drag: (shape) => shape,
-  // A caret is hit anywhere in its box: the mark is small.
-  hit: (shape, point, margin) => isInTurnedBox(shape, point, margin),
+  // A caret paints its whole box: the mark is small.
+  painted: (shape) => bodyPieces(boxCorners(shape)),
   scene: caretScene,
 };

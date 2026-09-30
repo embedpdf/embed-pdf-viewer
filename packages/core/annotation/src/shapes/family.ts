@@ -7,6 +7,7 @@
  */
 import type { AnnotationDTO } from '@embedpdf/engine-core/runtime';
 
+import type { PaintedPiece } from '../painted';
 import type {
   FieldValues,
   Handle,
@@ -74,10 +75,10 @@ export interface ShapeFamily<S extends Shape = Shape> {
   /* ── hitting and drawing ─────────────────────────────────────────────── */
 
   /**
-   * Is `point` on the shape: within `margin` of what it strokes, or inside it
-   * when `filled`?
+   * What it paints (`painted.ts`): its ink, and its inside when `filled`. A
+   * click and the marquee both read these pieces.
    */
-  hit(shape: S, point: Point, margin: number, filled: boolean, stroke: Stroke): boolean;
+  painted(shape: S, stroke: Stroke, filled: boolean): PaintedPiece[];
   /** What it draws, for the live (vector) view. */
   scene(shape: S, stroke: Stroke): RenderNode[];
 }

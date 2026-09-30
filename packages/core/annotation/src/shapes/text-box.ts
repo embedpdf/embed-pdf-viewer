@@ -17,7 +17,8 @@
  */
 import type { AnnotationDTO, LineEnding } from '@embedpdf/engine-core/runtime';
 
-import { endingNodes, endingNodesHit, endingPoints } from '../endings';
+import { endingNodes, endingPieces, endingPoints } from '../endings';
+import { bodyPieces, type PaintedPiece } from '../painted';
 import {
   expandRect,
   insetRect,
@@ -25,7 +26,6 @@ import {
   rectCornerPoints,
   rotatePoint,
   rotatedAabb,
-  segDist,
   unionRect,
 } from '../rect';
 import type { Handle, Placement, Point, Rect, RenderNode, Stroke } from '../types';
@@ -36,7 +36,6 @@ import {
   boxRotateAbout,
   boxScaleAbout,
   boxTranslate,
-  isInTurnedBox,
   type TurnedBox,
 } from './box';
 import type { ShapeFamily } from './family';
@@ -247,29 +246,17 @@ function textBoxSelectionBounds(shape: TextBoxShape, stroke: Stroke): Rect {
 }
 
 /**
- * Is `point` on the shape: anywhere in its box (plus `margin`), tested in the
- * box's own frame, or on a callout's line or the arrow at its tip.
+ * What the shape paints: its box, where its text is, grabbed anywhere in it
+ * and near its edge; and a callout's line, the stroke wide, and the ending at
+ * its tip.
  */
-function textBoxHit(
-  shape: TextBoxShape,
-  point: Point,
-  margin: number,
-  { strokeWidth }: Stroke,
-): boolean {
-  if (isInTurnedBox(shape, point, margin)) return true;
+function textBoxPainted(shape: TextBoxShape, { strokeWidth }: Stroke): PaintedPiece[] {
+  const pieces = bodyPieces(boxCorners(shape));
   const line = shape.calloutLine;
-  if (!line) return false;
-  const tolerance = margin + strokeWidth / 2;
-  for (let i = 0; i < line.length - 1; i++)
-    if (segDist(point, line[i]!, line[i + 1]!) <= tolerance) return true;
-  return (
-    !!shape.lineEnding &&
-    endingNodesHit(
-      endingNodes(line[0], tipAngle(line), shape.lineEnding, strokeWidth),
-      point,
-      tolerance,
-    )
-  );
+  if (!line) return pieces;
+  pieces.push({ kind: 'stroke', points: line, closed: false, halfWidth: strokeWidth / 2 });
+  const ending = endingNodes(line[0], tipAngle(line), shape.lineEnding ?? undefined, strokeWidth);
+  return [...pieces, ...endingPieces(ending, strokeWidth)];
 }
 
 /**
@@ -336,7 +323,7 @@ export const textBoxFamily: ShapeFamily<TextBoxShape> = {
   handles: textBoxHandles,
   drag: textBoxDrag,
   // A text box is hit anywhere in its box, filled or not.
-  hit: (shape, point, margin, _filled, stroke) => textBoxHit(shape, point, margin, stroke),
+  painted: (shape, stroke) => textBoxPainted(shape, stroke),
   scene: textBoxScene,
 };
 

@@ -55,8 +55,7 @@ export function familyChosenBy(pick: (annotation: AnnotationDTO) => ShapeFamily)
     upright: (shape, pivot) => familyOf(shape).upright(shape, pivot),
     handles: (shape) => familyOf(shape).handles(shape),
     drag: (shape, handle, to) => familyOf(shape).drag(shape, handle, to),
-    hit: (shape, point, margin, filled, stroke) =>
-      familyOf(shape).hit(shape, point, margin, filled, stroke),
+    painted: (shape, stroke, filled) => familyOf(shape).painted(shape, stroke, filled),
     scene: (shape, stroke) => familyOf(shape).scene(shape, stroke),
   };
 }

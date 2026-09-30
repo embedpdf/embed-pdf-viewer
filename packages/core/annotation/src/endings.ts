@@ -10,7 +10,8 @@
  * the segment angle (into the tip) and translate it to the tip point. Sizes
  * scale with the stroke width.
  */
-import { pointInPoly, segDist } from './rect';
+import type { PaintedPiece } from './painted';
+import { rectCenter } from './rect';
 import type { LineEnding, RenderNode, Point } from './types';
 
 interface EndingSpec {
@@ -164,32 +165,35 @@ export function endingNodes(
 }
 
 /**
- * Is the page point on a line/poly's drawn endings — so an arrowhead is as
- * clickable as the stroke. Uses the same ending nodes the renderer draws: a closed
- * shape (closed arrow, circle, square, diamond) hits inside or near its edge; an
- * open one (open arrow, butt, slash) hits near its stroke. `tol` is the stroke
- * band already widened by the hit margin.
+ * What a line's drawn endings paint, from the same nodes the renderer draws,
+ * so an arrowhead is as clickable as the stroke: the ink `strokeWidth` wide,
+ * and the inside of a closed head (closed arrow, square, diamond) or a circle.
+ * An open head (open arrow, butt, slash) paints its ink only.
  */
-export function endingNodesHit(nodes: RenderNode[], point: Point, tol: number): boolean {
-  for (const node of nodes) {
+export function endingPieces(nodes: readonly RenderNode[], strokeWidth: number): PaintedPiece[] {
+  const halfWidth = strokeWidth / 2;
+  return nodes.flatMap((node): PaintedPiece[] => {
     if (node.kind === 'ellipse') {
-      const rect = node.rect;
-      const rx = rect.width / 2;
-      const ry = rect.height / 2;
-      if (rx <= 0 || ry <= 0) continue;
-      const nx = (point.x - (rect.x + rx)) / rx;
-      const ny = (point.y - (rect.y + ry)) / ry;
-      if (Math.hypot(nx, ny) <= 1 + tol / Math.min(rx, ry)) return true; // filled disc + band
-    } else if (node.kind === 'poly') {
-      const points = node.points;
-      for (let i = 0; i < points.length - 1; i++)
-        if (segDist(point, points[i], points[i + 1]) <= tol) return true;
-      if (node.closed) {
-        if (points.length > 2 && segDist(point, points[points.length - 1], points[0]) <= tol)
-          return true;
-        if (pointInPoly(point, points)) return true; // filled head interior
-      }
+      const { rect } = node;
+      return [
+        {
+          kind: 'oval',
+          center: rectCenter(rect),
+          rx: rect.width / 2,
+          ry: rect.height / 2,
+          rotation: 0,
+          halfWidth,
+          filled: true,
+        },
+      ];
     }
-  }
-  return false;
+    if (node.kind !== 'poly') return [];
+    const ink: PaintedPiece = {
+      kind: 'stroke',
+      points: node.points,
+      closed: node.closed,
+      halfWidth,
+    };
+    return node.closed ? [{ kind: 'area', ring: node.points }, ink] : [ink];
+  });
 }

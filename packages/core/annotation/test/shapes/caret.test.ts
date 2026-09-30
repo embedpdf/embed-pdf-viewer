@@ -1,6 +1,7 @@
 import type { AnnotationDTO } from '@embedpdf/engine-core/runtime';
 import { describe, expect, it } from 'vitest';
 
+import { paintedNear } from '../../src/painted';
 import { caretFamily } from '../../src/shapes/caret';
 
 const BOX = { x: 94, y: 53, width: 6, height: 6 };
@@ -24,10 +25,13 @@ describe('the caret family', () => {
     });
   });
 
-  it('is hit anywhere in its box, plus the margin', () => {
-    const shape = caretFamily.read(caret(0));
-    expect(caretFamily.hit(shape, { x: 97, y: 56 }, 0, false, { strokeWidth: 0 })).toBe(true);
-    expect(caretFamily.hit(shape, { x: 102, y: 56 }, 1, false, { strokeWidth: 0 })).toBe(false);
-    expect(caretFamily.hit(shape, { x: 102, y: 56 }, 2, false, { strokeWidth: 0 })).toBe(true);
+  it('paints its whole box: hit anywhere in it, and within the margin of its edge', () => {
+    const pieces = caretFamily.painted(caretFamily.read(caret(0)), { strokeWidth: 0 }, false);
+    expect(paintedNear(pieces, { x: 97, y: 56 }, 0)).toBe(true);
+    expect(paintedNear(pieces, { x: 102, y: 56 }, 1)).toBe(false);
+    expect(paintedNear(pieces, { x: 102, y: 56 }, 2)).toBe(true);
+    // The margin reaches as far every way: 1.5 past two sides is 2.1 from the corner.
+    expect(paintedNear(pieces, { x: 101.5, y: 60.5 }, 2)).toBe(false);
+    expect(paintedNear(pieces, { x: 101.5, y: 60.5 }, 2.2)).toBe(true);
   });
 });

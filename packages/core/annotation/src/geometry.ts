@@ -7,6 +7,7 @@
  * numbers, nothing to convert.
  */
 import { isQuarterTurn, type PageRotation, type Size } from '@embedpdf/core-geometry';
+import { paintedNear, type PaintedPiece } from './painted';
 import {
   DEG2RAD,
   MIN_SIZE,
@@ -423,9 +424,9 @@ export function quadIntersectsRect(quad: [Point, Point, Point, Point], rect: Rec
 export const geomBounds = (geometry: Shape): Rect => familyOf(geometry).bounds(geometry);
 
 /**
- * Is the page point on the annotation: within `margin` of the stroke, or
- * inside the fill (when `filled`). The stroke band widens with the stroke
- * width; a cloud's bumps are what a cloudy box is hit on.
+ * Is the page point on what the shape paints ({@link geomPainted}): within
+ * `margin` of its ink, which widens with the stroke width, or inside it when
+ * `filled`. A cloudy border is hit on its curves.
  */
 export function geomHit(
   geometry: Shape,
@@ -434,7 +435,39 @@ export function geomHit(
   filled: boolean,
   stroke: Stroke,
 ): boolean {
-  return familyOf(geometry).hit(geometry, point, margin, filled, stroke);
+  return paintedNear(geomPainted(geometry, stroke, filled), point, margin);
+}
+
+/** The pieces each shape object painted last, and the stroke and fill they were asked for. */
+const paintedCache = new WeakMap<
+  Shape,
+  { stroke: Required<Stroke>; filled: boolean; pieces: readonly PaintedPiece[] }
+>();
+
+/**
+ * What the shape paints (`painted.ts`): its ink for `stroke`, and its inside
+ * when `filled`. Kept per shape object for the stroke and fill last asked
+ * about, since a hover asks again on every pointer move.
+ */
+export function geomPainted(
+  geometry: Shape,
+  stroke: Stroke,
+  filled: boolean,
+): readonly PaintedPiece[] {
+  const asked = {
+    strokeWidth: stroke.strokeWidth,
+    cloudyIntensity: stroke.cloudyIntensity ?? null,
+  };
+  const cached = paintedCache.get(geometry);
+  if (
+    cached?.filled === filled &&
+    cached.stroke.strokeWidth === asked.strokeWidth &&
+    cached.stroke.cloudyIntensity === asked.cloudyIntensity
+  )
+    return cached.pieces;
+  const pieces = familyOf(geometry).painted(geometry, asked, filled);
+  paintedCache.set(geometry, { stroke: asked, filled, pieces });
+  return pieces;
 }
 
 /** The shape's handles: resize corners and sides, a callout's tip and knee, or vertices. */

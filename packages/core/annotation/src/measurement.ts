@@ -1,10 +1,11 @@
 import { isReadout, measurementReadout } from '@embedpdf/engine-core/runtime';
 import type { AnnotationDTO } from '@embedpdf/engine-core/runtime';
-import { endingNodes, endingNodesHit, endingPoints } from './endings';
+import { endingNodes, endingPieces, endingPoints } from './endings';
 import { DISTANCE_CAPTION_SIZE as CAPTION_SIZE, distanceCaptionWidth } from './measurement-font';
 import { geomRotation, selectionQuad } from './geometry';
 import { dashOf } from './kinds/styles';
-import { rotatePoint, segDist, unionRect } from './rect';
+import { bodyPieces, type PaintedPiece } from './painted';
+import { rotatePoint, unionRect } from './rect';
 import { drawnLineOf, strokedOutlineOf } from './shapes/points';
 import type {
   FieldValues,
@@ -450,27 +451,33 @@ export function distanceCaptionHit(
   );
 }
 
-export function distanceHit(
-  layout: DistanceLayout,
-  point: Point,
-  strokeWidth: number,
-  margin: number,
-): boolean {
-  if (distanceCaptionHit(layout, point, margin)) {
-    return true;
-  }
+/** What a measurement's caption paints: its box, grabbed anywhere in it and near its edge. */
+export const captionPainted = (caption: DistanceCaptionLayout | null): PaintedPiece[] =>
+  caption ? bodyPieces(caption.bounds) : [];
 
+/**
+ * What a distance measurement paints: its caption, the ink of its dimension
+ * line, leaders and caption connector, and its endings.
+ */
+export function distancePainted(layout: DistanceLayout, strokeWidth: number): PaintedPiece[] {
+  const halfWidth = strokeWidth / 2;
   const segments = [
     ...layout.dimensionSegments,
     ...layout.leaderSegments,
     ...layout.captionConnector,
   ];
-
-  const tolerance = margin + strokeWidth / 2;
-  return (
-    segments.some((segment) => segDist(point, segment.from, segment.to) <= tolerance) ||
-    endingNodesHit(layout.endings, point, tolerance)
-  );
+  return [
+    ...captionPainted(layout.caption),
+    ...segments.map(
+      ({ from, to }): PaintedPiece => ({
+        kind: 'stroke',
+        points: [from, to],
+        closed: false,
+        halfWidth,
+      }),
+    ),
+    ...endingPieces(layout.endings, strokeWidth),
+  ];
 }
 
 export function distanceCaptionAt(

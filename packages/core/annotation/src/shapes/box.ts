@@ -14,7 +14,8 @@
  */
 import type { AnnotationDTO } from '@embedpdf/engine-core/runtime';
 
-import { cloudyBorderExtent, cloudyBounds, cloudyPath } from '../cloudy';
+import { cloudyBounds, cloudyOutline, cloudyPath } from '../cloudy';
+import type { PaintedPiece } from '../painted';
 import {
   MIN_SIZE,
   RECT_HANDLES,
@@ -29,7 +30,6 @@ import {
   rotatePoint,
   rotatedAabb,
   rotatedHandleCursor,
-  segDist,
   transposedAboutCenter,
   type RectHandle,
 } from '../rect';
@@ -100,13 +100,6 @@ function writeBox(
   return TURNING_KINDS.has(subtype)
     ? { box: shape.box, rotation: shape.rotation || null }
     : { rect: shape.box };
-}
-
-/** How far a cloudy border's bumps reach out from the box, about (hit-testing's band); 0 without a cloud. */
-function cloudReach(shape: BoxShape, stroke: Stroke): number {
-  return stroke.cloudyIntensity
-    ? cloudyBorderExtent(stroke.cloudyIntensity, stroke.strokeWidth, shape.ellipse)
-    : 0;
 }
 
 /**
@@ -201,47 +194,51 @@ export function boxResize<S extends TurnedBox>(shape: S, handle: string, to: Poi
 }
 
 /**
- * Is `point` on the shape: within `margin` of its stroke, or inside it when
- * `filled`. The test runs in the box's own frame (the point turned back).
- * A plain stroke draws inside the box, centred half its width in; a cloud's
- * bumps fill the band between the box and its reach.
+ * What the shape paints, turned with the box: a plain border's ink, which
+ * lies inside the box, centred half the stroke in; or a cloud's ink along its
+ * curves. Filled, it paints the box too, and a cloud the ring its curves close.
  */
-function boxHit(
-  shape: BoxShape,
-  point: Point,
-  margin: number,
-  filled: boolean,
-  stroke: Stroke,
-): boolean {
-  const local = shape.rotation ? rotatePoint(point, rectCenter(shape.box), -shape.rotation) : point;
-  const reach = cloudReach(shape, stroke);
-  const { strokeWidth } = stroke;
-  // The band the ink covers: a stroke's width inside the box, or a cloud's reach outside it.
-  const band = reach
-    ? { path: expandRect(shape.box, reach / 2), halfWidth: reach / 2 }
-    : { path: insetRect(shape.box, strokeWidth / 2), halfWidth: strokeWidth / 2 };
-  const tolerance = margin + band.halfWidth;
-  const outer = expandRect(shape.box, reach);
-  if (shape.ellipse) {
-    const middle = rectCenter(shape.box);
-    const outerRx = outer.width / 2;
-    const outerRy = outer.height / 2;
-    if (outerRx <= 0 || outerRy <= 0) return false;
-    if (filled && Math.hypot((local.x - middle.x) / outerRx, (local.y - middle.y) / outerRy) <= 1)
-      return true;
-    const rx = Math.max(0.01, band.path.width / 2);
-    const ry = Math.max(0.01, band.path.height / 2);
-    const distance = Math.hypot((local.x - middle.x) / rx, (local.y - middle.y) / ry);
-    return Math.abs(distance - 1) <= tolerance / Math.min(rx, ry);
+function boxPainted(shape: BoxShape, stroke: Stroke, filled: boolean): PaintedPiece[] {
+  const { strokeWidth, cloudyIntensity } = stroke;
+  const { box, rotation, ellipse } = shape;
+  const halfWidth = strokeWidth / 2;
+  const middle = rectCenter(box);
+  const turned = (points: Point[]): Point[] =>
+    rotation ? points.map((point) => rotatePoint(point, middle, rotation)) : points;
+  if (cloudyIntensity && box.width > 0 && box.height > 0) {
+    const curves = cloudyOutline(box, ellipse, cloudyIntensity, strokeWidth).map(turned);
+    const ink = curves.map(
+      (points): PaintedPiece => ({ kind: 'stroke', points, closed: true, halfWidth }),
+    );
+    if (!filled) return ink;
+    const inside: PaintedPiece = ellipse
+      ? {
+          kind: 'oval',
+          center: middle,
+          rx: box.width / 2,
+          ry: box.height / 2,
+          rotation,
+          halfWidth: 0,
+          filled: true,
+        }
+      : { kind: 'area', ring: boxCorners(shape) };
+    return [inside, ...curves.map((ring): PaintedPiece => ({ kind: 'area', ring })), ...ink];
   }
-  if (filled && rectContains(outer, local)) return true;
-  const [nw, ne, se, sw] = rectCornerPoints(band.path);
-  return (
-    segDist(local, nw, ne) <= tolerance ||
-    segDist(local, ne, se) <= tolerance ||
-    segDist(local, se, sw) <= tolerance ||
-    segDist(local, sw, nw) <= tolerance
-  );
+  const inset = insetRect(box, halfWidth);
+  if (ellipse) {
+    if (box.width <= 0 || box.height <= 0) return [];
+    // The ink's middle is the inset ellipse; its radii never quite reach 0.
+    const rx = Math.max(0.01, inset.width / 2);
+    const ry = Math.max(0.01, inset.height / 2);
+    return [{ kind: 'oval', center: middle, rx, ry, rotation, halfWidth, filled }];
+  }
+  const ink: PaintedPiece = {
+    kind: 'stroke',
+    points: turned(rectCornerPoints(inset)),
+    closed: true,
+    halfWidth,
+  };
+  return filled ? [{ kind: 'area', ring: boxCorners(shape) }, ink] : [ink];
 }
 
 /**
@@ -281,6 +278,6 @@ export const boxFamily: ShapeFamily<BoxShape> = {
   upright: (shape) => ({ ...shape, rotation: 0 }),
   handles: boxHandles,
   drag: boxResize,
-  hit: boxHit,
+  painted: boxPainted,
   scene: boxScene,
 };

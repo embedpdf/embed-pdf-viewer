@@ -8,7 +8,7 @@
 import { quadCorners, quadRing, type Quad } from '@embedpdf/core-geometry';
 import type { AnnotationDTO } from '@embedpdf/engine-core/runtime';
 
-import { expandRect, pointInPoly, unionRect } from '../rect';
+import { expandRect, unionRect } from '../rect';
 import type { Point, Rect, RenderNode, Stroke } from '../types';
 import type { ShapeFamily } from './family';
 
@@ -60,13 +60,6 @@ function quadsTranslate(shape: QuadsShape, delta: Point): QuadsShape {
 }
 
 /**
- * Is `point` inside any quad? Quad rings are simple (never self-crossing) by
- * construction, so the point-in-polygon test is exact for turned text too.
- */
-const quadsHit = (shape: QuadsShape, point: Point): boolean =>
-  shape.quadPoints.some((quad) => pointInPoly(point, quadRing(quad)));
-
-/**
  * A closed ring per quad (upper left round to lower left). The markup
  * painter draws each subtype from the quads itself; this keeps the generic
  * scene right regardless, turned text included.
@@ -96,6 +89,7 @@ export const quadsFamily: ShapeFamily<QuadsShape> = {
   upright: (shape) => shape,
   handles: () => [],
   drag: (shape) => shape,
-  hit: (shape, point) => quadsHit(shape, point),
+  // Each quad is filled: a highlight's colour, or the text a mark covers.
+  painted: (shape) => shape.quadPoints.map((quad) => ({ kind: 'area', ring: quadRing(quad) })),
   scene: quadsScene,
 };

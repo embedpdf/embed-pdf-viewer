@@ -26,16 +26,15 @@ import {
   type PagePointTurn,
 } from '@embedpdf/engine-core/runtime';
 
-import { cloudyPolyBounds, cloudyPolyPath } from '../cloudy';
-import { endingNodes, endingNodesHit } from '../endings';
+import { cloudyPolyBounds, cloudyPolyOutline, cloudyPolyPath } from '../cloudy';
+import { endingNodes, endingPieces } from '../endings';
+import type { PaintedPiece } from '../painted';
 import {
   expandRect,
   normalizeDeg,
-  pointInPoly,
   rectCenter,
   rectCornerPoints,
   rotatePoint,
-  segDist,
   unionRect,
 } from '../rect';
 import type { Handle, LineEnding, Placement, Point, Rect, RenderNode, Stroke } from '../types';
@@ -475,33 +474,33 @@ function pointsCorners(shape: PointsShape, stroke: Stroke): [Point, Point, Point
 }
 
 /**
- * Is `point` on the shape: within `margin` of a stroke or an ending, or
- * inside a filled polygon. The stroke band widens with the stroke width.
+ * What the shape paints: each drawn stroke's ink, a filled polygon's inside,
+ * and the endings. A cloudy polygon's ink runs along its cloud's curves, and
+ * filled, it paints the polygon and the ring its curves close.
  */
-function pointsHit(
-  shape: PointsShape,
-  point: Point,
-  margin: number,
-  filled: boolean,
-  { strokeWidth }: Stroke,
-): boolean {
-  const tolerance = margin + strokeWidth / 2;
+function pointsPainted(shape: PointsShape, stroke: Stroke, filled: boolean): PaintedPiece[] {
+  const { strokeWidth, cloudyIntensity } = stroke;
+  const halfWidth = strokeWidth / 2;
   const strokes = drawnStrokesOf(shape);
   const closed = shape.kind === 'poly' && shape.closed;
-  if (filled && closed && pointInPoly(point, strokes[0]!)) return true;
-  for (const stroke of strokes) {
-    for (let i = 0; i < stroke.length - 1; i++)
-      if (segDist(point, stroke[i]!, stroke[i + 1]!) <= tolerance) return true;
-    if (
-      closed &&
-      stroke.length > 2 &&
-      segDist(point, stroke[stroke.length - 1]!, stroke[0]!) <= tolerance
-    )
-      return true;
+  const outline = strokes[0];
+  const pieces: PaintedPiece[] = [];
+  if (outline && closed && cloudyIntensity && outline.length >= 3) {
+    const curves = cloudyPolyOutline(outline, cloudyIntensity, strokeWidth);
+    if (filled) {
+      pieces.push({ kind: 'area', ring: outline });
+      for (const ring of curves) pieces.push({ kind: 'area', ring });
+    }
+    for (const points of curves) pieces.push({ kind: 'stroke', points, closed: true, halfWidth });
+    return pieces;
   }
-  return endingSegs(shape).some((seg) =>
-    endingNodesHit(endingNodes(seg.tip, seg.angle, seg.ending, strokeWidth), point, tolerance),
-  );
+  if (outline && filled && closed) pieces.push({ kind: 'area', ring: outline });
+  for (const points of strokes) pieces.push({ kind: 'stroke', points, closed, halfWidth });
+  for (const seg of endingSegs(shape))
+    pieces.push(
+      ...endingPieces(endingNodes(seg.tip, seg.angle, seg.ending, strokeWidth), strokeWidth),
+    );
+  return pieces;
 }
 
 /**
@@ -544,6 +543,6 @@ export const pointsFamily: ShapeFamily<PointsShape> = {
   upright: pointsUpright,
   handles: pointsHandles,
   drag: pointsDrag,
-  hit: pointsHit,
+  painted: pointsPainted,
   scene: pointsScene,
 };

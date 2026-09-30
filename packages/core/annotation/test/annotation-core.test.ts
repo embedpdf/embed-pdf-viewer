@@ -19,7 +19,7 @@ import {
   STYLE,
   withAnnotation,
 } from './support';
-import { cloudyBorderExtent } from '../src/cloudy';
+import { cloudyBounds, cloudyOutline } from '../src/cloudy';
 import { annotDeletable, annotTransformable, DRAWN_FLAGS } from '../src/flags';
 import {
   chordThrough,
@@ -45,7 +45,13 @@ import {
   uprightRotation,
   fitStampBox,
 } from '../src/geometry';
-import { normalizeDeg, rotatedAabb, rotatedHandleCursor, transposedAboutCenter } from '../src/rect';
+import {
+  normalizeDeg,
+  rotatedAabb,
+  rotatedHandleCursor,
+  transposedAboutCenter,
+  unionRect,
+} from '../src/rect';
 import { caretFromAnchor, caretRectFromAnchor } from '../src/shapes/caret';
 import { calloutEnd, calloutShape, textBoxFamily, textPlateInset } from '../src/shapes/text-box';
 import { expandGroups, groupKeyOf, groupMembers } from '../src/group';
@@ -1244,23 +1250,26 @@ describe('annotation-core', () => {
     expect(geomHit(geometry, { x: 100, y: 150 }, margin, false, { strokeWidth: sw })).toBe(true);
   });
 
-  it("a cloudy border's scallops start on the box and reach out by the cloud's extent; an empty box draws the plain outline", () => {
+  it("a cloudy border's scallops start on the box and reach out; an empty box draws the plain outline", () => {
     const box = { x: 100, y: 100, width: 120, height: 90 };
     const geometry: Shape = { kind: 'box', box, rotation: 0, ellipse: false };
     const [node] = geomScene(geometry, { strokeWidth: 2, cloudyIntensity: 2 });
     expect(node.kind).toBe('path');
     const pathData = node.kind === 'path' ? node.d : '';
-    const nums = pathData.match(/-?\d+(\.\d+)?/g)!.map(Number);
-    const xs = nums.filter((_, i) => i % 2 === 0);
-    const ys = nums.filter((_, i) => i % 2 === 1);
-    const eps = 0.5;
-    const reach = cloudyBorderExtent(2, 2, false);
-    // The scallops reach past the box, and no further than the cloud's extent.
+    const xs = pathData
+      .match(/-?\d+(\.\d+)?/g)!
+      .map(Number)
+      .filter((_, i) => i % 2 === 0);
+    // The scallops reach past the box.
     expect(Math.min(...xs)).toBeLessThan(box.x);
-    expect(Math.min(...xs)).toBeGreaterThanOrEqual(box.x - reach - eps);
-    expect(Math.max(...xs)).toBeLessThanOrEqual(box.x + box.width + reach + eps);
-    expect(Math.min(...ys)).toBeGreaterThanOrEqual(box.y - reach - eps);
-    expect(Math.max(...ys)).toBeLessThanOrEqual(box.y + box.height + reach + eps);
+    // The points along the curves lie where the cloud paints, less half the
+    // stroke, to within the flattening's error.
+    const curves = unionRect(cloudyOutline(box, false, 2, 2).flat());
+    const painted = cloudyBounds(box, false, 2, 2);
+    for (const side of ['x', 'y'] as const)
+      expect(Math.abs(curves[side] - (painted[side] + 1))).toBeLessThan(0.02);
+    expect(Math.abs(curves.width - (painted.width - 2))).toBeLessThan(0.04);
+    expect(Math.abs(curves.height - (painted.height - 2))).toBeLessThan(0.04);
     // An empty box has nowhere to start the scallops: the plain outline, never a broken cloud.
     const empty: Shape = {
       kind: 'box',
@@ -1275,14 +1284,13 @@ describe('annotation-core', () => {
     const box = { x: 50, y: 50, width: 40, height: 30 };
     const geometry: Shape = { kind: 'box', box, rotation: 0, ellipse: false };
     const cloudy = { strokeWidth: 2, cloudyIntensity: 2 };
-    // The bumps reach the cloud's radius and half the stroke past the box: the
-    // box around their curves, Bézier arcs a hair off a true circle.
-    const reach = cloudyBorderExtent(2, 2, false);
+    // The bumps and half the stroke past them, on every side of the box.
     const drawn = geomVisualBounds(geometry, cloudy);
-    expect(drawn.x).toBeCloseTo(50 - reach, 2);
-    expect(drawn.y).toBeCloseTo(50 - reach, 2);
-    expect(drawn.width).toBeCloseTo(40 + 2 * reach, 2);
-    expect(drawn.height).toBeCloseTo(30 + 2 * reach, 2);
+    expect(drawn).toEqual(cloudyBounds(box, false, 2, 2));
+    expect(drawn.x).toBeLessThan(50);
+    expect(drawn.y).toBeLessThan(50);
+    expect(drawn.x + drawn.width).toBeGreaterThan(90);
+    expect(drawn.y + drawn.height).toBeGreaterThan(80);
     expect(selectionBounds(geometry, cloudy)).toEqual(box);
     const corners = geomHandles(geometry).filter((handle) => handle.id.length === 2);
     expect(corners.map((handle) => handle.at)).toEqual([
@@ -1293,26 +1301,36 @@ describe('annotation-core', () => {
     ]);
   });
 
-  it("a cloudy box is hit on its scallops, outside the box, and not past the cloud's reach", () => {
+  it('a cloudy box is hit on its curves: not between its bumps, nor in its middle unless filled', () => {
     const box = { x: 100, y: 100, width: 100, height: 100 };
     const geometry: Shape = { kind: 'box', box, rotation: 0, ellipse: false };
     const cloudy = { strokeWidth: 2, cloudyIntensity: 2 };
-    const reach = cloudyBorderExtent(2, 2, false);
     const margin = 2;
-    // Halfway through the bumps, outside the box.
-    expect(geomHit(geometry, { x: 100 - reach / 2, y: 150 }, margin, false, cloudy)).toBe(true);
-    // Past the bumps and the margin.
-    expect(geomHit(geometry, { x: 100 - reach - margin - 1, y: 150 }, margin, false, cloudy)).toBe(
+    // Anywhere along the curves, with no margin at all.
+    for (const point of cloudyOutline(box, false, 2, 2)[0]!)
+      expect(geomHit(geometry, point, 0, false, cloudy)).toBe(true);
+    // Past what the cloud paints and the margin.
+    const painted = cloudyBounds(box, false, 2, 2);
+    expect(geomHit(geometry, { x: painted.x - margin - 0.5, y: 150 }, margin, false, cloudy)).toBe(
       false,
     );
-    // The middle of an unfilled cloud.
+    // Between the box's left side and the bumps' tips there are gaps the ink doesn't reach.
+    const band: Point[] = [];
+    for (let x = painted.x; x < box.x; x += 0.25)
+      for (let y = 120; y < 180; y += 0.25) band.push({ x, y });
+    expect(band.some((point) => !geomHit(geometry, point, margin, false, cloudy))).toBe(true);
+    // The middle of an unfilled cloud; a filled one paints it.
     expect(geomHit(geometry, { x: 150, y: 150 }, margin, false, cloudy)).toBe(false);
+    expect(geomHit(geometry, { x: 150, y: 150 }, margin, true, cloudy)).toBe(true);
   });
 
-  it('cloudyBorderExtent grows with intensity and stroke; circle scallops are larger than square', () => {
-    expect(cloudyBorderExtent(2, 4, false)).toBeGreaterThan(cloudyBorderExtent(1, 4, false));
-    expect(cloudyBorderExtent(1, 10, false)).toBeGreaterThan(cloudyBorderExtent(1, 4, false));
-    expect(cloudyBorderExtent(1, 4, true)).toBeGreaterThan(cloudyBorderExtent(1, 4, false));
+  it("a cloud reaches farther with intensity and stroke; a circle's bumps reach farther than a square's", () => {
+    const box = { x: 100, y: 100, width: 100, height: 100 };
+    const reach = (intensity: number, strokeWidth: number, ellipse: boolean) =>
+      box.x - cloudyBounds(box, ellipse, intensity, strokeWidth).x;
+    expect(reach(2, 4, false)).toBeGreaterThan(reach(1, 4, false));
+    expect(reach(1, 10, false)).toBeGreaterThan(reach(1, 4, false));
+    expect(reach(1, 4, true)).toBeGreaterThan(reach(1, 4, false));
   });
 
   it('capabilities are orthogonal, not one binary: shapes resize, lines vertex-edit, markup neither', () => {

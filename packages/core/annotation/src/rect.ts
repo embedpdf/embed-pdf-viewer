@@ -121,6 +121,60 @@ export function segDist(point: Point, from: Point, to: Point): number {
       : Math.max(0, Math.min(1, ((point.x - from.x) * dx + (point.y - from.y) * dy) / len2));
   return Math.hypot(point.x - (from.x + fraction * dx), point.y - (from.y + fraction * dy));
 }
+/** Distance from `point` to the rect: 0 on or inside it. */
+export function pointRectDistance(point: Point, rect: Rect): number {
+  const dx = Math.max(rect.x - point.x, 0, point.x - (rect.x + rect.width));
+  const dy = Math.max(rect.y - point.y, 0, point.y - (rect.y + rect.height));
+  return Math.hypot(dx, dy);
+}
+
+/** Does the segment from `from` to `to` pass through the rect (edges included)? Clipped Liang–Barsky style. */
+export function segmentCrossesRect(from: Point, to: Point, rect: Rect): boolean {
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  // Each side as `step * t <= room`: the part of the segment on the rect's side of it.
+  const sides: [step: number, room: number][] = [
+    [-dx, from.x - rect.x],
+    [dx, rect.x + rect.width - from.x],
+    [-dy, from.y - rect.y],
+    [dy, rect.y + rect.height - from.y],
+  ];
+  let enter = 0;
+  let leave = 1;
+  for (const [step, room] of sides) {
+    if (step === 0) {
+      if (room < 0) return false;
+      continue;
+    }
+    const t = room / step;
+    if (step < 0) enter = Math.max(enter, t);
+    else leave = Math.min(leave, t);
+    if (enter > leave) return false;
+  }
+  return true;
+}
+
+/** Distance from the segment to the rect: 0 when it passes through it. */
+export function segmentRectDistance(from: Point, to: Point, rect: Rect): number {
+  if (segmentCrossesRect(from, to, rect)) return 0;
+  // Two convex shapes apart are nearest at an end of one or a corner of the other.
+  return Math.min(
+    pointRectDistance(from, rect),
+    pointRectDistance(to, rect),
+    ...rectCornerPoints(rect).map((corner) => segDist(corner, from, to)),
+  );
+}
+
+/**
+ * Does the polygon (even-odd, as {@link pointInPoly} reads it) touch the rect:
+ * overlap it, hold it, or meet its edge?
+ */
+export function polygonTouchesRect(ring: readonly Point[], rect: Rect): boolean {
+  if (ring.some((vertex) => rectContains(rect, vertex))) return true;
+  if (pointInPoly({ x: rect.x, y: rect.y }, ring)) return true;
+  return ring.some((vertex, i) => segmentCrossesRect(vertex, ring[(i + 1) % ring.length]!, rect));
+}
+
 /** Even-odd point-in-polygon. */
 export function pointInPoly(point: Point, points: readonly Point[]): boolean {
   let inside = false;

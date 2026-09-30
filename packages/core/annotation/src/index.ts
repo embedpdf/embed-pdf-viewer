@@ -42,7 +42,15 @@ export {
   rotationAnchor,
 } from './view';
 export type { TextBox } from './view';
-export { hitTest, cursorAt, isSelectable, canMove, isOnTextBox, type Target } from './hit';
+export {
+  hitTest,
+  cursorAt,
+  isSelectable,
+  canMove,
+  isOnTextBox,
+  paintedOf,
+  type Target,
+} from './hit';
 // Rich text run algebra (pure): what the editor binding and the plugin's
 // selection styling compute with.
 export {
@@ -113,6 +121,7 @@ export {
   geomBounds,
   geomVisualBounds,
   geomHit,
+  geomPainted,
   geomHandles,
   geomTranslate,
   geomDragHandle,
@@ -194,7 +203,9 @@ export {
   withValues,
   writableTarget,
 } from './record';
-export { cloudyPath, cloudyBorderExtent } from './cloudy';
+export { cloudyPath } from './cloudy';
+// What an annotation paints, and the two questions a click and the marquee ask of it.
+export { bodyPieces, paintedNear, paintedTouches, type PaintedPiece } from './painted';
 export * from './measurement';
 export * from './measurement-shape';
 // How an annotation is drawn: the engine's raster, or live (see appearance.ts).

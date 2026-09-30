@@ -8,9 +8,9 @@ import { hitTest } from '../src/hit';
 import {
   type DistanceAppearance,
   distanceCaptionAt,
-  distanceHit,
   distanceLabel,
   distanceLayout,
+  distancePainted,
   distanceScene,
   measurementOf,
   moveDistanceCaption,
@@ -19,6 +19,7 @@ import type { LineShape } from '../src/shapes/points';
 import type { Shape, Model, Message } from '../src/types';
 import { initialModel } from '../src/update';
 import { pageItems, chrome } from '../src/view';
+import { paintedNear } from '../src/painted';
 import { shapeOf } from '../src/record';
 const PAGE = toPageRef(1);
 const geom: LineShape = {
@@ -284,7 +285,7 @@ describe('distance gestures and captions', () => {
       expect(point.y).toBeLessThan(outline.rect.y + outline.rect.height);
     }
     expect(layout.captionConnector).toHaveLength(2);
-    expect(distanceHit(layout, { x: 40, y: 94 }, 1, 1)).toBe(true);
+    expect(paintedNear(distancePainted(layout, 1), { x: 40, y: 94 }, 1)).toBe(true);
   });
 
   it('matches the fixture short-arrow cases without painting the inner shaft', () => {
@@ -305,7 +306,7 @@ describe('distance gestures and captions', () => {
       { from: { x: 49.7457, y: 15 }, to: { x: 69.7457, y: 15 } },
     ]);
     expect(layout.caption!.center.y).toBe(26.5);
-    expect(distanceHit(layout, { x: 24, y: 15 }, 1, 1)).toBe(false);
+    expect(paintedNear(distancePainted(layout, 1), { x: 24, y: 15 }, 1)).toBe(false);
 
     const longer: LineShape = {
       ...short,

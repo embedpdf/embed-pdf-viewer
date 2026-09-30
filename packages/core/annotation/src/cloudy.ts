@@ -32,7 +32,10 @@ interface P {
 
 const formatNumber = (value: number): string => Number(value.toFixed(4)).toString();
 
-/** Where the cloud's curves go: an SVG path (`PathBuilder`), or their bounds (`CurveBounds`). */
+/**
+ * Where the cloud's curves go: an SVG path (`PathBuilder`), their bounds
+ * (`CurveBounds`), or the points along them (`CurvePolylines`).
+ */
 interface CurveSink {
   moveTo(x: number, y: number): void;
   curveTo(x1: number, y1: number, x2: number, y2: number, x3: number, y3: number): void;
@@ -65,6 +68,16 @@ class PathBuilder implements CurveSink {
   build(): string {
     return this.parts.join(' ');
   }
+}
+
+/** The point at `t` on the cubic Bézier `p0..p3`. */
+function bezierAt(p0: P, p1: P, p2: P, p3: P, t: number): P {
+  const rest = 1 - t;
+  const weights = [rest * rest * rest, 3 * rest * rest * t, 3 * rest * t * t, t * t * t];
+  return {
+    x: weights[0]! * p0.x + weights[1]! * p1.x + weights[2]! * p2.x + weights[3]! * p3.x,
+    y: weights[0]! * p0.y + weights[1]! * p1.y + weights[2]! * p2.y + weights[3]! * p3.y,
+  };
 }
 
 /** Where a cubic Bézier coordinate `p0..p3` turns: the parameters in (0, 1) where its slope is zero. */
@@ -118,16 +131,8 @@ class CurveBounds implements CurveSink {
     const p1 = this.place(x1, y1);
     const p2 = this.place(x2, y2);
     const p3 = this.place(x3, y3);
-    const at = (t: number): P => {
-      const s = 1 - t;
-      const w = [s * s * s, 3 * s * s * t, 3 * s * t * t, t * t * t];
-      return {
-        x: w[0]! * p0.x + w[1]! * p1.x + w[2]! * p2.x + w[3]! * p3.x,
-        y: w[0]! * p0.y + w[1]! * p1.y + w[2]! * p2.y + w[3]! * p3.y,
-      };
-    };
     for (const t of [...turnsOf(p0.x, p1.x, p2.x, p3.x), ...turnsOf(p0.y, p1.y, p2.y, p3.y)]) {
-      this.add(at(t));
+      this.add(bezierAt(p0, p1, p2, p3, t));
     }
     this.add(p3);
     this.current = p3;
@@ -139,6 +144,47 @@ class CurveBounds implements CurveSink {
       width: this.right - this.left,
       height: this.bottom - this.top,
     };
+  }
+}
+
+/**
+ * Chord length the curves are split into, in page units: a curl of radius r
+ * then strays at most 0.5² / 8r from its chords, under 0.02 for any curl a
+ * cloud draws.
+ */
+const FLATTEN_STEP = 0.5;
+
+/**
+ * The curves as polylines, one per subpath, in the same page space as
+ * `PathBuilder`'s path: each cubic split into chords of about
+ * {@link FLATTEN_STEP}. Hit-testing and the marquee read the cloud from these.
+ */
+class CurvePolylines implements CurveSink {
+  readonly lines: Point[][] = [];
+  private current: P = { x: 0, y: 0 };
+  constructor(
+    private ox: number,
+    private oy: number,
+  ) {}
+  private place(x: number, y: number): P {
+    return { x: x + this.ox, y: -y + this.oy };
+  }
+  moveTo(x: number, y: number): void {
+    this.current = this.place(x, y);
+    this.lines.push([this.current]);
+  }
+  curveTo(x1: number, y1: number, x2: number, y2: number, x3: number, y3: number): void {
+    const p0 = this.current;
+    const p1 = this.place(x1, y1);
+    const p2 = this.place(x2, y2);
+    const p3 = this.place(x3, y3);
+    // The control polygon is never shorter than the curve.
+    const hull = distance(p0, p1) + distance(p1, p2) + distance(p2, p3);
+    const steps = Math.max(2, Math.ceil(hull / FLATTEN_STEP));
+    let line = this.lines[this.lines.length - 1];
+    if (!line) this.lines.push((line = [p0]));
+    for (let i = 1; i <= steps; i++) line.push(bezierAt(p0, p1, p2, p3, i / steps));
+    this.current = p3;
   }
 }
 
@@ -571,22 +617,6 @@ function cloudyEllipseImpl(
 
 /* ── public API ────────────────────────────────────────────────────────────── */
 
-/**
- * About how far (content units) a cloud's scallops reach out from the shape's
- * box on each side: the scallop radius plus half the stroke. A hit band; what
- * a cloud paints is `cloudyBounds` / `cloudyPolyBounds`.
- */
-export function cloudyBorderExtent(
-  intensity: number,
-  strokeWidth: number,
-  ellipse: boolean,
-): number {
-  const cr = ellipse
-    ? ellipseCloudRadius(intensity, strokeWidth)
-    : polygonCloudRadius(intensity, strokeWidth);
-  return cr + strokeWidth / 2;
-}
-
 /** The cloud of a closed polygon, its curves into `out`. */
 function polygonCloud(
   points: Point[],
@@ -674,6 +704,32 @@ export function cloudyPolyBounds(points: Point[], intensity: number, strokeWidth
   const out = new CurveBounds(0, 0);
   polygonCloud(points, intensity, strokeWidth, out);
   return expandRect(out.bounds(), strokeWidth / 2);
+}
+
+/** The points along a cloudy polygon border's curves, one closed polyline per subpath. */
+export function cloudyPolyOutline(
+  points: Point[],
+  intensity: number,
+  strokeWidth: number,
+): Point[][] {
+  const out = new CurvePolylines(0, 0);
+  polygonCloud(points, intensity, strokeWidth, out);
+  return out.lines;
+}
+
+/**
+ * The points along a cloudy square's or circle's border curves, as
+ * `cloudyPolyOutline`: on `box` before any turn, as `cloudyPath` draws them.
+ */
+export function cloudyOutline(
+  box: Rect,
+  ellipse: boolean,
+  intensity: number,
+  strokeWidth: number,
+): Point[][] {
+  const out = new CurvePolylines(box.x, box.y);
+  boxCloud(box, ellipse, intensity, strokeWidth, out);
+  return out.lines;
 }
 
 /** The box around what a cloudy square's or circle's border paints, as `cloudyPolyBounds`. */

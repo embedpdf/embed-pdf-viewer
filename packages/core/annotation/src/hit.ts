@@ -1,19 +1,21 @@
 import type { PageRef } from '@embedpdf/engine-core/runtime';
 import { annotationSelectionFrame, annotationTurnPivot } from './selection';
 import {
+  captionPainted,
   distanceCaptionHit,
   distanceHandles,
-  distanceHit,
   distanceLayout,
+  distancePainted,
   measurementOf,
 } from './measurement';
 import { measurementLayout } from './measurement-shape';
-import { geomHandles, geomHit, placeRotateKnob, pointInQuad, rectHandlesFor } from './geometry';
+import { geomHandles, geomPainted, placeRotateKnob, pointInQuad, rectHandlesFor } from './geometry';
 import { cursorOnScreen, unionRect } from './rect';
 import { groupCaps } from './group';
 import { isSubstrateOnly } from './plane';
 import { annotInteractive, annotTransformable, viewable } from './flags';
 import { anchoredGeom, anchoredStrokeWidth, anchorModeOf, type ViewEnv } from './anchor';
+import { paintedNear, type PaintedPiece } from './painted';
 import {
   type ModelAnnotation,
   type ChromeGeometry,
@@ -101,6 +103,26 @@ const hasHandles = (model: Model, record: ModelAnnotation): boolean => {
  *  The same projection `pageItems` renders, so click matches paint. */
 const hitGeomOf = (record: ModelAnnotation, view: ViewEnv | undefined): Shape =>
   anchoredGeom(shapeOf(record.annotation), anchorModeOf(record), view);
+
+/**
+ * What an annotation paints where the pointer meets it (`painted.ts`): its
+ * shape's pieces, projected as a screen-anchored body shows at `view`, and a
+ * measurement's caption, dimension line and leaders. A click and the marquee
+ * both read this.
+ */
+export function paintedOf(record: ModelAnnotation, view?: ViewEnv): readonly PaintedPiece[] {
+  const style = styleOf(record.annotation);
+  const measure = measurementOf(record.annotation);
+  const geometry = hitGeomOf(record, view);
+  const stroke = { ...style, strokeWidth: hitStrokeOf(record, view) };
+  if (measure?.intent === 'line-dimension') {
+    const distance = distanceLayout(geometry, measure, stroke.strokeWidth);
+    if (distance) return distancePainted(distance, stroke.strokeWidth);
+  }
+  const caption = measure ? measurementLayout(geometry, measure, stroke)?.caption : null;
+  const shape = geomPainted(geometry, stroke, isFilled(record));
+  return caption ? [...captionPainted(caption), ...shape] : shape;
+}
 
 /**
  * Is `point` on a text box's own box, where its text is? Not on a callout's
@@ -339,23 +361,7 @@ export function hitTest(
     if (model.selected.includes(id) && canMove(model, id) && inFrame(record, point, view)) {
       return { kind: 'annot', id };
     }
-    const style = styleOf(record.annotation);
-    const measure = measurementOf(record.annotation);
-    const geometry = hitGeomOf(record, view);
-    const strokeWidth = hitStrokeOf(record, view);
-    const distance =
-      measure?.intent === 'line-dimension' && distanceLayout(geometry, measure, strokeWidth);
-    const layout = measure && measurementLayout(geometry, measure, { ...style, strokeWidth });
-    const hit =
-      (layout && distanceCaptionHit(layout, point, strokeMargin)) ||
-      (distance
-        ? distanceHit(distance, point, strokeWidth, strokeMargin)
-        : geomHit(geometry, point, strokeMargin, isFilled(record), {
-            ...style,
-            strokeWidth: strokeWidth,
-          }));
-
-    if (hit) {
+    if (paintedNear(paintedOf(record, view), point, strokeMargin)) {
       return { kind: 'annot', id };
     }
   }
