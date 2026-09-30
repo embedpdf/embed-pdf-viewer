@@ -65,6 +65,7 @@ function ThumbnailList() {
   return (
     <Stage
       token={ThumbsStageToken}
+      interaction={false} // a secondary lens: click-to-navigate, never the document's tools
       zoomGestures={false} // fixed-magnification rail: cmd+wheel/pinch scrolls, never zooms
       className="flex-1"
       style={{ position: 'relative' }}
