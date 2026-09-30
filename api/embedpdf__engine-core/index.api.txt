@@ -131,6 +131,7 @@ DEFAULT_EDGE_RESOLVER_BUDGET [VariableDeclaration] (from packages/engine/core/sr
 DEFAULT_MEDIA_BOX [VariableDeclaration] (from packages/engine/core/src/geometry/pageBoxes.ts): DEFAULT_MEDIA_BOX: PdfRect ={ left: 0, bottom: 0, right: 612, top: 792}
 DEFAULT_PDF_SAVE_MODE [VariableDeclaration] (from packages/engine/core/src/dto/PdfSaveMode.ts): DEFAULT_PDF_SAVE_MODE: PdfSaveMode = 'incremental'
 DEFAULT_RICH_TEXT_BODY [VariableDeclaration] (from packages/engine/core/src/dto/RichText.ts): DEFAULT_RICH_TEXT_BODY: Readonly<RichTextBody> ={ family: 'Helvetica', weight: 400, italic: false, size: 12, color: '#000000', decoration: [], script: 'normal', letterSpacing: 0, horizontalScale: 1, align: 'left', dir: 'ltr', }
+DRAWN_RECT_KINDS [VariableDeclaration] (from packages/engine/core/src/annotation/shapeForRect.ts): DRAWN_RECT_KINDS: ReadonlySet<AnnotationSubtype> = new Set([ 'highlight', 'underline', 'squiggly', 'strikeout', 'square', 'circle', 'free-text', 'stamp', 'caret', 'line', 'polyline', 'polygon', 'ink', ])
 DTOOfKind [TypeAliasDeclaration] (from packages/engine/core/src/annotation/registry.ts): export type DTOOfKind<K> = K extends AnnotationKindModule<infer _S, infer D, infer _Dr, infer _Pa> ? D : never;
 DateInput [TypeAliasDeclaration] (from packages/engine/core/src/dto/IsoDateTime.ts): export type DateInput = IsoDateTime | Date;
 DescribeFont [TypeAliasDeclaration] (from packages/engine/core/src/annotation/fontFaces.ts): export type DescribeFont = (fontKey: string) => FontIdentityInfo | undefined;
