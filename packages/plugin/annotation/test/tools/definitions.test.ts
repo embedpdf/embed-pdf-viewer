@@ -50,8 +50,22 @@ describe('annotation tool registry', () => {
   it('gives the note and attachment tools a plain plus: their ghost is the icon', () => {
     const tools = buildToolRegistry();
     for (const id of ['note', 'attachment']) {
-      expect(tools.get(id)).toMatchObject({ cursor: 'crosshair', ghost: { mode: 'footprint' } });
+      expect(tools.get(id)).toMatchObject({ cursor: 'crosshair', ghost: { opacity: 0.5 } });
     }
+  });
+
+  it('resolves `ghost`: true is half see-through, an opacity is kept, and extends inherit it', () => {
+    const tools = buildToolRegistry([
+      { id: 'square', ghost: true },
+      { id: 'note', ghost: { opacity: 0.3 } },
+      { id: 'todo', extends: 'note' },
+      { id: 'quiet-note', extends: 'note', ghost: false },
+    ]);
+    expect(tools.get('square')?.ghost).toEqual({ opacity: 0.5 });
+    expect(tools.get('circle')?.ghost).toBe(false); // drag-first: off unless asked
+    expect(tools.get('note')?.ghost).toEqual({ opacity: 0.3 });
+    expect(tools.get('todo')?.ghost).toEqual({ opacity: 0.3 });
+    expect(tools.get('quiet-note')?.ghost).toBe(false);
   });
 
   it('rejects unsupported defaults from untyped JavaScript/JSON configuration', () => {

@@ -16,17 +16,21 @@ export {
   lineEndingsOf,
   toolAnnotation,
   rotateDraftDelta,
-  MIN_DRAG,
 } from './update';
 export {
   clampRectToBox,
-  clickCreateGeom,
+  gesturePlacement,
+  isDrag,
+  MIN_DRAG,
+  placedShape,
   resolveClickPlacement,
-  type ClickPlacement,
+  type GestureForm,
+  type PlacementFrame,
 } from './placement';
 export { computeMoveSnap, type SnapResult } from './snap';
 export {
   pageItems,
+  unmadeItem,
   iconOf,
   chrome,
   selectedItems,
@@ -128,7 +132,6 @@ export {
   isRotatableGeom,
   // upright placement
   uprightRotation,
-  transposedAboutCenter,
   uprightAnchoredRect,
   fitStampBox,
   ROTATE_KNOB_OFFSET,
@@ -145,6 +148,7 @@ export {
   rotatedHandleCursor,
   rotatedAabb,
   normalizeDeg,
+  transposedAboutCenter,
   type RectHandle,
 } from './rect';
 // The shape families: everything the core does with one kind of shape.
@@ -218,6 +222,7 @@ export type {
   Model,
   Message,
   ClickCreate,
+  Placement,
   PointerInput,
   FieldValues,
   QuadRing,

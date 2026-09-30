@@ -65,18 +65,26 @@ export type SelectionAuthoring =
   | { kind: 'text-edit'; operation: 'insert' | 'replace' };
 
 /**
- * The armed tool's in-page preview:
- *   - `footprint` — the exact box a click would place, in the page (content
- *     space, page-clamped, WYSIWYG). Meaningful only when the box is
- *     determinable: an armed stamp payload, or a `clickCreate` size.
- *   - `false` — no preview.
- * Which tool is armed is otherwise the cursor's job: give the tool an image
- * cursor built from your toolbar icon (the hub's `setToolCursor` + the web
- * package's `svgCursor`), and the hub's claim/gap arbitration keeps it honest
- * over annotations, form fields, and page gaps. A footprint ghost already
- * shows what a click places, so that tool's cursor stays its plain keyword.
+ * The tool's ghost: a see-through copy of what a click would place, following
+ * the pointer, drawn with the tool's current defaults exactly where and as
+ * the click will make it. `true` shows it half see-through, `{ opacity }`
+ * as opaque as you say (0–1; `--epdf-ghost-opacity` wins over it from CSS),
+ * `false` hides it. It shows only where a click creates: a tool whose click
+ * makes nothing (ink, a polygon, `clickCreate: false`) has none, and it hides
+ * over an annotation or text, where the click does something else.
+ * The cursor says which tool is active; the ghost says where the click lands.
  */
-export type GhostPolicy = false | { mode: 'footprint' };
+export type GhostPolicy = boolean | { opacity: number };
+
+/** A resolved ghost: how opaque it paints, or `false` for none. */
+export type ResolvedGhost = false | { opacity: number };
+
+/** How opaque a ghost paints unless its tool says. */
+export const GHOST_OPACITY = 0.5;
+
+/** A tool's ghost setting, resolved: `true` is half see-through. */
+const resolveGhost = (ghost: GhostPolicy): ResolvedGhost =>
+  ghost === true ? { opacity: GHOST_OPACITY } : ghost;
 
 /** Time/geometry policy for freehand ink authoring. */
 export interface InkAuthoringOptions {
@@ -162,6 +170,7 @@ export const TOOL_DEFAULT_FIELDS = {
   'widget-text': WIDGET_TEXT_FIELDS,
   'widget-choice': WIDGET_TEXT_FIELDS,
   'widget-toggle': WIDGET_BOX_FIELDS,
+  'widget-radio': WIDGET_BOX_FIELDS,
   // The bare box every other widget family ingests as (a signature field's
   // widget among them): box styling only — no text to style.
   'widget-box': WIDGET_BOX_FIELDS,
@@ -197,7 +206,7 @@ export interface AnnotationToolDef<K extends ToolAuthoringKind = ToolAuthoringKi
   /** The routing kind this tool authors — the core's client kind (the geometry
    *  it draws + the props key). Usually the PDF subtype, but not always:
    *  `free-text-callout` routes the callout gesture onto a free-text
-   *  annotation, and `widget-text`/`widget-choice`/`widget-toggle` are client
+   *  annotation, and `widget-text`/`widget-choice`/`widget-toggle`/`widget-radio` are client
    *  views of the one PDF `widget` subtype (a form tool's commit goes through
    *  `doc.forms`, never this plugin — see the form plugin's tool table).
    *  Defaults to the inherited kind, or the id when neither is given. */
@@ -246,21 +255,25 @@ export interface AnnotationToolDef<K extends ToolAuthoringKind = ToolAuthoringKi
    * for stamps and text on rotated pages. WYSIWYG at authoring time: the
    * rotation is baked into the annotation, so a save keeps what the author saw
    * (other viewers apply only /Rotate — document that when view rotation is in
-   * play). Box kinds only (stamp / free-text, where reading orientation is
-   * meaningful); ignored by vertex kinds and callouts. Default: on for the
-   * built-in `stamp` and `free-text` tools, off elsewhere.
+   * play). A drawing without a reading direction bakes no turn: a clicked
+   * square or circle swaps its sides instead, so it shows its `clickCreate`
+   * size as the author sees the page, and a clicked line points the way its
+   * `clickCreate` says there; a drag, and a callout's leader, follow the
+   * pointer. Default: on for the built-in `stamp`, `free-text`, `note`,
+   * `attachment`, `square`, `circle` and `line` tools, off elsewhere.
    */
   upright?: boolean;
   /**
-   * What a bare click creates: a default-size shape
-   * centred on the point / a default-length line from it / free-text's
-   * type-here box — page-clamped, in PDF pt. `false` = drag-only. Defaults:
-   * on for the built-in square/circle/line/free-text, off elsewhere.
+   * What a bare click creates ({@link ClickCreate}): a default-size shape
+   * centred on the point, a default-length line centred on it, free text's
+   * type-here box hanging from it — page-clamped, in PDF pt. `false` =
+   * drag-only. Defaults: on for the built-in square/circle/line/free-text,
+   * off elsewhere.
    */
   clickCreate?: ClickCreate | false;
   /**
-   * The armed-tool in-page preview ({@link GhostPolicy}). Defaults: inherited,
-   * else off (the built-in stamp declares `footprint`).
+   * The tool's ghost ({@link GhostPolicy}). Defaults: inherited, else off;
+   * on for the built-in click-to-place tools (stamp, note, attachment).
    */
   ghost?: GhostPolicy;
   /** Opaque presentation hints (label/icon…) for a toolbar or cursor that builds
@@ -344,8 +357,8 @@ export interface ResolvedTool {
   upright: boolean;
   /** What a bare click creates, or `false` for drag-only. */
   clickCreate: ClickCreate | false;
-  /** The armed-tool in-page preview ({@link GhostPolicy}). */
-  ghost: GhostPolicy;
+  /** The tool's ghost ({@link GhostPolicy}): how opaque it paints, or `false` for none. */
+  ghost: ResolvedGhost;
   meta?: Record<string, unknown>;
 }
 
@@ -376,15 +389,17 @@ export const isTouchDirect = (enables: ReadonlySet<string>): boolean =>
 export const DEFAULT_TOOLS: AnnotationToolInput[] = [
   // shapes / lines / ink / free text — the `annotation-draw` gesture.
   // Draw tools carry click-create defaults (a bare click places a
-  // default-size annotation); armed-tool identity rides the cursor, so none
-  // of them needs a ghost.
+  // default-size annotation). Their ghost is off: they are drag-first, so the
+  // size usually comes from the drag, and `ghost: true` turns it on.
   {
     id: 'square',
     subtype: 'square',
     cursor: 'crosshair',
     enables: DRAW_TAGS,
     defaults: { color: HOUSE_RED, strokeWidth: 6 },
+    // A click shows 80 wide and 60 tall as the page is seen, turned or not.
     clickCreate: { width: 80, height: 60 },
+    upright: true,
   },
   {
     id: 'circle',
@@ -392,7 +407,9 @@ export const DEFAULT_TOOLS: AnnotationToolInput[] = [
     cursor: 'crosshair',
     enables: DRAW_TAGS,
     defaults: { color: HOUSE_RED, strokeWidth: 6 },
+    // A click shows 80 wide and 60 tall as the page is seen, turned or not.
     clickCreate: { width: 80, height: 60 },
+    upright: true,
   },
   {
     id: 'line',
@@ -400,7 +417,9 @@ export const DEFAULT_TOOLS: AnnotationToolInput[] = [
     cursor: 'crosshair',
     enables: DRAW_TAGS,
     defaults: { color: HOUSE_RED, strokeWidth: 6 },
+    // A click lays it centred on the point, pointing right as the page shows.
     clickCreate: { length: 80 },
+    upright: true,
   },
   {
     id: 'distance',
@@ -579,7 +598,7 @@ export const DEFAULT_TOOLS: AnnotationToolInput[] = [
     enables: ['annotation-place', 'annotation-edit'],
     source: { kind: 'prompt', accept: 'image/png,image/jpeg,application/pdf' },
     upright: true,
-    ghost: { mode: 'footprint' },
+    ghost: true,
   },
   // link — drag an invisible hit rectangle; the target is set afterwards
   // through the selection editor (create-then-edit), unless a preset carries
@@ -604,7 +623,7 @@ export const DEFAULT_TOOLS: AnnotationToolInput[] = [
     defaults: { icon: 'comment', color: '#facc15' },
     flags: { noZoom: true, noRotate: true },
     upright: true,
-    ghost: { mode: 'footprint' },
+    ghost: true,
   },
   // file attachment — click-to-place with the spot-first-file-second rule:
   // the click opens the installed file-picker port (a file dialog by
@@ -620,7 +639,7 @@ export const DEFAULT_TOOLS: AnnotationToolInput[] = [
     defaults: { icon: 'paperclip', color: '#facc15' },
     flags: { noZoom: true, noRotate: true },
     upright: true,
-    ghost: { mode: 'footprint' },
+    ghost: true,
   },
 ];
 
@@ -701,7 +720,7 @@ export function buildToolRegistry(
       ink: base?.ink || definition.ink ? { ...base?.ink, ...definition.ink } : undefined,
       upright: definition.upright ?? base?.upright ?? false,
       clickCreate: definition.clickCreate ?? base?.clickCreate ?? false,
-      ghost: definition.ghost ?? base?.ghost ?? false,
+      ghost: resolveGhost(definition.ghost ?? base?.ghost ?? false),
       meta: base?.meta || definition.meta ? { ...base?.meta, ...definition.meta } : undefined,
     };
     validateDefaults(resolved);

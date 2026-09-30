@@ -20,16 +20,18 @@
  * view never falls back to an older version of what the user did.
  */
 import { annotationAfter, initialSession, sameSession } from '@embedpdf/core-annotation';
-import type { Id, ModelAnnotation, Session } from '@embedpdf/core-annotation';
+import type { Id, ModelAnnotation, Point, Session } from '@embedpdf/core-annotation';
+import type { PageRotation } from '@embedpdf/core-geometry';
 import {
   annotationKey,
   generateUuid,
   type AnnotationDTO,
   type AnnotationPatch,
   type AnnotationRef,
+  type PageRef,
 } from '@embedpdf/engine-core/runtime';
 
-import type { AnnotationConfig, ChromeSettings, ChromeSettingsPatch, ToolGhost } from './contract';
+import type { AnnotationConfig, ChromeSettings, ChromeSettingsPatch } from './contract';
 import type { TextSelection } from './rich-text';
 
 /** What one pending change does to its record. */
@@ -81,6 +83,25 @@ export interface PendingChange {
   readonly written?: true;
 }
 
+/** Where the active tool's ghost is: the pointer on a page, and how that page shows there. */
+export interface GhostPointer {
+  readonly toolId: string;
+  readonly page: PageRef;
+  readonly point: Point;
+  /** The page's display rotation at the pointer (an upright tool lays its click out as seen). */
+  readonly displayRotation?: PageRotation;
+  /** The page's zoom at the pointer (a screen-sized icon's size depends on it). */
+  readonly zoom?: number;
+}
+
+/** A sibling plugin's placement gesture with one of this plugin's tools: its press, and the pointer now. */
+export interface ForeignPlacement {
+  readonly toolId: string;
+  readonly page: PageRef;
+  readonly from: Point;
+  readonly to: Point;
+}
+
 export interface AnnotationState {
   /** The core's session: selection, hover, the gesture in progress, tool settings. */
   readonly session: Session;
@@ -94,13 +115,17 @@ export interface AnnotationState {
   readonly vector: Readonly<Record<Id, true>>;
   readonly chrome: ChromeSettings;
   /**
-   * The armed tool's footprint ghost: where, and what, the next click would
-   * place (a stamp's fitted image box, or a click-create tool's default
-   * geometry), computed by the same rules placement uses. It is state
-   * because it is rendered: vector ghosts ride `pageItems`, image ghosts
-   * render through the framework's `ToolGhost`. The armed bytes stay out of state.
+   * Where the active tool's ghost is: the pointer, while a click there would
+   * make something. Only the pointer is state; what the ghost paints is
+   * derived from it and the tool's live defaults (tools/ghost.ts).
    */
-  readonly toolGhost: ToolGhost | null;
+  readonly ghostAt: GhostPointer | null;
+  /**
+   * A placement a sibling plugin's gesture is making with one of this
+   * plugin's tools (the form palette's drag-to-place). Once it is a drag it
+   * paints as a drawing in progress (tools/ghost.ts).
+   */
+  readonly placing: ForeignPlacement | null;
   /**
    * The text editor's selection inside the annotation being edited (flat
    * offsets over its plain text), or null. It is state because the property
@@ -148,7 +173,8 @@ export const initialAnnotationState = (config: AnnotationConfig = {}): Annotatio
   pending: [],
   vector: {},
   chrome: mergeChrome(DEFAULT_CHROME, config.chrome ?? {}),
-  toolGhost: null,
+  ghostAt: null,
+  placing: null,
   textSelection: null,
 });
 
@@ -326,10 +352,15 @@ export const patchChrome = (
   chrome: mergeChrome(state.chrome, patch),
 });
 
-export const setToolGhost = (
+export const setGhostAt = (
   state: AnnotationState,
-  toolGhost: ToolGhost | null,
-): AnnotationState => (state.toolGhost === toolGhost ? state : { ...state, toolGhost });
+  ghostAt: GhostPointer | null,
+): AnnotationState => (state.ghostAt === ghostAt ? state : { ...state, ghostAt });
+
+export const setPlacing = (
+  state: AnnotationState,
+  placing: ForeignPlacement | null,
+): AnnotationState => (state.placing === placing ? state : { ...state, placing });
 
 export const setTextSelection = (
   state: AnnotationState,

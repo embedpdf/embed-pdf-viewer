@@ -7,13 +7,12 @@
  */
 import type { AnnotationFlags, InkIntent } from '@embedpdf/engine-core/runtime';
 
-import { transposedAboutCenter, uprightRotation } from '../geometry';
-import { rectFromPoints, unionRect } from '../rect';
 import { straightenInkStroke } from '../ink';
 import { measurementDraftFields, type MeasurementAppearance } from '../measurement';
 import { shapeMeasurementReadout } from '../measurement-shape';
-import { clickCreateGeom, resolveClickPlacement } from '../placement';
+import { gesturePlacement, MIN_DRAG, placedShape } from '../placement';
 import { writableTarget } from '../record';
+import { unionRect } from '../rect';
 import type {
   ClickCreate,
   Shape,
@@ -22,6 +21,7 @@ import type {
   FieldValues,
   InkStraightenOptions,
   Model,
+  Placement,
   PointerInput,
   Rect,
   KindName,
@@ -32,10 +32,24 @@ import { distancePointer } from './draw-distance';
 import { clampPointToBox } from './page-bound';
 import { defaultsFor, lineEndingsOf, toolAnnotation } from './session';
 
-/** The click ↔ drag threshold (content units): a press-release whose width and
- *  height both stay under it is a click. Exported so every gesture owner (the
- *  draw handler, the form plugin's place handler) shares one definition. */
-export const MIN_DRAG = 3;
+/** A box or a line being drawn: the gestures a click or a drag completes. */
+type ShapeDraft = Extract<Draft, { kind: 'create-rect' | 'create-line' }>;
+
+/**
+ * Where a box or a line being drawn puts what it makes if released now: the
+ * dragged box or segment, or the tool's click default (`gesturePlacement`).
+ * The commit below and the drawing in progress (view.ts) both read it, and
+ * the tool's ghost makes the same call at the pointer.
+ */
+export function draftPlacement(draft: ShapeDraft, pageBox?: Rect): Placement | null {
+  return gesturePlacement(
+    draft.kind === 'create-line' ? 'segment' : 'box',
+    draft.from,
+    draft.to,
+    draft.clickCreate,
+    { pageBox, upright: draft.upright, displayRotation: draft.displayRotation },
+  );
+}
 
 export function createPointer(
   model: Model,
@@ -128,6 +142,10 @@ export function createPointer(
             page: input.page,
             from: input.point,
             to: input.point,
+            // Captured at down, as for a box: an upright click lays the line as seen.
+            ...(input.upright && input.displayRotation
+              ? { displayRotation: input.displayRotation, upright: true }
+              : {}),
             ...(clickCreate !== undefined ? { clickCreate } : {}),
             ...(flags ? { flags } : {}),
           }
@@ -158,7 +176,6 @@ export function createPointer(
                 page: input.page,
                 from: input.point,
                 to: input.point,
-                ellipse: subtype === 'circle',
                 // Captured at down (the gesture's home page); a rotation of 0
                 // makes upright a no-op, so the draft stays clean then.
                 ...(input.upright && input.displayRotation
@@ -205,84 +222,11 @@ export function createPointer(
     return deferInkCommit ? [next, []] : finishInkCreate(next);
   }
 
+  // What the gesture makes: the dragged shape, or the tool's click default,
+  // laid by the kind's shape family. The tool's ghost showed exactly this.
   const tool = toolAnnotation(model, activeDraft.subtype, activeDraft.preset);
-  let geometry: Shape | null = null;
-  // The upright counter-rotation for a box commit (0 when the tool/page don't
-  // ask for one). A dragged box keeps the on-screen footprint the author drew:
-  // for a quarter-turn the unrotated box is the drag rect transposed about its
-  // centre, so spinning it by `rot` lands exactly back on the dragged region.
-  const upRot =
-    activeDraft.kind === 'create-rect' && activeDraft.upright && activeDraft.displayRotation
-      ? uprightRotation(activeDraft.displayRotation)
-      : 0;
-  const uprightBox = (dragged: Rect): Rect =>
-    upRot === 90 || upRot === 270 ? transposedAboutCenter(dragged) : dragged;
-  // Click commits resolve through the shared placement layer (placement.ts) —
-  // the same `resolveClickPlacement` the footprint ghost and the form plugin
-  // consume, so preview ≡ commit by construction. The core only supplies the
-  // kind-level fallback for free text (a click must always yield a typable
-  // box) and converts the placement to a Shape via `clickCreateGeom`.
-  const clickGeom = (policy: ClickCreate): Shape | null =>
-    clickCreateGeom(
-      activeDraft.subtype,
-      resolveClickPlacement(activeDraft.from, policy, {
-        pageBox: input.pageBox,
-        upright: activeDraft.kind === 'create-rect' ? activeDraft.upright : undefined,
-        displayRotation:
-          activeDraft.kind === 'create-rect' ? activeDraft.displayRotation : undefined,
-      }),
-      lineEndingsOf(tool),
-    );
-  if (activeDraft.kind === 'create-rect' && activeDraft.subtype === 'free-text') {
-    // Free-text: a dragged box, or — on a mere click — a default box you can
-    // immediately type into (created unless the tool says `clickCreate: false`;
-    // an empty text box is unreachable by drag alone, hence the kind-level
-    // fallback: 180×40, top-left anchored so the box hangs where you'll type).
-    const dragged = rectFromPoints(activeDraft.from, activeDraft.to);
-    const isClick = dragged.width < MIN_DRAG && dragged.height < MIN_DRAG;
-    if (!isClick) {
-      geometry = {
-        kind: 'text-box',
-        box: uprightBox(dragged),
-        rotation: upRot,
-        calloutLine: null,
-        lineEnding: null,
-      };
-    } else if (activeDraft.clickCreate !== false) {
-      geometry = clickGeom(
-        activeDraft.clickCreate && 'width' in activeDraft.clickCreate
-          ? activeDraft.clickCreate
-          : { width: 180, height: 40, anchor: 'top-left' },
-      );
-    }
-  } else if (activeDraft.kind === 'create-rect') {
-    const dragged = rectFromPoints(activeDraft.from, activeDraft.to);
-    if (dragged.width >= MIN_DRAG || dragged.height >= MIN_DRAG) {
-      // The dragged box is the shape's box; a cloud reaches out from it.
-      geometry = {
-        kind: 'box',
-        box: uprightBox(dragged),
-        rotation: upRot,
-        ellipse: activeDraft.ellipse,
-      };
-    } else if (activeDraft.clickCreate && 'width' in activeDraft.clickCreate) {
-      geometry = clickGeom(activeDraft.clickCreate);
-    }
-  } else if (activeDraft.kind === 'create-line') {
-    if (
-      Math.hypot(activeDraft.to.x - activeDraft.from.x, activeDraft.to.y - activeDraft.from.y) >=
-      MIN_DRAG
-    ) {
-      geometry = {
-        kind: 'line',
-        linePoints: { start: activeDraft.from, end: activeDraft.to },
-        lineEndings: lineEndingsOf(tool),
-        rotation: 0,
-      };
-    } else if (activeDraft.clickCreate && 'length' in activeDraft.clickCreate) {
-      geometry = clickGeom(activeDraft.clickCreate);
-    }
-  }
+  const placement = draftPlacement(activeDraft, input.pageBox);
+  const geometry: Shape | null = placement && placedShape(tool, placement);
   if (!geometry) return [{ ...model, draft: null }, []];
   if (activeDraft.kind === 'create-line' && activeDraft.capture)
     return [

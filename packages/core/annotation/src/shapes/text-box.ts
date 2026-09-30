@@ -24,7 +24,7 @@ import {
   segDist,
   unionRect,
 } from '../rect';
-import type { Handle, Point, Rect, RenderNode, Stroke } from '../types';
+import type { Handle, Placement, Point, Rect, RenderNode, Stroke } from '../types';
 import {
   boxCorners,
   boxHandles,
@@ -49,6 +49,18 @@ export interface TextBoxShape extends TurnedBox {
   calloutLine: CalloutLine | null;
   /** The ending at a callout's tip. */
   lineEnding: LineEnding | null;
+}
+
+/** A plain text box where a create gesture places a box: typed into from empty, turned to read upright. */
+function placeTextBox(placement: Placement): TextBoxShape | null {
+  if (placement.kind !== 'box') return null;
+  return {
+    kind: 'text-box',
+    box: placement.rect,
+    rotation: placement.rot,
+    calloutLine: null,
+    lineEnding: null,
+  };
 }
 
 /** A free text's shape, read off its annotation. A line counts only on a callout. */
@@ -305,6 +317,7 @@ function textBoxScene(shape: TextBoxShape, { strokeWidth }: Stroke): RenderNode[
 export const textBoxFamily: ShapeFamily<TextBoxShape> = {
   read: readTextBox,
   write: writeTextBox,
+  placed: placeTextBox,
   bounds: (shape) => shape.box,
   drawnBounds: textBoxDrawnBounds,
   rect: textBoxRect,

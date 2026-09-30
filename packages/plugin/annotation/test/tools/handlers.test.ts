@@ -15,7 +15,10 @@ import type {
 import { describe, expect, it, vi } from 'vitest';
 
 import type { AnnotationHostCapability } from '../../src/host-contract';
-import { createDrawHandler, createEditHandler, createGhostHandler } from '../../src/tools/handlers';
+import { createDrawHandler, createEditHandler, createPlaceHandler } from '../../src/tools/handlers';
+
+/** The ghost's seams, for a fake whose test is about something else. */
+const GHOST_SEAMS = { canCreate: () => true, hoverGhostAt: () => {}, clearGhost: () => {} };
 
 const PAGE_1 = toPageRef(1);
 const PAGE_2 = toPageRef(2);
@@ -96,44 +99,65 @@ describe('annotation edit handler — page anchoring', () => {
   });
 });
 
-describe('annotation ghost handler — hover footprint', () => {
-  function makeGhostAnno() {
-    const hovers: Array<{ toolId: string; page: PageRef; point: Point; rotation?: number }> = [];
+describe('the tool ghost follows the hover of the handler that takes the click', () => {
+  function makeGhostAnno(canCreate = true) {
+    const hovers: Array<{
+      toolId: string;
+      page: PageRef;
+      point: Point;
+      rotation?: number;
+      zoom?: number;
+    }> = [];
     let clears = 0;
     const anno = {
-      hoverGhostAt: (toolId: string, page: PageRef, point: Point, rotation?: number) =>
-        hovers.push({ toolId, page, point, rotation }),
+      canCreate: () => canCreate,
+      hoverGhostAt: (
+        toolId: string,
+        page: PageRef,
+        point: Point,
+        rotation?: number,
+        zoom?: number,
+      ) => hovers.push({ toolId, page, point, rotation, zoom }),
       clearGhost: () => {
         clears++;
       },
+      placeAt: () => true,
     } as unknown as AnnotationHostCapability;
     return { anno, hovers, clears: () => clears };
   }
-  const ghostInteraction = {
-    getActiveToolId: () => 'stamp',
-  } as unknown as InteractionHostCapability;
+  const ghostInteraction = (claimed = false) =>
+    ({
+      getActiveToolId: () => 'note',
+      hasCursorClaim: () => claimed,
+    }) as unknown as InteractionHostCapability;
+  const over = sample({ page: { ref: PAGE_1, point: { x: 100, y: 200 }, rotation: 90, zoom: 2 } });
 
-  it('hover over a page routes the ACTIVE tool + rotation to the capability', () => {
+  it('hover over a page puts the ACTIVE tool’s ghost there, with the page’s view', () => {
     const { anno, hovers } = makeGhostAnno();
-    const handler = createGhostHandler(anno, ghostInteraction);
-    handler.onHover?.(sample({ page: { ref: PAGE_1, point: { x: 100, y: 200 }, rotation: 90 } }));
+    createPlaceHandler(anno, ghostInteraction()).onHover?.(over);
     expect(hovers).toEqual([
-      { toolId: 'stamp', page: PAGE_1, point: { x: 100, y: 200 }, rotation: 90 },
+      { toolId: 'note', page: PAGE_1, point: { x: 100, y: 200 }, rotation: 90, zoom: 2 },
     ]);
   });
 
-  it('hover over the page gap clears the ghost', () => {
-    const { anno, hovers, clears } = makeGhostAnno();
-    const handler = createGhostHandler(anno, ghostInteraction);
-    handler.onHover?.(sample({}));
-    expect(hovers).toHaveLength(0);
-    expect(clears()).toBe(1);
+  it('clears where the click does something else, without create permission, and off the page', () => {
+    for (const [anno, interaction, at] of [
+      [makeGhostAnno(), ghostInteraction(true), over], // an annotation or text claims the pointer
+      [makeGhostAnno(false), ghostInteraction(), over], // the user may not create
+      [makeGhostAnno(), ghostInteraction(), sample({})], // the page gap
+    ] as const) {
+      createPlaceHandler(anno.anno, interaction).onHover?.(at);
+      expect(anno.hovers).toHaveLength(0);
+      expect(anno.clears()).toBe(1);
+    }
   });
 
-  it('a press hides the ghost and NEVER captures (real handlers still route)', () => {
+  it('the ghost stays through the press, and clears when the click ends', () => {
     const { anno, clears } = makeGhostAnno();
-    const handler = createGhostHandler(anno, ghostInteraction);
-    expect(handler.onDown(down())).toBe(false);
+    const handler = createPlaceHandler(anno, ghostInteraction());
+    expect(handler.onDown(down())).toBe(true);
+    expect(clears()).toBe(0);
+    handler.onUp?.(sample({ phase: 'up' }));
     expect(clears()).toBe(1);
   });
 });
@@ -144,6 +168,7 @@ describe('annotation draw handler — grouped ink', () => {
     try {
       const calls: string[] = [];
       const anno = {
+        ...GHOST_SEAMS,
         getToolSubtype: () => 'ink',
         getResolvedTool: () => ({ ink: { groupStrokesMs: 800 } }),
         createPointer: (_tool: string, phase: string) => calls.push(phase),
@@ -151,6 +176,7 @@ describe('annotation draw handler — grouped ink', () => {
       } as unknown as AnnotationHostCapability;
       const inkInteraction = {
         getActiveToolId: () => 'ink',
+        hasCursorClaim: () => false,
         onToolChanged: () => () => {},
         claimCursor: () => {},
       } as unknown as InteractionHostCapability;
@@ -219,6 +245,7 @@ describe('annotation draw handler — cancel discards the draft', () => {
   function makeDrawAnno() {
     const calls: Array<{ fn: string; args: unknown[] }> = [];
     const anno = {
+      ...GHOST_SEAMS,
       getToolSubtype: () => 'square',
       getResolvedTool: () => undefined,
       createPointer: (...args: unknown[]) => calls.push({ fn: 'createPointer', args }),
@@ -229,6 +256,7 @@ describe('annotation draw handler — cancel discards the draft', () => {
   }
   const drawInteraction = {
     getActiveToolId: () => 'square',
+    hasCursorClaim: () => false,
     onToolChanged: () => () => {},
   } as unknown as InteractionHostCapability;
 
@@ -297,6 +325,7 @@ describe('distance placement — release, hover, click', () => {
     const calls: Call[] = [];
     let placementPage: PageRef | null = null;
     const anno = {
+      ...GHOST_SEAMS,
       getToolSubtype: () => 'line',
       getResolvedTool: () => undefined,
       distanceCreationPage: () => placementPage,
@@ -308,6 +337,7 @@ describe('distance placement — release, hover, click', () => {
     } as unknown as AnnotationHostCapability;
     const drawInteraction = {
       getActiveToolId: () => 'distance',
+      hasCursorClaim: () => false,
       onToolChanged: () => () => {},
     } as unknown as InteractionHostCapability;
     const handler = createDrawHandler(anno, drawInteraction);
@@ -342,6 +372,7 @@ describe('multi-click placement — hover off the page', () => {
   function draw(subtype: string) {
     const calls: Call[] = [];
     const anno = {
+      ...GHOST_SEAMS,
       getToolSubtype: () => subtype,
       getResolvedTool: () => undefined,
       createPointer: (_tool: string, phase: string, page: PageRef, point: Point) => {
@@ -350,6 +381,7 @@ describe('multi-click placement — hover off the page', () => {
     } as unknown as AnnotationHostCapability;
     const drawInteraction = {
       getActiveToolId: () => subtype,
+      hasCursorClaim: () => false,
       onToolChanged: () => () => {},
     } as unknown as InteractionHostCapability;
     return { handler: createDrawHandler(anno, drawInteraction), calls };

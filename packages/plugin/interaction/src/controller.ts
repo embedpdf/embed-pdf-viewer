@@ -182,6 +182,7 @@ export function createInteractionController(
       syncCursor();
     },
     getCursor: () => state().cursor,
+    hasCursorClaim: () => claims.size > 0,
     onCursorChanged: cursorChanged.on,
     wouldClaimTouch: (sample) => {
       for (const handler of eligible(sample.source)) if (handler.claimsTouch?.(sample)) return true;

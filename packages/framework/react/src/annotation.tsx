@@ -175,6 +175,9 @@ function paintAttrs(paint: Paint) {
  * shapes, cloudy borders and every text-markup type all render here, and a Vue /
  * Svelte painter is the same ~10-line loop.
  */
+/** How opaque a ghost paints: `--epdf-ghost-opacity` from CSS wins over the tool's own. */
+const ghostOpacity = (opacity: number): string => `var(--epdf-ghost-opacity, ${opacity})`;
+
 function Shape({ item, page }: { item: RenderItem; page: PageContextValue }) {
   // Nothing to draw until the annotation has area (the 0×0 draft at mouse-down).
   if (item.box.width <= 0 || item.box.height <= 0) return null;
@@ -200,6 +203,8 @@ function Shape({ item, page }: { item: RenderItem; page: PageContextValue }) {
         height,
         overflow: 'visible',
         pointerEvents: 'none',
+        // A ghost is see-through as a whole, so its fill and stroke don't stack.
+        ...(item.source === 'ghost' ? { opacity: ghostOpacity(item.ghostOpacity ?? 0.5) } : {}),
         ...(rot ? { transform: `rotate(${rot}deg)`, transformOrigin: 'center' } : {}),
       }}
     >
@@ -310,24 +315,24 @@ function BakedImage({
 }
 
 /**
- * The armed stamp's image footprint ghost: a translucent render of the payload
- * drawn in the exact box a click would place it (the plugin computes it with
- * the same fit + clamp as placement). Vector footprint ghosts never reach this
- * component — they ride `pageItems` like every draft preview. The preview
- * bytes live in the capability closure; this layer owns only the object-URL
- * lifetime, keyed on the armed stamp — a new arm swaps the image, a disarm (or
- * tool change) drops it.
+ * The armed stamp's ghost: a see-through render of the payload drawn in the
+ * exact box a click would place it (the plugin computes it with the same fit
+ * + clamp as placement). Every other tool's ghost rides `pageItems` like a
+ * drawing in progress. The preview bytes live in the capability closure; this
+ * layer owns only the object-URL lifetime, keyed on the armed stamp — a new
+ * arm swaps the image, a disarm (or tool change) drops it.
  */
 function ToolGhostImage({ page }: { page: PageContextValue }) {
   const anno = useCapability(AnnotationHostToken);
-  const ghost = useSelector(AnnotationHostToken, (annotation) => annotation.getToolGhost(page.ref));
+  const ghost = useSelector(AnnotationHostToken, (annotation) =>
+    annotation.getImageGhost(page.ref),
+  );
   const armed = useSelector(AnnotationHostToken, (annotation) => annotation.getArmedStamp());
   const [url, setUrl] = useState<string | null>(null);
   // The ghost is a bitmap of vector artwork, right at one size: ask for the
   // bucket that covers the box's device width (points × device px per point),
   // so it stays sharp at every zoom and density. The plugin caches per bucket.
-  const bucket =
-    ghost?.kind === 'image' ? previewBucket(ghost.box.width * page.transform.renderScale) : 0;
+  const bucket = ghost ? previewBucket(ghost.box.width * page.transform.renderScale) : 0;
 
   useEffect(() => {
     if (!bucket) {
@@ -354,7 +359,7 @@ function ToolGhostImage({ page }: { page: PageContextValue }) {
     };
   }, [anno, armed, bucket]);
 
-  if (!ghost || ghost.kind !== 'image' || !url) return null;
+  if (!ghost || !url) return null;
   const frame = boxOf(ghost.box, page);
   return (
     <img
@@ -372,7 +377,7 @@ function ToolGhostImage({ page }: { page: PageContextValue }) {
         maxWidth: 'none',
         maxHeight: 'none',
         pointerEvents: 'none',
-        opacity: 0.5,
+        opacity: ghostOpacity(ghost.opacity),
         ...(ghost.rot ? { transform: `rotate(${ghost.rot}deg)`, transformOrigin: 'center' } : {}),
       }}
     />

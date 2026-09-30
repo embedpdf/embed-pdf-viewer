@@ -7,10 +7,10 @@ import {
 } from '@embedpdf/core-annotation';
 import { describe, expect, it } from 'vitest';
 
-import { iconAnnotationOf, iconPlaceAt } from '../../src/write/placement';
+import { annotationOfTool, iconPlaceAt } from '../../src/write/placement';
 
 const PAGE = { width: 600, height: 800 };
-const NOTE = iconAnnotationOf(initialModel, {
+const NOTE = annotationOfTool(initialModel, {
   subtype: 'text',
   preset: 'note',
   flags: { noZoom: true, noRotate: true },

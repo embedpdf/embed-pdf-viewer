@@ -176,6 +176,18 @@ export const rectCenter = (rect: Rect): Point => ({
   y: rect.y + rect.height / 2,
 });
 
+/** `rect` with width↔height swapped about its own centre — the unrotated box
+ *  whose quarter-turn AABB is exactly `rect` again. */
+export function transposedAboutCenter(rect: Rect): Rect {
+  const point = rectCenter(rect);
+  return {
+    x: point.x - rect.height / 2,
+    y: point.y - rect.width / 2,
+    width: rect.height,
+    height: rect.width,
+  };
+}
+
 const rotateAboutM = (pivot: Point, deg: number): Mat2D<'page', 'page'> =>
   rotateAbout(pivot as PointIn<'page'>, deg * DEG2RAD);
 

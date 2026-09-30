@@ -1,17 +1,15 @@
 /** Drawing a free-text callout: the tip, the elbow, then the text box it points from. */
 import type { AnnotationFlags } from '@embedpdf/engine-core/runtime';
 
-import { transposedAboutCenter, uprightAnchoredRect, uprightRotation } from '../geometry';
-import { rectFromPoints, rotatedAabb } from '../rect';
-import { clampRectToBox } from '../placement';
+import { uprightRotation } from '../geometry';
+import { gesturePlacement } from '../placement';
 import { calloutShape } from '../shapes/text-box';
-import type { Draft, Effect, Model, Point, PointerInput, Rect } from '../types';
+import type { ClickCreate, Draft, Effect, Model, Placement, PointerInput, Rect } from '../types';
 import { draftOf, newRecord } from './changes';
-import { MIN_DRAG } from './draw';
 import { defaultsFor, toolAnnotation } from './session';
 
-/** Default text-box size for a callout placed with a click (no box drag). */
-const CALLOUT_BOX = { width: 150, height: 40 };
+/** A callout's text box on a click (no box drag): hanging down-right of the press, as a free text's does. */
+const CALLOUT_BOX: ClickCreate = { width: 150, height: 40, anchor: 'top-left' };
 
 /** The callout draft's upright counter-rotation (deg CW; 0 = none) — the same
  *  rule the rect commit applies, shared by `calloutBox`, the ghost preview and
@@ -22,52 +20,23 @@ export function calloutUprightRot(draft: Extract<Draft, { kind: 'create-callout'
 
 /**
  * The text-box rect for an in-progress callout's `box` step — the one rule both
- * the live preview and the commit use, so what you see is what you get. Only a
- * drag past `MIN_DRAG` sizes the box; a press-without-drag (a click) keeps the
- * default-size box anchored at the press point, so it never collapses to a sliver
+ * the live preview and the commit use, so what you see is what you get: the
+ * box step's gesture placed as any box tool's is (`gesturePlacement`). A drag
+ * past `MIN_DRAG` sizes the box; a press-without-drag (a click) keeps the
+ * default-size box at the press point, so it never collapses to a sliver
  * while you decide whether you're dragging (the "bounce"). Before the press
- * (hover), the default box tracks the cursor.
- *
- * Under `upright` this returns the unrotated logical box (the frame text is laid
- * out in): a dragged box keeps the on-screen footprint the author drew (quarter
- * turns transpose it about its centre — spinning by `rot` lands exactly back on
- * the dragged region), and the default box anchors so its displayed top-left
- * hangs at the point, down-right of the cursor as the author sees it — the same
- * two rules the free-text drag/click commits use. The default box then slides
- * so that footprint stays inside the page; a real drag is already bounded by
- * the point clamp and is left exactly where the author drew it.
+ * (hover), the default box tracks the cursor. Under `upright` it is the box
+ * before its turn, laid out as the author sees the page.
  */
 export function calloutBox(draft: Extract<Draft, { kind: 'create-callout' }>): Rect {
-  const rot = calloutUprightRot(draft);
-  const quarter = rot === 90 || rot === 270;
-  const defaultBox = (at: Point): Rect =>
-    slideCalloutFootprint(
-      rot
-        ? uprightAnchoredRect(at, CALLOUT_BOX.width, CALLOUT_BOX.height, draft.displayRotation!)
-        : { x: at.x, y: at.y, ...CALLOUT_BOX },
-      rot,
-      draft.pageBox,
-    );
-  if (draft.boxFrom) {
-    const dragged = draft.boxTo ? rectFromPoints(draft.boxFrom, draft.boxTo) : null;
-    if (dragged && (dragged.width >= MIN_DRAG || dragged.height >= MIN_DRAG))
-      return quarter ? transposedAboutCenter(dragged) : dragged;
-    return defaultBox(draft.boxFrom);
-  }
-  return defaultBox(draft.current);
-}
-
-/** Shift `rect` so its displayed footprint (the box rotated about its centre)
- *  sits inside `page`. The logical rect may still cross the page under an
- *  upright quarter-turn; only the footprint the author sees is page-bound. */
-function slideCalloutFootprint(rect: Rect, rot: number, page: Rect | undefined): Rect {
-  if (!page) return rect;
-  const foot = rotatedAabb(rect, rot);
-  const placed = clampRectToBox(foot, page);
-  const dx = placed.x - foot.x;
-  const dy = placed.y - foot.y;
-  if (dx === 0 && dy === 0) return rect;
-  return { ...rect, x: rect.x + dx, y: rect.y + dy };
+  const from = draft.boxFrom ?? draft.current;
+  // A box gesture with a box policy always places a box.
+  const placement = gesturePlacement('box', from, draft.boxTo ?? from, CALLOUT_BOX, {
+    pageBox: draft.pageBox,
+    upright: draft.upright,
+    displayRotation: draft.displayRotation,
+  }) as Extract<Placement, { kind: 'box' }>;
+  return placement.rect;
 }
 
 /**

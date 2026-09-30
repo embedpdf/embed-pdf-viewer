@@ -68,6 +68,18 @@ entry and the message switch.
 The reads (`view.ts`, `hit.ts`, `scene.ts`, `geometry.ts`, …) take the same
 `Model` and never change it.
 
+## What a create gesture makes
+
+A create tool answers one question: if the gesture ended now, what would
+exist? `placement.ts` answers where: `gesturePlacement` gives the dragged box
+or segment once the gesture is a drag, else the tool's click default
+(`resolveClickPlacement`: its size, and which part lands on the click). Each
+shape family answers what (`ShapeFamily.placed`, through `placedShape`): a
+box, a circle, a text box, a line with the tool's endings, a round radio
+button. The commit (`draw.ts`), the drawing in progress (`view.ts`) and the
+tool's ghost (the plugin's `tools/ghost.ts`) make these same calls, and
+`unmadeItem` paints an annotation not made yet as the made one will paint.
+
 ## Tests
 
 `test/support.ts` drives the core the way the plugin does: `modelWith(records)`

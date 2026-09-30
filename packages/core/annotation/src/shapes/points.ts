@@ -38,7 +38,7 @@ import {
   segDist,
   unionRect,
 } from '../rect';
-import type { Handle, LineEnding, Point, Rect, RenderNode, Stroke } from '../types';
+import type { Handle, LineEnding, Placement, Point, Rect, RenderNode, Stroke } from '../types';
 import type { ShapeFamily } from './family';
 
 /** A line: its two ends upright, and their endings. */
@@ -114,6 +114,23 @@ function readPoints(read: AnnotationDTO): PointsShape {
     case 'ink':
       return { kind: 'ink', inkList: annotation.inkList, rotation };
   }
+}
+
+const NO_ENDINGS: LineEndings = { start: 'none', end: 'none' };
+
+/** A line's or polyline's endings; none for an annotation that has none. */
+export const lineEndingsOf = (annotation: AnnotationDTO): LineEndings =>
+  ('lineEndings' in annotation && annotation.lineEndings) || NO_ENDINGS;
+
+/** A line where a create gesture places a segment, with the tool's endings; no other points kind is placed. */
+function placePoints(placement: Placement, annotation: AnnotationDTO): LineShape | null {
+  if (placement.kind !== 'segment' || annotation.subtype !== 'line') return null;
+  return {
+    kind: 'line',
+    linePoints: { start: placement.a, end: placement.b },
+    lineEndings: lineEndingsOf(annotation),
+    rotation: 0,
+  };
 }
 
 /**
@@ -513,6 +530,7 @@ function pointsScene(shape: PointsShape, stroke: Stroke): RenderNode[] {
 export const pointsFamily: ShapeFamily<PointsShape> = {
   read: readPoints,
   write: writePoints,
+  placed: placePoints,
   bounds: pointsBounds,
   drawnBounds: pointsDrawnBounds,
   rect: pointsDrawnBounds,

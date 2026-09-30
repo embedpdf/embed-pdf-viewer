@@ -44,8 +44,8 @@ export function connectForm(ctx: FormContext, form: FormHostCapability): void {
   // annotation plugin, the tools join its registry and gain live defaults,
   // the style panel and click-to-create. Without it they are plain hub tools:
   // placement still works; only interactive styling needs the annotation
-  // plugin. Either way the form place handler commits them: these tools
-  // enable 'form-place', never 'annotation-draw'.
+  // plugin, and so does the ghost. Either way the form place handler commits
+  // them: these tools enable 'form-place', never 'annotation-draw'.
   for (const tool of FORM_TOOLS) {
     ctx.cleanup(
       annotation
@@ -56,8 +56,14 @@ export function connectForm(ctx: FormContext, form: FormHostCapability): void {
             enables: [...PLACE_TAGS],
             clickCreate: tool.clickCreate,
             defaults: tool.defaults,
+            // Click-first: the field a click places follows the pointer.
+            ghost: true,
           })
-        : interaction.registerTool({ id: tool.id, cursor: tool.cursor, enables: new Set(PLACE_TAGS) }),
+        : interaction.registerTool({
+            id: tool.id,
+            cursor: tool.cursor,
+            enables: new Set(PLACE_TAGS),
+          }),
     );
   }
   ctx.cleanup(interaction.registerHandler(createPlaceHandler(form, interaction, annotation)));

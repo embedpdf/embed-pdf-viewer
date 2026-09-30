@@ -122,7 +122,7 @@ which the mirror advances when the engine reports a re-baked appearance.
 | `write/`        | the verbs, and the effect runners that turn core effects into engine writes           |
 | `repository/`   | engine DTO ↔ page-space record, one projection per annotation kind                    |
 | `comments/`     | the comment threads lens over the same records                                        |
-| `tools/`        | tool definitions, the registry, and the pointer handlers on the interaction hub       |
+| `tools/`        | tool definitions, the registry, the tool's ghost, and the pointer handlers on the hub |
 
 ## Tests
 

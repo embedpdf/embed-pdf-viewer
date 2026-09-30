@@ -81,6 +81,8 @@ const quadsScene = (shape: QuadsShape): RenderNode[] =>
 export const quadsFamily: ShapeFamily<QuadsShape> = {
   read: readQuads,
   write: (shape) => ({ quadPoints: shape.quadPoints }),
+  // Quads are made from a text selection, never placed.
+  placed: () => null,
   bounds: quadsBounds,
   drawnBounds: quadsDrawnBounds,
   rect: quadsDrawnBounds,

@@ -30,9 +30,10 @@ import {
   rotatedAabb,
   rotatedHandleCursor,
   segDist,
+  transposedAboutCenter,
   type RectHandle,
 } from '../rect';
-import type { Handle, Point, Rect, RenderNode, Stroke } from '../types';
+import type { Handle, Placement, Point, Rect, RenderNode, Stroke } from '../types';
 import type { ShapeFamily } from './family';
 
 /** A box and its turn, as the engine keeps them. */
@@ -55,13 +56,37 @@ const TURNING_KINDS: ReadonlySet<string> = new Set(['square', 'circle', 'stamp']
 
 type TurningAnnotation = Extract<AnnotationDTO, { subtype: 'square' | 'circle' | 'stamp' }>;
 
+/** Whether a box kind draws the ellipse in its box: a circle, and a radio button (the engine draws one round). */
+const drawsEllipse = (annotation: AnnotationDTO): boolean =>
+  annotation.subtype === 'circle' ||
+  (annotation.subtype === 'widget' && annotation.fieldFamily === 'radio');
+
 /** A box kind's shape, read off its annotation. */
 function readBox(annotation: AnnotationDTO): BoxShape {
   if (!TURNING_KINDS.has(annotation.subtype)) {
-    return { kind: 'box', box: annotation.rect, rotation: 0, ellipse: false };
+    return { kind: 'box', box: annotation.rect, rotation: 0, ellipse: drawsEllipse(annotation) };
   }
   const { box, rotation } = annotation as TurningAnnotation;
-  return { kind: 'box', box, rotation: rotation ?? 0, ellipse: annotation.subtype === 'circle' };
+  return { kind: 'box', box, rotation: rotation ?? 0, ellipse: drawsEllipse(annotation) };
+}
+
+/**
+ * A box kind's shape where a create gesture places a box. An upright tool's
+ * turn (`placement.rot`, quarter turns) matters only to a drawing that reads
+ * one way: a stamp's image keeps it. Every other box (a square, a circle, a
+ * widget) takes the region the turned box covers, a quarter turn swapping
+ * its sides, and stores no turn: it shows as the author saw it, unturned.
+ */
+function placeBox(placement: Placement, annotation: AnnotationDTO): BoxShape | null {
+  if (placement.kind !== 'box') return null;
+  const keepsTurn = annotation.subtype === 'stamp';
+  const quarter = placement.rot % 180 !== 0;
+  return {
+    kind: 'box',
+    box: !keepsTurn && quarter ? transposedAboutCenter(placement.rect) : placement.rect,
+    rotation: keepsTurn ? placement.rot : 0,
+    ellipse: drawsEllipse(annotation),
+  };
 }
 
 /**
@@ -236,6 +261,7 @@ function boxScene(shape: BoxShape, stroke: Stroke): RenderNode[] {
 export const boxFamily: ShapeFamily<BoxShape> = {
   read: readBox,
   write: writeBox,
+  placed: placeBox,
   bounds: (shape) => shape.box,
   drawnBounds: boxDrawnBounds,
   rect: boxRect,

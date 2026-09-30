@@ -17,7 +17,7 @@ import {
 } from '../contract';
 import type { ArmedStampInfo } from '../contract';
 import { previewBucket } from '../host-contract';
-import { setToolGhost } from '../model';
+import { setGhostAt } from '../model';
 import type { AnnotationContext, AnnotationServices } from '../services';
 import { appliedRefOf } from './outcomes';
 import { ARMED_STAMP_TOOL_ID } from '../tools/definitions';
@@ -94,7 +94,7 @@ export function createStamps(
   let armedInfo: ArmedStampInfo | null = null;
   /** A new or dropped payload invalidates the ghost drawn for the old one, and wakes readers. */
   const armChanged = (): void => {
-    ctx.state.update(setToolGhost, null);
+    ctx.state.update(setGhostAt, null);
     ctx.notify();
   };
 

@@ -293,7 +293,6 @@ export type Draft =
       page: PageRef;
       from: Point;
       to: Point;
-      ellipse: boolean;
       /** Display rotation + upright policy captured at down (the gesture's home
        *  page), so the commit counter-rotates against what the author saw even
        *  if the up sample resolves elsewhere. See {@link PointerInput}. */
@@ -325,6 +324,10 @@ export type Draft =
       page: PageRef;
       from: Point;
       to: Point;
+      /** Display rotation + upright policy captured at down (see the rect
+       *  draft): an upright tool's click lays its line as the author saw the page. */
+      displayRotation?: PageRotation;
+      upright?: boolean;
       /** The tool's click-create policy, captured at down like `upright`. */
       clickCreate?: ClickCreate | false;
       /** The tool's `/F` seed, captured at down (see the rect draft). */
@@ -596,11 +599,12 @@ export interface PointerInput {
    */
   zoom?: number;
   /**
-   * Counter-rotate the created annotation so it reads upright at
+   * Lay the created annotation out as the author sees the page at
    * `displayRotation` — the authoring tool's `upright` policy, resolved by the
-   * caller (the core knows subtypes, not tools). Box kinds only (free-text /
-   * stamp are the ones with a natural reading orientation); vertex kinds and
-   * callouts ignore it.
+   * caller (the core knows subtypes, not tools). A box counter-rotates so it
+   * reads upright (free text, stamps); a clicked line points the way its
+   * `ClickCreate` says on screen. A dragged line and a callout's leader
+   * follow the pointer and ignore it.
    */
   upright?: boolean;
   /**
@@ -614,20 +618,34 @@ export interface PointerInput {
 
 /**
  * What a bare click (a press-release under the drag threshold) creates for a
- * tool: a default-size box with an explicit anchor (`center` unless stated —
- * free text declares `top-left` so the box hangs where you'll type,
- * display-frame-aware under `upright`), or a default-length line from the
- * point (`angleDeg` 0 = rightward, CW-positive in y-down space). Resolved
- * from the tool by the caller and passed on the message — the core knows
- * subtypes, not tools (the `upright` pattern). `false` suppresses a kind's
- * own click fallback (free text always click-creates by default).
- * Anchoring is policy data, never inferred from the kind — the same policy
- * drives annotation commits, footprint ghosts, and form-field placement
- * (see `resolveClickPlacement`).
+ * tool, in PDF points:
+ *   - a box, `width` × `height`, whose `anchor` sits on the click: its middle
+ *     (`center`, the default) or its top-left corner (`top-left`: free text
+ *     hangs where you'll type);
+ *   - a line, `length` long, pointing `rotation` degrees clockwise from
+ *     rightward, whose `anchor` sits on the click: its middle (`center`, the
+ *     default), its start, or its end (an arrow's tip).
+ * Under an `upright` tool the anchor, the box's sides and the line's
+ * direction are as the person sees the turned page. Resolved from the tool
+ * by the caller and passed on the message: the core knows kinds, not tools.
+ * The same policy drives the commit, the tool's ghost and a form field's
+ * placement (see `resolveClickPlacement`).
  */
 export type ClickCreate =
   | { width: number; height: number; anchor?: 'center' | 'top-left' }
-  | { length: number; angleDeg?: number };
+  | { length: number; rotation?: number; anchor?: 'center' | 'start' | 'end' };
+
+/**
+ * Where a create gesture puts what it makes, on the page and slid inside it:
+ * a box and the turn an `upright` tool gives it (degrees clockwise, 0 for
+ * none), or a segment from `a` to `b`. A click's comes from the tool's
+ * {@link ClickCreate}, a drag's from the dragged points. It says nothing of
+ * what is drawn there: each shape family turns it into its shape
+ * (`ShapeFamily.placed`), and a form field takes the box as its bounds.
+ */
+export type Placement =
+  | { kind: 'box'; rect: Rect; rot: number }
+  | { kind: 'segment'; a: Point; b: Point };
 
 export type Message =
   | { type: 'editPointer'; phase: 'down' | 'move' | 'up'; in: PointerInput }
@@ -803,7 +821,15 @@ export interface RenderItem {
    *  text, text/choice widgets). Lets a behavior renderer's focused editor
    *  match the baked appearance's font. */
   text?: TextStyle;
-  source: 'baked' | 'vector' | 'ghost';
+  /**
+   * How it paints: the engine's raster (`baked`), live from its description
+   * (`vector`), or an annotation not made yet, drawn as it will be: a drawing
+   * in progress (`draft`, solid) or the tool's ghost, what a click would
+   * place (`ghost`, see-through by `ghostOpacity`).
+   */
+  source: 'baked' | 'vector' | 'draft' | 'ghost';
+  /** How opaque a ghost paints (0–1); a painter lets `--epdf-ghost-opacity` win over it. */
+  ghostOpacity?: number;
   selected: boolean;
   /** The pointer is over this annotation — scene-level hover affordances
    *  (e.g. a redaction mark previews its applied look). */

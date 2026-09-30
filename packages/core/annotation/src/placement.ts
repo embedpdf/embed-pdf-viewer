@@ -1,34 +1,40 @@
 /**
- * Click-create placement — the pure, plane-agnostic layer.
+ * Where a create gesture puts what it makes — the pure, plane-agnostic layer.
  *
- * `resolveClickPlacement` answers "where does a bare click put the thing": a
- * box (anchored per policy, upright-aware, slid onto the page) or a segment
- * (default length/angle from the point, slid onto the page as a unit). It is
- * the single source for that answer — the annotation core's click commit, the
- * hover footprint ghost, and the form plugin's field placement all consume
- * the same result, so preview ≡ commit by construction.
- *
- * It deliberately returns logical geometry: no annotation visual semantics
- * (no ellipse) — a form field takes `rect` straight to
- * `doc.forms.createField`. The annotation-only conversion to a
- * committable/renderable `Shape` is {@link clickCreateGeom} below; that
- * is where ellipse semantics apply.
+ * A create tool answers one question: if the gesture ended now, what would
+ * exist? `gesturePlacement` answers the "where": past the drag threshold, the
+ * dragged box or segment; under it, the tool's click default
+ * (`resolveClickPlacement`). `placedShape` answers the "what": the kind's
+ * shape family lays its shape there. The commit, the drawing in progress and
+ * the tool's ghost all make these two calls, so a ghost shows what a click
+ * makes by construction. A form field takes the placed box as its bounds.
  */
-import { transposedAboutCenter, uprightAnchoredRect, uprightRotation } from './geometry';
-import { rectFromPoints } from './rect';
 import type { PageRotation } from '@embedpdf/core-geometry';
-import type { LineEndings } from '@embedpdf/engine-core/runtime';
-import type { ClickCreate, Shape, Rect, KindName, Point } from './types';
+import type { AnnotationDTO } from '@embedpdf/engine-core/runtime';
 
-/** A resolved click placement: what the click will occupy, page-clamped. */
-export type ClickPlacement =
-  | {
-      kind: 'box';
-      rect: Rect;
-      /** Upright counter-rotation captured for the commit (deg CW; 0 = none). */
-      rot: number;
-    }
-  | { kind: 'segment'; a: Point; b: Point };
+import { uprightAnchoredRect, uprightRotation } from './geometry';
+import { kindOf } from './record';
+import { rectFromPoints, rotatePoint, transposedAboutCenter } from './rect';
+import type { ClickCreate, Placement, Point, Rect, Shape } from './types';
+import { clampPointToBox } from './update/page-bound';
+
+/** The click ↔ drag threshold (content units): a press-release that stays
+ *  under it is a click. Every gesture owner (the draw handler, the form
+ *  plugin's place handler) shares this one definition. */
+export const MIN_DRAG = 3;
+
+/** What a create gesture lays: a box (shapes, text boxes, form fields) or a segment (lines). */
+export type GestureForm = 'box' | 'segment';
+
+/** The page a placement is made on, and how the person sees it. */
+export interface PlacementFrame {
+  /** The page's content box: a placement slides inside it. */
+  pageBox?: Rect;
+  /** Lay it out as the person sees the page: the tool's `upright`. */
+  upright?: boolean;
+  /** How far the page shows turned (document /Rotate + view rotation, degrees clockwise). */
+  displayRotation?: PageRotation;
+}
 
 /** Slide a rect (as a unit) to sit inside `box`; pins at the origin edge when
  *  it doesn't fit. Placements are page-bound; the pointer isn't. */
@@ -41,78 +47,99 @@ export const clampRectToBox = (rect: Rect, box: Rect | undefined): Rect => {
   };
 };
 
+/** Whether a gesture from `from` to `to` is a drag: a segment once it is
+ *  `MIN_DRAG` long, a box once either side is. */
+export function isDrag(form: GestureForm, from: Point, to: Point): boolean {
+  if (form === 'segment') return Math.hypot(to.x - from.x, to.y - from.y) >= MIN_DRAG;
+  return Math.abs(to.x - from.x) >= MIN_DRAG || Math.abs(to.y - from.y) >= MIN_DRAG;
+}
+
+/** The turn an upright tool gives a box on a page shown turned: that turn undone. */
+const uprightTurn = ({ upright, displayRotation }: PlacementFrame): number =>
+  upright && displayRotation ? uprightRotation(displayRotation) : 0;
+
 /**
- * Resolve a click-create policy at a page point. `anchor` defaults to
- * `center`; under `upright` a box counter-rotates against the page's display
- * rotation exactly as the drag commit would (centre-anchored boxes transpose
- * about their centre, top-left boxes anchor in the display frame).
+ * Where a create gesture from `from` to `to` puts what it makes: the dragged
+ * box or segment once it is a drag, else the tool's click default at `from`
+ * (`null` when a click makes nothing). A drag stays on the page: its points
+ * pin to the edge. An upright drag keeps the region the author dragged: under
+ * a quarter turn the box before its turn is the dragged one with its sides
+ * swapped about its middle, so the turn lands it back on that region.
+ */
+export function gesturePlacement(
+  form: GestureForm,
+  from: Point,
+  to: Point,
+  clickCreate: ClickCreate | false | undefined,
+  frame: PlacementFrame = {},
+): Placement | null {
+  if (!isDrag(form, from, to)) {
+    return clickCreate ? resolveClickPlacement(from, clickCreate, frame) : null;
+  }
+  const a = frame.pageBox ? clampPointToBox(from, frame.pageBox) : from;
+  const b = frame.pageBox ? clampPointToBox(to, frame.pageBox) : to;
+  if (form === 'segment') return { kind: 'segment', a, b };
+  const rot = uprightTurn(frame);
+  const dragged = rectFromPoints(a, b);
+  return { kind: 'box', rect: rot % 180 ? transposedAboutCenter(dragged) : dragged, rot };
+}
+
+/**
+ * Where a bare click at `point` puts what the tool makes (see
+ * {@link ClickCreate}), slid inside the page. Under `upright` it is laid out
+ * as the person sees the page: a line's direction and a box's top-left corner
+ * are the screen's, and a box turns to read upright, showing `width` ×
+ * `height` as configured.
  */
 export function resolveClickPlacement(
   point: Point,
   policy: ClickCreate,
-  options: { pageBox?: Rect; upright?: boolean; displayRotation?: PageRotation } = {},
-): ClickPlacement {
+  frame: PlacementFrame = {},
+): Placement {
+  // How far the person sees the page turned, for an upright tool.
+  const seen = frame.upright ? (frame.displayRotation ?? 0) : 0;
   if ('length' in policy) {
-    const ang = ((policy.angleDeg ?? 0) * Math.PI) / 180;
-    const end = {
-      x: point.x + Math.cos(ang) * policy.length,
-      y: point.y + Math.sin(ang) * policy.length,
-    };
-    const bounds = rectFromPoints(point, end);
-    const placed = clampRectToBox(bounds, options.pageBox);
+    const turn = ((policy.rotation ?? 0) * Math.PI) / 180;
+    // The line as the person sees it, turned back into page space.
+    const span = rotatePoint(
+      { x: Math.cos(turn) * policy.length, y: Math.sin(turn) * policy.length },
+      { x: 0, y: 0 },
+      -seen,
+    );
+    // How much of the line lies before the click: none from its start, all to its end.
+    const before = policy.anchor === 'start' ? 0 : policy.anchor === 'end' ? 1 : 0.5;
+    const a = { x: point.x - span.x * before, y: point.y - span.y * before };
+    const b = { x: a.x + span.x, y: a.y + span.y };
+    const bounds = rectFromPoints(a, b);
+    const placed = clampRectToBox(bounds, frame.pageBox);
     const dx = placed.x - bounds.x;
     const dy = placed.y - bounds.y;
-    return {
-      kind: 'segment',
-      a: { x: point.x + dx, y: point.y + dy },
-      b: { x: end.x + dx, y: end.y + dy },
-    };
+    return { kind: 'segment', a: { x: a.x + dx, y: a.y + dy }, b: { x: b.x + dx, y: b.y + dy } };
   }
   const { width, height } = policy;
-  const rot =
-    options.upright && options.displayRotation ? uprightRotation(options.displayRotation) : 0;
-  let rect: Rect;
-  if (policy.anchor === 'top-left') {
-    rect = rot
-      ? uprightAnchoredRect(point, width, height, options.displayRotation!)
-      : { x: point.x, y: point.y, width, height };
-  } else {
-    rect = { x: point.x - width / 2, y: point.y - height / 2, width, height };
-    // A quarter-turn transposes the unrotated box so the displayed box keeps
-    // the configured width×height (same rule as a dragged box).
-    if (rot === 90 || rot === 270) rect = transposedAboutCenter(rect);
-  }
-  return { kind: 'box', rect: clampRectToBox(rect, options.pageBox), rot };
+  const rot = uprightTurn(frame);
+  const rect =
+    policy.anchor === 'top-left'
+      ? uprightAnchoredRect(point, width, height, seen)
+      : { x: point.x - width / 2, y: point.y - height / 2, width, height };
+  // What the page shows is the box turned by `rot` (a quarter turn swaps its
+  // sides): slide that inside the page, and the box with it.
+  const shown = rot % 180 ? transposedAboutCenter(rect) : rect;
+  const placed = clampRectToBox(shown, frame.pageBox);
+  return {
+    kind: 'box',
+    rect: { ...rect, x: rect.x + placed.x - shown.x, y: rect.y + placed.y - shown.y },
+    rot,
+  };
 }
 
 /**
- * Annotation-only: convert a placement into the `Shape` the commit stores and
- * the ghost paints, for a routing kind. This is where annotation visual
- * semantics live — the ellipse for circles; a cloud reaches out from the
- * placed box. Forms never call this; a field box is the placement rect
- * itself. Null for kinds a click cannot author.
+ * What a create from a tool makes at `placement`: its kind's shape there, as
+ * the kind's shape family lays it (`ShapeFamily.placed`), or `null` when the
+ * kind can't be made that way (a line from a box). `annotation` is what the
+ * tool creates before it has a shape (`toolAnnotation`): its kind, and what
+ * the shape takes from it (a line's endings, a circle's roundness).
  */
-export function clickCreateGeom(
-  subtype: KindName,
-  placement: ClickPlacement,
-  lineEndings: LineEndings,
-): Shape | null {
-  if (placement.kind === 'segment') {
-    return subtype === 'line'
-      ? {
-          kind: 'line',
-          linePoints: { start: placement.a, end: placement.b },
-          lineEndings,
-          rotation: 0,
-        }
-      : null;
-  }
-  const { rect, rot } = placement;
-  if (subtype === 'free-text') {
-    return { kind: 'text-box', box: rect, rotation: rot, calloutLine: null, lineEnding: null };
-  }
-  if (subtype === 'square' || subtype === 'circle') {
-    return { kind: 'box', box: rect, rotation: rot, ellipse: subtype === 'circle' };
-  }
-  return null;
+export function placedShape(annotation: AnnotationDTO, placement: Placement): Shape | null {
+  return kindOf(annotation).family.placed(placement, annotation);
 }

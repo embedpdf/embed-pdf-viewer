@@ -21,7 +21,6 @@ import type {
   RotationAnchor,
   FieldSpec,
   FieldValues,
-  Shape,
   Id,
   Rect,
   SnapSettings,
@@ -45,7 +44,7 @@ import type {
 } from '@embedpdf/engine-core/runtime';
 
 import type { TextFormat } from './rich-text';
-import type { AnnotationToolInput, GhostPolicy } from './tools/definitions';
+import type { AnnotationToolInput, ResolvedGhost } from './tools/definitions';
 
 export { AnnotationToken } from './token';
 export type { Face, TextFormat, TextSelection } from './rich-text';
@@ -149,17 +148,20 @@ export interface ChromeSettingsPatch {
   guides?: Partial<ChromeSettings['guides']>;
 }
 
-/** The armed tool's would-be placement under the cursor (page space). */
-export type ToolGhost = {
+/**
+ * The armed stamp's ghost: its image, see-through, in the box a click at the
+ * pointer would place it in (page space). Every other tool's ghost paints
+ * with the page's items (`source: 'ghost'`).
+ */
+export interface ImageGhost {
   page: PageRef;
-  /** The exact box the click's placement would use. */
+  /** The box the stamp's placement would use, before its turn. */
   box: Rect;
-  /** The tool's upright counter-rotation at this hover (deg, CW). */
+  /** The tool's upright turn at this hover (degrees clockwise). */
   rot: number;
-} & (
-  | { kind: 'image' } // the armed stamp raster — framework blits it
-  | { kind: 'vector'; toolId: string; geometry: Shape } // painted via pageItems/scene
-);
+  /** How opaque it paints (0–1); `--epdf-ghost-opacity` wins over it. */
+  opacity: number;
+}
 
 /** Registration options for {@link annotationPlugin} — the initial values of the
  *  live-adjustable {@link AnnotationCapability.setSnap} /
@@ -375,8 +377,8 @@ export interface AnnotationTool {
   readonly defaults?: FieldValues;
   readonly flags?: Partial<AnnotationFlags>;
   readonly upright: boolean;
-  /** Whether what a click places follows the pointer as a ghost (`footprint`). */
-  readonly ghost: GhostPolicy;
+  /** The tool's ghost, what a click would place following the pointer: how opaque it paints, or `false`. */
+  readonly ghost: ResolvedGhost;
 }
 
 /** The live multi-click draft (polygon / polyline): where it is and whether it can finish. */

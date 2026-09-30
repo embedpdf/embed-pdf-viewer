@@ -31,7 +31,7 @@ import type {
 
 /**
  * Icon kinds place at their usual size: the icon fills its rect, so the
- * footprint ghost and the placement use exactly this size.
+ * tool's ghost and the placement use exactly this size.
  */
 export const ICON_PLACE_SIZE = { width: 20, height: 20 } as const;
 
@@ -40,8 +40,12 @@ export type IconPlaceKind = 'text' | 'file-attachment';
 export const isIconPlaceKind = (subtype: KindName): subtype is IconPlaceKind =>
   subtype === 'text' || subtype === 'file-attachment';
 
-/** What an icon tool creates, read as an annotation: its defaults and its `/F` seed. */
-export const iconAnnotationOf = (
+/**
+ * What a tool creates, read as an annotation before it has a shape: its
+ * defaults and its `/F` seed. Its placement, its ghost and its commit all
+ * start from it.
+ */
+export const annotationOfTool = (
   model: Model,
   tool: { subtype: KindName; preset: string; flags?: Partial<AnnotationFlags> },
 ): AnnotationDTO =>

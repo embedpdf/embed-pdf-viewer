@@ -130,6 +130,8 @@ function caretDrawnBounds(shape: CaretShape): Rect {
 export const caretFamily: ShapeFamily<CaretShape> = {
   read: readCaret,
   write: writeCaret,
+  // A caret is made from a text selection, never placed.
+  placed: () => null,
   bounds: (shape) => shape.box,
   drawnBounds: caretDrawnBounds,
   rect: (shape) => rotatedAabb(caretDrawnBounds(shape), shape.rotation, rectCenter(shape.box)),

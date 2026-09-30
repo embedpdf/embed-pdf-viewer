@@ -2,7 +2,9 @@
  * The form-tool table — the single source of truth for the palette. Every
  * derivation reads this one list: interaction registration (annotation-less),
  * annotation tool/style registration (full viewer), active-tool → field
- * family lookup, click placement, and default appearance.
+ * family lookup, click placement, and default appearance. With the
+ * annotation plugin each tool shows a ghost: the field a click places, drawn
+ * with the tool's defaults where it will land.
  *
  * "One tool system, two commit planes": the tools live in the annotation
  * registry when that plugin is present (defaults, style panel, click-create —
@@ -23,7 +25,7 @@ export interface FormToolDef {
   family: AuthorableFormFamily;
   /** The client kind the annotation registry routes on (props panel).
    *  Not a PDF subtype — every widget is PDF `widget`; this is the view. */
-  visualKind: 'widget-text' | 'widget-choice' | 'widget-toggle' | 'widget-box';
+  visualKind: 'widget-text' | 'widget-choice' | 'widget-toggle' | 'widget-radio' | 'widget-box';
   /** What a bare click places (box policies only — fields are boxes). */
   clickCreate: Extract<ClickCreate, { width: number }>;
   /** Seed drawing defaults, the widget's appearance fields: a placed field is
@@ -62,7 +64,8 @@ export const FORM_TOOLS: readonly FormToolDef[] = [
   {
     id: 'form-radio',
     family: 'radio',
-    visualKind: 'widget-toggle',
+    // Round, as the engine draws a radio button: its ghost and its placement too.
+    visualKind: 'widget-radio',
     clickCreate: { width: 18, height: 18 },
     defaults: FIELD_CHROME,
     cursor: 'crosshair',

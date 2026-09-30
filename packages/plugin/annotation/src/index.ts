@@ -11,9 +11,14 @@ export { annotationPlugin } from './annotation.plugin';
 export { annotationKey, refFromStableId } from '@embedpdf/core';
 export * from './contract';
 // The shared placement layer + the one click↔drag threshold, re-exported so a
-// sibling commit plane (the form plugin's place handler) resolves clicks with
-// the exact call the annotation core and the footprint ghost use.
-export { MIN_DRAG, resolveClickPlacement, type ClickPlacement } from '@embedpdf/core-annotation';
+// sibling commit plane (the form plugin's place handler) places a gesture with
+// the exact call the annotation core and the tool's ghost use.
+export {
+  MIN_DRAG,
+  gesturePlacement,
+  resolveClickPlacement,
+  type Placement,
+} from '@embedpdf/core-annotation';
 export { widgetAppearanceOf } from './authoring';
 // The comments lens's thread shapes (composed in engine-core per
 // ISO 32000 §12.5.6.3) + the annotation identity type its verbs take — re-exported
@@ -24,6 +29,7 @@ export type {
   AnnotationToolDef,
   AnnotationToolInput,
   GhostPolicy,
+  ResolvedGhost,
   InkAuthoringOptions,
   PromptSourceSpec,
   ResolvedTool,

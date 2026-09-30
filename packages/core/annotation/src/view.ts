@@ -6,7 +6,12 @@ import { annotationSelectionFrame } from './selection';
  * applied) for customRenderer wrapping; `chrome` is the selection overlay
  * (handles carry their resize cursor, group box, marquee).
  */
-import { distanceHandles, distanceLayout, measurementOf } from './measurement';
+import {
+  distanceHandles,
+  distanceLayout,
+  measurementOf,
+  type MeasurementAppearance,
+} from './measurement';
 import {
   measurementLayout,
   moveMeasurementCaption,
@@ -32,24 +37,16 @@ import { isSelectable, paintOrder } from './hit';
 import { annotTransformable, viewable } from './flags';
 import { anchoredGeom, anchoredStrokeWidth, anchorModeOf, type ViewEnv } from './anchor';
 import { blendFor } from './kinds/styles';
+import { isDrag, placedShape } from './placement';
 import {
   calloutBox,
   calloutUprightRot,
+  draftPlacement,
   lineEndingsOf,
   rotateDraftDelta,
   toolAnnotation,
 } from './update';
-import type {
-  ModelAnnotation,
-  ChromeNode,
-  Shape,
-  Id,
-  Model,
-  Rect,
-  RenderItem,
-  Style,
-  Point,
-} from './types';
+import type { ChromeNode, Shape, Id, Model, Rect, RenderItem, Style, Point } from './types';
 import type { CreationDraftAnchor, RotationAnchor } from './types';
 import { kindOf, refOf, shapeOf, styleOf, textOf } from './record';
 
@@ -141,11 +138,48 @@ function effGeom(model: Model, id: Id, view: ViewEnv | undefined): Shape {
 
 /** Style with the stroke width an anchored vector body renders at (screen-
  *  constant line weight); everyone else keeps their style verbatim. */
-function effStyle(record: ModelAnnotation, view: ViewEnv | undefined): Style {
-  const mode = anchorModeOf(record);
-  const style = styleOf(record.annotation);
+function effStyle(annotation: AnnotationDTO, view: ViewEnv | undefined): Style {
+  const mode = anchorModeOf({ annotation });
+  const style = styleOf(annotation);
   if (!mode?.zoom || !view) return style;
   return { ...style, strokeWidth: anchoredStrokeWidth(style.strokeWidth, mode, view) };
+}
+
+/**
+ * How an annotation not made yet paints, drawn as it will be once made: a
+ * drawing in progress (`draft`) or the tool's ghost (`ghost`, what a click
+ * would place). `annotation` is what the tool creates, its defaults and
+ * flags; `shape` is where it goes, as the made one will store it, so a
+ * screen-anchored icon shows at its size on screen, as a made one does.
+ */
+export function unmadeItem(
+  id: Id,
+  annotation: AnnotationDTO,
+  shape: Shape,
+  source: 'draft' | 'ghost',
+  view?: ViewEnv,
+  measure?: MeasurementAppearance,
+): RenderItem {
+  const geometry = anchoredGeom(shape, anchorModeOf({ annotation }), view);
+  const style = effStyle(annotation, view);
+  const distance = measure && measurementLayout(geometry, measure, style);
+  const text = textOf(annotation);
+  return {
+    id,
+    ref: null,
+    subtype: kindOf(annotation).name,
+    geometry,
+    box: distance?.visualBounds ?? geomVisualBounds(geometry, style),
+    style,
+    ...(text ? { text } : {}),
+    ...iconOf(annotation),
+    ...redactionLabelOf(annotation),
+    ...(measure ? { measure } : {}),
+    source,
+    selected: false,
+    rot: geomRotation(geometry),
+    blend: blendFor(style),
+  };
 }
 
 /** A free-text box renders as a live element (editable / reflowing) while it's
@@ -172,7 +206,7 @@ export function pageItems(model: Model, page: PageRef, view?: ViewEnv): RenderIt
     // (see `textBoxes`). Dropping the live plain box here would lose its border
     // and background the moment it is touched.
     const geometry = effGeom(model, id, view);
-    const style = effStyle(record, view);
+    const style = effStyle(record.annotation, view);
     // Where the baked raster is drawn (appearance.ts): a stamp's where its
     // shape is, everyone else's at its raster box, carried along by a move.
     const ap = rasterPlacement(model, id, view, geometry);
@@ -199,67 +233,67 @@ export function pageItems(model: Model, page: PageRef, view?: ViewEnv): RenderIt
     });
   }
   const draft = model.draft;
+  // A box or a line being drawn shows what releasing it makes, once it is a
+  // drag. Until then the release is a click: the tool's ghost shows that.
   if (
-    (draft?.kind === 'create-rect' ||
-      draft?.kind === 'create-line' ||
-      draft?.kind === 'create-distance' ||
+    (draft?.kind === 'create-rect' || draft?.kind === 'create-line') &&
+    draft.page.objectNumber === pageObjectNumber &&
+    isDrag(draft.kind === 'create-line' ? 'segment' : 'box', draft.from, draft.to)
+  ) {
+    const placement = draftPlacement(draft);
+    const tool = { ...toolAnnotation(model, draft.subtype, draft.preset), ...draft.flags };
+    const shape = placement && placedShape(tool, placement);
+    if (shape) {
+      const measure = draft.kind === 'create-line' ? draft.measure : undefined;
+      items.push(unmadeItem(DRAFT_ID, tool, shape, 'draft', view, measure));
+    }
+  }
+  if (
+    (draft?.kind === 'create-distance' ||
       draft?.kind === 'create-poly' ||
       draft?.kind === 'create-ink') &&
     draft.page.objectNumber === pageObjectNumber
   ) {
     // Preview with the tool's resolved defaults (base + per-subtype override), so the
-    // ghost is a faithful WYSIWYG of what will commit — not the bare base style. The
-    // dragged box is the shape's box, and a cloud reaches out from it; a 0-drag
-    // draws nothing (skipped, like a solid 0×0).
+    // drawing is a faithful WYSIWYG of what will commit — not the bare base style.
     const tool = toolAnnotation(model, draft.subtype, draft.preset);
     const style = { ...styleOf(tool) };
     if (draft.kind === 'create-distance' && style.interiorColor == null) {
       style.interiorColor = style.color;
     }
-    const dragged = draft.kind === 'create-rect' ? rectFromPoints(draft.from, draft.to) : null;
-    const geometry: Shape | null =
-      draft.kind === 'create-rect'
-        ? dragged && (dragged.width > 0 || dragged.height > 0)
-          ? { kind: 'box', box: dragged, rotation: 0, ellipse: draft.ellipse }
-          : null
-        : draft.kind === 'create-line' || draft.kind === 'create-distance'
+    const geometry: Shape =
+      draft.kind === 'create-distance'
+        ? {
+            kind: 'line',
+            linePoints: { start: draft.from, end: draft.to },
+            lineEndings: lineEndingsOf(tool),
+            rotation: 0,
+          }
+        : draft.kind === 'create-poly'
           ? {
-              kind: 'line',
-              linePoints: { start: draft.from, end: draft.to },
-              lineEndings: lineEndingsOf(tool),
+              kind: 'poly',
+              vertices: polyPreviewPoints(draft.points, draft.current),
+              closed: draft.closed,
+              lineEndings: draft.closed ? undefined : lineEndingsOf(tool),
               rotation: 0,
             }
-          : draft.kind === 'create-poly'
-            ? {
-                kind: 'poly',
-                vertices: polyPreviewPoints(draft.points, draft.current),
-                closed: draft.closed,
-                lineEndings: draft.closed ? undefined : lineEndingsOf(tool),
-                rotation: 0,
-              }
-            : { kind: 'ink', inkList: draft.strokes, rotation: 0 };
-    if (geometry) {
-      const measure =
-        draft.kind === 'create-line' ||
-        draft.kind === 'create-distance' ||
-        draft.kind === 'create-poly'
-          ? draft.measure
-          : undefined;
-      const distance = measure && measurementLayout(geometry, measure, style);
-      items.push({
-        id: DRAFT_ID,
-        ref: null,
-        measure,
-        subtype: draft.subtype,
-        geometry,
-        box: distance?.visualBounds ?? geomVisualBounds(geometry, style),
-        style,
-        source: 'ghost',
-        selected: false,
-      });
-    }
+          : { kind: 'ink', inkList: draft.strokes, rotation: 0 };
+    const measure =
+      draft.kind === 'create-distance' || draft.kind === 'create-poly' ? draft.measure : undefined;
+    const distance = measure && measurementLayout(geometry, measure, style);
+    items.push({
+      id: DRAFT_ID,
+      ref: null,
+      measure,
+      subtype: draft.subtype,
+      geometry,
+      box: distance?.visualBounds ?? geomVisualBounds(geometry, style),
+      style,
+      source: 'draft',
+      selected: false,
+    });
   }
-  // Callout creation ghost: the in-progress leader (tip → cur, then tip → knee →
+  // Callout creation drawing: the in-progress leader (tip → cur, then tip → knee →
   // box) and the text-box preview, painted through the same vector scene.
   if (draft?.kind === 'create-callout' && draft.page.objectNumber === pageObjectNumber) {
     const tool = toolAnnotation(model, draft.subtype, draft.preset);
@@ -285,7 +319,7 @@ export function pageItems(model: Model, page: PageRef, view?: ViewEnv): RenderIt
       geometry,
       box: geomVisualBounds(geometry, style),
       style,
-      source: 'ghost',
+      source: 'draft',
       selected: false,
     });
   }
@@ -301,7 +335,7 @@ export function pageItems(model: Model, page: PageRef, view?: ViewEnv): RenderIt
       geometry,
       box: geomVisualBounds(geometry, { strokeWidth: 0 }),
       style: styleOf(toolAnnotation(model, model.preview.subtype, model.preview.preset)),
-      source: 'ghost',
+      source: 'draft',
       selected: false,
     });
   }
@@ -353,7 +387,7 @@ export function selectedItems(model: Model, view?: ViewEnv): RenderItem[] {
     const record = model.byId[id];
     if (!record) continue;
     const geometry = effGeom(model, id, view);
-    const style = effStyle(record, view);
+    const style = effStyle(record.annotation, view);
     items.push({
       id,
       ref: refOf(record),
@@ -381,7 +415,7 @@ function effectiveSelectionFrame(model: Model, id: Id, geometry: Shape, view?: V
   const record = model.byId[id];
   return annotationSelectionFrame(record, undefined, {
     geometry,
-    style: effStyle(record, view),
+    style: effStyle(record.annotation, view),
     measure: effMeasure(model, id),
   });
 }
@@ -557,7 +591,7 @@ export function chrome(
   if (selection.length === 1) {
     const record = model.byId[selection[0]];
     const geometry = effGeom(model, selection[0], view);
-    const style = effStyle(record, view);
+    const style = effStyle(record.annotation, view);
     const caps = kindOf(record.annotation).caps;
     const rot = geomRotation(geometry);
     const measure = effMeasure(model, record.id);

@@ -11,7 +11,6 @@ import type { AnnotationHostCapability } from '../host-contract';
 import {
   ANNOTATION_DRAW_PRIORITY,
   ANNOTATION_EDIT_PRIORITY,
-  ANNOTATION_GHOST_PRIORITY,
   ANNOTATION_MARQUEE_PRIORITY,
   ANNOTATION_PLACE_PRIORITY,
 } from '../priorities';
@@ -33,18 +32,46 @@ const pointOn = (sample: PointerSample, page: PageRef): Point | null =>
   (sample.page?.ref.objectNumber === page.objectNumber ? sample.page.point : null);
 
 /**
+ * The tool's ghost follows the hover of the handler that would take the
+ * click (see tools/ghost.ts): it shows what a click here makes, so only where
+ * the click would reach that handler — nothing above it claims the pointer
+ * (an annotation, text) — and the user may create. Off the page it clears.
+ */
+function followGhost(
+  anno: AnnotationHostCapability,
+  interaction: InteractionHostCapability,
+  sample: PointerSample,
+): void {
+  if (sample.page && anno.canCreate() && !interaction.hasCursorClaim()) {
+    anno.hoverGhostAt(
+      interaction.getActiveToolId(),
+      sample.page.ref,
+      sample.page.point,
+      sample.page.rotation,
+      sample.page.zoom,
+    );
+  } else {
+    anno.clearGhost();
+  }
+}
+
+/**
  * Click-to-place for every payload-carrying tool (stamp / note / file
  * attachment). Each click places one annotation centred on the point (the
  * tool stays active for repeat placement, like a rubber stamp); the
  * capability's `placeAt` routes by the active tool's kind: armed stamp bytes,
  * a stamp/attachment prompt (pick the spot first, the payload second), or an
  * immediate note. No drag gesture — placement size comes from the content
- * (stamp aspect / the fixed icon box), not the pointer.
+ * (stamp aspect / the fixed icon box), not the pointer. Its hover shows the
+ * tool's ghost where the click lands; the ghost clears when the click ends.
  *
  * Priority is deliberately below the edit handler (100): a click over an
  * existing annotation selects it; placement happens on empty page space.
  */
-export function createPlaceHandler(anno: AnnotationHostCapability): InteractionHandler {
+export function createPlaceHandler(
+  anno: AnnotationHostCapability,
+  interaction: InteractionHostCapability,
+): InteractionHandler {
   return {
     id: 'annotation-place',
     // `annotation-stamp` is honoured as a legacy alias for embedder tool
@@ -63,41 +90,9 @@ export function createPlaceHandler(anno: AnnotationHostCapability): InteractionH
         sample.page.zoom,
       );
     },
-  };
-}
-
-/**
- * The armed tool's footprint ghost: every hover re-computes the would-be
- * placement under the cursor (stamp image fit / click-create default geometry);
- * off-page clears it. One handler for every tool — `ghostHoverAt` resolves the
- * tool's ghost policy and clears when it isn't `footprint`. Never captures:
- * the highest priority makes its onDown run first on every press (hiding the
- * ghost while a gesture runs), then declines so the real handlers route.
- */
-export function createGhostHandler(
-  anno: AnnotationHostCapability,
-  interaction: InteractionHostCapability,
-): InteractionHandler {
-  const hover = (sample: PointerSample): void => {
-    if (sample.page)
-      anno.hoverGhostAt(
-        interaction.getActiveToolId(),
-        sample.page.ref,
-        sample.page.point,
-        sample.page.rotation,
-        sample.page.zoom,
-      );
-    else anno.clearGhost();
-  };
-  return {
-    id: 'annotation-ghost',
-    priority: ANNOTATION_GHOST_PRIORITY,
-    enabledFor: () => true,
-    onDown: () => {
-      anno.clearGhost();
-      return false;
-    },
-    onHover: hover,
+    onUp: () => anno.clearGhost(),
+    onCancel: () => anno.clearGhost(),
+    onHover: (sample) => followGhost(anno, interaction, sample),
   };
 }
 
@@ -380,7 +375,11 @@ export function createMarqueeHandler(anno: AnnotationHostCapability): Interactio
   };
 }
 
-/** Drawing: live under `annotation-draw` (the square / circle / line tools). */
+/**
+ * Drawing: live under `annotation-draw` (the square / circle / line tools).
+ * Its hover shows the tool's ghost where a click lands; the ghost stays while
+ * the press is still a click, and clears when the gesture ends.
+ */
 export function createDrawHandler(
   anno: AnnotationHostCapability,
   interaction: InteractionHostCapability,
@@ -525,6 +524,7 @@ export function createDrawHandler(
         }
       }
       origin = null;
+      anno.clearGhost();
     },
     onCancel: () => {
       // Aborted (second finger → pinch, or a system cancel): the draft dies,
@@ -541,8 +541,10 @@ export function createDrawHandler(
       followPage = null;
       origin = null;
       anno.cancelCreationDraft();
+      anno.clearGhost();
     },
     onHover: (sample) => {
+      followGhost(anno, interaction, sample);
       const tool = toolId();
       const st = subtypeOf(tool);
       const distancePage = anno.distanceCreationPage?.();

@@ -7,7 +7,16 @@
  */
 import type { AnnotationDTO } from '@embedpdf/engine-core/runtime';
 
-import type { FieldValues, Handle, Shape, Point, Rect, RenderNode, Stroke } from '../types';
+import type {
+  FieldValues,
+  Handle,
+  Placement,
+  Shape,
+  Point,
+  Rect,
+  RenderNode,
+  Stroke,
+} from '../types';
 
 /** A box's four corners as the page shows them: nw, ne, se, sw. */
 export type Corners = [Point, Point, Point, Point];
@@ -19,6 +28,12 @@ export interface ShapeFamily<S extends Shape = Shape> {
   read(annotation: AnnotationDTO): S;
   /** The engine fields that state `shape` on an annotation of `subtype`. */
   write(shape: S, subtype: string): FieldValues;
+  /**
+   * The shape a create gesture makes at `placement` (a clicked or dragged box
+   * or segment, `placement.ts`) for `annotation`, what the tool creates before
+   * it has a shape; `null` when this family's kinds aren't made that way.
+   */
+  placed(placement: Placement, annotation: AnnotationDTO): S | null;
 
   /* ── where it is ─────────────────────────────────────────────────────── */
 

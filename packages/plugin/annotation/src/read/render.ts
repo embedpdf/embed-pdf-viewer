@@ -1,16 +1,12 @@
 import { CONTINUOUS_RENDER_POLICY, snapAppearanceScale } from '@embedpdf/core';
 import {
-  geomRotation,
   groupOf,
-  iconOf,
   isSubstrateOnly,
   type Model,
   pageItems as corePageItems,
   refOf,
   type RenderItem,
   shapeOf,
-  styleOf,
-  toolAnnotation,
   viewable,
   type ViewEnv,
 } from '@embedpdf/core-annotation';
@@ -20,21 +16,24 @@ import type { LinkNavItem, TextItem } from '../contract';
 import type { AnnotationState } from '../model';
 import type { AnnotationContext, AnnotationServices } from '../services';
 import { buildTextItems } from '../text-item';
+import type { Ghost } from '../tools/ghost';
 
 /**
- * What a page paints: the vector items (drafts, previews and the tool ghost
- * ride the same pipeline), the editable text items, the navigable link
+ * What a page paints: the vector items (drafts, previews and the tool's
+ * ghost ride the same pipeline), the editable text items, the navigable link
  * areas, and the baked-appearance seam (epoch, bake scale, rasters).
  */
 export function createRenderReads(
   ctx: Pick<AnnotationContext, 'state' | 'document' | 'doc'>,
-  { view: { pageModel }, tools }: Pick<AnnotationServices, 'view' | 'tools'>,
+  { view: { pageModel } }: Pick<AnnotationServices, 'view'>,
+  ghost: Pick<Ghost, 'itemsOn'>,
 ) {
   const itemsCache = new Map<
     number,
     {
       model: Model;
-      ghost: AnnotationState['toolGhost'];
+      ghostAt: AnnotationState['ghostAt'];
+      placing: AnnotationState['placing'];
       zoom: number | undefined;
       rotation: number | undefined;
       v: RenderItem[];
@@ -43,40 +42,31 @@ export function createRenderReads(
   const pageItemsOf = (page: PageRef, view?: ViewEnv): RenderItem[] => {
     const pageObjectNumber = page.objectNumber;
     const model = pageModel(pageObjectNumber);
-    const ghost = ctx.state.get().toolGhost;
+    // The ghost and a sibling's placement count for their own page only, so
+    // a ghost following the pointer recomputes that page alone.
+    const state = ctx.state.get();
+    const ghostAt = state.ghostAt?.page.objectNumber === pageObjectNumber ? state.ghostAt : null;
+    const placing = state.placing?.page.objectNumber === pageObjectNumber ? state.placing : null;
     const cached = itemsCache.get(pageObjectNumber);
     if (
       cached &&
       cached.model === model &&
-      cached.ghost === ghost &&
+      cached.ghostAt === ghostAt &&
+      cached.placing === placing &&
       cached.zoom === view?.zoom &&
       cached.rotation === view?.rotation
     )
       return cached.v;
-    const items = corePageItems(model, page, view);
-    // The armed tool's vector footprint ghost rides the same items pipeline as
-    // every draft preview (image ghosts blit through the framework instead).
-    if (ghost && ghost.page.objectNumber === pageObjectNumber && ghost.kind === 'vector') {
-      const tool = tools.get(ghost.toolId);
-      // What a create from the tool starts from: a note's or attachment's
-      // ghost draws the icon the tool will place.
-      const annotation = toolAnnotation(model, tool?.subtype ?? ghost.toolId, tool?.preset);
-      items.push({
-        id: 'tool-ghost',
-        ref: null,
-        subtype: tool?.subtype ?? 'square',
-        geometry: ghost.geometry,
-        box: ghost.box,
-        style: styleOf(annotation),
-        ...iconOf(annotation),
-        rot: geomRotation(ghost.geometry),
-        source: 'ghost',
-        selected: false,
-      });
-    }
+    // The tool's ghost and a sibling's placement paint on top, as the
+    // annotations they will be (tools/ghost.ts).
+    const items = [
+      ...corePageItems(model, page, view),
+      ...ghost.itemsOn(pageObjectNumber, model, view),
+    ];
     itemsCache.set(pageObjectNumber, {
-      model: model,
-      ghost: ghost,
+      model,
+      ghostAt,
+      placing,
       zoom: view?.zoom,
       rotation: view?.rotation,
       v: items,

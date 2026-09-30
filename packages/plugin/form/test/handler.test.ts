@@ -40,24 +40,43 @@ function makeForm(over: Partial<FormHostCapability> = {}) {
   return { form, placed, setResult: (created: CreatedField) => (resolveNext = created) };
 }
 
+type Vec = { x: number; y: number };
+
 function makeAnnotation() {
-  const previews: Array<{ toolId: string; page: PageRef; box: unknown }> = [];
+  const previews: Array<{ toolId: string; page: PageRef; from: Vec; to: Vec }> = [];
+  const ghosts: Array<{ toolId: string; page: PageRef; point: Vec }> = [];
   const selects: unknown[] = [];
   let clears = 0;
+  let ghostClears = 0;
   const annotation = {
-    setPlacementPreview: (toolId: string, page: PageRef, box: unknown) =>
-      previews.push({ toolId, page, box }),
+    previewPlacement: (toolId: string, page: PageRef, from: Vec, to: Vec) =>
+      previews.push({ toolId, page, from, to }),
     clearPlacementPreview: () => {
       clears++;
+    },
+    hoverGhostAt: (toolId: string, page: PageRef, point: Vec) =>
+      ghosts.push({ toolId, page, point }),
+    clearGhost: () => {
+      ghostClears++;
     },
     select: (ref: unknown) => selects.push(ref),
     getToolDefaults: () => ({ interiorColor: '#ffffff', color: '#6b7280', strokeWidth: 1 }),
   } as unknown as AnnotationHostCapability;
-  return { annotation, previews, selects, clears: () => clears };
+  return {
+    annotation,
+    previews,
+    ghosts,
+    selects,
+    clears: () => clears,
+    ghostClears: () => ghostClears,
+  };
 }
 
-const interactionFor = (toolId: string): InteractionHostCapability =>
-  ({ getActiveToolId: () => toolId }) as unknown as InteractionHostCapability;
+const interactionFor = (toolId: string, claimed = false): InteractionHostCapability =>
+  ({
+    getActiveToolId: () => toolId,
+    hasCursorClaim: () => claimed,
+  }) as unknown as InteractionHostCapability;
 
 const sample = (over: Partial<PointerSample>): PointerSample => ({
   phase: 'move',
@@ -124,23 +143,64 @@ describe('form place handler', () => {
     expect(handler.onDown(at('down', 10, 10))).toBe(false);
   });
 
-  it('drives the placement preview while dragging and clears it on up', async () => {
+  it('reports the gesture to the placement preview while it moves, and clears it on up', async () => {
     const { form } = makeForm();
-    const { annotation, previews, clears } = makeAnnotation();
+    const { annotation, previews, clears, ghostClears } = makeAnnotation();
     const handler = createPlaceHandler(form, interactionFor('form-checkbox'), annotation);
     handler.onDown(at('down', 10, 10));
-    handler.onMove?.(at('move', 11, 11)); // under threshold → no preview yet
-    expect(previews).toHaveLength(0);
+    // The annotation plugin paints it once it is a drag; under that, the ghost shows the click.
     handler.onMove?.(at('move', 60, 40));
-    expect(previews.at(-1)).toMatchObject({
+    expect(previews.at(-1)).toEqual({
       toolId: 'form-checkbox',
       page: PAGE_REF,
-      box: { x: 10, y: 10, width: 50, height: 30 },
+      from: { x: 10, y: 10 },
+      to: { x: 60, y: 40 },
     });
-    const before = clears();
     handler.onUp?.(at('up', 60, 40));
-    expect(clears()).toBe(before + 1); // every completion path drops the preview
+    // Every completion path drops the preview and the ghost.
+    expect(clears()).toBe(1);
+    expect(ghostClears()).toBe(1);
     await flush();
+  });
+
+  it('a cancel places nothing and drops what the gesture painted', async () => {
+    const { form, placed } = makeForm();
+    const { annotation, clears, ghostClears } = makeAnnotation();
+    const handler = createPlaceHandler(form, interactionFor('form-text'), annotation);
+    handler.onDown(at('down', 10, 10));
+    handler.onMove?.(at('move', 60, 40));
+    handler.onCancel?.(sample({ phase: 'cancel' }));
+    await flush();
+    expect(placed).toHaveLength(0);
+    expect(clears()).toBe(1);
+    expect(ghostClears()).toBe(1);
+  });
+
+  it('its hover shows the tool’s ghost only where a click places a field', () => {
+    const { form } = makeForm();
+    const shown = makeAnnotation();
+    createPlaceHandler(form, interactionFor('form-radio'), shown.annotation).onHover?.(
+      at('move', 100, 100),
+    );
+    expect(shown.ghosts).toEqual([
+      { toolId: 'form-radio', page: PAGE_REF, point: { x: 100, y: 100 } },
+    ]);
+    // Over a widget or annotation (a hover claim), without design permission, off the page.
+    const cases = [
+      [makeForm().form, interactionFor('form-radio', true), at('move', 100, 100)],
+      [
+        makeForm({ canDesign: () => false } as Partial<FormHostCapability>).form,
+        interactionFor('form-radio'),
+        at('move', 100, 100),
+      ],
+      [makeForm().form, interactionFor('form-radio'), sample({})],
+    ] as const;
+    for (const [caseForm, interaction, where] of cases) {
+      const hidden = makeAnnotation();
+      createPlaceHandler(caseForm, interaction, hidden.annotation).onHover?.(where);
+      expect(hidden.ghosts).toHaveLength(0);
+      expect(hidden.ghostClears()).toBe(1);
+    }
   });
 
   it('auto-selects the created widget — unless the tool changed mid-flight', async () => {

@@ -26,11 +26,18 @@ import { stamp } from './stamp';
 import { strikeout } from './strikeout';
 import { textNote } from './text-note';
 import { underline } from './underline';
-import { widgetBox, widgetButton, widgetChoice, widgetText, widgetToggle } from './widget';
+import {
+  widgetBox,
+  widgetButton,
+  widgetChoice,
+  widgetRadio,
+  widgetText,
+  widgetToggle,
+} from './widget';
 import { plainStyle } from './styles';
 
 export { defineKind, NO_CAPS, type AnnotationKind, type FieldSpec, type KindCaps } from './define';
-export { widgetKindOf } from './widget';
+export { fieldFamilyOfKind, widgetKindOf } from './widget';
 
 /** The kinds, by name. */
 export const KINDS: Readonly<Record<string, AnnotationKind>> = {
@@ -55,6 +62,7 @@ export const KINDS: Readonly<Record<string, AnnotationKind>> = {
   [widgetChoice.name]: widgetChoice,
   [widgetButton.name]: widgetButton,
   [widgetToggle.name]: widgetToggle,
+  [widgetRadio.name]: widgetRadio,
   [widgetBox.name]: widgetBox,
 };
 

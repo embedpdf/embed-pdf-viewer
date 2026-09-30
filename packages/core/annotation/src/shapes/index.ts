@@ -41,6 +41,7 @@ export function familyChosenBy(pick: (annotation: AnnotationDTO) => ShapeFamily)
   return {
     read: (annotation) => pick(annotation).read(annotation),
     write: (shape, subtype) => familyOf(shape).write(shape, subtype),
+    placed: (placement, annotation) => pick(annotation).placed(placement, annotation),
     bounds: (shape) => familyOf(shape).bounds(shape),
     drawnBounds: (shape, stroke) => familyOf(shape).drawnBounds(shape, stroke),
     rect: (shape, stroke) => familyOf(shape).rect(shape, stroke),

@@ -3,9 +3,10 @@
  * keeping its references to records right when a record is confirmed under a
  * new id (`rekey`) or leaves the view (`forget`).
  */
-import type { AnnotationDTO, LineEndings } from '@embedpdf/engine-core/runtime';
+import type { AnnotationDTO } from '@embedpdf/engine-core/runtime';
 
 import { readOfDefaults } from '../record/defaults';
+import { lineEndingsOf } from '../shapes/points';
 import type { Draft, Effect, FieldValues, Id, Model, Session } from '../types';
 
 export const initialSession: Session = {
@@ -41,11 +42,8 @@ export const defaultsFor = (model: Model, preset: string): FieldValues =>
 export const toolAnnotation = (model: Model, kind: string, preset: string = kind): AnnotationDTO =>
   readOfDefaults(kind, defaultsFor(model, preset));
 
-const NO_ENDINGS: LineEndings = { start: 'none', end: 'none' };
-
-/** A line's or polyline's endings; none for an annotation that has none. */
-export const lineEndingsOf = (annotation: AnnotationDTO): LineEndings =>
-  ('lineEndings' in annotation && annotation.lineEndings) || NO_ENDINGS;
+// A tool's line endings are read off what it creates, as a line's are (shapes/points.ts).
+export { lineEndingsOf };
 
 /** Merge fields into a tool's defaults; each value is whole, as in a patch. */
 export function setDefaults(model: Model, preset: string, patch: FieldValues): [Model, Effect[]] {

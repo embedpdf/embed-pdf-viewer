@@ -9,7 +9,7 @@ import {
 import { styleOf } from '../record';
 import type { Shape, Effect, Model, PointerInput } from '../types';
 import { draftOf, newRecord } from './changes';
-import { MIN_DRAG } from './draw';
+import { MIN_DRAG } from '../placement';
 import { defaultsFor, lineEndingsOf, toolAnnotation } from './session';
 
 /**

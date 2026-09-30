@@ -17,6 +17,13 @@ export interface InteractionHostCapability extends InteractionCapability {
   registerHandler(handler: InteractionHandler, options?: { source?: string }): Unsubscribe;
   /** Push or clear a cursor claim on the priority stack (hover feedback). */
   claimCursor(token: string, cursor: Cursor | null, priority?: number): void;
+  /**
+   * Whether a hover claim holds the cursor: the pointer is over something a
+   * click acts on instead of the tool (an annotation, text). A handler's hover
+   * sees the claims of every handler above it, so a create handler asks this
+   * to know whether its click would reach it (its ghost shows only then).
+   */
+  hasCursorClaim(): boolean;
   /** The resolved cursor string. */
   getCursor(): Cursor;
   /** The resolved cursor changed. */

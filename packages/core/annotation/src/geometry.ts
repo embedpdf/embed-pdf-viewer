@@ -90,18 +90,6 @@ export function geomRotateAbout(geometry: Shape, pivot: Point, deltaDeg: number)
  */
 export const uprightRotation = (displayRotation: number): number => normalizeDeg(-displayRotation);
 
-/** `rect` with width↔height swapped about its own centre — the unrotated box
- *  whose quarter-turn AABB is exactly `rect` again. */
-export function transposedAboutCenter(rect: Rect): Rect {
-  const point = rectCenter(rect);
-  return {
-    x: point.x - rect.height / 2,
-    y: point.y - rect.width / 2,
-    width: rect.height,
-    height: rect.width,
-  };
-}
-
 /**
  * The unrotated content rect for a default-size upright box "placed at" a
  * point: positioned so that, after the upright counter-rotation, the box shows

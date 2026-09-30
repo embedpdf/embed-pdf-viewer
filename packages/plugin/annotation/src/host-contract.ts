@@ -35,7 +35,7 @@ import type {
   Behavior,
   LinkNavItem,
   TextItem,
-  ToolGhost,
+  ImageGhost,
 } from './contract';
 import { AnnotationToken as PublicAnnotationToken } from './token';
 import type { ResolvedTool } from './tools/definitions';
@@ -45,7 +45,6 @@ export type { AnnotationState } from './model';
 export {
   ANNOTATION_DRAW_PRIORITY,
   ANNOTATION_EDIT_PRIORITY,
-  ANNOTATION_GHOST_PRIORITY,
   ANNOTATION_MARQUEE_PRIORITY,
   ANNOTATION_PLACE_PRIORITY,
 } from './priorities';
@@ -215,8 +214,13 @@ export interface AnnotationHostCapability extends AnnotationCapability {
   previewMarkup(subtype: KindName, quadsByPage: Record<number, Quad[]>, preset?: string): void;
   clearMarkupPreview(): void;
 
-  // ── ghosts and previews ──
-  /** Show the tool's ghost at a hover; `displayRotation` and `zoom` are the page's view there. */
+  // ── ghosts and previews (tools/ghost.ts) ──
+  /**
+   * Put the tool's ghost at a hover, what a click there would make;
+   * `displayRotation` and `zoom` are the page's view there. The handler that
+   * would take the click calls it, only where the click would reach it and
+   * the user may create; a tool without a ghost clears it.
+   */
   hoverGhostAt(
     toolId: string,
     page: PageRef,
@@ -225,9 +229,16 @@ export interface AnnotationHostCapability extends AnnotationCapability {
     zoom?: number,
   ): void;
   clearGhost(): void;
-  setPlacementPreview(toolId: string, page: PageRef, box: Rect): void;
+  /**
+   * A sibling plugin's placement gesture with one of this plugin's tools (the
+   * form palette's drag-to-place): its press and the pointer now. Once it is a
+   * drag, the page paints what releasing places; under that the tool's ghost
+   * still shows the click.
+   */
+  previewPlacement(toolId: string, page: PageRef, from: Point, to: Point): void;
   clearPlacementPreview(): void;
-  getToolGhost(page: PageRef): ToolGhost | null;
+  /** The armed stamp's ghost on a page, for the render layer's `<img>`. */
+  getImageGhost(page: PageRef): ImageGhost | null;
   /** The armed stamp: a new object on every arm, null when nothing is armed. */
   getArmedStamp(): ArmedStampInfo | null;
   /** Render the armed stamp's ghost preview for a device pixel width (cached per size bucket). */

@@ -14,7 +14,6 @@ import { ARMED_STAMP_TOOL_ID, isTouchDirect } from './tools/definitions';
 import {
   createDrawHandler,
   createEditHandler,
-  createGhostHandler,
   createMarqueeHandler,
   createPlaceHandler,
 } from './tools/handlers';
@@ -55,8 +54,7 @@ export function connectAnnotation(
   }
 
   for (const handler of [
-    createPlaceHandler(annotation),
-    createGhostHandler(annotation, interaction),
+    createPlaceHandler(annotation, interaction),
     createEditHandler(annotation, interaction),
     createMarqueeHandler(annotation),
     createDrawHandler(annotation, interaction),
@@ -66,7 +64,7 @@ export function connectAnnotation(
 
   ctx.listen(interaction.onToolChanged, () => {
     annotation.cancel();
-    // A footprint ghost belongs to the tool that computed it.
+    // A ghost belongs to the tool that showed it.
     annotation.clearGhost();
     // Annotations whose behavior just engaged (form widgets under a fill
     // tool) leave the selection, so no chrome is stranded on a fill control.

@@ -10,7 +10,7 @@ import {
   type PageRef,
 } from '@embedpdf/engine-core/runtime';
 
-import { iconAnnotationOf, iconPlaceAt, iconPlacement, isIconPlaceKind } from './placement';
+import { annotationOfTool, iconPlaceAt, iconPlacement, isIconPlaceKind } from './placement';
 import type { FilePickerProvider } from '../contract';
 import type { AnnotationReads } from '../read/annotations';
 import type { AnnotationContext, AnnotationServices } from '../services';
@@ -62,7 +62,7 @@ export function createIcons(
     const doc = ctx.doc;
     const page = geometry.sizeOf(pageObjectNumber);
     if (!doc || !page || !isIconPlaceKind(tool.subtype)) return false;
-    const { rect } = iconPlaceAt(iconAnnotationOf(store.model(), tool), point, page, view);
+    const { rect } = iconPlaceAt(annotationOfTool(store.model(), tool), point, page, view);
     const placement = iconPlacement(
       tool.subtype,
       { rect },
@@ -121,7 +121,7 @@ export function createIcons(
       if (!doc || !size || !tool || !isIconPlaceKind(tool.subtype)) {
         throw new PluginError('unsupported', 'annotation', 'no attachment tool is registered');
       }
-      const { rect } = iconPlaceAt(iconAnnotationOf(store.model(), tool), at, size, undefined);
+      const { rect } = iconPlaceAt(annotationOfTool(store.model(), tool), at, size, undefined);
       const placement = iconPlacement(
         tool.subtype,
         { rect },

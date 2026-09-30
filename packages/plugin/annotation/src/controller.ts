@@ -19,9 +19,9 @@ import { createSelectionFieldsReads } from './read/selection-fields';
 import { createServices, type AnnotationContext } from './services';
 import { createAnnouncer } from './services/announce';
 import { followConfirmedChanges } from './sync/confirmed';
+import { createGhost } from './tools/ghost';
 import { createCrud } from './write/crud';
 import { createDrafts } from './write/drafts';
-import { createGhost } from './write/ghost';
 import { createIcons } from './write/icons';
 import { createLinkWrites } from './write/links';
 import { createMarkupWrites } from './write/markup';
@@ -41,7 +41,6 @@ export function createAnnotationController(ctx: AnnotationContext, config: Annot
   // Reads: pure projections of the model.
   const annotations = createAnnotationReads(ctx, services);
   const chrome = createChromeReads(ctx, services);
-  const render = createRenderReads(ctx, services);
   const selectionFields = createSelectionFieldsReads(ctx, services);
 
   // Sync: what follows when the engine confirms a change.
@@ -54,7 +53,9 @@ export function createAnnotationController(ctx: AnnotationContext, config: Annot
   registerEffectRunners(ctx, services, links);
   const crud = createCrud(ctx, services, annotations);
   const stamps = createStamps(ctx, services);
+  // The tool's ghost: what a click would make, which the page's items paint.
   const ghost = createGhost(ctx, services, stamps);
+  const render = createRenderReads(ctx, services, ghost);
   const icons = createIcons(ctx, services, annotations, stamps);
   const selection = createSelectionWrites(services, annotations, selectionFields, text, links);
   const measurement = createMeasurement(ctx, services, crud);

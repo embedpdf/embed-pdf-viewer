@@ -1,5 +1,5 @@
 /**
- * Form widgets (`/Widget`): one PDF subtype, five kinds. The widget's field
+ * Form widgets (`/Widget`): one PDF subtype, six kinds. The widget's field
  * family picks its kind, so a checkbox never offers a font and a sidebar needs
  * no widget-specific code. Every widget has a box; the text-bearing ones add
  * the `/DA` text fields. The writer maps these flat fields onto `/MK`, `/BS`,
@@ -70,9 +70,18 @@ export const widgetButton = defineKind({
   fields: TEXT_FIELDS,
 });
 
-/** A checkbox or a radio button: no text. */
+/** A checkbox: no text. */
 export const widgetToggle = defineKind({
   name: 'widget-toggle',
+  family: boxFamily,
+  style: widgetStyle,
+  caps: WIDGET_CAPS,
+  fields: BOX_FIELDS,
+});
+
+/** A radio button: no text, and round (its box draws the ellipse in it, as the engine draws one). */
+export const widgetRadio = defineKind({
+  name: 'widget-radio',
   family: boxFamily,
   style: widgetStyle,
   caps: WIDGET_CAPS,
@@ -95,8 +104,25 @@ const KIND_BY_FAMILY: Readonly<Record<string, string>> = {
   listbox: widgetChoice.name,
   pushbutton: widgetButton.name,
   checkbox: widgetToggle.name,
-  radio: widgetToggle.name,
+  radio: widgetRadio.name,
 };
 
 /** The name of the widget kind for a widget's field family. */
 export const widgetKindOf = (family: string): string => KIND_BY_FAMILY[family] ?? widgetBox.name;
+
+/**
+ * The field family a widget kind stands for, the other way round: what a form
+ * tool's defaults read as, so they read as the tool's own kind (a choice tool
+ * as a combo box, the bare box as a signature field).
+ */
+const FAMILY_BY_KIND: Readonly<Record<string, string>> = {
+  [widgetText.name]: 'text',
+  [widgetChoice.name]: 'combobox',
+  [widgetButton.name]: 'pushbutton',
+  [widgetToggle.name]: 'checkbox',
+  [widgetRadio.name]: 'radio',
+  [widgetBox.name]: 'signature',
+};
+
+/** The field family a widget kind stands for; `undefined` for a kind that is no widget's. */
+export const fieldFamilyOfKind = (kind: string): string | undefined => FAMILY_BY_KIND[kind];

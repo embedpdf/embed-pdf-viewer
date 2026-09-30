@@ -41,23 +41,23 @@ import {
   rotateKnob,
   selectionQuad,
   turnPivotOf,
-  transposedAboutCenter,
   uprightAnchoredRect,
   uprightRotation,
   fitStampBox,
 } from '../src/geometry';
-import { normalizeDeg, rotatedAabb, rotatedHandleCursor } from '../src/rect';
+import { normalizeDeg, rotatedAabb, rotatedHandleCursor, transposedAboutCenter } from '../src/rect';
 import { caretFromAnchor, caretRectFromAnchor } from '../src/shapes/caret';
 import { calloutEnd, calloutShape, textPlateInset } from '../src/shapes/text-box';
 import { expandGroups, groupKeyOf, groupMembers } from '../src/group';
 import { cursorAt, groupUnionBounds, hitTest, paintOrder } from '../src/hit';
 import { kindNamed } from '../src/kinds';
 import { linkChildrenOf, linkOf } from '../src/links';
-import { clickCreateGeom, resolveClickPlacement } from '../src/placement';
+import { gesturePlacement, isDrag, placedShape, resolveClickPlacement } from '../src/placement';
 import { isAttachedLink, isConversationOnly, isSubstrateOnly } from '../src/plane';
 import { scene } from '../src/scene';
 import { computeMoveSnap } from '../src/snap';
 import type {
+  ClickCreate,
   Draft,
   KindName,
   Message,
@@ -107,6 +107,9 @@ const marqueePtr = (
   phase,
   in: { page: PAGE, point: { x, y }, shift },
 });
+/** The built-in free-text tool's click policy: a click opens a box to type in. */
+const FREE_TEXT_CLICK: ClickCreate = { width: 180, height: 40, anchor: 'top-left' };
+/** A pointer sample from a tool drawing `subtype`; free text's carries its tool's click policy. */
 const createPtr = (
   subtype:
     | Extract<KindName, 'square' | 'circle' | 'line' | 'polygon' | 'polyline' | 'link'>
@@ -119,6 +122,7 @@ const createPtr = (
   type: 'createPointer',
   phase,
   subtype,
+  ...(subtype === 'free-text' ? { clickCreate: FREE_TEXT_CLICK } : {}),
   in: { page: PAGE, point: { x, y }, shift: false, finish },
 });
 const run = (model: Model, msgs: Message[]): Model =>
@@ -189,16 +193,69 @@ describe('resolveClickPlacement — the shared placement layer', () => {
     expect(Math.max(placement.a.x, placement.b.x)).toBeLessThanOrEqual(300);
   });
 
-  it('upright: a centred box transposes under a quarter-turn; top-left anchors in the display frame', () => {
+  it('segments anchor CENTER by default; START or END put that end on the click', () => {
+    const point = { x: 100, y: 100 };
+    expect(resolveClickPlacement(point, { length: 80 })).toEqual({
+      kind: 'segment',
+      a: { x: 60, y: 100 },
+      b: { x: 140, y: 100 },
+    });
+    expect(resolveClickPlacement(point, { length: 80, anchor: 'start' })).toEqual({
+      kind: 'segment',
+      a: { x: 100, y: 100 },
+      b: { x: 180, y: 100 },
+    });
+    // An arrow's tip (its end) on the click: "point at this".
+    expect(resolveClickPlacement(point, { length: 80, anchor: 'end' })).toEqual({
+      kind: 'segment',
+      a: { x: 20, y: 100 },
+      b: { x: 100, y: 100 },
+    });
+  });
+
+  it('a segment points `rotation` degrees clockwise; upright, as the person sees the page', () => {
+    const down = resolveClickPlacement({ x: 100, y: 100 }, { length: 80, rotation: 90 });
+    if (down.kind !== 'segment') throw new Error('expected segment');
+    expect(down.a.x).toBeCloseTo(100);
+    expect(down.a.y).toBeCloseTo(60);
+    expect(down.b.y).toBeCloseTo(140);
+    // On a page shown turned 90° clockwise, "rightward on screen" is page-up.
+    const seen = resolveClickPlacement(
+      { x: 100, y: 100 },
+      { length: 80 },
+      { upright: true, displayRotation: 90 },
+    );
+    if (seen.kind !== 'segment') throw new Error('expected segment');
+    expect(seen.a.x).toBeCloseTo(100);
+    expect(seen.a.y).toBeCloseTo(140);
+    expect(seen.b.x).toBeCloseTo(100);
+    expect(seen.b.y).toBeCloseTo(60);
+    // Without upright the page's own axes lay it.
+    expect(
+      resolveClickPlacement({ x: 100, y: 100 }, { length: 80 }, { displayRotation: 90 }),
+    ).toEqual({ kind: 'segment', a: { x: 60, y: 100 }, b: { x: 140, y: 100 } });
+  });
+
+  it('upright: a centred box keeps width × height before its turn, and slides by what the page shows', () => {
     const centred = resolveClickPlacement(
       { x: 100, y: 100 },
       { width: 80, height: 60 },
       { upright: true, displayRotation: 90 },
     );
-    if (centred.kind !== 'box') throw new Error('expected box');
-    // Transposed about the centre: the displayed box keeps 80×60.
-    expect(centred.rect).toMatchObject({ width: 60, height: 80 });
-    expect(centred.rot).not.toBe(0);
+    // Turned 270° on a page shown turned 90°: it shows 80 wide, 60 tall, as configured.
+    expect(centred).toEqual({
+      kind: 'box',
+      rect: { x: 60, y: 70, width: 80, height: 60 },
+      rot: 270,
+    });
+    // Near the top edge the page shows it 80 tall: that is what slides inside.
+    const edge = resolveClickPlacement(
+      { x: 100, y: 10 },
+      { width: 80, height: 60 },
+      { upright: true, displayRotation: 90, pageBox: PAGE_BOX },
+    );
+    if (edge.kind !== 'box') throw new Error('expected box');
+    expectRectClose(rotatedAabb(edge.rect, edge.rot), { x: 70, y: 0, width: 60, height: 80 });
     const anchored = resolveClickPlacement(
       { x: 100, y: 100 },
       { width: 80, height: 60, anchor: 'top-left' },
@@ -208,42 +265,84 @@ describe('resolveClickPlacement — the shared placement layer', () => {
     expect(anchored.rect).toEqual(uprightAnchoredRect({ x: 100, y: 100 }, 80, 60, 90));
   });
 
-  it('GHOST ≡ COMMIT: the footprint call and the up-phase produce the same geometry', () => {
+  it('a gesture places its drag past MIN_DRAG, its click under it', () => {
+    const policy: ClickCreate = { width: 80, height: 60 };
+    expect(isDrag('box', { x: 0, y: 0 }, { x: 2, y: 2 })).toBe(false);
+    expect(isDrag('box', { x: 0, y: 0 }, { x: 3, y: 0 })).toBe(true);
+    expect(isDrag('segment', { x: 0, y: 0 }, { x: 2.5, y: 2.5 })).toBe(true);
+    expect(gesturePlacement('box', { x: 100, y: 100 }, { x: 101, y: 101 }, policy)).toEqual(
+      resolveClickPlacement({ x: 100, y: 100 }, policy),
+    );
+    expect(gesturePlacement('box', { x: 100, y: 100 }, { x: 101, y: 101 }, false)).toBeNull();
+    // A drag pins to the page edge.
+    expect(
+      gesturePlacement('box', { x: 10, y: 10 }, { x: 400, y: 50 }, policy, { pageBox: PAGE_BOX }),
+    ).toEqual({ kind: 'box', rect: { x: 10, y: 10, width: 290, height: 40 }, rot: 0 });
+    expect(gesturePlacement('segment', { x: 10, y: 10 }, { x: 60, y: 10 }, false)).toEqual({
+      kind: 'segment',
+      a: { x: 10, y: 10 },
+      b: { x: 60, y: 10 },
+    });
+  });
+
+  it('each family lays its shape at a placement; a radio button is round', () => {
+    const box = { kind: 'box', rect: { x: 10, y: 10, width: 18, height: 18 }, rot: 0 } as const;
+    const radio = placedShape(toolAnnotation(initialModel, 'widget-radio'), box);
+    expect(radio).toMatchObject({ kind: 'box', ellipse: true });
+    expect(placedShape(toolAnnotation(initialModel, 'widget-toggle'), box)).toMatchObject({
+      ellipse: false,
+    });
+    expect(placedShape(toolAnnotation(initialModel, 'circle'), box)).toMatchObject({
+      ellipse: true,
+    });
+    expect(placedShape(toolAnnotation(initialModel, 'free-text'), box)).toMatchObject({
+      kind: 'text-box',
+    });
+    // A line isn't made from a box, nor a box from a segment.
+    expect(placedShape(toolAnnotation(initialModel, 'line'), box)).toBeNull();
+    const segment = { kind: 'segment', a: { x: 0, y: 0 }, b: { x: 10, y: 0 } } as const;
+    expect(placedShape(toolAnnotation(initialModel, 'square'), segment)).toBeNull();
+  });
+
+  it('a form tool reads as its own widget kind', () => {
+    for (const kind of [
+      'widget-text',
+      'widget-choice',
+      'widget-toggle',
+      'widget-radio',
+      'widget-box',
+    ])
+      expect(kindOf(toolAnnotation(initialModel, kind)).name).toBe(kind);
+  });
+
+  it('GHOST ≡ COMMIT: the click placement a ghost paints is the shape the up-phase commits', () => {
     const pageBox = PAGE_BOX;
     const cases: Array<{
-      subtype: 'square' | 'free-text' | 'line';
-      policy: import('../src/types').ClickCreate;
+      subtype: 'square' | 'circle' | 'free-text' | 'line';
+      policy: ClickCreate;
     }> = [
       { subtype: 'square', policy: { width: 80, height: 60 } },
+      { subtype: 'circle', policy: { width: 80, height: 60 } },
       { subtype: 'free-text', policy: { width: 180, height: 40, anchor: 'top-left' } },
       { subtype: 'line', policy: { length: 80 } },
+      { subtype: 'line', policy: { length: 80, anchor: 'end', rotation: 30 } },
     ];
     for (const { subtype, policy } of cases) {
-      const point = { x: 295, y: 5 }; // a corner, so the clamp is exercised too
-      const model = run(initialModel, [
-        {
-          type: 'createPointer',
-          phase: 'down',
-          subtype,
-          clickCreate: policy,
-          in: { page: PAGE, point, shift: false, pageBox },
-        },
-        {
-          type: 'createPointer',
-          phase: 'up',
-          subtype,
-          clickCreate: policy,
-          in: { page: PAGE, point, shift: false, pageBox },
-        },
-      ]);
-      const committed = shapeOf(model.byId[model.order[0]]!.annotation);
-      // Exactly the call the hover ghost makes (capability ghostHoverAt):
-      const ghost = clickCreateGeom(
-        subtype,
-        resolveClickPlacement(point, policy, { pageBox }),
-        lineEndingsOf(toolAnnotation(initialModel, subtype)),
-      );
-      expect(ghost).toEqual(committed);
+      for (const displayRotation of [0, 90, 180, 270] as const) {
+        const point = { x: 295, y: 5 }; // a corner, so the clamp is exercised too
+        const input = { page: PAGE, point, shift: false, pageBox, displayRotation, upright: true };
+        const model = run(initialModel, [
+          { type: 'createPointer', phase: 'down', subtype, clickCreate: policy, in: input },
+          { type: 'createPointer', phase: 'up', subtype, clickCreate: policy, in: input },
+        ]);
+        const committed = shapeOf(model.byId[model.order[0]]!.annotation);
+        // Exactly the calls the tool's ghost makes at the pointer:
+        const ghost = placedShape(
+          toolAnnotation(initialModel, subtype),
+          resolveClickPlacement(point, policy, { pageBox, upright: true, displayRotation }),
+        );
+        expect(ghost).toEqual(committed);
+      }
     }
   });
 });
@@ -311,10 +410,10 @@ describe('click-create (a bare click places the tool default)', () => {
     });
   });
 
-  it('line: click lays a default-length segment from the point', () => {
+  it('line: click lays a default-length segment CENTRED on the point', () => {
     const model = run(initialModel, [
-      clickMsg('line', 'down', 20, 30, { length: 80 }),
-      clickMsg('line', 'up', 20, 30, { length: 80 }),
+      clickMsg('line', 'down', 60, 30, { length: 80 }),
+      clickMsg('line', 'up', 60, 30, { length: 80 }),
     ]);
     expect(shapeOf(model.byId[model.order[0]].annotation)).toMatchObject({
       kind: 'line',
@@ -330,7 +429,7 @@ describe('click-create (a bare click places the tool default)', () => {
     expect(model.order).toHaveLength(0);
   });
 
-  it('free-text: clickCreate false suppresses the kind fallback', () => {
+  it('free-text: clickCreate false makes a click create nothing', () => {
     const model = run(initialModel, [
       clickMsg('free-text', 'down', 10, 10, false),
       clickMsg('free-text', 'up', 10, 10, false),
@@ -432,7 +531,7 @@ describe('annotation-core', () => {
       createPtr('polygon', 'down', 80, 10),
       createPtr('polygon', 'move', 40, 70),
     ]);
-    const ghost = pageItems(drawing, PAGE).find((item) => item.source === 'ghost');
+    const ghost = pageItems(drawing, PAGE).find((item) => item.source === 'draft');
     expect(ghost?.geometry).toEqual({
       kind: 'poly',
       vertices: [
@@ -1247,11 +1346,11 @@ describe('annotation-core', () => {
       subtype: 'highlight',
       quadsByPage: { [PON]: [quadFromRect({ x: 10, y: 10, width: 80, height: 12 })] },
     })[0];
-    const ghost = pageItems(model, PAGE).find((item) => item.source === 'ghost');
+    const ghost = pageItems(model, PAGE).find((item) => item.source === 'draft');
     expect(ghost?.subtype).toBe('highlight');
     expect(ghost?.geometry.kind).toBe('quads');
     const cleared = step(model, { type: 'clearMarkupPreview' })[0];
-    expect(pageItems(cleared, PAGE).some((item) => item.source === 'ghost')).toBe(false);
+    expect(pageItems(cleared, PAGE).some((item) => item.source === 'draft')).toBe(false);
   });
 
   it('scene() paints markup per subtype in the core (no framework logic): highlight fills+multiply, squiggly strokes a path', () => {
@@ -1503,7 +1602,7 @@ describe('annotation-core', () => {
     })[0];
     // mid-draw (down + move, no up yet) → the ghost is live
     model = run(model, [createPtr('square', 'down', 10, 10), createPtr('square', 'move', 60, 60)]);
-    const ghost = pageItems(model, PAGE).find((item) => item.source === 'ghost');
+    const ghost = pageItems(model, PAGE).find((item) => item.source === 'draft');
     expect(ghost?.style.color).toBe('#123456'); // the tool's default, not the fixture red
   });
 
@@ -1922,6 +2021,7 @@ describe('annotation-core callout', () => {
       type: 'createPointer',
       phase,
       subtype: 'free-text',
+      clickCreate: FREE_TEXT_CLICK,
       in: { page: PAGE, point: { x: 100, y: 100 }, shift: false },
     });
     let model = run(initialModel, [pointer('down'), pointer('up')]);
@@ -2098,13 +2198,13 @@ describe('annotation-core callout', () => {
       calloutPtr('move', 120, 120), // knee-step preview follows the cursor
     ]);
     expect(model.order).toHaveLength(0); // nothing committed yet
-    const ghost = pageItems(model, PAGE).find((item) => item.source === 'ghost');
+    const ghost = pageItems(model, PAGE).find((item) => item.source === 'draft');
     expect(ghost).toBeDefined();
   });
 
   // The box-step ghost geom (the in-progress text box) — drives the no-bounce check.
   const ghostBox = (model: Model) => {
-    const geometry = pageItems(model, PAGE).find((item) => item.source === 'ghost')?.geometry;
+    const geometry = pageItems(model, PAGE).find((item) => item.source === 'draft')?.geometry;
     return geometry && geometry.kind === 'text-box' ? geometry.box : null;
   };
 
@@ -2330,7 +2430,7 @@ describe('annotation-core callout — upright on a rotated page', () => {
       rotPtr('up', 120, 120),
       rotPtr('move', 200, 100), // hover in the box step
     ]);
-    const ghost = pageItems(model, PAGE).find((item) => item.source === 'ghost');
+    const ghost = pageItems(model, PAGE).find((item) => item.source === 'draft');
     expect(ghost).toBeDefined();
     expect(ghost!.geometry.kind === 'text-box' && ghost!.geometry.rotation).toBe(270);
   });
@@ -2363,7 +2463,7 @@ describe('annotation-core callout — upright on a rotated page', () => {
       pointer('up', 80, 200),
       pointer('move', anchor.x, anchor.y),
     ]);
-    const ghost = pageItems(model, PAGE).find((item) => item.source === 'ghost');
+    const ghost = pageItems(model, PAGE).find((item) => item.source === 'draft');
     if (!ghost || ghost.geometry.kind !== 'text-box') throw new Error('expected text ghost');
     const placed = rotatedAabb(ghost.geometry.box, ghost.geometry.rotation ?? 0);
     expect(placed.y).toBeCloseTo(0);
@@ -4036,6 +4136,7 @@ describe('upright creation (counter-rotating the display rotation)', () => {
     type: 'createPointer',
     phase,
     subtype,
+    ...(subtype === 'free-text' ? { clickCreate: FREE_TEXT_CLICK } : {}),
     in: { page: PAGE, point: { x, y }, shift: false, ...extra },
   });
   const textGeom = (geometry: Shape) => (geometry.kind === 'text-box' ? geometry : null);
@@ -4121,7 +4222,7 @@ describe('upright creation (counter-rotating the display rotation)', () => {
     expect(geometry.box).toEqual({ x: 50, y: 60, width: 120, height: 40 });
   });
 
-  it('a box SHAPE tool opting in gets the same treatment (square under 270)', () => {
+  it('an upright SQUARE stores no turn: a drag keeps exactly the dragged region (square under 270)', () => {
     const model = run(initialModel, [
       uprightPtr('square', 'down', 10, 10, { displayRotation: 270, upright: true }),
       uprightPtr('square', 'move', 110, 50),
@@ -4129,8 +4230,38 @@ describe('upright creation (counter-rotating the display rotation)', () => {
     ]);
     const geometry = shapeOf(model.byId[model.order[0]].annotation);
     expect(geometry.kind).toBe('box');
-    expect(geomRotation(geometry)).toBe(90); // -270 ≡ 90
-    expectRectClose(rotatedAabb(rectGeom(geometry)!, 90), { x: 10, y: 10, width: 100, height: 40 });
+    expect(geomRotation(geometry)).toBe(0); // a square reads no way: nothing turned to store
+    expect(rectGeom(geometry)).toEqual({ x: 10, y: 10, width: 100, height: 40 });
+  });
+
+  it('an upright square or circle CLICK shows its size as seen: its sides swap, nothing turns', () => {
+    for (const subtype of ['square', 'circle'] as const) {
+      const policy: ClickCreate = { width: 80, height: 60 };
+      const model = run(initialModel, [
+        {
+          ...uprightPtr(subtype, 'down', 100, 200, { displayRotation: 90, upright: true }),
+          clickCreate: policy,
+        },
+        { ...uprightPtr(subtype, 'up', 100, 200), clickCreate: policy },
+      ]);
+      const geometry = shapeOf(model.byId[model.order[0]].annotation);
+      expect(geomRotation(geometry)).toBe(0);
+      // 60 wide, 80 tall on the page: 80 wide, 60 tall on a page shown turned 90°.
+      expect(rectGeom(geometry)).toEqual({ x: 70, y: 160, width: 60, height: 80 });
+    }
+  });
+
+  it('a stamp keeps the upright turn: its image reads one way', () => {
+    const annotation = toolAnnotation(initialModel, 'stamp');
+    const placement = {
+      kind: 'box',
+      rect: { x: 0, y: 0, width: 80, height: 60 },
+      rot: 270,
+    } as const;
+    expect(placedShape(annotation, placement)).toMatchObject({
+      box: { x: 0, y: 0, width: 80, height: 60 },
+      rotation: 270,
+    });
   });
 
   it('inert without the policy, without the rotation, and when only later phases carry it', () => {

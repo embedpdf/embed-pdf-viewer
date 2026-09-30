@@ -159,6 +159,7 @@ describe('update', () => {
       type: 'createPointer',
       phase,
       subtype: 'free-text',
+      clickCreate: { width: 180, height: 40, anchor: 'top-left' },
       in: { page: PAGE, point: { x: 50, y: 50 }, shift: false },
     });
     const [pressed] = step(modelWith([], { defaults }), click('down'));

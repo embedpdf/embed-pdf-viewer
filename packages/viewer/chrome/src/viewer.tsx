@@ -301,6 +301,11 @@ export function FullViewer({
     // slot (see config/commands.ts + config/chrome.ts).
     annotationPlugin({
       tools: [
+        // Shapes and lines show their ghost: what a click places follows the
+        // pointer (the arrow inherits the line's).
+        { id: 'square', ghost: true },
+        { id: 'circle', ghost: true },
+        { id: 'line', ghost: true },
         {
           id: 'arrow',
           extends: 'line',
