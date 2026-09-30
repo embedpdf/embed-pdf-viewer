@@ -14,28 +14,7 @@ button, and what's left over goes into a "More" menu. You draw every button.
 The items are [commands](commands), so each one already knows its label, icon, whether it's enabled,
 and what it does. These are from the [standard commands](commands#the-standard-commands):
 
-```tsx
-import { Toolbar, group, item } from '@embedpdf/react/toolbar';
-
-const bar = {
-  id: 'main',
-  sections: {
-    start: [group('navigation', ['page:previous', 'page:next'])],
-    center: [group('zoom', ['zoom:out', item('zoom:in', { variants: ['icon+label', 'icon'] })])],
-    end: [group('tools', ['tool:pointer', 'tool:pan', 'tool:highlight'], { collapse: 'menu' })],
-  },
-};
-
-<Toolbar
-  bar={bar}
-  renderCommand={(command, variant, run) => (
-    <button onClick={run} disabled={!command.enabled} aria-pressed={command.active} title={command.label}>
-      <Icon name={command.icon} />
-      {variant === 'icon+label' && command.label}
-    </button>
-  )}
-/>;
-```
+<Snippet name="ui/toolbar" />
 
 Resize the window, and the toolbar adjusts on its own. It measures real rendered widths, so a longer
 translation or a bigger font just works.
@@ -66,20 +45,7 @@ space the other two leave. In a right-to-left language, `start` and `end` swap s
 Not everything is a command: a page number input, a search box. Put a custom item in the bar and draw
 it:
 
-```tsx
-const bar = {
-  id: 'main',
-  sections: {
-    center: [group('page', [custom('page-number', 'page:go-to', { variants: ['full', 'compact'] })])],
-  },
-};
-
-<Toolbar
-  bar={bar}
-  renderCommand={renderCommand}
-  renderCustom={{ 'page-number': (variant) => <PageNumberInput compact={variant === 'compact'} /> }}
-/>;
-```
+<Snippet name="ui/toolbar-custom" />
 
 The second argument, `'page:go-to'` (a command of your own that opens a "Go to page" dialog), is what
 the item becomes in the "More" menu when there's no room for it. `variants` lets it get smaller first, like a command's variants.
@@ -95,21 +61,44 @@ the item becomes in the "More" menu when there's no room for it. `variants` lets
 | `renderOverflowTrigger` | The "More" button                                                      |
 | `renderOverflowMenu`    | The "More" menu, with its sections, items and the call to run each one |
 
+<Fw only="react">
+
 Every prop you leave out has a plain default, so you can start with `renderCommand` and add the rest as
 you style them. `gap` and `separatorWidth` set the spacing, and `className` and `style` go on the
 toolbar itself.
+
+</Fw>
+
+<Fw only="vue">
+
+Every slot you leave out has a plain default, so you can start with `#command` and add the rest as
+you style them. `gap` and `separator-width` set the spacing, and `class` and `style` go on the
+toolbar itself.
+
+</Fw>
+
+<Fw only="svelte">
+
+Every snippet you leave out has a plain default, so you can start with `command` and add the rest as
+you style them. `gap` and `separatorWidth` set the spacing, and `class` and `style` go on the
+toolbar itself.
+
+</Fw>
+
+<Fw only="angular">
+
+Every template you leave out has a plain default, so you can start with `epdfToolbarCommand` and add
+the rest as you style them. `gap` and `separatorWidth` set the spacing, and a `class` or `style` on
+`<epdf-toolbar>` styles the toolbar itself.
+
+</Fw>
 
 ## A toolbar per mode
 
 Most viewers change the toolbar with what people do: annotation tools while annotating, field tools
 while building a form. Keep a bar per mode and pick one from your state:
 
-```tsx
-const { activeToolId } = useInteractionState();
-const bar = activeToolId === 'form-edit' ? formBar : mainBar;
-
-<Toolbar bar={bar} renderCommand={renderCommand} />;
-```
+<Snippet name="ui/toolbar-mode" />
 
 ## Good to know
 

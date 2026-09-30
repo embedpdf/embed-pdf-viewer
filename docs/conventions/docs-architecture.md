@@ -97,6 +97,25 @@ website/src/samples/
 - A missing sample for a framework renders an honest "not yet ported for
   {framework}" callout — driven by file presence, not hand-maintained flags.
 
+## The reference is complete, and checked
+
+Every headless plugin page ends with its reference: `## Methods` (everything
+`use<Plugin>()` gives you), `## State` (everything `use<Plugin>State()` gives
+you, with the getter that reads each value once), then
+`## Settings`, `## Events` and `## Permissions`. The rows are written by hand,
+in plain words, each linking to the section that shows it.
+
+- Every public member of a plugin's capability is on exactly one page: a
+  Methods row, a State row's getter, or an Events row. A plugin spread over
+  several pages splits by its nouns (`annotation.selection.*` on Selecting).
+- `docs/content/reference.mjs` says which pages document which capability.
+  `docs/content/scripts/reference.mjs` reads each capability interface from its
+  TypeScript source and fails on a member no page lists, a member on two pages,
+  or a listed name the capability doesn't have. It runs in `docs:check`.
+- The pages describe the API the code is moving to. Where they're ahead, the
+  name is `pending` in the manifest, with why; the check fails once a pending
+  entry is no longer needed, so the list only shrinks.
+
 ## The support matrix is generated, not written
 
 During the rollout (React complete → Vue/Svelte/Angular incremental), every

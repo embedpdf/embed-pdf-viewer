@@ -33,7 +33,7 @@ export const rehypeCodeExample = () => {
 
       // Framework-resolved samples (<Example name="…">): highlight every
       // framework's files; the client picks by pathname.
-      if (node.name === 'Example') {
+      if (node.name === 'Example' || node.name === 'Snippet') {
         const attr = node.attributes?.find((a: any) => a.name === '__fwFiles');
         if (!attr?.value) return;
         try {

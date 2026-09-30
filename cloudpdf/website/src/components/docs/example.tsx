@@ -91,10 +91,13 @@ export function Example({
   filesByFramework,
   demosByFramework,
   mode = 'default',
+  kind = 'example',
 }: {
   filesByFramework?: string;
   demosByFramework?: string;
   mode?: ExampleMode;
+  /** A `<Snippet>` is code only; its gap note says so. */
+  kind?: 'example' | 'snippet';
 }) {
   const pathname = usePathname();
   const product = fanoutProductFromPath(pathname);
@@ -125,7 +128,8 @@ export function Example({
       : null;
     return (
       <div className="mt-6 max-w-[72ch] rounded-[14px] border border-[#C9DEFF] bg-[#F2F7FF] px-[18px] py-4 font-sans text-[15px] leading-[1.6] text-[#2A4574]">
-        This example isn&rsquo;t available for <b>{label}</b> yet.
+        {kind === 'snippet' ? 'This code isn’t written for ' : 'This example isn’t available for '}
+        <b>{label}</b> yet.
         {fallback && fallbackHref && fallbackLabel ? (
           <>
             {' '}

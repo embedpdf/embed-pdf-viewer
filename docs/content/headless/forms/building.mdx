@@ -8,27 +8,7 @@ description: "Turn any PDF into a form: place text boxes, checkboxes, radio butt
 The form plugin can also add fields to a PDF, and change or remove the ones it has, so people can turn
 any document into a form. Switch to **design mode**, pick a field tool, and click or drag on the page:
 
-```tsx
-const FIELD_TOOLS = [
-  ['form-text', 'Text'],
-  ['form-checkbox', 'Checkbox'],
-  ['form-radio', 'Radio button'],
-  ['form-combobox', 'Dropdown'],
-  ['form-listbox', 'List'],
-  ['form-signature', 'Signature'],
-] as const;
-
-function FieldPalette() {
-  const interaction = useInteraction();
-  const { activeToolId } = useInteractionState();
-
-  return FIELD_TOOLS.map(([id, label]) => (
-    <button key={id} aria-pressed={activeToolId === id} onClick={() => interaction.activateTool(id)}>
-      {label}
-    </button>
-  ));
-}
-```
+<Snippet name="forms/field-palette" />
 
 Building needs the [annotation plugin](../annotations) next to the form plugin: in design mode, fields
 are boxes you select, move, resize and style like any annotation.
@@ -58,29 +38,19 @@ interaction.activateTool('pointer'); // fill it in
 
 ## Change a field's settings
 
+<Fw only={['react', 'vue', 'svelte']}>
+
 `useFormState().selectedField` is the field of the selected box, for a settings panel:
 
-```tsx
-function FieldSettings() {
-  const form = useForm();
-  const { selectedField: field } = useFormState();
-  if (!field) return null;
+</Fw>
 
-  return (
-    <>
-      <input defaultValue={field.name} onBlur={(e) => form.update(field.ref, { name: e.target.value })} />
-      <label>
-        <input
-          type="checkbox"
-          checked={field.required}
-          onChange={(e) => form.update(field.ref, { required: e.target.checked })}
-        />
-        Required
-      </label>
-    </>
-  );
-}
-```
+<Fw only="angular">
+
+`form.selectedField()` is the field of the selected box, for a settings panel:
+
+</Fw>
+
+<Snippet name="forms/field-settings" />
 
 `update()` takes only what you change, with the same settings a field reads:
 
@@ -139,14 +109,25 @@ await form.delete(field.ref);
 This removes the field and every box it has. To remove one box of a field that shows in several places,
 such as a reference number on every page, use `form.removeWidget(field.ref, widget.ref)`.
 
+## Methods
+
+What `useForm()` gives you for building forms. Reading, filling and the form's state are on
+[Filling forms](../forms#methods).
+
+| Method                      | What it does                                                                                                            |
+| :-------------------------- | :---------------------------------------------------------------------------------------------------------------------- |
+| `create(draft)`             | Adds a field, with a box for each place it shows. Resolves `{ field }`. [Add fields from code](#add-fields-from-code)    |
+| `update(ref, patch)`        | Changes a field's settings; pass only what changes. Resolves `{ field }`. [Change a field's settings](#change-a-fields-settings) |
+| `delete(ref)`               | Removes a field and every box it has. [Remove a field](#remove-a-field)                                                 |
+| `removeWidget(ref, widget)` | Removes one box of a field that shows in several places                                                                 |
+| `repair(options?)`          | Fixes a form other PDF apps read differently, such as fields missing from the form's list, and resolves what it fixed. See [Repair a broken form](/docs/engine/forms/authoring#repair-a-broken-form). |
+| `canDesign()`               | Whether adding, changing and removing fields is allowed. [Permissions](#permissions)                                    |
+
+Every method that returns a promise also takes a `signal` in its options, to cancel it.
+
 ## Events
 
-```ts
-useFormEvent(
-  (form) => form.onFieldCreated,
-  ({ field }) => selectField(field),
-);
-```
+<Snippet name="forms/select-new-field" />
 
 | Event            | Fires when                        | Carries            |
 | :--------------- | :-------------------------------- | :----------------- |
@@ -158,7 +139,7 @@ useFormEvent(
 
 | Permission         | What it allows                          | Check               |
 | :----------------- | :-------------------------------------- | :------------------ |
-| `doc.forms.modify` | Adding, changing and removing fields    | `form.canDesign()`  |
+| `doc.forms.modify` | Adding, changing, removing and repairing fields | `form.canDesign()` |
 
 Hide the field tools when `canDesign()` is false.
 

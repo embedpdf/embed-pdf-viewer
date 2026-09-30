@@ -37,6 +37,14 @@ export {
 export { DocsProductSwitcher, type DocsProductItem } from './product-switcher';
 export { SearchDialog, type SearchDialogProduct, type SearchDialogProps } from './search-dialog';
 export { DOCS_KIT_TOKENS, type DocsKitToken } from './tokens';
+export {
+  FrameworkLink,
+  FwCode,
+  Framework,
+  StateIntroText,
+  Word,
+  useDocsFramework,
+} from './framework';
 export * as mdast from './mdast';
 export {
   renderDocsMarkdownWith,

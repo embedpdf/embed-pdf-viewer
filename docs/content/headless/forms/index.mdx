@@ -6,22 +6,9 @@ description: Let people fill in PDF forms, read and set values from your code, c
 # Filling forms
 
 Many PDFs are forms: text boxes, checkboxes, dropdowns, signature fields. Register `formPlugin()` and
-put a `<FormLayer>` in each page, and people can fill them in:
+put `<FormLayer>` in each page, and people can fill them in:
 
-```tsx
-import { FormLayer, formPlugin } from '@embedpdf/react/form';
-
-const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), formPlugin()];
-
-<Stage>
-  {() => (
-    <>
-      <RenderLayer />
-      <FormLayer />
-    </>
-  )}
-</Stage>;
-```
+<Snippet name="forms/form-layer" />
 
 Each field becomes a real HTML control, placed and styled like the field in the PDF: people type in text
 boxes, tick checkboxes, pick from lists, and move between fields with Tab. A value is saved into the
@@ -29,15 +16,19 @@ document as it's entered, so it's there when the PDF is downloaded, and every PD
 
 ## Read the form
 
-`useFormState()` gives you every field and re-renders when a value changes:
+<Fw only={['react', 'vue', 'svelte']}>
 
-```tsx
-const { fields } = useFormState();
+`useFormState()` gives you every field, and <Word of="rerenders" /> when a value changes:
 
-for (const field of fields) {
-  console.log(field.name, field.family);
-}
-```
+</Fw>
+
+<Fw only="angular">
+
+`form.fields()` is every field, as a signal: your view updates when a value changes.
+
+</Fw>
+
+<Snippet name="forms/field-list" />
 
 Each field has its full `name` (such as `billing.name`), its `family` (`'text'`, `'checkbox'`,
 `'radio'`, `'combobox'`, `'listbox'`, `'pushbutton'` or `'signature'`), its value, and a `ref`: its
@@ -46,9 +37,7 @@ address for everything else. The fields and their values are the engine's; see
 
 For one field, such as a total you show in your own UI, use `useFormValue()`:
 
-```tsx
-const total = useFormValue(toFieldRef('invoice.total'));
-```
+<Snippet name="forms/invoice-total" />
 
 `toFieldRef(name)` makes a ref from a field's full name, for when you know a field by name.
 
@@ -57,8 +46,6 @@ const total = useFormValue(toFieldRef('invoice.total'));
 `setValue()` takes the same values a field reads:
 
 ```ts
-const form = useForm();
-
 await form.setValue(name.ref, { value: 'Ada Lovelace' }); // text
 await form.setValue(agree.ref, { checked: true }); // checkbox
 await form.setValue(plan.ref, { value: 'yearly' }); // radio group: the button's export value
@@ -68,6 +55,16 @@ await form.setValue(toppings.ref, { selectedValues: ['cheese', 'olives'] }); // 
 
 It runs the same checks and scripts as typing does, and resolves with `{ field, status }`: `status`
 is `'applied'`, `'unchanged'`, or `'rejected'` when the form's own validation refused the value.
+
+<Fw only="angular">
+
+Your own inputs can fill in fields too. `form.controlOf(ref)` gives you a field as an Angular
+`FormControl`: it holds the field's value, and fills in the field when the control changes, with
+the same checks and scripts:
+
+<Snippet name="forms/form-control" />
+
+</Fw>
 
 To fill many fields at once, such as from your backend, pass them by name:
 
@@ -95,12 +92,10 @@ first one.
 Many forms add up totals, format dates and check values with scripts. With JavaScript on in the
 [actions plugin](../documents/actions), they run as people type, as in Acrobat:
 
-```ts
-const plugins = [/* … */ formPlugin(), actionsPlugin({ javascript: { enabled: true } })];
-```
+<Snippet name="forms/scripts" />
 
 When a script refuses a value, such as a date in the wrong format, the field keeps its old value and
-`onValidationRejected` tells you why, so you can show a message.
+<Fw only={['react', 'vue', 'svelte']}>`onValidationRejected`</Fw><Fw only="angular">`validationRejected$`</Fw> tells you why, so you can show a message.
 
 ## Reset the form
 
@@ -114,7 +109,7 @@ await form.reset([name.ref, email.ref]); // some fields
 FDF and XFDF are the formats every PDF tool uses for form data: the values without the PDF.
 
 ```ts
-const bytes = await form.export(); // XFDF; form.export('fdf') for FDF
+const { bytes } = await form.export(); // XFDF; form.export('fdf') for FDF
 await otherForm.import(bytes);
 ```
 
@@ -128,6 +123,46 @@ await form.importValues(values);
 Fields are matched by their full name. A field the form doesn't have, or a value it can't take, is
 skipped; the rest still land.
 
+## Methods
+
+What `useForm()` gives you for reading and filling. The verbs that change the form itself are
+on [Building forms](forms/building#methods).
+
+| Method                     | What it does                                                                                                                                   |
+| :------------------------- | :--------------------------------------------------------------------------------------------------------------------------------------------- |
+| `get(ref)`                 | One field, with its value, or `null` when the form has no such field. [Read the form](#read-the-form)                                           |
+| `getValue(ref)`            | One field's value, in the shape `setValue()` takes, or `null`. In a component, use `useFormValue(ref)`.                                        |
+| `getFieldForWidget(widget)` | The field a box belongs to, from the box's ref                                                                                                |
+| `listWidgets(page)`        | Each field box on a page, with its place, its control, its value and whether it can be filled. For drawing the fields yourself.                |
+| `getWidgetAt(page, point)` | The field box under a point on a page, with its field, or `null`                                                                               |
+| `setValue(ref, value)`     | Fills in a field with `{ value }`, `{ checked }` or `{ selectedValues }`, running the form's checks and scripts. Resolves `{ field, status }`. [Fill in a field](#fill-in-a-field) |
+| `setValues(entries)`       | Fills in several fields in order, each `{ ref, value }`; one that fails doesn't stop the rest. Resolves `{ applied, skipped, failed }`.        |
+| `importValues(values)`     | Fills in fields by full name from a plain object. Resolves `{ applied, skipped, failed }`. [Move form data in and out](#move-form-data-in-and-out) |
+| `exportValues()`           | Every value, keyed by full name, as a plain object                                                                                             |
+| `export(format?)`          | The form data as XFDF, or FDF with `'fdf'`. Resolves `{ format, bytes }`.                                                                      |
+| `import(bytes)`            | Fills in the fields from FDF or XFDF bytes, telling the format by itself. Resolves `{ applied, skipped }`.                                     |
+| `reset(refs?)`             | Puts back each field's default, for the whole form or the fields you pass. Resolves `{ fields }`, the fields it changed. [Reset the form](#reset-the-form) |
+| `validate()`               | Checks the required fields. Returns `{ valid, missing }`, the empty ones in page order. [Check required fields](#check-required-fields)        |
+| `activateWidget(widget)`   | Does what a click on a field box does, such as running a button's action                                                                       |
+| `getSnapshot()`            | Everything at once, as the engine's `list()` returns it: `fields`, `formKind`, `needsAppearances` and `calculationOrder`                        |
+| `refresh()`                | Reads the whole form again, and <Fw only={['react', 'vue', 'svelte']}>`onResynced`</Fw><Fw only="angular">`resynced$`</Fw> fires. You rarely need it: the plugin follows every change, whoever made it.                      |
+| `canRead()`, `canFill()`   | Whether reading the form, and filling it in, are allowed. [Permissions](#permissions)                                                         |
+
+Every method that returns a promise also takes a `signal` in its options, to cancel it.
+
+## State
+
+<StateIntro hook="useFormState()" />
+
+| Field           | What it is                                                                                      | Read once                                            |
+| :-------------- | :---------------------------------------------------------------------------------------------- | :--------------------------------------------------- |
+| `fields`        | Every field, with its value                                                                     | `list()`, or `list({ family, page, name })` for some |
+| `status`        | Whether the form is read: `'idle'`, `'loading'`, `'ready'`, `'forbidden'` or `'error'`           | `getStatus()`                                        |
+| `formKind`      | What the document has: `'none'`, `'acroform'` (a regular PDF form) or `'xfa'`                   | `getFormKind()`                                      |
+| `selectedField` | In design mode, the field of the selected box, or `null`; see [Building forms](forms/building#change-a-fields-settings) | `getSelectedField()`          |
+
+For one field, `useFormValue(ref)` <Word of="rerenders" /> only when that field's value changes.
+
 ## Settings
 
 Set them when you register the plugin.
@@ -140,18 +175,13 @@ Scripts need JavaScript on in the actions plugin; without it, `'scripts'` accept
 
 ## Events
 
-```ts
-useFormEvent(
-  (form) => form.onValueChanged,
-  ({ field }) => autosave(field.name),
-);
-```
+<Snippet name="forms/autosave" />
 
-| Event                  | Fires when                                              | Carries             |
-| :--------------------- | :------------------------------------------------------ | :------------------ |
-| `onValueChanged`       | A field's value changed                                 | `field`, `origin`   |
-| `onValidationRejected` | The form's validation refused a value                   | `field`, `issues`   |
-| `onResynced`           | The whole form was read again, as after an import       | —                   |
+| Event                  | Fires when                                                                | Carries           |
+| :--------------------- | :------------------------------------------------------------------------ | :---------------- |
+| `onValueChanged`       | A field's value changed                                                   | `field`, `origin` |
+| `onValidationRejected` | The form's validation refused a value                                     | `field`, `issues` |
+| `onResynced`           | The whole form was read, as when it opens, after `refresh()` or a repair  | `snapshot`        |
 
 Fields that are added, changed or removed have their own events; see
 [Building forms](forms/building#events).

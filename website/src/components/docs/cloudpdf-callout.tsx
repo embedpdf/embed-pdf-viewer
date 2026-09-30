@@ -1,10 +1,10 @@
-import Link from 'next/link';
+import { FrameworkLink } from '@embedpdf/docs-kit';
 import type { ReactNode } from 'react';
 
 type CloudPdfCalloutProps = {
   /** The one-line point, in the author's words. */
   title: string;
-  /** Where the link goes, on cloudpdf.com. */
+  /** Where the link goes, on cloudpdf.com; it keeps the reader's framework. */
   href: string;
   /** The link's words. */
   cta: string;
@@ -31,13 +31,13 @@ export function CloudPdfCallout({ title, href, cta, children }: CloudPdfCalloutP
           <div className="mt-1.5 font-sans text-[15px] leading-[1.6] text-[#2A4574] [&>:first-child]:mt-0 [&_code]:text-[13.5px] [&_p]:mt-2">
             {children}
           </div>
-          <Link
+          <FrameworkLink
             href={href}
             className="mt-3 inline-flex items-center gap-1.5 font-sans text-[14.5px] font-semibold text-[#1189FA] no-underline hover:underline"
           >
             {cta}
             <span aria-hidden="true">→</span>
-          </Link>
+          </FrameworkLink>
         </div>
       </div>
     </aside>

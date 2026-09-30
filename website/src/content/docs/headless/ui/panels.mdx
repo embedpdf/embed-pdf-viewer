@@ -10,30 +10,20 @@ description: Keep track of which sidebars, dialogs and menus are open, open them
 A viewer has sidebars (thumbnails, comments, search), dialogs and menus. The shell plugin keeps track of
 which are open, so a toolbar button, a keyboard shortcut and your own code can all open the same
 panel, and you can remember the layout for next time. You draw the panels; the plugin only holds their
-state. Register `shellPlugin()`, and ask for a panel by name:
+state. Register `shellPlugin()`:
 
-```tsx
-import { shellPlugin, useSurface } from '@embedpdf/react/shell';
+<Snippet name="ui/shell-plugin" />
 
-const plugins = [/* … */ shellPlugin()];
+Then ask for a panel by name:
 
-function CommentsPanel() {
-  const panel = useSurface('comments');
-  if (!panel.isOpen) return null;
+<Snippet name="ui/comments-panel" />
 
-  return (
-    <aside>
-      <button onClick={panel.close}>Close</button>
-      <CommentList />
-    </aside>
-  );
-}
+<Fw only="angular">
 
-function CommentsButton() {
-  const panel = useSurface('comments');
-  return <button onClick={() => panel.toggle({ exclusive: 'right' })}>Comments</button>;
-}
-```
+The `epdfPanelToggle` directive toggles the panel from your own button, with `epdfPanelToggleExclusive`
+for its [group](#one-panel-per-side), and sets the button's `aria-expanded`.
+
+</Fw>
 
 The names are yours: `'comments'`, `'thumbnails'`, `'settings'`. Each document keeps its own, so every
 tab remembers which panels were open.
@@ -55,9 +45,14 @@ A panel can carry data, such as which comment to scroll to:
 
 ```ts
 shell.open('comments', { exclusive: 'right', props: { focus: thread.root.ref } });
-
-const { props } = useSurface('comments'); // { focus: … }
 ```
+
+The panel reads them:
+
+<Snippet name="ui/panel-props" />
+
+`shell.updateSurfaceProps('comments', { focus: nextThread.root.ref })` changes them without reopening the
+panel.
 
 ## From commands
 
@@ -79,7 +74,7 @@ shell.openMenu('more');
 shell.closeAllMenus(); // for a click outside, or Escape
 ```
 
-`useShellState().openMenus` lists the open menus, the last one opened on top.
+`openMenus` in [State](#state) lists the open menus, the last one opened on top.
 
 ## Remember the layout
 
@@ -90,14 +85,34 @@ localStorage.setItem('panels', JSON.stringify(shell.getSnapshot()));
 shell.applySnapshot(JSON.parse(localStorage.getItem('panels')!));
 ```
 
+## Methods
+
+Everything `useShell()` gives you.
+
+| Method                                              | What it does                                                                                                                              |
+| :-------------------------------------------------- | :---------------------------------------------------------------------------------------------------------------------------------------- |
+| `open(id, { exclusive?, props? })`                  | Opens a panel or dialog. `exclusive` closes the others in that group, and `props` travels with it. [One panel per side](#one-panel-per-side) |
+| `toggle(id, { exclusive?, props? })`                | Opens a closed panel, or closes an open one                                                                                               |
+| `close(id)`, `closeAll()`                           | Closes one panel, or every panel                                                                                                          |
+| `updateSurfaceProps(id, props)`                     | Changes a panel's `props` without reopening it. [Open a panel with something in it](#open-a-panel-with-something-in-it)                   |
+| `openMenu(id)`, `closeMenu(id)`, `toggleMenu(id)`   | Opens, closes or toggles one menu. Opening a menu leaves the others open, so a submenu stays above its menu. [Menus](#menus)              |
+| `closeAllMenus()`                                   | Closes every menu, for a click outside or Escape                                                                                          |
+| `getSnapshot()`, `applySnapshot(snapshot)`          | Everything the plugin holds, as plain data you can store; and back. [Remember the layout](#remember-the-layout)                           |
+
+<Fw only={['react', 'vue', 'svelte']}>In a component, `useSurface(id)` gives you one panel: `{ isOpen, props, open, close, toggle }`.</Fw><Fw only="angular">In a component, `shell.surface(id)` gives you one panel: `isOpen()` and `props()` as signals, and `open()`, `close()` and `toggle()`.</Fw>
+
+## State
+
+<StateIntro hook="useShellState()" />
+
+| Field          | What it is                                                                   | Read once                                                      |
+| :------------- | :--------------------------------------------------------------------------- | :------------------------------------------------------------- |
+| `openSurfaces` | The open panels and dialogs, each with its `id`, `exclusive` group and `props` | `listOpenSurfaces()`, or `isOpen(id)` and `getSurface(id)` for one |
+| `openMenus`    | The open menus' ids, the last one opened on top                              | `listOpenMenus()`, or `isMenuOpen(id)` for one                 |
+
 ## Events
 
-```ts
-useShellEvent(
-  (shell) => shell.onSurfaceOpened,
-  ({ id }) => analytics.track('panel', { id }),
-);
-```
+<Snippet name="ui/panel-events" />
 
 | Event             | Fires when             | Carries        |
 | :---------------- | :--------------------- | :------------- |
@@ -110,5 +125,5 @@ useShellEvent(
 
 ### No document yet
 
-The panel hooks work before a document is open: every panel reads as closed, and opening one does
+The panel <Word of="hooks" /> work before a document is open: every panel reads as closed, and opening one does
 nothing until there is a document. So a toolbar outside `<DocumentGate>` can use them.

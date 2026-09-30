@@ -12,45 +12,19 @@ icon, when it's enabled or active, what it does, and its keyboard shortcut. Tool
 palette and the keyboard all run the same command, so they always agree. Register the plugin with the
 commands you need:
 
-```ts
-import { commandsPlugin, standardCommands } from '@embedpdf/react/commands';
-
-const plugins = [
-  /* … */
-  commandsPlugin({
-    commands: [
-      ...standardCommands,
-      {
-        id: 'review:approve',
-        label: 'Approve',
-        icon: 'check',
-        shortcut: 'Mod+Enter',
-        enabled: ({ get }) => get(AnnotationToken).canCreate(),
-        run: ({ get }) => approveDocument(get(DocumentsToken)),
-      },
-    ],
-  }),
-];
-```
+<Snippet name="ui/commands-plugin" />
 
 ## Show a command
 
-`useCommand(id)` gives you everything a button needs, and re-renders when any of it changes:
+<Fw only={['react', 'vue', 'svelte']}>`useCommand(id)` gives you everything a button needs, and <Word of="rerenders" /> when any of it changes:</Fw><Fw only="angular">The `epdfCommand` directive runs the command on click and keeps your button's `disabled`, `aria-pressed`, `title` and `hidden` in step with it. Its template reference gives you the rest, as signals:</Fw>
 
-```tsx
-function CommandButton({ id }: { id: string }) {
-  const command = useCommand(id);
-  if (!command?.visible) return null;
+<Snippet name="ui/command-button" />
 
-  return (
-    <button onClick={command.run} disabled={!command.enabled} aria-pressed={command.active}>
-      <Icon name={command.icon} />
-      {command.label}
-      {command.shortcut && <kbd>{command.shortcut}</kbd>}
-    </button>
-  );
-}
-```
+<Fw only={['vue', 'svelte']}>
+
+Pass the id as a function, and the button follows `id` when it changes.
+
+</Fw>
 
 `shortcut` is formatted for the user's platform: `⌘ K` on a Mac, `Ctrl+K` elsewhere. The
 [toolbar](toolbar) draws commands the same way.
@@ -76,12 +50,10 @@ Each one is enabled only when it can run: `selection:copy` needs a selection and
 
 ## Keyboard shortcuts
 
-`useCommandShortcuts()` turns every command's shortcut into a working key. Call it once, near the top
-of your viewer:
+`useCommandShortcuts()` turns every command's shortcut into a working key. <Fw only={['react', 'vue', 'svelte']}>Call it once, near the top
+of your viewer:</Fw><Fw only="angular">Add it to `provideEmbedPdf()`, next to `withCommands()`:</Fw>
 
-```ts
-useCommandShortcuts();
-```
+<Snippet name="ui/command-shortcuts" />
 
 It ignores keys typed into text fields, runs commands for the active document, and does nothing for a
 command that's disabled. `Mod` means Cmd on a Mac and Ctrl elsewhere.
@@ -89,8 +61,6 @@ command that's disabled. `Mod` means Cmd on a Mac and Ctrl elsewhere.
 ## Run a command from code
 
 ```ts
-const commands = useCommands();
-
 await commands.execute('zoom:in');
 await commands.execute('review:approve', { args: { note: 'Looks good' } });
 ```
@@ -102,9 +72,11 @@ is disabled, hidden or unknown.
 
 `searchCommands()` finds commands by their label, for a palette like the one in code editors:
 
-```tsx
-const results = commands.searchCommands(query); // enabled and visible commands that match
+```ts
+const results = commands.searchCommands(query); // visible commands whose label or id matches
 ```
+
+A disabled command is still in the results, so show it greyed out.
 
 ## Define a command
 
@@ -127,14 +99,35 @@ whenever anything changes, so a button is always right without events or effects
 ## Turn features off
 
 Put commands in categories, and turn a whole category off: its commands are hidden and disabled,
-wherever they appear:
+wherever they appear. The `disabledCategories` [setting](#settings) turns categories off from the start,
+and while the app runs:
 
 ```ts
-commandsPlugin({ commands, disabledCategories: ['annotate'] });
-
-commands.disableCategory('annotate'); // or while the app runs
+commands.disableCategory('annotate');
 commands.enableCategory('annotate');
 ```
+
+## Methods
+
+Everything `useCommands()` gives you.
+
+| Method                                                                   | What it does                                                                                                                                         |
+| :----------------------------------------------------------------------- | :--------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `execute(id, { args?, documentId? })`                                    | Runs a command. Resolves `{ status, reason? }`: `'executed'`, or `'rejected'` with why. A `run` that throws rejects. [Run a command from code](#run-a-command-from-code) |
+| `canExecute(id, documentId?)`                                            | Whether a command can run now: it's registered, enabled and visible                                                                                 |
+| `resolveCommand(id, documentId?)`                                        | A command as a button shows it: label, icon, shortcuts, and whether it's enabled, active and visible. `null` for an unknown id. <Fw only={['react', 'vue', 'svelte']}>In a component, use `useCommand(id)`.</Fw><Fw only="angular">In a template, use the `epdfCommand` directive.</Fw> [Show a command](#show-a-command) |
+| `listCommands(documentId?)`                                              | Every command, resolved the same way, in the order they were added                                                                                  |
+| `searchCommands(query, documentId?)`                                     | The visible commands whose label or id contains the query. [A command palette](#a-command-palette)                                                  |
+| `listShortcuts()`                                                        | Every shortcut with its command, as `{ commandId, shortcut }`, for a keyboard help sheet. [Keyboard shortcuts](#keyboard-shortcuts)                 |
+| `registerCommand(command, { replace? })`, `registerCommands(commands, { replace? })` | Adds one command, or several, while the app runs, and returns a function that removes them. An id that's taken is refused unless you pass `replace: true`. [Define a command](#define-a-command) |
+| `getCommand(id)`, `hasCommand(id)`                                       | A command as you defined it, or `null`; whether it's registered                                                                                      |
+| `listCommandIds()`                                                       | Every command's id, in the order they were added                                                                                                     |
+| `disableCategory(category)`, `enableCategory(category)`                  | Turns a category off, or on again. [Turn features off](#turn-features-off)                                                                          |
+| `setDisabledCategories(categories)`                                      | Replaces the list of categories that are off                                                                                                         |
+| `getDisabledCategories()`, `isCategoryDisabled(category)`                | The categories that are off; whether one is                                                                                                          |
+
+Leave out `documentId`, and a command runs and resolves for the active document. Every method that
+returns a promise also takes a `signal` in its options, to cancel it.
 
 ## Settings
 
@@ -147,17 +140,12 @@ Set them when you register the plugin.
 
 ## Events
 
-```ts
-useCommandsEvent(
-  (commands) => commands.onExecuted,
-  ({ id }) => analytics.track('command', { id }),
-);
-```
+<Snippet name="ui/command-events" />
 
-| Event               | Fires when                      | Carries          |
-| :------------------ | :------------------------------ | :--------------- |
-| `onExecuted`        | A command ran                   | `id`, `args`     |
-| `onExecutionFailed` | A command's `run` threw         | `id`, `error`    |
+| Event               | Fires when                      | Carries                           |
+| :------------------ | :------------------------------ | :-------------------------------- |
+| `onExecuted`        | A command ran                   | `commandId`, `documentId`, `args` |
+| `onExecutionFailed` | A command's `run` threw         | `commandId`, `documentId`, `error` |
 
 ## Good to know
 

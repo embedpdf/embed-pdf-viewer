@@ -7,29 +7,13 @@ description: "The active tool decides what the pointer does: select, pan, draw. 
 
 At any moment one **tool** is active, and it decides what a click or a drag on the page does: select
 text, scroll, draw a rectangle, place a stamp. The interaction plugin keeps track of it, and every
-feature that uses the pointer works through it. Register it, and switch tools from your toolbar:
+feature that uses the pointer works through it. Register `interactionPlugin()`:
 
-```tsx
-import { interactionPlugin, useInteraction, useInteractionState } from '@embedpdf/react/interaction';
+<Snippet name="ui/interaction-plugin" />
 
-const plugins = [stagePlugin(), renderPlugin(), interactionPlugin()];
+Then switch tools from your toolbar:
 
-function ToolSwitch() {
-  const interaction = useInteraction();
-  const { activeToolId } = useInteractionState();
-
-  return (
-    <>
-      <button aria-pressed={activeToolId === 'pointer'} onClick={() => interaction.activateTool('pointer')}>
-        Select
-      </button>
-      <button aria-pressed={activeToolId === 'pan'} onClick={() => interaction.activateTool('pan')}>
-        Hand
-      </button>
-    </>
-  );
-}
-```
+<Snippet name="ui/tool-switch" />
 
 ## The built-in tools
 
@@ -40,29 +24,14 @@ function ToolSwitch() {
 
 Plugins add their own: the annotation plugin a tool per kind (`square`, `highlight`, `note`…), the form
 plugin a tool per field, redaction `redact`, measurements `distance`. They're all switched the same
-way, with `activateTool(id)`, and `useInteractionState().tools` lists them.
+way, with `activateTool(id)`, and `tools` in [State](#state) lists them.
 
 ## Hold a tool for a moment
 
 `pushTool()` switches to a tool and remembers the one before; `popTool()` goes back. That's how
 "hold Space to pan" works:
 
-```ts
-useEffect(() => {
-  const down = (event: KeyboardEvent) => {
-    if (event.code === 'Space' && !event.repeat) interaction.pushTool('pan');
-  };
-  const up = (event: KeyboardEvent) => {
-    if (event.code === 'Space') interaction.popTool();
-  };
-  window.addEventListener('keydown', down);
-  window.addEventListener('keyup', up);
-  return () => {
-    window.removeEventListener('keydown', down);
-    window.removeEventListener('keyup', up);
-  };
-}, [interaction]);
-```
+<Snippet name="ui/hold-space" />
 
 `activateDefaultTool()` goes back to the default tool, `pointer` unless you set another.
 
@@ -103,19 +72,32 @@ tool's own cursor, in three steps:
 - **A CSS cursor**: `cursor: 'crosshair'`.
 - **An image**: `cursor: svgCursor({ svg: penIcon, hotspot: { x: 2, y: 22 } })`. The SVG needs a
   `width` and a `height`, and `hotspot` is the point that clicks.
-- **An image that changes**, such as a pen in the current color: `useToolCursor()` from a component.
+- **An image that changes**, such as a pen in the current color: `useToolCursor()` from a component, which follows the values it reads.
 
-```tsx
-import { svgCursor, useToolCursor } from '@embedpdf/react/interaction';
+<Snippet name="ui/pen-cursor" />
 
-function PenCursor({ color }: { color: string }) {
-  useToolCursor({ toolId: 'ink', cursors: { crosshair: { svg: penIcon(color), hotspot: { x: 2, y: 22 } } } });
-  return null;
-}
-```
+<Fw only="react">
 
 `cursors` replaces the tool's cursors by name, and the tool's own comes back when the component
-unmounts. See [The cursor](../annotations/tools#the-cursor) for annotation tools.
+unmounts.
+
+</Fw>
+
+<Fw only={['vue', 'svelte']}>
+
+`cursors` replaces the tool's cursors by name. Pass a function, and the cursor follows `color`; the
+tool's own comes back when the component unmounts.
+
+</Fw>
+
+<Fw only="angular">
+
+`overrideCursor()` runs again when `color()` changes, and brings the tool's own cursors back when
+the directive is destroyed.
+
+</Fw>
+
+See [The cursor](../annotations/tools#the-cursor) for annotation tools.
 
 ## Touch
 
@@ -134,14 +116,32 @@ click with.
 Register a feedback provider, and a long-press that lands on a word gives the small tick people know
 from native apps:
 
-```ts
-import { feedbackPlugin, vibrationFeedback } from '@embedpdf/react/interaction';
-
-const plugins = [/* … */ interactionPlugin(), feedbackPlugin({ provider: vibrationFeedback })];
-```
+<Snippet name="ui/haptics" />
 
 It's safe to leave in: where the browser can't vibrate, iOS Safari included, nothing happens. In a
 native app shell, pass `wkFeedback('yourHandlerName')` to use the app's own haptics.
+
+## Methods
+
+Everything `useInteraction()` gives you.
+
+| Method                             | What it does                                                                                                                                              |
+| :--------------------------------- | :-------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `activateTool(id)`                 | Makes a tool the active one. An id that isn't registered is refused. [The built-in tools](#the-built-in-tools)                                            |
+| `pushTool(id)`, `popTool()`        | Switches to a tool and remembers the one before; goes back to it. [Hold a tool for a moment](#hold-a-tool-for-a-moment)                                  |
+| `activateDefaultTool()`            | Goes back to the default tool                                                                                                                             |
+| `getDefaultToolId()`               | The tool a document opens with, `pointer` unless you set another                                                                                          |
+| `registerTool(tool, { replace? })` | Adds a tool of your own, and returns a function that removes it. An id that's taken is refused unless you pass `replace: true`. [Your own tool](#your-own-tool) |
+| `setToolCursor(id, cursors)`       | Replaces a tool's cursors by name while the app runs; `null` brings its own back. In a component, use `useToolCursor()`, which undoes it when the component goes. [Cursors](#cursors) |
+
+## State
+
+<StateIntro hook="useInteractionState()" />
+
+| Field          | What it is                                                           | Read once                                                  |
+| :------------- | :------------------------------------------------------------------- | :--------------------------------------------------------- |
+| `activeToolId` | The active tool's id                                                 | `getActiveToolId()`, or `getActiveTool()` for the whole tool |
+| `tools`        | Every tool you can switch to, in the order they were added, the built-in ones first | `listTools()`, or `getTool(id)` and `hasTool(id)` for one |
 
 ## Settings
 
@@ -154,12 +154,7 @@ Set them when you register the plugin.
 
 ## Events
 
-```ts
-useInteractionEvent(
-  (interaction) => interaction.onToolChanged,
-  ({ toolId }) => analytics.track('tool', { toolId }),
-);
-```
+<Snippet name="ui/tool-events" />
 
 | Event                 | Fires when                                   | Carries                           |
 | :-------------------- | :------------------------------------------- | :-------------------------------- |

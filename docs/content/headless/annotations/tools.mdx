@@ -7,10 +7,11 @@ description: Change what each tool draws, add your own tools, and choose the cur
 
 A tool says what a click or a drag on the page creates: the kind of annotation, its default
 colors and sizes, the cursor, and whether a preview follows the pointer. Change the built-in
-tools, or add your own, when you register the plugin:
+tools, or add your own, in the options you pass to `annotationPlugin()`. The code on this page
+shows those options:
 
 ```ts
-annotationPlugin({
+{
   tools: [
     { id: 'ink', defaults: { color: '#1e90ff', strokeWidth: 3 } },
     {
@@ -19,7 +20,7 @@ annotationPlugin({
       defaults: { lineEndings: { start: 'none', end: 'closed-arrow' } },
     },
   ],
-});
+}
 ```
 
 The first entry changes the built-in `ink` tool. The second adds an `arrow` tool: a line with an
@@ -33,14 +34,14 @@ the annotation has, so the [engine's page for each kind](/docs/engine/annotation
 can set:
 
 ```ts
-annotationPlugin({
+{
   tools: [
     { id: 'square', defaults: { color: '#dc143c', strokeWidth: 2, interiorColor: '#ffe4e1' } },
     { id: 'highlight', defaults: { color: '#90ee90', opacity: 0.6 } },
     { id: 'free-text', defaults: { fontFamily: 'helvetica', fontSize: 16, fontColor: '#1e1e1e' } },
     { id: 'note', defaults: { icon: 'help', color: '#ffd700' } },
   ],
-});
+}
 ```
 
 Defaults can be any field except where the annotation goes (`box`, points, `rect`), since that
@@ -56,7 +57,7 @@ error that names the tool and the field.
 kind, cursor, preview and behavior:
 
 ```ts
-annotationPlugin({
+{
   tools: [
     { id: 'red-pen', extends: 'ink', defaults: { color: '#ff0000', strokeWidth: 2 } },
     { id: 'marker', extends: 'ink-highlight', defaults: { color: '#ffa500' } },
@@ -67,7 +68,7 @@ annotationPlugin({
       defaults: { target: { kind: 'uri', uri: 'https://example.com/docs' } },
     },
   ],
-});
+}
 ```
 
 Give a tool a label and an icon for your toolbar in `meta`. The plugin keeps it and never reads
@@ -95,23 +96,10 @@ const remove = annotation.tools.register({
 A color picker or a width slider in your toolbar changes a tool's defaults for the drawings that
 follow:
 
-```tsx
-function InkColor() {
-  const annotation = useAnnotation();
-  const defaults = useAnnotationDefaults('ink');
+<Snippet name="annotations/tools-ink-color" />
 
-  return (
-    <input
-      type="color"
-      value={defaults.color}
-      onChange={(event) => annotation.tools.updateDefaults('ink', { color: event.target.value })}
-    />
-  );
-}
-```
-
-`useAnnotationDefaults()` re-renders when the defaults change, so the picker always shows the
-current color. To build a whole style panel for any tool, list the fields it can change;
+`useAnnotationDefaults()` <Word of="rerenders" /> when the defaults change, so the picker always
+shows the current color. To build a whole style panel for any tool, list the fields it can change;
 it's the same list a [style panel for the selection](selecting#a-style-panel) uses:
 
 ```ts
@@ -123,20 +111,19 @@ the same document.
 
 ### Remember them
 
-To keep a person's choices for next time, save them when they change and pass them back at
-startup:
+To keep a person's choices for next time, save them when they change:
+
+<Snippet name="annotations/tools-remember" />
+
+Then pass them back at startup:
 
 ```ts
-annotation.tools.onDefaultsChanged(({ toolId, defaults }) => {
-  localStorage.setItem(`tool:${toolId}`, JSON.stringify(defaults));
-});
-
-annotationPlugin({
+{
   tools: ['ink', 'highlight'].map((id) => ({
     id,
     defaults: JSON.parse(localStorage.getItem(`tool:${id}`) ?? '{}'),
   })),
-});
+}
 ```
 
 ## What happens after drawing
@@ -145,12 +132,12 @@ By default the new annotation is selected, so its handles and your menu appear a
 tool stays active, so people can draw another. Change it for every tool, or for one:
 
 ```ts
-annotationPlugin({
+{
   afterCreate: { select: false, tool: 'stay' }, // every tool: keep drawing, don't select
   tools: [
     { id: 'stamp', afterCreate: { select: true, tool: 'default' } }, // one stamp, then back
   ],
-});
+}
 ```
 
 | Option     | What it does                                                                                  | Default  |
@@ -176,13 +163,13 @@ Most drawing tools also work with a single click: it places an annotation of a d
 you click. `clickCreate` sets that size, or turns it off:
 
 ```ts
-annotationPlugin({
+{
   tools: [
     { id: 'square', clickCreate: { width: 120, height: 80 } },
     { id: 'line', clickCreate: { length: 100 } },
     { id: 'circle', clickCreate: false }, // drag only
   ],
-});
+}
 ```
 
 | Tool                 | A click makes                                     |
@@ -205,39 +192,26 @@ to fully yours.
 **A standard cursor.** Any CSS cursor name:
 
 ```ts
-annotationPlugin({ tools: [{ id: 'square', cursor: 'cell' }] });
+{ tools: [{ id: 'square', cursor: 'cell' }] }
 ```
 
-**An image.** `svgCursor()` turns an SVG into a cursor. The SVG needs a `width` and a `height`,
-and `hotspot` is the point in it that clicks:
+**An image.** `svgCursor()`, from `@embedpdf/react/interaction`, turns an SVG into a cursor. The
+SVG needs a `width` and a `height`, and `hotspot` is the point in it that clicks:
 
 ```ts
-import { svgCursor } from '@embedpdf/react/interaction';
-
-annotationPlugin({
+{
   tools: [{ id: 'ink', cursor: svgCursor({ svg: penIcon, hotspot: { x: 2, y: 22 } }) }],
-});
+}
 ```
 
 **An image that follows the defaults.** `useToolCursor()` sets a tool's cursor from a component, so
 it can change with the tool's color:
 
-```tsx
-import { useToolCursor } from '@embedpdf/react/interaction';
-
-function InkCursor() {
-  const { color } = useAnnotationDefaults('ink');
-  useToolCursor({
-    toolId: 'ink',
-    cursors: { crosshair: { svg: penIcon(color), hotspot: { x: 2, y: 22 } } },
-  });
-  return null;
-}
-```
+<Snippet name="annotations/tools-ink-cursor" />
 
 `cursors` replaces cursors by name: `crosshair` is the ink tool's own cursor. Name `text` too to
 replace the text cursor a markup tool shows over text. The cursor goes back to the tool's own when
-the component unmounts.
+the component is removed.
 
 ## Show a preview before placing
 
@@ -245,13 +219,13 @@ A **preview** (a ghost) is a see-through copy of what a click would place, follo
 shows exactly where the annotation will land and how big it will be:
 
 ```ts
-annotationPlugin({
+{
   tools: [
     { id: 'square', ghost: true },
     { id: 'note', ghost: { opacity: 0.3 } },
     { id: 'todo', extends: 'note', ghost: false },
   ],
-});
+}
 ```
 
 The preview is drawn with the tool's current defaults, so it has the color the annotation will
@@ -266,32 +240,65 @@ says _where_ the annotation will land. You can use either, or both.
 
 ## Stamps and files
 
-The `stamp` and `attachment` tools ask for a file after the click. The file dialog comes from a
-small hook: call it once, in a component that's always mounted, such as your toolbar:
+The `stamp` and `attachment` tools ask for a file after the click.
 
-```ts
-useFilePickerProvider();
-```
+<Fw only={['react', 'vue', 'svelte']}>
+
+The file dialog comes from a small <Word of="hook" />: call it once, in a component that's always
+mounted, such as your toolbar:
+
+</Fw>
+<Fw only="angular">
+
+The file dialog comes from a provider feature: add `withFilePicker()` to `provideEmbedPdf()`, next
+to your other features:
+
+</Fw>
+
+<Snippet name="annotations/tools-file-picker" />
 
 To pick from your own library or a cloud drive instead, pass a function. It gets the tool and the
 spot, and returns the file, or `null` to cancel:
 
-```ts
-useFilePickerProvider(async ({ toolId, page, point }) => {
-  if (toolId === 'stamp') return { data: await openStampLibrary() };
-  return null;
-});
-```
+<Snippet name="annotations/tools-file-picker-custom" />
 
 A stamp tool can also carry fixed bytes, so a click places it at once:
 
 ```ts
-annotationPlugin({
+{
   tools: [{ id: 'approved', extends: 'stamp', source: { kind: 'bytes', source: approvedPng } }],
-});
+}
 ```
 
 For libraries of stamps, see [Stamps](stamps).
+
+## Methods
+
+What `useAnnotation()` gives you for tools and stamps: its `tools` and `stamps` parts. The rest is on
+[Annotations in code](with-code#methods).
+
+| Method                                 | What it does                                                                                                                                           |
+| :------------------------------------- | :----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `tools.list()`                         | Every tool, the built-in ones and yours, so a toolbar can build itself from it. [Make your own tool](#make-your-own-tool)                              |
+| `tools.get(id)`                        | One tool, or `null`                                                                                                                                    |
+| `tools.register(tool)`                 | Adds a tool while the app runs, or replaces the one with the same id, and returns a function that removes it                                           |
+| `tools.getDefaults(id)`                | The fields a tool's next annotation starts with. In a component, use `useAnnotationDefaults(id)`. [Let people change the defaults](#let-people-change-the-defaults) |
+| `tools.updateDefaults(id, changes)`    | Changes a tool's defaults for the drawings that follow. They stay in this viewer and are never shared.                                                 |
+| `tools.listFields(id)`                 | The fields a style panel for the tool shows, each with its control, as for the [selection](selecting#a-style-panel)                                    |
+| `stamps.arm(stamp)`, `stamps.disarm()` | Arms a stamp's bytes so the next click places them, as the `stamp` tool does after picking a file, or disarms them. For stamps from a library, use [Stamps](stamps). |
+| `stamps.isArmed()`                     | Whether a stamp is armed                                                                                                                               |
+| `stamps.place(stamp, { page, center })` | Places a stamp's bytes with its middle on `center`, without a click. Resolves `{ annotation }`.                                                                |
+| `setFilePickerProvider(provider)`      | Sets the function that gives the `stamp` and `attachment` tools their file, and returns a function that removes it. In a component, use `useFilePickerProvider()`. [Stamps and files](#stamps-and-files) |
+
+Every method that returns a promise also takes a `signal` in its options, to cancel it.
+
+## Events
+
+<Snippet name="annotations/tools-defaults-changed" />
+
+| Event                     | Fires when                                           | Carries              |
+| :------------------------ | :--------------------------------------------------- | :------------------- |
+| `tools.onDefaultsChanged` | A tool's defaults changed, from your UI or your code | `toolId`, `defaults` |
 
 ## Good to know
 

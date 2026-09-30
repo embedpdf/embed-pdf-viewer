@@ -6,7 +6,7 @@ description: Let people select text with the pointer or a finger, select text fr
 # Selecting & copying
 
 The selection plugin lets people select text with the mouse or a finger, and lets your code select the
-same text. Register `interactionPlugin()` and `selectionPlugin()`, and put a `<SelectionLayer>`
+same text. Register `interactionPlugin()` and `selectionPlugin()`, and put `<SelectionLayer>`
 above the page:
 
 <Example name="selection/basic" mode="open" />
@@ -29,8 +29,6 @@ text until your code asks for it, and a document can allow selecting while it fo
 <Example name="selection/programmatic" />
 
 ```ts
-const selection = useSelection();
-
 selection.select({ page: page.ref, start: 20, count: 40 }); // 40 characters on one page
 selection.selectWordAt(page.ref, { x: 120, y: 80 }); // the word at a point
 selection.selectLineAt(page.ref, { x: 120, y: 80 }); // the line at a point
@@ -60,13 +58,10 @@ to a point on a page, as dragging a handle does.
 
 ## Show the selection in your UI
 
-`useSelectionState()` gives you what to show, and re-renders when it changes:
+`useSelectionState()` gives you what to show, and your component <Word of="rerenders" /> when it
+changes:
 
-```tsx
-const { hasSelection, isSelecting, pages } = useSelectionState();
-
-return <button disabled={!hasSelection}>Highlight</button>;
-```
+<Snippet name="text/highlight-button" />
 
 Every field is listed under [State](#state). For drawing your own highlight, `selection.listSegments(page.ref)` gives you each selected line as
 four corners, turned with the text, and `selection.listRects(page.ref)` a plain box per line.
@@ -83,29 +78,17 @@ const text = await selection.readText();
 clipboard. Lines on different pages are joined with a new line, and with nothing selected it's an
 empty string. `readTextInRange(range)` reads any range without selecting it.
 
-For the clipboard, the React package has a button helper and one component that makes Ctrl+C and
-the browser's Copy menu work:
+For the clipboard, the <Framework /> package has two helpers. `copySelection()` copies from your own
+button:
 
-```tsx
-import { SelectionClipboard, copySelection, useSelection, useSelectionState } from '@embedpdf/react/selection';
+<Snippet name="text/copy-button" />
 
-function CopyButton() {
-  const selection = useSelection();
-  const { hasSelection } = useSelectionState();
+`<SelectionClipboard>` makes Ctrl+C and the browser's Copy menu work. Mount it once per document view:
 
-  return (
-    <button disabled={!hasSelection || !selection.canCopy()} onClick={() => copySelection(selection)}>
-      Copy
-    </button>
-  );
-}
+<Snippet name="text/clipboard" />
 
-// Once per document view: Ctrl+C / Cmd+C and the browser's Copy menu
-<SelectionClipboard />;
-```
-
-`<SelectionClipboard>` reads the text as soon as a selection settles, so the browser's copy can
-answer at once. Pass `prefetch={false}` to read text only when someone copies.
+It reads the text as soon as a selection settles, so the browser's copy can answer at once. Set
+`prefetch` to `false` to read text only when someone copies.
 
 ## Add a selection menu
 
@@ -114,34 +97,18 @@ appears when the selection settles:
 
 <Example name="selection/menu" />
 
-Mount it in the Stage's `overlay`, and it stays attached to the text while the user scrolls and zooms.
-The menu only places things; what's in it is yours: copy, comment, highlight, redact. `placement`
+Mount it <Fw only="react">in the Stage's `overlay`</Fw><Fw only="vue">in the Stage's `#overlay`
+slot</Fw><Fw only="svelte">in the Stage's `overlay` snippet</Fw><Fw only="angular">inside
+`<epdf-stage>`, next to the page template</Fw>, and it stays attached to the text while the user
+scrolls and zooms. The menu only places things; what's in it is yours: copy, comment, highlight, redact. `placement`
 is `'top'`, `'bottom'`, `'left'` or `'right'`, and `gap` the space in pixels.
 
 ## On touch screens
 
 A finger has no text cursor, so selection works as it does elsewhere on a phone: **long-press a word,
-then drag the handles.** Add `<SelectionHandles>` to the Stage's overlay, next to your menu:
+then drag the handles.** Add `<SelectionHandles>` next to your menu:
 
-```tsx
-<Stage
-  overlay={
-    <>
-      <SelectionMenu>
-        <CopyButton />
-      </SelectionMenu>
-      <SelectionHandles />
-    </>
-  }
->
-  {() => (
-    <>
-      <RenderLayer />
-      <SelectionLayer />
-    </>
-  )}
-</Stage>
-```
+<Snippet name="text/selection-handles" />
 
 Each handle is the selection's own edge, with a round grip. Dragging one grows the selection from the
 other end, across pages too. Grabbing a handle never scrolls the page, and everywhere else a finger
@@ -173,10 +140,9 @@ Every method that returns a promise also takes a `signal` in its options, to can
 
 ## State
 
-Everything `useSelectionState()` gives you. Your component re-renders when a value changes. Outside a
-component, read the same value with the method in the last column.
+<StateIntro hook="useSelectionState()" />
 
-| Field          | What it is                                                                  | Outside a component   |
+| Field          | What it is                                                                  | Read once             |
 | :------------- | :-------------------------------------------------------------------------- | :-------------------- |
 | `hasSelection` | Whether anything is selected                                                | `hasSelection()`      |
 | `isSelecting`  | Whether the user is still dragging                                          | `isSelecting()`       |
@@ -191,17 +157,12 @@ Set them when you register the plugin.
 | :-------------- | :---------------------------------------------------------- | :------ |
 | `dragThreshold` | How far, in pixels, the pointer moves before a drag selects | `4`     |
 
-The components take their colors as props: `<SelectionLayer color>` (default a translucent blue)
+The components take their colors as <Word of="props" />: `<SelectionLayer color>` (default a translucent blue)
 and `<SelectionHandles color>`.
 
 ## Events
 
-```ts
-useSelectionEvent(
-  (selection) => selection.onCommitted,
-  () => prefetchTranslation(),
-);
-```
+<Snippet name="text/selection-committed" />
 
 | Event         | Fires when                                                  | Carries          |
 | :------------ | :---------------------------------------------------------- | :--------------- |
@@ -209,8 +170,8 @@ useSelectionEvent(
 | `onCommitted` | A drag or a tap finished selecting                          | `range`          |
 | `onCleared`   | The selection was cleared                                   | —                |
 
-Use `onChanged` for things that follow the selection as it grows, and `onCommitted` for things that
-should happen once, such as creating a highlight.
+Use the change event for things that follow the selection as it grows, and the commit event for
+things that should happen once, such as creating a highlight.
 
 ## Permissions
 
@@ -240,4 +201,4 @@ keeps large documents fast, and it's why a document can allow selecting without 
 ### Outside the browser
 
 The selection plugin itself has no clipboard or HTML in it, so `readText()` also works in tests and in
-Node. The clipboard is the React package's job.
+Node. The clipboard is the <Framework /> package's job.

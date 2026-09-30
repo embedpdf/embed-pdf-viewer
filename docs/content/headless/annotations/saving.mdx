@@ -8,48 +8,65 @@ description: Listen for annotation changes, save them into the PDF, and move the
 Every annotation change fires an event, whoever made it: the user, your code, or someone else on
 a shared document. Listen for them to keep your own UI or server in step:
 
-```ts
-useAnnotationEvent(
-  (annotation) => annotation.onCreated,
-  ({ annotation, origin }) => {
-    console.log(`${annotation.author} added a ${annotation.subtype}`);
-  },
-);
-```
+<Snippet name="annotations/saving-events" />
 
-The hook listens while the component is mounted. Outside React, call the event directly;
-it returns a function that stops listening:
+<Fw only={['react', 'vue', 'svelte']}>
+
+The <Word of="hook" /> listens while the component is mounted. Outside a component, call the event on the
+plugin's API; it returns a function that stops listening:
 
 ```ts
-const stop = useAnnotation().onCreated(({ annotation }) => {
+const stop = annotation.onCreated(({ annotation }) => {
   /* … */
 });
 ```
 
+</Fw>
+
+<Fw only="angular">
+
+`takeUntilDestroyed()` stops listening when the component or directive is destroyed. Anywhere
+else, such as in a service, keep the subscription and end it yourself:
+
+```ts
+const subscription = annotation.created$.subscribe(({ annotation }) => {
+  /* … */
+});
+
+subscription.unsubscribe();
+```
+
+</Fw>
+
 ## Events
 
-| Event           | Fires when                                                 | Carries                             |
-| :-------------- | :--------------------------------------------------------- | :---------------------------------- |
-| `onCreated`     | An annotation was added.                                   | `annotation`, `origin`              |
-| `onUpdated`     | An annotation was changed.                                 | `annotation`, `origin`              |
-| `onDeleted`     | Annotations were deleted: one, plus its popup and replies. | `refs`, `page`, `origin`            |
-| `onMoved`       | The drawing order on a page changed.                       | `refs`, `page`, `toIndex`, `origin` |
-| `onResynced`    | Annotations were read again, as after loading a document.  | `pages`                             |
-| `onWriteFailed` | The engine refused a change the user made.                 | `refs`, `error`                     |
+| Event               | Fires when                                                          | Carries                             |
+| :------------------ | :------------------------------------------------------------------ | :---------------------------------- |
+| `onCreated`         | An annotation was added.                                            | `annotation`, `origin`              |
+| `onUpdated`         | An annotation was changed.                                          | `annotation`, `origin`              |
+| `onDeleted`         | Annotations were deleted: one, plus its popup and replies.          | `refs`, `page`, `origin`            |
+| `onMoved`           | The drawing order on a page changed.                                | `refs`, `page`, `toIndex`, `origin` |
+| `onResynced`        | Annotations were read again, as after loading a document.           | `pages`                             |
+| `onWriteFailed`     | The engine refused a change the user made.                          | `refs`, `error`                     |
+| `onSettingsChanged` | A setting changed, through `updateSettings()` or `resetSettings()`. | `settings`, `changed`               |
 
-- **Once, and after it's saved.** `onCreated`, `onUpdated`, `onDeleted` and `onMoved` fire when
-  the engine has saved the change, never while it's still pending. A change fires once, however
+- **Once, and after it's saved.** <Fw only={['react', 'vue', 'svelte']}>`onCreated`, `onUpdated`, `onDeleted` and
+  `onMoved`</Fw><Fw only="angular">`created$`, `updated$`, `deleted$` and `moved$`</Fw> fire when the engine has saved
+  the change, never while it's still pending. A change fires once, however
   many screens show it.
 - **Loading isn't a list of creates.** When a document opens, its annotations arrive as one
-  `onResynced`, not as an `onCreated` per annotation. The same happens after a change that
-  touches whole pages, such as flattening or redaction. On `onResynced`, read the `pages` it names
-  again with `list()`.
+  <Fw only={['react', 'vue', 'svelte']}>`onResynced`, not as an `onCreated`</Fw><Fw only="angular">`resynced$`, not as a `created$`</Fw> per
+  annotation. The same happens after a change that touches whole pages, such as flattening or
+  redaction. Then read the `pages` it names again with `list()`.
 - **`annotation` is the record after the change.** It's what `get()` returns now.
 
-The selection, the tool and text editing have events of their own (`onSelectionChanged`,
-`onDraftChanged`, `onEditingChanged`); see [Selecting & editing](selecting).
+The selection, a shape being drawn, text editing and hover have events of their own
+(<Fw only={['react', 'vue', 'svelte']}>`onSelectionChanged`, `onDraftChanged`, `onEditingChanged`, `onHoverChanged`</Fw><Fw only="angular">`selectionChanged$`,
+`draftChanged$`, `editingChanged$`, `hoverChanged$`</Fw>); see [Selecting & editing](selecting#events).
+A tool's defaults have <Fw only={['react', 'vue', 'svelte']}>`tools.onDefaultsChanged`</Fw><Fw only="angular">`tools.defaultsChanged$`</Fw>; see
+[Tools & defaults](tools#events).
 
-### Where a change came from
+## Where a change came from
 
 `origin` says who made the change:
 
@@ -60,14 +77,7 @@ The selection, the tool and text editing have events of their own (`onSelectionC
 | `origin.ts`   | When it happened, in milliseconds.                                            |
 | `origin.tx`   | Shared by every change one call made, such as an import.                      |
 
-```ts
-useAnnotationEvent(
-  (annotation) => annotation.onUpdated,
-  ({ annotation, origin }) => {
-    if (origin.kind === 'remote') toast(`${annotation.author} changed a comment`);
-  },
-);
-```
+<Snippet name="annotations/saving-remote-toast" />
 
 These are the engine's own events, so the fields mean the same as on
 [Events](/docs/engine/concepts/events).
@@ -77,8 +87,6 @@ These are the engine's own events, so the fields mean the same as on
 Annotations are part of the document. Save the document and they're in the file:
 
 ```ts
-const documents = useDocuments();
-
 const bytes = await documents.download(); // the whole PDF, with every annotation
 ```
 
@@ -90,13 +98,10 @@ between a quick save that appends the changes and a full rewrite, see
 
 To take annotations out of a document, as data rather than inside a PDF, export them. One call
 gives you a **bundle**: every annotation with the bytes it carries (a stamp's drawing, an
-attached file). One call puts a bundle into a document:
+attached file). One call puts a bundle into a document. `AnnotationTransfer` comes from
+`@embedpdf/react/annotation`:
 
 ```ts
-import { AnnotationTransfer, useAnnotation } from '@embedpdf/react/annotation';
-
-const annotation = useAnnotation();
-
 const bundle = await annotation.export(); // everything
 const text = AnnotationTransfer.stringify(bundle); // one JSON text, ready to store
 
@@ -156,7 +161,7 @@ the document opens again. It's one row per document and one call each way:
 // on save
 await api.put(`/reviews/${docId}`, AnnotationTransfer.stringify(await annotation.export()));
 
-// on open, once useAnnotationState().status is 'ready'
+// on open, once the annotations are loaded (status 'ready')
 const text = await api.get(`/reviews/${docId}`);
 if (text) await annotation.import(await AnnotationTransfer.parse(text));
 ```
@@ -164,21 +169,12 @@ if (text) await annotation.import(await AnnotationTransfer.parse(text));
 **Store each annotation as it changes.** Listen for the events and write each change to your
 server. Key your rows by the annotation's ref:
 
-```ts
-import { annotationKey } from '@embedpdf/react/annotation';
+<Snippet name="annotations/saving-sync" />
 
-useAnnotationEvent(
-  (annotation) => annotation.onCreated,
-  ({ annotation, origin }) => {
-    if (origin.kind === 'local')
-      api.put(`/annotations/${annotationKey(annotation.ref)}`, annotation);
-  },
-);
-```
-
-Handle `onUpdated` the same way, and `onDeleted` by deleting each of its `refs`. On
-`onResynced`, compare the pages it names with `list()`. Only send `local` changes: a `remote`
-one was already saved by whoever made it.
+<Fw only={['react', 'vue', 'svelte']}>Handle `onUpdated` the same way, and `onDeleted` by deleting each of its `refs`. On
+`onResynced`, compare the pages it names with `list()`.</Fw><Fw only="angular">Handle `updated$` the same way, and
+`deleted$` by deleting each of its `refs`. On `resynced$`, compare the pages it names with
+`list()`.</Fw> Only send `local` changes: a `remote` one was already saved by whoever made it.
 
 ### Which id to store
 
@@ -191,7 +187,8 @@ and opened again. To use it as a key in a map or a URL, turn it into a string wi
 ### Unsaved changes
 
 To warn before someone leaves with annotations that aren't downloaded yet, use
-`useDocument().hasUnsavedChanges`; see [Warn before changes are lost](../documents/saving#warn-before-changes-are-lost).
+<Fw only={['react', 'vue', 'svelte']}>`hasUnsavedChanges` from `useDocument()`</Fw><Fw only="angular">the `hasUnsavedChanges()` signal on
+`inject(EpdfDocument)`</Fw>; see [Warn before changes are lost](../documents/saving#warn-before-changes-are-lost).
 
 ### Events on a shared document
 

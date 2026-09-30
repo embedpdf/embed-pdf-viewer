@@ -5,6 +5,7 @@
   "type": "module",
   "description": "The shared documentation corpus — authored once, mounted per site with the engine axis resolved at sync time. See docs/conventions/docs-architecture.md.",
   "scripts": {
-    "sync": "node scripts/sync.mjs"
+    "sync": "node scripts/sync.mjs",
+    "reference": "node scripts/reference.mjs"
   }
 }

@@ -22,19 +22,7 @@ Colors work the same everywhere too: hex strings such as `'#dc143c'`. Angles are
 Because every part speaks the same coordinates, a value from one goes to another as it is. A comment
 thread knows where its first comment is, and that's where the Stage should go:
 
-```tsx
-const threads = useCommentThreads();
-const stage = useStage();
-
-threads.map((thread) => (
-  <button
-    key={annotationKey(thread.root.ref)}
-    onClick={() => stage.reveal(thread.page, { rect: thread.root.rect })}
-  >
-    {thread.root.contents}, page {thread.pageLabel}
-  </button>
-));
-```
+<Snippet name="concepts/thread-links" />
 
 There's nothing to convert, whether the page is zoomed, rotated or scrolled.
 
@@ -54,14 +42,7 @@ stage.goToPage(hit.page); // the page of a search hit
 Pixels change with every zoom, rotation and scroll, so nothing in EmbedPDF stores them. When you draw
 something of your own on a page, convert at the last moment with the page's `transform`:
 
-```tsx
-function Pin({ box, page }: AnnotationRendererProps) {
-  // page coordinates → this page's pixels, zoom and rotation included
-  const { x, y } = page.transform.pageToView({ x: box.x, y: box.y });
-
-  return <div style={{ position: 'absolute', left: x, top: y }}>📌</div>;
-}
-```
+<Snippet name="concepts/pin" />
 
 | From              | To                | Use                                       |
 | :---------------- | :---------------- | :---------------------------------------- |

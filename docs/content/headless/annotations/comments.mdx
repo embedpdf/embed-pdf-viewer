@@ -9,26 +9,7 @@ Any annotation can carry a comment, its `contents`, and people can reply to it. 
 make a **thread**: the first comment and its replies, in order. `useCommentThreads()` gives you
 every thread in the document, ready for a sidebar:
 
-```tsx
-import { annotationKey, useCommentThreads } from '@embedpdf/react/annotation';
-
-function Comments() {
-  const threads = useCommentThreads();
-
-  return threads.map((thread) => (
-    <article key={annotationKey(thread.root.ref)}>
-      <p>
-        {thread.root.author}, page {thread.pageLabel}: {thread.root.contents}
-      </p>
-      {thread.replies.map((reply) => (
-        <p key={annotationKey(reply.ref)}>
-          {reply.author}: {reply.contents}
-        </p>
-      ))}
-    </article>
-  ));
-}
-```
+<Snippet name="annotations/comments-sidebar" />
 
 Threads come in reading order: by page, then from the top of the page. The list updates by itself
 when anyone adds, changes or deletes a comment, on this screen or, on a shared document, on
@@ -47,8 +28,6 @@ A thread has:
 ## Reply, edit and delete
 
 ```ts
-const comments = useComments();
-
 const { annotation: reply } = await comments.reply(thread.root.ref, 'Checked, looks right.');
 await comments.setText(reply.ref, 'Checked against the invoice, looks right.');
 await comments.delete(reply.ref); // one comment
@@ -59,7 +38,8 @@ A reply always goes to the thread's first comment, whichever comment you pass. I
 Acrobat saves replies, so they show up as replies there too.
 
 Deleting the first comment of a thread deletes the whole thread, as Acrobat does. `deleteThread()`
-says what it deleted, and what it couldn't (someone else's reply you may not delete).
+does the same, all or nothing, and tells you what happened: when the thread has a comment you may
+not delete, such as someone else's reply, nothing is deleted and `failed` lists what stopped it.
 
 ## Review states
 
@@ -81,21 +61,42 @@ States are saved as the PDF's own review states, so Acrobat shows them in its co
 
 The thread's `root` has a page and a `rect`, which is where the view should go:
 
-```ts
-const stage = useStage();
+<Snippet name="annotations/comments-jump" />
 
-stage.reveal(thread.page, { rect: thread.root.rect });
-annotation.selection.set([thread.root.ref]); // and select it
-```
+## Methods
+
+Everything `useComments()` gives you. It's the `comments` part of `useAnnotation()`.
+
+| Method                   | What it does                                                                                                                                         |
+| :----------------------- | :--------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `listThreads()`          | Every thread, in reading order. In a component, use `useCommentThreads()`, which also gives each thread its `pageLabel`.                             |
+| `getThread(ref)`         | The thread a comment is in, whether you pass its first comment, a reply or a review state, or `null`. In a component, use `useCommentThread(ref)`.   |
+| `reply(ref, text)`       | Replies to the thread's first comment, whichever comment you pass. Resolves `{ annotation }`. [Reply, edit and delete](#reply-edit-and-delete)       |
+| `setText(ref, text)`     | Changes a comment's text                                                                                                                             |
+| `delete(ref)`            | Deletes a comment with its replies. The first comment of a thread deletes the whole thread.                                                          |
+| `deleteThread(ref)`      | Deletes a whole thread, all or nothing. Resolves `{ deleted, failed }`: when a comment in it may not be deleted, nothing goes and `failed` lists it. |
+| `setStatus(ref, state)`  | Sets the user's review state on a thread, such as `'accepted'` or `'rejected'`. [Review states](#review-states)                                      |
+| `setMarked(ref, marked)` | Checks a thread off for the user, or clears the check mark                                                                                           |
+| `canReply(ref)`, `canSetText(ref)`, `canDelete(ref)`, `canDeleteThread(ref)`, `canSetStatus(ref)`, `canSetMarked(ref)` | Whether the user may do that to this comment. [Permissions](#permissions)                                                                            |
+
+Every method that returns a promise also takes a `signal` in its options, to cancel it.
+
+## Events
+
+<Snippet name="annotations/comments-events" />
+
+| Event                      | Fires when                                         | Carries              |
+| :------------------------- | :------------------------------------------------- | :------------------- |
+| `comments.onThreadChanged` | A thread changed through this viewer               | `rootRef`, `change`  |
+
+`change` is `'reply'`, `'text'`, `'status'`, `'marked'` or `'deleted'`. For every change, including
+other people's, use the annotation events; see [Events, saving & sharing](saving#events).
 
 ## Permissions
 
 Every comment verb has a check that answers for one comment, so you show only the buttons that work:
 
-```tsx
-<button disabled={!comments.canReply(thread.root.ref)}>Reply</button>
-<button disabled={!comments.canDeleteThread(thread.root.ref)}>Delete thread</button>
-```
+<Snippet name="annotations/comments-permissions" />
 
 | Permission           | What it allows                                                     | Check                                     |
 | :------------------- | :----------------------------------------------------------------- | :---------------------------------------- |
@@ -107,22 +108,6 @@ A review state and a check mark are small replies of their own, the way Acrobat 
 need the right to create, not to change. The checks also follow the comment's own flags:
 `lockedContents` stops text edits, and `locked` stops deleting.
 
-## Events
-
-```ts
-useAnnotationEvent(
-  (annotation) => annotation.comments.onThreadChanged,
-  ({ rootRef, change }) => change === 'reply' && notifyThreadAuthor(rootRef),
-);
-```
-
-| Event                      | Fires when                                         | Carries              |
-| :------------------------- | :------------------------------------------------- | :------------------- |
-| `comments.onThreadChanged` | A thread changed through this viewer               | `rootRef`, `change`  |
-
-`change` is `'reply'`, `'text'`, `'status'`, `'marked'` or `'deleted'`. For every change, including
-other people's, use the annotation events; see [Events, saving & sharing](saving#events).
-
 ## Good to know
 
 ### Comments without a note
@@ -132,8 +117,9 @@ highlight. A plain note (the `note` tool) is a thread with an icon on the page.
 
 ### Loading
 
-`useAnnotationState().status` is `'loading'` until every annotation is in. Show a loading state in your
-sidebar until then, so an empty list doesn't look like "no comments".
+<Fw only={['react', 'vue', 'svelte']}>The `status` from `useAnnotationState()`</Fw><Fw only="angular">The
+`status()` signal on `inject(EpdfAnnotation)`</Fw> is `'loading'` until every annotation is in. Show a
+loading state in your sidebar until then, so an empty list doesn't look like "no comments".
 
 ### Reviewing together
 

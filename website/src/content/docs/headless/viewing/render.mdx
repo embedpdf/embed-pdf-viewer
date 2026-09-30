@@ -7,7 +7,7 @@ description: Draw every page sharp at every zoom, within a memory budget you cho
 
 # Rendering
 
-The render plugin draws the pages. Put a `<RenderLayer>` in each page, and the plugin decides what
+The render plugin draws the pages. Put `<RenderLayer>` in each page, and the plugin decides what
 to render, how big and when, keeps the results cached, and redraws only the pages whose content
 changed:
 
@@ -37,13 +37,11 @@ this.
 
 One setting decides how big a whole-page picture may get, in device pixels:
 
-```ts
-renderPlugin({ fullPage: { maxWidth: 1280 } });
-```
+<Snippet name="viewing/render-budget" />
 
 The default, `640`, makes the first picture of each page small and fast, and lets tiles carry the
 sharpness at normal reading zooms. A bigger budget means fewer tiles but a slower first paint and
-more memory. For a view that should never tile, such as a thumbnail strip, pass `tiles={false}` to
+more memory. For a view that should never tile, such as a thumbnail strip, set `tiles` to `false` on
 its layer.
 
 ## Annotations in the picture
@@ -52,18 +50,13 @@ By default the page picture includes the annotations, so a plain `<RenderLayer>`
 as it is: right for thumbnails and read-only views. When an [annotation layer](../annotations) draws
 the annotations so people can edit them, leave them out of the picture:
 
-```tsx
-<RenderLayer annotations={false} />
-<AnnotationLayer />
-```
+<Snippet name="viewing/render-without-annotations" />
 
 ## Render a page yourself
 
 For your own preview, an export or a page picker, render any page on demand:
 
 ```ts
-const render = useRender();
-
 const image = await render.renderPage(page.ref, { width: 800 });
 const { url, revoke } = await image.objectUrl();
 // …show it, and call revoke() when you're done
@@ -88,6 +81,7 @@ const { applied } = await render.renderPages(
 | `includeAnnotations` | Draw the annotations into the image                            | `true`    |
 | `format`             | `'png'`, `'webp'` or `'bmp'`                                   | per engine |
 | `quality`            | For WebP, from `0` to `1`                                      | per engine |
+| `concurrency`        | For `renderPages`, how many pages render at once               | `4`       |
 
 ## When a page changes
 
@@ -104,6 +98,22 @@ render.invalidate({ pages: [page.ref], scope: 'annotations' }); // only their an
 
 Your own long-lived renders can keep up the same way: `render.getRenderEpoch(page.ref)` changes
 whenever the page's pixels do.
+
+## Methods
+
+Everything `useRender()` gives you.
+
+| Method                                     | What it does                                                                                                                                     |
+| :----------------------------------------- | :----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `renderPage(page, options?)`               | Renders one page at exactly the size you ask for, sharing the layers' cache. Resolves an image; `image.objectUrl()` gives a URL for an `<img>`. [Render a page yourself](#render-a-page-yourself) |
+| `renderThumbnail(page, { maxWidth })`      | Renders a small picture of a page, `maxWidth` pixels wide                                                                                        |
+| `renderPages(pages, options?)`             | Renders several pages, a few at a time. Resolves `{ applied, failed }`: each page with its image, in the order you gave, and the pages that failed with why. |
+| `invalidate({ pages?, scope? })`           | Redraws pages after a change the plugin can't see; without `pages`, every page. [When a page changes](#when-a-page-changes)                      |
+| `getRenderEpoch(page, includeAnnotations?)` | A number that changes whenever the page's pixels do, with the annotations unless you pass `false`. Key your own long-lived renders on it.        |
+| `getRenderPolicy()`                        | The sizes the engine renders best at: any size on the local engine, a short list of widths on a CloudPDF server. See [Render policy](/docs/engine/documents/rendering#render-policy). |
+| `canRender()`                              | Whether page images are allowed. [Permissions](#permissions)                                                                                     |
+
+Every method that returns a promise also takes a `signal` in its options, to cancel it.
 
 ## Settings
 
@@ -124,16 +134,11 @@ Set them when you register the plugin.
 | `quality`                     | WebP quality, from `0` to `1`                                         | per engine       |
 | `debug`                       | Log what the plugin renders, and why, to the console                  | `false`          |
 
-`<RenderLayer>` takes two props: `annotations` (default `true`) and `tiles` (default `true`).
+`<RenderLayer>` takes two <Word of="props" />: `annotations` (default `true`) and `tiles` (default `true`).
 
 ## Events
 
-```ts
-useRenderEvent(
-  (render) => render.onInvalidated,
-  ({ pages }) => refreshMyPreviews(pages),
-);
-```
+<Snippet name="viewing/refresh-previews" />
 
 | Event           | Fires when                                  | Carries                      |
 | :-------------- | :------------------------------------------ | :--------------------------- |

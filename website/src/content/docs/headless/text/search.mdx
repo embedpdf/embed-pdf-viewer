@@ -8,41 +8,9 @@ description: Find text in the document, highlight every match on the page, step 
 # Search
 
 The search plugin finds text in the whole document and highlights every match. Register
-`searchPlugin()`, put a `<SearchLayer>` in each page, and search from your own search box:
+`searchPlugin()`, put `<SearchLayer>` in each page, and search from your own search box:
 
-```tsx
-import { SearchLayer, searchPlugin, useSearch, useSearchState } from '@embedpdf/react/search';
-
-const plugins = [stagePlugin(), renderPlugin(), searchPlugin()];
-
-function SearchBox() {
-  const search = useSearch();
-  const { hitCount, activeHitIndex, status } = useSearchState();
-
-  return (
-    <form onSubmit={(event) => event.preventDefault()}>
-      <input onChange={(event) => search.search({ text: event.target.value })} />
-      {status === 'searching' && <span>Searching…</span>}
-      {hitCount > 0 && (
-        <span>
-          {activeHitIndex + 1} of {hitCount}
-        </span>
-      )}
-      <button onClick={() => search.previousHit()}>↑</button>
-      <button onClick={() => search.nextHit()}>↓</button>
-    </form>
-  );
-}
-
-<Stage>
-  {() => (
-    <>
-      <RenderLayer />
-      <SearchLayer />
-    </>
-  )}
-</Stage>;
-```
+<Snippet name="search/search-box" />
 
 - **Matches appear as they're found.** Large documents are searched a few pages at a time, and the
   count and the highlights grow as the search goes.
@@ -72,26 +40,7 @@ A search starts from the page the reader is on, and `{ from: page.ref }` starts 
 
 `useSearchHits()` gives you every match found so far, each with a few words around it:
 
-```tsx
-function Results() {
-  const search = useSearch();
-  const hits = useSearchHits();
-
-  return (
-    <ol>
-      {hits.map((hit, index) => (
-        <li key={index}>
-          <button onClick={() => search.goToHit(index)}>
-            Page {hit.pageIndex + 1}: …{hit.snippet?.before}
-            <mark>{hit.snippet?.match}</mark>
-            {hit.snippet?.after}…
-          </button>
-        </li>
-      ))}
-    </ol>
-  );
-}
-```
+<Snippet name="search/results" />
 
 `useSearchHits(page.ref)` gives the matches on one page, for a count per thumbnail.
 
@@ -132,9 +81,7 @@ Use it for a "mark every occurrence" feature, or to [redact](../annotations/reda
 
 ## Change how matches look
 
-```tsx
-<SearchLayer color="#ffd500" activeColor="#ff9632" blendMode="multiply" />
-```
+<Snippet name="search/highlights" />
 
 | Prop          | What it is                                         | Default      |
 | :------------ | :------------------------------------------------- | :----------- |
@@ -153,7 +100,7 @@ Everything `useSearch()` gives you.
 | `nextHit(reveal?)`, `previousHit(reveal?)` | Makes the next or previous match the active one and scrolls to it, wrapping at the ends. Returns the match, or `null` when there is none.                                          |
 | `goToHit(index, reveal?)`                  | Makes one match the active one and scrolls to it. [A list of results](#a-list-of-results)                                                                                         |
 | `revealActiveHit(reveal?)`                 | Scrolls back to the active match without changing it                                                                                                                             |
-| `listHits({ page? })`                      | Every match found so far, or the ones on one page. In a component, use `useSearchHits(page?)`.                                                                                     |
+| `listHits({ page? })`                      | Every match found so far, or the ones on one page. In a component, use `useSearchHits()`.                                                                                          |
 | `listPagesWithHits()`                      | The pages that have a match, in document order                                                                                                                                   |
 | `cancel()`                                 | Stops searching and keeps the matches found so far                                                                                                                               |
 | `clear()`                                  | Stops searching and removes the matches and their highlights                                                                                                                     |
@@ -166,10 +113,9 @@ returns a promise also takes a `signal` in its options, to cancel it.
 
 ## State
 
-Everything `useSearchState()` gives you. Your component re-renders when a value changes. Outside a
-component, read the same value with the method in the last column.
+<StateIntro hook="useSearchState()" />
 
-| Field            | What it is                                                             | Outside a component                                  |
+| Field            | What it is                                                             | Read once                                            |
 | :--------------- | :--------------------------------------------------------------------- | :--------------------------------------------------- |
 | `query`          | The last search, with its options, or `null`                           | `getQuery()`                                         |
 | `status`         | `'idle'`, `'searching'`, `'complete'`, `'cancelled'` or `'error'`      | `getStatus()`                                        |
@@ -179,8 +125,8 @@ component, read the same value with the method in the last column.
 | `progress`       | How far the search got: `pagesSearched` of `pageCount`                 | `getProgress()`                                      |
 | `error`          | Why the search failed, when `status` is `'error'`                      | `getError()`                                         |
 
-The matches themselves come from `useSearchHits()`, so a component that only shows the count doesn't
-re-render for every match that arrives.
+The matches themselves come from `useSearchHits()`.<Fw only="react"> Keeping them apart means a component that only
+shows the count doesn't re-render for every match that arrives.</Fw>
 
 ## Settings
 
@@ -193,12 +139,7 @@ Set them when you register the plugin.
 
 ## Events
 
-```ts
-useSearchEvent(
-  (search) => search.onCompleted,
-  ({ hitCount }) => announce(`${hitCount} matches`),
-);
-```
+<Snippet name="search/match-count" />
 
 | Event                | Fires when                                              | Carries                   |
 | :------------------- | :------------------------------------------------------ | :------------------------ |

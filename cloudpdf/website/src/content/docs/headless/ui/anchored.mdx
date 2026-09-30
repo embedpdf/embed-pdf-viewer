@@ -9,21 +9,9 @@ description: Attach your own UI to a spot on a page, such as a selection, an ann
 
 A menu next to selected text, a card next to an annotation, a button over a search match: UI that
 belongs to a spot on the page, but floats above it. `<Anchored>` places your UI at a spot, and keeps it
-there while people scroll, zoom and rotate. Put it in the Stage's `overlay`:
+there while people scroll, zoom and rotate. <Fw only="react">Put it in the Stage's `overlay`:</Fw><Fw only="vue">Put it in the Stage's `#overlay` slot:</Fw><Fw only="svelte">Put it in the Stage's `overlay` snippet:</Fw><Fw only="angular">Put it inside `<epdf-stage>`, next to the page template:</Fw>
 
-```tsx
-import { Anchored } from '@embedpdf/react/anchored';
-
-<Stage
-  overlay={
-    <Anchored anchor={{ page: hit.page, bounds: hit.bounds }} placement="bottom">
-      <button onClick={() => highlight(hit)}>Highlight</button>
-    </Anchored>
-  }
->
-  {() => <RenderLayer />}
-</Stage>;
-```
+<Snippet name="ui/stage-overlay" />
 
 The anchor is a box on a page, in page coordinates: the same `page` and `bounds` every plugin gives
 you. The overlay moves with the view in the same frame as the pages, so your menu never lags behind.
@@ -44,18 +32,19 @@ They hide while people drag, and show when the selection settles. What's inside 
 
 `useAnnotationAnchor(ref)` gives you an annotation's anchor, and follows it while it's moved:
 
-```tsx
-function ReplyCount({ note }: { note: Annotation }) {
-  const anchor = useAnnotationAnchor(note.ref);
-  const thread = useCommentThread(note.ref);
+<Snippet name="ui/reply-count" />
 
-  return (
-    <Anchored anchor={anchor} placement="right" gap={4}>
-      <span className="badge">{thread?.replies.length ?? 0}</span>
-    </Anchored>
-  );
-}
-```
+<Fw only={['vue', 'svelte']}>
+
+Pass the ref as a function, and the anchor and the thread follow `note` when it changes.
+
+</Fw>
+
+<Fw only="angular">
+
+Pass the ref as a function, and the anchor and the thread follow the `note` input when it changes.
+
+</Fw>
 
 ## Where it goes
 

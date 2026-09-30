@@ -9,29 +9,10 @@ Redaction removes content for good: the text, images and drawings under a mark a
 file, not just covered up. It happens in two steps, as in Acrobat: first people **mark** what should
 go, and review it; then they **apply** the marks, and the content is gone.
 
-Register `redactionPlugin()` with the annotation plugin, and use the `redact` tool: select text to
-mark it, or drag to mark an area:
+Register `redactionPlugin()` next to `interactionPlugin()` and `annotationPlugin()`, and use the
+`redact` tool: select text to mark it, or drag to mark an area:
 
-```tsx
-import { redactionPlugin, useRedaction, useRedactionState } from '@embedpdf/react/redaction';
-
-const plugins = [/* … */ interactionPlugin(), annotationPlugin(), redactionPlugin()];
-
-function RedactBar() {
-  const interaction = useInteraction();
-  const redaction = useRedaction();
-  const { pendingCount, applying } = useRedactionState();
-
-  return (
-    <>
-      <button onClick={() => interaction.activateTool('redact')}>Mark for redaction</button>
-      <button disabled={!pendingCount || applying} onClick={() => redaction.applyAll()}>
-        Redact {pendingCount} marks
-      </button>
-    </>
-  );
-}
-```
+<Snippet name="annotations/redaction-bar" />
 
 A mark is an annotation, so until it's applied, people can move it, resize it, delete it, and see it
 in other PDF apps. Applying it is what removes the content.
@@ -39,8 +20,6 @@ in other PDF apps. Applying it is what removes the content.
 ## Mark from code
 
 ```ts
-const redaction = useRedaction();
-
 await redaction.markSelection(); // the selected text
 await redaction.markArea(page.ref, { x: 72, y: 100, width: 200, height: 40 });
 await redaction.markPage(page.ref); // the whole page
@@ -55,25 +34,10 @@ match.
 
 `usePendingRedactions()` lists the marks that haven't been applied yet, for a review panel:
 
-```tsx
-function Pending() {
-  const stage = useStage();
-  const redaction = useRedaction();
-  const marks = usePendingRedactions();
+<Snippet name="annotations/redaction-pending" />
 
-  return marks.map((mark) => (
-    <li key={annotationKey(mark.ref)}>
-      <button onClick={() => stage.reveal(mark.page, { rect: mark.bounds })}>
-        Page {mark.pageIndex + 1}: {mark.kind === 'text' ? 'text' : 'area'}
-      </button>
-      <button onClick={() => redaction.unmark([mark.ref])}>Remove</button>
-    </li>
-  ));
-}
-```
-
-`redaction.clearPending()` removes every mark. `usePendingRedactions({ page: page.ref })` lists one
-page's.
+`redaction.clearPending()` removes every mark.<Fw only={['react', 'vue', 'svelte']}> `usePendingRedactions({ page: page.ref })`
+lists one page's.</Fw><Fw only="angular"> `redaction.pendingOn(page.ref)` lists one page's.</Fw>
 
 ## Apply
 
@@ -106,6 +70,42 @@ await redaction.updateLabel(mark.ref, { overlayText: 'Classified', repeat: true 
 `repeat` fills the area with the label over and over; otherwise it shows once. The color and font of
 every mark are settings.
 
+## Methods
+
+Everything `useRedaction()` gives you.
+
+| Method                                       | What it does                                                                                                                                              |
+| :------------------------------------------- | :-------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `markSelection()`                            | Marks the selected text, one mark per page, and clears the selection. Resolves `{ marks }`. [Mark from code](#mark-from-code)                            |
+| `markArea(page, rect)`, `markPage(page)`     | Marks an area of a page, or the whole page. Resolves `{ mark }`.                                                                                          |
+| `markMatches(query, { pages? })`             | Marks every match of a [search](../text/search), or the ones on some pages. It replaces the current search. Resolves `{ marks }`.                        |
+| `unmark(refs)`                               | Removes marks without applying them. [Review the marks](#review-the-marks)                                                                                |
+| `clearPending()`                             | Removes every mark                                                                                                                                        |
+| `updateLabel(ref, { overlayText, repeat? })` | Sets the label a mark shows once it's applied; `overlayText: null` clears it. Resolves `{ mark }`. [What shows in place of the content](#what-shows-in-place-of-the-content) |
+| `listPending({ page? })`                     | The marks not applied yet, in page order, or one page's. In a component, use `usePendingRedactions({ page? })`.                                          |
+| `getPending(ref)`                            | One mark, or `null` when it isn't a mark waiting to be applied                                                                                            |
+| `estimateCollateral(refs?)`                  | The other annotations applying would remove too, as `{ count, refs }`, for every mark or for the ones you pass. [Apply](#apply)                          |
+| `applyAll()`                                 | Applies every mark in the document, on pages that haven't loaded too. Can't be undone. [Apply](#apply)                                                   |
+| `apply(refs)`, `applyPages(pages)`           | Applies some marks, or the marks on some pages. Can't be undone.                                                                                          |
+| `canMark()`, `canUnmark(ref)`, `canUpdateLabel(ref)`, `canApply()` | Whether marking, removing a mark, changing its label and applying are allowed. [Permissions](#permissions)                          |
+
+Applying resolves the result: each page's `status` (`'applied'`, `'unchanged'`, `'skipped'` or
+`'failed'`) and how many other annotations were removed. Every method that returns a promise also
+takes a `signal` in its options, to cancel it.
+
+## State
+
+<StateIntro hook="useRedactionState()" />
+
+| Field          | What it is                                                        | Read once                                                |
+| :------------- | :---------------------------------------------------------------- | :------------------------------------------------------- |
+| `pendingCount` | How many marks are waiting to be applied                          | `getPendingCount()`, or `getPendingCount(page)` for one page |
+| `applying`     | Whether marks are being applied right now                         | `isApplying()`                                           |
+| `lastResult`   | The result of the last apply, from this session or another, or `null` | `getLastResult()`                                    |
+
+The marks themselves come from `usePendingRedactions()`.<Fw only="react"> Keeping them apart means a component that
+only shows the count doesn't re-render for every mark.</Fw>
+
 ## Settings
 
 Set them when you register the plugin.
@@ -119,12 +119,7 @@ Set them when you register the plugin.
 
 ## Events
 
-```ts
-useRedactionEvent(
-  (redaction) => redaction.onApplied,
-  ({ result }) => auditLog.record('redacted', result),
-);
-```
+<Snippet name="annotations/redaction-events" />
 
 | Event              | Fires when                                      | Carries             |
 | :----------------- | :---------------------------------------------- | :------------------ |
@@ -136,9 +131,14 @@ useRedactionEvent(
 | Permission            | What it allows                          | Check                   |
 | :-------------------- | :-------------------------------------- | :---------------------- |
 | `annotations:create`  | Marking                                 | `redaction.canMark()`   |
+| `annotations:delete`  | Removing a mark before it's applied     | `redaction.canUnmark(ref)` |
+| `annotations:update`  | Changing a mark's label                 | `redaction.canUpdateLabel(ref)` |
 | `doc.redact`          | Applying                                | `redaction.canApply()`  |
 
-A reviewer who may mark but not apply can prepare redactions for someone else to approve.
+A mark is an annotation, so removing it or changing its label follows the same rules as any
+annotation, per mark. Applying also rewrites the pages and removes annotations, so `canApply()` needs
+`doc.pages.modify` and `doc.annotate.modify` as well. A reviewer who may mark but not apply can
+prepare redactions for someone else to approve.
 
 ## Good to know
 

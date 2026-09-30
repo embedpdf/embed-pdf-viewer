@@ -14,8 +14,6 @@ new ones, blank or from another PDF. These are edits to the file, kept when it's
 <Example name="page-edit/organize" mode="open" />
 
 ```ts
-const pageEdit = usePageEdit();
-
 await pageEdit.rotateBy([page.ref], 90);
 await pageEdit.move([page.ref], { index: 0 }); // to the front
 await pageEdit.delete([page.ref]);
@@ -24,7 +22,8 @@ await pageEdit.delete([page.ref]);
 After an edit, everything that shows pages updates by itself: the Stage, thumbnails, page numbers. On
 a shared document, the others see the change too.
 
-Every call takes a list of pages, so one call works for a single page and for a multi-selection.
+Calls that act on pages take a list of them, so one call works for a single page and for a
+multi-selection.
 
 ## Rotate pages
 
@@ -76,7 +75,7 @@ await pageEdit.duplicate([page.ref]);
 ```
 
 Each resolves with `{ pages }`: the new pages, so you can scroll to them or select them. Without a
-`size`, a blank page takes the size of the page before it.
+`size`, a blank page takes the size of the page it's placed next to.
 
 ## Extract pages
 
@@ -96,21 +95,35 @@ saveFile(bytes, 'chapter-2.pdf');
 | `{ before: pageRef }`   | Right before that page        |
 | `'end'`                 | After the last page           |
 
+## Methods
+
+Everything `usePageEdit()` gives you.
+
+| Method                                                  | What it does                                                                                                                      |
+| :------------------------------------------------------ | :-------------------------------------------------------------------------------------------------------------------------------- |
+| `rotateBy(pages, delta)`                                | Turns each page by `90`, `-90` or `180` degrees from where it is. [Rotate pages](#rotate-pages)                                    |
+| `setRotation(pages, rotation)`                          | Gives every page the same rotation: `0`, `90`, `180` or `270`                                                                     |
+| `move(pages, placement)`                                | Moves pages to a new place. Several pages keep their order and land together. [Reorder pages](#reorder-pages)                     |
+| `delete(pages)`                                         | Deletes pages. Deleting every page is refused. [Delete pages](#delete-pages)                                                      |
+| `insertBlank({ placement?, size?, count? })`            | Inserts blank pages, one unless you pass a `count`. Resolves `{ pages }`, the new pages. [Insert pages](#insert-pages)            |
+| `insertFromBytes(bytes, { pageIndexes?, placement? })`  | Inserts the pages of another PDF, or only the ones at `pageIndexes`. Resolves `{ pages }`.                                        |
+| `insertFromDocument(documentId, pages, { placement? })` | Inserts copies of pages from another document open in the viewer. Resolves `{ pages }`.                                           |
+| `duplicate(pages, { placement? })`                      | Copies pages, right after the last of them unless you pass a placement. Resolves `{ pages }`.                                     |
+| `extract(pages)`                                        | Copies pages into a new PDF and resolves its bytes. This document doesn't change. [Extract pages](#extract-pages)                 |
+| `canEdit()`, `canExtract()`                             | Whether rotating, reordering, deleting and inserting are allowed, and whether copying pages out is. [Permissions](#permissions)   |
+
+`placement` is one of the values in [Where a page goes](#where-a-page-goes); without one, new pages go
+at the end. Every method that returns a promise also takes a `signal` in its options, to cancel it.
+
 ## Events
 
 Page changes are document events, so every part of your app hears them, whichever plugin made the
 change:
 
-```ts
-useDocumentsEvent(
-  (documents) => documents.onPagesChanged,
-  ({ pages }) => setPageCount(pages.length),
-);
-```
+<Snippet name="documents/page-count" />
 
-| Event            | Fires when                                  | Carries               |
-| :--------------- | :------------------------------------------ | :-------------------- |
-| `onPagesChanged` | Pages were added, removed, moved or rotated | `documentId`, `pages` |
+The page edit plugin has no events of its own. <Fw only={['react', 'vue', 'svelte']}>`onPagesChanged`</Fw><Fw only="angular">`pagesChanged$`</Fw> and what it carries are listed under
+[Opening documents](opening#events).
 
 ## Permissions
 

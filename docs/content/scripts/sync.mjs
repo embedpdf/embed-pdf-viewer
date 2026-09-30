@@ -19,6 +19,9 @@
  *
  * The generator OWNS the target directories: anything there it did not emit
  * is deleted (or fails `--check`). Site-local pages don't belong in them.
+ *
+ * `--check` also runs the headless reference check (`reference.mjs`): the pages
+ * list every public member of every plugin, and nothing the code doesn't have.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -26,6 +29,7 @@ import { fileURLToPath } from 'node:url';
 
 import { DEMO_DOCUMENTS } from '../documents.mjs';
 import { ENGINES } from '../engines.mjs';
+import { checkReference } from './reference.mjs';
 
 const contentRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -56,6 +60,8 @@ const MOUNTS = {
     { from: 'samples/signature', to: 'src/samples/signature' },
     { from: 'samples/getting-started', to: 'src/samples/getting-started' },
     { from: 'samples/viewer', to: 'src/samples/viewer' },
+    // Code-only snippets, one file per framework (<Snippet name>); demos never build them.
+    { from: 'snippets', to: 'src/samples/snippets' },
   ],
 };
 
@@ -267,7 +273,7 @@ function ownedRoots() {
   return [...MOUNTS.mdx, ...MOUNTS.samples].map((mount) => mount.to);
 }
 
-function main() {
+async function main() {
   const args = parseArgs(process.argv);
   const expected = buildExpected(args.engine, args.frameworks);
 
@@ -303,6 +309,7 @@ function main() {
       process.exit(1);
     }
     console.log(`Docs content is current (${expected.size} files, engine=${args.engine}).`);
+    await checkReference();
     return;
   }
 
@@ -321,4 +328,4 @@ function main() {
   );
 }
 
-main();
+await main();

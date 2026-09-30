@@ -23,24 +23,10 @@ the same in every other PDF app.
 Register `interactionPlugin()` and `annotationPlugin()`, then put an `<AnnotationLayer>` above the
 rendered page:
 
-```tsx
-import { interactionPlugin } from '@embedpdf/react/interaction';
-import { AnnotationLayer, annotationPlugin } from '@embedpdf/react/annotation';
+<Snippet name="annotations/index-layer" />
 
-const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), annotationPlugin()];
-
-<Stage>
-  {() => (
-    <>
-      <RenderLayer annotations={false} />
-      <AnnotationLayer />
-    </>
-  )}
-</Stage>;
-```
-
-`annotations={false}` tells the render layer to leave annotations out of the page picture. The
-annotation layer draws them instead, so they can be selected, moved and changed.
+Setting `annotations` to `false` tells the render layer to leave annotations out of the page
+picture. The annotation layer draws them instead, so they can be selected, moved and changed.
 
 `interactionPlugin()` is the shared input system. Every tool, from text selection to drawing,
 speaks through it; see [Selecting & copying](text/selection) for how it works.
@@ -49,20 +35,7 @@ speaks through it; see [Selecting & copying](text/selection) for how it works.
 
 A **tool** says what a click or a drag on the page creates. Activate one and people can draw:
 
-```tsx
-import { useInteraction, useInteractionState } from '@embedpdf/react/interaction';
-
-function Toolbar() {
-  const interaction = useInteraction();
-  const { activeToolId } = useInteractionState();
-
-  return ['pointer', 'square', 'ink', 'highlight', 'note'].map((id) => (
-    <button key={id} aria-pressed={activeToolId === id} onClick={() => interaction.activateTool(id)}>
-      {id}
-    </button>
-  ));
-}
-```
+<Snippet name="annotations/index-toolbar" />
 
 - **`pointer`** selects: click an annotation to select it, then move, resize or turn it.
 - **`square`** draws a rectangle: drag, or just click for a default-size one.
@@ -79,7 +52,7 @@ Everything on these pages is one of five things:
 
 | Thing          | What it is                                                                         | Where you use it                           |
 | :------------- | :--------------------------------------------------------------------------------- | :----------------------------------------- |
-| **Annotation** | A record in the PDF: its kind, position, colors and text.                          | `useAnnotation().list()`                   |
+| **Annotation** | A record in the PDF: its kind, position, colors and text.                          | `annotation.list()`                        |
 | **Tool**       | What a click or drag creates, with which defaults, cursor and preview.             | `annotationPlugin({ tools })`              |
 | **Layer**      | What each page draws: the annotations, the selection box and handles, the preview. | `<AnnotationLayer>`                        |
 | **Overlay**    | Your own UI attached to an annotation, such as a menu or a hover card.             | `<AnnotationMenu>`                         |
@@ -120,24 +93,19 @@ opened for.
 
 Tell the viewer who the user is, once. Every document it opens uses it:
 
-```tsx
-<Viewer
-  engine={engine}
-  plugins={plugins}
-  identity={{ userId: 'u_381', displayName: 'Dana Smith' }}
-  initialDocuments={[{ source: contract }]}
-/>
-```
+<Snippet name="annotations/index-identity" />
 
 `displayName` becomes the `author` other PDF apps show, and `userId` records who owns the
 annotation. The same identity decides which annotations count as the user's own when
 [permissions](concepts/permissions) say "only their own".
 
-To open one document as someone else, give it its own `identity`. It replaces the viewer's for
-that document:
+To open one document as someone else, give its entry in `initialDocuments` its own `identity`. It
+replaces the viewer's for that document:
 
-```tsx
-initialDocuments={[{ source: contract, identity: { userId: 'bot', displayName: 'Import job' } }]}
+```ts
+const initialDocuments = [
+  { source: contract, identity: { userId: 'bot', displayName: 'Import job' } },
+];
 ```
 
 A document keeps the identity it was opened with. If you change the viewer's `identity`, documents

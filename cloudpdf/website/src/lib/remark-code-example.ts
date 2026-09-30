@@ -46,12 +46,16 @@ export const remarkCodeExample = (options: RemarkCodeExampleOptions = {}) => {
 
   return (tree: any) => {
     visit(tree, 'mdxJsxFlowElement', (node: any) => {
-      if (node.name === 'Example') {
+      // <Snippet name="search/search-box">: code only, one file per framework under
+      // samples/snippets/ (docs/content/snippets/), resolved exactly like an example.
+      if (node.name === 'Example' || node.name === 'Snippet') {
         const nameAttr = node.attributes?.find(
           (attr: any) => attr.type === 'mdxJsxAttribute' && attr.name === 'name',
         );
         if (typeof nameAttr?.value !== 'string') return;
-        const byFramework = collectSampleFiles(nameAttr.value, githubBaseUrl);
+        const sampleName =
+          node.name === 'Snippet' ? `snippets/${nameAttr.value}` : nameAttr.value;
+        const byFramework = collectSampleFiles(sampleName, githubBaseUrl);
         node.attributes.push({
           type: 'mdxJsxAttribute',
           name: '__fwFiles',

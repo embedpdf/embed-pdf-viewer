@@ -8,22 +8,9 @@ description: "Make the links in a PDF work: go to a page, open a website, and ch
 # Links
 
 Most PDFs have links: a table of contents that jumps to a chapter, a footnote to a website. Register
-`linkPlugin()` and put a `<LinkLayer>` in each page, and they work:
+`linkPlugin()` and put `<LinkLayer>` in each page, and they work:
 
-```tsx
-import { LinkLayer, linkPlugin } from '@embedpdf/react/link';
-
-const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), linkPlugin()];
-
-<Stage>
-  {() => (
-    <>
-      <RenderLayer />
-      <LinkLayer />
-    </>
-  )}
-</Stage>;
-```
+<Snippet name="viewing/link-layer" />
 
 - **A link to a page** goes there, to the exact spot and zoom the link names.
 - **A link to a website** opens in a new tab, after a safety check (see [Good to know](#good-to-know)).
@@ -35,70 +22,78 @@ with Enter.
 
 ## Change how links look
 
-By default a link area is invisible, as in other PDF apps. `renderLink` lets you draw it yourself,
-for example with an underline on hover:
+By default a link area is invisible, as in other PDF apps. `<LinkLayer renderLink>` lets you draw it
+yourself, for example with an underline on hover:
 
-```tsx
-<LinkLayer
-  renderLink={({ link, native }) => (
-    <span className="pdf-link" title={link.target.kind === 'uri' ? link.target.uri : undefined}>
-      {native}
-    </span>
-  )}
-/>
-```
+<Snippet name="viewing/custom-links" />
 
-`native` is the layer's own clickable area: wrap it to keep what a click does. Return `undefined` for
-a link you don't want to change.
+`native` is the layer's own clickable area: wrap it to keep what a click does.
+<Fw only="react">Return `undefined` for a link you don't want to change.</Fw><Fw only={['vue', 'svelte', 'angular']}>For a link you don't want to change, show `native` alone.</Fw>
 
 ## Read the links on a page
 
 ```ts
-const link = useLink();
-
 link.listLinks(page.ref); // every link on the page
 link.getLinkAt(page.ref, { x: 120, y: 80 }); // the link at a point, or null
 ```
 
 Each link has an `id`, its `bounds` on the page, and a `target`: where it goes.
 
-| `target.kind` | Goes to                                          |
-| :------------ | :----------------------------------------------- |
-| `'goto'`      | A page of this document: `target.destination`    |
-| `'uri'`       | A website or an email address: `target.uri`      |
-| `'named'`     | A viewer action, such as the next page           |
+| `target.kind`               | Goes to                                                                         |
+| :-------------------------- | :------------------------------------------------------------------------------ |
+| `'goto'`                    | A page of this document: `target.destination`                                   |
+| `'uri'`                     | A website or an email address: `target.uri`                                     |
+| `'named'`                   | A viewer action, such as the next page                                          |
+| `'javascript'`              | Runs the link's script, when the [actions plugin](../documents/actions) allows it |
+| `'goto-remote'`, `'launch'` | Nowhere: see [Which links never run](#which-links-never-run)                    |
 
 ## Follow a link from code
 
 `activate()` does what a click does:
 
 ```ts
-await link.activate(someLink);
+const { outcome } = link.activate(someLink);
 ```
 
-It resolves with what happened: `'revealed'` (the view went to a page), `'uri'` (a website opened),
-or `'dispatched'` (the actions plugin ran the link's action).
+It returns what happened right away, so a website can still open in a new tab: `'revealed'` (the
+view went to a page), `'uri'` (a website opened), or `'dispatched'` (the actions plugin runs the
+link's action). A link it won't follow, such as one to another file, is `'reported'`.
+
+## Methods
+
+Everything `useLink()` gives you.
+
+| Method                              | What it does                                                                                                                  |
+| :---------------------------------- | :---------------------------------------------------------------------------------------------------------------------------- |
+| `listLinks(page)`                   | Every link on a page, once the page's links are read. [Read the links on a page](#read-the-links-on-a-page)                   |
+| `getLink(page, id)`                 | One link by its `id`, or `null`                                                                                               |
+| `getLinkAt(page, point)`            | The link at a point on the page, the smallest when links overlap, or `null`                                                   |
+| `listAllLinks()`                    | Every link in the document, reading each page's links as needed                                                               |
+| `ensureLoaded(page)`                | Reads a page's links if they aren't read yet. `<LinkLayer>` does this for every page it shows.                                |
+| `isLoaded(page)`, `getStatus(page)` | Whether a page's links are read, and in detail: `'idle'`, `'loading'`, `'ready'`, `'error'` or `'forbidden'`                  |
+| `activate(link)`                    | Follows a link, or a link's `target`, as a click does, and returns what happened. [Follow a link from code](#follow-a-link-from-code) |
+| `activateAt(page, point)`           | Follows the link at a point on the page. Returns `null` when there's no link there.                                           |
+| `resolve(target)`                   | What following a target would do, without doing it: `{ kind }` is `'destination'`, `'uri'`, `'named'` or `'reported'`         |
+| `getLabel(link)`                    | A short label for a tooltip: the web address, or where the link goes                                                          |
+
+Every method that returns a promise also takes a `signal` in its options, to cancel it.
 
 ## Events
 
-```ts
-useLinkEvent(
-  (link) => link.onActivated,
-  ({ target }) => analytics.track('link_followed', { kind: target.kind }),
-);
-```
+<Snippet name="viewing/link-analytics" />
 
 | Event         | Fires when                                         | Carries                  |
 | :------------ | :------------------------------------------------- | :----------------------- |
 | `onActivated` | Someone followed a link, by click, key or code     | `target`, `activation`   |
-| `onLoaded`    | A page's links are read and ready                  | `page`                   |
+| `onLoaded`    | A page's links were read, or read again after a change | `page`               |
 
 ## Good to know
 
 ### Which links never run
 
-A website link opens only with `http`, `https`, `mailto` or `tel`. Links that would start a program,
-open another file on the user's computer, or run JavaScript are never followed.
+A website link opens only with `http`, `https`, `mailto` or `tel`. Links that would start a program
+or open another file on the user's computer are never followed, and a link's JavaScript runs only
+when the [actions plugin](../documents/actions) has JavaScript turned on.
 
 ### Links while editing annotations
 

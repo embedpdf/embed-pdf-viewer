@@ -6,7 +6,7 @@ description: Draw annotations with your own components, react to hover, show car
 # Your own annotation look
 
 The annotation layer draws each annotation the way the PDF describes it. You can draw some of them
-with your own component instead: a stamp that shows live data from your server, a note that looks
+with your own <Fw only={['react', 'vue', 'svelte']}>component</Fw><Fw only="angular">template</Fw> instead: a stamp that shows live data from your server, a note that looks
 like your app's comment bubble, a highlight with a badge.
 
 This changes the screen only. The PDF keeps the annotation's own look, so other PDF apps,
@@ -14,32 +14,31 @@ printing and downloads show the original:
 
 | Where                               | What people see                 |
 | :---------------------------------- | :------------------------------ |
-| Your viewer                         | Your component                  |
+| Your viewer                         | Your <Fw only={['react', 'vue', 'svelte']}>component</Fw><Fw only="angular">template</Fw> |
 | The saved PDF, other apps, printing | The annotation's own appearance |
 
 ## Draw an annotation your way
 
-Give the layer a list of **renderers**. Each one says which annotations it draws and with which
-component:
+<Fw only={['react', 'vue', 'svelte']}>Give the layer a list of **renderers**. Each one says which
+annotations it draws and with which component:</Fw><Fw only="angular">Put a **renderer** in the layer for
+each look: an `<ng-template epdfAnnotation>` that says which annotations it draws, and draws them:</Fw>
 
-```tsx
-const renderers = [
-  {
-    for: (annotation) => annotation.subtype === 'stamp' && annotation.name === 'Approved',
-    component: ApprovedBadge,
-  },
-];
+<Snippet name="annotations/rendering-renderers" />
 
-<AnnotationLayer renderers={renderers} />;
-```
+<Fw only={['react', 'vue', 'svelte']}>`for`</Fw><Fw only="angular">The function you give `epdfAnnotation`</Fw>
+gets the annotation, with all its fields, so you can pick by kind, name, author or anything else.<Fw only="angular">
+A subtype picks every annotation of that kind: `epdfAnnotation="stamp"`.</Fw> The first renderer that
+matches wins; an annotation no renderer matches is drawn as usual.
 
-`for` gets the annotation, with all its fields, so you can pick by kind, name, author or anything
-else. The first renderer that matches wins; an annotation no renderer matches is drawn as usual.
+<Fw only="react">
 
 Define the list once, outside your component or in `useMemo`. The layer registers each entry, and
 a new list every render would register them again (the viewer warns about it while you develop).
 
-Your component gets:
+</Fw>
+
+<Fw only={['react', 'vue', 'svelte']}>Your component gets:</Fw><Fw only="angular">Your template gets these:
+the annotation is `let-annotation`, and the rest are named, such as `let-box="box"`.</Fw>
 
 | Prop          | What it is                                                                          |
 | :------------ | :---------------------------------------------------------------------------------- |
@@ -49,120 +48,55 @@ Your component gets:
 | `native`      | The layer's own drawing of it. Render it to keep the original look and add to it.   |
 | `appearance`  | The engine's picture of the annotation (`url`, `box`), or `null`.                   |
 | `hovered`     | True while the pointer is over it.                                                  |
-| `interactive` | True when your component takes the pointer (see [below](#take-over-the-pointer)).   |
+| `interactive` | True when what you draw takes the pointer (see [below](#take-over-the-pointer)).    |
 
-```tsx
-function ApprovedBadge({ box, page, native, hovered }: AnnotationRendererProps) {
-  const { x, y, width, height } = page.transform.pageToViewRect(box);
-  return (
-    <>
-      {native}
-      <div
-        className={hovered ? 'badge badge--hover' : 'badge'}
-        style={{ position: 'absolute', left: x + width - 12, top: y - 12 }}
-      >
-        ✓
-      </div>
-    </>
-  );
-}
-```
+<Snippet name="annotations/rendering-badge" />
 
-People can still select, move, resize and delete the annotation: your component draws, and the
-viewer keeps handling the pointer. That's also why a component like this gets no clicks of its
-own. For that, see [Take over the pointer](#take-over-the-pointer).
+People can still select, move, resize and delete the annotation: your <Fw only={['react', 'vue', 'svelte']}>component</Fw><Fw only="angular">template</Fw> draws, and the
+viewer keeps handling the pointer. That's also why it gets no clicks of its own. For that, see
+[Take over the pointer](#take-over-the-pointer).
 
 ## Show a card on hover
 
-A hover card sits next to an annotation while the pointer is over it. Two hooks give you what you
-need: the annotation under the pointer, and an anchor that keeps a card attached to it:
+A hover card sits next to an annotation while the pointer is over it. It needs two things: the
+annotation under the pointer, and an anchor that keeps a card attached to it:
 
-```tsx
-import { Anchored } from '@embedpdf/react/anchored';
-import { useAnnotationAnchor, useAnnotationState } from '@embedpdf/react/annotation';
+<Snippet name="annotations/rendering-hover-card" />
 
-function StampCard() {
-  const { hovered } = useAnnotationState(); // the annotation under the pointer, or null
-  const anchor = useAnnotationAnchor(hovered?.ref ?? null);
-
-  if (hovered?.subtype !== 'stamp') return null;
-  return (
-    <Anchored anchor={anchor} placement="top">
-      <div className="card">Approved by {hovered.author}</div>
-    </Anchored>
-  );
-}
-
-<Stage overlay={<StampCard />}>{/* … */}</Stage>;
-```
-
-Mount it in the Stage's `overlay`, like a menu. The card stays next to the annotation while the
-user scrolls and zooms, and while the annotation is moved.
+<Fw only="react">Mount it in the Stage's `overlay`</Fw><Fw only="vue">Mount it in the Stage's `#overlay`
+slot</Fw><Fw only="svelte">Mount it in the Stage's `overlay` snippet</Fw><Fw only="angular">Put it inside
+`<epdf-stage>`</Fw>, like a menu. The card stays next to the annotation while the user scrolls and
+zooms, and while the annotation is moved.
 
 `useAnnotationAnchor(ref)` works for any annotation, not only the hovered one. Use it for a badge
 that's always there, such as a count of replies next to each note.
 
 ## Take over the pointer
 
-Sometimes your component must take clicks itself: buttons, links, a text field. Mark the
-renderer `interactive`:
+Sometimes your <Fw only={['react', 'vue', 'svelte']}>component</Fw><Fw only="angular">template</Fw> must take clicks itself: buttons, links, a text field. <Fw only={['react', 'vue', 'svelte']}>Mark the
+renderer `interactive`:</Fw><Fw only="angular">Add `epdfAnnotationInteractive` to the renderer:</Fw>
 
-```tsx
-const renderers = [
-  {
-    for: (annotation) => annotation.subtype === 'stamp' && annotation.name === 'Approved',
-    component: ApprovalWidget,
-    interactive: true,
-  },
-];
-```
+<Snippet name="annotations/rendering-interactive" />
 
-While a renderer is interactive, the pointer belongs to your component, and people can't select,
+While a renderer is interactive, the pointer belongs to your <Fw only={['react', 'vue', 'svelte']}>component</Fw><Fw only="angular">template</Fw>, and people can't select,
 move or delete that annotation with it. Most apps want both: interactive while reading, editable
 while editing. Pass a function, and the viewer asks it whenever it matters:
 
-```ts
-{
-  for: (annotation) => annotation.subtype === 'stamp' && annotation.name === 'Approved',
-  component: ApprovalWidget,
-  interactive: ({ toolId }) => toolId === 'pan', // interactive in reading mode only
-}
-```
+<Snippet name="annotations/rendering-interactive-when" />
 
 ## Example: an interactive stamp
 
 A stamp that's an ordinary stamp in the PDF, but on screen shows its approval status, a card
 with details on hover, and working buttons when you're reading:
 
-```tsx
-const renderers = [
-  {
-    for: (annotation) => annotation.subtype === 'stamp' && annotation.name === 'Approved',
-    component: ApprovalStamp,
-    interactive: ({ toolId }) => toolId === 'pan',
-  },
-];
-
-function ApprovalStamp({ annotation, box, page, native, interactive }: AnnotationRendererProps) {
-  const approval = useApproval(annotationKey(annotation.ref)); // your own data
-  const { x, y, width, height } = page.transform.pageToViewRect(box);
-
-  return (
-    <div style={{ position: 'absolute', left: x, top: y, width, height }}>
-      {native}
-      <StatusDot status={approval.status} />
-      {interactive && <button onClick={approval.open}>Details</button>}
-    </div>
-  );
-}
-```
+<Snippet name="annotations/rendering-stamp" />
 
 1. The stamp is placed like any stamp, so the PDF holds the real one; see [Stamps](stamps).
-2. `for` picks it out by its `name`, which the stamp keeps in every PDF app.
-3. The component draws the stamp itself (`native`) and your status on top.
+2. <Fw only={['react', 'vue', 'svelte']}>`for`</Fw><Fw only="angular">`epdfAnnotation`</Fw> picks it out by its `name`, which the stamp keeps in every PDF app.
+3. The <Fw only={['react', 'vue', 'svelte']}>component</Fw><Fw only="angular">template</Fw> draws the stamp itself (`native`) and your status on top.
 4. In reading mode (the `pan` tool) the button works. With the `pointer` tool, people select and
    move the stamp as usual.
-5. For a card on hover, add the [hover card](#show-a-card-on-hover) to the overlay.
+5. For a card on hover, add the [hover card](#show-a-card-on-hover) too.
 
 To find your own data for an annotation, key it by `annotationKey(annotation.ref)`: the ref stays
 the same after the document is saved and opened again.
@@ -177,8 +111,8 @@ before it closes and a `pointerenter` on the card that cancels it.
 
 ### Form fields
 
-Form fields are annotations too, and the form plugin draws them with its own renderer, which you
-add to the same list. A plugin's renderer always wins over your rules for the fields it handles.
+Form fields are annotations too. The `<FormLayer>` draws the fields it handles, and always wins over
+your renderers for them; see [Forms and annotations](../forms#forms-and-annotations).
 
 ### Other layers
 

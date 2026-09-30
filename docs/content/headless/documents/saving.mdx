@@ -9,18 +9,7 @@ Everything people do in the viewer, such as annotations, form values and page ed
 document. `download()` gives you the PDF with all of it, as bytes, and `saveFile()` hands them to
 the browser as a download:
 
-```tsx
-import { saveFile, useDocuments } from '@embedpdf/react/runtime';
-
-function DownloadButton() {
-  const documents = useDocuments();
-  return (
-    <button onClick={async () => saveFile(await documents.download(), 'contract.pdf')}>
-      Download
-    </button>
-  );
-}
-```
+<Snippet name="documents/download-button" />
 
 `download()` waits for changes still on their way, such as the last words someone typed in a text
 box, so the file has everything the user sees. Without an id it downloads the active document;
@@ -84,22 +73,10 @@ only, as data rather than PDF bytes, see [Export and import](../annotations/savi
 
 `useDocument()` tells you whether the document has changes that haven't been downloaded yet:
 
-```tsx
-function UnsavedWarning() {
-  const { hasUnsavedChanges } = useDocument();
+<Snippet name="documents/unsaved-warning" />
 
-  useEffect(() => {
-    if (!hasUnsavedChanges) return;
-    const warn = (event: BeforeUnloadEvent) => event.preventDefault();
-    window.addEventListener('beforeunload', warn);
-    return () => window.removeEventListener('beforeunload', warn);
-  }, [hasUnsavedChanges]);
-
-  return hasUnsavedChanges ? <span>Unsaved changes</span> : null;
-}
-```
-
-It becomes `false` again after a `download()`.
+It becomes `false` again after a `download()`. The document's other fields are listed on
+[Opening documents](opening#state).
 
 <Engine cloud>
 
@@ -108,14 +85,25 @@ On CloudPDF, changes are stored on your server as people make them, so `hasUnsav
 
 </Engine>
 
+## Methods
+
+What `useDocuments()` gives you for downloading and printing. Opening and closing are on
+[Opening documents](opening#methods), tabs and the active document on
+[Several documents](tabs#methods).
+
+| Method                              | What it does                                                                                                                                         |
+| :---------------------------------- | :--------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `download(id?, { mode })`           | The PDF with every change, as bytes. Waits for changes still on their way first. `mode` is `'incremental'` (the default) or `'rewrite'`. [A quick save or a full rewrite](#a-quick-save-or-a-full-rewrite) |
+| `downloadLayer(id?)`                | Only the changes, as a layer you store and open again on top of the original. Local engine only; rejects when the document wasn't opened with a layer. [Keep only the changes](#keep-only-the-changes) |
+| `print(id?)`                        | Prints the document's pages through the browser's print dialog. [Print](#print)                                                                     |
+| `canDownload(id?)`, `canPrint(id?)` | Whether downloading and printing are allowed. [Permissions](#permissions)                                                                            |
+
+Without an `id`, each uses the active document. Every method that returns a promise also takes a
+`signal` in its options, to cancel it.
+
 ## Events
 
-```ts
-useDocumentsEvent(
-  (documents) => documents.onUnsavedChangesChanged,
-  ({ hasUnsavedChanges }) => setTitleDot(hasUnsavedChanges),
-);
-```
+<Snippet name="documents/title-dot" />
 
 | Event                     | Fires when                                                | Carries                             |
 | :------------------------ | :-------------------------------------------------------- | :---------------------------------- |

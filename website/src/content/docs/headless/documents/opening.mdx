@@ -12,33 +12,13 @@ the document is ready:
 
 <Engine local>
 
-```tsx
-<Viewer
-  engine={engine}
-  plugins={plugins}
-  initialDocuments={[{ source: { kind: 'url', url: '/files/contract.pdf' } }]}
->
-  <DocumentGate fallback={<Spinner />}>
-    <Stage>{() => <RenderLayer />}</Stage>
-  </DocumentGate>
-</Viewer>
-```
+<Snippet name="documents/initial-documents" />
 
 </Engine>
 
 <Engine cloud>
 
-```tsx
-<Viewer
-  engine={engine}
-  plugins={plugins}
-  initialDocuments={[{ source: { kind: 'token', token: () => fetchDocumentToken('contract') } }]}
->
-  <DocumentGate fallback={<Spinner />}>
-    <Stage>{() => <RenderLayer />}</Stage>
-  </DocumentGate>
-</Viewer>
-```
+<Snippet name="documents/initial-documents-cloud" />
 
 </Engine>
 
@@ -49,20 +29,76 @@ The viewer is on screen at once; the document opens in the background. Component
 
 `useDocuments()` opens documents while the app runs, for example one the user picked:
 
-```tsx
-function OpenButton() {
-  const documents = useDocuments();
-
-  const onPick = async (file: File) => {
-    await documents.open({ kind: 'bytes', bytes: await file.arrayBuffer() }, { name: file.name });
-  };
-
-  return <input type="file" accept="application/pdf" onChange={(e) => onPick(e.target.files![0])} />;
-}
-```
+<Snippet name="documents/open-button" />
 
 `open()` resolves with `{ document }` once it's open, and the new document becomes the active one.
 Pass `{ activate: false }` to open it in the background.
+
+<Fw only="angular">
+
+When an input or a route parameter names the document, give it to the Stage instead:
+`<epdf-stage [document]="source()">` opens the document, and when the signal changes, it opens the
+new one and closes the old one.
+
+<Engine local>
+
+```ts
+import { Component, computed, input } from '@angular/core';
+import { EpdfRenderLayer } from '@embedpdf/angular/render';
+import { EpdfPageTemplate, EpdfStage } from '@embedpdf/angular/stage';
+
+@Component({
+  selector: 'app-contract-page',
+  imports: [EpdfStage, EpdfPageTemplate, EpdfRenderLayer],
+  template: `
+    <epdf-stage [document]="source()">
+      <ng-template epdfPage>
+        <epdf-render-layer />
+      </ng-template>
+    </epdf-stage>
+  `,
+})
+export class ContractPage {
+  /** `/contracts/:id`, bound with `withComponentInputBinding()` */
+  readonly id = input.required<string>();
+  protected readonly source = computed(() => ({ kind: 'url', url: `/files/${this.id()}.pdf` }) as const);
+}
+```
+
+</Engine>
+
+<Engine cloud>
+
+```ts
+import { Component, computed, input } from '@angular/core';
+import { EpdfRenderLayer } from '@embedpdf/angular/render';
+import { EpdfPageTemplate, EpdfStage } from '@embedpdf/angular/stage';
+import { fetchDocumentToken } from './api';
+
+@Component({
+  selector: 'app-contract-page',
+  imports: [EpdfStage, EpdfPageTemplate, EpdfRenderLayer],
+  template: `
+    <epdf-stage [document]="source()">
+      <ng-template epdfPage>
+        <epdf-render-layer />
+      </ng-template>
+    </epdf-stage>
+  `,
+})
+export class ContractPage {
+  /** `/contracts/:id`, bound with `withComponentInputBinding()` */
+  readonly id = input.required<string>();
+  protected readonly source = computed(() => {
+    const id = this.id();
+    return { kind: 'token', token: () => fetchDocumentToken(id) } as const;
+  });
+}
+```
+
+</Engine>
+
+</Fw>
 
 ## Where a document comes from
 
@@ -104,39 +140,17 @@ Pass `token` as a function, so a long session always has a fresh one. See
 
 `<DocumentGate>` has something to show for each state a document can be in:
 
-```tsx
-<DocumentGate
-  fallback={<Spinner />}
-  locked={(document) => <PasswordForm document={document} />}
-  error={(document) => <p>Couldn't open {document.name}: {document.error.message}</p>}
->
-  <Stage>{() => <RenderLayer />}</Stage>
-</DocumentGate>
-```
+<Snippet name="documents/gate-states" />
 
 A password-protected PDF opens **locked**. Ask for the password and unlock it:
 
-```tsx
-function PasswordForm({ document }: { document: DocumentInfo }) {
-  const documents = useDocuments();
-  const [wrong, setWrong] = useState(false);
-
-  const submit = async (password: string) => {
-    try {
-      await documents.unlock(document.id, { password });
-    } catch {
-      setWrong(true); // it stays locked; ask again
-    }
-  };
-
-  return <PasswordPrompt onSubmit={submit} wrong={wrong} />;
-}
-```
+<Snippet name="documents/password-form" />
 
 After an error, such as a network failure, `documents.retry(id)` tries again.
 
 To show the state yourself, for example on a tab, `useDocument()` gives you the document's
-`status`: `'loading'`, `'locked'`, `'ready'` or `'error'`.
+`status`: `'loading'`, `'locked'`, `'ready'` or `'error'`. Every field is listed under
+[State](#state).
 
 ## Who the user is and what they may do
 
@@ -144,14 +158,7 @@ To show the state yourself, for example on a tab, `useDocument()` gives you the 
 
 Tell the viewer who the user is and what they may do, once. Every document it opens uses them:
 
-```tsx
-<Viewer
-  engine={engine}
-  plugins={plugins}
-  identity={{ userId: 'u_381', displayName: 'Dana Smith' }}
-  scope={['doc.open', 'doc.render', 'doc.text.select', 'doc.annotate.read', 'annotations:create:self']}
-/>
-```
+<Snippet name="documents/identity-scope" />
 
 - **`identity`** is who the user is. Their `displayName` becomes the author of the annotations they
   make.
@@ -160,8 +167,9 @@ Tell the viewer who the user is and what they may do, once. Every document it op
 
 A document can have its own, which replace the viewer's for that document:
 
-```tsx
-initialDocuments={[{ source, scope: ['doc.open', 'doc.render'] }]} // this one is read-only
+```ts
+const initialDocuments = [{ source, scope: ['doc.open', 'doc.render'] }]; // this one is read-only
+await documents.open(source, { scope: ['doc.open', 'doc.render'] }); // and so is this one
 ```
 
 [Permissions](../concepts/permissions) lists every permission.
@@ -183,14 +191,51 @@ await documents.close(document.id);
 
 Closing frees the document's memory in the engine. The next document becomes the active one.
 
+## Methods
+
+What `useDocuments()` gives you for opening and closing documents and reading their pages. Tabs and
+the active document are on [Several documents](tabs#methods), downloading and printing on
+[Saving & downloading](saving#methods).
+
+| Method                     | What it does                                                                                                                                                               |
+| :------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `open(source, options?)`   | Opens a document and makes it the active one. Resolves `{ document }` once it's ready, or locked with a password; rejects when it can't be opened. [Open a document later](#open-a-document-later) |
+| `openAll(documents)`       | Opens several documents, as `initialDocuments` does: every tab appears at once, in order, and the one marked `active` (or the first) becomes the active one. A failure shows in that document's `status` instead of throwing. |
+| `unlock(id, { password })` | Unlocks a locked document. Rejects on a wrong password, and the document stays locked so you can ask again. [Loading, errors and passwords](#loading-errors-and-passwords) |
+| `retry(id)`                | Tries a failed document again, with the same source and options. Resolves like `open()`.                                                                                     |
+| `close(id)`, `closeAll()`  | Closes one document, or every document, and frees its memory. [Close a document](#close-a-document)                                                                        |
+| `get(id)`                  | A document's fields, the ones [`useDocument()`](#state) gives you, or `null` when it isn't open                                                                             |
+| `listPages(id?)`           | The document's pages, in order. In a component, use [`usePageList()`](../viewing/page-view#pick-the-page).                                                                  |
+| `getPage(page, id?)`       | One page, by its `ref` or its index, or `null` when the document doesn't have it                                                                                           |
+| `getPageIndex(ref, id?)`   | A page's position, from 0, or `-1` when the document doesn't have it                                                                                                       |
+| `getRevision(id?)`         | A number that goes up each time pages are added, removed, moved or rotated; `-1` with no document                                                                          |
+
+`options` for `open()` are `name` (what its tab shows), `activate: false` (open it in the
+background), `password`, and, on the local engine, `scope` and `identity`. Without an `id`, the page
+methods use the active document. To stop an open that's still loading, close the document: that
+cancels its download too.
+
+## State
+
+`useDocument()` gives you the document a component talks to: the active one, or the one its
+`<DocumentScope>` names.<Fw only="react"> Your component re-renders when a value changes.</Fw><Fw only="vue"> Its fields are refs: your template updates when one changes.</Fw><Fw only="svelte"> It's one reactive object: read its fields, and your markup updates when they change.</Fw><Fw only="angular"> Each field is a signal: read it in a template or a `computed()`, and your view updates when it changes.</Fw> Outside a component,
+`get(id)` gives the same fields.
+
+| Field               | What it is                                                                                                   |
+| :------------------ | :----------------------------------------------------------------------------------------------------------- |
+| `id`                | The document's id, for `close(id)`, `unlock(id, …)` and `<DocumentScope>`                                    |
+| `name`              | The name its tab shows, from `open()` or `rename()`                                                          |
+| `status`            | `'loading'`, `'locked'`, `'ready'` or `'error'`                                                              |
+| `pageCount`         | How many pages it has; `0` until it's ready                                                                  |
+| `hasUnsavedChanges` | Whether it has changes that weren't downloaded yet. [Warn before changes are lost](saving#warn-before-changes-are-lost) |
+| `passwordProvided`  | When it's locked: whether a password was tried and was wrong                                                 |
+| `error`             | Why it couldn't be opened, when `status` is `'error'`: `{ code, message }`                                   |
+
+Every open document, with the same fields, comes from [`useDocumentsState()`](tabs#state).
+
 ## Events
 
-```ts
-useDocumentsEvent(
-  (documents) => documents.onOpenFailed,
-  ({ error }) => toast(`Couldn't open the file: ${error.message}`),
-);
-```
+<Snippet name="documents/open-failed" />
 
 | Event            | Fires when                                          | Carries                     |
 | :--------------- | :-------------------------------------------------- | :-------------------------- |
@@ -198,8 +243,9 @@ useDocumentsEvent(
 | `onOpenFailed`   | A document couldn't be opened                       | `documentId`, `error`       |
 | `onLocked`       | A document needs a password                         | `documentId`, `passwordProvided` |
 | `onClosed`       | A document was closed                               | `documentId`                |
-| `onActiveChanged`| Another document became the active one              | `documentId`, `previousDocumentId` |
-| `onPagesChanged` | Pages were added, removed, moved or rotated         | `documentId`, `pages`       |
+| `onPagesChanged` | Pages were added, removed, moved or rotated         | `documentId`, `pages`, `revision` |
+
+Switching the active document is on [Several documents](tabs#events).
 
 ## Good to know
 
@@ -233,8 +279,19 @@ at once whatever the file's size.
 
 ### `initialDocuments` is read once
 
+<Fw only={['react', 'vue', 'svelte']}>
+
 Like `engine` and `plugins`, the viewer reads `initialDocuments` when it mounts. To open another
 document later, use `documents.open()`.
+
+</Fw>
+
+<Fw only="angular">
+
+Like `engine`, `provideEmbedPdf()` reads `initialDocuments` once, when the viewer starts. To open
+another document later, use `documents.open()`, or give the Stage a `[document]` that changes.
+
+</Fw>
 
 ### Several documents
 

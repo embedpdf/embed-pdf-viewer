@@ -70,6 +70,32 @@ npm install @embedpdf/angular @cloudpdf/engine
 The framework package holds every plugin, one import path each (`@embedpdf/react/search`,
 `@embedpdf/react/annotation`). A plugin you don't import isn't in your bundle.
 
+<Fw only="react">
+
+It works with React 18 and later.
+
+</Fw>
+
+<Fw only="vue">
+
+It's written for Vue 3: components for your templates and composables for `<script setup>`.
+
+</Fw>
+
+<Fw only="svelte">
+
+It's written for Svelte 5: components that take snippets, and functions that give you reactive
+state for your runes.
+
+</Fw>
+
+<Fw only="angular">
+
+It needs Angular 20.2 or later. Everything is standalone, `OnPush` and built on signals, so it works
+in zoneless apps (`provideZonelessChangeDetection()`), the default for new ones.
+
+</Fw>
+
 ## Create the engine once
 
 Create one engine when your app starts, and share it with every viewer:
@@ -83,7 +109,7 @@ import { localEngine } from '@embedpdf/engine';
 export const engine = localEngine();
 ```
 
-Creating the engine is instant and allocates nothing. The viewer starts it when it mounts, and
+Creating the engine is instant and allocates nothing. The first viewer that uses it starts it, and
 PDFium boots in a Web Worker in the background.
 
 </Engine>
@@ -101,22 +127,36 @@ export const engine = cloudEngine({ baseUrl: 'https://pdf.example.com' });
 
 </Engine>
 
+<Fw only={['react', 'vue', 'svelte']}>
+
 `<Viewer>` can also own the engine. Pass a function, and the viewer creates the engine when it
 mounts and destroys it when it unmounts:
 
+</Fw>
+
+<Fw only="angular">
+
+`provideEmbedPdf()` can also own the engine. Pass a function: the viewer calls it in the browser
+when it starts, and destroys the engine when the component or route that provides it goes away:
+
+</Fw>
+
 <Engine local>
 
-```tsx
-<Viewer engine={() => localEngine()} plugins={plugins} />
-```
+<Snippet name="start/owned-engine" />
+
+<Fw only="angular">
+
+The function may return a promise. With `import()`, as here, the engine loads in its own chunk the
+first time a viewer needs it, instead of with your page.
+
+</Fw>
 
 </Engine>
 
 <Engine cloud>
 
-```tsx
-<Viewer engine={() => cloudEngine({ baseUrl: 'https://pdf.example.com' })} plugins={plugins} />
-```
+<Snippet name="start/owned-engine-cloud" />
 
 </Engine>
 
@@ -125,62 +165,99 @@ viewer in your app.
 
 ## Register the plugins
 
+<Fw only={['react', 'vue', 'svelte']}>
+
 Plugins are a list you create once, next to the engine:
 
-```ts
-import { stagePlugin } from '@embedpdf/react/stage';
-import { renderPlugin } from '@embedpdf/react/render';
-import { interactionPlugin } from '@embedpdf/react/interaction';
-import { selectionPlugin } from '@embedpdf/react/selection';
+</Fw>
 
-export const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), selectionPlugin()];
-```
+<Fw only="angular">
+
+Each plugin is a feature of `provideEmbedPdf()`, given with the engine. Put it in the `providers`
+of the component that shows the viewer:
+
+</Fw>
+
+<Snippet name="start/plugins" />
+
+<Fw only="react">
 
 The viewer reads `engine` and `plugins` once, when it mounts. Creating the list inside a component
 would make a new list on every render; the viewer ignores it and warns you while you develop.
+
+</Fw>
+
+<Fw only={['vue', 'svelte']}>
+
+The viewer reads `engine` and `plugins` once, when it mounts, and ignores later changes to them.
+
+</Fw>
+
+<Fw only="angular">
+
+That component and everything in its template share one viewer, and the component can `inject()`
+the plugins' services itself. In `app.config.ts` or a route's `providers`, the same call gives the
+whole app or route one viewer, so a toolbar in your header and the pages in your outlet work
+together. The viewer reads the engine and the features once, when it starts.
+
+</Fw>
 
 Order doesn't matter, and a plugin that needs another says so when the app starts: the annotation
 plugin, for example, needs the interaction plugin.
 
 ## Server-side rendering
 
-The headless packages render nothing on the server that needs the engine: the engine starts in the
-browser, when the viewer mounts. So a module-level engine is safe everywhere.
+The headless packages render nothing on the server that needs the engine: the engine only starts in
+the browser. So a module-level engine is safe everywhere.
 
 <Fw only="react">
 
 In the Next.js App Router, mark the component that renders `<Viewer>` as a client component:
 
-```tsx
-'use client';
-
-import { Viewer } from '@embedpdf/react/runtime';
-import { engine, plugins } from './pdf';
-
-export function DocumentViewer() {
-  return <Viewer engine={engine} plugins={plugins}>{/* … */}</Viewer>;
-}
-```
-
 </Fw>
 
 <Fw only="vue">
 
-In Nuxt, render the viewer on the client only, inside `<ClientOnly>`.
+In Nuxt, render the viewer on the client only, inside `<ClientOnly>`. The server renders its
+`#fallback` slot instead:
 
 </Fw>
 
 <Fw only="svelte">
 
 In SvelteKit, render the viewer in the browser only, for example behind `{#if browser}` with
-`browser` from `$app/environment`.
+`browser` from `$app/environment`:
 
 </Fw>
 
 <Fw only="angular">
 
-With Angular SSR, render the viewer in the browser only, with `@defer` or behind
-`isPlatformBrowser`.
+With Angular SSR, the viewer works as it is, and the server renders the page around it. To keep its
+code, the engine included, out of the first download, put it in a `@defer (on viewport)` block: it
+loads when it scrolls into view.
+
+</Fw>
+
+<Snippet name="start/ssr" />
+
+<Fw only="vue">
+
+A component named `DocumentViewer.client.vue` renders on the client only wherever you use it, with
+no `<ClientOnly>` around it.
+
+</Fw>
+
+<Fw only="svelte">
+
+To leave a whole page out of server rendering, add `export const ssr = false` to its `+page.ts`.
+
+</Fw>
+
+<Fw only="angular">
+
+The server renders the `@placeholder`, and the deferred component loads in its own chunk with
+everything it imports. `on viewport` watches the placeholder, so give it the viewer's height, and
+nothing moves when the viewer takes its place.
 
 </Fw>
 
@@ -188,12 +265,42 @@ With Angular SSR, render the viewer in the browser only, with `@defer` or behind
 
 ## Bundlers and self-hosting
 
-The engine's worker and WebAssembly ship inside the package. Vite, webpack 5 (and Next.js), Rollup
-and Parcel pick them up with no configuration: nothing to copy, and nothing is fetched from a CDN.
-The engine loads from your own site, so it works offline and behind a firewall.
+The engine's worker and WebAssembly ship inside the package, and your build picks them up.
+
+<Fw only="react">
+
+Vite, webpack 5 and Rspack need no configuration, and neither does Next.js, with webpack or
+Turbopack.
+
+</Fw>
+
+<Fw only="vue">
+
+Vite, and so Nuxt, needs no configuration, and neither do webpack 5 and Rspack.
+
+</Fw>
+
+<Fw only="svelte">
+
+Vite, and so SvelteKit, needs no configuration, and neither do webpack 5 and Rspack.
+
+</Fw>
+
+<Fw only="angular">
+
+The Angular CLI needs no configuration. Its application builder can't copy the WebAssembly as a
+file, so `@embedpdf/engine` gives it its portable build without being asked: the WebAssembly
+travels inside your build as a lazy chunk and is unpacked in the browser, a moment's work when the
+engine starts.
+
+</Fw>
+
+There's nothing to copy, and nothing is fetched from a CDN. The engine loads from your own site, so
+it works offline and behind a firewall.
 
 If your setup can't bundle a worker, for example with a strict Content Security Policy, host the
-files yourself: [Self-hosting](/docs/viewer/self-hosting) lists every option.
+files yourself: [Self-hosting](/docs/viewer/self-hosting) lists every option, with notes for Parcel
+and plain esbuild.
 
 ## Fonts
 
@@ -216,9 +323,9 @@ engine option is in the engine's [Setup](/docs/engine/setup#options).
 >
 
 Move a headless viewer to CloudPDF by changing one line: `localEngine()` becomes
-`cloudEngine({ baseUrl })`. Your plugins, components and hooks stay as they are. Files stay on
-your server, the first page shows without downloading the PDF, and fonts, limits and storage are
-the server's to configure.
+`cloudEngine({ baseUrl })`. Your plugins, components and <Word of="hooks" /> stay as they are.
+Files stay on your server, the first page shows without downloading the PDF, and fonts, limits and
+storage are the server's to configure.
 
 </CloudPdfCallout>
 
@@ -231,13 +338,15 @@ the server's to configure.
 Each document opens with a token your backend creates: it says who the user is and what they may
 do. Pass a function, so a long session gets fresh tokens:
 
-```tsx
-<Viewer
-  engine={engine}
-  plugins={plugins}
-  initialDocuments={[{ source: { kind: 'token', token: () => fetchDocumentToken(documentId) } }]}
-/>
-```
+<Snippet name="start/tokens" />
+
+<Fw only="angular">
+
+Providers can't read a component's inputs, so a document that depends on one goes to
+`<epdf-stage [document]>`. When the id changes, the viewer opens the new document and closes the
+old one.
+
+</Fw>
 
 [Authentication](/docs/engine/authentication) covers the three ways to open a document and what a
 token carries. Fonts, limits and storage are your server's configuration.
@@ -253,8 +362,26 @@ A viewer can hold several open documents at once, like tabs. See
 
 ### Changing `engine` or `plugins`
 
+<Fw only={['react', 'vue']}>
+
 Both are read once. To use another engine or another set of plugins, mount a new `<Viewer>`, for
 example by giving it a new `key`.
+
+</Fw>
+
+<Fw only="svelte">
+
+Both are read once. To use another engine or another set of plugins, mount a new `<Viewer>`, for
+example inside a `{#key}` block.
+
+</Fw>
+
+<Fw only="angular">
+
+Both are read once, when the viewer starts. To use another engine or other plugins, create the
+component that provides them again, for example under another route or an `@if`.
+
+</Fw>
 
 <Callout type="info">
   The ready-made [Viewer](/docs/viewer) uses these same packages. If you start there, everything on

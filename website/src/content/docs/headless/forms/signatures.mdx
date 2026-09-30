@@ -18,20 +18,11 @@ Register `signaturePlugin()` next to `formPlugin()` and `stampPlugin()`, with th
 
 <Example name="signature/basic" mode="open" />
 
-```ts
-import { indexedDbKeyStore, personalSigner, signaturePlugin } from '@embedpdf/react/signature';
-
-signaturePlugin({
-  key: () => personalSigner({ subject: 'Ada Lovelace', store: indexedDbKeyStore('my-app-keys') }),
-  trust: { anchors: async () => [rootCertificate] }, // the certificates you trust
-});
-```
+<Snippet name="forms/signature-plugin" />
 
 ## Sign a field
 
 ```ts
-const signature = useSignature();
-
 const { version } = await signature.sign({
   field: toFieldRef('approval'),
   mark: { assetId },
@@ -62,11 +53,11 @@ a mark from a signature library:
 
 ```ts
 await signature.placeMark({ assetId }, { field: toFieldRef('approval') }); // signs the field
-await signature.placeMark({ assetId }, { page: page.ref, at: { x: 120, y: 90 } }); // a stamp
+await signature.placeMark({ assetId }, { page: page.ref, center: { x: 120, y: 90 } }); // a stamp
 ```
 
 What happens in a field depends on `mode`: `'sign'` signs it, `'visual'` only draws the mark in,
-and `'ask'` asks your UI first through `onSignRequested`, so you can show your own sign dialog.
+and `'ask'` asks your UI first through <Fw only={['react', 'vue', 'svelte']}>`onSignRequested`</Fw><Fw only="angular">`signRequested$`</Fw>, so you can show your own sign dialog.
 
 ## Fill a field without signing
 
@@ -82,11 +73,10 @@ A signed field can't be filled or cleared: what it shows is part of what was sig
 
 ## The key
 
-The engine never holds a key. You give the plugin a **signer**, which does the signing:
+The engine never holds a key. You give the plugin a **signer**, which does the signing.
+`@embedpdf/react/signature` has one for each case:
 
 ```ts
-import { createTestSigner, personalSigner, remoteSigner, webCryptoSigner } from '@embedpdf/react/signature';
-
 // Your own key and certificate chain
 webCryptoSigner({ privateKey, certificateChain: [leaf, issuer] });
 
@@ -111,9 +101,9 @@ When the key signs somewhere else, such as on a phone or in a signing service th
 split the signing in two:
 
 ```ts
-const { id, digest } = await signature.prepareSignature({ field, mark: { assetId } });
+const { signingId, digest } = await signature.prepareSignature({ field, mark: { assetId } });
 const cms = await myService.sign(digest); // may take minutes
-await signature.completeSignature(id, cms);
+await signature.completeSignature(signingId, cms);
 ```
 
 While a signature is prepared, the document can't be changed, so nothing can slip in between.
@@ -121,15 +111,7 @@ While a signature is prepared, the document can't be changed, so nothing can sli
 
 ## Check the signatures
 
-```tsx
-const { signatures } = useSignatureState();
-
-signatures.map((sig) => (
-  <li key={sig.field.name}>
-    {sig.field.name}: {sig.verdict?.summary ?? 'checking…'}
-  </li>
-));
-```
+<Snippet name="forms/signature-list" />
 
 A verdict's `summary` is:
 
@@ -149,12 +131,7 @@ After an approval signature, filling in the form and adding more signatures keep
 annotation doesn't. The plugin warns you the moment a change would break a signature once it's saved,
 as Acrobat does:
 
-```ts
-useSignatureEvent(
-  (signature) => signature.onInvalidationPredicted,
-  ({ field }) => toast(`This change will break the signature in "${field.name}" when saved.`),
-);
-```
+<Snippet name="forms/break-warning" />
 
 `signature.getProtection()` tells you what the document's signatures allow, before anyone tries. A
 signer who wants comments to stay allowed signs with a certification that allows them.
@@ -175,12 +152,12 @@ await stamp.createAsset({
 });
 ```
 
-`useSignerRows()` lists each person with their signature and initials, for a picker. The library is
+<Fw only={['react', 'vue', 'svelte']}>`useSignerRows()`</Fw><Fw only="angular">`signature.signerRows()`</Fw> lists each person with their signature and initials, for a picker. The library is
 a normal PDF, so Acrobat can open it too.
 
 ## "Sign here" in a form
 
-With the [form layer](index), an empty signature field shows a "sign here" button. Clicking it makes
+With the [form layer](../forms), an empty signature field shows a "sign here" button. Clicking it makes
 the field the **target**: the next mark the person picks goes there. A signed field, clicked, asks your
 UI to show its details:
 
@@ -190,9 +167,51 @@ signature.setTarget(toFieldRef('approval')); // the next mark goes here; null cl
 
 | Event                   | Fires when                                     | Show                     |
 | :---------------------- | :--------------------------------------------- | :----------------------- |
-| `onTargetChanged`       | A field became the target                      | your signatures panel    |
-| `onSignRequested`       | In `'ask'` mode, a mark was dropped on a field | your sign dialog         |
-| `onInspectionRequested` | A signed field was clicked                     | the signature's details  |
+| <Fw only={['react', 'vue', 'svelte']}>`onTargetChanged`</Fw><Fw only="angular">`targetChanged$`</Fw> | A field became the target                      | your signatures panel    |
+| <Fw only={['react', 'vue', 'svelte']}>`onSignRequested`</Fw><Fw only="angular">`signRequested$`</Fw> | In `'ask'` mode, a mark was dropped on a field | your sign dialog         |
+| <Fw only={['react', 'vue', 'svelte']}>`onInspectionRequested`</Fw><Fw only="angular">`inspectionRequested$`</Fw> | A signed field was clicked                     | the signature's details  |
+
+## Methods
+
+Everything `useSignature()` gives you.
+
+| Method                                                    | What it does                                                                                                                              |
+| :-------------------------------------------------------- | :---------------------------------------------------------------------------------------------------------------------------------------- |
+| `sign({ field, mark })`                                   | Signs a field: the mark becomes what it shows, and the key seals the document. Also takes `signer`, a per-call `key`, `certify` and `lock`, and resolves `{ signature, version, protection }`. [Sign a field](#sign-a-field) |
+| `placeMark(mark, { field })`, `placeMark(mark, { page, center })` | Does what a click with an armed mark does: in a field, signs, fills or asks, by `mode`; anywhere else, places a stamp. Resolves what it did as `kind`: `'signed'`, `'filled'`, `'requested'` or `'placed'`. [Let people click to sign](#let-people-click-to-sign) |
+| `fillField(field, mark)`, `clearField(field)`             | Draws a mark into a field without signing, or takes it out again. Refused on a signed field. [Fill a field without signing](#fill-a-field-without-signing) |
+| `prepareSignature({ field, mark })`, `completeSignature(signingId, cms)` | Signs in two steps: the first resolves `{ signingId, digest }` for your key to sign, the second seals the document with what the key returned. [Signing in two steps](#signing-in-two-steps) |
+| `cancelPending()`                                         | Gives up a signature prepared in two steps, so the document can be changed again                                                          |
+| `validate({ until? })`                                    | Checks every signature again and resolves the verdicts. `until: 'persisted'` checks the file as it was opened. [Which bytes are checked](#which-bytes-are-checked) |
+| `validateField(field)`                                    | Checks one signed field and resolves its verdict                                                                                          |
+| `getVerdict(field)`, `listVerdicts()`                     | One signed field's verdict from the last check, or every verdict; `null` before the first check. [Check the signatures](#check-the-signatures) |
+| `getSignature(field)`                                     | One signature field's facts, signed or not, such as `fieldName`, `signed` and `signer`, or `null`                                         |
+| `listUnsignedFields()`                                    | The signature fields still to sign, in document order                                                                                     |
+| `analyzeChanges({ since })`                               | What changed after a signature (`{ signatureIndex }`) or a version of the file (`{ revisionIndex }`), rule by rule                         |
+| `readRevision(field)`, `readRevision({ revisionIndex })`  | The exact bytes of the file version a signature covers. [The signed bytes](#the-signed-bytes)                                             |
+| `setTarget(field)`                                        | Makes a field the target, where the next mark the person picks goes; `null` clears. ["Sign here" in a form](#sign-here-in-a-form)          |
+| `requestInspection(field)`                                | Asks your UI to show a signed field's details, as clicking it does: <Fw only={['react', 'vue', 'svelte']}>`onInspectionRequested`</Fw><Fw only="angular">`inspectionRequested$`</Fw> fires                                         |
+| `getMode()`                                               | The mode in effect: the `mode` setting, or its default. [Settings](#settings)                                                            |
+| `getSnapshot()`                                           | Everything at once, as the engine reads it: every signature field, signed or not, the file's versions, and `protection`                   |
+| `refresh()`                                               | Reads the signatures again. You rarely need it: the plugin reads and checks them again after every change.                                |
+| `canSign()`, `canCertify()`, `canFill()`, `canReadRevision()` | Whether signing, certifying, drawing a mark without signing, and reading the signed bytes are allowed. [Permissions](#permissions)    |
+
+`field` is a field's ref, such as `toFieldRef('approval')`; the methods that only read also take the
+ref of the field's box. Every method that returns a promise also takes a `signal` in its options, to
+cancel it.
+
+## State
+
+<StateIntro hook="useSignatureState()" />
+
+| Field        | What it is                                                                                              | Read once           |
+| :----------- | :------------------------------------------------------------------------------------------------------ | :------------------ |
+| `signatures` | The signed fields, in document order, each with its `verdict` once checked                              | `listSignatures()`  |
+| `protection` | What the document's signatures allow, or `null` before they're read                                     | `getProtection()`   |
+| `target`     | The field the next mark goes to, or `null`                                                              | `getTarget()`       |
+| `busy`       | Whether a signing or a fill is running                                                                  | `isBusy()`          |
+| `pending`    | A signature prepared in two steps and not completed yet, as `{ signingId, field }`, or `null`. Until it's completed or cancelled, the document can't be changed. | `getPending()` |
+| `status`     | Whether the signatures are read: `'idle'`, `'loading'`, `'ready'`, `'forbidden'` or `'error'`             | `getStatus()`       |
 
 ## Settings
 
@@ -207,22 +226,21 @@ Set them when you register the plugin.
 
 ## Events
 
-```ts
-useSignatureEvent(
-  (signature) => signature.onInvalidationPredicted,
-  () => showWarning('Saving this change will break a signature.'),
-);
-```
+<Snippet name="forms/save-warning" />
 
-| Event                     | Fires when                                          | Carries              |
-| :------------------------ | :-------------------------------------------------- | :------------------- |
-| `onSigned`                | A field was signed                                  | `field`, `version`   |
-| `onFilled`, `onCleared`   | A mark was drawn into a field, or removed           | `field`              |
-| `onValidated`             | The signatures were checked                         | `verdicts`           |
-| `onProtectionChanged`     | What the signatures allow changed                   | `protection`         |
-| `onInvalidationPredicted` | A change would break a signature once saved         | `field`              |
+| Event                     | Fires when                                           | Carries                     |
+| :------------------------ | :--------------------------------------------------- | :-------------------------- |
+| `onSigned`                | A field was signed, whoever signed it                | `field`, `result`, `origin` |
+| `onFilled`, `onCleared`   | A mark was drawn into a field, or removed            | `field`                     |
+| `onValidated`             | The signatures were checked                          | `verdicts`                  |
+| `onProtectionChanged`     | What the signatures allow changed                    | `protection`                |
+| `onInvalidationPredicted` | A change would break a signature once saved          | `field`, `detail`           |
+| `onTargetChanged`         | A field became the target, or the target was cleared | `field` (`null` when cleared) |
+| `onSignRequested`         | In `'ask'` mode, a mark was dropped on a field       | `field`, `mark`             |
+| `onInspectionRequested`   | A signed field was clicked                           | `field`                     |
 
-The events for your UI are in ["Sign here" in a form](#sign-here-in-a-form).
+`result` is what `sign()` resolves. ["Sign here" in a form](#sign-here-in-a-form) says what to show
+for the last three.
 
 ## Permissions
 

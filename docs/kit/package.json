@@ -11,6 +11,7 @@
     "./mdx/highlight": "./mdx/highlight-code.mjs",
     "./search": "./src/search/index.ts",
     "./mdx/install-channel": "./mdx/install-channel.mjs",
+    "./mdx/frameworks": "./mdx/frameworks.mjs",
     "./llms": "./src/llms.ts",
     "./og": "./src/og/index.ts"
   },

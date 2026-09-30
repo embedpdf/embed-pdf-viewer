@@ -15,62 +15,18 @@ import { Cards, Card } from '@/components/docs/cards';
 
 The headless packages give you everything a PDF viewer does, without a look of their own: pages
 that scroll and zoom, crisp rendering, text selection and search, annotations, forms and
-signatures. You build the interface in React, Vue, Svelte or Angular, and nothing appears on
-screen unless you put it there.
+signatures. You build the interface in <Framework />, and nothing appears on screen unless you put
+it there.
 
 <Engine local>
 
-```tsx
-import { Viewer, DocumentGate } from '@embedpdf/react/runtime';
-import { Stage, stagePlugin } from '@embedpdf/react/stage';
-import { RenderLayer, renderPlugin } from '@embedpdf/react/render';
-import { localEngine } from '@embedpdf/engine';
-
-const engine = localEngine();
-const plugins = [stagePlugin(), renderPlugin()];
-
-export function App() {
-  return (
-    <Viewer
-      engine={engine}
-      plugins={plugins}
-      initialDocuments={[{ source: { kind: 'url', url: '/contract.pdf' } }]}
-    >
-      <DocumentGate fallback={<p>Opening…</p>}>
-        <Stage style={{ height: 600 }}>{() => <RenderLayer />}</Stage>
-      </DocumentGate>
-    </Viewer>
-  );
-}
-```
+<Snippet name="start/overview" />
 
 </Engine>
 
 <Engine cloud>
 
-```tsx
-import { Viewer, DocumentGate } from '@embedpdf/react/runtime';
-import { Stage, stagePlugin } from '@embedpdf/react/stage';
-import { RenderLayer, renderPlugin } from '@embedpdf/react/render';
-import { cloudEngine } from '@cloudpdf/engine';
-
-const engine = cloudEngine({ baseUrl: 'https://pdf.example.com' });
-const plugins = [stagePlugin(), renderPlugin()];
-
-export function App() {
-  return (
-    <Viewer
-      engine={engine}
-      plugins={plugins}
-      initialDocuments={[{ source: { kind: 'token', token: () => fetchDocumentToken('contract') } }]}
-    >
-      <DocumentGate fallback={<p>Opening…</p>}>
-        <Stage style={{ height: 600 }}>{() => <RenderLayer />}</Stage>
-      </DocumentGate>
-    </Viewer>
-  );
-}
-```
+<Snippet name="start/overview-cloud" />
 
 </Engine>
 
@@ -99,8 +55,11 @@ A headless viewer has five parts. You meet them on every page:
 - **Plugins** add one feature each: search, annotations, forms. Register the ones you need; the
   rest never reach your bundle.
 - **Layers** draw inside each page: the page itself, the text selection, the annotations.
-- **Hooks** connect your own UI: `useSearch()` to search, `useSearchState()` to show the results,
-  `useSearchEvent()` to react when something happens.
+- <Fw only="react">**Hooks**</Fw><Fw only="vue">**Composables**</Fw><Fw only="svelte">**Functions**</Fw><Fw only="angular">**Services**</Fw> connect your own UI: <Fw only={['react', 'vue', 'svelte']}>`useSearch()`
+  to search, `useSearchState()` to show the results, `useSearchEvent()` to react when something
+  happens.</Fw><Fw only="angular">`inject(EpdfSearch)` gives you the plugin's methods to search,
+  its values as signals to show the results (`search.hitCount()`), and its events as streams to
+  react when something happens (`search.completed$`).</Fw>
 
 [How it works](concepts/how-it-works) explains each in a few minutes.
 
@@ -134,7 +93,7 @@ same place:
 ## Local or cloud
 
 The same viewer runs on either engine. Only how you create the engine and open a document differs;
-every plugin, hook and component stays the same.
+every plugin, <Word of="hook" /> and component stays the same.
 
 <Engine local>
 
@@ -179,7 +138,7 @@ stored as people make them, with everyone who has the document open seeing each 
   />
   <Card
     title="How it works"
-    description="Plugins, hooks, layers, and which document a component talks to."
+    description="Plugins, how your UI talks to them, layers, and which document a component talks to."
     href="concepts/how-it-works"
   />
 </Cards>

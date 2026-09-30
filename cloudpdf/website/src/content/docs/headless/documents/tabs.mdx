@@ -10,28 +10,7 @@ description: "Open several documents at once: tabs, side-by-side panes, and whic
 A viewer can hold several documents at once, like tabs in a browser. One of them is the active
 document, and every component talks to it unless you say otherwise:
 
-```tsx
-function Tabs() {
-  const documents = useDocuments();
-  const { documents: open, activeId } = useDocumentsState();
-
-  return (
-    <div role="tablist">
-      {open.map((document) => (
-        <button
-          key={document.id}
-          role="tab"
-          aria-selected={document.id === activeId}
-          onClick={() => documents.setActive(document.id)}
-        >
-          {document.name}
-          <span onClick={() => documents.close(document.id)}>×</span>
-        </button>
-      ))}
-    </div>
-  );
-}
-```
+<Snippet name="documents/tabs" />
 
 Each document keeps its own state: its zoom and scroll position, its selection, its search and its
 active tool. Switch tabs and back, and everything is where you left it.
@@ -45,81 +24,101 @@ documents.move(id, 0); // to the front
 await documents.close(id);
 ```
 
-Each entry in `useDocumentsState().documents` has the document's `id`, its `name`, and its
+Each entry in `documents`, from `useDocumentsState()`, has the document's `id`, its `name`, and its
 `status`: `'loading'`, `'locked'`, `'ready'` or `'error'`, so a tab can show a spinner or a lock.
+Every field is listed under [State](#state).
 
 ## Talk to a specific document
 
-A component talks to the active document. Inside a `<DocumentScope>`, it talks to the one you name,
+A component talks to the active document. Inside `<DocumentScope>`, it talks to the one you name,
 whatever is active:
 
-```tsx
-<DocumentScope id={documentId}>
-  <Stage>{() => <RenderLayer />}</Stage>
-  <ZoomControls />
-</DocumentScope>
-```
+<Snippet name="documents/document-scope" />
 
-Every hook inside, such as `useStage()` or `useSearch()`, uses that document. That's how you show
-two documents at once, or a preview of one while another is active.
+Everything inside, such as the Stage, `useSearch()` and `useSelection()`, uses that document.
+That's how you show two documents at once, or a preview of one while another is active.
 
 ## Side by side
 
 The view manager arranges documents into panes, each with its own tabs, like split editors in a
 code editor. Register `viewManagerPlugin()`, then render one Stage per pane:
 
-```tsx
-import { useViewManager, useViewManagerState } from '@embedpdf/react/view-manager';
+<Snippet name="documents/panes" />
 
-function Panes() {
-  const views = useViewManager();
-  const { panes, focusedPaneId } = useViewManagerState();
-
-  return (
-    <div className="panes">
-      {panes.map((pane) => (
-        <section key={pane.id} data-focused={pane.id === focusedPaneId} onFocus={() => views.setFocusedPane(pane.id)}>
-          <PaneTabs pane={pane} />
-          {pane.activeDocumentId && (
-            <DocumentScope id={pane.activeDocumentId}>
-              <Stage>{() => <RenderLayer />}</Stage>
-            </DocumentScope>
-          )}
-        </section>
-      ))}
-    </div>
-  );
-}
+```ts
+views.splitPane(documentId); // the document in a new pane, beside the focused one
+views.setActiveDocument(paneId, documentId); // show another of the pane's tabs
+views.moveDocumentBetween(fromPaneId, toPaneId, documentId); // drag a tab to another pane
+views.removePane(paneId); // its documents move to another pane
 ```
 
-| Call                                        | What it does                                              |
-| :------------------------------------------ | :-------------------------------------------------------- |
-| `views.splitPane(documentId)`               | Opens the document in a new pane beside the focused one   |
-| `views.removePane(paneId)`                  | Closes a pane; its documents move to another pane         |
-| `views.setActiveDocument(paneId, id)`       | Shows another of the pane's documents                     |
-| `views.moveDocumentBetween(id, from, to)`   | Drags a tab from one pane to another                      |
-| `views.setFocusedPane(paneId)`              | Makes a pane the one new documents open in                |
+A document opened with `documents.open()` lands in the focused pane. Every call is listed under
+[Methods](#methods).
 
-A document opened with `documents.open()` lands in the focused pane.
+## Methods
+
+What `useDocuments()` gives you for several documents. Opening and closing are on
+[Opening documents](opening#methods), downloading and printing on
+[Saving & downloading](saving#methods).
+
+| Method             | What it does                                                                                                           |
+| :----------------- | :--------------------------------------------------------------------------------------------------------------------- |
+| `setActive(id)`    | Makes a document the active one: the one every component talks to outside `<DocumentScope>`. [Manage the tabs](#manage-the-tabs)   |
+| `rename(id, name)` | Changes the name its tab shows. The file doesn't change.                                                               |
+| `move(id, index)`  | Moves a document to another place in the tab order                                                                     |
+| `swap(id, otherId)`| Swaps two documents in the tab order                                                                                   |
+| `setOrder(ids)`    | Puts every document in a new order at once. `ids` holds the id of every open document.                                 |
+
+Everything `useViewManager()` gives you.
+
+| Method                                                          | What it does                                                                                                    |
+| :-------------------------------------------------------------- | :-------------------------------------------------------------------------------------------------------------- |
+| `splitPane(documentId, { from? })`                              | Moves an open document into a new pane beside the focused one, or beside `from`, and focuses it. Returns the new pane's id. [Side by side](#side-by-side) |
+| `createPane({ documentIds? })`                                  | Adds a pane, empty or with these documents moved into it, and focuses it. Returns its id.                       |
+| `removePane(paneId, { moveDocumentsTo? })`                      | Closes a pane. Its documents move to `moveDocumentsTo`, or else to the focused or the last pane.                |
+| `movePane(paneId, index)`                                       | Moves a pane to another place in the order, for reordering panes by dragging                                    |
+| `setFocusedPane(paneId)`                                        | Makes a pane the focused one, where new documents open. `null` focuses none.                                    |
+| `setActiveDocument(paneId, documentId)`                         | Shows another of the pane's documents                                                                           |
+| `addDocument(paneId, documentId, index?)`                       | Adds a document to a pane's tabs. A document is in one pane at a time, so it leaves the pane it was in.         |
+| `removeDocument(paneId, documentId)`                            | Takes a document out of a pane, without closing it                                                              |
+| `moveDocumentWithin(paneId, documentId, index)`                 | Moves a tab to another place inside its pane                                                                    |
+| `moveDocumentBetween(fromPaneId, toPaneId, documentId, index?)` | Moves a tab from one pane to another, for dragging tabs between panes                                           |
+
+## State
+
+<StateIntro hook="useDocumentsState()" />
+
+| Field       | What it is                                                                                                      | Read once                                         |
+| :---------- | :-------------------------------------------------------------------------------------------------------------- | :------------------------------------------------ |
+| `documents` | Every open document, in tab order, including ones that are loading, locked or failed. Each has the fields [`useDocument()`](opening#state) gives you. | `list()`, `has(id)`, `getCount()`, `getOrder()` |
+| `activeId`  | The active document's id, or `null` with no document open                                                       | `getActiveId()`, or `getActive()` for its fields  |
+
+`has(id)` says whether a document is open, `getCount()` how many are, and `getOrder()` gives just their
+ids. One document's fields come from `get(id)`, on [Opening documents](opening#state).
+
+<StateIntro hook="useViewManagerState()" />
+
+| Field           | What it is                                                                                                     | Read once                                                                  |
+| :-------------- | :------------------------------------------------------------------------------------------------------------- | :------------------------------------------------------------------------- |
+| `panes`         | Every pane, in order. Each has its `id`, its `documentIds` (its tabs, in order) and the `activeDocumentId` it shows. | `listPanes()`, `getPane(paneId)`, `getPaneOrder()`, `getPaneOfDocument(documentId)` |
+| `focusedPaneId` | The pane new documents open in, or `null`                                                                      | `getFocusedPaneId()`                                                       |
+
+`getPane(paneId)` reads one pane, `getPaneOrder()` gives just their ids, and
+`getPaneOfDocument(documentId)` says which pane holds a document.
 
 ## Events
 
-```ts
-useDocumentsEvent(
-  (documents) => documents.onActiveChanged,
-  ({ documentId }) => router.replace(`/documents/${documentId}`),
-);
-```
+<Snippet name="documents/active-route" />
 
 | Event                        | Fires when                              | Carries                                 |
 | :--------------------------- | :-------------------------------------- | :-------------------------------------- |
 | `onActiveChanged`            | Another document became the active one  | `documentId`, `previousDocumentId`      |
 | View manager `onPaneCreated` | A pane was added                        | `paneId`                                |
 | View manager `onPaneRemoved` | A pane was closed                       | `paneId`                                |
-| View manager `onFocusChanged`| Another pane got the focus              | `paneId`                                |
-| View manager `onDocumentMoved` | A document moved between panes        | `documentId`, `from`, `to`              |
+| View manager `onFocusChanged`| Another pane got the focus              | `paneId`, or `null` when none has it    |
+| View manager `onDocumentMoved` | A document moved between panes        | `documentId`, `fromPaneId`, `toPaneId`  |
 
-The view manager's events come from `useViewManagerEvent()`. Opening and closing documents are on
+<Fw only={['react', 'vue', 'svelte']}>The view manager's events come from `useViewManagerEvent()`.</Fw><Fw only="angular">The view manager's events are streams on `inject(EpdfViewManager)`.</Fw> Opening and closing documents are on
 [Opening documents](opening#events).
 
 ## Good to know

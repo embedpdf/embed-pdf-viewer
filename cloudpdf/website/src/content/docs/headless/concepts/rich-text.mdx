@@ -37,8 +37,6 @@ have the full model: [Free text](/docs/engine/annotations/free-text#rich-text).
 The same calls work while someone types in a box and when boxes are only selected:
 
 ```ts
-const annotation = useAnnotation();
-
 await annotation.selection.update({ bold: true });
 await annotation.selection.update({ fontSize: 24, fontColor: '#c00000' });
 await annotation.text.toggleFormat('italic'); // italic on, or off if it already is
@@ -72,14 +70,9 @@ everything the user typed.
 
 The engine puts a font into the PDF, but the browser draws the text while people type, so it needs
 the same font. Register the font with the engine, and give the browser the same file under the same
-key:
+key<Fw only="angular">, in your `engine` function, which runs only in the browser</Fw>:
 
-```ts
-import { mountWebFont } from '@embedpdf/react/runtime';
-
-await engine.fonts.register({ key: 'brand-sans', data });
-const unmount = await mountWebFont('brand-sans', data);
-```
+<Snippet name="concepts/web-font" />
 
 The key is the font's name in both places: `fontFamily: 'brand-sans'` on a text box. The standard
 PDF fonts need nothing: Helvetica shows as `Helvetica, Arial, sans-serif`, and so on. More in
@@ -92,22 +85,8 @@ yourself](../annotations/custom-rendering), `useRichTextEditor()` makes your ele
 it draws the runs, turns typing back into runs, keeps the caret when the style changes, and handles
 pasting, input methods and the format shortcuts:
 
-```tsx
-import { useRichTextEditor, type AnnotationRendererProps } from '@embedpdf/react/annotation';
+<Snippet name="concepts/branded-text-box" />
 
-function BrandedTextBox({ annotation, box, page }: AnnotationRendererProps) {
-  const editor = useRichTextEditor(annotation, page);
-  const { x, y, width, height } = page.transform.pageToViewRect(box);
-
-  return (
-    <div
-      ref={editor.ref}
-      className={editor.editing ? 'text-box editing' : 'text-box'}
-      style={{ position: 'absolute', left: x, top: y, width, height, ...editor.style }}
-    />
-  );
-}
-```
-
-`editor.style` is the box's body style as CSS: font, size, color and alignment. The formatting
-calls above work on your element as they do on the built-in one.
+<Fw only="react">`editor.style` is the box's body style as CSS: font, size, color and alignment.</Fw><Fw only="vue">`style` is the box's body style as CSS: font, size, color and alignment.</Fw><Fw only="svelte">`editor.style` is the box's body style as a CSS string: font, size, color and alignment.</Fw><Fw only="angular">The directive gives your element the box's body style: font, size, color and alignment. Its
+`editing()` is true while someone types in the box.</Fw> The formatting calls above work on your element
+as they do on the built-in one.

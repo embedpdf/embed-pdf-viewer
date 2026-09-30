@@ -1,5 +1,5 @@
 import type { MDXComponents } from 'mdx/types';
-import Link from 'next/link';
+import { FrameworkLink, FwCode, Framework, StateIntroText, Word } from '@embedpdf/docs-kit';
 import type { AnchorHTMLAttributes, ReactNode } from 'react';
 
 import { CloudPdfCallout } from './cloudpdf-callout';
@@ -47,7 +47,7 @@ export function useMDXComponents(components?: MDXComponents): MDXComponents {
       />
     ),
     a: ({ href = '', ...props }: AnchorHTMLAttributes<HTMLAnchorElement>) => (
-      <Link
+      <FrameworkLink
         href={href}
         className="text-ep-blue font-semibold underline-offset-[3px] hover:underline"
         {...props}
@@ -93,6 +93,16 @@ export function useMDXComponents(components?: MDXComponents): MDXComponents {
     CodeExample,
     DocsOverview,
     Example,
+    // The headless docs, written for each framework (docs/conventions/docs-architecture.md).
+    Framework,
+    FwCode,
+    Snippet: (props: { name: string }) => <Example {...props} mode="code" kind="snippet" />,
+    StateIntro: (props: { hook: string }) => (
+      <p className="text-ep-ink mt-4 max-w-[70ch] font-sans text-[16.5px] leading-[1.7]">
+        <StateIntroText {...props} />
+      </p>
+    ),
+    Word,
     Fw,
     ...components,
   };

@@ -9,6 +9,17 @@ import { unified } from 'unified';
 import type { DocsEngine } from './axis';
 
 // eslint-disable-next-line import/no-unresolved — sibling plain-ESM module, typed by its .d.mts
+import {
+  FRAMEWORK_LABELS,
+  FRAMEWORK_WORDS,
+  FRAMEWORKS,
+  frameworkHref,
+  frameworkName,
+  inlineCodeContexts,
+  stateIntroParts,
+  type Framework,
+} from '../mdx/frameworks.mjs';
+// eslint-disable-next-line import/no-unresolved — sibling plain-ESM module, typed by its .d.mts
 import { applyInstallChannel } from '../mdx/install-channel.mjs';
 
 /**
@@ -191,8 +202,25 @@ function noteNode(text: string): AstNode {
   };
 }
 
-function createResolver(site: DocsMarkdownSite, integration: string | undefined) {
+/**
+ * The framework a headless page's names are shown for (`useSearch()` → `inject(EpdfSearch)`),
+ * or null when names stay as written.
+ */
+type FrameworkNames = { framework: Framework; contexts: Map<unknown, string> } | null;
+
+function createResolver(
+  site: DocsMarkdownSite,
+  integration: string | undefined,
+  names: FrameworkNames = null,
+) {
+  const framework =
+    integration && (FRAMEWORKS as readonly string[]).includes(integration)
+      ? (integration as Framework)
+      : null;
+
   function absoluteContentUrl(url: string) {
+    // Every docs link keeps the reader's framework, cross-site ones too.
+    if (framework) url = frameworkHref(url, framework);
     if (!url.startsWith('/')) return url;
     const resolved = site.resolveContentHref?.(url, integration) ?? url;
     return `${site.siteOrigin}${resolved}`;
@@ -232,6 +260,42 @@ function createResolver(site: DocsMarkdownSite, integration: string | undefined)
           return files?.length
             ? fileNodes(files)
             : [noteNode(`This example is not available for ${label} yet.`)];
+        }
+
+        if (node.name === 'Snippet') {
+          if (!integration) {
+            throw new Error('<Snippet> can only be exported from a variant-specific route.');
+          }
+          const name = stringAttribute(node, 'name');
+          const files = site.resolveExampleFiles(`snippets/${name}`, integration);
+          const label = site.variantLabel?.(integration) ?? integration;
+          return files?.length
+            ? fileNodes(files)
+            : [noteNode(`This code isn't written for ${label} yet.`)];
+        }
+
+        if (node.name === 'Framework') {
+          return [{ type: 'text', value: FRAMEWORK_LABELS[framework ?? 'react'] }];
+        }
+
+        if (node.name === 'Word') {
+          const word = stringAttribute(node, 'of') as keyof typeof FRAMEWORK_WORDS;
+          if (!FRAMEWORK_WORDS[word]) throw new Error(`<Word of="${word}"> is not a known word.`);
+          return [{ type: 'text', value: FRAMEWORK_WORDS[word][framework ?? 'react'] }];
+        }
+
+        if (node.name === 'StateIntro') {
+          const parts = stateIntroParts(stringAttribute(node, 'hook'), framework ?? 'react');
+          return [
+            {
+              type: 'paragraph',
+              children: parts.map((part) =>
+                part.code
+                  ? { type: 'inlineCode', value: part.text }
+                  : { type: 'text', value: part.text },
+              ),
+            },
+          ];
         }
 
         if (node.name === 'CodeExample') {
@@ -349,6 +413,11 @@ function createResolver(site: DocsMarkdownSite, integration: string | undefined)
         node.url = absoluteContentUrl(node.url);
       }
 
+      if (node.type === 'inlineCode' && names && typeof node.value === 'string') {
+        const context = names.contexts.get(originalNode) ?? 'name';
+        node.value = frameworkName(node.value, names.framework, context as never);
+      }
+
       if (node.children) node.children = resolveNodes(node.children);
       return [node];
     });
@@ -372,10 +441,20 @@ function applyInstallChannelToTree(node: AstNode): void {
 /** Resolve raw MDX to the plain Markdown AST one concrete route shows. */
 export function resolveDocsTreeWith(
   site: DocsMarkdownSite,
-  { sourceCode, integration }: Pick<RenderDocsMarkdownOptions, 'sourceCode' | 'integration'>,
+  {
+    sourceCode,
+    integration,
+    canonicalPath,
+  }: Pick<RenderDocsMarkdownOptions, 'sourceCode' | 'integration'> & { canonicalPath?: string },
 ) {
   const tree = markdownProcessor.parse(sourceCode) as AstNode;
-  tree.children = createResolver(site, integration)(tree.children ?? []);
+  // Headless pages show each framework's names; other pages keep them as written.
+  const headless = canonicalPath ? canonicalPath.includes('/docs/headless/') : true;
+  const names: FrameworkNames =
+    headless && integration && (FRAMEWORKS as readonly string[]).includes(integration)
+      ? { framework: integration as Framework, contexts: inlineCodeContexts(tree) }
+      : null;
+  tree.children = createResolver(site, integration, names)(tree.children ?? []);
   applyInstallChannelToTree(tree);
   return tree;
 }
@@ -390,7 +469,7 @@ export function renderDocsMarkdownWith(
   site: DocsMarkdownSite,
   { sourceCode, canonicalPath, integration, metadata, variantKey }: RenderDocsMarkdownOptions,
 ) {
-  const tree = resolveDocsTreeWith(site, { sourceCode, integration });
+  const tree = resolveDocsTreeWith(site, { sourceCode, integration, canonicalPath });
   const body = stringifyDocsTree(tree);
 
   const baseTitle = typeof metadata?.title === 'string' ? metadata.title : undefined;

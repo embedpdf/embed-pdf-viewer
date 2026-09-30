@@ -29,7 +29,7 @@ export const SAMPLE_ENTRY_FILENAMES: Record<string, string> = {
 /** Topics whose samples are not demo-built: they import packages that are
  *  not in this workspace (e.g. `@embedpdf/react-pdf-viewer`, the ready-made
  *  viewer). Docs still show the code; only the live-preview build skips them. */
-export const DEMO_EXCLUDED_TOPICS = ['viewer'];
+export const DEMO_EXCLUDED_TOPICS = ['viewer', 'snippets'];
 
 export type SampleVariant = {
   /** Manifest/entry key: `<topic path>/<base>.<fw>` */

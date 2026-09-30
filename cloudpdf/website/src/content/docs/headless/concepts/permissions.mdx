@@ -30,15 +30,10 @@ document (a locked annotation, a read-only field) and what's selected. You never
 yourself, and you never read permission names: which permission a call needs is the plugin's
 business, not yours.
 
-> **The rule:** show a button when its check is true. Read the check while you render, like any
+> **The rule:** show a button when its check is true. Read the check <Fw only="react">while you render</Fw><Fw only={['vue', 'angular']}>in your template</Fw><Fw only="svelte">in your markup</Fw>, like any
 > other state: the answer changes when the selection changes or the user gets new permissions.
 
-```tsx
-const annotation = useAnnotation();
-
-{annotation.canCreate() && <DrawingTools />}
-<button disabled={!annotation.canDelete(ref)}>Delete</button>
-```
+<Snippet name="concepts/annotation-actions" />
 
 ## One answer per annotation
 
@@ -53,17 +48,7 @@ the same: a field the user may not fill shows as read-only.
 Checks are there to keep your UI honest; the engine doesn't rely on them. A refused call rejects,
 the same way in every plugin:
 
-```ts
-import { isPluginError } from '@embedpdf/react/runtime';
-
-try {
-  await form.setValue(toFieldRef('total'), { value: '120.00' });
-} catch (error) {
-  if (isPluginError(error, 'permission-denied')) {
-    console.log(error.permission); // what was missing, such as 'doc.forms.fill'
-  }
-}
-```
+<Snippet name="concepts/permission-denied" />
 
 The local and the cloud engine refuse the same way, so this one check covers both.
 
@@ -76,36 +61,18 @@ A document gets its permissions when it opens, together with who the user is.
 
 <Engine local>
 
-On the local engine you give both. Once on the viewer, for every document it opens, and per document
+On the local engine you give both. Once <Fw only={['react', 'vue', 'svelte']}>on the viewer</Fw><Fw only="angular">in `provideEmbedPdf()`</Fw>, for every document it opens, and per document
 when one needs something else:
 
-```tsx
-<Viewer
-  engine={engine}
-  plugins={plugins}
-  identity={{ userId: 'u_381', displayName: 'Dana Smith' }}
-  scope={[
-    'doc.open',
-    'doc.render',
-    'doc.text.select',
-    'doc.annotate.read',
-    'annotations:create:self',
-    'annotations:update:self',
-    'annotations:delete:self',
-  ]}
-  initialDocuments={[
-    { source: report },
-    { source: archive, scope: ['doc.open', 'doc.render'] }, // this one is read-only
-  ]}
-/>
-```
+<Snippet name="concepts/viewer-permissions" />
 
 - **A document's own `scope` replaces the viewer's.** It's the whole list for that document, not an
   addition, so it means exactly what it says. The same goes for `identity`.
 - **`identity` is who the user is.** Permissions that say "their own" (`:self`) or "their group"
   (`:group`) are checked against it, so they need one: opening without it fails.
-- **A document keeps what it opened with.** Change the viewer's `scope` or `identity`, and the
-  documents you open after that get the new values.
+- **A document keeps what it opened with.** <Fw only={['react', 'vue', 'svelte']}>Change the viewer's `scope` or `identity`, and the
+  documents you open after that get the new values.</Fw><Fw only="angular">Documents you open later with other values, through
+  `documents.open()`, don't change the ones already open.</Fw>
 
 Code that opens documents itself passes the same options to
 `documents.open(source, { scope, identity })`.
@@ -150,7 +117,7 @@ Each plugin's page has a Permissions section with the permission behind each che
 | [Comments](../annotations/comments#permissions)  | `canReply(ref)` `canSetText(ref)` `canSetStatus(ref)` `canSetMarked(ref)` `canDelete(ref)` `canDeleteThread(ref)` |
 | [Stamps](../annotations/stamps#permissions)      | `canPlace()` `canCreateFromAnnotations()`                                                                 |
 | [Measurements](../annotations/measurements#permissions) | `canMeasure(page)` `canCalibrate()`                                                                |
-| [Redaction](../annotations/redaction#permissions) | `canMark()` `canApply()`                                                                                 |
+| [Redaction](../annotations/redaction#permissions) | `canMark()` `canUnmark(ref)` `canUpdateLabel(ref)` `canApply()`                                          |
 | [Forms](../forms#permissions)                    | `canRead()` `canFill()`; [building forms](../forms/building#permissions): `canDesign()`                  |
 | [Signatures](../forms/signatures#permissions)    | `canSign()` `canCertify()` `canFill()` `canReadRevision()`                                               |
 

@@ -8,30 +8,13 @@ description: "Show your viewer in the user's language: pick it, load its strings
 # Translations
 
 The translations plugin holds your viewer's text in every language you support, and switches between
-them while the app runs. Register it with the user's language, and translate with `useT()`:
+them while the app runs. Register it with the user's language:
 
-```tsx
-import { i18nPlugin, negotiateLocale, useT } from '@embedpdf/react/i18n';
+<Snippet name="ui/i18n-plugin" />
 
-const locale = negotiateLocale(['en', 'nl', 'de'], navigator.languages) ?? 'en';
+<Fw only={['react', 'vue', 'svelte']}>Then translate with `useT()`:</Fw><Fw only="angular">Then translate with the `epdfT` pipe:</Fw>
 
-const plugins = [
-  /* … */
-  i18nPlugin({
-    locale,
-    locales: [{ code: 'en', name: 'English', translations: en }],
-    loaders: {
-      nl: () => import('./locales/nl').then((module) => module.default),
-      de: () => import('./locales/de').then((module) => module.default),
-    },
-  }),
-];
-
-function SaveButton() {
-  const t = useT();
-  return <button>{t('toolbar.save')}</button>;
-}
-```
+<Snippet name="ui/save-button" />
 
 `negotiateLocale` picks the best language you have for what the browser asks, such as `nl` for a
 browser set to `nl-BE`. A language in `loaders` is loaded the first time someone switches to it, so
@@ -55,6 +38,8 @@ t('toolbar.save'); // 'Opslaan'
 t('search.results', { params: { count: 3 } }); // '3 resultaten'
 ```
 
+<Fw only="angular">In a template, the pipe takes the same options: `{{ 'search.results' | epdfT: { params: { count: 3 } } }}`.</Fw>
+
 - **`{name}`** is filled in from `params`.
 - **Plurals**: a string with `one` and `other` picks by `params.count`.
 - **Missing strings** fall back to the fallback language (English unless you set another), then to
@@ -63,25 +48,11 @@ t('search.results', { params: { count: 3 } }); // '3 resultaten'
 
 ## Switch the language
 
-```tsx
-function LanguagePicker() {
-  const i18n = useI18n();
-  const { locale, locales, loading } = useI18nState();
+<Snippet name="ui/language-picker" />
 
-  return (
-    <select value={locale} disabled={loading} onChange={(event) => i18n.setLocale(event.target.value)}>
-      {locales.map((language) => (
-        <option key={language.code} value={language.code}>
-          {language.name}
-        </option>
-      ))}
-    </select>
-  );
-}
-```
-
-`setLocale()` loads the language if it needs to, then switches. Everything that uses `useT()`
-re-renders in the new language.
+`setLocale()` loads the language if it needs to, then switches. <Fw only={['react', 'vue', 'svelte']}>Everything that uses `useT()`
+<Word of="rerenders" /> in the new language.</Fw><Fw only="angular">Every `epdfT` pipe updates to the new
+language.</Fw>
 
 ## Add strings later
 
@@ -102,17 +73,39 @@ stamps. Change any of them with `addTranslations`, under the same keys.
 
 ## Right-to-left languages
 
-A language can say it reads right to left with `dir: 'rtl'`. `useI18nState().direction` tells you,
-so you can set it on your viewer's root:
+A language can say it reads right to left with `direction: 'rtl'`. `direction` in [State](#state) tells
+you, so you can set it on your viewer's root:
 
-```tsx
-const { direction } = useI18nState();
-
-return <div dir={direction}>{/* your viewer */}</div>;
-```
+<Snippet name="ui/direction" />
 
 For documents that read right to left, such as a book in Arabic, set the Stage's `direction` too, so
 pages and spreads run from right to left.
+
+## Methods
+
+Everything `useI18n()` gives you.
+
+| Method                              | What it does                                                                                                                                  |
+| :---------------------------------- | :-------------------------------------------------------------------------------------------------------------------------------------------- |
+| `t(key, { params?, fallback? })`    | A string in the current language, with `params` filled in. <Fw only={['react', 'vue', 'svelte']}>In a component, use `useT()`, which <Word of="rerenders" /> when the language changes.</Fw><Fw only="angular">In a template, use the `epdfT` pipe, which updates when the language changes.</Fw> [Strings](#strings) |
+| `getTranslator()`                   | A `t` function that stays the same until the language or the strings change, for code that caches on it.<Fw only={['react', 'vue', 'svelte']}> `useT()` returns it.</Fw>                 |
+| `hasKey(key)`                       | Whether a key has a string in the current or the fallback language. Never warns.                                                              |
+| `setLocale(code)`                   | Loads the language if it needs to, then switches. Resolves once it shows; rejects when it can't load, or when a newer call replaces it. [Switch the language](#switch-the-language) |
+| `addTranslations(code, translations)` | Adds strings to one of your languages, loaded or not, and replaces the ones with the same key. [Add strings later](#add-strings-later)        |
+| `registerLocale(locale)`            | Adds a whole language, `{ code, name, direction?, translations }`, and returns a function that removes it again                                     |
+
+Every method that returns a promise also takes a `signal` in its options, to cancel it.
+
+## State
+
+<StateIntro hook="useI18nState()" />
+
+| Field       | What it is                                                                                          | Read once            |
+| :---------- | :-------------------------------------------------------------------------------------------------- | :------------------- |
+| `locale`    | The current language's code                                                                         | `getLocale()`        |
+| `direction` | `'ltr'` or `'rtl'`, how the current language reads                                                  | `getDirection()`     |
+| `locales`   | Every language you can switch to, loaded or not, each with `code`, `name`, `direction` and `loaded`. A language in `loaders` shows its code as its `name` until it's loaded. | `listLocales()` |
+| `loading`   | The code of the language being loaded, or `null`                                                    | `getLoadingLocale()` |
 
 ## Settings
 
@@ -127,17 +120,12 @@ Set them when you register the plugin.
 
 ## Events
 
-```ts
-useI18nEvent(
-  (i18n) => i18n.onLocaleChanged,
-  ({ locale }) => document.documentElement.setAttribute('lang', locale),
-);
-```
+<Snippet name="ui/locale-events" />
 
 | Event                | Fires when                               | Carries                     |
 | :------------------- | :--------------------------------------- | :-------------------------- |
 | `onLocaleChanged`    | The language changed                     | `locale`, `previousLocale`  |
-| `onLocaleLoadFailed` | A language couldn't be loaded            | `code`, `error`             |
+| `onLocaleLoadFailed` | A language couldn't be loaded            | `locale`, `error`           |
 
 ## Good to know
 
@@ -149,5 +137,5 @@ viewer can be translated too.
 ### A language that fails to load
 
 When a language in `loaders` can't be loaded, for example because the user is offline, the viewer
-stays in the language it had, and `onLocaleLoadFailed` tells you why. Call `setLocale()` again to
+stays in the language it had, and <Fw only={['react', 'vue', 'svelte']}>`onLocaleLoadFailed`</Fw><Fw only="angular">`localeLoadFailed$`</Fw> tells you why. Call `setLocale()` again to
 try once more.

@@ -16,8 +16,6 @@ place it:
 <Example name="stamp/basic" mode="open" />
 
 ```ts
-const stamp = useStamp();
-
 const { library } = await stamp.importLibrary(await loadDefaultLibrary('en'));
 await stamp.armAsset(assetId); // the next click places it
 ```
@@ -25,7 +23,7 @@ await stamp.armAsset(assetId); // the next click places it
 - **A library names itself.** A library is a PDF: its title is the library's name, and its named
   pages are the stamps. An Acrobat stamp file imports as it is.
 - **Libraries are shared, placing is per document.** Every open document sees the same libraries.
-  Arming and placing act on the document `useStamp()` is in, like every other hook.
+  Arming and placing act on the document your component is in, like every other <Word of="hook" />.
 - **The preview stays sharp.** A vector stamp is drawn for the size it's shown at, so a big stamp at
   300% is as crisp as the placed one.
 
@@ -57,39 +55,30 @@ await stamp.updateAsset(asset.id, { label: 'PAID' });
 
 ## Show a stamp picker
 
-```tsx
-function StampPicker({ libraryId }: { libraryId: string }) {
-  const stamp = useStamp();
-  const assets = useStampAssets({ libraryId });
+A button per stamp arms it, and each button shows the stamp's preview:
 
-  return assets.map((asset) => (
-    <button key={asset.id} onClick={() => stamp.armAsset(asset.id)}>
-      <StampPreview assetId={asset.id} />
-      {asset.label}
-    </button>
-  ));
-}
+<Snippet name="annotations/stamps-picker" />
 
-function StampPreview({ assetId }: { assetId: string }) {
-  const url = useStampAssetPreviewUrl(assetId);
-  return url ? <img src={url} alt="" /> : null;
-}
-```
+<Snippet name="annotations/stamps-preview" />
 
 `useStampLibraries()` lists the libraries, and `useStampAssets({ libraryId })` the stamps in one.
-Both update when stamps are added, renamed or removed.
+Both update when stamps are added, renamed or removed.<Fw only={['react', 'vue', 'svelte']}> `useStampState().armedAsset`
+is the armed stamp, to show which button is on.</Fw><Fw only="angular"> `stamp.armedAsset()` is the armed stamp, to
+show which button is on.</Fw>
 
 ## Library kinds
 
 A library says what it holds: `kind` is `'stamps'` (the default), `'signatures'` (a person's marks;
-see [Signatures](../forms/signatures)), or a name of your own. A picker asks for the kinds it shows:
+see [Signatures](../forms/signatures)), or a name of your own:
 
 ```ts
 await stamp.createLibrary('Review marks', { kind: 'review' });
 await stamp.importLibrary(bytes, { libraryKind: 'legal-seals' }); // override what the file says
-
-useStampLibraries({ kind: ['stamps', 'legal-seals'] });
 ```
+
+A picker asks for the kinds it shows:
+
+<Snippet name="annotations/stamps-library-kinds" />
 
 ## Draw or type a stamp
 
@@ -114,13 +103,13 @@ inputs:
 ```ts
 const { annotation } = await stamp.placeAsset(assetId, {
   page: page.ref,
-  at: { x: 120, y: 90 }, // the stamp's center, in page coordinates
+  center: { x: 120, y: 90 }, // where the stamp's middle goes, in page coordinates
   targetWidth: 160, // optional: the stamp's own size by default
   rotation: 0, // optional: degrees clockwise
 });
 
 // The same stamp on several pages, such as "DRAFT" on every page
-await stamp.placeAssetOnPages(assetId, 'all', { at: { x: 300, y: 400 } });
+await stamp.placeAssetOnPages(assetId, 'all', { center: { x: 300, y: 400 } });
 ```
 
 The box keeps the stamp's proportions and stays on the page. The placed annotation carries the
@@ -151,12 +140,7 @@ you. `persistStampLibraries` and `restoreStampLibraries` connect a library to a 
 
 <Example name="stamp/persist" mode="open" />
 
-```ts
-useEffect(() => {
-  void restoreStampLibraries(stamp, store); // import every stored library
-  return persistStampLibraries(stamp, store, { except: ['embedpdf-standard'] });
-}, [stamp]);
-```
+<Snippet name="annotations/stamps-persist" />
 
 A store has three calls, `list`, `put` and `delete`, over bytes by library id.
 `indexedDbByteStore` is the browser default, and `memoryStampStore` is for tests. Writes are
@@ -173,15 +157,59 @@ The library itself never changes. `stampPlugin({ dynamic: false })` keeps stamps
 
 `@embedpdf/default-stamps` has the standard set as one library per language (`en`, `de`, `nl`, `fr`,
 `es`, `zh-CN`, `sv`, `ja`), each with the same identifiers and translated labels. It loads from your
-own build, so nothing is fetched from anywhere else:
+own build, so nothing is fetched from anywhere else. `negotiateLocale`, from `@embedpdf/react/i18n`,
+picks the one closest to the reader's language:
 
 ```ts
 import { LOCALES, loadDefaultLibrary } from '@embedpdf/default-stamps/library';
-import { negotiateLocale } from '@embedpdf/react/i18n';
 
 const locale = negotiateLocale(LOCALES, navigator.languages) ?? 'en';
 await stamp.importLibrary(await loadDefaultLibrary(locale));
 ```
+
+## Methods
+
+Everything `useStamp()` gives you.
+
+| Method                                                         | What it does                                                                                                                                                                  |
+| :------------------------------------------------------------- | :---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `listLibraries({ kind? })`                                     | Every library, or the ones of the kinds you ask for. In a component, use `useStampLibraries({ kind? })`. [Library kinds](#library-kinds)                                      |
+| `getLibrary(libraryId)`                                        | One library, or `null`                                                                                                                                                        |
+| `listAssets({ libraryId? })`                                   | Every stamp, or the ones in one library, in the order a picker shows them. In a component, use `useStampAssets({ libraryId })`. [Show a stamp picker](#show-a-stamp-picker)  |
+| `getAsset(assetId)`                                            | One stamp, or `null`                                                                                                                                                          |
+| `getAssetPreview(assetId)`, `renderAssetPreview(assetId, { width })` | A stamp's picture as `{ bytes, mimeType }`, or `null`: the thumbnail at the `previewWidth` setting, or one drawn at any width. In a component, `useStampAssetPreviewUrl(assetId)` gives an image URL. |
+| `readAssetBytes(assetId)`                                      | A copy of the stamp's artwork as a one-page PDF, or `null`                                                                                                                    |
+| `createLibrary(name, { kind? })`                               | Creates an empty library. Resolves `{ library }`. [Library kinds](#library-kinds)                                                                                             |
+| `updateLibrary(libraryId, changes)`                            | Renames a library, or changes its categories. Resolves `{ library }`.                                                                                                         |
+| `deleteLibrary(libraryId)`                                     | Removes a library and every stamp in it                                                                                                                                       |
+| `importLibrary(bytes, { libraryKind? })`                       | Makes a library from a PDF: an Acrobat stamp file as it is, a plain PDF with one stamp per page. Resolves `{ library }`. [A library is a PDF](#a-library-is-a-pdf)           |
+| `exportLibrary(libraryId)`                                     | The library as the PDF it is, to store or to open in Acrobat                                                                                                                  |
+| `createAsset({ libraryId?, label, source })`                   | Adds a stamp from a one-page PDF, a PNG or a JPEG, or from a `mark` instead of `source`. Without `libraryId`, it gets a library of its own. Resolves `{ asset }`. [Draw or type a stamp](#draw-or-type-a-stamp) |
+| `createAssetFromAnnotations(page, refs, { libraryId?, label })` | Turns annotations on a page into one stamp, exactly as they look. Resolves `{ asset }`. [Make a stamp from annotations](#make-a-stamp-from-annotations)                     |
+| `updateAsset(assetId, changes)`                                | Changes a stamp's label, subject or categories; its identifier never changes. Resolves `{ asset }`.                                                                           |
+| `deleteAsset(assetId)`                                         | Removes a stamp from its library                                                                                                                                              |
+| `moveAsset(assetId, { libraryId })`                            | Moves a stamp to another library. Resolves `{ asset }`, which has a new id there.                                                                                             |
+| `duplicateAsset(assetId, { label? })`                          | Copies a stamp within its library. Resolves `{ asset }`.                                                                                                                      |
+| `armAsset(assetId, { targetWidth? })`                          | Arms a stamp: the next click on a page places it, with a preview under the pointer. [Show a stamp picker](#show-a-stamp-picker)                                               |
+| `disarm()`                                                     | Disarms the stamp without placing it                                                                                                                                          |
+| `placeAsset(assetId, { page, center, targetWidth?, rotation?, select? })` | Places a stamp without the pointer, its middle on `center`. Resolves `{ annotation }`. [Place a stamp with code](#place-a-stamp-with-code)                                   |
+| `placeAssetOnPages(assetId, pages, { center, … })`             | Places the same stamp at the same spot on several pages, or on `'all'`. Resolves `{ applied, skipped, failed }`: the placed stamps, and the pages that were skipped or failed. |
+| `canPlace()`, `canCreateFromAnnotations()`                     | Whether placing a stamp, and making one from annotations, are allowed. [Permissions](#permissions)                                                                           |
+| `canImport()`                                                  | Whether libraries can be imported here. It turns `false` once an import finds no local engine to open them in; see [Settings](#settings).                                    |
+
+Every method that returns a promise also takes a `signal` in its options, to cancel it.
+
+## State
+
+<StateIntro hook="useStampState()" />
+
+| Field        | What it is                                            | Read once           |
+| :----------- | :---------------------------------------------------- | :------------------ |
+| `armedAsset` | The stamp the next click on this document places, or `null` | `getArmedAsset()` |
+
+The libraries and their stamps come from `useStampLibraries()` and `useStampAssets({ libraryId })`.<Fw only="react">
+Keeping them apart means a component that only shows the armed stamp doesn't re-render when a library
+changes.</Fw>
 
 ## Settings
 
@@ -203,22 +231,18 @@ like any annotation.
 
 ## Events
 
-```ts
-useStampEvent(
-  (stamp) => stamp.onLibraryChanged,
-  ({ libraryId, reason }) => console.log(libraryId, reason),
-);
-```
+<Snippet name="annotations/stamps-events" />
 
 | Event              | Fires when                                                   | Carries                  |
 | :----------------- | :----------------------------------------------------------- | :----------------------- |
 | `onLibraryChanged` | Anything in a library changed: the one to save it on         | `libraryId`, `reason`    |
-| `onLibraryCreated`, `onLibraryUpdated`, `onLibraryDeleted` | A library was added, renamed or removed | `library` |
-| `onAssetCreated`, `onAssetUpdated`, `onAssetDeleted` | A stamp was added, changed or removed | `asset`       |
+| `onLibraryCreated`, `onLibraryUpdated`, `onLibraryDeleted` | A library was added, changed or removed | `libraryId`, `library` |
+| `onAssetCreated`, `onAssetUpdated`, `onAssetDeleted` | A stamp was added, changed or removed | `assetId`, `libraryId`, `asset` |
 | `onArmChanged`     | A stamp was armed or disarmed                                | `documentId`, `asset`    |
 
 `reason` is `'created'`, `'imported'`, `'updated'`, `'asset-added'`, `'asset-updated'`,
-`'asset-removed'` or `'removed'`.
+`'asset-removed'` or `'removed'`. `library` and `asset` are the new values, and `null` in the
+deleted events; in the arm event, `asset` is `null` when the stamp was disarmed.
 
 ## Permissions
 
