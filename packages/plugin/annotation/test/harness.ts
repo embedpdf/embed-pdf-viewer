@@ -17,6 +17,7 @@ import type {
 } from '@embedpdf/engine-core/runtime';
 import { pageAnnotationOf, toPageRef } from '@embedpdf/engine-core/runtime';
 import { InteractionToken } from '@embedpdf/plugin-interaction/contract/host';
+import { SelectionToken } from '@embedpdf/plugin-selection/contract';
 import { vi } from 'vitest';
 
 import { createAnnotationController } from '../src/controller';
@@ -57,6 +58,8 @@ export const snapshotOf = (records: readonly FileAnnotation[], auditHead?: numbe
 export interface AnnotationHarnessOptions {
   /** The first page's crop box in PDF points (default: a 600 × 800 page at the origin). */
   readonly crop?: { left: number; bottom: number; right: number; top: number };
+  /** A text selection plugin to read and clear (`applyToolToSelection`, `createFromSelection`). */
+  readonly selection?: object;
 }
 
 const DEFAULT_CROP: PdfRect = { left: 0, bottom: 0, right: 600, top: 800 };
@@ -99,7 +102,10 @@ export function annotationHarness(options: AnnotationHarnessOptions = {}) {
   const ctx = createTestContext<AnnotationState>({
     id: 'annotation',
     state: initialAnnotationState(),
-    capabilities: [[InteractionToken, interaction]],
+    capabilities: [
+      [InteractionToken, interaction],
+      ...(options.selection ? [[SelectionToken, options.selection] as const] : []),
+    ],
     pages: [
       options.crop
         ? { ref: PAGE, crop: options.crop }

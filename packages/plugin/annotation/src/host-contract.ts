@@ -201,7 +201,14 @@ export interface AnnotationHostCapability extends AnnotationCapability {
   placeArmedStamp(page: PageRef, point: Point, displayRotation?: PageRotation): boolean;
   requestStampAt(page: PageRef, point: Point, displayRotation?: PageRotation): boolean;
 
-  // ── markup bridge (the selection plugin's commit path) ──
+  // ── markup bridge (the selection plugin meets the text tools) ──
+  /**
+   * Turn the text selection into what the tool makes of it (markup, a caret,
+   * a replace-text pair) and clear the selection; `false`, and nothing, for a
+   * tool that makes nothing of a selection, without create authority, or
+   * without a selection.
+   */
+  applyToolToSelection(toolId: string): boolean;
   createMarkup(subtype: KindName, page: PageRef, quads: Quad[], preset?: string): void;
   createCaret(page: PageRef, anchor: TextEndAnchor): void;
   createReplaceText(page: PageRef, quads: Quad[], anchor: TextEndAnchor, preset?: string): void;
