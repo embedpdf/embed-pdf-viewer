@@ -20,7 +20,7 @@ const refOf = (page: PageRef, annotObjectNumber: number): AnnotationRef => ({
   objectNumber: annotObjectNumber,
 });
 
-  /** An annotation as a read returns it, with the fields the import checks. */
+/** An annotation as a read returns it, with the fields the import checks. */
 function annotation(
   page: PageRef,
   annotObjectNumber: number,
@@ -33,6 +33,7 @@ function annotation(
     page,
     index,
     identityQuality: 'durable',
+    hasAppearance: true,
     nm: null,
     rect: box,
     // A square's shape is its box; a note's icon fills its rect.

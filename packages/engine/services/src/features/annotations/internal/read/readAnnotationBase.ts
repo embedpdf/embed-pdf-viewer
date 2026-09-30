@@ -17,6 +17,9 @@ import { pdfDateToIso } from '../../../../shared/pdf-date';
 import { ActionReadBudgetTracker, readActionModel } from '../../../actions/ActionModelReader';
 import { blendModeFromCode } from '../blendMode';
 
+/** `FPDF_ANNOT_APPEARANCEMODE_NORMAL`: the `/AP /N` stream. */
+const APPEARANCE_MODE_NORMAL = 0;
+
 /**
  * Reads the fields every annotation DTO carries: identity, flags, rect,
  * contents, relationships, attribution and actions, each present and `null`
@@ -54,6 +57,7 @@ export function readAnnotationBase(
     page: toPageRef(pageObjectNumber),
     index,
     identityQuality: identity.identityQuality,
+    hasAppearance: fn.EPDFAnnot_HasAppearanceStream(annotPtr, APPEARANCE_MODE_NORMAL),
     nm: identity.nm,
     ...flags,
     rect,

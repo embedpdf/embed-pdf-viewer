@@ -339,9 +339,10 @@ function asTaken(bundle: AnnotationBundle, dropped: readonly AnnotationImportDro
 /**
  * What two documents can agree on after import. Refs to
  * annotations become positions in the bundle, pages their position in the
- * source document; `index`, `importedBy`, `identityQuality` (how the
- * source stored it) and a file's size and checksum (the bytes', which are
- * compared by their id) go, and in `stamp` mode the attribution it stamps.
+ * source document; `index`, `importedBy`, `identityQuality` and
+ * `hasAppearance` (how the source stored it: an import draws its copies from
+ * data) and a file's size and checksum (the bytes', which are compared by
+ * their id) go, and in `stamp` mode the attribution it stamps.
  * A link's `activate` action is its `target`, compared there: a `/Dest`
  * and the `/A` a copy writes for it read the same target.
  */
@@ -389,6 +390,7 @@ function normalized(bundle: AnnotationBundle, attribution: Attribution) {
         index: _index,
         importedBy: _importedBy,
         identityQuality: _identityQuality,
+        hasAppearance: _hasAppearance,
         popup,
         reply,
         ...rest

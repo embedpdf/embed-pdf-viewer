@@ -87,6 +87,12 @@ export interface AnnotationAppearancesQuery {
  * a free-text callout, a turned drawing that reaches past its box,
  * and appearances with any other matrix — renders as-is with `rect` =
  * `/Rect` and needs no transform.
+ *
+ * An annotation with no normal appearance in the file (`hasAppearance`
+ * false) renders as the engine draws it in memory, never written: `rect` is
+ * the box that drawing takes, which can reach past `/Rect` (a line's
+ * arrowhead on a `/Rect` with no height). One the engine can't draw without
+ * writing an appearance has no raster.
  */
 export interface AnnotationAppearanceRaster<C extends Coordinates = PageCoordinates> {
   /** Full wire identity (durable or weak), including index-only annotations. */

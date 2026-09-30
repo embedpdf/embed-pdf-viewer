@@ -5,7 +5,8 @@ import { InteractionToken } from '@embedpdf/plugin-interaction/contract';
 
 /**
  * Links are annotations: while a navigation tool is active the link layer
- * owns their pixels, so the annotation plugin's behavior for them stands down.
+ * owns their input (its anchors take the clicks), so the annotation plane
+ * stands down for them. A link still shows as the file draws it.
  */
 export function connectLink(ctx: PluginContext<void>): void {
   const annotation = ctx.tryGet(AnnotationToken);

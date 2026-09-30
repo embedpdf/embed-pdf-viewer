@@ -6,12 +6,13 @@
 import { toPageRef, type AnnotationPatch } from '@embedpdf/engine-core/runtime';
 import { describe, expect, it } from 'vitest';
 
-import { modelWith, recordOf, step, STYLE } from './support';
+import { modelWith, recordOf, step, STYLE, withAnnotation } from './support';
 import {
   applyChange,
   drawnAfter,
   rasterPlacement,
   sourceDuring,
+  sourceOfConfirmed,
   sourceOfNew,
 } from '../src/appearance';
 import { DRAWN_FLAGS } from '../src/flags';
@@ -159,5 +160,23 @@ describe('a new record', () => {
   it('draws live, except a stamp, which shows its image', () => {
     expect(sourceOfNew(baked('square').annotation)).toBe('vector');
     expect(sourceOfNew(baked('stamp').annotation)).toBe('baked');
+  });
+});
+
+describe('a record the engine reports', () => {
+  it('draws from the raster, unless this session drew it live', () => {
+    expect(sourceOfConfirmed(baked('square').annotation, false)).toBe('baked');
+    expect(sourceOfConfirmed(baked('square').annotation, true)).toBe('vector');
+  });
+
+  it('with no appearance in the file, draws live: every viewer draws that one from its fields', () => {
+    const bare = withAnnotation(baked('square'), { hasAppearance: false });
+    expect(sourceOfConfirmed(bare.annotation, false)).toBe('vector');
+  });
+
+  it('a stamp is always its raster, with or without an appearance', () => {
+    const bare = withAnnotation(baked('stamp'), { hasAppearance: false });
+    expect(sourceOfConfirmed(bare.annotation, false)).toBe('baked');
+    expect(sourceOfConfirmed(bare.annotation, true)).toBe('baked');
   });
 });

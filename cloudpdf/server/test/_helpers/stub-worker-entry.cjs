@@ -198,6 +198,7 @@ function annotationDto(a, index) {
     page: pageRef(a.pon),
     index,
     identityQuality: 'durable',
+    hasAppearance: true,
     nm: a.nm,
     flags: {
       invisible: false,

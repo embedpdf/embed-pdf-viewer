@@ -5,6 +5,7 @@ import {
 } from '../../dto/RichText';
 import type { AnnotationRef } from '../../identity/AnnotationRef';
 import type { Coordinates } from '../../pageSpace/coordinates';
+import { UNBAKED_KINDS } from '../appearance';
 import { annotationDefaultsOf } from '../defaults';
 import type { DescribeFont } from '../fontFaces';
 import { declarationOf, type AnnotationDraft, type AnnotationDTO } from '../kinds';
@@ -86,6 +87,7 @@ export function annotationOfResolvedDraft<C extends Coordinates>(
   read.page = context.ref.page;
   read.index = context.index;
   read.identityQuality = 'durable';
+  read.hasAppearance = !UNBAKED_KINDS.has(subtype);
   if (read.rect === null) read.rect = context.rect ?? given.rect ?? given.box ?? NO_BOX;
 
   if (subtype === 'free-text') freeTextReadOf(given, read);

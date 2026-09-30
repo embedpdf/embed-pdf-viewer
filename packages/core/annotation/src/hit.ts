@@ -106,7 +106,7 @@ const hitGeomOf = (record: ModelAnnotation, view: ViewEnv | undefined): Shape =>
 const hitStrokeOf = (record: ModelAnnotation, view: ViewEnv | undefined): number =>
   anchoredStrokeWidth(styleOf(record.annotation).strokeWidth, anchorModeOf(record), view);
 
-// `opaqueBody` kinds (stamp images) are visible across their whole box, so they
+// `opaqueBody` kinds (stamp images, note icons) are visible across their whole box, so they
 // hit like a filled shape. Not keyed on `source: 'baked'` — every annotation
 // loaded from a PDF starts baked, and an unfilled square must still be grabbed
 // only on its outline.

@@ -156,6 +156,7 @@ function boxOf(rect: Rect, page: PageContextValue) {
 function paintAttrs(paint: Paint) {
   return {
     fill: paint.fill ?? 'none',
+    fillRule: paint.fillRule, // undefined → SVG default (nonzero); even-odd punches icon holes
     stroke: paint.stroke ?? 'none',
     strokeWidth: paint.width,
     opacity: paint.opacity,
@@ -930,7 +931,14 @@ export function AnnotationLayer({ renderers }: AnnotationLayerProps = {}) {
               />
             );
           } else {
-            out = null; // engaged but no renderer wired — the owner shows nothing
+            // Engaged with no renderer wired: the behavior's plugin owns the
+            // input (a link's anchor takes the click), and the annotation
+            // keeps its own look.
+            out = (
+              <div {...INERT} style={{ pointerEvents: 'none' }}>
+                {native}
+              </div>
+            );
           }
         } else {
           const entry = renderers?.find(

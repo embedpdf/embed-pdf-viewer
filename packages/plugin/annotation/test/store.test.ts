@@ -34,6 +34,7 @@ const base = (objectNumber: number) => ({
   page: PAGE,
   index: objectNumber,
   identityQuality: 'durable',
+  hasAppearance: true,
   nm: null,
   ...FLAGS,
   contents: null,

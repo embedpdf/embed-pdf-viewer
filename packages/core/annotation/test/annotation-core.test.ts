@@ -107,7 +107,9 @@ const marqueePtr = (
   in: { page: PAGE, point: { x, y }, shift },
 });
 const createPtr = (
-  subtype: Extract<KindName, 'square' | 'circle' | 'line' | 'polygon' | 'polyline'> | 'free-text',
+  subtype:
+    | Extract<KindName, 'square' | 'circle' | 'line' | 'polygon' | 'polyline' | 'link'>
+    | 'free-text',
   phase: 'down' | 'move' | 'up',
   x: number,
   y: number,
@@ -902,6 +904,17 @@ describe('annotation-core', () => {
 
   it('active marquee draft emits a marquee chrome node', () => {
     const model = run(initialModel, [marqueePtr('down', 10, 20), marqueePtr('move', 40, 60)]);
+    expect(chrome(model, PAGE)).toContainEqual({
+      kind: 'marquee',
+      rect: { x: 10, y: 20, width: 30, height: 40 },
+    });
+  });
+
+  it('a link being drawn shows as the rubber band: it has no drawing of its own', () => {
+    const model = run(initialModel, [
+      createPtr('link', 'down', 10, 20),
+      createPtr('link', 'move', 40, 60),
+    ]);
     expect(chrome(model, PAGE)).toContainEqual({
       kind: 'marquee',
       rect: { x: 10, y: 20, width: 30, height: 40 },

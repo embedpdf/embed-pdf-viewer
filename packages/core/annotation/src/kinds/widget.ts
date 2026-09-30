@@ -21,6 +21,7 @@ const WIDGET_CAPS: KindCaps = {
   groupMovable: true,
   hasFill: true,
   opaqueBody: true,
+  rasterOnly: true,
   ignoresReadOnly: true,
 };
 

@@ -4,16 +4,17 @@
  * will bring.
  *
  * The engine's own functions state the fields the change writes
- * (`annotationOfDraft`, `applyAnnotationPatch`). One field the engine works
- * out as it writes: a drawn kind's `rect` (`DRAWN_RECT_KINDS`), the upright
- * box around what its appearance paints. It follows the engine's own verdict
- * on the change (`appearanceChangeOf`):
+ * (`annotationOfDraft`, `applyAnnotationPatch`). Two fields the engine works
+ * out as it writes, and they follow its own verdict on the change
+ * (`appearanceChangeOf`): a drawn kind's `rect` (`DRAWN_RECT_KINDS`), the
+ * upright box around what its appearance paints, and `hasAppearance`,
+ * whether the file holds that appearance:
  *
- * | The change                          | `rect`                                      |
- * | :---------------------------------- | :------------------------------------------ |
- * | Nothing visible                     | as it is                                    |
- * | A pure move                         | moved the same distance                     |
- * | Anything else visible, and a create | the box around the new drawing              |
+ * | The change                          | `rect`                         | `hasAppearance`          |
+ * | :---------------------------------- | :----------------------------- | :----------------------- |
+ * | Nothing visible                     | as it is                       | as it is                 |
+ * | A pure move                         | moved the same distance        | as it is                 |
+ * | Anything else visible, and a create | the box around the new drawing | baked                    |
  *
  * The engine measures that box on the appearance it bakes; the viewer
  * measures it on the drawing it draws live (`drawnBoundsOf`). The two
@@ -22,7 +23,9 @@
  * `packages/engine/main/test/annotation-rect.test.ts` holds them to it.
  *
  * A kind whose shape is its rect (a link, a note, a form field) states its
- * rect itself.
+ * rect itself. A link or form widget gets no appearance of the engine's
+ * (`UNBAKED_KINDS`): whether the file holds one stays as it was, and a new
+ * one has none.
  */
 import {
   annotationOfDraft,
@@ -30,6 +33,7 @@ import {
   applyAnnotationPatch,
   DRAWN_RECT_KINDS,
   resolveAnnotationPatch,
+  UNBAKED_KINDS,
   type AnnotationDraft,
   type AnnotationDTO,
   type AnnotationPatch,
@@ -84,22 +88,26 @@ export function annotationOfNew(
 
 /**
  * `annotation` after `patch`, as the engine reads it back: the patch applied
- * by the engine's own rules, and a drawn kind's `rect` as the engine's
+ * by the engine's own rules, and the fields the engine works out as its
  * verdict on the change says (the table at the top of this file). Throws, as
  * the engine would refuse it, for a patch the annotation doesn't take.
  */
 export function annotationAfter(annotation: AnnotationDTO, patch: AnnotationPatch): AnnotationDTO {
   const after = applyAnnotationPatch(annotation, patch);
-  if (!rectFollowsDrawing(after)) return after;
   const change = appearanceChangeOf(annotation, resolveAnnotationPatch(annotation, patch));
   switch (change.impact) {
     case 'inert':
       return after;
     case 'translation': {
+      if (!rectFollowsDrawing(after)) return after;
       const { rect } = annotation;
       return { ...after, rect: { ...rect, x: rect.x + change.by.x, y: rect.y + change.by.y } };
     }
     case 'regenerate':
-      return { ...after, rect: drawnBoundsOf(after) };
+      return {
+        ...after,
+        ...(UNBAKED_KINDS.has(after.subtype) ? {} : { hasAppearance: true }),
+        ...(rectFollowsDrawing(after) ? { rect: drawnBoundsOf(after) } : {}),
+      };
   }
 }

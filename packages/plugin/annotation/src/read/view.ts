@@ -12,9 +12,9 @@ import { memo, type Mirror } from '@embedpdf/core';
 import {
   type AnnotationView,
   type Id,
-  kindOf,
   type Model,
   type ModelAnnotation,
+  sourceOfConfirmed,
 } from '@embedpdf/core-annotation';
 import type { AnnotationDTO } from '@embedpdf/engine-core/runtime';
 
@@ -56,11 +56,9 @@ export function createView(
     const cached = confirmed.get(stored);
     if (cached && cached.vector === vector) return cached.record;
     const projected = fromDTO(stored.dto);
-    // Opaque bodies (stamp images, widgets) have no live rendering: always the raster.
-    const live = vector && !kindOf(projected.annotation).caps.opaqueBody;
     const record: ModelAnnotation = {
       ...projected,
-      source: live ? 'vector' : 'baked',
+      source: sourceOfConfirmed(projected.annotation, vector),
       apVersion: stored.apVersion,
       authority: authorityOf(ctx, stored.dto),
     };

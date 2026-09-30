@@ -306,6 +306,7 @@ describe('records mirror through the controller', () => {
       ...recordOn(1, 5),
       index: 0,
       identityQuality: 'durable',
+      hasAppearance: true,
       nm: null,
       print: true,
       contents: null,

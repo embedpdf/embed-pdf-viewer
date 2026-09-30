@@ -1,4 +1,5 @@
 import type { AnnotationDTO, AnnotationPatch } from './kinds';
+import type { AnnotationSubtype } from './subtype';
 import type { Coordinates, PdfCoordinates } from '../pageSpace/coordinates';
 
 /**
@@ -39,6 +40,16 @@ export type AppearanceChange =
   | { readonly impact: 'inert' }
   | { readonly impact: 'translation'; readonly by: { readonly x: number; readonly y: number } }
   | { readonly impact: 'regenerate' };
+
+/**
+ * The kinds a write gives no appearance of the engine's: a link, which the
+ * engine writes with no border to draw, and a form widget, which its form
+ * field draws (one on its own has nothing to draw). A write leaves whether
+ * the file holds one as it was, and a new one has none. Every other kind's
+ * create bakes one, and so does every change to it that is visible and not a
+ * pure move.
+ */
+export const UNBAKED_KINDS: ReadonlySet<AnnotationSubtype> = new Set(['link', 'widget']);
 
 /** What actually happened to `/AP` during an update (the engine's echo). */
 export type AppearanceAction = 'preserved' | 'regenerated' | 'generation-unavailable';
@@ -95,6 +106,7 @@ const INERT_KEYS: ReadonlySet<string> = new Set([
   'page',
   'index',
   'identityQuality',
+  'hasAppearance',
   'author',
   'createdAt',
   'modifiedAt',

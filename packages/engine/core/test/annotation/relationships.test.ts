@@ -34,6 +34,7 @@ function annot(
     page: { kind: 'objectNumber', objectNumber: PAGE },
     index: 0,
     identityQuality: 'durable',
+    hasAppearance: true,
     nm: rel.nm ?? null,
     ...NO_ANNOTATION_FLAGS,
     rect: { left: 0, top: 10, right: 10, bottom: 0 },

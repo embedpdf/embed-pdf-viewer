@@ -31,7 +31,7 @@ import { groupCaps } from './group';
 import { isSelectable, paintOrder } from './hit';
 import { annotTransformable, viewable } from './flags';
 import { anchoredGeom, anchoredStrokeWidth, anchorModeOf, type ViewEnv } from './anchor';
-import { blendFor } from './scene';
+import { blendFor } from './kinds/styles';
 import {
   calloutBox,
   calloutUprightRot,
@@ -65,6 +65,12 @@ const polyPreviewPoints = (points: Point[], current: Point): Point[] => {
 const redactionLabelOf = (annotation: AnnotationDTO): Pick<RenderItem, 'label'> =>
   annotation.subtype === 'redact' && annotation.overlayText
     ? { label: { text: annotation.overlayText, repeat: annotation.repeat } }
+    : {};
+
+/** A note's or file attachment's icon: what its live drawing draws. */
+const iconOf = (annotation: AnnotationDTO): Pick<RenderItem, 'icon'> =>
+  (annotation.subtype === 'text' || annotation.subtype === 'file-attachment') && annotation.icon
+    ? { icon: annotation.icon }
     : {};
 
 function effMeasure(model: Model, id: Id) {
@@ -181,6 +187,7 @@ export function pageItems(model: Model, page: PageRef, view?: ViewEnv): RenderIt
       apBox: ap.box,
       style,
       ...(text ? { text } : {}),
+      ...iconOf(record.annotation),
       ...redactionLabelOf(record.annotation),
       measure,
       source: sourceDuring(model, id),
@@ -494,6 +501,15 @@ export function chrome(
   const pageObjectNumber = page.objectNumber;
   const nodes: ChromeNode[] = [];
   if (model.draft?.kind === 'marquee' && model.draft.page.objectNumber === pageObjectNumber) {
+    nodes.push({ kind: 'marquee', rect: rectFromPoints(model.draft.from, model.draft.to) });
+  }
+  // A link being drawn: it has no drawing of its own, so the box it will
+  // cover shows as the rubber band.
+  if (
+    model.draft?.kind === 'create-rect' &&
+    model.draft.subtype === 'link' &&
+    model.draft.page.objectNumber === pageObjectNumber
+  ) {
     nodes.push({ kind: 'marquee', rect: rectFromPoints(model.draft.from, model.draft.to) });
   }
   // Live alignment guides of a snapped move (the gesture lives on one page —

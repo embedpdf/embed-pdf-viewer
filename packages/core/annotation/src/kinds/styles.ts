@@ -6,7 +6,7 @@
  */
 import type { AnnotationDTO } from '@embedpdf/engine-core/runtime';
 
-import type { Style } from '../types';
+import type { Paint, Style } from '../types';
 
 /** A style's border when it has no dash of its own and no cloud. */
 const PLAIN_BORDER = { borderStyle: 'solid', dashArray: null, cloudyIntensity: null } as const;
@@ -114,6 +114,11 @@ export function plainStyle(annotation: AnnotationDTO): Style {
     blendMode: annotation.blendMode,
     ...PLAIN_BORDER,
   };
+}
+
+/** The CSS mix-blend-mode a style's live drawing composites with; `undefined` for normal. */
+export function blendFor(style: Style): Paint['blend'] {
+  return style.blendMode === 'normal' ? undefined : style.blendMode;
 }
 
 /** The dash a border draws with, or `undefined` for a solid or cloudy one. */
