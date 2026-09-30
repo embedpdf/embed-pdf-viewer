@@ -16,6 +16,7 @@ export {
   lineEndingsOf,
   toolAnnotation,
   rotateDraftDelta,
+  selectionInBox,
 } from './update';
 export {
   clampRectToBox,
@@ -129,7 +130,6 @@ export {
   selectionQuad,
   turnPivotOf,
   pointInQuad,
-  quadIntersectsRect,
   // rotation
   geomRotation,
   geomRotateAbout,

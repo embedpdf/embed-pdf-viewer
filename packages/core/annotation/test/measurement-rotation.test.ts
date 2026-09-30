@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { recordOf, step, type RecordInput, STYLE } from './support';
 import { DRAWN_FLAGS } from '../src/flags';
 import { DEFAULT_CHROME_GEOMETRY, pointInQuad, turnPivotOf } from '../src/geometry';
-import { rotatePoint, unionRect } from '../src/rect';
+import { rectFromPoints, rotatePoint, unionRect } from '../src/rect';
 import { drawnLineOf } from '../src/shapes/points';
 import { hitTest, groupUnionBounds } from '../src/hit';
 import { type DistanceAppearance, distanceLayout, measurementOf } from '../src/measurement';
@@ -191,9 +191,9 @@ describe('measurement selection frame and rotation', () => {
 
   it('uses the full measurement frame for marquee and group rotation', () => {
     const state = selected();
-    expect(annotsInBox(state, toPageRef(1), { x: 290, y: 340 }, { x: 325, y: 355 })).toEqual([
-      'distance',
-    ]);
+    expect(
+      annotsInBox(state, toPageRef(1), rectFromPoints({ x: 290, y: 340 }, { x: 325, y: 355 })),
+    ).toEqual(['distance']);
     const square = recordOf({
       id: 'square',
       ref: null,

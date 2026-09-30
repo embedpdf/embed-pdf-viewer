@@ -379,45 +379,6 @@ export function selectionQuad(geometry: Shape, stroke: Stroke): [Point, Point, P
 export const pointInQuad = (point: Point, quad: [Point, Point, Point, Point]): boolean =>
   pointInPoly(point, quad);
 
-/**
- * Does the (convex) selection quad intersect an axis-aligned rect? Separating
- * axis test on the only four candidate axes — the rect's x/y plus the quad's
- * two edge normals; a gap on any axis proves disjoint, otherwise they overlap
- * (touching counts). This is the marquee's predicate: it must catch a tilted
- * shape by the oriented box that is actually drawn — the AABB of that quad has
- * empty corners covering most of the unrotated footprint, so testing it selects
- * shapes the marquee never touched. At `rot 0` the quad is axis-aligned and
- * this degenerates to exactly `rectsIntersect`.
- */
-export function quadIntersectsRect(quad: [Point, Point, Point, Point], rect: Rect): boolean {
-  const rectPts = rectCornerPoints(rect);
-  const axes: Point[] = [
-    { x: 1, y: 0 },
-    { x: 0, y: 1 },
-    { x: -(quad[1].y - quad[0].y), y: quad[1].x - quad[0].x },
-    { x: -(quad[3].y - quad[0].y), y: quad[3].x - quad[0].x },
-  ];
-  for (const ax of axes) {
-    if (Math.abs(ax.x) < 1e-12 && Math.abs(ax.y) < 1e-12) continue; // degenerate edge
-    let qLo = Infinity;
-    let qHi = -Infinity;
-    for (const point of quad) {
-      const projection = point.x * ax.x + point.y * ax.y;
-      qLo = Math.min(qLo, projection);
-      qHi = Math.max(qHi, projection);
-    }
-    let rLo = Infinity;
-    let rHi = -Infinity;
-    for (const point of rectPts) {
-      const projection = point.x * ax.x + point.y * ax.y;
-      rLo = Math.min(rLo, projection);
-      rHi = Math.max(rHi, projection);
-    }
-    if (qHi < rLo || rHi < qLo) return false; // separated on this axis
-  }
-  return true;
-}
-
 /* ── geom ops ─────────────────────────────────────────────────────────────── */
 
 /** The box around the shape's own box or points, the stroke left out. */

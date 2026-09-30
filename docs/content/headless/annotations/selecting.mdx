@@ -13,7 +13,7 @@ panel around it.
 ## How people select
 
 - **Click** an annotation to select it. **Shift-click** adds it to the selection, or takes it out.
-- **Drag on empty space** to draw a box: everything it touches is selected.
+- **Drag on empty space** to draw a box: everything it touches is selected. It has to touch what an annotation paints: its lines, or the inside of a filled shape. A box drawn inside an empty rectangle doesn't select the rectangle.
 - **Click empty space** to clear the selection.
 - **Double-click** a text box to type in it.
 
@@ -239,7 +239,7 @@ What `useAnnotation()` gives you for selecting, drawing and editing text: its `s
 | :--------------------------------------------------------- | :------------------------------------------------------------------------------------------------------------------------------- |
 | `selection.set(refs)`, `selection.add(refs)`               | Selects these annotations, or adds them to the selection. An annotation in a group brings its group. [Select with code](#select-with-code) |
 | `selection.selectAll(page?)`                               | Selects everything that can be selected, on one page or in the whole document                                                    |
-| `selection.selectInRect(page, rect)`                       | Selects everything a box on a page touches, as dragging on empty space does                                                      |
+| `selection.selectInRect(page, rect)`                       | Selects everything a box on a page touches of what it paints, with the rest of each one's group, as dragging on empty space does |
 | `selection.clear()`                                        | Clears the selection                                                                                                             |
 | `selection.update(changes)`                                | Changes the selected annotations: each takes the fields its kind has. Pass a function to change each one relative to itself. [A style panel](#a-style-panel) |
 | `selection.updateLink(target)`                             | Links the selected annotations to a page or a website, or removes their links with `null`. [A style panel](#a-style-panel) |

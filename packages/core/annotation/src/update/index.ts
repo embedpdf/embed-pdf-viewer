@@ -247,5 +247,5 @@ function transition(model: Model, message: Message): [Model, Effect[]] {
 export { initialSession, defaultsFor, lineEndingsOf, toolAnnotation } from './session';
 export { rotateDraftDelta } from './edit';
 export { draftPlacement } from './draw';
-export { annotsInBox } from './marquee';
+export { annotsInBox, selectionInBox } from './marquee';
 export { calloutBox, calloutUprightRot } from './draw-callout';

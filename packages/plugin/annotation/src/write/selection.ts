@@ -4,7 +4,6 @@ import {
   applyStyleToRange,
   expandGroups,
   type FieldValues,
-  geomVisualBounds,
   groupKeyOf,
   groupOf,
   type Id,
@@ -13,10 +12,8 @@ import {
   type Rect,
   refOf,
   richDocOf,
-  shapeOf,
-  styleOf,
+  selectionInBox,
 } from '@embedpdf/core-annotation';
-import { intersectRects } from '@embedpdf/core-geometry';
 import {
   annotationKey,
   type AnnotationDTO,
@@ -41,7 +38,12 @@ import { refsOfIn, type Commit } from '../services/store';
  * through the same `update → patch effect` path a gesture takes.
  */
 export function createSelectionWrites(
-  { store, authority, fonts }: Pick<AnnotationServices, 'store' | 'authority' | 'fonts'>,
+  {
+    store,
+    authority,
+    fonts,
+    behaviors,
+  }: Pick<AnnotationServices, 'store' | 'authority' | 'fonts' | 'behaviors'>,
   annotations: Pick<AnnotationReads, 'selectedCommitted'>,
   selectionFields: Pick<SelectionFieldsReads, 'activeTextRange' | 'selectionFieldsOf'>,
   text: Pick<TextEditing, 'flushAllText'>,
@@ -122,16 +124,8 @@ export function createSelectionWrites(
       store.commit({ type: 'select', ids });
     },
     selectInRect: (page: PageRef, rect: Rect, options?: { add?: boolean }) => {
-      const model = store.model();
-      const ids = model.order.filter((id) => {
-        const record = model.byId[id];
-        if (!record || !pageRefsEqual(record.annotation.page, page) || !isSelectable(model, id))
-          return false;
-        const geometry = shapeOf(record.annotation);
-        const style = styleOf(record.annotation);
-        const hit = intersectRects(geomVisualBounds(geometry, style), rect);
-        return hit.width > 0 && hit.height > 0;
-      });
+      const engaged = behaviors.engagedIdsOn(page.objectNumber);
+      const ids = selectionInBox(store.model(), page, rect, engaged);
       if (ids.length || !options?.add) store.commit({ type: 'select', ids, add: options?.add });
     },
     clearSelection: () => {

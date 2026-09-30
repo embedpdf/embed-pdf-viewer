@@ -1,14 +1,17 @@
-/** Rubber-band selection: drag a box on empty page space to select what it touches. */
+/**
+ * Rubber-band selection: drag a box on empty page space to select what it
+ * touches of what each annotation paints (`painted.ts`), the ink, or the
+ * inside of a filled shape, as a click would hit it.
+ */
 import type { PageRef } from '@embedpdf/engine-core/runtime';
 
 import { type ViewEnv } from '../anchor';
-import { quadIntersectsRect } from '../geometry';
 import { rectFromPoints } from '../rect';
 import { expandGroups } from '../group';
-import { isSelectable } from '../hit';
+import { isSelectable, paintedOf } from '../hit';
+import { paintedTouches } from '../painted';
 import { isSubstrateOnly } from '../plane';
-import { annotationSelectionFrame } from '../selection';
-import type { Effect, Id, Model, Point, PointerInput } from '../types';
+import type { Effect, Id, Model, PointerInput, Rect } from '../types';
 import { clampPointToBox, viewOf } from './page-bound';
 
 export function marqueePointer(
@@ -27,10 +30,12 @@ export function marqueePointer(
     return [{ ...model, draft: { ...model.draft, to: point } }, []];
   }
 
-  // A marquee that touches one member takes the whole group with it.
-  const hits = expandGroups(
+  const hits = selectionInBox(
     model,
-    annotsInBox(model, model.draft.page, model.draft.from, point, input.inert, viewOf(input)),
+    model.draft.page,
+    rectFromPoints(model.draft.from, point),
+    input.inert,
+    viewOf(input),
   );
   const selected = input.shift ? toggleSelection(model.selected, hits) : hits;
   return [{ ...model, selected, draft: null }, []];
@@ -45,17 +50,35 @@ function toggleSelection(base: Id[], ids: Id[]): Id[] {
   return [...next];
 }
 
-/** The annotations on `page` a marquee from `from` to `to` touches. */
+/**
+ * What a box on `page` selects: every annotation it touches
+ * ({@link annotsInBox}), and the rest of the group of each. The marquee and
+ * the capability's `selectInRect` both select this.
+ */
+export function selectionInBox(
+  model: Model,
+  page: PageRef,
+  box: Rect,
+  inert?: ReadonlySet<Id>,
+  view?: ViewEnv,
+): Id[] {
+  return expandGroups(model, annotsInBox(model, page, box, inert, view));
+}
+
+/**
+ * The selectable annotations on `page` whose paint the box touches: their
+ * ink, or their inside where a click would hit it. Screen-anchored bodies
+ * count as they show at `view`. An unfilled shape's empty middle, or the
+ * empty corners of a diagonal line's bounds, is not touching it.
+ */
 export function annotsInBox(
   model: Model,
   page: PageRef,
-  from: Point,
-  to: Point,
+  box: Rect,
   inert?: ReadonlySet<Id>,
   view?: ViewEnv,
 ): Id[] {
   const pageObjectNumber = page.objectNumber;
-  const box = rectFromPoints(from, to);
   return model.order.filter((id) => {
     const record = model.byId[id];
     if (
@@ -67,13 +90,6 @@ export function annotsInBox(
     // Conversation-plane annotations (replies, review states) are never on
     // the page — the marquee cannot sweep up what does not paint.
     if (isSubstrateOnly(record)) return false;
-    // intersect against what is actually drawn: the oriented selection quad
-    // (exact, via SAT) — the same quad the chrome outlines and the grab region
-    // uses (screen-anchored bodies at their view-projected footprint). Its
-    // AABB is a coarse superset whose empty corners cover most of a tilted
-    // shape's unrotated footprint, so testing the AABB selected shapes the
-    // marquee never touched.
-    const frame = annotationSelectionFrame(record, view);
-    return quadIntersectsRect(frame.corners, box);
+    return paintedTouches(paintedOf(record, view), box);
   });
 }

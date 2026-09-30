@@ -26,7 +26,6 @@ import {
   geomBounds,
   geomHit,
   geomScene,
-  quadIntersectsRect,
   geomVisualBounds,
   geomHandles,
   geomTranslate,
@@ -47,6 +46,7 @@ import {
 } from '../src/geometry';
 import {
   normalizeDeg,
+  rectFromPoints,
   rotatedAabb,
   rotatedHandleCursor,
   transposedAboutCenter,
@@ -4091,44 +4091,31 @@ describe('marquee vs rotated shapes', () => {
   });
   const model = modelWith([bar]);
 
-  it('quadIntersectsRect: SAT on the four candidate axes', () => {
-    // axis-aligned quad ≡ rectsIntersect semantics, touching counts
-    const aligned: [Point, Point, Point, Point] = [
-      { x: 10, y: 10 },
-      { x: 50, y: 10 },
-      { x: 50, y: 40 },
-      { x: 10, y: 40 },
-    ];
-    expect(quadIntersectsRect(aligned, { x: 40, y: 30, width: 30, height: 30 })).toBe(true);
-    expect(quadIntersectsRect(aligned, { x: 50, y: 40, width: 10, height: 10 })).toBe(true); // touch
-    expect(quadIntersectsRect(aligned, { x: 51, y: 41, width: 10, height: 10 })).toBe(false);
-    // containment both ways
-    const diamond: [Point, Point, Point, Point] = [
-      { x: 100, y: 50 },
-      { x: 150, y: 100 },
-      { x: 100, y: 150 },
-      { x: 50, y: 100 },
-    ];
-    expect(quadIntersectsRect(diamond, { x: 95, y: 95, width: 10, height: 10 })).toBe(true); // rect inside quad
-    expect(quadIntersectsRect(diamond, { x: 0, y: 0, width: 300, height: 300 })).toBe(true); // quad inside rect
-    // the case only a quad axis separates: a rect in the diamond's AABB corner
-    // overlaps on x and y, but not across the diamond's tilted edge
-    expect(quadIntersectsRect(diamond, { x: 52, y: 52, width: 20, height: 20 })).toBe(false);
-  });
-
   it('a marquee in the rotated AABB empty corner or over the unrotated footprint selects NOTHING', () => {
     // empty AABB corner — visually nowhere near the bar (an AABB test selects R1)
-    expect(annotsInBox(model, PAGE, { x: 250, y: 35 }, { x: 270, y: 55 })).toEqual([]);
+    expect(annotsInBox(model, PAGE, rectFromPoints({ x: 250, y: 35 }, { x: 270, y: 55 }))).toEqual(
+      [],
+    );
     // over the unrotated footprint (an AABB test selects R1)
-    expect(annotsInBox(model, PAGE, { x: 125, y: 95 }, { x: 140, y: 110 })).toEqual([]);
+    expect(annotsInBox(model, PAGE, rectFromPoints({ x: 125, y: 95 }, { x: 140, y: 110 }))).toEqual(
+      [],
+    );
     // the other empty AABB corner (below the NW→SE bar) — also nothing
-    expect(annotsInBox(model, PAGE, { x: 120, y: 160 }, { x: 150, y: 190 })).toEqual([]);
+    expect(
+      annotsInBox(model, PAGE, rectFromPoints({ x: 120, y: 160 }, { x: 150, y: 190 })),
+    ).toEqual([]);
     // crossing the tilted bar → selected
-    expect(annotsInBox(model, PAGE, { x: 190, y: 100 }, { x: 210, y: 120 })).toEqual(['R1']);
+    expect(
+      annotsInBox(model, PAGE, rectFromPoints({ x: 190, y: 100 }, { x: 210, y: 120 })),
+    ).toEqual(['R1']);
     // clipping just the bar's NW tip (corners ≈ (136,31)/(121,46)) → selected
-    expect(annotsInBox(model, PAGE, { x: 120, y: 30 }, { x: 140, y: 50 })).toEqual(['R1']);
+    expect(annotsInBox(model, PAGE, rectFromPoints({ x: 120, y: 30 }, { x: 140, y: 50 }))).toEqual([
+      'R1',
+    ]);
     // fully outside everything
-    expect(annotsInBox(model, PAGE, { x: 400, y: 40 }, { x: 430, y: 70 })).toEqual([]);
+    expect(annotsInBox(model, PAGE, rectFromPoints({ x: 400, y: 40 }, { x: 430, y: 70 }))).toEqual(
+      [],
+    );
   });
 
   it('unrotated shapes behave exactly as before', () => {
@@ -4140,8 +4127,12 @@ describe('marquee vs rotated shapes', () => {
         ellipse: false,
       }),
     ]);
-    expect(annotsInBox(flat, PAGE, { x: 90, y: 90 }, { x: 110, y: 110 })).toEqual(['R1']); // corner overlap
-    expect(annotsInBox(flat, PAGE, { x: 90, y: 130 }, { x: 110, y: 150 })).toEqual([]); // below it
+    expect(annotsInBox(flat, PAGE, rectFromPoints({ x: 90, y: 90 }, { x: 110, y: 110 }))).toEqual([
+      'R1',
+    ]); // corner overlap
+    expect(annotsInBox(flat, PAGE, rectFromPoints({ x: 90, y: 130 }, { x: 110, y: 150 }))).toEqual(
+      [],
+    ); // below it
   });
 });
 

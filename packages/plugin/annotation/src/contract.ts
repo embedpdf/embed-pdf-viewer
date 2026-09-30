@@ -539,7 +539,11 @@ export interface AnnotationCapability {
   select(refs: AnnotationRef | readonly AnnotationRef[], options?: { add?: boolean }): void;
   /** Everything selectable, or everything selectable on one page. */
   selectAll(page?: PageRef): void;
-  /** Marquee selection without a pointer: everything whose bounds intersect the rect. */
+  /**
+   * Marquee selection without a pointer: everything the rect touches of what
+   * it paints (its ink, or the inside of a filled shape), with the rest of
+   * each one's group, exactly as dragging a box on the page selects.
+   */
   selectInRect(page: PageRef, rect: Rect, options?: { add?: boolean }): void;
   clearSelection(): void;
   getSelection(): readonly AnnotationRef[];
