@@ -7,7 +7,7 @@
  */
 import type { AnnotationDTO } from '@embedpdf/engine-core/runtime';
 
-import type { Border, FieldValues, Handle, ModelGeometry, Point, Rect, RenderNode } from '../types';
+import type { FieldValues, Handle, ModelGeometry, Point, Rect, RenderNode, Stroke } from '../types';
 
 /** A box's four corners as the page shows them: nw, ne, se, sw. */
 export type Corners = [Point, Point, Point, Point];
@@ -25,13 +25,13 @@ export interface ShapeFamily<S extends ModelGeometry = ModelGeometry> {
   /** The box around its box or points, the stroke left out. */
   bounds(shape: S): Rect;
   /** The box around all it draws (the stroke, endings, a cloud's bumps): the engine's `rect`. */
-  drawnBounds(shape: S, strokeWidth: number, border?: Border): Rect;
+  drawnBounds(shape: S, stroke: Stroke): Rect;
   /** The box a selection wraps: where its handles sit, and where a selected shape is grabbed. */
-  selectionBounds(shape: S, strokeWidth: number, border?: Border): Rect;
+  selectionBounds(shape: S, stroke: Stroke): Rect;
   /** Does the shape have a turned box of its own, which a selection outlines turned? */
   oriented(shape: S): boolean;
   /** That turned box's corners, or `null` when the shape has none. */
-  turnedCorners(shape: S, strokeWidth: number, border?: Border): Corners | null;
+  turnedCorners(shape: S, stroke: Stroke): Corners | null;
   /** Where a turn of the shape pivots, as the engine turns it. */
   pivot(shape: S): Point;
 
@@ -56,14 +56,7 @@ export interface ShapeFamily<S extends ModelGeometry = ModelGeometry> {
    * Is `point` on the shape: within `margin` of what it strokes, or inside it
    * when `filled`?
    */
-  hit(
-    shape: S,
-    point: Point,
-    margin: number,
-    filled: boolean,
-    strokeWidth: number,
-    border?: Border,
-  ): boolean;
+  hit(shape: S, point: Point, margin: number, filled: boolean, stroke: Stroke): boolean;
   /** What it draws, for the live (vector) view. */
-  scene(shape: S, strokeWidth: number, border?: Border): RenderNode[];
+  scene(shape: S, stroke: Stroke): RenderNode[];
 }

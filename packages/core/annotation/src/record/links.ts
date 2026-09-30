@@ -33,5 +33,5 @@ const takesLink = (subtype: string): boolean =>
  */
 export function linkChildRects(shape: ModelGeometry, style: Style): Rect[] {
   if (shape.kind === 'quads') return shape.quadPoints.map(quadBounds);
-  return [unionRect(selectionQuad(shape, style.strokeWidth, style.border))];
+  return [unionRect(selectionQuad(shape, style))];
 }

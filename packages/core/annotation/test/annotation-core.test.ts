@@ -58,6 +58,7 @@ import type {
   Model,
   Message,
   RenderItem,
+  Style,
   Subtype,
   Point,
   RecordFields,
@@ -564,7 +565,7 @@ describe('annotation-core', () => {
       box: { x: 94, y: 53, width: 6, height: 6 },
       rotation: 270,
     };
-    const obb = obbFromGeom(geometry, 0)!;
+    const obb = obbFromGeom(geometry, { strokeWidth: 0 })!;
     expect(obb.angle).toBe(270);
     // A square box under a quarter turn about its own centre lands on the same
     // four corner positions (relabeled) — an order-insensitive, convention-free
@@ -701,9 +702,13 @@ describe('annotation-core', () => {
       rotation: 0,
       ellipse: false,
     };
-    expect(geomHit(geometry, { x: 150, y: 150 }, 4, /* filled */ false, 2)).toBe(false); // centre, unfilled → miss
-    expect(geomHit(geometry, { x: 100, y: 150 }, 4, false, 2)).toBe(true); // on the left edge → hit
-    expect(geomHit(geometry, { x: 150, y: 150 }, 4, /* filled */ true, 2)).toBe(true); // filled → centre hits
+    expect(geomHit(geometry, { x: 150, y: 150 }, 4, /* filled */ false, { strokeWidth: 2 })).toBe(
+      false,
+    ); // centre, unfilled → miss
+    expect(geomHit(geometry, { x: 100, y: 150 }, 4, false, { strokeWidth: 2 })).toBe(true); // on the left edge → hit
+    expect(geomHit(geometry, { x: 150, y: 150 }, 4, /* filled */ true, { strokeWidth: 2 })).toBe(
+      true,
+    ); // filled → centre hits
   });
 
   it('an UNFILLED circle is hit only near its outline', () => {
@@ -713,8 +718,8 @@ describe('annotation-core', () => {
       rotation: 0,
       ellipse: true,
     };
-    expect(geomHit(geometry, { x: 50, y: 50 }, 4, false, 2)).toBe(false); // centre → miss
-    expect(geomHit(geometry, { x: 100, y: 50 }, 4, false, 2)).toBe(true); // right vertex of the ellipse → hit
+    expect(geomHit(geometry, { x: 50, y: 50 }, 4, false, { strokeWidth: 2 })).toBe(false); // centre → miss
+    expect(geomHit(geometry, { x: 100, y: 50 }, 4, false, { strokeWidth: 2 })).toBe(true); // right vertex of the ellipse → hit
   });
 
   it('selection is sticky: a SELECTED annotation moves from anywhere in its bounds', () => {
@@ -751,7 +756,9 @@ describe('annotation-core', () => {
         strokeWidth: 6,
         opacity: 1,
         blendMode: 'normal',
-        border: { kind: 'solid' },
+        borderStyle: 'solid',
+        dashArray: null,
+        cloudyIntensity: null,
       },
       flags: DRAWN_FLAGS,
       source: 'vector',
@@ -768,8 +775,8 @@ describe('annotation-core', () => {
       kind: 'annot',
       id: 'A1',
     });
-    expect(selectionBounds(shapeOf(arrow.annotation), 6)).toEqual(
-      geomVisualBounds(shapeOf(arrow.annotation), 6),
+    expect(selectionBounds(shapeOf(arrow.annotation), { strokeWidth: 6 })).toEqual(
+      geomVisualBounds(shapeOf(arrow.annotation), { strokeWidth: 6 }),
     ); // line: outline == visual bounds
   });
 
@@ -938,7 +945,9 @@ describe('annotation-core', () => {
         strokeWidth: 3,
         opacity: 1,
         blendMode: 'normal',
-        border: { kind: 'solid' },
+        borderStyle: 'solid',
+        dashArray: null,
+        cloudyIntensity: null,
       },
       flags: DRAWN_FLAGS,
       source: 'vector',
@@ -946,7 +955,7 @@ describe('annotation-core', () => {
     const model = modelWith([line]);
     const it = pageItems(model, PAGE)[0];
     // the render box is the same calculation that feeds the engine /Rect…
-    expect(it.box).toEqual(geomVisualBounds(it.geometry, it.style.strokeWidth));
+    expect(it.box).toEqual(geomVisualBounds(it.geometry, { strokeWidth: it.style.strokeWidth }));
     // …and it encloses the arrowhead + stroke, so it is strictly larger than the
     // tight geometry bounds (the cause of the old clipped/misplaced endings).
     const tight = geomBounds(it.geometry);
@@ -972,7 +981,9 @@ describe('annotation-core', () => {
         strokeWidth: 8,
         opacity: 1,
         blendMode: 'normal',
-        border: { kind: 'solid' },
+        borderStyle: 'solid',
+        dashArray: null,
+        cloudyIntensity: null,
       },
       flags: DRAWN_FLAGS,
       source: 'vector',
@@ -985,7 +996,9 @@ describe('annotation-core', () => {
     };
     const lineOutline = outlineRect(selection)!;
     const tight = geomBounds(shapeOf(selection.byId['L1'].annotation));
-    expect(lineOutline).toEqual(geomVisualBounds(shapeOf(selection.byId['L1'].annotation), 8));
+    expect(lineOutline).toEqual(
+      geomVisualBounds(shapeOf(selection.byId['L1'].annotation), { strokeWidth: 8 }),
+    );
     expect(lineOutline.width).toBeGreaterThan(tight.width);
     expect(lineOutline.height).toBeGreaterThan(tight.height);
 
@@ -1007,16 +1020,16 @@ describe('annotation-core', () => {
     };
     const sw = 8;
     const onArrow = { x: 510, y: 242 }; // on the lower wing, ~19px off the a→b stroke band
-    expect(geomHit(geometry, onArrow, 6, /* filled */ false, sw)).toBe(true);
+    expect(geomHit(geometry, onArrow, 6, /* filled */ false, { strokeWidth: sw })).toBe(true);
     // the hit comes from the ending, not the line: with no endings that point misses
     const noEnds: ModelGeometry = {
       kind: 'line',
       linePoints: { start: { x: 60, y: 75 }, end: { x: 545, y: 235 } },
       rotation: 0,
     };
-    expect(geomHit(noEnds, onArrow, 6, false, sw)).toBe(false);
+    expect(geomHit(noEnds, onArrow, 6, false, { strokeWidth: sw })).toBe(false);
     // and a point off both the line and the arrowhead still misses
-    expect(geomHit(geometry, { x: 300, y: 360 }, 6, false, sw)).toBe(false);
+    expect(geomHit(geometry, { x: 300, y: 360 }, 6, false, { strokeWidth: sw })).toBe(false);
   });
 
   it('geomScene fills by closed-ness: closed arrow → closed poly, open arrow → open poly', () => {
@@ -1026,9 +1039,9 @@ describe('annotation-core', () => {
       lineEndings: { start: 'none', end },
       rotation: 0,
     });
-    const closed = geomScene(line('closed-arrow'), 2);
+    const closed = geomScene(line('closed-arrow'), { strokeWidth: 2 });
     expect(closed.some((node) => node.kind === 'poly' && node.closed)).toBe(true); // filled head
-    const open = geomScene(line('open-arrow'), 2);
+    const open = geomScene(line('open-arrow'), { strokeWidth: 2 });
     expect(open.some((node) => node.kind === 'poly' && !node.closed)).toBe(true); // stroke-only head
     expect(open.some((node) => node.kind === 'poly' && node.closed)).toBe(false);
   });
@@ -1041,8 +1054,8 @@ describe('annotation-core', () => {
       ellipse: false,
     };
     // the box never grows with the stroke — the stroke lives inside it
-    expect(geomVisualBounds(geometry, 20)).toEqual(geometry.box);
-    const [node] = geomScene(geometry, 20);
+    expect(geomVisualBounds(geometry, { strokeWidth: 20 })).toEqual(geometry.box);
+    const [node] = geomScene(geometry, { strokeWidth: 20 });
     expect(node).toMatchObject({ kind: 'rect', rect: { x: 110, y: 110, width: 60, height: 40 } });
   });
 
@@ -1056,18 +1069,18 @@ describe('annotation-core', () => {
     const sw = 24;
     const margin = 4;
     // the stroke is drawn inside the box, centred ~12px in; its inner edge must hit
-    expect(geomHit(geometry, { x: 122, y: 150 }, margin, false, sw)).toBe(true);
+    expect(geomHit(geometry, { x: 122, y: 150 }, margin, false, { strokeWidth: sw })).toBe(true);
     // a point well outside the box (past the margin) must miss — no phantom band
     // from a stroke straddling the edge
-    expect(geomHit(geometry, { x: 90, y: 150 }, margin, false, sw)).toBe(false);
+    expect(geomHit(geometry, { x: 90, y: 150 }, margin, false, { strokeWidth: sw })).toBe(false);
     // and the box edge itself is still on the (outer half of the) stroke → hits
-    expect(geomHit(geometry, { x: 100, y: 150 }, margin, false, sw)).toBe(true);
+    expect(geomHit(geometry, { x: 100, y: 150 }, margin, false, { strokeWidth: sw })).toBe(true);
   });
 
   it("a cloudy border's scallops start on the box and reach out by the cloud's extent; an empty box draws the plain outline", () => {
     const box = { x: 100, y: 100, width: 120, height: 90 };
     const geometry: ModelGeometry = { kind: 'box', box, rotation: 0, ellipse: false };
-    const [node] = geomScene(geometry, 2, { kind: 'cloudy', intensity: 2 });
+    const [node] = geomScene(geometry, { strokeWidth: 2, cloudyIntensity: 2 });
     expect(node.kind).toBe('path');
     const pathData = node.kind === 'path' ? node.d : '';
     const nums = pathData.match(/-?\d+(\.\d+)?/g)!.map(Number);
@@ -1088,21 +1101,21 @@ describe('annotation-core', () => {
       rotation: 0,
       ellipse: false,
     };
-    expect(geomScene(empty, 2, { kind: 'cloudy', intensity: 2 })[0].kind).toBe('rect');
+    expect(geomScene(empty, { strokeWidth: 2, cloudyIntensity: 2 })[0].kind).toBe('rect');
   });
 
   it("a cloudy box's drawn bounds take in the cloud; its selection and handles stay on the box", () => {
     const box = { x: 50, y: 50, width: 40, height: 30 };
     const geometry: ModelGeometry = { kind: 'box', box, rotation: 0, ellipse: false };
-    const cloudy = { kind: 'cloudy', intensity: 2 } as const;
+    const cloudy = { strokeWidth: 2, cloudyIntensity: 2 };
     const reach = cloudyBorderExtent(2, 2, false);
-    expect(geomVisualBounds(geometry, 2, cloudy)).toEqual({
+    expect(geomVisualBounds(geometry, cloudy)).toEqual({
       x: 50 - reach,
       y: 50 - reach,
       width: 40 + 2 * reach,
       height: 30 + 2 * reach,
     });
-    expect(selectionBounds(geometry, 2, cloudy)).toEqual(box);
+    expect(selectionBounds(geometry, cloudy)).toEqual(box);
     const corners = geomHandles(geometry).filter((handle) => handle.id.length === 2);
     expect(corners.map((handle) => handle.at)).toEqual([
       { x: 50, y: 50 },
@@ -1115,17 +1128,17 @@ describe('annotation-core', () => {
   it("a cloudy box is hit on its scallops, outside the box, and not past the cloud's reach", () => {
     const box = { x: 100, y: 100, width: 100, height: 100 };
     const geometry: ModelGeometry = { kind: 'box', box, rotation: 0, ellipse: false };
-    const cloudy = { kind: 'cloudy', intensity: 2 } as const;
+    const cloudy = { strokeWidth: 2, cloudyIntensity: 2 };
     const reach = cloudyBorderExtent(2, 2, false);
     const margin = 2;
     // Halfway through the bumps, outside the box.
-    expect(geomHit(geometry, { x: 100 - reach / 2, y: 150 }, margin, false, 2, cloudy)).toBe(true);
+    expect(geomHit(geometry, { x: 100 - reach / 2, y: 150 }, margin, false, cloudy)).toBe(true);
     // Past the bumps and the margin.
-    expect(
-      geomHit(geometry, { x: 100 - reach - margin - 1, y: 150 }, margin, false, 2, cloudy),
-    ).toBe(false);
+    expect(geomHit(geometry, { x: 100 - reach - margin - 1, y: 150 }, margin, false, cloudy)).toBe(
+      false,
+    );
     // The middle of an unfilled cloud.
-    expect(geomHit(geometry, { x: 150, y: 150 }, margin, false, 2, cloudy)).toBe(false);
+    expect(geomHit(geometry, { x: 150, y: 150 }, margin, false, cloudy)).toBe(false);
   });
 
   it('cloudyBorderExtent grows with intensity and stroke; circle scallops are larger than square', () => {
@@ -1189,7 +1202,9 @@ describe('annotation-core', () => {
         strokeWidth: 0,
         opacity: 1,
         blendMode: subtype === 'highlight' ? 'multiply' : 'normal',
-        border: { kind: 'solid' },
+        borderStyle: 'solid',
+        dashArray: null,
+        cloudyIntensity: null,
       },
       source: 'vector',
       selected: false,
@@ -1229,7 +1244,9 @@ describe('annotation-core', () => {
         strokeWidth: 3,
         opacity: 1,
         blendMode: 'normal',
-        border: { kind: 'solid' },
+        borderStyle: 'solid',
+        dashArray: null,
+        cloudyIntensity: null,
       },
       source: 'vector',
       selected: false,
@@ -1245,13 +1262,15 @@ describe('annotation-core', () => {
   it('scene() strokes a cloudy border with ROUND joins (PDFium `1 j` parity) — polygon and box alike', () => {
     // The curl tails reverse direction by design; a miter join spikes at every
     // seam. PDFium bakes cloudy APs with `1 j`, so the live paint must match.
-    const cloudyStyle = {
+    const cloudyStyle: Style = {
       color: '#e5484d',
       interiorColor: null,
       strokeWidth: 4,
       opacity: 1,
       blendMode: 'normal' as const,
-      border: { kind: 'cloudy' as const, intensity: 2 },
+      borderStyle: 'solid',
+      dashArray: null,
+      cloudyIntensity: 2,
     };
     const polygon: RenderItem = {
       id: 'p',
@@ -1392,7 +1411,9 @@ describe('annotation-core', () => {
         strokeWidth: 10,
         opacity: 1,
         blendMode: 'normal',
-        border: { kind: 'solid' },
+        borderStyle: 'solid',
+        dashArray: null,
+        cloudyIntensity: null,
       },
       flags: DRAWN_FLAGS,
       source: 'vector',
@@ -1525,7 +1546,9 @@ describe('annotation-core', () => {
         strokeWidth: 0,
         opacity: 1,
         blendMode: 'multiply',
-        border: { kind: 'solid' },
+        borderStyle: 'solid',
+        dashArray: null,
+        cloudyIntensity: null,
       },
       flags: DRAWN_FLAGS,
       source: 'baked',
@@ -1564,7 +1587,9 @@ describe('annotation-core', () => {
         strokeWidth: 2,
         opacity: 1,
         blendMode: 'normal',
-        border: { kind: 'solid' },
+        borderStyle: 'solid',
+        dashArray: null,
+        cloudyIntensity: null,
       },
       flags: DRAWN_FLAGS,
       source: 'vector',
@@ -1701,7 +1726,9 @@ describe('annotation-core', () => {
         strokeWidth: 2,
         opacity: 1,
         blendMode: 'normal',
-        border: { kind: 'solid' },
+        borderStyle: 'solid',
+        dashArray: null,
+        cloudyIntensity: null,
       },
       flags: DRAWN_FLAGS,
       source: 'vector',
@@ -1721,7 +1748,9 @@ describe('annotation-core', () => {
         strokeWidth: 0,
         opacity: 1,
         blendMode: 'multiply',
-        border: { kind: 'solid' },
+        borderStyle: 'solid',
+        dashArray: null,
+        cloudyIntensity: null,
       },
       flags: DRAWN_FLAGS,
       source: 'vector',
@@ -1797,19 +1826,19 @@ describe('annotation-core callout', () => {
       calloutLine: null,
       lineEnding: null,
     };
-    expect(geomScene(plain, 2)).toEqual([
+    expect(geomScene(plain, { strokeWidth: 2 })).toEqual([
       { kind: 'rect', rect: { x: 101, y: 101, width: 198, height: 58 } },
     ]);
     // No border width: the box is still the scene's (its fill), uninset.
-    expect(geomScene(plain, 0)).toEqual([
+    expect(geomScene(plain, { strokeWidth: 0 })).toEqual([
       { kind: 'rect', rect: { x: 100, y: 100, width: 200, height: 60 } },
     ]);
     // A tilted box draws as its rotated corner ring.
-    const tilted = geomScene({ ...plain, rotation: 90 }, 2);
+    const tilted = geomScene({ ...plain, rotation: 90 }, { strokeWidth: 2 });
     expect(tilted).toHaveLength(1);
     expect(tilted[0]!.kind).toBe('poly');
     // A callout: leader + arrow first, then the same box.
-    const callout = geomScene(calloutGeom(), 2);
+    const callout = geomScene(calloutGeom(), { strokeWidth: 2 });
     expect(callout[0]).toMatchObject({ kind: 'poly', closed: false });
     expect(callout[callout.length - 1]).toEqual({
       kind: 'rect',
@@ -1852,7 +1881,7 @@ describe('annotation-core callout', () => {
 
   it('geomVisualBounds wraps the box, the leader, AND the arrow at the tip', () => {
     const geometry = calloutGeom();
-    const rect = geomVisualBounds(geometry, 2);
+    const rect = geomVisualBounds(geometry, { strokeWidth: 2 });
     // the tip (x=40) sits far left of the box (x=200): the overall bounds reach it
     expect(rect.x).toBeLessThanOrEqual(40);
     expect(rect.y).toBeLessThanOrEqual(60);
@@ -1868,7 +1897,7 @@ describe('annotation-core callout', () => {
           calloutLine: null,
           lineEnding: null,
         },
-        2,
+        { strokeWidth: 2 },
       ),
     ).toEqual({
       x: 0,
@@ -1924,7 +1953,7 @@ describe('annotation-core callout', () => {
   });
 
   it('geomScene emits the leader polyline, the arrow node, and a stroke-only box border', () => {
-    const nodes = geomScene(calloutGeom(), 1);
+    const nodes = geomScene(calloutGeom(), { strokeWidth: 1 });
     const leader = nodes.find((node) => node.kind === 'poly' && !node.closed);
     expect(leader).toBeDefined();
     // the open leader carries [tip, knee, conn]
@@ -1943,7 +1972,7 @@ describe('annotation-core callout', () => {
           calloutLine: null,
           lineEnding: null,
         },
-        1,
+        { strokeWidth: 1 },
       ),
     ).toEqual([{ kind: 'rect', rect: { x: 0.5, y: 0.5, width: 9, height: 9 } }]);
   });
@@ -2119,11 +2148,7 @@ describe('annotation-core callout', () => {
     const a0Geometry = shapeOf(a0.annotation);
     if (a0Geometry.kind !== 'text-box' || !a0Geometry.calloutLine)
       throw new Error('expected callout');
-    const visual = geomVisualBounds(
-      a0Geometry,
-      fieldsOf(a0).style.strokeWidth,
-      fieldsOf(a0).style.border,
-    );
+    const visual = geomVisualBounds(a0Geometry, fieldsOf(a0).style);
     const rect = a0Geometry.box;
     const grab = { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
     const edit = (phase: 'down' | 'move' | 'up', x: number, y: number): Message => ({
@@ -2305,24 +2330,29 @@ describe('annotation-core callout — upright on a rotated page', () => {
   it('geomHit tests the box by its FOOTPRINT and the leader in page space', () => {
     const geometry = rotCalloutGeom();
     // inside the footprint (x∈[240,280], y∈[60,180]) but outside the logical rect
-    expect(geomHit(geometry, { x: 260, y: 70 }, 0, true, 1)).toBe(true);
+    expect(geomHit(geometry, { x: 260, y: 70 }, 0, true, { strokeWidth: 1 })).toBe(true);
     // inside the logical rect but outside the footprint and off the leader
-    expect(geomHit(geometry, { x: 210, y: 135 }, 0, true, 1)).toBe(false);
+    expect(geomHit(geometry, { x: 210, y: 135 }, 0, true, { strokeWidth: 1 })).toBe(false);
     // the leader still hits in page space (knee→conn runs along y=120)
-    expect(geomHit(geometry, { x: 180, y: 120 }, 2, true, 1)).toBe(true);
+    expect(geomHit(geometry, { x: 180, y: 120 }, 2, true, { strokeWidth: 1 })).toBe(true);
   });
 
   it('geomVisualBounds and selectionBounds wrap the rotated footprint', () => {
     const geometry = rotCalloutGeom();
-    const vb = geomVisualBounds(geometry, 0);
+    const vb = geomVisualBounds(geometry, { strokeWidth: 0 });
     // reaches the footprint's top (y=60) and right (x=280) — not just the logical box
     expect(vb.y).toBeLessThanOrEqual(60);
     expect(vb.x + vb.width).toBeGreaterThanOrEqual(280);
-    expectRectClose(selectionBounds(geometry, 1), { x: 240, y: 60, width: 40, height: 120 });
+    expectRectClose(selectionBounds(geometry, { strokeWidth: 1 }), {
+      x: 240,
+      y: 60,
+      width: 40,
+      height: 120,
+    });
   });
 
   it('geomScene draws the tilted box as a CLOSED corner ring; the leader stays open', () => {
-    const nodes = geomScene(rotCalloutGeom(), 1);
+    const nodes = geomScene(rotCalloutGeom(), { strokeWidth: 1 });
     const ring = nodes.find((node) => node.kind === 'poly' && node.closed);
     expect(ring).toBeDefined();
     if (!ring || ring.kind !== 'poly') throw new Error('expected ring');
@@ -2421,7 +2451,7 @@ describe('annotation-core — rotation', () => {
       ellipse: false,
       rotation: 90,
     };
-    const obbBox = obbFromGeom(box, 0);
+    const obbBox = obbFromGeom(box, { strokeWidth: 0 });
     expect(obbBox?.angle).toBe(90);
     expect(obbBox?.corners).toHaveLength(4);
 
@@ -2438,7 +2468,7 @@ describe('annotation-core — rotation', () => {
       rotation: 0,
     };
     const turned = geomRotateAbout(base, turnPivotOf(base), 45);
-    const obbV = obbFromGeom(turned, 0);
+    const obbV = obbFromGeom(turned, { strokeWidth: 0 });
     expect(obbV?.angle).toBe(45);
     expect(obbV?.corners).toHaveLength(4);
   });
@@ -2587,7 +2617,7 @@ describe('annotation-core — rotation-aware selection (grab + menu + group)', (
   });
 
   it('selectionQuad of an upright box is just its axis-aligned corners', () => {
-    const quad = selectionQuad(rect(10, 20, 100, 40), 0);
+    const quad = selectionQuad(rect(10, 20, 100, 40), { strokeWidth: 0 });
     expect(quad).toEqual([
       { x: 10, y: 20 },
       { x: 110, y: 20 },
@@ -2685,7 +2715,7 @@ describe('annotation-core — rotation pivots about the rect centre', () => {
     const centre = turnPivotOf(geometry);
 
     // find the rotate knob, then start + drag the gesture there.
-    const obb = obbFromGeom(geometry, fieldsOf(poly).style.strokeWidth)!;
+    const obb = obbFromGeom(geometry, fieldsOf(poly).style)!;
     const corners = obb.corners;
     const fromMid = { x: (corners[0].x + corners[1].x) / 2, y: (corners[0].y + corners[1].y) / 2 };
     const down = { x: corners[3].x - corners[0].x, y: corners[3].y - corners[0].y };
@@ -2789,7 +2819,7 @@ describe('annotation-core — join-aware stroke bounds', () => {
     );
     const sw = 10;
     const halfWidth = sw / 2;
-    const rect = geomVisualBounds(geometry, sw);
+    const rect = geomVisualBounds(geometry, { strokeWidth: sw });
 
     // The mitred apex spikes above y=0 by halfWidth/cos(delta/2) = halfWidth*sqrt(5) ≈ 11.18.
     const spike = halfWidth * Math.sqrt(5);
@@ -2816,7 +2846,7 @@ describe('annotation-core — join-aware stroke bounds', () => {
     );
     const sw = 10;
     const halfWidth = sw / 2;
-    const rect = geomVisualBounds(geometry, sw);
+    const rect = geomVisualBounds(geometry, { strokeWidth: sw });
     // Bounded by the vertex hull grown by the bevel (~halfWidth), nowhere near the ~190*halfWidth spike.
     expect(rect.width).toBeLessThan(100 + 4 * halfWidth);
     expect(rect.height).toBeLessThan(20 * halfWidth);
@@ -2834,9 +2864,9 @@ describe('annotation-core — join-aware stroke bounds', () => {
     );
     const sw = 8;
     const halfWidth = sw / 2;
-    const sb = selectionBounds(geometry, sw);
+    const sb = selectionBounds(geometry, { strokeWidth: sw });
     // selectionBounds now routes polygons through the stroke-aware visual bounds…
-    expect(sb).toEqual(geomVisualBounds(geometry, sw));
+    expect(sb).toEqual(geomVisualBounds(geometry, { strokeWidth: sw }));
     // …so the outline sits outside the tight vertex box (a 90° corner miters to -halfWidth).
     const tight = geomBounds(geometry);
     expect(sb.x).toBeCloseTo(-halfWidth, 3);
@@ -2859,7 +2889,7 @@ describe('annotation-core — join-aware stroke bounds', () => {
     };
     const sw = 6;
     const halfWidth = sw / 2;
-    const rect = geomVisualBounds(geometry, sw);
+    const rect = geomVisualBounds(geometry, { strokeWidth: sw });
     const hull = geomBounds(geometry);
     expect(rect).toEqual({
       x: hull.x - halfWidth,
@@ -2878,7 +2908,7 @@ describe('annotation-core — join-aware stroke bounds', () => {
       rotation: 0,
     };
     const sw = 6;
-    const rect = geomVisualBounds(geometry, sw);
+    const rect = geomVisualBounds(geometry, { strokeWidth: sw });
     // The arrowhead tip is a 60° corner: the mitred stroke reaches h/sin(30°) = sw
     // past the tip vertex. The right edge must clear that (old flat h/2 pad did not).
     expect(rect.x + rect.width).toBeGreaterThanOrEqual(100 + sw - 1e-6);
@@ -2890,14 +2920,16 @@ describe('annotation-core — join-aware stroke bounds', () => {
       ref: null,
       subtype,
       geometry,
-      box: geomVisualBounds(geometry, 4),
+      box: geomVisualBounds(geometry, { strokeWidth: 4 }),
       style: {
         color: '#000000',
         interiorColor: null,
         strokeWidth: 4,
         opacity: 1,
         blendMode: 'normal',
-        border: { kind: 'solid' },
+        borderStyle: 'solid',
+        dashArray: null,
+        cloudyIntensity: null,
       },
       source: 'vector',
       selected: false,
@@ -2964,7 +2996,9 @@ describe('annotation-core opaqueBody (stamp) gestures', () => {
         strokeWidth: 1,
         opacity: 1,
         blendMode: 'normal',
-        border: { kind: 'solid' },
+        borderStyle: 'solid',
+        dashArray: null,
+        cloudyIntensity: null,
       },
       flags: DRAWN_FLAGS,
       source: 'baked',
@@ -3446,7 +3480,9 @@ describe('page-bound rotate knob', () => {
         strokeWidth: 1,
         opacity: 1,
         blendMode: 'normal',
-        border: { kind: 'solid' },
+        borderStyle: 'solid',
+        dashArray: null,
+        cloudyIntensity: null,
       },
       flags: DRAWN_FLAGS,
       source: 'baked',
@@ -3631,7 +3667,9 @@ describe('rotate guides (live rotate chrome mode)', () => {
         strokeWidth: 1,
         opacity: 1,
         blendMode: 'normal',
-        border: { kind: 'solid' },
+        borderStyle: 'solid',
+        dashArray: null,
+        cloudyIntensity: null,
       },
       flags: DRAWN_FLAGS,
       source: 'baked',
@@ -3741,7 +3779,9 @@ describe('group chrome rides live gestures', () => {
         strokeWidth: 1,
         opacity: 1,
         blendMode: 'normal',
-        border: { kind: 'solid' },
+        borderStyle: 'solid',
+        dashArray: null,
+        cloudyIntensity: null,
       },
       flags: DRAWN_FLAGS,
       source: 'baked',
@@ -3852,7 +3892,9 @@ describe('marquee vs rotated shapes', () => {
       strokeWidth: 2,
       opacity: 1,
       blendMode: 'normal',
-      border: { kind: 'solid' },
+      borderStyle: 'solid',
+      dashArray: null,
+      cloudyIntensity: null,
     },
     flags: DRAWN_FLAGS,
     source: 'vector',
@@ -4251,7 +4293,9 @@ describe('link prop (attached children in the substrate, read via linkOf)', () =
     strokeWidth: 2,
     opacity: 1,
     blendMode: 'normal',
-    border: { kind: 'solid' },
+    borderStyle: 'solid',
+    dashArray: null,
+    cloudyIntensity: null,
   } as const;
 
   const committedSquare = (extra?: Partial<RecordInput>): ModelAnnotation =>
@@ -4525,7 +4569,7 @@ describe('callout ↔ AP-generator mirror', () => {
     );
 
   it('the box border insets by half the stroke — ink INSIDE the rect, like squares', () => {
-    const nodes = geomScene(calloutGeom(), 6);
+    const nodes = geomScene(calloutGeom(), { strokeWidth: 6 });
     const box = nodes.find((node) => node.kind === 'rect');
     if (box?.kind !== 'rect') throw new Error('expected a rect border node');
     // rect (200,100,120,40) inset by 3: outer edge of the 6-wide stroke lands
@@ -4535,7 +4579,7 @@ describe('callout ↔ AP-generator mirror', () => {
   });
 
   it("the leader's connection point extends under the border by half the stroke", () => {
-    const nodes = geomScene(calloutGeom(), 6);
+    const nodes = geomScene(calloutGeom(), { strokeWidth: 6 });
     const leader = nodes[0];
     if (leader?.kind !== 'poly' || leader.closed) throw new Error('expected the open leader poly');
     // conn (200,120), incoming direction +x → adjusted to (203,120): the line
@@ -4560,7 +4604,9 @@ describe('callout ↔ AP-generator mirror', () => {
         strokeWidth: 6,
         opacity: 1,
         blendMode: 'normal',
-        border: { kind: 'solid' },
+        borderStyle: 'solid',
+        dashArray: null,
+        cloudyIntensity: null,
       },
       flags: DRAWN_FLAGS,
       source: 'baked',

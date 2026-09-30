@@ -9,7 +9,7 @@ import { quadCorners, quadRing, type Quad } from '@embedpdf/core-geometry';
 import type { AnnotationDTO } from '@embedpdf/engine-core/runtime';
 
 import { expandRect, pointInPoly, unionRect } from '../rect';
-import type { Point, Rect, RenderNode } from '../types';
+import type { Point, Rect, RenderNode, Stroke } from '../types';
 import type { ShapeFamily } from './family';
 
 /** A quads family record's shape: its text's quads. */
@@ -32,7 +32,7 @@ function readQuads(annotation: AnnotationDTO): QuadsShape {
 const quadsBounds = (shape: QuadsShape): Rect => unionRect(shape.quadPoints.flatMap(quadCorners));
 
 /** What the marks draw: the quads, grown by half the stroke (an underline's or squiggle's). */
-const quadsDrawnBounds = (shape: QuadsShape, strokeWidth: number): Rect =>
+const quadsDrawnBounds = (shape: QuadsShape, { strokeWidth }: Stroke): Rect =>
   expandRect(quadsBounds(shape), strokeWidth / 2);
 
 /** The middle of the quads' corners: where they would turn. */

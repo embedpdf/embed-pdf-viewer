@@ -24,7 +24,7 @@ import {
   segDist,
   unionRect,
 } from '../rect';
-import type { Handle, Point, Rect, RenderNode } from '../types';
+import type { Handle, Point, Rect, RenderNode, Stroke } from '../types';
 import {
   boxCorners,
   boxHandles,
@@ -188,7 +188,7 @@ const tipAngle = (line: CalloutLine): number =>
  * the page shows it, its line and the arrow at its tip, grown by half the
  * stroke.
  */
-function textBoxDrawnBounds(shape: TextBoxShape, strokeWidth: number): Rect {
+function textBoxDrawnBounds(shape: TextBoxShape, { strokeWidth }: Stroke): Rect {
   const line = shape.calloutLine;
   if (!line) return shape.box;
   const points = [...boxCorners(shape), ...line];
@@ -211,7 +211,7 @@ function textBoxHit(
   shape: TextBoxShape,
   point: Point,
   margin: number,
-  strokeWidth: number,
+  { strokeWidth }: Stroke,
 ): boolean {
   const local = shape.rotation ? rotatePoint(point, rectCenter(shape.box), -shape.rotation) : point;
   if (rectContains(expandRect(shape.box, margin), local)) return true;
@@ -237,7 +237,7 @@ function textBoxHit(
  * (the generator's `adjusted_conn`), so the two meet without a gap. The text
  * itself is the framework's editable element, not part of the scene.
  */
-function textBoxScene(shape: TextBoxShape, strokeWidth = 0): RenderNode[] {
+function textBoxScene(shape: TextBoxShape, { strokeWidth }: Stroke): RenderNode[] {
   const nodes: RenderNode[] = [];
   const line = shape.calloutLine;
   if (line) {
@@ -291,8 +291,8 @@ export const textBoxFamily: ShapeFamily<TextBoxShape> = {
   upright: textBoxUpright,
   handles: textBoxHandles,
   drag: textBoxDrag,
-  hit: (shape, point, margin, _filled, strokeWidth) =>
-    textBoxHit(shape, point, margin, strokeWidth),
+  // A text box is hit anywhere in its box, filled or not.
+  hit: (shape, point, margin, _filled, stroke) => textBoxHit(shape, point, margin, stroke),
   scene: textBoxScene,
 };
 

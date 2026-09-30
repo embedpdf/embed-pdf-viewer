@@ -1,6 +1,7 @@
 import { boxFamily } from '../shapes';
 import { defineKind, NO_CAPS } from './define';
 import { LINKABLE } from './fields';
+import { plainStyle } from './styles';
 
 /**
  * A link (`/Link`): an invisible rectangle that goes somewhere when clicked.
@@ -12,6 +13,7 @@ import { LINKABLE } from './fields';
 export const link = defineKind({
   name: 'link',
   family: boxFamily,
+  style: plainStyle,
   caps: {
     ...NO_CAPS,
     selectable: true,

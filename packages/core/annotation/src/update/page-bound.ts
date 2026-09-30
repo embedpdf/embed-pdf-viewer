@@ -16,7 +16,7 @@ import { geomVisualBounds } from '../geometry';
 import { unionRect } from '../rect';
 import { annotationSelectionFrame } from '../selection';
 import type { Draft, Id, Model, ModelAnnotation, Point, PointerInput, Rect } from '../types';
-import { fieldsOf, shapeOf } from '../record';
+import { shapeOf, styleOf } from '../record';
 
 const clampAxis = (value: number, lo: number, hi: number): number =>
   Math.max(lo, Math.min(hi, value));
@@ -46,14 +46,13 @@ export const viewOf = (input: PointerInput): ViewEnv | undefined =>
 function moveClampCorners(annotation: ModelAnnotation, view?: ViewEnv): Point[] {
   const mode = anchorModeOf(annotation);
   const stored = shapeOf(annotation.annotation);
-  const { style } = fieldsOf(annotation);
+  const style = styleOf(annotation.annotation);
   const geometry = anchoredGeom(stored, mode, view);
   if (geometry.kind === 'text-box' && geometry.calloutLine) {
-    const visual = geomVisualBounds(
-      geometry,
-      anchoredStrokeWidth(style.strokeWidth, mode, view),
-      style.border,
-    );
+    const visual = geomVisualBounds(geometry, {
+      ...style,
+      strokeWidth: anchoredStrokeWidth(style.strokeWidth, mode, view),
+    });
     return [
       { x: visual.x, y: visual.y },
       { x: visual.x + visual.width, y: visual.y },

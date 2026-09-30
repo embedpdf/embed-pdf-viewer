@@ -18,7 +18,7 @@ import type { PageRef } from '@embedpdf/engine-core/runtime';
 
 import type { TextItem } from './contract';
 import { cssFontFamilyForFont, stripBodyDefaults } from './rich-text';
-import { fieldsOf } from '@embedpdf/core-annotation';
+import { fieldsOf, styleOf } from '@embedpdf/core-annotation';
 
 /** Project the model's free-text boxes into render-ready {@link TextItem}s — the
  *  core geometry (`textBoxes`) joined with the DTO-derived CSS. Pure; memoized by
@@ -32,7 +32,7 @@ export function buildTextItems(model: Model, page: PageRef, view?: ViewEnv): Tex
     const style = fields?.text ?? initialTextStyle;
     // Match the engine's text plate inset. Browser font metrics and line
     // heights belong to the shared editor binding.
-    const sw = fields?.style.strokeWidth ?? 0;
+    const sw = annotation ? styleOf(annotation.annotation).strokeWidth : 0;
     const doc = fields ? richDocOf(fields) : null;
     return {
       id: tb.id,

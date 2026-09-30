@@ -25,7 +25,14 @@ import { describe, expect, it } from 'vitest';
 import { DRAWN_FLAGS } from '../src/flags';
 import { linkChildrenOf, linkOf } from '../src/links';
 import { isAttachedLink } from '../src/plane';
-import type { Message, Model, ModelAnnotation, ModelGeometry, RecordFields } from '../src/types';
+import type {
+  Message,
+  Model,
+  ModelAnnotation,
+  ModelGeometry,
+  RecordFields,
+  Style,
+} from '../src/types';
 import { answering, modelWith, record } from './support';
 import { KINDS, type FieldSpec } from '../src/kinds';
 import { update } from '../src/update';
@@ -216,13 +223,15 @@ describe('record — Ink Highlight intent and blend', () => {
 });
 
 describe('record — Replace Text authoring', () => {
-  const style = {
+  const style: Style = {
     color: '#e44234',
     interiorColor: null,
     strokeWidth: 1,
     opacity: 1,
     blendMode: 'normal' as const,
-    border: { kind: 'solid' as const },
+    borderStyle: 'solid',
+    dashArray: null,
+    cloudyIntensity: null,
   };
 
   it('emits the normalized Caret and StrikeOut intents with print flags', () => {
@@ -683,7 +692,7 @@ function polygonDTO(
 describe('record — polygon cloudy border', () => {
   it('fromDTO reads /BE intensity into a cloudy border', () => {
     const annotation = fromDTO(fromFile(polygonDTO(2)));
-    expect(fieldsOf(annotation).style.border).toEqual({ kind: 'cloudy', intensity: 2 });
+    expect(fieldsOf(annotation).style.cloudyIntensity).toBe(2);
   });
 
   it('toPatch carries cloudyIntensity and no rect: the engine measures the curls', () => {
@@ -702,7 +711,12 @@ describe('record — polygon cloudy border', () => {
     const annotation = fromDTO(fromFile(polygonDTO(2)));
     const solid = {
       ...fieldsOf(annotation),
-      style: { ...fieldsOf(annotation).style, border: { kind: 'solid' as const } },
+      style: {
+        ...fieldsOf(annotation).style,
+        borderStyle: 'solid' as const,
+        dashArray: null,
+        cloudyIntensity: null,
+      },
     };
     const patch = toFile(toPatch(solid)) as Extract<
       AnnotationPatch<PdfCoordinates>,
@@ -716,7 +730,12 @@ describe('record — polygon cloudy border', () => {
     const annotation = fromDTO(fromFile(rotatedPolylineDTO(0, 41)));
     const cloudyStyled = {
       ...fieldsOf(annotation),
-      style: { ...fieldsOf(annotation).style, border: { kind: 'cloudy' as const, intensity: 2 } },
+      style: {
+        ...fieldsOf(annotation).style,
+        borderStyle: 'solid' as const,
+        dashArray: null,
+        cloudyIntensity: 2,
+      },
     };
     const patch = toFile(toPatch(cloudyStyled)) as Extract<
       AnnotationPatch<PdfCoordinates>,
@@ -778,7 +797,12 @@ describe('record — withFields (a change is its write)', () => {
   it('a border change on a plain square writes the border alone: no cloud or box it already has', () => {
     const annotation = fromDTO(fromFile(squareDTO(63)));
     const patch = patchOf(annotation, {
-      style: { ...fieldsOf(annotation).style, border: { kind: 'dashed', dash: [4, 2] } },
+      style: {
+        ...fieldsOf(annotation).style,
+        borderStyle: 'dashed' as const,
+        dashArray: [4, 2],
+        cloudyIntensity: null,
+      },
     });
     expect(patch).toEqual({ subtype: 'square', borderStyle: 'dashed', dashArray: [4, 2] });
   });
@@ -899,7 +923,7 @@ describe('record — shape cloudy border tri-state', () => {
   it("fromDTO reads /BE intensity into a cloudy border; the shape's box is the engine's box", () => {
     const annotation = fromDTO(fromFile(cloudySquare()));
     const geometry = shapeOf(annotation.annotation);
-    expect(fieldsOf(annotation).style.border).toEqual({ kind: 'cloudy', intensity: 2 });
+    expect(fieldsOf(annotation).style.cloudyIntensity).toBe(2);
     if (geometry.kind !== 'box') throw new Error('expected a box');
     const square = annotation.annotation as Extract<AnnotationDTO, { subtype: 'square' }>;
     expect(geometry.box).toEqual(square.box);
@@ -919,7 +943,12 @@ describe('record — shape cloudy border tri-state', () => {
     const annotation = fromDTO(fromFile(cloudySquare()));
     const solid = {
       ...fieldsOf(annotation),
-      style: { ...fieldsOf(annotation).style, border: { kind: 'solid' as const } },
+      style: {
+        ...fieldsOf(annotation).style,
+        borderStyle: 'solid' as const,
+        dashArray: null,
+        cloudyIntensity: null,
+      },
     };
     const patch = toFile(toPatch(solid)) as Extract<
       AnnotationPatch<PdfCoordinates>,
@@ -1151,7 +1180,9 @@ describe('record — every field a kind takes writes only fields its engine kind
             strokeWidth: 1,
             opacity: 1,
             blendMode: 'normal',
-            border: { kind: 'solid' },
+            borderStyle: 'solid',
+            dashArray: null,
+            cloudyIntensity: null,
           },
           ...(subtype === 'free-text' || subtype.startsWith('widget-')
             ? {

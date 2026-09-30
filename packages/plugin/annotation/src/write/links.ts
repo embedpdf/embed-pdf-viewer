@@ -1,5 +1,4 @@
 import {
-  fieldsOf,
   type Id,
   kindOf,
   linkChildrenOf,
@@ -7,6 +6,7 @@ import {
   type ModelAnnotation,
   refOf,
   shapeOf,
+  styleOf,
 } from '@embedpdf/core-annotation';
 import {
   annotationKey,
@@ -72,7 +72,7 @@ export function createLinkWrites(
     const rects =
       desired == null
         ? []
-        : linkChildRects(shapeOf(annotation.annotation), fieldsOf(annotation).style);
+        : linkChildRects(shapeOf(annotation.annotation), styleOf(annotation.annotation));
     const current = linkChildrenOf(store.model(), id);
     const changes: StoreChange[] = [];
     const paired = Math.min(current.length, rects.length);

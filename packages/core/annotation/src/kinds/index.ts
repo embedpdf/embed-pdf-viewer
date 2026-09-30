@@ -1,7 +1,7 @@
 /**
  * Every annotation kind. Each is declared in its own file in this folder: its
- * shape family, what a user can do to it, and what a sidebar edits. To add a
- * kind, declare it in a file and list it below.
+ * shape family, how it is drawn, what a user can do to it, and what a sidebar
+ * edits. To add a kind, declare it in a file and list it below.
  *
  * A kind is how an annotation is edited; a tool is how one is made (tools/,
  * in the plugin). Many tools can make one kind: ink and the ink highlighter,
@@ -27,6 +27,7 @@ import { strikeout } from './strikeout';
 import { textNote } from './text-note';
 import { underline } from './underline';
 import { widgetBox, widgetButton, widgetChoice, widgetText, widgetToggle } from './widget';
+import { plainStyle } from './styles';
 
 export { defineKind, NO_CAPS, type AnnotationKind, type FieldSpec, type KindCaps } from './define';
 export { widgetKindOf } from './widget';
@@ -69,7 +70,7 @@ export function kindNamed(name: string): AnnotationKind {
   if (kind) return kind;
   let shown = shownOnly.get(name);
   if (!shown) {
-    shown = { name, family: boxFamily, caps: NO_CAPS, fields: [] };
+    shown = { name, family: boxFamily, style: plainStyle, caps: NO_CAPS, fields: [] };
     shownOnly.set(name, shown);
   }
   return shown;

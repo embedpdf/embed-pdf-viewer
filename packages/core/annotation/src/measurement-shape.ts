@@ -153,10 +153,7 @@ export function shapeMeasurementLayout(
           ],
         }
       : null;
-  const selectionPoints = [
-    ...selectionQuad(geometry, style.strokeWidth, style.border),
-    ...(caption?.bounds ?? []),
-  ];
+  const selectionPoints = [...selectionQuad(geometry, style), ...(caption?.bounds ?? [])];
   return { caption, selectionPoints, visualBounds: unionRect(selectionPoints) };
 }
 
@@ -179,7 +176,7 @@ export function measurementSelectionQuad(
     return distanceSelectionQuad(geometry, appearance, style.strokeWidth);
   }
   const layout = shapeMeasurementLayout(geometry, appearance, style);
-  if (!layout) return selectionQuad(geometry, style.strokeWidth, style.border);
+  if (!layout) return selectionQuad(geometry, style);
   const angle = geomRotation(geometry);
   const bounds = unionRect(
     layout.selectionPoints.map((point) => rotatePoint(point, ORIGIN, -angle)),

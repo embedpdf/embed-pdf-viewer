@@ -1,6 +1,7 @@
 import { quadsFamily } from '../shapes';
 import { defineKind, NO_CAPS } from './define';
 import { MARKUP_FIELDS } from './fields';
+import { markupStyle } from './styles';
 
 /**
  * A line through text (`/StrikeOut`). Bound to the text it marks: it can be selected,
@@ -10,6 +11,7 @@ import { MARKUP_FIELDS } from './fields';
 export const strikeout = defineKind({
   name: 'strikeout',
   family: quadsFamily,
+  style: markupStyle,
   caps: { ...NO_CAPS, paintsBeneath: true, selectable: true, anchored: true, commentable: true },
   fields: MARKUP_FIELDS,
 });

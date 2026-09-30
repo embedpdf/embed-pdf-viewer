@@ -1,11 +1,13 @@
 import type { PageRotation, Point, Rect as GeometryRect, Quad } from '@embedpdf/core-geometry';
 import type {
+  AnnotationBorderStyle,
   AnnotationDTO,
   AnnotationPatch,
   AnnotationFlags,
   AnnotationRef,
   BlendMode,
   CaretIntent,
+  Color,
   InkIntent,
   LineEnding,
   LineEndings,
@@ -104,37 +106,42 @@ export type ModelGeometry =
   | TextBoxShape; // free text; its text is data, rendered by the framework as an editable element
 
 /**
- * How a shape's outline is stroked. A discriminated union so illegal combinations
- * — a dash array on a cloudy border, an intensity on a dashed one — are simply
- * unrepresentable. Maps onto the engine's `/BS /S` (`borderStyle`), `/BS /D`
- * (`dashArray`), and `/BE /I` (`cloudyIntensity`) wire fields. Cloudy is only
- * honoured for shapes (square/circle); other kinds treat it as solid.
+ * How an annotation is drawn, by the engine's field names: its colours, its
+ * stroke and its border, with its kind's fill-ins (a highlight strokes
+ * nothing, a caret draws 1 pt). A view its kind works out from the
+ * annotation (`styleOf`, `kinds/styles.ts`) for drawing, bounding and
+ * hit-testing: nothing is written back through it.
  */
-export type Border =
-  | { kind: 'solid' }
-  | { kind: 'dashed'; dash: number[] }
-  | { kind: 'cloudy'; intensity: number };
-
 export interface Style {
-  /** `/C` colour — stroke for geometric kinds, highlight colour for markup. */
-  color: string;
-  /** `/IC` interior (fill) colour. `null` when the annotation has no fill. */
-  interiorColor: string | null;
+  /** The stroke for a drawn kind, a markup's colour, a free text's border. */
+  color: Color;
+  /** The fill; `null` when the annotation has none. */
+  interiorColor: Color | null;
   strokeWidth: number;
   opacity: number;
-  /** Effective blend mode of the annotation's normal appearance. */
   blendMode: BlendMode;
-  /** Outline style — defaults to `{ kind: 'solid' }`. */
-  border: Border;
+  borderStyle: AnnotationBorderStyle;
+  /** A dashed border's pattern; `null` draws the engine's default dash. */
+  dashArray: number[] | null;
+  /** A cloudy border's intensity; `null` without a cloud. A cloud wins over a dash. */
+  cloudyIntensity: number | null;
+}
+
+/**
+ * What a shape's bounds, hit test and drawing depend on besides the shape:
+ * how wide its stroke is, and a cloud's intensity. A {@link Style} is one.
+ */
+export interface Stroke {
+  strokeWidth: number;
+  cloudyIntensity?: number | null;
 }
 
 export type TextAlign = 'left' | 'center' | 'right';
 
 /**
- * Page-space text styling for a text-editable kind (free text) — the text
- * counterpart of {@link Style}, projected from the DTO's `/DA` fields the same
- * way `style` is projected from `/C`/`/CA`/`/BS`. CSS colour string; the engine
- * `Color` seam is crossed only in record/.
+ * Page-space text styling for a text-editable kind (free text), projected
+ * from the DTO's `/DA` fields. CSS colour string; the engine `Color` seam is
+ * crossed only in record/.
  */
 export interface TextStyle {
   /** A PDF standard font name or a registered font key. */

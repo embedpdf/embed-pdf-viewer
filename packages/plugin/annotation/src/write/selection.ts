@@ -15,6 +15,7 @@ import {
   refOf,
   richDocOf,
   shapeOf,
+  styleOf,
 } from '@embedpdf/core-annotation';
 import { intersectRects } from '@embedpdf/core-geometry';
 import {
@@ -132,11 +133,8 @@ export function createSelectionWrites(
         )
           return false;
         const geometry = shapeOf(annotation.annotation);
-        const { style } = fieldsOf(annotation);
-        const hit = intersectRects(
-          geomVisualBounds(geometry, style.strokeWidth, style.border),
-          rect,
-        );
+        const style = styleOf(annotation.annotation);
+        const hit = intersectRects(geomVisualBounds(geometry, style), rect);
         return hit.width > 0 && hit.height > 0;
       });
       if (ids.length || !options?.add) store.commit({ type: 'select', ids, add: options?.add });

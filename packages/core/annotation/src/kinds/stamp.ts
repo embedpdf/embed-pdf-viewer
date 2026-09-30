@@ -1,6 +1,7 @@
 import { boxFamily } from '../shapes';
 import { defineKind, NO_CAPS } from './define';
 import { LINKABLE, OPACITY } from './fields';
+import { stampStyle } from './styles';
 
 /**
  * A stamp (`/Stamp`): an image or drawing whose look is always the engine's
@@ -11,6 +12,7 @@ import { LINKABLE, OPACITY } from './fields';
 export const stamp = defineKind({
   name: 'stamp',
   family: boxFamily,
+  style: stampStyle,
   caps: {
     ...NO_CAPS,
     selectable: true,

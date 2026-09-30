@@ -42,13 +42,10 @@ export function familyChosenBy(pick: (annotation: AnnotationDTO) => ShapeFamily)
     read: (annotation) => pick(annotation).read(annotation),
     write: (shape, subtype) => familyOf(shape).write(shape, subtype),
     bounds: (shape) => familyOf(shape).bounds(shape),
-    drawnBounds: (shape, strokeWidth, border) =>
-      familyOf(shape).drawnBounds(shape, strokeWidth, border),
-    selectionBounds: (shape, strokeWidth, border) =>
-      familyOf(shape).selectionBounds(shape, strokeWidth, border),
+    drawnBounds: (shape, stroke) => familyOf(shape).drawnBounds(shape, stroke),
+    selectionBounds: (shape, stroke) => familyOf(shape).selectionBounds(shape, stroke),
     oriented: (shape) => familyOf(shape).oriented(shape),
-    turnedCorners: (shape, strokeWidth, border) =>
-      familyOf(shape).turnedCorners(shape, strokeWidth, border),
+    turnedCorners: (shape, stroke) => familyOf(shape).turnedCorners(shape, stroke),
     pivot: (shape) => familyOf(shape).pivot(shape),
     translate: (shape, delta) => familyOf(shape).translate(shape, delta),
     rotateAbout: (shape, pivot, degrees) => familyOf(shape).rotateAbout(shape, pivot, degrees),
@@ -56,8 +53,8 @@ export function familyChosenBy(pick: (annotation: AnnotationDTO) => ShapeFamily)
     upright: (shape, pivot) => familyOf(shape).upright(shape, pivot),
     handles: (shape) => familyOf(shape).handles(shape),
     drag: (shape, handle, to) => familyOf(shape).drag(shape, handle, to),
-    hit: (shape, point, margin, filled, strokeWidth, border) =>
-      familyOf(shape).hit(shape, point, margin, filled, strokeWidth, border),
-    scene: (shape, strokeWidth, border) => familyOf(shape).scene(shape, strokeWidth, border),
+    hit: (shape, point, margin, filled, stroke) =>
+      familyOf(shape).hit(shape, point, margin, filled, stroke),
+    scene: (shape, stroke) => familyOf(shape).scene(shape, stroke),
   };
 }

@@ -1,6 +1,7 @@
 import { textBoxFamily } from '../shapes';
 import { defineKind, NO_CAPS } from './define';
 import { LINKABLE, OPACITY } from './fields';
+import { strokedStyle } from './styles';
 
 /**
  * A text box (`/FreeText`), plain or with a callout line. Its box resizes and
@@ -10,6 +11,7 @@ import { LINKABLE, OPACITY } from './fields';
 export const freeText = defineKind({
   name: 'free-text',
   family: textBoxFamily,
+  style: strokedStyle,
   caps: {
     ...NO_CAPS,
     selectable: true,

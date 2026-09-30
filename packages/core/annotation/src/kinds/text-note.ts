@@ -1,6 +1,7 @@
 import { boxFamily } from '../shapes';
 import { defineKind, NO_CAPS } from './define';
 import { COLOR, LINKABLE, OPACITY } from './fields';
+import { iconStyle } from './styles';
 
 /** The `/Name` icons a note can show: the engine's `NoteIcon` names. */
 const NOTE_ICONS = [
@@ -21,6 +22,7 @@ const NOTE_ICONS = [
 export const textNote = defineKind({
   name: 'text',
   family: boxFamily,
+  style: iconStyle,
   caps: {
     ...NO_CAPS,
     selectable: true,

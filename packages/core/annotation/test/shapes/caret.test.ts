@@ -26,8 +26,8 @@ describe('the caret family', () => {
 
   it('is hit anywhere in its box, plus the margin', () => {
     const shape = caretFamily.read(caret(0));
-    expect(caretFamily.hit(shape, { x: 97, y: 56 }, 0, false, 0)).toBe(true);
-    expect(caretFamily.hit(shape, { x: 102, y: 56 }, 1, false, 0)).toBe(false);
-    expect(caretFamily.hit(shape, { x: 102, y: 56 }, 2, false, 0)).toBe(true);
+    expect(caretFamily.hit(shape, { x: 97, y: 56 }, 0, false, { strokeWidth: 0 })).toBe(true);
+    expect(caretFamily.hit(shape, { x: 102, y: 56 }, 1, false, { strokeWidth: 0 })).toBe(false);
+    expect(caretFamily.hit(shape, { x: 102, y: 56 }, 2, false, { strokeWidth: 0 })).toBe(true);
   });
 });

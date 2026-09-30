@@ -7,7 +7,7 @@ import { anchorModeOf, unanchoredGeom } from '../anchor';
 import { geomRotateAbout, geomScaleAbout, geomTranslate, groupResizeFactors } from '../geometry';
 import { measurementOf } from '../measurement';
 import { moveMeasurementCaption, shapeMeasurementReadout } from '../measurement-shape';
-import { fieldsOf, shapeOf, withShape, withValues } from '../record';
+import { shapeOf, styleOf, withShape, withValues } from '../record';
 import type { Effect, Model } from '../types';
 import { commitViewGesture, geomEqual } from './changes';
 import { rotateDraftDelta } from './edit';
@@ -31,7 +31,7 @@ export function editUp(model: Model): [Model, Effect[]] {
     const annotation = model.byId[draft.id];
     const measure = annotation && measurementOf(annotation.annotation);
     if (!measure || (!draft.delta.x && !draft.delta.y)) return [{ ...model, draft: null }, []];
-    const { style } = fieldsOf(annotation!);
+    const style = styleOf(annotation!.annotation);
     const caption = moveMeasurementCaption(
       shapeOf(annotation!.annotation),
       measure,

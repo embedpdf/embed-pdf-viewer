@@ -8,28 +8,25 @@
 import { initialTextStyle } from '../props';
 import type { RecordFields, Style } from '../types';
 import type { LoweredKey, Wire } from './projection';
+import { dashOf } from '../kinds/styles';
 import { hexColorOf } from './seam';
 
 /** /BS slice of the style — a cloudy border keeps a solid underlying stroke
  *  (the scallops are the /BE effect, layered on by the shape kinds). */
-export const borderSlice = (style: Style): Wire => ({
-  borderStyle: style.border.kind === 'dashed' ? ('dashed' as const) : ('solid' as const),
-  ...(style.border.kind === 'dashed' ? { dashArray: style.border.dash } : {}),
-});
+export const borderSlice = (style: Style): Wire => {
+  const dash = dashOf(style);
+  return dash ? { borderStyle: 'dashed', dashArray: dash } : { borderStyle: 'solid' };
+};
 
 /** The `/DA`-styled text slice falls back to the draw-time seed exactly like
  *  the old projections did (a fresh draft may not carry `text` yet). */
 const textOf = (annotation: RecordFields) => annotation.text ?? initialTextStyle;
 
 export const GENERIC_PROPS: Partial<Record<LoweredKey, (annotation: RecordFields) => Wire>> = {
-  color: (annotation) => ({ color: hexColorOf(annotation.style.color) }),
+  color: (annotation) => ({ color: annotation.style.color }),
   opacity: (annotation) => ({ opacity: annotation.style.opacity }),
   blendMode: (annotation) => ({ blendMode: annotation.style.blendMode }),
-  interiorColor: (annotation) => ({
-    interiorColor: annotation.style.interiorColor
-      ? hexColorOf(annotation.style.interiorColor)
-      : null,
-  }),
+  interiorColor: (annotation) => ({ interiorColor: annotation.style.interiorColor }),
   strokeWidth: (annotation) => ({ strokeWidth: annotation.style.strokeWidth }),
   border: (annotation) => borderSlice(annotation.style),
   fontFamily: (annotation) => ({ fontFamily: textOf(annotation).fontFamily }),

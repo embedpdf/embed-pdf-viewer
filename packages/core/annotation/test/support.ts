@@ -128,7 +128,9 @@ export const STYLE: Style = {
   strokeWidth: 2,
   opacity: 1,
   blendMode: 'normal',
-  border: { kind: 'solid' },
+  borderStyle: 'solid',
+  dashArray: null,
+  cloudyIntensity: null,
 };
 
 /** A sidebar edit of the selection: the same fields for every selected record. */

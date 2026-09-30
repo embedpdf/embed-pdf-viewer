@@ -3,7 +3,7 @@ import { anchoredGeom, anchoredStrokeWidth, anchorModeOf } from './anchor';
 import { geomRotation, isRotatableGeom, selectionQuad, turnPivotOf } from './geometry';
 import { measurementOf, type MeasurementAppearance } from './measurement';
 import { measurementSelectionQuad } from './measurement-shape';
-import { fieldsOf, shapeOf } from './record';
+import { shapeOf, styleOf } from './record';
 import type { ModelAnnotation, ModelGeometry, QuadRing, Point, Style, ViewEnv } from './types';
 
 export interface SelectionFrame {
@@ -21,14 +21,14 @@ export function annotationSelectionFrame(
   view?: ViewEnv,
   live?: { geometry?: ModelGeometry; style?: Style; measure?: MeasurementAppearance },
 ): SelectionFrame {
-  const style = live?.style ?? fieldsOf(annotation).style;
+  const style = live?.style ?? styleOf(annotation.annotation);
   const measure = live?.measure ?? measurementOf(annotation.annotation);
   const mode = anchorModeOf(annotation);
   const geometry = anchoredGeom(live?.geometry ?? shapeOf(annotation.annotation), mode, view);
   const strokeWidth = anchoredStrokeWidth(style.strokeWidth, mode, view);
   const corners = measure
     ? measurementSelectionQuad(geometry, measure, { ...style, strokeWidth })
-    : selectionQuad(geometry, strokeWidth, style.border);
+    : selectionQuad(geometry, { ...style, strokeWidth: strokeWidth });
 
   // PDF /Rect is a page-aligned rendering envelope. Its conservative padding
   // must not change the editor's frame or rotation center after an engine echo.

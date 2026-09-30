@@ -3,6 +3,7 @@ import type { AnnotationDTO } from '@embedpdf/engine-core/runtime';
 import { endingNodes, endingNodesHit, endingPoints } from './endings';
 import { DISTANCE_CAPTION_SIZE as CAPTION_SIZE, distanceCaptionWidth } from './measurement-font';
 import { geomRotation, selectionQuad } from './geometry';
+import { dashOf } from './kinds/styles';
 import { rotatePoint, segDist, unionRect } from './rect';
 import { drawnLineOf } from './shapes/points';
 import type {
@@ -368,7 +369,7 @@ export function distanceSelectionQuad(
 ): QuadRing {
   const layout = distanceLayout(geometry, appearance, strokeWidth);
   if (!layout || geometry.kind !== 'line') {
-    return selectionQuad(geometry, strokeWidth);
+    return selectionQuad(geometry, { strokeWidth: strokeWidth });
   }
 
   // The line's own frame is its turn. Include every measurement component
@@ -494,7 +495,7 @@ export function distanceScene(
     stroke: style.color,
     width: style.strokeWidth,
     opacity: style.opacity,
-    dash: style.border.kind === 'dashed' ? style.border.dash : undefined,
+    dash: dashOf(style),
   };
   const segments = [
     ...layout.dimensionSegments,

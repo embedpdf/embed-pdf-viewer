@@ -45,7 +45,7 @@ import type {
   Point,
 } from './types';
 import type { CreationDraftAnchor } from './types';
-import { fieldsOf, kindOf, refOf, shapeOf } from './record';
+import { fieldsOf, kindOf, refOf, shapeOf, styleOf } from './record';
 
 const DRAFT_ID = '__draft__';
 const PREVIEW_ID = '__markup_preview__';
@@ -72,7 +72,7 @@ function effMeasure(model: Model, id: Id) {
 
   if (draft.kind === 'caption' && draft.id === id) {
     const geometry = shapeOf(annotation.annotation);
-    const { style } = fieldsOf(annotation);
+    const style = styleOf(annotation.annotation);
     return moveMeasurementCaption(geometry, measure, draft.delta, style).measure;
   }
 
@@ -109,7 +109,7 @@ function effGeom(model: Model, id: Id, view: ViewEnv | undefined): ModelGeometry
     if (draft.kind === 'handle' && draft.id === id) return draft.current; // already view space
     if (draft.kind === 'caption' && draft.id === id) {
       // A perimeter's or area's caption center is its shape's.
-      const { style } = fieldsOf(annotation);
+      const style = styleOf(annotation.annotation);
       const measure = measurementOf(annotation.annotation);
       return measure
         ? moveMeasurementCaption(geometry, measure, draft.delta, style).geometry
@@ -131,7 +131,7 @@ function effGeom(model: Model, id: Id, view: ViewEnv | undefined): ModelGeometry
  *  constant line weight); everyone else keeps their style verbatim. */
 function effStyle(annotation: ModelAnnotation, view: ViewEnv | undefined): Style {
   const mode = anchorModeOf(annotation);
-  const { style } = fieldsOf(annotation);
+  const style = styleOf(annotation.annotation);
   if (!mode?.zoom || !view) return style;
   return { ...style, strokeWidth: anchoredStrokeWidth(style.strokeWidth, mode, view) };
 }
@@ -152,7 +152,7 @@ export function pageItems(model: Model, page: PageRef, view?: ViewEnv): RenderIt
   // what you see.
   for (const id of paintOrder(model, page)) {
     const annotation = model.byId[id];
-    const fields = fieldsOf(annotation);
+    const { text } = fieldsOf(annotation);
     // Free text stays in the render list in every state, like a shape: a baked,
     // idle box renders as its engine /AP image; a live one (editing / resizing /
     // restyled) renders its box — fill + border, and a callout's leader — via
@@ -171,10 +171,10 @@ export function pageItems(model: Model, page: PageRef, view?: ViewEnv): RenderIt
       ref: refOf(annotation),
       subtype: kindOf(annotation.annotation).name,
       geometry,
-      box: distance?.visualBounds ?? geomVisualBounds(geometry, style.strokeWidth, style.border),
+      box: distance?.visualBounds ?? geomVisualBounds(geometry, style),
       apBox: ap.box,
       style,
-      ...(fields.text ? { text: fields.text } : {}),
+      ...(text ? { text } : {}),
       ...redactionLabelOf(annotation.annotation),
       measure,
       source: sourceDuring(model, id),
@@ -182,7 +182,7 @@ export function pageItems(model: Model, page: PageRef, view?: ViewEnv): RenderIt
       ...(model.hovered === id ? { hovered: true } : {}),
       rot: geomRotation(geometry),
       ...(ap.rot ? { apRot: ap.rot } : {}),
-      blend: blendFor(fields.style),
+      blend: blendFor(style),
     });
   }
   const draft = model.draft;
@@ -239,7 +239,7 @@ export function pageItems(model: Model, page: PageRef, view?: ViewEnv): RenderIt
         measure,
         subtype: draft.subtype,
         geometry,
-        box: distance?.visualBounds ?? geomVisualBounds(geometry, style.strokeWidth, style.border),
+        box: distance?.visualBounds ?? geomVisualBounds(geometry, style),
         style,
         source: 'ghost',
         selected: false,
@@ -269,7 +269,7 @@ export function pageItems(model: Model, page: PageRef, view?: ViewEnv): RenderIt
       ref: null,
       subtype: draft.subtype,
       geometry,
-      box: geomVisualBounds(geometry, style.strokeWidth, style.border),
+      box: geomVisualBounds(geometry, style),
       style,
       source: 'ghost',
       selected: false,
@@ -285,7 +285,7 @@ export function pageItems(model: Model, page: PageRef, view?: ViewEnv): RenderIt
       ref: null,
       subtype: model.preview.subtype,
       geometry,
-      box: geomVisualBounds(geometry, 0),
+      box: geomVisualBounds(geometry, { strokeWidth: 0 }),
       style: toolStyleOf(model, model.preview.subtype, model.preview.preset).style,
       source: 'ghost',
       selected: false,
@@ -345,7 +345,7 @@ export function selectedItems(model: Model, view?: ViewEnv): RenderItem[] {
       ref: refOf(annotation),
       subtype: kindOf(annotation.annotation).name,
       geometry,
-      box: geomVisualBounds(geometry, style.strokeWidth, style.border),
+      box: geomVisualBounds(geometry, style),
       style,
       source: annotation.source,
       selected: true,

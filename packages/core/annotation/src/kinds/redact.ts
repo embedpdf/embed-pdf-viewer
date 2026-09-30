@@ -3,6 +3,7 @@ import type { AnnotationDTO } from '@embedpdf/engine-core/runtime';
 import { boxFamily, familyChosenBy, quadsFamily } from '../shapes';
 import { defineKind, NO_CAPS } from './define';
 import { FILL, OPACITY } from './fields';
+import { redactStyle } from './styles';
 
 /** A mark over text has its quads; an area mark has none, and its shape is its rect, a box. */
 const markShape = familyChosenBy((annotation: AnnotationDTO) =>
@@ -21,6 +22,7 @@ const markShape = familyChosenBy((annotation: AnnotationDTO) =>
 export const redact = defineKind({
   name: 'redact',
   family: markShape,
+  style: redactStyle,
   caps: {
     ...NO_CAPS,
     paintsBeneath: true,

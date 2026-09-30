@@ -41,7 +41,7 @@ export function createGhost(
     const { style } = toolStyleOf(store.model(), tool?.subtype ?? toolId, tool?.preset);
     ctx.state.update(setToolGhost, {
       page: toPageRef(pageObjectNumber),
-      box: geomVisualBounds(geometry, style.strokeWidth, style.border),
+      box: geomVisualBounds(geometry, style),
       rot: 0,
       kind: 'vector',
       toolId,

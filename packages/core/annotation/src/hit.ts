@@ -24,7 +24,7 @@ import {
   type Rect,
   type Point,
 } from './types';
-import { fieldsOf, kindOf, shapeOf } from './record';
+import { kindOf, shapeOf, styleOf } from './record';
 
 export type Target =
   | { kind: 'handle'; id: Id; handle: string; cursor: Cursor }
@@ -106,7 +106,7 @@ const hitGeomOf = (annotation: ModelAnnotation, view: ViewEnv | undefined): Mode
 /** Stroke width in effective content units (a noZoom body's line weight scales
  *  with its geometry). */
 const hitStrokeOf = (annotation: ModelAnnotation, view: ViewEnv | undefined): number =>
-  anchoredStrokeWidth(fieldsOf(annotation).style.strokeWidth, anchorModeOf(annotation), view);
+  anchoredStrokeWidth(styleOf(annotation.annotation).strokeWidth, anchorModeOf(annotation), view);
 
 // `opaqueBody` kinds (stamp images) are visible across their whole box, so they
 // hit like a filled shape. Not keyed on `source: 'baked'` — every annotation
@@ -114,7 +114,7 @@ const hitStrokeOf = (annotation: ModelAnnotation, view: ViewEnv | undefined): nu
 // only on its outline.
 const isFilled = (annotation: ModelAnnotation): boolean => {
   const geometry = shapeOf(annotation.annotation);
-  const { style } = fieldsOf(annotation);
+  const style = styleOf(annotation.annotation);
   return (
     style.interiorColor != null ||
     geometry.kind === 'quads' ||
@@ -213,7 +213,7 @@ export function hitTest(
         }
       }
       if (hasHandles(model, annotation)) {
-        const { style } = fieldsOf(annotation);
+        const style = styleOf(annotation.annotation);
         const measure = measurementOf(annotation.annotation);
         const geometry = hitGeomOf(annotation, view);
         const distance =
@@ -316,7 +316,7 @@ export function hitTest(
     // A selected annotation is sticky-grabbable from anywhere in its bounds, but
     // only if it can actually move; otherwise it's grabbed on its stroke/fill like
     // an unselected one (so a selectable-but-anchored kind still re-selects cleanly).
-    const { style } = fieldsOf(annotation);
+    const style = styleOf(annotation.annotation);
     const measure = measurementOf(annotation.annotation);
     const geometry = hitGeomOf(annotation, view);
     const strokeWidth = hitStrokeOf(annotation, view);
@@ -329,14 +329,10 @@ export function hitTest(
         ? inBounds(annotation, point, view)
         : distance
           ? distanceHit(distance, point, strokeWidth, strokeMargin)
-          : geomHit(
-              geometry,
-              point,
-              strokeMargin,
-              isFilled(annotation),
-              strokeWidth,
-              style.border,
-            ));
+          : geomHit(geometry, point, strokeMargin, isFilled(annotation), {
+              ...style,
+              strokeWidth: strokeWidth,
+            }));
 
     if (hit) {
       return { kind: 'annot', id };

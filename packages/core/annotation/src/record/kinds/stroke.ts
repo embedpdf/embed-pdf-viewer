@@ -26,8 +26,7 @@ const measureSlice = (dto: AnnotationDTO): { measure?: MeasurementAppearance } =
 const polyCloudy = (annotation: RecordFields): Wire =>
   annotation.geometry.kind === 'poly' && annotation.geometry.closed
     ? {
-        cloudyIntensity:
-          annotation.style.border.kind === 'cloudy' ? annotation.style.border.intensity : null,
+        cloudyIntensity: annotation.style.cloudyIntensity,
       }
     : {};
 

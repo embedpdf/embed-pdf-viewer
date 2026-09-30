@@ -31,7 +31,7 @@ import {
   segDist,
   type RectHandle,
 } from '../rect';
-import type { Border, Handle, Point, Rect, RenderNode } from '../types';
+import type { Handle, Point, Rect, RenderNode, Stroke } from '../types';
 import type { ShapeFamily } from './family';
 
 /** A box and its turn, as the engine keeps them. */
@@ -77,9 +77,9 @@ function writeBox(
 }
 
 /** How far a cloudy border's bumps reach out from the box; 0 without a cloud. */
-function cloudReach(shape: BoxShape, strokeWidth: number, border: Border | undefined): number {
-  return border?.kind === 'cloudy'
-    ? cloudyBorderExtent(border.intensity, strokeWidth, shape.ellipse)
+function cloudReach(shape: BoxShape, stroke: Stroke): number {
+  return stroke.cloudyIntensity
+    ? cloudyBorderExtent(stroke.cloudyIntensity, stroke.strokeWidth, shape.ellipse)
     : 0;
 }
 
@@ -87,8 +87,8 @@ function cloudReach(shape: BoxShape, strokeWidth: number, border: Border | undef
  * What the shape draws, before its turn: the box, grown by a cloud's reach.
  * A plain stroke draws inside the box.
  */
-function boxDrawnBounds(shape: BoxShape, strokeWidth: number, border?: Border): Rect {
-  return expandRect(shape.box, cloudReach(shape, strokeWidth, border));
+function boxDrawnBounds(shape: BoxShape, stroke: Stroke): Rect {
+  return expandRect(shape.box, cloudReach(shape, stroke));
 }
 
 /** The box's corners as the page shows them (nw, ne, se, sw), turned about its middle. */
@@ -171,11 +171,11 @@ function boxHit(
   point: Point,
   margin: number,
   filled: boolean,
-  strokeWidth: number,
-  border?: Border,
+  stroke: Stroke,
 ): boolean {
   const local = shape.rotation ? rotatePoint(point, rectCenter(shape.box), -shape.rotation) : point;
-  const reach = cloudReach(shape, strokeWidth, border);
+  const reach = cloudReach(shape, stroke);
+  const { strokeWidth } = stroke;
   // The band the ink covers: a stroke's width inside the box, or a cloud's reach outside it.
   const band = reach
     ? { path: expandRect(shape.box, reach / 2), halfWidth: reach / 2 }
@@ -209,12 +209,13 @@ function boxHit(
  * box's middle): a cloud around the box, or the box's outline, inset half
  * the stroke so the ink lies inside the box.
  */
-function boxScene(shape: BoxShape, strokeWidth = 0, border?: Border): RenderNode[] {
-  if (border?.kind === 'cloudy' && shape.box.width > 0 && shape.box.height > 0) {
+function boxScene(shape: BoxShape, stroke: Stroke): RenderNode[] {
+  const { strokeWidth, cloudyIntensity } = stroke;
+  if (cloudyIntensity && shape.box.width > 0 && shape.box.height > 0) {
     return [
       {
         kind: 'path',
-        d: cloudyPath(shape.box, shape.ellipse, border.intensity, strokeWidth),
+        d: cloudyPath(shape.box, shape.ellipse, cloudyIntensity, strokeWidth),
       },
     ];
   }

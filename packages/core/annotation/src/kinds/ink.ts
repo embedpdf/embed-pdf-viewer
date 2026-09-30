@@ -1,6 +1,7 @@
 import { pointsFamily } from '../shapes';
 import { defineKind, NO_CAPS } from './define';
 import { BLEND_MODE, COLOR, LINKABLE, OPACITY, STROKE_WIDTH } from './fields';
+import { strokedStyle } from './styles';
 
 /**
  * Freehand strokes (`/Ink`). It moves and turns as a whole, and scales in a
@@ -9,6 +10,7 @@ import { BLEND_MODE, COLOR, LINKABLE, OPACITY, STROKE_WIDTH } from './fields';
 export const ink = defineKind({
   name: 'ink',
   family: pointsFamily,
+  style: strokedStyle,
   caps: {
     ...NO_CAPS,
     selectable: true,

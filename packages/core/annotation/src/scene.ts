@@ -13,6 +13,7 @@ import { distanceScene, measurementCaptionScene } from './measurement';
 import { shapeMeasurementLayout } from './measurement-shape';
 import { quadBounds, quadRing } from '@embedpdf/core-geometry';
 import { geomScene } from './geometry';
+import { dashOf } from './kinds/styles';
 import type {
   ModelGeometry,
   Paint,
@@ -42,12 +43,12 @@ function shapePaint(style: Style, closed: boolean): Paint {
     stroke: style.color,
     width: style.strokeWidth,
     opacity: style.opacity,
-    dash: style.border.kind === 'dashed' ? style.border.dash : undefined,
+    dash: dashOf(style),
     // Cloud curls end in deliberate direction reversals (the 22° curl-back
     // tails), which a miter join blows up into spikes. PDFium bakes cloudy
     // borders with `1 j` (round join) for exactly this reason — match it, so
     // the live path and the baked /AP render the same seams.
-    ...(style.border.kind === 'cloudy' ? { join: 'round' as const } : {}),
+    ...(style.cloudyIntensity ? { join: 'round' as const } : {}),
   };
 }
 
@@ -270,7 +271,7 @@ export function scene(item: RenderItem): SceneNode[] {
   if (item.geometry.kind === 'quads')
     return markupScene(item.subtype, item.geometry.quadPoints, item.style);
   if (item.geometry.kind === 'caret') {
-    return geomScene(item.geometry).map((node) => ({
+    return geomScene(item.geometry, item.style).map((node) => ({
       ...node,
       paint: {
         fill: item.style.color,
@@ -281,7 +282,7 @@ export function scene(item: RenderItem): SceneNode[] {
     })) as SceneNode[];
   }
   const ink = item.geometry.kind === 'ink'; // freehand: round the pen-stroke ends (caps)
-  const nodes = geomScene(item.geometry, item.style.strokeWidth, item.style.border).map((node) => {
+  const nodes = geomScene(item.geometry, item.style).map((node) => {
     const closed =
       node.kind === 'rect' ||
       node.kind === 'ellipse' ||

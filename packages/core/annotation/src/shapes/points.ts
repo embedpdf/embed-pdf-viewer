@@ -38,7 +38,7 @@ import {
   segDist,
   unionRect,
 } from '../rect';
-import type { Border, Handle, LineEnding, Point, Rect, RenderNode } from '../types';
+import type { Handle, LineEnding, Point, Rect, RenderNode, Stroke } from '../types';
 import type { ShapeFamily } from './family';
 
 /** A line: its two ends upright, and their endings. */
@@ -400,16 +400,17 @@ function endingSegs(shape: PointsShape): EndingSeg[] {
  * mitred arrowhead tip is enclosed exactly. A closed poly's cloud reaches past
  * its vertices by the cloud's extent.
  */
-function pointsDrawnBounds(shape: PointsShape, strokeWidth: number, border?: Border): Rect {
+function pointsDrawnBounds(shape: PointsShape, stroke: Stroke): Rect {
+  const { strokeWidth, cloudyIntensity } = stroke;
   const strokes = drawnStrokesOf(shape);
   if (shape.kind === 'ink') return expandRect(unionRect(strokes.flat()), strokeWidth / 2);
   const points = strokes[0]!;
   const closed = shape.kind === 'poly' && shape.closed;
-  if (closed && border?.kind === 'cloudy') {
+  if (closed && cloudyIntensity) {
     // Corner curls are arcs of the cloud radius centred at the vertices, and the
     // stroke straddles them — so ink reaches radius + strokeWidth/2 beyond the
     // vertex hull on every side: exactly `cloudyBorderExtent`.
-    return expandRect(unionRect(points), cloudyBorderExtent(border.intensity, strokeWidth, false));
+    return expandRect(unionRect(points), cloudyBorderExtent(cloudyIntensity, strokeWidth, false));
   }
   const outline = strokeOutlinePoints(points, closed, strokeWidth);
   for (const seg of endingSegs(shape)) {
@@ -431,13 +432,9 @@ function pointsDrawnBounds(shape: PointsShape, strokeWidth: number, border?: Bor
  * The oriented box around what the shape draws: the drawn bounds of its
  * upright points, turned about its middle — the snug tilted rectangle.
  */
-function pointsCorners(
-  shape: PointsShape,
-  strokeWidth: number,
-  border?: Border,
-): [Point, Point, Point, Point] {
+function pointsCorners(shape: PointsShape, stroke: Stroke): [Point, Point, Point, Point] {
   const upright = { ...shape, rotation: 0 };
-  const corners = rectCornerPoints(pointsDrawnBounds(upright, strokeWidth, border));
+  const corners = rectCornerPoints(pointsDrawnBounds(upright, stroke));
   if (!shape.rotation) return corners as [Point, Point, Point, Point];
   const middle = pointsMiddleOf(shape);
   return corners.map((corner) => rotatePoint(corner, middle, shape.rotation)) as [
@@ -457,7 +454,7 @@ function pointsHit(
   point: Point,
   margin: number,
   filled: boolean,
-  strokeWidth: number,
+  { strokeWidth }: Stroke,
 ): boolean {
   const tolerance = margin + strokeWidth / 2;
   const strokes = drawnStrokesOf(shape);
@@ -483,13 +480,14 @@ function pointsHit(
  * cloud as PDFium bakes it: curls on the vertex path, reaching out), each
  * ink stroke as an open polyline, and the endings.
  */
-function pointsScene(shape: PointsShape, strokeWidth = 0, border?: Border): RenderNode[] {
+function pointsScene(shape: PointsShape, stroke: Stroke): RenderNode[] {
+  const { strokeWidth, cloudyIntensity } = stroke;
   const strokes = drawnStrokesOf(shape);
   if (shape.kind === 'ink')
     return strokes.map((stroke) => ({ kind: 'poly', points: stroke, closed: false }));
   const points = strokes[0]!;
-  if (shape.kind === 'poly' && shape.closed && border?.kind === 'cloudy' && points.length >= 3)
-    return [{ kind: 'path', d: cloudyPolyPath(points, border.intensity, strokeWidth) }];
+  if (shape.kind === 'poly' && shape.closed && cloudyIntensity && points.length >= 3)
+    return [{ kind: 'path', d: cloudyPolyPath(points, cloudyIntensity, strokeWidth) }];
   const nodes: RenderNode[] =
     shape.kind === 'line'
       ? [{ kind: 'line', a: points[0]!, b: points[1]! }]

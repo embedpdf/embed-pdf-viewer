@@ -22,7 +22,7 @@ import {
   resizeRect,
 } from './rect';
 import { familyOf } from './shapes';
-import type { Border, ModelGeometry, Handle, Rect, RenderNode, Point } from './types';
+import type { ModelGeometry, Handle, Rect, RenderNode, Point, Stroke } from './types';
 
 /* ── rotation ──────────────────────────────────────────────────────────────
  * Annotation rotation, layered on the generic `@embedpdf/core-geometry` affine
@@ -183,10 +183,9 @@ export function geomResetRotation(geometry: ModelGeometry, pivot?: Point): Model
  */
 export function obbFromGeom(
   geometry: ModelGeometry,
-  strokeWidth: number,
-  border?: Border,
+  stroke: Stroke,
 ): { corners: [Point, Point, Point, Point]; angle: number } | null {
-  const corners = familyOf(geometry).turnedCorners(geometry, strokeWidth, border);
+  const corners = familyOf(geometry).turnedCorners(geometry, stroke);
   return corners ? { corners, angle: geomRotation(geometry) } : null;
 }
 
@@ -361,18 +360,13 @@ export function placeRotateKnob(
  * (+ endings) — the same math feeds `geomScene`, so the visual box and what's
  * drawn always agree.
  *
- * `border` matters for the clouds: a box's, and a closed poly's, whose curls
+ * The stroke's cloud matters too: a box's, and a closed poly's, whose curls
  * are centred on the vertex path and reach outward — the bounds grow by the
  * cloud extent, and the engine's `rect` grows with them so the baked scallops
  * are never clipped.
  */
-export function geomVisualBounds(
-  geometry: ModelGeometry,
-  strokeWidth: number,
-  border?: Border,
-): Rect {
-  return familyOf(geometry).drawnBounds(geometry, strokeWidth, border);
-}
+export const geomVisualBounds = (geometry: ModelGeometry, stroke: Stroke): Rect =>
+  familyOf(geometry).drawnBounds(geometry, stroke);
 
 /**
  * The rect the selection wraps — and the region a selected annotation can be grabbed
@@ -384,13 +378,8 @@ export function geomVisualBounds(
  * hit-test both call this, so what you see highlighted is exactly what you can grab —
  * they can never drift.
  */
-export function selectionBounds(
-  geometry: ModelGeometry,
-  strokeWidth: number,
-  border?: Border,
-): Rect {
-  return familyOf(geometry).selectionBounds(geometry, strokeWidth, border);
-}
+export const selectionBounds = (geometry: ModelGeometry, stroke: Stroke): Rect =>
+  familyOf(geometry).selectionBounds(geometry, stroke);
 
 /**
  * The four corners of the oriented selection box — the same quad `chrome` draws.
@@ -403,17 +392,11 @@ export function selectionBounds(
  */
 export function selectionQuad(
   geometry: ModelGeometry,
-  strokeWidth: number,
-  border?: Border,
+  stroke: Stroke,
 ): [Point, Point, Point, Point] {
-  const obb = obbFromGeom(geometry, strokeWidth, border);
+  const obb = obbFromGeom(geometry, stroke);
   if (obb) return obb.corners;
-  return rectCornerPoints(selectionBounds(geometry, strokeWidth, border)) as [
-    Point,
-    Point,
-    Point,
-    Point,
-  ];
+  return rectCornerPoints(selectionBounds(geometry, stroke)) as [Point, Point, Point, Point];
 }
 
 /** Is the point inside the (convex) selection quad? Even-odd ring test. */
@@ -467,17 +450,16 @@ export const geomBounds = (geometry: ModelGeometry): Rect => familyOf(geometry).
 /**
  * Is the page point on the annotation: within `margin` of the stroke, or
  * inside the fill (when `filled`). The stroke band widens with the stroke
- * width; a box's `border` says whether its cloud's bumps are what to hit.
+ * width; a cloud's bumps are what a cloudy box is hit on.
  */
 export function geomHit(
   geometry: ModelGeometry,
   point: Point,
   margin: number,
   filled: boolean,
-  strokeWidth: number,
-  border?: Border,
+  stroke: Stroke,
 ): boolean {
-  return familyOf(geometry).hit(geometry, point, margin, filled, strokeWidth, border);
+  return familyOf(geometry).hit(geometry, point, margin, filled, stroke);
 }
 
 /** The shape's handles: resize corners and sides, a callout's tip and knee, or vertices. */
@@ -496,8 +478,5 @@ export const geomDragHandle = (geometry: ModelGeometry, handle: string, to: Poin
  * paints exactly what the AP generator bakes; the framework's editable
  * element owns only the text.
  */
-export const geomScene = (
-  geometry: ModelGeometry,
-  strokeWidth = 0,
-  border?: Border,
-): RenderNode[] => familyOf(geometry).scene(geometry, strokeWidth, border);
+export const geomScene = (geometry: ModelGeometry, stroke: Stroke): RenderNode[] =>
+  familyOf(geometry).scene(geometry, stroke);

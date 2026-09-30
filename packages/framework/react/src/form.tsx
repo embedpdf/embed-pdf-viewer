@@ -608,7 +608,7 @@ function ListBoxWidget({ fill, item, page }: WidgetProps<'choice'>) {
   const frame = viewBox(item.box, page);
   const scale = item.box.width > 0 ? frame.width / item.box.width : 1;
   const strokeWidth = item.style.strokeWidth * scale;
-  const borderStyle = item.style.border.kind === 'dashed' ? 'dashed' : 'solid';
+  const borderStyle = item.style.borderStyle === 'dashed' ? 'dashed' : 'solid';
   return (
     <ChoiceFrame fill={fill} item={item} page={page} focused={focused} innerRef={wrap}>
       <NativeListBox

@@ -15,7 +15,7 @@ import type {
 } from '@embedpdf/engine-core/runtime';
 
 import { FLAG_KEYS } from '../flags';
-import type { Border, FieldValues, Rect, Style } from '../types';
+import type { FieldValues, Rect } from '../types';
 
 // The one annotation key (engine-core `annotationKey`): obj:<n> | nm:<page>:<name> | idx:<page>:<i>.
 export { annotationKey } from '@embedpdf/core';
@@ -56,19 +56,6 @@ export function boxGeomFields(rect: Rect, rot: number): { box: PageBox; rotation
   return { box: rect, rotation: rot || null };
 }
 
-/** Engine border fields (`/BS /S`, `/BS /D`, `/BE /I`) → the `Border` union. A
- *  cloudy effect wins over the underlying border style (which stays solid). */
-export function borderFromDTO(dto: {
-  borderStyle?: string;
-  dashArray?: number[] | null;
-  cloudyIntensity?: number | null;
-}): Border {
-  if ((dto.cloudyIntensity ?? 0) > 0) return { kind: 'cloudy', intensity: dto.cloudyIntensity! };
-  if (dto.borderStyle === 'dashed')
-    return { kind: 'dashed', dash: dto.dashArray?.length ? dto.dashArray : [3, 3] };
-  return { kind: 'solid' };
-}
-
 /** The writable projection of a `link` value: `goto`/`uri` pass through,
  *  read-only arms (`javascript`, `named`, `goto-remote`, `launch`,
  *  `unsupported`) yield `null` — they can be carried, never (re)written. */
@@ -76,121 +63,6 @@ export function writableTarget(
   target: PdfLinkTarget | null | undefined,
 ): PdfLinkTargetWritable | null {
   return target && (target.kind === 'goto' || target.kind === 'uri') ? target : null;
-}
-
-export const TEXT_MARKUP = new Set(['highlight', 'underline', 'squiggly', 'strikeout']);
-// Geometric kinds that carry the `/C` stroke colour + `/BS` border. Ink belongs
-// here too (it has a stroke but no `/IC`, so its interiorColor reads back null).
-const STROKE_KINDS = new Set(['square', 'circle', 'line', 'polygon', 'polyline', 'ink']);
-
-/** Engine DTO → page-space `Style` (CSS colours, `Border` union). Exported so
- *  selection-aware UIs can read display values straight off a {@link AnnotationDTO}
- *  without re-deriving the colour/border mapping. */
-export function styleFromDTO(dto: AnnotationDTO): Style {
-  if (dto.subtype === 'widget') {
-    return {
-      color: dto.color ? dto.color : '#1a1a1a',
-      interiorColor: dto.interiorColor ? dto.interiorColor : null,
-      strokeWidth: dto.strokeWidth,
-      opacity: 1,
-      blendMode: dto.blendMode,
-      border: dto.borderStyle === 'dashed' ? { kind: 'dashed', dash: [3, 3] } : { kind: 'solid' },
-    };
-  }
-  if (STROKE_KINDS.has(dto.subtype)) {
-    const strokeDto = dto as Extract<
-      AnnotationDTO,
-      { interiorColor: Color | null; opacity: number; strokeWidth: number }
-    >;
-    return {
-      color: strokeDto.color,
-      interiorColor: strokeDto.interiorColor ? strokeDto.interiorColor : null,
-      strokeWidth: strokeDto.strokeWidth,
-      opacity: strokeDto.opacity,
-      blendMode: dto.blendMode,
-      border: borderFromDTO(strokeDto),
-    };
-  }
-  if (TEXT_MARKUP.has(dto.subtype)) {
-    const markupDto = dto as Extract<AnnotationDTO, { color: Color }>;
-    return {
-      color: markupDto.color,
-      interiorColor: null,
-      strokeWidth: 0,
-      opacity: markupDto.opacity,
-      blendMode: dto.blendMode,
-      border: { kind: 'solid' },
-    };
-  }
-  if (dto.subtype === 'caret') {
-    const caretDto = dto as Extract<AnnotationDTO, { color: Color; opacity: number }>;
-    return {
-      color: caretDto.color,
-      interiorColor: null,
-      strokeWidth: 1,
-      opacity: caretDto.opacity,
-      blendMode: dto.blendMode,
-      border: { kind: 'solid' },
-    };
-  }
-  if (dto.subtype === 'free-text') {
-    // `/DA` colour is the border + leader stroke; `/C` is the box background; `/BS`
-    // gives the width. A plain text box draws no vector scene, so these only matter
-    // for a callout's leader/arrow/box-border (and the style toolbar's readout).
-    const freeTextDto = dto as Extract<AnnotationDTO, { subtype: 'free-text' }>;
-    return {
-      color: freeTextDto.color,
-      interiorColor: freeTextDto.interiorColor ? freeTextDto.interiorColor : null,
-      strokeWidth: freeTextDto.strokeWidth,
-      opacity: freeTextDto.opacity,
-      blendMode: dto.blendMode,
-      border: borderFromDTO(freeTextDto),
-    };
-  }
-  if (dto.subtype === 'redact') {
-    // `/C` is the marking-stage outline; `/IC` the fill painted on apply.
-    // No `/BS` on redact — the outline weight is a client rendering choice.
-    const redactDto = dto as Extract<AnnotationDTO, { subtype: 'redact' }>;
-    return {
-      color: redactDto.color,
-      interiorColor: redactDto.interiorColor ? redactDto.interiorColor : null,
-      strokeWidth: 1.5,
-      opacity: redactDto.opacity,
-      blendMode: dto.blendMode,
-      border: { kind: 'solid' },
-    };
-  }
-  if (dto.subtype === 'stamp') {
-    // The drawing is the appearance; /CA is the only style it has.
-    return {
-      color: '#444444',
-      interiorColor: null,
-      strokeWidth: 1,
-      opacity: dto.opacity,
-      blendMode: dto.blendMode,
-      border: { kind: 'solid' },
-    };
-  }
-  if (dto.subtype === 'text' || dto.subtype === 'file-attachment') {
-    // Icon kinds: /C is the icon fill, /CA its opacity — no stroke/fill split.
-    const iconDto = dto as Extract<AnnotationDTO, { color: Color; opacity: number }>;
-    return {
-      color: iconDto.color,
-      interiorColor: null,
-      strokeWidth: 1,
-      opacity: iconDto.opacity,
-      blendMode: dto.blendMode,
-      border: { kind: 'solid' },
-    };
-  }
-  return {
-    color: '#444444',
-    interiorColor: null,
-    strokeWidth: 1,
-    opacity: 1,
-    blendMode: dto.blendMode,
-    border: { kind: 'solid' },
-  };
 }
 
 const WIDGET_APPEARANCE_FIELDS = [

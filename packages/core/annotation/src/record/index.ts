@@ -57,19 +57,15 @@ import type { KindProjection, LoweredKey, Wire } from './projection';
 import { GENERIC_PROPS } from './props';
 import { groupOf, irtOf, kindOf, refOf } from './identity';
 import { shapeOf } from './shape';
-import { annotationKey, flagsOf, styleFromDTO } from './seam';
+import { annotationKey, flagsOf } from './seam';
+import { styleOf } from './style';
 
 export { groupOf, irtOf, kindOf, refOf } from './identity';
 export { shapeOf, withShape } from './shape';
+export { styleOf } from './style';
 export { withValues } from './values';
 
-export {
-  boxGeomFields,
-  hexColorOf,
-  styleFromDTO,
-  widgetAppearanceOf,
-  writableTarget,
-} from './seam';
+export { boxGeomFields, hexColorOf, widgetAppearanceOf, writableTarget } from './seam';
 export { linkChildRects } from './links';
 
 /** Every wire subtype declares exactly one projection — a missing kind is a
@@ -151,7 +147,7 @@ function projected(dto: AnnotationDTO): Projected {
     // `/F` verbatim — every behavioral question (visible? selectable? frozen?)
     // is answered by the core's flag predicates, never derived here.
     flags: flagsOf(dto),
-    style: styleFromDTO(dto),
+    style: styleOf(dto),
     geometry: shapeOf(dto),
     ...projectionOf(kindOf(dto).name).ingest?.(dto),
   };
@@ -281,10 +277,7 @@ export function annotationOfRecord(record: RecordFields, place: AnnotationPlace)
   const draft = (
     place.ref.kind === 'nm' ? { ...statement, nm: place.ref.nm } : statement
   ) as AnnotationDraft;
-  const drawn =
-    'rect' in draft
-      ? undefined
-      : geomVisualBounds(record.geometry, record.style.strokeWidth, record.style.border);
+  const drawn = 'rect' in draft ? undefined : geomVisualBounds(record.geometry, record.style);
   const annotation = annotationOfDraft(draft, {
     ref: place.ref,
     index: place.index,
@@ -299,7 +292,13 @@ const STYLE_KEYS = [
   'strokeWidth',
   'opacity',
   'blendMode',
-  'border',
+] as const satisfies readonly (keyof Style)[];
+
+/** A style's border: a change to any of these writes the border. */
+const BORDER_KEYS = [
+  'borderStyle',
+  'dashArray',
+  'cloudyIntensity',
 ] as const satisfies readonly (keyof Style)[];
 
 const TEXT_KEYS = [
@@ -337,6 +336,8 @@ function patchFor(before: RecordFields, after: RecordFields): AnnotationPatch | 
   };
   if (before.style !== after.style) {
     for (const key of STYLE_KEYS) compare(key, before.style[key], after.style[key]);
+    const borderOf = (style: Style) => BORDER_KEYS.map((key) => style[key]);
+    compare('border', borderOf(before.style), borderOf(after.style));
   }
   if (before.text !== after.text) {
     for (const key of TEXT_KEYS) compare(key, before.text?.[key], after.text?.[key]);

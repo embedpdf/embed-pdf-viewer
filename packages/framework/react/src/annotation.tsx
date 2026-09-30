@@ -56,7 +56,6 @@ export type {
   RenderItem,
   LineEnding,
   LineEndings,
-  Border,
   Style,
   AnnotationFlags,
   FieldSpec,

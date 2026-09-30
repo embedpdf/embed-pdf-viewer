@@ -4,7 +4,10 @@
  * Each kind is declared in its own file in this folder; `index.ts` lists
  * them all.
  */
+import type { AnnotationDTO } from '@embedpdf/engine-core/runtime';
+
 import type { ShapeFamily } from '../shapes';
+import type { Style } from '../types';
 
 /**
  * One editable field of a kind, as a UI contract: which engine field, rendered
@@ -135,6 +138,11 @@ export interface AnnotationKind {
    * The shape's family then hits, handles, moves and draws it.
    */
   readonly family: ShapeFamily;
+  /**
+   * How it is drawn: its colours, stroke and border, read off the annotation
+   * with its kind's fill-ins (`styles.ts`).
+   */
+  readonly style: (annotation: AnnotationDTO) => Style;
   /** What a user can do to it. The annotation's `/F` flags override these at runtime (flags.ts). */
   readonly caps: KindCaps;
   /** What a sidebar edits, in display order, keyed by the engine's field names. */

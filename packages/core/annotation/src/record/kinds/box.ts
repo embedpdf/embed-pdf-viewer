@@ -20,8 +20,7 @@ const shape: KindProjection = {
   prop: {
     border: (annotation) => ({
       ...borderSlice(annotation.style),
-      cloudyIntensity:
-        annotation.style.border.kind === 'cloudy' ? annotation.style.border.intensity : null,
+      cloudyIntensity: annotation.style.cloudyIntensity,
     }),
   },
 };
@@ -92,7 +91,7 @@ export const widget: KindProjection = {
   prop: {
     // A widget's border has a style but no dash pattern of its own.
     border: (annotation) => ({
-      borderStyle: annotation.style.border.kind === 'dashed' ? 'dashed' : 'solid',
+      borderStyle: annotation.style.borderStyle === 'dashed' ? 'dashed' : 'solid',
     }),
   },
   createable: false,

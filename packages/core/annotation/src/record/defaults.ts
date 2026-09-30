@@ -15,7 +15,7 @@ import { initialTextStyle } from '../props';
 import type { FieldValues, Style, TextStyle } from '../types';
 import { textFromDTO } from './kinds/freeText';
 import { widgetTextFromDTO } from './kinds/box';
-import { styleFromDTO } from './seam';
+import { styleOf } from './style';
 
 /** The engine subtype a client kind creates: a callout is a free text, a form tool's kind a widget. */
 export const engineSubtypeOf = (kind: string): AnnotationSubtype =>
@@ -74,7 +74,7 @@ export function styleOfDefaults(kind: string, defaults: FieldValues): ToolStyle 
     target?: PdfLinkTarget | null;
   };
   return {
-    style: styleFromDTO(read),
+    style: styleOf(read),
     text: textOfRead(read),
     lineEndings: read.lineEndings ?? NO_ENDINGS,
     lineEnding: read.lineEnding ?? 'none',
