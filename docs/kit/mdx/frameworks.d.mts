@@ -17,3 +17,4 @@ export function stateIntroParts(
   hook: string,
   framework: Framework,
 ): Array<{ text: string; code?: boolean }>;
+export function frameworkCode(code: string, framework: Framework): string;

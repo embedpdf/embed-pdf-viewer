@@ -35,7 +35,9 @@ this.
 
 One setting decides how big a whole-page picture may get, in device pixels:
 
-<Snippet name="viewing/render-budget" />
+```ts
+renderPlugin({ fullPage: { maxWidth: 1280 } });
+```
 
 The default, `640`, makes the first picture of each page small and fast, and lets tiles carry the
 sharpness at normal reading zooms. A bigger budget means fewer tiles but a slower first paint and
@@ -110,12 +112,15 @@ Everything `useRender()` gives you.
 | `getRenderEpoch(page, includeAnnotations?)` | A number that changes whenever the page's pixels do, with the annotations unless you pass `false`. Key your own long-lived renders on it.        |
 | `getRenderPolicy()`                        | The sizes the engine renders best at: any size on the local engine, a short list of widths on a CloudPDF server. See [Render policy](/docs/engine/documents/rendering#render-policy). |
 | `canRender()`                              | Whether page images are allowed. [Permissions](#permissions)                                                                                     |
+| `getSettings()`, `updateSettings(changes)`, `resetSettings()` | Reads the settings, changes them while the app runs, or goes back to what you registered. In a component, use `useRenderSettings()`. [Settings](#settings) |
 
 Every method that returns a promise also takes a `signal` in its options, to cancel it.
 
 ## Settings
 
-Set them when you register the plugin.
+Set them when you register the plugin, and change them while the app runs with
+`render.updateSettings({ … })`; `render.resetSettings()` goes back to what you registered, and
+`useRenderSettings()` gives you the current settings.
 
 | Setting                       | What it does                                                          | Default          |
 | :---------------------------- | :-------------------------------------------------------------------- | :--------------- |
@@ -141,6 +146,7 @@ Set them when you register the plugin.
 | Event           | Fires when                                  | Carries                      |
 | :-------------- | :------------------------------------------ | :--------------------------- |
 | `onInvalidated` | Pages' pixels changed and they will redraw  | `pages`, `scope`, `origin`   |
+| `onSettingsChanged` | The settings changed | `settings`, `changed` |
 
 ## Permissions
 

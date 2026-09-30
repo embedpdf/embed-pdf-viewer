@@ -4,7 +4,7 @@ import { RenderLayer } from '@embedpdf/react/render';
 import { SelectionLayer } from '@embedpdf/react/selection';
 import { Stage } from '@embedpdf/react/stage';
 
-export const plugins = [annotationPlugin()];
+export const plugins = [/* …as before */ annotationPlugin()];
 
 export function HighlightButton() {
   const interaction = useInteraction();

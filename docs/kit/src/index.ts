@@ -40,6 +40,7 @@ export { DOCS_KIT_TOKENS, type DocsKitToken } from './tokens';
 export {
   FrameworkLink,
   FwCode,
+  FwVariant,
   Framework,
   StateIntroText,
   Word,

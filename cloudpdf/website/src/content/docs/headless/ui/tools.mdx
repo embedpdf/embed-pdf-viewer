@@ -135,6 +135,7 @@ Everything `useInteraction()` gives you.
 | `getDefaultToolId()`               | The tool a document opens with, `pointer` unless you set another                                                                                          |
 | `registerTool(tool, { replace? })` | Adds a tool of your own, and returns a function that removes it. An id that's taken is refused unless you pass `replace: true`. [Your own tool](#your-own-tool) |
 | `setToolCursor(id, cursors)`       | Replaces a tool's cursors by name while the app runs; `null` brings its own back. In a component, use `useToolCursor()`, which undoes it when the component goes. [Cursors](#cursors) |
+| `getSettings()`, `updateSettings(changes)`, `resetSettings()` | Reads the settings, changes them while the app runs, or goes back to what you registered. In a component, use `useInteractionSettings()`. [Settings](#settings) |
 
 ## State
 
@@ -147,7 +148,9 @@ Everything `useInteraction()` gives you.
 
 ## Settings
 
-Set them when you register the plugin.
+Set them when you register the plugin, and change them while the app runs with
+`interaction.updateSettings({ … })`; `interaction.resetSettings()` goes back to what you registered, and
+`useInteractionSettings()` gives you the current settings.
 
 | Setting       | What it does                                 | Default     |
 | :------------ | :------------------------------------------- | :---------- |
@@ -164,6 +167,7 @@ Set them when you register the plugin.
 | `onGestureStarted`    | A drag with a tool began                     | `toolId`, `page`, `pointerType`   |
 | `onGestureEnded`      | It ended                                     | `toolId`, `page`, `pointerType`   |
 | `onGestureCancelled`  | It was cancelled, for example by a second finger | `toolId`, `page`, `pointerType` |
+| `onSettingsChanged` | The settings changed | `settings`, `changed` |
 
 ## Good to know
 

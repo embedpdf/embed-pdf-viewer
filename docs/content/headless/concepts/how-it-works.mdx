@@ -174,7 +174,7 @@ while the user scrolls and zooms. See [Menus over the page](../ui/anchored).
 ## Settings
 
 A plugin's settings are the options you pass when you register it, and each plugin page lists them
-under **Settings**. Some plugins let you change them while the app runs, for example when the user
+under **Settings**. Every plugin lets you change them while the app runs, for example when the user
 picks another layout:
 
 ```ts
@@ -184,17 +184,21 @@ stage.resetSettings(); // back to what you registered
 
 <Fw only={['react', 'vue', 'svelte']}>
 
-Every plugin with live settings has the same three calls, a `useStageSettings()`-style
+Every plugin with settings has the same three calls, a `useStageSettings()`-style
 <Word of="hook" />, and an `onSettingsChanged` event.
 
 </Fw>
 
 <Fw only="angular">
 
-Every plugin with live settings has the same three calls, a `settings()` signal, and a
+Every plugin with settings has the same three calls, a `settings()` signal, and a
 `settingsChanged$` stream.
 
 </Fw>
+
+Colors are settings too, such as the highlight of a search match or the handles of an annotation.
+Each color setting can also come from a CSS variable, which wins over the setting, for dark mode or a
+different look per viewer: see [Colors & theming](../ui/theming).
 
 ## Checks before you act
 

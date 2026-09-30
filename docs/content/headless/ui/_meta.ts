@@ -1,4 +1,5 @@
 export default {
+  theming: 'Colors & theming',
   tools: 'Tools, cursors & touch',
   anchored: 'Menus over the page',
   toolbar: 'Toolbar',

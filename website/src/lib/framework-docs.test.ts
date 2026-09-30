@@ -81,6 +81,13 @@ describe('headless pages written for each framework', () => {
     const vue = markdownFor('text/search', 'vue');
     expect(vue).toContain('```vue');
     expect(vue).toContain('@embedpdf/vue/search');
-    expect(vue).toContain('`active-color`');
+    expect(vue).toContain('`<SearchLayer @hit-click>`');
+  });
+
+  it('writes plugin settings once and shows them the framework’s way', () => {
+    expect(markdownFor('annotations/tools', 'react')).toContain('annotationPlugin({');
+    expect(markdownFor('annotations/tools', 'vue')).toContain('annotationPlugin({');
+    expect(markdownFor('annotations/tools', 'angular')).toContain('withAnnotation({');
+    expect(markdownFor('viewing/stage', 'angular')).toContain("withStage({\n  id: 'stage-thumbs'");
   });
 });

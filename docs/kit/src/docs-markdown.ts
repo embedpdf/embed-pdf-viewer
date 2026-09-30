@@ -13,6 +13,7 @@ import {
   FRAMEWORK_LABELS,
   FRAMEWORK_WORDS,
   FRAMEWORKS,
+  frameworkCode,
   frameworkHref,
   frameworkName,
   inlineCodeContexts,
@@ -401,6 +402,8 @@ function createResolver(
       }
 
       if (node.type === 'code' && typeof node.value === 'string') {
+        // A framework-free block as this framework reads it (`withAnnotation()` on Angular).
+        if (names) node.value = frameworkCode(node.value as string, names.framework);
         const metadata = node.meta?.split(/\s+/).filter(Boolean) ?? [];
         if (metadata.includes('npm2yarn')) {
           node.value = convertPackageManager(node.value as string, 'pnpm');

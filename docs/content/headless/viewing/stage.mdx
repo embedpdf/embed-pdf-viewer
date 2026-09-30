@@ -109,7 +109,13 @@ stage.updateSettings({ layout: 'horizontal', spread: 'odd' });
 
 Two combinations you'll reach for often:
 
-<Snippet name="viewing/book-and-grid" />
+```ts
+// A book: facing pages, one spread at a time
+stagePlugin({ flow: 'paged', spread: 'odd' });
+
+// A thumbnail grid that wraps to the available width
+stagePlugin({ layout: 'grid', columns: 'auto', zoom: { pageWidth: 150 } });
+```
 
 `columns` applies to the grid: `'auto'` wraps to fit, `'square'` aims for a square grid, and a
 number fixes the count.
@@ -122,14 +128,25 @@ number fixes the count.
   space between sheets of paper. `{ px: 16 }` stays 16 screen pixels at every zoom, which suits a
   thumbnail strip.
 
-<Snippet name="viewing/page-spacing" />
+```ts
+stagePlugin({ padding: 32, gap: { px: 12 } });
+```
 
 ## Adapt to the space you have
 
 A generous margin on a desktop wastes half a phone screen. Settings can depend on how much room
 the Stage has, like a CSS container query:
 
-<Snippet name="viewing/responsive-rules" />
+```ts
+stagePlugin({
+  padding: 24,
+  spread: 'odd',
+  responsive: [
+    { name: 'compact', when: { maxWidth: 600 }, settings: { padding: 4 } },
+    { when: { orientation: 'portrait' }, settings: { spread: 'none' } },
+  ],
+});
+```
 
 Every rule whose `when` matches applies, in order, and a later rule wins on the settings they share.
 `when` takes `minWidth`, `maxWidth`, `minHeight`, `maxHeight` and `orientation`, all combined with
@@ -158,8 +175,8 @@ Touch works out of the box, tuned to feel like the platform rather than a web pa
 - **Edges are elastic.** Pulling past the end stretches and springs back.
 - **Long-press selects a word** when the [Selection](../text/selection) plugin is registered.
 
-For a Stage that should scroll but not zoom under a pinch, such as a thumbnail strip, set its
-`zoomGestures` to `false`.
+For a Stage that should scroll but not zoom under a pinch or Ctrl+wheel, such as a thumbnail strip,
+set its `zoomGestures` setting to `false`.
 
 ## Labels and buttons on every page
 
@@ -172,13 +189,17 @@ buttons above, reserve space with `pageFrame` and draw into it with
 The reserved bands are in screen pixels, so labels keep their size at every zoom. They count as part
 of the page: "fit page" includes them, and going to a page shows its label.
 
-Each page has a drop shadow so it reads as paper. Change it with a CSS variable:
+Each page has a drop shadow so it reads as paper. It's the viewer's `page.shadow` setting (`'none'`
+for no shadow), next to `page.background`, the color of a page before its picture arrives. Both can
+also come from CSS, which wins over the setting:
 
 ```css
-:root {
+.pdf-viewer {
   --epdf-page-shadow: 0 2px 8px rgb(0 0 0 / 0.25); /* or none */
 }
 ```
+
+See [Colors & theming](../ui/theming).
 
 ## Scrollbars
 
@@ -196,7 +217,8 @@ to page, and it hides when the pointer leaves, like a macOS scrollbar:
 | `minThumbSize` | The smallest thumb, in pixels, for very long documents          | `24`      |
 | `trackPress`   | A click on the track moves a `'page'` or `'jump'`s there        | `'page'`  |
 
-It sets `data-axis`, `data-state` and `data-dragging` for your CSS. To build your own, such as a
+It sets `data-axis`, `data-state` and `data-dragging` for your CSS; until you style the thumb, its
+color is `--epdf-scrollbar-thumb`. To build your own, such as a
 reading-progress bar, `useScrollMetrics()` gives you `scrollTop`, `scrollHeight` and
 `clientHeight`, the same numbers a scrolling element has.
 
@@ -328,9 +350,16 @@ own zoom and layout; both show the same live document.
 </Fw>
 
 A thumbnail strip should usually not start text selection or drawing when someone drags it. Turn
-off its `interaction`; it keeps its own drag-to-scroll:
+off its `interaction` setting; it keeps its own drag-to-scroll:
 
-<Snippet name="viewing/thumbnail-stage" />
+```ts
+stagePlugin({
+  id: 'stage-thumbs',
+  token: ThumbsToken,
+  layout: 'grid',
+  interaction: false, // a drag doesn't select text or draw
+});
+```
 
 ## Methods
 
@@ -416,25 +445,28 @@ Set them when you register the plugin, and change them while the app runs with
 `stage.updateSettings({ … })`. `stage.resetSettings()` goes back to what you registered, and
 `useStageSettings()` gives you the current settings.
 
-| Setting          | What it does                                                        | Default                        |
-| :--------------- | :------------------------------------------------------------------ | :----------------------------- |
-| `flow`           | Scroll every page, or one page or spread at a time                  | `'continuous'`                 |
-| `layout`         | `'vertical'`, `'horizontal'` or `'grid'`                            | `'vertical'`                   |
-| `spread`         | Facing pages: `'none'`, `'odd'`, `'even'`                           | `'none'`                       |
-| `sizing`         | `'intrinsic'` (true sizes) or `'uniform'` (equal widths)            | `'intrinsic'`                  |
-| `columns`        | Grid columns: `'square'`, `'auto'` or a number                      | `'square'`                     |
-| `zoom`           | A mode, a level, `{ pageWidth }` or `{ pageHeight }`                | `{ mode: 'automatic' }`        |
-| `padding`        | Space around the pages, in screen pixels                            | `24` (`4` when compact)        |
-| `gap`            | Space between pages: a number (grows with zoom) or `{ px }`         | `16`                           |
-| `pageFrame`      | Space reserved around each page for your labels, in screen pixels   | `0` on every side              |
-| `bounded`        | Keep panning within the pages; `false` for an endless canvas        | `true`                         |
-| `direction`      | Reading direction: `'rtl'` flips the page order and spreads         | `'ltr'`                        |
-| `arrivalAlign`   | Where a page lands when you go to it                                | `{ x: 'start', y: 'start' }`   |
-| `zoomAlign`      | What stays put when you zoom with a button                          | `{ x: 'center', y: 'center' }` |
-| `anchorAlign`    | What stays put when the window resizes or the layout changes        | `{ x: 'start', y: 'start' }`   |
-| `fitAlign`       | Where the content rests when everything fits                        | `{ x: 'center', y: 'center' }` |
-| `viewRotation`   | How the pages are turned: `0`, `90`, `180`, `270`                   | `0`                            |
-| `scrollBehavior` | Whether going to a page glides or jumps: `'smooth'`, `'instant'`    | `'smooth'`                     |
+| Setting          | What it does                                                                              | Default                        |
+| :--------------- | :---------------------------------------------------------------------------------------- | :----------------------------- |
+| `flow`           | Scroll every page, or one page or spread at a time                                        | `'continuous'`                 |
+| `layout`         | `'vertical'`, `'horizontal'` or `'grid'`                                                  | `'vertical'`                   |
+| `spread`         | Facing pages: `'none'`, `'odd'`, `'even'`                                                 | `'none'`                       |
+| `sizing`         | `'intrinsic'` (true sizes) or `'uniform'` (equal widths)                                  | `'intrinsic'`                  |
+| `columns`        | Grid columns: `'square'`, `'auto'` or a number                                            | `'square'`                     |
+| `zoom`           | A mode, a level, `{ pageWidth }` or `{ pageHeight }`                                      | `{ mode: 'automatic' }`        |
+| `padding`        | Space around the pages, in screen pixels                                                  | `24` (`4` when compact)        |
+| `gap`            | Space between pages: a number (grows with zoom) or `{ px }`                               | `16`                           |
+| `pageFrame`      | Space reserved around each page for your labels, in screen pixels                         | `0` on every side              |
+| `bounded`        | Keep panning within the pages; `false` for an endless canvas                              | `true`                         |
+| `direction`      | Reading direction: `'rtl'` flips the page order and spreads                               | `'ltr'`                        |
+| `arrivalAlign`   | Where a page lands when you go to it                                                      | `{ x: 'start', y: 'start' }`   |
+| `zoomAlign`      | What stays put when you zoom with a button                                                | `{ x: 'center', y: 'center' }` |
+| `anchorAlign`    | What stays put when the window resizes or the layout changes                              | `{ x: 'start', y: 'start' }`   |
+| `fitAlign`       | Where the content rests when everything fits                                              | `{ x: 'center', y: 'center' }` |
+| `viewRotation`   | How the pages are turned: `0`, `90`, `180`, `270`                                         | `0`                            |
+| `scrollBehavior` | Whether going to a page glides or jumps: `'smooth'`, `'instant'`                          | `'smooth'`                     |
+| `interaction`    | Drags reach the active tool, such as text selection; `false` for a view that only scrolls | `true`                         |
+| `panFallback`    | A drag in the space between pages scrolls, whatever the tool                              | `true`                         |
+| `zoomGestures`   | A pinch or Ctrl+wheel zooms; `false` keeps the zoom fixed                                 | `true`                         |
 
 Set once, when you register the plugin:
 

@@ -13,7 +13,7 @@
   });
 </script>
 
-<Stage token={ThumbsToken} interaction={false} zoomGestures={false}>
+<Stage token={ThumbsToken}>
   {#snippet page(page)}
     <button
       onclick={() => main.goToPage(page.ref)}

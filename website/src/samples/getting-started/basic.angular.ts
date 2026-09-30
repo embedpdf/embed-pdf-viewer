@@ -11,7 +11,7 @@ const ebook = async (): Promise<OpenInput> => {
   return { kind: 'bytes', id: 'ebook', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 
-// Kernel readers live inside <epdf-viewer>, where the host is injectable —
+// Kernel readers live INSIDE <epdf-viewer>, where the host is injectable —
 // and document UI is gated on having a document.
 @Component({
   selector: 'demo-workspace',

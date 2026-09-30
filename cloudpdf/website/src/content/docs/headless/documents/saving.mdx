@@ -14,8 +14,8 @@ the browser as a download:
 <Snippet name="documents/download-button" />
 
 `download()` waits for changes still on their way, such as the last words someone typed in a text
-box, so the file has everything the user sees. Without an id it downloads the active document;
-`documents.download(id)` picks another.
+box, so the file has everything the user sees. Without an id it downloads the document in scope,
+usually the active one; `documents.download(id)` picks another.
 
 ## Send it to your server
 
@@ -100,8 +100,9 @@ What `useDocuments()` gives you for downloading and printing. Opening and closin
 | `print(id?)`                        | Prints the document's pages through the browser's print dialog. [Print](#print)                                                                     |
 | `canDownload(id?)`, `canPrint(id?)` | Whether downloading and printing are allowed. [Permissions](#permissions)                                                                            |
 
-Without an `id`, each uses the active document. Every method that returns a promise also takes a
-`signal` in its options, to cancel it.
+Without an `id`, each uses the document in scope: the one a
+[`<DocumentScope>`](tabs#talk-to-a-specific-document) around your component names, or else the
+active one. Every method that returns a promise also takes a `signal` in its options, to cancel it.
 
 ## Events
 

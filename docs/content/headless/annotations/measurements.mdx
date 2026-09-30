@@ -10,7 +10,7 @@ room. The measurement plugin adds the tools for it, and keeps each page's scale,
 centimeters on the page reads as 3 meters in the room. Register `measurementPlugin()` next to
 `interactionPlugin()` and `annotationPlugin()`, and turn on a tool:
 
-<Snippet name="annotations/measurements-tool" />
+<Snippet name="annotations/measurements/tool" />
 
 | Tool        | Measures                                      | How                                     |
 | :---------- | :-------------------------------------------- | :-------------------------------------- |
@@ -44,7 +44,7 @@ measurement.startCalibration(); // the next line the user draws is the known len
 
 The plugin asks your UI for the real length, through<Fw only={['react', 'vue', 'svelte']}> `useMeasurementState().calibrationRequest`</Fw><Fw only="angular"> the `measurement.calibrationRequest()` signal</Fw>:
 
-<Snippet name="annotations/measurements-calibration" />
+<Snippet name="annotations/measurements/calibration" />
 
 `calibrate()` sets the page's scale from the two points and the length you give. Pass
 `{ applyTo: 'all' }` to use the same scale on every page.
@@ -62,7 +62,7 @@ the number of steps per unit.
 
 ## Read a measurement
 
-<Snippet name="annotations/measurements-readout" />
+<Snippet name="annotations/measurements/readout" />
 
 `label` is the text shown on the page, in the page's units. Without a scale to compute from, a
 readout says why: `{ unavailable: 'no-scale' }`.
@@ -114,6 +114,7 @@ Everything `useMeasurement()` gives you.
 | `measureDistance(page, from, to)`, `measureArea(page, corners)` | Measures in the page's scale without drawing anything: `{ value, label }`                                                                                   |
 | `createMeasurement({ kind, page, points })`              | Makes the same measurement the tool would. Resolves `{ annotation }`. [Measure from code](#measure-from-code)                                                     |
 | `canCalibrate()`, `canMeasure(page)`                     | Whether setting a scale, and measuring on a page, are allowed. [Permissions](#permissions)                                                                         |
+| `getSettings()`, `updateSettings(changes)`, `resetSettings()` | Reads the settings, changes them while the app runs, or goes back to what you registered. In a component, use `useMeasurementSettings()`. [Settings](#settings) |
 
 `pages` is a page, a list of pages, or `'all'`. A scale change recalculates the measurements already
 on those pages and resolves one report per page; pass `{ recalculate: false }` to keep their values.
@@ -134,7 +135,9 @@ Keeping them apart means a component re-renders only for its own page or measure
 
 ## Settings
 
-Set them when you register the plugin.
+Set them when you register the plugin, and change them while the app runs with
+`measurement.updateSettings({ … })`; `measurement.resetSettings()` goes back to what you registered, and
+`useMeasurementSettings()` gives you the current settings.
 
 | Setting        | What it does                                                  | Default                     |
 | :------------- | :------------------------------------------------------------ | :-------------------------- |
@@ -146,7 +149,7 @@ A measurement's look, such as its line, arrows and label position, is its tool's
 
 ## Events
 
-<Snippet name="annotations/measurements-events" />
+<Snippet name="annotations/measurements/events" />
 
 | Event                    | Fires when                                         | Carries           |
 | :----------------------- | :------------------------------------------------- | :---------------- |
@@ -154,6 +157,7 @@ A measurement's look, such as its line, arrows and label position, is its tool's
 | `onCalibrationRequested` | The user drew a known length, and your UI should ask for it | `request` |
 | `onCalibrationCompleted` | A page was calibrated                              | `page`            |
 | `onCalibrationDismissed` | Calibrating was cancelled                          | —                 |
+| `onSettingsChanged` | The settings changed | `settings`, `changed` |
 
 `report` lists the measurements recalculated for the new scale, and any that couldn't be.
 

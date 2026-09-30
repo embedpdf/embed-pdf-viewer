@@ -57,9 +57,9 @@ await stamp.updateAsset(asset.id, { label: 'PAID' });
 
 A button per stamp arms it, and each button shows the stamp's preview:
 
-<Snippet name="annotations/stamps-picker" />
+<Snippet name="annotations/stamps/picker" />
 
-<Snippet name="annotations/stamps-preview" />
+<Snippet name="annotations/stamps/preview" />
 
 `useStampLibraries()` lists the libraries, and `useStampAssets({ libraryId })` the stamps in one.
 Both update when stamps are added, renamed or removed.<Fw only={['react', 'vue', 'svelte']}> `useStampState().armedAsset`
@@ -78,7 +78,7 @@ await stamp.importLibrary(bytes, { libraryKind: 'legal-seals' }); // override wh
 
 A picker asks for the kinds it shows:
 
-<Snippet name="annotations/stamps-library-kinds" />
+<Snippet name="annotations/stamps/library-kinds" />
 
 ## Draw or type a stamp
 
@@ -140,7 +140,7 @@ you. `persistStampLibraries` and `restoreStampLibraries` connect a library to a 
 
 <Example name="stamp/persist" mode="open" />
 
-<Snippet name="annotations/stamps-persist" />
+<Snippet name="annotations/stamps/persist" />
 
 A store has three calls, `list`, `put` and `delete`, over bytes by library id.
 `indexedDbByteStore` is the browser default, and `memoryStampStore` is for tests. Writes are
@@ -196,6 +196,7 @@ Everything `useStamp()` gives you.
 | `placeAssetOnPages(assetId, pages, { center, … })`             | Places the same stamp at the same spot on several pages, or on `'all'`. Resolves `{ applied, skipped, failed }`: the placed stamps, and the pages that were skipped or failed. |
 | `canPlace()`, `canCreateFromAnnotations()`                     | Whether placing a stamp, and making one from annotations, are allowed. [Permissions](#permissions)                                                                           |
 | `canImport()`                                                  | Whether libraries can be imported here. It turns `false` once an import finds no local engine to open them in; see [Settings](#settings).                                    |
+| `getSettings()`, `updateSettings(changes)`, `resetSettings()` | Reads the settings, changes them while the app runs, or goes back to what you registered. In a component, use `useStampSettings()`. [Settings](#settings) |
 
 Every method that returns a promise also takes a `signal` in its options, to cancel it.
 
@@ -213,7 +214,9 @@ changes.</Fw>
 
 ## Settings
 
-Set them when you register the plugin.
+Set them when you register the plugin, and change them while the app runs with
+`stamp.updateSettings({ … })`; `stamp.resetSettings()` goes back to what you registered, and
+`useStampSettings()` gives you the current settings.
 
 | Setting        | What it does                                                           | Default          |
 | :------------- | :--------------------------------------------------------------------- | :--------------- |
@@ -231,7 +234,7 @@ like any annotation.
 
 ## Events
 
-<Snippet name="annotations/stamps-events" />
+<Snippet name="annotations/stamps/events" />
 
 | Event              | Fires when                                                   | Carries                  |
 | :----------------- | :----------------------------------------------------------- | :----------------------- |
@@ -239,6 +242,7 @@ like any annotation.
 | `onLibraryCreated`, `onLibraryUpdated`, `onLibraryDeleted` | A library was added, changed or removed | `libraryId`, `library` |
 | `onAssetCreated`, `onAssetUpdated`, `onAssetDeleted` | A stamp was added, changed or removed | `assetId`, `libraryId`, `asset` |
 | `onArmChanged`     | A stamp was armed or disarmed                                | `documentId`, `asset`    |
+| `onSettingsChanged` | The settings changed | `settings`, `changed` |
 
 `reason` is `'created'`, `'imported'`, `'updated'`, `'asset-added'`, `'asset-updated'`,
 `'asset-removed'` or `'removed'`. `library` and `asset` are the new values, and `null` in the

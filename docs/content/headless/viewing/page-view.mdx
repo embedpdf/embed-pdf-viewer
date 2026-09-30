@@ -35,7 +35,8 @@ For a strip next to the main view, with many pages that scroll, use a second Sta
 
 <Snippet name="viewing/thumbnail-strip" />
 
-- **Turning off `interaction`** keeps a drag on the strip from selecting text in the document.
+- **Turning off `interaction`** in the strip's settings keeps a drag on it from selecting text in
+  the document.
 - **Turning off `zoomGestures`** keeps the thumbnails their size under a pinch.
 - **`reveal()`** scrolls the strip only as far as needed, so it follows without jumping.
 
@@ -80,6 +81,11 @@ do.
 </Fw>
 
 ## Good to know
+
+### How pages look
+
+A page here has the same background and shadow as on the Stage: the viewer's `page` settings, or
+`--epdf-page-background` and `--epdf-page-shadow` from CSS (see [Colors & theming](../ui/theming)).
 
 ### Menus inside a page view
 

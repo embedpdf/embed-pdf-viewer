@@ -81,14 +81,31 @@ Use it for a "mark every occurrence" feature, or to [redact](../annotations/reda
 
 ## Change how matches look
 
-<Snippet name="search/highlights" />
+Set the highlight colors when you register the plugin:
 
-| Prop          | What it is                                         | Default      |
-| :------------ | :------------------------------------------------- | :----------- |
-| `color`       | The highlight of every match                       | `'#ffd500'`  |
-| `activeColor` | The highlight of the active match                  | `'#ff9632'`  |
-| `blendMode`   | How the highlight mixes with the page              | `'multiply'` |
-| `onHitClick`  | Called with the match someone clicks               | —            |
+```ts
+searchPlugin({
+  highlight: { color: '#fde047', activeColor: '#f97316' },
+});
+```
+
+On dark or scanned pages, where a multiplied highlight disappears, use translucent colors and
+`blendMode: 'normal'`. Each of these can also come from CSS, which wins over the setting, for
+example in dark mode:
+
+```css
+@media (prefers-color-scheme: dark) {
+  .pdf-viewer {
+    --epdf-search-highlight: rgb(253 224 71 / 0.4);
+    --epdf-search-blend-mode: normal;
+  }
+}
+```
+
+## Click a match on the page
+
+Give `<SearchLayer onHitClick>` a function, and it's called with the match someone clicks, for
+example to make it the active one.
 
 ## Methods
 
@@ -107,6 +124,7 @@ Everything `useSearch()` gives you.
 | `refresh()`                                | Runs the current search again from the start. The plugin does this by itself when the document changes.                                                                           |
 | `findAll(query, { snippets? })`            | Finds every match without showing them or touching the current search. `snippets: false` leaves out the words around each match. [Search without showing it](#search-without-showing-it) |
 | `canSearch({ snippets? })`                 | Whether searching is allowed; with `snippets: true`, whether matches carry the words around them. [Permissions](#permissions)                                                      |
+| `getSettings()`, `updateSettings(changes)`, `resetSettings()` | Reads the settings, changes them while the app runs, or goes back to what you registered. In a component, use `useSearchSettings()`. [Settings](#settings) |
 
 `reveal` is `{ anchor, behavior }`, the [`reveal` setting](#settings) for one call. Every method that
 returns a promise also takes a `signal` in its options, to cancel it.
@@ -130,12 +148,17 @@ shows the count doesn't re-render for every match that arrives.</Fw>
 
 ## Settings
 
-Set them when you register the plugin.
+Set them when you register the plugin, and change them while the app runs with
+`search.updateSettings({ … })`; `search.resetSettings()` goes back to what you registered, and
+`useSearchSettings()` gives you the current settings.
 
-| Setting           | What it does                                                      | Default                       |
-| :---------------- | :---------------------------------------------------------------- | :---------------------------- |
-| `reveal.anchor`   | Where a match lands in the view when you move to it               | `{ y: 0.35 }`, like a browser |
-| `reveal.behavior` | Glide there (`'smooth'`) or jump (`'instant'`)                    | `'smooth'`                    |
+| Setting                 | What it does                                                      | Default                       | From CSS                         |
+| :---------------------- | :---------------------------------------------------------------- | :---------------------------- | :------------------------------- |
+| `reveal.anchor`         | Where a match lands in the view when you move to it               | `{ y: 0.35 }`, like a browser | —                                |
+| `reveal.behavior`       | Glide there (`'smooth'`) or jump (`'instant'`)                    | `'smooth'`                    | —                                |
+| `highlight.color`       | The highlight of every match                                      | `'#ffd500'`                   | `--epdf-search-highlight`        |
+| `highlight.activeColor` | The highlight of the active match                                 | `'#ff9632'`                   | `--epdf-search-highlight-active` |
+| `highlight.blendMode`   | How the highlights mix with the page                              | `'multiply'`                  | `--epdf-search-blend-mode`       |
 
 ## Events
 
@@ -150,6 +173,7 @@ Set them when you register the plugin.
 | `onFailed`           | A search failed                                         | `error`                   |
 | `onActiveHitChanged` | Another match became the active one                     | `index`, `hit`            |
 | `onCleared`          | The search was cleared                                  | —                         |
+| `onSettingsChanged` | The settings changed | `settings`, `changed` |
 
 ## Permissions
 

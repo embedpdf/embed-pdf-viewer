@@ -16,8 +16,6 @@ export function Thumbnails() {
   return (
     <Stage
       token={ThumbsToken}
-      interaction={false}
-      zoomGestures={false}
       pageChrome={(page) => <span className="label">{page.pageIndex + 1}</span>}
     >
       {(page) => (

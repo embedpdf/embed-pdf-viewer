@@ -11,7 +11,7 @@ Any annotation can carry a comment, its `contents`, and people can reply to it. 
 make a **thread**: the first comment and its replies, in order. `useCommentThreads()` gives you
 every thread in the document, ready for a sidebar:
 
-<Snippet name="annotations/comments-sidebar" />
+<Snippet name="annotations/comments/sidebar" />
 
 Threads come in reading order: by page, then from the top of the page. The list updates by itself
 when anyone adds, changes or deletes a comment, on this screen or, on a shared document, on
@@ -63,7 +63,7 @@ States are saved as the PDF's own review states, so Acrobat shows them in its co
 
 The thread's `root` has a page and a `rect`, which is where the view should go:
 
-<Snippet name="annotations/comments-jump" />
+<Snippet name="annotations/comments/jump" />
 
 ## Methods
 
@@ -85,7 +85,7 @@ Every method that returns a promise also takes a `signal` in its options, to can
 
 ## Events
 
-<Snippet name="annotations/comments-events" />
+<Snippet name="annotations/comments/events" />
 
 | Event                      | Fires when                                         | Carries              |
 | :------------------------- | :------------------------------------------------- | :------------------- |
@@ -98,7 +98,7 @@ other people's, use the annotation events; see [Events, saving & sharing](saving
 
 Every comment verb has a check that answers for one comment, so you show only the buttons that work:
 
-<Snippet name="annotations/comments-permissions" />
+<Snippet name="annotations/comments/permissions" />
 
 | Permission           | What it allows                                                     | Check                                     |
 | :------------------- | :----------------------------------------------------------------- | :---------------------------------------- |

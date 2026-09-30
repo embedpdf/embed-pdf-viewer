@@ -123,13 +123,18 @@ Everything `useCommands()` gives you.
 | `disableCategory(category)`, `enableCategory(category)`                  | Turns a category off, or on again. [Turn features off](#turn-features-off)                                                                          |
 | `setDisabledCategories(categories)`                                      | Replaces the list of categories that are off                                                                                                         |
 | `getDisabledCategories()`, `isCategoryDisabled(category)`                | The categories that are off; whether one is                                                                                                          |
+| `getSettings()`, `updateSettings(changes)`, `resetSettings()` | Reads the settings, changes them while the app runs, or goes back to what you registered. In a component, use `useCommandsSettings()`. [Settings](#settings) |
 
-Leave out `documentId`, and a command runs and resolves for the active document. Every method that
-returns a promise also takes a `signal` in its options, to cancel it.
+Leave out `documentId`, and a command runs and resolves for the document in scope: the one a
+[`<DocumentScope>`](../documents/tabs#talk-to-a-specific-document) around your component names, or
+else the active one. Every method that returns a promise also takes a `signal` in its options, to
+cancel it.
 
 ## Settings
 
-Set them when you register the plugin.
+Set them when you register the plugin, and change them while the app runs with
+`commands.updateSettings({ … })`; `commands.resetSettings()` goes back to what you registered, and
+`useCommandsSettings()` gives you the current settings.
 
 | Setting              | What it does                                          | Default |
 | :------------------- | :---------------------------------------------------- | :------ |
@@ -144,6 +149,7 @@ Set them when you register the plugin.
 | :------------------ | :------------------------------ | :-------------------------------- |
 | `onExecuted`        | A command ran                   | `commandId`, `documentId`, `args` |
 | `onExecutionFailed` | A command's `run` threw         | `commandId`, `documentId`, `error` |
+| `onSettingsChanged` | The settings changed | `settings`, `changed` |
 
 ## Good to know
 

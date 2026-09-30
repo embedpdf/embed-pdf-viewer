@@ -212,8 +212,9 @@ the active document are on [Several documents](tabs#methods), downloading and pr
 
 `options` for `open()` are `name` (what its tab shows), `activate: false` (open it in the
 background), `password`, and, on the local engine, `scope` and `identity`. Without an `id`, the page
-methods use the active document. To stop an open that's still loading, close the document: that
-cancels its download too.
+methods use the document in scope: the one a [`<DocumentScope>`](tabs#talk-to-a-specific-document)
+around your component names, or else the active one. To stop an open that's still loading, close the
+document: that cancels its download too.
 
 ## State
 

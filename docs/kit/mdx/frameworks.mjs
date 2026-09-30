@@ -113,7 +113,7 @@ const ANGULAR_HOOKS = {
   useAnnotationList: ['annotation.watch()', 'annotation.watch($args)'],
   useAnnotationAnchor: ['annotation.anchorOf($args)', 'annotation.anchorOf($args)'],
   useAnnotationDefaults: ['annotation.tools.defaultsOf($args)', 'annotation.tools.defaultsOf($args)'],
-  useSelectionFields: ['annotation.selection.fields()'],
+  useAnnotationProperties: ['annotation.selection.properties()'],
   useCommentThreads: ['comments.threads()'],
   useCommentThread: ['comments.threadOf($args)', 'comments.threadOf($args)'],
   useToolCursor: ['interaction.overrideCursor()', 'interaction.overrideCursor($args)'],
@@ -320,6 +320,34 @@ export function stateIntroParts(hook, framework) {
   }
 }
 
+// ── code blocks ─────────────────────────────────────────────────────────────
+
+/** Plugin factories with an Angular feature of the same name (`feedbackPlugin()` → `withFeedback()`). */
+const FACTORIES = [...PLUGINS, 'Feedback'];
+
+/**
+ * A framework-free code block as a framework shows it: `@embedpdf/react/…` imports become that
+ * framework's package, and on Angular `annotationPlugin({ … })` becomes `withAnnotation({ … })`.
+ * So one block of plugin settings serves every framework.
+ *
+ * @param {string} code
+ * @param {Framework} framework
+ * @returns {string}
+ */
+export function frameworkCode(code, framework) {
+  if (framework === 'react' || !FRAMEWORKS.includes(framework)) return code;
+  let out = code.replace(/@embedpdf\/react(?=[/'"])/g, `@embedpdf/${framework}`);
+  if (framework === 'angular') {
+    out = out.replace(/\b([a-z]\w*)Plugin\b/g, (whole, name) => {
+      const plugin = name.charAt(0).toUpperCase() + name.slice(1);
+      return FACTORIES.includes(plugin) ? `with${plugin}` : whole;
+    });
+  }
+  return out;
+}
+
+const CODE_LANGS = new Set(['ts', 'tsx', 'js', 'jsx', 'typescript', 'javascript']);
+
 // ── links ───────────────────────────────────────────────────────────────────
 
 const DOCS_LINK = /^((?:https:\/\/www\.(?:embedpdf|cloudpdf)\.com)?\/docs\/(headless|viewer))(\/[^?#]*)?([?#].*)?$/;
@@ -388,12 +416,31 @@ export function inlineCodeContexts(tree) {
 
 /**
  * Remark: on headless pages, every inline code span becomes `<FwCode value context />`, which
- * shows the reader's framework's name for it.
+ * shows the reader's framework's name for it, and a code block that reads differently per framework
+ * (`frameworkCode`) becomes one `<FwVariant frameworks="…">` per group of frameworks that read it
+ * the same.
  */
 export function remarkFrameworkNames() {
   return (tree, file) => {
     const path = String(file?.path ?? file?.history?.[0] ?? '');
     if (!/[/\\]docs[/\\]headless[/\\]/.test(path)) return;
+    visit(tree, 'code', (node, index, parent) => {
+      if (!parent || typeof index !== 'number' || !CODE_LANGS.has(node.lang ?? '')) return;
+      const groups = new Map();
+      for (const framework of FRAMEWORKS) {
+        const value = frameworkCode(node.value, framework);
+        groups.set(value, [...(groups.get(value) ?? []), framework]);
+      }
+      if (groups.size === 1) return;
+      const variants = [...groups].map(([value, frameworks]) => ({
+        type: 'mdxJsxFlowElement',
+        name: 'FwVariant',
+        attributes: [{ type: 'mdxJsxAttribute', name: 'frameworks', value: frameworks.join(' ') }],
+        children: [{ ...node, value }],
+      }));
+      parent.children.splice(index, 1, ...variants);
+      return index + variants.length;
+    });
     const contexts = inlineCodeContexts(tree);
     visit(tree, 'inlineCode', (node, index, parent) => {
       // Headings stay plain text: the table of contents reads them.

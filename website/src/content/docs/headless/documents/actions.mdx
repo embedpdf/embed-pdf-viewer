@@ -38,21 +38,9 @@ never run.
 
 Many forms calculate totals, check values and format dates with JavaScript. Turn it on:
 
-<Fw only={['react', 'vue', 'svelte']}>
-
 ```ts
 actionsPlugin({ javascript: { enabled: true } });
 ```
-
-</Fw>
-
-<Fw only="angular">
-
-```ts
-withActions({ javascript: { enabled: true } });
-```
-
-</Fw>
 
 Scripts run in a sealed sandbox: they can read and change the document's form fields and move
 between pages, but they can't reach your app, the page's HTML or the network. Each script has a
@@ -61,25 +49,11 @@ time budget, so a script that loops forever is stopped instead of freezing the v
 A script can ask who the user is (`identity.name` in Acrobat's JavaScript). It gets the user the
 document was opened for, and you can add the fields scripts often ask for:
 
-<Fw only={['react', 'vue', 'svelte']}>
-
 ```ts
 actionsPlugin({
   javascript: { enabled: true, identity: { corporation: 'Acme', email: 'dana@acme.com' } },
 });
 ```
-
-</Fw>
-
-<Fw only="angular">
-
-```ts
-withActions({
-  javascript: { enabled: true, identity: { corporation: 'Acme', email: 'dana@acme.com' } },
-});
-```
-
-</Fw>
 
 ## How websites open, printing and alerts
 
@@ -101,8 +75,6 @@ of them with your own UI:
 Each kind of action has a rule for each way it can start: a click by the user (`user`), the pointer
 moving over something (`hover`), or the document opening or closing (`lifecycle`):
 
-<Fw only={['react', 'vue', 'svelte']}>
-
 ```ts
 actionsPlugin({
   policy: {
@@ -111,21 +83,6 @@ actionsPlugin({
   },
 });
 ```
-
-</Fw>
-
-<Fw only="angular">
-
-```ts
-withActions({
-  policy: {
-    uri: { user: 'adapter', hover: 'block', lifecycle: 'block' }, // websites only on click
-    javascript: { lifecycle: 'block' }, // no scripts when the document opens
-  },
-});
-```
-
-</Fw>
 
 | Rule        | Means                                                    |
 | :---------- | :------------------------------------------------------- |
@@ -176,8 +133,8 @@ its options, to cancel it.
 
 ## Settings
 
-Set them when you register the plugin. `policy` can also change while the app runs, with
-`actions.updateSettings({ policy })`; `actions.resetSettings()` goes back to what you registered, and
+Set them when you register the plugin, and change them while the app runs with
+`actions.updateSettings({ … })`; `actions.resetSettings()` goes back to what you registered, and
 `useActionsSettings()` gives you the current settings.
 
 | Setting               | What it does                                                   | Default           |

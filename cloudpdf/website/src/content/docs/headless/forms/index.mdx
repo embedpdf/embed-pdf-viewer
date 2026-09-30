@@ -92,7 +92,7 @@ first one.
 ## Calculations, formatting and validation
 
 Many forms add up totals, format dates and check values with scripts. With JavaScript on in the
-[actions plugin](../documents/actions), they run as people type, as in Acrobat:
+[actions plugin](documents/actions), they run as people type, as in Acrobat:
 
 <Snippet name="forms/scripts" />
 
@@ -149,6 +149,7 @@ on [Building forms](forms/building#methods).
 | `getSnapshot()`            | Everything at once, as the engine's `list()` returns it: `fields`, `formKind`, `needsAppearances` and `calculationOrder`                        |
 | `refresh()`                | Reads the whole form again, and <Fw only={['react', 'vue', 'svelte']}>`onResynced`</Fw><Fw only="angular">`resynced$`</Fw> fires. You rarely need it: the plugin follows every change, whoever made it.                      |
 | `canRead()`, `canFill()`   | Whether reading the form, and filling it in, are allowed. [Permissions](#permissions)                                                         |
+| `getSettings()`, `updateSettings(changes)`, `resetSettings()` | Reads the settings, changes them while the app runs, or goes back to what you registered. In a component, use `useFormSettings()`. [Settings](#settings) |
 
 Every method that returns a promise also takes a `signal` in its options, to cancel it.
 
@@ -167,13 +168,23 @@ For one field, `useFormValue(ref)` <Word of="rerenders" /> only when that field'
 
 ## Settings
 
-Set them when you register the plugin.
+Set them when you register the plugin, and change them while the app runs with
+`form.updateSettings({ … })`; `form.resetSettings()` goes back to what you registered, and
+`useFormSettings()` gives you the current settings.
 
-| Setting      | What it does                                                           | Default     |
-| :----------- | :--------------------------------------------------------------------- | :---------- |
-| `validation` | Run the form's own checks (`'scripts'`), or accept every value (`'none'`) | `'scripts'` |
+| Setting             | What it does                                                               | Default                      | From CSS                       |
+| :------------------ | :------------------------------------------------------------------------- | :--------------------------- | :----------------------------- |
+| `validation`        | Run the form's own checks (`'scripts'`), or accept every value (`'none'`)  | `'scripts'`                  | —                              |
+| `focus.color`       | The ring around the field being filled in                                  | the viewer's accent          | `--epdf-form-focus`            |
+| `fields.border`     | The edge of a field that has no border of its own                          | the viewer's accent at 55%   | `--epdf-form-field-border`     |
+| `fields.background` | Inside a field that has no background of its own                           | `'rgb(255 255 255 / 0.92)'`    | `--epdf-form-field-background` |
+| `fields.color`      | The check mark and text of a field that has no color of its own            | `'#1f2a44'`                    | `--epdf-form-field-color`      |
 
 Scripts need JavaScript on in the actions plugin; without it, `'scripts'` accepts every value too.
+
+The colors are what the viewer draws around fields; a field's own colors are saved in the PDF (see
+[Building forms](forms/building)). A CSS variable wins over the setting: see
+[Colors & theming](ui/theming).
 
 ## Events
 
@@ -184,6 +195,7 @@ Scripts need JavaScript on in the actions plugin; without it, `'scripts'` accept
 | `onValueChanged`       | A field's value changed                                                   | `field`, `origin` |
 | `onValidationRejected` | The form's validation refused a value                                     | `field`, `issues` |
 | `onResynced`           | The whole form was read, as when it opens, after `refresh()` or a repair  | `snapshot`        |
+| `onSettingsChanged` | The settings changed | `settings`, `changed` |
 
 Fields that are added, changed or removed have their own events; see
 [Building forms](forms/building#events).
@@ -201,7 +213,7 @@ Without `doc.forms.fill`, the fields show their values but can't be changed.
 
 ### Forms and annotations
 
-Fields are annotations too, of kind `'widget'`. With the [annotation plugin](../annotations)
+Fields are annotations too, of kind `'widget'`. With the [annotation plugin](annotations)
 registered, the `<FormLayer>` and the annotation layer share the page: fields stay fillable with the
 `pointer` tool, and become movable boxes in [design mode](forms/building).
 

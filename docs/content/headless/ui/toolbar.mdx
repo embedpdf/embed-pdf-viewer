@@ -110,3 +110,10 @@ permission or open a document, and the toolbar follows.
 
 A command's label comes through [translations](translations), so the toolbar is in the user's language
 and re-measures when it changes.
+
+### The default look
+
+When you don't draw a part yourself, the toolbar draws a plain one. Its colors come from CSS only,
+because you're meant to replace them: `--epdf-toolbar-surface` (the "More" menu and folded groups,
+`#ffffff`), `--epdf-toolbar-border` (`rgb(0 0 0 / 0.15)`) and `--epdf-toolbar-active` (a pressed or
+open button, `rgb(0 0 0 / 0.12)`).

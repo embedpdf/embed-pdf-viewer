@@ -1,0 +1,214 @@
+---
+title: Colors & theming
+description: "Every color the viewer draws is a setting with a default. Set your accent once, fine-tune any part, and override colors from CSS for dark mode or a different look per viewer."
+---
+
+# Colors & theming
+
+Every color EmbedPDF draws on the screen, such as the text selection, search highlights and the
+handles of a selected annotation, is a setting with a sensible default. Give the viewer your
+accent, and every part follows it:
+
+<Snippet name="ui/viewer-accent" />
+
+Then fine-tune any part with its plugin's settings, such as the handles of an annotation:
+
+```ts
+annotationPlugin({
+  chrome: {
+    outline: { style: 'dashed' },
+    handles: { shape: 'circle', fill: '#fce4ec' },
+    rotationHandle: { stalk: false }, // no line between the box and the handle
+  },
+});
+```
+
+Every setting is typed, has its default, and is listed with its plugin under **Settings**. All of them
+together are under [Every color](#every-color).
+
+## Override from CSS
+
+Every color setting can also come from a CSS variable, and a CSS variable always wins over a setting.
+Use it for dark mode, for a different look per viewer, or to keep colors in your stylesheet:
+
+```css
+.pdf-viewer {
+  --epdf-accent: #e91e63;
+  --epdf-search-highlight: #7dd3fc;
+}
+```
+
+Put the class on an element around your viewer; nothing needs importing. The rule is short: any CSS
+variable wins over any setting. A part looks for its own variable, then its plugin's accent variable
+(such as `--epdf-annotation-accent`), then `--epdf-accent`. Only when none is set does its setting
+apply, then the setting it follows, then the built-in color.
+
+Only paint comes from CSS: colors, line widths, dashes, shadows and opacity. How big a handle is,
+where the rotation handle sits and how close snapping starts are settings only, because they decide
+where a click lands.
+
+## Dark mode
+
+Set the variables inside a media query, or under a class your app already switches:
+
+```css
+@media (prefers-color-scheme: dark) {
+  .pdf-viewer {
+    --epdf-accent: #8ab4ff;
+    --epdf-page-background: #2b2b2b;
+    --epdf-readout-background: #f5f5f5;
+    --epdf-readout-color: #111111;
+  }
+}
+
+[data-theme='dark'] .pdf-viewer {
+  --epdf-accent: #8ab4ff;
+}
+```
+
+No code runs and nothing re-renders: the browser repaints.
+
+## Change colors while the app runs
+
+Every setting can change while the app runs. A plugin's settings change with `updateSettings()`:
+
+```ts
+annotation.updateSettings({ chrome: { accent: '#0f6e56' } });
+```
+
+<Fw only={['react', 'vue', 'svelte']}>
+
+The viewer's `accent` and `page` follow the values you give it, like any other prop.
+
+</Fw>
+
+<Fw only="angular">
+
+The viewer's `accent` and `page` change with `inject(EpdfViewer).updateSettings({ accent })`, since
+the settings you give `provideEmbedPdf()` are read once.
+
+</Fw>
+
+For every part at once, such as an accent the user picks, set the variables on your wrapper.
+`epdfTheme()` turns setting names into the variables, with autocomplete:
+
+<Snippet name="ui/theme-picker" />
+
+## Different looks for different viewers
+
+Each viewer has its own settings. And a CSS variable applies to everything inside the element you set
+it on, so two viewers on one page can each have their own colors from one stylesheet:
+
+```css
+.contract-viewer {
+  --epdf-accent: #0f6e56;
+}
+
+.review-viewer {
+  --epdf-accent: #993c1d;
+}
+```
+
+## Every color
+
+**The viewer**
+
+| Setting            | What it colors                                   | Default                        | From CSS                 |
+| :---------------- | :----------------------------------------------- | :----------------------------- | :----------------------- |
+| `accent`          | Every part below that has no color of its own    | `'#3858e9'`                      | `--epdf-accent`          |
+| `page.background` | A page before its picture arrives                | `'#ffffff'`                      | `--epdf-page-background` |
+| `page.shadow`     | The shadow under each page; `'none'` for none    | `'0 6px 18px rgb(0 0 0 / 0.18)'` | `--epdf-page-shadow`     |
+
+**Annotations**: `annotationPlugin({ chrome })`
+
+| Setting                         | What it colors                                                    | Default                   | From CSS                                   |
+| :----------------------------- | :---------------------------------------------------------------- | :------------------------ | :----------------------------------------- |
+| `chrome.accent`                | Every annotation part below that has no color of its own          | the viewer's `accent`     | `--epdf-annotation-accent`                 |
+| `chrome.outline.color`         | The box around the selection                                      | `chrome.accent`           | `--epdf-annotation-outline`                |
+| `chrome.outline.width`         | Its line width                                                    | `1`                       | `--epdf-annotation-outline-width`          |
+| `chrome.outline.style`         | `'solid'` or `'dashed'`                                           | `'solid'`                 | `--epdf-annotation-outline-dash` (`4 3`)   |
+| `chrome.handles.fill`          | Inside the resize and point handles                               | `'#ffffff'`                 | `--epdf-annotation-handle-fill`            |
+| `chrome.handles.stroke`        | Their edge                                                        | `chrome.accent`           | `--epdf-annotation-handle-stroke`          |
+| `chrome.rotationHandle.fill`   | Inside the rotation handle                                        | `chrome.handles.fill`     | `--epdf-annotation-rotation-handle-fill`   |
+| `chrome.rotationHandle.stroke` | Its edge and its stalk                                            | `chrome.handles.stroke`   | `--epdf-annotation-rotation-handle-stroke` |
+| `chrome.guides.color`          | The lines that show what an annotation snaps to while you move it | `'#e91e63'`                 | `--epdf-annotation-guide`                  |
+| `chrome.guides.rotationColor`  | The reference cross and the angle line while you turn it          | `chrome.accent`           | `--epdf-annotation-rotation-guide`         |
+| `chrome.guides.width`          | The width of both kinds of line                                   | `1.5`                     | `--epdf-annotation-guide-width`            |
+| `chrome.guides.style`          | `'solid'` or `'dashed'`                                           | `'solid'`                 | `--epdf-annotation-guide-dash` (`4 3`)     |
+| `chrome.marquee.fill`          | Inside the box you drag to select several annotations             | `chrome.accent` at 8%     | `--epdf-annotation-marquee-fill`           |
+| `chrome.marquee.stroke`        | Its edge                                                          | `chrome.accent`           | `--epdf-annotation-marquee-stroke`         |
+| `chrome.textOutline`           | A text box while you type in it                                   | `chrome.accent`           | `--epdf-annotation-text-outline`           |
+| `chrome.readout.background`    | Behind the angle while you turn an annotation                     | `'rgb(0 0 0 / 0.8)'`        | `--epdf-readout-background`                |
+| `chrome.readout.color`         | The angle's text                                                  | `'#ffffff'`                 | `--epdf-readout-color`                     |
+| A tool's `ghost.opacity`       | The preview under the pointer                                     | `0.5`                     | `--epdf-ghost-opacity`                     |
+
+**Text selection**: `selectionPlugin({ color, handles })`
+
+| Setting            | What it colors                          | Default                       | From CSS                              |
+| :---------------- | :-------------------------------------- | :---------------------------- | :------------------------------------ |
+| `color`           | Selected text                           | the viewer's `accent` at 35%  | `--epdf-text-selection`               |
+| `handles.color`   | The grips at its ends, on touch screens | the viewer's `accent`         | `--epdf-text-selection-handle`        |
+| `handles.shadow`  | Their shadow                            | `'0 1px 4px rgb(0 0 0 / 0.35)'` | `--epdf-text-selection-handle-shadow` |
+
+**Search**: `searchPlugin({ highlight })`
+
+| Setting                  | What it colors                       | Default      | From CSS                         |
+| :---------------------- | :----------------------------------- | :----------- | :------------------------------- |
+| `highlight.color`       | Every match                          | `'#ffd500'`    | `--epdf-search-highlight`        |
+| `highlight.activeColor` | The active match                     | `'#ff9632'`    | `--epdf-search-highlight-active` |
+| `highlight.blendMode`   | How the highlights mix with the page | `'multiply'` | `--epdf-search-blend-mode`       |
+
+**Forms**: `formPlugin({ focus, fields })`
+
+| Setting              | What it colors                                                  | Default                      | From CSS                       |
+| :------------------ | :-------------------------------------------------------------- | :--------------------------- | :----------------------------- |
+| `focus.color`       | The ring around the field being filled in                       | the viewer's `accent`        | `--epdf-form-focus`            |
+| `fields.border`     | The edge of a field that has no border of its own               | the viewer's `accent` at 55% | `--epdf-form-field-border`     |
+| `fields.background` | Inside a field that has no background of its own                | `'rgb(255 255 255 / 0.92)'`    | `--epdf-form-field-background` |
+| `fields.color`      | The check mark and text of a field that has no color of its own | `'#1f2a44'`                    | `--epdf-form-field-color`      |
+
+**Parts you style yourself** have no settings, only CSS, for the look they have until you style them:
+
+| From CSS                 | What it colors                                     | Default                   |
+| :----------------------- | :------------------------------------------------- | :------------------------ |
+| `--epdf-scrollbar-thumb` | The [scrollbar](../viewing/stage#scrollbars)'s thumb | `rgb(0 0 0 / 0.4)`        |
+| `--epdf-toolbar-surface` | The [toolbar](toolbar)'s "More" menu and folded groups | `#ffffff`               |
+| `--epdf-toolbar-border`  | Their edge, and the edge of a button               | `rgb(0 0 0 / 0.15)`       |
+| `--epdf-toolbar-active`  | A pressed or open button                           | `rgb(0 0 0 / 0.12)`       |
+| `--epdf-font-mono`       | Numbers in readouts, such as the angle             | `ui-monospace, monospace` |
+
+## What isn't here
+
+**Colors saved in the PDF** belong to the document, not to your app, and look the same in every app
+that opens the file:
+
+- an annotation's color, set in each tool's defaults ([Tools & defaults](../annotations/tools));
+- a redaction's fill and label ([Redaction](../annotations/redaction#settings));
+- the look of a new form field ([Building forms](../forms/building));
+- a stamp's colors ([Stamps](../annotations/stamps)).
+
+## Good to know
+
+### Tailwind
+
+Set a variable with an arbitrary property on the wrapper, for example
+`class="pdf-viewer [--epdf-accent:var(--color-pink-500)]"`.
+
+<Fw only="angular">
+
+### Inside your components
+
+CSS variables pass through view encapsulation, so a variable set on a parent element reaches
+EmbedPDF's elements inside your own components, whatever their `encapsulation`.
+
+</Fw>
+
+### Translucent defaults
+
+Defaults such as "the accent at 35%" are mixed with `color-mix()`, which every current browser
+supports, so they always match the color they follow.
+
+### The ready-made Viewer
+
+The [Viewer](/docs/viewer) builds its light and dark themes on the same variables, so a variable you
+set works there too.

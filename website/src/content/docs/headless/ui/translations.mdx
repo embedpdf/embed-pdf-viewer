@@ -93,6 +93,7 @@ Everything `useI18n()` gives you.
 | `setLocale(code)`                   | Loads the language if it needs to, then switches. Resolves once it shows; rejects when it can't load, or when a newer call replaces it. [Switch the language](#switch-the-language) |
 | `addTranslations(code, translations)` | Adds strings to one of your languages, loaded or not, and replaces the ones with the same key. [Add strings later](#add-strings-later)        |
 | `registerLocale(locale)`            | Adds a whole language, `{ code, name, direction?, translations }`, and returns a function that removes it again                                     |
+| `getSettings()`, `updateSettings(changes)`, `resetSettings()` | Reads the settings, changes them while the app runs, or goes back to what you registered. In a component, use `useI18nSettings()`. [Settings](#settings) |
 
 Every method that returns a promise also takes a `signal` in its options, to cancel it.
 
@@ -109,7 +110,9 @@ Every method that returns a promise also takes a `signal` in its options, to can
 
 ## Settings
 
-Set them when you register the plugin.
+Set them when you register the plugin, and change them while the app runs with
+`i18n.updateSettings({ … })`; `i18n.resetSettings()` goes back to what you registered, and
+`useI18nSettings()` gives you the current settings.
 
 | Setting          | What it does                                               | Default          |
 | :--------------- | :--------------------------------------------------------- | :--------------- |
@@ -126,6 +129,7 @@ Set them when you register the plugin.
 | :------------------- | :--------------------------------------- | :-------------------------- |
 | `onLocaleChanged`    | The language changed                     | `locale`, `previousLocale`  |
 | `onLocaleLoadFailed` | A language couldn't be loaded            | `locale`, `error`           |
+| `onSettingsChanged` | The settings changed | `settings`, `changed` |
 
 ## Good to know
 

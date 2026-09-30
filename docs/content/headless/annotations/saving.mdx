@@ -8,7 +8,7 @@ description: Listen for annotation changes, save them into the PDF, and move the
 Every annotation change fires an event, whoever made it: the user, your code, or someone else on
 a shared document. Listen for them to keep your own UI or server in step:
 
-<Snippet name="annotations/saving-events" />
+<Snippet name="annotations/saving/events" />
 
 <Fw only={['react', 'vue', 'svelte']}>
 
@@ -77,7 +77,7 @@ A tool's defaults have <Fw only={['react', 'vue', 'svelte']}>`tools.onDefaultsCh
 | `origin.ts`   | When it happened, in milliseconds.                                            |
 | `origin.tx`   | Shared by every change one call made, such as an import.                      |
 
-<Snippet name="annotations/saving-remote-toast" />
+<Snippet name="annotations/saving/remote-toast" />
 
 These are the engine's own events, so the fields mean the same as on
 [Events](/docs/engine/concepts/events).
@@ -169,7 +169,7 @@ if (text) await annotation.import(await AnnotationTransfer.parse(text));
 **Store each annotation as it changes.** Listen for the events and write each change to your
 server. Key your rows by the annotation's ref:
 
-<Snippet name="annotations/saving-sync" />
+<Snippet name="annotations/saving/sync" />
 
 <Fw only={['react', 'vue', 'svelte']}>Handle `onUpdated` the same way, and `onDeleted` by deleting each of its `refs`. On
 `onResynced`, compare the pages it names with `list()`.</Fw><Fw only="angular">Handle `updated$` the same way, and

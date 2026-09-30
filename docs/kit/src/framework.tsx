@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import type { AnchorHTMLAttributes } from 'react';
+import type { AnchorHTMLAttributes, ReactNode } from 'react';
 
 // eslint-disable-next-line import/no-unresolved — sibling plain-ESM module, typed by its .d.mts
 import {
@@ -30,6 +30,11 @@ export function useDocsFramework(): FrameworkKey {
 /** An inline code span, as the reader's framework names it (`useSearch()` → `inject(EpdfSearch)`). */
 export function FwCode({ value, context }: { value: string; context?: NameContext }) {
   return <code>{frameworkName(value, useDocsFramework(), context)}</code>;
+}
+
+/** One framework group's version of a code block (`remarkFrameworkNames` splits blocks this way). */
+export function FwVariant({ frameworks, children }: { frameworks: string; children: ReactNode }) {
+  return frameworks.split(' ').includes(useDocsFramework()) ? <>{children}</> : null;
 }
 
 /** `<Framework />`: React, Vue, Svelte or Angular. */

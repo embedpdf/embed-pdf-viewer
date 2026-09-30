@@ -34,7 +34,7 @@ annotation.selection.clear();
 To show the selection in a component, use `useAnnotationState()`. Your component
 <Word of="rerenders" /> when the selection changes:
 
-<Snippet name="annotations/selecting-selected" />
+<Snippet name="annotations/selecting/selected" />
 
 Every field is listed under [State](#state).
 
@@ -45,7 +45,7 @@ Every field is listed under [State](#state).
 Stage's `overlay` snippet</Fw><Fw only="angular">Put it inside `<epdf-stage>`, next to the page template</Fw>,
 and it stays attached while the user scrolls and zooms:
 
-<Snippet name="annotations/selecting-menu" />
+<Snippet name="annotations/selecting/menu" />
 
 - **The menu only places things.** What's in it is yours: build it from the selection, as above,
   to show buttons that fit what's selected.
@@ -56,31 +56,31 @@ and it stays attached while the user scrolls and zooms:
 
 ## A style panel
 
-A style panel shows the fields of what's selected, such as color, width, opacity and font, with
-their current values. `useSelectionFields()` gives you everything to draw it:
+A style panel shows the properties of what's selected, such as color, width, opacity and font, with
+their current values. `useAnnotationProperties()` gives you everything to draw it:
 
-- **`fields`** are the fields the selection can change, in display order. Each one says which
-  control fits: a color, a number with its range, a choice from a list, or an on/off flag.
+- **`properties`** are what the selection can change, in display order. Each one says which control
+  fits: a color, a number with its range, a choice from a list, or an on/off flag.
 - **`values`** are their current values.
-- **`mixed`** lists the fields where the selected annotations differ. Show those as "mixed".
+- **`mixed`** lists the properties where the selected annotations differ. Show those as "mixed".
 
-When different kinds are selected, you get only the fields they all have.
+When different kinds are selected, you get only the properties they all have.
 
-Each field's `key` is the annotation's own field name, so reading and writing need no mapping:
+Each property's `key` is the annotation's own field name, so reading and writing need no mapping:
 
-<Snippet name="annotations/selecting-style-panel" />
+<Snippet name="annotations/selecting/style-panel" />
 
-| `field.control` | What to show                                                                                                   | Also on the field    |
+| `property.control` | What to show                                                                                                | Also on the property |
 | :-------------- | :------------------------------------------------------------------------------------------------------------- | :------------------- |
 | `'color'`       | A color picker. `null` means no color.                                                                         |                      |
 | `'number'`      | A slider or a number input.                                                                                    | `min`, `max`, `step` |
 | `'choice'`      | A list, such as fonts or line endings.                                                                         | `options`            |
 | `'flag'`        | An on/off switch, such as `locked` or `print`.                                                                 |                      |
 | `'text'`        | A text input, such as a redaction's label.                                                                     |                      |
-| `'textFormat'`  | A bold, italic or underline toggle for text boxes. Write it with `annotation.text.toggleFormat(field.format)`. | `format`             |
-| `'link'`        | Where the annotation links to. Write it with `annotation.links.set(ref, target)`.                              |                      |
+| `'textFormat'`  | A bold, italic or underline toggle for text boxes. Write it with `annotation.text.toggleFormat(property.format)`. | `format`             |
+| `'link'`        | Where the annotation links to. Write it with `annotation.selection.updateLink(target)`, or `null` to remove it. |                      |
 
-`selection.update()` gives each selected annotation the fields its kind has, and skips the rest.
+`selection.update()` gives each selected annotation the properties its kind has, and skips the rest.
 To change each annotation relative to itself, pass a function. For example, to set only the end
 arrow of lines that keep their own start:
 
@@ -90,18 +90,16 @@ await annotation.selection.update((member) =>
 );
 ```
 
-The same fields drive a panel for a tool's defaults; see
+The same properties drive a panel for a tool's defaults; see
 [Let people change the defaults](tools#let-people-change-the-defaults).
 
 ## Change the handles
 
-By default the selection has a blue outline, square handles on its corners and sides (or on each
-point of a line or a polygon), and a round rotation handle above it. Everything about them can
-change.
+By default the selection has an outline in the accent color, square handles on its corners and sides
+(or on each point of a line or a polygon), and a round rotation handle above it, on a short line
+called its stalk. Everything about them can change.
 
-**Set them at startup.** One color changes every part; the rest is optional:
-
-<Fw only={['react', 'vue', 'svelte']}>
+**Set them when you register the plugin.** One color changes every part; the rest is optional:
 
 ```ts
 annotationPlugin({
@@ -109,43 +107,42 @@ annotationPlugin({
     accent: '#e91e63',
     outline: { style: 'dashed', width: 1 },
     handles: { shape: 'circle', size: 10 },
-    rotationHandle: { offset: 30 },
+    rotationHandle: { offset: 30, stalk: false },
   },
 });
 ```
 
-</Fw>
-
-<Fw only="angular">
-
-```ts
-withAnnotation({
-  chrome: {
-    accent: '#e91e63',
-    outline: { style: 'dashed', width: 1 },
-    handles: { shape: 'circle', size: 10 },
-    rotationHandle: { offset: 30 },
-  },
-});
-```
-
-</Fw>
-
-| Setting          | What it changes                                                                                                                                                   |
-| :--------------- | :---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `accent`         | The color of every part below, unless you set one of its own.                                                                                                     |
-| `outline`        | The box around the selection: `style` (`'solid'`, `'dashed'`), `width`, `color`.                                                                                  |
-| `handles`        | The resize and point handles: `shape` (`'square'`, `'circle'`), `size`, `hitSize`, `fill`, `stroke`.                                                              |
-| `rotationHandle` | The turn handle: `enabled`, `size`, `hitSize`, `offset` (distance from the box), `stalk` (the line to it), `fill`, `stroke`, `readout` (the angle while turning). |
-| `guides`         | The lines shown while snapping and turning: `enabled`, `style`, `width`, colors.                                                                                  |
+| Setting          | What it changes                                                                                                                          | From CSS                                                                                   |
+| :--------------- | :--------------------------------------------------------------------------------------------------------------------------------------- | :----------------------------------------------------------------------------------------- |
+| `accent`         | The color of every part below, unless you set one of its own. Defaults to the viewer's accent.                                           | `--epdf-annotation-accent`                                                                 |
+| `outline`        | The box around the selection: `style` (`'solid'`, `'dashed'`), `width`, `color`.                                                         | `--epdf-annotation-outline`, `--epdf-annotation-outline-width`, `--epdf-annotation-outline-dash` |
+| `handles`        | The resize and point handles: `shape` (`'square'`, `'circle'`), `size`, `hitSize`, `fill`, `stroke`.                                     | `--epdf-annotation-handle-fill`, `--epdf-annotation-handle-stroke`                         |
+| `rotationHandle` | The turn handle: `enabled`, `size`, `hitSize`, `offset` (distance from the box), `stalk` (`false` hides the line to it), `fill`, `stroke`. | `--epdf-annotation-rotation-handle-fill`, `--epdf-annotation-rotation-handle-stroke`       |
+| `guides`         | The lines shown while snapping and turning: `enabled`, `color`, `rotationColor`, `style`, `width`.                                        | `--epdf-annotation-guide`, `--epdf-annotation-rotation-guide`, `--epdf-annotation-guide-width`, `--epdf-annotation-guide-dash` |
+| `marquee`        | The box you drag to select several annotations: `fill`, `stroke`.                                                                        | `--epdf-annotation-marquee-fill`, `--epdf-annotation-marquee-stroke`                       |
+| `textOutline`    | The outline of a text box while you type in it.                                                                                          | `--epdf-annotation-text-outline`                                                           |
+| `readout`        | The angle while you turn: `enabled`, `background`, `color`.                                                                               | `--epdf-readout-background`, `--epdf-readout-color`                                        |
 
 Every size is in screen pixels, so handles stay the same size at every zoom. `hitSize` is the area
 you can grab; keep it at 24 or more for touch.
 
-**Change them while the app runs**, for example when the user switches to a dark theme:
+**Override the colors from CSS**, for example for dark mode. A CSS variable wins over the setting:
+
+```css
+@media (prefers-color-scheme: dark) {
+  .pdf-viewer {
+    --epdf-annotation-accent: #ff80ab;
+  }
+}
+```
+
+Colors, widths and dashes can come from CSS. Sizes and the offset can't, because they decide where
+you can grab. Every variable is on [Colors & theming](../ui/theming#every-color).
+
+**Change them while the app runs**, for example when the user picks another accent:
 
 ```ts
-annotation.updateSettings({ chrome: { accent: theme.accent } });
+annotation.updateSettings({ chrome: { accent: '#0f6e56' } });
 annotation.resetSettings(); // back to what the plugin was registered with
 ```
 
@@ -156,7 +153,7 @@ snippets, and it draws them in place of its handles:</Fw><Fw only="angular">Put 
 `<ng-template epdfHandle>` and an `<ng-template epdfRotationHandle>` in the layer, and it draws them in
 place of its handles:</Fw>
 
-<Snippet name="annotations/selecting-handles" />
+<Snippet name="annotations/selecting/handles" />
 
 | Prop       | What it is                                                          |
 | :--------- | :------------------------------------------------------------------ |
@@ -171,41 +168,22 @@ the viewer still decides where a handle can be grabbed, so what you draw can't b
 
 ## Snapping
 
-<Fw only={['react', 'vue', 'svelte']}>
-
 ```ts
 annotationPlugin({
   snap: {
-    guides: true, // snap to other annotations and the page while moving
-    guideThreshold: 5, // how close, in points, before it snaps
+    alignment: true, // snap to other annotations and the page while moving
+    alignmentThreshold: 6, // how close, in screen pixels, before it snaps
     rotation: true,
     rotationAngles: [0, 45, 90, 135, 180, 225, 270, 315],
     rotationThreshold: 4, // degrees
   },
 });
 
-annotation.updateSettings({ snap: { guides: false } }); // while the app runs
+annotation.updateSettings({ snap: { alignment: false } }); // while the app runs
 ```
 
-</Fw>
-
-<Fw only="angular">
-
-```ts
-withAnnotation({
-  snap: {
-    guides: true, // snap to other annotations and the page while moving
-    guideThreshold: 5, // how close, in points, before it snaps
-    rotation: true,
-    rotationAngles: [0, 45, 90, 135, 180, 225, 270, 315],
-    rotationThreshold: 4, // degrees
-  },
-});
-
-annotation.updateSettings({ snap: { guides: false } }); // while the app runs
-```
-
-</Fw>
+The threshold is in screen pixels, so snapping feels the same at every zoom. The lines that show
+what an annotation snaps to are `--epdf-annotation-guide`.
 
 ## Turn and group
 
@@ -236,21 +214,21 @@ await annotation.text.end();
 ```
 
 `annotation.text.getEditing()` is the box being typed in, or `null`. How fonts and formatting work
-is on [Rich text](../../concepts/rich-text).
+is on [Rich text](../concepts/rich-text).
 
 ## Shapes with many points
 
 A polygon or a polyline takes a click per point, and a double-click ends it. While it's being drawn,
 `<AnnotationDraftMenu>` can show buttons to finish or cancel it, which helps on touch screens:
 
-<Snippet name="annotations/selecting-draft-menu" />
+<Snippet name="annotations/selecting/draft-menu" />
 
 ## Keyboard
 
 The headless plugin doesn't take over any keys, since your app may already use them. Delete and
 Escape are a few lines:
 
-<Snippet name="annotations/selecting-keyboard" />
+<Snippet name="annotations/selecting/keyboard" />
 
 ## Methods
 
@@ -264,7 +242,8 @@ What `useAnnotation()` gives you for selecting, drawing and editing text: its `s
 | `selection.selectInRect(page, rect)`                       | Selects everything a box on a page touches, as dragging on empty space does                                                      |
 | `selection.clear()`                                        | Clears the selection                                                                                                             |
 | `selection.update(changes)`                                | Changes the selected annotations: each takes the fields its kind has. Pass a function to change each one relative to itself. [A style panel](#a-style-panel) |
-| `selection.getFields()`                                    | What a style panel shows for the selection: `{ fields, values, mixed }`. In a component, use `useSelectionFields()`.             |
+| `selection.updateLink(target)`                             | Links the selected annotations to a page or a website, or removes their links with `null`. [A style panel](#a-style-panel) |
+| `selection.getProperties()`                                | What a style panel shows for the selection: `{ properties, values, mixed }`. In a component, use `useAnnotationProperties()`.  |
 | `selection.delete()`                                       | Deletes every selected annotation                                                                                                |
 | `selection.rotateBy(degrees)`, `selection.resetRotation()` | Turns the selection a quarter turn (`90` clockwise, `-90` the other way), or back upright. [Turn and group](#turn-and-group)     |
 | `selection.group()`, `selection.ungroup()`                 | Makes the selected annotations one group, saved the way Acrobat saves it, or splits the selected group up again                  |
@@ -290,12 +269,12 @@ Every method that returns a promise also takes a `signal` in its options, to can
 | `editing`  | The text box being typed in, or `null`                                                                    | `text.getEditing()` |
 
 The annotations themselves come from `useAnnotationList(filter)`, a tool's defaults from
-`useAnnotationDefaults(id)`, and a style panel's fields from `useSelectionFields()`<Fw only="react">, so a
+`useAnnotationDefaults(id)`, and a style panel's properties from `useAnnotationProperties()`<Fw only="react">, so a
 component re-renders only for what it shows</Fw>.
 
 ## Events
 
-<Snippet name="annotations/selecting-events" />
+<Snippet name="annotations/selecting/events" />
 
 | Event                | Fires when                                        | Carries                  |
 | :------------------- | :------------------------------------------------ | :----------------------- |

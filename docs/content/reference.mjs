@@ -16,6 +16,10 @@ export const REFERENCE = [
     capability: 'plugin/search/src/contract.ts#SearchCapability',
     pages: ['headless/text/search.mdx'],
     pending: {
+      getSettings: 'every plugin has the live settings trio (G3)',
+      updateSettings: 'every plugin has the live settings trio (G3)',
+      resetSettings: 'every plugin has the live settings trio (G3)',
+      onSettingsChanged: 'every plugin has the live settings trio (G3)',
       onProgressChanged: 'onProgress is renamed (T4, G1)',
       onProgress: 'renamed to onProgressChanged (T4, G1)',
     },
@@ -24,6 +28,10 @@ export const REFERENCE = [
     capability: 'plugin/selection/src/contract.ts#SelectionCapability',
     pages: ['headless/text/selection.mdx'],
     pending: {
+      getSettings: 'every plugin has the live settings trio (G3)',
+      updateSettings: 'every plugin has the live settings trio (G3)',
+      resetSettings: 'every plugin has the live settings trio (G3)',
+      onSettingsChanged: 'every plugin has the live settings trio (G3)',
       isSelecting: 'public getter for the gesture state; the host has isGestureActive() (T1)',
     },
   },
@@ -42,6 +50,12 @@ export const REFERENCE = [
   {
     capability: 'plugin/render/src/contract.ts#RenderCapability',
     pages: ['headless/viewing/render.mdx'],
+    pending: {
+      getSettings: 'every plugin has the live settings trio (G3)',
+      updateSettings: 'every plugin has the live settings trio (G3)',
+      resetSettings: 'every plugin has the live settings trio (G3)',
+      onSettingsChanged: 'every plugin has the live settings trio (G3)',
+    },
   },
   {
     capability: 'plugin/link/src/contract.ts#LinkCapability',
@@ -121,7 +135,6 @@ export const REFERENCE = [
     pending: {
       // ── names the docs use first ──
       getAt: 'hitTestAt renamed, and it returns the record (A-N1)',
-      isPending: 'new in one-object step 4 (on its worktree, not on this branch yet) (A-S4)',
       move: 'new (A-P2)',
       export: 'new (A-P1)',
       import: 'new (A-P1)',
@@ -140,7 +153,8 @@ export const REFERENCE = [
       'selection.selectInRect': 'selectInRect under its noun (A-N1)',
       'selection.clear': 'clearSelection under its noun (A-N1)',
       'selection.list': 'listSelected under its noun (A-N1)',
-      'selection.getFields': 'getSelectionProps + getSelectionFlags as one read; flags are fields (A-S1, A-N1)',
+      'selection.getProperties': 'getSelectionFields under its noun, named properties so they never read as form fields (A-N1, A-S1)',
+      'selection.updateLink': 'updateSelectionLink under its noun (A-N1)',
       'selection.getAnchor': 'getSelectionAnchor under its noun (A-N1)',
       'selection.update': 'updateSelection under its noun, takes a function too (A-N1, A-S1)',
       'selection.delete': 'deleteSelection under its noun (A-N1)',
@@ -162,7 +176,7 @@ export const REFERENCE = [
       'tools.register': 'registerTool under its noun (A-N1)',
       'tools.getDefaults': 'getToolDefaults under its noun (A-N1)',
       'tools.updateDefaults': 'setToolDefaults under its noun (A-N1)',
-      'tools.listFields': 'listPropSpecs under its noun, in field names (A-S1, A-N1)',
+      'tools.getProperties': 'getToolFields under its noun: { properties, values, mixed }, like selection.getProperties (A-N1, A-S1)',
       'tools.onDefaultsChanged': 'new (A-P14)',
       'stamps.arm': 'armStamp under its noun (A-N1)',
       'stamps.disarm': 'disarmStamp under its noun (A-N1)',
@@ -176,6 +190,10 @@ export const REFERENCE = [
       'comments.canDeleteThread': 'per-verb check, from getPermissions().canDeleteThread (A-C1)',
 
       // ── code names the docs dropped or renamed ──
+      getSelectionFields: 'now selection.getProperties (A-N1, A-S1)',
+      updateSelectionLink: 'now selection.updateLink (A-N1)',
+      updateToolDefaults: 'now tools.updateDefaults (A-N1)',
+      getToolFields: 'now tools.getProperties (A-N1, A-S1)',
       hitTestAt: 'renamed getAt, returns the record (A-N1)',
       canEdit: 'renamed canUpdate (G11, A-N1)',
       readAttachment: 'replaced by downloadResource(ref, "file") (A-P13)',
@@ -183,24 +201,12 @@ export const REFERENCE = [
       updateSnapSettings: 'replaced by the settings trio (A-P10)',
       getChromeSettings: 'replaced by the settings trio (A-P10)',
       updateChromeSettings: 'replaced by the settings trio (A-P10)',
-      getRaw: 'gone: get() returns the engine record (one-object step 4, A-S4)',
-      listRaw: 'gone: list() returns engine records (one-object step 4, A-S4)',
-      createRaw: 'gone: create(page, fields) takes an engine draft (one-object step 4, A-S4)',
-      updateRaw: 'gone: update(ref, changes) takes an engine patch (one-object step 4, A-S4)',
-      createMany: 'gone: call create per annotation, or import a bundle (one-object step 4, A-S4)',
-      updateMany: 'gone: call update per annotation, or selection.update (one-object step 4, A-S4)',
-      deleteMany: 'gone: call delete per annotation, or selection.delete (one-object step 4, A-S4)',
-      setRotation: 'gone: update(ref, { rotation }) (one-object step 4, A-S4)',
-      rotateBy: 'gone: update(ref, { rotation }); selection.rotateBy turns the selection (one-object step 4, A-S4)',
-      setContents: 'gone: update(ref, { contents }) (one-object step 4, A-S4)',
-      setRichText: 'gone: update(ref, { richText }) (one-object step 4, A-S4)',
       select: 'now selection.set / selection.add (A-N1)',
       selectAll: 'now selection.selectAll (A-N1)',
       selectInRect: 'now selection.selectInRect (A-N1)',
       clearSelection: 'now selection.clear (A-N1)',
       getSelection: 'dropped: selection.list() gives the records, map them to refs (A-N1)',
       listSelected: 'now selection.list (A-N1)',
-      getSelectionProps: 'now selection.getFields, in field names (A-S1)',
       getSelectionFlags: 'dropped: flags are fields, in selection.getFields (A-S1)',
       getSelectionAnchor: 'now selection.getAnchor (A-N1)',
       updateSelection: 'now selection.update (A-N1)',
@@ -228,8 +234,6 @@ export const REFERENCE = [
       getTool: 'now tools.get (A-N1)',
       registerTool: 'now tools.register (A-N1)',
       getToolDefaults: 'now tools.getDefaults (A-N1)',
-      setToolDefaults: 'now tools.updateDefaults (A-N1)',
-      listPropSpecs: 'now tools.listFields (A-S1)',
       'comments.getPermissions': 'replaced by one check per verb (A-C1)',
     },
   },
@@ -238,17 +242,31 @@ export const REFERENCE = [
     capability: 'plugin/stamp/src/contract.ts#StampCapability',
     pages: ['headless/annotations/stamps.mdx'],
     pending: {
+      getSettings: 'every plugin has the live settings trio (G3)',
+      updateSettings: 'every plugin has the live settings trio (G3)',
+      resetSettings: 'every plugin has the live settings trio (G3)',
+      onSettingsChanged: 'every plugin has the live settings trio (G3)',
       canCreateFromAnnotations: 'missing twin for createAssetFromAnnotations, needs doc.download (AS3, G5)',
     },
   },
   {
     capability: 'plugin/measurement/src/contract.ts#MeasurementCapability',
     pages: ['headless/annotations/measurements.mdx'],
+    pending: {
+      getSettings: 'every plugin has the live settings trio (G3)',
+      updateSettings: 'every plugin has the live settings trio (G3)',
+      resetSettings: 'every plugin has the live settings trio (G3)',
+      onSettingsChanged: 'every plugin has the live settings trio (G3)',
+    },
   },
   {
     capability: 'plugin/redaction/src/contract.ts#RedactionCapability',
     pages: ['headless/annotations/redaction.mdx'],
     pending: {
+      getSettings: 'every plugin has the live settings trio (G3)',
+      updateSettings: 'every plugin has the live settings trio (G3)',
+      resetSettings: 'every plugin has the live settings trio (G3)',
+      onSettingsChanged: 'every plugin has the live settings trio (G3)',
       canUnmark: 'missing twin for unmark/clearPending, per mark (G5, G11)',
       canUpdateLabel: 'missing twin for updateLabel, per mark (G5, G11)',
     },
@@ -258,6 +276,10 @@ export const REFERENCE = [
     capability: 'plugin/form/src/contract.ts#FormCapability',
     pages: ['headless/forms/index.mdx', 'headless/forms/building.mdx'],
     pending: {
+      getSettings: 'every plugin has the live settings trio (G3)',
+      updateSettings: 'every plugin has the live settings trio (G3)',
+      resetSettings: 'every plugin has the live settings trio (G3)',
+      onSettingsChanged: 'every plugin has the live settings trio (G3)',
       list: 'F2: listFields is renamed',
       listFields: 'F2: renamed to list',
       get: 'F2: getField is renamed',
@@ -288,6 +310,10 @@ export const REFERENCE = [
     capability: 'plugin/signature/src/contract.ts#SignatureCapability',
     pages: ['headless/forms/signatures.mdx'],
     pending: {
+      getSettings: 'every plugin has the live settings trio (G3)',
+      updateSettings: 'every plugin has the live settings trio (G3)',
+      resetSettings: 'every plugin has the live settings trio (G3)',
+      onSettingsChanged: 'every plugin has the live settings trio (G3)',
       onInvalidationPredicted: 'SG2: onInvalidating is renamed',
       onInvalidating: 'SG2: renamed to onInvalidationPredicted',
       canReadRevision: 'SG5: the check for readRevision (doc.download)',
@@ -298,6 +324,10 @@ export const REFERENCE = [
     capability: 'plugin/interaction/src/contract.ts#InteractionCapability',
     pages: ['headless/ui/tools.mdx'],
     pending: {
+      getSettings: 'every plugin has the live settings trio (G3)',
+      updateSettings: 'every plugin has the live settings trio (G3)',
+      resetSettings: 'every plugin has the live settings trio (G3)',
+      onSettingsChanged: 'every plugin has the live settings trio (G3)',
       activeToolEnables:
         'behavior tags are how plugins build tools on each other; a public tool has its own pointer handlers (U2), so the tag check moves to the host contract (U15)',
     },
@@ -305,6 +335,12 @@ export const REFERENCE = [
   {
     capability: 'plugin/commands/src/contract.ts#CommandsCapability',
     pages: ['headless/ui/commands.mdx'],
+    pending: {
+      getSettings: 'every plugin has the live settings trio (G3)',
+      updateSettings: 'every plugin has the live settings trio (G3)',
+      resetSettings: 'every plugin has the live settings trio (G3)',
+      onSettingsChanged: 'every plugin has the live settings trio (G3)',
+    },
   },
   {
     capability: 'plugin/shell/src/contract.ts#ShellCapability',
@@ -313,5 +349,11 @@ export const REFERENCE = [
   {
     capability: 'plugin/i18n/src/contract.ts#I18nCapability',
     pages: ['headless/ui/translations.mdx'],
+    pending: {
+      getSettings: 'every plugin has the live settings trio (G3)',
+      updateSettings: 'every plugin has the live settings trio (G3)',
+      resetSettings: 'every plugin has the live settings trio (G3)',
+      onSettingsChanged: 'every plugin has the live settings trio (G3)',
+    },
   },
 ];

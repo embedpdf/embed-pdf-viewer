@@ -40,11 +40,11 @@ annotation.getAt(page.ref, { x: 120, y: 80 }); // the topmost one at a point, or
 To keep a component up to date, use `useAnnotationList()`. Your component <Word of="rerenders" />
 when the list changes:
 
-<Snippet name="annotations/with-code-list" />
+<Snippet name="annotations/with-code/list" />
 
 Each annotation has a `subtype` (its kind), a `rect` (where it is on its page), a `page` and a
 `ref`. Keep the `ref`: it's how you change or delete the annotation later. Positions are in
-points from the top-left of the page; see [Coordinates](../../concepts/coordinates).
+points from the top-left of the page; see [Coordinates](../concepts/coordinates).
 
 Annotations are loaded in the background when a document opens. `useAnnotationState()` has a
 `status`: `'loading'` until they're all in, then `'ready'`.
@@ -164,7 +164,7 @@ You rarely need this: `get()` and `list()` already show the change. It's useful 
 If the engine refuses a change (a lock set by someone else, or permission taken away), the change
 disappears again, and an event says why:
 
-<Snippet name="annotations/with-code-write-failed" />
+<Snippet name="annotations/with-code/write-failed" />
 
 The `await` of the call that made the change rejects with the same error.
 
@@ -235,7 +235,7 @@ A permission can end in `:self`, the user's own annotations, or `:group`, their 
 that take a `ref` answer per annotation. They also follow the annotation's own flags: for a `locked`
 one, `canDelete(ref)` is false, so your UI offers no delete button, even though your own code may still
 delete it (see [Locked annotations](#locked-annotations)). More on
-[Permissions](../../concepts/permissions).
+[Permissions](../concepts/permissions).
 
 ## Good to know
 

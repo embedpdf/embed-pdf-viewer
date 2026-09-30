@@ -14,7 +14,7 @@ go, and review it; then they **apply** the marks, and the content is gone.
 Register `redactionPlugin()` next to `interactionPlugin()` and `annotationPlugin()`, and use the
 `redact` tool: select text to mark it, or drag to mark an area:
 
-<Snippet name="annotations/redaction-bar" />
+<Snippet name="annotations/redaction/bar" />
 
 A mark is an annotation, so until it's applied, people can move it, resize it, delete it, and see it
 in other PDF apps. Applying it is what removes the content.
@@ -36,7 +36,7 @@ match.
 
 `usePendingRedactions()` lists the marks that haven't been applied yet, for a review panel:
 
-<Snippet name="annotations/redaction-pending" />
+<Snippet name="annotations/redaction/pending" />
 
 `redaction.clearPending()` removes every mark.<Fw only={['react', 'vue', 'svelte']}> `usePendingRedactions({ page: page.ref })`
 lists one page's.</Fw><Fw only="angular"> `redaction.pendingOn(page.ref)` lists one page's.</Fw>
@@ -90,6 +90,7 @@ Everything `useRedaction()` gives you.
 | `applyAll()`                                 | Applies every mark in the document, on pages that haven't loaded too. Can't be undone. [Apply](#apply)                                                   |
 | `apply(refs)`, `applyPages(pages)`           | Applies some marks, or the marks on some pages. Can't be undone.                                                                                          |
 | `canMark()`, `canUnmark(ref)`, `canUpdateLabel(ref)`, `canApply()` | Whether marking, removing a mark, changing its label and applying are allowed. [Permissions](#permissions)                          |
+| `getSettings()`, `updateSettings(changes)`, `resetSettings()` | Reads the settings, changes them while the app runs, or goes back to what you registered. In a component, use `useRedactionSettings()`. [Settings](#settings) |
 
 Applying resolves the result: each page's `status` (`'applied'`, `'unchanged'`, `'skipped'` or
 `'failed'`) and how many other annotations were removed. Every method that returns a promise also
@@ -110,7 +111,9 @@ only shows the count doesn't re-render for every mark.</Fw>
 
 ## Settings
 
-Set them when you register the plugin.
+Set them when you register the plugin, and change them while the app runs with
+`redaction.updateSettings({ … })`; `redaction.resetSettings()` goes back to what you registered, and
+`useRedactionSettings()` gives you the current settings.
 
 | Setting                | What it does                                     | Default     |
 | :--------------------- | :----------------------------------------------- | :---------- |
@@ -121,12 +124,13 @@ Set them when you register the plugin.
 
 ## Events
 
-<Snippet name="annotations/redaction-events" />
+<Snippet name="annotations/redaction/events" />
 
 | Event              | Fires when                                      | Carries             |
 | :----------------- | :---------------------------------------------- | :------------------ |
 | `onApplied`        | Marks were applied and the content is gone      | `result`, `origin`  |
 | `onPendingChanged` | A mark was added, changed or removed            | `pages`             |
+| `onSettingsChanged` | The settings changed | `settings`, `changed` |
 
 ## Permissions
 

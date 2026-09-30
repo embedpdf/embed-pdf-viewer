@@ -135,6 +135,7 @@ Everything `useSelection()` gives you.
 | `getAnchor()`                   | Where a menu attaches: `{ page, bounds }` on the page where the selection ends, or `null`. `<SelectionMenu>` uses it.                      |
 | `getSnapshot()`                 | Everything at once: each page's lines, both ends with their direction, and the range. For drawing your own highlight and handles.         |
 | `canSelect()`, `canCopy()`      | Whether selecting, and reading the selected text, are allowed. [Permissions](#permissions)                                                 |
+| `getSettings()`, `updateSettings(changes)`, `resetSettings()` | Reads the settings, changes them while the app runs, or goes back to what you registered. In a component, use `useSelectionSettings()`. [Settings](#settings) |
 
 Every method that returns a promise also takes a `signal` in its options, to cancel it.
 
@@ -151,14 +152,19 @@ Every method that returns a promise also takes a `signal` in its options, to can
 
 ## Settings
 
-Set them when you register the plugin.
+Set them when you register the plugin, and change them while the app runs with
+`selection.updateSettings({ … })`; `selection.resetSettings()` goes back to what you registered, and
+`useSelectionSettings()` gives you the current settings.
 
-| Setting         | What it does                                                | Default |
-| :-------------- | :---------------------------------------------------------- | :------ |
-| `dragThreshold` | How far, in pixels, the pointer moves before a drag selects | `4`     |
+| Setting           | What it does                                                | Default                       | From CSS                              |
+| :---------------- | :---------------------------------------------------------- | :---------------------------- | :------------------------------------ |
+| `dragThreshold`   | How far, in pixels, the pointer moves before a drag selects | `4`                           | —                                     |
+| `color`           | The color of selected text                                  | the viewer's accent at 35%    | `--epdf-text-selection`               |
+| `handles.color`   | The grips at its ends, on touch screens                     | the viewer's accent           | `--epdf-text-selection-handle`        |
+| `handles.shadow`  | Their shadow                                                | `'0 1px 4px rgb(0 0 0 / 0.35)'` | `--epdf-text-selection-handle-shadow` |
 
-The components take their colors as <Word of="props" />: `<SelectionLayer color>` (default a translucent blue)
-and `<SelectionHandles color>`.
+A CSS variable wins over the setting, for dark mode or a different look per viewer: see
+[Colors & theming](../ui/theming).
 
 ## Events
 
@@ -169,6 +175,7 @@ and `<SelectionHandles color>`.
 | `onChanged`   | The selection changed, while dragging too                   | `range`, `pages` |
 | `onCommitted` | A drag or a tap finished selecting                          | `range`          |
 | `onCleared`   | The selection was cleared                                   | —                |
+| `onSettingsChanged` | The settings changed | `settings`, `changed` |
 
 Use the change event for things that follow the selection as it grows, and the commit event for
 things that should happen once, such as creating a highlight.

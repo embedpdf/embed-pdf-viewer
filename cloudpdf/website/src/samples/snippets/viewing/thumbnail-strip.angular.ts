@@ -15,12 +15,7 @@ import { ThumbsToken } from './thumbnail-strip-token';
     </epdf-stage>
 
     <!-- The thumbnail strip: a second stage, with its own reference -->
-    <epdf-stage
-      #thumbs="epdfStage"
-      [token]="thumbsToken"
-      [interaction]="false"
-      [zoomGestures]="false"
-    >
+    <epdf-stage #thumbs="epdfStage" [token]="thumbsToken">
       <ng-template epdfPage let-page>
         <button
           (click)="main.goToPage(page.ref)"

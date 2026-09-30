@@ -195,6 +195,7 @@ Everything `useSignature()` gives you.
 | `getSnapshot()`                                           | Everything at once, as the engine reads it: every signature field, signed or not, the file's versions, and `protection`                   |
 | `refresh()`                                               | Reads the signatures again. You rarely need it: the plugin reads and checks them again after every change.                                |
 | `canSign()`, `canCertify()`, `canFill()`, `canReadRevision()` | Whether signing, certifying, drawing a mark without signing, and reading the signed bytes are allowed. [Permissions](#permissions)    |
+| `getSettings()`, `updateSettings(changes)`, `resetSettings()` | Reads the settings, changes them while the app runs, or goes back to what you registered. In a component, use `useSignatureSettings()`. [Settings](#settings) |
 
 `field` is a field's ref, such as `toFieldRef('approval')`; the methods that only read also take the
 ref of the field's box. Every method that returns a promise also takes a `signal` in its options, to
@@ -215,7 +216,9 @@ cancel it.
 
 ## Settings
 
-Set them when you register the plugin.
+Set them when you register the plugin, and change them while the app runs with
+`signature.updateSettings({ … })`; `signature.resetSettings()` goes back to what you registered, and
+`useSignatureSettings()` gives you the current settings.
 
 | Setting        | What it does                                                           | Default                         |
 | :------------- | :--------------------------------------------------------------------- | :------------------------------ |
@@ -238,6 +241,7 @@ Set them when you register the plugin.
 | `onTargetChanged`         | A field became the target, or the target was cleared | `field` (`null` when cleared) |
 | `onSignRequested`         | In `'ask'` mode, a mark was dropped on a field       | `field`, `mark`             |
 | `onInspectionRequested`   | A signed field was clicked                           | `field`                     |
+| `onSettingsChanged` | The settings changed | `settings`, `changed` |
 
 `result` is what `sign()` resolves. ["Sign here" in a form](#sign-here-in-a-form) says what to show
 for the last three.

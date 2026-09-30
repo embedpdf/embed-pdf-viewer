@@ -13,7 +13,7 @@ watch(currentPageIndex, (index) => thumbs.reveal(index), { immediate: true });
 </script>
 
 <template>
-  <Stage :token="ThumbsToken" :interaction="false" :zoom-gestures="false">
+  <Stage :token="ThumbsToken">
     <template #page="{ page }">
       <button
         :aria-current="page.pageIndex === currentPageIndex"
