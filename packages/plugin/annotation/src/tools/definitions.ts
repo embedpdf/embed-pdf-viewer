@@ -70,10 +70,11 @@ export type SelectionAuthoring =
  *     space, page-clamped, WYSIWYG). Meaningful only when the box is
  *     determinable: an armed stamp payload, or a `clickCreate` size.
  *   - `false` — no preview.
- * Which tool is armed is the cursor's job, not a ghost's: give the tool an
- * image cursor built from your toolbar icon (the hub's `setToolCursor` + the
- * web package's `svgCursor`), and the hub's claim/gap arbitration keeps it
- * honest over annotations, form fields, and page gaps.
+ * Which tool is armed is otherwise the cursor's job: give the tool an image
+ * cursor built from your toolbar icon (the hub's `setToolCursor` + the web
+ * package's `svgCursor`), and the hub's claim/gap arbitration keeps it honest
+ * over annotations, form fields, and page gaps. A footprint ghost already
+ * shows what a click places, so that tool's cursor stays its plain keyword.
  */
 export type GhostPolicy = false | { mode: 'footprint' };
 
@@ -593,7 +594,8 @@ export const DEFAULT_TOOLS: AnnotationToolInput[] = [
   },
   // sticky note ("comment") — click-to-place, no payload: each click drops a
   // fixed 20×20 icon (engine-baked /AP from /C + /Name), screen-sized and
-  // upright per the spec's Text-icon rule (the noZoom/noRotate seed).
+  // upright per the spec's Text-icon rule (the noZoom/noRotate seed). Its
+  // ghost is the icon under the pointer, so the cursor is a plain plus.
   {
     id: 'note',
     subtype: 'text',
@@ -607,11 +609,12 @@ export const DEFAULT_TOOLS: AnnotationToolInput[] = [
   // file attachment — click-to-place with the spot-first-file-second rule:
   // the click opens the installed file-picker port (a file dialog by
   // default; `accept` unset = any file — attaching any format is the point);
-  // the picked file embeds at the clicked point.
+  // the picked file embeds at the clicked point. Like the note's, its ghost
+  // is the icon under the pointer, so the cursor is a plain plus.
   {
     id: 'attachment',
     subtype: 'file-attachment',
-    cursor: 'copy',
+    cursor: 'crosshair',
     enables: ['annotation-place', 'annotation-edit'],
     source: { kind: 'prompt' },
     defaults: { icon: 'paperclip', color: '#facc15' },

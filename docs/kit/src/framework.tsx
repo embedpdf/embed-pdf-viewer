@@ -28,8 +28,16 @@ export function useDocsFramework(): FrameworkKey {
 }
 
 /** An inline code span, as the reader's framework names it (`useSearch()` → `inject(EpdfSearch)`). */
-export function FwCode({ value, context }: { value: string; context?: NameContext }) {
-  return <code>{frameworkName(value, useDocsFramework(), context)}</code>;
+export function FwCode({
+  value,
+  context,
+  owner,
+}: {
+  value: string;
+  context?: NameContext;
+  owner?: string;
+}) {
+  return <code>{frameworkName(value, useDocsFramework(), context, owner)}</code>;
 }
 
 /** One framework group's version of a code block (`remarkFrameworkNames` splits blocks this way). */

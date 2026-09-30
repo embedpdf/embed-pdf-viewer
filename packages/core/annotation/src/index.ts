@@ -27,6 +27,7 @@ export {
 export { computeMoveSnap, type SnapResult } from './snap';
 export {
   pageItems,
+  iconOf,
   chrome,
   selectedItems,
   textBoxes,

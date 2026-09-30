@@ -11,7 +11,7 @@ import { visit } from 'unist-util-visit';
  *
  * - `remarkFrameworkNames` marks every inline code span of a headless page with its context
  *   (a props, State or Events table, or prose), at compile time;
- * - `frameworkName(text, framework, context)` gives the framework's name, at render time;
+ * - `frameworkName(text, framework, context, owner)` gives the framework's name, at render time;
  * - `frameworkHref(href, framework)` keeps the reader's framework in every docs link.
  *
  * Plain ESM (not TypeScript) so `next.config.ts` can load it without a transpile step.
@@ -19,6 +19,11 @@ import { visit } from 'unist-util-visit';
 
 /** @typedef {'react' | 'vue' | 'svelte' | 'angular'} Framework */
 /** @typedef {'name' | 'prop' | 'state' | 'event'} NameContext */
+/**
+ * Where an inline code span stands: its context, and for a State value the React state hook that
+ * owns it (`useSearchState()`, from the section's `<StateIntro hook>`).
+ * @typedef {{ context: NameContext, owner?: string }} NameSpot
+ */
 
 export const FRAMEWORKS = /** @type {const} */ (['react', 'vue', 'svelte', 'angular']);
 
@@ -206,12 +211,27 @@ function componentName(text, framework) {
   return `${open}>${inside.join('')}`;
 }
 
+/**
+ * Angular's signal for a State value whose plain name would clash. An Angular service is both the
+ * plugin's API and its state, so a value can't share its name with the service or with one of the
+ * service's namespaces: a namespace is never itself a signal, and its data is a signal inside it.
+ * Keyed by the React state hook, then the value.
+ */
+const ANGULAR_STATE = {
+  useMetadataState: { metadata: 'fields()', custom: 'custom.fields()' },
+};
+
+/** A State value's signal on Angular: `hitCount` → `hitCount()`, unless it would clash. */
+function angularStateValue(value, owner = '') {
+  return ANGULAR_STATE[owner.replace(/\(\)$/, '')]?.[value] ?? `${value}()`;
+}
+
 /** A hook (`useSearch()`, `useSearchState()`) or a plugin factory (`searchPlugin()`) on Angular. */
 function angularCall(text) {
   // A value read off a hook: `useSearchState().hitCount` → `search.hitCount()` (a signal).
   const member = text.match(/^use([A-Z]\w*?)(State)?\(\)\.(\w+)$/);
   if (member && (PLUGINS.includes(member[1]) || member[1] === 'Document')) {
-    return `${lowerFirst(member[1])}.${member[3]}()`;
+    return `${lowerFirst(member[1])}.${angularStateValue(member[3], `use${member[1]}State`)}`;
   }
   const call = text.match(/^(use[A-Z]\w*)(?:\((.*)\))?$/);
   const named = call && ANGULAR_HOOKS[call[1]];
@@ -239,9 +259,10 @@ function angularCall(text) {
  * @param {string} text the inline code, as written in the MDX
  * @param {Framework} framework
  * @param {NameContext} [context] where it stands: a props, State or Events table, or prose
+ * @param {string} [owner] for a State value, the React state hook that owns it
  * @returns {string}
  */
-export function frameworkName(text, framework, context = 'name') {
+export function frameworkName(text, framework, context = 'name', owner) {
   if (framework === 'react' || !FRAMEWORKS.includes(framework)) return text;
   if (text.startsWith('@embedpdf/react')) return packageName(text, framework);
 
@@ -251,7 +272,7 @@ export function frameworkName(text, framework, context = 'name') {
     return text.replace(/(^|\.)on([A-Z]\w*)$/, (_, dot, name) => `${dot}${lowerFirst(name)}$`);
   }
   if (context === 'state' && framework === 'angular' && /^[a-z]\w*$/.test(text)) {
-    return `${text}()`; // every State value is a signal
+    return angularStateValue(text, owner); // every State value is a signal
   }
 
   const component = componentName(text, framework);
@@ -378,19 +399,30 @@ const textOf = (node) =>
     ? node.value
     : (node.children ?? []).map(textOf).join('');
 
+/** The `hook` of a `<StateIntro hook="useSearchState()" />` node, or undefined. */
+const stateIntroHook = (node) =>
+  node.type === 'mdxJsxFlowElement' && node.name === 'StateIntro'
+    ? node.attributes?.find((attribute) => attribute.name === 'hook')?.value
+    : undefined;
+
 /**
  * Where each inline code span stands, so `frameworkName` knows what it names: a cell under a
- * `Prop` column is a prop, a `Field` cell in `## State` is a state value, a cell under an `Event`
- * column is an event. Everything else is a name.
+ * `Prop` column is a prop, a `Field` cell in `## State` is a state value (owned by the section's
+ * `<StateIntro hook>`), a cell under an `Event` column is an event. Everything else is a name.
  *
  * @param {unknown} tree an mdast tree
- * @returns {Map<unknown, NameContext>}
+ * @returns {Map<unknown, NameSpot>}
  */
 export function inlineCodeContexts(tree) {
   const contexts = new Map();
   let section = '';
+  let owner;
   for (const node of /** @type {{ children: any[] }} */ (tree).children ?? []) {
-    if (node.type === 'heading' && node.depth === 2) section = textOf(node).trim();
+    if (node.type === 'heading' && node.depth === 2) {
+      section = textOf(node).trim();
+      owner = undefined;
+    }
+    owner = stateIntroHook(node) ?? owner;
     if (node.type !== 'table') continue;
     const headers = (node.children[0]?.children ?? []).map((cell) => textOf(cell).trim());
     node.children.slice(1).forEach((row) => {
@@ -406,7 +438,7 @@ export function inlineCodeContexts(tree) {
                 : null;
         if (!context) return;
         visit(cell, 'inlineCode', (code) => {
-          contexts.set(code, context);
+          contexts.set(code, context === 'state' && owner ? { context, owner } : { context });
         });
       });
     });
@@ -415,7 +447,7 @@ export function inlineCodeContexts(tree) {
 }
 
 /**
- * Remark: on headless pages, every inline code span becomes `<FwCode value context />`, which
+ * Remark: on headless pages, every inline code span becomes `<FwCode value context owner? />`, which
  * shows the reader's framework's name for it, and a code block that reads differently per framework
  * (`frameworkCode`) becomes one `<FwVariant frameworks="…">` per group of frameworks that read it
  * the same.
@@ -450,7 +482,10 @@ export function remarkFrameworkNames() {
         name: 'FwCode',
         attributes: [
           { type: 'mdxJsxAttribute', name: 'value', value: node.value },
-          { type: 'mdxJsxAttribute', name: 'context', value: contexts.get(node) ?? 'name' },
+          { type: 'mdxJsxAttribute', name: 'context', value: contexts.get(node)?.context ?? 'name' },
+          ...(contexts.get(node)?.owner
+            ? [{ type: 'mdxJsxAttribute', name: 'owner', value: contexts.get(node).owner }]
+            : []),
         ],
         children: [],
       };

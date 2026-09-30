@@ -68,7 +68,7 @@ const redactionLabelOf = (annotation: AnnotationDTO): Pick<RenderItem, 'label'> 
     : {};
 
 /** A note's or file attachment's icon: what its live drawing draws. */
-const iconOf = (annotation: AnnotationDTO): Pick<RenderItem, 'icon'> =>
+export const iconOf = (annotation: AnnotationDTO): Pick<RenderItem, 'icon'> =>
   (annotation.subtype === 'text' || annotation.subtype === 'file-attachment') && annotation.icon
     ? { icon: annotation.icon }
     : {};

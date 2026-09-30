@@ -17,5 +17,5 @@ import { EpdfMetadata } from '@embedpdf/angular/metadata';
 })
 export class TitleField {
   protected readonly metadata = inject(EpdfMetadata);
-  protected readonly title = computed(() => this.metadata.metadata()?.title ?? '');
+  protected readonly title = computed(() => this.metadata.fields()?.title ?? '');
 }

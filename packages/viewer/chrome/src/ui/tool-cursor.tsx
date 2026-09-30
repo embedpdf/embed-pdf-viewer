@@ -18,13 +18,17 @@
  * over an annotation drops the icon. A new tool gets the right cursor from
  * what it declares; nothing tool-specific lives here.
  *
+ * A tool whose ghost follows the pointer (a note's or attachment's icon, an
+ * armed stamp's image) gets no skin: the ghost already shows what a click
+ * places, so its cursor stays the plain keyword it declares.
+ *
  * The image: a white-haloed glyph at the hotspot (readable on any page color)
  * with the icon at its top right — 40px, under the 128px cursor ceiling;
  * Chromium may briefly show the default arrow when a >32px cursor would
  * overlap browser UI (anti-spoofing), which is fine mid-viewport.
  */
 import { useToolCursor, useTool } from '@embedpdf/react/interaction';
-import { useToolDefaults } from '@embedpdf/react/annotation';
+import { useAnnotation, useToolDefaults } from '@embedpdf/react/annotation';
 import { TOOL_ICONS } from '../config/commands';
 import { ICON_PATHS } from './icons';
 import type { IconAccent, PathSpec } from './icons';
@@ -125,7 +129,9 @@ export function ArmedToolCursor() {
   const { activeToolId } = useTool();
   // Live accent: an `updateToolDefaults` recolor re-renders us and rebuilds the cursor.
   const defaults = useToolDefaults(activeToolId);
-  const entry = TOOL_ICONS[activeToolId];
+  // What a click places follows the pointer: the cursor carries no icon.
+  const ghostFollows = Boolean(useAnnotation().getTool(activeToolId)?.ghost);
+  const entry = ghostFollows ? undefined : TOOL_ICONS[activeToolId];
   const colorOf = (key: string) => (defaults[key] as string | null | undefined) ?? undefined;
   const accent = entry?.accent
     ? {

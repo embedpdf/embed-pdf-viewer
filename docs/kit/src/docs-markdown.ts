@@ -19,6 +19,7 @@ import {
   inlineCodeContexts,
   stateIntroParts,
   type Framework,
+  type NameSpot,
 } from '../mdx/frameworks.mjs';
 // eslint-disable-next-line import/no-unresolved — sibling plain-ESM module, typed by its .d.mts
 import { applyInstallChannel } from '../mdx/install-channel.mjs';
@@ -207,7 +208,7 @@ function noteNode(text: string): AstNode {
  * The framework a headless page's names are shown for (`useSearch()` → `inject(EpdfSearch)`),
  * or null when names stay as written.
  */
-type FrameworkNames = { framework: Framework; contexts: Map<unknown, string> } | null;
+type FrameworkNames = { framework: Framework; contexts: Map<unknown, NameSpot> } | null;
 
 function createResolver(
   site: DocsMarkdownSite,
@@ -417,8 +418,8 @@ function createResolver(
       }
 
       if (node.type === 'inlineCode' && names && typeof node.value === 'string') {
-        const context = names.contexts.get(originalNode) ?? 'name';
-        node.value = frameworkName(node.value, names.framework, context as never);
+        const spot = names.contexts.get(originalNode);
+        node.value = frameworkName(node.value, names.framework, spot?.context, spot?.owner);
       }
 
       if (node.children) node.children = resolveNodes(node.children);

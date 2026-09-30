@@ -44,7 +44,7 @@ import type {
 } from '@embedpdf/engine-core/runtime';
 
 import type { TextFormat } from './rich-text';
-import type { AnnotationToolInput } from './tools/definitions';
+import type { AnnotationToolInput, GhostPolicy } from './tools/definitions';
 
 export { AnnotationToken } from './token';
 export type { Face, TextFormat, TextSelection } from './rich-text';
@@ -374,6 +374,8 @@ export interface AnnotationTool {
   readonly defaults?: FieldValues;
   readonly flags?: Partial<AnnotationFlags>;
   readonly upright: boolean;
+  /** Whether what a click places follows the pointer as a ghost (`footprint`). */
+  readonly ghost: GhostPolicy;
 }
 
 /** The live multi-click draft (polygon / polyline): where it is and whether it can finish. */

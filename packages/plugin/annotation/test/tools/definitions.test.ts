@@ -47,6 +47,13 @@ describe('annotation tool registry', () => {
     });
   });
 
+  it('gives the note and attachment tools a plain plus: their ghost is the icon', () => {
+    const tools = buildToolRegistry();
+    for (const id of ['note', 'attachment']) {
+      expect(tools.get(id)).toMatchObject({ cursor: 'crosshair', ghost: { mode: 'footprint' } });
+    }
+  });
+
   it('rejects unsupported defaults from untyped JavaScript/JSON configuration', () => {
     expect(() => buildToolRegistry([invalidCircleDefaults])).toThrow(
       "tool 'invalid-circle' does not support default 'lineEndings'",

@@ -100,6 +100,7 @@ export function createToolRegistry(
         ...(tool.defaults ? { defaults: tool.defaults } : {}),
         ...(tool.flags ? { flags: tool.flags } : {}),
         upright: tool.upright,
+        ghost: tool.ghost,
       };
       toolProjections.set(tool, hit);
     }

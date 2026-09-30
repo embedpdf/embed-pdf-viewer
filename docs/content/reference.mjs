@@ -230,6 +230,7 @@ export const REFERENCE = [
       disarmStamp: 'now stamps.disarm (A-N1)',
       hasArmedStamp: 'now stamps.isArmed (A-N1)',
       placeStamp: 'now stamps.place (A-N1)',
+      createAttachment: 'goes: an attachment is made with create() and a rect, like a note (G13)',
       listTools: 'now tools.list (A-N1)',
       getTool: 'now tools.get (A-N1)',
       registerTool: 'now tools.register (A-N1)',

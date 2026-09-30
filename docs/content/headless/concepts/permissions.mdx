@@ -69,8 +69,9 @@ when one needs something else:
 - **`identity` is who the user is.** Permissions that say "their own" (`:self`) or "their group"
   (`:group`) are checked against it, so they need one: opening without it fails.
 - **A document keeps what it opened with.** <Fw only={['react', 'vue', 'svelte']}>Change the viewer's `scope` or `identity`, and the
-  documents you open after that get the new values.</Fw><Fw only="angular">Documents you open later with other values, through
-  `documents.open()`, don't change the ones already open.</Fw>
+  documents you open after that get the new values.</Fw><Fw only="angular">Change the viewer's `scope` or `identity` with
+  `inject(EpdfViewer).updateSettings({ scope, identity })`, and the documents you open after that get
+  the new values.</Fw>
 
 Code that opens documents itself passes the same options to
 `documents.open(source, { scope, identity })`.

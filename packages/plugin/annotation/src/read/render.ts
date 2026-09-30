@@ -1,6 +1,7 @@
 import { CONTINUOUS_RENDER_POLICY, snapAppearanceScale } from '@embedpdf/core';
 import {
   groupOf,
+  iconOf,
   isSubstrateOnly,
   type Model,
   pageItems as corePageItems,
@@ -56,14 +57,17 @@ export function createRenderReads(
     // every draft preview (image ghosts blit through the framework instead).
     if (ghost && ghost.page.objectNumber === pageObjectNumber && ghost.kind === 'vector') {
       const tool = tools.get(ghost.toolId);
-      const style = styleOf(toolAnnotation(model, tool?.subtype ?? ghost.toolId, tool?.preset));
+      // What a create from the tool starts from: a note's or attachment's
+      // ghost draws the icon the tool will place.
+      const annotation = toolAnnotation(model, tool?.subtype ?? ghost.toolId, tool?.preset);
       items.push({
         id: 'tool-ghost',
         ref: null,
         subtype: tool?.subtype ?? 'square',
         geometry: ghost.geometry,
         box: ghost.box,
-        style,
+        style: styleOf(annotation),
+        ...iconOf(annotation),
         source: 'ghost',
         selected: false,
       });

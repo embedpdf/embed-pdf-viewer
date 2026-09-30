@@ -163,6 +163,12 @@ Tell the viewer who the user is and what they may do, once. Every document it op
 - **`scope`** is what they may do, as a list of permissions. Leave it out and they may do
   everything; the engine reminds you once in the console.
 
+<Fw only={['react', 'vue', 'svelte']}>Change them on the viewer, and the documents you open after
+that use the new values; documents already open keep theirs.</Fw><Fw only="angular">Change them
+while the app runs with `inject(EpdfViewer).updateSettings({ identity, scope })`, for example when
+someone else signs in. The documents you open after that use the new values; documents already
+open keep theirs.</Fw>
+
 A document can have its own, which replace the viewer's for that document:
 
 ```ts

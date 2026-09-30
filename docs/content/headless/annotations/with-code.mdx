@@ -77,12 +77,19 @@ await annotation.create(page.ref, { subtype: 'square', box }, undefined, {
 | `tool`   | Starts from that tool's defaults, the user's current drawing style, before your own fields.    |
 | `select` | Selects the new annotation, as drawing it would. Without it, code never changes the selection. |
 
-Stamps and file attachments carry bytes: pass them in the third argument.
+Stamps and file attachments carry bytes. They go in the third argument, `resources`, named for what
+they are: a stamp's `appearance`, an attachment's `file`.
 
 ```ts
 const image = await (await fetch('/approved.png')).blob();
-
 await annotation.create(page.ref, { subtype: 'stamp', box }, { appearance: image });
+
+// A file pinned to the page, drawn as an icon, 20 × 20 like a note
+await annotation.create(
+  page.ref,
+  { subtype: 'file-attachment', rect: { x: 40, y: 60, width: 20, height: 20 } },
+  { file: pickedFile }, // a File brings its name and type
+);
 ```
 
 For stamps from a library, see [Stamps](stamps).
@@ -204,10 +211,9 @@ What `useAnnotation()` gives you directly. Its parts have their own pages: `sele
 | `list({ pages?, subtype? })`                                   | Every annotation in drawing order, or the ones on some pages or of one kind. In a component, use `useAnnotationList(filter)`. [Read annotations](#read-annotations) |
 | `getAt(page, point)`                                           | The topmost annotation at a point on a page, or `null`. A selected annotation's handles count as the annotation.                                       |
 | `isPending(ref)`                                               | Whether the engine is still saving a change to it. [Changes show at once](#changes-show-at-once)                                                       |
-| `create(page, fields, bytes?, { tool?, select? })`             | Creates an annotation from its kind and fields, and shows it at once. A stamp's drawing or an attachment's file goes in `bytes`. Resolves `{ annotation }`. [Create an annotation](#create-an-annotation) |
+| `create(page, fields, resources?, { tool?, select? })`         | Creates an annotation from its kind and fields, and shows it at once. A stamp's drawing or an attachment's file goes in `resources`, as `{ appearance }` or `{ file }`. Resolves `{ annotation }`. [Create an annotation](#create-an-annotation) |
 | `createFromSelection(tool, { clear? })`                        | Turns the selected text into a highlight, an underline, a strikeout or a squiggly line, one per page. Resolves `{ annotations }`. [From the selected text](#from-the-selected-text) |
-| `createAttachment(page, at, file)`                             | Pins a file to a point on a page, as the `attachment` tool does. Resolves `{ annotation }`.                                                            |
-| `update(ref, changes, bytes?)`                                 | Changes only the fields you pass, and `null` removes one. New `bytes` replace a stamp's drawing or an attachment's file. Resolves `{ annotation }`. [Change an annotation](#change-an-annotation) |
+| `update(ref, changes, resources?)`                             | Changes only the fields you pass, and `null` removes one. New `resources` replace a stamp's drawing or an attachment's file. Resolves `{ annotation }`. [Change an annotation](#change-an-annotation) |
 | `delete(ref)`                                                  | Deletes an annotation, with its popup and its replies. [Delete an annotation](#delete-an-annotation)                                                   |
 | `move(refs, toIndex)`                                          | Moves annotations that sit next to each other to a new place in their page's drawing order. [Change the drawing order](#change-the-drawing-order)      |
 | `export({ refs?, pages? })`, `import(bundle, options?)`        | Takes annotations out as a bundle, with the bytes they carry, or puts a bundle in. `import` resolves `{ annotations, refMap, dropped }`. [Export and import](saving#export-and-import) |

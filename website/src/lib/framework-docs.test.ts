@@ -90,4 +90,12 @@ describe('headless pages written for each framework', () => {
     expect(markdownFor('annotations/tools', 'angular')).toContain('withAnnotation({');
     expect(markdownFor('viewing/stage', 'angular')).toContain("withStage({\n  id: 'stage-thumbs'");
   });
+
+  it('keeps Angular signals from clashing with the service or a namespace', () => {
+    const angular = markdownFor('documents/metadata', 'angular');
+    expect(angular).toContain('| `fields()`');
+    expect(angular).toContain('| `custom.fields()`');
+    expect(angular).toContain('| `status()`');
+    expect(markdownFor('documents/metadata', 'react')).toContain('| `metadata`');
+  });
 });

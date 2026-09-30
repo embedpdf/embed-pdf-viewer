@@ -108,8 +108,20 @@ const initialDocuments = [
 ];
 ```
 
-A document keeps the identity it was opened with. If you change the viewer's `identity`, documents
-you open afterwards use the new one.
+A document keeps the identity it was opened with. <Fw only={['react', 'vue', 'svelte']}>If you change the viewer's `identity`, documents
+you open afterwards use the new one.</Fw>
+
+<Fw only="angular">
+
+To change the viewer's identity, for example when someone else signs in, use
+`inject(EpdfViewer).updateSettings({ identity })`. Documents you open afterwards use the new one. To
+follow your app's login:
+
+```ts
+effect(() => viewer.updateSettings({ identity: auth.identity() }));
+```
+
+</Fw>
 
 </Engine>
 
