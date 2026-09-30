@@ -1,7 +1,7 @@
 import {
+  ANNOTATION_DEFAULTS,
   EngineError,
   EngineErrorCode,
-  type Color,
   type HighlightDraft,
   type HighlightPatch,
   type PdfQuad,
@@ -26,20 +26,6 @@ import { shiftAnnotRect, shiftBetween } from './shiftAnnotRect';
 import { applyAnnotationBaseDraft, applyAnnotationBasePatch } from './writeAnnotationBase';
 import { readQuadPoints } from '../read/annotationReadPrimitives';
 import { strikeoutIntentToName } from '../textEditIntent';
-
-/**
- * Default opacity when a draft omits `opacity`. PDFium's /CA defaults to
- * 1.0 if absent from the dict, but we set it explicitly so reads always
- * round-trip the same value.
- */
-const DEFAULT_OPACITY = 1;
-
-/**
- * Default fill colour per text-markup subtype. Matches the read-side
- * fallback in `readers/annotations/text-markup.ts`.
- */
-const DEFAULT_HIGHLIGHT_COLOR: Color = '#ffff00';
-const DEFAULT_TEXT_MARKUP_COLOR: Color = '#000000';
 
 export type TextMarkupDraft =
   | HighlightDraft<PdfCoordinates>
@@ -76,10 +62,9 @@ export function applyTextMarkupDraft(
   appendQuadPoints(fn, mem, annotPtr, quadPoints);
   setRectFromQuadPoints(fn, mem, annotPtr, quadPoints);
 
-  const fallback =
-    draft.subtype === 'highlight' ? DEFAULT_HIGHLIGHT_COLOR : DEFAULT_TEXT_MARKUP_COLOR;
-  setAnnotColor(fn, annotPtr, draft.color ?? fallback);
-  setAnnotOpacity(fn, annotPtr, draft.opacity ?? DEFAULT_OPACITY);
+  const defaults = ANNOTATION_DEFAULTS[draft.subtype];
+  setAnnotColor(fn, annotPtr, draft.color ?? defaults.color);
+  setAnnotOpacity(fn, annotPtr, draft.opacity ?? defaults.opacity);
   if (draft.subtype === 'strikeout' && draft.intent != null) {
     setIntent(fn, annotPtr, strikeoutIntentToName(draft.intent));
   }
@@ -128,7 +113,12 @@ export function applyTextMarkupPatch(
   }
 }
 
-const cornersOf = (quad: PdfQuad) => [quad.p1, quad.p2, quad.p3, quad.p4];
+const cornersOf = (quad: PdfQuad) => [
+  quad.upperLeft,
+  quad.upperRight,
+  quad.lowerLeft,
+  quad.lowerRight,
+];
 
 /**
  * Type-narrowing predicate. Mirrors the reader-side dispatch. Used by
@@ -185,16 +175,16 @@ export function replaceQuadPoints(
 }
 
 function writeQuadPointStruct(mem: PdfRuntimeMemory, buf: Ptr, qp: PdfQuad): void {
-  // FS_QUADPOINTSF layout per public/fpdf_annot.h: { x1,y1, x2,y2, x3,y3, x4,y4 }
-  // = p1 p2 p3 p4 — same positional slot order as readQuadPoints.
-  mem.poke(buf, 'f32', qp.p1.x, 0);
-  mem.poke(buf, 'f32', qp.p1.y, 4);
-  mem.poke(buf, 'f32', qp.p2.x, 8);
-  mem.poke(buf, 'f32', qp.p2.y, 12);
-  mem.poke(buf, 'f32', qp.p3.x, 16);
-  mem.poke(buf, 'f32', qp.p3.y, 20);
-  mem.poke(buf, 'f32', qp.p4.x, 24);
-  mem.poke(buf, 'f32', qp.p4.y, 28);
+  // FS_QUADPOINTSF holds { x1,y1, x2,y2, x3,y3, x4,y4 }: the corners go in the
+  // order Acrobat reads (see PdfQuad).
+  mem.poke(buf, 'f32', qp.upperLeft.x, 0);
+  mem.poke(buf, 'f32', qp.upperLeft.y, 4);
+  mem.poke(buf, 'f32', qp.upperRight.x, 8);
+  mem.poke(buf, 'f32', qp.upperRight.y, 12);
+  mem.poke(buf, 'f32', qp.lowerLeft.x, 16);
+  mem.poke(buf, 'f32', qp.lowerLeft.y, 20);
+  mem.poke(buf, 'f32', qp.lowerRight.x, 24);
+  mem.poke(buf, 'f32', qp.lowerRight.y, 28);
 }
 
 export function setRectFromQuadPoints(
@@ -208,7 +198,7 @@ export function setRectFromQuadPoints(
   let maxX = Number.NEGATIVE_INFINITY;
   let maxY = Number.NEGATIVE_INFINITY;
   for (const qp of quadPoints) {
-    for (const p of [qp.p1, qp.p2, qp.p3, qp.p4]) {
+    for (const p of [qp.upperLeft, qp.upperRight, qp.lowerLeft, qp.lowerRight]) {
       if (p.x < minX) minX = p.x;
       if (p.x > maxX) maxX = p.x;
       if (p.y < minY) minY = p.y;

@@ -6,7 +6,7 @@
  * when editing ends) and sends the latest text, so it carries every keystroke
  * that waited for it: they settle together, accepted or refused.
  */
-import type { Id, Point } from '@embedpdf/core-annotation';
+import { type Id, type Point, refOf, richDocOf, shapeOf } from '@embedpdf/core-annotation';
 import {
   annotationKey,
   type AnnotationRef,
@@ -15,12 +15,9 @@ import {
 } from '@embedpdf/engine-core/runtime';
 
 import { setTextSelection } from '../model';
-import type { AnnotationReads } from '../read/annotations';
 import type { ChromeReads } from '../read/chrome';
-import { cssFontFamilyForFace, richDocOf, textCommitPatch, type TextSelection } from '../rich-text';
+import { cssFontFamilyForFace, textCommitPatch, type TextSelection } from '../rich-text';
 import type { AnnotationContext, AnnotationServices } from '../services';
-import { throwIfFailed } from './outcomes';
-import type { Commit } from '../services/store';
 
 const TEXT_WRITE_DELAY_MS = 250;
 
@@ -32,7 +29,6 @@ interface Waiter {
 export function createTextEditing(
   ctx: Pick<AnnotationContext, 'doc' | 'state' | 'cleanup'>,
   { store, identity, fonts }: Pick<AnnotationServices, 'store' | 'identity' | 'fonts'>,
-  annotations: Pick<AnnotationReads, 'loadedOrThrow'>,
   chrome: Pick<ChromeReads, 'hitAt'>,
 ) {
   /** The pause timer of each record being typed in. */
@@ -66,7 +62,11 @@ export function createTextEditing(
       .withRef(id, async (ref) => {
         const record = store.model().byId[annotationKey(ref)];
         if (!record) return;
-        const patch = textCommitPatch(record, richDocOf(record, fonts).paragraphs, fonts);
+        const patch = textCommitPatch(
+          record,
+          richDocOf(record.annotation, fonts).paragraphs,
+          fonts,
+        );
         await ctx.doc.page(ref.page).annotations.update(ref, { subtype: 'free-text', ...patch });
       })
       .then(
@@ -99,30 +99,7 @@ export function createTextEditing(
       }),
   }));
 
-  /** Apply a text message and write it at once; rejects when the engine refuses it. */
-  const writeNow = async (id: Id, commit: () => Commit): Promise<void> => {
-    const committed = commit();
-    void flushText(id);
-    throwIfFailed(await committed.written);
-  };
-
   const api = {
-    setContents: async (ref: AnnotationRef, text: string) => {
-      const annotation = annotations.loadedOrThrow(ref);
-      await writeNow(annotation.id, () =>
-        store.commit({ type: 'setText', id: annotation.id, text }),
-      );
-    },
-    setRichText: async (ref: AnnotationRef, doc: { paragraphs: RichTextParagraph[] }) => {
-      const annotation = annotations.loadedOrThrow(ref);
-      await writeNow(annotation.id, () =>
-        store.commit({
-          type: 'setRichText',
-          id: annotation.id,
-          doc: { paragraphs: doc.paragraphs },
-        }),
-      );
-    },
     beginTextEdit: (ref: AnnotationRef) => {
       store.commit({ type: 'beginTextEdit', id: annotationKey(ref) });
     },
@@ -138,8 +115,9 @@ export function createTextEditing(
       // A double-click on the box body or one of its resize handles both target the
       // same annotation; either should open it for editing.
       const id = target.kind === 'annot' || target.kind === 'handle' ? target.id : null;
-      if (id != null && model.byId[id]?.geometry.kind === 'text') {
-        store.commit({ type: 'beginTextEdit', id });
+      const record = id != null ? model.byId[id] : undefined;
+      if (record && shapeOf(record.annotation).kind === 'text-box') {
+        store.commit({ type: 'beginTextEdit', id: record.id });
         return true;
       }
       // Nothing editable here — report it so the caller can fall through to a
@@ -156,7 +134,7 @@ export function createTextEditing(
     },
     getEditingRef: () => {
       const model = store.model();
-      return model.editing ? (model.byId[model.editing]?.ref ?? null) : null;
+      return model.editing ? refOf(model.byId[model.editing]) : null;
     },
     getEditingId: () => store.model().editing,
     draftContents: (ref: AnnotationRef, text: string) => {

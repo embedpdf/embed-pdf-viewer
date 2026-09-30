@@ -127,10 +127,10 @@ describe('plane-scoped view sharing (cloud SDK, real runtime)', () => {
         opacity: 0.5,
         quadPoints: [
           {
-            p1: { x: 50, y: 100 },
-            p2: { x: 150, y: 100 },
-            p3: { x: 50, y: 80 },
-            p4: { x: 150, y: 80 },
+            upperLeft: { x: 50, y: 100 },
+            upperRight: { x: 150, y: 100 },
+            lowerLeft: { x: 50, y: 80 },
+            lowerRight: { x: 150, y: 80 },
           },
         ],
       });

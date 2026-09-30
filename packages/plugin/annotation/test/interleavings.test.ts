@@ -1,7 +1,8 @@
 /**
  * Randomized interleavings of changes to one record: restyles and flag
  * toggles whose engine writes settle in any order, some refused, with other
- * sessions' updates arriving meanwhile. The fake engine applies a write when
+ * sessions' updates arriving meanwhile. A restyle to the colour the record
+ * already shows changes nothing and writes nothing. The fake engine applies a write when
  * it answers it and publishes the result before the promise settles, as the
  * real engines do.
  *
@@ -19,7 +20,7 @@ import type { AnnotationFlags, AnnotationRef } from '@embedpdf/engine-core/runti
 import { toPageRef } from '@embedpdf/engine-core/runtime';
 import { describe, expect, it } from 'vitest';
 
-import { annotationHarness, type FileAnnotation } from './harness';
+import { annotationHarness, type FileAnnotation, dataOf } from './harness';
 
 const PAGE = toPageRef(1);
 const REF: AnnotationRef = { kind: 'objectNumber', page: PAGE, objectNumber: 20 };
@@ -145,8 +146,8 @@ async function play(seed: number, steps: number) {
     outstanding().at(-1)?.source ?? (preferVector ? 'vector' : 'baked');
   const check = (label: string) => {
     const annotation = harness.capability.get(REF)!;
-    expect(annotation.props.color, `${label}: color`).toBe(expected('color'));
-    expect(annotation.flags.print, `${label}: print`).toBe(expected('print'));
+    expect(dataOf(annotation).color, `${label}: color`).toBe(expected('color'));
+    expect(annotation.print, `${label}: print`).toBe(expected('print'));
     const item = harness.capability.listPageItems(PAGE).find(({ id }) => id === 'obj:20')!;
     expect(item.source, `${label}: source`).toBe(expectedSource());
   };
@@ -157,6 +158,11 @@ async function play(seed: number, steps: number) {
     if (roll < 0.3) {
       const color = rng.pick(COLORS);
       void harness.capability.updateSelection({ color });
+      // The colour it already shows: no change, and no write.
+      if (color === expected('color')) {
+        check(label);
+        continue;
+      }
       // A restyle renders live: this session owns the appearance now.
       const change: UserChange = {
         field: 'color',
@@ -168,7 +174,7 @@ async function play(seed: number, steps: number) {
       changes.push(change);
       inFlight.push(change);
     } else if (roll < 0.5) {
-      const print = !harness.capability.get(REF)!.flags.print;
+      const print = !harness.capability.get(REF)!.print;
       // Flags leave the appearance alone: the record renders as it did.
       const source = expectedSource();
       void harness.capability.updateSelectionFlags({ print });
@@ -226,8 +232,8 @@ async function play(seed: number, steps: number) {
     check(`seed ${seed} drain`);
   }
   expect(harness.state().pending).toEqual([]);
-  expect(harness.capability.get(REF)!.props.color).toBe(engine.color);
-  expect(harness.capability.get(REF)!.flags.print).toBe(engine.print);
+  expect(dataOf(harness.capability.get(REF)).color).toBe(engine.color);
+  expect(harness.capability.get(REF)!.print).toBe(engine.print);
 }
 
 describe('randomized interleavings of changes to one record', () => {

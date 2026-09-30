@@ -7,9 +7,11 @@
  */
 import type { PageRef } from '@embedpdf/engine-core/runtime';
 import { anchorModeOf } from './anchor';
-import { selectionQuad, unionRect } from './geometry';
+import { selectionQuad } from './geometry';
+import { unionRect } from './rect';
 import { isSelectable } from './hit';
 import type { Guide, Id, Model, Rect, Point } from './types';
+import { shapeOf, styleOf } from './record';
 
 export interface SnapResult {
   delta: Point;
@@ -37,12 +39,11 @@ const shift = (bounds: Bounds, point: Point): Bounds => ({
 
 /** An annotation's visual footprint corners — the oriented quad, so a rotated
  *  shape snaps by what's actually drawn, not its unrotated box. */
-const annotQuad = (model: Model, id: Id): Point[] =>
-  selectionQuad(
-    model.byId[id].geometry,
-    model.byId[id].style.strokeWidth,
-    model.byId[id].style.border,
-  );
+const annotQuad = (model: Model, id: Id): Point[] => {
+  const geometry = shapeOf(model.byId[id].annotation);
+  const style = styleOf(model.byId[id].annotation);
+  return selectionQuad(geometry, style);
+};
 
 /**
  * Snap a move delta: shift the selection's union bounds by `raw`, compare its
@@ -78,7 +79,7 @@ export function computeMoveSnap(
       .filter(
         (id) =>
           !moving.has(id) &&
-          model.byId[id].page.objectNumber === pageObjectNumber &&
+          model.byId[id].annotation.page.objectNumber === pageObjectNumber &&
           isSelectable(model, id) &&
           !anchorModeOf(model.byId[id]),
       )

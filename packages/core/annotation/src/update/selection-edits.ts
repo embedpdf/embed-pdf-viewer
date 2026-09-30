@@ -1,111 +1,124 @@
 /**
- * Edits the toolbar applies to the whole selection: restyle, flags, quarter
- * turns, reset rotation, delete. Each changed record gets its own effect.
+ * Edits the toolbar applies to the whole selection: fields, text formats,
+ * links, flags, quarter turns, reset rotation, delete. Each changed record's
+ * change is its own engine write (`update` derives it from the change set).
  */
-import type { AnnotationFlags } from '@embedpdf/engine-core/runtime';
+import type { AnnotationFlags, PdfLinkTarget, RichTextBody } from '@embedpdf/engine-core/runtime';
 
-import { annotDeletable, annotTransformable, flagsEqual, mergeFlags } from '../flags';
-import { geomResetRotation, geomRotateAbout, geomRotation, rotatePoint } from '../geometry';
+import { annotDeletable, annotTransformable } from '../flags';
+import { geomResetRotation, geomRotateAbout, geomRotation } from '../geometry';
 import { groupUnionBounds } from '../hit';
-import { capsFor } from '../kinds';
 import { linkChildrenOf } from '../links';
-import { transformMeasurementCaption } from '../measurement-shape';
-import { applyProps, kindTakesLink } from '../props';
+import { kindTakesLink } from '../props';
+import { kindOf, shapeOf, withShape, withValues, writableTarget } from '../record';
 import { annotationTurnPivot } from '../selection';
-import type { AnnotationPropsPatch, Effect, Id, Model, Point, PropKey } from '../types';
-import { geometryPatch, ownGeometry, toVector, withoutRecords } from './changes';
+import type { Effect, FieldValues, Id, Model, ModelAnnotation, Point } from '../types';
+import { withoutRecords } from './changes';
+
+type TextFormat = 'bold' | 'italic' | 'underline';
 
 /**
- * Apply a flat property patch to the current selection. Each member takes only
- * the keys its kind declares (see `applyProps` — routing to `style`, `geom.ends`
- * or `text` happens there) and ignores the rest, so one patch restyles a mixed
- * selection. Changed members flip to `vector` (we own the appearance now) and
- * emit one engine patch each. The base style / tool defaults are never touched:
- * editing existing annotations must not change what the next drawn one looks like.
+ * The model with `change` applied to each record of `ids` (a record listed
+ * twice sees its first change). The same model when no record changes.
  */
-export function setProps(model: Model, patch: AnnotationPropsPatch): [Model, Effect[]] {
-  if (!model.selected.length) return [model, []];
-  const byId = { ...model.byId };
-  const fx: Effect[] = [];
-  // The effect carries the user's keys verbatim — the shell lowers exactly
-  // this intent to wire fields; the changed-prop set is the artifact.
-  const keys = (Object.keys(patch) as PropKey[]).filter((propKey) => patch[propKey] !== undefined);
-  for (const id of model.selected) {
-    const annotation = byId[id];
-    if (!annotation) continue;
-    // The `link` slot is not appearance and not model state on a non-link
-    // kind: the value lives in attached child annotations (the `linkOf`
-    // lens reads them back), so the intent is read off the PATCH and rides
-    // the target-carrying `syncLink` — the shell's reconciler owns the child
-    // operations. Locked annotations refuse it like any other prop write.
-    const linkIntent =
-      patch.link !== undefined &&
-      annotation.subtype !== 'link' &&
-      kindTakesLink(annotation.subtype) &&
-      annotTransformable(annotation);
-    const next = applyProps(annotation, patch);
-    if (!next) {
-      // Nothing applied to the model (link-only patch on a parent, or an
-      // undeclared key) — the link intent still materializes.
-      if (linkIntent) fx.push({ type: 'syncLink', id, target: patch.link ?? null });
-      continue;
-    }
-    const linkChanged = next.link !== annotation.link;
-    const otherChanged =
-      next.style !== annotation.style ||
-      next.geometry !== annotation.geometry ||
-      next.text !== annotation.text ||
-      next.icon !== annotation.icon;
-    // A restyle flips to vector (we own the appearance now) — except
-    // `opaqueBody` kinds (widgets), which have no vector render: they stay
-    // baked and the shell re-fetches the engine's re-baked raster on resolve.
-    // Flipping them would also drop them out of `appearanceEpoch`, freezing
-    // their raster forever.
-    byId[id] = capsFor(annotation.subtype).opaqueBody || !otherChanged ? next : toVector(next);
-    // The link kind's target lives on its own DTO — a plain engine patch.
-    if (otherChanged || (linkChanged && annotation.subtype === 'link'))
-      fx.push({ type: 'patch', id, scope: { kind: 'props', keys } });
-    if (linkIntent) fx.push({ type: 'syncLink', id, target: patch.link ?? null });
+function changeRecords(
+  model: Model,
+  ids: readonly Id[],
+  change: (record: ModelAnnotation) => ModelAnnotation,
+): Model {
+  let byId: Model['byId'] | null = null;
+  for (const id of ids) {
+    const record = (byId ?? model.byId)[id];
+    if (!record) continue;
+    const next = change(record);
+    if (next === record) continue;
+    byId ??= { ...model.byId };
+    byId[id] = next;
   }
-  return fx.length ? [{ ...model, byId }, fx] : [model, []];
+  return byId ? { ...model, byId } : model;
 }
 
 /**
- * Merge a `/F` flags patch into the selection (or explicit ids). Not the props
- * path, on purpose: flags aren't appearance — members keep their render
- * `source` (a baked raster stays valid; nothing re-bakes) — and the write is
- * not gated by `locked`, because unlocking a locked annotation is the whole
- * point (Acrobat's Locked checkbox stays live). One `flags` effect per changed
- * member.
+ * Write engine fields to records, a patch per id, each through `withValues`:
+ * a record takes the fields its kind has and may change now, so one message
+ * restyles a mixed selection, and a `rect` the engine would refuse throws.
+ * The tool defaults are never touched: editing existing annotations doesn't
+ * change the next one drawn.
  */
-/**
- * The actions plane's session-visibility write (Hide actions, script
- * `annot.hidden`): merge per-id hidden overrides into the session overlay.
- * Pure session state — zero effects, no engine write, no authority. Hiding
- * clears transient engagement so no orphaned selection chrome or text editor
- * survives on an invisible annotation. Identity-preserving no-op when nothing
- * changes (plugin memo caches key on model identity).
- */
+export function setFields(
+  model: Model,
+  patches: Readonly<Record<Id, FieldValues>>,
+): [Model, Effect[]] {
+  const next = changeRecords(model, Object.keys(patches), (record) =>
+    withValues(record, patches[record.id]!),
+  );
+  return [next, []];
+}
 
+/** Does a free text's body carry `format`, as the sidebar shows it? */
+function bodyHas(body: RichTextBody, format: TextFormat): boolean {
+  if (format === 'bold') return body.weight >= 600;
+  if (format === 'italic') return body.italic;
+  return body.decoration.includes('underline');
+}
+
+/** The body with `format` on or off, the rest of it as it was. */
+function bodyWith(body: RichTextBody, format: TextFormat, on: boolean): RichTextBody {
+  if (format === 'bold') return { ...body, weight: on ? 700 : 400 };
+  if (format === 'italic') return { ...body, italic: on };
+  const lines = body.decoration.filter((line) => line !== 'underline');
+  return { ...body, decoration: on ? [...lines, 'underline'] : lines };
+}
+
+/**
+ * Bold, italic or underline on or off for the selection's free texts. A
+ * format is the rich text's body, so every run that doesn't set its own
+ * follows; the editor's range formats runs instead.
+ */
+export function setTextFormat(model: Model, format: TextFormat, on: boolean): [Model, Effect[]] {
+  const next = changeRecords(model, model.selected, (record) => {
+    const annotation = record.annotation;
+    if (annotation.subtype !== 'free-text') return record;
+    const { body, paragraphs } = annotation.richText;
+    if (bodyHas(body, format) === on) return record;
+    return withValues(record, { richText: { body: bodyWith(body, format, on), paragraphs } });
+  });
+  return [next, []];
+}
+
+/**
+ * Link the selection to `target`, or unlink it (`null`). A link annotation's
+ * target is a field of it. Every other linkable kind's link lives in
+ * attached child annotations, so it rides a `syncLink` effect and the
+ * plugin's reconciler writes the children. Locked annotations refuse it.
+ */
+export function setLink(model: Model, target: PdfLinkTarget | null): [Model, Effect[]] {
+  const fx: Effect[] = [];
+  const links: Id[] = [];
+  for (const id of model.selected) {
+    const record = model.byId[id];
+    if (!record || !annotTransformable(record) || !kindTakesLink(kindOf(record.annotation)))
+      continue;
+    if (record.annotation.subtype === 'link') links.push(id);
+    else fx.push({ type: 'syncLink', id, target });
+  }
+  // A read-only target (a script, a named action) is carried, never written.
+  if (target && !writableTarget(target)) return [model, fx];
+  return [changeRecords(model, links, (record) => withValues(record, { target })), fx];
+}
+
+/**
+ * Merge `/F` flags into the selection (or explicit ids), through
+ * `withValues`: a flag is writable with update authority alone, so a locked
+ * annotation unlocks and a hidden one shows. A flag changes no drawing: a
+ * baked raster stays baked.
+ */
 export function setFlags(
   model: Model,
   patch: Partial<AnnotationFlags>,
   ids?: Id[],
 ): [Model, Effect[]] {
-  const targets = ids ?? model.selected;
-  if (!targets.length) return [model, []];
-  const fx: Effect[] = [];
-  let byId: Model['byId'] | null = null;
-  for (const id of targets) {
-    const annotation = (byId ?? model.byId)[id];
-    if (!annotation) continue;
-    const flags = mergeFlags(annotation.flags, patch);
-    if (flagsEqual(flags, annotation.flags)) continue; // no spurious engine writes
-    byId ??= { ...model.byId };
-    byId[id] = { ...annotation, flags };
-    fx.push({ type: 'flags', id });
-  }
-  return byId ? [{ ...model, byId }, fx] : [model, []];
+  return [changeRecords(model, ids ?? model.selected, (record) => withValues(record, patch)), []];
 }
 
 /**
@@ -116,8 +129,8 @@ export function setFlags(
  */
 export function rotateSelection(model: Model, deltaDeg: number): [Model, Effect[]] {
   const ids = model.selected.filter((id) => {
-    const annotation = model.byId[id];
-    return annotation && annotTransformable(annotation) && capsFor(annotation.subtype).rotatable;
+    const record = model.byId[id];
+    return record && annotTransformable(record) && kindOf(record.annotation).caps.rotatable;
   });
   if (!ids.length) return [model, []];
   // pivot: where the engine turns a single shape (`turnPivotOf`: a box's
@@ -130,29 +143,21 @@ export function rotateSelection(model: Model, deltaDeg: number): [Model, Effect[
   // view-space commit instead).
   let pivot: Point;
   if (ids.length === 1) {
-    const annotation = model.byId[ids[0]];
-    pivot = annotationTurnPivot(annotation);
+    const record = model.byId[ids[0]];
+    pivot = annotationTurnPivot(record);
   } else {
-    const page = model.byId[ids[0]].page;
+    const page = model.byId[ids[0]].annotation.page;
     const union = groupUnionBounds({ ...model, selected: ids }, page);
     if (!union) return [model, []];
     pivot = { x: union.x + union.width / 2, y: union.y + union.height / 2 };
   }
   const byId = { ...model.byId };
-  const fx: Effect[] = [];
   for (const id of ids) {
-    const annotation = byId[id];
-    const before = annotation.geometry;
-    byId[id] = ownGeometry({
-      ...annotation,
-      geometry: geomRotateAbout(before, pivot, deltaDeg),
-      measure: transformMeasurementCaption(annotation.measure, (point) =>
-        rotatePoint(point, pivot, deltaDeg),
-      ),
-    });
-    fx.push(geometryPatch(id));
+    const record = byId[id];
+    const geometry = shapeOf(record.annotation);
+    byId[id] = withShape(record, geomRotateAbout(geometry, pivot, deltaDeg));
   }
-  return [{ ...model, byId }, fx];
+  return [{ ...model, byId }, []];
 }
 
 /** Reset rotation on the selection to the as-authored orientation. For a
@@ -160,22 +165,17 @@ export function rotateSelection(model: Model, deltaDeg: number): [Model, Effect[
  *  as meaningful as for anyone else. */
 export function resetRotation(model: Model): [Model, Effect[]] {
   const byId = { ...model.byId };
-  const fx: Effect[] = [];
+  let turned = false;
   for (const id of model.selected) {
-    const annotation = byId[id];
-    if (!annotation || !annotTransformable(annotation) || geomRotation(annotation.geometry) === 0)
-      continue;
-    const pivot = annotationTurnPivot(annotation);
-    byId[id] = ownGeometry({
-      ...annotation,
-      geometry: geomResetRotation(annotation.geometry, pivot),
-      measure: transformMeasurementCaption(annotation.measure, (point) =>
-        rotatePoint(point, pivot, -geomRotation(annotation.geometry)),
-      ),
-    });
-    fx.push(geometryPatch(id));
+    const record = byId[id];
+    if (!record || !annotTransformable(record)) continue;
+    const geometry = shapeOf(record.annotation);
+    if (geomRotation(geometry) === 0) continue;
+    const pivot = annotationTurnPivot(record);
+    byId[id] = withShape(record, geomResetRotation(geometry, pivot));
+    turned = true;
   }
-  return fx.length ? [{ ...model, byId }, fx] : [model, []];
+  return turned ? [{ ...model, byId }, []] : [model, []];
 }
 
 export function deleteSelection(model: Model): [Model, Effect[]] {
@@ -183,8 +183,8 @@ export function deleteSelection(model: Model): [Model, Effect[]] {
   // transformable members go; the rest keep their selection, so a mixed
   // selection deletes what it may and leaves the frozen ones visibly selected.
   const deletable = model.selected.filter((id) => {
-    const annotation = model.byId[id];
-    return !!annotation && annotDeletable(annotation);
+    const record = model.byId[id];
+    return !!record && annotDeletable(record);
   });
   if (!deletable.length) return [model, []];
   // Attached link children die with their parent. They are model
@@ -192,7 +192,7 @@ export function deleteSelection(model: Model): [Model, Effect[]] {
   // below handle parent and children uniformly — no side ledger.
   const withChildren = [
     ...deletable,
-    ...deletable.flatMap((id) => linkChildrenOf(model, id).map((annotation) => annotation.id)),
+    ...deletable.flatMap((id) => linkChildrenOf(model, id).map((record) => record.id)),
   ];
   const fx: Effect[] = withChildren
     .filter((id) => model.byId[id])

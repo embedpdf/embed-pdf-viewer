@@ -1,4 +1,5 @@
-import type { Id, Subtype } from '@embedpdf/core-annotation';
+import type { Id, KindName } from '@embedpdf/core-annotation';
+import { kindOf, refOf } from '@embedpdf/core-annotation';
 import type { AnnotationRef } from '@embedpdf/engine-core/runtime';
 
 import type { Behavior } from '../contract';
@@ -15,7 +16,7 @@ export function createBehaviors(store: AnnotationStore) {
 
   const matches = (
     right: Behavior,
-    left: { subtype: Subtype; ref: AnnotationRef | null },
+    left: { subtype: KindName; ref: AnnotationRef | null },
   ): boolean => right.matches(left) && right.engaged();
 
   /**
@@ -27,11 +28,14 @@ export function createBehaviors(store: AnnotationStore) {
     const model = store.model();
     let out: Set<Id> | undefined;
     for (const id of model.order) {
-      const annotation = model.byId[id];
-      if (!annotation || annotation.page.objectNumber !== pageObjectNumber) continue;
+      const record = model.byId[id];
+      if (!record || record.annotation.page.objectNumber !== pageObjectNumber) continue;
       if (
         behaviors.some((behavior) =>
-          matches(behavior, { subtype: annotation.subtype, ref: annotation.ref }),
+          matches(behavior, {
+            subtype: kindOf(record.annotation).name,
+            ref: refOf(record),
+          }),
         )
       ) {
         (out ??= new Set()).add(id);
@@ -48,18 +52,21 @@ export function createBehaviors(store: AnnotationStore) {
         if (index >= 0) behaviors.splice(index, 1);
       };
     },
-    getBehaviorFor: (annotation: { subtype: Subtype; ref: AnnotationRef | null }) =>
+    getBehaviorFor: (annotation: { subtype: KindName; ref: AnnotationRef | null }) =>
       behaviors.find((behavior) => matches(behavior, annotation)) ?? null,
     pruneEngagedSelection: () => {
       // Engaged ⇒ hit-test-inert ⇒ must not stay selected either (a widget
       // selected in design mode keeps no chrome once the fill tool engages).
       const model = store.model();
       const drop = model.selected.filter((id) => {
-        const annotation = model.byId[id];
+        const record = model.byId[id];
         return (
-          annotation &&
+          record &&
           behaviors.some((behavior) =>
-            matches(behavior, { subtype: annotation.subtype, ref: annotation.ref }),
+            matches(behavior, {
+              subtype: kindOf(record.annotation).name,
+              ref: refOf(record),
+            }),
           )
         );
       });

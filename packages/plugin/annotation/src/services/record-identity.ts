@@ -1,10 +1,10 @@
 /**
  * Record identity: the one place a record changes its key. It happens twice:
  *
- *   - a new record is confirmed. It shows under a `new:<n>` id; its create
- *     carries a fresh /NM, and the engine's record comes back with that /NM
- *     under its real key. Whichever arrives first (the event in the records
- *     mirror, or the write's own result) confirms it.
+ *   - a new record is confirmed. It shows under the key of the `nm` ref its
+ *     create is written under (a fresh /NM), and the engine's record comes
+ *     back with that /NM under its real key. Whichever arrives first (the
+ *     event in the records mirror, or the write's own result) confirms it.
  *   - the engine names a weak record (one addressed by its position on the
  *     page): the record leaves the view under its position key and returns
  *     under a new key at the same position.
@@ -26,7 +26,7 @@
  * has confirmed, after its create for a new one.
  */
 import { PluginError, type Mirror } from '@embedpdf/core';
-import type { AnnotationView, Id } from '@embedpdf/core-annotation';
+import { refOf, type AnnotationView, type Id } from '@embedpdf/core-annotation';
 import { annotationKey, positionKey, type AnnotationRef } from '@embedpdf/engine-core/runtime';
 
 import { followRecord, writeSettled } from '../model';
@@ -42,20 +42,24 @@ interface Waiter {
 
 /**
  * Weak records the engine named between two views: gone under their position
- * key, present under a new key at the same position.
+ * key, present under a new key (and ref) at the same position.
  */
-function renamesBetween(previous: AnnotationView, next: AnnotationView): Map<Id, Id> {
-  const appearedAt = new Map<string, Id>();
+function renamesBetween(
+  previous: AnnotationView,
+  next: AnnotationView,
+): Map<Id, { to: Id; ref: AnnotationRef }> {
+  const appearedAt = new Map<string, { to: Id; ref: AnnotationRef }>();
   for (const id of next.order) {
     const record = next.byId[id];
-    if (!(id in previous.byId) && record?.data) {
-      appearedAt.set(positionKey(record.page, record.data.index), id);
+    const ref = refOf(record);
+    if (!(id in previous.byId) && record && ref) {
+      appearedAt.set(positionKey(record.annotation.page, record.annotation.index), { to: id, ref });
     }
   }
-  const renamed = new Map<Id, Id>();
+  const renamed = new Map<Id, { to: Id; ref: AnnotationRef }>();
   for (const id of previous.order) {
-    const to = previous.byId[id]?.ref?.kind === 'index' ? appearedAt.get(id) : undefined;
-    if (to !== undefined && !(id in next.byId)) renamed.set(id, to);
+    const named = refOf(previous.byId[id])?.kind === 'index' ? appearedAt.get(id) : undefined;
+    if (named !== undefined && !(id in next.byId)) renamed.set(id, named);
   }
   return renamed;
 }
@@ -73,11 +77,11 @@ export function createRecordIdentity(
   const followers: ((from: Id, to: Id) => void)[] = [];
 
   /** The record `from` is the record `to` now: everything keyed by it moves. */
-  const follow = (from: Id, to: Id, ref?: AnnotationRef): void => {
+  const follow = (from: Id, to: Id, ref: AnnotationRef): void => {
     // The session moves first, while both keys are in the view; then the
     // record's pending changes, render preference and text range.
     store.commit({ type: 'rekey', from, to });
-    ctx.state.update(followRecord, from, to, ref ?? null);
+    ctx.state.update(followRecord, from, to, ref);
     for (const follower of followers) follower(from, to);
   };
 
@@ -139,7 +143,8 @@ export function createRecordIdentity(
   /** The ref of a confirmed new record the mirror does not hold yet: its create change has it. */
   const confirmedCreateRef = (id: Id): AnnotationRef | null => {
     for (const { id: changed, change } of ctx.state.get().pending) {
-      if (changed === id && change.kind === 'create' && change.record.ref) return change.record.ref;
+      const ref = changed === id && change.kind === 'create' ? refOf(change.record) : null;
+      if (ref) return ref;
     }
     return null;
   };
@@ -171,7 +176,7 @@ export function createRecordIdentity(
     const gone = previous.order.filter((id) => !(id in next.byId));
     if (!gone.length) return;
     const renamed = renamesBetween(previous, next);
-    for (const [from, to] of renamed) follow(from, to);
+    for (const [from, { to, ref }] of renamed) follow(from, to, ref);
     const forgotten = gone.filter((id) => !renamed.has(id));
     if (forgotten.length) store.commit({ type: 'forget', ids: forgotten });
   });

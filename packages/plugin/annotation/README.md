@@ -91,9 +91,11 @@ move, and so does what an area keeps per record (`onFollow`: typing waiting
 for its write, a link sync in progress). An id taken before the move still
 finds the record (`identity.current`).
 
-- **Programmatic verbs** that show nothing before the engine answers
-  (`update`, `delete`, `createRaw`) write straight to the engine; the mirror
-  shows their result before they resolve.
+- **Changes stated in code** (`create`, `update`, `delete`, comments, links,
+  scripts) go through the store's second door, `apply`: each is checked with
+  the engine's own functions, shown at once, and written, settled and refused
+  exactly like a gesture's. A record created in code is keyed by the `/NM` it
+  was created with until the engine confirms it.
 
 ## How a record renders
 

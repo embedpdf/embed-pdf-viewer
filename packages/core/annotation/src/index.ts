@@ -12,8 +12,9 @@ export {
   initialSession,
   sameSession,
   EMPTY_CHANGE,
-  initialStyle,
   defaultsFor,
+  lineEndingsOf,
+  toolAnnotation,
   rotateDraftDelta,
   MIN_DRAG,
 } from './update';
@@ -40,16 +41,20 @@ export { hitTest, cursorAt, isSelectable, canMove, type Target } from './hit';
 // selection styling compute with.
 export {
   applyStyleToRange,
+  bodyFromTextStyle,
+  faceForFont,
   isPlainRichText,
   locateOffset,
   normalizeRuns,
   paragraphsFromPlainText,
   plainTextOf,
   rangeHasStyle,
+  richDocOf,
   richTextLength,
   sameStyleDelta,
   splitRunsAt,
   styleAt,
+  type FontLookup,
   type RichTextRange,
   type RichTextStyleDelta,
 } from './richtext';
@@ -85,59 +90,39 @@ export {
   type AnchorMode,
   type ViewEnv,
 } from './anchor';
+// The kinds: one declaration per kind (kinds/), by name.
 export {
+  defineKind,
   KINDS,
-  capsFor,
-  propsFor,
-  type KindCaps,
+  kindNamed,
+  NO_CAPS,
   type AnnotationKind,
-  type PropSpec,
+  type FieldSpec,
+  type KindCaps,
 } from './kinds';
-export {
-  applyProps,
-  initialTextStyle,
-  readProp,
-  sharedProps,
-  styleFromProps,
-  textStyleFromProps,
-} from './props';
+export { initialTextStyle, kindTakesLink, sharedFields } from './props';
+export { engineSubtypeOf, readOfDefaults, widgetAppearanceOf } from './record/defaults';
 export {
   geomScene,
-  textPlateInset,
   geomBounds,
   geomVisualBounds,
   geomHit,
   geomHandles,
   geomTranslate,
   geomDragHandle,
-  calloutConnection,
-  calloutLinePoints,
-  rectFromPoints,
-  caretGeomFromAnchor,
-  caretRectFromAnchor,
-  caretRectFromTextEnd,
   selectionBounds,
   selectionQuad,
   turnPivotOf,
   pointInQuad,
   quadIntersectsRect,
-  shapeRectFor,
-  shapeBoxOf,
-  unionRect,
-  RECT_HANDLES,
-  rotatedHandleCursor,
-  type RectHandle,
   // rotation
-  centroidOf,
   geomRotation,
   geomRotateAbout,
   geomResetRotation,
   obbFromGeom,
   rotateKnob,
   placeRotateKnob,
-  rotatedAabb,
   DEFAULT_CHROME_GEOMETRY,
-  normalizeDeg,
   isRotatableGeom,
   // upright placement
   uprightRotation,
@@ -145,16 +130,69 @@ export {
   uprightAnchoredRect,
   fitStampBox,
   ROTATE_KNOB_OFFSET,
-  MITER_LIMIT,
   // group scaling
   geomScaleAbout,
   groupResizeAnchor,
   groupResizeBox,
   groupResizeFactors,
 } from './geometry';
+export {
+  rectFromPoints,
+  unionRect,
+  RECT_HANDLES,
+  rotatedHandleCursor,
+  rotatedAabb,
+  normalizeDeg,
+  type RectHandle,
+} from './rect';
+// The shape families: everything the core does with one kind of shape.
+export {
+  boxFamily,
+  caretFamily,
+  familyChosenBy,
+  familyOf,
+  pointsFamily,
+  quadsFamily,
+  textBoxFamily,
+  type Corners,
+  type ShapeFamily,
+} from './shapes';
+export type { BoxShape, TurnedBox } from './shapes/box';
+export { caretFromAnchor, caretRectFromAnchor, type CaretShape } from './shapes/caret';
+export type { QuadsShape } from './shapes/quads';
+export {
+  MITER_LIMIT,
+  drawnStrokesOf,
+  type InkShape,
+  type LineShape,
+  type PointsShape,
+  type PolyShape,
+} from './shapes/points';
+export { calloutEnd, textPlateInset, type CalloutLine, type TextBoxShape } from './shapes/text-box';
+// A record: the engine annotation it holds, read (who it is, its shape, how
+// it is drawn, how its text is set), written back as engine fields, and
+// read as the engine writes it while a write is on its way.
+export {
+  annotationAfter,
+  annotationOfNew,
+  fromDTO,
+  groupOf,
+  irtOf,
+  kindOf,
+  linkChildRects,
+  refOf,
+  shapeOf,
+  styleOf,
+  textOf,
+  withShape,
+  withValues,
+  writableTarget,
+} from './record';
 export { cloudyPath, cloudyBorderExtent } from './cloudy';
 export * from './measurement';
 export * from './measurement-shape';
+// How an annotation is drawn: the engine's raster, or live (see appearance.ts).
+export { drawnAfter, sourceOfNew, type DrawState } from './appearance';
 export { annotationSelectionFrame, type SelectionFrame } from './selection';
 export { scene } from './scene';
 export { straightenInkStroke } from './ink';
@@ -163,17 +201,13 @@ export type {
   AnnotationView,
   ChangeSet,
   ModelAnnotation,
-  AnnotationProps,
-  AnnotationPropsPatch,
-  Border,
-  Callout,
   ChromeGeometry,
   ChromeNode,
   Cursor,
   CreationDraftAnchor,
   Draft,
   Effect,
-  ModelGeometry,
+  Shape,
   Guide,
   Handle,
   Id,
@@ -182,9 +216,8 @@ export type {
   Message,
   ClickCreate,
   PointerInput,
-  PatchScope,
-  PropKey,
-  Quad,
+  FieldValues,
+  QuadRing,
   Rect,
   LineEnding,
   LineEndings,
@@ -195,11 +228,12 @@ export type {
   RenderNode,
   SceneNode,
   SnapSettings,
+  Stroke,
   Style,
-  Subtype,
+  KindName,
   TextAlign,
   TextEndAnchor,
-  TextQuad,
+  Quad,
   TextStyle,
   Point,
 } from './types';

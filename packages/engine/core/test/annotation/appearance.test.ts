@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { appearanceImpactOf, semanticEqual } from '../../src/shared';
+import { appearanceChangeOf, appearanceImpactOf, semanticEqual } from '../../src/shared';
 import type { AnnotationDTO, AnnotationPatch } from '../../src/shared';
 import type { PdfCoordinates } from '../../src/pageSpace/coordinates';
 
@@ -293,10 +293,10 @@ describe('appearanceImpactOf — verified rigid translation', () => {
       rect: rect(0, 0, 100, 20),
       quadPoints: [
         {
-          p1: { x: 0, y: 20 },
-          p2: { x: 100, y: 20 },
-          p3: { x: 0, y: 0 },
-          p4: { x: 100, y: 0 },
+          upperLeft: { x: 0, y: 20 },
+          upperRight: { x: 100, y: 20 },
+          lowerLeft: { x: 0, y: 0 },
+          lowerRight: { x: 100, y: 0 },
         },
       ],
     });
@@ -304,10 +304,10 @@ describe('appearanceImpactOf — verified rigid translation', () => {
       subtype: 'highlight',
       quadPoints: [
         {
-          p1: { x: 0, y: -10 },
-          p2: { x: 100, y: -10 },
-          p3: { x: 0, y: -30 },
-          p4: { x: 100, y: -30 },
+          upperLeft: { x: 0, y: -10 },
+          upperRight: { x: 100, y: -10 },
+          lowerLeft: { x: 0, y: -30 },
+          lowerRight: { x: 100, y: -30 },
         },
       ],
     });
@@ -386,5 +386,37 @@ describe('appearanceImpactOf — verified rigid translation', () => {
     expect(
       appearanceImpactOf(squareDto(), patch({ subtype: 'circle', box: rect(0, 0, 1, 1) })),
     ).toBe('regenerate');
+  });
+});
+
+describe('appearanceChangeOf — the distance a translation moves by', () => {
+  it("in the file's coordinates: how far the box's corner moved", () => {
+    const p = fullSquarePatch({ box: rect(130, 80, 230, 180) });
+    expect(appearanceChangeOf(squareDto(), p)).toEqual({
+      impact: 'translation',
+      by: { x: 30, y: -20 },
+    });
+  });
+
+  it('in page space: the same question, on page-space boxes and points', () => {
+    const square = {
+      subtype: 'square',
+      rect: { x: 100, y: 100, width: 100, height: 100 },
+      box: { x: 100, y: 100, width: 100, height: 100 },
+      rotation: null,
+      color: '#008000',
+    } as unknown as AnnotationDTO;
+    const moved = { subtype: 'square', box: { x: 130, y: 120, width: 100, height: 100 } };
+    expect(appearanceChangeOf(square, moved as AnnotationPatch)).toEqual({
+      impact: 'translation',
+      by: { x: 30, y: 20 },
+    });
+    const resized = { subtype: 'square', box: { x: 100, y: 100, width: 120, height: 100 } };
+    expect(appearanceChangeOf(square, resized as AnnotationPatch)).toEqual({
+      impact: 'regenerate',
+    });
+    expect(appearanceChangeOf(square, { subtype: 'square', locked: true })).toEqual({
+      impact: 'inert',
+    });
   });
 });

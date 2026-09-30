@@ -1,35 +1,33 @@
 /**
  * Rich text policy — what the annotation plugin decides about a free-text
  * annotation's rich document, kept pure so every framework's editor glue
- * behaves identically (the mechanics live in `@embedpdf/web`'s binding, the
- * run algebra in the core):
+ * behaves identically (the mechanics live in `@embedpdf/web`'s binding; the
+ * run algebra, an annotation's rich document and a font's face in the core):
  *
- *   • the rich document of any annot (the DTO's, or one synthesised from the
- *     plain text + the `/DA` text style for a draft that has no DTO yet)
  *   • a flat props patch → the run delta it means for a text range (font,
  *     size, colour, bold/italic/underline) and the keys left for the body
  *   • what a range reads back for those keys (agree → the value, else mixed)
- *   • faces: a DTO font (standard kebab name / registered key) ↔ the face a
- *     run names (family + weight + italic) ↔ a CSS family list
+ *   • faces: the DTO font a face names, and a CSS family list for either
  *   • the commit rule: a document nothing overrides on a plain annotation
  *     commits as `contents`; anything else as `richText`
  */
 import {
+  faceForFont,
+  type FieldValues,
+  type FontLookup,
   locateOffset,
-  paragraphsFromPlainText,
   type ModelAnnotation,
-  type AnnotationPropsPatch,
-  type PropKey,
+  richDocOf,
   type RichTextRange,
   type RichTextStyleDelta,
-  type TextStyle,
 } from '@embedpdf/core-annotation';
-import type {
-  FontHandle,
-  RichTextBody,
-  RichTextDocument,
-  RichTextParagraph,
-  RichTextRunStyle,
+import {
+  isStandardFontName,
+  STANDARD_FACES,
+  type RichTextBody,
+  type RichTextDocument,
+  type RichTextParagraph,
+  type RichTextRunStyle,
 } from '@embedpdf/engine-core/runtime';
 
 export type TextFormat = 'bold' | 'italic' | 'underline';
@@ -47,8 +45,8 @@ export interface Face {
   italic?: boolean;
 }
 
-/** The props keys a text range takes as run deltas. */
-export const RANGE_KEYS: readonly PropKey[] = [
+/** The fields a text range takes as run deltas: its font, size and colour, and the formats. */
+export const RANGE_KEYS: readonly string[] = [
   'fontFamily',
   'fontSize',
   'fontColor',
@@ -59,30 +57,7 @@ export const RANGE_KEYS: readonly PropKey[] = [
 
 // ---- Faces ---------------------------------------------------------------------
 
-type StandardFamily = 'Helvetica' | 'Times' | 'Courier' | 'Symbol' | 'ZapfDingbats';
-interface StandardFace {
-  family: StandardFamily;
-  weight: number;
-  italic: boolean;
-}
-
-/** The engine's standard-14 vocabulary (the `StandardFont` kebab names). */
-const STANDARD_FACES: Record<string, StandardFace> = {
-  courier: { family: 'Courier', weight: 400, italic: false },
-  'courier-bold': { family: 'Courier', weight: 700, italic: false },
-  'courier-bold-oblique': { family: 'Courier', weight: 700, italic: true },
-  'courier-oblique': { family: 'Courier', weight: 400, italic: true },
-  helvetica: { family: 'Helvetica', weight: 400, italic: false },
-  'helvetica-bold': { family: 'Helvetica', weight: 700, italic: false },
-  'helvetica-bold-oblique': { family: 'Helvetica', weight: 700, italic: true },
-  'helvetica-oblique': { family: 'Helvetica', weight: 400, italic: true },
-  'times-roman': { family: 'Times', weight: 400, italic: false },
-  'times-bold': { family: 'Times', weight: 700, italic: false },
-  'times-bold-italic': { family: 'Times', weight: 700, italic: true },
-  'times-italic': { family: 'Times', weight: 400, italic: true },
-  symbol: { family: 'Symbol', weight: 400, italic: false },
-  'zapf-dingbats': { family: 'ZapfDingbats', weight: 400, italic: false },
-};
+type StandardFamily = (typeof STANDARD_FACES)[keyof typeof STANDARD_FACES]['family'];
 
 /** Family names compare without case, spaces, hyphens, underscores and
  *  quotes — the engine's own rule. */
@@ -118,22 +93,6 @@ const STANDARD_STACKS: Record<StandardFamily, string> = {
   Symbol: 'serif',
   ZapfDingbats: 'serif',
 };
-
-/** The registered fonts an engine knows (the local engine's `fonts.list()`;
- *  none on the cloud engine). */
-export type FontLookup = () => readonly FontHandle[];
-
-/** The face a DTO font names: a standard font's family/weight/italic, a
- *  registered key's identity, else the string itself as a family. */
-export function faceForFont(font: string, fonts?: FontLookup): Face {
-  const standard = STANDARD_FACES[font];
-  if (standard) return { ...standard };
-  const registered = fonts?.().find((handle) => handle.key === font);
-  if (registered) {
-    return { family: registered.familyName, weight: registered.weight, italic: registered.italic };
-  }
-  return { family: font };
-}
 
 /** The DTO font for a face: the registered key whose identity matches (the
  *  closest weight, italic first), else the standard kebab name, else the
@@ -178,50 +137,13 @@ export function cssFontFamilyForFace(family: string, fonts?: FontLookup): string
 
 /** The CSS family list for a DTO font (a standard kebab name or a key). */
 export function cssFontFamilyForFont(font: string, fonts?: FontLookup): string {
-  const standard = STANDARD_FACES[font];
-  if (standard) return STANDARD_STACKS[standard.family];
+  if (isStandardFontName(font)) return STANDARD_STACKS[STANDARD_FACES[font].family];
   return `"${font}", sans-serif`;
 }
 
 // ---- Documents -----------------------------------------------------------------
 
 const hex = (css: string): string => css.trim().toUpperCase();
-
-/** The rich body the `/DA` text style describes (a draft's body before its
- *  DTO exists; also the fallback for a DTO without `richText`). */
-export function bodyFromTextStyle(style: TextStyle, fonts?: FontLookup): RichTextBody {
-  const face = faceForFont(style.fontFamily, fonts);
-  return {
-    family: face.family,
-    weight: style.bold ? 700 : (face.weight ?? 400),
-    italic: style.italic ?? face.italic ?? false,
-    size: style.fontSize,
-    color: hex(style.fontColor),
-    decoration: style.underline ? ['underline'] : [],
-    script: 'normal',
-    letterSpacing: 0,
-    horizontalScale: 1,
-    align: style.textAlign,
-    dir: 'ltr',
-  };
-}
-
-/** The annotation's rich document: the DTO's, else one synthesised from
- *  its plain text and text style (a draft the engine has not echoed yet). */
-export function richDocOf(annotation: ModelAnnotation, fonts?: FontLookup): RichTextDocument {
-  if (annotation.data?.subtype === 'free-text' && annotation.data.richText)
-    return annotation.data.richText;
-  const style: TextStyle = annotation.text ?? {
-    fontFamily: 'helvetica',
-    fontSize: 12,
-    fontColor: '#000000',
-    textAlign: 'left',
-  };
-  return {
-    body: bodyFromTextStyle(style, fonts),
-    paragraphs: paragraphsFromPlainText(annotation.data?.contents ?? ''),
-  };
-}
 
 /**
  * The write a text edit commits: the rich paragraphs, with paragraph
@@ -230,12 +152,14 @@ export function richDocOf(annotation: ModelAnnotation, fonts?: FontLookup): Rich
  * wrote. One engine, one path: plain and formatted text alike.
  */
 export function textCommitPatch(
-  annotation: ModelAnnotation,
+  record: ModelAnnotation,
   paragraphs: RichTextParagraph[],
   fonts?: FontLookup,
 ): { richText: { paragraphs: RichTextParagraph[] } } {
   return {
-    richText: { paragraphs: stripBodyDefaults(paragraphs, richDocOf(annotation, fonts).body) },
+    richText: {
+      paragraphs: stripBodyDefaults(paragraphs, richDocOf(record.annotation, fonts).body),
+    },
   };
 }
 
@@ -268,44 +192,44 @@ export function stripBodyDefaults(
 // ---- Props ↔ runs --------------------------------------------------------------
 
 /**
- * Split a props patch for an annotation whose editor holds a text range:
- * the run delta the range takes (font → face, size, colour, bold → weight,
- * italic, underline → decoration) and the keys that still go to the body.
+ * Split a patch for an annotation whose editor holds a text range: the run
+ * delta the range takes (font → face, size, colour, and the formats: bold →
+ * weight, italic, underline → decoration) and the fields that still go to the
+ * annotation.
  */
-export function runDeltaForProps(
-  patch: AnnotationPropsPatch,
+export function runDeltaForFields(
+  patch: FieldValues,
   fonts?: FontLookup,
-): { delta: RichTextStyleDelta; rest: AnnotationPropsPatch } {
+): { delta: RichTextStyleDelta; rest: Record<string, unknown> } {
   const delta: RichTextStyleDelta = {};
-  const rest: AnnotationPropsPatch = {};
-  for (const key of Object.keys(patch) as PropKey[]) {
-    const value = patch[key];
+  const rest: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(patch)) {
     if (value === undefined) continue;
     switch (key) {
       case 'fontFamily': {
-        const face = faceForFont(patch.fontFamily!, fonts);
+        const face = faceForFont(value as string, fonts);
         delta.family = face.family;
         if (face.weight !== undefined) delta.weight = face.weight;
         if (face.italic !== undefined) delta.italic = face.italic;
         break;
       }
       case 'fontSize':
-        delta.size = patch.fontSize;
+        delta.size = value as number;
         break;
       case 'fontColor':
-        delta.color = hex(patch.fontColor!);
+        delta.color = hex(value as string);
         break;
       case 'bold':
-        delta.weight = patch.bold ? 700 : 400;
+        delta.weight = value ? 700 : 400;
         break;
       case 'italic':
-        delta.italic = patch.italic;
+        delta.italic = value as boolean;
         break;
       case 'underline':
-        delta.decoration = patch.underline ? ['underline'] : [];
+        delta.decoration = value ? ['underline'] : [];
         break;
       default:
-        (rest as Record<string, unknown>)[key] = value;
+        rest[key] = value;
     }
   }
   return { delta, rest };
@@ -345,7 +269,7 @@ export function rangeProps(
   doc: RichTextDocument,
   range: RichTextRange,
   fonts?: FontLookup,
-): { values: Partial<Record<PropKey, unknown>>; mixed: PropKey[] } {
+): { values: Record<string, unknown>; mixed: string[] } {
   const runs = runsInRange(doc, range);
   const body = doc.body;
   const resolve = (delta: RichTextStyleDelta): Partial<RichTextRunStyle> => ({
@@ -357,9 +281,9 @@ export function rangeProps(
     decoration: delta.decoration ?? body.decoration,
   });
   const styles = (runs.length ? runs : [{}]).map(resolve);
-  const values: Partial<Record<PropKey, unknown>> = {};
-  const mixed: PropKey[] = [];
-  const read = (key: PropKey, of: (style: Partial<RichTextRunStyle>) => unknown) => {
+  const values: Record<string, unknown> = {};
+  const mixed: string[] = [];
+  const read = (key: string, of: (style: Partial<RichTextRunStyle>) => unknown) => {
     const first = of(styles[0]!);
     values[key] = first;
     if (styles.some((style) => JSON.stringify(of(style)) !== JSON.stringify(first)))

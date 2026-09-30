@@ -1,59 +1,31 @@
 /**
  * What every transition that changes records shares — the records it returns
- * become the message's change set: the ids of new records, who owns the
- * appearance after an edit (live rendering, or the raster box following the
- * geometry), the effect a geometry commit emits, and removing records.
+ * become the message's change set: a new record and the draft it is written
+ * from, a view-space gesture's commit, and removing records.
  */
+import { annotationKey } from '@embedpdf/core';
+import {
+  ANNOTATION_FIELD_NAMES,
+  type AnnotationDraft,
+  type AnnotationDTO,
+  type AnnotationFlags,
+  type AnnotationRef,
+  type PageRef,
+} from '@embedpdf/engine-core/runtime';
+
 import { anchoredGeom, anchorModeOf, unanchoredGeom, type ViewEnv } from '../anchor';
-import { capsFor } from '../kinds';
-import type {
-  ModelGeometry,
-  Effect,
-  Id,
-  Model,
-  ModelAnnotation,
-  Point,
-  Rect,
-  Subtype,
-} from '../types';
+import { sourceOfNew } from '../appearance';
+import { DRAWN_FLAGS } from '../flags';
+import { annotationOfNew, shapeOf } from '../record';
+import { engineSubtypeOf } from '../record/defaults';
+import { familyOf } from '../shapes';
+import type { FieldValues, Shape, Id, Model, ModelAnnotation, Point, KindName } from '../types';
 import { forget } from './session';
 
-export const isPolySubtype = (subtype: Subtype): subtype is 'polygon' | 'polyline' =>
+export const isPolySubtype = (subtype: KindName): subtype is 'polygon' | 'polyline' =>
   subtype === 'polygon' || subtype === 'polyline';
 
-/** Flip an annotation to live (vector) rendering — we now own its appearance, so
- *  the engine's baked AP is no longer authoritative. Idempotent. */
-export const toVector = (annotation: ModelAnnotation): ModelAnnotation =>
-  annotation.source === 'vector' ? annotation : { ...annotation, source: 'vector' };
-
-/**
- * Take ownership of the appearance after a geometry edit. Vector kinds flip to
- * live rendering; `opaqueBody` kinds (stamp images) have no vector render — they
- * stay `baked`, with the raster box following the committed geometry (the bitmap
- * shows stretched until the engine's natively re-fit appearance arrives with the
- * DTO sync). Call with the new geometry already applied.
- */
-export const ownGeometry = (annotation: ModelAnnotation): ModelAnnotation => {
-  if (!capsFor(annotation.subtype).opaqueBody) return toVector(annotation);
-  return 'rect' in annotation.geometry
-    ? { ...annotation, apBox: annotation.geometry.rect }
-    : annotation;
-};
-
-/** The patch effect for a committed geometry edit. */
-export const geometryPatch = (id: Id): Effect => ({
-  type: 'patch',
-  id,
-  scope: { kind: 'geometry' },
-});
-
 export const sub = (from: Point, to: Point): Point => ({ x: from.x - to.x, y: from.y - to.y });
-
-export const translateRect = (rect: Rect, point: Point): Rect => ({
-  ...rect,
-  x: rect.x + point.x,
-  y: rect.y + point.y,
-});
 
 /**
  * Commit a view-space gesture result for one annotation: apply `op` to the
@@ -64,19 +36,102 @@ export const translateRect = (rect: Rect, point: Point): Rect => ({
  * annotations alike, through one code path.
  */
 export const commitViewGesture = (
-  annotation: ModelAnnotation,
+  record: ModelAnnotation,
   view: ViewEnv | undefined,
-  op: (geometry: ModelGeometry) => ModelGeometry,
-): ModelGeometry => {
-  const mode = anchorModeOf(annotation);
-  return unanchoredGeom(op(anchoredGeom(annotation.geometry, mode, view)), mode, view);
+  op: (geometry: Shape) => Shape,
+): Shape => {
+  const mode = anchorModeOf(record);
+  return unanchoredGeom(op(anchoredGeom(shapeOf(record.annotation), mode, view)), mode, view);
 };
 
-export const geomEqual = (left: ModelGeometry, right: ModelGeometry): boolean =>
+export const geomEqual = (left: Shape, right: Shape): boolean =>
   JSON.stringify(left) === JSON.stringify(right);
 
-/** The id of the `offset`-th record a message creates (`new:<n>`), counted from the session's `seq`. */
-export const newRecordId = (model: Model, offset = 1): Id => `new:${model.seq + offset}`;
+/**
+ * The ref the `offset`-th record a message creates is written under: its name
+ * `<namePrefix><n>` on `page`, counted from the session's `seq`.
+ */
+export const newRecordRef = (
+  model: Model,
+  page: PageRef,
+  offset = 1,
+): Extract<AnnotationRef, { kind: 'nm' }> => ({
+  kind: 'nm',
+  page,
+  nm: `${model.namePrefix}${model.seq + offset}`,
+});
+
+/** The key of the `offset`-th record a message creates on `page`: its `nm` ref's. */
+export const newRecordId = (model: Model, page: PageRef, offset = 1): Id =>
+  annotationKey(newRecordRef(model, page, offset));
+
+/**
+ * The draft a drawing creates, complete before its record is made: the
+ * tool's `defaults` (the fields its kind has), the fields that state its
+ * `shape`, what the drawing adds (`fields`: an intent, a measurement, first
+ * text), and the flags a drawn annotation starts with (`print`, and the
+ * tool's own). The view's record and the engine's create both come from
+ * it.
+ */
+export function draftOf(
+  kind: string,
+  defaults: FieldValues,
+  shape: Shape,
+  fields: FieldValues = {},
+  flags: Partial<AnnotationFlags> = {},
+): AnnotationDraft {
+  const subtype = engineSubtypeOf(kind);
+  const declared = ANNOTATION_FIELD_NAMES[subtype];
+  const own = Object.fromEntries(
+    Object.entries(defaults).filter(([name]) => declared.includes(name)),
+  );
+  return {
+    ...own,
+    ...familyOf(shape).write(shape, subtype),
+    ...fields,
+    ...DRAWN_FLAGS,
+    ...flags,
+    subtype,
+  } as unknown as AnnotationDraft;
+}
+
+/** A record a message creates, and the draft it is written from, named as the record is keyed. */
+export interface NewRecord {
+  readonly record: ModelAnnotation;
+  readonly draft: AnnotationDraft;
+}
+
+/**
+ * The `offset`-th record a message creates, from its `draft`: named by the
+ * `nm` it will be written under (its key), holding the annotation the engine
+ * will read back (`annotationOfNew`), appended after the page's other
+ * records, and drawn as a new record is (`sourceOfNew`). `reply` ties it to
+ * the annotation it belongs to; the write states it once that one has a ref.
+ */
+export function newRecord(
+  model: Model,
+  page: PageRef,
+  draft: AnnotationDraft,
+  options: { offset?: number; reply?: NonNullable<AnnotationDTO['reply']> } = {},
+): NewRecord {
+  const offset = options.offset ?? 1;
+  const ref = newRecordRef(model, page, offset);
+  const named = { ...draft, nm: ref.nm } as AnnotationDraft;
+  const onPage = model.order.filter(
+    (id) => model.byId[id]?.annotation.page.objectNumber === page.objectNumber,
+  ).length;
+  const read = annotationOfNew(named, { ref, index: onPage + offset - 1 });
+  const annotation: AnnotationDTO = options.reply ? { ...read, reply: options.reply } : read;
+  return {
+    record: {
+      id: annotationKey(ref),
+      unconfirmed: true,
+      source: sourceOfNew(annotation),
+      annotation,
+    },
+    draft: named,
+  };
+}
 
 /** The model without these records, and without any session reference to them. */
 export function withoutRecords(model: Model, ids: readonly Id[]): Model {

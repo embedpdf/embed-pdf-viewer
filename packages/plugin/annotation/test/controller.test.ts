@@ -1,10 +1,11 @@
 import type { DocumentEvent } from '@embedpdf/core';
-import { textQuadFromRect } from '@embedpdf/core-geometry';
+import { quadFromRect } from '@embedpdf/core-geometry';
 import type { AnnotationFlags, AnnotationRef, PdfQuad } from '@embedpdf/engine-core/runtime';
 import { toPageRef } from '@embedpdf/engine-core/runtime';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { annotationHarness, type FileAnnotation } from './harness';
+import { groupOf, irtOf, styleOf } from '@embedpdf/core-annotation';
 
 const PON = 1;
 const PON2 = 2;
@@ -68,10 +69,10 @@ const caretDTO = (): FileAnnotation =>
 
 const strikeoutDTO = (): FileAnnotation => {
   const quad: PdfQuad = {
-    p1: { x: 10, y: 780 },
-    p2: { x: 90, y: 780 },
-    p3: { x: 10, y: 765 },
-    p4: { x: 90, y: 765 },
+    upperLeft: { x: 10, y: 780 },
+    upperRight: { x: 90, y: 780 },
+    lowerLeft: { x: 10, y: 765 },
+    lowerRight: { x: 90, y: 765 },
   };
   return {
     ...base(11),
@@ -106,8 +107,8 @@ describe('Replace Text grouped persistence', () => {
 
     harness.capability.createReplaceText(
       PAGE,
-      [textQuadFromRect(rect)],
-      { glyphQuad: textQuadFromRect(rect), advance: 1 },
+      [quadFromRect(rect)],
+      { glyphQuad: quadFromRect(rect), advance: 1 },
       'replace-text',
     );
     await vi.waitFor(() => expect(harness.create).toHaveBeenCalledTimes(2));
@@ -124,10 +125,9 @@ describe('Replace Text grouped persistence', () => {
       print: true,
     });
     const [caretId, strikeoutId] = harness.model().order;
-    expect(harness.model().byId[strikeoutId]).toMatchObject({
-      irt: caretId,
-      group: caretId,
-    });
+    const strikeout = harness.model().byId[strikeoutId]!.annotation;
+    expect(irtOf(strikeout)).toBe(caretId);
+    expect(groupOf(strikeout)).toBe(caretId);
     expect(harness.model().selected).toEqual([caretId, strikeoutId]);
   });
 
@@ -141,8 +141,8 @@ describe('Replace Text grouped persistence', () => {
 
     harness.capability.createReplaceText(
       PAGE,
-      [textQuadFromRect(rect)],
-      { glyphQuad: textQuadFromRect(rect), advance: 1 },
+      [quadFromRect(rect)],
+      { glyphQuad: quadFromRect(rect), advance: 1 },
       'replace-text',
     );
     await vi.waitFor(() => expect(harness.remove).toHaveBeenCalledWith(ref(10)));
@@ -187,18 +187,14 @@ describe('annotation flags', () => {
 
     harness.capability.updateSelectionFlags({ locked: true });
     // optimistic: the model flips immediately, source untouched (still baked)
-    expect(harness.model().byId[id].flags.locked).toBe(true);
+    expect(harness.model().byId[id].annotation.locked).toBe(true);
     expect(harness.model().byId[id].source).toBe('baked');
 
     await vi.waitFor(() => expect(harness.update).toHaveBeenCalledTimes(1));
     const [wref, patch] = harness.update.mock.calls[0]!;
     expect(wref).toEqual(ref(20));
-    // a flags-only patch: no geometry/style keys ride along, so nothing re-bakes
-    expect(patch).toEqual({
-      subtype: 'square',
-      ...NO_FLAGS,
-      locked: true,
-    });
+    // a flags-only patch, of the one flag that changed: nothing re-bakes
+    expect(patch).toEqual({ subtype: 'square', locked: true });
     // the re-sync preserves 'baked'
     await vi.waitFor(() => expect(harness.model().byId[id].source).toBe('baked'));
   });
@@ -222,7 +218,7 @@ describe('annotation flags', () => {
     harness.capability.select(ref(23));
     harness.update.mockResolvedValueOnce({ annotation: squareDTO(23) });
     harness.capability.updateSelectionFlags({ locked: false });
-    expect(harness.model().byId[id].flags.locked).toBe(false);
+    expect(harness.model().byId[id].annotation.locked).toBe(false);
     await vi.waitFor(() => expect(harness.update).toHaveBeenCalledTimes(1));
   });
 
@@ -230,19 +226,19 @@ describe('annotation flags', () => {
     const harness = createHarness();
     await loadPage(harness, [squareDTO(25)]);
     harness.update.mockResolvedValueOnce({ annotation: squareDTO(25, { hidden: true }) });
-    await harness.capability.update(ref(25), { flags: { hidden: true } });
+    await harness.capability.update(ref(25), { subtype: 'square', hidden: true });
     expect(harness.update.mock.calls[0]![1]).toEqual({ subtype: 'square', hidden: true });
   });
 
-  it('the data-API create defaults /F to print when the caller omits flags', async () => {
+  it('create writes the draft as given: printing is the engine’s default, not added', async () => {
     const harness = createHarness();
+    await harness.load([]);
     harness.create.mockResolvedValueOnce({ annotation: squareDTO(24) });
-    await harness.capability.createRaw(PAGE, {
+    await harness.capability.create(PAGE, {
       subtype: 'square',
-      rect: { x: 0, y: 0, width: 10, height: 10 },
       box: { x: 0, y: 0, width: 10, height: 10 },
-    } as Parameters<typeof harness.capability.createRaw>[1]);
-    expect(harness.create.mock.calls[0]![0]).toMatchObject({ print: true });
+    });
+    expect(harness.create.mock.calls[0]![0]).not.toHaveProperty('print');
   });
 });
 
@@ -255,8 +251,8 @@ describe('claimsTouchAt (touch consent)', () => {
     const rect = { x: 10, y: 20, width: 80, height: 15 };
     harness.capability.createReplaceText(
       PAGE,
-      [textQuadFromRect(rect)],
-      { glyphQuad: textQuadFromRect(rect), advance: 1 },
+      [quadFromRect(rect)],
+      { glyphQuad: quadFromRect(rect), advance: 1 },
       'replace-text',
     );
     await vi.waitFor(() => expect(harness.create).toHaveBeenCalledTimes(2));
@@ -408,11 +404,11 @@ describe('the records mirror', () => {
     const rect = { x: 10, y: 20, width: 80, height: 15 };
     harness.capability.createReplaceText(
       PAGE,
-      [textQuadFromRect(rect)],
-      { glyphQuad: textQuadFromRect(rect), advance: 1 },
+      [quadFromRect(rect)],
+      { glyphQuad: quadFromRect(rect), advance: 1 },
       'replace-text',
     );
-    const newIds = harness.model().order.filter((id) => id.startsWith('new:'));
+    const newIds = harness.model().order.filter((id) => id.startsWith('nm:'));
     expect(newIds.length).toBeGreaterThan(0);
 
     // obj:41 was deleted while the stream could not be trusted.
@@ -433,13 +429,13 @@ describe('the records mirror', () => {
     harness.create.mockImplementationOnce(async (draft: { nm: string }) => ({
       annotation: { ...hydrationSquare(60), nm: draft.nm },
     }));
-    const created = await harness.capability.create({
-      subtype: 'square',
-      page: PAGE,
-      bounds: { x: 10, y: 10, width: 50, height: 40 },
-      select: true,
-    });
-    expect(created).toEqual(ref(60));
+    const created = await harness.capability.create(
+      PAGE,
+      { subtype: 'square', box: { x: 10, y: 10, width: 50, height: 40 } },
+      undefined,
+      { select: true },
+    );
+    expect(created.annotation.ref).toEqual(ref(60));
     expect(harness.model().order).toEqual(['obj:60']);
     expect(harness.model().selected).toEqual(['obj:60']);
   });
@@ -453,7 +449,7 @@ describe('the records mirror', () => {
       annotation: hydrationSquare(70),
       appearance: { changed: true },
     });
-    await harness.capability.updateRaw(ref(70), { subtype: 'square', contents: 'x' } as never);
+    await harness.capability.update(ref(70), { subtype: 'square', contents: 'x' } as never);
     expect(updated).toHaveBeenCalledTimes(1);
     expect(updated.mock.calls[0]![0].origin).toEqual({
       locality: 'local',
@@ -633,7 +629,7 @@ describe('the comments lens', () => {
   const page2Root = (objectNumber: number): FileAnnotation =>
     ({
       ...hydrationSquare(objectNumber),
-      ref: { kind: 'objectNumber', page: PAGE2, objectNumber },
+      ref: { kind: 'objectNumber', page: PAGE2, objectNumber: objectNumber },
       page: PAGE2,
     }) as FileAnnotation;
 
@@ -695,7 +691,6 @@ describe('the comments lens', () => {
         contents: 'agreed',
         icon: 'comment',
         reply: { to: ref(20) }, // the root, not the reply
-        print: true,
         noZoom: true,
         noRotate: true,
       }),
@@ -914,12 +909,12 @@ describe('the twin law — authority fused into presentation and gestures', () =
     const harness = createHarness();
     harness.allowsAnnotationCreate.mockReturnValue(false);
     const rect = { x: 10, y: 20, width: 80, height: 15 };
-    harness.capability.createMarkup('highlight', PAGE, [textQuadFromRect(rect)], 'highlight');
-    harness.capability.createCaret(PAGE, { glyphQuad: textQuadFromRect(rect), advance: 1 });
+    harness.capability.createMarkup('highlight', PAGE, [quadFromRect(rect)], 'highlight');
+    harness.capability.createCaret(PAGE, { glyphQuad: quadFromRect(rect), advance: 1 });
     harness.capability.createReplaceText(
       PAGE,
-      [textQuadFromRect(rect)],
-      { glyphQuad: textQuadFromRect(rect), advance: 1 },
+      [quadFromRect(rect)],
+      { glyphQuad: quadFromRect(rect), advance: 1 },
       'replace-text',
     );
     await expect(harness.capability.createFromSelection('highlight')).rejects.toMatchObject({
@@ -944,13 +939,15 @@ describe('the twin law — authority fused into presentation and gestures', () =
     await harness.load([stamped(20, 'me')]);
     harness.capability.select(ref(20));
     const id = harness.model().order[0]!;
-    const before = harness.model().byId[id]!.style.color;
+    const before = styleOf(harness.model().byId[id]!.annotation).color;
     harness.update.mockRejectedValueOnce(new Error('Forbidden'));
     harness.capability.updateSelection({ color: '#00ff00' });
     // optimistic first…
-    expect(harness.model().byId[id]!.style.color).toBe('#00ff00');
+    expect(styleOf(harness.model().byId[id]!.annotation).color).toBe('#00ff00');
     // …then the refusal restores the pre-patch annotation.
-    await vi.waitFor(() => expect(harness.model().byId[id]!.style.color).toBe(before));
+    await vi.waitFor(() =>
+      expect(styleOf(harness.model().byId[id]!.annotation).color).toBe(before),
+    );
   });
 });
 
@@ -1064,19 +1061,19 @@ describe.each([
     actions: null,
   } as unknown as FileAnnotation;
 
-  it('a programmatic update keeps the raster and fetches the one the engine re-baked', async () => {
+  it('a programmatic restyle draws live, like the same edit made by hand, and stays live', async () => {
     const harness = createHarness();
     await harness.load([dto]);
     expect(harness.capability.listPageItems(PAGE)[0].source).toBe('baked');
-    const epoch = harness.capability.getAppearanceEpoch(PAGE);
 
     const updated = { ...dto, strokeWidth: 2 };
     harness.update.mockResolvedValueOnce({ annotation: updated, appearance: { changed: true } });
-    await harness.capability.updateRaw(dto.ref, { subtype, strokeWidth: 2 });
+    await harness.capability.update(dto.ref, { subtype, strokeWidth: 2 });
 
-    expect(harness.capability.getRaw(dto.ref)).toEqual(harness.read(updated));
-    expect(harness.capability.listPageItems(PAGE)[0].source).toBe('baked');
-    expect(harness.capability.getAppearanceEpoch(PAGE)).not.toBe(epoch);
+    expect(harness.capability.get(dto.ref)).toEqual(harness.read(updated));
+    expect(harness.capability.listPageItems(PAGE)[0].source).toBe('vector');
+    // A record drawn live is no part of the page's raster.
+    expect(harness.capability.getAppearanceEpoch(PAGE)).toBe('');
   });
 
   it('preserves vector rendering through consecutive local edits and engine responses', async () => {
@@ -1099,7 +1096,7 @@ describe.each([
 
       finishWrite({ annotation: updated, appearance: { changed: true } });
       await vi.waitFor(() =>
-        expect(harness.capability.getRaw(dto.ref)).toEqual(harness.read(updated)),
+        expect(harness.capability.get(dto.ref)).toEqual(harness.read(updated)),
       );
 
       expect(harness.capability.listPageItems(PAGE)[0].source).toBe('vector');
@@ -1111,6 +1108,7 @@ describe.each([
 describe('distance authoring and recalibration', () => {
   it('uses the viewport at the first point, retaining that snapshot throughout the drag', async () => {
     const harness = createHarness();
+    harness.seedToolDefaults();
     const { measureFromKnownLength } = await import('@embedpdf/engine-core/runtime');
     const fallback = measureFromKnownLength(100, { value: 1, unit: 'm' });
     const region = measureFromKnownLength(100, { value: 10, unit: 'ft' });
@@ -1150,13 +1148,14 @@ describe('distance authoring and recalibration', () => {
       expect.objectContaining({
         intent: 'line-dimension',
         measure: region,
-        contents: '20.00 ft',
         captionEnabled: true,
         captionPosition: 'inline',
         leader: { length: 12, extension: 5, offset: 0 },
       }),
     );
-    await vi.waitFor(() => expect(harness.capability.getRaw(ref(71))).toBeTruthy());
+    // The label is the engine's: it works it out from the points and the scale.
+    expect(harness.create.mock.calls[0]![0]).not.toHaveProperty('contents');
+    await vi.waitFor(() => expect(harness.capability.get(ref(71))).toBeTruthy());
     expect(harness.capability.listPageItems(PAGE)[0].source).toBe('vector');
     expect(harness.capability.getAppearanceEpoch(PAGE)).toBe('');
     expect(harness.capability.comments.getPermissions(ref(71)).canEditText).toBe(false);
@@ -1166,6 +1165,7 @@ describe('distance authoring and recalibration', () => {
   });
   it('does not create over a winning foreign viewport or before viewport hydration', async () => {
     const harness = createHarness();
+    harness.seedToolDefaults();
     const { measureFromRatio } = await import('@embedpdf/engine-core/runtime');
     harness.capability.createPointer('distance', 'down', PAGE, { x: 20, y: 20 });
     expect(harness.model().draft).toBeNull();
@@ -1244,6 +1244,7 @@ describe('distance authoring and recalibration', () => {
 describe.each(['area', 'perimeter'])('%s scale resolution', (tool) => {
   it('freezes the first viewport through multiple vertices and writes shape caption defaults', async () => {
     const harness = createHarness();
+    harness.seedToolDefaults();
     const { measureFromKnownLength } = await import('@embedpdf/engine-core/runtime');
     const region = measureFromKnownLength(100, { value: 10, unit: 'm' });
     const fallback = measureFromKnownLength(100, { value: 1, unit: 'm' });
@@ -1284,20 +1285,18 @@ describe.each(['area', 'perimeter'])('%s scale resolution', (tool) => {
     harness.capability.createPointer(tool, 'down', PAGE, { x: 220, y: 120 });
     harness.capability.finishCreationDraft();
     expect(harness.create).toHaveBeenCalledWith(
-      expect.objectContaining({
-        subtype,
-        measure: region,
-        captionEnabled: true,
-        contents: tool === 'area' ? '100.00 m²' : '30.00 m',
-      }),
+      expect.objectContaining({ subtype, measure: region, captionEnabled: true }),
     );
-    await vi.waitFor(() => expect(harness.capability.getRaw(ref(75))).toBeTruthy());
+    // The label is the engine's: it works it out from the points and the scale.
+    expect(harness.create.mock.calls[0]![0]).not.toHaveProperty('contents');
+    await vi.waitFor(() => expect(harness.capability.get(ref(75))).toBeTruthy());
     expect(harness.capability.listPageItems(PAGE)[0].source).toBe('vector');
     expect(harness.capability.getAppearanceEpoch(PAGE)).toBe('');
   });
 
   it('rejects unhydrated, foreign and unauthorized creation without starting a draft', async () => {
     const harness = createHarness();
+    harness.seedToolDefaults();
     const { measureFromRatio } = await import('@embedpdf/engine-core/runtime');
     harness.capability.createPointer(tool, 'down', PAGE, { x: 20, y: 20 });
     expect(harness.model().draft).toBeNull();

@@ -370,18 +370,26 @@ export type PointIn<S extends Space> = Point & SpaceBrand<S>;
 export type RectIn<S extends Space> = Rect & SpaceBrand<S>;
 
 /**
- * Four positional points (no corner semantics) — the viewer twin of the engine's
- * `PdfQuad`. Use this (via {@link applyQuad}) for rotatable/skewed content where
- * an axis-aligned rect would lie.
+ * A quad: four corners named in the text's own upright frame, the viewer twin
+ * of the engine's `PageQuad`. `upper` is the ascent side and `lower` the
+ * baseline side; `left` to `right` runs along the frame's x axis. The names
+ * are neither screen directions nor reading order: text turned 180° has its
+ * `upperLeft` at the bottom right, and right-to-left text still runs from
+ * `left` to `right`. In y-down page space an upright quad has `upper*` at the
+ * smaller y. Use it (via {@link applyQuad}) for text and any content that can
+ * turn or skew, where an axis-aligned rect would lie.
  */
 export interface Quad {
-  p1: Point;
-  p2: Point;
-  p3: Point;
-  p4: Point;
+  upperLeft: Point;
+  upperRight: Point;
+  lowerLeft: Point;
+  lowerRight: Point;
 }
 /** A quad tagged with its coordinate space. */
 export type QuadIn<S extends Space> = Quad & SpaceBrand<S>;
+
+/** Four points as a polygon ring, for `<polygon>`, fills and hit tests. */
+export type QuadRing = [Point, Point, Point, Point];
 
 /**
  * A 2D affine transform from space `From` to space `To`, stored as the six
@@ -474,16 +482,16 @@ export function applyRect<F extends Space, T extends Space>(
   } as RectIn<T>;
 }
 
-/** Apply a transform to a quad, preserving orientation (maps the four points). */
+/** Apply a transform to a quad: each corner moves and keeps its name. */
 export function applyQuad<F extends Space, T extends Space>(
   matrix: Mat2D<F, T>,
   quad: QuadIn<F>,
 ): QuadIn<T> {
   return {
-    p1: applyPoint(matrix, quad.p1 as PointIn<F>),
-    p2: applyPoint(matrix, quad.p2 as PointIn<F>),
-    p3: applyPoint(matrix, quad.p3 as PointIn<F>),
-    p4: applyPoint(matrix, quad.p4 as PointIn<F>),
+    upperLeft: applyPoint(matrix, quad.upperLeft as PointIn<F>),
+    upperRight: applyPoint(matrix, quad.upperRight as PointIn<F>),
+    lowerLeft: applyPoint(matrix, quad.lowerLeft as PointIn<F>),
+    lowerRight: applyPoint(matrix, quad.lowerRight as PointIn<F>),
   } as QuadIn<T>;
 }
 
@@ -582,209 +590,59 @@ export function rotateScaleMatrix(
   }
 }
 
-/* ── TextQuad — corner-named quads for text-anchored geometry ──────────────
- *
- * {@link Quad} is deliberately positional (no corner guarantee) because
- * imported PDF quads have chaotic corner orders. TextQuad is the semantic
- * counterpart for quads whose orientation is known — produced only by code
- * that established it (selection segments, glyph cells, or `normalizeQuad`
- * at an ingest boundary), never by casting.
- *
- * Corner names are frame-geometric in the text's own upright frame:
- * `upper` is the ascent side, `lower` the baseline side, and `start` → `end`
- * runs along the frame's +x. Visual semantics — deliberately not reading
- * order: bidi/advance direction is a glyph-sequence concern carried
- * separately where consumers need it. In y-down page space an upright
- * TextQuad has `upper*` at the smaller y.
- */
+/* ── Quad helpers ─────────────────────────────────────────────────────── */
 
-export interface TextQuad {
-  upperStart: Point;
-  upperEnd: Point;
-  lowerStart: Point;
-  lowerEnd: Point;
-}
-
-/** A TextQuad tagged with its coordinate space. */
-export type TextQuadIn<S extends Space> = TextQuad & SpaceBrand<S>;
-
-/** Axis-aligned TextQuad over a rect (y-down: upper = smaller y). */
-export function textQuadFromRect(rect: Rect): TextQuad {
+/** An upright quad over a rect (y-down: upper = smaller y). */
+export function quadFromRect(rect: Rect): Quad {
   return {
-    upperStart: { x: rect.x, y: rect.y },
-    upperEnd: { x: rect.x + rect.width, y: rect.y },
-    lowerStart: { x: rect.x, y: rect.y + rect.height },
-    lowerEnd: { x: rect.x + rect.width, y: rect.y + rect.height },
+    upperLeft: { x: rect.x, y: rect.y },
+    upperRight: { x: rect.x + rect.width, y: rect.y },
+    lowerLeft: { x: rect.x, y: rect.y + rect.height },
+    lowerRight: { x: rect.x + rect.width, y: rect.y + rect.height },
   };
 }
 
-/** The four corners in slot order: upper-start, upper-end, lower-start, lower-end. */
-export function textQuadPoints(quad: TextQuad): [Point, Point, Point, Point] {
-  return [quad.upperStart, quad.upperEnd, quad.lowerStart, quad.lowerEnd];
+/** The four corners: upper-left, upper-right, lower-left, lower-right. */
+export function quadCorners(quad: Quad): [Point, Point, Point, Point] {
+  return [quad.upperLeft, quad.upperRight, quad.lowerLeft, quad.lowerRight];
 }
 
-/** The corners as a polygon ring (US → UE → LE → LS) — for `<polygon>`/fills. */
-export function textQuadRing(quad: TextQuad): [Point, Point, Point, Point] {
-  return [quad.upperStart, quad.upperEnd, quad.lowerEnd, quad.lowerStart];
+/** The corners as a polygon ring: upper-left, upper-right, lower-right, lower-left. */
+export function quadRing(quad: Quad): QuadRing {
+  return [quad.upperLeft, quad.upperRight, quad.lowerRight, quad.lowerLeft];
 }
 
 /**
- * One side edge of the cell — the start (`US → LS`) or end (`UE → LE`) edge,
+ * One side edge of the cell, the left (`UL → LL`) or right (`UR → LR`) one,
  * ascent corner first. This is the segment a caret or a selection handle
  * occupies: its length is the glyph's ink height in the text's own frame (not
  * the AABB height, which grows with tilt), and its direction carries the
  * text's rotation. Which side is the selection's leading edge is a reading
  * -order question — decide it with `advance`, not with geometry.
  */
-export function textQuadEdge(quad: TextQuad, side: 'start' | 'end'): [Point, Point] {
-  return side === 'start' ? [quad.upperStart, quad.lowerStart] : [quad.upperEnd, quad.lowerEnd];
+export function quadEdge(quad: Quad, side: 'left' | 'right'): [Point, Point] {
+  return side === 'left' ? [quad.upperLeft, quad.lowerLeft] : [quad.upperRight, quad.lowerRight];
 }
 
 /** Corner-wise equality — an AABB comparison would call a quad that rotated
  *  in place "unchanged"; corners cannot. (Change-detection for quad consumers.) */
-export function textQuadEquals(left: TextQuad, right: TextQuad): boolean {
+export function quadEquals(left: Quad, right: Quad): boolean {
   const eq = (point: Point, other: Point) => point.x === other.x && point.y === other.y;
   return (
-    eq(left.upperStart, right.upperStart) &&
-    eq(left.upperEnd, right.upperEnd) &&
-    eq(left.lowerStart, right.lowerStart) &&
-    eq(left.lowerEnd, right.lowerEnd)
+    eq(left.upperLeft, right.upperLeft) &&
+    eq(left.upperRight, right.upperRight) &&
+    eq(left.lowerLeft, right.lowerLeft) &&
+    eq(left.lowerRight, right.lowerRight)
   );
 }
 
-/** Axis-aligned bounds of a TextQuad. */
-export function textQuadBounds(quad: TextQuad): Rect {
-  const xs = [quad.upperStart.x, quad.upperEnd.x, quad.lowerStart.x, quad.lowerEnd.x];
-  const ys = [quad.upperStart.y, quad.upperEnd.y, quad.lowerStart.y, quad.lowerEnd.y];
+/** Axis-aligned bounds of a quad. */
+export function quadBounds(quad: Quad): Rect {
+  const xs = [quad.upperLeft.x, quad.upperRight.x, quad.lowerLeft.x, quad.lowerRight.x];
+  const ys = [quad.upperLeft.y, quad.upperRight.y, quad.lowerLeft.y, quad.lowerRight.y];
   const minX = Math.min(...xs);
   const minY = Math.min(...ys);
   return { x: minX, y: minY, width: Math.max(...xs) - minX, height: Math.max(...ys) - minY };
 }
 
-/** Map a TextQuad through an affine transform (corner semantics ride along). */
-export function applyTextQuad<F extends Space, T extends Space>(
-  matrix: Mat2D<F, T>,
-  textQuad: TextQuadIn<F>,
-): TextQuadIn<T> {
-  return {
-    upperStart: applyPoint(matrix, textQuad.upperStart as PointIn<F>),
-    upperEnd: applyPoint(matrix, textQuad.upperEnd as PointIn<F>),
-    lowerStart: applyPoint(matrix, textQuad.lowerStart as PointIn<F>),
-    lowerEnd: applyPoint(matrix, textQuad.lowerEnd as PointIn<F>),
-  } as TextQuadIn<T>;
-}
-
-/** Serialize to the positional zigzag convention (`p1..p4` = US, UE, LS, LE). */
-export function positionalQuad(quad: TextQuad): Quad {
-  return { p1: quad.upperStart, p2: quad.upperEnd, p3: quad.lowerStart, p4: quad.lowerEnd };
-}
-
-/**
- * Read a trusted producer's positional quad (`p1..p4` = US, UE, LS, LE), such
- * as the engine's text segments and glyph cells, as a TextQuad: the inverse of
- * {@link positionalQuad}. A quad of unknown order (an imported `/QuadPoints`)
- * goes through {@link normalizeQuad} instead.
- */
-export function textQuadFromPositional(quad: Quad): TextQuad {
-  return { upperStart: quad.p1, upperEnd: quad.p2, lowerStart: quad.p3, lowerEnd: quad.p4 };
-}
-
-const QUAD_EPSILON = 1e-6;
-
-type QuadCornerList = [Point, Point, Point, Point];
-
-function finitePoint(point: Point): boolean {
-  return Number.isFinite(point.x) && Number.isFinite(point.y);
-}
-
-/** Is `[us, ue, ls, le]` a well-formed zigzag reading of a quad? */
-function zigzagWellFormed([us, ue, ls, le]: QuadCornerList): boolean {
-  if (![us, ue, ls, le].every(finitePoint)) return false;
-  const upper = { x: ue.x - us.x, y: ue.y - us.y };
-  const lower = { x: le.x - ls.x, y: le.y - ls.y };
-  const startSide = { x: ls.x - us.x, y: ls.y - us.y };
-  const endSide = { x: le.x - ue.x, y: le.y - ue.y };
-  const lenU = Math.hypot(upper.x, upper.y);
-  const lenL = Math.hypot(lower.x, lower.y);
-  const lenS = Math.hypot(startSide.x, startSide.y);
-  const lenE = Math.hypot(endSide.x, endSide.y);
-  if (lenU <= QUAD_EPSILON || lenL <= QUAD_EPSILON || lenS <= QUAD_EPSILON || lenE <= QUAD_EPSILON)
-    return false;
-  // Opposite edges roughly parallel, same direction (rejects crossed/reversed).
-  if (upper.x * lower.x + upper.y * lower.y <= 0) return false;
-  if (startSide.x * endSide.x + startSide.y * endSide.y <= 0) return false;
-  // Usable area, consistent winding on both ends.
-  const startArea = upper.x * startSide.y - upper.y * startSide.x;
-  const endArea = lower.x * endSide.y - lower.y * endSide.x;
-  if (Math.abs(startArea) <= QUAD_EPSILON * lenU * lenS) return false;
-  if (Math.abs(endArea) <= QUAD_EPSILON * lenL * lenE) return false;
-  return Math.sign(startArea) === Math.sign(endArea);
-}
-
-/**
- * Interpret an arbitrary positional quad (an imported `/QuadPoints` entry,
- * already in page space) as a TextQuad — a normalizer, not a cast:
- *
- *   1. the de-facto zigzag order (US, UE, LS, LE) passes through untouched —
- *      this covers every well-formed writer, rotated quads included;
- *   2. the common ring order (US, UE, LE, LS) is recognized and repaired;
- *   3. anything else gets a deterministic geometric labeling: corners sorted
- *      into a ring around their centroid, "upper" = the edge whose midpoint
- *      sits highest on screen (smallest y). The 180° "which side is up"
- *      ambiguity is unresolvable from geometry alone — convention decides.
- *
- * Drawing code downstream (`markupScene`) reads corner semantics, so a
- * mislabeled import can shift an underline to the wrong edge but can never
- * crash or self-intersect.
- */
-export function normalizeQuad(quad: Quad): TextQuad {
-  const zigzag: QuadCornerList = [quad.p1, quad.p2, quad.p3, quad.p4];
-  if (zigzagWellFormed(zigzag)) {
-    return { upperStart: quad.p1, upperEnd: quad.p2, lowerStart: quad.p3, lowerEnd: quad.p4 };
-  }
-  const ring: QuadCornerList = [quad.p1, quad.p2, quad.p4, quad.p3];
-  if (zigzagWellFormed(ring)) {
-    return { upperStart: quad.p1, upperEnd: quad.p2, lowerStart: quad.p4, lowerEnd: quad.p3 };
-  }
-
-  // Deterministic fallback for degenerate/garbage producers.
-  const points = [quad.p1, quad.p2, quad.p3, quad.p4].map((point) =>
-    finitePoint(point) ? point : { x: 0, y: 0 },
-  );
-  const cx = (points[0].x + points[1].x + points[2].x + points[3].x) / 4;
-  const cy = (points[0].y + points[1].y + points[2].y + points[3].y) / 4;
-  const ringSorted = [...points].sort(
-    (left, right) => Math.atan2(left.y - cy, left.x - cx) - Math.atan2(right.y - cy, right.x - cx),
-  );
-  // Pick the ring edge whose midpoint sits highest on screen as the upper edge.
-  let upperEdge = 0;
-  let bestY = Infinity;
-  for (let i = 0; i < 4; i++) {
-    const midY = (ringSorted[i].y + ringSorted[(i + 1) % 4].y) / 2;
-    if (midY < bestY) {
-      bestY = midY;
-      upperEdge = i;
-    }
-  }
-  const upperFirst = ringSorted[upperEdge];
-  const upperSecond = ringSorted[(upperEdge + 1) % 4];
-  const lowerSecond = ringSorted[(upperEdge + 2) % 4];
-  const lowerFirst = ringSorted[(upperEdge + 3) % 4];
-  // Ring [upperFirst, upperSecond, lowerSecond, lowerFirst] with upper edge
-  // upperFirst→upperSecond ⇒ the opposite edge runs lowerFirst→lowerSecond.
-  const startFirst = upperFirst.x <= upperSecond.x;
-  return startFirst
-    ? {
-        upperStart: upperFirst,
-        upperEnd: upperSecond,
-        lowerStart: lowerFirst,
-        lowerEnd: lowerSecond,
-      }
-    : {
-        upperStart: upperSecond,
-        upperEnd: upperFirst,
-        lowerStart: lowerSecond,
-        lowerEnd: lowerFirst,
-      };
-}
 export * from './page-space';

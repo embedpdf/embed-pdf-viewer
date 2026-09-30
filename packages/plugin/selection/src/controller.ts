@@ -8,13 +8,7 @@ import {
   type PageObjectNumber,
   type PageRef,
 } from '@embedpdf/core';
-import {
-  boundsOfRects,
-  textQuadBounds,
-  textQuadFromPositional,
-  type Point,
-  type Rect,
-} from '@embedpdf/core-geometry';
+import { boundsOfRects, quadBounds, type Point, type Rect } from '@embedpdf/core-geometry';
 import {
   sliceText,
   toPageRef,
@@ -33,7 +27,7 @@ import type {
   SelectionSnapshot,
   TextRange,
 } from './contract';
-import { selectionSegmentOf, type SelectionSegment } from './geometry';
+import type { SelectionSegment } from './geometry';
 import type { SelectionHostCapability } from './host-contract';
 import {
   clearSelection,
@@ -194,9 +188,7 @@ export function createSelectionController(
       }
       const from = i === startPageIndex ? start.glyph : 0;
       const to = i === endPageIndex ? end.glyph : textLayout.charCount - 1;
-      segments[page.objectNumber] = textLayout
-        .segments({ start: from, count: to - from + 1 })
-        .map((segment) => selectionSegmentOf(segment));
+      segments[page.objectNumber] = textLayout.segments({ start: from, count: to - from + 1 });
     }
     ctx.state.update(setSelection, clamped, segments);
   }
@@ -267,12 +259,11 @@ export function createSelectionController(
     const textLayout = geometryFor(position.page);
     const cell = textLayout ? textLayout.charQuad(position.glyph) : null;
     if (textLayout && cell) {
-      const glyphQuad = textQuadFromPositional(cell);
       return {
         page: position.page,
-        glyphQuad,
+        glyphQuad: cell,
         advance: segment.advance,
-        rect: textQuadBounds(glyphQuad),
+        rect: quadBounds(cell),
       };
     }
     return {

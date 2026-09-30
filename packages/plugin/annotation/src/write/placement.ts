@@ -1,19 +1,15 @@
-import type { AnnotationProps, Subtype } from '@embedpdf/core-annotation';
+import type { FieldValues, KindName } from '@embedpdf/core-annotation';
 import type {
   AnnotationDraft,
   AnnotationFlags,
   AnnotationResources,
   AttachmentFileSource,
-  FileAttachmentIcon,
-  NoteIcon,
   PageBox,
 } from '@embedpdf/engine-core/runtime';
 
-import { hexColorOf } from '../repository';
-
 /**
  * Per-kind code for the click-to-place icon kinds (note / file attachment)
- * — the `props.ts`/`repository.ts` pattern: all tool config stays in the
+ * — the `props.ts` pattern: all tool config stays in the
  * tool table; this module only interprets it. The stamp keeps its own
  * sizing/sniffing path in the capability; everything funnels through the
  * one `placeAt` entry there.
@@ -27,45 +23,35 @@ export const ICON_PLACE_SIZE = { width: 20, height: 20 } as const;
 
 export type IconPlaceKind = 'text' | 'file-attachment';
 
-export const isIconPlaceKind = (subtype: Subtype): subtype is IconPlaceKind =>
+export const isIconPlaceKind = (subtype: KindName): subtype is IconPlaceKind =>
   subtype === 'text' || subtype === 'file-attachment';
 
 /**
  * Build the engine create for a placed icon annotation: its data, and for a
  * file attachment the file's bytes as the `file` resource. `geometry` is the
- * icon's `rect`; `defaults` is the tool's resolved flat props bag
- * (`defaultsFor`); the icon falls back to the kind's own default when the
- * bag carries none.
+ * icon's `rect`; `defaults` are the tool's (`defaultsFor`): its icon, colour
+ * and opacity. What they leave out takes the engine's defaults.
  */
 export function iconPlacement(
   subtype: IconPlaceKind,
   geometry: { rect: PageBox },
-  defaults: AnnotationProps,
+  defaults: FieldValues,
   flags: Partial<AnnotationFlags> | undefined,
   file: AttachmentFileSource | null,
 ): { data: AnnotationDraft; resources?: AnnotationResources } {
-  const shared = {
-    ...geometry,
-    color: hexColorOf(defaults.color),
-    opacity: defaults.opacity,
-    // A fresh placement carries print (Acrobat parity) plus the tool's seed
-    // (the note/attachment tools pass noZoom + noRotate).
-    print: true,
-    ...flags,
-  };
-  if (subtype === 'text') {
-    return { data: { subtype: 'text', icon: (defaults.icon as NoteIcon) ?? 'comment', ...shared } };
-  }
+  // The tool's seed (the note/attachment tools pass noZoom + noRotate); a
+  // new annotation prints by the engine's default.
+  const shared = { ...defaults, ...geometry, ...flags };
+  if (subtype === 'text') return { data: { ...shared, subtype: 'text' } as AnnotationDraft };
   if (!file) {
     throw new Error('[annotation] a file-attachment placement requires a file payload');
   }
   return {
     data: {
-      subtype: 'file-attachment',
-      icon: (defaults.icon as FileAttachmentIcon) ?? 'paperclip',
-      file: attachmentMetadataOf(file),
       ...shared,
-    },
+      subtype: 'file-attachment',
+      file: attachmentMetadataOf(file),
+    } as AnnotationDraft,
     resources: { file: file.data instanceof ArrayBuffer ? new Uint8Array(file.data) : file.data },
   };
 }

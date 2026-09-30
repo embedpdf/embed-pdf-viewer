@@ -9,21 +9,16 @@
  * the same result, so preview ≡ commit by construction.
  *
  * It deliberately returns logical geometry: no annotation visual semantics
- * (no cloudy-border outer-box expansion, no ellipse) — a form field takes
- * `rect` straight to `doc.forms.createField`. The annotation-only conversion
- * to a committable/renderable `ModelGeometry` is {@link clickCreateGeom} below; that
- * is where `shapeRectFor` and ellipse semantics apply.
+ * (no ellipse) — a form field takes `rect` straight to
+ * `doc.forms.createField`. The annotation-only conversion to a
+ * committable/renderable `Shape` is {@link clickCreateGeom} below; that
+ * is where ellipse semantics apply.
  */
-import {
-  rectFromPoints,
-  shapeRectFor,
-  transposedAboutCenter,
-  uprightAnchoredRect,
-  uprightRotation,
-} from './geometry';
-import { styleFromProps } from './props';
+import { transposedAboutCenter, uprightAnchoredRect, uprightRotation } from './geometry';
+import { rectFromPoints } from './rect';
 import type { PageRotation } from '@embedpdf/core-geometry';
-import type { AnnotationProps, ClickCreate, ModelGeometry, Rect, Subtype, Point } from './types';
+import type { LineEndings } from '@embedpdf/engine-core/runtime';
+import type { ClickCreate, Shape, Rect, KindName, Point } from './types';
 
 /** A resolved click placement: what the click will occupy, page-clamped. */
 export type ClickPlacement =
@@ -91,33 +86,33 @@ export function resolveClickPlacement(
 }
 
 /**
- * Annotation-only: convert a placement into the `ModelGeometry` the commit stores and
+ * Annotation-only: convert a placement into the `Shape` the commit stores and
  * the ghost paints, for a routing kind. This is where annotation visual
- * semantics live — ellipse for circles, the cloudy outer-box via
- * `shapeRectFor`. Forms never call this; a field box is the placement rect
+ * semantics live — the ellipse for circles; a cloud reaches out from the
+ * placed box. Forms never call this; a field box is the placement rect
  * itself. Null for kinds a click cannot author.
  */
 export function clickCreateGeom(
-  subtype: Subtype,
+  subtype: KindName,
   placement: ClickPlacement,
-  definition: AnnotationProps,
-): ModelGeometry | null {
+  lineEndings: LineEndings,
+): Shape | null {
   if (placement.kind === 'segment') {
     return subtype === 'line'
-      ? { kind: 'line', a: placement.a, b: placement.b, ends: definition.lineEndings }
+      ? {
+          kind: 'line',
+          linePoints: { start: placement.a, end: placement.b },
+          lineEndings,
+          rotation: 0,
+        }
       : null;
   }
   const { rect, rot } = placement;
   if (subtype === 'free-text') {
-    return { kind: 'text', rect, ...(rot ? { rot } : {}) };
+    return { kind: 'text-box', box: rect, rotation: rot, calloutLine: null, lineEnding: null };
   }
   if (subtype === 'square' || subtype === 'circle') {
-    return {
-      kind: 'rect',
-      rect: shapeRectFor(rect, subtype === 'circle', styleFromProps(definition)),
-      ellipse: subtype === 'circle',
-      ...(rot ? { rot } : {}),
-    };
+    return { kind: 'box', box: rect, rotation: rot, ellipse: subtype === 'circle' };
   }
   return null;
 }

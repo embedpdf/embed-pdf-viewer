@@ -62,8 +62,8 @@ export function pdfRectFromOriginSize(o: PdfOriginSize): PdfRect {
  * rendering and hit-testing want.
  */
 export function pdfQuadBounds(q: PdfQuad): PdfRect {
-  const xs = [q.p1.x, q.p2.x, q.p3.x, q.p4.x];
-  const ys = [q.p1.y, q.p2.y, q.p3.y, q.p4.y];
+  const xs = [q.upperLeft.x, q.upperRight.x, q.lowerLeft.x, q.lowerRight.x];
+  const ys = [q.upperLeft.y, q.upperRight.y, q.lowerLeft.y, q.lowerRight.y];
   return {
     left: Math.min(...xs),
     right: Math.max(...xs),
@@ -72,39 +72,85 @@ export function pdfQuadBounds(q: PdfQuad): PdfRect {
   };
 }
 
-/** Named corners of a quad, in PDF user space (y-up). */
-export interface PdfQuadCorners {
-  topLeft: PdfPoint;
-  topRight: PdfPoint;
-  bottomLeft: PdfPoint;
-  bottomRight: PdfPoint;
+/** A `/QuadPoints` entry's four points, in the order the file gives them. */
+export type PdfQuadPoints = readonly [PdfPoint, PdfPoint, PdfPoint, PdfPoint];
+
+const QUAD_EPSILON = 1e-6;
+
+const isFinitePoint = (point: PdfPoint) => Number.isFinite(point.x) && Number.isFinite(point.y);
+
+/** Whether the four points, read as upper-left, upper-right, lower-left, lower-right, make a quad. */
+function isZigzagQuad([ul, ur, ll, lr]: PdfQuadPoints): boolean {
+  if (![ul, ur, ll, lr].every(isFinitePoint)) return false;
+  const upper = { x: ur.x - ul.x, y: ur.y - ul.y };
+  const lower = { x: lr.x - ll.x, y: lr.y - ll.y };
+  const left = { x: ll.x - ul.x, y: ll.y - ul.y };
+  const right = { x: lr.x - ur.x, y: lr.y - ur.y };
+  const lengths = [upper, lower, left, right].map((edge) => Math.hypot(edge.x, edge.y));
+  if (lengths.some((length) => length <= QUAD_EPSILON)) return false;
+  // Opposite edges run the same way: a crossed or reversed order fails here.
+  if (upper.x * lower.x + upper.y * lower.y <= 0) return false;
+  if (left.x * right.x + left.y * right.y <= 0) return false;
+  // Both ends have area and turn the same way.
+  const leftArea = upper.x * left.y - upper.y * left.x;
+  const rightArea = lower.x * right.y - lower.y * right.x;
+  if (Math.abs(leftArea) <= QUAD_EPSILON * lengths[0] * lengths[2]) return false;
+  if (Math.abs(rightArea) <= QUAD_EPSILON * lengths[1] * lengths[3]) return false;
+  return Math.sign(leftArea) === Math.sign(rightArea);
 }
 
 /**
- * Axis-aligned named-corner interpretation of a quad.
+ * Name the corners of a `/QuadPoints` entry. Writers disagree on the order,
+ * so every quad read from a file passes through here, and the corner names
+ * hold once, centrally:
  *
- * Valid only for upright (non-rotated, non-skewed) quads: it is derived from
- * the enclosing bounds, so for rotated/skewed quads it returns the bounding
- * box corners, not the true geometric corners. For arbitrary quads use the
- * positional `p1..p4` or `pdfQuadBounds` directly.
+ *   1. the order Acrobat writes and reads (upper-left, upper-right,
+ *      lower-left, lower-right) is kept, turned quads included;
+ *   2. the ring order some writers use (upper-left, upper-right, lower-right,
+ *      lower-left) is repaired;
+ *   3. anything else is named from its shape: the corners go round their
+ *      middle, the edge highest on the page (largest y) is the upper one, and
+ *      its end with the smaller x is the left. Which side of a quad is up
+ *      cannot be told from four points alone; this rule decides it.
+ *
+ * A misnamed quad can move an underline to the wrong edge, never cross it.
  */
-export function pdfQuadCorners(q: PdfQuad): PdfQuadCorners {
-  const b = pdfQuadBounds(q);
-  return {
-    topLeft: { x: b.left, y: b.top },
-    topRight: { x: b.right, y: b.top },
-    bottomLeft: { x: b.left, y: b.bottom },
-    bottomRight: { x: b.right, y: b.bottom },
-  };
-}
+export function normalizePdfQuad(points: PdfQuadPoints): PdfQuad {
+  const [first, second, third, fourth] = points;
+  if (isZigzagQuad(points)) {
+    return { upperLeft: first, upperRight: second, lowerLeft: third, lowerRight: fourth };
+  }
+  if (isZigzagQuad([first, second, fourth, third])) {
+    return { upperLeft: first, upperRight: second, lowerLeft: fourth, lowerRight: third };
+  }
 
-/**
- * Build a quad from named corners, in PDFium `FS_QUADPOINTSF` slot order
- * (`p1 = topLeft`, `p2 = topRight`, `p3 = bottomLeft`, `p4 = bottomRight`).
- * The inverse of `pdfQuadCorners` for upright quads.
- */
-export function pdfQuadFromCorners(c: PdfQuadCorners): PdfQuad {
-  return { p1: c.topLeft, p2: c.topRight, p3: c.bottomLeft, p4: c.bottomRight };
+  const finite = points.map((point) => (isFinitePoint(point) ? point : { x: 0, y: 0 }));
+  const cx = finite.reduce((sum, point) => sum + point.x, 0) / 4;
+  const cy = finite.reduce((sum, point) => sum + point.y, 0) / 4;
+  const ring = [...finite].sort(
+    (a, b) => Math.atan2(a.y - cy, a.x - cx) - Math.atan2(b.y - cy, b.x - cx),
+  );
+  let upper = 0;
+  for (let i = 1; i < 4; i++) {
+    if (ring[i].y + ring[(i + 1) % 4].y > ring[upper].y + ring[(upper + 1) % 4].y) upper = i;
+  }
+  // Round the ring: upperEnds[0], upperEnds[1], lowerEnds[1], lowerEnds[0].
+  const upperEnds = [ring[upper], ring[(upper + 1) % 4]];
+  const lowerEnds = [ring[(upper + 3) % 4], ring[(upper + 2) % 4]];
+  const leftFirst = upperEnds[0].x <= upperEnds[1].x;
+  return leftFirst
+    ? {
+        upperLeft: upperEnds[0],
+        upperRight: upperEnds[1],
+        lowerLeft: lowerEnds[0],
+        lowerRight: lowerEnds[1],
+      }
+    : {
+        upperLeft: upperEnds[1],
+        upperRight: upperEnds[0],
+        lowerLeft: lowerEnds[1],
+        lowerRight: lowerEnds[0],
+      };
 }
 
 /**

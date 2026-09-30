@@ -1,6 +1,5 @@
 import { fitStampBox, type Rect, type Point } from '@embedpdf/core-annotation';
 import {
-  annotationKey,
   resolveBinarySource,
   sniffBinaryMetadata,
   toPageRef,
@@ -19,9 +18,8 @@ import {
 import type { ArmedStampInfo } from '../contract';
 import { previewBucket } from '../host-contract';
 import { setToolGhost } from '../model';
-import { boxGeomFields } from '../repository';
 import type { AnnotationContext, AnnotationServices } from '../services';
-import { named } from './named';
+import { appliedRefOf } from './outcomes';
 import { ARMED_STAMP_TOOL_ID } from '../tools/definitions';
 
 /**
@@ -151,7 +149,7 @@ export function createStamps(
    *  The size is fit to the page and clamped fully onto it (the rubber-stamp
    *  rule: never larger than the page, aspect preserved), and never spills off
    *  the edge. `rotCW` (the tool's upright counter-rotation, CW content degrees)
-   *  emits the repository's box rotation fields — the engine bakes the tilted
+   *  becomes the box's `rotation` — the engine bakes the tilted
    *  /AP exactly as an interactively rotated stamp round-trips, and the fit uses
    *  the rotated footprint. Returns null when the page/document isn't ready. */
   const createStampAt = (
@@ -166,24 +164,25 @@ export function createStamps(
     const page = geometry.sizeOf(pageObjectNumber);
     if (!doc || !page) return null;
     const box: Rect = fitStampBox(point, desired, page, rotCW);
-    return doc
-      .page(toPageRef(pageObjectNumber))
-      .annotations.create(
-        named({
+    const applied = store.apply([
+      {
+        type: 'create',
+        page: toPageRef(pageObjectNumber),
+        draft: {
           subtype: 'stamp',
-          ...boxGeomFields(box, rotCW),
+          // Its box before any turn, and the turn (`null` upright, so none is kept).
+          box,
+          rotation: rotCW || null,
           fit: 'contain',
           ...(identity.name !== undefined ? { name: identity.name } : {}),
           ...(identity.subject !== undefined ? { subject: identity.subject } : {}),
-        }),
-        { appearance: bytesOf(source) },
-      )
-      .then((result) => {
-        // The fold has added the confirmed stamp; every placement selects
-        // its result (the anchor for menus and editing).
-        store.commit({ type: 'select', ids: [annotationKey(result.annotation.ref)] });
-        return result.annotation.ref;
-      });
+        },
+        resources: { appearance: bytesOf(source) },
+      },
+    ]);
+    // Every placement selects its stamp (the anchor for menus and editing).
+    store.commit({ type: 'select', ids: [...applied.ids] });
+    return appliedRefOf(applied);
   };
 
   /** The click path's fire-and-forget wrapper: a rejected placement is logged,

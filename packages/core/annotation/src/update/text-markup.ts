@@ -5,21 +5,22 @@
  */
 import type { AnnotationFlags, PageRef } from '@embedpdf/engine-core/runtime';
 
-import { DRAWN_FLAGS } from '../flags';
-import { caretGeomFromAnchor } from '../geometry';
-import { styleFromProps } from '../props';
-import type { Effect, Model, ModelAnnotation, Subtype, TextEndAnchor, TextQuad } from '../types';
-import { newRecordId } from './changes';
-import { defaultsFor } from './session';
+import { geomBounds } from '../geometry';
+import { styleOf } from '../record';
+import { caretFromAnchor } from '../shapes/caret';
+import type { QuadsShape } from '../shapes/quads';
+import type { Effect, Model, KindName, TextEndAnchor, Quad } from '../types';
+import { draftOf, newRecord } from './changes';
+import { defaultsFor, toolAnnotation } from './session';
 
 /** Drop degenerate segment quads (zero-length baseline or ink extent). Area is
  *  the cross product of the two edge vectors — orientation-safe. */
-const usableQuads = (quads: TextQuad[]): TextQuad[] =>
+const usableQuads = (quads: Quad[]): Quad[] =>
   quads.filter((quad) => {
-    const ux = quad.upperEnd.x - quad.upperStart.x;
-    const uy = quad.upperEnd.y - quad.upperStart.y;
-    const sx = quad.lowerStart.x - quad.upperStart.x;
-    const sy = quad.lowerStart.y - quad.upperStart.y;
+    const ux = quad.upperRight.x - quad.upperLeft.x;
+    const uy = quad.upperRight.y - quad.upperLeft.y;
+    const sx = quad.lowerLeft.x - quad.upperLeft.x;
+    const sy = quad.lowerLeft.y - quad.upperLeft.y;
     return Math.abs(ux * sy - uy * sx) > 0;
   });
 
@@ -30,36 +31,34 @@ const usableQuads = (quads: TextQuad[]): TextQuad[] =>
  */
 export function createMarkup(
   model: Model,
-  subtype: Subtype,
+  subtype: KindName,
   page: PageRef,
-  segmentQuads: TextQuad[],
+  segmentQuads: Quad[],
   preset: string = subtype,
   flags?: Partial<AnnotationFlags>,
 ): [Model, Effect[]] {
   const quads = usableQuads(segmentQuads);
   if (!quads.length) return [model, []];
-  const id = newRecordId(model);
-  const annotation: ModelAnnotation = {
-    id,
-    ref: null,
+  const shape: QuadsShape = { kind: 'quads', quadPoints: quads };
+  // A text redaction states the box around its quads: the engine asks for it.
+  const fields = subtype === 'redact' ? { rect: geomBounds(shape) } : {};
+  const created = newRecord(
+    model,
     page,
-    subtype,
-    geometry: { kind: 'quads', quads },
-    style: styleFromProps(defaultsFor(model, preset)),
-    flags: { ...DRAWN_FLAGS, ...flags },
-    source: 'vector',
-  };
+    draftOf(subtype, defaultsFor(model, preset), shape, fields, flags),
+  );
+  const id = created.record.id;
   return [
     {
       ...model,
       seq: model.seq + 1,
-      byId: { ...model.byId, [id]: annotation },
+      byId: { ...model.byId, [id]: created.record },
       order: [...model.order, id],
       selected: [id],
       draft: null,
       preview: null,
     },
-    [{ type: 'create', id }],
+    [{ type: 'create', id, draft: created.draft }],
   ];
 }
 
@@ -72,50 +71,54 @@ export function createMarkup(
 export function createReplaceText(
   model: Model,
   page: PageRef,
-  segmentQuads: TextQuad[],
+  segmentQuads: Quad[],
   anchor: TextEndAnchor,
   preset = 'replace-text',
 ): [Model, Effect[]] {
   const quads = usableQuads(segmentQuads);
   if (!quads.length) return [model, []];
-  const primaryId = newRecordId(model);
-  const strikeoutId = newRecordId(model, 2);
-  const style = styleFromProps(defaultsFor(model, preset));
-  const caret: ModelAnnotation = {
-    id: primaryId,
-    ref: null,
+  // The caret takes the strikeout tool's colour, so the pair reads as one mark.
+  const strikeStyle = styleOf(toolAnnotation(model, 'strikeout', preset));
+  const caret = newRecord(
+    model,
     page,
-    subtype: 'caret',
-    intent: 'replace',
-    geometry: caretGeomFromAnchor(anchor),
-    style,
-    flags: DRAWN_FLAGS,
-    source: 'vector',
-  };
-  const strikeout: ModelAnnotation = {
-    id: strikeoutId,
-    ref: null,
+    draftOf('caret', {}, caretFromAnchor(anchor), {
+      color: strikeStyle.color,
+      opacity: strikeStyle.opacity,
+      intent: 'replace',
+    }),
+  );
+  const primaryId = caret.record.id;
+  const strikeout = newRecord(
+    model,
     page,
-    subtype: 'strikeout',
-    intent: 'strikeout-text-edit',
-    geometry: { kind: 'quads', quads },
-    style,
-    flags: DRAWN_FLAGS,
-    source: 'vector',
-    irt: primaryId,
-    group: primaryId,
-  };
+    draftOf(
+      'strikeout',
+      defaultsFor(model, preset),
+      { kind: 'quads', quadPoints: quads },
+      { intent: 'strikeout-text-edit' },
+    ),
+    { offset: 2, reply: { to: caret.record.annotation.ref, type: 'group' } },
+  );
+  const strikeoutId = strikeout.record.id;
   return [
     {
       ...model,
       seq: model.seq + 2,
-      byId: { ...model.byId, [primaryId]: caret, [strikeoutId]: strikeout },
+      byId: { ...model.byId, [primaryId]: caret.record, [strikeoutId]: strikeout.record },
       order: [...model.order, primaryId, strikeoutId],
       selected: [primaryId, strikeoutId],
       draft: null,
       preview: null,
     },
-    [{ type: 'createGroup', primary: primaryId, members: [strikeoutId] }],
+    [
+      {
+        type: 'createGroup',
+        primary: primaryId,
+        members: [strikeoutId],
+        drafts: { [primaryId]: caret.draft, [strikeoutId]: strikeout.draft },
+      },
+    ],
   ];
 }
 
@@ -125,42 +128,36 @@ export function createCaret(
   anchor: TextEndAnchor,
   flags?: Partial<AnnotationFlags>,
 ): [Model, Effect[]] {
-  const caretGeom = caretGeomFromAnchor(anchor);
-  if (caretGeom.rect.width <= 0 || caretGeom.rect.height <= 0) return [model, []];
-  const id = newRecordId(model);
-  const definition = defaultsFor(model, 'caret');
-  const annotation: ModelAnnotation = {
-    id,
-    ref: null,
+  const caretGeom = caretFromAnchor(anchor);
+  if (caretGeom.box.width <= 0 || caretGeom.box.height <= 0) return [model, []];
+  const created = newRecord(
+    model,
     page,
-    subtype: 'caret',
-    geometry: caretGeom,
-    style: styleFromProps(definition),
-    flags: { ...DRAWN_FLAGS, ...flags },
-    source: 'vector',
-  };
+    draftOf('caret', defaultsFor(model, 'caret'), caretGeom, {}, flags),
+  );
+  const id = created.record.id;
   return [
     {
       ...model,
       seq: model.seq + 1,
-      byId: { ...model.byId, [id]: annotation },
+      byId: { ...model.byId, [id]: created.record },
       order: [...model.order, id],
       selected: [id],
       draft: null,
       preview: null,
     },
-    [{ type: 'create', id }],
+    [{ type: 'create', id, draft: created.draft }],
   ];
 }
 
 /** Set / replace the live markup preview from the selection's per-page quads. */
 export function setMarkupPreview(
   model: Model,
-  subtype: Subtype,
-  quadsByPage: Record<number, TextQuad[]>,
+  subtype: KindName,
+  quadsByPage: Record<number, Quad[]>,
   preset: string = subtype,
 ): [Model, Effect[]] {
-  const byPage: Record<number, TextQuad[]> = {};
+  const byPage: Record<number, Quad[]> = {};
   for (const key in quadsByPage) {
     const quads = usableQuads(quadsByPage[key]);
     if (quads.length) byPage[Number(key)] = quads;

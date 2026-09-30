@@ -1,40 +1,44 @@
-import type { PageRotation, Point, Rect as GeometryRect, TextQuad } from '@embedpdf/core-geometry';
+import type { PageRotation, Point, Rect as GeometryRect, Quad } from '@embedpdf/core-geometry';
 import type {
+  AnnotationBorderStyle,
+  AnnotationDraft,
   AnnotationDTO,
+  AnnotationPatch,
   AnnotationFlags,
   AnnotationRef,
   BlendMode,
-  CaretIntent,
+  Color,
   InkIntent,
   LineEnding,
   LineEndings,
   PageRef,
   PdfLinkTarget,
   RichTextDocumentInput,
-  StrikeoutIntent,
 } from '@embedpdf/engine-core/runtime';
 
 import type { DistanceAppearance, MeasurementAppearance } from './measurement';
 import type { ShapeMeasurementAppearance } from './measurement-shape';
+import type { BoxShape } from './shapes/box';
+import type { CaretShape } from './shapes/caret';
+import type { PointsShape } from './shapes/points';
+import type { QuadsShape } from './shapes/quads';
+import type { TextBoxShape } from './shapes/text-box';
 
-export type { TextQuad } from '@embedpdf/core-geometry';
+export type { Quad, QuadRing } from '@embedpdf/core-geometry';
 
 export type { LineEnding, LineEndings };
 
 export type { Point } from '@embedpdf/core-geometry';
 export type Rect = GeometryRect;
-/** Four positional page-space points — selection chrome / OBB corners.
- *  Text-markup geometry uses the corner-named {@link TextQuad} instead. */
-export type Quad = [Point, Point, Point, Point];
 
 /**
  * Where a text-edit annotation (caret / replace-text) anchors: the boundary
  * glyph's oriented cell plus the reading direction along its baseline
- * (+1 = toward `end`, −1 = toward `start` — sequence-derived, never inferred
- * from geometry).
+ * (+1 = toward the right end, −1 = toward the left end — sequence-derived,
+ * never inferred from geometry).
  */
 export interface TextEndAnchor {
-  glyphQuad: TextQuad;
+  glyphQuad: Quad;
   advance: 1 | -1;
 }
 
@@ -59,7 +63,11 @@ export interface ViewEnv {
   rotation: PageRotation;
 }
 
-export type Subtype =
+/**
+ * An annotation kind's name (`kinds/`): its PDF subtype, a widget's field
+ * family (`widget-text`…), or a tool's own kind (`free-text-callout`).
+ */
+export type KindName =
   | 'highlight'
   | 'underline'
   | 'squiggly'
@@ -79,89 +87,69 @@ export type Subtype =
   | (string & {});
 
 /**
- * Page-space geometry — the one thing hit-testing, editing, and rendering work
- * on. A small closed union covers every kind: shapes (rect/ellipse), line,
- * polygon/polyline (poly), text markup (quads), and caret.
+ * An annotation's shape: what hit-testing, gestures and drawing work on, read
+ * off the annotation by its kind's family (`shapeOf`). One arm per family,
+ * each the engine's own fields
+ * ({@link BoxShape}, {@link TextBoxShape}, {@link PointsShape},
+ * {@link QuadsShape}, {@link CaretShape}).
+ *
+ * Rotation is degrees clockwise in page space, normalized `[0,360)`, and
+ * works the same way for every family that turns: the shape is kept upright
+ * (a box, or points), and `rotation` turns it about its middle. The engine
+ * works out `/Rect` around the turned drawing, so PDFium bakes a portable `/AP`.
  */
+export type Shape =
+  | BoxShape // square, circle, stamp, and the kinds whose shape is their rect
+  | PointsShape // line, polyline, polygon, ink
+  | QuadsShape // text markup, text redaction
+  | CaretShape // an insertion mark on its text
+  | TextBoxShape; // free text; its text is data, rendered by the framework as an editable element
+
 /**
- * A free-text callout's leader: the `/CL` line + `/LE` arrow. `tip` is the
- * called-out point (the arrow is drawn here); `knee` is the optional elbow. The
- * point where the leader meets the text box (the third `/CL` point) is never
- * stored — it is derived from the box + the knee (see `calloutConnection`), so it
- * can't drift when the box or knee moves. Page space (y-down).
+ * How an annotation is drawn, by the engine's field names: its colours, its
+ * stroke and its border, with its kind's fill-ins (a highlight strokes
+ * nothing, a caret draws 1 pt). A view its kind works out from the
+ * annotation (`styleOf`, `kinds/styles.ts`) for drawing, bounding and
+ * hit-testing: nothing is written back through it.
  */
-export interface Callout {
-  tip: Point;
-  knee?: Point;
-  ending: LineEnding;
+export interface Style {
+  /** The stroke for a drawn kind, a markup's colour, a free text's border. */
+  color: Color;
+  /** The fill; `null` when the annotation has none. */
+  interiorColor: Color | null;
+  strokeWidth: number;
+  opacity: number;
+  blendMode: BlendMode;
+  borderStyle: AnnotationBorderStyle;
+  /** A dashed border's pattern; `null` draws the engine's default dash. */
+  dashArray: number[] | null;
+  /** A cloudy border's intensity; `null` without a cloud. A cloud wins over a dash. */
+  cloudyIntensity: number | null;
 }
 
 /**
- * Rotation (degrees, clockwise in page space, normalized `[0,360)`) carried by
- * the rotatable `ModelGeometry` variants. The semantics differ by family, which is exactly
- * the box-vs-vertex split:
- *
- * - **Box** (`rect`, `text`): `rect` is the unrotated local box and `rot` is the
- *   applied tilt — together they reconstruct the visual. The repository emits
- *   `rect` as the engine's `box` and `rot` as `rotation` (both clockwise, so it
- *   passes through); the engine works out `/Rect` around the turned drawing,
- *   so PDFium bakes a portable `/AP`.
- * - **Vertex** (`line`, `poly`, `ink`): the points are already rotated (they are
- *   the portable visual), so `rot` is an advisory scalar — the cumulative tilt the
- *   user applied since authoring. It lets EmbedPDF reconstruct an oriented
- *   selection box (`obbFromTheta`) and offer reset-to-0; it is inert for
- *   rendering (PDFium ignores a lone `Rotation` with no `UnrotatedRect`).
+ * What a shape's bounds, hit test and drawing depend on besides the shape:
+ * how wide its stroke is, and a cloud's intensity. A {@link Style} is one.
  */
-export type ModelGeometry =
-  | { kind: 'rect'; rect: Rect; ellipse: boolean; rot?: number } // square / circle (rect = unrotated box)
-  | { kind: 'line'; a: Point; b: Point; ends?: LineEndings; rot?: number } // line (points pre-rotated; rot advisory)
-  | { kind: 'poly'; points: Point[]; closed: boolean; ends?: LineEndings; rot?: number } // polygon/polyline (pre-rotated; rot advisory)
-  | { kind: 'quads'; quads: TextQuad[] } // highlight / underline / squiggly / strikeout
-  | { kind: 'caret'; rect: Rect; rot?: number } // caret insertion marker (rect = unrotated box; rot = its text's baseline tilt, authoring metadata — no gesture)
-  | { kind: 'ink'; strokes: Point[][]; rot?: number } // freehand ink (pre-rotated; rot advisory)
-  | { kind: 'text'; rect: Rect; callout?: Callout; rot?: number }; // free-text box (`rect` is the unrotated text box);
-// a `callout` adds a leader line + arrow. The text is data (DTO `contents`),
-// rendered by the framework as an editable element, not by `scene()`.
-
-/**
- * How a shape's outline is stroked. A discriminated union so illegal combinations
- * — a dash array on a cloudy border, an intensity on a dashed one — are simply
- * unrepresentable. Maps onto the engine's `/BS /S` (`borderStyle`), `/BS /D`
- * (`dashArray`), and `/BE /I` (`cloudyIntensity`) wire fields. Cloudy is only
- * honoured for shapes (square/circle); other kinds treat it as solid.
- */
-export type Border =
-  | { kind: 'solid' }
-  | { kind: 'dashed'; dash: number[] }
-  | { kind: 'cloudy'; intensity: number };
-
-export interface Style {
-  /** `/C` colour — stroke for geometric kinds, highlight colour for markup. */
-  color: string;
-  /** `/IC` interior (fill) colour. `null` when the annotation has no fill. */
-  interiorColor: string | null;
+export interface Stroke {
   strokeWidth: number;
-  opacity: number;
-  /** Effective blend mode of the annotation's normal appearance. */
-  blendMode: BlendMode;
-  /** Outline style — defaults to `{ kind: 'solid' }`. */
-  border: Border;
+  cloudyIntensity?: number | null;
 }
 
 export type TextAlign = 'left' | 'center' | 'right';
 
 /**
- * Page-space text styling for a text-editable kind (free text) — the text
- * counterpart of {@link Style}, projected from the DTO's `/DA` fields the same
- * way `style` is projected from `/C`/`/CA`/`/BS`. CSS colour string; the engine
- * `Color` seam is crossed only in the plugin repository.
+ * How an annotation's text is set, by the engine's field names: its font,
+ * size, colour and alignment, and a free text's bold, italic and underline.
+ * A view its kind works out from the annotation (`textOf`,
+ * `kinds/texts.ts`): nothing is written back through it.
  */
 export interface TextStyle {
   /** A PDF standard font name or a registered font key. */
   fontFamily: string;
-  /** Content units (PDF points). */
+  /** Page units (PDF points); 0 fits a form field's or a redaction label's box. */
   fontSize: number;
-  fontColor: string;
+  fontColor: Color;
   textAlign: TextAlign;
   /**
    * The rich body's formatting (free text only): bold = body weight ≥ 600,
@@ -175,83 +163,32 @@ export interface TextStyle {
 }
 
 /**
- * The one flat vocabulary for editable appearance properties — what property
- * sidebars/toolbars read and write, regardless of where each property is stored
- * internally (`style`, `geom.ends`, or `text`). Which keys apply to a kind, and
- * in what UI order, is declared per kind in the kind table (`propsFor`).
+ * Engine fields by name, as a create or an update states them: a tool's
+ * defaults (a draft without its shape), or what a selection edit writes to
+ * each member. The kind table's {@link FieldSpec}s say which a sidebar edits.
  */
-export interface AnnotationProps extends Style, TextStyle {
-  /** `/LE` endings (line / polyline). */
-  lineEndings: LineEndings;
-  /**
-   * `/Name` icon of an icon kind (text note, file attachment). Optional in
-   * the bag — each kind falls back to its own spec default ('comment',
-   * 'paperclip') at creation, so one flat vocabulary needs no per-kind base
-   * value. Valid values are the `options` of the kind's `icon` PropSpec.
-   */
-  icon?: string;
-  /**
-   * Where this annotation links to, or `null` for none. Optional in the bag
-   * like `icon`. One key, two storages (the props.ts routing rule): on the
-   * link kind it is the annotation's own target (`/A`); on every other
-   * linkable kind it is the target of the attached link child(ren) —
-   * grouped `/Link` annotations the model folds into their parent (the
-   * serialization the PDF spec forces, since only Link annotations are
-   * clickable). Writing it creates/retargets/deletes those children through
-   * the one `syncLink` seam.
-   */
-  link?: PdfLinkTarget | null;
-}
-
-export type PropKey = keyof AnnotationProps;
+export type FieldValues = Readonly<Record<string, unknown>>;
 
 /**
- * What a committed edit changed — carried on the `patch` effect so the shell
- * emits exactly that intent (repository `toScopedPatch`) instead of
- * reconstructing a full projection. `geometry` covers every gesture commit
- * (move/resize/rotate/vertex edit); `props` forwards the user's patch keys
- * verbatim. Text content never rides this effect (the debounced text-edit
- * write owns `contents`).
+ * One annotation as the core works on it: the engine's record, and how it is
+ * drawn right now. The record is the only data: its ref, page, kind and
+ * relationships are read off it (`refOf`, `kindOf`, `irtOf`, `groupOf`), so
+ * is its shape (`shapeOf`), and an edit writes engine fields back
+ * (`withShape`, `withValues`; record/).
  */
-export type PatchScope =
-  | { kind: 'geometry' }
-  | { kind: 'caption' }
-  | { kind: 'leader' }
-  | { kind: 'props'; keys: PropKey[] };
-
-/** A partial property write. `lineEndings` merges per side (set just `end`
- *  without knowing `start`); every other key overwrites. */
-export type AnnotationPropsPatch = {
-  [K in PropKey]?: K extends 'lineEndings' ? Partial<LineEndings> : AnnotationProps[K];
-};
-
 export interface ModelAnnotation {
-  id: Id;
-  ref: AnnotationRef | null;
-  /** The page this annotation lives on. Internals may key by
-   *  `page.objectNumber`; the address itself is what callers pass around. */
-  page: PageRef;
-  subtype: Subtype;
-  geometry: ModelGeometry;
-  style: Style;
-  /** Text styling — present only for text-editable kinds (free text). Like
-   *  `style`, a page-space projection of `data`, editable via `setProps`. */
-  text?: TextStyle;
-  /** Redaction label (`/OverlayText` + `/Repeat`) — redact kind only. A
-   *  projection of `data` like `text`; the hover preview scene draws it. */
-  label?: { text: string; repeat: boolean };
-  measure?: MeasurementAppearance;
-  /** `/Name` icon — present only for icon kinds (text note, file attachment).
-   *  Like `style`, a projection of `data`, editable via `setProps`. */
-  icon?: string;
   /**
-   * The `/F` annotation flags, verbatim from the DTO (freshly drawn annotations
-   * start at {@link DRAWN_FLAGS} — `print` set). Never read individual keys to
-   * gate behavior — the predicates in `flags.ts` (`annotInteractive`,
-   * `annotTransformable`, `annotContentsEditable`, `viewable`) are the one
-   * interpretation of the spec, and `anchorModeOf` owns `noZoom`/`noRotate`.
+   * The record's key: `annotationKey(annotation.ref)`. A record this session
+   * created is keyed by the `nm` ref it is written under until the engine
+   * confirms it, and by the engine's key from then on.
    */
-  flags: AnnotationFlags;
+  id: Id;
+  /**
+   * A record this session created that the engine hasn't confirmed yet: it
+   * has no engine ref (`refOf` is `null`), and writes to it wait for its
+   * create. Its annotation's `ref` is the `nm` ref it is written under.
+   */
+  unconfirmed?: true;
   /**
    * How the record renders: `baked` blits the engine's appearance raster,
    * `vector` draws it live from its geometry and style. The core sets
@@ -297,33 +234,15 @@ export interface ModelAnnotation {
    */
   authority?: { update: boolean; delete: boolean };
   /**
-   * The canonical engine DTO this annotation was derived from (PDF-space, sRGB)
-   * — the single source of truth for its data. `geom` and `style` are
-   * page-space render projections of it, recomputed (never edited directly)
-   * whenever `data` changes, so the two can't drift. Absent only for a record
-   * this session created that the engine has not confirmed yet (no DTO exists).
+   * The annotation's data in the engine's shape: what the engine will read
+   * back once this session's writes land. A confirmed record's is the
+   * engine's own read; a record this session created reads as its create
+   * writes it (`newRecord`); an edit merges the fields it changed, and
+   * `update` applies them as the engine will, a drawn kind's `rect`
+   * included (`record/written.ts`). Its attribution waits for the engine's
+   * answer.
    */
-  data?: AnnotationDTO;
-  /** Normalized PDF `/IT` for intent-bearing annotations authored before a DTO exists. */
-  intent?: CaretIntent | StrikeoutIntent | InkIntent;
-  /**
-   * The link kind's own `/A` target (see {@link AnnotationProps.link}) —
-   * present only on `subtype: 'link'`. Every other kind's link is an
-   * attached child annotation in the substrate, read through the `linkOf`
-   * lens and materialized by the shell's `syncLink` reconciler; parents
-   * store nothing.
-   */
-  link?: PdfLinkTarget | null;
-  /**
-   * Relationship to another annotation. `irt` ("in reply to") links a child to a
-   * parent — a reply in a comment thread, or a caret bound to its strikeout in a
-   * replace-text pair. `group` ties a set into one composite unit (created and,
-   * typically, deleted together). Both are unused until comments / replace-text
-   * land, but the field lives here from the start so select/delete/persistence
-   * never have to be retrofitted around it.
-   */
-  irt?: Id;
-  group?: string;
+  annotation: AnnotationDTO;
 }
 
 /** A draggable handle: a resize corner/edge (rect) or a vertex (line/poly). */
@@ -367,7 +286,7 @@ export interface SnapSettings {
 export type Draft =
   | {
       kind: 'create-rect';
-      subtype: Subtype;
+      subtype: KindName;
       preset?: string;
       page: PageRef;
       from: Point;
@@ -399,7 +318,7 @@ export type Draft =
       kind: 'create-line';
       measure?: MeasurementAppearance;
       capture?: string;
-      subtype: Subtype;
+      subtype: KindName;
       preset?: string;
       page: PageRef;
       from: Point;
@@ -412,7 +331,7 @@ export type Draft =
   | {
       kind: 'create-poly';
       measure?: ShapeMeasurementAppearance;
-      subtype: Subtype;
+      subtype: KindName;
       preset?: string;
       page: PageRef;
       points: Point[];
@@ -423,7 +342,7 @@ export type Draft =
     }
   | {
       kind: 'create-ink';
-      subtype: Subtype;
+      subtype: KindName;
       preset?: string;
       page: PageRef;
       strokes: Point[][];
@@ -437,7 +356,7 @@ export type Draft =
       // is the live pointer for the leader/box preview; `boxFrom`/`boxTo` are the
       // dragged box once the box step starts.
       kind: 'create-callout';
-      subtype: Subtype;
+      subtype: KindName;
       preset?: string;
       page: PageRef;
       step: 'knee' | 'box';
@@ -470,8 +389,8 @@ export type Draft =
       kind: 'handle';
       id: Id;
       handle: string;
-      base: ModelGeometry;
-      current: ModelGeometry;
+      base: Shape;
+      current: Shape;
       view?: ViewEnv;
     }
   // Rotate gesture (single or multi-target). `pivot` is the rotation centre
@@ -514,11 +433,11 @@ export type Draft =
 /** A live text-markup preview (the in-progress selection rendered as the markup it
  *  will become). Per page, since a selection can span pages. */
 export interface MarkupPreview {
-  subtype: Subtype;
+  subtype: KindName;
   /** Defaults key, distinct from subtype for presets such as replace-text. */
   preset: string;
   /** Keyed by `page.pageObjectNumber` (an internal lookup, not an address). */
-  byPage: Record<number, TextQuad[]>;
+  byPage: Record<number, Quad[]>;
 }
 
 /** Anchor + affordance state for UI that controls an in-progress creation draft. */
@@ -547,14 +466,23 @@ export interface Session {
   draft: Draft | null;
   /** Transient ghost of an in-progress markup selection (null when idle). */
   preview: MarkupPreview | null;
-  /** How many records this session has created; the next one is `new:<seq + 1>`. */
+  /**
+   * How many records this session has created; the next one is written under
+   * the name `<namePrefix><seq + 1>`.
+   */
   seq: number;
-  /** The base style new annotations inherit (per-tool `defaults` layer on top). */
-  style: Style;
-  /** Per-tool (keyed by subtype / tool id) property overrides for newly drawn
-   *  annotations — the same flat vocabulary `setProps` uses. `lineEndings` is
-   *  stored fully resolved (merged at `setDefaults` time). */
-  defaults: Record<string, AnnotationPropsPatch>;
+  /**
+   * The start of the `/NM` name each record this session creates is written
+   * with: `<namePrefix><n>` for its `n`-th. A host gives each session its own,
+   * so two sessions never name two annotations alike.
+   */
+  namePrefix: string;
+  /**
+   * Each tool's defaults for the annotations it draws, keyed by the tool's
+   * preset: the engine fields its creates state. The engine's own defaults
+   * fill in what they leave out.
+   */
+  defaults: Record<string, FieldValues>;
   /** Extra clickable margin (content units) around a stroke — bump it for touch. */
   hitMargin: number;
   /** The free-text annotation currently in text-edit mode (its `contentEditable`
@@ -587,6 +515,13 @@ export type Model = Session & AnnotationView;
 export interface ChangeSet {
   readonly put: readonly ModelAnnotation[];
   readonly drop: readonly Id[];
+  /**
+   * What each changed record's change means to the engine, by id: the fields
+   * it changed, as `update` takes them. None for a new record (its create
+   * writes it) or for a change the engine keeps nothing of (a record handed
+   * to live rendering, a value set to what it was).
+   */
+  readonly patches: Readonly<Record<Id, AnnotationPatch>>;
 }
 
 /** The result of one message: the next session, the records it changed, and the engine work to do. */
@@ -689,7 +624,7 @@ export type Message =
       measure?: MeasurementAppearance;
       capture?: string;
       phase: 'down' | 'move' | 'up';
-      subtype: Subtype;
+      subtype: KindName;
       /** The authoring tool's `defaults` key (see {@link Draft}). Defaults to `subtype`. */
       preset?: string;
       /** PDF intent carried by an ink authoring preset. */
@@ -707,23 +642,6 @@ export type Message =
     }
   | { type: 'finishInkDraft' }
   | { type: 'finishCreationDraft' }
-  /**
-   * Programmatic creation from page-space geometry — the data API's `create`.
-   * Adds the same `new:` record a draw tool commits, from the preset's
-   * defaults with `props` layered on top, and emits the same `create` effect:
-   * one commit path for pointer and API. `preset` defaults to `subtype`.
-   */
-  | {
-      type: 'createAnnot';
-      page: PageRef;
-      subtype: Subtype;
-      geometry: ModelGeometry;
-      preset?: string;
-      props?: AnnotationPropsPatch;
-      flags?: Partial<AnnotationFlags>;
-      /** Select the new annotation (a tool would); default false for API creates. */
-      select?: boolean;
-    }
   | {
       type: 'createCaret';
       page: PageRef;
@@ -733,7 +651,7 @@ export type Message =
   | {
       type: 'createReplaceText';
       page: PageRef;
-      quads: TextQuad[];
+      quads: Quad[];
       anchor: TextEndAnchor;
       preset?: string;
     }
@@ -742,9 +660,9 @@ export type Message =
   // selection covers.
   | {
       type: 'createMarkup';
-      subtype: Subtype;
+      subtype: KindName;
       page: PageRef;
-      quads: TextQuad[];
+      quads: Quad[];
       preset?: string;
       /** The tool's `/F` seed — merged over {@link DRAWN_FLAGS} at commit. */
       flags?: Partial<AnnotationFlags>;
@@ -752,9 +670,9 @@ export type Message =
   // live markup preview (the selection rendered as the markup it will become)
   | {
       type: 'setMarkupPreview';
-      subtype: Subtype;
+      subtype: KindName;
       /** Per-page quads keyed by `page.pageObjectNumber` (a lookup, not an address). */
-      quadsByPage: Record<number, TextQuad[]>;
+      quadsByPage: Record<number, Quad[]>;
       preset?: string;
     }
   | { type: 'clearMarkupPreview' }
@@ -768,24 +686,28 @@ export type Message =
   // a freshly placed form widget). Unknown/unselectable ids are dropped;
   // selecting a group member takes the whole group, like a click would.
   | { type: 'select'; ids: Id[]; add?: boolean }
-  // Apply a flat property patch to the current selection. Each member takes the
-  // keys its kind declares (`propsFor`) and ignores the rest, so one message
-  // restyles a mixed selection. Members flip to `vector`; one patch effect each.
-  | { type: 'setProps'; patch: AnnotationPropsPatch }
-  // Merge a `/F` flags patch into the selection (or explicit ids). Flags are
-  // not appearance: members keep their render `source` (no /AP re-bake), and —
-  // deliberately — the write is not gated by `locked`: this is how you unlock
-  // (Acrobat keeps its Locked checkbox live on a locked annotation). One
-  // `flags` effect per changed committed member; an uncommitted draft just
-  // merges (its create draft carries the flags when it commits).
+  // Write engine fields to records, a patch per id: each takes the fields its
+  // kind has and may change now (`mayWrite`), so one message restyles a mixed
+  // selection. How each is drawn after follows appearance.ts.
+  | { type: 'setFields'; patches: Readonly<Record<Id, FieldValues>> }
+  // Bold, italic or underline on the selection's text bodies.
+  | { type: 'setTextFormat'; format: 'bold' | 'italic' | 'underline'; on: boolean }
+  // Link the selection somewhere, or unlink it (`null`): the link kind's own
+  // target, or every other linkable kind's attached link.
+  | { type: 'setLink'; target: PdfLinkTarget | null }
+  // Merge a `/F` flags patch into the selection (or explicit ids). A flag
+  // needs update authority only, never an unlocked record: this is how you
+  // unlock (Acrobat keeps its Locked checkbox live on a locked annotation).
+  // Flags are not appearance: a baked raster stays baked.
   | { type: 'setFlags'; patch: Partial<AnnotationFlags>; ids?: Id[] }
-  | { type: 'setDefaults'; subtype: Subtype; patch: AnnotationPropsPatch }
+  // Merge fields into a tool's defaults (keyed by its preset).
+  | { type: 'setDefaults'; preset: string; patch: FieldValues }
   // Live-adjust snapping (a UI toggle) — merges into `Model.snap`.
   | { type: 'setSnap'; patch: Partial<SnapSettings> }
-  // Rotate the current selection by a fixed quarter-turn (clockwise) about its
-  // centre — the toolbar "rotate 90°" affordance. Works for a single shape or a
-  // multi-target group (about the union-box centre).
-  | { type: 'rotate90' }
+  // Turn the selection a quarter turn, clockwise (90) or back (-90): the
+  // toolbar's rotate buttons. A single shape turns about its own pivot, a
+  // multi-selection about the middle of the box around it; locked members stay.
+  | { type: 'rotateSelection'; degrees: 90 | -90 }
   // Reset rotation to the as-authored orientation: box `rot → 0`; vertex points
   // spun by `-rot` about their centroid, `rot → 0`. One patch effect per member.
   | { type: 'resetRotation' }
@@ -806,18 +728,25 @@ export type Message =
   | { type: 'endTextEdit' };
 
 export type Effect =
-  | { type: 'captured'; tool: string; page: PageRef; geometry: ModelGeometry }
-  | { type: 'create'; id: Id }
-  | { type: 'createGroup'; primary: Id; members: Id[] }
-  /** Write the part of one record that `scope` names. Whether the engine's
-   *  re-baked appearance differs is the engine's answer, not the core's guess. */
-  | { type: 'patch'; id: Id; scope: PatchScope }
+  | { type: 'captured'; tool: string; page: PageRef; geometry: Shape }
+  /** Write a new record: the draft its annotation was read from, named as it is keyed. */
+  | { type: 'create'; id: Id; draft: AnnotationDraft }
+  /** Write a composite (a replace-text caret and its strikeout): the primary
+   *  first, then each member answering it. `drafts` holds each one's draft. */
+  | {
+      type: 'createGroup';
+      primary: Id;
+      members: Id[];
+      drafts: Readonly<Record<Id, AnnotationDraft>>;
+    }
+  /** Write one record's change: its entry in the change set's `patches`. `update`
+   *  asks for it for every changed record that has one, except typed text, which
+   *  its `text` effect writes after a pause. Whether the engine's re-baked
+   *  appearance differs is the engine's answer, not the core's guess. */
+  | { type: 'patch'; id: Id; patch: AnnotationPatch }
   /** Write the edited text of one free-text record. The plugin waits for a
    *  pause in typing and writes the latest text once. */
   | { type: 'text'; id: Id }
-  /** A `/F`-only engine write for one record: the plugin sends the record's
-   *  merged flags. Flags never change an appearance, so nothing re-renders. */
-  | { type: 'flags'; id: Id }
   /** The parent's `link` prop changed on a non-link kind: reconcile its
    *  attached link children (create / retarget / delete) toward `target`
    *  (null = remove them). Declarative — the plugin's reconciler is the only
@@ -834,13 +763,13 @@ export type Effect =
 export interface RenderItem {
   id: Id;
   ref: AnnotationRef | null;
-  subtype: Subtype;
-  geometry: ModelGeometry;
+  subtype: KindName;
+  geometry: Shape;
   /**
-   * The visual box (geometry + stroke + line endings) in page space — the same
-   * `geomVisualBounds` that feeds the engine `/Rect`. The renderer paints into this
-   * box and does no bounds math of its own, so the on-screen box and the baked
-   * appearance can never drift (the patch computes the rect).
+   * The box the live drawing is painted into (its family's `drawnBounds`:
+   * geometry, stroke, endings, cloud): a box's or caret's own, before its
+   * turn (`rot`), the page's for the rest. The renderer paints into this box
+   * and does no bounds math of its own.
    */
   box: Rect;
   /**
@@ -870,7 +799,7 @@ export interface RenderItem {
   label?: { text: string; repeat: boolean };
   measure?: MeasurementAppearance;
   /**
-   * Applied rotation (deg, CW), or 0/undefined. For box kinds (`rect`/`text`)
+   * Applied rotation (deg, CW), or 0/undefined. For box kinds (`box`/`text-box`)
    * `box` is the unrotated visual box and the renderer applies this rotation
    * about its centre (CSS/SVG transform). For vertex kinds the geometry is
    * already rotated, so this is advisory only — the renderer must not re-apply it.

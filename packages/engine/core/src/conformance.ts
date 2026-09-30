@@ -135,3 +135,8 @@ export type {
   SignatureConformanceFixtures,
   SignatureConformanceOptions,
 } from './conformance/runSignatureConformance';
+export {
+  PREDICTION_FIXTURE_PDF,
+  runAnnotationPredictionConformance,
+  type AnnotationPredictionConformanceOptions,
+} from './conformance/runAnnotationPredictionConformance';

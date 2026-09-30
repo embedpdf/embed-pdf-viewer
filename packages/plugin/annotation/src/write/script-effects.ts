@@ -1,5 +1,6 @@
 import { scriptColorToRgb } from '@embedpdf/core-acrojs';
 import type { ScriptAnnotEffect, ScriptColorArray } from '@embedpdf/core-acrojs';
+import { refOf } from '@embedpdf/core-annotation';
 import {
   colorOf,
   pageBoxOf,
@@ -10,6 +11,7 @@ import {
 import type { AnnotCommitEntry, AnnotCommitResult } from '@embedpdf/plugin-actions/contract/host';
 
 import type { AnnotationContext, AnnotationServices } from '../services';
+import { appliedOrThrow } from './outcomes';
 
 /** Script patch → the engine's per-kind patch vocabulary. Colors cross the
  *  Acrobat-array → engine {r,g,b}/255 boundary here; a script's rect, in the
@@ -80,9 +82,9 @@ export function createScriptEffects(
           continue;
         }
         const loaded = store.model().byId[`obj:${entry.annotObjectNumber}`];
-        const pageObjectNumber = loaded?.page.objectNumber ?? entry.page?.objectNumber;
-        let ref = loaded?.ref ?? null;
-        let subtype: string | undefined = loaded?.subtype;
+        const pageObjectNumber = loaded?.annotation.page.objectNumber ?? entry.page?.objectNumber;
+        let ref = refOf(loaded);
+        let subtype: string | undefined = loaded?.annotation.subtype;
         if ((!ref || !subtype) && pageObjectNumber !== undefined) {
           // Read the page from the engine when the model does not have the annotation.
           try {
@@ -118,7 +120,7 @@ export function createScriptEffects(
           continue;
         }
         try {
-          await doc.page(toPageRef(pageObjectNumber)).annotations.update(ref, patch);
+          await appliedOrThrow(store.apply([{ type: 'update', ref, patch }]));
           results.push({ annotObjectNumber: entry.annotObjectNumber, status: 'applied' });
         } catch (error) {
           // Stop on the first failure: a refused entry (for example a

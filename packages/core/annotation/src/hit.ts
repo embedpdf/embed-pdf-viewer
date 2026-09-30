@@ -1,16 +1,15 @@
 import type { PageRef } from '@embedpdf/engine-core/runtime';
 import { annotationSelectionFrame, annotationTurnPivot } from './selection';
-import { distanceCaptionHit, distanceHandles, distanceHit, distanceLayout } from './measurement';
-import { measurementLayout } from './measurement-shape';
 import {
-  geomHandles,
-  geomHit,
-  placeRotateKnob,
-  pointInQuad,
-  rectHandlesFor,
-  unionRect,
-} from './geometry';
-import { capsFor, isMarkup } from './kinds';
+  distanceCaptionHit,
+  distanceHandles,
+  distanceHit,
+  distanceLayout,
+  measurementOf,
+} from './measurement';
+import { measurementLayout } from './measurement-shape';
+import { geomHandles, geomHit, placeRotateKnob, pointInQuad, rectHandlesFor } from './geometry';
+import { unionRect } from './rect';
 import { groupCaps } from './group';
 import { isSubstrateOnly } from './plane';
 import { annotInteractive, annotTransformable, viewable } from './flags';
@@ -19,12 +18,13 @@ import {
   type ModelAnnotation,
   type ChromeGeometry,
   type Cursor,
-  type ModelGeometry,
+  type Shape,
   type Id,
   type Model,
   type Rect,
   type Point,
 } from './types';
+import { kindOf, shapeOf, styleOf } from './record';
 
 export type Target =
   | { kind: 'handle'; id: Id; handle: string; cursor: Cursor }
@@ -49,11 +49,11 @@ export function paintOrder(model: Model, page: PageRef): Id[] {
   const markup: Id[] = [];
   const other: Id[] = [];
   for (const id of model.order) {
-    const annotation = model.byId[id];
-    if (!annotation || annotation.page.objectNumber !== pageObjectNumber) continue;
-    if (!viewable(annotation.flags, model.selected.includes(id))) continue;
-    if (isSubstrateOnly(annotation)) continue;
-    (isMarkup(annotation.subtype) ? markup : other).push(id);
+    const record = model.byId[id];
+    if (!record || record.annotation.page.objectNumber !== pageObjectNumber) continue;
+    if (!viewable(record.annotation, model.selected.includes(id))) continue;
+    if (isSubstrateOnly(record)) continue;
+    (kindOf(record.annotation).caps.paintsBeneath ? markup : other).push(id);
   }
   return [...markup, ...other];
 }
@@ -62,8 +62,8 @@ export function paintOrder(model: Model, page: PageRef): Id[] {
  *  all caps — hidden/noView/readOnly are inert; locked stays selectable, it
  *  just won't transform.) */
 export const isSelectable = (model: Model, id: Id): boolean => {
-  const annotation = model.byId[id];
-  return !!annotation && annotInteractive(annotation) && capsFor(annotation.subtype).selectable;
+  const record = model.byId[id];
+  return !!record && annotInteractive(record) && kindOf(record.annotation).caps.selectable;
 };
 
 /** An anchored kind's quad geometry is bound to underlying text — never moved
@@ -71,17 +71,17 @@ export const isSelectable = (model: Model, id: Id): boolean => {
  *  area marks (rect geometry) keep their transforms, text marks (quads) are
  *  as fixed as classic markup. Markup kinds themselves have `movable: false`
  *  and never reach this gate. */
-const textBound = (annotation: ModelAnnotation): boolean =>
-  capsFor(annotation.subtype).anchored && annotation.geometry.kind === 'quads';
+const textBound = (record: ModelAnnotation): boolean =>
+  kindOf(record.annotation).caps.anchored && shapeOf(record.annotation).kind === 'quads';
 
 /** Can this annotation be dragged by its body to move? (`locked` freezes it.) */
 export const canMove = (model: Model, id: Id): boolean => {
-  const annotation = model.byId[id];
+  const record = model.byId[id];
   return (
-    !!annotation &&
-    annotTransformable(annotation) &&
-    capsFor(annotation.subtype).movable &&
-    !textBound(annotation)
+    !!record &&
+    annotTransformable(record) &&
+    kindOf(record.annotation).caps.movable &&
+    !textBound(record)
   );
 };
 
@@ -89,31 +89,36 @@ export const canMove = (model: Model, id: Id): boolean => {
  *  `locked` (and inert `/F` states) suppress them at runtime — a
  *  screen-anchored body keeps its handles: `noZoom`/`noRotate` exempt it from
  *  the display transform, they don't freeze its size or vertices. */
-const hasHandles = (model: Model, annotation: ModelAnnotation): boolean => {
-  if (!annotTransformable(annotation) || textBound(annotation)) return false;
-  const caps = capsFor(annotation.subtype);
+const hasHandles = (model: Model, record: ModelAnnotation): boolean => {
+  if (!annotTransformable(record) || textBound(record)) return false;
+  const caps = kindOf(record.annotation).caps;
   return caps.resizable || caps.vertexEditable;
 };
 
 /** The geometry a pointer actually meets: the anchored (screen-constant)
  *  projection for `noZoom`/`noRotate` annotations, the stored geom otherwise.
  *  The same projection `pageItems` renders, so click matches paint. */
-const hitGeomOf = (annotation: ModelAnnotation, view: ViewEnv | undefined): ModelGeometry =>
-  anchoredGeom(annotation.geometry, anchorModeOf(annotation), view);
+const hitGeomOf = (record: ModelAnnotation, view: ViewEnv | undefined): Shape =>
+  anchoredGeom(shapeOf(record.annotation), anchorModeOf(record), view);
 
 /** Stroke width in effective content units (a noZoom body's line weight scales
  *  with its geometry). */
-const hitStrokeOf = (annotation: ModelAnnotation, view: ViewEnv | undefined): number =>
-  anchoredStrokeWidth(annotation.style.strokeWidth, anchorModeOf(annotation), view);
+const hitStrokeOf = (record: ModelAnnotation, view: ViewEnv | undefined): number =>
+  anchoredStrokeWidth(styleOf(record.annotation).strokeWidth, anchorModeOf(record), view);
 
 // `opaqueBody` kinds (stamp images) are visible across their whole box, so they
 // hit like a filled shape. Not keyed on `source: 'baked'` — every annotation
 // loaded from a PDF starts baked, and an unfilled square must still be grabbed
 // only on its outline.
-const isFilled = (annotation: ModelAnnotation): boolean =>
-  annotation.style.interiorColor != null ||
-  annotation.geometry.kind === 'quads' ||
-  capsFor(annotation.subtype).opaqueBody;
+const isFilled = (record: ModelAnnotation): boolean => {
+  const geometry = shapeOf(record.annotation);
+  const style = styleOf(record.annotation);
+  return (
+    style.interiorColor != null ||
+    geometry.kind === 'quads' ||
+    kindOf(record.annotation).caps.opaqueBody
+  );
+};
 const inRect = (rect: Rect, point: Point): boolean =>
   point.x >= rect.x &&
   point.x <= rect.x + rect.width &&
@@ -123,8 +128,8 @@ const inRect = (rect: Rect, point: Point): boolean =>
 // Same oriented quad the chrome outlines — so the grab area matches what you see
 // highlighted, tilt included (a rotated box is grabbable across its tilted body, not
 // just its unrotated footprint; a thin arrow's whole outline box, arrowhead and all).
-const inBounds = (annotation: ModelAnnotation, point: Point, view: ViewEnv | undefined): boolean =>
-  pointInQuad(point, annotationSelectionFrame(annotation, view).corners);
+const inBounds = (record: ModelAnnotation, point: Point, view: ViewEnv | undefined): boolean =>
+  pointInQuad(point, annotationSelectionFrame(record, view).corners);
 
 /**
  * The union of the selection bounds of every selected, movable annotation on a
@@ -137,15 +142,15 @@ function selectionUnionBounds(model: Model, page: PageRef, view: ViewEnv | undef
   const pageObjectNumber = page.objectNumber;
   const selection = model.selected.filter(
     (id) =>
-      model.byId[id]?.page.objectNumber === pageObjectNumber &&
+      model.byId[id]?.annotation.page.objectNumber === pageObjectNumber &&
       isSelectable(model, id) &&
       canMove(model, id),
   );
   if (selection.length < 2) return null;
   const corners: Point[] = [];
   for (const id of selection) {
-    const annotation = model.byId[id];
-    corners.push(...annotationSelectionFrame(annotation, view).corners);
+    const record = model.byId[id];
+    corners.push(...annotationSelectionFrame(record, view).corners);
   }
   return unionRect(corners);
 }
@@ -156,9 +161,9 @@ export function groupUnionBounds(model: Model, page: PageRef, view?: ViewEnv): R
   const pageObjectNumber = page.objectNumber;
   const corners: Point[] = [];
   for (const id of model.selected) {
-    const annotation = model.byId[id];
-    if (!annotation || annotation.page.objectNumber !== pageObjectNumber) continue;
-    corners.push(...annotationSelectionFrame(annotation, view).corners);
+    const record = model.byId[id];
+    if (!record || record.annotation.page.objectNumber !== pageObjectNumber) continue;
+    corners.push(...annotationSelectionFrame(record, view).corners);
   }
   return corners.length ? unionRect(corners) : null;
 }
@@ -183,16 +188,16 @@ export function hitTest(
 ): Target {
   const pageObjectNumber = page.objectNumber;
   if (model.selected.length === 1 && isSelectable(model, model.selected[0])) {
-    const annotation = model.byId[model.selected[0]];
-    if (annotation.page.objectNumber === pageObjectNumber) {
+    const record = model.byId[model.selected[0]];
+    if (record.annotation.page.objectNumber === pageObjectNumber) {
       // The rotate knob (checked first — it floats outside the box, clear of
       // the handles), placed on the projected selection frame so it sits exactly
       // where the chrome drew it — a screen-anchored body rotates too (the
       // gesture edits its authored tilt; `noRotate` only exempts it from the
       // page's rotation). Locked suppresses it. `placeRotateKnob` keeps it
       // inside `pageBox`.
-      if (capsFor(annotation.subtype).rotatable && annotTransformable(annotation)) {
-        const frame = annotationSelectionFrame(annotation, view);
+      if (kindOf(record.annotation).caps.rotatable && annotTransformable(record)) {
+        const frame = annotationSelectionFrame(record, view);
         const knob = placeRotateKnob(frame.corners, chromeGeometry.knobOffset, pageBox);
         if (
           Math.abs(knob.at.x - point.x) <= chromeGeometry.knobTol &&
@@ -200,16 +205,18 @@ export function hitTest(
         ) {
           return {
             kind: 'rotate',
-            ids: [annotation.id],
-            pivot: annotationTurnPivot(annotation, view),
+            ids: [record.id],
+            pivot: annotationTurnPivot(record, view),
           };
         }
       }
-      if (hasHandles(model, annotation)) {
-        const geometry = hitGeomOf(annotation, view);
+      if (hasHandles(model, record)) {
+        const style = styleOf(record.annotation);
+        const measure = measurementOf(record.annotation);
+        const geometry = hitGeomOf(record, view);
         const distance =
-          annotation.measure?.intent === 'line-dimension' &&
-          distanceLayout(geometry, annotation.measure, hitStrokeOf(annotation, view));
+          measure?.intent === 'line-dimension' &&
+          distanceLayout(geometry, measure, hitStrokeOf(record, view));
         const handles = distance ? distanceHandles(distance) : geomHandles(geometry);
         if (distance) {
           // Nearby endpoint and leader hit areas overlap at small offsets.
@@ -222,16 +229,16 @@ export function hitTest(
         // The text is the drag target. It owns no visible handle, and wins
         // before the annotation's sticky body bounds.
         const layout =
-          annotation.measure &&
-          measurementLayout(geometry, annotation.measure, {
-            ...annotation.style,
-            strokeWidth: hitStrokeOf(annotation, view),
+          measure &&
+          measurementLayout(geometry, measure, {
+            ...style,
+            strokeWidth: hitStrokeOf(record, view),
           });
         if (
           layout &&
           distanceCaptionHit(layout, point, Math.min(2, chromeGeometry.handleTol / 3))
         ) {
-          return { kind: 'handle', id: annotation.id, handle: 'caption', cursor: 'move' };
+          return { kind: 'handle', id: record.id, handle: 'caption', cursor: 'move' };
         }
         // Handles live on the projected geometry — the handle gesture then
         // runs entirely in view space (see the `handle` draft).
@@ -240,7 +247,7 @@ export function hitTest(
             Math.abs(handle.at.x - point.x) <= chromeGeometry.handleTol &&
             Math.abs(handle.at.y - point.y) <= chromeGeometry.handleTol
           ) {
-            return { kind: 'handle', id: annotation.id, handle: handle.id, cursor: handle.cursor };
+            return { kind: 'handle', id: record.id, handle: handle.id, cursor: handle.cursor };
           }
         }
       }
@@ -268,7 +275,7 @@ export function hitTest(
           return {
             kind: 'rotate',
             ids: model.selected.filter(
-              (id) => model.byId[id]?.page.objectNumber === pageObjectNumber,
+              (id) => model.byId[id]?.annotation.page.objectNumber === pageObjectNumber,
             ),
             pivot,
           };
@@ -286,7 +293,7 @@ export function hitTest(
             return {
               kind: 'group-handle',
               ids: model.selected.filter(
-                (id) => model.byId[id]?.page.objectNumber === pageObjectNumber,
+                (id) => model.byId[id]?.annotation.page.objectNumber === pageObjectNumber,
               ),
               handle: handle.id,
               cursor: handle.cursor,
@@ -300,28 +307,30 @@ export function hitTest(
   const order = paintOrder(model, page);
   for (let i = order.length - 1; i >= 0; i--) {
     const id = order[i];
-    const annotation = model.byId[id];
+    const record = model.byId[id];
     // `inert` ids (engaged Behaviors — form widgets under a fill tool) are
     // invisible here: their own DOM owns the pointer.
-    if (!annotation || inert?.has(id) || !isSelectable(model, id)) continue;
+    if (!record || inert?.has(id) || !isSelectable(model, id)) continue;
     // A selected annotation is sticky-grabbable from anywhere in its bounds, but
     // only if it can actually move; otherwise it's grabbed on its stroke/fill like
     // an unselected one (so a selectable-but-anchored kind still re-selects cleanly).
-    const geometry = hitGeomOf(annotation, view);
-    const strokeWidth = hitStrokeOf(annotation, view);
+    const style = styleOf(record.annotation);
+    const measure = measurementOf(record.annotation);
+    const geometry = hitGeomOf(record, view);
+    const strokeWidth = hitStrokeOf(record, view);
     const distance =
-      annotation.measure?.intent === 'line-dimension' &&
-      distanceLayout(geometry, annotation.measure, strokeWidth);
-    const layout =
-      annotation.measure &&
-      measurementLayout(geometry, annotation.measure, { ...annotation.style, strokeWidth });
+      measure?.intent === 'line-dimension' && distanceLayout(geometry, measure, strokeWidth);
+    const layout = measure && measurementLayout(geometry, measure, { ...style, strokeWidth });
     const hit =
       (layout && distanceCaptionHit(layout, point, strokeMargin)) ||
       (model.selected.includes(id) && canMove(model, id)
-        ? inBounds(annotation, point, view)
+        ? inBounds(record, point, view)
         : distance
           ? distanceHit(distance, point, strokeWidth, strokeMargin)
-          : geomHit(geometry, point, strokeMargin, isFilled(annotation), strokeWidth));
+          : geomHit(geometry, point, strokeMargin, isFilled(record), {
+              ...style,
+              strokeWidth: strokeWidth,
+            }));
 
     if (hit) {
       return { kind: 'annot', id };

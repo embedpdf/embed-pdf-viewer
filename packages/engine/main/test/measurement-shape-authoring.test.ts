@@ -9,9 +9,11 @@ import {
   toPageRef,
 } from '@embedpdf/engine-core/runtime';
 import { annotationSelectionFrame, shapeMeasurementLayout } from '../../../core/annotation/src';
-import { rotatePoint, turnPivotOf } from '../../../core/annotation/src/geometry';
+import { turnPivotOf } from '../../../core/annotation/src/geometry';
+import { rotatePoint } from '../../../core/annotation/src/rect';
 import { createLocalEngine } from '../src/index';
-import { fromDTO } from '../../../plugin/annotation/src/repository';
+import { fromDTO, shapeOf, styleOf } from '../../../core/annotation/src/record';
+import { measurementOf } from '../../../core/annotation/src/measurement';
 import { annotationKey } from '@embedpdf/engine-core/runtime';
 import { annotationShell } from './helpers/annotation-shell';
 
@@ -47,7 +49,7 @@ describe.each(['wasm', 'native'] as const)('shape authoring integration (%s)', (
           scale,
         );
         for (const preset of annotation.listResolvedTools()) {
-          if (preset.defaults) annotation.setToolDefaults(preset.id, preset.defaults);
+          if (preset.defaults) annotation.updateToolDefaults(preset.id, preset.defaults);
         }
         for (const point of [
           { x: 100, y: 300 },
@@ -58,12 +60,13 @@ describe.each(['wasm', 'native'] as const)('shape authoring integration (%s)', (
           annotation.createPointer(tool, 'down', page.ref, point);
         }
         void annotation.finishCreationDraft();
-        await vi.waitFor(() => expect(annotation.listSelected()).toHaveLength(1));
-        const created = annotation.listSelected()[0].raw!;
+        // Written and confirmed: its ref is the engine's.
+        await vi.waitFor(() => expect(annotation.listSelected()[0]?.ref.kind).toBe('objectNumber'));
+        const created = annotation.listSelected()[0]!;
         if (created.subtype !== 'polygon' && created.subtype !== 'polyline')
           throw new Error('Expected shape');
         const current = () => {
-          const dto = annotation.getRaw(created.ref)!;
+          const dto = annotation.get(created.ref)!;
           if (dto.subtype !== 'polygon' && dto.subtype !== 'polyline')
             throw new Error('Expected shape');
           return dto;
@@ -82,11 +85,15 @@ describe.each(['wasm', 'native'] as const)('shape authoring integration (%s)', (
         expect(created.contents).toBe(tool === 'area' ? '50.00 m²' : '25.00 m');
         expect(created.captionEnabled).toBe(true);
         expect(created.captionCenter).toBe(null);
-        const model = fromDTO(created);
-        if (!model.measure || model.measure.intent === 'line-dimension')
+        const record = fromDTO(created);
+        const measure = measurementOf(record.annotation);
+        if (!measure || measure.intent === 'line-dimension')
           throw new Error('Expected shape measure');
-        const label = shapeMeasurementLayout(model.geometry, model.measure, model.style)!.caption!
-          .center;
+        const label = shapeMeasurementLayout(
+          shapeOf(record.annotation),
+          measure,
+          styleOf(record.annotation),
+        )!.caption!.center;
         const target = { x: 390, y: 275 };
         annotation.editPointer('down', page.ref, label, false);
         annotation.editPointer('move', page.ref, target, false);
@@ -104,7 +111,7 @@ describe.each(['wasm', 'native'] as const)('shape authoring integration (%s)', (
         expectVector();
 
         const before = current();
-        const pivot = turnPivotOf(fromDTO(before).geometry);
+        const pivot = turnPivotOf(shapeOf(fromDTO(before).annotation));
         const rotatedCaption = rotatePoint(target, pivot, 90);
         await annotation.rotateSelectionBy(90);
         await vi.waitFor(() => {
@@ -122,13 +129,13 @@ describe.each(['wasm', 'native'] as const)('shape authoring integration (%s)', (
           );
           expect(drawnCaption.x).toBeCloseTo(rotatedCaption.x, 3);
           expect(drawnCaption.y).toBeCloseTo(rotatedCaption.y, 3);
-          const after = turnPivotOf(fromDTO(current()).geometry);
+          const after = turnPivotOf(shapeOf(fromDTO(current()).annotation));
           expect(after.x).toBeCloseTo(pivot.x, 3);
           expect(after.y).toBeCloseTo(pivot.y, 3);
         });
         expectVector();
         const displacedRect = current().rect;
-        await annotation.updateRaw(created.ref, {
+        await annotation.update(created.ref, {
           subtype: created.subtype,
           captionCenter: null,
         });

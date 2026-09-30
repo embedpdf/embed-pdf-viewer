@@ -1,17 +1,17 @@
 import { isReadout, measurementReadout } from '@embedpdf/engine-core/runtime';
-import type {
-  LineDimensionCaption,
-  LineLeader,
-  PdfMeasurement,
-} from '@embedpdf/engine-core/runtime';
-import { endingNodes, endingPoints } from './endings';
+import type { AnnotationDTO } from '@embedpdf/engine-core/runtime';
+import { endingNodes, endingNodesHit, endingPoints } from './endings';
 import { DISTANCE_CAPTION_SIZE as CAPTION_SIZE, distanceCaptionWidth } from './measurement-font';
-import { geomHit, geomRotation, rotatePoint, selectionQuad, unionRect } from './geometry';
+import { geomRotation, selectionQuad } from './geometry';
+import { dashOf } from './kinds/styles';
+import { rotatePoint, segDist, unionRect } from './rect';
+import { drawnLineOf, strokedOutlineOf } from './shapes/points';
 import type {
-  ModelGeometry,
+  FieldValues,
+  Shape,
   Handle,
   Paint,
-  Quad,
+  QuadRing,
   Rect,
   RenderNode,
   SceneNode,
@@ -22,17 +22,81 @@ import type { ShapeMeasurementAppearance } from './measurement-shape';
 
 export type MeasurementAppearance = DistanceAppearance | ShapeMeasurementAppearance;
 
+type LineAnnotation = Extract<AnnotationDTO, { subtype: 'line' }>;
+
 /**
- * A distance annotation's render projection. Offsets stay in directed PDF line
- * axes.
+ * A distance's measurement: the engine's own fields for its scale, its
+ * caption (on or off, its position, and its offset in the line's own axes),
+ * its leader and its label (`contents`, which the engine works out).
  */
-export interface DistanceAppearance {
-  intent: 'line-dimension';
-  measure: PdfMeasurement | null;
-  caption: LineDimensionCaption;
-  leader?: LineLeader;
-  text: string;
+export type DistanceAppearance = { intent: 'line-dimension' } & Pick<
+  LineAnnotation,
+  'measure' | 'captionEnabled' | 'captionPosition' | 'captionOffset' | 'leader' | 'contents'
+>;
+
+/**
+ * The annotation's measurement, when it is one: a line measuring a
+ * distance, a polyline a perimeter, a polygon an area, as its intent says.
+ * Its measurement fields, read off it for drawing and hit-testing.
+ */
+export function measurementOf(annotation: AnnotationDTO): MeasurementAppearance | undefined {
+  if (annotation.subtype === 'line' && annotation.intent === 'line-dimension') {
+    return {
+      intent: annotation.intent,
+      measure: annotation.measure,
+      captionEnabled: annotation.captionEnabled,
+      captionPosition: annotation.captionPosition,
+      captionOffset: annotation.captionOffset,
+      leader: annotation.leader,
+      contents: annotation.contents,
+    };
+  }
+  if (
+    (annotation.subtype === 'polyline' || annotation.subtype === 'polygon') &&
+    (annotation.intent === 'polyline-dimension' || annotation.intent === 'polygon-dimension')
+  ) {
+    return {
+      intent: annotation.intent,
+      measure: annotation.measure,
+      captionEnabled: annotation.captionEnabled,
+      contents: annotation.contents,
+    };
+  }
+  return undefined;
 }
+
+/** The subject a measurement is named by, as Acrobat names it. */
+const SUBJECT = {
+  'line-dimension': 'Distance',
+  'polyline-dimension': 'Perimeter',
+  'polygon-dimension': 'Area',
+} as const;
+
+/**
+ * What a new measurement states beside its points: its intent, its scale
+ * (one the engine can write), its caption and leader as it has them, and its
+ * subject. Its label is the engine's: it works it out from the points and
+ * the scale.
+ */
+export function measurementDraftFields(appearance: MeasurementAppearance): FieldValues {
+  const caption =
+    appearance.intent === 'line-dimension'
+      ? {
+          captionEnabled: appearance.captionEnabled,
+          captionPosition: appearance.captionPosition,
+          captionOffset: appearance.captionOffset,
+          leader: appearance.leader,
+        }
+      : { captionEnabled: appearance.captionEnabled };
+  return {
+    intent: appearance.intent,
+    measure: appearance.measure?.subtype === 'rectilinear' ? appearance.measure : null,
+    ...Object.fromEntries(Object.entries(caption).filter(([, value]) => value !== undefined)),
+    subject: SUBJECT[appearance.intent],
+  };
+}
+
+type CaptionOffset = DistanceAppearance['captionOffset'];
 
 export interface DistanceSegment {
   from: Point;
@@ -46,7 +110,7 @@ export interface DistanceCaptionLayout {
   normal: Point;
   width: number;
   height: number;
-  bounds: Quad;
+  bounds: QuadRing;
 }
 
 /** One layout drives the preview, selection, handles, and hit testing. */
@@ -95,19 +159,19 @@ function lineAxes(start: Point, end: Point) {
   return { along, normal, length };
 }
 
-export function distanceLabel(geometry: ModelGeometry, appearance: DistanceAppearance): string {
+export function distanceLabel(geometry: Shape, appearance: DistanceAppearance): string {
   if (geometry.kind !== 'line') {
-    return appearance.text;
+    return appearance.contents ?? '';
   }
 
   const readout = measurementReadout({
     subtype: 'line',
     intent: appearance.intent,
     measure: appearance.measure,
-    linePoints: { start: geometry.a, end: geometry.b },
+    linePoints: geometry.linePoints,
   });
 
-  return isReadout(readout) ? readout.label : appearance.text;
+  return isReadout(readout) ? readout.label : (appearance.contents ?? '');
 }
 
 function captionQuad(
@@ -116,7 +180,7 @@ function captionQuad(
   normal: Point,
   width: number,
   height: number,
-): Quad {
+): QuadRing {
   const corner = (x: number, y: number) => offsetPoint(offsetPoint(center, along, x), normal, y);
 
   return [
@@ -133,7 +197,7 @@ function captionConnector(
   caption: DistanceCaptionLayout,
   along: Point,
   normal: Point,
-  offset: LineDimensionCaption['offset'],
+  offset: CaptionOffset,
 ): DistanceSegment[] {
   if (!offset || (offset.along === 0 && offset.perpendicular === 0)) {
     return [];
@@ -169,7 +233,7 @@ function dimensionSegments(
   normal: Point,
   length: number,
   caption: DistanceCaptionLayout | null,
-  position: LineDimensionCaption['position'],
+  position: DistanceAppearance['captionPosition'],
   outside: boolean,
   strokeWidth: number,
 ): DistanceSegment[] {
@@ -207,7 +271,7 @@ function dimensionSegments(
 }
 
 export function distanceLayout(
-  geometry: ModelGeometry,
+  geometry: Shape,
   appearance: DistanceAppearance,
   strokeWidth: number,
 ): DistanceLayout | null {
@@ -215,14 +279,15 @@ export function distanceLayout(
     return null;
   }
 
-  const { along, normal, length } = lineAxes(geometry.a, geometry.b);
+  const { start: a, end: b } = drawnLineOf(geometry);
+  const { along, normal, length } = lineAxes(a, b);
   const leaderLength = appearance.leader?.length ?? 0;
-  const dimensionStart = offsetPoint(geometry.a, normal, leaderLength);
-  const dimensionEnd = offsetPoint(geometry.b, normal, leaderLength);
+  const dimensionStart = offsetPoint(a, normal, leaderLength);
+  const dimensionEnd = offsetPoint(b, normal, leaderLength);
   const midpoint = offsetPoint(dimensionStart, along, length / 2);
   const text = distanceLabel(geometry, appearance);
   const width = distanceCaptionWidth(text);
-  const hasCaption = appearance.caption.enabled && text.length > 0;
+  const hasCaption = !!appearance.captionEnabled && text.length > 0;
   // A documented fit policy, constrained by the Acrobat 1.75 m / 2.01 m cases.
   const outside = hasCaption && width + 2 * CAPTION_PADDING + ARROW_RESERVE * strokeWidth > length;
 
@@ -231,11 +296,11 @@ export function distanceLayout(
     const reversed = along.x < 0 || (along.x === 0 && along.y > 0);
     const textAlong = reversed ? { x: -along.x, y: -along.y } : along;
     const textNormal = { x: textAlong.y, y: -textAlong.x };
-    const offset = appearance.caption.offset;
+    const offset = appearance.captionOffset;
     let center = offsetPoint(midpoint, along, offset?.along ?? 0);
     center = offsetPoint(center, normal, offset?.perpendicular ?? 0);
 
-    if (appearance.caption.position === 'top' || outside) {
+    if (appearance.captionPosition === 'top' || outside) {
       const side = outside && leaderLength < 0 ? -1 : 1;
       const padding = outside ? OUTSIDE_CAPTION_PADDING : CAPTION_PADDING;
       // The anchor follows the directed line when it rotates. Only the glyph
@@ -260,7 +325,7 @@ export function distanceLayout(
     const leaderOffset = side * (appearance.leader?.offset ?? 0);
     const leaderEnd = leaderLength + side * (appearance.leader?.extension ?? 0);
 
-    for (const endpoint of [geometry.a, geometry.b]) {
+    for (const endpoint of [a, b]) {
       leaderSegments.push({
         from: offsetPoint(endpoint, normal, leaderOffset),
         to: offsetPoint(endpoint, normal, leaderEnd),
@@ -275,29 +340,29 @@ export function distanceLayout(
     normal,
     length,
     caption,
-    appearance.caption.position,
+    appearance.captionPosition,
     outside,
     strokeWidth,
   );
   const connector = caption
-    ? captionConnector(midpoint, caption, along, normal, appearance.caption.offset)
+    ? captionConnector(midpoint, caption, along, normal, appearance.captionOffset)
     : [];
 
   const angle = Math.atan2(along.y, along.x);
   const startAngle = outside ? angle : angle + Math.PI;
   const endAngle = outside ? angle + Math.PI : angle;
   const endings = [
-    ...endingNodes(dimensionStart, startAngle, geometry.ends?.start, strokeWidth),
-    ...endingNodes(dimensionEnd, endAngle, geometry.ends?.end, strokeWidth),
+    ...endingNodes(dimensionStart, startAngle, geometry.lineEndings?.start, strokeWidth),
+    ...endingNodes(dimensionEnd, endAngle, geometry.lineEndings?.end, strokeWidth),
   ];
   const boundsPoints = [
-    geometry.a,
-    geometry.b,
+    a,
+    b,
     ...segments.flatMap((segment) => [segment.from, segment.to]),
     ...leaderSegments.flatMap((segment) => [segment.from, segment.to]),
     ...connector.flatMap((segment) => [segment.from, segment.to]),
-    ...endingPoints(dimensionStart, startAngle, geometry.ends?.start, strokeWidth),
-    ...endingPoints(dimensionEnd, endAngle, geometry.ends?.end, strokeWidth),
+    ...endingPoints(dimensionStart, startAngle, geometry.lineEndings?.start, strokeWidth),
+    ...endingPoints(dimensionEnd, endAngle, geometry.lineEndings?.end, strokeWidth),
     ...(caption?.bounds ?? []),
   ];
 
@@ -305,8 +370,8 @@ export function distanceLayout(
     along,
     normal,
     length,
-    measuredStart: geometry.a,
-    measuredEnd: geometry.b,
+    measuredStart: a,
+    measuredEnd: b,
     dimensionStart,
     dimensionEnd,
     dimensionSegments: segments,
@@ -330,21 +395,21 @@ export function expandDistanceBounds(bounds: Rect, padding: number): Rect {
 }
 
 export function distanceSelectionQuad(
-  geometry: ModelGeometry,
+  geometry: Shape,
   appearance: DistanceAppearance,
   strokeWidth: number,
-): Quad {
+): QuadRing {
   const layout = distanceLayout(geometry, appearance, strokeWidth);
   if (!layout || geometry.kind !== 'line') {
-    return selectionQuad(geometry, strokeWidth);
+    return selectionQuad(geometry, { strokeWidth: strokeWidth });
   }
 
-  // Vertex annotations recover their local frame using the advisory rotation.
-  // Include every measurement component before constructing that frame, then
-  // rotate its corners back. Reboxing the page-aligned bounds would grow and
-  // shift the selection as the annotation turns.
+  // The line's own frame is its turn. Include every measurement component
+  // before constructing that frame, then rotate its corners back. Reboxing the
+  // page-aligned bounds would grow and shift the selection as the annotation
+  // turns.
   const angle = geomRotation(geometry);
-  const origin = geometry.a;
+  const origin = drawnLineOf(geometry).start;
   const points = layout.selectionPoints.map((point) => rotatePoint(point, origin, -angle));
   const bounds = expandDistanceBounds(unionRect(points), strokeWidth / 2 + 1);
   const corner = (x: number, y: number) => rotatePoint({ x, y }, origin, angle);
@@ -401,53 +466,33 @@ export function distanceHit(
     ...layout.captionConnector,
   ];
 
+  const tolerance = margin + strokeWidth / 2;
   return (
-    segments.some((segment) =>
-      geomHit({ kind: 'line', a: segment.from, b: segment.to }, point, margin, false, strokeWidth),
-    ) ||
-    layout.endings.some((ending) => {
-      if (ending.kind === 'poly') {
-        return geomHit(
-          { kind: 'poly', points: ending.points, closed: ending.closed },
-          point,
-          margin,
-          true,
-          strokeWidth,
-        );
-      }
-      if (ending.kind === 'ellipse') {
-        return geomHit(
-          { kind: 'rect', rect: ending.rect, ellipse: true },
-          point,
-          margin,
-          true,
-          strokeWidth,
-        );
-      }
-      return false;
-    })
+    segments.some((segment) => segDist(point, segment.from, segment.to) <= tolerance) ||
+    endingNodesHit(layout.endings, point, tolerance)
   );
 }
 
 export function distanceCaptionAt(
-  geometry: ModelGeometry,
+  geometry: Shape,
   appearance: DistanceAppearance,
   width: number,
 ): Point | null {
   return distanceLayout(geometry, appearance, width)?.caption?.center ?? null;
 }
 
-export function distanceLeaderLength(geometry: ModelGeometry, point: Point): number {
+export function distanceLeaderLength(geometry: Shape, point: Point): number {
   if (geometry.kind !== 'line') {
     return 0;
   }
 
-  const { normal } = lineAxes(geometry.a, geometry.b);
-  return projectDelta(geometry.a, point, normal);
+  const { start, end } = drawnLineOf(geometry);
+  const { normal } = lineAxes(start, end);
+  return projectDelta(start, point, normal);
 }
 
 export function moveDistanceCaption(
-  geometry: ModelGeometry,
+  geometry: Shape,
   appearance: DistanceAppearance,
   delta: Point,
 ): DistanceAppearance {
@@ -455,23 +500,38 @@ export function moveDistanceCaption(
     return appearance;
   }
 
-  const { along, normal } = lineAxes(geometry.a, geometry.b);
-  const previous = appearance.caption.offset;
+  const { start, end } = drawnLineOf(geometry);
+  const { along, normal } = lineAxes(start, end);
+  const previous = appearance.captionOffset;
 
   return {
     ...appearance,
-    caption: {
-      ...appearance.caption,
-      offset: {
-        along: (previous?.along ?? 0) + delta.x * along.x + delta.y * along.y,
-        perpendicular: (previous?.perpendicular ?? 0) + delta.x * normal.x + delta.y * normal.y,
-      },
+    captionOffset: {
+      along: (previous?.along ?? 0) + delta.x * along.x + delta.y * along.y,
+      perpendicular: (previous?.perpendicular ?? 0) + delta.x * normal.x + delta.y * normal.y,
     },
   };
 }
 
+/**
+ * The upright box around all a distance paints: its dimension line, leader
+ * and connector lines and its endings stroked at `strokeWidth` (what
+ * `distanceScene` draws), and its caption's box.
+ */
+export function distanceDrawnBounds(layout: DistanceLayout, strokeWidth: number): Rect {
+  const lines = [
+    ...layout.dimensionSegments,
+    ...layout.leaderSegments,
+    ...layout.captionConnector,
+  ].map((segment): RenderNode => ({ kind: 'line', a: segment.from, b: segment.to }));
+  return unionRect([
+    ...strokedOutlineOf([...lines, ...layout.endings], strokeWidth),
+    ...(layout.caption?.bounds ?? []),
+  ]);
+}
+
 export function distanceScene(
-  geometry: ModelGeometry,
+  geometry: Shape,
   appearance: DistanceAppearance,
   style: Style,
 ): SceneNode[] {
@@ -484,7 +544,7 @@ export function distanceScene(
     stroke: style.color,
     width: style.strokeWidth,
     opacity: style.opacity,
-    dash: style.border.kind === 'dashed' ? style.border.dash : undefined,
+    dash: dashOf(style),
   };
   const segments = [
     ...layout.dimensionSegments,

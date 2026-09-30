@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { toPageRef, type DocumentEvent } from '@embedpdf/core';
-import { textQuadFromRect } from '@embedpdf/core-geometry';
+import { quadFromRect } from '@embedpdf/core-geometry';
 
 import type { SelectionSegment } from '../src/geometry';
 import {
@@ -15,7 +15,7 @@ import {
 
 const segment = (x: number): SelectionSegment => {
   const rect = { x, y: 0, width: 8, height: 10 };
-  return { quad: textQuadFromRect(rect), rect, advance: 1 };
+  return { quad: quadFromRect(rect), rect, advance: 1 };
 };
 
 const range = (focusGlyph: number): SelectionRange => ({

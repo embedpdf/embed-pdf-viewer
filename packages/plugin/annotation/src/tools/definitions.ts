@@ -1,8 +1,9 @@
 /**
  * The annotation tool registry — the one place that says which tools exist and
  * what each one authors. A tool is a named authoring preset, not a new kind: it
- * binds an `id` to a PDF `subtype`, a bag of per-tool `defaults`, a cursor, and
- * the interaction tags it turns on. Two tools can share a subtype but differ in
+ * binds an `id` to a PDF `subtype`, its `defaults` (the engine fields what it
+ * draws takes: a draft without its shape), a cursor, and the interaction tags
+ * it turns on. Two tools can share a subtype but differ in
  * defaults (an "arrow" is a `line` with an arrowhead default), which is exactly
  * why defaults are keyed by the tool id (the `preset`), never by the subtype.
  *
@@ -13,18 +14,16 @@
  */
 import type {
   AnnotationFlags,
-  AnnotationPropsPatch,
   ClickCreate,
+  FieldValues,
   InkStraightenOptions,
-  PropKey,
-  Subtype,
+  KindName,
 } from '@embedpdf/core-annotation';
 import type {
+  AnnotationDraft,
   BinarySource,
-  InkIntent,
-  LineDimensionCaption,
-  LineLeader,
-  ShapeDimensionCaption,
+  RichTextBody,
+  WidgetAppearance,
 } from '@embedpdf/engine-core/runtime';
 
 /**
@@ -86,48 +85,65 @@ export interface InkAuthoringOptions {
   straighten?: InkStraightenOptions;
 }
 
+const SHAPE_FIELDS = [
+  'color',
+  'interiorColor',
+  'opacity',
+  'strokeWidth',
+  'borderStyle',
+  'dashArray',
+  'cloudyIntensity',
+] as const;
+const LINE_FIELDS = [
+  'color',
+  'interiorColor',
+  'opacity',
+  'strokeWidth',
+  'borderStyle',
+  'dashArray',
+  'lineEndings',
+] as const;
+/** A distance's measurement fields: its intent, caption and leader. */
+const DISTANCE_FIELDS = ['intent', 'captionEnabled', 'captionPosition', 'leader'] as const;
+/** A perimeter's or area's: its intent and whether its caption shows. */
+const SHAPE_DIMENSION_FIELDS = ['intent', 'captionEnabled'] as const;
+const FREE_TEXT_FIELDS = [
+  'fontFamily',
+  'fontSize',
+  'fontColor',
+  'textAlign',
+  'richText',
+  'opacity',
+  'interiorColor',
+  'color',
+  'strokeWidth',
+  'borderStyle',
+  'dashArray',
+] as const;
+const WIDGET_BOX_FIELDS = ['color', 'interiorColor', 'strokeWidth', 'borderStyle'] as const;
+const WIDGET_TEXT_FIELDS = [
+  ...WIDGET_BOX_FIELDS,
+  'fontFamily',
+  'fontSize',
+  'fontColor',
+  'textAlign',
+] as const;
+
 /**
- * The creation properties each known authoring kind actually consumes. This is
- * deliberately separate from the flat internal patch vocabulary: it gives tool
- * configuration precise compile-time and runtime validation while mixed-selection
- * edits can keep using `AnnotationPropsPatch`.
+ * The engine fields each known authoring kind's defaults may set: the ones a
+ * create from the tool takes, besides its shape. Separate from the kind's
+ * sidebar fields, so a tool's configuration gets precise compile-time and
+ * runtime validation.
  */
-export const TOOL_DEFAULT_KEYS = {
-  square: ['color', 'interiorColor', 'opacity', 'strokeWidth', 'border'],
-  circle: ['color', 'interiorColor', 'opacity', 'strokeWidth', 'border'],
-  line: ['color', 'interiorColor', 'opacity', 'strokeWidth', 'border', 'lineEndings'],
-  polygon: ['color', 'interiorColor', 'opacity', 'strokeWidth', 'border'],
-  polyline: ['color', 'interiorColor', 'opacity', 'strokeWidth', 'border', 'lineEndings'],
-  ink: ['color', 'opacity', 'strokeWidth', 'blendMode'],
-  'free-text': [
-    'fontFamily',
-    'fontSize',
-    'fontColor',
-    'bold',
-    'italic',
-    'underline',
-    'textAlign',
-    'opacity',
-    'interiorColor',
-    'color',
-    'strokeWidth',
-    'border',
-  ],
-  'free-text-callout': [
-    'fontFamily',
-    'fontSize',
-    'fontColor',
-    'bold',
-    'italic',
-    'underline',
-    'textAlign',
-    'opacity',
-    'interiorColor',
-    'color',
-    'strokeWidth',
-    'border',
-    'lineEndings',
-  ],
+export const TOOL_DEFAULT_FIELDS = {
+  square: SHAPE_FIELDS,
+  circle: SHAPE_FIELDS,
+  line: [...LINE_FIELDS, ...DISTANCE_FIELDS],
+  polygon: [...SHAPE_FIELDS, ...SHAPE_DIMENSION_FIELDS],
+  polyline: [...LINE_FIELDS, ...SHAPE_DIMENSION_FIELDS],
+  ink: ['color', 'opacity', 'strokeWidth', 'blendMode', 'intent'],
+  'free-text': FREE_TEXT_FIELDS,
+  'free-text-callout': [...FREE_TEXT_FIELDS, 'lineEnding'],
   highlight: ['color', 'opacity', 'blendMode'],
   underline: ['color', 'opacity', 'blendMode'],
   strikeout: ['color', 'opacity', 'blendMode'],
@@ -136,43 +152,34 @@ export const TOOL_DEFAULT_KEYS = {
   redact: ['color', 'interiorColor', 'opacity', 'fontFamily', 'fontSize', 'fontColor', 'textAlign'],
   stamp: [],
   // A link preset may carry a fixed target ('docs-link' style one-click links).
-  link: ['link'],
+  link: ['target'],
   text: ['icon', 'color', 'opacity'],
   'file-attachment': ['icon', 'color', 'opacity'],
-  // Widget client kinds (the form plugin's palette tools): the same key sets
-  // the kind table declares — box styling for every family, /DA text styling
-  // for the text-bearing ones. The engine maps them onto /MK //BS //DA //Q.
-  'widget-text': [
-    'color',
-    'interiorColor',
-    'strokeWidth',
-    'border',
-    'fontFamily',
-    'fontSize',
-    'fontColor',
-    'textAlign',
-  ],
-  'widget-choice': [
-    'color',
-    'interiorColor',
-    'strokeWidth',
-    'border',
-    'fontFamily',
-    'fontSize',
-    'fontColor',
-    'textAlign',
-  ],
-  'widget-toggle': ['color', 'interiorColor', 'strokeWidth', 'border'],
+  // Widget client kinds (the form plugin's palette tools): box styling for
+  // every family, `/DA` text styling for the text-bearing ones. The engine
+  // maps them onto /MK //BS //DA //Q.
+  'widget-text': WIDGET_TEXT_FIELDS,
+  'widget-choice': WIDGET_TEXT_FIELDS,
+  'widget-toggle': WIDGET_BOX_FIELDS,
   // The bare box every other widget family ingests as (a signature field's
   // widget among them): box styling only — no text to style.
-  'widget-box': ['color', 'interiorColor', 'strokeWidth', 'border'],
-} as const satisfies Record<string, readonly PropKey[]>;
+  'widget-box': WIDGET_BOX_FIELDS,
+} as const satisfies Record<string, readonly string[]>;
 
-export type ToolAuthoringKind = keyof typeof TOOL_DEFAULT_KEYS;
-type ToolDefaultKey<K extends ToolAuthoringKind> = (typeof TOOL_DEFAULT_KEYS)[K][number];
-export type ToolDefaultsFor<K extends ToolAuthoringKind> = [ToolDefaultKey<K>] extends [never]
+export type ToolAuthoringKind = keyof typeof TOOL_DEFAULT_FIELDS;
+type ToolDefaultField<K extends ToolAuthoringKind> = (typeof TOOL_DEFAULT_FIELDS)[K][number];
+/** The draft a kind's creates are: a callout is a free text; a form tool's kind is a widget's appearance. */
+type ToolDraftOf<K extends ToolAuthoringKind> = K extends `widget-${string}`
+  ? WidgetAppearance
+  : Partial<Extract<AnnotationDraft, { subtype: K extends 'free-text-callout' ? 'free-text' : K }>>;
+/** A tool's rich text is its body: the formatting what it types starts with. */
+type ToolRichText = {
+  richText?: { body: Partial<RichTextBody> };
+};
+export type ToolDefaultsFor<K extends ToolAuthoringKind> = [ToolDefaultField<K>] extends [never]
   ? never
-  : Pick<AnnotationPropsPatch, ToolDefaultKey<K>>;
+  : Pick<ToolDraftOf<K>, Exclude<ToolDefaultField<K>, 'richText'> & keyof ToolDraftOf<K>> &
+      ('richText' extends ToolDefaultField<K> ? ToolRichText : unknown);
 
 /**
  * A tool definition — the public config vocabulary. Every field except `id` is
@@ -182,7 +189,7 @@ export type ToolDefaultsFor<K extends ToolAuthoringKind> = [ToolDefaultKey<K>] e
 export interface AnnotationToolDef<K extends ToolAuthoringKind = ToolAuthoringKind> {
   /** Stable tool id — the value passed to `activateTool` and the `defaults` key. */
   id: string;
-  /** Inherit `subtype` / `propsKind` / `cursor` / `enables` / `source` /
+  /** Inherit `subtype` / `fieldsKind` / `cursor` / `enables` / `source` /
    *  `selection` / `intent` / `ink` / `meta`
    *  from an existing tool id (a built-in or another entry). Own fields win. */
   extends?: string;
@@ -193,16 +200,17 @@ export interface AnnotationToolDef<K extends ToolAuthoringKind = ToolAuthoringKi
    *  views of the one PDF `widget` subtype (a form tool's commit goes through
    *  `doc.forms`, never this plugin — see the form plugin's tool table).
    *  Defaults to the inherited kind, or the id when neither is given. */
-  subtype?: Subtype;
-  /** The kind whose editable-property specs a style panel shows for this tool.
-   *  Defaults to `subtype` (a callout authors `free-text` props, for example). */
-  propsKind?: string;
+  subtype?: KindName;
+  /** The kind whose editable fields a style panel shows for this tool.
+   *  Defaults to `subtype` (a callout edits `free-text` fields, for example). */
+  fieldsKind?: string;
   /** Advanced: the `defaults` key this tool reads/writes. Defaults to the id, and
    *  that is almost always right — override it only to alias a shared defaults bag
    *  (the built-in insert-caret tool points its preset at the `caret` key). */
   preset?: string;
-  /** Seed defaults for newly drawn annotations — the flat AnnotationProps patch,
-   *  merged over any inherited defaults (line endings merge per side). */
+  /** The engine fields what the tool draws takes, besides its shape: a draft
+   *  without its shape, merged over any inherited defaults (each value whole).
+   *  The engine's defaults fill in what they leave out. */
   defaults?: ToolDefaultsFor<K>;
   /**
    * `/F` annotation flags seeded on everything this tool creates, merged over
@@ -228,22 +236,6 @@ export interface AnnotationToolDef<K extends ToolAuthoringKind = ToolAuthoringKi
       : never;
   /** What a committed text selection authors. Omit for pointer/click tools. */
   selection?: SelectionAuthoring;
-  /** PDF `/IT` authored by an intent-bearing ink preset. */
-  intent?: K extends 'ink'
-    ? InkIntent
-    : K extends 'line'
-      ? 'line-dimension'
-      : K extends 'polygon'
-        ? 'polygon-dimension'
-        : K extends 'polyline'
-          ? 'polyline-dimension'
-          : never;
-  /** Caption defaults for a measurement preset. Shape centers use absolute PDF coordinates. */
-  measurement?: K extends 'line'
-    ? { caption: LineDimensionCaption; leader?: LineLeader }
-    : K extends 'polygon' | 'polyline'
-      ? { caption: ShapeDimensionCaption }
-      : never;
   /** Ink-only stroke grouping and straightening policy. */
   ink?: K extends 'ink' ? InkAuthoringOptions : never;
   /**
@@ -333,20 +325,18 @@ export type AnnotationToolInput = DirectToolDef | BuiltinToolOverride | Extended
 export interface ResolvedTool {
   id: string;
   /** Routing token for the draw core + the created annotation's PDF subtype. */
-  subtype: Subtype;
+  subtype: KindName;
   /** The `defaults` key (always the tool id) — keeps same-subtype tools apart. */
   preset: string;
-  /** The `propsFor` key for the style panel. */
-  propsKind: string;
+  /** The kind whose fields the style panel shows (`kindNamed(…).fields`). */
+  fieldsKind: string;
   cursor: string;
   enables: ReadonlySet<string>;
-  defaults?: AnnotationPropsPatch;
+  defaults?: FieldValues;
   /** `/F` seed for created annotations (see {@link AnnotationToolDef.flags}). */
   flags?: Partial<AnnotationFlags>;
   source?: StampSourceSpec;
   selection?: SelectionAuthoring;
-  intent?: InkIntent | 'line-dimension' | 'polyline-dimension' | 'polygon-dimension';
-  measurement?: { caption: LineDimensionCaption | ShapeDimensionCaption; leader?: LineLeader };
   ink?: InkAuthoringOptions;
   /** Counter-rotate creations against the page's display rotation (see
    *  {@link AnnotationToolDef.upright}). */
@@ -360,6 +350,8 @@ export interface ResolvedTool {
 
 // ── field groups shared by the built-ins (keeps the table readable) ──────────
 const DRAW_TAGS = ['annotation-draw', 'annotation-edit'];
+/** This viewer's drawing red: shapes, lines and text boxes start in it. */
+const HOUSE_RED = '#e5484d';
 const MARKUP_TAGS = ['text-select', 'annotation-edit'];
 
 /**
@@ -390,7 +382,7 @@ export const DEFAULT_TOOLS: AnnotationToolInput[] = [
     subtype: 'square',
     cursor: 'crosshair',
     enables: DRAW_TAGS,
-    defaults: { strokeWidth: 6 },
+    defaults: { color: HOUSE_RED, strokeWidth: 6 },
     clickCreate: { width: 80, height: 60 },
   },
   {
@@ -398,7 +390,7 @@ export const DEFAULT_TOOLS: AnnotationToolInput[] = [
     subtype: 'circle',
     cursor: 'crosshair',
     enables: DRAW_TAGS,
-    defaults: { strokeWidth: 6 },
+    defaults: { color: HOUSE_RED, strokeWidth: 6 },
     clickCreate: { width: 80, height: 60 },
   },
   {
@@ -406,17 +398,19 @@ export const DEFAULT_TOOLS: AnnotationToolInput[] = [
     subtype: 'line',
     cursor: 'crosshair',
     enables: DRAW_TAGS,
-    defaults: { strokeWidth: 6 },
+    defaults: { color: HOUSE_RED, strokeWidth: 6 },
     clickCreate: { length: 80 },
   },
   {
     id: 'distance',
     extends: 'line',
-    intent: 'line-dimension',
     clickCreate: false,
-    defaults: { strokeWidth: 1, lineEndings: { start: 'closed-arrow', end: 'closed-arrow' } },
-    measurement: {
-      caption: { enabled: true, position: 'inline' },
+    defaults: {
+      intent: 'line-dimension',
+      strokeWidth: 1,
+      lineEndings: { start: 'closed-arrow', end: 'closed-arrow' },
+      captionEnabled: true,
+      captionPosition: 'inline',
       leader: { length: 12, extension: 5, offset: 0 },
     },
   },
@@ -433,28 +427,29 @@ export const DEFAULT_TOOLS: AnnotationToolInput[] = [
     subtype: 'polygon',
     cursor: 'crosshair',
     enables: DRAW_TAGS,
-    defaults: { strokeWidth: 6 },
+    defaults: { color: HOUSE_RED, strokeWidth: 6 },
   },
   {
     id: 'polyline',
     subtype: 'polyline',
     cursor: 'crosshair',
     enables: DRAW_TAGS,
-    defaults: { strokeWidth: 6 },
+    defaults: { color: HOUSE_RED, strokeWidth: 6 },
   },
   {
     id: 'perimeter',
     extends: 'polyline',
-    intent: 'polyline-dimension',
-    defaults: { strokeWidth: 1, lineEndings: { start: 'none', end: 'none' } },
-    measurement: { caption: { enabled: true } },
+    defaults: {
+      intent: 'polyline-dimension',
+      strokeWidth: 1,
+      lineEndings: { start: 'none', end: 'none' },
+      captionEnabled: true,
+    },
   },
   {
     id: 'area',
     extends: 'polygon',
-    intent: 'polygon-dimension',
-    defaults: { strokeWidth: 1 },
-    measurement: { caption: { enabled: true } },
+    defaults: { intent: 'polygon-dimension', strokeWidth: 1, captionEnabled: true },
   },
   {
     id: 'ink',
@@ -467,8 +462,7 @@ export const DEFAULT_TOOLS: AnnotationToolInput[] = [
   {
     id: 'ink-highlight',
     extends: 'ink',
-    intent: 'ink-highlight',
-    defaults: { color: '#ffcd45', strokeWidth: 14, blendMode: 'multiply' },
+    defaults: { intent: 'ink-highlight', color: '#ffcd45', strokeWidth: 14, blendMode: 'multiply' },
     ink: {
       straighten: { deviationThreshold: 0.15, axisSnapDegrees: 15 },
     },
@@ -478,7 +472,7 @@ export const DEFAULT_TOOLS: AnnotationToolInput[] = [
     subtype: 'free-text',
     cursor: 'crosshair',
     enables: DRAW_TAGS,
-    defaults: { fontColor: '#ef4444' },
+    defaults: { color: HOUSE_RED, strokeWidth: 2, fontColor: '#ef4444' },
     upright: true,
     // Top-left anchored: the box hangs where you'll type (the kind's reading
     // feel); shapes default to `center`. Anchoring is explicit policy data.
@@ -492,10 +486,10 @@ export const DEFAULT_TOOLS: AnnotationToolInput[] = [
     // anchors — see the core's `calloutPointer`.
     id: 'free-text-callout',
     subtype: 'free-text-callout',
-    propsKind: 'free-text',
+    fieldsKind: 'free-text',
     cursor: 'crosshair',
     enables: DRAW_TAGS,
-    defaults: { strokeWidth: 6, lineEndings: { end: 'open-arrow' } },
+    defaults: { color: HOUSE_RED, strokeWidth: 6, lineEnding: 'open-arrow' },
     upright: true,
   },
   // text markup — the `text-select` gesture (inert without a selection plugin).
@@ -522,6 +516,7 @@ export const DEFAULT_TOOLS: AnnotationToolInput[] = [
     defaults: {
       color: '#e44234',
       interiorColor: '#000000',
+      fontSize: 14,
       fontColor: '#ffffff',
       opacity: 1,
     },
@@ -556,7 +551,7 @@ export const DEFAULT_TOOLS: AnnotationToolInput[] = [
     // live under the `caret` preset — the key `createCaret` resolves.
     id: 'insert-text',
     subtype: 'caret',
-    propsKind: 'caret',
+    fieldsKind: 'caret',
     preset: 'caret',
     cursor: 'default',
     enables: MARKUP_TAGS,
@@ -566,7 +561,7 @@ export const DEFAULT_TOOLS: AnnotationToolInput[] = [
   {
     id: 'replace-text',
     subtype: 'strikeout',
-    propsKind: 'strikeout',
+    fieldsKind: 'strikeout',
     cursor: 'default',
     enables: MARKUP_TAGS,
     defaults: { color: '#ef4444' },
@@ -587,7 +582,7 @@ export const DEFAULT_TOOLS: AnnotationToolInput[] = [
   },
   // link — drag an invisible hit rectangle; the target is set afterwards
   // through the selection editor (create-then-edit), unless a preset carries
-  // a fixed one (`{ id: 'docs-link', extends: 'link', defaults: { link: … } }`).
+  // a fixed one (`{ id: 'docs-link', extends: 'link', defaults: { target: … } }`).
   // While this tool is active the navigation plane stands down (no `link-nav`),
   // so existing links become plain editable rects.
   {
@@ -626,17 +621,9 @@ export const DEFAULT_TOOLS: AnnotationToolInput[] = [
   },
 ];
 
-/** Merge two default patches, `right` over `left`, with line endings merged per side. */
-function mergeDefaults(
-  left?: AnnotationPropsPatch,
-  right?: AnnotationPropsPatch,
-): AnnotationPropsPatch | undefined {
-  if (!left) return right;
-  if (!right) return left;
-  const merged: AnnotationPropsPatch = { ...left, ...right };
-  if (left.lineEndings || right.lineEndings)
-    merged.lineEndings = { ...left.lineEndings, ...right.lineEndings };
-  return merged;
+/** Merge two tools' defaults, `right` over `left`, each value whole. */
+function mergeDefaults(left?: FieldValues, right?: FieldValues): FieldValues | undefined {
+  return left && right ? { ...left, ...right } : (right ?? left);
 }
 
 /** Overlay a same-id override onto a base definition (configure a built-in). */
@@ -646,7 +633,7 @@ function mergeDef(base: AnnotationToolDef, over: AnnotationToolDef): AnnotationT
     ...over,
     enables: over.enables ?? base.enables,
     meta: base.meta || over.meta ? { ...base.meta, ...over.meta } : undefined,
-    defaults: mergeDefaults(base.defaults, over.defaults),
+    defaults: mergeDefaults(base.defaults, over.defaults) as AnnotationToolDef['defaults'],
     flags: base.flags || over.flags ? { ...base.flags, ...over.flags } : undefined,
     ink: base.ink || over.ink ? { ...base.ink, ...over.ink } : undefined,
   };
@@ -654,7 +641,7 @@ function mergeDef(base: AnnotationToolDef, over: AnnotationToolDef): AnnotationT
 
 function validateDefaults(tool: ResolvedTool): void {
   if (!tool.defaults) return;
-  const allowed = TOOL_DEFAULT_KEYS[tool.subtype as ToolAuthoringKind];
+  const allowed = TOOL_DEFAULT_FIELDS[tool.subtype as ToolAuthoringKind];
   // Unknown/custom routing kinds remain extensible; known built-ins are strict.
   if (!allowed) return;
   const keys = new Set<string>(allowed);
@@ -696,20 +683,18 @@ export function buildToolRegistry(
       base = resolve(definition.extends);
       resolving.delete(id);
     }
-    const subtype = (definition.subtype ?? base?.subtype ?? definition.id) as Subtype;
+    const subtype = (definition.subtype ?? base?.subtype ?? definition.id) as KindName;
     const resolved: ResolvedTool = {
       id: definition.id,
       subtype,
       preset: definition.preset ?? definition.id,
-      propsKind: definition.propsKind ?? base?.propsKind ?? subtype,
+      fieldsKind: definition.fieldsKind ?? base?.fieldsKind ?? subtype,
       cursor: definition.cursor ?? base?.cursor ?? 'crosshair',
       enables: new Set(definition.enables ?? (base ? [...base.enables] : [])),
       defaults: mergeDefaults(base?.defaults, definition.defaults),
       flags: base?.flags || definition.flags ? { ...base?.flags, ...definition.flags } : undefined,
       source: definition.source ?? base?.source,
       selection: definition.selection ?? base?.selection,
-      intent: definition.intent ?? base?.intent,
-      measurement: definition.measurement ?? base?.measurement,
       ink: base?.ink || definition.ink ? { ...base?.ink, ...definition.ink } : undefined,
       upright: definition.upright ?? base?.upright ?? false,
       clickCreate: definition.clickCreate ?? base?.clickCreate ?? false,

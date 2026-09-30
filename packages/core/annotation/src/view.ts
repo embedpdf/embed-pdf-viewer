@@ -1,15 +1,15 @@
-import type { PageRef } from '@embedpdf/engine-core/runtime';
+import type { AnnotationDTO, PageRef } from '@embedpdf/engine-core/runtime';
+import { rasterPlacement, sourceDuring } from './appearance';
 import { annotationSelectionFrame } from './selection';
 /**
  * Pure view selectors. `pageItems` is the per-annotation render list (live gesture
  * applied) for customRenderer wrapping; `chrome` is the selection overlay
  * (handles carry their resize cursor, group box, marquee).
  */
-import { distanceHandles, distanceLayout } from './measurement';
+import { distanceHandles, distanceLayout, measurementOf } from './measurement';
 import {
   measurementLayout,
   moveMeasurementCaption,
-  transformMeasurementCaption,
   shapeMeasurementReadout,
 } from './measurement-shape';
 import {
@@ -22,33 +22,27 @@ import {
   geomVisualBounds,
   groupResizeFactors,
   placeRotateKnob,
-  rectFromPoints,
   rectHandlesFor,
-  normalizeDeg,
-  rotatePoint,
-  shapeRectFor,
-  unionRect,
   ROTATE_KNOB_OFFSET,
 } from './geometry';
+import { rectFromPoints, rotatePoint, unionRect } from './rect';
+import { calloutShape } from './shapes/text-box';
 import { groupCaps } from './group';
 import { isSelectable, paintOrder } from './hit';
-import { capsFor } from './kinds';
 import { annotTransformable, viewable } from './flags';
-import {
-  anchoredBox,
-  anchoredGeom,
-  anchoredStrokeWidth,
-  anchorModeOf,
-  anchorOf,
-  type ViewEnv,
-} from './anchor';
+import { anchoredGeom, anchoredStrokeWidth, anchorModeOf, type ViewEnv } from './anchor';
 import { blendFor } from './scene';
-import { styleFromProps } from './props';
-import { calloutBox, calloutUprightRot, defaultsFor, rotateDraftDelta } from './update';
+import {
+  calloutBox,
+  calloutUprightRot,
+  lineEndingsOf,
+  rotateDraftDelta,
+  toolAnnotation,
+} from './update';
 import type {
   ModelAnnotation,
   ChromeNode,
-  ModelGeometry,
+  Shape,
   Id,
   Model,
   Rect,
@@ -57,6 +51,7 @@ import type {
   Point,
 } from './types';
 import type { CreationDraftAnchor } from './types';
+import { kindOf, refOf, shapeOf, styleOf, textOf } from './record';
 
 const DRAFT_ID = '__draft__';
 const PREVIEW_ID = '__markup_preview__';
@@ -66,17 +61,25 @@ const polyPreviewPoints = (points: Point[], current: Point): Point[] => {
   return last && (current.x !== last.x || current.y !== last.y) ? [...points, current] : points;
 };
 
+/** A redaction's overlay text: the label its hover preview draws. */
+const redactionLabelOf = (annotation: AnnotationDTO): Pick<RenderItem, 'label'> =>
+  annotation.subtype === 'redact' && annotation.overlayText
+    ? { label: { text: annotation.overlayText, repeat: annotation.repeat } }
+    : {};
+
 function effMeasure(model: Model, id: Id) {
-  const annotation = model.byId[id];
+  const record = model.byId[id];
   const draft = model.draft;
-  const measure = annotation.measure;
+  const measure = measurementOf(record.annotation);
 
   if (!measure || !draft) {
     return measure;
   }
 
   if (draft.kind === 'caption' && draft.id === id) {
-    return moveMeasurementCaption(annotation.geometry, measure, draft.delta, annotation.style);
+    const geometry = shapeOf(record.annotation);
+    const style = styleOf(record.annotation);
+    return moveMeasurementCaption(geometry, measure, draft.delta, style).measure;
   }
 
   if (draft.kind === 'leader' && draft.id === id && measure.intent === 'line-dimension') {
@@ -89,24 +92,6 @@ function effMeasure(model: Model, id: Id) {
     };
   }
 
-  if (draft.kind === 'move' && draft.ids.includes(id)) {
-    return transformMeasurementCaption(measure, (point) => ({
-      x: point.x + draft.delta.x,
-      y: point.y + draft.delta.y,
-    }));
-  }
-  if (draft.kind === 'rotate' && draft.ids.includes(id)) {
-    return transformMeasurementCaption(measure, (point) =>
-      rotatePoint(point, draft.pivot, rotateDraftDelta(model, draft).delta),
-    );
-  }
-  if (draft.kind === 'group' && draft.ids.includes(id)) {
-    const { sx, sy } = groupResizeFactors(draft.base, draft.current);
-    return transformMeasurementCaption(measure, (point) => ({
-      x: draft.anchor.x + (point.x - draft.anchor.x) * sx,
-      y: draft.anchor.y + (point.y - draft.anchor.y) * sy,
-    }));
-  }
   return measure;
 }
 
@@ -120,14 +105,22 @@ function effMeasure(model: Model, id: Id) {
  * `unanchoredGeom`, so preview ≡ commit by construction. The geometry every
  * selector below hands out, so render/chrome/bounds agree with hit.
  */
-function effGeom(model: Model, id: Id, view: ViewEnv | undefined): ModelGeometry {
-  const annotation = model.byId[id];
-  const geometry = anchoredGeom(annotation.geometry, anchorModeOf(annotation), view);
+function effGeom(model: Model, id: Id, view: ViewEnv | undefined): Shape {
+  const record = model.byId[id];
+  const geometry = anchoredGeom(shapeOf(record.annotation), anchorModeOf(record), view);
   const draft = model.draft;
   if (draft) {
     if (draft.kind === 'move' && draft.ids.includes(id))
       return geomTranslate(geometry, draft.delta);
     if (draft.kind === 'handle' && draft.id === id) return draft.current; // already view space
+    if (draft.kind === 'caption' && draft.id === id) {
+      // A perimeter's or area's caption center is its shape's.
+      const style = styleOf(record.annotation);
+      const measure = measurementOf(record.annotation);
+      return measure
+        ? moveMeasurementCaption(geometry, measure, draft.delta, style).geometry
+        : geometry;
+    }
     if (draft.kind === 'rotate' && draft.ids.includes(id)) {
       // The same snapped angle rule the commit uses (see `rotateDraftDelta`).
       return geomRotateAbout(geometry, draft.pivot, rotateDraftDelta(model, draft).delta);
@@ -142,84 +135,18 @@ function effGeom(model: Model, id: Id, view: ViewEnv | undefined): ModelGeometry
 
 /** Style with the stroke width an anchored vector body renders at (screen-
  *  constant line weight); everyone else keeps their style verbatim. */
-function effStyle(annotation: ModelAnnotation, view: ViewEnv | undefined): Style {
-  const mode = anchorModeOf(annotation);
-  if (!mode?.zoom || !view) return annotation.style;
-  return {
-    ...annotation.style,
-    strokeWidth: anchoredStrokeWidth(annotation.style.strokeWidth, mode, view),
-  };
-}
-
-/** The blit placement for a baked raster: its box (view space, live move
- *  applied) + the rotation to re-apply about the box centre.
- *
- *  `opaqueBody` kinds (stamp images): the raster is the visual, so the box
- *  follows every live gesture — the unrotated rect of the effective geometry
- *  covers move, resize, and group-scale in one rule, and the effective
- *  rotation drives the blit transform (a stamp spins with the gesture).
- *
- *  Everyone else blits by the AP `/Rect`: for a screen-anchored annotation
- *  that box rides the same similarity the geometry projects through
- *  (`anchoredBox`), composing its counter-rotation with any engine-stripped
- *  `apRot` — so a baked noZoom/noRotate body renders screen-constant too. */
-function effAp(model: Model, id: Id, view: ViewEnv | undefined): { box?: Rect; rot?: number } {
-  const annotation = model.byId[id];
-  if (capsFor(annotation.subtype).opaqueBody) {
-    const geometry = effGeom(model, id, view);
-    return {
-      box: 'rect' in geometry ? geometry.rect : annotation.apBox,
-      rot: geomRotation(geometry) || undefined,
-    };
-  }
-  if (!annotation.apBox) return { rot: annotation.apRot };
-  const projected = anchoredBox(
-    annotation.apBox,
-    anchorOf(annotation.geometry),
-    anchorModeOf(annotation),
-    view,
-  );
-  let box = projected?.box ?? annotation.apBox;
-  const rot = normalizeDeg((annotation.apRot ?? 0) + (projected?.rot ?? 0)) || undefined;
-  const draft = model.draft;
-  if (draft?.kind === 'move' && draft.ids.includes(id)) {
-    box = { ...box, x: box.x + draft.delta.x, y: box.y + draft.delta.y };
-  }
-  return { box, rot };
-}
-
-/** Render source for one annotation: an in-progress resize renders live (the
- *  baked raster can't stretch), even though the commit hasn't flipped `source`
- *  yet — so the drag is crisp and a no-op grab can revert to baked. */
-function effSource(model: Model, id: Id): 'baked' | 'vector' {
-  const annotation = model.byId[id];
-  // `opaqueBody` kinds have no vector render: they stay baked through every
-  // gesture — the bitmap stretches with `effApBox` and tilts via the item's
-  // live `rot`, then the engine's re-fit appearance replaces it on commit.
-  if (capsFor(annotation.subtype).opaqueBody) return annotation.source;
-  // A text box under text edit renders fully live (scene fill/border — and a
-  // callout's leader — + DOM text): the flat baked raster can't hide just
-  // its text, so any blend doubles it. Geometry gestures flip below; editing
-  // joins them here.
-  if (model.editing === id && annotation.geometry.kind === 'text') return 'vector';
-  const draft = model.draft;
-  // A live resize/rotate/group transform must render live — the baked raster
-  // can't stretch or tilt — even before the commit flips `source`.
-  if (
-    (draft?.kind === 'handle' || draft?.kind === 'caption' || draft?.kind === 'leader') &&
-    draft.id === id
-  )
-    return 'vector';
-  if ((draft?.kind === 'rotate' || draft?.kind === 'group') && draft.ids.includes(id))
-    return 'vector';
-  return annotation.source;
+function effStyle(record: ModelAnnotation, view: ViewEnv | undefined): Style {
+  const mode = anchorModeOf(record);
+  const style = styleOf(record.annotation);
+  if (!mode?.zoom || !view) return style;
+  return { ...style, strokeWidth: anchoredStrokeWidth(style.strokeWidth, mode, view) };
 }
 
 /** A free-text box renders as a live element (editable / reflowing) while it's
  *  being edited or while its source is vector (a resize, in-progress or committed);
  *  otherwise it renders as the engine's baked /AP image, exactly like a shape. */
 function textIsLive(model: Model, id: Id): boolean {
-  return model.editing === id || effSource(model, id) === 'vector';
+  return model.editing === id || sourceDuring(model, id) === 'vector';
 }
 
 export function pageItems(model: Model, page: PageRef, view?: ViewEnv): RenderItem[] {
@@ -230,7 +157,8 @@ export function pageItems(model: Model, page: PageRef, view?: ViewEnv): RenderIt
   // `/F` hides. The same order hit-testing uses, so what you click matches
   // what you see.
   for (const id of paintOrder(model, page)) {
-    const annotation = model.byId[id];
+    const record = model.byId[id];
+    const text = textOf(record.annotation);
     // Free text stays in the render list in every state, like a shape: a baked,
     // idle box renders as its engine /AP image; a live one (editing / resizing /
     // restyled) renders its box — fill + border, and a callout's leader — via
@@ -238,31 +166,29 @@ export function pageItems(model: Model, page: PageRef, view?: ViewEnv): RenderIt
     // (see `textBoxes`). Dropping the live plain box here would lose its border
     // and background the moment it is touched.
     const geometry = effGeom(model, id, view);
-    const style = effStyle(annotation, view);
-    // Blit box + rotation for the baked raster (see `effAp`): opaqueBody kinds
-    // follow the live effective geometry; everyone else blits by the AP /Rect,
-    // projected through the anchor similarity for screen-anchored bodies and
-    // composed with any engine-stripped `apRot`.
-    const ap = effAp(model, id, view);
+    const style = effStyle(record, view);
+    // Where the baked raster is drawn (appearance.ts): a stamp's where its
+    // shape is, everyone else's at its raster box, carried along by a move.
+    const ap = rasterPlacement(model, id, view, geometry);
     const measure = effMeasure(model, id);
     const distance = measure && measurementLayout(geometry, measure, style);
     items.push({
       id,
-      ref: annotation.ref,
-      subtype: annotation.subtype,
+      ref: refOf(record),
+      subtype: kindOf(record.annotation).name,
       geometry,
-      box: distance?.visualBounds ?? geomVisualBounds(geometry, style.strokeWidth, style.border),
+      box: distance?.visualBounds ?? geomVisualBounds(geometry, style),
       apBox: ap.box,
       style,
-      ...(annotation.text ? { text: annotation.text } : {}),
-      ...(annotation.label ? { label: annotation.label } : {}),
+      ...(text ? { text } : {}),
+      ...redactionLabelOf(record.annotation),
       measure,
-      source: effSource(model, id),
+      source: sourceDuring(model, id),
       selected: model.selected.includes(id),
       ...(model.hovered === id ? { hovered: true } : {}),
       rot: geomRotation(geometry),
       ...(ap.rot ? { apRot: ap.rot } : {}),
-      blend: blendFor(annotation.style),
+      blend: blendFor(style),
     });
   }
   const draft = model.draft;
@@ -275,34 +201,36 @@ export function pageItems(model: Model, page: PageRef, view?: ViewEnv): RenderIt
     draft.page.objectNumber === pageObjectNumber
   ) {
     // Preview with the tool's resolved defaults (base + per-subtype override), so the
-    // ghost is a faithful WYSIWYG of what will commit — not the bare base style. A
-    // cloudy rect stores the outer box (see `shapeRectFor`), so the cloud grows out
-    // from the cursor; a 0-drag draws nothing (skipped, like a solid 0×0).
-    const definition = defaultsFor(model, draft.preset ?? draft.subtype);
-    const style = styleFromProps(definition);
+    // ghost is a faithful WYSIWYG of what will commit — not the bare base style. The
+    // dragged box is the shape's box, and a cloud reaches out from it; a 0-drag
+    // draws nothing (skipped, like a solid 0×0).
+    const tool = toolAnnotation(model, draft.subtype, draft.preset);
+    const style = { ...styleOf(tool) };
     if (draft.kind === 'create-distance' && style.interiorColor == null) {
       style.interiorColor = style.color;
     }
     const dragged = draft.kind === 'create-rect' ? rectFromPoints(draft.from, draft.to) : null;
-    const geometry: ModelGeometry | null =
+    const geometry: Shape | null =
       draft.kind === 'create-rect'
         ? dragged && (dragged.width > 0 || dragged.height > 0)
-          ? {
-              kind: 'rect',
-              rect: shapeRectFor(dragged, draft.ellipse, style),
-              ellipse: draft.ellipse,
-            }
+          ? { kind: 'box', box: dragged, rotation: 0, ellipse: draft.ellipse }
           : null
         : draft.kind === 'create-line' || draft.kind === 'create-distance'
-          ? { kind: 'line', a: draft.from, b: draft.to, ends: definition.lineEndings }
+          ? {
+              kind: 'line',
+              linePoints: { start: draft.from, end: draft.to },
+              lineEndings: lineEndingsOf(tool),
+              rotation: 0,
+            }
           : draft.kind === 'create-poly'
             ? {
                 kind: 'poly',
-                points: polyPreviewPoints(draft.points, draft.current),
+                vertices: polyPreviewPoints(draft.points, draft.current),
                 closed: draft.closed,
-                ends: draft.closed ? undefined : definition.lineEndings,
+                lineEndings: draft.closed ? undefined : lineEndingsOf(tool),
+                rotation: 0,
               }
-            : { kind: 'ink', strokes: draft.strokes };
+            : { kind: 'ink', inkList: draft.strokes, rotation: 0 };
     if (geometry) {
       const measure =
         draft.kind === 'create-line' ||
@@ -317,7 +245,7 @@ export function pageItems(model: Model, page: PageRef, view?: ViewEnv): RenderIt
         measure,
         subtype: draft.subtype,
         geometry,
-        box: distance?.visualBounds ?? geomVisualBounds(geometry, style.strokeWidth, style.border),
+        box: distance?.visualBounds ?? geomVisualBounds(geometry, style),
         style,
         source: 'ghost',
         selected: false,
@@ -327,28 +255,28 @@ export function pageItems(model: Model, page: PageRef, view?: ViewEnv): RenderIt
   // Callout creation ghost: the in-progress leader (tip → cur, then tip → knee →
   // box) and the text-box preview, painted through the same vector scene.
   if (draft?.kind === 'create-callout' && draft.page.objectNumber === pageObjectNumber) {
-    const definition = defaultsFor(model, draft.preset ?? draft.subtype);
-    const style = styleFromProps(definition);
-    const ending =
-      definition.lineEndings.end !== 'none' ? definition.lineEndings.end : 'open-arrow';
+    const tool = toolAnnotation(model, draft.subtype, draft.preset);
+    const style = styleOf(tool);
+    const toolEnding = tool.subtype === 'free-text' ? tool.lineEnding : null;
+    const ending = toolEnding && toolEnding !== 'none' ? toolEnding : 'open-arrow';
     // The box preview carries the same upright rot the commit will apply, so
     // the ghost box (and its leader connection) is what you actually get.
     const rot = calloutUprightRot(draft);
-    const geometry: ModelGeometry =
+    const geometry: Shape =
       draft.step === 'knee'
-        ? { kind: 'line', a: draft.tip, b: draft.current, ends: { start: ending, end: 'none' } }
-        : {
-            kind: 'text',
-            rect: calloutBox(draft),
-            callout: { tip: draft.tip, knee: draft.knee, ending },
-            ...(rot ? { rot } : {}),
-          };
+        ? {
+            kind: 'line',
+            linePoints: { start: draft.tip, end: draft.current },
+            lineEndings: { start: ending, end: 'none' },
+            rotation: 0,
+          }
+        : calloutShape(calloutBox(draft), rot, draft.tip, draft.knee, ending);
     items.push({
       id: DRAFT_ID,
       ref: null,
       subtype: draft.subtype,
       geometry,
-      box: geomVisualBounds(geometry, style.strokeWidth, style.border),
+      box: geomVisualBounds(geometry, style),
       style,
       source: 'ghost',
       selected: false,
@@ -358,14 +286,14 @@ export function pageItems(model: Model, page: PageRef, view?: ViewEnv): RenderIt
   // will become (same `scene()` paint as the committed annotation).
   const quads = model.preview?.byPage[pageObjectNumber];
   if (model.preview && quads?.length) {
-    const geometry: ModelGeometry = { kind: 'quads', quads };
+    const geometry: Shape = { kind: 'quads', quadPoints: quads };
     items.push({
       id: PREVIEW_ID,
       ref: null,
       subtype: model.preview.subtype,
       geometry,
-      box: geomVisualBounds(geometry, 0),
-      style: styleFromProps(defaultsFor(model, model.preview.preset)),
+      box: geomVisualBounds(geometry, { strokeWidth: 0 }),
+      style: styleOf(toolAnnotation(model, model.preview.subtype, model.preview.preset)),
       source: 'ghost',
       selected: false,
     });
@@ -390,16 +318,19 @@ export function textBoxes(model: Model, page: PageRef, view?: ViewEnv): TextBox[
   const pageObjectNumber = page.objectNumber;
   const out: TextBox[] = [];
   for (const id of model.order) {
-    const annotation = model.byId[id];
-    if (annotation.page.objectNumber !== pageObjectNumber || annotation.geometry.kind !== 'text')
+    const record = model.byId[id];
+    if (
+      record.annotation.page.objectNumber !== pageObjectNumber ||
+      shapeOf(record.annotation).kind !== 'text-box'
+    )
       continue;
-    if (!viewable(annotation.flags, model.selected.includes(id))) continue; // `/F`-hidden
+    if (!viewable(record.annotation, model.selected.includes(id))) continue; // `/F`-hidden
     if (!textIsLive(model, id)) continue; // baked → rendered as the /AP image instead
     const geometry = effGeom(model, id, view);
-    if (geometry.kind !== 'text') continue;
+    if (geometry.kind !== 'text-box') continue;
     out.push({
       id,
-      box: geometry.rect,
+      box: geometry.box,
       editing: model.editing === id,
       rot: geomRotation(geometry),
     });
@@ -412,18 +343,18 @@ export function textBoxes(model: Model, page: PageRef, view?: ViewEnv): TextBox[
 export function selectedItems(model: Model, view?: ViewEnv): RenderItem[] {
   const items: RenderItem[] = [];
   for (const id of model.selected) {
-    const annotation = model.byId[id];
-    if (!annotation) continue;
+    const record = model.byId[id];
+    if (!record) continue;
     const geometry = effGeom(model, id, view);
-    const style = effStyle(annotation, view);
+    const style = effStyle(record, view);
     items.push({
       id,
-      ref: annotation.ref,
-      subtype: annotation.subtype,
+      ref: refOf(record),
+      subtype: kindOf(record.annotation).name,
       geometry,
-      box: geomVisualBounds(geometry, style.strokeWidth, style.border),
+      box: geomVisualBounds(geometry, style),
       style,
-      source: annotation.source,
+      source: record.source,
       selected: true,
       rot: geomRotation(geometry),
     });
@@ -439,12 +370,11 @@ const boxCorners = (rect: Rect): [Point, Point, Point, Point] => [
 ];
 
 /** Project the complete annotation after applying the current gesture. */
-function effectiveSelectionFrame(model: Model, id: Id, geometry: ModelGeometry, view?: ViewEnv) {
-  const annotation = model.byId[id];
-  return annotationSelectionFrame({
-    ...annotation,
+function effectiveSelectionFrame(model: Model, id: Id, geometry: Shape, view?: ViewEnv) {
+  const record = model.byId[id];
+  return annotationSelectionFrame(record, undefined, {
     geometry,
-    style: effStyle(annotation, view),
+    style: effStyle(record, view),
     measure: effMeasure(model, id),
   });
 }
@@ -453,14 +383,14 @@ function effectiveSelectionFrame(model: Model, id: Id, geometry: ModelGeometry, 
 function unionBoundsOf(
   model: Model,
   page: PageRef,
-  geomOf: (id: Id) => ModelGeometry,
+  geomOf: (id: Id) => Shape,
   view?: ViewEnv,
 ): Rect | null {
   const pageObjectNumber = page.objectNumber;
   const corners: Point[] = [];
   for (const id of model.selected) {
-    const annotation = model.byId[id];
-    if (!annotation || annotation.page.objectNumber !== pageObjectNumber) continue;
+    const record = model.byId[id];
+    if (!record || record.annotation.page.objectNumber !== pageObjectNumber) continue;
     corners.push(...effectiveSelectionFrame(model, id, geomOf(id), view).corners);
   }
   return corners.length ? unionRect(corners) : null;
@@ -474,23 +404,24 @@ function placeSelectionKnob(
   page: PageRef,
   pageBox: Rect | undefined,
   knobOffset: number,
-  geomOf: (id: Id) => ModelGeometry,
+  geomOf: (id: Id) => Shape,
   view?: ViewEnv,
 ): { at: Point; from: Point } | null {
   const pageObjectNumber = page.objectNumber;
   const selection = model.selected.filter(
-    (id) => isSelectable(model, id) && model.byId[id].page.objectNumber === pageObjectNumber,
+    (id) =>
+      isSelectable(model, id) && model.byId[id].annotation.page.objectNumber === pageObjectNumber,
   );
   if (selection.length === 1) {
-    const annotation = model.byId[selection[0]];
+    const record = model.byId[selection[0]];
     // No knob for a locked (frozen) annotation — the same gate hitTest
     // applies, so the drawn knob is always grabbable and vice versa. A
     // screen-anchored body keeps its knob: rotating edits its authored tilt
     // (`noRotate` only exempts it from the page's rotation). The obb takes
     // the projected stroke width (`effStyle`) — with the raw width, the knob
     // drifts off the outline as zoom grows.
-    if (!capsFor(annotation.subtype).rotatable || !annotTransformable(annotation)) return null;
-    const frame = effectiveSelectionFrame(model, annotation.id, geomOf(annotation.id), view);
+    if (!kindOf(record.annotation).caps.rotatable || !annotTransformable(record)) return null;
+    const frame = effectiveSelectionFrame(model, record.id, geomOf(record.id), view);
     return placeRotateKnob(frame.corners, knobOffset, pageBox);
   }
   if (selection.length > 1 && groupCaps(model, selection).rotatable) {
@@ -526,14 +457,14 @@ export function selectionKnob(
   const draft = model.draft;
   if (
     draft?.kind === 'rotate' &&
-    model.byId[draft.ids[0]]?.page.objectNumber === page.objectNumber
+    model.byId[draft.ids[0]]?.annotation.page.objectNumber === page.objectNumber
   ) {
     const rest = placeSelectionKnob(
       model,
       page,
       pageBox,
       knobOffset,
-      (id) => anchoredGeom(model.byId[id].geometry, anchorModeOf(model.byId[id]), view),
+      (id) => anchoredGeom(shapeOf(model.byId[id].annotation), anchorModeOf(model.byId[id]), view),
       view,
     );
     if (!rest) return null;
@@ -570,7 +501,7 @@ export function chrome(
   if (
     model.draft?.kind === 'move' &&
     model.draft.guides.length &&
-    model.byId[model.draft.ids[0]]?.page.objectNumber === pageObjectNumber
+    model.byId[model.draft.ids[0]]?.annotation.page.objectNumber === pageObjectNumber
   ) {
     for (const guide of model.draft.guides)
       nodes.push({ kind: 'guide', axis: guide.axis, at: guide.at, lo: guide.lo, hi: guide.hi });
@@ -581,7 +512,7 @@ export function chrome(
   // affordances are noise; "how far am I" feedback is everything.
   const rd =
     model.draft?.kind === 'rotate' &&
-    model.byId[model.draft.ids[0]]?.page.objectNumber === pageObjectNumber
+    model.byId[model.draft.ids[0]]?.annotation.page.objectNumber === pageObjectNumber
       ? model.draft
       : null;
   if (rd) {
@@ -604,18 +535,19 @@ export function chrome(
     nodes.push({ kind: 'rotate-guides', center: rd.pivot, angle, lines });
   }
   const selection = model.selected.filter(
-    (id) => isSelectable(model, id) && model.byId[id].page.objectNumber === pageObjectNumber,
+    (id) =>
+      isSelectable(model, id) && model.byId[id].annotation.page.objectNumber === pageObjectNumber,
   );
   if (selection.length === 1) {
-    const annotation = model.byId[selection[0]];
+    const record = model.byId[selection[0]];
     const geometry = effGeom(model, selection[0], view);
-    const style = effStyle(annotation, view);
-    const caps = capsFor(annotation.subtype);
+    const style = effStyle(record, view);
+    const caps = kindOf(record.annotation).caps;
     const rot = geomRotation(geometry);
-    const measure = effMeasure(model, annotation.id);
+    const measure = effMeasure(model, record.id);
     const distance =
       measure?.intent === 'line-dimension' && distanceLayout(geometry, measure, style.strokeWidth);
-    const frame = effectiveSelectionFrame(model, annotation.id, geometry, view);
+    const frame = effectiveSelectionFrame(model, record.id, geometry, view);
     if (frame.angle !== 0) {
       nodes.push({ kind: 'obb', corners: frame.corners, angle: frame.angle });
     } else {
@@ -628,7 +560,7 @@ export function chrome(
     // them. `geomHandles` already places them on the rotated box; `rot`
     // additionally tilts each handle glyph so it rides the box's orientation.
     // Suppressed during a live rotate (`rd`) — guides own that mode.
-    if (!rd && annotTransformable(annotation) && (caps.resizable || caps.vertexEditable)) {
+    if (!rd && annotTransformable(record) && (caps.resizable || caps.vertexEditable)) {
       const handles = distance ? distanceHandles(distance) : geomHandles(geometry);
       for (const handle of handles) {
         nodes.push({
@@ -670,7 +602,8 @@ export function chrome(
 export function selectionBoundsOnPage(model: Model, page: PageRef, view?: ViewEnv): Rect | null {
   const pageObjectNumber = page.objectNumber;
   const selection = model.selected.filter(
-    (id) => isSelectable(model, id) && model.byId[id].page.objectNumber === pageObjectNumber,
+    (id) =>
+      isSelectable(model, id) && model.byId[id].annotation.page.objectNumber === pageObjectNumber,
   );
   if (selection.length === 0) return null;
   // The rotated AABB: the axis-aligned box that encloses the oriented selection
@@ -699,7 +632,7 @@ export function selectionAnchor(
   if (model.draft?.kind === 'rotate') return null;
   const id = model.selected.find((selectedId) => isSelectable(model, selectedId));
   if (id == null) return null;
-  const page = model.byId[id].page;
+  const page = model.byId[id].annotation.page;
   const view = viewOf?.(page);
   const bounds = selectionBoundsOnPage(model, page, view);
   if (!bounds) return null;
@@ -737,7 +670,7 @@ export function creationDraftAnchor(model: Model): CreationDraftAnchor | null {
         !(
           'unavailable' in
           shapeMeasurementReadout(
-            { kind: 'poly', points: draft.points, closed: draft.closed },
+            { kind: 'poly', vertices: draft.points, closed: draft.closed, rotation: 0 },
             draft.measure,
           )
         )),

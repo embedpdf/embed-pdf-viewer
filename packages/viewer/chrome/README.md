@@ -262,7 +262,7 @@ el.addEventListener('epdf:ready', () => {
 
   viewer.watch(
     // the one primitive
-    () => annotation.getSelectionProps(),
+    () => annotation.getSelectionFields(),
     (props) => myPanel.render(props),
   );
   viewer.documents.list(); // the tab model
@@ -319,7 +319,11 @@ picked goes in. The Form tab authors signature fields.
 What placing a mark on a field does is the `signatures` config:
 
 ```tsx
-import { FullViewer, personalSigner, indexedDbKeyStore } from '@embedpdf/viewer-chrome';
+import {
+  FullViewer,
+  personalSigner,
+  indexedDbKeyStore,
+} from '@embedpdf/viewer-chrome';
 
 <FullViewer
   engine={engine}
@@ -328,14 +332,24 @@ import { FullViewer, personalSigner, indexedDbKeyStore } from '@embedpdf/viewer-
     // (`remoteSigner`), or one self-signed identity per person kept in the
     // browser (`personalSigner`). Without a key the mark is only DRAWN
     // into the field — nothing is sealed.
-    key: () => personalSigner({ subject: 'Ada Lovelace', store: indexedDbKeyStore('acme-keys') }),
+    key: () =>
+      personalSigner({
+        subject: 'Ada Lovelace',
+        store: indexedDbKeyStore('acme-keys'),
+      }),
     // Anchors a reader trusts; none → "valid, signer not trusted" at best.
     trust: { anchors: async () => [rootCertificateDer] },
     // 'sign' (default with a key) | 'visual' (default without) | 'ask' (a dialog first)
     mode: 'ask',
     allowCertify: true, // offer a certification (first signature) in the dialog
     kinds: ['signature'], // no initials
-    fonts: [{ key: 'great-vibes', url: '/fonts/GreatVibes.ttf', label: 'Great Vibes' }], // typed marks
+    fonts: [
+      {
+        key: 'great-vibes',
+        url: '/fonts/GreatVibes.ttf',
+        label: 'Great Vibes',
+      },
+    ], // typed marks
   }}
   stamps={{
     sidebar: ['stamps'], // library kinds the stamps sidebar lists

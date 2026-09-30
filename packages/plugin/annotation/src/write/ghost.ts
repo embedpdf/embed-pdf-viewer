@@ -1,11 +1,12 @@
 import {
   clickCreateGeom,
-  defaultsFor,
   fitStampBox,
   geomVisualBounds,
+  lineEndingsOf,
   resolveClickPlacement,
-  styleFromProps,
-  type ModelGeometry,
+  styleOf,
+  toolAnnotation,
+  type Shape,
   type Rect,
   type Point,
 } from '@embedpdf/core-annotation';
@@ -33,16 +34,12 @@ export function createGhost(
 
   /** Paint a vector ghost item for a tool's would-be geometry — shared by the
    *  hover footprint and the externally-driven placement preview. */
-  const showVectorGhost = (
-    pageObjectNumber: number,
-    toolId: string,
-    geometry: ModelGeometry,
-  ): void => {
+  const showVectorGhost = (pageObjectNumber: number, toolId: string, geometry: Shape): void => {
     const tool = tools.get(toolId);
-    const style = styleFromProps(defaultsFor(store.model(), tool?.preset ?? toolId));
+    const style = styleOf(toolAnnotation(store.model(), tool?.subtype ?? toolId, tool?.preset));
     ctx.state.update(setToolGhost, {
       page: toPageRef(pageObjectNumber),
-      box: geomVisualBounds(geometry, style.strokeWidth, style.border),
+      box: geomVisualBounds(geometry, style),
       rot: 0,
       kind: 'vector',
       toolId,
@@ -84,7 +81,7 @@ export function createGhost(
     if (isIconPlaceKind(tool.subtype)) {
       const rot = tools.uprightRotFor(displayRotation);
       const box = fitStampBox(point, ICON_PLACE_SIZE, page, rot);
-      showVectorGhost(pageObjectNumber, toolId, { kind: 'rect', rect: box, ellipse: false });
+      showVectorGhost(pageObjectNumber, toolId, { kind: 'box', box, rotation: 0, ellipse: false });
       return;
     }
     // A click-create tool: the shared placement layer resolves where the click
@@ -103,7 +100,7 @@ export function createGhost(
     const ghostGeometry = clickCreateGeom(
       tool.subtype,
       placement,
-      defaultsFor(store.model(), tool.preset),
+      lineEndingsOf(toolAnnotation(store.model(), tool.subtype, tool.preset)),
     );
     if (!ghostGeometry) {
       clearGhost();
@@ -129,7 +126,12 @@ export function createGhost(
       width: Math.max(0, Math.min(box.x + box.width, page.width) - x),
       height: Math.max(0, Math.min(box.y + box.height, page.height) - y),
     };
-    showVectorGhost(pageObjectNumber, toolId, { kind: 'rect', rect, ellipse: false });
+    showVectorGhost(pageObjectNumber, toolId, {
+      kind: 'box',
+      box: rect,
+      rotation: 0,
+      ellipse: false,
+    });
   };
 
   const api = {

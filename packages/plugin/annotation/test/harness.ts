@@ -23,6 +23,10 @@ import { createAnnotationController } from '../src/controller';
 import { initialAnnotationState, type AnnotationState } from '../src/model';
 
 export const PAGE = toPageRef(1);
+
+/** A read's data by field name, for assertions that span kinds (`color` is a square's, not a widget's). */
+export const dataOf = (annotation: AnnotationDTO | null | undefined): Record<string, unknown> =>
+  (annotation ?? {}) as unknown as Record<string, unknown>;
 export const PAGE2 = toPageRef(2);
 
 const localOrigin = { kind: 'local', sessionId: 'me', sub: null, ts: 0, serverId: null };
@@ -105,10 +109,10 @@ export function annotationHarness(options: AnnotationHarnessOptions = {}) {
     doc: {
       page: (page: PageRef) => ({
         annotations: {
-          create: async (draft: unknown) => {
+          create: async (draft: unknown, resources?: unknown) => {
             // Every create this plugin sends to the viewed document carries an /NM.
             if (!(draft as { nm?: string }).nm) throw new Error('a create without an /NM');
-            const result = readResult(await create(draft));
+            const result = readResult(await create(draft, ...(resources ? [resources] : [])));
             ctx.emitDocumentEvent({
               type: 'annotations.created',
               page: result.annotation.page ?? page,
@@ -118,8 +122,8 @@ export function annotationHarness(options: AnnotationHarnessOptions = {}) {
             } as unknown as DocumentEvent);
             return result;
           },
-          update: async (ref: AnnotationRef, patch: unknown) => {
-            const result = readResult(await update(ref, patch));
+          update: async (ref: AnnotationRef, patch: unknown, resources?: unknown) => {
+            const result = readResult(await update(ref, patch, ...(resources ? [resources] : [])));
             if (result?.annotation) {
               ctx.emitDocumentEvent({
                 type: 'annotations.updated',
@@ -198,6 +202,11 @@ export function annotationHarness(options: AnnotationHarnessOptions = {}) {
     started = true;
     ctx.connect(instance);
   };
+  /** Seed each tool's defaults into the session, as `connect` does. */
+  const seedToolDefaults = () => {
+    for (const tool of api.listResolvedTools())
+      if (tool.defaults) api.updateToolDefaults(tool.id, tool.defaults);
+  };
 
   return {
     ctx,
@@ -213,8 +222,13 @@ export function annotationHarness(options: AnnotationHarnessOptions = {}) {
     state: () => ctx.state.get(),
     /** The composed model: confirmed records, pending changes and the session. */
     model: () => instance.model(),
+    /** Run a core message through the store's `commit` door, as a gesture does. */
+    commit: instance.commit,
+    /** State changes in code, through the store's `apply` door. */
+    apply: instance.apply,
     startSync,
     connectAll,
+    seedToolDefaults,
     /** A fixture (the file's values) as the engine hands it out, in page space. */
     read,
     /** Deliver a document event (another session's change, a form write, …); its annotation is the file's values. */

@@ -1,5 +1,17 @@
-import { DRAWN_FLAGS, initialSession, type ModelAnnotation } from '@embedpdf/core-annotation';
-import { toPageRef } from '@embedpdf/engine-core/runtime';
+import {
+  DRAWN_FLAGS,
+  groupOf,
+  initialSession,
+  type ModelAnnotation,
+  refOf,
+} from '@embedpdf/core-annotation';
+import {
+  annotationKey,
+  annotationOfDraft,
+  toPageRef,
+  type AnnotationDraft,
+  type AnnotationRef,
+} from '@embedpdf/engine-core/runtime';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -37,17 +49,33 @@ describe('chrome settings state', () => {
 });
 
 describe('pending changes', () => {
-  const record = (id: string, extra: Partial<ModelAnnotation> = {}): ModelAnnotation => ({
-    id,
-    ref: null,
-    page: toPageRef(1),
-    subtype: 'square',
-    geometry: { kind: 'rect', rect: { x: 0, y: 0, width: 10, height: 10 }, ellipse: false },
-    style: initialSession.style,
-    flags: DRAWN_FLAGS,
-    source: 'baked',
-    ...extra,
-  });
+  const PAGE = toPageRef(1);
+  /** The `nm` ref a record this session creates is written under. */
+  const named = (name: string): AnnotationRef => ({ kind: 'nm', page: PAGE, nm: name });
+  /**
+   * A record this session created, keyed by the ref it is written under;
+   * `reply` names the annotation it answers.
+   */
+  const record = (
+    name: string,
+    reply?: { to: AnnotationRef; type: 'reply' | 'group' },
+  ): ModelAnnotation => {
+    const draft = {
+      subtype: 'square',
+      box: { x: 0, y: 0, width: 10, height: 10 },
+      color: '#e5484d',
+      strokeWidth: 2,
+      ...DRAWN_FLAGS,
+      nm: name,
+    } as AnnotationDraft;
+    const annotation = annotationOfDraft(draft, { ref: named(name), index: 0 });
+    return {
+      id: annotationKey(named(name)),
+      unconfirmed: true,
+      source: 'baked',
+      annotation: reply ? { ...annotation, reply } : annotation,
+    };
+  };
   const edit = (token: number, id: string, fields: Partial<ModelAnnotation>): PendingChange => ({
     token,
     id,
@@ -60,10 +88,14 @@ describe('pending changes', () => {
   const tokens = (state: { pending: readonly PendingChange[] }) =>
     state.pending.map((change) => change.token);
 
-  it('changedFields holds exactly the fields a message changed', () => {
+  it('changedFields holds exactly the fields a message changed, beside the annotation', () => {
     const before = record('a');
-    const after = { ...before, flags: { ...before.flags, locked: true } };
-    expect(changedFields(before, after)).toEqual({ flags: after.flags });
+    const after = {
+      ...before,
+      source: 'vector' as const,
+      apBox: { x: 1, y: 2, width: 3, height: 4 },
+    };
+    expect(changedFields(before, after)).toEqual({ source: 'vector', apBox: after.apBox });
   });
 
   it('stage keeps the session and appends the changes; a live change makes the record prefer vector', () => {
@@ -76,7 +108,7 @@ describe('pending changes', () => {
 
   it('a refused change goes at once, even behind an older one', () => {
     const state = writeSettled(
-      withPending([edit(1, 'a', { flags: DRAWN_FLAGS }), edit(2, 'a', {})]),
+      withPending([edit(1, 'a', { source: 'vector' }), edit(2, 'a', {})]),
       [2],
       'refused',
     );
@@ -93,45 +125,57 @@ describe('pending changes', () => {
     expect(tokens(state)).toEqual([]); // 1 gone, so 3 is released
   });
 
-  it('followRecord moves changes, the vector preference and the text range; pointers follow', () => {
-    const REF = { kind: 'objectNumber', page: record('x').page, objectNumber: 9 } as const;
+  it('followRecord moves changes, the vector preference and the text range; answers follow', () => {
+    const REF = { kind: 'objectNumber', page: PAGE, objectNumber: 9 } as const;
+    const primary = record('s-1');
+    const member = record('s-2', { to: named('s-1'), type: 'group' });
     const state = followRecord(
       {
         ...withPending([
-          { token: 1, id: 'new:1', change: { kind: 'create', record: record('new:1') } },
+          { token: 1, id: primary.id, change: { kind: 'create', record: primary } },
+          { token: 2, id: member.id, change: { kind: 'create', record: member } },
+          edit(3, primary.id, { source: 'vector' }),
           {
-            token: 2,
-            id: 'new:2',
-            change: { kind: 'create', record: record('new:2', { group: 'new:1' }) },
+            token: 4,
+            id: 'obj:5',
+            change: {
+              kind: 'edit',
+              patch: { subtype: 'square', reply: { to: named('s-1'), type: 'group' } },
+              fields: {},
+            },
           },
-          edit(3, 'new:1', { flags: DRAWN_FLAGS }),
         ]),
-        vector: { 'new:1': true },
-        textSelection: { id: 'new:1', start: 0, end: 2 },
+        vector: { [primary.id]: true },
+        textSelection: { id: primary.id, start: 0, end: 2 },
       },
-      'new:1',
+      primary.id,
       'obj:9',
       REF,
     );
     expect(state.pending.map((change) => [change.token, change.id])).toEqual([
       [1, 'obj:9'],
-      [2, 'new:2'],
+      [2, member.id],
       [3, 'obj:9'],
+      [4, 'obj:5'],
     ]);
     // The create stays until its write settles, under the confirmed key and ref.
     const created = state.pending[0]!.change;
-    expect(created.kind === 'create' && [created.record.id, created.record.ref]).toEqual([
+    expect(created.kind === 'create' && [created.record.id, refOf(created.record)]).toEqual([
       'obj:9',
       REF,
     ]);
-    const member = state.pending[1]!.change;
-    expect(member.kind === 'create' && member.record.group).toBe('obj:9');
+    // What answered the new record answers it by its engine ref now.
+    const answer = state.pending[1]!.change;
+    expect(answer.kind === 'create' && groupOf(answer.record.annotation)).toBe('obj:9');
+    const regroup = state.pending[3]!.change;
+    expect(regroup.kind === 'edit' && regroup.patch).toMatchObject({ reply: { to: REF } });
     expect(state.vector).toEqual({ 'obj:9': true });
     expect(state.textSelection).toEqual({ id: 'obj:9', start: 0, end: 2 });
   });
 
   it('followRecord leaves a state with nothing of the record alone', () => {
     const state = withPending([edit(1, 'a', {})]);
-    expect(followRecord(state, 'b', 'c', null)).toBe(state);
+    const REF = { kind: 'objectNumber', page: PAGE, objectNumber: 3 } as const;
+    expect(followRecord(state, 'b', 'obj:3', REF)).toBe(state);
   });
 });

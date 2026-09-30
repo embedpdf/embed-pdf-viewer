@@ -1,4 +1,4 @@
-import type { Subtype, Point } from '@embedpdf/core-annotation';
+import type { KindName, Point } from '@embedpdf/core-annotation';
 import type { PageRotation } from '@embedpdf/core-geometry';
 import type { PageRef } from '@embedpdf/engine-core/runtime';
 import type {
@@ -17,8 +17,8 @@ import {
 } from '../priorities';
 
 const MARQUEE_DRAG_THRESHOLD_PX = 4;
-const isPolyTool = (subtype: Subtype): boolean => subtype === 'polygon' || subtype === 'polyline';
-const isCalloutTool = (subtype: Subtype): boolean => subtype === 'free-text-callout';
+const isPolyTool = (subtype: KindName): boolean => subtype === 'polygon' || subtype === 'polyline';
+const isCalloutTool = (subtype: KindName): boolean => subtype === 'free-text-callout';
 
 /**
  * Resolve a sample against a gesture's home page. Annotation gestures are
@@ -383,7 +383,7 @@ export function createDrawHandler(
   // (it resolves the defaults preset — arrow vs line); the subtype is what the
   // poly/callout gesture checks read (arrow → `line`, a polygon preset → `polygon`).
   const toolId = () => interaction.getActiveToolId();
-  const subtypeOf = (id: string): Subtype => anno.getToolSubtype(id);
+  const subtypeOf = (id: string): KindName => anno.getToolSubtype(id);
   let drawingPoly = false;
   // A callout is mid-creation between its tip/knee/box clicks; while it is, hover
   // (no button) must still drive the leader/box preview, like a poly's vertices.

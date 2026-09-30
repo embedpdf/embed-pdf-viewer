@@ -32,7 +32,17 @@ export { isRotatedGeometryRun } from './dto/PageGeometrySnapshot';
 export { validateSearchQuery } from './search/regex';
 
 // Annotations.
-export { appearanceTurnOf, drawnPointsOf, shapeForRect } from './pageSpace/helpers';
+export {
+  annotationOfDraft,
+  appearanceTurnOf,
+  applyAnnotationPatch,
+  drawnPointsOf,
+  resolveAnnotationDraft,
+  resolveAnnotationPatch,
+  shapeForRect,
+} from './pageSpace/helpers';
+export type { DraftAttribution, DraftContext } from './annotation/resolve/annotationOfDraft';
+export { ANNOTATION_DEFAULTS, type AnnotationDefaults } from './annotation/defaults';
 export { buildCommentThreads } from './annotation/comments';
 export { AnnotationTransfer } from './transfer/AnnotationTransfer';
 export {

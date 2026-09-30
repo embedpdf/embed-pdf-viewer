@@ -10,16 +10,17 @@ import {
   geomRotation,
   groupResizeAnchor,
   groupResizeBox,
-  normalizeDeg,
 } from '../geometry';
+import { normalizeDeg } from '../rect';
 import { groupMembers } from '../group';
 import { canMove, hitTest } from '../hit';
 import { distanceLeaderLength } from '../measurement';
 import { computeMoveSnap } from '../snap';
-import type { ModelGeometry, Draft, Effect, Id, Model, Point, PointerInput } from '../types';
+import type { Draft, Effect, Id, Model, Point, PointerInput } from '../types';
 import { sub } from './changes';
 import { editUp } from './edit-commit';
 import { clampMoveDelta, clampPointToBox, editDraftPage, viewOf } from './page-bound';
+import { shapeOf } from '../record';
 
 const RAD2DEG = 180 / Math.PI;
 
@@ -47,7 +48,9 @@ export function rotateDraftDelta(
   // The absolute angle is read off the projected geometry (identity when
   // un-flagged): the chip and the snap targets speak about what the user sees
   // — a noRotate shape's on-screen tilt, not its stored one.
-  const base = one ? geomRotation(anchoredGeom(one.geometry, anchorModeOf(one), draft.view)) : 0;
+  const base = one
+    ? geomRotation(anchoredGeom(shapeOf(one.annotation), anchorModeOf(one), draft.view))
+    : 0;
   const angle = normalizeDeg(base + raw);
   if (!model.snap.rotation || draft.free) return { delta: raw, angle, snapped: false };
   for (const target of model.snap.rotationAngles) {
@@ -62,9 +65,10 @@ export function rotateDraftDelta(
  *  an off-axis scale across a rotated rect+rot is a shear it can't represent. A
  *  vertex member's advisory `rot` counts (preserves obbFromTheta + reset). */
 const selectionHasRotation = (model: Model, ids: Id[]): boolean =>
-  ids.some(
-    (id) => geomRotation(model.byId[id]?.geometry ?? ({ kind: 'caret' } as ModelGeometry)) !== 0,
-  );
+  ids.some((id) => {
+    const record = model.byId[id];
+    return !!record && geomRotation(shapeOf(record.annotation)) !== 0;
+  });
 
 export function editPointer(
   model: Model,
@@ -113,9 +117,9 @@ export function editDown(model: Model, input: PointerInput): [Model, Effect[]] {
     // The handle gesture runs in view space: `base` is the projected geometry
     // the user grabbed (identity for un-flagged annotations), and the commit
     // maps the result back via `unanchoredGeom` with the same captured view.
-    const annotation = model.byId[hit.id];
+    const record = model.byId[hit.id];
     const view = viewOf(input);
-    const base = anchoredGeom(annotation.geometry, anchorModeOf(annotation), view);
+    const base = anchoredGeom(shapeOf(record.annotation), anchorModeOf(record), view);
     return [
       {
         ...model,
@@ -225,9 +229,9 @@ export function editMove(model: Model, input: PointerInput): [Model, Effect[]] {
   }
   const point = clampPointToBox(input.point, input.pageBox);
   if (draft.kind === 'leader') {
-    const annotation = model.byId[draft.id];
-    const start = distanceLeaderLength(annotation.geometry, draft.start);
-    const current = distanceLeaderLength(annotation.geometry, point);
+    const geometry = shapeOf(model.byId[draft.id].annotation);
+    const start = distanceLeaderLength(geometry, draft.start);
+    const current = distanceLeaderLength(geometry, point);
 
     return [{ ...model, draft: { ...draft, delta: current - start } }, []];
   }

@@ -87,8 +87,18 @@ export function runSearchConformance(
             expect(s.rect.width > 0).toBe(true);
             expect(s.rect.height > 0).toBe(true);
             // The pair is one constructor's output — enforce it stayed that way.
-            const xs = [s.quad.p1.x, s.quad.p2.x, s.quad.p3.x, s.quad.p4.x];
-            const ys = [s.quad.p1.y, s.quad.p2.y, s.quad.p3.y, s.quad.p4.y];
+            const xs = [
+              s.quad.upperLeft.x,
+              s.quad.upperRight.x,
+              s.quad.lowerLeft.x,
+              s.quad.lowerRight.x,
+            ];
+            const ys = [
+              s.quad.upperLeft.y,
+              s.quad.upperRight.y,
+              s.quad.lowerLeft.y,
+              s.quad.lowerRight.y,
+            ];
             expect(Math.abs(s.rect.x - Math.min(...xs)) < 1e-3).toBe(true);
             expect(Math.abs(s.rect.x + s.rect.width - Math.max(...xs)) < 1e-3).toBe(true);
             expect(Math.abs(s.rect.y - Math.min(...ys)) < 1e-3).toBe(true);

@@ -21,8 +21,8 @@ import { measurementIntentToName } from '../measurementIntent';
 const MEASURE_SUBTYPE_RL = 1;
 
 /**
- * Receives the caption complete, as {@link prepareMeasurementDraft} and
- * {@link prepareMeasurementPatch} leave it: the native setters write the
+ * Receives the caption complete, as {@link resolveMeasurementDraft} and
+ * {@link pdfResolveAnnotationPatch} leave it: the native setters write the
  * whole caption at once. A foreign measure never reaches here.
  */
 export function writeMeasurementFields(

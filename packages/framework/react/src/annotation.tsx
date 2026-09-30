@@ -15,7 +15,7 @@ import type { EventHook, ResourceStatus } from '@embedpdf/core';
 import {
   scene,
   MITER_LIMIT,
-  type AnnotationProps,
+  type FieldValues,
   type Paint,
   type Rect,
   type RenderItem,
@@ -23,15 +23,15 @@ import {
 import {
   AnnotationToken,
   annotationKey,
-  type Annotation,
   type AnnotationCapability,
+  type AnnotationDTO,
   type AnnotationFilter,
   type AnnotationRef,
   type Behavior,
   type CommentsApi,
   type CommentThread,
+  type EditableFields,
   type SelectionFlags,
-  type SelectionProps,
   type FilePickerProvider,
   type TextItem,
 } from '@embedpdf/plugin-annotation';
@@ -56,17 +56,14 @@ export type {
   RenderItem,
   LineEnding,
   LineEndings,
-  Border,
   Style,
   AnnotationFlags,
-  AnnotationProps,
-  AnnotationPropsPatch,
-  PropKey,
-  PropSpec,
+  FieldSpec,
+  FieldValues,
   TextAlign,
   TextStyle,
 } from '@embedpdf/core-annotation';
-export type { SelectionFlags, SelectionProps } from '@embedpdf/plugin-annotation';
+export type { EditableFields, SelectionFlags } from '@embedpdf/plugin-annotation';
 import { devWarn } from './dev';
 import { usePageLayerFact } from './dev-registry';
 import {
@@ -190,7 +187,7 @@ function Shape({ item, page }: { item: RenderItem; page: PageContextValue }) {
   // angle; rotate the whole <svg> about its centre. Vertex kinds (line/poly/ink)
   // are already rotated in their geometry, so `rot` is advisory there — never
   // re-applied.
-  const rot = item.geometry.kind === 'rect' || item.geometry.kind === 'caret' ? (item.rot ?? 0) : 0;
+  const rot = item.geometry.kind === 'box' || item.geometry.kind === 'caret' ? (item.rot ?? 0) : 0;
   return (
     <svg
       viewBox={vb}
@@ -1027,9 +1024,9 @@ export function useAnnotationEvent<T>(
   useCapabilityEvent(AnnotationToken, select, handler);
 }
 
-/** Page-space annotation records matching `filter` (a page, a subtype, an
- *  author, a group), reference-stable while the matching set is unchanged. */
-export function useAnnotationList(filter?: AnnotationFilter): readonly Annotation[] {
+/** The annotations matching `filter` (a page, a subtype, an author, a group),
+ *  as the user sees them, reference-stable while the matching set is unchanged. */
+export function useAnnotationList(filter?: AnnotationFilter): readonly AnnotationDTO[] {
   const key = filter
     ? `${filter.page?.objectNumber ?? ''}|${filter.subtype ?? ''}|${filter.author ?? ''}|${
         filter.group ? annotationKey(filter.group) : ''
@@ -1049,36 +1046,36 @@ const sameRefs = (left: readonly AnnotationRef[], right: readonly AnnotationRef[
   (left.length === right.length &&
     left.every((ref, i) => annotationKey(ref) === annotationKey(right[i]!)));
 
-/** Structural equality for a resolved props bag — keeps the subscription from
- *  re-rendering on unrelated dispatches, since `currentDefaults` returns a fresh
- *  object each call. Small flat objects; JSON compare is exact and cheap here. */
-const sameProps = (left: AnnotationProps, right: AnnotationProps): boolean =>
-  left === right || JSON.stringify(left) === JSON.stringify(right);
-
 /**
- * A tool's resolved defaults (base + per-tool override) as a full flat props
- * bag, subscribed so a `setDefaults` re-renders the consumer. Use this — not the
- * imperative `useAnnotation().getToolDefaults(id)` — to drive default-editing
- * controls, so they reflect changes live. Pair with `propsForTool(id)` for the
- * specs to render.
+ * A tool's defaults over the engine's for its kind (the engine fields what it
+ * draws takes), subscribed so an `updateToolDefaults` re-renders the consumer.
+ * Use this — not the imperative `useAnnotation().getToolDefaults(id)` — to
+ * drive controls that preview a tool (an icon's colour), so they follow live.
+ * Reference-stable while the defaults stay the same.
  */
-export function useAnnotationDefaults(toolId: string): AnnotationProps {
-  return useSelector(
-    AnnotationToken,
-    (annotation) => annotation.getToolDefaults(toolId),
-    sameProps,
-  );
+export function useToolDefaults(toolId: string): FieldValues {
+  return useSelector(AnnotationToken, (annotation) => annotation.getToolDefaults(toolId));
 }
 
 /**
- * The selection's editable properties — ordered specs shared by every selected
- * kind, current values, and which keys are mixed. The hook a property sidebar
- * renders from; write back with `useAnnotation().updateSelection({ [key]: v })`.
- * Reference-stable between model changes (the capability memoizes by model
- * identity), so the default equality is enough.
+ * The fields a tool's style panel edits, with the tool's current values —
+ * the same shape as {@link useSelectionFields}. Write back with
+ * `useAnnotation().updateToolDefaults(id, { [key]: v })`.
  */
-export function useSelectionProps(): SelectionProps {
-  return useSelector(AnnotationToken, (annotation) => annotation.getSelectionProps());
+export function useToolFields(toolId: string): EditableFields {
+  return useSelector(AnnotationToken, (annotation) => annotation.getToolFields(toolId));
+}
+
+/**
+ * The selection's editable fields — ordered specs shared by every selected
+ * kind, current values by engine field name, and which fields are mixed. The
+ * hook a property sidebar renders from; write back with
+ * `useAnnotation().updateSelection({ [key]: v })`. Reference-stable between
+ * model changes (the capability memoizes by model identity), so the default
+ * equality is enough.
+ */
+export function useSelectionFields(): EditableFields {
+  return useSelector(AnnotationToken, (annotation) => annotation.getSelectionFields());
 }
 
 /**
@@ -1086,7 +1083,7 @@ export function useSelectionProps(): SelectionProps {
  * the selected annotations disagree (render an indeterminate control), `null`
  * overall when nothing is selected. Write back with
  * `useAnnotation().updateSelectionFlags({ locked: true })`. Reference-stable
- * between model changes, like {@link useSelectionProps}.
+ * between model changes, like {@link useSelectionFields}.
  */
 export function useSelectionFlags(): SelectionFlags | null {
   return useSelector(AnnotationToken, (annotation) => annotation.getSelectionFlags());

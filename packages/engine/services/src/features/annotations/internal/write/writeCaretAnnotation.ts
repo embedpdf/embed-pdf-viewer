@@ -1,4 +1,9 @@
-import type { CaretDraft, CaretPatch, Color, PdfCoordinates } from '@embedpdf/engine-core/runtime';
+import {
+  ANNOTATION_DEFAULTS,
+  type CaretDraft,
+  type CaretPatch,
+  type PdfCoordinates,
+} from '@embedpdf/engine-core/runtime';
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
 
 import {
@@ -11,11 +16,8 @@ import { applyAnnotationBaseDraft, applyAnnotationBasePatch } from './writeAnnot
 import { applyAnnotationBoxPatch, writeAnnotationBox } from './writeAnnotationBox';
 import { caretIntentToName } from '../textEditIntent';
 
-/** Default `/C` colour when a caret draft omits it (engine-wide default mark). */
-const DEFAULT_CARET_COLOR: Color = '#ff0000';
-
-/** Default opacity, set explicitly so reads always round-trip the same value. */
-const DEFAULT_OPACITY = 1;
+/** A caret's defaults (`annotation/defaults.ts`), written explicitly so reads round-trip. */
+const DEFAULTS = ANNOTATION_DEFAULTS.caret;
 
 /**
  * Apply a caret draft to a freshly-created annotation. The caret symbol
@@ -32,8 +34,8 @@ export function applyCaretDraft(
 ): void {
   applyAnnotationBaseDraft(fn, mem, annotPtr, draft);
   writeAnnotationBox(fn, mem, annotPtr, { box: draft.box, rotation: draft.rotation ?? null });
-  setAnnotColor(fn, annotPtr, draft.color ?? DEFAULT_CARET_COLOR);
-  setAnnotOpacity(fn, annotPtr, draft.opacity ?? DEFAULT_OPACITY);
+  setAnnotColor(fn, annotPtr, draft.color ?? DEFAULTS.color);
+  setAnnotOpacity(fn, annotPtr, draft.opacity ?? DEFAULTS.opacity);
   if (draft.intent != null) setIntent(fn, annotPtr, caretIntentToName(draft.intent));
 }
 

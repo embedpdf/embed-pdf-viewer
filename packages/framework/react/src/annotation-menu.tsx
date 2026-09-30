@@ -29,7 +29,7 @@ export interface AnnotationMenuProps {
  * Floats over the current annotation selection (one anchor regardless of
  * cross-page selection), dodging the rotate knob. Compose the contents from
  * hooks: `useAnnotation()` for the verbs, `useAnnotationSelected()` /
- * `useSelectionProps()` for the data.
+ * `useSelectionFields()` for the data.
  */
 export function AnnotationMenu({ children, gap = 15, placement = 'top' }: AnnotationMenuProps) {
   // Reading the binding subscribes this component to projection changes

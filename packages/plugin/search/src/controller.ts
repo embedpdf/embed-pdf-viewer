@@ -7,7 +7,7 @@ import {
   type LatestCancellation,
   type PageRef,
 } from '@embedpdf/core';
-import { boundsOfRects, textQuadFromPositional } from '@embedpdf/core-geometry';
+import { boundsOfRects } from '@embedpdf/core-geometry';
 import { StageToken } from '@embedpdf/plugin-stage/contract';
 import type { SearchQuery, SearchSlice } from '@embedpdf/engine-core/runtime';
 import type {
@@ -93,13 +93,8 @@ export function createSearchController(ctx: PluginContext<SearchState>, config: 
       // A page that vanished mid-search (deleted) drops its hits.
       const page = ctx.getPage(match.page);
       if (!page) continue;
-      // Segments arrive in page space; the quad's corners are frame-geometric
-      // (p1..p4 = upper-start, upper-end, lower-start, lower-end).
-      const segments = match.segments.map((segment) => ({
-        quad: textQuadFromPositional(segment.quad),
-        rect: segment.rect,
-        advance: segment.advance,
-      }));
+      // Segments arrive in page space, ready to draw.
+      const segments = match.segments;
       hits.push({
         page: match.page,
         pageIndex: page.index,

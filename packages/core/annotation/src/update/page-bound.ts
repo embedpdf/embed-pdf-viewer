@@ -12,9 +12,11 @@
 import type { PageRef } from '@embedpdf/engine-core/runtime';
 
 import { anchoredGeom, anchoredStrokeWidth, anchorModeOf, type ViewEnv } from '../anchor';
-import { geomVisualBounds, unionRect } from '../geometry';
+import { geomVisualBounds } from '../geometry';
+import { unionRect } from '../rect';
 import { annotationSelectionFrame } from '../selection';
 import type { Draft, Id, Model, ModelAnnotation, Point, PointerInput, Rect } from '../types';
+import { shapeOf, styleOf } from '../record';
 
 const clampAxis = (value: number, lo: number, hi: number): number =>
   Math.max(lo, Math.min(hi, value));
@@ -41,15 +43,16 @@ export const viewOf = (input: PointerInput): ViewEnv | undefined =>
  *  member counts at its view-projected footprint. A callout's frame is only
  *  the text box, so the clamp uses the visual bounds — box, leader, and
  *  arrowhead — and the arrow cannot leave the page. */
-function moveClampCorners(annotation: ModelAnnotation, view?: ViewEnv): Point[] {
-  const mode = anchorModeOf(annotation);
-  const geometry = anchoredGeom(annotation.geometry, mode, view);
-  if (geometry.kind === 'text' && geometry.callout) {
-    const visual = geomVisualBounds(
-      geometry,
-      anchoredStrokeWidth(annotation.style.strokeWidth, mode, view),
-      annotation.style.border,
-    );
+function moveClampCorners(record: ModelAnnotation, view?: ViewEnv): Point[] {
+  const mode = anchorModeOf(record);
+  const stored = shapeOf(record.annotation);
+  const style = styleOf(record.annotation);
+  const geometry = anchoredGeom(stored, mode, view);
+  if (geometry.kind === 'text-box' && geometry.calloutLine) {
+    const visual = geomVisualBounds(geometry, {
+      ...style,
+      strokeWidth: anchoredStrokeWidth(style.strokeWidth, mode, view),
+    });
     return [
       { x: visual.x, y: visual.y },
       { x: visual.x + visual.width, y: visual.y },
@@ -57,16 +60,16 @@ function moveClampCorners(annotation: ModelAnnotation, view?: ViewEnv): Point[] 
       { x: visual.x, y: visual.y + visual.height },
     ];
   }
-  return [...annotationSelectionFrame(annotation, view).corners];
+  return [...annotationSelectionFrame(record, view).corners];
 }
 
 /** The union of the ids' move-clamp bounds. */
 export function unionBoundsOf(model: Model, ids: Id[], view?: ViewEnv): Rect | null {
   const corners: Point[] = [];
   for (const id of ids) {
-    const annotation = model.byId[id];
-    if (!annotation) continue;
-    corners.push(...moveClampCorners(annotation, view));
+    const record = model.byId[id];
+    if (!record) continue;
+    corners.push(...moveClampCorners(record, view));
   }
   return corners.length ? unionRect(corners) : null;
 }
@@ -93,5 +96,5 @@ export function clampMoveDelta(
 /** The page an edit draft is anchored to — every edit gesture lives on one page. */
 export function editDraftPage(model: Model, draft: Draft): PageRef | null {
   const id = 'id' in draft ? draft.id : 'ids' in draft && draft.ids.length ? draft.ids[0] : null;
-  return id != null ? (model.byId[id]?.page ?? null) : null;
+  return id != null ? (model.byId[id]?.annotation.page ?? null) : null;
 }

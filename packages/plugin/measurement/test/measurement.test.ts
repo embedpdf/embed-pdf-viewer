@@ -51,8 +51,20 @@ function harness(
       failed: [],
     })),
     onDraftCaptured: draftCaptured.on,
-    getRaw: () => null,
-    create: vi.fn(async () => ({ kind: 'objectNumber', objectNumber: 9, page: PAGE })),
+    get: () => null,
+    getToolDefaults: () => ({
+      color: '#ef4444',
+      interiorColor: null,
+      strokeWidth: 1,
+      opacity: 1,
+      lineEndings: { start: 'closed-arrow', end: 'closed-arrow' },
+      captionEnabled: true,
+      captionPosition: 'inline',
+      leader: { length: 12, extension: 5, offset: 0 },
+    }),
+    create: vi.fn(async () => ({
+      annotation: { ref: { kind: 'objectNumber', objectNumber: 9, page: PAGE } },
+    })),
   };
   const interaction = { activateTool: vi.fn() };
   let engineViewports: PageMeasurementViewport[] = options.viewports ?? [];
@@ -148,10 +160,10 @@ describe('measurement', () => {
     });
   });
 
-  it('creates a measurement annotation through the annotation plugin', async () => {
-    const { measurement, annotation } = harness();
+  it('creates a measurement annotation through the annotation plugin, with the page’s scale', async () => {
+    const { measurement, annotation } = harness({ viewports: [owned(ONE_TO_HUNDRED)] });
     await settle();
-    await measurement.createMeasurement({
+    const ref = await measurement.createMeasurement({
       kind: 'distance',
       page: PAGE,
       points: [
@@ -159,8 +171,21 @@ describe('measurement', () => {
         { x: 10, y: 0 },
       ],
     });
+    expect(ref).toMatchObject({ objectNumber: 9 });
+    // A dimension line: the tool's style, caption and leader, and the page's scale.
     expect(annotation.create).toHaveBeenCalledWith(
-      expect.objectContaining({ subtype: 'line', tool: 'distance', page: PAGE }),
+      PAGE,
+      expect.objectContaining({
+        subtype: 'line',
+        intent: 'line-dimension',
+        linePoints: { start: { x: 0, y: 0 }, end: { x: 10, y: 0 } },
+        lineEndings: { start: 'closed-arrow', end: 'closed-arrow' },
+        interiorColor: '#ef4444',
+        captionEnabled: true,
+        captionPosition: 'inline',
+        leader: { length: 12, extension: 5, offset: 0 },
+        measure: expect.objectContaining({ subtype: 'rectilinear' }),
+      }),
     );
     await expect(
       measurement.createMeasurement({ kind: 'distance', page: PAGE, points: [{ x: 0, y: 0 }] }),

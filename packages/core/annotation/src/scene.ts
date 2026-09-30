@@ -11,17 +11,19 @@
  */
 import { distanceScene, measurementCaptionScene } from './measurement';
 import { shapeMeasurementLayout } from './measurement-shape';
-import { textQuadBounds, textQuadRing } from '@embedpdf/core-geometry';
+import { quadBounds, quadRing } from '@embedpdf/core-geometry';
 import { geomScene } from './geometry';
+import { dashOf } from './kinds/styles';
+import { CARET_STROKE_WIDTH } from './shapes/caret';
 import type {
-  ModelGeometry,
+  Shape,
   Paint,
   Rect,
   RenderItem,
   SceneNode,
   Style,
-  Subtype,
-  TextQuad,
+  KindName,
+  Quad,
   TextStyle,
   Point,
 } from './types';
@@ -42,12 +44,12 @@ function shapePaint(style: Style, closed: boolean): Paint {
     stroke: style.color,
     width: style.strokeWidth,
     opacity: style.opacity,
-    dash: style.border.kind === 'dashed' ? style.border.dash : undefined,
+    dash: dashOf(style),
     // Cloud curls end in deliberate direction reversals (the 22° curl-back
     // tails), which a miter join blows up into spikes. PDFium bakes cloudy
     // borders with `1 j` (round join) for exactly this reason — match it, so
     // the live path and the baked /AP render the same seams.
-    ...(style.border.kind === 'cloudy' ? { join: 'round' as const } : {}),
+    ...(style.cloudyIntensity ? { join: 'round' as const } : {}),
   };
 }
 
@@ -77,22 +79,25 @@ function squigglePath(
   return pathData;
 }
 
-/** Per-subtype markup nodes on the quads' own edges (corner-named TextQuads:
- *  upper = ascent side, lower = baseline side, start → end along the frame).
+/** Per-subtype markup nodes on the quads' own edges (upper = ascent side,
+ *  lower = baseline side, left → right along the frame).
  *  The colour is the markup `/C` (our model keeps stroke==fill). Rotated and
  *  sheared cells draw along their true baselines; upright output is identical
  *  to the old axis-aligned math. */
-function markupScene(subtype: Subtype, quads: TextQuad[], style: Style): SceneNode[] {
+function markupScene(subtype: KindName, quads: Quad[], style: Style): SceneNode[] {
   const color = style.color;
   const opacity = style.opacity;
   const nodes: SceneNode[] = [];
   for (const quad of quads) {
     const down = {
-      x: quad.lowerStart.x - quad.upperStart.x,
-      y: quad.lowerStart.y - quad.upperStart.y,
+      x: quad.lowerLeft.x - quad.upperLeft.x,
+      y: quad.lowerLeft.y - quad.upperLeft.y,
     };
     const inkHeight = Math.hypot(down.x, down.y); // true ink height
-    const wVec = { x: quad.lowerEnd.x - quad.lowerStart.x, y: quad.lowerEnd.y - quad.lowerStart.y };
+    const wVec = {
+      x: quad.lowerRight.x - quad.lowerLeft.x,
+      y: quad.lowerRight.y - quad.lowerLeft.y,
+    };
     const baselineLength = Math.hypot(wVec.x, wVec.y); // true baseline length
     if (baselineLength <= 0 || inkHeight <= 0) continue;
     const normal = { x: down.x / inkHeight, y: down.y / inkHeight }; // unit, toward the baseline
@@ -101,20 +106,20 @@ function markupScene(subtype: Subtype, quads: TextQuad[], style: Style): SceneNo
       // the baseline edge, inset lw off the descent side (the old `y + h − lw`)
       nodes.push({
         kind: 'line',
-        a: { x: quad.lowerStart.x - normal.x * lw, y: quad.lowerStart.y - normal.y * lw },
-        b: { x: quad.lowerEnd.x - normal.x * lw, y: quad.lowerEnd.y - normal.y * lw },
+        a: { x: quad.lowerLeft.x - normal.x * lw, y: quad.lowerLeft.y - normal.y * lw },
+        b: { x: quad.lowerRight.x - normal.x * lw, y: quad.lowerRight.y - normal.y * lw },
         paint: { stroke: color, width: lw, opacity, blend: blendFor(style) },
       });
     } else if (subtype === 'strikeout') {
       nodes.push({
         kind: 'line',
         a: {
-          x: (quad.upperStart.x + quad.lowerStart.x) / 2,
-          y: (quad.upperStart.y + quad.lowerStart.y) / 2,
+          x: (quad.upperLeft.x + quad.lowerLeft.x) / 2,
+          y: (quad.upperLeft.y + quad.lowerLeft.y) / 2,
         },
         b: {
-          x: (quad.upperEnd.x + quad.lowerEnd.x) / 2,
-          y: (quad.upperEnd.y + quad.lowerEnd.y) / 2,
+          x: (quad.upperRight.x + quad.lowerRight.x) / 2,
+          y: (quad.upperRight.y + quad.lowerRight.y) / 2,
         },
         paint: { stroke: color, width: lw, opacity, blend: blendFor(style) },
       });
@@ -122,8 +127,8 @@ function markupScene(subtype: Subtype, quads: TextQuad[], style: Style): SceneNo
       const amp = Math.min(2, Math.max(1, inkHeight * 0.08));
       const direction = { x: wVec.x / baselineLength, y: wVec.y / baselineLength };
       const start = {
-        x: quad.lowerStart.x - normal.x * amp,
-        y: quad.lowerStart.y - normal.y * amp,
+        x: quad.lowerLeft.x - normal.x * amp,
+        y: quad.lowerLeft.y - normal.y * amp,
       };
       nodes.push({
         kind: 'path',
@@ -135,7 +140,7 @@ function markupScene(subtype: Subtype, quads: TextQuad[], style: Style): SceneNo
       // highlight: translucent fill with `multiply` so the text reads through it
       nodes.push({
         kind: 'poly',
-        points: textQuadRing(quad),
+        points: quadRing(quad),
         closed: true,
         paint: { fill: color, opacity, blend: blendFor(style) },
       });
@@ -159,16 +164,16 @@ const rectRing = (rect: Rect): [Point, Point, Point, Point] => [
   { x: rect.x, y: rect.y + rect.height },
 ];
 
-function redactRegions(geometry: ModelGeometry): RedactRegion[] {
+function redactRegions(geometry: Shape): RedactRegion[] {
   if (geometry.kind === 'quads') {
     const out: RedactRegion[] = [];
-    for (const quad of geometry.quads) {
-      const bounds = textQuadBounds(quad);
-      if (bounds.width > 0 && bounds.height > 0) out.push({ ring: textQuadRing(quad), bounds });
+    for (const quad of geometry.quadPoints) {
+      const bounds = quadBounds(quad);
+      if (bounds.width > 0 && bounds.height > 0) out.push({ ring: quadRing(quad), bounds });
     }
     return out;
   }
-  if (geometry.kind === 'rect') return [{ ring: rectRing(geometry.rect), bounds: geometry.rect }];
+  if (geometry.kind === 'box') return [{ ring: rectRing(geometry.box), bounds: geometry.box }];
   return [];
 }
 
@@ -265,20 +270,20 @@ export function scene(item: RenderItem): SceneNode[] {
     return distanceScene(item.geometry, item.measure, item.style);
   if (item.subtype === 'redact') return redactScene(item);
   if (item.geometry.kind === 'quads')
-    return markupScene(item.subtype, item.geometry.quads, item.style);
+    return markupScene(item.subtype, item.geometry.quadPoints, item.style);
   if (item.geometry.kind === 'caret') {
-    return geomScene(item.geometry).map((node) => ({
+    return geomScene(item.geometry, item.style).map((node) => ({
       ...node,
       paint: {
         fill: item.style.color,
         stroke: item.style.color,
-        width: 0.5,
+        width: CARET_STROKE_WIDTH,
         opacity: item.style.opacity,
       },
     })) as SceneNode[];
   }
   const ink = item.geometry.kind === 'ink'; // freehand: round the pen-stroke ends (caps)
-  const nodes = geomScene(item.geometry, item.style.strokeWidth, item.style.border).map((node) => {
+  const nodes = geomScene(item.geometry, item.style).map((node) => {
     const closed =
       node.kind === 'rect' ||
       node.kind === 'ellipse' ||

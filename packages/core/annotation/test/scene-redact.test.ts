@@ -1,4 +1,4 @@
-import { textQuadFromRect } from '@embedpdf/core-geometry';
+import { quadFromRect } from '@embedpdf/core-geometry';
 import { toPageRef } from '@embedpdf/engine-core/runtime';
 import { describe, expect, it } from 'vitest';
 
@@ -22,7 +22,7 @@ function redactItem(overrides: Partial<RenderItem> = {}): RenderItem {
     id: 'obj:1',
     ref: null,
     subtype: 'redact',
-    geometry: { kind: 'rect', rect: REGION, ellipse: false },
+    geometry: { kind: 'box', box: REGION, rotation: 0, ellipse: false },
     box: REGION,
     style: {
       color: '#e44234',
@@ -30,7 +30,9 @@ function redactItem(overrides: Partial<RenderItem> = {}): RenderItem {
       strokeWidth: 1.5,
       opacity: 1,
       blendMode: 'normal',
-      border: { kind: 'solid' },
+      borderStyle: 'solid',
+      dashArray: null,
+      cloudyIntensity: null,
     },
     text: LABEL_STYLE,
     source: 'vector',
@@ -40,7 +42,7 @@ function redactItem(overrides: Partial<RenderItem> = {}): RenderItem {
 }
 
 describe('hover model state', () => {
-  const annotation = {
+  const record = {
     id: 'obj:1',
     page: toPageRef(1),
     subtype: 'redact',
@@ -48,7 +50,7 @@ describe('hover model state', () => {
   } as unknown as ModelAnnotation;
   const base: Model = {
     ...initialModel,
-    byId: { 'obj:1': annotation },
+    byId: { 'obj:1': record },
     order: ['obj:1'],
   };
 
@@ -108,9 +110,9 @@ describe('redact scene', () => {
         hovered: true,
         geometry: {
           kind: 'quads',
-          quads: [
-            textQuadFromRect({ x: 0, y: 0, width: 50, height: 10 }),
-            textQuadFromRect({ x: 0, y: 14, width: 30, height: 10 }),
+          quadPoints: [
+            quadFromRect({ x: 0, y: 0, width: 50, height: 10 }),
+            quadFromRect({ x: 0, y: 14, width: 30, height: 10 }),
           ],
         },
       }),

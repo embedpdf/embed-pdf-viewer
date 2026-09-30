@@ -8,7 +8,7 @@ import {
   AnnotationLayer,
   annotationPlugin,
   useAnnotation,
-  useSelectionProps,
+  useSelectionFields,
 } from '@embedpdf/react/annotation';
 import { cloudEngine } from '@cloudpdf/engine';
 
@@ -31,10 +31,10 @@ type Format = 'bold' | 'italic' | 'underline';
 
 function RichTextToolbar() {
   const annotation = useAnnotation();
-  // The selection's editable properties: while the text editor holds a range
+  // The selection's editable fields: while the text editor holds a range
   // these describe the RANGE (bold true = every selected run is bold, `mixed`
   // when they disagree); otherwise the selected boxes' body style.
-  const props = useSelectionProps();
+  const props = useSelectionFields();
   const { currentPage } = usePages();
   const { pages } = usePageList();
   const page = pages[currentPage];
@@ -44,33 +44,37 @@ function RichTextToolbar() {
   // differ from it. `contents` becomes the plain projection automatically.
   const addTextBox = async () => {
     if (!page) return;
-    const ref = await annotation.createRaw(page.ref, {
-      subtype: 'free-text',
-      intent: 'free-text',
-      box: { x: 60, y: 90, width: 340, height: 60 },
-      fontFamily: 'helvetica',
-      fontSize: 16,
-      textAlign: 'left',
-      color: '#1e1e1e',
-      interiorColor: '#fffacd',
-      richText: {
-        body: { family: 'Helvetica', size: 16 },
-        paragraphs: [
-          {
-            runs: [
-              { text: 'Double-click me, select a word, then make it ' },
-              { text: 'bold', style: { weight: 700 } },
-              { text: '.' },
-            ],
-          },
-        ],
+    await annotation.create(
+      page.ref,
+      {
+        subtype: 'free-text',
+        intent: 'free-text',
+        box: { x: 60, y: 90, width: 340, height: 60 },
+        fontFamily: 'helvetica',
+        fontSize: 16,
+        textAlign: 'left',
+        color: '#1e1e1e',
+        interiorColor: '#fffacd',
+        richText: {
+          body: { family: 'Helvetica', size: 16 },
+          paragraphs: [
+            {
+              runs: [
+                { text: 'Double-click me, select a word, then make it ' },
+                { text: 'bold', style: { weight: 700 } },
+                { text: '.' },
+              ],
+            },
+          ],
+        },
       },
-    });
-    annotation.select(ref);
+      undefined,
+      { select: true },
+    );
     setStatus('added — double-click the box to edit its text');
   };
 
-  const hasText = props.specs.some((spec) => spec.key === 'bold');
+  const hasText = props.fields.some((spec) => spec.key === 'bold');
   const isOn = (format: Format) => props.values[format] === true && !props.mixed.includes(format);
 
   return (

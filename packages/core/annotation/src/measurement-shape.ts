@@ -1,17 +1,23 @@
 import { isReadout, measurementReadout } from '@embedpdf/engine-core/runtime';
-import type { PdfMeasurement, ShapeDimensionCaption } from '@embedpdf/engine-core/runtime';
-import { geomRotation, pointInPoly, rotatePoint, selectionQuad, unionRect } from './geometry';
+import type { AnnotationDTO } from '@embedpdf/engine-core/runtime';
+import { geomRotation, selectionQuad } from './geometry';
+import { pointInPoly, rotatePoint, unionRect } from './rect';
+import { drawnPointOf, drawnVerticesOf, uprightPointOf } from './shapes/points';
 import { DISTANCE_CAPTION_SIZE, distanceCaptionWidth } from './measurement-font';
 import { distanceLayout, distanceSelectionQuad, moveDistanceCaption } from './measurement';
 import type { DistanceCaptionLayout, MeasurementAppearance } from './measurement';
-import type { ModelGeometry, Quad, Rect, Style, Point } from './types';
+import type { Shape, QuadRing, Rect, Style, Point } from './types';
 
-export interface ShapeMeasurementAppearance {
+type ShapeAnnotation = Extract<AnnotationDTO, { subtype: 'polygon' | 'polyline' }>;
+
+/**
+ * A perimeter's or area's measurement: the engine's own fields for its scale,
+ * whether its caption shows, and its label (`contents`, which the engine
+ * works out). Where the caption sits is the shape's `captionCenter`.
+ */
+export type ShapeMeasurementAppearance = {
   intent: 'polyline-dimension' | 'polygon-dimension';
-  measure: PdfMeasurement | null;
-  caption: ShapeDimensionCaption;
-  text: string;
-}
+} & Pick<ShapeAnnotation, 'measure' | 'captionEnabled' | 'contents'>;
 
 export interface ShapeMeasurementLayout {
   caption: DistanceCaptionLayout | null;
@@ -21,49 +27,22 @@ export interface ShapeMeasurementLayout {
 
 const ORIGIN = { x: 0, y: 0 };
 
-/** The caption's center, where it's drawn on the page. */
-export function shapeCaptionPoint(appearance: ShapeMeasurementAppearance): Point | undefined {
-  return appearance.caption.center ?? undefined;
-}
-
-export function withShapeCaptionPoint(
-  appearance: ShapeMeasurementAppearance,
-  center: Point,
-): ShapeMeasurementAppearance {
-  return {
-    ...appearance,
-    caption: { ...appearance.caption, center },
-  };
-}
-
-export function transformMeasurementCaption(
-  appearance: MeasurementAppearance | undefined,
-  transform: (point: Point) => Point,
-): MeasurementAppearance | undefined {
-  if (!appearance || appearance.intent === 'line-dimension') return appearance;
-  const center = shapeCaptionPoint(appearance);
-  return center ? withShapeCaptionPoint(appearance, transform(center)) : appearance;
-}
-
-export function shapeMeasurementReadout(
-  geometry: ModelGeometry,
-  appearance: ShapeMeasurementAppearance,
-) {
+export function shapeMeasurementReadout(geometry: Shape, appearance: ShapeMeasurementAppearance) {
   return measurementReadout({
     subtype: appearance.intent === 'polygon-dimension' ? 'polygon' : 'polyline',
     intent: appearance.intent,
     measure: appearance.measure,
-    vertices: geometry.kind === 'poly' ? geometry.points : [],
+    vertices: geometry.kind === 'poly' ? geometry.vertices : [],
   });
 }
 
 export function shapeMeasurementLabel(
-  geometry: ModelGeometry,
+  geometry: Shape,
   appearance: ShapeMeasurementAppearance,
 ): string {
   const readout = shapeMeasurementReadout(geometry, appearance);
   if (isReadout(readout)) return readout.label;
-  return readout.unavailable === 'invalid-geometry' ? '—' : appearance.text;
+  return readout.unavailable === 'invalid-geometry' ? '—' : (appearance.contents ?? '');
 }
 
 /** Match the native shape-caption anchor, including an interior fallback for concave areas. */
@@ -135,16 +114,16 @@ export function automaticShapeCaptionCenter(points: readonly Point[], closed: bo
 }
 
 export function shapeMeasurementLayout(
-  geometry: ModelGeometry,
+  geometry: Shape,
   appearance: ShapeMeasurementAppearance,
   style: Style,
 ): ShapeMeasurementLayout | null {
-  if (geometry.kind !== 'poly' || !geometry.points.length) return null;
+  if (geometry.kind !== 'poly' || !geometry.vertices.length) return null;
   const angle = geomRotation(geometry);
-  const localPoints = geometry.points.map((point) => rotatePoint(point, ORIGIN, -angle));
-  const center =
-    shapeCaptionPoint(appearance) ??
-    rotatePoint(automaticShapeCaptionCenter(localPoints, geometry.closed), ORIGIN, angle);
+  const localPoints = drawnVerticesOf(geometry).map((point) => rotatePoint(point, ORIGIN, -angle));
+  const center = geometry.captionCenter
+    ? drawnPointOf(geometry, geometry.captionCenter)
+    : rotatePoint(automaticShapeCaptionCenter(localPoints, geometry.closed), ORIGIN, angle);
   const text = shapeMeasurementLabel(geometry, appearance);
   const width = distanceCaptionWidth(text);
   const height = DISTANCE_CAPTION_SIZE;
@@ -155,7 +134,7 @@ export function shapeMeasurementLayout(
     y: center.y + x * along.y + y * normal.y,
   });
   const caption: DistanceCaptionLayout | null =
-    appearance.caption.enabled && text
+    appearance.captionEnabled && text
       ? {
           text,
           center,
@@ -171,15 +150,12 @@ export function shapeMeasurementLayout(
           ],
         }
       : null;
-  const selectionPoints = [
-    ...selectionQuad(geometry, style.strokeWidth, style.border),
-    ...(caption?.bounds ?? []),
-  ];
+  const selectionPoints = [...selectionQuad(geometry, style), ...(caption?.bounds ?? [])];
   return { caption, selectionPoints, visualBounds: unionRect(selectionPoints) };
 }
 
 export function measurementLayout(
-  geometry: ModelGeometry,
+  geometry: Shape,
   appearance: MeasurementAppearance,
   style: Style,
 ) {
@@ -189,15 +165,15 @@ export function measurementLayout(
 }
 
 export function measurementSelectionQuad(
-  geometry: ModelGeometry,
+  geometry: Shape,
   appearance: MeasurementAppearance,
   style: Style,
-): Quad {
+): QuadRing {
   if (appearance.intent === 'line-dimension') {
     return distanceSelectionQuad(geometry, appearance, style.strokeWidth);
   }
   const layout = shapeMeasurementLayout(geometry, appearance, style);
-  if (!layout) return selectionQuad(geometry, style.strokeWidth, style.border);
+  if (!layout) return selectionQuad(geometry, style);
   const angle = geomRotation(geometry);
   const bounds = unionRect(
     layout.selectionPoints.map((point) => rotatePoint(point, ORIGIN, -angle)),
@@ -207,19 +183,27 @@ export function measurementSelectionQuad(
     { x: bounds.x + bounds.width, y: bounds.y },
     { x: bounds.x + bounds.width, y: bounds.y + bounds.height },
     { x: bounds.x, y: bounds.y + bounds.height },
-  ].map((point) => rotatePoint(point, ORIGIN, angle)) as Quad;
+  ].map((point) => rotatePoint(point, ORIGIN, angle)) as QuadRing;
 }
 
+/**
+ * The caption dragged by `delta`: a distance's caption offset changes (its
+ * measurement), a perimeter's or area's caption center (its shape, kept
+ * upright with the vertices).
+ */
 export function moveMeasurementCaption(
-  geometry: ModelGeometry,
+  geometry: Shape,
   appearance: MeasurementAppearance,
   delta: Point,
   style: Style,
-): MeasurementAppearance {
+): { geometry: Shape; measure: MeasurementAppearance } {
   if (appearance.intent === 'line-dimension')
-    return moveDistanceCaption(geometry, appearance, delta);
+    return { geometry, measure: moveDistanceCaption(geometry, appearance, delta) };
   const center = shapeMeasurementLayout(geometry, appearance, style)?.caption?.center;
-  return center
-    ? withShapeCaptionPoint(appearance, { x: center.x + delta.x, y: center.y + delta.y })
-    : appearance;
+  if (!center || geometry.kind !== 'poly') return { geometry, measure: appearance };
+  const moved = { x: center.x + delta.x, y: center.y + delta.y };
+  return {
+    geometry: { ...geometry, captionCenter: uprightPointOf(geometry, moved) },
+    measure: appearance,
+  };
 }

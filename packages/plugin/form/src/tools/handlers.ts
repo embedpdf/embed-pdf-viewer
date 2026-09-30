@@ -2,7 +2,7 @@ import { rectFromCorners } from '@embedpdf/core-geometry';
 import {
   MIN_DRAG,
   resolveClickPlacement,
-  widgetAppearanceFromProps,
+  widgetAppearanceOf,
 } from '@embedpdf/plugin-annotation/authoring';
 import type { PageRef } from '@embedpdf/engine-core/runtime';
 import type { AnnotationHostCapability } from '@embedpdf/plugin-annotation/contract/host';
@@ -91,7 +91,7 @@ export function createPlaceHandler(
           // Style from the tool's live defaults when the annotation plugin
           // holds them (the user may have restyled the tool); without it,
           // use the tool table's defaults, so a field is never invisible.
-          appearance: widgetAppearanceFromProps(
+          appearance: widgetAppearanceOf(
             annotation ? annotation.getToolDefaults(toolId) : tool.defaults,
           ),
         })

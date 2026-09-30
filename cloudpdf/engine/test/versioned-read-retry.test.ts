@@ -780,10 +780,10 @@ describe('CloudPageTextService — end-to-end transparent retry', () => {
         contents: 'delta-driven-create',
         quadPoints: [
           {
-            p1: { x: 0, y: 0 },
-            p2: { x: 10, y: 0 },
-            p3: { x: 0, y: 10 },
-            p4: { x: 10, y: 10 },
+            upperLeft: { x: 0, y: 0 },
+            upperRight: { x: 10, y: 0 },
+            lowerLeft: { x: 0, y: 10 },
+            lowerRight: { x: 10, y: 10 },
           },
         ],
       });
@@ -982,10 +982,10 @@ describe('CloudPageAnnotationsService — binary payload wire shape', () => {
         subtype: 'highlight',
         quadPoints: [
           {
-            p1: { x: 0, y: 0 },
-            p2: { x: 10, y: 0 },
-            p3: { x: 0, y: 10 },
-            p4: { x: 10, y: 10 },
+            upperLeft: { x: 0, y: 0 },
+            upperRight: { x: 10, y: 0 },
+            lowerLeft: { x: 0, y: 10 },
+            lowerRight: { x: 10, y: 10 },
           },
         ],
       });

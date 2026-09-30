@@ -6,10 +6,10 @@ SelectionChangedEvent [InterfaceDeclaration] (from packages/plugin/selection/src
 SelectionClearedEvent [TypeAliasDeclaration] (from packages/plugin/selection/src/contract.ts): export type SelectionClearedEvent = Record<string, never>;
 SelectionCommittedEvent [InterfaceDeclaration] (from packages/plugin/selection/src/contract.ts): export interface SelectionCommittedEvent{ readonly range: TextRange; }
 SelectionConfig [InterfaceDeclaration] (from packages/plugin/selection/src/contract.ts): export interface SelectionConfig{ dragThreshold?: number; }
-SelectionEndpoint [InterfaceDeclaration] (from packages/plugin/selection/src/contract.ts): export interface SelectionEndpoint{ page: PageRef; glyphQuad: TextQuad; advance: 1 | -1; rect: Rect; }
+SelectionEndpoint [InterfaceDeclaration] (from packages/plugin/selection/src/contract.ts): export interface SelectionEndpoint{ page: PageRef; glyphQuad: Quad; advance: 1 | -1; rect: Rect; }
 SelectionHostCapability [InterfaceDeclaration]: export interface SelectionHostCapability extends SelectionCapability{ ensureLoaded(page: PageRef): Promise<void>; isLoaded(page: PageRef): boolean; isOverText(page: PageRef, point: Point): boolean; beginGesture(): void; beginGestureAt(page: PageRef, point: Point): boolean; endGesture(): void; isGestureActive(): boolean; setHighlightVisible(visible: boolean): void; isHighlightVisible(): boolean; }
 SelectionRangeInput [TypeAliasDeclaration] (from packages/plugin/selection/src/contract.ts): export type SelectionRangeInput = TextRange |{ page: PageRef; start: number; count: number} ;
-SelectionSegment [InterfaceDeclaration] (from packages/plugin/selection/src/geometry.ts): export interface SelectionSegment{ quad: TextQuad; rect: Rect; advance: 1 | -1; }
+SelectionSegment [TypeAliasDeclaration] (from packages/plugin/selection/src/geometry.ts): export type SelectionSegment = PdfTextSegment;
 SelectionSnapshot [InterfaceDeclaration] (from packages/plugin/selection/src/contract.ts): export interface SelectionSnapshot{ readonly pages: readonly{ page: PageRef; segments: readonly SelectionSegment[]} []; readonly start: SelectionEndpoint | null; readonly end: SelectionEndpoint | null; readonly direction: 'forward' | 'backward'; readonly range: TextRange | null; }
 SelectionToken [VariableDeclaration]: SelectionToken = createHostToken<SelectionHostCapability>(PublicSelectionToken)
 TextPosition [InterfaceDeclaration] (from packages/plugin/selection/src/contract.ts): export interface TextPosition{ page: PageRef; index: number; }

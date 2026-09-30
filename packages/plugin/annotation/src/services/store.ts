@@ -1,28 +1,52 @@
 /**
- * The store: the one door every user action goes through.
+ * The store: the two doors every change goes through, and one path behind them.
  *
- *   commit(message)
+ *   commit(message)                       a gesture or a selection verb
  *     → update(model, message)            the core: next session, change set, effects
  *     → intents.begin(result)             the change shows at once (state: session + pending)
  *     → effect runners                    each effect becomes an engine write
  *     → intents.run(writes)               the writes run; their entries settle when they do
  *
+ *   apply(changes)                        a change stated in code (the API, comments, links…)
+ *     → each change checked by the engine's own rules and shown the same way
+ *     → the registered writer             each change becomes its engine write
+ *     → intents.run(writes)               settled like a gesture's
+ *
  * The model it hands out is the view's (read/view.ts): confirmed records with
  * the pending changes on top, composed with the session.
  */
+import { PluginError, toPluginError } from '@embedpdf/core';
 import {
+  annotationOfNew,
   creationDraftAnchor,
-  update,
+  drawnAfter,
   type Effect,
+  fromDTO,
   type Id,
-  type Model,
   type Message,
+  type Model,
+  type ModelAnnotation,
+  refOf,
+  sourceOfNew,
+  update,
+  type UpdateResult,
 } from '@embedpdf/core-annotation';
-import type { AnnotationRef } from '@embedpdf/engine-core/runtime';
+import {
+  annotationKey,
+  generateUuid,
+  resolveAnnotationPatch,
+  type AnnotationDraft,
+  type AnnotationDTO,
+  type AnnotationPatch,
+  type AnnotationRef,
+  type AnnotationResources,
+  type PageRef,
+} from '@embedpdf/engine-core/runtime';
 
+import { withPendingEdit, type RecordChange } from '../model';
 import type { AnnotationContext } from './context';
 import type { AnnotationEvents } from './events';
-import type { IntentOutcome, Intents, IntentWrite } from './intents';
+import type { CarriedWrite, IntentOutcome, Intents, IntentWrite } from './intents';
 import type { View } from '../read/view';
 
 /**
@@ -42,21 +66,175 @@ export interface Commit {
   readonly written: Promise<IntentOutcome>;
 }
 
+/**
+ * A change stated in code, in the engine's own terms. A create names its
+ * annotation (the draft's `nm`, else a fresh one), and the record is keyed by
+ * that name until the engine confirms it. A patch is written as given.
+ */
+export type StoreChange =
+  | {
+      readonly type: 'create';
+      readonly page: PageRef;
+      readonly draft: AnnotationDraft;
+      readonly resources?: AnnotationResources;
+    }
+  | {
+      readonly type: 'update';
+      readonly ref: AnnotationRef;
+      readonly patch: AnnotationPatch;
+      readonly resources?: AnnotationResources;
+    }
+  | { readonly type: 'delete'; readonly ref: AnnotationRef };
+
+/** What applying stated changes started: the record each change names, in order. */
+export interface Applied {
+  readonly ids: readonly Id[];
+  /** Settles when every engine write has settled. Never rejects. */
+  readonly written: Promise<AppliedOutcome>;
+}
+
+/** How stated changes settled, and what the engine answered each. */
+export interface AppliedOutcome extends IntentOutcome {
+  /**
+   * What the engine wrote for each change, in order: the annotation a create
+   * or update left. `null` for a delete, a change with nothing to write, and
+   * a refused one.
+   */
+  readonly annotations: readonly (AnnotationDTO | null)[];
+}
+
+/**
+ * Turns one stated change into its engine write, for the record `id` it
+ * names. A create's draft carries its name by now. Registered by the write area.
+ */
+export type ApplyWriter = (change: StoreChange, id: Id) => IntentWrite;
+
 export interface AnnotationStore {
   /** The current model: what every read and gesture works on. */
   model(): Model;
-  /** Run one message through the core, show its change, and start its engine writes. */
+  /**
+   * Run one message through the core, show its change, and start its engine
+   * writes. Throws, before anything shows, for a message the engine would
+   * refuse (a `rect` with a new shape), as `apply` does.
+   */
   commit(message: Message): Commit;
+  /**
+   * Show changes stated in code at once and start their engine writes, exactly
+   * like a gesture's: pending until they settle, dropped when refused. Throws,
+   * before anything shows, for a change the engine would refuse or a record
+   * the view doesn't have.
+   */
+  apply(changes: readonly StoreChange[]): Applied;
   /** Claim the effects an area performs (one runner per kind; last wins). */
   onEffect<K extends Effect['type']>(kind: K, runner: EffectRunner<K>): void;
+  /** Claim the engine writes of stated changes (one writer; last wins). */
+  onApply(writer: ApplyWriter): void;
 }
 
 /** The refs behind a list of model ids (records not yet confirmed have none). */
 export const refsOfIn = (model: Model, ids: readonly Id[]): AnnotationRef[] =>
-  ids.map((id) => model.byId[id]?.ref ?? null).filter((ref): ref is AnnotationRef => ref != null);
+  ids.map((id) => refOf(model.byId[id])).filter((ref): ref is AnnotationRef => ref != null);
 
 const sameIds = (left: readonly Id[], right: readonly Id[]): boolean =>
   left === right || (left.length === right.length && left.every((id, i) => id === right[i]));
+
+/**
+ * The record a ref names: its key, or, for an `nm` ref, the record on that
+ * page with that name (as the engine resolves one), confirmed or not.
+ */
+export function recordOfRef(model: Model, ref: AnnotationRef): ModelAnnotation | null {
+  const byKey = model.byId[annotationKey(ref)];
+  if (byKey) return byKey;
+  if (ref.kind !== 'nm') return null;
+  for (const id of model.order) {
+    const record = model.byId[id];
+    if (
+      record &&
+      record.annotation.nm === ref.nm &&
+      record.annotation.page.objectNumber === ref.page.objectNumber
+    ) {
+      return record;
+    }
+  }
+  return null;
+}
+
+/** A stated change, the record it names, and the pending change it makes (none: nothing to write). */
+interface StatedChange {
+  readonly id: Id;
+  readonly change: StoreChange;
+  readonly pending: RecordChange | null;
+}
+
+/**
+ * The pending change a stated change makes, and the record it names. The
+ * engine's own rules work it out (core `annotationOfNew`, and the engine's
+ * `resolveAnnotationPatch`), so what shows is what the engine will write; they
+ * throw for a change the engine would refuse.
+ */
+function statedChangeOf(model: Model, change: StoreChange): StatedChange {
+  if (change.type === 'create') {
+    const nm = change.draft.nm ?? generateUuid();
+    const ref: AnnotationRef = { kind: 'nm', page: change.page, nm };
+    const draft = { ...change.draft, nm } as AnnotationDraft;
+    const onPage = model.order.filter(
+      (id) => model.byId[id]?.annotation.page.objectNumber === change.page.objectNumber,
+    ).length;
+    // The annotations it links to are the engine's to look up as it writes
+    // (as a change set links them): read without them, then stated.
+    const { reply, parent, ...fields } = draft as AnnotationDraft & {
+      reply?: { to: AnnotationRef; type?: 'reply' | 'group' } | null;
+      parent?: AnnotationRef | null;
+    };
+    const annotation = {
+      ...annotationOfNew(fields as AnnotationDraft, { ref, index: onPage }),
+      ...(reply ? { reply: { to: reply.to, type: reply.type ?? 'reply' } } : {}),
+      ...(parent ? { parent } : {}),
+    } as AnnotationDTO;
+    const record: ModelAnnotation = {
+      ...fromDTO(annotation),
+      unconfirmed: true,
+      source: sourceOfNew(annotation),
+    };
+    const id = record.id;
+    return { id, change: { ...change, draft }, pending: { kind: 'create', record } };
+  }
+  const record = recordOfRef(model, change.ref);
+  if (!record) {
+    throw new PluginError('not-found', 'annotation', `no annotation ${annotationKey(change.ref)}`);
+  }
+  if (change.type === 'delete') return { id: record.id, change, pending: { kind: 'delete' } };
+  const noFields = Object.keys(change.patch).every((name) => name === 'subtype');
+  // A patch that says nothing, with no bytes, is no write at all.
+  if (noFields && !change.resources) return { id: record.id, change, pending: null };
+  // The engine's resolve rules, run now: a patch it would refuse throws
+  // before anything shows. The record is then drawn as the appearance rule
+  // says, exactly as after a gesture (core `appearance.ts`).
+  resolveAnnotationPatch(record.annotation, change.patch);
+  return {
+    id: record.id,
+    change,
+    pending: { kind: 'edit', patch: change.patch, fields: drawnAfter(record, change.patch) },
+  };
+}
+
+/**
+ * `model` with a stated change laid over it, as the view will show it. The
+ * next change of the same call is worked out against it: two moves of one
+ * record, or a create and then its edit, are seen as the engine will write
+ * them, in order.
+ */
+function withStated(model: Model, { id, pending }: StatedChange): Model {
+  if (!pending) return model;
+  if (pending.kind === 'create') {
+    return { ...model, byId: { ...model.byId, [id]: pending.record }, order: [...model.order, id] };
+  }
+  if (pending.kind === 'delete') {
+    const { [id]: _deleted, ...byId } = model.byId;
+    return { ...model, byId, order: model.order.filter((each) => each !== id) };
+  }
+  return { ...model, byId: { ...model.byId, [id]: withPendingEdit(model.byId[id]!, pending) } };
+}
 
 export function createStore(
   ctx: Pick<AnnotationContext, 'state'>,
@@ -66,18 +244,68 @@ export function createStore(
 ): AnnotationStore {
   // Keyed by effect type, so a runner only ever receives effects of its own kind.
   const runners = new Map<Effect['type'], (effect: Effect, model: Model) => IntentWrite | void>();
+  let writer: ApplyWriter | null = null;
   const model = view.model;
 
   const commit = (message: Message): Commit => {
     const before = model();
-    const result = update(before, message);
+    // A message the engine would refuse (a `rect` with a new shape) throws
+    // before anything shows, as a stated change does.
+    let result: UpdateResult;
+    try {
+      result = update(before, message);
+    } catch (error) {
+      throw toPluginError('annotation', error);
+    }
     const staged = intents.begin(before, result);
-    const writes: IntentWrite[] = [];
+    // A message changes each record once: an effect's write carries the changes of the records it names.
+    const tokenOf = new Map(staged.map((change) => [change.id, change.token]));
+    const writes: CarriedWrite[] = [];
     for (const effect of result.effects) {
       const write = runners.get(effect.type)?.(effect, model());
-      if (write) writes.push(write);
+      if (!write) continue;
+      const tokens = write.ids.flatMap((id) => (tokenOf.has(id) ? [tokenOf.get(id)!] : []));
+      writes.push({ write, tokens });
     }
     return { effects: result.effects, written: intents.run(staged, writes) };
+  };
+
+  const apply = (changes: readonly StoreChange[]): Applied => {
+    // Everything is worked out before anything shows: one refused change
+    // stages none. Each change is worked out against the ones before it.
+    const stated: StatedChange[] = [];
+    let current = model();
+    try {
+      for (const change of changes) {
+        const each = statedChangeOf(current, change);
+        stated.push(each);
+        current = withStated(current, each);
+      }
+    } catch (error) {
+      throw toPluginError('annotation', error);
+    }
+    const withPending = stated.filter(({ pending }) => pending !== null);
+    const staged = intents.beginStated(
+      withPending.map(({ id, pending }) => ({ id, change: pending! })),
+    );
+    // Each stated change is written by its own write, which settles exactly
+    // its change: two changes to one record settle apart.
+    const writes: CarriedWrite[] = writer
+      ? withPending.map(({ id, change }, index) => ({
+          write: writer!(change, id),
+          tokens: [staged[index]!.token],
+        }))
+      : [];
+    const written = intents.run(staged, writes).then(
+      (outcome): AppliedOutcome => ({
+        ...outcome,
+        annotations: stated.map((each) => {
+          const index = withPending.indexOf(each);
+          return index < 0 ? null : (outcome.answers[index]?.annotation ?? null);
+        }),
+      }),
+    );
+    return { ids: stated.map(({ id }) => id), written };
   };
 
   // The selection, draft and editing events, derived from each change of the
@@ -97,7 +325,7 @@ export function createStore(
       events.draftChanged.emit({ draft: creationDraftAnchor(next) });
     if (previous.editing !== next.editing) {
       events.editingChanged.emit({
-        ref: next.editing ? (next.byId[next.editing]?.ref ?? null) : null,
+        ref: next.editing ? refOf(next.byId[next.editing]) : null,
       });
     }
   });
@@ -105,6 +333,10 @@ export function createStore(
   return {
     model,
     commit,
+    apply,
+    onApply: (next) => {
+      writer = next;
+    },
     onEffect: (kind, runner) => {
       runners.set(kind, (effect, current) =>
         runner(effect as Extract<Effect, { type: typeof kind }>, current),

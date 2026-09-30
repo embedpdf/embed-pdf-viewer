@@ -10,12 +10,21 @@
  * runs concatenated. Every character counts one, including the `\r` a run
  * carries as a hard break and the `\r` that separates two paragraphs.
  */
-import type {
-  RichTextDocumentInput,
-  RichTextParagraph,
-  RichTextRun,
-  RichTextRunStyle,
+import {
+  faceForFreeTextFont,
+  type AnnotationDTO,
+  type FaceRequest,
+  type FontHandle,
+  type RichTextBody,
+  type RichTextDocument,
+  type RichTextDocumentInput,
+  type RichTextParagraph,
+  type RichTextRun,
+  type RichTextRunStyle,
 } from '@embedpdf/engine-core/runtime';
+
+import { textOf } from './record/text';
+import type { TextStyle } from './types';
 
 export type RichTextStyleDelta = Partial<RichTextRunStyle>;
 
@@ -275,4 +284,52 @@ export function isPlainRichText(doc: RichTextDocumentInput): boolean {
       paragraph.unknown === undefined &&
       paragraph.runs.every((run) => cleanDelta(run.style) === undefined),
   );
+}
+
+/* ── a free text's document ──────────────────────────────────────────────── */
+
+/** The registered fonts an engine knows (the local engine's `fonts.list()`;
+ *  none on the cloud engine). */
+export type FontLookup = () => readonly FontHandle[];
+
+/** The face a DTO font names: a standard font's family, weight and italic, a
+ *  registered key's identity, else the string itself as a family. */
+export const faceForFont = (font: string, fonts?: FontLookup): FaceRequest =>
+  faceForFreeTextFont(font, fonts && ((key) => fonts().find((handle) => handle.key === key)));
+
+const hex = (css: string): string => css.trim().toUpperCase();
+
+/** The rich body the `/DA` text style describes (a draft's body before its
+ *  DTO exists; also the fallback for a DTO without `richText`). */
+export function bodyFromTextStyle(style: TextStyle, fonts?: FontLookup): RichTextBody {
+  const face = faceForFont(style.fontFamily, fonts);
+  return {
+    family: face.family,
+    weight: style.bold ? 700 : (face.weight ?? 400),
+    italic: style.italic ?? face.italic ?? false,
+    size: style.fontSize,
+    color: hex(style.fontColor),
+    decoration: style.underline ? ['underline'] : [],
+    script: 'normal',
+    letterSpacing: 0,
+    horizontalScale: 1,
+    align: style.textAlign,
+    dir: 'ltr',
+  };
+}
+
+/** The annotation's rich document: a free text's own, else one made from
+ *  its plain text and how its text is set. */
+export function richDocOf(annotation: AnnotationDTO, fonts?: FontLookup): RichTextDocument {
+  if (annotation.subtype === 'free-text' && annotation.richText) return annotation.richText;
+  const style: TextStyle = textOf(annotation) ?? {
+    fontFamily: 'helvetica',
+    fontSize: 12,
+    fontColor: '#000000',
+    textAlign: 'left',
+  };
+  return {
+    body: bodyFromTextStyle(style, fonts),
+    paragraphs: paragraphsFromPlainText(annotation.contents ?? ''),
+  };
 }

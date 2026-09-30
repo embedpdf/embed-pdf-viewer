@@ -41,12 +41,12 @@ export interface PixelBox {
   height: number;
 }
 
-/** Four points in an image's pixels, in the order of the page-space quad they come from. */
+/** A page-space quad in an image's pixels: each corner keeps its name. */
 export interface PixelQuad {
-  p1: PixelPoint;
-  p2: PixelPoint;
-  p3: PixelPoint;
-  p4: PixelPoint;
+  upperLeft: PixelPoint;
+  upperRight: PixelPoint;
+  lowerLeft: PixelPoint;
+  lowerRight: PixelPoint;
 }
 
 /** Converts between page space and the pixels of one render. */
@@ -179,12 +179,12 @@ function mapped(
   m: PageRenderMatrix,
   value: PagePoint | PageBox | PageQuad,
 ): PagePoint | PageBox | PageQuad {
-  if ('p1' in value) {
+  if ('upperLeft' in value) {
     return {
-      p1: mappedPoint(m, value.p1),
-      p2: mappedPoint(m, value.p2),
-      p3: mappedPoint(m, value.p3),
-      p4: mappedPoint(m, value.p4),
+      upperLeft: mappedPoint(m, value.upperLeft),
+      upperRight: mappedPoint(m, value.upperRight),
+      lowerLeft: mappedPoint(m, value.lowerLeft),
+      lowerRight: mappedPoint(m, value.lowerRight),
     };
   }
   if ('width' in value) {

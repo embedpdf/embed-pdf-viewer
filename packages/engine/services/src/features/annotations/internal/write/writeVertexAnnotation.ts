@@ -1,4 +1,5 @@
 import {
+  ANNOTATION_DEFAULTS,
   pdfPointTurned,
   type PdfPoint,
   type PdfPointTurn,
@@ -33,7 +34,6 @@ export type VertexDraft = PolygonDraft<PdfCoordinates> | PolylineDraft<PdfCoordi
 export type VertexPatch = PolygonPatch<PdfCoordinates> | PolylinePatch<PdfCoordinates>;
 
 /** Default line endings when a polyline draft omits them. */
-const DEFAULT_LINE_ENDINGS = { start: 'none', end: 'none' } as const;
 
 type VertexWrite = VertexDraft | VertexPatch;
 
@@ -146,7 +146,7 @@ export function applyPolylineDraft(
   writeMeasurementFields(fn, mem, annotPtr, draftWithDrawnCaption(draft, placed));
   applyFilledStyleDraft(fn, mem, annotPtr, draft);
   setVertices(fn, mem, annotPtr, placed.drawn[0]!);
-  setLineEndings(fn, annotPtr, draft.lineEndings ?? DEFAULT_LINE_ENDINGS);
+  setLineEndings(fn, annotPtr, draft.lineEndings ?? ANNOTATION_DEFAULTS.polyline.lineEndings);
 }
 
 export function applyPolylinePatch(

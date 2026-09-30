@@ -57,7 +57,7 @@ export function applyLinkPatch(
   if (patch.target === null) clearLinkTarget(fn, annotPtr);
   else if (patch.target !== undefined) {
     // A read-only target sent back unchanged was dropped before the write
-    // (`checkAnnotationPatch`); any other one, another app's named verb
+    // (`pdfResolveAnnotationPatch`); any other one, another app's named verb
     // included, was refused there.
     if (
       patch.target.kind !== 'goto' &&

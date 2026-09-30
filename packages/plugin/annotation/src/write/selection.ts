@@ -1,41 +1,51 @@
 import { pageRefsEqual } from '@embedpdf/core';
 import {
+  type AnnotationFlags,
   applyStyleToRange,
   expandGroups,
+  type FieldValues,
   geomVisualBounds,
   groupKeyOf,
+  groupOf,
+  type Id,
   isSelectable,
   type ModelAnnotation,
-  type AnnotationFlags,
-  type AnnotationPropsPatch,
   type Rect,
+  refOf,
+  richDocOf,
+  shapeOf,
+  styleOf,
 } from '@embedpdf/core-annotation';
 import { intersectRects } from '@embedpdf/core-geometry';
-import { annotationKey, type AnnotationRef, type PageRef } from '@embedpdf/engine-core/runtime';
+import {
+  annotationKey,
+  type AnnotationDTO,
+  type AnnotationPatch,
+  type AnnotationRef,
+  type PageRef,
+  type PdfLinkTarget,
+} from '@embedpdf/engine-core/runtime';
 
 import type { AnnotationReads } from '../read/annotations';
-import type { SelectionPropsReads } from '../read/selection-props';
-import { richDocOf, runDeltaForProps, type TextFormat } from '../rich-text';
+import type { SelectionFieldsReads } from '../read/selection-fields';
+import { runDeltaForFields, type TextFormat } from '../rich-text';
 import type { AnnotationServices } from '../services';
-import type { Crud } from './crud';
 import type { LinkWrites } from './links';
 import { batchResultOf, throwIfFailed } from './outcomes';
-import { rotationOf } from './page-patch';
 import type { TextEditing } from './text-editing';
 import { refsOfIn, type Commit } from '../services/store';
 
 /**
- * The selection: what is selected, and the verbs that restyle, flag, delete,
- * rotate, group and ungroup it as one — every member through the same
- * `update → patch effect → toPatch` path a gesture takes.
+ * The selection: what is selected, and the verbs that change its fields,
+ * link, flag, delete, rotate, group and ungroup it as one — every member
+ * through the same `update → patch effect` path a gesture takes.
  */
 export function createSelectionWrites(
   { store, authority, fonts }: Pick<AnnotationServices, 'store' | 'authority' | 'fonts'>,
-  annotations: Pick<AnnotationReads, 'loadedOrThrow' | 'selectedCommitted'>,
-  selectionProps: Pick<SelectionPropsReads, 'activeTextRange' | 'selectionPropsOf'>,
+  annotations: Pick<AnnotationReads, 'selectedCommitted'>,
+  selectionFields: Pick<SelectionFieldsReads, 'activeTextRange' | 'selectionFieldsOf'>,
   text: Pick<TextEditing, 'flushAllText'>,
   links: Pick<LinkWrites, 'writeRelationship'>,
-  crud: Pick<Crud, 'setRotation'>,
 ) {
   const selectedRefs = () => refsOfIn(store.model(), store.model().selected);
 
@@ -43,44 +53,49 @@ export function createSelectionWrites(
   const commitOverSelection = async (commit: () => Commit[]) => {
     const refs = selectedRefs();
     const outcomes = await Promise.all(commit().map((committed) => committed.written));
-    return batchResultOf(refs, {
-      created: {},
-      failed: outcomes.flatMap((outcome) => outcome.failed),
-    });
+    return batchResultOf(refs, { failed: outcomes.flatMap((outcome) => outcome.failed) });
   };
 
-  // Restyle the selection: one flat props patch through the pure core (the
-  // same `update → patch effect → toPatch` path every gesture takes). Each
-  // member takes the keys its kind declares and ignores the rest; the change
-  // shows at once and one engine write runs per member.
-  const restyle = (patch: AnnotationPropsPatch): Commit[] => {
+  /**
+   * Change the selection's fields, a patch per member (a function patches
+   * each relative to itself), through the pure core like every gesture: each
+   * member takes the fields its kind has, the change shows at once and one
+   * engine write runs per member. While the text editor holds a range, the
+   * font, size, colour and formats restyle the runs it covers (a delta over
+   * the body, through the pure run algebra) and the rest goes to the
+   * annotation.
+   */
+  const restyle = (patch: FieldValues | ((annotation: AnnotationDTO) => FieldValues)): Commit[] => {
     const model = store.model();
-    const range = selectionProps.activeTextRange(model);
-    if (range) {
-      // The editor holds a range: font/size/colour/format restyle the
-      // runs it covers (a delta over the body, through the pure run
-      // algebra); whatever is left restyles the annotation as usual.
-      const annotation = model.byId[range.id]!;
-      const { delta, rest } = runDeltaForProps(patch, fonts);
-      const commits: Commit[] = [];
+    const range = selectionFields.activeTextRange(model);
+    const commits: Commit[] = [];
+    const patches: Record<Id, FieldValues> = {};
+    for (const id of model.selected) {
+      const record = model.byId[id];
+      if (!record) continue;
+      const own = typeof patch === 'function' ? patch(record.annotation) : patch;
+      if (range?.id !== id) {
+        patches[id] = own;
+        continue;
+      }
+      const { delta, rest } = runDeltaForFields(own, fonts);
       if (Object.keys(delta).length) {
         const next = applyStyleToRange(
-          { paragraphs: richDocOf(annotation, fonts).paragraphs },
+          { paragraphs: richDocOf(record.annotation, fonts).paragraphs },
           range,
           delta,
         );
-        commits.push(store.commit({ type: 'setRichText', id: range.id, doc: next }));
+        commits.push(store.commit({ type: 'setRichText', id, doc: next }));
       }
-      if (Object.keys(rest).length) {
-        text.flushAllText(); // the props write must not overtake the text
-        commits.push(store.commit({ type: 'setProps', patch: rest }));
-      }
-      return commits;
+      patches[id] = rest;
     }
-    // A body restyle of the annotation being typed in: land the text first
-    // so the engine's body rewrite carries the latest paragraphs.
-    if (model.editing) text.flushAllText();
-    return [store.commit({ type: 'setProps', patch })];
+    if (Object.values(patches).some((fields) => Object.keys(fields).length)) {
+      // A body restyle of the annotation being typed in: land the text first
+      // so the engine's body rewrite carries the latest paragraphs.
+      if (model.editing) text.flushAllText();
+      commits.push(store.commit({ type: 'setFields', patches }));
+    }
+    return commits;
   };
 
   const api = {
@@ -97,9 +112,11 @@ export function createSelectionWrites(
     selectAll: (page?: PageRef) => {
       const model = store.model();
       const ids = model.order.filter((id) => {
-        const annotation = model.byId[id];
+        const record = model.byId[id];
         return (
-          !!annotation && (!page || pageRefsEqual(annotation.page, page)) && isSelectable(model, id)
+          !!record &&
+          (!page || pageRefsEqual(record.annotation.page, page)) &&
+          isSelectable(model, id)
         );
       });
       store.commit({ type: 'select', ids });
@@ -107,17 +124,12 @@ export function createSelectionWrites(
     selectInRect: (page: PageRef, rect: Rect, options?: { add?: boolean }) => {
       const model = store.model();
       const ids = model.order.filter((id) => {
-        const annotation = model.byId[id];
-        if (!annotation || !pageRefsEqual(annotation.page, page) || !isSelectable(model, id))
+        const record = model.byId[id];
+        if (!record || !pageRefsEqual(record.annotation.page, page) || !isSelectable(model, id))
           return false;
-        const hit = intersectRects(
-          geomVisualBounds(
-            annotation.geometry,
-            annotation.style.strokeWidth,
-            annotation.style.border,
-          ),
-          rect,
-        );
+        const geometry = shapeOf(record.annotation);
+        const style = styleOf(record.annotation);
+        const hit = intersectRects(geomVisualBounds(geometry, style), rect);
         return hit.width > 0 && hit.height > 0;
       });
       if (ids.length || !options?.add) store.commit({ type: 'select', ids, add: options?.add });
@@ -125,28 +137,30 @@ export function createSelectionWrites(
     clearSelection: () => {
       store.commit({ type: 'deselect' });
     },
-    updateSelection: (patch: AnnotationPropsPatch) => commitOverSelection(() => restyle(patch)),
+    updateSelection: (patch: AnnotationPatch | ((annotation: AnnotationDTO) => AnnotationPatch)) =>
+      commitOverSelection(() => restyle(patch as FieldValues)),
+    updateSelectionLink: (target: PdfLinkTarget | null) =>
+      commitOverSelection(() => [store.commit({ type: 'setLink', target })]),
     updateSelectionFlags: (patch: Partial<AnnotationFlags>) =>
       commitOverSelection(() => [store.commit({ type: 'setFlags', patch })]),
     deleteSelection: () => commitOverSelection(() => [store.commit({ type: 'delete' })]),
     rotateSelectionBy: async (delta: 90 | -90) => {
-      if (delta === 90) {
-        throwIfFailed(await store.commit({ type: 'rotate90' }).written);
-        return;
-      }
-      for (const ref of selectedRefs()) {
-        const annotation = annotations.loadedOrThrow(ref);
-        await crud.setRotation(ref, rotationOf(annotation.geometry) - 90);
-      }
+      throwIfFailed(await store.commit({ type: 'rotateSelection', degrees: delta }).written);
     },
     resetSelectionRotation: async () => {
       throwIfFailed(await store.commit({ type: 'resetRotation' }).written);
     },
     toggleTextFormat: async (format: TextFormat) => {
-      const current = selectionProps.selectionPropsOf().values[format];
-      const outcomes = await Promise.all(
-        restyle({ [format]: !current } as AnnotationPropsPatch).map((commit) => commit.written),
-      );
+      const on = selectionFields.selectionFieldsOf().values[format] !== true;
+      const model = store.model();
+      const range = selectionFields.activeTextRange(model);
+      // A held range takes the format as a run delta; otherwise each body
+      // does, once the text being typed has landed.
+      if (!range && model.editing) text.flushAllText();
+      const commits = range
+        ? restyle({ [format]: on })
+        : [store.commit({ type: 'setTextFormat', format, on })];
+      const outcomes = await Promise.all(commits.map((commit) => commit.written));
       outcomes.forEach(throwIfFailed);
     },
     // Grouping writes a relationship (`/IRT` + `/RT /Group`) onto every
@@ -155,18 +169,17 @@ export function createSelectionWrites(
       const model = store.model();
       const members = annotations.selectedCommitted();
       if (members.length < 2) return;
-      const pageObjectNumber = members[0].page.objectNumber;
-      if (members.some((annotation) => annotation.page.objectNumber !== pageObjectNumber)) return; // groups are page-local
+      const pageObjectNumber = members[0].annotation.page.objectNumber;
+      if (members.some((record) => record.annotation.page.objectNumber !== pageObjectNumber))
+        return; // groups are page-local
       const ordered = [...members].sort(
         (left, right) => model.order.indexOf(left.id) - model.order.indexOf(right.id),
       );
       const [primary, ...rest] = ordered;
-      const primaryRef = primary.ref;
+      const primaryRef = refOf(primary);
       if (!primaryRef) return;
       await Promise.all(
-        rest.map((annotation) =>
-          links.writeRelationship(annotation, { to: primaryRef, type: 'group' }),
-        ),
+        rest.map((record) => links.writeRelationship(record, { to: primaryRef, type: 'group' })),
       );
     },
     ungroup: async (): Promise<void> => {
@@ -174,26 +187,29 @@ export function createSelectionWrites(
       const subs = expandGroups(model, model.selected)
         .map((id) => model.byId[id])
         .filter(
-          (annotation): annotation is ModelAnnotation =>
-            !!annotation && !!annotation.ref && !!annotation.data && !!annotation.group,
+          (record): record is ModelAnnotation =>
+            !!record && !!refOf(record) && !!groupOf(record.annotation),
         );
-      await Promise.all(subs.map((annotation) => links.writeRelationship(annotation, null)));
+      await Promise.all(subs.map((record) => links.writeRelationship(record, null)));
     },
     canGroup: (): boolean => {
       const model = store.model();
       const members = annotations.selectedCommitted();
       if (members.length < 2) return false;
       if (
-        members.some((annotation) => annotation.page.objectNumber !== members[0].page.objectNumber)
+        members.some(
+          (record) =>
+            record.annotation.page.objectNumber !== members[0].annotation.page.objectNumber,
+        )
       )
         return false;
       // Grouping writes a relationship onto every member — each must
       // pass the per-record update check.
       if (
-        !members.every(
-          (annotation) =>
-            annotation.ref != null && authority.allowsMutation('update', annotation.ref),
-        )
+        !members.every((record) => {
+          const ref = refOf(record);
+          return ref != null && authority.allowsMutation('update', ref);
+        })
       )
         return false;
       // Already exactly one complete group → nothing to do.
@@ -207,13 +223,13 @@ export function createSelectionWrites(
       // selected group — same per-record write gate as `ungroup` hits.
       const subs = expandGroups(model, model.selected)
         .map((id) => model.byId[id])
-        .filter((annotation): annotation is ModelAnnotation => !!annotation && !!annotation.group);
+        .filter((record): record is ModelAnnotation => !!record && !!groupOf(record.annotation));
       return (
         subs.length > 0 &&
-        subs.every(
-          (annotation) =>
-            annotation.ref != null && authority.allowsMutation('update', annotation.ref),
-        )
+        subs.every((record) => {
+          const ref = refOf(record);
+          return ref != null && authority.allowsMutation('update', ref);
+        })
       );
     },
   };

@@ -69,14 +69,14 @@ describe('pageTransform', () => {
   it('maps a quad corner by corner, keeping their order', () => {
     const view = pageTransform(LETTER, { rotation: 90 });
     const quad = {
-      p1: { x: 10, y: 20 },
-      p2: { x: 30, y: 20 },
-      p3: { x: 10, y: 40 },
-      p4: { x: 30, y: 40 },
+      upperLeft: { x: 10, y: 20 },
+      upperRight: { x: 30, y: 20 },
+      lowerLeft: { x: 10, y: 40 },
+      lowerRight: { x: 30, y: 40 },
     };
     const pixels = view.pageToPixels(quad);
-    close(pixels.p1, view.pageToPixels(quad.p1));
-    close(pixels.p4, view.pageToPixels(quad.p4));
+    close(pixels.upperLeft, view.pageToPixels(quad.upperLeft));
+    close(pixels.lowerRight, view.pageToPixels(quad.lowerRight));
   });
 
   it('measures a target from its own top-left, at its own size', () => {

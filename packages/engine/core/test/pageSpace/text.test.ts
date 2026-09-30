@@ -51,9 +51,19 @@ const oriented = (
     y: origin.y + u.y * t + n.y * up,
   });
   const glyphs: RotatedGeometryGlyph<PdfCoordinates>[] = Array.from({ length: 4 }, (_, i) => ({
-    loose: { p1: at(i * 8, 12), p2: at(i * 8 + 8, 12), p3: at(i * 8, 0), p4: at(i * 8 + 8, 0) },
+    loose: {
+      upperLeft: at(i * 8, 12),
+      upperRight: at(i * 8 + 8, 12),
+      lowerLeft: at(i * 8, 0),
+      lowerRight: at(i * 8 + 8, 0),
+    },
   }));
-  const corners = glyphs.flatMap((g) => [g.loose.p1, g.loose.p2, g.loose.p3, g.loose.p4]);
+  const corners = glyphs.flatMap((g) => [
+    g.loose.upperLeft,
+    g.loose.upperRight,
+    g.loose.lowerLeft,
+    g.loose.lowerRight,
+  ]);
   const xs = corners.map((p) => p.x);
   const ys = corners.map((p) => p.y);
   const rect: PdfRect = {
@@ -164,7 +174,12 @@ describe('text in page space', () => {
   test('a search batch measures each match on its own page', () => {
     const other = { left: 0, bottom: 0, right: 612, top: 792 };
     const pdfSegment = {
-      quad: { p1: { x: 0, y: 12 }, p2: { x: 10, y: 12 }, p3: { x: 0, y: 0 }, p4: { x: 10, y: 0 } },
+      quad: {
+        upperLeft: { x: 0, y: 12 },
+        upperRight: { x: 10, y: 12 },
+        lowerLeft: { x: 0, y: 0 },
+        lowerRight: { x: 10, y: 0 },
+      },
       rect: { left: 0, bottom: 0, right: 10, top: 12 },
       advance: 1 as const,
     };

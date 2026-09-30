@@ -21,8 +21,8 @@ export function applyPopupDraft(
   annotPtr: Ptr,
   draft: PopupDraft<PdfCoordinates>,
 ): void {
-  // A popup is a window on its parent, never printed itself.
-  applyAnnotationBaseDraft(fn, mem, annotPtr, draft, { print: false });
+  // A popup is a window on its parent: unless the draft says so, it doesn't print.
+  applyAnnotationBaseDraft(fn, mem, annotPtr, draft);
   setAnnotRect(fn, mem, annotPtr, draft.rect);
   if (draft.open !== undefined) setPopupOpen(fn, annotPtr, draft.open);
 }

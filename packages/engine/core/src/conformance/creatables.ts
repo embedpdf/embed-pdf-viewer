@@ -25,10 +25,10 @@ export function iconRect(x: number, y: number): PageBox {
 export function creatables(): Creatable[] {
   const rect: PageBox = { x: 40, y: 40, width: 100, height: 60 };
   const quad = {
-    p1: { x: 40, y: 40 },
-    p2: { x: 140, y: 40 },
-    p3: { x: 40, y: 60 },
-    p4: { x: 140, y: 60 },
+    upperLeft: { x: 40, y: 40 },
+    upperRight: { x: 140, y: 40 },
+    lowerLeft: { x: 40, y: 60 },
+    lowerRight: { x: 140, y: 60 },
   };
   const vertices = [
     { x: 50, y: 90 },

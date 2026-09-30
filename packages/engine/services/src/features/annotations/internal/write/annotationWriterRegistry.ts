@@ -72,12 +72,7 @@ import {
   preflightStampDraft,
   preflightStampPatch,
 } from './writeStampAnnotation';
-import {
-  applyTextDraft,
-  applyTextPatch,
-  isTextSubtype,
-  preflightTextDraft,
-} from './writeTextAnnotation';
+import { applyTextDraft, applyTextPatch, isTextSubtype } from './writeTextAnnotation';
 import {
   applyTextMarkupDraft,
   applyTextMarkupPatch,
@@ -107,9 +102,6 @@ export function preflightDraft(
   }
   if (isRedactSubtype(draft.subtype)) {
     preflightRedactDraft(draft as RedactDraft<PdfCoordinates>);
-  }
-  if (isTextSubtype(draft.subtype)) {
-    preflightTextDraft(draft as TextDraft<PdfCoordinates>);
   }
 }
 

@@ -18,8 +18,8 @@
  * `StageCapability`) so this plugin stays stage-free — selection also runs
  * in stage-less hosts (`PageView`) — and the math tests run against a fake.
  */
-import { textQuadEdge } from '@embedpdf/core-geometry';
-import type { Point, TextQuad } from '@embedpdf/core-geometry';
+import { quadEdge } from '@embedpdf/core-geometry';
+import type { Point, Quad } from '@embedpdf/core-geometry';
 import type { PageRef } from '@embedpdf/engine-core/runtime';
 
 /** What handle geometry & drags need from the hosting view. */
@@ -37,7 +37,7 @@ export interface SelectionHandleView {
 export interface SelectionHandleEndpoint {
   page: PageRef;
   /** The boundary glyph's own oriented cell, page page space. */
-  glyphQuad: TextQuad;
+  glyphQuad: Quad;
   /** Reading direction of its segment (+1 = the frame's +x) — decides which
    *  side of the cell is the selection's leading edge. */
   advance: 1 | -1;
@@ -91,7 +91,7 @@ export function selectionHandleGeom(
   // Which side of the cell is this selection's edge is a reading-order
   // question (`advance`), never a geometric one.
   const leading = role === 'start' ? endpoint.advance > 0 : endpoint.advance < 0;
-  const [upperPage, lowerPage] = textQuadEdge(endpoint.glyphQuad, leading ? 'start' : 'end');
+  const [upperPage, lowerPage] = quadEdge(endpoint.glyphQuad, leading ? 'left' : 'right');
   const upper = view.toOverlay(endpoint.page, upperPage);
   const lower = view.toOverlay(endpoint.page, lowerPage);
   if (!upper || !lower) return null;
@@ -139,8 +139,8 @@ export function createSelectionHandleDrag(
   // glyph for rotated text too.
   const quad = opposite.glyphQuad;
   const anchorPoint = midpoint(
-    midpoint(quad.upperStart, quad.lowerEnd),
-    midpoint(quad.upperEnd, quad.lowerStart),
+    midpoint(quad.upperLeft, quad.lowerRight),
+    midpoint(quad.upperRight, quad.lowerLeft),
   );
   let begun = false;
   let lastPage = draggedPage;

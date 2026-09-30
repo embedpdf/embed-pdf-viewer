@@ -7404,7 +7404,7 @@
                 "items": {
                   "type": "object",
                   "properties": {
-                    "p1": {
+                    "upperLeft": {
                       "type": "object",
                       "properties": {
                         "x": {
@@ -7417,17 +7417,17 @@
                       "required": ["x", "y"],
                       "additionalProperties": false
                     },
-                    "p2": {
-                      "$ref": "#/components/schemas/Annotation/anyOf/0/properties/quadPoints/items/properties/p1"
+                    "upperRight": {
+                      "$ref": "#/components/schemas/Annotation/anyOf/0/properties/quadPoints/items/properties/upperLeft"
                     },
-                    "p3": {
-                      "$ref": "#/components/schemas/Annotation/anyOf/0/properties/quadPoints/items/properties/p1"
+                    "lowerLeft": {
+                      "$ref": "#/components/schemas/Annotation/anyOf/0/properties/quadPoints/items/properties/upperLeft"
                     },
-                    "p4": {
-                      "$ref": "#/components/schemas/Annotation/anyOf/0/properties/quadPoints/items/properties/p1"
+                    "lowerRight": {
+                      "$ref": "#/components/schemas/Annotation/anyOf/0/properties/quadPoints/items/properties/upperLeft"
                     }
                   },
-                  "required": ["p1", "p2", "p3", "p4"],
+                  "required": ["upperLeft", "upperRight", "lowerLeft", "lowerRight"],
                   "additionalProperties": false
                 },
                 "minItems": 1
@@ -8638,7 +8638,7 @@
               "vertices": {
                 "type": "array",
                 "items": {
-                  "$ref": "#/components/schemas/Annotation/anyOf/0/properties/quadPoints/items/properties/p1"
+                  "$ref": "#/components/schemas/Annotation/anyOf/0/properties/quadPoints/items/properties/upperLeft"
                 }
               },
               "rotation": {
@@ -8652,7 +8652,7 @@
               "captionCenter": {
                 "allOf": [
                   {
-                    "$ref": "#/components/schemas/Annotation/anyOf/0/properties/quadPoints/items/properties/p1"
+                    "$ref": "#/components/schemas/Annotation/anyOf/0/properties/quadPoints/items/properties/upperLeft"
                   }
                 ],
                 "nullable": true
@@ -9012,7 +9012,7 @@
               "vertices": {
                 "type": "array",
                 "items": {
-                  "$ref": "#/components/schemas/Annotation/anyOf/0/properties/quadPoints/items/properties/p1"
+                  "$ref": "#/components/schemas/Annotation/anyOf/0/properties/quadPoints/items/properties/upperLeft"
                 }
               },
               "rotation": {
@@ -9026,7 +9026,7 @@
               "captionCenter": {
                 "allOf": [
                   {
-                    "$ref": "#/components/schemas/Annotation/anyOf/0/properties/quadPoints/items/properties/p1"
+                    "$ref": "#/components/schemas/Annotation/anyOf/0/properties/quadPoints/items/properties/upperLeft"
                   }
                 ],
                 "nullable": true
@@ -9285,10 +9285,10 @@
                 "type": "object",
                 "properties": {
                   "start": {
-                    "$ref": "#/components/schemas/Annotation/anyOf/0/properties/quadPoints/items/properties/p1"
+                    "$ref": "#/components/schemas/Annotation/anyOf/0/properties/quadPoints/items/properties/upperLeft"
                   },
                   "end": {
-                    "$ref": "#/components/schemas/Annotation/anyOf/0/properties/quadPoints/items/properties/p1"
+                    "$ref": "#/components/schemas/Annotation/anyOf/0/properties/quadPoints/items/properties/upperLeft"
                   }
                 },
                 "required": ["start", "end"],
@@ -9834,7 +9834,7 @@
                 "items": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/Annotation/anyOf/0/properties/quadPoints/items/properties/p1"
+                    "$ref": "#/components/schemas/Annotation/anyOf/0/properties/quadPoints/items/properties/upperLeft"
                   }
                 }
               },
@@ -10280,10 +10280,10 @@
                     "maxItems": 2,
                     "items": [
                       {
-                        "$ref": "#/components/schemas/Annotation/anyOf/0/properties/quadPoints/items/properties/p1"
+                        "$ref": "#/components/schemas/Annotation/anyOf/0/properties/quadPoints/items/properties/upperLeft"
                       },
                       {
-                        "$ref": "#/components/schemas/Annotation/anyOf/0/properties/quadPoints/items/properties/p1"
+                        "$ref": "#/components/schemas/Annotation/anyOf/0/properties/quadPoints/items/properties/upperLeft"
                       }
                     ]
                   },
@@ -10293,13 +10293,13 @@
                     "maxItems": 3,
                     "items": [
                       {
-                        "$ref": "#/components/schemas/Annotation/anyOf/0/properties/quadPoints/items/properties/p1"
+                        "$ref": "#/components/schemas/Annotation/anyOf/0/properties/quadPoints/items/properties/upperLeft"
                       },
                       {
-                        "$ref": "#/components/schemas/Annotation/anyOf/0/properties/quadPoints/items/properties/p1"
+                        "$ref": "#/components/schemas/Annotation/anyOf/0/properties/quadPoints/items/properties/upperLeft"
                       },
                       {
-                        "$ref": "#/components/schemas/Annotation/anyOf/0/properties/quadPoints/items/properties/p1"
+                        "$ref": "#/components/schemas/Annotation/anyOf/0/properties/quadPoints/items/properties/upperLeft"
                       }
                     ]
                   }

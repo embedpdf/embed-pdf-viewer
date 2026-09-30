@@ -13,6 +13,7 @@
 import type { PdfLinkTarget } from '@embedpdf/engine-core/runtime';
 
 import { isAttachedLink } from './plane';
+import { groupOf } from './record';
 import type { ModelAnnotation, Id, Model } from './types';
 
 /** Every attached link child of `parentId`, in z-order (multi-segment
@@ -20,9 +21,9 @@ import type { ModelAnnotation, Id, Model } from './types';
 export function linkChildrenOf(model: Model, parentId: Id): ModelAnnotation[] {
   const out: ModelAnnotation[] = [];
   for (const id of model.order) {
-    const annotation = model.byId[id];
-    if (annotation && isAttachedLink(annotation) && annotation.group === parentId)
-      out.push(annotation);
+    const record = model.byId[id];
+    if (record && isAttachedLink(record) && groupOf(record.annotation) === parentId)
+      out.push(record);
   }
   return out;
 }
@@ -30,6 +31,6 @@ export function linkChildrenOf(model: Model, parentId: Id): ModelAnnotation[] {
 /** The parent's link target, derived from its first attached child — the
  *  read side of the `syncLink` reconciler. Null when no child exists. */
 export function linkOf(model: Model, parentId: Id): PdfLinkTarget | null {
-  const data = linkChildrenOf(model, parentId)[0]?.data;
-  return data?.subtype === 'link' ? (data.target ?? null) : null;
+  const child = linkChildrenOf(model, parentId)[0]?.annotation;
+  return child?.subtype === 'link' ? (child.target ?? null) : null;
 }

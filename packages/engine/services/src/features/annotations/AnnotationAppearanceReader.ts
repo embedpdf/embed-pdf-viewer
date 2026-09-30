@@ -172,8 +172,8 @@ export class AnnotationAppearanceReader {
 
   /**
    * Render a single annotation appearance into its own raster. Returns `null`
-   * when the mode has no appearance stream (after an optional form-field AP
-   * generation fallback) or the render fails.
+   * when the mode has no appearance stream (a form widget's normal appearance
+   * is drawn in memory instead) or the render fails.
    */
   private renderOne(
     pagePtr: Ptr,
@@ -189,13 +189,15 @@ export class AnnotationAppearanceReader {
     const { fn } = this.runtime;
 
     if (!fn.EPDFAnnot_HasAppearanceStream(annotPtr, modeInt)) {
-      // Form widgets frequently ship without a baked /AP. Generate one on the
-      // fly, then re-check.
+      // Form widgets frequently ship without an /AP: the renderer draws their
+      // normal appearance in memory, inside their /Rect, and writes nothing
+      // (a read never changes the file).
       const subtype = fn.FPDFAnnot_GetSubtype(annotPtr);
-      if (subtype === ANNOT_SUBTYPE_WIDGET && !fn.FPDFAnnot_HasKey(annotPtr, 'AP')) {
-        fn.EPDFAnnot_GenerateFormFieldAP(annotPtr);
-        if (!fn.EPDFAnnot_HasAppearanceStream(annotPtr, modeInt)) return null;
-      } else {
+      if (
+        subtype !== ANNOT_SUBTYPE_WIDGET ||
+        modeInt !== 0 ||
+        fn.FPDFAnnot_HasKey(annotPtr, 'AP')
+      ) {
         return null;
       }
     }

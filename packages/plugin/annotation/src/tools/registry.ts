@@ -1,9 +1,11 @@
 import {
   defaultsFor,
-  propsFor,
+  kindNamed,
+  readOfDefaults,
+  textOf,
   uprightRotation,
-  type AnnotationPropsPatch,
-  type Subtype,
+  type FieldValues,
+  type KindName,
 } from '@embedpdf/core-annotation';
 import { InteractionToken } from '@embedpdf/plugin-interaction/contract';
 
@@ -13,14 +15,15 @@ import {
   type AnnotationToolInput,
   type ResolvedTool,
 } from './definitions';
-import type { AnnotationConfig, AnnotationTool } from '../contract';
+import type { AnnotationConfig, AnnotationTool, EditableFields } from '../contract';
+import { fieldValues } from '../read/field-values';
 import type { AnnotationContext } from '../services/context';
 import type { AnnotationStore } from '../services/store';
 
 /**
  * The resolved tool table (built-ins + config overrides). A tool is a named
  * authoring preset: it maps its id → a routing subtype, a `defaults` key
- * (`preset`), a `propsFor` kind, and — for stamps — a source spec. The config
+ * (`preset`), the kind whose fields it shows, and — for stamps — a source spec. The config
  * tools are kept so `registerTool` can re-resolve `extends` against the same
  * base pool.
  */
@@ -47,6 +50,41 @@ export function createToolRegistry(
     if (!displayRotation) return 0;
     const tool = activeTool();
     return tool?.upright ? uprightRotation(displayRotation) : 0;
+  };
+
+  /**
+   * A tool's defaults over the engine's for its kind, and the fields its style
+   * panel edits with their values. Cached per tool while its defaults stay the
+   * same object, so a subscribed panel re-renders only when they change.
+   */
+  const toolFields = new Map<
+    string,
+    { own: FieldValues; defaults: FieldValues; fields: EditableFields }
+  >();
+  const toolFieldsOf = (toolId: string) => {
+    const tool = registry.get(toolId);
+    const kind = tool?.subtype ?? toolId;
+    const own = defaultsFor(store.model(), tool?.preset ?? toolId);
+    const cached = toolFields.get(toolId);
+    if (cached?.own === own) return cached;
+    const read = readOfDefaults(kind, own);
+    const { subtype: _kind, ...defaults } = read as unknown as Record<string, unknown>;
+    // A tool's style panel edits its kind's fields: a callout edits a free
+    // text's, an arrow a line's. The registry holds that mapping.
+    const fields = kindNamed(tool?.fieldsKind ?? toolId).fields;
+    const text = textOf(read);
+    const target = read.subtype === 'link' ? (read.target ?? null) : null;
+    const entry = {
+      own,
+      defaults,
+      fields: {
+        fields,
+        values: fieldValues(fields, { data: defaults, text, link: target }),
+        mixed: [],
+      },
+    };
+    toolFields.set(toolId, entry);
+    return entry;
   };
 
   const toolProjections = new WeakMap<ResolvedTool, AnnotationTool>();
@@ -90,23 +128,20 @@ export function createToolRegistry(
         { replace: true },
       );
       if (resolved.defaults)
-        store.commit({ type: 'setDefaults', subtype: resolved.preset, patch: resolved.defaults });
+        store.commit({ type: 'setDefaults', preset: resolved.preset, patch: resolved.defaults });
       return () => {
         registry.delete(resolved.id);
         un?.();
       };
     },
-    getToolDefaults: (toolId: string) =>
-      defaultsFor(store.model(), registry.get(toolId)?.preset ?? toolId),
-    setToolDefaults: (toolId: string, patch: AnnotationPropsPatch) => {
-      store.commit({ type: 'setDefaults', subtype: registry.get(toolId)?.preset ?? toolId, patch });
+    getToolDefaults: (toolId: string): FieldValues => toolFieldsOf(toolId).defaults,
+    updateToolDefaults: (toolId: string, patch: FieldValues) => {
+      store.commit({ type: 'setDefaults', preset: registry.get(toolId)?.preset ?? toolId, patch });
     },
-    // A tool's editable-prop schema comes from its kind: a callout edits free-text
-    // props, an arrow edits line props. The registry holds that mapping.
-    listPropSpecs: (toolId: string) => propsFor(registry.get(toolId)?.propsKind ?? toolId),
+    getToolFields: (toolId: string): EditableFields => toolFieldsOf(toolId).fields,
     listResolvedTools: () => values(),
     getResolvedTool: (id: string) => registry.get(id) ?? null,
-    getToolSubtype: (id: string) => registry.get(id)?.subtype ?? (id as Subtype),
+    getToolSubtype: (id: string) => registry.get(id)?.subtype ?? (id as KindName),
   };
 
   return { get, values, activeTool, uprightRotFor, api };

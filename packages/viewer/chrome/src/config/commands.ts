@@ -65,8 +65,8 @@ const selectionSubtypes = (commandContext: Ctx) =>
  */
 /** The selection's link target, as the annotation holds it (destinations in the file's coordinates). */
 const selectionLink = (commandContext: Ctx): PdfLinkTarget | null | undefined => {
-  const props = anno(commandContext)?.getSelectionProps();
-  if (!props || !props.specs.some((spec) => spec.key === 'link') || props.mixed.includes('link'))
+  const props = anno(commandContext)?.getSelectionFields();
+  if (!props || !props.fields.some((spec) => spec.key === 'link') || props.mixed.includes('link'))
     return undefined;
   return (props.values.link ?? null) as PdfLinkTarget | null;
 };
@@ -102,10 +102,11 @@ const toolAccent = (
   if (!accent) return null;
   const anno = commandContext.tryGet(AnnotationToken);
   if (!anno) return null;
-  const props = anno.getToolDefaults(toolId);
+  const defaults = anno.getToolDefaults(toolId);
+  const colorOf = (key: ColorKey) => (defaults[key] as string | null | undefined) ?? undefined;
   return {
-    primary: props[accent.primary] ?? undefined,
-    secondary: accent.secondary ? (props[accent.secondary] ?? undefined) : undefined,
+    primary: colorOf(accent.primary),
+    secondary: accent.secondary ? colorOf(accent.secondary) : undefined,
   };
 };
 
@@ -670,7 +671,8 @@ export const defaultCommands: CommandDef[] = [
     categories: ['annotation'],
     panel: { id: 'annotation-style', exclusive: 'right' },
     // The kind table decides: no declared editable props → no style button.
-    visible: (commandContext) => (anno(commandContext)?.getSelectionProps().specs.length ?? 0) > 0,
+    visible: (commandContext) =>
+      (anno(commandContext)?.getSelectionFields().fields.length ?? 0) > 0,
   },
   {
     // The selection becomes a reusable stamp: the engine flattens the
@@ -784,7 +786,7 @@ export const defaultCommands: CommandDef[] = [
   {
     // Make the selection a link: opens the anchored popover (a link is a
     // verb on the selection, not a style), whose editor sets
-    // the target through `updateSelection({ link })`; the plugin's
+    // the target through `updateSelectionLink(target)`; the plugin's
     // reconciler materializes the attached child annotations.
     id: 'annotation:link',
     labelKey: 'commands.annotate.link',
@@ -813,7 +815,7 @@ export const defaultCommands: CommandDef[] = [
     labelKey: 'commands.annotate.removeLink',
     icon: 'linkOff',
     categories: ['annotation'],
-    run: (commandContext) => anno(commandContext)?.updateSelection({ link: null }),
+    run: (commandContext) => anno(commandContext)?.updateSelectionLink(null),
     visible: (commandContext) => selectionLink(commandContext) != null,
   },
 

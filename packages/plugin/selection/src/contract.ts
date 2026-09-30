@@ -8,7 +8,7 @@
  * PDF units, crop-relative), the space every layer paints in.
  */
 import type { EventHook, OperationOptions, PageRef } from '@embedpdf/core';
-import type { Point, Rect, TextQuad } from '@embedpdf/core-geometry';
+import type { Point, Rect, Quad } from '@embedpdf/core-geometry';
 import type { SelectionSegment } from './geometry';
 
 export type { SelectionSegment } from './geometry';
@@ -63,7 +63,7 @@ export type SelectionRangeInput = TextRange | { page: PageRef; start: number; co
  */
 export interface SelectionEndpoint {
   page: PageRef;
-  glyphQuad: TextQuad;
+  glyphQuad: Quad;
   advance: 1 | -1;
   rect: Rect;
 }

@@ -14,20 +14,20 @@ const box = (left: number, bottom: number, right: number, top: number): PdfRect 
   top,
 });
 
-/** Axis-aligned quad in the frame-geometric slot order (US, UE, LS, LE). */
+/** Axis-aligned quad over a box. */
 const quadOf = (left: number, bottom: number, right: number, top: number): PdfQuad => ({
-  p1: { x: left, y: top },
-  p2: { x: right, y: top },
-  p3: { x: left, y: bottom },
-  p4: { x: right, y: bottom },
+  upperLeft: { x: left, y: top },
+  upperRight: { x: right, y: top },
+  lowerLeft: { x: left, y: bottom },
+  lowerRight: { x: right, y: bottom },
 });
 
 /** Quad of the b×h cell at `origin`, rotated 90° CCW (baseline along +y). */
 const rotatedQuad = (x: number, y: number, w: number, h: number): PdfQuad => ({
-  p1: { x: x + h, y: y }, // upper-start
-  p2: { x: x + h, y: y + w }, // upper-end
-  p3: { x: x, y: y }, // lower-start
-  p4: { x: x, y: y + w }, // lower-end
+  upperLeft: { x: x + h, y: y },
+  upperRight: { x: x + h, y: y + w },
+  lowerLeft: { x: x, y: y },
+  lowerRight: { x: x, y: y + w },
 });
 
 const upright = (
@@ -153,7 +153,12 @@ describe('buildRunsFromRawGlyphs', () => {
     expect(run.glyphs[0].loose).toEqual(q1);
     expect(run.glyphs[0].tight).toEqual(rotatedQuad(51, 101, 8, 12));
     expect(run.glyphs[1]).toEqual({
-      loose: { p1: { x: 0, y: 0 }, p2: { x: 0, y: 0 }, p3: { x: 0, y: 0 }, p4: { x: 0, y: 0 } },
+      loose: {
+        upperLeft: { x: 0, y: 0 },
+        upperRight: { x: 0, y: 0 },
+        lowerLeft: { x: 0, y: 0 },
+        lowerRight: { x: 0, y: 0 },
+      },
       empty: true,
     });
     // Page-space AABB over the real glyphs' cells (the first glyph is real,

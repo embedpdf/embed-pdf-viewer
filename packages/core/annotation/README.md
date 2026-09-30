@@ -31,13 +31,18 @@ Consequences worth knowing:
 - A message that changes no record returns `EMPTY_CHANGE`, and a pointer move
   during a drag changes only the session (the gesture's `draft`), so it costs
   one comparison.
-- Records the core creates get the id `new:<n>` from the session's `seq`. When
-  the engine confirms one under its real key, the plugin sends `rekey` so the
-  selection, hover and text editing follow it; when records leave the view, it
-  sends `forget`.
-- The core decides _how_ an edit renders (`source: 'vector'` once a resize or
-  restyle makes the engine's raster stale; a move keeps the raster), never
-  _whether_ the engine's re-baked raster changed: that is the engine's answer.
+- A record the core creates is keyed by the `nm` ref it is written under
+  (`<namePrefix><n>`, counted by the session's `seq`) and marked `unconfirmed`.
+  When the engine confirms it under its real key, the plugin sends `rekey` so
+  the selection, hover and text editing follow it; when records leave the
+  view, it sends `forget`.
+- How a record is drawn after a change is one rule, in `src/appearance.ts`,
+  for gestures, sidebar edits and code edits alike: a move keeps the raster
+  and moves it, any other visible change draws live, and stamps and form
+  widgets always show their raster. It asks the engine's own verdict
+  (`appearanceChangeOf`), so the view keeps an appearance exactly where the
+  engine does. Whether the engine's re-baked raster changed is the engine's
+  answer, never the core's.
 
 ## Where each message is handled
 
@@ -54,7 +59,7 @@ entry and the message switch.
 | `draw-distance.ts`   | the distance measurement gesture                                           |
 | `text-markup.ts`     | `createMarkup`, `createCaret`, `createReplaceText`, the markup preview     |
 | `create.ts`          | `createAnnot`: creation from the API                                       |
-| `selection-edits.ts` | `setProps`, `setFlags`, `rotate90`, `resetRotation`, `delete`              |
+| `selection-edits.ts` | `setProps`, `setFlags`, `rotateSelection`, `resetRotation`, `delete`       |
 | `text.ts`            | `setText`, `setRichText`                                                   |
 | `session.ts`         | the initial session, tool defaults, `rekey`, `forget`                      |
 | `changes.ts`         | what every record-changing transition shares                               |

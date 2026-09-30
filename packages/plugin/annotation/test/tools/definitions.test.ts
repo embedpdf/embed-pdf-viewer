@@ -16,7 +16,7 @@ describe('annotation tool registry', () => {
       id: 'replace-text',
       subtype: 'strikeout',
       preset: 'replace-text',
-      propsKind: 'strikeout',
+      fieldsKind: 'strikeout',
       selection: { kind: 'text-edit', operation: 'replace' },
       defaults: { color: '#ef4444' },
     });
@@ -34,8 +34,12 @@ describe('annotation tool registry', () => {
     const tool = buildToolRegistry().get('ink-highlight');
     expect(tool).toMatchObject({
       subtype: 'ink',
-      intent: 'ink-highlight',
-      defaults: { color: '#ffcd45', strokeWidth: 14, blendMode: 'multiply' },
+      defaults: {
+        intent: 'ink-highlight',
+        color: '#ffcd45',
+        strokeWidth: 14,
+        blendMode: 'multiply',
+      },
       ink: {
         groupStrokesMs: 800,
         straighten: { deviationThreshold: 0.15, axisSnapDegrees: 15 },

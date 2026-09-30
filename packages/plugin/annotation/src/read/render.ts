@@ -1,12 +1,15 @@
 import { CONTINUOUS_RENDER_POLICY, snapAppearanceScale } from '@embedpdf/core';
 import {
-  defaultsFor,
+  groupOf,
   isSubstrateOnly,
-  pageItems as corePageItems,
-  styleFromProps,
-  viewable,
   type Model,
+  pageItems as corePageItems,
+  refOf,
   type RenderItem,
+  shapeOf,
+  styleOf,
+  toolAnnotation,
+  viewable,
   type ViewEnv,
 } from '@embedpdf/core-annotation';
 import type { PageRef } from '@embedpdf/engine-core/runtime';
@@ -53,7 +56,7 @@ export function createRenderReads(
     // every draft preview (image ghosts blit through the framework instead).
     if (ghost && ghost.page.objectNumber === pageObjectNumber && ghost.kind === 'vector') {
       const tool = tools.get(ghost.toolId);
-      const style = styleFromProps(defaultsFor(model, tool?.preset ?? ghost.toolId));
+      const style = styleOf(toolAnnotation(model, tool?.subtype ?? ghost.toolId, tool?.preset));
       items.push({
         id: 'tool-ghost',
         ref: null,
@@ -110,31 +113,31 @@ export function createRenderReads(
     if (cached && cached.model === model) return cached.v;
     const items: LinkNavItem[] = [];
     for (const id of model.order) {
-      const annotation = model.byId[id];
+      const record = model.byId[id];
+      const annotation = record?.annotation;
       if (
         !annotation ||
         annotation.page.objectNumber !== pageObjectNumber ||
         annotation.subtype !== 'link'
       )
         continue;
-      if (!viewable(annotation.flags, false)) continue; // hidden links don't navigate
-      // Standalone links carry their own model `link` (/A); attached children
-      // carry the target on their DTO. Rects are the child's own committed
-      // geometry — anchors render only in view contexts, where nothing is
-      // mid-gesture, so no live parent-derivation is needed.
-      const target =
-        annotation.link ??
-        (annotation.data?.subtype === 'link' ? (annotation.data.target ?? null) : null);
-      if (target == null || annotation.geometry.kind !== 'rect') continue;
-      const activate = annotation.data?.actions?.activate;
-      const ref = annotation.ref ?? annotation.data?.ref ?? undefined;
-      const hoverEnter = Boolean(annotation.data?.actions?.cursorEnter?.root);
-      const hoverExit = Boolean(annotation.data?.actions?.cursorExit?.root);
+      if (!viewable(annotation, false)) continue; // hidden links don't navigate
+      // A standalone link and an attached child both carry their own target.
+      // Rects are the link's own committed geometry — anchors render only in
+      // view contexts, where nothing is mid-gesture, so no live
+      // parent-derivation is needed.
+      const target = annotation.target ?? null;
+      const geometry = shapeOf(annotation);
+      if (target == null || geometry.kind !== 'box') continue;
+      const activate = annotation.actions?.activate;
+      const ref = refOf(record) ?? undefined;
+      const hoverEnter = Boolean(annotation.actions?.cursorEnter?.root);
+      const hoverExit = Boolean(annotation.actions?.cursorExit?.root);
       items.push({
         id,
-        bounds: annotation.geometry.rect,
+        bounds: geometry.box,
         target,
-        attached: annotation.group !== undefined,
+        attached: groupOf(annotation) !== undefined,
         ...(activate ? { activate } : {}),
         ...(ref ? { ref } : {}),
         ...(hoverEnter || hoverExit ? { hoverEvents: { enter: hoverEnter, exit: hoverExit } } : {}),
@@ -161,18 +164,18 @@ export function createRenderReads(
       const model = pageModel(pageObjectNumber);
       const parts: string[] = [];
       for (const id of model.order) {
-        const annotation = model.byId[id];
+        const record = model.byId[id];
         if (
-          !annotation ||
-          annotation.page.objectNumber !== pageObjectNumber ||
-          annotation.source !== 'baked' ||
-          !annotation.ref
+          !record ||
+          record.annotation.page.objectNumber !== pageObjectNumber ||
+          record.source !== 'baked' ||
+          !refOf(record)
         )
           continue;
         // Conversation-plane annotations never paint — a remote reply or
         // status change must not churn the page's raster cache key.
-        if (isSubstrateOnly(annotation)) continue;
-        parts.push(`${id}@${annotation.apVersion ?? 0}`);
+        if (isSubstrateOnly(record)) continue;
+        parts.push(`${id}@${record.apVersion ?? 0}`);
       }
       return parts.sort().join('|');
     },

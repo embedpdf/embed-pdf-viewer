@@ -11,8 +11,8 @@
  * that structural: these tools enable `form-place`, never `annotation-draw`,
  * so the annotation draw handler can't wake up for them.
  */
-import type { FormFieldFamily } from '@embedpdf/engine-core/runtime';
-import type { AnnotationPropsPatch, ClickCreate } from '@embedpdf/plugin-annotation/contract';
+import type { FormFieldFamily, WidgetAppearance } from '@embedpdf/engine-core/runtime';
+import type { ClickCreate } from '@embedpdf/plugin-annotation/contract';
 
 /** The families the palette can author (push buttons are not authorable). */
 export type AuthorableFormFamily = Exclude<FormFieldFamily, 'pushbutton' | 'unknown'>;
@@ -26,16 +26,17 @@ export interface FormToolDef {
   visualKind: 'widget-text' | 'widget-choice' | 'widget-toggle' | 'widget-box';
   /** What a bare click places (box policies only — fields are boxes). */
   clickCreate: Extract<ClickCreate, { width: number }>;
-  /** Seed drawing defaults: a placed field is visible (white box, gray
-   *  border) and restylable per tool through the shared style panel. */
-  defaults: AnnotationPropsPatch;
+  /** Seed drawing defaults, the widget's appearance fields: a placed field is
+   *  visible (white box, gray border) and restylable per tool through the
+   *  shared style panel. */
+  defaults: WidgetAppearance;
   cursor: string;
 }
 
 /** Palette tools keep widgets editable right after placement. */
 export const PLACE_TAGS = ['form-place', 'annotation-edit'] as const;
 
-const FIELD_CHROME: AnnotationPropsPatch = {
+const FIELD_CHROME: WidgetAppearance = {
   interiorColor: '#ffffff',
   color: '#6b7280',
   strokeWidth: 1,

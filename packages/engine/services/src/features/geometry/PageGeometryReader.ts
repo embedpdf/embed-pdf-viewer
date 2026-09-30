@@ -338,7 +338,12 @@ function runBounds(
 const ZERO_RECT: PdfRect = { left: 0, bottom: 0, right: 0, top: 0 };
 
 function zeroQuad(): PdfQuad {
-  return { p1: { x: 0, y: 0 }, p2: { x: 0, y: 0 }, p3: { x: 0, y: 0 }, p4: { x: 0, y: 0 } };
+  return {
+    upperLeft: { x: 0, y: 0 },
+    upperRight: { x: 0, y: 0 },
+    lowerLeft: { x: 0, y: 0 },
+    lowerRight: { x: 0, y: 0 },
+  };
 }
 
 function emptyRawGlyph(): Omit<RawGeometryGlyphRecord, 'objectKey' | 'fontSize'> {
@@ -354,9 +359,9 @@ function emptyRawGlyph(): Omit<RawGeometryGlyphRecord, 'objectKey' | 'fontSize'>
 function readQuad(mem: PdfRuntimeMemory, ptr: Ptr, byteOffset: number): PdfQuad {
   const f = (offset: number) => readF32(mem, ptr, byteOffset + offset);
   return {
-    p1: { x: f(0), y: f(4) },
-    p2: { x: f(8), y: f(12) },
-    p3: { x: f(16), y: f(20) },
-    p4: { x: f(24), y: f(28) },
+    upperLeft: { x: f(0), y: f(4) },
+    upperRight: { x: f(8), y: f(12) },
+    lowerLeft: { x: f(16), y: f(20) },
+    lowerRight: { x: f(24), y: f(28) },
   };
 }

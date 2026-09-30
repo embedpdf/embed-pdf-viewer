@@ -18,7 +18,7 @@ export * from '@embedpdf/plugin-selection';
 export { copySelection } from '@embedpdf/web';
 import * as React from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { textQuadEquals } from '@embedpdf/core-geometry';
+import { quadEquals } from '@embedpdf/core-geometry';
 import type { CapabilityToken, EventHook, PageRef } from '@embedpdf/core';
 import {
   HANDLE_BAR,
@@ -95,10 +95,10 @@ export function SelectionLayer({ color = 'rgba(33, 150, 243, 0.35)' }: Selection
         // rotation). An affine map, so mapping the four corners is exact —
         // upright segments render pixel-identical to the old div-per-rect.
         const ring = [
-          segment.quad.upperStart,
-          segment.quad.upperEnd,
-          segment.quad.lowerEnd,
-          segment.quad.lowerStart,
+          segment.quad.upperLeft,
+          segment.quad.upperRight,
+          segment.quad.lowerRight,
+          segment.quad.lowerLeft,
         ].map((point) => page.transform.toPixels(point));
         return (
           <polygon
@@ -225,8 +225,8 @@ const sameEndpoints = (left: Endpoints | null, right: Endpoints | null): boolean
     left.end.advance === right.end.advance &&
     // corner-wise, so a boundary that rotates without moving its bounding box
     // still re-renders (an AABB comparison would call that "unchanged")
-    textQuadEquals(left.start.glyphQuad, right.start.glyphQuad) &&
-    textQuadEquals(left.end.glyphQuad, right.end.glyphQuad)
+    quadEquals(left.start.glyphQuad, right.start.glyphQuad) &&
+    quadEquals(left.end.glyphQuad, right.end.glyphQuad)
   );
 };
 

@@ -29,14 +29,14 @@ export interface PageBox {
 }
 
 /**
- * Four points in page space, in the order the file gives them. Like
- * `PdfQuad`, it promises no corner meaning: the slots are positional.
+ * A quad in page space, with `PdfQuad`'s corner names. The names belong to
+ * the text's frame, so the flip to page space keeps them.
  */
 export interface PageQuad {
-  p1: PagePoint;
-  p2: PagePoint;
-  p3: PagePoint;
-  p4: PagePoint;
+  upperLeft: PagePoint;
+  upperRight: PagePoint;
+  lowerLeft: PagePoint;
+  lowerRight: PagePoint;
 }
 
 /** A point in the file's coordinates, in page space. `visible` is the page's visible box. */
@@ -68,19 +68,19 @@ export function pdfRectOf(box: PageBox, visible: PdfRect): PdfRect {
 
 export function pageQuadOf(quad: PdfQuad, visible: PdfRect): PageQuad {
   return {
-    p1: pagePointOf(quad.p1, visible),
-    p2: pagePointOf(quad.p2, visible),
-    p3: pagePointOf(quad.p3, visible),
-    p4: pagePointOf(quad.p4, visible),
+    upperLeft: pagePointOf(quad.upperLeft, visible),
+    upperRight: pagePointOf(quad.upperRight, visible),
+    lowerLeft: pagePointOf(quad.lowerLeft, visible),
+    lowerRight: pagePointOf(quad.lowerRight, visible),
   };
 }
 
 export function pdfQuadOf(quad: PageQuad, visible: PdfRect): PdfQuad {
   return {
-    p1: pdfPointOf(quad.p1, visible),
-    p2: pdfPointOf(quad.p2, visible),
-    p3: pdfPointOf(quad.p3, visible),
-    p4: pdfPointOf(quad.p4, visible),
+    upperLeft: pdfPointOf(quad.upperLeft, visible),
+    upperRight: pdfPointOf(quad.upperRight, visible),
+    lowerLeft: pdfPointOf(quad.lowerLeft, visible),
+    lowerRight: pdfPointOf(quad.lowerRight, visible),
   };
 }
 
@@ -117,15 +117,15 @@ export const unmirroredBox = (rect: PdfRect): PageBox => ({
 });
 
 export const mirroredQuad = (quad: PageQuad): PdfQuad => ({
-  p1: mirroredPoint(quad.p1),
-  p2: mirroredPoint(quad.p2),
-  p3: mirroredPoint(quad.p3),
-  p4: mirroredPoint(quad.p4),
+  upperLeft: mirroredPoint(quad.upperLeft),
+  upperRight: mirroredPoint(quad.upperRight),
+  lowerLeft: mirroredPoint(quad.lowerLeft),
+  lowerRight: mirroredPoint(quad.lowerRight),
 });
 
 export const unmirroredQuad = (quad: PdfQuad): PageQuad => ({
-  p1: unmirroredPoint(quad.p1),
-  p2: unmirroredPoint(quad.p2),
-  p3: unmirroredPoint(quad.p3),
-  p4: unmirroredPoint(quad.p4),
+  upperLeft: unmirroredPoint(quad.upperLeft),
+  upperRight: unmirroredPoint(quad.upperRight),
+  lowerLeft: unmirroredPoint(quad.lowerLeft),
+  lowerRight: unmirroredPoint(quad.lowerRight),
 });

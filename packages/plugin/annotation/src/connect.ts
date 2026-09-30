@@ -51,7 +51,7 @@ export function connectAnnotation(
         touchDirect: isTouchDirect(tool.enables),
       }),
     );
-    if (tool.defaults) annotation.setToolDefaults(tool.id, tool.defaults);
+    if (tool.defaults) annotation.updateToolDefaults(tool.id, tool.defaults);
   }
 
   for (const handler of [

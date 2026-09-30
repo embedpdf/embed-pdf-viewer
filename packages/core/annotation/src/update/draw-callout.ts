@@ -1,20 +1,14 @@
 /** Drawing a free-text callout: the tip, the elbow, then the text box it points from. */
 import type { AnnotationFlags } from '@embedpdf/engine-core/runtime';
 
-import { DRAWN_FLAGS } from '../flags';
-import {
-  rectFromPoints,
-  rotatedAabb,
-  transposedAboutCenter,
-  uprightAnchoredRect,
-  uprightRotation,
-} from '../geometry';
+import { transposedAboutCenter, uprightAnchoredRect, uprightRotation } from '../geometry';
+import { rectFromPoints, rotatedAabb } from '../rect';
 import { clampRectToBox } from '../placement';
-import { styleFromProps, textStyleFromProps } from '../props';
-import type { Draft, Effect, Model, ModelAnnotation, Point, PointerInput, Rect } from '../types';
-import { newRecordId } from './changes';
+import { calloutShape } from '../shapes/text-box';
+import type { Draft, Effect, Model, Point, PointerInput, Rect } from '../types';
+import { draftOf, newRecord } from './changes';
 import { MIN_DRAG } from './draw';
-import { defaultsFor } from './session';
+import { defaultsFor, toolAnnotation } from './session';
 
 /** Default text-box size for a callout placed with a click (no box drag). */
 const CALLOUT_BOX = { width: 150, height: 40 };
@@ -82,8 +76,8 @@ function slideCalloutFootprint(rect: Rect, rot: number, page: Rect | undefined):
  *   hover/move      → preview the leader to the cursor
  *   click 2 (down)  → set the `knee`, advance to the `box` step
  *   drag/click (up) → lay the text box (dragged, or a default box on a click)
- * Commit creates a `free-text` annotation with a `callout` geom and opens it for
- * editing — the connection point to the box is always derived, never stored.
+ * Commit creates a `free-text` callout and opens it for editing; the line's
+ * end is where it meets the box (`calloutShape`).
  */
 export function calloutPointer(
   model: Model,
@@ -142,35 +136,32 @@ export function calloutPointer(
   // The upright counter-rotation applies to the text box only (about its own
   // centre) — the leader tip/knee are page-space anchors and never turn.
   const rot = calloutUprightRot(draft);
-  const definition = defaultsFor(model, draft.preset ?? 'free-text-callout');
-  const ending = definition.lineEndings.end !== 'none' ? definition.lineEndings.end : 'open-arrow';
-  const id = newRecordId(model);
-  const annotation: ModelAnnotation = {
-    id,
-    ref: null,
-    page: draft.page,
-    subtype: 'free-text',
-    geometry: {
-      kind: 'text',
-      rect,
-      callout: { tip: draft.tip, knee: draft.knee, ending },
-      ...(rot ? { rot } : {}),
-    },
-    style: styleFromProps(definition),
-    text: textStyleFromProps(definition),
-    flags: { ...DRAWN_FLAGS, ...draft.flags },
-    source: 'vector',
-  };
+  const tool = toolAnnotation(model, 'free-text-callout', draft.preset);
+  // The tool's arrow at the tip; a callout without one gets an open arrow.
+  const toolEnding = tool.subtype === 'free-text' ? tool.lineEnding : null;
+  const ending = toolEnding && toolEnding !== 'none' ? toolEnding : 'open-arrow';
+  const created = newRecord(
+    model,
+    draft.page,
+    draftOf(
+      'free-text-callout',
+      defaultsFor(model, draft.preset ?? 'free-text-callout'),
+      calloutShape(rect, rot, draft.tip, draft.knee, ending),
+      { intent: 'free-text-callout', contents: '' },
+      draft.flags,
+    ),
+  );
+  const id = created.record.id;
   return [
     {
       ...model,
       seq: model.seq + 1,
-      byId: { ...model.byId, [id]: annotation },
+      byId: { ...model.byId, [id]: created.record },
       order: [...model.order, id],
       selected: [id],
       draft: null,
       editing: id,
     },
-    [{ type: 'create', id }],
+    [{ type: 'create', id, draft: created.draft }],
   ];
 }

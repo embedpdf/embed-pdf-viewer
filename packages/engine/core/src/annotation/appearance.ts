@@ -1,5 +1,5 @@
 import type { AnnotationDTO, AnnotationPatch } from './kinds';
-import type { PdfCoordinates } from '../pageSpace/coordinates';
+import type { Coordinates, PdfCoordinates } from '../pageSpace/coordinates';
 
 /**
  * Appearance-impact classification: the shared, pure decision for whether an
@@ -19,6 +19,9 @@ import type { PdfCoordinates } from '../pageSpace/coordinates';
  * the DTO vocabulary, produced by the same readers), so value-diffing drops
  * no-op keys even from clients that send full-object patches. Unknown keys
  * and unknown subtypes classify as `regenerate` — conservative by default.
+ * It reads positions by their axis names only (`x`/`left`/`right`,
+ * `y`/`bottom`/`top`), so it classifies the file's values and page-space
+ * values alike: a viewer asks the same question the engine does.
  */
 export type AppearanceImpact =
   /** Nothing appearance-affecting changed value — never touch `/AP`. */
@@ -27,6 +30,15 @@ export type AppearanceImpact =
   | 'translation'
   /** A semantic appearance edit — the owner re-bakes `/AP`. */
   | 'regenerate';
+
+/**
+ * An update's appearance impact, with the distance a `translation` moves the
+ * drawing by, in the coordinates of the values classified.
+ */
+export type AppearanceChange =
+  | { readonly impact: 'inert' }
+  | { readonly impact: 'translation'; readonly by: { readonly x: number; readonly y: number } }
+  | { readonly impact: 'regenerate' };
 
 /** What actually happened to `/AP` during an update (the engine's echo). */
 export type AppearanceAction = 'preserved' | 'regenerated' | 'generation-unavailable';
@@ -229,28 +241,29 @@ function firstPoint(value: unknown): { x: number; y: number } | undefined {
   if (typeof record.left === 'number' && typeof record.bottom === 'number') {
     return { x: record.left, y: record.bottom };
   }
-  return firstPoint(record.start ?? record.p1);
+  return firstPoint(record.start ?? record.upperLeft);
 }
 
 /**
- * Verify the touched geometry is one rigid translation of the current state.
- * Requires the kind's first geometry field in the patch; it and every other
- * geometry field present on the annotation must ride along shifted by the
- * same delta — a box resized, or a leader left behind by a moved text box, is
- * not a translation (the dictionary would desync from the pixels). For the
- * kinds that turn, the turn is checked as an after-state: an omitted rotation
- * keeps the current one.
+ * The distance the touched geometry moves by, when it is one rigid
+ * translation of the current state; `null` when it isn't. Requires the kind's
+ * first geometry field in the patch; it and every other geometry field
+ * present on the annotation must ride along shifted by the same delta — a box
+ * resized, or a leader left behind by a moved text box, is not a translation
+ * (the dictionary would desync from the pixels). For the kinds that turn, the
+ * turn is checked as an after-state: an omitted rotation keeps the current
+ * one.
  */
-function isRigidTranslation(
+function rigidTranslationOf(
   cur: Record<string, unknown>,
   pat: Record<string, unknown>,
   subtype: string,
   geometryKeys: readonly string[],
-): boolean {
+): { x: number; y: number } | null {
   const [anchor] = geometryKeys;
   const from = firstPoint(cur[anchor!]);
   const to = firstPoint(pat[anchor!]);
-  if (!from || !to) return false;
+  if (!from || !to) return null;
   const dx = to.x - from.x;
   const dy = to.y - from.y;
 
@@ -258,35 +271,39 @@ function isRigidTranslation(
     // Tri-state writes: an omitted rotation preserves the current one; `null`
     // clears (≡ 0). Compare the resulting after-state.
     const rotAfter = pat.rotation === undefined ? cur.rotation : pat.rotation;
-    if (!numEq(normDeg(cur.rotation), normDeg(rotAfter))) return false;
+    if (!numEq(normDeg(cur.rotation), normDeg(rotAfter))) return null;
   }
 
   for (const key of geometryKeys) {
     const c = cur[key];
     const p = pat[key];
     if (c == null && p == null) continue; // absent on both — nothing to shift
-    if (c == null || p == null) return false; // geometry appearing/vanishing
-    if (!shiftedBy(c, p, dx, dy)) return false;
+    if (c == null || p == null) return null; // geometry appearing/vanishing
+    if (!shiftedBy(c, p, dx, dy)) return null;
   }
-  return true;
+  return { x: dx, y: dy };
 }
 
+const INERT: AppearanceChange = { impact: 'inert' };
+const REGENERATE: AppearanceChange = { impact: 'regenerate' };
+
 /**
- * Classify an update patch against the annotation's current DTO.
+ * Classify an update patch against the annotation's current read, in either
+ * space, with the distance a translation moves the drawing by.
  *
  * 1. Value-diff: drop keys whose value semantically equals the current one,
  *    plus the always-inert metadata keys (and per-kind inert keys: `contents`
  *    where it isn't painted).
  *    Nothing left → `'inert'`.
  * 2. If every remaining key is translatable geometry for this kind and the
- *    values are one rigid translation → `'translation'`.
+ *    values are one rigid translation → `'translation'`, by how far.
  * 3. Anything else — style, text, unknown keys, unknown kinds → `'regenerate'`.
  */
-export function appearanceImpactOf(
-  current: AnnotationDTO<PdfCoordinates>,
-  patch: AnnotationPatch<PdfCoordinates>,
-): AppearanceImpact {
-  if (patch.subtype !== undefined && patch.subtype !== current.subtype) return 'regenerate';
+export function appearanceChangeOf<C extends Coordinates>(
+  current: AnnotationDTO<C>,
+  patch: AnnotationPatch<C>,
+): AppearanceChange {
+  if (patch.subtype !== undefined && patch.subtype !== current.subtype) return REGENERATE;
 
   const cur = current as unknown as Record<string, unknown>;
   const pat = patch as unknown as Record<string, unknown>;
@@ -302,7 +319,7 @@ export function appearanceImpactOf(
     if (key === 'contents' && !contentsPainted) continue;
     if (!semanticEqual(value, cur[key])) touched.push(key);
   }
-  if (touched.length === 0) return 'inert';
+  if (touched.length === 0) return INERT;
 
   const baseGeometryKeys = TRANSLATABLE_GEOMETRY[subtype];
   // A manual shape caption is page-space geometry and must ride with a rigid
@@ -311,7 +328,16 @@ export function appearanceImpactOf(
     baseGeometryKeys && (subtype === 'polygon' || subtype === 'polyline') && cur.captionCenter
       ? [...baseGeometryKeys, 'captionCenter']
       : baseGeometryKeys;
-  if (!geometryKeys) return 'regenerate';
-  if (!touched.every((k) => geometryKeys.includes(k))) return 'regenerate';
-  return isRigidTranslation(cur, pat, subtype, geometryKeys) ? 'translation' : 'regenerate';
+  if (!geometryKeys) return REGENERATE;
+  if (!touched.every((k) => geometryKeys.includes(k))) return REGENERATE;
+  const by = rigidTranslationOf(cur, pat, subtype, geometryKeys);
+  return by ? { impact: 'translation', by } : REGENERATE;
+}
+
+/** {@link appearanceChangeOf}'s verdict alone, on the file's values: what the engine's update decides. */
+export function appearanceImpactOf(
+  current: AnnotationDTO<PdfCoordinates>,
+  patch: AnnotationPatch<PdfCoordinates>,
+): AppearanceImpact {
+  return appearanceChangeOf(current, patch).impact;
 }

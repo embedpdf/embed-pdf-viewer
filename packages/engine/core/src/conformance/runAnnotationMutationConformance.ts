@@ -88,10 +88,10 @@ export interface AnnotationMutationConformanceOptions extends Omit<ConformanceOp
 /** Its top corners first, as a text selection's quads are. */
 const DEFAULT_QUAD: HighlightDraft['quadPoints'] = [
   {
-    p1: { x: 50, y: 100 },
-    p2: { x: 150, y: 100 },
-    p3: { x: 50, y: 120 },
-    p4: { x: 150, y: 120 },
+    upperLeft: { x: 50, y: 100 },
+    upperRight: { x: 150, y: 100 },
+    lowerLeft: { x: 50, y: 120 },
+    lowerRight: { x: 150, y: 120 },
   },
 ];
 
@@ -839,9 +839,9 @@ export function runAnnotationMutationConformance(
         if (movedHighlight.annotation.subtype !== 'highlight')
           throw new Error('expected a highlight');
         expectRect(movedHighlight.annotation.rect, highlightTo);
-        expectPoint(movedHighlight.annotation.quadPoints[0]!.p1, {
-          x: quad[0]!.p1.x + 10,
-          y: quad[0]!.p1.y + 15,
+        expectPoint(movedHighlight.annotation.quadPoints[0]!.upperLeft, {
+          x: quad[0]!.upperLeft.x + 10,
+          y: quad[0]!.upperLeft.y + 15,
         });
 
         // A turned drawing only moves.

@@ -8,7 +8,7 @@ import type {
   TextLayout,
 } from '@embedpdf/engine-core/runtime';
 import { createTextLayout, pageGeometryOf } from '@embedpdf/engine-core/runtime';
-import { selectionSegmentOf, type SelectionSegment } from '../src/geometry';
+import type { SelectionSegment } from '../src/geometry';
 
 const crop: PdfRect = { left: 0, bottom: 0, right: 200, top: 100 };
 
@@ -17,7 +17,7 @@ const crop: PdfRect = { left: 0, bottom: 0, right: 200, top: 100 };
 const layoutOf = (snapshot: PageGeometrySnapshot<PdfCoordinates>): TextLayout =>
   createTextLayout(pageGeometryOf(snapshot, crop));
 const segmentsOf = (layout: TextLayout, from: number, to: number): SelectionSegment[] =>
-  layout.segments({ start: from, count: to - from + 1 }).map(selectionSegmentOf);
+  layout.segments({ start: from, count: to - from + 1 });
 
 // y-up glyph box helper.
 const glyph = (
@@ -102,14 +102,14 @@ describe('selection geometry', () => {
 // ── oriented text ──────────────────────────────────────────────────────────
 
 // One glyph cell of a column rotated 90° counter-clockwise: the baseline runs
-// +y (up the page), ascent points −x. Frame-geometric slots: p1 upper-start,
-// p2 upper-end, p3 lower-start, p4 lower-end.
+// +y (up the page), ascent points −x, so the upper edge is on the page's left
+// and the cell's left end at the bottom.
 const columnGlyph = (yBottom: number, yTop: number): RotatedGeometryGlyph<PdfCoordinates> => ({
   loose: {
-    p1: { x: 88, y: yBottom }, // upper-start (ascent side, baseline start)
-    p2: { x: 88, y: yTop }, // upper-end
-    p3: { x: 100, y: yBottom }, // lower-start (baseline side)
-    p4: { x: 100, y: yTop }, // lower-end
+    upperLeft: { x: 88, y: yBottom },
+    upperRight: { x: 88, y: yTop },
+    lowerLeft: { x: 100, y: yBottom },
+    lowerRight: { x: 100, y: yTop },
   },
 });
 
@@ -141,12 +141,12 @@ describe('oriented selection', () => {
     const { quad, rect, advance } = segments[0];
     // Page space (y-down, crop top=100): the column occupies x 88..100,
     // y 56..80, reading bottom-of-screen → top-of-screen.
-    expect(quad.upperStart.x).toBeCloseTo(88);
-    expect(quad.upperStart.y).toBeCloseTo(80);
-    expect(quad.upperEnd.x).toBeCloseTo(88);
-    expect(quad.upperEnd.y).toBeCloseTo(56);
-    expect(quad.lowerStart.x).toBeCloseTo(100);
-    expect(quad.lowerStart.y).toBeCloseTo(80);
+    expect(quad.upperLeft.x).toBeCloseTo(88);
+    expect(quad.upperLeft.y).toBeCloseTo(80);
+    expect(quad.upperRight.x).toBeCloseTo(88);
+    expect(quad.upperRight.y).toBeCloseTo(56);
+    expect(quad.lowerLeft.x).toBeCloseTo(100);
+    expect(quad.lowerLeft.y).toBeCloseTo(80);
     expect(rect.x).toBeCloseTo(88);
     expect(rect.y).toBeCloseTo(56);
     expect(rect.width).toBeCloseTo(12);

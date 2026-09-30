@@ -1,9 +1,8 @@
-import { annotContentsEditable } from '@embedpdf/core-annotation';
+import { annotContentsEditable, refOf } from '@embedpdf/core-annotation';
 import {
   annotationKey,
   isDimension,
   toPageRef,
-  type AnnotationDTO,
   type AnnotationDraft,
   type AnnotationPatch,
   type AnnotationRef,
@@ -14,10 +13,10 @@ import type { CommentPermissions, CommentsApi, ThreadDeleteResult } from '../con
 import type { AnnotationContext, AnnotationServices } from '../services';
 import type { ThreadIndex } from './threads';
 import type { Crud } from '../write/crud';
-import { named } from '../write/named';
+import { appliedOrThrow, appliedRefOf } from '../write/outcomes';
 
-// Screen-anchored like a sticky note; `print` for Acrobat parity.
-const REPLY_FLAGS = { print: true, noZoom: true, noRotate: true };
+// Screen-anchored like a sticky note (it prints by the engine's default).
+const REPLY_FLAGS = { noZoom: true, noRotate: true };
 // Status annotations are metadata: hidden everywhere (our paint plane
 // culls them regardless; `hidden` keeps foreign viewers from drawing an
 // icon).
@@ -35,19 +34,17 @@ export function createComments(
   ctx: Pick<AnnotationContext, 'doc'>,
   { store, authority, events }: Pick<AnnotationServices, 'store' | 'authority' | 'events'>,
   threads: ThreadIndex,
-  crud: Pick<Crud, 'updateRaw'>,
+  crud: Pick<Crud, 'update'>,
 ) {
-  /** Create a conversation annotation (a reply or a review state); the fold adds it to the model. */
-  const createConversationAnnot = async (
+  /** Create a conversation annotation (a reply or a review state): shown at once, then confirmed. */
+  const createConversationAnnot = (
     pageObjectNumber: number,
     draft: AnnotationDraft,
-  ): Promise<AnnotationDTO> => {
-    const result = await ctx.doc.page(toPageRef(pageObjectNumber)).annotations.create(named(draft));
-    return result.annotation;
-  };
+  ): Promise<AnnotationRef> =>
+    appliedRefOf(store.apply([{ type: 'create', page: toPageRef(pageObjectNumber), draft }]));
 
   const deleteOne = async (ref: AnnotationRef): Promise<void> => {
-    await ctx.doc.page(ref.page).annotations.delete(ref);
+    await appliedOrThrow(store.apply([{ type: 'delete', ref }]));
   };
 
   const announce = (
@@ -72,17 +69,19 @@ export function createComments(
         ...REPLY_FLAGS,
       });
       announce(root, 'reply');
-      return created.ref;
+      return created;
     },
 
     setText: async (ref, text) => {
       const root = threads.rootRefOf(ref);
-      const data = store.model().byId[annotationKey(ref)]?.data;
-      if (data && isDimension(data))
+      const record = store.model().byId[annotationKey(ref)];
+      if (record && isDimension(record.annotation))
         throw new Error('[annotation] measurement contents are derived');
-      const subtype = data?.subtype;
-      if (!subtype) throw new Error('[annotation] cannot edit an uncommitted annotation');
-      await crud.updateRaw(ref, { subtype, contents: text } as AnnotationPatch);
+      if (!refOf(record)) throw new Error('[annotation] cannot edit an uncommitted annotation');
+      await crud.update(ref, {
+        subtype: record.annotation.subtype,
+        contents: text,
+      } as AnnotationPatch);
       announce(root, 'text');
     },
 
@@ -158,12 +157,8 @@ export function createComments(
         canReply: authority.canCreate(),
         canSetStatus: authority.canCreate(),
         canEditText: (() => {
-          const annotation = store.model().byId[annotationKey(ref)];
-          return (
-            !!annotation &&
-            !(annotation.data && isDimension(annotation.data)) &&
-            annotContentsEditable(annotation)
-          );
+          const record = store.model().byId[annotationKey(ref)];
+          return !!record && !isDimension(record.annotation) && annotContentsEditable(record);
         })(),
         canDelete: authority.canDelete(ref),
         canDeleteThread: thread !== null && threads.memberRefsOf(thread).every(authority.canDelete),

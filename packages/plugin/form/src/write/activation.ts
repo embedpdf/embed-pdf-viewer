@@ -42,7 +42,7 @@ export function createActivation(
   const surfaceViaActions = services.scripting.surface;
 
   const annotationActivation = async (ref: AnnotationRef) => {
-    const loaded = annotationHost?.getRaw(ref);
+    const loaded = annotationHost?.get(ref);
     if (loaded?.subtype === 'widget') return loaded.actions?.activate ?? null;
     const { annotations } = await ctx.doc.page(ref.page).annotations.list();
     const annotation = annotations.find((candidate) => sameAnnotationRef(candidate.ref, ref));
@@ -100,7 +100,7 @@ export function createActivation(
   const widgetHoverFlags = (
     annotationRef: AnnotationRef,
   ): { enter: boolean; exit: boolean } | null => {
-    const loaded = annotationHost?.getRaw(annotationRef);
+    const loaded = annotationHost?.get(annotationRef);
     if (loaded?.subtype !== 'widget') return null;
     return {
       enter: Boolean(loaded.actions?.cursorEnter?.root),

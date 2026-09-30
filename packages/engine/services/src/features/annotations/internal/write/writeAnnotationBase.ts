@@ -1,8 +1,10 @@
-import type {
-  AnnotationDraftBase,
-  AnnotationPatchBase,
-  DateInput,
-  PdfCoordinates,
+import {
+  annotationDefaultsOf,
+  type AnnotationDraftBase,
+  type AnnotationPatchBase,
+  type AnnotationSubtype,
+  type DateInput,
+  type PdfCoordinates,
 } from '@embedpdf/engine-core/runtime';
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
 
@@ -32,7 +34,6 @@ export function applyAnnotationBaseDraft(
   mem: PdfRuntimeMemory,
   annotPtr: Ptr,
   draft: AnnotationDraftBase<PdfCoordinates>,
-  defaults: { print: boolean } = { print: true },
 ): void {
   if (draft.contents !== undefined) {
     writeAnnotStringOrClear(fn, mem, annotPtr, 'Contents', draft.contents);
@@ -43,8 +44,10 @@ export function applyAnnotationBaseDraft(
   if (draft.nm) {
     writeAnnotString(fn, mem, annotPtr, 'NM', draft.nm);
   }
-  // A new annotation prints unless the draft says otherwise, as in Acrobat.
-  const flags = flagFieldsOf({ ...draft, print: draft.print ?? defaults.print });
+  // A flag the draft leaves out is its kind's default: a new annotation
+  // prints, except a popup.
+  const subtype = (draft as { subtype?: AnnotationSubtype }).subtype;
+  const flags = flagFieldsOf({ ...(subtype ? annotationDefaultsOf(subtype) : {}), ...draft });
   if (flags) setAnnotFlags(fn, annotPtr, flags);
 }
 

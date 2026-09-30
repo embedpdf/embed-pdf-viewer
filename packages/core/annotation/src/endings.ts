@@ -10,6 +10,7 @@
  * the segment angle (into the tip) and translate it to the tip point. Sizes
  * scale with the stroke width.
  */
+import { pointInPoly, segDist } from './rect';
 import type { LineEnding, RenderNode, Point } from './types';
 
 interface EndingSpec {
@@ -160,4 +161,35 @@ export function endingNodes(
     ];
   }
   return [{ kind: 'poly', points, closed: spec.closed }];
+}
+
+/**
+ * Is the page point on a line/poly's drawn endings — so an arrowhead is as
+ * clickable as the stroke. Uses the same ending nodes the renderer draws: a closed
+ * shape (closed arrow, circle, square, diamond) hits inside or near its edge; an
+ * open one (open arrow, butt, slash) hits near its stroke. `tol` is the stroke
+ * band already widened by the hit margin.
+ */
+export function endingNodesHit(nodes: RenderNode[], point: Point, tol: number): boolean {
+  for (const node of nodes) {
+    if (node.kind === 'ellipse') {
+      const rect = node.rect;
+      const rx = rect.width / 2;
+      const ry = rect.height / 2;
+      if (rx <= 0 || ry <= 0) continue;
+      const nx = (point.x - (rect.x + rx)) / rx;
+      const ny = (point.y - (rect.y + ry)) / ry;
+      if (Math.hypot(nx, ny) <= 1 + tol / Math.min(rx, ry)) return true; // filled disc + band
+    } else if (node.kind === 'poly') {
+      const points = node.points;
+      for (let i = 0; i < points.length - 1; i++)
+        if (segDist(point, points[i], points[i + 1]) <= tol) return true;
+      if (node.closed) {
+        if (points.length > 2 && segDist(point, points[points.length - 1], points[0]) <= tol)
+          return true;
+        if (pointInPoly(point, points)) return true; // filled head interior
+      }
+    }
+  }
+  return false;
 }

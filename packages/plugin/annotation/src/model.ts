@@ -10,16 +10,24 @@
  * The view (read/view.ts) lays the pending changes over the confirmed records
  * and composes the session with them into the core's `Model`.
  *
- * A pending change holds exactly what one engine write carries (a record's
- * new flags, its new geometry, its typed text), so settling one write never
- * touches other outstanding work on the same record. A refused change is
+ * A pending edit holds the engine patch its write carries (a record's new
+ * flags, its new geometry, its typed text), beside how the record is drawn
+ * after it, so settling one write never touches other outstanding work on
+ * the same record. A refused change is
  * dropped at once: the view shows the engine's record again, never a copy
  * taken before the write. An accepted change is dropped once the confirmed
  * record holds it and every older change of that record has settled, so the
  * view never falls back to an older version of what the user did.
  */
-import { initialSession, sameSession } from '@embedpdf/core-annotation';
+import { annotationAfter, initialSession, sameSession } from '@embedpdf/core-annotation';
 import type { Id, ModelAnnotation, Session } from '@embedpdf/core-annotation';
+import {
+  annotationKey,
+  generateUuid,
+  type AnnotationDTO,
+  type AnnotationPatch,
+  type AnnotationRef,
+} from '@embedpdf/engine-core/runtime';
 
 import type { AnnotationConfig, ChromeSettings, ChromeSettingsPatch, ToolGhost } from './contract';
 import type { TextSelection } from './rich-text';
@@ -28,10 +36,39 @@ import type { TextSelection } from './rich-text';
 export type RecordChange =
   /** A record this session created, not yet confirmed. */
   | { readonly kind: 'create'; readonly record: ModelAnnotation }
-  /** New values for some of a record's fields: exactly what one write carries. */
-  | { readonly kind: 'edit'; readonly fields: Partial<ModelAnnotation> }
+  /**
+   * An edit: the engine patch its write carries (none when the engine keeps
+   * nothing of it), and how the record is drawn after it (live, or its raster
+   * moved). The view lays the patch over the record's annotation, as the
+   * engine will apply it, and the rest over the record.
+   */
+  | {
+      readonly kind: 'edit';
+      readonly patch?: AnnotationPatch;
+      readonly fields: Partial<Omit<ModelAnnotation, 'annotation'>>;
+    }
   /** The user deleted the record. */
   | { readonly kind: 'delete' };
+
+/**
+ * `record` with a pending edit laid over it: how it is drawn after the edit,
+ * and its annotation as the engine will read it back (`annotationAfter`). A
+ * patch the record no longer takes (another session changed it under the
+ * edit) is one the engine will refuse: the annotation shows as it is until
+ * that refusal drops the change.
+ */
+export function withPendingEdit(
+  record: ModelAnnotation,
+  edit: Extract<RecordChange, { kind: 'edit' }>,
+): ModelAnnotation {
+  const drawn = { ...record, ...edit.fields };
+  if (!edit.patch) return drawn;
+  try {
+    return { ...drawn, annotation: annotationAfter(record.annotation, edit.patch) };
+  } catch {
+    return drawn;
+  }
+}
 
 /** One unconfirmed change to one record, carried by one engine write. */
 export interface PendingChange {
@@ -102,7 +139,12 @@ export const mergeChrome = (base: ChromeSettings, patch: ChromeSettingsPatch): C
 
 /** The initial state; the registration config seeds the session's snapping and the chrome. */
 export const initialAnnotationState = (config: AnnotationConfig = {}): AnnotationState => ({
-  session: { ...initialSession, snap: { ...initialSession.snap, ...config.snap } },
+  session: {
+    ...initialSession,
+    // Each session names the annotations it creates apart from every other session's.
+    namePrefix: `${generateUuid()}-`,
+    snap: { ...initialSession.snap, ...config.snap },
+  },
   pending: [],
   vector: {},
   chrome: mergeChrome(DEFAULT_CHROME, config.chrome ?? {}),
@@ -112,17 +154,21 @@ export const initialAnnotationState = (config: AnnotationConfig = {}): Annotatio
 
 /* ── the session and pending changes ─────────────────────────────────────── */
 
-/** The top-level fields whose value differs between two versions of a record. */
+/**
+ * The top-level fields whose value differs between two versions of a record,
+ * its annotation aside: how it is drawn, which an edit carries beside its patch.
+ */
 export function changedFields(
   before: ModelAnnotation,
   after: ModelAnnotation,
-): Partial<ModelAnnotation> {
+): Partial<Omit<ModelAnnotation, 'annotation'>> {
   const fields: Record<string, unknown> = {};
   const keys = new Set([...Object.keys(before), ...Object.keys(after)]) as Set<
     keyof ModelAnnotation
   >;
+  keys.delete('annotation');
   for (const key of keys) if (before[key] !== after[key]) fields[key] = after[key];
-  return fields as Partial<ModelAnnotation>;
+  return fields as Partial<Omit<ModelAnnotation, 'annotation'>>;
 }
 
 /**
@@ -182,49 +228,64 @@ export function writeSettled(
   return { ...state, pending };
 }
 
+/** The `/IRT` a patch writes, if it writes one. */
+const replyOf = (patch: AnnotationPatch | undefined): { to: AnnotationRef } | null | undefined =>
+  (patch as { reply?: { to: AnnotationRef } | null } | undefined)?.reply;
+
 /**
- * A record got another key: a new record was confirmed (`new:<n>` becomes the
- * engine's key, and `ref` its engine ref), or the engine named a weak record.
+ * A record got another key: a new record was confirmed (the key of the `nm`
+ * ref it was written under becomes the engine's key, and `ref` its
+ * annotation's ref), or the engine named a weak record (`ref` its new ref).
  * Its pending changes, render preference and text range follow it, and so do
- * records that point at it. A new record's `create` change stays, under the
- * confirmed key, until its write settles: the records mirror may not hold the
- * record yet (a page read that started before the create is still running).
+ * the annotations that answer it: their `/IRT` names it by `ref`. A new
+ * record's `create` change stays, under the confirmed key, until its write
+ * settles: the records mirror may not hold the record yet (a page read that
+ * started before the create is still running).
  */
 export function followRecord(
   state: AnnotationState,
   from: Id,
   to: Id,
-  ref: ModelAnnotation['ref'],
+  ref: AnnotationRef,
 ): AnnotationState {
-  const points = (record: Partial<ModelAnnotation>) => record.irt === from || record.group === from;
-  const repoint = <T extends Partial<ModelAnnotation>>(record: T): T => ({
+  const answers = (reply: { to: AnnotationRef } | null | undefined): boolean =>
+    !!reply && annotationKey(reply.to) === from;
+  const answering = (annotation: AnnotationDTO): AnnotationDTO =>
+    annotation.reply && answers(annotation.reply)
+      ? { ...annotation, reply: { ...annotation.reply, to: ref } }
+      : annotation;
+  /** The new record `from`, confirmed: keyed `to`, its annotation under the engine's ref. */
+  const confirmed = ({ unconfirmed: _waiting, ...record }: ModelAnnotation): ModelAnnotation => ({
     ...record,
-    ...(record.irt === from ? { irt: to } : {}),
-    ...(record.group === from ? { group: to } : {}),
+    id: to,
+    annotation: { ...record.annotation, ref },
   });
   const touched = state.pending.some(
     (pending) =>
       pending.id === from ||
-      (pending.change.kind === 'create' && points(pending.change.record)) ||
-      (pending.change.kind === 'edit' && points(pending.change.fields)),
+      (pending.change.kind === 'create' && answers(pending.change.record.annotation.reply)) ||
+      (pending.change.kind === 'edit' && answers(replyOf(pending.change.patch))),
   );
   const textSelection =
     state.textSelection?.id === from ? { ...state.textSelection, id: to } : state.textSelection;
   if (!touched && !state.vector[from] && textSelection === state.textSelection) return state;
   const pending = state.pending.map((entry): PendingChange => {
     const { change } = entry;
+    const reply = change.kind === 'edit' ? replyOf(change.patch) : null;
     const followed: RecordChange =
-      change.kind === 'create' && (entry.id === from || points(change.record))
-        ? {
-            kind: 'create',
-            record: {
-              ...repoint(change.record),
-              ...(entry.id === from ? { id: to, ref: ref ?? change.record.ref } : {}),
-            },
-          }
-        : change.kind === 'edit' && points(change.fields)
-          ? { kind: 'edit', fields: repoint(change.fields) }
-          : change;
+      change.kind === 'create' && entry.id === from
+        ? { kind: 'create', record: confirmed(change.record) }
+        : change.kind === 'create' && answers(change.record.annotation.reply)
+          ? {
+              kind: 'create',
+              record: { ...change.record, annotation: answering(change.record.annotation) },
+            }
+          : change.kind === 'edit' && reply && answers(reply)
+            ? {
+                ...change,
+                patch: { ...change.patch, reply: { ...reply, to: ref } } as AnnotationPatch,
+              }
+            : change;
     const id = entry.id === from ? to : entry.id;
     return id === entry.id && followed === change ? entry : { ...entry, id, change: followed };
   });

@@ -1,6 +1,6 @@
 /** Measurement creation: a measurement annotation with the page's scale, through the annotation plugin. */
 import { PluginError } from '@embedpdf/core';
-import type { AnnotationRef } from '@embedpdf/engine-core/runtime';
+import type { AnnotationDraft, AnnotationRef } from '@embedpdf/engine-core/runtime';
 
 import type { CreateMeasurementInput, MeasurementCapability } from '../contract';
 import type { MeasurementServices } from '../services';
@@ -12,47 +12,76 @@ export function createMeasuring(
 ) {
   const { annotation } = siblings;
 
-  const createMeasurement = (input: CreateMeasurementInput): Promise<AnnotationRef> => {
-    if (!annotation.canCreate()) {
-      return Promise.reject(
-        new PluginError(
-          'permission-denied',
-          'measurement',
-          'measuring needs annotation create authority',
-        ),
-      );
-    }
-    if (!scaleOf(input.page).ready) {
-      return Promise.reject(
-        new PluginError('not-ready', 'measurement', 'the page scale is not known yet'),
-      );
-    }
-    const tool = input.tool ?? input.kind;
+  /**
+   * The measurement's engine draft: the tool's current defaults (style,
+   * caption and leader), the dimension intent, and the page's scale. The
+   * engine works out the label from the points and the scale.
+   */
+  const draftOf = (input: CreateMeasurementInput, tool: string): AnnotationDraft | Error => {
+    const style = annotation.getToolDefaults(tool);
+    const shared = {
+      color: style.color,
+      strokeWidth: style.strokeWidth,
+      opacity: style.opacity,
+      measure: scaleOf(input.page).measure,
+      captionEnabled: style.captionEnabled ?? true,
+    };
     switch (input.kind) {
       case 'distance': {
         const [from, to] = input.points;
         if (!from || !to || input.points.length !== 2) {
-          return Promise.reject(
-            new PluginError('invalid-input', 'measurement', 'a distance needs exactly two points'),
+          return new PluginError(
+            'invalid-input',
+            'measurement',
+            'a distance needs exactly two points',
           );
         }
-        return annotation.create({ page: input.page, subtype: 'line', from, to, tool });
+        return {
+          subtype: 'line',
+          intent: 'line-dimension',
+          linePoints: { start: from, end: to },
+          lineEndings: style.lineEndings,
+          // The arrowheads fill with the line's color unless the tool sets a fill.
+          interiorColor: style.interiorColor ?? style.color,
+          ...shared,
+          captionPosition: style.captionPosition ?? 'inline',
+          ...(style.leader ? { leader: style.leader } : {}),
+        } as AnnotationDraft;
       }
       case 'perimeter':
-        return annotation.create({
-          page: input.page,
+        return {
           subtype: 'polyline',
+          intent: 'polyline-dimension',
           vertices: input.points,
-          tool,
-        });
+          lineEndings: style.lineEndings,
+          ...shared,
+        } as AnnotationDraft;
       case 'area':
-        return annotation.create({
-          page: input.page,
+        return {
           subtype: 'polygon',
+          intent: 'polygon-dimension',
           vertices: input.points,
-          tool,
-        });
+          interiorColor: style.interiorColor,
+          ...shared,
+        } as AnnotationDraft;
     }
+  };
+
+  const createMeasurement = async (input: CreateMeasurementInput): Promise<AnnotationRef> => {
+    if (!annotation.canCreate()) {
+      throw new PluginError(
+        'permission-denied',
+        'measurement',
+        'measuring needs annotation create authority',
+      );
+    }
+    if (!scaleOf(input.page).ready) {
+      throw new PluginError('not-ready', 'measurement', 'the page scale is not known yet');
+    }
+    const draft = draftOf(input, input.tool ?? input.kind);
+    if (draft instanceof Error) throw draft;
+    const created = await annotation.create(input.page, draft);
+    return created.annotation.ref;
   };
 
   return { api: { createMeasurement } satisfies Partial<MeasurementCapability> };

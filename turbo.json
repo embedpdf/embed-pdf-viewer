@@ -8,7 +8,10 @@
     },
     "@embedpdf/engine#build": {
       "dependsOn": ["^build"],
-      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/packages/engine/runtime/npm/wasm32/lib/embedpdf.browser.js"],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/packages/engine/runtime/npm/wasm32/lib/embedpdf.browser.js"
+      ],
       "outputs": ["dist/**", "workers/**", "src/generated/**"]
     },
     "@embedpdf/engine-runtime#build": {
@@ -53,6 +56,14 @@
     },
     "@embedpdf/viewer#test": {
       "dependsOn": ["build"]
+    },
+    "@embedpdf/engine#test": {
+      "dependsOn": ["^build"],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/packages/core/annotation/src/**",
+        "$TURBO_ROOT$/packages/plugin/annotation/src/**"
+      ]
     }
   }
 }

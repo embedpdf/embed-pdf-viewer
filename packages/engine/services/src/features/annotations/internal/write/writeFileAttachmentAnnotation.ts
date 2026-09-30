@@ -1,11 +1,10 @@
 import type {
   AttachmentFileInfo,
-  Color,
   FileAttachmentDraft,
   FileAttachmentPatch,
   PdfCoordinates,
 } from '@embedpdf/engine-core/runtime';
-import { EngineError, EngineErrorCode } from '@embedpdf/engine-core/runtime';
+import { ANNOTATION_DEFAULTS, EngineError, EngineErrorCode } from '@embedpdf/engine-core/runtime';
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
 
 import {
@@ -18,10 +17,8 @@ import { setAnnotColor, setAnnotOpacity, setAnnotRect } from './annotationWriteP
 import { applyAnnotationBaseDraft, applyAnnotationBasePatch } from './writeAnnotationBase';
 import { writeUtf16String } from '../../../../runtime/memory/strings';
 
-/** Default `/C` — the generator's default icon fill, set explicitly so reads round-trip. */
-const DEFAULT_FILE_ATTACHMENT_COLOR: Color = '#ffff00';
-
-const DEFAULT_OPACITY = 1;
+/** A file's icon defaults (`annotation/defaults.ts`), written explicitly so reads round-trip. */
+const DEFAULTS = ANNOTATION_DEFAULTS['file-attachment'];
 
 /** The file's metadata as a draft or patch carries it. */
 type FileMetadata = NonNullable<FileAttachmentDraft<PdfCoordinates>['file']>;
@@ -68,9 +65,9 @@ export function applyFileAttachmentDraft(
 ): void {
   applyAnnotationBaseDraft(fn, mem, annotPtr, draft);
   setAnnotRect(fn, mem, annotPtr, draft.rect);
-  setAnnotColor(fn, annotPtr, draft.color ?? DEFAULT_FILE_ATTACHMENT_COLOR);
-  setAnnotOpacity(fn, annotPtr, draft.opacity ?? DEFAULT_OPACITY);
-  setFileAttachmentIcon(fn, annotPtr, draft.icon ?? 'paperclip');
+  setAnnotColor(fn, annotPtr, draft.color ?? DEFAULTS.color);
+  setAnnotOpacity(fn, annotPtr, draft.opacity ?? DEFAULTS.opacity);
+  setFileAttachmentIcon(fn, annotPtr, draft.icon ?? DEFAULTS.icon);
   // `preflightFileAttachmentDraft` refused a draft without the file's name.
   const file = draft.file!;
   const attachmentPtr = addFileSpec(fn, mem, annotPtr, file.name);

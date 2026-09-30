@@ -6,12 +6,38 @@
  */
 import type { DocumentEvent } from '@embedpdf/core';
 import type { AnnotationFlags, AnnotationRef } from '@embedpdf/engine-core/runtime';
-import { toPageRef } from '@embedpdf/engine-core/runtime';
+import { annotationKey, toPageRef } from '@embedpdf/engine-core/runtime';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { annotationHarness, PAGE2, snapshotOf, type FileAnnotation } from './harness';
+import { type Message, styleOf } from '@embedpdf/core-annotation';
+
+import { createdRefOf } from '../src/write/outcomes';
+import {
+  annotationHarness,
+  dataOf,
+  PAGE2,
+  snapshotOf,
+  type AnnotationHarness,
+  type FileAnnotation,
+} from './harness';
 
 const PAGE = toPageRef(1);
+
+/** A square drawn through the gesture door, as a tool makes it; resolves with its confirmed ref. */
+const drawSquare = (harness: AnnotationHarness) => {
+  const draw = (phase: 'down' | 'move' | 'up', x: number, y: number): Message => ({
+    type: 'createPointer',
+    phase,
+    subtype: 'square',
+    in: { page: PAGE, point: { x, y }, shift: false },
+  });
+  harness.commit(draw('down', 10, 10));
+  harness.commit(draw('move', 60, 50));
+  return createdRefOf(harness.commit(draw('up', 60, 50)));
+};
+/** The key of the first record a session creates: the `nm` ref it is written under. */
+const firstCreated = (harness: AnnotationHarness) =>
+  annotationKey({ kind: 'nm', page: PAGE, nm: `${harness.state().session.namePrefix}1` });
 const NO_FLAGS: AnnotationFlags = {
   invisible: false,
   hidden: false,
@@ -159,7 +185,7 @@ describe('a refused write shows the truth', () => {
     const result = await harness.capability.updateSelectionFlags({ locked: true });
 
     expect(result.failed).toHaveLength(1);
-    expect(harness.capability.get(ref(20))!.flags.locked).toBe(false);
+    expect(harness.capability.get(ref(20))!.locked).toBe(false);
   });
 
   it("a refused restyle shows the collaborator's change that landed meanwhile", async () => {
@@ -170,13 +196,13 @@ describe('a refused write shows the truth', () => {
     harness.capability.select(ref(20));
 
     const restyle = harness.capability.updateSelection({ color: '#00ff00' });
-    expect(harness.capability.get(ref(20))!.props.color).toBe('#00ff00');
+    expect(dataOf(harness.capability.get(ref(20))).color).toBe('#00ff00');
     harness.emit(remoteUpdate(square(20, { contents: 'from Bob' })));
     write.reject(new Error('Forbidden'));
     await restyle;
 
     const annotation = harness.capability.get(ref(20))!;
-    expect(annotation.props.color).toBe('#000000');
+    expect(dataOf(annotation).color).toBe('#000000');
     expect(annotation.contents).toBe('from Bob');
   });
 
@@ -194,8 +220,8 @@ describe('a refused write shows the truth', () => {
     const result = await harness.capability.updateSelection({ color: '#00ff00' });
 
     expect(result.failed.map((failure) => failure.ref)).toEqual([ref(21)]);
-    expect(harness.capability.get(ref(20))!.props.color).toBe('#00ff00');
-    expect(harness.capability.get(ref(21))!.props.color).toBe('#000000');
+    expect(dataOf(harness.capability.get(ref(20))).color).toBe('#00ff00');
+    expect(dataOf(harness.capability.get(ref(21))).color).toBe('#000000');
   });
 });
 
@@ -222,13 +248,12 @@ describe('what the capability says about a write', () => {
     harness.capability.select(ref(20));
 
     const restyle = harness.capability.updateSelection({ color: '#00ff00' });
-    expect(harness.capability.get(ref(20))!.pending).toBe(true);
-    expect(harness.capability.get(ref(20))!.raw).toEqual(harness.read(square(20)));
+    expect(harness.capability.isPending(ref(20))).toBe(true);
     write.resolve({ annotation: square(20, { color: '#00ff00' }) });
     await restyle;
 
-    expect(harness.capability.get(ref(20))!.pending).toBeUndefined();
-    expect(harness.capability.get(ref(20))!.props.color).toBe('#00ff00');
+    expect(harness.capability.isPending(ref(20))).toBe(false);
+    expect(dataOf(harness.capability.get(ref(20))).color).toBe('#00ff00');
   });
 
   it('a refused create removes the new annotation and rejects', async () => {
@@ -238,13 +263,8 @@ describe('what the capability says about a write', () => {
     const failures = vi.fn();
     harness.capability.onWriteFailed(failures);
 
-    const created = harness.capability.create({
-      subtype: 'square',
-      page: PAGE,
-      bounds: { x: 10, y: 10, width: 50, height: 40 },
-      select: true,
-    });
-    expect(harness.model().order).toEqual(['new:1']);
+    const created = drawSquare(harness);
+    expect(harness.model().order).toEqual([firstCreated(harness)]);
 
     await expect(created).rejects.toMatchObject({ code: 'operation-failed' });
     expect(harness.model().order).toEqual([]);
@@ -254,7 +274,7 @@ describe('what the capability says about a write', () => {
 });
 
 describe('typing', () => {
-  it('an older echo never replaces newer typing, and the raw record is the confirmed one', async () => {
+  it('an older echo never replaces newer typing, which stays pending', async () => {
     vi.useFakeTimers();
     const harness = annotationHarness();
     await harness.load([freeText('Hello')]);
@@ -269,7 +289,7 @@ describe('typing', () => {
     await vi.advanceTimersByTimeAsync(0);
 
     expect(harness.capability.get(ref(30))!.contents).toBe('Hello world');
-    expect(harness.capability.getRaw(ref(30))!.contents).toBe('Hello w');
+    expect(harness.capability.isPending(ref(30))).toBe(true);
   });
 });
 
@@ -287,7 +307,7 @@ describe('weak annotations (direct objects without /NM)', () => {
     await harness.capability.updateSelection({ color: '#00ff00' });
 
     expect(harness.capability.list()).toHaveLength(1);
-    expect(harness.capability.get(named)!.props.color).toBe('#00ff00');
+    expect(dataOf(harness.capability.get(named)).color).toBe('#00ff00');
     expect(harness.capability.getSelection()).toEqual([named]);
   });
 
@@ -316,7 +336,7 @@ describe('several changes to one record', () => {
     harness.update.mockResolvedValueOnce({ annotation: freeText('Hello', { flags: locked }) });
     await harness.capability.updateSelectionFlags({ locked: true });
     expect(harness.capability.get(ref(30))!.contents).toBe('Hello world');
-    expect(harness.capability.get(ref(30))!.flags.locked).toBe(true);
+    expect(harness.capability.get(ref(30))!.locked).toBe(true);
 
     harness.update.mockResolvedValueOnce({
       annotation: freeText('Hello world', { flags: locked }),
@@ -341,12 +361,11 @@ describe('several changes to one record', () => {
     harness.update.mockResolvedValueOnce({
       annotation: freeText('Hello', { rect: inFile, box: inFile }),
     });
-    await harness.capability.updateRaw(ref(30), { subtype: 'free-text', box: moved } as never);
+    await harness.capability.update(ref(30), { subtype: 'free-text', box: moved } as never);
 
     const annotation = harness.capability.get(ref(30))!;
     expect(annotation.contents).toBe('Hello world');
-    expect(annotation.raw!.rect).toEqual(moved);
-    expect(annotation.bounds.x).toBeGreaterThan(150); // the moved box, not the one typing started in
+    expect(dataOf(annotation).box).toEqual(moved); // the moved box, not the one typing started in
   });
 
   it('two restyles settling out of order show the newer value', async () => {
@@ -360,11 +379,11 @@ describe('several changes to one record', () => {
 
     const red = harness.capability.updateSelection({ color: '#ff0000' });
     await harness.capability.updateSelection({ color: '#0000ff' });
-    expect(harness.capability.get(ref(20))!.props.color).toBe('#0000ff');
+    expect(dataOf(harness.capability.get(ref(20))).color).toBe('#0000ff');
 
     older.resolve({ annotation: square(20, { color: '#0000ff' }) });
     await red;
-    expect(harness.capability.get(ref(20))!.props.color).toBe('#0000ff');
+    expect(dataOf(harness.capability.get(ref(20))).color).toBe('#0000ff');
   });
 
   it('an older write refused after a newer one succeeded shows the newer value', async () => {
@@ -381,7 +400,7 @@ describe('several changes to one record', () => {
     older.reject(new Error('Forbidden'));
     await red;
 
-    expect(harness.capability.get(ref(20))!.props.color).toBe('#0000ff');
+    expect(dataOf(harness.capability.get(ref(20))).color).toBe('#0000ff');
   });
 
   it('a slow older write never drops newer work', async () => {
@@ -401,7 +420,7 @@ describe('several changes to one record', () => {
     slow.resolve({ annotation: square(20, { color: '#ff0000' }) });
     await red;
 
-    expect(harness.capability.get(ref(20))!.props.color).toBe('#00ff00');
+    expect(dataOf(harness.capability.get(ref(20))).color).toBe('#00ff00');
   });
 });
 
@@ -411,12 +430,7 @@ describe('a new record before the engine confirms it', () => {
     await harness.load([]);
     const create = deferred<unknown>();
     harness.create.mockReturnValueOnce(create.promise);
-    const created = harness.capability.create({
-      subtype: 'square',
-      page: PAGE,
-      bounds: { x: 10, y: 10, width: 50, height: 40 },
-      select: true,
-    });
+    const created = drawSquare(harness);
     const confirm = () =>
       create.resolve({
         annotation: { ...square(60), nm: (harness.create.mock.calls[0]![0] as { nm: string }).nm },
@@ -431,8 +445,8 @@ describe('a new record before the engine confirms it', () => {
     });
 
     const restyle = harness.capability.updateSelection({ color: '#00ff00' });
-    expect(harness.model().order).toEqual(['new:1']);
-    expect(harness.model().byId['new:1']!.style.color).toBe('#00ff00');
+    expect(harness.model().order).toEqual([firstCreated(harness)]);
+    expect(styleOf(harness.model().byId[firstCreated(harness)]!.annotation).color).toBe('#00ff00');
     expect(harness.update).not.toHaveBeenCalled();
 
     confirm();
@@ -441,7 +455,7 @@ describe('a new record before the engine confirms it', () => {
     expect(harness.update).toHaveBeenCalledTimes(1);
     expect(harness.update.mock.calls[0]![0]).toEqual(ref(60));
     expect(harness.model().selected).toEqual(['obj:60']);
-    expect(harness.capability.get(ref(60))!.props.color).toBe('#00ff00');
+    expect(dataOf(harness.capability.get(ref(60))).color).toBe('#00ff00');
   });
 
   it('a delete hides it for good: the engine deletes it after the create', async () => {
@@ -491,7 +505,7 @@ describe('a weak record the engine names', () => {
     await green;
 
     expect(harness.capability.list()).toHaveLength(1);
-    expect(harness.capability.get(named)!.props.strokeWidth).toBe(5);
+    expect(dataOf(harness.capability.get(named)).strokeWidth).toBe(5);
     expect(harness.capability.getSelection()).toEqual([named]);
 
     second.resolve({
@@ -505,10 +519,7 @@ describe('a weak record the engine names', () => {
     });
     await wide;
     expect(harness.capability.list()).toHaveLength(1);
-    expect(harness.capability.get(named)!.props).toMatchObject({
-      color: '#00ff00',
-      strokeWidth: 5,
-    });
+    expect(harness.capability.get(named)).toMatchObject({ color: '#00ff00', strokeWidth: 5 });
   });
 
   it('a delete whose page read fails stays hidden, reports the records stale, and a refresh shows the truth', async () => {
@@ -664,12 +675,7 @@ describe('a record whose key changes keeps everything that belongs to it', () =>
       annotation: { ...square(60), nm: draft.nm },
     }));
 
-    const created = harness.capability.create({
-      subtype: 'square',
-      page: PAGE,
-      bounds: { x: 10, y: 10, width: 50, height: 40 },
-      select: true,
-    });
+    const created = drawSquare(harness);
     await new Promise((resolve) => setTimeout(resolve, 0));
     expect(harness.model().order).toEqual(['obj:60']);
     expect(harness.capability.getSelection()).toEqual([ref(60)]);
@@ -726,12 +732,7 @@ describe('a record whose key changes keeps everything that belongs to it', () =>
     await harness.load([]);
     const answer = deferred<unknown>();
     harness.create.mockReturnValueOnce(answer.promise);
-    const created = harness.capability.create({
-      subtype: 'square',
-      page: PAGE,
-      bounds: { x: 10, y: 10, width: 50, height: 40 },
-      select: true,
-    });
+    const created = drawSquare(harness);
     const dto = { ...square(60), nm: (harness.create.mock.calls[0]![0] as { nm: string }).nm };
     const meta = {
       affectedPages: [],
@@ -831,25 +832,20 @@ describe('a record whose key changes keeps everything that belongs to it', () =>
     harness.create.mockImplementationOnce(async (draft: { nm: string }) => ({
       annotation: { ...square(60), nm: draft.nm },
     }));
-    const created = harness.capability.create({
-      subtype: 'square',
-      page: PAGE,
-      bounds: { x: 10, y: 10, width: 50, height: 40 },
-      select: true,
-    });
+    const created = drawSquare(harness);
     await new Promise((resolve) => setTimeout(resolve, 0));
 
     harness.update.mockResolvedValueOnce({
-      annotation: square(60, { color: '#ff0000' }),
+      annotation: square(60, { color: '#00ff00' }),
     });
-    const restyled = harness.capability.updateSelection({ color: '#ff0000' });
+    const restyled = harness.capability.updateSelection({ color: '#00ff00' });
     expect(harness.update).toHaveBeenCalledWith(ref(60), expect.anything());
 
     load.resolve(snapshotOf([]));
     await refreshed;
     await created;
     expect(await restyled).toMatchObject({ applied: [ref(60)], failed: [] });
-    expect(harness.capability.get(ref(60))!.props.color).toBe('#ff0000');
+    expect(dataOf(harness.capability.get(ref(60))).color).toBe('#00ff00');
   });
 
   it("a link set on a new record is written once the record's create is confirmed", async () => {
@@ -858,13 +854,8 @@ describe('a record whose key changes keeps everything that belongs to it', () =>
     const create = deferred<unknown>();
     harness.create.mockReturnValueOnce(create.promise);
     const TARGET = { kind: 'uri', uri: 'https://www.embedpdf.com/' } as const;
-    const created = harness.capability.create({
-      subtype: 'square',
-      page: PAGE,
-      bounds: { x: 10, y: 10, width: 50, height: 40 },
-      select: true,
-    });
-    const linked = harness.capability.updateSelection({ link: TARGET });
+    const created = drawSquare(harness);
+    const linked = harness.capability.updateSelectionLink(TARGET);
     harness.create.mockResolvedValueOnce({
       annotation: square(61, {
         subtype: 'link',
@@ -964,7 +955,7 @@ describe('how a record with a pending change renders', () => {
     harness.emit(remoteUpdate(square(20, { color: '#ff0000', author: 'Bob' })));
 
     const item = () => harness.capability.listPageItems(PAGE).find(({ id }) => id === 'obj:20')!;
-    expect(harness.capability.get(ref(20))!.props.color).toBe('#00ff00');
+    expect(dataOf(harness.capability.get(ref(20))).color).toBe('#00ff00');
     expect(item().source).toBe('vector');
 
     pending.resolve({ annotation: square(20, { color: '#00ff00', author: 'Bob' }) });

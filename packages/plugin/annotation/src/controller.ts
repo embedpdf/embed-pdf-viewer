@@ -15,7 +15,7 @@ import type { AnnotationHostCapability } from './host-contract';
 import { createAnnotationReads } from './read/annotations';
 import { createChromeReads } from './read/chrome';
 import { createRenderReads } from './read/render';
-import { createSelectionPropsReads } from './read/selection-props';
+import { createSelectionFieldsReads } from './read/selection-fields';
 import { createServices, type AnnotationContext } from './services';
 import { createAnnouncer } from './services/announce';
 import { followConfirmedChanges } from './sync/confirmed';
@@ -42,20 +42,21 @@ export function createAnnotationController(ctx: AnnotationContext, config: Annot
   const annotations = createAnnotationReads(ctx, services);
   const chrome = createChromeReads(ctx, services);
   const render = createRenderReads(ctx, services);
-  const selectionProps = createSelectionPropsReads(ctx, services);
+  const selectionFields = createSelectionFieldsReads(ctx, services);
 
   // Sync: what follows when the engine confirms a change.
-  followConfirmedChanges(ctx, services, createAnnouncer(events, annotations.projectRef));
+  followConfirmedChanges(ctx, services, createAnnouncer(events));
 
-  // Writes: every change goes through the store's one commit door.
-  const text = createTextEditing(ctx, services, annotations, chrome);
+  // Writes: every change goes through the store, a gesture's through `commit`,
+  // one stated in code through `apply`, and each ends in the same writes.
+  const text = createTextEditing(ctx, services, chrome);
   const links = createLinkWrites(ctx, services);
   registerEffectRunners(ctx, services, links);
-  const crud = createCrud(ctx, services, annotations, text);
+  const crud = createCrud(ctx, services, annotations);
   const stamps = createStamps(ctx, services);
   const ghost = createGhost(ctx, services, stamps);
   const icons = createIcons(ctx, services, annotations, stamps);
-  const selection = createSelectionWrites(services, annotations, selectionProps, text, links, crud);
+  const selection = createSelectionWrites(services, annotations, selectionFields, text, links);
   const measurement = createMeasurement(ctx, services, crud);
   const pointer = createPointer(ctx, services, chrome, measurement);
   const drafts = createDrafts(services);
@@ -71,7 +72,7 @@ export function createAnnotationController(ctx: AnnotationContext, config: Annot
     annotations.api,
     chrome.api,
     render.api,
-    selectionProps.api,
+    selectionFields.api,
     tools.api,
     behaviors.api,
     text.api,
@@ -112,5 +113,9 @@ export function createAnnotationController(ctx: AnnotationContext, config: Annot
     connect: () => connectAnnotation(ctx, api),
     /** The composed model every read and gesture works on (for the plugin's tests). */
     model: view.model,
+    /** The door for gestures and selection verbs (for the plugin's tests). */
+    commit: services.store.commit,
+    /** The door for changes stated in code (for the plugin's tests). */
+    apply: services.store.apply,
   };
 }

@@ -286,6 +286,27 @@ export type UpdateShape<Fields extends KindFields, C extends Coordinates = PageC
   [Name in AcceptedNames<Fields>]?: InSpace<C, Fields[Name], ReadValue<Fields[Name]>>;
 };
 
+/** A kind's optional data fields a read never shows as `null` and that hold nothing placed on the page. */
+type ConstantDefaultNames<Fields extends KindFields> = NamesWhere<
+  Fields,
+  { owner: 'data'; required: false; readNullable: false; space: 'none' }
+>;
+
+/**
+ * What a create that leaves out a data field reads back, per field. A field
+ * a read never shows as `null`, holding nothing placed on the page, needs a
+ * value. The others may name one: left out, a read says `null`, or the
+ * engine works the value out (a redaction's quads, a free text's rich text).
+ */
+export type DefaultsShape<Fields extends KindFields> = {
+  [Name in ConstantDefaultNames<Fields>]: ReadValue<Fields[Name]>;
+} & {
+  [Name in Exclude<
+    NamesWhere<Fields, { owner: 'data'; required: false }>,
+    ConstantDefaultNames<Fields>
+  >]?: ReadValue<Fields[Name]>;
+};
+
 // ── kinds ──
 
 /** The resources a kind takes, by role (`annotation/resources.ts`). */
@@ -369,6 +390,12 @@ export type ReadOf<Declaration, C extends Coordinates = PageCoordinates> =
 export type CreateOf<Declaration, C extends Coordinates = PageCoordinates> =
   Declaration extends KindDeclaration<infer Subtype, infer Fields, infer _Resources>
     ? KindCreate<Subtype, Fields, C>
+    : never;
+
+/** What a create that leaves out a data field reads back (see `annotation/defaults.ts`). */
+export type DefaultsOf<Declaration> =
+  Declaration extends KindDeclaration<infer _Subtype, infer Fields, infer _Resources>
+    ? DefaultsShape<Fields>
     : never;
 
 /** The data an update accepts. */

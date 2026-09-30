@@ -3,10 +3,13 @@
  * engine's answer is in the confirmed records.
  *
  *   1. stage   the message's session enters the state, and every record it
- *              changed becomes one pending change (new fields, a new record,
- *              or a delete) with a token of its own; the view shows it at once
- *   2. write   the effect runners' engine writes run; each carries the
- *              changes of the records it names
+ *              changed becomes one pending change (an edit and its patch, a
+ *              new record, or a delete) with a token of its own; the view
+ *              shows it at once. A change stated in code (`store.apply`) is
+ *              staged the same way.
+ *   2. write   the effect runners' engine writes run; each carries exactly
+ *              the pending changes it was bound to (their tokens), and
+ *              answers with what the engine wrote
  *   3. settle  a refused write drops its changes at once: they are wrong. An
  *              accepted write settles its changes once the records mirror
  *              holds the result: at once for an event the mirror applied
@@ -25,9 +28,15 @@
  */
 import { toPluginError, toPluginErrorInfo, type Mirror, type PluginError } from '@embedpdf/core';
 import type { Id, Model, UpdateResult } from '@embedpdf/core-annotation';
-import type { AnnotationRef } from '@embedpdf/engine-core/runtime';
+import type { AnnotationDTO, AnnotationRef } from '@embedpdf/engine-core/runtime';
 
-import { changedFields, stage, writeSettled, type PendingChange } from '../model';
+import {
+  changedFields,
+  stage,
+  writeSettled,
+  type PendingChange,
+  type RecordChange,
+} from '../model';
 import type { AnnotationContext } from './context';
 import type { AnnotationEvents } from './events';
 import type { AnnotationRecords } from '../sync/records';
@@ -35,27 +44,41 @@ import type { AnnotationRecords } from '../sync/records';
 /** The confirmed ref of each record a write created, by the id it was created under. */
 export type CreatedRefs = Readonly<Record<Id, AnnotationRef>>;
 
-/**
- * One engine write an effect asks for. A record is carried by at most one
- * write of a message.
- */
+/** What the engine answered one write. */
+export interface WriteAnswer {
+  /** The confirmed ref of each record the write created, by the id it was created under. */
+  readonly created?: CreatedRefs;
+  /** The annotation a single create or update left, as the engine read it back. */
+  readonly annotation?: AnnotationDTO;
+}
+
+/** One engine write an effect or a stated change asks for. */
 export interface IntentWrite {
   /** The records whose changes this write carries. */
   readonly ids: readonly Id[];
-  /** Runs the engine call. A create resolves with the refs of the records it created. */
-  readonly perform: () => Promise<CreatedRefs | void>;
+  /** Runs the engine call, and resolves with what the engine answered. */
+  readonly perform: () => Promise<WriteAnswer | void>;
+}
+
+/**
+ * A write, bound to the pending changes it carries: their tokens settle when
+ * it does. Binding by token, not by record, lets two changes to one record
+ * each settle with their own write.
+ */
+export interface CarriedWrite {
+  readonly write: IntentWrite;
+  readonly tokens: readonly number[];
 }
 
 export interface IntentOutcome {
   readonly created: CreatedRefs;
   /** The writes the engine refused, with the ids they carried. */
   readonly failed: readonly { readonly ids: readonly Id[]; readonly error: PluginError }[];
+  /** What each write answered, in the order the writes were given; `null` for a refused one. */
+  readonly answers: readonly (WriteAnswer | null)[];
 }
 
-/** A staged message: the token of each record's change. */
-export type Staged = ReadonlyMap<Id, number>;
-
-const NOTHING_WRITTEN: IntentOutcome = { created: {}, failed: [] };
+const NOTHING_WRITTEN: IntentOutcome = { created: {}, failed: [], answers: [] };
 
 export function createIntents(
   ctx: Pick<AnnotationContext, 'state'>,
@@ -98,7 +121,13 @@ export function createIntents(
         token: ++token,
         id: record.id,
         change: previous
-          ? { kind: 'edit', fields: { ...changedFields(previous, record), source: record.source } }
+          ? {
+              kind: 'edit',
+              ...(result.change.patches[record.id]
+                ? { patch: result.change.patches[record.id] }
+                : {}),
+              fields: { ...changedFields(previous, record), source: record.source },
+            }
           : { kind: 'create', record },
       });
     }
@@ -124,33 +153,47 @@ export function createIntents(
     return [...ids].map(refOf).filter((ref): ref is AnnotationRef => ref !== null);
   };
 
-  /** Step 1: record the message's result against the model it acted on. */
-  const begin = (before: Model, result: UpdateResult): Staged => {
+  /** Step 1: record the message's result against the model it acted on; its staged changes. */
+  const begin = (before: Model, result: UpdateResult): readonly PendingChange[] => {
     // Tokens are taken before the update: a reaction to it can commit (and stage) again.
     const changes = changesOf(before, result);
     ctx.state.update(stage, result.session, changes);
-    return new Map(changes.map((change) => [change.id, change.token]));
+    return changes;
   };
 
-  /** Steps 2 and 3: run the writes and settle the changes they carried. */
-  const run = async (staged: Staged, writes: readonly IntentWrite[]): Promise<IntentOutcome> => {
-    const tokensOf = (ids: readonly Id[]) =>
-      ids.flatMap((id) => (staged.has(id) ? [staged.get(id)!] : []));
-    const carried = new Set(writes.flatMap((write) => write.ids));
-    const uncarried = [...staged.keys()].filter((id) => !carried.has(id));
+  /** Step 1 for changes stated in code: each record's change, with the session as it is. */
+  const beginStated = (
+    stated: readonly { id: Id; change: RecordChange }[],
+  ): readonly PendingChange[] => {
+    const changes = stated.map(({ id, change }): PendingChange => ({ token: ++token, id, change }));
+    ctx.state.update(stage, ctx.state.get().session, changes);
+    return changes;
+  };
+
+  /**
+   * Steps 2 and 3: run the writes and settle the changes each carried. A
+   * staged change no write carries is dropped: nothing will write it.
+   */
+  const run = async (
+    staged: readonly PendingChange[],
+    writes: readonly CarriedWrite[],
+  ): Promise<IntentOutcome> => {
+    const carried = new Set(writes.flatMap(({ tokens }) => tokens));
+    const uncarried = staged.map((change) => change.token).filter((each) => !carried.has(each));
     if (!writes.length) {
-      if (uncarried.length) ctx.state.update(writeSettled, tokensOf(uncarried), 'refused');
+      if (uncarried.length) ctx.state.update(writeSettled, uncarried, 'refused');
       return NOTHING_WRITTEN;
     }
     let created: Record<Id, AnnotationRef> = {};
     const failed: { ids: readonly Id[]; error: PluginError }[] = [];
     const reports: { refs: AnnotationRef[]; error: PluginError }[] = [];
+    const answers: (WriteAnswer | null)[] = writes.map(() => null);
     await Promise.all(
-      writes.map(async (write) => {
-        const tokens = tokensOf(write.ids);
+      writes.map(async ({ write, tokens }, index) => {
         try {
-          const refs = await write.perform();
-          if (refs) created = { ...created, ...refs };
+          const answer = await write.perform();
+          if (answer?.created) created = { ...created, ...answer.created };
+          answers[index] = answer ?? {};
         } catch (error) {
           const refusal = { ids: write.ids, error: toPluginError('annotation', error) };
           failed.push(refusal);
@@ -164,14 +207,14 @@ export function createIntents(
         else held = [...held, ...tokens];
       }),
     );
-    if (uncarried.length) ctx.state.update(writeSettled, tokensOf(uncarried), 'refused');
+    if (uncarried.length) ctx.state.update(writeSettled, uncarried, 'refused');
     for (const { refs, error } of reports) {
       events.writeFailed.emit({ refs, error: toPluginErrorInfo(error) });
     }
-    return { created, failed };
+    return { created, failed, answers };
   };
 
-  return { begin, run };
+  return { begin, beginStated, run };
 }
 
 export type Intents = ReturnType<typeof createIntents>;

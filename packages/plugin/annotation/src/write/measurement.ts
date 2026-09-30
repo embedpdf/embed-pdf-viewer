@@ -23,7 +23,7 @@ import type { Crud } from './crud';
 export function createMeasurement(
   ctx: Pick<AnnotationContext, 'cleanup'>,
   { store, records }: Pick<AnnotationServices, 'store' | 'records'>,
-  crud: Pick<Crud, 'updateRaw'>,
+  crud: Pick<Crud, 'update'>,
 ) {
   const pageViewports = new Map<
     number,
@@ -61,9 +61,9 @@ export function createMeasurement(
       // it (one the user just deleted is not in the view, and is left alone).
       const model = store.model();
       const candidates = Object.values(records.get().byKey).flatMap(({ dto }) => {
-        const annotation = model.byId[annotationKey(dto.ref)];
-        return annotation && dto.page.objectNumber === pageObjectNumber && isDimension(dto)
-          ? [{ dto, annotation }]
+        const record = model.byId[annotationKey(dto.ref)];
+        return record && dto.page.objectNumber === pageObjectNumber && isDimension(dto)
+          ? [{ dto, annotation: record }]
           : [];
       });
       for (const { dto, annotation } of candidates) {
@@ -83,7 +83,7 @@ export function createMeasurement(
           continue;
         }
         try {
-          await crud.updateRaw(ref, { subtype: dto.subtype, measure: scale } as AnnotationPatch);
+          await crud.update(ref, { subtype: dto.subtype, measure: scale } as AnnotationPatch);
           report.updated.push(ref);
         } catch (error) {
           report.failed.push({ ref, error: serializeError(error) });

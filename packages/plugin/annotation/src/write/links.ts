@@ -1,4 +1,13 @@
-import { linkChildrenOf, linkOf, type ModelAnnotation, type Id } from '@embedpdf/core-annotation';
+import {
+  type Id,
+  kindOf,
+  linkChildrenOf,
+  linkOf,
+  type ModelAnnotation,
+  refOf,
+  shapeOf,
+  styleOf,
+} from '@embedpdf/core-annotation';
 import {
   annotationKey,
   type AnnotationDraft,
@@ -8,9 +17,10 @@ import {
   type PdfLinkTarget,
 } from '@embedpdf/engine-core/runtime';
 
-import { linkChildRects, writableTarget } from '../repository';
+import { linkChildRects, writableTarget } from '@embedpdf/core-annotation';
 import type { AnnotationContext, AnnotationServices } from '../services';
-import { named } from './named';
+import type { StoreChange } from '../services/store';
+import { appliedOrThrow, throwIfFailed } from './outcomes';
 
 /**
  * Attached links (a Link child riding an editable annotation) and group
@@ -41,46 +51,48 @@ export function createLinkWrites(
    * The one place attached link children are created, retargeted, re-rected,
    * or deleted. Declarative: desired state = `desired` target + the parent's
    * committed geometry (`linkChildRects`); current state is read straight
-   * from the substrate (`linkChildrenOf`) — no join-key ledger. Each write's
-   * confirmed record reaches the records mirror before the write resolves, so
-   * the `linkOf` lens converges as the run goes, here and in every other
-   * session. Idempotent — foreign inconsistencies heal on the next local edit.
+   * from the substrate (`linkChildrenOf`), children not confirmed yet
+   * included — no join-key ledger. The changes go through `store.apply`, so
+   * they show at once and the `linkOf` lens converges as the run goes, here
+   * and in every other session. Idempotent — foreign inconsistencies heal on
+   * the next local edit.
    */
   const reconcileChildren = async (id: Id, desired: PdfLinkTarget | null): Promise<void> => {
-    const doc = ctx.doc;
-    const annotation = store.model().byId[id];
-    if (!doc || !annotation || !annotation.ref || annotation.subtype === 'link') return;
-    const page = doc.page(annotation.page);
+    const record = store.model().byId[id];
+    if (!ctx.doc || !record || !refOf(record) || kindOf(record.annotation).name === 'link') return;
     // Read-only target arms can't be (re)written: children keep their /A and
     // only their rects follow the parent.
     const target = writableTarget(desired);
-    const rects = desired == null ? [] : linkChildRects(annotation);
+    const rects =
+      desired == null ? [] : linkChildRects(shapeOf(record.annotation), styleOf(record.annotation));
     const current = linkChildrenOf(store.model(), id);
-    try {
-      const paired = Math.min(current.length, rects.length);
-      for (let i = 0; i < paired; i++) {
-        const ref = current[i].ref;
-        if (!ref) continue;
-        await page.annotations.update(ref, {
+    const changes: StoreChange[] = [];
+    const paired = Math.min(current.length, rects.length);
+    for (let i = 0; i < paired; i++) {
+      changes.push({
+        type: 'update',
+        ref: current[i].annotation.ref,
+        patch: { subtype: 'link', rect: rects[i], ...(target ? { target } : {}) },
+      });
+    }
+    for (let i = current.length; i < rects.length; i++) {
+      changes.push({
+        type: 'create',
+        page: record.annotation.page,
+        draft: {
           subtype: 'link',
           rect: rects[i],
-          ...(target ? { target } : {}),
-        });
-      }
-      for (let i = current.length; i < rects.length; i++) {
-        await page.annotations.create(
-          named({
-            subtype: 'link',
-            rect: rects[i],
-            target,
-            reply: { to: annotation.ref, type: 'group' },
-          } as AnnotationDraft),
-        );
-      }
-      for (let i = rects.length; i < current.length; i++) {
-        const child = current[i];
-        if (child.ref) await page.annotations.delete(child.ref);
-      }
+          target,
+          reply: { to: refOf(record), type: 'group' },
+        } as AnnotationDraft,
+      });
+    }
+    for (let i = rects.length; i < current.length; i++) {
+      changes.push({ type: 'delete', ref: current[i].annotation.ref });
+    }
+    if (!changes.length) return;
+    try {
+      throwIfFailed(await store.apply(changes).written);
     } catch (error) {
       console.error('[annotation] attached-link sync failed:', error);
     }
@@ -119,15 +131,15 @@ export function createLinkWrites(
     reply: { to: AnnotationRef; type?: 'group' } | null,
   ): AnnotationPatch => ({ subtype, reply }) as AnnotationPatch;
 
-  /** Write a relationship change to one committed annotation; the fold applies the result. */
+  /** Write a relationship change to one committed annotation: shown at once, then written. */
   const writeRelationship = async (
     record: ModelAnnotation,
     reply: { to: AnnotationRef; type?: 'group' } | null,
   ): Promise<void> => {
-    if (!record.ref || !record.data) return;
-    await ctx.doc
-      .page(record.page)
-      .annotations.update(record.ref, relationshipPatch(record.data.subtype, reply));
+    const ref = refOf(record);
+    if (!ref) return;
+    const patch = relationshipPatch(record.annotation.subtype, reply);
+    await appliedOrThrow(store.apply([{ type: 'update', ref, patch }]));
   };
 
   // A restyle that set or cleared a link: the verb that made it waits for the
@@ -145,11 +157,12 @@ export function createLinkWrites(
     links: {
       get: (ref: AnnotationRef) => {
         const model = store.model();
-        const annotation = model.byId[annotationKey(ref)];
-        if (!annotation) return null;
+        const record = model.byId[annotationKey(ref)];
+        if (!record) return null;
+        const annotation = record.annotation;
         return annotation.subtype === 'link'
-          ? (annotation.link ?? null)
-          : linkOf(model, annotation.id);
+          ? (annotation.target ?? null)
+          : linkOf(model, record.id);
       },
       // The verbs go straight to the reconciler chain (latest-wins per
       // parent) and resolve when the children are committed — `get` reads

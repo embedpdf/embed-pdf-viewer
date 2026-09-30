@@ -50,10 +50,10 @@ describe("AnnotationsClient", () => {
                     opacity: 1.1,
                     quadPoints: [
                         {
-                            p1: { x: 1.1, y: 1.1 },
-                            p2: { x: 1.1, y: 1.1 },
-                            p3: { x: 1.1, y: 1.1 },
-                            p4: { x: 1.1, y: 1.1 },
+                            upperLeft: { x: 1.1, y: 1.1 },
+                            upperRight: { x: 1.1, y: 1.1 },
+                            lowerLeft: { x: 1.1, y: 1.1 },
+                            lowerRight: { x: 1.1, y: 1.1 },
                         },
                     ],
                 },
@@ -176,10 +176,10 @@ describe("AnnotationsClient", () => {
                     opacity: 1.1,
                     quadPoints: [
                         {
-                            p1: { x: 1.1, y: 1.1 },
-                            p2: { x: 1.1, y: 1.1 },
-                            p3: { x: 1.1, y: 1.1 },
-                            p4: { x: 1.1, y: 1.1 },
+                            upperLeft: { x: 1.1, y: 1.1 },
+                            upperRight: { x: 1.1, y: 1.1 },
+                            lowerLeft: { x: 1.1, y: 1.1 },
+                            lowerRight: { x: 1.1, y: 1.1 },
                         },
                     ],
                 },
@@ -292,7 +292,12 @@ describe("AnnotationsClient", () => {
                 color: "color",
                 opacity: 1.1,
                 quadPoints: [
-                    { p1: { x: 1.1, y: 1.1 }, p2: { x: 1.1, y: 1.1 }, p3: { x: 1.1, y: 1.1 }, p4: { x: 1.1, y: 1.1 } },
+                    {
+                        upperLeft: { x: 1.1, y: 1.1 },
+                        upperRight: { x: 1.1, y: 1.1 },
+                        lowerLeft: { x: 1.1, y: 1.1 },
+                        lowerRight: { x: 1.1, y: 1.1 },
+                    },
                 ],
             },
             meta: {
@@ -542,7 +547,12 @@ describe("AnnotationsClient", () => {
                 color: "color",
                 opacity: 1.1,
                 quadPoints: [
-                    { p1: { x: 1.1, y: 1.1 }, p2: { x: 1.1, y: 1.1 }, p3: { x: 1.1, y: 1.1 }, p4: { x: 1.1, y: 1.1 } },
+                    {
+                        upperLeft: { x: 1.1, y: 1.1 },
+                        upperRight: { x: 1.1, y: 1.1 },
+                        lowerLeft: { x: 1.1, y: 1.1 },
+                        lowerRight: { x: 1.1, y: 1.1 },
+                    },
                 ],
             },
             appearance: { action: "preserved", changed: true },

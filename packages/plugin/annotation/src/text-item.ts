@@ -7,34 +7,37 @@
  */
 import {
   initialTextStyle,
+  type Model,
+  refOf,
+  richDocOf,
   textBoxes,
   textPlateInset,
-  type Model,
   type ViewEnv,
 } from '@embedpdf/core-annotation';
 import type { PageRef } from '@embedpdf/engine-core/runtime';
 
 import type { TextItem } from './contract';
-import { cssFontFamilyForFont, richDocOf, stripBodyDefaults } from './rich-text';
+import { cssFontFamilyForFont, stripBodyDefaults } from './rich-text';
+import { styleOf, textOf } from '@embedpdf/core-annotation';
 
 /** Project the model's free-text boxes into render-ready {@link TextItem}s — the
  *  core geometry (`textBoxes`) joined with the DTO-derived CSS. Pure; memoized by
  *  model identity at the call site so selectors get a stable reference. */
 export function buildTextItems(model: Model, page: PageRef, view?: ViewEnv): TextItem[] {
   return textBoxes(model, page, view).map((tb) => {
-    const annotation = model.byId[tb.id];
-    // `text`/`style` show the user's pending change (a props edit lands here
+    const record = model.byId[tb.id];
+    // The text shows the user's pending change (a props edit lands here
     // before the engine confirms it), so the editor restyles instantly.
-    const style = annotation?.text ?? initialTextStyle;
+    const style = (record && textOf(record.annotation)) ?? initialTextStyle;
     // Match the engine's text plate inset. Browser font metrics and line
     // heights belong to the shared editor binding.
-    const sw = annotation?.style.strokeWidth ?? 0;
-    const doc = annotation ? richDocOf(annotation) : null;
+    const sw = record ? styleOf(record.annotation).strokeWidth : 0;
+    const doc = record ? richDocOf(record.annotation) : null;
     return {
       id: tb.id,
-      ref: annotation?.ref ?? null,
+      ref: refOf(record),
       box: tb.box,
-      contents: annotation?.data?.contents ?? '',
+      contents: record?.annotation.contents ?? '',
       // Paragraph alignment/direction equal to the body's is inherited, not
       // an override: the element carries the body's (`css.align`), so a
       // block must not pin itself to a resolved value — or the Align

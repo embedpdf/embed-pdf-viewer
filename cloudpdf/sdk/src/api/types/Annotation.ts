@@ -125,29 +125,29 @@ export namespace Annotation {
 
         export namespace QuadPoints {
             export interface Item {
-                p1: Item.P1;
-                p2: Item.P2;
-                p3: Item.P3;
-                p4: Item.P4;
+                upperLeft: Item.UpperLeft;
+                upperRight: Item.UpperRight;
+                lowerLeft: Item.LowerLeft;
+                lowerRight: Item.LowerRight;
             }
 
             export namespace Item {
-                export interface P1 {
+                export interface UpperLeft {
                     x: number;
                     y: number;
                 }
 
-                export interface P2 {
+                export interface UpperRight {
                     x: number;
                     y: number;
                 }
 
-                export interface P3 {
+                export interface LowerLeft {
                     x: number;
                     y: number;
                 }
 
-                export interface P4 {
+                export interface LowerRight {
                     x: number;
                     y: number;
                 }
@@ -255,29 +255,29 @@ export namespace Annotation {
 
         export namespace QuadPoints {
             export interface Item {
-                p1: Item.P1;
-                p2: Item.P2;
-                p3: Item.P3;
-                p4: Item.P4;
+                upperLeft: Item.UpperLeft;
+                upperRight: Item.UpperRight;
+                lowerLeft: Item.LowerLeft;
+                lowerRight: Item.LowerRight;
             }
 
             export namespace Item {
-                export interface P1 {
+                export interface UpperLeft {
                     x: number;
                     y: number;
                 }
 
-                export interface P2 {
+                export interface UpperRight {
                     x: number;
                     y: number;
                 }
 
-                export interface P3 {
+                export interface LowerLeft {
                     x: number;
                     y: number;
                 }
 
-                export interface P4 {
+                export interface LowerRight {
                     x: number;
                     y: number;
                 }
@@ -385,29 +385,29 @@ export namespace Annotation {
 
         export namespace QuadPoints {
             export interface Item {
-                p1: Item.P1;
-                p2: Item.P2;
-                p3: Item.P3;
-                p4: Item.P4;
+                upperLeft: Item.UpperLeft;
+                upperRight: Item.UpperRight;
+                lowerLeft: Item.LowerLeft;
+                lowerRight: Item.LowerRight;
             }
 
             export namespace Item {
-                export interface P1 {
+                export interface UpperLeft {
                     x: number;
                     y: number;
                 }
 
-                export interface P2 {
+                export interface UpperRight {
                     x: number;
                     y: number;
                 }
 
-                export interface P3 {
+                export interface LowerLeft {
                     x: number;
                     y: number;
                 }
 
-                export interface P4 {
+                export interface LowerRight {
                     x: number;
                     y: number;
                 }
@@ -516,29 +516,29 @@ export namespace Annotation {
 
         export namespace QuadPoints {
             export interface Item {
-                p1: Item.P1;
-                p2: Item.P2;
-                p3: Item.P3;
-                p4: Item.P4;
+                upperLeft: Item.UpperLeft;
+                upperRight: Item.UpperRight;
+                lowerLeft: Item.LowerLeft;
+                lowerRight: Item.LowerRight;
             }
 
             export namespace Item {
-                export interface P1 {
+                export interface UpperLeft {
                     x: number;
                     y: number;
                 }
 
-                export interface P2 {
+                export interface UpperRight {
                     x: number;
                     y: number;
                 }
 
-                export interface P3 {
+                export interface LowerLeft {
                     x: number;
                     y: number;
                 }
 
-                export interface P4 {
+                export interface LowerRight {
                     x: number;
                     y: number;
                 }
@@ -2504,29 +2504,29 @@ export namespace Annotation {
 
         export namespace QuadPoints {
             export interface Item {
-                p1: Item.P1;
-                p2: Item.P2;
-                p3: Item.P3;
-                p4: Item.P4;
+                upperLeft: Item.UpperLeft;
+                upperRight: Item.UpperRight;
+                lowerLeft: Item.LowerLeft;
+                lowerRight: Item.LowerRight;
             }
 
             export namespace Item {
-                export interface P1 {
+                export interface UpperLeft {
                     x: number;
                     y: number;
                 }
 
-                export interface P2 {
+                export interface UpperRight {
                     x: number;
                     y: number;
                 }
 
-                export interface P3 {
+                export interface LowerLeft {
                     x: number;
                     y: number;
                 }
 
-                export interface P4 {
+                export interface LowerRight {
                     x: number;
                     y: number;
                 }

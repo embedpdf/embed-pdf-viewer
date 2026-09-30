@@ -45,10 +45,10 @@ const match = (pageObjectNumber: number, start: number) => ({
   segments: [
     {
       quad: {
-        p1: { x: 30, y: 40 },
-        p2: { x: 50, y: 40 },
-        p3: { x: 30, y: 50 },
-        p4: { x: 50, y: 50 },
+        upperLeft: { x: 30, y: 40 },
+        upperRight: { x: 50, y: 40 },
+        lowerLeft: { x: 30, y: 50 },
+        lowerRight: { x: 50, y: 50 },
       },
       rect: { x: 30, y: 40, width: 20, height: 10 },
       advance: 1 as const,
@@ -150,8 +150,8 @@ describe('search session', () => {
     const first = api.listHits()[0];
     expect(first.pageIndex).toBe(0);
     expect(first.segments[0].rect).toEqual({ x: 30, y: 40, width: 20, height: 10 });
-    expect(first.segments[0].quad.upperStart).toEqual({ x: 30, y: 40 });
-    expect(first.segments[0].quad.lowerEnd).toEqual({ x: 50, y: 50 });
+    expect(first.segments[0].quad.upperLeft).toEqual({ x: 30, y: 40 });
+    expect(first.segments[0].quad.lowerRight).toEqual({ x: 50, y: 50 });
     expect(api.listHits({ page: toPageRef(5) })).toBe(api.listHits({ page: toPageRef(5) }));
     expect(api.getHitCount(toPageRef(5))).toBe(2);
     expect(api.listPagesWithHits().map((page) => page.objectNumber)).toEqual([5, 7]);
