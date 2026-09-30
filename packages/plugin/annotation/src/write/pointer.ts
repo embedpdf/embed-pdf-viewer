@@ -1,7 +1,7 @@
 import {
   defaultsFor,
   type MeasurementAppearance,
-  type Subtype,
+  type KindName,
   type Point,
 } from '@embedpdf/core-annotation';
 import type { PageRotation } from '@embedpdf/core-geometry';
@@ -189,7 +189,7 @@ export function createPointer(
         measure,
         capture: resolvedTool?.meta?.capture === true ? tool : undefined,
         phase,
-        subtype: resolvedTool?.subtype ?? (tool as Subtype),
+        subtype: resolvedTool?.subtype ?? (tool as KindName),
         preset: resolvedTool?.preset ?? tool,
         intent: intent === 'ink-highlight' ? intent : undefined,
         clickCreate: resolvedTool?.clickCreate,

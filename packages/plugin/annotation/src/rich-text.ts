@@ -13,12 +13,11 @@
  */
 import {
   faceForFont,
-  fieldsOf,
-  locateOffset,
-  richDocOf,
   type FieldValues,
   type FontLookup,
+  locateOffset,
   type ModelAnnotation,
+  richDocOf,
   type RichTextRange,
   type RichTextStyleDelta,
 } from '@embedpdf/core-annotation';
@@ -153,13 +152,13 @@ const hex = (css: string): string => css.trim().toUpperCase();
  * wrote. One engine, one path: plain and formatted text alike.
  */
 export function textCommitPatch(
-  annotation: ModelAnnotation,
+  record: ModelAnnotation,
   paragraphs: RichTextParagraph[],
   fonts?: FontLookup,
 ): { richText: { paragraphs: RichTextParagraph[] } } {
   return {
     richText: {
-      paragraphs: stripBodyDefaults(paragraphs, richDocOf(fieldsOf(annotation), fonts).body),
+      paragraphs: stripBodyDefaults(paragraphs, richDocOf(record.annotation, fonts).body),
     },
   };
 }

@@ -5,7 +5,7 @@ import { toPageRef } from '@embedpdf/engine-core/runtime';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { annotationHarness, type FileAnnotation } from './harness';
-import { fieldsOf } from '@embedpdf/core-annotation';
+import { groupOf, irtOf, styleOf } from '@embedpdf/core-annotation';
 
 const PON = 1;
 const PON2 = 2;
@@ -125,10 +125,9 @@ describe('Replace Text grouped persistence', () => {
       print: true,
     });
     const [caretId, strikeoutId] = harness.model().order;
-    expect(fieldsOf(harness.model().byId[strikeoutId]!)).toMatchObject({
-      irt: caretId,
-      group: caretId,
-    });
+    const strikeout = harness.model().byId[strikeoutId]!.annotation;
+    expect(irtOf(strikeout)).toBe(caretId);
+    expect(groupOf(strikeout)).toBe(caretId);
     expect(harness.model().selected).toEqual([caretId, strikeoutId]);
   });
 
@@ -940,13 +939,15 @@ describe('the twin law — authority fused into presentation and gestures', () =
     await harness.load([stamped(20, 'me')]);
     harness.capability.select(ref(20));
     const id = harness.model().order[0]!;
-    const before = fieldsOf(harness.model().byId[id]!).style.color;
+    const before = styleOf(harness.model().byId[id]!.annotation).color;
     harness.update.mockRejectedValueOnce(new Error('Forbidden'));
     harness.capability.updateSelection({ color: '#00ff00' });
     // optimistic first…
-    expect(fieldsOf(harness.model().byId[id]!).style.color).toBe('#00ff00');
+    expect(styleOf(harness.model().byId[id]!.annotation).color).toBe('#00ff00');
     // …then the refusal restores the pre-patch annotation.
-    await vi.waitFor(() => expect(fieldsOf(harness.model().byId[id]!).style.color).toBe(before));
+    await vi.waitFor(() =>
+      expect(styleOf(harness.model().byId[id]!.annotation).color).toBe(before),
+    );
   });
 });
 

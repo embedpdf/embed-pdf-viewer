@@ -157,10 +157,8 @@ export function createComments(
         canReply: authority.canCreate(),
         canSetStatus: authority.canCreate(),
         canEditText: (() => {
-          const annotation = store.model().byId[annotationKey(ref)];
-          return (
-            !!annotation && !isDimension(annotation.annotation) && annotContentsEditable(annotation)
-          );
+          const record = store.model().byId[annotationKey(ref)];
+          return !!record && !isDimension(record.annotation) && annotContentsEditable(record);
         })(),
         canDelete: authority.canDelete(ref),
         canDeleteThread: thread !== null && threads.memberRefsOf(thread).every(authority.canDelete),

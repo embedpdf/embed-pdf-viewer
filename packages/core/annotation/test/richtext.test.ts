@@ -1,5 +1,4 @@
-import type { FontHandle } from '@embedpdf/engine-core/runtime';
-import { toPageRef } from '@embedpdf/engine-core/runtime';
+import type { AnnotationDTO, FontHandle } from '@embedpdf/engine-core/runtime';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -17,7 +16,7 @@ import {
   splitRunsAt,
   styleAt,
 } from '../src/richtext';
-import type { RecordFields, TextStyle } from '../src/types';
+import type { TextStyle } from '../src/types';
 
 const doc = () => ({
   paragraphs: [
@@ -157,7 +156,7 @@ describe('a free text’s document', () => {
     expect(faceForFont('Mystery')).toEqual({ family: 'Mystery' });
   });
 
-  it('synthesises a body from the /DA text style for a draft without a DTO', () => {
+  it('synthesises a body from the /DA text style for an annotation without a rich body', () => {
     expect(bodyFromTextStyle({ ...text, fontFamily: 'times-bold', underline: true })).toMatchObject(
       { family: 'Times', weight: 700, italic: false, size: 12, decoration: ['underline'] },
     );
@@ -170,13 +169,10 @@ describe('a free text’s document', () => {
       color: '#FF0000',
     });
     const annotation = {
-      id: 'a',
-      ref: null,
-      page: toPageRef(1),
       subtype: 'free-text',
-      text,
-      annotation: { subtype: 'free-text', contents: 'a\rb' },
-    } as unknown as RecordFields;
+      contents: 'a\rb',
+      ...text,
+    } as unknown as AnnotationDTO;
     const doc = richDocOf(annotation);
     expect(doc.paragraphs).toEqual([{ runs: [{ text: 'a' }] }, { runs: [{ text: 'b' }] }]);
     expect(doc.body.family).toBe('Helvetica');

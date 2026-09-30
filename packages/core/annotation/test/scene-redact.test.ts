@@ -42,7 +42,7 @@ function redactItem(overrides: Partial<RenderItem> = {}): RenderItem {
 }
 
 describe('hover model state', () => {
-  const annotation = {
+  const record = {
     id: 'obj:1',
     page: toPageRef(1),
     subtype: 'redact',
@@ -50,7 +50,7 @@ describe('hover model state', () => {
   } as unknown as ModelAnnotation;
   const base: Model = {
     ...initialModel,
-    byId: { 'obj:1': annotation },
+    byId: { 'obj:1': record },
     order: ['obj:1'],
   };
 

@@ -18,27 +18,26 @@ import type { PageRef } from '@embedpdf/engine-core/runtime';
 
 import type { TextItem } from './contract';
 import { cssFontFamilyForFont, stripBodyDefaults } from './rich-text';
-import { fieldsOf, styleOf } from '@embedpdf/core-annotation';
+import { styleOf, textOf } from '@embedpdf/core-annotation';
 
 /** Project the model's free-text boxes into render-ready {@link TextItem}s — the
  *  core geometry (`textBoxes`) joined with the DTO-derived CSS. Pure; memoized by
  *  model identity at the call site so selectors get a stable reference. */
 export function buildTextItems(model: Model, page: PageRef, view?: ViewEnv): TextItem[] {
   return textBoxes(model, page, view).map((tb) => {
-    const annotation = model.byId[tb.id];
-    const fields = annotation ? fieldsOf(annotation) : undefined;
-    // `text`/`style` show the user's pending change (a props edit lands here
+    const record = model.byId[tb.id];
+    // The text shows the user's pending change (a props edit lands here
     // before the engine confirms it), so the editor restyles instantly.
-    const style = fields?.text ?? initialTextStyle;
+    const style = (record && textOf(record.annotation)) ?? initialTextStyle;
     // Match the engine's text plate inset. Browser font metrics and line
     // heights belong to the shared editor binding.
-    const sw = annotation ? styleOf(annotation.annotation).strokeWidth : 0;
-    const doc = fields ? richDocOf(fields) : null;
+    const sw = record ? styleOf(record.annotation).strokeWidth : 0;
+    const doc = record ? richDocOf(record.annotation) : null;
     return {
       id: tb.id,
-      ref: refOf(annotation),
+      ref: refOf(record),
       box: tb.box,
-      contents: annotation?.annotation.contents ?? '',
+      contents: record?.annotation.contents ?? '',
       // Paragraph alignment/direction equal to the body's is inherited, not
       // an override: the element carries the body's (`css.align`), so a
       // block must not pin itself to a resolved value — or the Align

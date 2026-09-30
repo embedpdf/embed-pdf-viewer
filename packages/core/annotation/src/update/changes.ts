@@ -1,27 +1,30 @@
 /**
  * What every transition that changes records shares — the records it returns
- * become the message's change set: the ids of new records, who owns the
- * appearance after an edit (live rendering, or the raster box following the
- * geometry), the effect a geometry commit emits, and removing records.
+ * become the message's change set: a new record and the draft it is written
+ * from, a view-space gesture's commit, and removing records.
  */
 import { annotationKey } from '@embedpdf/core';
-import type { AnnotationRef, PageRef } from '@embedpdf/engine-core/runtime';
+import {
+  ANNOTATION_FIELD_NAMES,
+  annotationOfDraft,
+  type AnnotationDraft,
+  type AnnotationDTO,
+  type AnnotationFlags,
+  type AnnotationRef,
+  type PageRef,
+} from '@embedpdf/engine-core/runtime';
 
 import { anchoredGeom, anchorModeOf, unanchoredGeom, type ViewEnv } from '../anchor';
 import { sourceOfNew } from '../appearance';
-import { annotationOfRecord, type AnnotationPlace, recordOf, shapeOf } from '../record';
-import type {
-  ModelGeometry,
-  Id,
-  Model,
-  ModelAnnotation,
-  Point,
-  RecordFields,
-  Subtype,
-} from '../types';
+import { DRAWN_FLAGS } from '../flags';
+import { geomVisualBounds } from '../geometry';
+import { shapeOf, styleOf } from '../record';
+import { engineSubtypeOf } from '../record/defaults';
+import { familyOf } from '../shapes';
+import type { FieldValues, Shape, Id, Model, ModelAnnotation, Point, KindName } from '../types';
 import { forget } from './session';
 
-export const isPolySubtype = (subtype: Subtype): subtype is 'polygon' | 'polyline' =>
+export const isPolySubtype = (subtype: KindName): subtype is 'polygon' | 'polyline' =>
   subtype === 'polygon' || subtype === 'polyline';
 
 export const sub = (from: Point, to: Point): Point => ({ x: from.x - to.x, y: from.y - to.y });
@@ -35,15 +38,15 @@ export const sub = (from: Point, to: Point): Point => ({ x: from.x - to.x, y: fr
  * annotations alike, through one code path.
  */
 export const commitViewGesture = (
-  annotation: ModelAnnotation,
+  record: ModelAnnotation,
   view: ViewEnv | undefined,
-  op: (geometry: ModelGeometry) => ModelGeometry,
-): ModelGeometry => {
-  const mode = anchorModeOf(annotation);
-  return unanchoredGeom(op(anchoredGeom(shapeOf(annotation.annotation), mode, view)), mode, view);
+  op: (geometry: Shape) => Shape,
+): Shape => {
+  const mode = anchorModeOf(record);
+  return unanchoredGeom(op(anchoredGeom(shapeOf(record.annotation), mode, view)), mode, view);
 };
 
-export const geomEqual = (left: ModelGeometry, right: ModelGeometry): boolean =>
+export const geomEqual = (left: Shape, right: Shape): boolean =>
   JSON.stringify(left) === JSON.stringify(right);
 
 /**
@@ -65,40 +68,76 @@ export const newRecordId = (model: Model, page: PageRef, offset = 1): Id =>
   annotationKey(newRecordRef(model, page, offset));
 
 /**
- * The fields a new record is made from: everything but what `newRecord` gives
- * it (its key, ref and relationships — `reply` states the one it answers).
+ * The draft a drawing creates, complete before anything is predicted: the
+ * tool's `defaults` (the fields its kind has), the fields that state its
+ * `shape`, what the drawing adds (`fields`: an intent, a measurement, first
+ * text), and the flags a drawn annotation starts with (`print`, and the
+ * tool's own). The view's prediction and the engine's create both come from
+ * it.
  */
-export type NewRecordFields = Omit<RecordFields, 'id' | 'ref' | 'source' | 'irt' | 'group'>;
+export function draftOf(
+  kind: string,
+  defaults: FieldValues,
+  shape: Shape,
+  fields: FieldValues = {},
+  flags: Partial<AnnotationFlags> = {},
+): AnnotationDraft {
+  const subtype = engineSubtypeOf(kind);
+  const declared = ANNOTATION_FIELD_NAMES[subtype];
+  const own = Object.fromEntries(
+    Object.entries(defaults).filter(([name]) => declared.includes(name)),
+  );
+  return {
+    ...own,
+    ...familyOf(shape).write(shape, subtype),
+    ...fields,
+    ...DRAWN_FLAGS,
+    ...flags,
+    subtype,
+  } as unknown as AnnotationDraft;
+}
+
+/** A record a message creates, and the draft it is written from, named as the record is keyed. */
+export interface NewRecord {
+  readonly record: ModelAnnotation;
+  readonly draft: AnnotationDraft;
+}
 
 /**
- * The `offset`-th record a message creates: keyed by the `nm` ref it will be
- * written under, drawn as a new record is (`sourceOfNew`), and holding the annotation its fields predict,
- * appended after the page's other records. `reply` ties it to the annotation
- * it belongs to.
+ * The `offset`-th record a message creates, from its `draft`: named by the
+ * `nm` it will be written under (its key), holding the annotation the engine
+ * will read back, appended after the page's other records, and drawn as a
+ * new record is (`sourceOfNew`). A kind whose `rect` the engine works out
+ * from its drawing gets the drawn bounds. `reply` ties it to the annotation
+ * it belongs to; the write states it once that one has a ref.
  */
 export function newRecord(
   model: Model,
-  fields: NewRecordFields,
-  options: { offset?: number; reply?: AnnotationPlace['reply'] } = {},
-): ModelAnnotation {
+  page: PageRef,
+  draft: AnnotationDraft,
+  options: { offset?: number; reply?: NonNullable<AnnotationDTO['reply']> } = {},
+): NewRecord {
   const offset = options.offset ?? 1;
-  const page = fields.page;
   const ref = newRecordRef(model, page, offset);
-  const record: RecordFields = {
-    ...fields,
-    id: annotationKey(ref),
-    ref: null,
-    source: 'vector',
-  };
+  const named = { ...draft, nm: ref.nm } as AnnotationDraft;
   const onPage = model.order.filter(
     (id) => model.byId[id]?.annotation.page.objectNumber === page.objectNumber,
   ).length;
-  const annotation = annotationOfRecord(record, {
-    ref,
-    index: onPage + offset - 1,
+  const read = annotationOfDraft(named, { ref, index: onPage + offset - 1 });
+  const annotation: AnnotationDTO = {
+    ...read,
+    ...('rect' in draft ? {} : { rect: geomVisualBounds(shapeOf(read), styleOf(read)) }),
     ...(options.reply ? { reply: options.reply } : {}),
-  });
-  return recordOf({ ...record, source: sourceOfNew(annotation) }, annotation);
+  } as AnnotationDTO;
+  return {
+    record: {
+      id: annotationKey(ref),
+      unconfirmed: true,
+      source: sourceOfNew(annotation),
+      annotation,
+    },
+    draft: named,
+  };
 }
 
 /** The model without these records, and without any session reference to them. */

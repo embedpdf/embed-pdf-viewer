@@ -1,15 +1,14 @@
 /** Drawing a free-text callout: the tip, the elbow, then the text box it points from. */
 import type { AnnotationFlags } from '@embedpdf/engine-core/runtime';
 
-import { DRAWN_FLAGS } from '../flags';
 import { transposedAboutCenter, uprightAnchoredRect, uprightRotation } from '../geometry';
 import { rectFromPoints, rotatedAabb } from '../rect';
 import { clampRectToBox } from '../placement';
 import { calloutShape } from '../shapes/text-box';
 import type { Draft, Effect, Model, Point, PointerInput, Rect } from '../types';
-import { newRecord } from './changes';
+import { draftOf, newRecord } from './changes';
 import { MIN_DRAG } from './draw';
-import { toolStyleOf } from './session';
+import { defaultsFor, toolAnnotation } from './session';
 
 /** Default text-box size for a callout placed with a click (no box drag). */
 const CALLOUT_BOX = { width: 150, height: 40 };
@@ -137,27 +136,32 @@ export function calloutPointer(
   // The upright counter-rotation applies to the text box only (about its own
   // centre) — the leader tip/knee are page-space anchors and never turn.
   const rot = calloutUprightRot(draft);
-  const tool = toolStyleOf(model, 'free-text-callout', draft.preset);
-  const ending = tool.lineEnding !== 'none' ? tool.lineEnding : 'open-arrow';
-  const annotation = newRecord(model, {
-    page: draft.page,
-    subtype: 'free-text',
-    geometry: calloutShape(rect, rot, draft.tip, draft.knee, ending),
-    style: tool.style,
-    text: tool.text,
-    flags: { ...DRAWN_FLAGS, ...draft.flags },
-  });
-  const id = annotation.id;
+  const tool = toolAnnotation(model, 'free-text-callout', draft.preset);
+  // The tool's arrow at the tip; a callout without one gets an open arrow.
+  const toolEnding = tool.subtype === 'free-text' ? tool.lineEnding : null;
+  const ending = toolEnding && toolEnding !== 'none' ? toolEnding : 'open-arrow';
+  const created = newRecord(
+    model,
+    draft.page,
+    draftOf(
+      'free-text-callout',
+      defaultsFor(model, draft.preset ?? 'free-text-callout'),
+      calloutShape(rect, rot, draft.tip, draft.knee, ending),
+      { intent: 'free-text-callout', contents: '' },
+      draft.flags,
+    ),
+  );
+  const id = created.record.id;
   return [
     {
       ...model,
       seq: model.seq + 1,
-      byId: { ...model.byId, [id]: annotation },
+      byId: { ...model.byId, [id]: created.record },
       order: [...model.order, id],
       selected: [id],
       draft: null,
       editing: id,
     },
-    [{ type: 'create', id }],
+    [{ type: 'create', id, draft: created.draft }],
   ];
 }

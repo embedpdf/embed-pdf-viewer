@@ -33,12 +33,12 @@ export function createAuthority(
   // the same fused predicates the gestures and chrome consume, so a false
   // twin and a bare-outline render can never disagree (permissions.md).
   const canEdit = (ref: AnnotationRef): boolean => {
-    const annotation = store.model().byId[annotationKey(ref)];
-    return !!annotation && annotTransformable(annotation);
+    const record = store.model().byId[annotationKey(ref)];
+    return !!record && annotTransformable(record);
   };
   const canDelete = (ref: AnnotationRef): boolean => {
-    const annotation = store.model().byId[annotationKey(ref)];
-    return !!annotation && annotDeletable(annotation);
+    const record = store.model().byId[annotationKey(ref)];
+    return !!record && annotDeletable(record);
   };
 
   const assertCreate = (): void => {

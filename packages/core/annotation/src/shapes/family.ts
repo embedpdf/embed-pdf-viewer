@@ -7,12 +7,12 @@
  */
 import type { AnnotationDTO } from '@embedpdf/engine-core/runtime';
 
-import type { FieldValues, Handle, ModelGeometry, Point, Rect, RenderNode, Stroke } from '../types';
+import type { FieldValues, Handle, Shape, Point, Rect, RenderNode, Stroke } from '../types';
 
 /** A box's four corners as the page shows them: nw, ne, se, sw. */
 export type Corners = [Point, Point, Point, Point];
 
-export interface ShapeFamily<S extends ModelGeometry = ModelGeometry> {
+export interface ShapeFamily<S extends Shape = Shape> {
   /* ── reading and writing: the shape is engine fields ─────────────────── */
 
   /** The shape, read off an annotation of a kind in this family. */

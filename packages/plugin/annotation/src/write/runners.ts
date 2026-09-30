@@ -24,7 +24,6 @@ import {
   type PageRef,
 } from '@embedpdf/engine-core/runtime';
 
-import { fieldsOf, toCreateDraft } from '@embedpdf/core-annotation';
 import type { AnnotationContext, AnnotationServices } from '../services';
 import type { IntentWrite } from '../services/intents';
 import type { LinkWrites } from './links';
@@ -97,11 +96,11 @@ export function registerEffectRunners(
         : deleteWrite(id),
   );
 
+  // A drawn record: written from the draft its annotation was predicted from.
   store.onEffect('create', (effect, model) => {
     const record = model.byId[effect.id];
-    const draft = record ? toCreateDraft(fieldsOf(record)) : null;
-    if (!record || !draft) return;
-    return createWrite(effect.id, record.annotation.page, draft);
+    if (!record) return;
+    return createWrite(effect.id, record.annotation.page, effect.draft);
   });
 
   // A composite (a replace-text caret and its strikeout): the primary first,
@@ -121,9 +120,7 @@ export function registerEffectRunners(
     ) {
       return;
     }
-    const drafts = records.map((record) => (record ? toCreateDraft(fieldsOf(record)) : null));
-    if (drafts.some((draft) => !draft)) return;
-    const creates = drafts.map((draft) => named(draft!));
+    const creates = ids.map((id) => named(effect.drafts[id]!));
     ids.forEach((id, index) => identity.expect(creates[index]!.nm, id));
     return {
       ids,

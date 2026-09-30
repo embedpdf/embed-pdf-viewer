@@ -57,23 +57,23 @@ export function annotsInBox(
   const pageObjectNumber = page.objectNumber;
   const box = rectFromPoints(from, to);
   return model.order.filter((id) => {
-    const annotation = model.byId[id];
+    const record = model.byId[id];
     if (
-      annotation?.annotation.page.objectNumber !== pageObjectNumber ||
+      record?.annotation.page.objectNumber !== pageObjectNumber ||
       inert?.has(id) ||
       !isSelectable(model, id)
     )
       return false;
     // Conversation-plane annotations (replies, review states) are never on
     // the page — the marquee cannot sweep up what does not paint.
-    if (isSubstrateOnly(annotation)) return false;
+    if (isSubstrateOnly(record)) return false;
     // intersect against what is actually drawn: the oriented selection quad
     // (exact, via SAT) — the same quad the chrome outlines and the grab region
     // uses (screen-anchored bodies at their view-projected footprint). Its
     // AABB is a coarse superset whose empty corners cover most of a tilted
     // shape's unrotated footprint, so testing the AABB selected shapes the
     // marquee never touched.
-    const frame = annotationSelectionFrame(annotation, view);
+    const frame = annotationSelectionFrame(record, view);
     return quadIntersectsRect(frame.corners, box);
   });
 }

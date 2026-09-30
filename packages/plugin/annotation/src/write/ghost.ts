@@ -2,9 +2,11 @@ import {
   clickCreateGeom,
   fitStampBox,
   geomVisualBounds,
+  lineEndingsOf,
   resolveClickPlacement,
-  toolStyleOf,
-  type ModelGeometry,
+  styleOf,
+  toolAnnotation,
+  type Shape,
   type Rect,
   type Point,
 } from '@embedpdf/core-annotation';
@@ -32,13 +34,9 @@ export function createGhost(
 
   /** Paint a vector ghost item for a tool's would-be geometry — shared by the
    *  hover footprint and the externally-driven placement preview. */
-  const showVectorGhost = (
-    pageObjectNumber: number,
-    toolId: string,
-    geometry: ModelGeometry,
-  ): void => {
+  const showVectorGhost = (pageObjectNumber: number, toolId: string, geometry: Shape): void => {
     const tool = tools.get(toolId);
-    const { style } = toolStyleOf(store.model(), tool?.subtype ?? toolId, tool?.preset);
+    const style = styleOf(toolAnnotation(store.model(), tool?.subtype ?? toolId, tool?.preset));
     ctx.state.update(setToolGhost, {
       page: toPageRef(pageObjectNumber),
       box: geomVisualBounds(geometry, style),
@@ -102,7 +100,7 @@ export function createGhost(
     const ghostGeometry = clickCreateGeom(
       tool.subtype,
       placement,
-      toolStyleOf(store.model(), tool.subtype, tool.preset),
+      lineEndingsOf(toolAnnotation(store.model(), tool.subtype, tool.preset)),
     );
     if (!ghostGeometry) {
       clearGhost();

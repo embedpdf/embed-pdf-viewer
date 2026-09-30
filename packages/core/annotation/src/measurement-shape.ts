@@ -6,7 +6,7 @@ import { drawnPointOf, drawnVerticesOf, uprightPointOf } from './shapes/points';
 import { DISTANCE_CAPTION_SIZE, distanceCaptionWidth } from './measurement-font';
 import { distanceLayout, distanceSelectionQuad, moveDistanceCaption } from './measurement';
 import type { DistanceCaptionLayout, MeasurementAppearance } from './measurement';
-import type { ModelGeometry, QuadRing, Rect, Style, Point } from './types';
+import type { Shape, QuadRing, Rect, Style, Point } from './types';
 
 type ShapeAnnotation = Extract<AnnotationDTO, { subtype: 'polygon' | 'polyline' }>;
 
@@ -27,10 +27,7 @@ export interface ShapeMeasurementLayout {
 
 const ORIGIN = { x: 0, y: 0 };
 
-export function shapeMeasurementReadout(
-  geometry: ModelGeometry,
-  appearance: ShapeMeasurementAppearance,
-) {
+export function shapeMeasurementReadout(geometry: Shape, appearance: ShapeMeasurementAppearance) {
   return measurementReadout({
     subtype: appearance.intent === 'polygon-dimension' ? 'polygon' : 'polyline',
     intent: appearance.intent,
@@ -40,7 +37,7 @@ export function shapeMeasurementReadout(
 }
 
 export function shapeMeasurementLabel(
-  geometry: ModelGeometry,
+  geometry: Shape,
   appearance: ShapeMeasurementAppearance,
 ): string {
   const readout = shapeMeasurementReadout(geometry, appearance);
@@ -117,7 +114,7 @@ export function automaticShapeCaptionCenter(points: readonly Point[], closed: bo
 }
 
 export function shapeMeasurementLayout(
-  geometry: ModelGeometry,
+  geometry: Shape,
   appearance: ShapeMeasurementAppearance,
   style: Style,
 ): ShapeMeasurementLayout | null {
@@ -158,7 +155,7 @@ export function shapeMeasurementLayout(
 }
 
 export function measurementLayout(
-  geometry: ModelGeometry,
+  geometry: Shape,
   appearance: MeasurementAppearance,
   style: Style,
 ) {
@@ -168,7 +165,7 @@ export function measurementLayout(
 }
 
 export function measurementSelectionQuad(
-  geometry: ModelGeometry,
+  geometry: Shape,
   appearance: MeasurementAppearance,
   style: Style,
 ): QuadRing {
@@ -195,11 +192,11 @@ export function measurementSelectionQuad(
  * upright with the vertices).
  */
 export function moveMeasurementCaption(
-  geometry: ModelGeometry,
+  geometry: Shape,
   appearance: MeasurementAppearance,
   delta: Point,
   style: Style,
-): { geometry: ModelGeometry; measure: MeasurementAppearance } {
+): { geometry: Shape; measure: MeasurementAppearance } {
   if (appearance.intent === 'line-dimension')
     return { geometry, measure: moveDistanceCaption(geometry, appearance, delta) };
   const center = shapeMeasurementLayout(geometry, appearance, style)?.caption?.center;

@@ -15,25 +15,25 @@ import { rotateDraftDelta } from './edit';
 export function editUp(model: Model): [Model, Effect[]] {
   const draft = model.draft!;
   if (draft.kind === 'leader') {
-    const annotation = model.byId[draft.id];
-    const measure = annotation && measurementOf(annotation.annotation);
+    const record = model.byId[draft.id];
+    const measure = record && measurementOf(record.annotation);
     if (measure?.intent !== 'line-dimension' || draft.delta === 0) {
       return [{ ...model, draft: null }, []];
     }
 
-    const updated = withValues(annotation!, {
+    const updated = withValues(record!, {
       leader: { ...measure.leader, length: (measure.leader?.length ?? 0) + draft.delta },
     });
 
     return [{ ...model, draft: null, byId: { ...model.byId, [updated.id]: updated } }, []];
   }
   if (draft.kind === 'caption') {
-    const annotation = model.byId[draft.id];
-    const measure = annotation && measurementOf(annotation.annotation);
+    const record = model.byId[draft.id];
+    const measure = record && measurementOf(record.annotation);
     if (!measure || (!draft.delta.x && !draft.delta.y)) return [{ ...model, draft: null }, []];
-    const style = styleOf(annotation!.annotation);
+    const style = styleOf(record!.annotation);
     const caption = moveMeasurementCaption(
-      shapeOf(annotation!.annotation),
+      shapeOf(record!.annotation),
       measure,
       draft.delta,
       style,
@@ -42,8 +42,8 @@ export function editUp(model: Model): [Model, Effect[]] {
     // area's caption center is its shape's.
     const moved =
       caption.measure.intent === 'line-dimension'
-        ? withValues(annotation!, { captionOffset: caption.measure.captionOffset })
-        : withShape(annotation!, caption.geometry);
+        ? withValues(record!, { captionOffset: caption.measure.captionOffset })
+        : withShape(record!, caption.geometry);
     return [{ ...model, draft: null, byId: { ...model.byId, [moved.id]: moved } }, []];
   }
   if (draft.kind === 'handle') {
@@ -60,24 +60,24 @@ export function editUp(model: Model): [Model, Effect[]] {
         return [{ ...model, draft: null }, []];
       }
     }
-    const annotation = withShape(before, stored);
-    return [{ ...model, byId: { ...model.byId, [draft.id]: annotation }, draft: null }, []];
+    const record = withShape(before, stored);
+    return [{ ...model, byId: { ...model.byId, [draft.id]: record }, draft: null }, []];
   }
   if (draft.kind === 'rotate') {
     const { delta } = rotateDraftDelta(model, draft);
     if (Math.abs(delta) < 0.01) return [{ ...model, draft: null }, []];
     const byId = { ...model.byId };
     for (const id of draft.ids) {
-      const annotation = byId[id];
-      if (!annotation) continue;
+      const record = byId[id];
+      if (!record) continue;
       // The gesture composed in view space (`effGeom`); the commit replays the
       // same composition and unprojects — a screen-anchored member's authored
       // tilt turns WYSIWYG, exactly as previewed. A measurement's caption
       // center turns with its shape.
-      const rotated = commitViewGesture(annotation, draft.view, (geometry) =>
+      const rotated = commitViewGesture(record, draft.view, (geometry) =>
         geomRotateAbout(geometry, draft.pivot, delta),
       );
-      byId[id] = withShape(annotation, rotated);
+      byId[id] = withShape(record, rotated);
     }
     return [{ ...model, byId, draft: null }, []];
   }
@@ -86,12 +86,12 @@ export function editUp(model: Model): [Model, Effect[]] {
     if (Math.abs(sx - 1) < 1e-4 && Math.abs(sy - 1) < 1e-4) return [{ ...model, draft: null }, []];
     const byId = { ...model.byId };
     for (const id of draft.ids) {
-      const annotation = byId[id];
-      if (!annotation) continue;
-      const scaled = commitViewGesture(annotation, draft.view, (geometry) =>
+      const record = byId[id];
+      if (!record) continue;
+      const scaled = commitViewGesture(record, draft.view, (geometry) =>
         geomScaleAbout(geometry, draft.anchor, sx, sy),
       );
-      byId[id] = withShape(annotation, scaled);
+      byId[id] = withShape(record, scaled);
     }
     return [{ ...model, byId, draft: null }, []];
   }
@@ -99,9 +99,9 @@ export function editUp(model: Model): [Model, Effect[]] {
     if (Math.hypot(draft.delta.x, draft.delta.y) < 0.01) return [{ ...model, draft: null }, []]; // a click
     const byId = { ...model.byId };
     for (const id of draft.ids) {
-      const annotation = byId[id];
-      const geometry = shapeOf(annotation.annotation);
-      byId[id] = withShape(annotation, geomTranslate(geometry, draft.delta));
+      const record = byId[id];
+      const geometry = shapeOf(record.annotation);
+      byId[id] = withShape(record, geomTranslate(geometry, draft.delta));
     }
     return [{ ...model, byId, draft: null }, []];
   }

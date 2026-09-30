@@ -5,18 +5,18 @@
 import type { AnnotationDTO } from '@embedpdf/engine-core/runtime';
 
 import { familyOf } from '../shapes';
-import type { ModelAnnotation, ModelGeometry } from '../types';
+import type { ModelAnnotation, Shape } from '../types';
 import { kindOf } from './identity';
 import { withValues } from './values';
 
-const shapes = new WeakMap<AnnotationDTO, ModelGeometry>();
+const shapes = new WeakMap<AnnotationDTO, Shape>();
 
 /**
  * The annotation's shape (`shapes/`), read by its kind's family. The same
  * shape for the same annotation, so what is worked out from a shape once
  * (where its points are drawn) is kept.
  */
-export function shapeOf(annotation: AnnotationDTO): ModelGeometry {
+export function shapeOf(annotation: AnnotationDTO): Shape {
   let shape = shapes.get(annotation);
   if (!shape) {
     shape = kindOf(annotation).family.read(annotation);
@@ -30,5 +30,5 @@ export function shapeOf(annotation: AnnotationDTO): ModelGeometry {
  * written through `withValues`. The same record when the shape is the one
  * it has, or when the record may not change now.
  */
-export const withShape = (record: ModelAnnotation, shape: ModelGeometry): ModelAnnotation =>
+export const withShape = (record: ModelAnnotation, shape: Shape): ModelAnnotation =>
   withValues(record, familyOf(shape).write(shape, record.annotation.subtype));

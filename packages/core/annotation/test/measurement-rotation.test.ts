@@ -1,7 +1,7 @@
 import { toPageRef } from '@embedpdf/engine-core/runtime';
 import { describe, expect, it } from 'vitest';
 
-import { record, step, type RecordInput, STYLE } from './support';
+import { recordOf, step, type RecordInput, STYLE } from './support';
 import { DRAWN_FLAGS } from '../src/flags';
 import { DEFAULT_CHROME_GEOMETRY, pointInQuad, turnPivotOf } from '../src/geometry';
 import { rotatePoint, unionRect } from '../src/rect';
@@ -12,7 +12,7 @@ import { annotationSelectionFrame } from '../src/selection';
 import type { ModelAnnotation, Model, QuadRing, Point } from '../src/types';
 import { initialModel, annotsInBox } from '../src/update';
 import { chrome, pageItems } from '../src/view';
-import { fieldsOf, shapeOf } from '../src/record';
+import { shapeOf } from '../src/record';
 
 const PAGE = toPageRef(1);
 const appearance: DistanceAppearance = {
@@ -26,7 +26,7 @@ const appearance: DistanceAppearance = {
 };
 
 function measurement(overrides: Partial<RecordInput> = {}): ModelAnnotation {
-  return record({
+  return recordOf({
     id: 'distance',
     ref: null,
     page: toPageRef(1),
@@ -45,13 +45,13 @@ function measurement(overrides: Partial<RecordInput> = {}): ModelAnnotation {
   });
 }
 
-function selected(annotation = measurement()): Model {
+function selected(record = measurement()): Model {
   return {
     ...initialModel,
     snap: { ...initialModel.snap, rotation: false },
-    byId: { [annotation.id]: annotation },
-    order: [annotation.id],
-    selected: [annotation.id],
+    byId: { [record.id]: record },
+    order: [record.id],
+    selected: [record.id],
   };
 }
 
@@ -83,16 +83,16 @@ function pointer(model: Model, phase: 'down' | 'move' | 'up', point: Point): Mod
 
 describe('measurement selection frame and rotation', () => {
   const cases = [
-    { name: 'displaced inline caption', annotation: measurement() },
+    { name: 'displaced inline caption', record: measurement() },
     {
       name: 'top caption',
-      annotation: measurement({
+      record: measurement({
         measure: { ...appearance, captionPosition: 'top', captionOffset: null },
       }),
     },
     {
       name: 'short dimension with outside arrows',
-      annotation: measurement({
+      record: measurement({
         geometry: {
           kind: 'line',
           linePoints: { start: { x: 140, y: 180 }, end: { x: 170, y: 180 } },
@@ -103,13 +103,13 @@ describe('measurement selection frame and rotation', () => {
     },
   ];
 
-  it.each(cases)('rotates the complete $name about the middle of its line', ({ annotation }) => {
-    const start = selected(annotation);
+  it.each(cases)('rotates the complete $name about the middle of its line', ({ record }) => {
+    const start = selected(record);
     const outline = outlineCorners(start);
     // The pivot is where the engine turns the line: its own middle, not the
     // middle of the frame the caption and leaders widen.
-    const center = turnPivotOf(shapeOf(annotation.annotation));
-    const frameCenter = annotationSelectionFrame(annotation).center;
+    const center = turnPivotOf(shapeOf(record.annotation));
+    const frameCenter = annotationSelectionFrame(record).center;
     const knob = chrome(start, PAGE).find((node) => node.kind === 'rotate-knob');
     if (knob?.kind !== 'rotate-knob') throw new Error('Missing rotation handle');
     expectPoint(knob.from, {
@@ -121,8 +121,8 @@ describe('measurement selection frame and rotation', () => {
 
     const armed = pointer(start, 'down', knob.at);
     const initialCaption = distanceLayout(
-      shapeOf(annotation.annotation),
-      measurementOf(annotation.annotation) as DistanceAppearance,
+      shapeOf(record.annotation),
+      measurementOf(record.annotation) as DistanceAppearance,
       2,
     )!.caption!;
     for (const angle of [30, 89, 91, 137, 180, 269, 271, 359]) {
@@ -148,12 +148,12 @@ describe('measurement selection frame and rotation', () => {
         rotatePoint(frameCenter, center, angle),
       );
       expect(measurementOf(committed.byId.distance.annotation)).toEqual(
-        measurementOf(annotation.annotation),
+        measurementOf(record.annotation),
       );
       expect(shapeOf(committed.byId.distance.annotation)).toEqual(item.geometry);
     }
     expect(pointer(armed, 'move', knob.at).draft).toMatchObject({ pivot: center });
-    expect(step(armed, { type: 'cancel' })[0].byId.distance).toBe(annotation);
+    expect(step(armed, { type: 'cancel' })[0].byId.distance).toBe(record);
   });
 
   it('uses the same center for quarter turns and reset, without moving the annotation', () => {
@@ -180,13 +180,13 @@ describe('measurement selection frame and rotation', () => {
 
   it('keeps its frame after a native appearance with conservative bounds arrives', () => {
     const state = step(selected(), { type: 'rotateSelection', degrees: 90 })[0];
-    const annotation = state.byId.distance;
+    const record = state.byId.distance;
     const baked: ModelAnnotation = {
-      ...annotation,
+      ...record,
       source: 'baked',
       apBox: { x: 40, y: 60, width: 450, height: 400 },
     };
-    expect(annotationSelectionFrame(baked)).toEqual(annotationSelectionFrame(annotation));
+    expect(annotationSelectionFrame(baked)).toEqual(annotationSelectionFrame(record));
   });
 
   it('uses the full measurement frame for marquee and group rotation', () => {
@@ -194,9 +194,10 @@ describe('measurement selection frame and rotation', () => {
     expect(annotsInBox(state, toPageRef(1), { x: 290, y: 340 }, { x: 325, y: 355 })).toEqual([
       'distance',
     ]);
-    const square = record({
-      ...fieldsOf(measurement()),
+    const square = recordOf({
       id: 'square',
+      ref: null,
+      page: toPageRef(1),
       subtype: 'square',
       geometry: {
         kind: 'box',
@@ -204,8 +205,9 @@ describe('measurement selection frame and rotation', () => {
         rotation: 0,
         ellipse: false,
       },
-      measure: undefined,
-      annotation: undefined,
+      style: STYLE,
+      source: 'vector',
+      flags: DRAWN_FLAGS,
     });
     state.byId.square = square;
     state.order.push(square.id);

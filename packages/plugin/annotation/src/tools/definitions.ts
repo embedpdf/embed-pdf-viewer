@@ -17,7 +17,7 @@ import type {
   ClickCreate,
   FieldValues,
   InkStraightenOptions,
-  Subtype,
+  KindName,
 } from '@embedpdf/core-annotation';
 import type {
   AnnotationDraft,
@@ -200,7 +200,7 @@ export interface AnnotationToolDef<K extends ToolAuthoringKind = ToolAuthoringKi
    *  views of the one PDF `widget` subtype (a form tool's commit goes through
    *  `doc.forms`, never this plugin — see the form plugin's tool table).
    *  Defaults to the inherited kind, or the id when neither is given. */
-  subtype?: Subtype;
+  subtype?: KindName;
   /** The kind whose editable fields a style panel shows for this tool.
    *  Defaults to `subtype` (a callout edits `free-text` fields, for example). */
   fieldsKind?: string;
@@ -325,7 +325,7 @@ export type AnnotationToolInput = DirectToolDef | BuiltinToolOverride | Extended
 export interface ResolvedTool {
   id: string;
   /** Routing token for the draw core + the created annotation's PDF subtype. */
-  subtype: Subtype;
+  subtype: KindName;
   /** The `defaults` key (always the tool id) — keeps same-subtype tools apart. */
   preset: string;
   /** The kind whose fields the style panel shows (`kindNamed(…).fields`). */
@@ -683,7 +683,7 @@ export function buildToolRegistry(
       base = resolve(definition.extends);
       resolving.delete(id);
     }
-    const subtype = (definition.subtype ?? base?.subtype ?? definition.id) as Subtype;
+    const subtype = (definition.subtype ?? base?.subtype ?? definition.id) as KindName;
     const resolved: ResolvedTool = {
       id: definition.id,
       subtype,

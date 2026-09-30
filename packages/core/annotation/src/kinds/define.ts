@@ -7,7 +7,7 @@
 import type { AnnotationDTO } from '@embedpdf/engine-core/runtime';
 
 import type { ShapeFamily } from '../shapes';
-import type { Style } from '../types';
+import type { Style, TextStyle } from '../types';
 
 /**
  * One editable field of a kind, as a UI contract: which engine field, rendered
@@ -143,6 +143,11 @@ export interface AnnotationKind {
    * with its kind's fill-ins (`styles.ts`).
    */
   readonly style: (annotation: AnnotationDTO) => Style;
+  /**
+   * How its text is set, for a kind with text: its font, size, colour and
+   * alignment, read off the annotation (`texts.ts`).
+   */
+  readonly text?: (annotation: AnnotationDTO) => TextStyle;
   /** What a user can do to it. The annotation's `/F` flags override these at runtime (flags.ts). */
   readonly caps: KindCaps;
   /** What a sidebar edits, in display order, keyed by the engine's field names. */

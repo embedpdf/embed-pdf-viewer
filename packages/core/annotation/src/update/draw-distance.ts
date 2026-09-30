@@ -1,12 +1,16 @@
 /** Drawing a distance measurement: the measured line, then the offset of its dimension line. */
 import type { AnnotationFlags } from '@embedpdf/engine-core/runtime';
 
-import { DRAWN_FLAGS } from '../flags';
-import { distanceLeaderLength, type DistanceAppearance } from '../measurement';
-import type { ModelGeometry, Effect, Model, PointerInput } from '../types';
-import { newRecord } from './changes';
+import {
+  distanceLeaderLength,
+  measurementDraftFields,
+  type DistanceAppearance,
+} from '../measurement';
+import { styleOf } from '../record';
+import type { Shape, Effect, Model, PointerInput } from '../types';
+import { draftOf, newRecord } from './changes';
 import { MIN_DRAG } from './draw';
-import { toolStyleOf } from './session';
+import { defaultsFor, lineEndingsOf, toolAnnotation } from './session';
 
 /**
  * Distance creation has two stages. Releasing the endpoint drag only advances
@@ -77,11 +81,11 @@ export function distancePointer(
     return [model, []];
   }
 
-  const tool = toolStyleOf(model, draft.subtype, draft.preset);
-  const geometry: ModelGeometry = {
+  const tool = toolAnnotation(model, draft.subtype, draft.preset);
+  const geometry: Shape = {
     kind: 'line',
     linePoints: { start: draft.from, end: draft.to },
-    lineEndings: tool.lineEndings,
+    lineEndings: lineEndingsOf(tool),
     rotation: 0,
   };
   const appearance: DistanceAppearance = {
@@ -96,28 +100,33 @@ export function distancePointer(
     return [{ ...model, draft: { ...draft, measure: appearance } }, []];
   }
 
-  const annotation = newRecord(model, {
-    page: draft.page,
-    subtype: 'line',
-    geometry,
-    measure: appearance,
-    style: {
-      ...tool.style,
-      interiorColor: tool.style.interiorColor ?? tool.style.color,
-    },
-    flags: { ...DRAWN_FLAGS, ...draft.flags },
-  });
-  const id = annotation.id;
+  const style = styleOf(tool);
+  const created = newRecord(
+    model,
+    draft.page,
+    draftOf(
+      'line',
+      defaultsFor(model, draft.preset),
+      geometry,
+      {
+        ...measurementDraftFields(appearance),
+        // The arrowheads fill with the stroke colour when the tool gives no fill.
+        interiorColor: style.interiorColor ?? style.color,
+      },
+      draft.flags,
+    ),
+  );
+  const id = created.record.id;
 
   return [
     {
       ...model,
       seq: model.seq + 1,
-      byId: { ...model.byId, [id]: annotation },
+      byId: { ...model.byId, [id]: created.record },
       order: [...model.order, id],
       selected: [id],
       draft: null,
     },
-    [{ type: 'create', id }],
+    [{ type: 'create', id, draft: created.draft }],
   ];
 }

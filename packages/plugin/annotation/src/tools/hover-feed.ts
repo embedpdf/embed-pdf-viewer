@@ -32,15 +32,15 @@ export function createAnnotationHoverFeed(
 
   const targetOf = (id: string | null): HoverTarget | null => {
     if (!id) return null;
-    const annotation = annotOf(id);
-    const ref = annotation ? refOf(annotation) : null;
-    if (!annotation || !ref) return null;
-    const kind = kindOf(annotation.annotation).name;
+    const record = annotOf(id);
+    const ref = record ? refOf(record) : null;
+    if (!record || !ref) return null;
+    const kind = kindOf(record.annotation).name;
     if (kind.startsWith('widget') || kind === 'link') return null;
-    const enter = Boolean(annotation.annotation.actions?.cursorEnter?.root);
-    const exit = Boolean(annotation.annotation.actions?.cursorExit?.root);
+    const enter = Boolean(record.annotation.actions?.cursorEnter?.root);
+    const exit = Boolean(record.annotation.actions?.cursorExit?.root);
     if (!enter && !exit) return null;
-    return { ref, page: annotation.annotation.page, events: { enter, exit } };
+    return { ref, page: record.annotation.page, events: { enter, exit } };
   };
 
   return {

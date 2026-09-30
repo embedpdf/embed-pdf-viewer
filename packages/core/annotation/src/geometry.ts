@@ -22,14 +22,14 @@ import {
   resizeRect,
 } from './rect';
 import { familyOf } from './shapes';
-import type { ModelGeometry, Handle, Rect, RenderNode, Point, Stroke } from './types';
+import type { Shape, Handle, Rect, RenderNode, Point, Stroke } from './types';
 
 /* ── rotation ──────────────────────────────────────────────────────────────
  * Annotation rotation, layered on the generic `@embedpdf/core-geometry` affine
  * primitives (`rotateAbout`). Box kinds carry an unrotated `rect` + a `rot`
  * angle; vertex kinds carry already-rotated points + an advisory `rot`. These
  * helpers know that split and compose the matrix builders — they never hand-roll
- * a rotation matrix. See `ModelGeometry` in types.ts.
+ * a rotation matrix. See `Shape` in types.ts.
  * ──────────────────────────────────────────────────────────────────────────── */
 
 /** How far (content units) the rotate knob hangs off the top edge of the box. */
@@ -47,7 +47,7 @@ export const DEFAULT_CHROME_GEOMETRY = {
  *  its text's baseline tilt: reported here so the renderer and selection
  *  chrome follow it, while the caret's caps (not movable/resizable) keep
  *  every rotate gesture away from it. */
-export function geomRotation(geometry: ModelGeometry): number {
+export function geomRotation(geometry: Shape): number {
   return geometry.kind === 'quads' ? 0 : geometry.rotation;
 }
 
@@ -58,14 +58,13 @@ export function geomRotation(geometry: ModelGeometry): number {
  * where the upright points are, and a caption or an arrowhead never moves the
  * pivot.
  */
-export const turnPivotOf = (geometry: ModelGeometry): Point => familyOf(geometry).pivot(geometry);
+export const turnPivotOf = (geometry: Shape): Point => familyOf(geometry).pivot(geometry);
 
 /** Does the geometry carry a meaningful `rot` (an oriented local box exists)?
  *  Orientation is a geometry fact; whether the user may rotate is the separate
  *  `caps.rotatable` gate — a caret is oriented (it rides its text's tilt) yet
  *  offers no rotate gesture. */
-export const isRotatableGeom = (geometry: ModelGeometry): boolean =>
-  familyOf(geometry).oriented(geometry);
+export const isRotatableGeom = (geometry: Shape): boolean => familyOf(geometry).oriented(geometry);
 
 /**
  * Rotate a geom by `deltaDeg` (clockwise) about `pivot`: a box's middle
@@ -74,11 +73,7 @@ export const isRotatableGeom = (geometry: ModelGeometry): boolean =>
  * caret (oriented, but it follows its text; `geomResetRotation` still clears
  * its turn).
  */
-export function geomRotateAbout(
-  geometry: ModelGeometry,
-  pivot: Point,
-  deltaDeg: number,
-): ModelGeometry {
+export function geomRotateAbout(geometry: Shape, pivot: Point, deltaDeg: number): Shape {
   return deltaDeg === 0 ? geometry : familyOf(geometry).rotateAbout(geometry, pivot, deltaDeg);
 }
 
@@ -170,7 +165,7 @@ export function fitStampBox(center: Point, desired: Size, page: Size, rotCW: num
 /** Reset a geom to its as-authored orientation (turn → 0). Box: drop the turn.
  *  Points: turn back about `pivot` (the middle of the upright points by
  *  default, which only clears the turn). */
-export function geomResetRotation(geometry: ModelGeometry, pivot?: Point): ModelGeometry {
+export function geomResetRotation(geometry: Shape, pivot?: Point): Shape {
   return geomRotation(geometry) ? familyOf(geometry).upright(geometry, pivot) : geometry;
 }
 
@@ -182,7 +177,7 @@ export function geomResetRotation(geometry: ModelGeometry, pivot?: Point): Model
  * rectangle. Returns null for non-rotatable kinds.
  */
 export function obbFromGeom(
-  geometry: ModelGeometry,
+  geometry: Shape,
   stroke: Stroke,
 ): { corners: [Point, Point, Point, Point]; angle: number } | null {
   const corners = familyOf(geometry).turnedCorners(geometry, stroke);
@@ -247,12 +242,7 @@ export function groupResizeFactors(base: Rect, current: Rect): { sx: number; sy:
  * preserved (a uniform scale commutes with rotation). For unrotated members
  * (the anisotropic case) every point/extent scales directly.
  */
-export function geomScaleAbout(
-  geometry: ModelGeometry,
-  anchor: Point,
-  sx: number,
-  sy: number,
-): ModelGeometry {
+export function geomScaleAbout(geometry: Shape, anchor: Point, sx: number, sy: number): Shape {
   return familyOf(geometry).scaleAbout(geometry, anchor, sx, sy);
 }
 
@@ -365,7 +355,7 @@ export function placeRotateKnob(
  * cloud extent, and the engine's `rect` grows with them so the baked scallops
  * are never clipped.
  */
-export const geomVisualBounds = (geometry: ModelGeometry, stroke: Stroke): Rect =>
+export const geomVisualBounds = (geometry: Shape, stroke: Stroke): Rect =>
   familyOf(geometry).drawnBounds(geometry, stroke);
 
 /**
@@ -378,7 +368,7 @@ export const geomVisualBounds = (geometry: ModelGeometry, stroke: Stroke): Rect 
  * hit-test both call this, so what you see highlighted is exactly what you can grab —
  * they can never drift.
  */
-export const selectionBounds = (geometry: ModelGeometry, stroke: Stroke): Rect =>
+export const selectionBounds = (geometry: Shape, stroke: Stroke): Rect =>
   familyOf(geometry).selectionBounds(geometry, stroke);
 
 /**
@@ -390,10 +380,7 @@ export const selectionBounds = (geometry: ModelGeometry, stroke: Stroke): Rect =
  * all consume this, so what you can grab / where the menu sits never drifts from
  * the outline you see.
  */
-export function selectionQuad(
-  geometry: ModelGeometry,
-  stroke: Stroke,
-): [Point, Point, Point, Point] {
+export function selectionQuad(geometry: Shape, stroke: Stroke): [Point, Point, Point, Point] {
   const obb = obbFromGeom(geometry, stroke);
   if (obb) return obb.corners;
   return rectCornerPoints(selectionBounds(geometry, stroke)) as [Point, Point, Point, Point];
@@ -445,7 +432,7 @@ export function quadIntersectsRect(quad: [Point, Point, Point, Point], rect: Rec
 /* ── geom ops ─────────────────────────────────────────────────────────────── */
 
 /** The box around the shape's own box or points, the stroke left out. */
-export const geomBounds = (geometry: ModelGeometry): Rect => familyOf(geometry).bounds(geometry);
+export const geomBounds = (geometry: Shape): Rect => familyOf(geometry).bounds(geometry);
 
 /**
  * Is the page point on the annotation: within `margin` of the stroke, or
@@ -453,7 +440,7 @@ export const geomBounds = (geometry: ModelGeometry): Rect => familyOf(geometry).
  * width; a cloud's bumps are what a cloudy box is hit on.
  */
 export function geomHit(
-  geometry: ModelGeometry,
+  geometry: Shape,
   point: Point,
   margin: number,
   filled: boolean,
@@ -463,13 +450,12 @@ export function geomHit(
 }
 
 /** The shape's handles: resize corners and sides, a callout's tip and knee, or vertices. */
-export const geomHandles = (geometry: ModelGeometry): Handle[] =>
-  familyOf(geometry).handles(geometry);
+export const geomHandles = (geometry: Shape): Handle[] => familyOf(geometry).handles(geometry);
 
-export const geomTranslate = (geometry: ModelGeometry, delta: Point): ModelGeometry =>
+export const geomTranslate = (geometry: Shape, delta: Point): Shape =>
   familyOf(geometry).translate(geometry, delta);
 
-export const geomDragHandle = (geometry: ModelGeometry, handle: string, to: Point): ModelGeometry =>
+export const geomDragHandle = (geometry: Shape, handle: string, to: Point): Shape =>
   familyOf(geometry).drag(geometry, handle, to);
 
 /**
@@ -478,5 +464,5 @@ export const geomDragHandle = (geometry: ModelGeometry, handle: string, to: Poin
  * paints exactly what the AP generator bakes; the framework's editable
  * element owns only the text.
  */
-export const geomScene = (geometry: ModelGeometry, stroke: Stroke): RenderNode[] =>
+export const geomScene = (geometry: Shape, stroke: Stroke): RenderNode[] =>
   familyOf(geometry).scene(geometry, stroke);

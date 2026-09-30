@@ -4,7 +4,7 @@ import { geomRotation, isRotatableGeom, selectionQuad, turnPivotOf } from './geo
 import { measurementOf, type MeasurementAppearance } from './measurement';
 import { measurementSelectionQuad } from './measurement-shape';
 import { shapeOf, styleOf } from './record';
-import type { ModelAnnotation, ModelGeometry, QuadRing, Point, Style, ViewEnv } from './types';
+import type { ModelAnnotation, Shape, QuadRing, Point, Style, ViewEnv } from './types';
 
 export interface SelectionFrame {
   corners: QuadRing;
@@ -13,18 +13,18 @@ export interface SelectionFrame {
 }
 
 /**
- * The frame of `annotation` as it is drawn, or with `live` fields laid over its
+ * The frame of `record` as it is drawn, or with `live` fields laid over its
  * own (a gesture's geometry, a screen-anchored stroke).
  */
 export function annotationSelectionFrame(
-  annotation: ModelAnnotation,
+  record: ModelAnnotation,
   view?: ViewEnv,
-  live?: { geometry?: ModelGeometry; style?: Style; measure?: MeasurementAppearance },
+  live?: { geometry?: Shape; style?: Style; measure?: MeasurementAppearance },
 ): SelectionFrame {
-  const style = live?.style ?? styleOf(annotation.annotation);
-  const measure = live?.measure ?? measurementOf(annotation.annotation);
-  const mode = anchorModeOf(annotation);
-  const geometry = anchoredGeom(live?.geometry ?? shapeOf(annotation.annotation), mode, view);
+  const style = live?.style ?? styleOf(record.annotation);
+  const measure = live?.measure ?? measurementOf(record.annotation);
+  const mode = anchorModeOf(record);
+  const geometry = anchoredGeom(live?.geometry ?? shapeOf(record.annotation), mode, view);
   const strokeWidth = anchoredStrokeWidth(style.strokeWidth, mode, view);
   const corners = measure
     ? measurementSelectionQuad(geometry, measure, { ...style, strokeWidth })
@@ -42,7 +42,7 @@ export function annotationSelectionFrame(
   };
 }
 
-/** Where a turn of `annotation` pivots (`turnPivotOf`), in its frame's space. */
-export function annotationTurnPivot(annotation: ModelAnnotation, view?: ViewEnv): Point {
-  return turnPivotOf(anchoredGeom(shapeOf(annotation.annotation), anchorModeOf(annotation), view));
+/** Where a turn of `record` pivots (`turnPivotOf`), in its frame's space. */
+export function annotationTurnPivot(record: ModelAnnotation, view?: ViewEnv): Point {
+  return turnPivotOf(anchoredGeom(shapeOf(record.annotation), anchorModeOf(record), view));
 }

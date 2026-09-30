@@ -13,7 +13,8 @@ export {
   sameSession,
   EMPTY_CHANGE,
   defaultsFor,
-  toolStyleOf,
+  lineEndingsOf,
+  toolAnnotation,
   rotateDraftDelta,
   MIN_DRAG,
 } from './update';
@@ -100,12 +101,7 @@ export {
   type KindCaps,
 } from './kinds';
 export { initialTextStyle, kindTakesLink, sharedFields } from './props';
-export {
-  engineSubtypeOf,
-  readOfDefaults,
-  styleOfDefaults,
-  type ToolStyle,
-} from './record/defaults';
+export { engineSubtypeOf, readOfDefaults, widgetAppearanceOf } from './record/defaults';
 export {
   geomScene,
   geomBounds,
@@ -173,30 +169,21 @@ export {
   type PolyShape,
 } from './shapes/points';
 export { calloutEnd, textPlateInset, type CalloutLine, type TextBoxShape } from './shapes/text-box';
-// The engine's record and the model's entry, both ways: the entry a record
-// reads as, who it is (its ref, kind and relationships), the fields the
-// core's gestures read off it, and the engine fields a change of them writes.
+// A record: the engine annotation it holds, read (who it is, its shape, how
+// it is drawn, how its text is set) and written back as engine fields.
 export {
-  annotationOfRecord,
-  boxGeomFields,
-  fieldsOf,
   fromDTO,
   groupOf,
-  hexColorOf,
   irtOf,
   kindOf,
   linkChildRects,
-  recordOf,
   refOf,
   shapeOf,
   styleOf,
-  withFields,
+  textOf,
   withShape,
-  toCreateDraft,
-  toPatch,
-  widgetAppearanceOf,
+  withValues,
   writableTarget,
-  type AnnotationPlace,
 } from './record';
 export { cloudyPath, cloudyBorderExtent } from './cloudy';
 export * from './measurement';
@@ -217,7 +204,7 @@ export type {
   CreationDraftAnchor,
   Draft,
   Effect,
-  ModelGeometry,
+  Shape,
   Guide,
   Handle,
   Id,
@@ -229,7 +216,6 @@ export type {
   FieldValues,
   QuadRing,
   Rect,
-  RecordFields,
   LineEnding,
   LineEndings,
   Paint,
@@ -241,7 +227,7 @@ export type {
   SnapSettings,
   Stroke,
   Style,
-  Subtype,
+  KindName,
   TextAlign,
   TextEndAnchor,
   Quad,

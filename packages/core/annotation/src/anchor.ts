@@ -37,7 +37,7 @@ import { geomBounds, geomRotateAbout, geomScaleAbout, geomTranslate } from './ge
 import { normalizeDeg, rotatePoint } from './rect';
 import type { FlagBearer } from './flags';
 import { kindOf } from './record/identity';
-import type { ModelGeometry, Point, ViewEnv } from './types';
+import type { Shape, Point, ViewEnv } from './types';
 
 export type { ViewEnv };
 
@@ -67,7 +67,7 @@ export function anchorModeOf(record: FlagBearer): AnchorMode | null {
  * is bound to page text, so a screen-constant body is meaningless there; the
  * flags still round-trip untouched.
  */
-const projectable = (geometry: ModelGeometry): boolean =>
+const projectable = (geometry: Shape): boolean =>
   geometry.kind === 'box' ||
   geometry.kind === 'line' ||
   geometry.kind === 'poly' ||
@@ -77,7 +77,7 @@ const projectable = (geometry: ModelGeometry): boolean =>
 /** The fixed page point: the geometry's bounds top-left in page space
  *  (y-down) — which is the spec's "upper-left corner of the annotation
  *  rectangle", since `/Rect` is emitted from these bounds. */
-export const anchorOf = (geometry: ModelGeometry): Point => {
+export const anchorOf = (geometry: Shape): Point => {
   const rect = geomBounds(geometry);
   return { x: rect.x, y: rect.y };
 };
@@ -112,14 +112,14 @@ function factors(
  * unconditionally.
  */
 export function anchoredGeom(
-  geometry: ModelGeometry,
+  geometry: Shape,
   mode: AnchorMode | null,
   view: ViewEnv | undefined,
-): ModelGeometry {
+): Shape {
   const projection = factors(mode, view);
   if (!projection || !projectable(geometry)) return geometry;
   const point = anchorOf(geometry);
-  let out: ModelGeometry = geometry;
+  let out: Shape = geometry;
   if (projection.s !== 1) out = geomScaleAbout(out, point, 1 / projection.s, 1 / projection.s);
   if (projection.r !== 0) out = geomRotateAbout(out, point, normalizeDeg(-projection.r));
   return out;
@@ -137,13 +137,13 @@ export function anchoredGeom(
  * what makes a released gesture commit exactly what its preview showed.
  */
 export function unanchoredGeom(
-  target: ModelGeometry,
+  target: Shape,
   mode: AnchorMode | null,
   view: ViewEnv | undefined,
-): ModelGeometry {
+): Shape {
   const projection = factors(mode, view);
   if (!projection || !projectable(target)) return target;
-  let lin: ModelGeometry = target;
+  let lin: Shape = target;
   if (projection.s !== 1) lin = geomScaleAbout(lin, ORIGIN, projection.s, projection.s);
   if (projection.r !== 0) lin = geomRotateAbout(lin, ORIGIN, projection.r);
   const point = anchorOf(lin);

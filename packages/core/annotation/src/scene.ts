@@ -15,13 +15,13 @@ import { quadBounds, quadRing } from '@embedpdf/core-geometry';
 import { geomScene } from './geometry';
 import { dashOf } from './kinds/styles';
 import type {
-  ModelGeometry,
+  Shape,
   Paint,
   Rect,
   RenderItem,
   SceneNode,
   Style,
-  Subtype,
+  KindName,
   Quad,
   TextStyle,
   Point,
@@ -83,7 +83,7 @@ function squigglePath(
  *  The colour is the markup `/C` (our model keeps stroke==fill). Rotated and
  *  sheared cells draw along their true baselines; upright output is identical
  *  to the old axis-aligned math. */
-function markupScene(subtype: Subtype, quads: Quad[], style: Style): SceneNode[] {
+function markupScene(subtype: KindName, quads: Quad[], style: Style): SceneNode[] {
   const color = style.color;
   const opacity = style.opacity;
   const nodes: SceneNode[] = [];
@@ -163,7 +163,7 @@ const rectRing = (rect: Rect): [Point, Point, Point, Point] => [
   { x: rect.x, y: rect.y + rect.height },
 ];
 
-function redactRegions(geometry: ModelGeometry): RedactRegion[] {
+function redactRegions(geometry: Shape): RedactRegion[] {
   if (geometry.kind === 'quads') {
     const out: RedactRegion[] = [];
     for (const quad of geometry.quadPoints) {

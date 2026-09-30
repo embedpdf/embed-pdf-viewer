@@ -58,21 +58,13 @@ export function createLinkWrites(
    * the next local edit.
    */
   const reconcileChildren = async (id: Id, desired: PdfLinkTarget | null): Promise<void> => {
-    const annotation = store.model().byId[id];
-    if (
-      !ctx.doc ||
-      !annotation ||
-      !refOf(annotation) ||
-      kindOf(annotation.annotation).name === 'link'
-    )
-      return;
+    const record = store.model().byId[id];
+    if (!ctx.doc || !record || !refOf(record) || kindOf(record.annotation).name === 'link') return;
     // Read-only target arms can't be (re)written: children keep their /A and
     // only their rects follow the parent.
     const target = writableTarget(desired);
     const rects =
-      desired == null
-        ? []
-        : linkChildRects(shapeOf(annotation.annotation), styleOf(annotation.annotation));
+      desired == null ? [] : linkChildRects(shapeOf(record.annotation), styleOf(record.annotation));
     const current = linkChildrenOf(store.model(), id);
     const changes: StoreChange[] = [];
     const paired = Math.min(current.length, rects.length);
@@ -86,12 +78,12 @@ export function createLinkWrites(
     for (let i = current.length; i < rects.length; i++) {
       changes.push({
         type: 'create',
-        page: annotation.annotation.page,
+        page: record.annotation.page,
         draft: {
           subtype: 'link',
           rect: rects[i],
           target,
-          reply: { to: refOf(annotation), type: 'group' },
+          reply: { to: refOf(record), type: 'group' },
         } as AnnotationDraft,
       });
     }
@@ -165,10 +157,12 @@ export function createLinkWrites(
     links: {
       get: (ref: AnnotationRef) => {
         const model = store.model();
-        const annotation = model.byId[annotationKey(ref)];
-        if (!annotation) return null;
-        const record = annotation.annotation;
-        return record.subtype === 'link' ? (record.target ?? null) : linkOf(model, annotation.id);
+        const record = model.byId[annotationKey(ref)];
+        if (!record) return null;
+        const annotation = record.annotation;
+        return annotation.subtype === 'link'
+          ? (annotation.target ?? null)
+          : linkOf(model, record.id);
       },
       // The verbs go straight to the reconciler chain (latest-wins per
       // parent) and resolve when the children are committed — `get` reads

@@ -39,7 +39,7 @@ import { anchoredBox, anchorModeOf, anchorOf } from './anchor';
 import { geomRotation } from './geometry';
 import { normalizeDeg } from './rect';
 import { kindOf, shapeOf } from './record';
-import type { Id, Model, ModelAnnotation, ModelGeometry, Rect, ViewEnv } from './types';
+import type { Id, Model, ModelAnnotation, Shape, Rect, ViewEnv } from './types';
 
 /** The part of a record that says how it is drawn. */
 export type DrawState = Pick<ModelAnnotation, 'source' | 'apBox'>;
@@ -118,7 +118,7 @@ export function rasterPlacement(
   model: Model,
   id: Id,
   view: ViewEnv | undefined,
-  shapeNow: ModelGeometry,
+  shapeNow: Shape,
 ): { box?: Rect; rot?: number } {
   const record = model.byId[id];
   if (!drawsLive(record.annotation)) {

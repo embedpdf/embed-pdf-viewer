@@ -20,11 +20,11 @@ import type {
   CreationDraftAnchor,
   FieldSpec,
   FieldValues,
-  ModelGeometry,
+  Shape,
   Id,
   Rect,
   SnapSettings,
-  Subtype,
+  KindName,
 } from '@embedpdf/core-annotation';
 import type { PageRotation, Point } from '@embedpdf/core-geometry';
 import type {
@@ -157,7 +157,7 @@ export type ToolGhost = {
   rot: number;
 } & (
   | { kind: 'image' } // the armed stamp raster — framework blits it
-  | { kind: 'vector'; toolId: string; geometry: ModelGeometry } // painted via pageItems/scene
+  | { kind: 'vector'; toolId: string; geometry: Shape } // painted via pageItems/scene
 );
 
 /** Registration options for {@link annotationPlugin} — the initial values of the
@@ -225,7 +225,7 @@ export interface LinkNavItem {
  *  they render their own DOM and are not geometry-editable. Suspend → editable. */
 export interface Behavior {
   id: string;
-  matches(annotation: { subtype: Subtype; ref: AnnotationRef | null }): boolean;
+  matches(annotation: { subtype: KindName; ref: AnnotationRef | null }): boolean;
   engaged(): boolean;
 }
 
@@ -366,7 +366,7 @@ export interface CommentThreadChangedEvent {
 /** The public shape of an authoring tool (a named preset over a subtype). */
 export interface AnnotationTool {
   readonly id: string;
-  readonly subtype: Subtype;
+  readonly subtype: KindName;
   /** The defaults key this tool reads and writes. */
   readonly preset: string;
   readonly cursor: string;
@@ -720,7 +720,7 @@ export interface StampPlacement {
 export interface FilePromptRequest {
   toolId: string;
   /** The kind the placement creates — the routing key for per-tool pickers. */
-  subtype: Subtype;
+  subtype: KindName;
   /** The tool's file-dialog filter hint (from the tool def). UX only —
    *  the engine sniffs/validates the bytes for real. */
   accept?: string;

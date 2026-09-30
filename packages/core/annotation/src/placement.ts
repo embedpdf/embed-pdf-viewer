@@ -11,14 +11,14 @@
  * It deliberately returns logical geometry: no annotation visual semantics
  * (no ellipse) — a form field takes `rect` straight to
  * `doc.forms.createField`. The annotation-only conversion to a
- * committable/renderable `ModelGeometry` is {@link clickCreateGeom} below; that
+ * committable/renderable `Shape` is {@link clickCreateGeom} below; that
  * is where ellipse semantics apply.
  */
 import { transposedAboutCenter, uprightAnchoredRect, uprightRotation } from './geometry';
 import { rectFromPoints } from './rect';
 import type { PageRotation } from '@embedpdf/core-geometry';
-import type { ToolStyle } from './record/defaults';
-import type { ClickCreate, ModelGeometry, Rect, Subtype, Point } from './types';
+import type { LineEndings } from '@embedpdf/engine-core/runtime';
+import type { ClickCreate, Shape, Rect, KindName, Point } from './types';
 
 /** A resolved click placement: what the click will occupy, page-clamped. */
 export type ClickPlacement =
@@ -86,23 +86,23 @@ export function resolveClickPlacement(
 }
 
 /**
- * Annotation-only: convert a placement into the `ModelGeometry` the commit stores and
+ * Annotation-only: convert a placement into the `Shape` the commit stores and
  * the ghost paints, for a routing kind. This is where annotation visual
  * semantics live — the ellipse for circles; a cloud reaches out from the
  * placed box. Forms never call this; a field box is the placement rect
  * itself. Null for kinds a click cannot author.
  */
 export function clickCreateGeom(
-  subtype: Subtype,
+  subtype: KindName,
   placement: ClickPlacement,
-  tool: ToolStyle,
-): ModelGeometry | null {
+  lineEndings: LineEndings,
+): Shape | null {
   if (placement.kind === 'segment') {
     return subtype === 'line'
       ? {
           kind: 'line',
           linePoints: { start: placement.a, end: placement.b },
-          lineEndings: tool.lineEndings,
+          lineEndings,
           rotation: 0,
         }
       : null;

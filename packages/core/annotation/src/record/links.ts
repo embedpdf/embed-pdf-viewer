@@ -1,21 +1,13 @@
 /**
- * Attached-link folding + desired-state derivation — relationship logic, not
- * projection: a `/Link` child grouped under a linkable parent becomes the
- * parent's `link` prop, and the reconciler derives the children it should
- * have from the parent's committed geometry.
+ * Links: the rects a parent's attached link children take, and the link
+ * targets a write can state.
  */
 import { quadBounds } from '@embedpdf/core-geometry';
+import type { PdfLinkTarget, PdfLinkTargetWritable } from '@embedpdf/engine-core/runtime';
 
 import { selectionQuad } from '../geometry';
 import { unionRect } from '../rect';
-import { kindNamed } from '../kinds';
-import type { ModelGeometry, Rect, Style } from '../types';
-import { annotationKey } from './seam';
-
-/** Does this kind's table declare the `link` prop (may it carry an attached
- *  link)? Widgets/caret/redact/file-attachment deliberately don't. */
-const takesLink = (subtype: string): boolean =>
-  kindNamed(subtype).fields.some((spec) => spec.key === 'link');
+import type { Shape, Rect, Style } from '../types';
 
 /**
  * The desired hit rects (page space) of a parent's attached link
@@ -31,7 +23,16 @@ const takesLink = (subtype: string): boolean =>
  * the selection chrome outlines. Exact rotated hit regions need
  * `/QuadPoints` (tier 2).
  */
-export function linkChildRects(shape: ModelGeometry, style: Style): Rect[] {
+export function linkChildRects(shape: Shape, style: Style): Rect[] {
   if (shape.kind === 'quads') return shape.quadPoints.map(quadBounds);
   return [unionRect(selectionQuad(shape, style))];
+}
+
+/** The writable projection of a `link` value: `goto`/`uri` pass through,
+ *  read-only arms (`javascript`, `named`, `goto-remote`, `launch`,
+ *  `unsupported`) yield `null` — they can be carried, never (re)written. */
+export function writableTarget(
+  target: PdfLinkTarget | null | undefined,
+): PdfLinkTargetWritable | null {
+  return target && (target.kind === 'goto' || target.kind === 'uri') ? target : null;
 }

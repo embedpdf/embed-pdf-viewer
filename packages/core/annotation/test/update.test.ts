@@ -7,11 +7,11 @@ import { quadFromRect } from '@embedpdf/core-geometry';
 import { toPageRef, type AnnotationFlags } from '@embedpdf/engine-core/runtime';
 import { describe, expect, it } from 'vitest';
 
-import { modelWith, record, step, STYLE, restyle } from './support';
+import { modelWith, RecordInput, recordOf, restyle, step, STYLE, withAnnotation } from './support';
 import { DRAWN_FLAGS } from '../src/flags';
 import type { Message, Model, ModelAnnotation, Point } from '../src/types';
 import { EMPTY_CHANGE, update } from '../src/update';
-import { fieldsOf, refOf, shapeOf } from '../src/record';
+import { refOf, shapeOf } from '../src/record';
 
 const PAGE = toPageRef(1);
 const editPtr = (phase: 'down' | 'move' | 'up', x: number, y: number): Message => ({
@@ -20,33 +20,33 @@ const editPtr = (phase: 'down' | 'move' | 'up', x: number, y: number): Message =
   in: { page: PAGE, point: { x, y }, shift: false },
 });
 
-const square = (id: string, x: number): ModelAnnotation =>
-  record({
-    id,
-    ref: { kind: 'objectNumber', page: PAGE, objectNumber: Number(id.slice(4)) },
-    page: PAGE,
-    subtype: 'square',
-    geometry: {
-      kind: 'box',
-      box: { x, y: 100, width: 100, height: 60 },
-      rotation: 0,
-      ellipse: false,
-    },
-    style: { ...STYLE, interiorColor: '#ffffff' },
-    flags: DRAWN_FLAGS,
-    source: 'baked',
-  });
+/** A confirmed white square at `x`, keyed `obj:<n>`. */
+const squareInput = (id: string, x: number): RecordInput => ({
+  id,
+  ref: { kind: 'objectNumber', page: PAGE, objectNumber: Number(id.slice(4)) },
+  page: PAGE,
+  subtype: 'square',
+  geometry: {
+    kind: 'box',
+    box: { x, y: 100, width: 100, height: 60 },
+    rotation: 0,
+    ellipse: false,
+  },
+  style: { ...STYLE, interiorColor: '#ffffff' },
+  flags: DRAWN_FLAGS,
+  source: 'baked',
+});
+
+const square = (id: string, x: number): ModelAnnotation => recordOf(squareInput(id, x));
 
 /** A square with these `/F` flags set. */
-const squareWith = (id: string, flags: Partial<AnnotationFlags>): ModelAnnotation => {
-  const base = square(id, 100);
-  return { ...base, annotation: { ...base.annotation, ...flags } };
-};
+const squareWith = (id: string, flags: Partial<AnnotationFlags>): ModelAnnotation =>
+  withAnnotation(square(id, 100), flags);
 
 /** A plain free text box, as its create predicts it. */
 const textBox = (id: string): ModelAnnotation =>
-  record({
-    ...fieldsOf(square(id, 100)),
+  recordOf({
+    ...squareInput(id, 100),
     subtype: 'free-text',
     geometry: {
       kind: 'text-box',
@@ -55,7 +55,6 @@ const textBox = (id: string): ModelAnnotation =>
       calloutLine: null,
       lineEnding: null,
     },
-    annotation: undefined,
   });
 
 /** The last step of drawing a square from `from` to `to`: its result, with the new record in it. */
@@ -120,7 +119,92 @@ describe('update', () => {
     // `<namePrefix><seq + 1>` on its page, keyed as the engine keys an `nm` ref.
     expect(result.change.put.map((record) => record.id)).toEqual(['nm:1:new-1']);
     expect(result.session.seq).toBe(1);
-    expect(result.effects).toEqual([{ type: 'create', id: 'nm:1:new-1' }]);
+    // Written from the draft it was predicted from, under the same name.
+    expect(result.effects).toEqual([
+      {
+        type: 'create',
+        id: 'nm:1:new-1',
+        draft: expect.objectContaining({ subtype: 'square', nm: 'new-1', print: true }),
+      },
+    ]);
+  });
+
+  it('a drawing is predicted from the draft it is written from', () => {
+    const defaults = { square: { color: '#ff0000', strokeWidth: 3, fontSize: 40 } };
+    const result = drawSquare(modelWith([], { defaults }), { x: 0, y: 0 }, { x: 50, y: 30 });
+    const [effect] = result.effects;
+    if (effect?.type !== 'create') throw new Error('a drawing is a create');
+    // The tool's defaults its kind has, the shape's fields, the flags a drawing starts with.
+    const box = { x: 0, y: 0, width: 50, height: 30 };
+    expect(effect.draft).toMatchObject({
+      subtype: 'square',
+      color: '#ff0000',
+      strokeWidth: 3,
+      box,
+    });
+    expect(effect.draft).toMatchObject({ print: true, nm: 'new-1' });
+    expect(effect.draft).not.toHaveProperty('fontSize'); // a square has no text
+    // The view shows what that draft reads back as.
+    expect(result.change.put[0]!.annotation).toMatchObject({
+      color: '#ff0000',
+      strokeWidth: 3,
+      box,
+      nm: 'new-1',
+    });
+  });
+
+  it("a free text's draft carries the tool's font defaults, and opens for typing", () => {
+    const defaults = { 'free-text': { fontFamily: 'courier', fontSize: 18, textAlign: 'right' } };
+    const click = (phase: 'down' | 'up'): Message => ({
+      type: 'createPointer',
+      phase,
+      subtype: 'free-text',
+      in: { page: PAGE, point: { x: 50, y: 50 }, shift: false },
+    });
+    const [pressed] = step(modelWith([], { defaults }), click('down'));
+    const result = update(pressed, click('up'));
+    const [effect] = result.effects;
+    if (effect?.type !== 'create') throw new Error('a click is a create');
+    const fonts = { fontFamily: 'courier', fontSize: 18, textAlign: 'right' };
+    expect(effect.draft).toMatchObject({
+      subtype: 'free-text',
+      intent: 'free-text',
+      contents: '',
+      ...fonts,
+    });
+    const record = result.change.put[0]!;
+    expect(record.annotation).toMatchObject(fonts);
+    expect(result.session.editing).toBe(record.id);
+  });
+
+  it("a callout's draft states its intent, text box, line and the tool's arrow", () => {
+    const defaults = { 'free-text-callout': { lineEnding: 'closed-arrow' } };
+    const callout = (phase: 'down' | 'move' | 'up', x: number, y: number): Message => ({
+      type: 'createPointer',
+      phase,
+      subtype: 'free-text-callout',
+      in: { page: PAGE, point: { x, y }, shift: false },
+    });
+    // The tip, the knee, then the text box dragged out.
+    const drawing = [
+      callout('down', 40, 60),
+      callout('up', 40, 60),
+      callout('down', 120, 120),
+      callout('up', 120, 120),
+      callout('down', 200, 100),
+      callout('move', 320, 140),
+    ].reduce((model, message) => step(model, message)[0], modelWith([], { defaults }));
+    const [effect] = update(drawing, callout('up', 320, 140)).effects;
+    if (effect?.type !== 'create') throw new Error('a callout is a create');
+    expect(effect.draft).toMatchObject({
+      subtype: 'free-text',
+      intent: 'free-text-callout',
+      contents: '',
+      box: { x: 200, y: 100, width: 120, height: 40 },
+      lineEnding: 'closed-arrow',
+    });
+    const line = (effect.draft as { calloutLine?: unknown[] }).calloutLine;
+    expect(line).toEqual([{ x: 40, y: 60 }, { x: 120, y: 120 }, expect.anything()]);
   });
 
   it('a sidebar rect is a command: it moves the shape, and with a new shape it is refused', () => {

@@ -244,7 +244,7 @@ function transition(model: Model, message: Message): [Model, Effect[]] {
   }
 }
 
-export { initialSession, defaultsFor, toolStyleOf } from './session';
+export { initialSession, defaultsFor, lineEndingsOf, toolAnnotation } from './session';
 export { rotateDraftDelta } from './edit';
 export { MIN_DRAG } from './draw';
 export { annotsInBox } from './marquee';

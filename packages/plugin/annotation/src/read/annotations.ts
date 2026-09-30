@@ -100,18 +100,18 @@ export function createAnnotationReads(
     store.model().byId[annotationKey(ref)]?.annotation.page ?? ref.page;
 
   const loadedOrThrow = (ref: AnnotationRef): ModelAnnotation => {
-    const annotation = store.model().byId[annotationKey(ref)];
-    if (!annotation || !refOf(annotation)) {
+    const record = store.model().byId[annotationKey(ref)];
+    if (!record || !refOf(record)) {
       throw new PluginError('not-found', 'annotation', 'annotation is not loaded in this document');
     }
-    return annotation;
+    return record;
   };
   /** Committed, data-backed annotations in the current selection. */
   const selectedCommitted = (): ModelAnnotation[] => {
     const model = store.model();
     return model.selected
       .map((id) => model.byId[id])
-      .filter((annotation): annotation is ModelAnnotation => !!annotation && !!refOf(annotation));
+      .filter((record): record is ModelAnnotation => !!record && !!refOf(record));
   };
 
   const api = {

@@ -6,7 +6,7 @@
 import { toPageRef, type AnnotationPatch } from '@embedpdf/engine-core/runtime';
 import { describe, expect, it } from 'vitest';
 
-import { modelWith, record, step, STYLE } from './support';
+import { modelWith, recordOf, step, STYLE } from './support';
 import {
   applyChange,
   drawnAfter,
@@ -24,9 +24,9 @@ const BOX = { x: 100, y: 100, width: 100, height: 60 };
 /** A confirmed record drawn from the engine's raster at `BOX`. */
 const baked = (
   subtype: 'square' | 'stamp',
-  over: Partial<Parameters<typeof record>[0]> = {},
+  over: Partial<Parameters<typeof recordOf>[0]> = {},
 ): ModelAnnotation =>
-  record({
+  recordOf({
     id: 'obj:1',
     ref: { kind: 'objectNumber', page: PAGE, objectNumber: 1 },
     page: PAGE,

@@ -1,7 +1,7 @@
 import { measureFromKnownLength, toPageRef } from '@embedpdf/engine-core/runtime';
 import { describe, expect, it } from 'vitest';
 
-import { record, step, withoutLabel, STYLE } from './support';
+import { recordOf, type RecordInput, step, withoutLabel, STYLE } from './support';
 import { DRAWN_FLAGS } from '../src/flags';
 import { DEFAULT_CHROME_GEOMETRY } from '../src/geometry';
 import { hitTest } from '../src/hit';
@@ -16,10 +16,10 @@ import {
   moveDistanceCaption,
 } from '../src/measurement';
 import type { LineShape } from '../src/shapes/points';
-import type { ModelGeometry, Model, Message } from '../src/types';
+import type { Shape, Model, Message } from '../src/types';
 import { initialModel } from '../src/update';
 import { pageItems, chrome } from '../src/view';
-import { shapeOf, withFields } from '../src/record';
+import { shapeOf } from '../src/record';
 const PAGE = toPageRef(1);
 const geom: LineShape = {
   kind: 'line',
@@ -36,7 +36,7 @@ const measure: DistanceAppearance = {
   leader: { length: 12, extension: 5 },
   contents: 'stored',
 };
-const annotation = record({
+const distance: RecordInput = {
   id: 'a',
   ref: null,
   page: toPageRef(1),
@@ -46,10 +46,11 @@ const annotation = record({
   style: STYLE,
   source: 'baked',
   flags: DRAWN_FLAGS,
-});
+};
+const record = recordOf(distance);
 const model = (): Model => ({
   ...initialModel,
-  byId: { a: annotation },
+  byId: { a: record },
   order: ['a'],
   selected: ['a'],
 });
@@ -86,7 +87,7 @@ describe('distance gestures and captions', () => {
     const handles = chrome(state, PAGE).filter((node) => node.kind === 'handle');
     expect(handles).toHaveLength(4);
     expect(handles.some((node) => node.at.x === at.x + 20 && node.at.y === at.y - 30)).toBe(false);
-    expect(step(state, { type: 'cancel' })[0].byId.a).toBe(annotation);
+    expect(step(state, { type: 'cancel' })[0].byId.a).toBe(record);
     const [committed, effects] = step(state, pointer('up', at));
     expect(shapeOf(committed.byId.a.annotation)).toEqual(geom);
     // Only the caption is written, not the measured points.
@@ -99,7 +100,7 @@ describe('distance gestures and captions', () => {
     ]);
   });
   it('keeps directed offset signs for a reversed diagonal', () => {
-    const geometry: ModelGeometry = {
+    const geometry: Shape = {
       kind: 'line',
       linePoints: { start: { x: 100, y: 100 }, end: { x: 0, y: 0 } },
       rotation: 0,
@@ -129,7 +130,7 @@ describe('distance gestures and captions', () => {
   });
   it('hides caption handles on locked records', () => {
     const state = model();
-    state.byId = { a: withFields(annotation, { flags: { ...DRAWN_FLAGS, locked: true } }) };
+    state.byId = { a: recordOf({ ...distance, flags: { ...DRAWN_FLAGS, locked: true } }) };
     expect(chrome(state, PAGE).some((node) => node.kind === 'handle')).toBe(false);
   });
 
@@ -162,7 +163,18 @@ describe('distance gestures and captions', () => {
     const [committed, effects] = step(state, create('down', 190, 160));
     expect(committed.order).toHaveLength(1);
     expect(committed.draft).toBeNull();
-    expect(effects).toEqual([{ type: 'create', id: committed.order[0] }]);
+    expect(effects).toEqual([
+      {
+        type: 'create',
+        id: committed.order[0],
+        draft: expect.objectContaining({
+          subtype: 'line',
+          intent: 'line-dimension',
+          subject: 'Distance',
+          leader: expect.objectContaining({ length: -60 }),
+        }),
+      },
+    ]);
     expect(step(committed, create('up', 190, 160))[1]).toEqual([]);
   });
 
@@ -193,7 +205,7 @@ describe('distance gestures and captions', () => {
       state = step(state, pointer('move', { x: point.x + 35, y: 160 }))[0];
       expect((pageItems(state, PAGE)[0].measure as DistanceAppearance).leader?.length).toBe(-60);
       expect(pageItems(state, PAGE)[0].geometry).toEqual(geom);
-      expect(step(state, { type: 'cancel' })[0].byId.a).toBe(annotation);
+      expect(step(state, { type: 'cancel' })[0].byId.a).toBe(record);
 
       const [committed, effects] = step(state, pointer('up', point));
       expect(
@@ -242,7 +254,8 @@ describe('distance gestures and captions', () => {
   it('encloses leaders, displaced captions, connectors and handles in the selection', () => {
     const state = model();
     state.byId = {
-      a: withFields(annotation, {
+      a: recordOf({
+        ...distance,
         measure: {
           ...measure,
           captionEnabled: true,
@@ -304,7 +317,7 @@ describe('distance gestures and captions', () => {
   });
 
   it('hit-tests the rotated caption rectangle rather than a circle around it', () => {
-    const diagonal: ModelGeometry = {
+    const diagonal: Shape = {
       kind: 'line',
       linePoints: { start: { x: 50, y: 50 }, end: { x: 250, y: 250 } },
       rotation: 0,
@@ -315,7 +328,7 @@ describe('distance gestures and captions', () => {
       captionOffset: { along: 0, perpendicular: 80 },
     };
     const state = model();
-    state.byId = { a: withFields(annotation, { geometry: diagonal, measure: appearance }) };
+    state.byId = { a: recordOf({ ...distance, geometry: diagonal, measure: appearance }) };
     const layout = distanceLayout(diagonal, appearance, 1)!;
     const caption = layout.caption!;
     const nearText = {
@@ -345,7 +358,7 @@ describe('distance gestures and captions', () => {
 
   it('keeps the rotate knob clear of the caption when the dimension line moves above the endpoints', () => {
     const state = model();
-    state.byId = { a: withFields(annotation, { measure: { ...measure, leader: { length: 36 } } }) };
+    state.byId = { a: recordOf({ ...distance, measure: { ...measure, leader: { length: 36 } } }) };
     expect(hitTest(state, PAGE, { x: 140, y: 64 }, DEFAULT_CHROME_GEOMETRY, 6)).toMatchObject({
       handle: 'caption',
     });

@@ -66,8 +66,8 @@ export function rotateDraftDelta(
  *  vertex member's advisory `rot` counts (preserves obbFromTheta + reset). */
 const selectionHasRotation = (model: Model, ids: Id[]): boolean =>
   ids.some((id) => {
-    const annotation = model.byId[id];
-    return !!annotation && geomRotation(shapeOf(annotation.annotation)) !== 0;
+    const record = model.byId[id];
+    return !!record && geomRotation(shapeOf(record.annotation)) !== 0;
   });
 
 export function editPointer(
@@ -117,9 +117,9 @@ export function editDown(model: Model, input: PointerInput): [Model, Effect[]] {
     // The handle gesture runs in view space: `base` is the projected geometry
     // the user grabbed (identity for un-flagged annotations), and the commit
     // maps the result back via `unanchoredGeom` with the same captured view.
-    const annotation = model.byId[hit.id];
+    const record = model.byId[hit.id];
     const view = viewOf(input);
-    const base = anchoredGeom(shapeOf(annotation.annotation), anchorModeOf(annotation), view);
+    const base = anchoredGeom(shapeOf(record.annotation), anchorModeOf(record), view);
     return [
       {
         ...model,

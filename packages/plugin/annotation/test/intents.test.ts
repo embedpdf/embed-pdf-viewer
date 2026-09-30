@@ -9,7 +9,7 @@ import type { AnnotationFlags, AnnotationRef } from '@embedpdf/engine-core/runti
 import { annotationKey, toPageRef } from '@embedpdf/engine-core/runtime';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { fieldsOf, type Message } from '@embedpdf/core-annotation';
+import { type Message, styleOf } from '@embedpdf/core-annotation';
 
 import { createdRefOf } from '../src/write/outcomes';
 import {
@@ -446,7 +446,7 @@ describe('a new record before the engine confirms it', () => {
 
     const restyle = harness.capability.updateSelection({ color: '#00ff00' });
     expect(harness.model().order).toEqual([firstCreated(harness)]);
-    expect(fieldsOf(harness.model().byId[firstCreated(harness)]!).style.color).toBe('#00ff00');
+    expect(styleOf(harness.model().byId[firstCreated(harness)]!.annotation).color).toBe('#00ff00');
     expect(harness.update).not.toHaveBeenCalled();
 
     confirm();

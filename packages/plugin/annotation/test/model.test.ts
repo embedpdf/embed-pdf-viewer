@@ -1,13 +1,17 @@
 import {
-  annotationOfRecord,
   DRAWN_FLAGS,
   groupOf,
   initialSession,
   type ModelAnnotation,
-  recordOf,
   refOf,
 } from '@embedpdf/core-annotation';
-import { annotationKey, toPageRef, type AnnotationRef } from '@embedpdf/engine-core/runtime';
+import {
+  annotationKey,
+  annotationOfDraft,
+  toPageRef,
+  type AnnotationDraft,
+  type AnnotationRef,
+} from '@embedpdf/engine-core/runtime';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -56,36 +60,21 @@ describe('pending changes', () => {
     name: string,
     reply?: { to: AnnotationRef; type: 'reply' | 'group' },
   ): ModelAnnotation => {
-    const fields = {
-      id: annotationKey(named(name)),
-      ref: null,
-      page: PAGE,
+    const draft = {
       subtype: 'square',
-      geometry: {
-        kind: 'box',
-        box: { x: 0, y: 0, width: 10, height: 10 },
-        rotation: 0,
-        ellipse: false,
-      },
-      style: {
-        color: '#e5484d',
-        interiorColor: null,
-        strokeWidth: 2,
-        opacity: 1,
-        blendMode: 'normal',
-        borderStyle: 'solid',
-        dashArray: null,
-        cloudyIntensity: null,
-      },
-      flags: DRAWN_FLAGS,
+      box: { x: 0, y: 0, width: 10, height: 10 },
+      color: '#e5484d',
+      strokeWidth: 2,
+      ...DRAWN_FLAGS,
+      nm: name,
+    } as AnnotationDraft;
+    const annotation = annotationOfDraft(draft, { ref: named(name), index: 0 });
+    return {
+      id: annotationKey(named(name)),
+      unconfirmed: true,
       source: 'baked',
-    } as const;
-    const annotation = annotationOfRecord(fields, {
-      ref: named(name),
-      index: 0,
-      ...(reply ? { reply } : {}),
-    });
-    return recordOf(fields, annotation);
+      annotation: reply ? { ...annotation, reply } : annotation,
+    };
   };
   const edit = (token: number, id: string, fields: Partial<ModelAnnotation>): PendingChange => ({
     token,

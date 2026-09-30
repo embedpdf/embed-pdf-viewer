@@ -1,5 +1,5 @@
 import { pageRefsEqual } from '@embedpdf/core';
-import type { Subtype, TextEndAnchor, Quad } from '@embedpdf/core-annotation';
+import type { KindName, TextEndAnchor, Quad } from '@embedpdf/core-annotation';
 import type { AnnotationRef, PageRef } from '@embedpdf/engine-core/runtime';
 import { SelectionToken as SelectionPublicToken } from '@embedpdf/plugin-selection/contract';
 
@@ -17,7 +17,7 @@ export function createMarkupWrites(
   { store, authority, tools }: Pick<AnnotationServices, 'store' | 'authority' | 'tools'>,
 ) {
   const api = {
-    createMarkup: (subtype: Subtype, page: PageRef, quads: Quad[], preset?: string) => {
+    createMarkup: (subtype: KindName, page: PageRef, quads: Quad[], preset?: string) => {
       // Optimistic create — the same self-refusal `createPointer` has.
       if (!authority.canCreate()) return;
       // A markup tool's `/F` seed rides along (the preset is the tool id).
@@ -38,7 +38,7 @@ export function createMarkupWrites(
       if (!authority.canCreate()) return;
       store.commit({ type: 'createReplaceText', page, quads, anchor, preset });
     },
-    previewMarkup: (subtype: Subtype, quadsByPage: Record<number, Quad[]>, preset?: string) => {
+    previewMarkup: (subtype: KindName, quadsByPage: Record<number, Quad[]>, preset?: string) => {
       store.commit({ type: 'setMarkupPreview', subtype, quadsByPage, preset });
     },
     clearMarkupPreview: () => {

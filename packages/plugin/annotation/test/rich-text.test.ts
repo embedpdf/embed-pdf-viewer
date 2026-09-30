@@ -1,13 +1,6 @@
-import {
-  annotationOfRecord,
-  DRAWN_FLAGS,
-  recordOf,
-  type ModelAnnotation,
-  type RecordFields,
-  type TextStyle,
-} from '@embedpdf/core-annotation';
-import type { FontHandle, RichTextDocument } from '@embedpdf/engine-core/runtime';
-import { toPageRef } from '@embedpdf/engine-core/runtime';
+import { DRAWN_FLAGS, type ModelAnnotation, type TextStyle } from '@embedpdf/core-annotation';
+import type { AnnotationDraft, FontHandle, RichTextDocument } from '@embedpdf/engine-core/runtime';
+import { annotationOfDraft, toPageRef } from '@embedpdf/engine-core/runtime';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -52,38 +45,23 @@ const text: TextStyle = {
   textAlign: 'left',
 };
 
-/** A free-text record, its annotation predicted from these fields. */
+/** A free-text record, its annotation predicted from its draft. */
 const annot = (): ModelAnnotation => {
-  const fields: RecordFields = {
-    id: 'a',
-    ref: null,
-    page: toPageRef(1),
+  const draft = {
     subtype: 'free-text',
-    geometry: {
-      kind: 'text-box',
-      box: { x: 0, y: 0, width: 100, height: 20 },
-      rotation: 0,
-      calloutLine: null,
-      lineEnding: null,
-    },
-    style: {
-      color: '#000000',
-      interiorColor: null,
-      strokeWidth: 1,
-      opacity: 1,
-      blendMode: 'normal',
-      borderStyle: 'solid',
-      dashArray: null,
-      cloudyIntensity: null,
-    },
-    text,
-    flags: DRAWN_FLAGS,
-    source: 'vector',
-  };
-  return recordOf(
-    fields,
-    annotationOfRecord(fields, { ref: { kind: 'nm', page: fields.page, nm: 'a' }, index: 0 }),
-  );
+    box: { x: 0, y: 0, width: 100, height: 20 },
+    intent: 'free-text',
+    contents: '',
+    ...text,
+    color: '#000000',
+    strokeWidth: 1,
+    ...DRAWN_FLAGS,
+  } as AnnotationDraft;
+  const annotation = annotationOfDraft(draft, {
+    ref: { kind: 'nm', page: toPageRef(1), nm: 'a' },
+    index: 0,
+  });
+  return { id: 'a', unconfirmed: true, source: 'vector', annotation };
 };
 
 describe('faces', () => {
@@ -111,15 +89,15 @@ describe('documents', () => {
   it('commits the rich paragraphs, with paragraph properties equal to the body stripped', () => {
     const plain = [{ runs: [{ text: 'hello' }] }];
     const styled = [{ runs: [{ text: 'hel', style: { weight: 700 } }, { text: 'lo' }] }];
-    const annotation = annot();
-    expect(textCommitPatch(annotation, plain)).toEqual({ richText: { paragraphs: plain } });
-    expect(textCommitPatch(annotation, styled)).toEqual({ richText: { paragraphs: styled } });
+    const record = annot();
+    expect(textCommitPatch(record, plain)).toEqual({ richText: { paragraphs: plain } });
+    expect(textCommitPatch(record, styled)).toEqual({ richText: { paragraphs: styled } });
     // Paragraph align/dir equal to the body's (the editor round-trips what it
     // renders) are not overrides; a differing one is kept.
     const echoed = [{ align: 'left' as const, dir: 'ltr' as const, runs: [{ text: 'hello' }] }];
-    expect(textCommitPatch(annotation, echoed)).toEqual({ richText: { paragraphs: plain } });
+    expect(textCommitPatch(record, echoed)).toEqual({ richText: { paragraphs: plain } });
     const centred = [{ align: 'center' as const, dir: 'ltr' as const, runs: [{ text: 'hello' }] }];
-    expect(textCommitPatch(annotation, centred)).toEqual({
+    expect(textCommitPatch(record, centred)).toEqual({
       richText: { paragraphs: [{ align: 'center', runs: [{ text: 'hello' }] }] },
     });
   });

@@ -4,30 +4,94 @@
  * those records.
  */
 import { annotationKey } from '@embedpdf/core';
-import type { AnnotationDTO, AnnotationRef, PageRef } from '@embedpdf/engine-core/runtime';
+import {
+  annotationOfDraft,
+  type AnnotationDTO,
+  type AnnotationFlags,
+  type AnnotationRef,
+  type PageRef,
+  type PdfLinkTarget,
+} from '@embedpdf/engine-core/runtime';
 
-import { annotationOfRecord, recordOf } from '../src/record';
+import { geomBounds, geomVisualBounds } from '../src/geometry';
+import { kindNamed } from '../src/kinds';
+import { measurementDraftFields, type MeasurementAppearance } from '../src/measurement';
+import { shapeOf, styleOf, writableTarget } from '../src/record';
+import { engineSubtypeOf } from '../src/record/defaults';
 import type {
   Effect,
   FieldValues,
   Id,
+  KindName,
   Message,
   Model,
   ModelAnnotation,
-  RecordFields,
   Session,
+  Shape,
   Style,
+  TextStyle,
   UpdateResult,
 } from '../src/types';
 import { initialModel, sameSession, update } from '../src/update';
+import { draftOf } from '../src/update/changes';
 
 /**
- * A record's fields for a test, and any of its annotation's fields the test
- * states. The annotations it answers are the annotation's (`answering`).
+ * A test record, described as a drawing states one: its kind, its shape, its
+ * style and text by the engine's field names, what its draft adds (a
+ * measurement, an intent, a link target, an icon), its `/F` flags, and how
+ * it is drawn. `ref: null` is a record the engine hasn't confirmed. The
+ * annotation fields a test states directly (`annotation`) lie over what the
+ * draft reads back as; the annotations it answers are stated there
+ * (`answering`).
  */
-export type RecordInput = Omit<RecordFields, 'annotation' | 'irt' | 'group'> & {
-  annotation?: Partial<AnnotationDTO>;
-};
+export interface RecordInput extends Omit<ModelAnnotation, 'annotation'> {
+  readonly ref: AnnotationRef | null;
+  readonly page: PageRef;
+  readonly subtype: KindName;
+  readonly geometry: Shape;
+  readonly style: Style;
+  readonly text?: TextStyle;
+  readonly measure?: MeasurementAppearance;
+  readonly intent?: string;
+  readonly link?: PdfLinkTarget | null;
+  readonly icon?: string;
+  readonly flags: AnnotationFlags;
+  readonly annotation?: Partial<AnnotationDTO>;
+}
+
+/** The engine fields a kind's sidebar edits: a border picker's are its three. */
+function editedFields(kind: KindName): Set<string> {
+  return new Set(
+    kindNamed(kind).fields.flatMap((spec) =>
+      spec.key === 'borderStyle'
+        ? ['borderStyle', 'dashArray', ...(spec.cloudy ? ['cloudyIntensity'] : [])]
+        : [spec.key],
+    ),
+  );
+}
+
+/** What a test record's draft adds beside its style and shape, as the drawing of its kind would. */
+function draftExtras(input: RecordInput): FieldValues {
+  const subtype = engineSubtypeOf(input.subtype);
+  const shape = input.geometry;
+  return {
+    // A line's or polyline's endings: a field of their own, beside its points.
+    ...('lineEndings' in shape && shape.lineEndings ? { lineEndings: shape.lineEndings } : {}),
+    ...(input.measure ? measurementDraftFields(input.measure) : {}),
+    ...(subtype === 'free-text'
+      ? {
+          intent:
+            shape.kind === 'text-box' && shape.calloutLine ? 'free-text-callout' : 'free-text',
+          contents: '',
+        }
+      : {}),
+    ...(input.intent !== undefined ? { intent: input.intent } : {}),
+    ...(subtype === 'link' ? { target: writableTarget(input.link ?? null) } : {}),
+    ...(input.icon !== undefined ? { icon: input.icon } : {}),
+    // A text redaction states the box around its quads.
+    ...(subtype === 'redact' && shape.kind === 'quads' ? { rect: geomBounds(shape) } : {}),
+  };
+}
 
 /**
  * The key and ref of a confirmed test record named `name` on `page`: keyed as
@@ -45,20 +109,46 @@ export const answering = (
 ): Partial<AnnotationDTO> => ({ reply: { to: parent, type } });
 
 /**
- * A record as the plugin hands one to the core: its fields, and the
- * annotation they predict, with the annotation fields the test states laid
- * over it. A measurement's stated label stands where the engine can't work
- * one out (no scale), as a file's stored label does. A confirmed record keeps
- * its ref; one not written yet is named by its id.
+ * A record as the plugin hands one to the core: the annotation its draft
+ * reads back as (its style and text as its kind's sidebar sets them), with
+ * the annotation fields the test states laid over it. A kind whose `rect`
+ * the engine works out gets the drawn bounds; a measurement's stated label
+ * stands where the engine can't work one out (no scale), as a file's stored
+ * label does. A confirmed record keeps its ref; one not written yet is named
+ * by its id.
  */
-export function record(input: RecordInput): ModelAnnotation {
-  const { annotation: stated, ...fields } = input;
-  const ref = fields.ref ?? { kind: 'nm' as const, page: fields.page, nm: fields.id };
-  const predicted = annotationOfRecord(fields, { ref, index: 0 });
-  const label =
-    fields.measure?.contents && !predicted.contents ? { contents: fields.measure.contents } : {};
-  return recordOf(fields, { ...predicted, ...label, ...stated } as AnnotationDTO);
+export function recordOf(input: RecordInput): ModelAnnotation {
+  const { annotation: stated, ref, page, subtype, geometry, style, text, flags, measure } = input;
+  const edited = editedFields(subtype);
+  const sidebar = Object.fromEntries(
+    Object.entries({ ...style, ...text }).filter(([name]) => edited.has(name)),
+  );
+  const draft = draftOf(subtype, sidebar, geometry, draftExtras(input), flags);
+  const at = ref ?? { kind: 'nm' as const, page, nm: input.id };
+  const read = annotationOfDraft(draft, { ref: at, index: 0 });
+  const predicted =
+    'rect' in draft ? read : { ...read, rect: geomVisualBounds(shapeOf(read), styleOf(read)) };
+  const label = measure?.contents && !predicted.contents ? { contents: measure.contents } : {};
+  return {
+    id: input.id,
+    ...(ref === null ? { unconfirmed: true as const } : {}),
+    source: input.source,
+    ...(input.apBox ? { apBox: input.apBox } : {}),
+    ...(input.apRot !== undefined ? { apRot: input.apRot } : {}),
+    ...(input.apVersion !== undefined ? { apVersion: input.apVersion } : {}),
+    ...(input.authority ? { authority: input.authority } : {}),
+    annotation: { ...predicted, ...label, ...stated } as AnnotationDTO,
+  };
 }
+
+/** The record with these annotation fields stated over its own: how a test locks one, or gives it a file's value. */
+export const withAnnotation = (
+  record: ModelAnnotation,
+  fields: Partial<AnnotationDTO>,
+): ModelAnnotation => ({
+  ...record,
+  annotation: { ...record.annotation, ...fields } as AnnotationDTO,
+});
 
 /** A model over these records (in this order), with an optional session on top of the initial one. */
 export const modelWith = (

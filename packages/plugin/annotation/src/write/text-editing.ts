@@ -18,7 +18,6 @@ import { setTextSelection } from '../model';
 import type { ChromeReads } from '../read/chrome';
 import { cssFontFamilyForFace, textCommitPatch, type TextSelection } from '../rich-text';
 import type { AnnotationContext, AnnotationServices } from '../services';
-import { fieldsOf } from '@embedpdf/core-annotation';
 
 const TEXT_WRITE_DELAY_MS = 250;
 
@@ -63,7 +62,11 @@ export function createTextEditing(
       .withRef(id, async (ref) => {
         const record = store.model().byId[annotationKey(ref)];
         if (!record) return;
-        const patch = textCommitPatch(record, richDocOf(fieldsOf(record), fonts).paragraphs, fonts);
+        const patch = textCommitPatch(
+          record,
+          richDocOf(record.annotation, fonts).paragraphs,
+          fonts,
+        );
         await ctx.doc.page(ref.page).annotations.update(ref, { subtype: 'free-text', ...patch });
       })
       .then(
@@ -112,9 +115,9 @@ export function createTextEditing(
       // A double-click on the box body or one of its resize handles both target the
       // same annotation; either should open it for editing.
       const id = target.kind === 'annot' || target.kind === 'handle' ? target.id : null;
-      const annotation = id != null ? model.byId[id] : undefined;
-      if (annotation && shapeOf(annotation.annotation).kind === 'text-box') {
-        store.commit({ type: 'beginTextEdit', id: annotation.id });
+      const record = id != null ? model.byId[id] : undefined;
+      if (record && shapeOf(record.annotation).kind === 'text-box') {
+        store.commit({ type: 'beginTextEdit', id: record.id });
         return true;
       }
       // Nothing editable here — report it so the caller can fall through to a

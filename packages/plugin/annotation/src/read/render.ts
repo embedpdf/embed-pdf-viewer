@@ -7,7 +7,8 @@ import {
   refOf,
   type RenderItem,
   shapeOf,
-  toolStyleOf,
+  styleOf,
+  toolAnnotation,
   viewable,
   type ViewEnv,
 } from '@embedpdf/core-annotation';
@@ -55,7 +56,7 @@ export function createRenderReads(
     // every draft preview (image ghosts blit through the framework instead).
     if (ghost && ghost.page.objectNumber === pageObjectNumber && ghost.kind === 'vector') {
       const tool = tools.get(ghost.toolId);
-      const { style } = toolStyleOf(model, tool?.subtype ?? ghost.toolId, tool?.preset);
+      const style = styleOf(toolAnnotation(model, tool?.subtype ?? ghost.toolId, tool?.preset));
       items.push({
         id: 'tool-ghost',
         ref: null,
@@ -112,27 +113,31 @@ export function createRenderReads(
     if (cached && cached.model === model) return cached.v;
     const items: LinkNavItem[] = [];
     for (const id of model.order) {
-      const annotation = model.byId[id];
-      const record = annotation?.annotation;
-      if (!record || record.page.objectNumber !== pageObjectNumber || record.subtype !== 'link')
+      const record = model.byId[id];
+      const annotation = record?.annotation;
+      if (
+        !annotation ||
+        annotation.page.objectNumber !== pageObjectNumber ||
+        annotation.subtype !== 'link'
+      )
         continue;
-      if (!viewable(record, false)) continue; // hidden links don't navigate
+      if (!viewable(annotation, false)) continue; // hidden links don't navigate
       // A standalone link and an attached child both carry their own target.
       // Rects are the link's own committed geometry — anchors render only in
       // view contexts, where nothing is mid-gesture, so no live
       // parent-derivation is needed.
-      const target = record.target ?? null;
-      const geometry = shapeOf(annotation.annotation);
+      const target = annotation.target ?? null;
+      const geometry = shapeOf(annotation);
       if (target == null || geometry.kind !== 'box') continue;
-      const activate = record.actions?.activate;
-      const ref = refOf(annotation) ?? undefined;
-      const hoverEnter = Boolean(record.actions?.cursorEnter?.root);
-      const hoverExit = Boolean(record.actions?.cursorExit?.root);
+      const activate = annotation.actions?.activate;
+      const ref = refOf(record) ?? undefined;
+      const hoverEnter = Boolean(annotation.actions?.cursorEnter?.root);
+      const hoverExit = Boolean(annotation.actions?.cursorExit?.root);
       items.push({
         id,
         bounds: geometry.box,
         target,
-        attached: groupOf(annotation.annotation) !== undefined,
+        attached: groupOf(annotation) !== undefined,
         ...(activate ? { activate } : {}),
         ...(ref ? { ref } : {}),
         ...(hoverEnter || hoverExit ? { hoverEvents: { enter: hoverEnter, exit: hoverExit } } : {}),
@@ -159,18 +164,18 @@ export function createRenderReads(
       const model = pageModel(pageObjectNumber);
       const parts: string[] = [];
       for (const id of model.order) {
-        const annotation = model.byId[id];
+        const record = model.byId[id];
         if (
-          !annotation ||
-          annotation.annotation.page.objectNumber !== pageObjectNumber ||
-          annotation.source !== 'baked' ||
-          !refOf(annotation)
+          !record ||
+          record.annotation.page.objectNumber !== pageObjectNumber ||
+          record.source !== 'baked' ||
+          !refOf(record)
         )
           continue;
         // Conversation-plane annotations never paint — a remote reply or
         // status change must not churn the page's raster cache key.
-        if (isSubstrateOnly(annotation)) continue;
-        parts.push(`${id}@${annotation.apVersion ?? 0}`);
+        if (isSubstrateOnly(record)) continue;
+        parts.push(`${id}@${record.apVersion ?? 0}`);
       }
       return parts.sort().join('|');
     },

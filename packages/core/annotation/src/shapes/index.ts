@@ -5,7 +5,7 @@
  */
 import type { AnnotationDTO } from '@embedpdf/engine-core/runtime';
 
-import type { ModelGeometry } from '../types';
+import type { Shape } from '../types';
 import { boxFamily } from './box';
 import { caretFamily } from './caret';
 import type { ShapeFamily } from './family';
@@ -17,7 +17,7 @@ export type { Corners, ShapeFamily } from './family';
 export { boxFamily, caretFamily, pointsFamily, quadsFamily, textBoxFamily };
 
 /** The family that answers for each kind of shape: the points family for lines, polys and ink. */
-const FAMILY_OF: Record<ModelGeometry['kind'], ShapeFamily> = {
+const FAMILY_OF: Record<Shape['kind'], ShapeFamily> = {
   box: boxFamily,
   caret: caretFamily,
   'text-box': textBoxFamily,
@@ -31,7 +31,7 @@ const FAMILY_OF: Record<ModelGeometry['kind'], ShapeFamily> = {
  * The family that answers for `shape`. Each family works on its own shapes
  * only; looking it up by the shape's `kind` is what hands it one.
  */
-export const familyOf = (shape: ModelGeometry): ShapeFamily => FAMILY_OF[shape.kind];
+export const familyOf = (shape: Shape): ShapeFamily => FAMILY_OF[shape.kind];
 
 /**
  * The family of a kind whose annotation says which shape it has: `pick`

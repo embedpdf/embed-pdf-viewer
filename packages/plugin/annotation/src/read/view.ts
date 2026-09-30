@@ -68,25 +68,22 @@ export function createView(
   ctx: Pick<AnnotationContext, 'state' | 'doc' | 'document'>,
   records: Mirror<AnnotationRecords>,
 ) {
-  /** A confirmed record as the model has it, cached per record version and render preference. */
-  const confirmed = new WeakMap<
-    AnnotationRecord,
-    { vector: boolean; annotation: ModelAnnotation }
-  >();
-  const confirmedAnnotation = (record: AnnotationRecord, vector: boolean): ModelAnnotation => {
-    const cached = confirmed.get(record);
-    if (cached && cached.vector === vector) return cached.annotation;
-    const projected = fromDTO(record.dto);
+  /** A confirmed record as the model has it, cached per stored version and render preference. */
+  const confirmed = new WeakMap<AnnotationRecord, { vector: boolean; record: ModelAnnotation }>();
+  const confirmedRecord = (stored: AnnotationRecord, vector: boolean): ModelAnnotation => {
+    const cached = confirmed.get(stored);
+    if (cached && cached.vector === vector) return cached.record;
+    const projected = fromDTO(stored.dto);
     // Opaque bodies (stamp images, widgets) have no live rendering: always the raster.
     const live = vector && !kindOf(projected.annotation).caps.opaqueBody;
-    const annotation: ModelAnnotation = {
+    const record: ModelAnnotation = {
       ...projected,
       source: live ? 'vector' : 'baked',
-      apVersion: record.apVersion,
-      authority: authorityOf(ctx, record.dto),
+      apVersion: stored.apVersion,
+      authority: authorityOf(ctx, stored.dto),
     };
-    confirmed.set(record, { vector, annotation });
-    return annotation;
+    confirmed.set(stored, { vector, record });
+    return record;
   };
 
   /**
@@ -99,7 +96,7 @@ export function createView(
    */
   const layered = new Map<
     Id,
-    { base: ModelAnnotation; changes: readonly PendingChange[]; annotation: ModelAnnotation }
+    { base: ModelAnnotation; changes: readonly PendingChange[]; record: ModelAnnotation }
   >();
   const withChanges = (
     id: Id,
@@ -114,21 +111,21 @@ export function createView(
       cached.changes.length === changes.length &&
       cached.changes.every((change, index) => change === changes[index])
     ) {
-      return cached.annotation;
+      return cached.record;
     }
-    let annotation = base;
+    let record = base;
     for (const { change } of changes) {
       if (change.kind !== 'edit') continue;
-      annotation = { ...annotation, ...change.fields };
+      record = { ...record, ...change.fields };
       if (change.patch) {
-        annotation = { ...annotation, annotation: patched(annotation.annotation, change.patch) };
+        record = { ...record, annotation: patched(record.annotation, change.patch) };
       }
     }
     if (confirmed) {
-      annotation = { ...annotation, apVersion: base.apVersion, authority: base.authority };
+      record = { ...record, apVersion: base.apVersion, authority: base.authority };
     }
-    layered.set(id, { base, changes, annotation });
-    return annotation;
+    layered.set(id, { base, changes, record });
+    return record;
   };
 
   const view = memo(
@@ -148,7 +145,7 @@ export function createView(
       for (const key of confirmedRecords.order) {
         const changes = changesOf.get(key) ?? NO_CHANGES;
         if (deleted(changes)) continue;
-        const base = confirmedAnnotation(confirmedRecords.byKey[key]!, key in vector);
+        const base = confirmedRecord(confirmedRecords.byKey[key]!, key in vector);
         if (!base) continue;
         byId[key] = changes.length ? withChanges(key, base, changes, true) : base;
         order.push(key);

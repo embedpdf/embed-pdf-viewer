@@ -12,7 +12,8 @@ import { annotationSelectionFrame, shapeMeasurementLayout } from '../../../core/
 import { turnPivotOf } from '../../../core/annotation/src/geometry';
 import { rotatePoint } from '../../../core/annotation/src/rect';
 import { createLocalEngine } from '../src/index';
-import { fieldsOf, fromDTO, shapeOf } from '../../../core/annotation/src/record';
+import { fromDTO, shapeOf, styleOf } from '../../../core/annotation/src/record';
+import { measurementOf } from '../../../core/annotation/src/measurement';
 import { annotationKey } from '@embedpdf/engine-core/runtime';
 import { annotationShell } from './helpers/annotation-shell';
 
@@ -84,11 +85,15 @@ describe.each(['wasm', 'native'] as const)('shape authoring integration (%s)', (
         expect(created.contents).toBe(tool === 'area' ? '50.00 m²' : '25.00 m');
         expect(created.captionEnabled).toBe(true);
         expect(created.captionCenter).toBe(null);
-        const model = fieldsOf(fromDTO(created));
-        if (!model.measure || model.measure.intent === 'line-dimension')
+        const record = fromDTO(created);
+        const measure = measurementOf(record.annotation);
+        if (!measure || measure.intent === 'line-dimension')
           throw new Error('Expected shape measure');
-        const label = shapeMeasurementLayout(model.geometry, model.measure, model.style)!.caption!
-          .center;
+        const label = shapeMeasurementLayout(
+          shapeOf(record.annotation),
+          measure,
+          styleOf(record.annotation),
+        )!.caption!.center;
         const target = { x: 390, y: 275 };
         annotation.editPointer('down', page.ref, label, false);
         annotation.editPointer('move', page.ref, target, false);

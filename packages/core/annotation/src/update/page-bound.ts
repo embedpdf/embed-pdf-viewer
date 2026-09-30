@@ -43,10 +43,10 @@ export const viewOf = (input: PointerInput): ViewEnv | undefined =>
  *  member counts at its view-projected footprint. A callout's frame is only
  *  the text box, so the clamp uses the visual bounds — box, leader, and
  *  arrowhead — and the arrow cannot leave the page. */
-function moveClampCorners(annotation: ModelAnnotation, view?: ViewEnv): Point[] {
-  const mode = anchorModeOf(annotation);
-  const stored = shapeOf(annotation.annotation);
-  const style = styleOf(annotation.annotation);
+function moveClampCorners(record: ModelAnnotation, view?: ViewEnv): Point[] {
+  const mode = anchorModeOf(record);
+  const stored = shapeOf(record.annotation);
+  const style = styleOf(record.annotation);
   const geometry = anchoredGeom(stored, mode, view);
   if (geometry.kind === 'text-box' && geometry.calloutLine) {
     const visual = geomVisualBounds(geometry, {
@@ -60,16 +60,16 @@ function moveClampCorners(annotation: ModelAnnotation, view?: ViewEnv): Point[] 
       { x: visual.x, y: visual.y + visual.height },
     ];
   }
-  return [...annotationSelectionFrame(annotation, view).corners];
+  return [...annotationSelectionFrame(record, view).corners];
 }
 
 /** The union of the ids' move-clamp bounds. */
 export function unionBoundsOf(model: Model, ids: Id[], view?: ViewEnv): Rect | null {
   const corners: Point[] = [];
   for (const id of ids) {
-    const annotation = model.byId[id];
-    if (!annotation) continue;
-    corners.push(...moveClampCorners(annotation, view));
+    const record = model.byId[id];
+    if (!record) continue;
+    corners.push(...moveClampCorners(record, view));
   }
   return corners.length ? unionRect(corners) : null;
 }

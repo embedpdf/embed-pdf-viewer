@@ -3,7 +3,9 @@
  * keeping its references to records right when a record is confirmed under a
  * new id (`rekey`) or leaves the view (`forget`).
  */
-import { styleOfDefaults, type ToolStyle } from '../record/defaults';
+import type { AnnotationDTO, LineEndings } from '@embedpdf/engine-core/runtime';
+
+import { readOfDefaults } from '../record/defaults';
 import type { Draft, Effect, FieldValues, Id, Model, Session } from '../types';
 
 export const initialSession: Session = {
@@ -31,9 +33,19 @@ const NO_DEFAULTS: FieldValues = {};
 export const defaultsFor = (model: Model, preset: string): FieldValues =>
   model.defaults[preset] ?? NO_DEFAULTS;
 
-/** What a tool draws a `kind` with: its defaults (by its preset), read over the engine's. */
-export const toolStyleOf = (model: Model, kind: string, preset: string = kind): ToolStyle =>
-  styleOfDefaults(kind, defaultsFor(model, preset));
+/**
+ * What a create from a tool starts from, before it has a shape: the tool's
+ * defaults (by its preset) over the engine's for its `kind`, read as an
+ * annotation. A ghost is drawn with its style (`styleOf`).
+ */
+export const toolAnnotation = (model: Model, kind: string, preset: string = kind): AnnotationDTO =>
+  readOfDefaults(kind, defaultsFor(model, preset));
+
+const NO_ENDINGS: LineEndings = { start: 'none', end: 'none' };
+
+/** A line's or polyline's endings; none for an annotation that has none. */
+export const lineEndingsOf = (annotation: AnnotationDTO): LineEndings =>
+  ('lineEndings' in annotation && annotation.lineEndings) || NO_ENDINGS;
 
 /** Merge fields into a tool's defaults; each value is whole, as in a patch. */
 export function setDefaults(model: Model, preset: string, patch: FieldValues): [Model, Effect[]] {

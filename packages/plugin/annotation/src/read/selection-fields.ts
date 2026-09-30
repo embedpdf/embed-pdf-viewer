@@ -1,5 +1,4 @@
 import {
-  fieldsOf,
   FLAG_KEYS,
   kindOf,
   linkOf,
@@ -7,6 +6,7 @@ import {
   type ModelAnnotation,
   richDocOf,
   sharedFields,
+  textOf,
 } from '@embedpdf/core-annotation';
 
 import type { EditableFields, SelectionFlags } from '../contract';
@@ -32,15 +32,15 @@ export function createSelectionFieldsReads(
   };
 
   /** What a sidebar reads of one member: its fields, its text as shown, and its link. */
-  const sourcesOf = (model: Model, annotation: ModelAnnotation): FieldSources => {
-    const { text } = fieldsOf(annotation);
-    const record = annotation.annotation;
+  const sourcesOf = (model: Model, record: ModelAnnotation): FieldSources => {
+    const annotation = record.annotation;
+    const text = textOf(annotation);
     return {
-      data: record as unknown as Record<string, unknown>,
+      data: annotation as unknown as Record<string, unknown>,
       ...(text ? { text } : {}),
       // Parents store no link: the committed children are the truth, read
       // through the lens. A link annotation reads its own target.
-      link: record.subtype === 'link' ? (record.target ?? null) : linkOf(model, annotation.id),
+      link: annotation.subtype === 'link' ? (annotation.target ?? null) : linkOf(model, record.id),
     };
   };
 
@@ -51,9 +51,9 @@ export function createSelectionFieldsReads(
     if (cache && cache.model === model && cache.range === range) return cache.v;
     const members = model.selected
       .map((id) => model.byId[id])
-      .filter((annotation): annotation is ModelAnnotation => !!annotation);
-    const fields = sharedFields(members.map((annotation) => kindOf(annotation.annotation)));
-    const sources = members.map((annotation) => sourcesOf(model, annotation));
+      .filter((record): record is ModelAnnotation => !!record);
+    const fields = sharedFields(members.map((record) => kindOf(record.annotation)));
+    const sources = members.map((record) => sourcesOf(model, record));
     const values = sources.length ? fieldValues(fields, sources[0]!) : {};
     const mixed: string[] = [];
     for (const spec of fields) {
@@ -65,7 +65,7 @@ export function createSelectionFieldsReads(
     // range fields report the runs it covers, resolved against the body — the
     // same values `updateSelection` would restyle.
     if (range && members.length === 1 && members[0]!.id === range.id) {
-      const rp = rangeProps(richDocOf(fieldsOf(members[0]!), fonts), range, fonts);
+      const rp = rangeProps(richDocOf(members[0]!.annotation, fonts), range, fonts);
       for (const spec of fields) {
         if (!RANGE_KEYS.includes(spec.key)) continue;
         values[spec.key] = rp.values[spec.key];
@@ -86,15 +86,13 @@ export function createSelectionFieldsReads(
     if (flagsCache && flagsCache.model === model) return flagsCache.v;
     const members = model.selected
       .map((id) => model.byId[id])
-      .filter((annotation): annotation is ModelAnnotation => !!annotation);
+      .filter((record): record is ModelAnnotation => !!record);
     let flags: SelectionFlags | null = null;
     if (members.length) {
       flags = {} as SelectionFlags;
       for (const key of FLAG_KEYS) {
         const first = members[0].annotation[key];
-        flags[key] = members.every((annotation) => annotation.annotation[key] === first)
-          ? first
-          : null;
+        flags[key] = members.every((record) => record.annotation[key] === first) ? first : null;
       }
     }
     flagsCache = { model, v: flags };

@@ -11,6 +11,7 @@
 import { boxFamily } from '../shapes';
 import { defineKind, NO_CAPS, type FieldSpec, type KindCaps } from './define';
 import { widgetStyle } from './styles';
+import { fieldText } from './texts';
 
 const WIDGET_CAPS: KindCaps = {
   ...NO_CAPS,
@@ -43,6 +44,7 @@ export const widgetText = defineKind({
   name: 'widget-text',
   family: boxFamily,
   style: widgetStyle,
+  text: fieldText,
   caps: WIDGET_CAPS,
   fields: TEXT_FIELDS,
 });
@@ -52,6 +54,7 @@ export const widgetChoice = defineKind({
   name: 'widget-choice',
   family: boxFamily,
   style: widgetStyle,
+  text: fieldText,
   caps: WIDGET_CAPS,
   fields: TEXT_FIELDS,
 });
@@ -61,6 +64,7 @@ export const widgetButton = defineKind({
   name: 'widget-button',
   family: boxFamily,
   style: widgetStyle,
+  text: fieldText,
   caps: WIDGET_CAPS,
   fields: TEXT_FIELDS,
 });

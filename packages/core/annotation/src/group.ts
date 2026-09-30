@@ -22,8 +22,8 @@ import { groupOf, kindOf } from './record';
 import type { ModelAnnotation, Id, Model } from './types';
 
 /** A subordinate that counts toward a visual group (not link plumbing). */
-const visualMember = (annotation: ModelAnnotation | undefined): boolean =>
-  !!annotation && !isAttachedLink(annotation);
+const visualMember = (record: ModelAnnotation | undefined): boolean =>
+  !!record && !isAttachedLink(record);
 
 /**
  * The transform capabilities of a multi-target (group) selection: a group can
@@ -42,12 +42,10 @@ export interface GroupCaps {
 export function groupCaps(model: Model, ids: Id[]): GroupCaps {
   const members = ids
     .map((id) => model.byId[id])
-    .filter((annotation): annotation is NonNullable<typeof annotation> => !!annotation);
+    .filter((record): record is NonNullable<typeof record> => !!record);
   if (members.length === 0) return { movable: false, resizable: false, rotatable: false };
   const ok = (pick: (caps: KindCaps) => boolean): boolean =>
-    members.every(
-      (annotation) => annotTransformable(annotation) && pick(kindOf(annotation.annotation).caps),
-    );
+    members.every((record) => annotTransformable(record) && pick(kindOf(record.annotation).caps));
   return {
     movable: ok((caps) => caps.groupMovable),
     resizable: ok((caps) => caps.groupResizable),
@@ -62,10 +60,10 @@ export function groupCaps(model: Model, ids: Id[]): GroupCaps {
  * subordinate nor the target of any subordinate is ungrouped.
  */
 export function groupKeyOf(model: Model, id: Id): Id | null {
-  const annotation = model.byId[id];
-  if (!annotation) return null;
-  const group = groupOf(annotation.annotation);
-  if (group) return isAttachedLink(annotation) ? null : group;
+  const record = model.byId[id];
+  if (!record) return null;
+  const group = groupOf(record.annotation);
+  if (group) return isAttachedLink(record) ? null : group;
   for (const other of model.order) {
     const sub = model.byId[other];
     if (sub && groupOf(sub.annotation) === id && visualMember(sub)) return id;

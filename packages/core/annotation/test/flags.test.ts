@@ -2,7 +2,7 @@ import { quadFromRect } from '@embedpdf/core-geometry';
 import { toPageRef } from '@embedpdf/engine-core/runtime';
 import { describe, expect, it } from 'vitest';
 
-import { modelWith, record, step, type RecordInput, STYLE, restyle } from './support';
+import { modelWith, recordOf, step, type RecordInput, STYLE, restyle } from './support';
 import { anchoredGeom, anchorModeOf, anchorOf, unanchoredGeom, type ViewEnv } from '../src/anchor';
 import {
   DRAWN_FLAGS,
@@ -18,9 +18,9 @@ import {
 import { geomBounds, geomRotation } from '../src/geometry';
 import { hitTest, isSelectable, paintOrder } from '../src/hit';
 import { initialModel, DEFAULT_CHROME_GEOMETRY } from '../src/index';
-import type { ModelAnnotation, ModelGeometry, Model, Message, Point } from '../src/types';
+import type { ModelAnnotation, Shape, Model, Message, Point } from '../src/types';
 import { pageItems, chrome, textBoxes } from '../src/view';
-import { fieldsOf, shapeOf } from '../src/record';
+import { shapeOf, styleOf } from '../src/record';
 
 const PON = 1;
 const PAGE = toPageRef(PON);
@@ -34,7 +34,7 @@ const square = (
   flags: AnnotationFlags = DRAWN_FLAGS,
   over: Partial<RecordInput> = {},
 ): ModelAnnotation =>
-  record({
+  recordOf({
     id,
     ref: {
       kind: 'objectNumber',
@@ -83,15 +83,15 @@ describe('flag predicates (ISO 32000 Table 167)', () => {
   });
 
   it('lockedContents blocks contents, not geometry', () => {
-    const annotation = square('a3', flagsWith({ lockedContents: true }));
-    expect(annotTransformable(annotation)).toBe(true);
-    expect(annotContentsEditable(annotation)).toBe(false);
+    const record = square('a3', flagsWith({ lockedContents: true }));
+    expect(annotTransformable(record)).toBe(true);
+    expect(annotContentsEditable(record)).toBe(false);
   });
 
   it('widget kinds ignore readOnly (the form layer owns field ReadOnly)', () => {
-    const annotation = square('a4', flagsWith({ readOnly: true }), { subtype: 'widget-text' });
-    expect(annotInteractive(annotation)).toBe(true);
-    expect(annotTransformable(annotation)).toBe(true);
+    const record = square('a4', flagsWith({ readOnly: true }), { subtype: 'widget-text' });
+    expect(annotInteractive(record)).toBe(true);
+    expect(annotTransformable(record)).toBe(true);
   });
 
   it('drawn annotations start with print set (Acrobat parity)', () => {
@@ -115,9 +115,9 @@ describe('flag predicates (ISO 32000 Table 167)', () => {
         in: { page: PAGE, point: { x: 60, y: 50 }, shift: false },
       },
     ]);
-    const annotation = model.byId[model.order[0]];
-    expect(annotation.annotation).toMatchObject(DRAWN_FLAGS);
-    expect(annotation.annotation.print).toBe(true);
+    const record = model.byId[model.order[0]];
+    expect(record.annotation).toMatchObject(DRAWN_FLAGS);
+    expect(record.annotation.print).toBe(true);
   });
 
   it('a tool flags seed merges over DRAWN_FLAGS at commit (the note-tool path)', () => {
@@ -142,8 +142,8 @@ describe('flag predicates (ISO 32000 Table 167)', () => {
         in: { page: PAGE, point: { x: 60, y: 50 }, shift: false },
       },
     ]);
-    const annotation = model.byId[model.order[0]];
-    expect(annotation.annotation).toMatchObject(
+    const record = model.byId[model.order[0]];
+    expect(record.annotation).toMatchObject(
       flagsWith({ print: true, noZoom: true, noRotate: true }),
     );
   });
@@ -167,8 +167,8 @@ describe('flag-driven behavior in the model', () => {
   });
 
   it('toggleNoView + noView renders only while selected', () => {
-    const annotation = square('t1', flagsWith({ noView: true, toggleNoView: true }));
-    let model = loaded([annotation]);
+    const record = square('t1', flagsWith({ noView: true, toggleNoView: true }));
+    let model = loaded([record]);
     expect(pageItems(model, PAGE)).toEqual([]);
     model = { ...model, selected: ['t1'] };
     expect(pageItems(model, PAGE).map((item) => item.id)).toEqual(['t1']);
@@ -196,8 +196,8 @@ describe('flag-driven behavior in the model', () => {
     expect(nodes.some((node) => node.kind === 'rotate-knob')).toBe(false);
     // restyle is blocked, silently (no effect emitted)
     const [afterProps, propsFx] = step(model, restyle(model, { color: '#00ff00' }));
-    expect(fieldsOf(afterProps.byId['l1']).style.color).toBe(
-      fieldsOf(model.byId['l1']).style.color,
+    expect(styleOf(afterProps.byId['l1'].annotation).color).toBe(
+      styleOf(model.byId['l1'].annotation).color,
     );
     expect(propsFx).toEqual([]);
     // delete is blocked — the locked member survives, still selected
@@ -259,7 +259,7 @@ describe('flag-driven behavior in the model', () => {
 
 describe('screen-anchored bodies (noZoom / noRotate)', () => {
   const rect = { x: 100, y: 100, width: 40, height: 20 };
-  const geom: ModelGeometry = { kind: 'box', box: rect, rotation: 0, ellipse: false };
+  const geom: Shape = { kind: 'box', box: rect, rotation: 0, ellipse: false };
 
   it('anchorModeOf reads flags OR kind caps', () => {
     expect(anchorModeOf(square('a', DRAWN_FLAGS))).toBeNull();
@@ -327,7 +327,7 @@ describe('screen-anchored bodies (noZoom / noRotate)', () => {
   it('no view env / text-anchored geoms pass through untouched', () => {
     expect(anchoredGeom(geom, { zoom: true, upright: true }, undefined)).toBe(geom);
     // markup quads are bound to page text — no screen anchoring for them.
-    const quads: ModelGeometry = {
+    const quads: Shape = {
       kind: 'quads',
       quadPoints: [quadFromRect({ x: 0, y: 0, width: 10, height: 5 })],
     };
@@ -337,7 +337,7 @@ describe('screen-anchored bodies (noZoom / noRotate)', () => {
   });
 
   it('VERTEX kinds project too: an ink body scales about its bounds top-left', () => {
-    const ink: ModelGeometry = {
+    const ink: Shape = {
       kind: 'ink',
       inkList: [
         [
@@ -358,7 +358,7 @@ describe('screen-anchored bodies (noZoom / noRotate)', () => {
     const view: ViewEnv = { zoom: 2, rotation: 90 };
     const mode = { zoom: true, upright: true };
     // Round-trip a plain box, a rotated box, and a polygon.
-    const shapes: ModelGeometry[] = [
+    const shapes: Shape[] = [
       geom,
       { kind: 'box', box: { x: 100, y: 100, width: 40, height: 20 }, ellipse: false, rotation: 30 },
       {
@@ -392,8 +392,8 @@ describe('screen-anchored bodies (noZoom / noRotate)', () => {
   });
 
   it('pageItems projects the anchored footprint + scaled stroke; hit matches paint', () => {
-    const annotation = square('nz', flagsWith({ print: true, noZoom: true }));
-    const model = loaded([annotation]);
+    const record = square('nz', flagsWith({ print: true, noZoom: true }));
+    const model = loaded([record]);
     const view: ViewEnv = { zoom: 2, rotation: 0 };
     const [item] = pageItems(model, PAGE, view);
     if (item.geometry.kind !== 'box') throw new Error('expected rect');
@@ -480,8 +480,8 @@ describe('screen-anchored bodies (noZoom / noRotate)', () => {
   });
 
   it('an anchored annotation keeps its resize handles + rotate knob, and a quarter turn turns it', () => {
-    const annotation = square('an', flagsWith({ print: true, noZoom: true, noRotate: true }));
-    let model = loaded([annotation]);
+    const record = square('an', flagsWith({ print: true, noZoom: true, noRotate: true }));
+    let model = loaded([record]);
     model = { ...model, selected: ['an'] };
     const nodes = chrome(model, PAGE, undefined, undefined, { zoom: 2, rotation: 0 });
     expect(nodes.some((node) => node.kind === 'handle')).toBe(true);
@@ -499,8 +499,8 @@ describe('screen-anchored bodies (noZoom / noRotate)', () => {
   });
 
   it('resizing an anchored body via its projected handles commits the zoom-1 size (no release jump)', () => {
-    const annotation = square('nz2', flagsWith({ print: true, noZoom: true }));
-    let model = loaded([annotation]);
+    const record = square('nz2', flagsWith({ print: true, noZoom: true }));
+    let model = loaded([record]);
     model = { ...model, selected: ['nz2'] };
     const view = { zoom: 2, rotation: 0 as const };
     const input = (x: number, y: number) => ({
@@ -581,8 +581,8 @@ describe('screen-anchored bodies (noZoom / noRotate)', () => {
   });
 
   it('the rotate knob hangs off the anchored outline at every zoom (no drift)', () => {
-    const annotation = square('nz3', flagsWith({ print: true, noZoom: true }));
-    let model = loaded([annotation]);
+    const record = square('nz3', flagsWith({ print: true, noZoom: true }));
+    let model = loaded([record]);
     model = { ...model, selected: ['nz3'] };
     const view = { zoom: 4, rotation: 0 as const };
     const nodes = chrome(model, PAGE, undefined, undefined, view);

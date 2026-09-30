@@ -21,9 +21,9 @@ import type { ModelAnnotation, Id, Model } from './types';
 export function linkChildrenOf(model: Model, parentId: Id): ModelAnnotation[] {
   const out: ModelAnnotation[] = [];
   for (const id of model.order) {
-    const annotation = model.byId[id];
-    if (annotation && isAttachedLink(annotation) && groupOf(annotation.annotation) === parentId)
-      out.push(annotation);
+    const record = model.byId[id];
+    if (record && isAttachedLink(record) && groupOf(record.annotation) === parentId)
+      out.push(record);
   }
   return out;
 }

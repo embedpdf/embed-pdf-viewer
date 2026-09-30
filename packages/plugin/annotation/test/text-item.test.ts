@@ -1,13 +1,12 @@
 import {
-  annotationOfRecord,
-  recordOf,
   initialModel,
+  textBoxFamily,
   type ModelAnnotation,
   type AnnotationFlags,
-  type ModelGeometry,
+  type Shape,
   type Model,
 } from '@embedpdf/core-annotation';
-import { toPageRef } from '@embedpdf/engine-core/runtime';
+import { annotationOfDraft, toPageRef, type AnnotationDraft } from '@embedpdf/engine-core/runtime';
 import { describe, expect, it } from 'vitest';
 
 import { buildTextItems } from '../src/text-item';
@@ -44,32 +43,23 @@ const FLAGS: AnnotationFlags = {
 
 const freeText = (
   id: string,
-  geometry: Extract<ModelGeometry, { kind: 'text-box' }>,
+  geometry: Extract<Shape, { kind: 'text-box' }>,
   strokeWidth: number,
 ): ModelAnnotation => {
-  const fields = {
-    id,
-    ref: null,
-    page: PAGE,
+  const draft = {
     subtype: 'free-text',
-    geometry,
-    style: {
-      color: '#e07b39',
-      interiorColor: null,
-      strokeWidth,
-      opacity: 1,
-      blendMode: 'normal',
-      borderStyle: 'solid',
-      dashArray: null,
-      cloudyIntensity: null,
-    },
-    flags: FLAGS,
-    source: 'baked',
-  } as const;
-  return recordOf(
-    fields,
-    annotationOfRecord(fields, { ref: { kind: 'nm', page: PAGE, nm: id }, index: 0 }),
-  );
+    ...textBoxFamily.write(geometry, 'free-text'),
+    intent: geometry.calloutLine ? 'free-text-callout' : 'free-text',
+    contents: '',
+    color: '#e07b39',
+    strokeWidth,
+    ...FLAGS,
+  } as AnnotationDraft;
+  const annotation = annotationOfDraft(draft, {
+    ref: { kind: 'nm', page: PAGE, nm: id },
+    index: 0,
+  });
+  return { id, unconfirmed: true, source: 'baked', annotation };
 };
 
 describe('buildTextItems — text plate mirrors the AP generator', () => {
@@ -113,7 +103,7 @@ describe('buildTextItems — text plate mirrors the AP generator', () => {
 
 describe('buildTextItems — the editor document', () => {
   it('renders paragraph alignment equal to the body as inherited', () => {
-    const annotation = freeText(
+    const record = freeText(
       'A1',
       {
         kind: 'text-box',
@@ -124,8 +114,8 @@ describe('buildTextItems — the editor document', () => {
       },
       1,
     );
-    (annotation as { annotation?: unknown }).annotation = {
-      ...annotation.annotation,
+    (record as { annotation?: unknown }).annotation = {
+      ...record.annotation,
       textAlign: 'center',
       contents: 'one\rtwo',
       richText: {
@@ -150,7 +140,7 @@ describe('buildTextItems — the editor document', () => {
         ],
       },
     };
-    const [item] = buildTextItems(editingIn([annotation], 'A1'), PAGE);
+    const [item] = buildTextItems(editingIn([record], 'A1'), PAGE);
     expect(item!.css.align).toBe('center');
     expect(item!.richText.paragraphs).toEqual([
       { runs: [{ text: 'one' }] },

@@ -18,7 +18,6 @@ import {
 import type { ArmedStampInfo } from '../contract';
 import { previewBucket } from '../host-contract';
 import { setToolGhost } from '../model';
-import { boxGeomFields } from '@embedpdf/core-annotation';
 import type { AnnotationContext, AnnotationServices } from '../services';
 import { appliedRefOf } from './outcomes';
 import { ARMED_STAMP_TOOL_ID } from '../tools/definitions';
@@ -171,7 +170,9 @@ export function createStamps(
         page: toPageRef(pageObjectNumber),
         draft: {
           subtype: 'stamp',
-          ...boxGeomFields(box, rotCW),
+          // Its box before any turn, and the turn (`null` upright, so none is kept).
+          box,
+          rotation: rotCW || null,
           fit: 'contain',
           ...(identity.name !== undefined ? { name: identity.name } : {}),
           ...(identity.subject !== undefined ? { subject: identity.subject } : {}),

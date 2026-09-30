@@ -3,7 +3,6 @@ import {
   type AnnotationFlags,
   applyStyleToRange,
   expandGroups,
-  fieldsOf,
   type FieldValues,
   geomVisualBounds,
   groupKeyOf,
@@ -72,9 +71,9 @@ export function createSelectionWrites(
     const commits: Commit[] = [];
     const patches: Record<Id, FieldValues> = {};
     for (const id of model.selected) {
-      const annotation = model.byId[id];
-      if (!annotation) continue;
-      const own = typeof patch === 'function' ? patch(annotation.annotation) : patch;
+      const record = model.byId[id];
+      if (!record) continue;
+      const own = typeof patch === 'function' ? patch(record.annotation) : patch;
       if (range?.id !== id) {
         patches[id] = own;
         continue;
@@ -82,7 +81,7 @@ export function createSelectionWrites(
       const { delta, rest } = runDeltaForFields(own, fonts);
       if (Object.keys(delta).length) {
         const next = applyStyleToRange(
-          { paragraphs: richDocOf(fieldsOf(annotation), fonts).paragraphs },
+          { paragraphs: richDocOf(record.annotation, fonts).paragraphs },
           range,
           delta,
         );
@@ -113,10 +112,10 @@ export function createSelectionWrites(
     selectAll: (page?: PageRef) => {
       const model = store.model();
       const ids = model.order.filter((id) => {
-        const annotation = model.byId[id];
+        const record = model.byId[id];
         return (
-          !!annotation &&
-          (!page || pageRefsEqual(annotation.annotation.page, page)) &&
+          !!record &&
+          (!page || pageRefsEqual(record.annotation.page, page)) &&
           isSelectable(model, id)
         );
       });
@@ -125,15 +124,11 @@ export function createSelectionWrites(
     selectInRect: (page: PageRef, rect: Rect, options?: { add?: boolean }) => {
       const model = store.model();
       const ids = model.order.filter((id) => {
-        const annotation = model.byId[id];
-        if (
-          !annotation ||
-          !pageRefsEqual(annotation.annotation.page, page) ||
-          !isSelectable(model, id)
-        )
+        const record = model.byId[id];
+        if (!record || !pageRefsEqual(record.annotation.page, page) || !isSelectable(model, id))
           return false;
-        const geometry = shapeOf(annotation.annotation);
-        const style = styleOf(annotation.annotation);
+        const geometry = shapeOf(record.annotation);
+        const style = styleOf(record.annotation);
         const hit = intersectRects(geomVisualBounds(geometry, style), rect);
         return hit.width > 0 && hit.height > 0;
       });
@@ -175,9 +170,7 @@ export function createSelectionWrites(
       const members = annotations.selectedCommitted();
       if (members.length < 2) return;
       const pageObjectNumber = members[0].annotation.page.objectNumber;
-      if (
-        members.some((annotation) => annotation.annotation.page.objectNumber !== pageObjectNumber)
-      )
+      if (members.some((record) => record.annotation.page.objectNumber !== pageObjectNumber))
         return; // groups are page-local
       const ordered = [...members].sort(
         (left, right) => model.order.indexOf(left.id) - model.order.indexOf(right.id),
@@ -186,9 +179,7 @@ export function createSelectionWrites(
       const primaryRef = refOf(primary);
       if (!primaryRef) return;
       await Promise.all(
-        rest.map((annotation) =>
-          links.writeRelationship(annotation, { to: primaryRef, type: 'group' }),
-        ),
+        rest.map((record) => links.writeRelationship(record, { to: primaryRef, type: 'group' })),
       );
     },
     ungroup: async (): Promise<void> => {
@@ -196,10 +187,10 @@ export function createSelectionWrites(
       const subs = expandGroups(model, model.selected)
         .map((id) => model.byId[id])
         .filter(
-          (annotation): annotation is ModelAnnotation =>
-            !!annotation && !!refOf(annotation) && !!groupOf(annotation.annotation),
+          (record): record is ModelAnnotation =>
+            !!record && !!refOf(record) && !!groupOf(record.annotation),
         );
-      await Promise.all(subs.map((annotation) => links.writeRelationship(annotation, null)));
+      await Promise.all(subs.map((record) => links.writeRelationship(record, null)));
     },
     canGroup: (): boolean => {
       const model = store.model();
@@ -207,16 +198,16 @@ export function createSelectionWrites(
       if (members.length < 2) return false;
       if (
         members.some(
-          (annotation) =>
-            annotation.annotation.page.objectNumber !== members[0].annotation.page.objectNumber,
+          (record) =>
+            record.annotation.page.objectNumber !== members[0].annotation.page.objectNumber,
         )
       )
         return false;
       // Grouping writes a relationship onto every member — each must
       // pass the per-record update check.
       if (
-        !members.every((annotation) => {
-          const ref = refOf(annotation);
+        !members.every((record) => {
+          const ref = refOf(record);
           return ref != null && authority.allowsMutation('update', ref);
         })
       )
@@ -232,14 +223,11 @@ export function createSelectionWrites(
       // selected group — same per-record write gate as `ungroup` hits.
       const subs = expandGroups(model, model.selected)
         .map((id) => model.byId[id])
-        .filter(
-          (annotation): annotation is ModelAnnotation =>
-            !!annotation && !!groupOf(annotation.annotation),
-        );
+        .filter((record): record is ModelAnnotation => !!record && !!groupOf(record.annotation));
       return (
         subs.length > 0 &&
-        subs.every((annotation) => {
-          const ref = refOf(annotation);
+        subs.every((record) => {
+          const ref = refOf(record);
           return ref != null && authority.allowsMutation('update', ref);
         })
       );

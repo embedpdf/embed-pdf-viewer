@@ -1,4 +1,4 @@
-import type { FieldValues, Subtype } from '@embedpdf/core-annotation';
+import type { FieldValues, KindName } from '@embedpdf/core-annotation';
 import type {
   AnnotationDraft,
   AnnotationFlags,
@@ -23,7 +23,7 @@ export const ICON_PLACE_SIZE = { width: 20, height: 20 } as const;
 
 export type IconPlaceKind = 'text' | 'file-attachment';
 
-export const isIconPlaceKind = (subtype: Subtype): subtype is IconPlaceKind =>
+export const isIconPlaceKind = (subtype: KindName): subtype is IconPlaceKind =>
   subtype === 'text' || subtype === 'file-attachment';
 
 /**

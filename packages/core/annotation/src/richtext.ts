@@ -12,6 +12,7 @@
  */
 import {
   faceForFreeTextFont,
+  type AnnotationDTO,
   type FaceRequest,
   type FontHandle,
   type RichTextBody,
@@ -22,7 +23,8 @@ import {
   type RichTextRunStyle,
 } from '@embedpdf/engine-core/runtime';
 
-import type { RecordFields, TextStyle } from './types';
+import { textOf } from './record/text';
+import type { TextStyle } from './types';
 
 export type RichTextStyleDelta = Partial<RichTextRunStyle>;
 
@@ -316,12 +318,11 @@ export function bodyFromTextStyle(style: TextStyle, fonts?: FontLookup): RichTex
   };
 }
 
-/** The annotation's rich document: the DTO's, else one synthesised from
- *  its plain text and text style (a draft the engine has not echoed yet). */
-export function richDocOf(record: RecordFields, fonts?: FontLookup): RichTextDocument {
-  if (record.annotation?.subtype === 'free-text' && record.annotation.richText)
-    return record.annotation.richText;
-  const style: TextStyle = record.text ?? {
+/** The annotation's rich document: a free text's own, else one made from
+ *  its plain text and how its text is set. */
+export function richDocOf(annotation: AnnotationDTO, fonts?: FontLookup): RichTextDocument {
+  if (annotation.subtype === 'free-text' && annotation.richText) return annotation.richText;
+  const style: TextStyle = textOf(annotation) ?? {
     fontFamily: 'helvetica',
     fontSize: 12,
     fontColor: '#000000',
@@ -329,6 +330,6 @@ export function richDocOf(record: RecordFields, fonts?: FontLookup): RichTextDoc
   };
   return {
     body: bodyFromTextStyle(style, fonts),
-    paragraphs: paragraphsFromPlainText(record.annotation?.contents ?? ''),
+    paragraphs: paragraphsFromPlainText(annotation.contents ?? ''),
   };
 }

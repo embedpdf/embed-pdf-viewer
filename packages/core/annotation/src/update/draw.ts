@@ -7,29 +7,30 @@
  */
 import type { AnnotationFlags, InkIntent } from '@embedpdf/engine-core/runtime';
 
-import { DRAWN_FLAGS } from '../flags';
 import { transposedAboutCenter, uprightRotation } from '../geometry';
 import { rectFromPoints, unionRect } from '../rect';
 import { straightenInkStroke } from '../ink';
-import { type MeasurementAppearance } from '../measurement';
+import { measurementDraftFields, type MeasurementAppearance } from '../measurement';
 import { shapeMeasurementReadout } from '../measurement-shape';
 import { clickCreateGeom, resolveClickPlacement } from '../placement';
+import { writableTarget } from '../record';
 import type {
   ClickCreate,
-  ModelGeometry,
+  Shape,
   Draft,
   Effect,
+  FieldValues,
   InkStraightenOptions,
   Model,
   PointerInput,
   Rect,
-  Subtype,
+  KindName,
 } from '../types';
-import { isPolySubtype, newRecord } from './changes';
+import { draftOf, isPolySubtype, newRecord } from './changes';
 import { calloutPointer } from './draw-callout';
 import { distancePointer } from './draw-distance';
 import { clampPointToBox } from './page-bound';
-import { toolStyleOf } from './session';
+import { defaultsFor, lineEndingsOf, toolAnnotation } from './session';
 
 /** The click ↔ drag threshold (content units): a press-release whose width and
  *  height both stay under it is a click. Exported so every gesture owner (the
@@ -39,7 +40,7 @@ export const MIN_DRAG = 3;
 export function createPointer(
   model: Model,
   phase: 'down' | 'move' | 'up',
-  subtype: Subtype,
+  subtype: KindName,
   input: PointerInput,
   preset: string = subtype,
   intent?: InkIntent,
@@ -204,9 +205,8 @@ export function createPointer(
     return deferInkCommit ? [next, []] : finishInkCreate(next);
   }
 
-  const tool = toolStyleOf(model, activeDraft.subtype, activeDraft.preset);
-  const style = tool.style;
-  let geometry: ModelGeometry | null = null;
+  const tool = toolAnnotation(model, activeDraft.subtype, activeDraft.preset);
+  let geometry: Shape | null = null;
   // The upright counter-rotation for a box commit (0 when the tool/page don't
   // ask for one). A dragged box keeps the on-screen footprint the author drew:
   // for a quarter-turn the unrotated box is the drag rect transposed about its
@@ -221,8 +221,8 @@ export function createPointer(
   // the same `resolveClickPlacement` the footprint ghost and the form plugin
   // consume, so preview ≡ commit by construction. The core only supplies the
   // kind-level fallback for free text (a click must always yield a typable
-  // box) and converts the placement to a ModelGeometry via `clickCreateGeom`.
-  const clickGeom = (policy: ClickCreate): ModelGeometry | null =>
+  // box) and converts the placement to a Shape via `clickCreateGeom`.
+  const clickGeom = (policy: ClickCreate): Shape | null =>
     clickCreateGeom(
       activeDraft.subtype,
       resolveClickPlacement(activeDraft.from, policy, {
@@ -231,7 +231,7 @@ export function createPointer(
         displayRotation:
           activeDraft.kind === 'create-rect' ? activeDraft.displayRotation : undefined,
       }),
-      tool,
+      lineEndingsOf(tool),
     );
   if (activeDraft.kind === 'create-rect' && activeDraft.subtype === 'free-text') {
     // Free-text: a dragged box, or — on a mere click — a default box you can
@@ -276,7 +276,7 @@ export function createPointer(
       geometry = {
         kind: 'line',
         linePoints: { start: activeDraft.from, end: activeDraft.to },
-        lineEndings: tool.lineEndings,
+        lineEndings: lineEndingsOf(tool),
         rotation: 0,
       };
     } else if (activeDraft.clickCreate && 'length' in activeDraft.clickCreate) {
@@ -290,35 +290,43 @@ export function createPointer(
       [{ type: 'captured', tool: activeDraft.capture, page: activeDraft.page, geometry }],
     ];
 
-  const annotation = newRecord(model, {
-    page: activeDraft.page,
-    subtype: activeDraft.subtype,
+  const fields: FieldValues = {
+    // A measurement states its intent, scale, caption and leader.
     ...(activeDraft.kind === 'create-line' && activeDraft.measure
-      ? { measure: activeDraft.measure }
+      ? measurementDraftFields(activeDraft.measure)
       : {}),
-    geometry,
-    style,
-    // A text kind carries its text styling from birth, so the tool's font
-    // defaults actually apply to what you draw.
-    ...(geometry.kind === 'text-box' ? { text: tool.text } : {}),
+    // A free text starts empty, as a plain box.
+    ...(geometry.kind === 'text-box' ? { intent: 'free-text', contents: '' } : {}),
     // A drawn link starts at the tool preset's target ('docs-link' style
     // presets), or dead (`null` — the create-then-edit flow).
-    ...(activeDraft.subtype === 'link' ? { link: tool.target } : {}),
-    flags: { ...DRAWN_FLAGS, ...activeDraft.flags },
-  });
-  const id = annotation.id;
+    ...(activeDraft.subtype === 'link'
+      ? { target: writableTarget(tool.subtype === 'link' ? tool.target : null) }
+      : {}),
+  };
+  const created = newRecord(
+    model,
+    activeDraft.page,
+    draftOf(
+      activeDraft.subtype,
+      defaultsFor(model, activeDraft.preset ?? activeDraft.subtype),
+      geometry,
+      fields,
+      activeDraft.flags,
+    ),
+  );
+  const id = created.record.id;
   return [
     {
       ...model,
       seq: model.seq + 1,
-      byId: { ...model.byId, [id]: annotation },
+      byId: { ...model.byId, [id]: created.record },
       order: [...model.order, id],
       selected: [id],
       draft: null,
       // A freshly drawn free-text box opens straight into edit (type immediately).
       editing: geometry.kind === 'text-box' ? id : model.editing,
     },
-    [{ type: 'create', id }],
+    [{ type: 'create', id, draft: created.draft }],
   ];
 }
 
@@ -332,25 +340,29 @@ export function finishInkCreate(model: Model): [Model, Effect[]] {
   const bounds = unionRect(points);
   if (Math.max(bounds.width, bounds.height) < MIN_DRAG) return [{ ...model, draft: null }, []];
 
-  const annotation = newRecord(model, {
-    page: draft.page,
-    subtype: draft.subtype,
-    geometry: { kind: 'ink', inkList: draft.strokes, rotation: 0 },
-    style: toolStyleOf(model, draft.subtype, draft.preset).style,
-    ...(draft.intent ? { intent: draft.intent } : {}),
-    flags: { ...DRAWN_FLAGS, ...draft.flags },
-  });
-  const id = annotation.id;
+  const created = newRecord(
+    model,
+    draft.page,
+    draftOf(
+      draft.subtype,
+      defaultsFor(model, draft.preset ?? draft.subtype),
+      { kind: 'ink', inkList: draft.strokes, rotation: 0 },
+      // The ink highlighter says so: `/IT` is set at create, never changed.
+      draft.intent === 'ink-highlight' ? { intent: draft.intent } : {},
+      draft.flags,
+    ),
+  );
+  const id = created.record.id;
   return [
     {
       ...model,
       seq: model.seq + 1,
-      byId: { ...model.byId, [id]: annotation },
+      byId: { ...model.byId, [id]: created.record },
       order: [...model.order, id],
       selected: [id],
       draft: null,
     },
-    [{ type: 'create', id }],
+    [{ type: 'create', id, draft: created.draft }],
   ];
 }
 
@@ -360,35 +372,38 @@ export function finishPolyCreate(model: Model): [Model, Effect[]] {
   const minPoints = draft.closed ? 3 : 2;
   if (draft.points.length < minPoints) return [{ ...model, draft: null }, []];
 
-  const tool = toolStyleOf(model, draft.subtype, draft.preset);
-  const geometry: ModelGeometry = {
+  const tool = toolAnnotation(model, draft.subtype, draft.preset);
+  const geometry: Shape = {
     kind: 'poly',
     vertices: draft.points,
     closed: draft.closed,
-    lineEndings: draft.closed ? undefined : tool.lineEndings,
+    lineEndings: draft.closed ? undefined : lineEndingsOf(tool),
     rotation: 0,
   };
   if (draft.measure && 'unavailable' in shapeMeasurementReadout(geometry, draft.measure))
     return [model, []];
 
-  const annotation = newRecord(model, {
-    page: draft.page,
-    subtype: draft.subtype,
-    geometry,
-    measure: draft.measure,
-    style: tool.style,
-    flags: { ...DRAWN_FLAGS, ...draft.flags },
-  });
-  const id = annotation.id;
+  const created = newRecord(
+    model,
+    draft.page,
+    draftOf(
+      draft.subtype,
+      defaultsFor(model, draft.preset ?? draft.subtype),
+      geometry,
+      draft.measure ? measurementDraftFields(draft.measure) : {},
+      draft.flags,
+    ),
+  );
+  const id = created.record.id;
   return [
     {
       ...model,
       seq: model.seq + 1,
-      byId: { ...model.byId, [id]: annotation },
+      byId: { ...model.byId, [id]: created.record },
       order: [...model.order, id],
       selected: [id],
       draft: null,
     },
-    [{ type: 'create', id }],
+    [{ type: 'create', id, draft: created.draft }],
   ];
 }

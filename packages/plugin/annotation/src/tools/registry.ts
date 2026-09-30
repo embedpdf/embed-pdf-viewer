@@ -2,10 +2,10 @@ import {
   defaultsFor,
   kindNamed,
   readOfDefaults,
-  styleOfDefaults,
+  textOf,
   uprightRotation,
   type FieldValues,
-  type Subtype,
+  type KindName,
 } from '@embedpdf/core-annotation';
 import { InteractionToken } from '@embedpdf/plugin-interaction/contract';
 
@@ -67,14 +67,13 @@ export function createToolRegistry(
     const own = defaultsFor(store.model(), tool?.preset ?? toolId);
     const cached = toolFields.get(toolId);
     if (cached?.own === own) return cached;
-    const { subtype: _kind, ...defaults } = readOfDefaults(kind, own) as unknown as Record<
-      string,
-      unknown
-    >;
+    const read = readOfDefaults(kind, own);
+    const { subtype: _kind, ...defaults } = read as unknown as Record<string, unknown>;
     // A tool's style panel edits its kind's fields: a callout edits a free
     // text's, an arrow a line's. The registry holds that mapping.
     const fields = kindNamed(tool?.fieldsKind ?? toolId).fields;
-    const { text, target } = styleOfDefaults(kind, own);
+    const text = textOf(read);
+    const target = read.subtype === 'link' ? (read.target ?? null) : null;
     const entry = {
       own,
       defaults,
@@ -142,7 +141,7 @@ export function createToolRegistry(
     getToolFields: (toolId: string): EditableFields => toolFieldsOf(toolId).fields,
     listResolvedTools: () => values(),
     getResolvedTool: (id: string) => registry.get(id) ?? null,
-    getToolSubtype: (id: string) => registry.get(id)?.subtype ?? (id as Subtype),
+    getToolSubtype: (id: string) => registry.get(id)?.subtype ?? (id as KindName),
   };
 
   return { get, values, activeTool, uprightRotFor, api };

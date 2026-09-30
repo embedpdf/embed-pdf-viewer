@@ -1,17 +1,23 @@
 import { annotationKey } from '@embedpdf/core';
 import { quadFromRect } from '@embedpdf/core-geometry';
-import { ANNOTATION_DEFAULTS, toPageRef, type AnnotationDTO } from '@embedpdf/engine-core/runtime';
+import {
+  ANNOTATION_DEFAULTS,
+  toPageRef,
+  type AnnotationDTO,
+  type AnnotationFlags,
+} from '@embedpdf/engine-core/runtime';
 import { describe, expect, it } from 'vitest';
 
 import {
   answering,
   modelWith,
   named,
-  record,
-  step,
   type RecordInput,
-  STYLE,
+  recordOf,
   restyle,
+  step,
+  STYLE,
+  withAnnotation,
 } from './support';
 import { cloudyBorderExtent } from '../src/cloudy';
 import { annotDeletable, annotTransformable, DRAWN_FLAGS } from '../src/flags';
@@ -52,16 +58,15 @@ import { isAttachedLink, isConversationOnly, isSubstrateOnly } from '../src/plan
 import { scene } from '../src/scene';
 import { computeMoveSnap } from '../src/snap';
 import type {
-  ModelAnnotation,
-  ModelGeometry,
   Draft,
-  Model,
+  KindName,
   Message,
-  RenderItem,
-  Style,
-  Subtype,
+  Model,
+  ModelAnnotation,
   Point,
-  RecordFields,
+  RenderItem,
+  Shape,
+  Style,
 } from '../src/types';
 import {
   annotsInBox,
@@ -70,7 +75,8 @@ import {
   update,
   EMPTY_CHANGE,
   sameSession,
-  toolStyleOf,
+  lineEndingsOf,
+  toolAnnotation,
 } from '../src/update';
 import {
   chrome,
@@ -81,7 +87,7 @@ import {
   selectionKnob,
   textBoxes,
 } from '../src/view';
-import { fieldsOf, kindOf, shapeOf, withFields, withShape } from '../src/record';
+import { groupOf, irtOf, kindOf, shapeOf, styleOf, textOf, withShape } from '../src/record';
 
 const PON = 1;
 const PAGE = toPageRef(PON);
@@ -101,7 +107,7 @@ const marqueePtr = (
   in: { page: PAGE, point: { x, y }, shift },
 });
 const createPtr = (
-  subtype: Extract<Subtype, 'square' | 'circle' | 'line' | 'polygon' | 'polyline'> | 'free-text',
+  subtype: Extract<KindName, 'square' | 'circle' | 'line' | 'polygon' | 'polyline'> | 'free-text',
   phase: 'down' | 'move' | 'up',
   x: number,
   y: number,
@@ -114,7 +120,7 @@ const createPtr = (
 });
 const run = (model: Model, msgs: Message[]): Model =>
   msgs.reduce((acc, message) => step(acc, message)[0], model);
-const rectGeom = (geometry: ModelGeometry) => (geometry.kind === 'box' ? geometry.box : null);
+const rectGeom = (geometry: Shape) => (geometry.kind === 'box' ? geometry.box : null);
 /** The write a committed edit asks for: one `patch` effect stating at least `fields`. */
 const writes = (id: string, fields: Record<string, unknown>) => ({
   type: 'patch',
@@ -232,7 +238,7 @@ describe('resolveClickPlacement — the shared placement layer', () => {
       const ghost = clickCreateGeom(
         subtype,
         resolveClickPlacement(point, policy, { pageBox }),
-        toolStyleOf(initialModel, subtype),
+        lineEndingsOf(toolAnnotation(initialModel, subtype)),
       );
       expect(ghost).toEqual(committed);
     }
@@ -337,15 +343,15 @@ describe('annotation-core', () => {
       createPtr('square', 'move', 200, 160),
       createPtr('square', 'up', 200, 160),
     ]);
-    const annotation = sq.byId[sq.order[0]];
-    expect(shapeOf(annotation.annotation)).toMatchObject({ kind: 'box', ellipse: false });
-    expect(rectGeom(shapeOf(annotation.annotation))).toMatchObject({
+    const record = sq.byId[sq.order[0]];
+    expect(shapeOf(record.annotation)).toMatchObject({ kind: 'box', ellipse: false });
+    expect(rectGeom(shapeOf(record.annotation))).toMatchObject({
       x: 100,
       y: 100,
       width: 100,
       height: 60,
     });
-    expect(annotation.source).toBe('vector');
+    expect(record.source).toBe('vector');
 
     const ci = run(initialModel, [
       createPtr('circle', 'down', 0, 0),
@@ -529,8 +535,8 @@ describe('annotation-core', () => {
       advance: 1 as const,
     };
     const [model] = step(initialModel, { type: 'createCaret', page: PAGE, anchor });
-    const annotation = model.byId[model.order[0]];
-    expect(shapeOf(annotation.annotation)).toMatchObject({
+    const record = model.byId[model.order[0]];
+    expect(shapeOf(record.annotation)).toMatchObject({
       kind: 'caret',
       rotation: expect.closeTo(270, 5),
     });
@@ -560,7 +566,7 @@ describe('annotation-core', () => {
   });
 
   it('obbFromGeom/geomResetRotation treat the caret as a box-family geom', () => {
-    const geometry: ModelGeometry = {
+    const geometry: Shape = {
       kind: 'caret',
       box: { x: 94, y: 53, width: 6, height: 6 },
       rotation: 270,
@@ -596,14 +602,16 @@ describe('annotation-core', () => {
     expect(caretRectFromAnchor(anchor)).toEqual({ x: 95, y: 50, width: 10, height: 10 });
 
     const [model, fx] = step(initialModel, { type: 'createCaret', page: PAGE, anchor });
-    const annotation = model.byId[model.order[0]];
-    expect(fieldsOf(annotation)).toMatchObject({
-      subtype: 'caret',
-      geometry: { kind: 'caret', box: { x: 95, y: 50, width: 10, height: 10 }, rotation: 0 },
-      source: 'vector',
+    const record = model.byId[model.order[0]];
+    expect(record.annotation.subtype).toBe('caret');
+    expect(shapeOf(record.annotation)).toEqual({
+      kind: 'caret',
+      box: { x: 95, y: 50, width: 10, height: 10 },
+      rotation: 0,
     });
-    expect(model.selected).toEqual([annotation.id]);
-    expect(fx[0]).toMatchObject({ type: 'create', id: annotation.id });
+    expect(record.source).toBe('vector');
+    expect(model.selected).toEqual([record.id]);
+    expect(fx[0]).toMatchObject({ type: 'create', id: record.id });
     expect(scene(pageItems(model, PAGE)[0])[0]).toMatchObject({
       kind: 'path',
       // No tool defaults: the engine's own caret colour.
@@ -632,22 +640,42 @@ describe('annotation-core', () => {
     expect(model.order).toHaveLength(2);
     const caret = model.byId[model.order[0]];
     const strikeout = model.byId[model.order[1]];
-    expect(fieldsOf(caret)).toMatchObject({
+    // The caret takes the strikeout tool's colour, so the pair reads as one mark.
+    expect(caret.annotation).toMatchObject({
       subtype: 'caret',
       intent: 'replace',
-      geometry: { kind: 'caret' },
-      style: { color: '#f97316', opacity: 0.8 },
+      color: '#f97316',
+      opacity: 0.8,
     });
-    expect(fieldsOf(strikeout)).toMatchObject({
+    expect(shapeOf(caret.annotation).kind).toBe('caret');
+    expect(strikeout.annotation).toMatchObject({
       subtype: 'strikeout',
       intent: 'strikeout-text-edit',
-      geometry: { kind: 'quads' },
-      irt: caret.id,
-      group: caret.id,
-      style: { color: '#f97316', opacity: 0.8 },
+      color: '#f97316',
+      opacity: 0.8,
     });
+    expect(shapeOf(strikeout.annotation).kind).toBe('quads');
+    expect(irtOf(strikeout.annotation)).toBe(caret.id);
+    expect(groupOf(strikeout.annotation)).toBe(caret.id);
     expect(model.selected).toEqual([caret.id, strikeout.id]);
-    expect(fx).toEqual([{ type: 'createGroup', primary: caret.id, members: [strikeout.id] }]);
+    // Each part is written from its own draft; the member answers the primary once it has a ref.
+    expect(fx).toEqual([
+      {
+        type: 'createGroup',
+        primary: caret.id,
+        members: [strikeout.id],
+        drafts: {
+          [caret.id]: expect.objectContaining({ subtype: 'caret', intent: 'replace', nm: 'new-1' }),
+          [strikeout.id]: expect.objectContaining({
+            subtype: 'strikeout',
+            intent: 'strikeout-text-edit',
+            nm: 'new-2',
+          }),
+        },
+      },
+    ]);
+    const drafts = fx[0]?.type === 'createGroup' ? fx[0].drafts : {};
+    expect(drafts[strikeout.id]).not.toHaveProperty('reply');
   });
 
   it('rekey moves the selection to the id a new record was confirmed under', () => {
@@ -667,7 +695,7 @@ describe('annotation-core', () => {
 
   it('forget drops the selection, hover, text editing and a gesture on records that left', () => {
     const square = (id: string): ModelAnnotation =>
-      record({
+      recordOf({
         id,
         ref: null,
         page: PAGE,
@@ -696,7 +724,7 @@ describe('annotation-core', () => {
   });
 
   it('an UNFILLED rect is hit only on its stroke; a filled one anywhere inside', () => {
-    const geometry: ModelGeometry = {
+    const geometry: Shape = {
       kind: 'box',
       box: { x: 100, y: 100, width: 100, height: 100 },
       rotation: 0,
@@ -712,7 +740,7 @@ describe('annotation-core', () => {
   });
 
   it('an UNFILLED circle is hit only near its outline', () => {
-    const geometry: ModelGeometry = {
+    const geometry: Shape = {
       kind: 'box',
       box: { x: 0, y: 0, width: 100, height: 100 },
       rotation: 0,
@@ -739,7 +767,7 @@ describe('annotation-core', () => {
   });
 
   it('a selected arrow is grabbable anywhere inside its outline box, not just on the thin stroke', () => {
-    const arrow = record({
+    const arrow = recordOf({
       id: 'A1',
       ref: null,
       page: PAGE,
@@ -836,8 +864,8 @@ describe('annotation-core', () => {
   });
 
   it('marquee ignores INERT annotations (readOnly) but still takes locked ones', () => {
-    const square = (id: string, flags: RecordFields['flags']): ModelAnnotation =>
-      record({
+    const square = (id: string, flags: AnnotationFlags): ModelAnnotation =>
+      recordOf({
         id,
         ref: null,
         page: PAGE,
@@ -928,7 +956,7 @@ describe('annotation-core', () => {
   });
 
   it('pageItems hands the renderer the endings-aware box (geomVisualBounds), not the tight bounds', () => {
-    const line = record({
+    const line = recordOf({
       id: 'L1',
       ref: null,
       page: PAGE,
@@ -964,7 +992,7 @@ describe('annotation-core', () => {
   });
 
   it('the selection outline wraps the line endings; shape outlines stay tight (handles on the box)', () => {
-    const line = record({
+    const line = recordOf({
       id: 'L1',
       ref: null,
       page: PAGE,
@@ -1012,7 +1040,7 @@ describe('annotation-core', () => {
   });
 
   it('the arrowhead is clickable, not just the stroke', () => {
-    const geometry: ModelGeometry = {
+    const geometry: Shape = {
       kind: 'line',
       linePoints: { start: { x: 60, y: 75 }, end: { x: 545, y: 235 } },
       lineEndings: { start: 'none', end: 'open-arrow' },
@@ -1022,7 +1050,7 @@ describe('annotation-core', () => {
     const onArrow = { x: 510, y: 242 }; // on the lower wing, ~19px off the a→b stroke band
     expect(geomHit(geometry, onArrow, 6, /* filled */ false, { strokeWidth: sw })).toBe(true);
     // the hit comes from the ending, not the line: with no endings that point misses
-    const noEnds: ModelGeometry = {
+    const noEnds: Shape = {
       kind: 'line',
       linePoints: { start: { x: 60, y: 75 }, end: { x: 545, y: 235 } },
       rotation: 0,
@@ -1033,7 +1061,7 @@ describe('annotation-core', () => {
   });
 
   it('geomScene fills by closed-ness: closed arrow → closed poly, open arrow → open poly', () => {
-    const line = (end: 'closed-arrow' | 'open-arrow'): ModelGeometry => ({
+    const line = (end: 'closed-arrow' | 'open-arrow'): Shape => ({
       kind: 'line',
       linePoints: { start: { x: 0, y: 0 }, end: { x: 100, y: 0 } },
       lineEndings: { start: 'none', end },
@@ -1047,7 +1075,7 @@ describe('annotation-core', () => {
   });
 
   it("a box's stroke draws inside it: visual bounds equal the box, the drawn path insets by half the stroke", () => {
-    const geometry: ModelGeometry = {
+    const geometry: Shape = {
       kind: 'box',
       box: { x: 100, y: 100, width: 80, height: 60 },
       rotation: 0,
@@ -1060,7 +1088,7 @@ describe('annotation-core', () => {
   });
 
   it('hit-testing follows the inset stroke: a thick stroke is clickable on its inner edge, the phantom band outside the box shrinks', () => {
-    const geometry: ModelGeometry = {
+    const geometry: Shape = {
       kind: 'box',
       box: { x: 100, y: 100, width: 100, height: 100 },
       rotation: 0,
@@ -1079,7 +1107,7 @@ describe('annotation-core', () => {
 
   it("a cloudy border's scallops start on the box and reach out by the cloud's extent; an empty box draws the plain outline", () => {
     const box = { x: 100, y: 100, width: 120, height: 90 };
-    const geometry: ModelGeometry = { kind: 'box', box, rotation: 0, ellipse: false };
+    const geometry: Shape = { kind: 'box', box, rotation: 0, ellipse: false };
     const [node] = geomScene(geometry, { strokeWidth: 2, cloudyIntensity: 2 });
     expect(node.kind).toBe('path');
     const pathData = node.kind === 'path' ? node.d : '';
@@ -1095,7 +1123,7 @@ describe('annotation-core', () => {
     expect(Math.min(...ys)).toBeGreaterThanOrEqual(box.y - reach - eps);
     expect(Math.max(...ys)).toBeLessThanOrEqual(box.y + box.height + reach + eps);
     // An empty box has nowhere to start the scallops: the plain outline, never a broken cloud.
-    const empty: ModelGeometry = {
+    const empty: Shape = {
       kind: 'box',
       box: { x: 0, y: 0, width: 0, height: 0 },
       rotation: 0,
@@ -1106,7 +1134,7 @@ describe('annotation-core', () => {
 
   it("a cloudy box's drawn bounds take in the cloud; its selection and handles stay on the box", () => {
     const box = { x: 50, y: 50, width: 40, height: 30 };
-    const geometry: ModelGeometry = { kind: 'box', box, rotation: 0, ellipse: false };
+    const geometry: Shape = { kind: 'box', box, rotation: 0, ellipse: false };
     const cloudy = { strokeWidth: 2, cloudyIntensity: 2 };
     const reach = cloudyBorderExtent(2, 2, false);
     expect(geomVisualBounds(geometry, cloudy)).toEqual({
@@ -1127,7 +1155,7 @@ describe('annotation-core', () => {
 
   it("a cloudy box is hit on its scallops, outside the box, and not past the cloud's reach", () => {
     const box = { x: 100, y: 100, width: 100, height: 100 };
-    const geometry: ModelGeometry = { kind: 'box', box, rotation: 0, ellipse: false };
+    const geometry: Shape = { kind: 'box', box, rotation: 0, ellipse: false };
     const cloudy = { strokeWidth: 2, cloudyIntensity: 2 };
     const reach = cloudyBorderExtent(2, 2, false);
     const margin = 2;
@@ -1186,7 +1214,7 @@ describe('annotation-core', () => {
   });
 
   it('scene() paints markup per subtype in the core (no framework logic): highlight fills+multiply, squiggly strokes a path', () => {
-    const quads: ModelGeometry = {
+    const quads: Shape = {
       kind: 'quads',
       quadPoints: [quadFromRect({ x: 0, y: 0, width: 100, height: 12 })],
     };
@@ -1329,11 +1357,11 @@ describe('annotation-core', () => {
       ink('move', 40, 30),
       ink('up', 40, 30),
     ]);
-    const annotation = model.byId[model.order[0]];
-    const geometry = shapeOf(annotation.annotation);
+    const record = model.byId[model.order[0]];
+    const geometry = shapeOf(record.annotation);
     expect(geometry).toMatchObject({ kind: 'ink' });
     expect(geometry.kind === 'ink' && geometry.inkList[0].length).toBe(3);
-    expect(annotation.source).toBe('vector');
+    expect(record.source).toBe('vector');
     // a short tap (no travel) is discarded, not committed
     const tap = run(initialModel, [ink('down', 5, 5), ink('up', 5, 5)]);
     expect(tap.order).toHaveLength(0);
@@ -1341,7 +1369,7 @@ describe('annotation-core', () => {
     const node = scene(pageItems(model, PAGE)[0])[0];
     expect(node.kind).toBe('poly');
     expect(node.paint.fill).toBeUndefined();
-    expect(node.paint.stroke).toBe(fieldsOf(annotation).style.color);
+    expect(node.paint.stroke).toBe(styleOf(record.annotation).color);
     expect(node.paint.lineCap).toBe('round');
   });
 
@@ -1377,10 +1405,10 @@ describe('annotation-core', () => {
 
     model = step(model, { type: 'finishInkDraft' })[0];
     expect(model.order).toHaveLength(1);
-    const annotation = model.byId[model.order[0]];
-    const geometry = shapeOf(annotation.annotation);
-    expect(annotation.annotation).toMatchObject({ intent: 'ink-highlight' });
-    expect(fieldsOf(annotation).style.blendMode).toBe('multiply');
+    const record = model.byId[model.order[0]];
+    const geometry = shapeOf(record.annotation);
+    expect(record.annotation).toMatchObject({ intent: 'ink-highlight' });
+    expect(styleOf(record.annotation).blendMode).toBe('multiply');
     expect(geometry.kind).toBe('ink');
     if (geometry.kind === 'ink') {
       expect(geometry.inkList).toHaveLength(2);
@@ -1390,7 +1418,7 @@ describe('annotation-core', () => {
   });
 
   it('a selected ink wraps its stroke: the outline expands by the stroke, not tight to the centerline', () => {
-    const ink = record({
+    const ink = recordOf({
       id: 'I1',
       ref: null,
       page: PAGE,
@@ -1446,7 +1474,7 @@ describe('annotation-core', () => {
     ]);
     const defaultsBefore = model.defaults;
     model = step(model, restyle(model, { color: '#00ff00' }))[0];
-    expect(fieldsOf(model.byId[model.order[0]]).style.color).toBe('#00ff00'); // the selected square changed
+    expect(styleOf(model.byId[model.order[0]].annotation).color).toBe('#00ff00'); // the selected square changed
     expect(model.defaults).toBe(defaultsBefore); // …the tool defaults are untouched
   });
 
@@ -1467,8 +1495,8 @@ describe('annotation-core', () => {
       restyle(model, { strokeWidth: 7, lineEndings: { start: 'none', end: 'closed-arrow' } }),
     );
     // strokeWidth applies to both; endings only to the line (the square ignores it)
-    expect(fieldsOf(next.byId[sq]).style.strokeWidth).toBe(7);
-    expect(fieldsOf(next.byId[ln]).style.strokeWidth).toBe(7);
+    expect(styleOf(next.byId[sq].annotation).strokeWidth).toBe(7);
+    expect(styleOf(next.byId[ln].annotation).strokeWidth).toBe(7);
     const lnGeom = shapeOf(next.byId[ln].annotation);
     expect(lnGeom.kind === 'line' && lnGeom.lineEndings?.end).toBe('closed-arrow');
     expect(fx).toEqual([
@@ -1496,16 +1524,16 @@ describe('annotation-core', () => {
       ...model,
       byId: {
         ...model.byId,
-        [id]: withFields(model.byId[id], { flags: { ...DRAWN_FLAGS, locked: true } }),
+        [id]: withAnnotation(model.byId[id], { locked: true }),
       },
     };
     const [locked, lockedFx] = step(model, restyle(model, { color: '#00ff00' }));
-    expect(fieldsOf(locked.byId[id]).style.color).not.toBe('#00ff00');
+    expect(styleOf(locked.byId[id].annotation).color).not.toBe('#00ff00');
     expect(lockedFx).toEqual([]);
     // a font key on a square: not declared → no change, no effect
     model = {
       ...model,
-      byId: { ...model.byId, [id]: withFields(model.byId[id], { flags: DRAWN_FLAGS }) },
+      byId: { ...model.byId, [id]: withAnnotation(model.byId[id], { locked: false }) },
     };
     const [next, fx] = step(model, restyle(model, { fontSize: 24 }));
     expect(next).toBe(model);
@@ -1522,16 +1550,16 @@ describe('annotation-core', () => {
       createPtr('free-text', 'down', 10, 10),
       createPtr('free-text', 'up', 10, 10), // a click → default-size box
     ]);
-    const annotation = model.byId[model.order[0]];
-    expect(fieldsOf(annotation).text?.fontSize).toBe(22);
-    expect(fieldsOf(annotation).text?.fontColor).toBe('#112233');
+    const record = model.byId[model.order[0]];
+    expect(textOf(record.annotation)?.fontSize).toBe(22);
+    expect(textOf(record.annotation)?.fontColor).toBe('#112233');
     // …and setFields edits it (free text has font fields)
     const [next] = step(model, restyle(model, { textAlign: 'center' }));
-    expect(fieldsOf(next.byId[model.order[0]]).text?.textAlign).toBe('center');
+    expect(textOf(next.byId[model.order[0]].annotation)?.textAlign).toBe('center');
   });
 
   it('markup is selectable but anchored: it selects, shows a bare outline (no handles), and will not move', () => {
-    const hl = record({
+    const hl = recordOf({
       id: 'H1',
       ref: null,
       page: PAGE,
@@ -1571,7 +1599,7 @@ describe('annotation-core', () => {
   // ── group annotations ──────────────────────────────────────────────────────
   // Squares keyed as the engine keys them, so a member's `/IRT` finds its primary.
   const sq = (name: string, x: number, primary?: string): ModelAnnotation =>
-    record({
+    recordOf({
       ...named(name, PAGE),
       page: PAGE,
       subtype: 'square',
@@ -1709,7 +1737,7 @@ describe('annotation-core', () => {
   });
 
   it('markups always sit beneath other annotations, regardless of creation order', () => {
-    const square = record({
+    const square = recordOf({
       id: 'S1',
       ref: null,
       page: PAGE,
@@ -1733,7 +1761,7 @@ describe('annotation-core', () => {
       flags: DRAWN_FLAGS,
       source: 'vector',
     });
-    const highlight = record({
+    const highlight = recordOf({
       id: 'H1',
       ref: null,
       page: PAGE,
@@ -1777,7 +1805,7 @@ describe('annotation-core callout', () => {
   });
   // A committed callout geom for the pure-geometry tests: box to the right of an
   // off-box tip, with an elbow between them.
-  const calloutGeom = (): Extract<ModelGeometry, { kind: 'text-box' }> =>
+  const calloutGeom = (): Extract<Shape, { kind: 'text-box' }> =>
     calloutShape(
       { x: 200, y: 100, width: 120, height: 40 },
       0,
@@ -1819,7 +1847,7 @@ describe('annotation-core callout', () => {
     // The live view paints what the AP generator bakes: the border inset by
     // half the stroke so its outer edge sits on the rect. The framework's
     // editable element owns only the text.
-    const plain: Extract<ModelGeometry, { kind: 'text-box' }> = {
+    const plain: Extract<Shape, { kind: 'text-box' }> = {
       kind: 'text-box',
       box: { x: 100, y: 100, width: 200, height: 60 },
       rotation: 0,
@@ -1857,8 +1885,8 @@ describe('annotation-core callout', () => {
     });
     let model = run(initialModel, [pointer('down'), pointer('up')]);
     const id = model.order[0]!;
-    const annotation = model.byId[id]!;
-    const geometry = shapeOf(annotation.annotation);
+    const record = model.byId[id]!;
+    const geometry = shapeOf(record.annotation);
     if (geometry.kind !== 'text-box' || geometry.calloutLine)
       throw new Error('expected a plain text box');
     model = step(model, { type: 'setText', id, text: 'hello' })[0];
@@ -1871,8 +1899,8 @@ describe('annotation-core callout', () => {
     expect(nodes[0]).toMatchObject({
       kind: 'rect',
       paint: {
-        stroke: fieldsOf(annotation).style.color,
-        width: fieldsOf(annotation).style.strokeWidth,
+        stroke: styleOf(record.annotation).color,
+        width: styleOf(record.annotation).strokeWidth,
       },
     });
     // The editable element is still projected for the text.
@@ -1989,9 +2017,9 @@ describe('annotation-core callout', () => {
       calloutPtr('move', 320, 140),
       calloutPtr('up', 320, 140), // commit
     ]);
-    const annotation = model.byId[model.order[0]];
-    const geometry = shapeOf(annotation.annotation);
-    expect(kindOf(annotation.annotation).name).toBe('free-text');
+    const record = model.byId[model.order[0]];
+    const geometry = shapeOf(record.annotation);
+    expect(kindOf(record.annotation).name).toBe('free-text');
     expect(geometry.kind).toBe('text-box');
     if (geometry.kind !== 'text-box' || !geometry.calloutLine)
       throw new Error('expected callout geom');
@@ -1999,9 +2027,9 @@ describe('annotation-core callout', () => {
     expect(geometry.calloutLine[1]).toEqual({ x: 120, y: 120 });
     expect(geometry.lineEnding).toBe('open-arrow');
     expect(geometry.box).toMatchObject({ x: 200, y: 100, width: 120, height: 40 });
-    expect(model.selected).toEqual([annotation.id]);
-    expect(model.editing).toBe(annotation.id);
-    expect(annotation.source).toBe('vector');
+    expect(model.selected).toEqual([record.id]);
+    expect(model.editing).toBe(record.id);
+    expect(record.source).toBe('vector');
   });
 
   it('a click (no drag) for the box step lays a default-sized text box', () => {
@@ -2013,8 +2041,8 @@ describe('annotation-core callout', () => {
       calloutPtr('down', 200, 100), // box click, no travel
       calloutPtr('up', 200, 100),
     ]);
-    const annotation = model.byId[model.order[0]];
-    const geometry = shapeOf(annotation.annotation);
+    const record = model.byId[model.order[0]];
+    const geometry = shapeOf(record.annotation);
     expect(geometry.kind === 'text-box' && geometry.box).toMatchObject({
       x: 200,
       y: 100,
@@ -2065,8 +2093,8 @@ describe('annotation-core callout', () => {
     // preview is now the dragged rect — and it matches what an up would commit
     expect(ghostBox(model)).toMatchObject({ x: 200, y: 100, width: 120, height: 50 });
     const committed = step(model, calloutPtr('up', 320, 150))[0];
-    const annotation = committed.byId[committed.order[0]];
-    const geometry = shapeOf(annotation.annotation);
+    const record = committed.byId[committed.order[0]];
+    const geometry = shapeOf(record.annotation);
     expect(geometry.kind === 'text-box' && geometry.box).toMatchObject({
       x: 200,
       y: 100,
@@ -2097,8 +2125,8 @@ describe('annotation-core callout', () => {
       height: 40,
     });
     const committed = run(placed, [pointer('down', 600, 780), pointer('up', 600, 780)]);
-    const annotation = committed.byId[committed.order[0]];
-    const geometry = shapeOf(annotation.annotation);
+    const record = committed.byId[committed.order[0]];
+    const geometry = shapeOf(record.annotation);
     expect(geometry.kind === 'text-box' && geometry.box).toEqual(ghostBox(placed));
   });
 
@@ -2123,8 +2151,8 @@ describe('annotation-core callout', () => {
       pointer('move', 320, 150),
       pointer('up', 320, 150),
     ]);
-    const annotation = dragged.byId[dragged.order[0]];
-    const geometry = shapeOf(annotation.annotation);
+    const record = dragged.byId[dragged.order[0]];
+    const geometry = shapeOf(record.annotation);
     expect(geometry.kind === 'text-box' && geometry.box).toMatchObject({
       x: 200,
       y: 100,
@@ -2148,7 +2176,7 @@ describe('annotation-core callout', () => {
     const a0Geometry = shapeOf(a0.annotation);
     if (a0Geometry.kind !== 'text-box' || !a0Geometry.calloutLine)
       throw new Error('expected callout');
-    const visual = geomVisualBounds(a0Geometry, fieldsOf(a0).style);
+    const visual = geomVisualBounds(a0Geometry, styleOf(a0.annotation));
     const rect = a0Geometry.box;
     const grab = { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
     const edit = (phase: 'down' | 'move' | 'up', x: number, y: number): Message => ({
@@ -2177,7 +2205,7 @@ describe('annotation-core callout — upright on a rotated page', () => {
   });
   // A committed upright callout: box {200,100,120,40} tilted 270° about its
   // centre (260,120) — its page-space footprint is the transposed {240,60,40,120}.
-  const rotCalloutGeom = (): Extract<ModelGeometry, { kind: 'text-box' }> =>
+  const rotCalloutGeom = (): Extract<Shape, { kind: 'text-box' }> =>
     calloutShape(
       { x: 200, y: 100, width: 120, height: 40 },
       270,
@@ -2217,8 +2245,8 @@ describe('annotation-core callout — upright on a rotated page', () => {
       rotPtr('move', 320, 140),
       rotPtr('up', 320, 140), // commit
     ]);
-    const annotation = model.byId[model.order[0]];
-    const geometry = shapeOf(annotation.annotation);
+    const record = model.byId[model.order[0]];
+    const geometry = shapeOf(record.annotation);
     if (geometry.kind !== 'text-box' || !geometry.calloutLine)
       throw new Error('expected callout geom');
     // dragged {200,100,120,40}, centre (260,120) → transposed logical box
@@ -2245,8 +2273,8 @@ describe('annotation-core callout — upright on a rotated page', () => {
       rotPtr('down', 200, 100), // box click, no travel
       rotPtr('up', 200, 100),
     ]);
-    const annotation = model.byId[model.order[0]];
-    const geometry = shapeOf(annotation.annotation);
+    const record = model.byId[model.order[0]];
+    const geometry = shapeOf(record.annotation);
     if (geometry.kind !== 'text-box') throw new Error('expected text geom');
     // the same box uprightAnchoredRect places (its displayed top-left at the click)
     expect(geometry.box).toMatchObject(uprightAnchoredRect({ x: 200, y: 100 }, 150, 40, 90));
@@ -2320,8 +2348,8 @@ describe('annotation-core callout — upright on a rotated page', () => {
       plainPtr('down', 200, 100),
       plainPtr('up', 200, 100),
     ]);
-    const annotation = model.byId[model.order[0]];
-    const geometry = shapeOf(annotation.annotation);
+    const record = model.byId[model.order[0]];
+    const geometry = shapeOf(record.annotation);
     if (geometry.kind !== 'text-box') throw new Error('expected text geom');
     expect(geometry.box).toMatchObject({ x: 200, y: 100, width: 150, height: 40 });
     expect(geometry.rotation).toBe(0);
@@ -2386,13 +2414,13 @@ describe('annotation-core — rotation', () => {
     id: string,
     rect: { x: number; y: number; width: number; height: number },
   ): ModelAnnotation =>
-    record({
+    recordOf({
       id,
       ref: {
         kind: 'objectNumber',
         page: PAGE,
         objectNumber: Number(id.slice(1)),
-      } as RecordFields['ref'],
+      } as RecordInput['ref'],
       page: PAGE,
       subtype: 'square',
       geometry: { kind: 'box', box: rect, rotation: 0, ellipse: false },
@@ -2402,7 +2430,7 @@ describe('annotation-core — rotation', () => {
     });
 
   it('box rotates about its own centre: rot adds, centre + size fixed', () => {
-    const geometry: ModelGeometry = {
+    const geometry: Shape = {
       kind: 'box',
       box: { x: 100, y: 100, width: 100, height: 50 },
       rotation: 0,
@@ -2422,7 +2450,7 @@ describe('annotation-core — rotation', () => {
       { x: 100, y: 0 },
       { x: 100, y: 40 },
     ];
-    const geometry: ModelGeometry = {
+    const geometry: Shape = {
       kind: 'poly',
       vertices: points.map((point) => ({ ...point })),
       closed: false,
@@ -2445,7 +2473,7 @@ describe('annotation-core — rotation', () => {
   });
 
   it('obbFromGeom reconstructs an oriented box from θ for both families', () => {
-    const box: ModelGeometry = {
+    const box: Shape = {
       kind: 'box',
       box: { x: 0, y: 0, width: 100, height: 100 },
       ellipse: false,
@@ -2456,7 +2484,7 @@ describe('annotation-core — rotation', () => {
     expect(obbBox?.corners).toHaveLength(4);
 
     // a vertex shape: spin the same points by 45° and the OBB tilts to match.
-    const base: ModelGeometry = {
+    const base: Shape = {
       kind: 'poly',
       vertices: [
         { x: 0, y: 0 },
@@ -2544,14 +2572,14 @@ describe('annotation-core — rotation', () => {
 });
 
 describe('annotation-core — rotation-aware selection (grab + menu + group)', () => {
-  const square = (id: string, geometry: ModelGeometry, subtype = 'square'): ModelAnnotation =>
-    record({
+  const square = (id: string, geometry: Shape, subtype = 'square'): ModelAnnotation =>
+    recordOf({
       id,
       ref: {
         kind: 'objectNumber',
         page: PAGE,
         objectNumber: Number(id.slice(1)),
-      } as RecordFields['ref'],
+      } as RecordInput['ref'],
       page: PAGE,
       subtype,
       geometry,
@@ -2559,7 +2587,7 @@ describe('annotation-core — rotation-aware selection (grab + menu + group)', (
       flags: DRAWN_FLAGS,
       source: 'baked',
     });
-  const rect = (x: number, y: number, width: number, height: number): ModelGeometry => ({
+  const rect = (x: number, y: number, width: number, height: number): Shape => ({
     kind: 'box',
     box: { x, y, width, height },
     rotation: 0,
@@ -2628,14 +2656,14 @@ describe('annotation-core — rotation-aware selection (grab + menu + group)', (
 });
 
 describe('annotation-core — rotation pivots about the rect centre', () => {
-  const square = (id: string, geometry: ModelGeometry, subtype = 'square'): ModelAnnotation =>
-    record({
+  const square = (id: string, geometry: Shape, subtype = 'square'): ModelAnnotation =>
+    recordOf({
       id,
       ref: {
         kind: 'objectNumber',
         page: PAGE,
         objectNumber: Number(id.slice(1)),
-      } as RecordFields['ref'],
+      } as RecordInput['ref'],
       page: PAGE,
       subtype,
       geometry,
@@ -2645,7 +2673,7 @@ describe('annotation-core — rotation pivots about the rect centre', () => {
     });
 
   it('turnPivotOf of a box is the rect centre, before AND after a quarter-turn', () => {
-    const geometry: ModelGeometry = {
+    const geometry: Shape = {
       kind: 'box',
       box: { x: 100, y: 100, width: 100, height: 50 },
       rotation: 0,
@@ -2661,7 +2689,7 @@ describe('annotation-core — rotation pivots about the rect centre', () => {
   it('a vertex shape spins in place about turnPivotOf, NOT its off-centre vertex mean', () => {
     // An L-shaped (asymmetric) polyline: its vertex mean sits well away from the
     // centre of the bounding rect.
-    const geometry: ModelGeometry = {
+    const geometry: Shape = {
       kind: 'poly',
       vertices: [
         { x: 0, y: 0 },
@@ -2696,7 +2724,7 @@ describe('annotation-core — rotation pivots about the rect centre', () => {
   });
 
   it('a rotate gesture on a vertex shape pivots about the middle of its upright points and keeps it fixed', () => {
-    const geometry: ModelGeometry = {
+    const geometry: Shape = {
       kind: 'poly',
       vertices: [
         { x: 0, y: 0 },
@@ -2715,7 +2743,7 @@ describe('annotation-core — rotation pivots about the rect centre', () => {
     const centre = turnPivotOf(geometry);
 
     // find the rotate knob, then start + drag the gesture there.
-    const obb = obbFromGeom(geometry, fieldsOf(poly).style)!;
+    const obb = obbFromGeom(geometry, styleOf(poly.annotation))!;
     const corners = obb.corners;
     const fromMid = { x: (corners[0].x + corners[1].x) / 2, y: (corners[0].y + corners[1].y) / 2 };
     const down = { x: corners[3].x - corners[0].x, y: corners[3].y - corners[0].y };
@@ -2752,14 +2780,14 @@ describe('annotation-core — rotation pivots about the rect centre', () => {
 });
 
 describe('annotation-core — selectionAnchor carries the knob alongside a centred box', () => {
-  const square = (id: string, geometry: ModelGeometry, subtype = 'square'): ModelAnnotation =>
-    record({
+  const square = (id: string, geometry: Shape, subtype = 'square'): ModelAnnotation =>
+    recordOf({
       id,
       ref: {
         kind: 'objectNumber',
         page: PAGE,
         objectNumber: Number(id.slice(1)),
-      } as RecordFields['ref'],
+      } as RecordInput['ref'],
       page: PAGE,
       subtype,
       geometry,
@@ -2767,7 +2795,7 @@ describe('annotation-core — selectionAnchor carries the knob alongside a centr
       flags: DRAWN_FLAGS,
       source: 'baked',
     });
-  const rect = (x: number, y: number, width: number, height: number): ModelGeometry => ({
+  const rect = (x: number, y: number, width: number, height: number): Shape => ({
     kind: 'box',
     box: { x, y, width, height },
     rotation: 0,
@@ -2800,7 +2828,7 @@ describe('annotation-core — selectionAnchor carries the knob alongside a centr
 });
 
 describe('annotation-core — join-aware stroke bounds', () => {
-  const poly = (points: Point[], closed: boolean): ModelGeometry => ({
+  const poly = (points: Point[], closed: boolean): Shape => ({
     kind: 'poly',
     vertices: points,
     closed,
@@ -2876,7 +2904,7 @@ describe('annotation-core — join-aware stroke bounds', () => {
   });
 
   it('ink bounds are unchanged — a plain half-width grow of the freehand hull (round, never spikes)', () => {
-    const geometry: ModelGeometry = {
+    const geometry: Shape = {
       kind: 'ink',
       inkList: [
         [
@@ -2901,7 +2929,7 @@ describe('annotation-core — join-aware stroke bounds', () => {
 
   it('a mitred arrowhead tip is fully enclosed — the box reaches ~sw past the tip vertex', () => {
     // Horizontal line pointing right, closed arrow at the tip (100,0).
-    const geometry: ModelGeometry = {
+    const geometry: Shape = {
       kind: 'line',
       linePoints: { start: { x: 0, y: 0 }, end: { x: 100, y: 0 } },
       lineEndings: { start: 'none', end: 'closed-arrow' },
@@ -2915,7 +2943,7 @@ describe('annotation-core — join-aware stroke bounds', () => {
   });
 
   it('scene paint: only ink rounds its joins; shapes and polys stay sharp (miter)', () => {
-    const mk = (subtype: Subtype, geometry: ModelGeometry): RenderItem => ({
+    const mk = (subtype: KindName, geometry: Shape): RenderItem => ({
       id: 'x',
       ref: null,
       subtype,
@@ -2984,7 +3012,7 @@ describe('annotation-core — join-aware stroke bounds', () => {
 describe('annotation-core opaqueBody (stamp) gestures', () => {
   const STAMP_RECT = { x: 100, y: 100, width: 100, height: 50 };
   const stamp = (): ModelAnnotation =>
-    record({
+    recordOf({
       id: 'S1',
       ref: { kind: 'objectNumber', page: PAGE, objectNumber: 900 },
       page: PAGE,
@@ -3078,7 +3106,7 @@ describe('page-bound gestures', () => {
     phase: 'down' | 'move' | 'up',
     x: number,
     y: number,
-    page: RecordFields['page'] = PAGE,
+    page: RecordInput['page'] = PAGE,
   ): Message => ({
     type: 'editPointer',
     phase,
@@ -3094,7 +3122,7 @@ describe('page-bound gestures', () => {
     phase: 'down' | 'move' | 'up',
     x: number,
     y: number,
-    page: RecordFields['page'] = PAGE,
+    page: RecordInput['page'] = PAGE,
   ): Message => ({
     type: 'marqueePointer',
     phase,
@@ -3218,13 +3246,13 @@ describe('annotation-core — snapping', () => {
     rect: { x: number; y: number; width: number; height: number },
     rot?: number,
   ): ModelAnnotation =>
-    record({
+    recordOf({
       id,
       ref: {
         kind: 'objectNumber',
         page: PAGE,
         objectNumber: Number(id.slice(1)),
-      } as RecordFields['ref'],
+      } as RecordInput['ref'],
       page: PAGE,
       subtype: 'square',
       geometry: { kind: 'box', box: rect, ellipse: false, rotation: rot ?? 0 },
@@ -3421,7 +3449,7 @@ describe('annotation-core — snapping', () => {
   });
 
   it('geomHandles carries rotation-aware cursors (the hover-cursor fix)', () => {
-    const geometry: ModelGeometry = {
+    const geometry: Shape = {
       kind: 'box',
       box: { x: 0, y: 0, width: 100, height: 50 },
       rotation: 0,
@@ -3468,7 +3496,7 @@ describe('page-bound rotate knob', () => {
   // Stamps: rotatable + opaqueBody (grabbable anywhere inside), so one click at
   // the centre selects regardless of the shape's rotation.
   const stampAt = (id: string, rect: Box, rot = 0, objectNumber = 900): ModelAnnotation =>
-    record({
+    recordOf({
       id,
       ref: { kind: 'objectNumber', page: PAGE, objectNumber: objectNumber },
       page: PAGE,
@@ -3655,7 +3683,7 @@ describe('rotate guides (live rotate chrome mode)', () => {
     expect(point.y).toBeLessThanOrEqual(BOX.y + BOX.height + 1e-9);
   };
   const stampAt = (rect: Box): ModelAnnotation =>
-    record({
+    recordOf({
       id: 'S1',
       ref: { kind: 'objectNumber', page: PAGE, objectNumber: 900 },
       page: PAGE,
@@ -3767,7 +3795,7 @@ describe('rotate guides (live rotate chrome mode)', () => {
 describe('group chrome rides live gestures', () => {
   type Box = { x: number; y: number; width: number; height: number };
   const stampAt = (id: string, rect: Box, objectNumber: number): ModelAnnotation =>
-    record({
+    recordOf({
       id,
       ref: { kind: 'objectNumber', page: PAGE, objectNumber: objectNumber },
       page: PAGE,
@@ -3875,7 +3903,7 @@ describe('marquee vs rotated shapes', () => {
   // A thin 200×20 bar rotated 45° about its centre (200,110): it occupies the
   // diagonal band from ≈(129,39) to ≈(271,181) and nothing else. Its rotated
   // AABB spans ≈(122..278, 32..188).
-  const bar = record({
+  const bar = recordOf({
     id: 'R1',
     ref: { kind: 'objectNumber', page: PAGE, objectNumber: 900 },
     page: PAGE,
@@ -3970,7 +3998,7 @@ describe('upright creation (counter-rotating the display rotation)', () => {
     subtype,
     in: { page: PAGE, point: { x, y }, shift: false, ...extra },
   });
-  const textGeom = (geometry: ModelGeometry) => (geometry.kind === 'text-box' ? geometry : null);
+  const textGeom = (geometry: Shape) => (geometry.kind === 'text-box' ? geometry : null);
 
   it('helpers: a quarter-turn about the centre lands exactly back on the source box', () => {
     const dragged = { x: 50, y: 60, width: 120, height: 40 };
@@ -4156,7 +4184,7 @@ describe('render source after an edit (what keeps a raster, what renders live)',
   // (visual is the engine raster, stays baked through edits); squares flip to
   // vector on any geometry edit and render live.
   const committed = (subtype: 'stamp' | 'square'): Model => {
-    const annotation = record({
+    const record = recordOf({
       id: 'A1',
       ref: { kind: 'objectNumber', objectNumber: 7, page: PAGE },
       page: PAGE,
@@ -4172,7 +4200,7 @@ describe('render source after an edit (what keeps a raster, what renders live)',
       source: 'baked',
       apBox: { x: 100, y: 100, width: 100, height: 60 },
     });
-    return { ...initialModel, byId: { A1: annotation }, order: ['A1'], selected: ['A1'] };
+    return { ...initialModel, byId: { A1: record }, order: ['A1'], selected: ['A1'] };
   };
 
   it('a stamp MOVE commits a bare patch — the raster is still pixel-exact', () => {
@@ -4238,14 +4266,14 @@ describe('render source after an edit (what keeps a raster, what renders live)',
     model = step(model, { type: 'select', ids: ['nope'] })[0];
     expect(model.selected).toEqual(['A1']);
     // `add` extends rather than replaces.
-    const annotation: ModelAnnotation = { ...model.byId['A1'], id: 'B1' };
-    model = { ...model, byId: { ...model.byId, B1: annotation }, order: [...model.order, 'B1'] };
+    const record: ModelAnnotation = { ...model.byId['A1'], id: 'B1' };
+    model = { ...model, byId: { ...model.byId, B1: record }, order: [...model.order, 'B1'] };
     model = step(model, { type: 'select', ids: ['B1'], add: true })[0];
     expect([...model.selected].sort()).toEqual(['A1', 'B1']);
   });
 
   it('setFields keeps opaque-body kinds BAKED (a widget restyle re-fetches, never flips)', () => {
-    const annotation = record({
+    const record = recordOf({
       id: 'W1',
       ref: { kind: 'objectNumber', objectNumber: 9, page: PAGE },
       page: PAGE,
@@ -4263,7 +4291,7 @@ describe('render source after an edit (what keeps a raster, what renders live)',
     });
     const model: Model = {
       ...initialModel,
-      byId: { W1: annotation },
+      byId: { W1: record },
       order: ['W1'],
       selected: ['W1'],
     };
@@ -4299,7 +4327,7 @@ describe('link prop (attached children in the substrate, read via linkOf)', () =
   } as const;
 
   const committedSquare = (extra?: Partial<RecordInput>): ModelAnnotation =>
-    record({
+    recordOf({
       id: S1,
       ref: REF,
       page: PAGE,
@@ -4316,9 +4344,9 @@ describe('link prop (attached children in the substrate, read via linkOf)', () =
       ...extra,
     });
 
-  const withSelected = (annotation: ModelAnnotation): Model => {
-    const model = modelWith([annotation]);
-    return { ...model, selected: [annotation.id] };
+  const withSelected = (record: ModelAnnotation): Model => {
+    const model = modelWith([record]);
+    return { ...model, selected: [record.id] };
   };
 
   it('setLink on a non-link kind emits target-carrying syncLink, writes NOTHING to the model', () => {
@@ -4380,7 +4408,7 @@ describe('link prop (attached children in the substrate, read via linkOf)', () =
 
   it('an attached link is NOT a visual-group member: single selection, handles, no Ungroup', () => {
     const parent = committedSquare();
-    const child = record({
+    const child = recordOf({
       id: 'C1',
       ref: CHILD_REF,
       page: PAGE,
@@ -4414,7 +4442,7 @@ describe('link prop (attached children in the substrate, read via linkOf)', () =
     const subRef = { kind: 'objectNumber', page: PAGE, objectNumber: 42 } as const;
     const P2 = annotationKey(subRef);
     const sub = committedSquare({ id: P2, ref: subRef, annotation: answering(REF, 'group') });
-    const child = record({
+    const child = recordOf({
       id: 'C1',
       ref: CHILD_REF,
       page: PAGE,
@@ -4441,7 +4469,7 @@ describe('link prop (attached children in the substrate, read via linkOf)', () =
 
   it('deleting a parent also deletes its attached link children (substrate)', () => {
     const parent = committedSquare();
-    const child = record({
+    const child = recordOf({
       id: 'C1',
       ref: CHILD_REF,
       page: PAGE,
@@ -4482,14 +4510,14 @@ describe('link prop (attached children in the substrate, read via linkOf)', () =
 });
 
 describe('conversation plane — replies and review states never reach the page', () => {
-  const at = (x: number, y: number): RecordFields['geometry'] => ({
+  const at = (x: number, y: number): Shape => ({
     kind: 'box',
     box: { x, y, width: 40, height: 30 },
     rotation: 0,
     ellipse: false,
   });
   const annotation = (name: string, over: Partial<RecordInput>): ModelAnnotation =>
-    record({
+    recordOf({
       ...named(name, PAGE),
       page: PAGE,
       subtype: 'square',
@@ -4559,7 +4587,7 @@ describe('conversation plane — replies and review states never reach the page'
 describe('callout ↔ AP-generator mirror', () => {
   // Box (200,100)+120×40; tip far left; knee below-left of the box centre →
   // conn = left-edge midpoint (200,120). Same fixture as the callout describe.
-  const calloutGeom = (): Extract<ModelGeometry, { kind: 'text-box' }> =>
+  const calloutGeom = (): Extract<Shape, { kind: 'text-box' }> =>
     calloutShape(
       { x: 200, y: 100, width: 120, height: 40 },
       0,
@@ -4592,7 +4620,7 @@ describe('callout ↔ AP-generator mirror', () => {
   });
 
   it('text edit renders the callout fully LIVE — never baked raster + DOM text', () => {
-    const callout = record({
+    const callout = recordOf({
       id: 'C1',
       ref: null,
       page: PAGE,

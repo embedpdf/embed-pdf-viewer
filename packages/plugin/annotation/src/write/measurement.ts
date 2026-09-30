@@ -61,9 +61,9 @@ export function createMeasurement(
       // it (one the user just deleted is not in the view, and is left alone).
       const model = store.model();
       const candidates = Object.values(records.get().byKey).flatMap(({ dto }) => {
-        const annotation = model.byId[annotationKey(dto.ref)];
-        return annotation && dto.page.objectNumber === pageObjectNumber && isDimension(dto)
-          ? [{ dto, annotation }]
+        const record = model.byId[annotationKey(dto.ref)];
+        return record && dto.page.objectNumber === pageObjectNumber && isDimension(dto)
+          ? [{ dto, annotation: record }]
           : [];
       });
       for (const { dto, annotation } of candidates) {

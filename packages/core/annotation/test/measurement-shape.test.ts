@@ -1,7 +1,7 @@
 import { measureFromKnownLength, toPageRef } from '@embedpdf/engine-core/runtime';
 import { describe, expect, it } from 'vitest';
 
-import { record, rounded, step, withoutLabel, STYLE } from './support';
+import { recordOf, rounded, step, withoutLabel, STYLE } from './support';
 import { DRAWN_FLAGS } from '../src/flags';
 import { DEFAULT_CHROME_GEOMETRY, geomTranslate, turnPivotOf } from '../src/geometry';
 import { pointInPoly, rotatePoint } from '../src/rect';
@@ -15,7 +15,7 @@ import {
 import type { PolyShape } from '../src/shapes/points';
 import { scene } from '../src/scene';
 import { annotationSelectionFrame } from '../src/selection';
-import type { ModelAnnotation, ModelGeometry, Model, Message, Point } from '../src/types';
+import type { ModelAnnotation, Shape, Model, Message, Point } from '../src/types';
 import { initialModel } from '../src/update';
 import { chrome, creationDraftAnchor, pageItems } from '../src/view';
 import { shapeOf } from '../src/record';
@@ -38,8 +38,8 @@ const geometry: PolyShape = { kind: 'poly', closed: true, vertices: points, rota
 /** The shape with a manually placed caption: its center, upright with the vertices. */
 const withCenter = (center: Point): PolyShape => ({ ...geometry, captionCenter: center });
 
-function annotation(measure = appearance, geom: ModelGeometry = geometry): ModelAnnotation {
-  return record({
+function annotation(measure = appearance, geom: Shape = geometry): ModelAnnotation {
+  return recordOf({
     id: 'shape',
     ref: null,
     page: toPageRef(1),

@@ -129,10 +129,8 @@ export function setFlags(
  */
 export function rotateSelection(model: Model, deltaDeg: number): [Model, Effect[]] {
   const ids = model.selected.filter((id) => {
-    const annotation = model.byId[id];
-    return (
-      annotation && annotTransformable(annotation) && kindOf(annotation.annotation).caps.rotatable
-    );
+    const record = model.byId[id];
+    return record && annotTransformable(record) && kindOf(record.annotation).caps.rotatable;
   });
   if (!ids.length) return [model, []];
   // pivot: where the engine turns a single shape (`turnPivotOf`: a box's
@@ -145,8 +143,8 @@ export function rotateSelection(model: Model, deltaDeg: number): [Model, Effect[
   // view-space commit instead).
   let pivot: Point;
   if (ids.length === 1) {
-    const annotation = model.byId[ids[0]];
-    pivot = annotationTurnPivot(annotation);
+    const record = model.byId[ids[0]];
+    pivot = annotationTurnPivot(record);
   } else {
     const page = model.byId[ids[0]].annotation.page;
     const union = groupUnionBounds({ ...model, selected: ids }, page);
@@ -155,9 +153,9 @@ export function rotateSelection(model: Model, deltaDeg: number): [Model, Effect[
   }
   const byId = { ...model.byId };
   for (const id of ids) {
-    const annotation = byId[id];
-    const geometry = shapeOf(annotation.annotation);
-    byId[id] = withShape(annotation, geomRotateAbout(geometry, pivot, deltaDeg));
+    const record = byId[id];
+    const geometry = shapeOf(record.annotation);
+    byId[id] = withShape(record, geomRotateAbout(geometry, pivot, deltaDeg));
   }
   return [{ ...model, byId }, []];
 }
@@ -169,12 +167,12 @@ export function resetRotation(model: Model): [Model, Effect[]] {
   const byId = { ...model.byId };
   let turned = false;
   for (const id of model.selected) {
-    const annotation = byId[id];
-    if (!annotation || !annotTransformable(annotation)) continue;
-    const geometry = shapeOf(annotation.annotation);
+    const record = byId[id];
+    if (!record || !annotTransformable(record)) continue;
+    const geometry = shapeOf(record.annotation);
     if (geomRotation(geometry) === 0) continue;
-    const pivot = annotationTurnPivot(annotation);
-    byId[id] = withShape(annotation, geomResetRotation(geometry, pivot));
+    const pivot = annotationTurnPivot(record);
+    byId[id] = withShape(record, geomResetRotation(geometry, pivot));
     turned = true;
   }
   return turned ? [{ ...model, byId }, []] : [model, []];
@@ -185,8 +183,8 @@ export function deleteSelection(model: Model): [Model, Effect[]] {
   // transformable members go; the rest keep their selection, so a mixed
   // selection deletes what it may and leaves the frozen ones visibly selected.
   const deletable = model.selected.filter((id) => {
-    const annotation = model.byId[id];
-    return !!annotation && annotDeletable(annotation);
+    const record = model.byId[id];
+    return !!record && annotDeletable(record);
   });
   if (!deletable.length) return [model, []];
   // Attached link children die with their parent. They are model
@@ -194,7 +192,7 @@ export function deleteSelection(model: Model): [Model, Effect[]] {
   // below handle parent and children uniformly — no side ledger.
   const withChildren = [
     ...deletable,
-    ...deletable.flatMap((id) => linkChildrenOf(model, id).map((annotation) => annotation.id)),
+    ...deletable.flatMap((id) => linkChildrenOf(model, id).map((record) => record.id)),
   ];
   const fx: Effect[] = withChildren
     .filter((id) => model.byId[id])

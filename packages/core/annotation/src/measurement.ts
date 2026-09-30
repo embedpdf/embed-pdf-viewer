@@ -7,7 +7,8 @@ import { dashOf } from './kinds/styles';
 import { rotatePoint, segDist, unionRect } from './rect';
 import { drawnLineOf } from './shapes/points';
 import type {
-  ModelGeometry,
+  FieldValues,
+  Shape,
   Handle,
   Paint,
   QuadRing,
@@ -62,6 +63,37 @@ export function measurementOf(annotation: AnnotationDTO): MeasurementAppearance 
     };
   }
   return undefined;
+}
+
+/** The subject a measurement is named by, as Acrobat names it. */
+const SUBJECT = {
+  'line-dimension': 'Distance',
+  'polyline-dimension': 'Perimeter',
+  'polygon-dimension': 'Area',
+} as const;
+
+/**
+ * What a new measurement states beside its points: its intent, its scale
+ * (one the engine can write), its caption and leader as it has them, and its
+ * subject. Its label is the engine's: it works it out from the points and
+ * the scale.
+ */
+export function measurementDraftFields(appearance: MeasurementAppearance): FieldValues {
+  const caption =
+    appearance.intent === 'line-dimension'
+      ? {
+          captionEnabled: appearance.captionEnabled,
+          captionPosition: appearance.captionPosition,
+          captionOffset: appearance.captionOffset,
+          leader: appearance.leader,
+        }
+      : { captionEnabled: appearance.captionEnabled };
+  return {
+    intent: appearance.intent,
+    measure: appearance.measure?.subtype === 'rectilinear' ? appearance.measure : null,
+    ...Object.fromEntries(Object.entries(caption).filter(([, value]) => value !== undefined)),
+    subject: SUBJECT[appearance.intent],
+  };
 }
 
 type CaptionOffset = DistanceAppearance['captionOffset'];
@@ -127,7 +159,7 @@ function lineAxes(start: Point, end: Point) {
   return { along, normal, length };
 }
 
-export function distanceLabel(geometry: ModelGeometry, appearance: DistanceAppearance): string {
+export function distanceLabel(geometry: Shape, appearance: DistanceAppearance): string {
   if (geometry.kind !== 'line') {
     return appearance.contents ?? '';
   }
@@ -239,7 +271,7 @@ function dimensionSegments(
 }
 
 export function distanceLayout(
-  geometry: ModelGeometry,
+  geometry: Shape,
   appearance: DistanceAppearance,
   strokeWidth: number,
 ): DistanceLayout | null {
@@ -363,7 +395,7 @@ export function expandDistanceBounds(bounds: Rect, padding: number): Rect {
 }
 
 export function distanceSelectionQuad(
-  geometry: ModelGeometry,
+  geometry: Shape,
   appearance: DistanceAppearance,
   strokeWidth: number,
 ): QuadRing {
@@ -442,14 +474,14 @@ export function distanceHit(
 }
 
 export function distanceCaptionAt(
-  geometry: ModelGeometry,
+  geometry: Shape,
   appearance: DistanceAppearance,
   width: number,
 ): Point | null {
   return distanceLayout(geometry, appearance, width)?.caption?.center ?? null;
 }
 
-export function distanceLeaderLength(geometry: ModelGeometry, point: Point): number {
+export function distanceLeaderLength(geometry: Shape, point: Point): number {
   if (geometry.kind !== 'line') {
     return 0;
   }
@@ -460,7 +492,7 @@ export function distanceLeaderLength(geometry: ModelGeometry, point: Point): num
 }
 
 export function moveDistanceCaption(
-  geometry: ModelGeometry,
+  geometry: Shape,
   appearance: DistanceAppearance,
   delta: Point,
 ): DistanceAppearance {
@@ -482,7 +514,7 @@ export function moveDistanceCaption(
 }
 
 export function distanceScene(
-  geometry: ModelGeometry,
+  geometry: Shape,
   appearance: DistanceAppearance,
   style: Style,
 ): SceneNode[] {
