@@ -3821,7 +3821,7 @@ describe('page-bound rotate knob', () => {
     expect(hitTest(model, PAGE, offHandle, wide, model.hitMargin, BOX).kind).not.toBe('handle');
     // a custom offset moves the drawn knob and the hit target together
     const far = { ...DEFAULT_CHROME_GEOMETRY, knobOffset: 48 };
-    const node = chrome(model, PAGE, BOX, 48).find((node) => node.kind === 'rotate-knob');
+    const node = chrome(model, PAGE, BOX, far).find((node) => node.kind === 'rotate-knob');
     expect(node?.kind).toBe('rotate-knob');
     if (node?.kind !== 'rotate-knob') return;
     expect(knob.at.y - node.at.y).toBeCloseTo(24, 4); // 48 − 24 further out

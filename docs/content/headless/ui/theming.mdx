@@ -1,6 +1,6 @@
 ---
 title: Colors & theming
-description: "Every color the viewer draws is a setting with a default. Set your accent once, fine-tune any part, and override colors from CSS for dark mode or a different look per viewer."
+description: 'Every color the viewer draws is a setting with a default. Set your accent once, fine-tune any part, and override colors from CSS for dark mode or a different look per viewer.'
 ---
 
 # Colors & theming
@@ -113,69 +113,70 @@ it on, so two viewers on one page can each have their own colors from one styles
 
 **The viewer**
 
-| Setting            | What it colors                                   | Default                        | From CSS                 |
-| :---------------- | :----------------------------------------------- | :----------------------------- | :----------------------- |
-| `accent`          | Every part below that has no color of its own    | `'#3858e9'`                      | `--epdf-accent`          |
-| `page.background` | A page before its picture arrives                | `'#ffffff'`                      | `--epdf-page-background` |
-| `page.shadow`     | The shadow under each page; `'none'` for none    | `'0 6px 18px rgb(0 0 0 / 0.18)'` | `--epdf-page-shadow`     |
+| Setting           | What it colors                                | Default                          | From CSS                 |
+| :---------------- | :-------------------------------------------- | :------------------------------- | :----------------------- |
+| `accent`          | Every part below that has no color of its own | `'#3858e9'`                      | `--epdf-accent`          |
+| `page.background` | A page before its picture arrives             | `'#ffffff'`                      | `--epdf-page-background` |
+| `page.shadow`     | The shadow under each page; `'none'` for none | `'0 6px 18px rgb(0 0 0 / 0.18)'` | `--epdf-page-shadow`     |
 
 **Annotations**: `annotationPlugin({ chrome })`
 
-| Setting                         | What it colors                                                    | Default                   | From CSS                                   |
-| :----------------------------- | :---------------------------------------------------------------- | :------------------------ | :----------------------------------------- |
-| `chrome.accent`                | Every annotation part below that has no color of its own          | the viewer's `accent`     | `--epdf-annotation-accent`                 |
-| `chrome.outline.color`         | The box around the selection                                      | `chrome.accent`           | `--epdf-annotation-outline`                |
-| `chrome.outline.width`         | Its line width                                                    | `1`                       | `--epdf-annotation-outline-width`          |
-| `chrome.outline.style`         | `'solid'` or `'dashed'`                                           | `'solid'`                 | `--epdf-annotation-outline-dash` (`4 3`)   |
-| `chrome.handles.fill`          | Inside the resize and point handles                               | `'#ffffff'`                 | `--epdf-annotation-handle-fill`            |
-| `chrome.handles.stroke`        | Their edge                                                        | `chrome.accent`           | `--epdf-annotation-handle-stroke`          |
-| `chrome.rotationHandle.fill`   | Inside the rotation handle                                        | `chrome.handles.fill`     | `--epdf-annotation-rotation-handle-fill`   |
-| `chrome.rotationHandle.stroke` | Its edge and its stalk                                            | `chrome.handles.stroke`   | `--epdf-annotation-rotation-handle-stroke` |
-| `chrome.guides.color`          | The lines that show what an annotation snaps to while you move it | `'#e91e63'`                 | `--epdf-annotation-guide`                  |
-| `chrome.guides.rotationColor`  | The reference cross and the angle line while you turn it          | `chrome.accent`           | `--epdf-annotation-rotation-guide`         |
-| `chrome.guides.width`          | The width of both kinds of line                                   | `1.5`                     | `--epdf-annotation-guide-width`            |
-| `chrome.guides.style`          | `'solid'` or `'dashed'`                                           | `'solid'`                 | `--epdf-annotation-guide-dash` (`4 3`)     |
-| `chrome.marquee.fill`          | Inside the box you drag to select several annotations             | `chrome.accent` at 8%     | `--epdf-annotation-marquee-fill`           |
-| `chrome.marquee.stroke`        | Its edge                                                          | `chrome.accent`           | `--epdf-annotation-marquee-stroke`         |
-| `chrome.textOutline`           | A text box while you type in it                                   | `chrome.accent`           | `--epdf-annotation-text-outline`           |
-| `chrome.readout.background`    | Behind the angle while you turn an annotation                     | `'rgb(0 0 0 / 0.8)'`        | `--epdf-readout-background`                |
-| `chrome.readout.color`         | The angle's text                                                  | `'#ffffff'`                 | `--epdf-readout-color`                     |
-| A tool's `ghost.opacity`       | The preview under the pointer                                     | `0.5`                     | `--epdf-ghost-opacity`                     |
+| Setting                        | What it colors                                                    | Default                 | From CSS                                   |
+| :----------------------------- | :---------------------------------------------------------------- | :---------------------- | :----------------------------------------- |
+| `chrome.accent`                | Every annotation part below that has no color of its own          | the viewer's `accent`   | `--epdf-annotation-accent`                 |
+| `chrome.outline.color`         | The box around the selection                                      | `chrome.accent`         | `--epdf-annotation-outline`                |
+| `chrome.outline.width`         | Its line width                                                    | `1`                     | `--epdf-annotation-outline-width`          |
+| `chrome.outline.style`         | `'solid'` or `'dashed'`                                           | `'solid'`               | `--epdf-annotation-outline-dash` (`4 3`)   |
+| `chrome.handles.fill`          | Inside the resize and point handles                               | `'#ffffff'`             | `--epdf-annotation-handle-fill`            |
+| `chrome.handles.stroke`        | Their edge                                                        | `chrome.accent`         | `--epdf-annotation-handle-stroke`          |
+| `chrome.handles.frameOpacity`  | The dashed line joining a small annotation's handles (0 hides it) | `0.5`                   | `--epdf-annotation-handle-frame-opacity`   |
+| `chrome.rotationHandle.fill`   | Inside the rotation handle                                        | `chrome.handles.fill`   | `--epdf-annotation-rotation-handle-fill`   |
+| `chrome.rotationHandle.stroke` | Its edge and its stalk                                            | `chrome.handles.stroke` | `--epdf-annotation-rotation-handle-stroke` |
+| `chrome.guides.color`          | The lines that show what an annotation snaps to while you move it | `'#e91e63'`             | `--epdf-annotation-guide`                  |
+| `chrome.guides.rotationColor`  | The reference cross and the angle line while you turn it          | `chrome.accent`         | `--epdf-annotation-rotation-guide`         |
+| `chrome.guides.width`          | The width of both kinds of line                                   | `1.5`                   | `--epdf-annotation-guide-width`            |
+| `chrome.guides.style`          | `'solid'` or `'dashed'`                                           | `'solid'`               | `--epdf-annotation-guide-dash` (`4 3`)     |
+| `chrome.marquee.fill`          | Inside the box you drag to select several annotations             | `chrome.accent` at 8%   | `--epdf-annotation-marquee-fill`           |
+| `chrome.marquee.stroke`        | Its edge                                                          | `chrome.accent`         | `--epdf-annotation-marquee-stroke`         |
+| `chrome.textOutline`           | A text box while you type in it                                   | `chrome.accent`         | `--epdf-annotation-text-outline`           |
+| `chrome.readout.background`    | Behind the angle while you turn an annotation                     | `'rgb(0 0 0 / 0.8)'`    | `--epdf-readout-background`                |
+| `chrome.readout.color`         | The angle's text                                                  | `'#ffffff'`             | `--epdf-readout-color`                     |
+| A tool's `ghost.opacity`       | The preview under the pointer                                     | `0.5`                   | `--epdf-ghost-opacity`                     |
 
 **Text selection**: `selectionPlugin({ color, handles })`
 
-| Setting            | What it colors                          | Default                       | From CSS                              |
-| :---------------- | :-------------------------------------- | :---------------------------- | :------------------------------------ |
-| `color`           | Selected text                           | the viewer's `accent` at 35%  | `--epdf-text-selection`               |
-| `handles.color`   | The grips at its ends, on touch screens | the viewer's `accent`         | `--epdf-text-selection-handle`        |
-| `handles.shadow`  | Their shadow                            | `'0 1px 4px rgb(0 0 0 / 0.35)'` | `--epdf-text-selection-handle-shadow` |
+| Setting          | What it colors                          | Default                         | From CSS                              |
+| :--------------- | :-------------------------------------- | :------------------------------ | :------------------------------------ |
+| `color`          | Selected text                           | the viewer's `accent` at 35%    | `--epdf-text-selection`               |
+| `handles.color`  | The grips at its ends, on touch screens | the viewer's `accent`           | `--epdf-text-selection-handle`        |
+| `handles.shadow` | Their shadow                            | `'0 1px 4px rgb(0 0 0 / 0.35)'` | `--epdf-text-selection-handle-shadow` |
 
 **Search**: `searchPlugin({ highlight })`
 
-| Setting                  | What it colors                       | Default      | From CSS                         |
+| Setting                 | What it colors                       | Default      | From CSS                         |
 | :---------------------- | :----------------------------------- | :----------- | :------------------------------- |
-| `highlight.color`       | Every match                          | `'#ffd500'`    | `--epdf-search-highlight`        |
-| `highlight.activeColor` | The active match                     | `'#ff9632'`    | `--epdf-search-highlight-active` |
+| `highlight.color`       | Every match                          | `'#ffd500'`  | `--epdf-search-highlight`        |
+| `highlight.activeColor` | The active match                     | `'#ff9632'`  | `--epdf-search-highlight-active` |
 | `highlight.blendMode`   | How the highlights mix with the page | `'multiply'` | `--epdf-search-blend-mode`       |
 
 **Forms**: `formPlugin({ focus, fields })`
 
-| Setting              | What it colors                                                  | Default                      | From CSS                       |
+| Setting             | What it colors                                                  | Default                      | From CSS                       |
 | :------------------ | :-------------------------------------------------------------- | :--------------------------- | :----------------------------- |
 | `focus.color`       | The ring around the field being filled in                       | the viewer's `accent`        | `--epdf-form-focus`            |
 | `fields.border`     | The edge of a field that has no border of its own               | the viewer's `accent` at 55% | `--epdf-form-field-border`     |
-| `fields.background` | Inside a field that has no background of its own                | `'rgb(255 255 255 / 0.92)'`    | `--epdf-form-field-background` |
-| `fields.color`      | The check mark and text of a field that has no color of its own | `'#1f2a44'`                    | `--epdf-form-field-color`      |
+| `fields.background` | Inside a field that has no background of its own                | `'rgb(255 255 255 / 0.92)'`  | `--epdf-form-field-background` |
+| `fields.color`      | The check mark and text of a field that has no color of its own | `'#1f2a44'`                  | `--epdf-form-field-color`      |
 
 **Parts you style yourself** have no settings, only CSS, for the look they have until you style them:
 
-| From CSS                 | What it colors                                     | Default                   |
-| :----------------------- | :------------------------------------------------- | :------------------------ |
-| `--epdf-scrollbar-thumb` | The [scrollbar](../viewing/stage#scrollbars)'s thumb | `rgb(0 0 0 / 0.4)`        |
-| `--epdf-toolbar-surface` | The [toolbar](toolbar)'s "More" menu and folded groups | `#ffffff`               |
-| `--epdf-toolbar-border`  | Their edge, and the edge of a button               | `rgb(0 0 0 / 0.15)`       |
-| `--epdf-toolbar-active`  | A pressed or open button                           | `rgb(0 0 0 / 0.12)`       |
-| `--epdf-font-mono`       | Numbers in readouts, such as the angle             | `ui-monospace, monospace` |
+| From CSS                 | What it colors                                         | Default                   |
+| :----------------------- | :----------------------------------------------------- | :------------------------ |
+| `--epdf-scrollbar-thumb` | The [scrollbar](../viewing/stage#scrollbars)'s thumb   | `rgb(0 0 0 / 0.4)`        |
+| `--epdf-toolbar-surface` | The [toolbar](toolbar)'s "More" menu and folded groups | `#ffffff`                 |
+| `--epdf-toolbar-border`  | Their edge, and the edge of a button                   | `rgb(0 0 0 / 0.15)`       |
+| `--epdf-toolbar-active`  | A pressed or open button                               | `rgb(0 0 0 / 0.12)`       |
+| `--epdf-font-mono`       | Numbers in readouts, such as the angle                 | `ui-monospace, monospace` |
 
 ## What isn't here
 

@@ -590,10 +590,13 @@ describe('screen-anchored bodies (noZoom / noRotate)', () => {
     const knob = nodes.find((node) => node.kind === 'rotate-knob');
     if (outline?.kind !== 'outline' || knob?.kind !== 'rotate-knob')
       throw new Error('expected outline + knob');
-    // the stalk anchor is the outline's top-edge midpoint — knob and outline
-    // are built from the same projected geometry + projected stroke width
+    // the stalk anchor is the middle of the top edge of the frame the knob
+    // hangs off — the outline, or the frame a small box's handles stand out
+    // on — built from the same projected geometry + projected stroke width
+    const frame = nodes.find((node) => node.kind === 'handle-frame');
+    const top = frame?.kind === 'handle-frame' ? frame.corners[0].y : outline.rect.y;
     expect(knob.from.x).toBeCloseTo(outline.rect.x + outline.rect.width / 2, 6);
-    expect(knob.from.y).toBeCloseTo(outline.rect.y, 6);
+    expect(knob.from.y).toBeCloseTo(top, 6);
   });
 
   it('textBoxes culls /F-hidden free text', () => {

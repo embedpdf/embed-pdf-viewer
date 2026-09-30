@@ -53,8 +53,9 @@ export function familyChosenBy(pick: (annotation: AnnotationDTO) => ShapeFamily)
     rotateAbout: (shape, pivot, degrees) => familyOf(shape).rotateAbout(shape, pivot, degrees),
     scaleAbout: (shape, anchor, sx, sy) => familyOf(shape).scaleAbout(shape, anchor, sx, sy),
     upright: (shape, pivot) => familyOf(shape).upright(shape, pivot),
-    handles: (shape) => familyOf(shape).handles(shape),
-    drag: (shape, handle, to) => familyOf(shape).drag(shape, handle, to),
+    handleSpread: (shape, frame, page) => familyOf(shape).handleSpread(shape, frame, page),
+    handles: (shape, spread) => familyOf(shape).handles(shape, spread),
+    drag: (shape, handle, to, spread) => familyOf(shape).drag(shape, handle, to, spread),
     painted: (shape, stroke, filled) => familyOf(shape).painted(shape, stroke, filled),
     scene: (shape, stroke) => familyOf(shape).scene(shape, stroke),
   };

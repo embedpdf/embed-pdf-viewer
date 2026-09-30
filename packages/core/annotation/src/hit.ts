@@ -1,5 +1,5 @@
 import type { PageRef } from '@embedpdf/engine-core/runtime';
-import { annotationSelectionFrame, annotationTurnPivot } from './selection';
+import { annotationSelectionFrame, annotationTurnPivot, frameAtLeast } from './selection';
 import {
   captionPainted,
   distanceCaptionHit,
@@ -9,8 +9,22 @@ import {
   measurementOf,
 } from './measurement';
 import { measurementLayout } from './measurement-shape';
-import { geomHandles, geomPainted, placeRotateKnob, pointInQuad, rectHandlesFor } from './geometry';
-import { cursorOnScreen, unionRect } from './rect';
+import {
+  geomHandles,
+  geomHandleSpread,
+  geomPainted,
+  placeRotateKnob,
+  pointInQuad,
+  rectHandlesFor,
+} from './geometry';
+import {
+  cursorOnScreen,
+  NO_SPREAD,
+  rectCornerPoints,
+  spreadFor,
+  spreadRect,
+  unionRect,
+} from './rect';
 import { groupCaps } from './group';
 import { isSubstrateOnly } from './plane';
 import { annotInteractive, annotTransformable, viewable } from './flags';
@@ -20,6 +34,8 @@ import {
   type ModelAnnotation,
   type ChromeGeometry,
   type Cursor,
+  type Handle,
+  type HandleSpread,
   type Shape,
   type Id,
   type Model,
@@ -36,7 +52,14 @@ export type Target =
   | { kind: 'rotate'; ids: Id[]; pivot: Point }
   // A resize handle of the multi-target group box (the union box of the
   // selection). `box` is that union box; `ids` the members it scales.
-  | { kind: 'group-handle'; ids: Id[]; handle: string; cursor: Cursor; box: Rect }
+  | {
+      kind: 'group-handle';
+      ids: Id[];
+      handle: string;
+      cursor: Cursor;
+      box: Rect;
+      spread: HandleSpread;
+    }
   | { kind: 'annot'; id: Id }
   | { kind: 'empty' };
 
@@ -92,11 +115,19 @@ export const canMove = (model: Model, id: Id): boolean => {
  *  `locked` (and inert `/F` states) suppress them at runtime — a
  *  screen-anchored body keeps its handles: `noZoom`/`noRotate` exempt it from
  *  the display transform, they don't freeze its size or vertices. */
-const hasHandles = (model: Model, record: ModelAnnotation): boolean => {
+export const showsHandles = (record: ModelAnnotation): boolean => {
   if (!annotTransformable(record) || textBound(record)) return false;
   const caps = kindOf(record.annotation).caps;
   return caps.resizable || caps.vertexEditable;
 };
+
+/**
+ * The smallest a selected annotation's frame may be where its knob hangs and
+ * where it is grabbed: the handle frame when it shows handles, so they stay
+ * clear of each other; its own frame otherwise.
+ */
+export const grabFrameSizeOf = (record: ModelAnnotation, chromeGeometry: ChromeGeometry): number =>
+  showsHandles(record) ? chromeGeometry.handleFrame : 0;
 
 /** The geometry a pointer actually meets: the anchored (screen-constant)
  *  projection for `noZoom`/`noRotate` annotations, the stored geom otherwise.
@@ -166,8 +197,41 @@ const inRect = (rect: Rect, point: Point): boolean =>
 // Is the point inside the annotation's selection frame: the oriented quad the chrome
 // outlines, tilt included (a rotated box across its tilted body; a thin arrow's or a
 // callout's whole outline box, empty corners and all)?
-const inFrame = (record: ModelAnnotation, point: Point, view: ViewEnv | undefined): boolean =>
-  pointInQuad(point, annotationSelectionFrame(record, view).corners);
+const inFrame = (
+  record: ModelAnnotation,
+  point: Point,
+  view: ViewEnv | undefined,
+  size: number,
+): boolean =>
+  pointInQuad(point, frameAtLeast(annotationSelectionFrame(record, view), size).corners);
+
+/**
+ * The handle within `tolerance` of `point` (a square zone) that is nearest to
+ * it: where a small shape's zones meet, the one the pointer is closest to
+ * wins, never the first in the list.
+ */
+function nearestHandle(handles: readonly Handle[], point: Point, tolerance: number): Handle | null {
+  let nearest: Handle | null = null;
+  let best = Infinity;
+  for (const handle of handles) {
+    const dx = Math.abs(handle.at.x - point.x);
+    const dy = Math.abs(handle.at.y - point.y);
+    if (dx > tolerance || dy > tolerance) continue;
+    const distance = Math.hypot(dx, dy);
+    if (distance < best) {
+      best = distance;
+      nearest = handle;
+    }
+  }
+  return nearest;
+}
+
+/** How far a group box's handles stand out, so they span at least the handle frame, on the page. */
+export const groupSpread = (
+  union: Rect,
+  chromeGeometry: ChromeGeometry,
+  pageBox?: Rect,
+): HandleSpread => spreadFor(union, 0, chromeGeometry.handleFrame, pageBox);
 
 /**
  * The union of the selection bounds of every selected, movable annotation on a
@@ -235,7 +299,10 @@ export function hitTest(
       // page's rotation). Locked suppresses it. `placeRotateKnob` keeps it
       // inside `pageBox`.
       if (kindOf(record.annotation).caps.rotatable && annotTransformable(record)) {
-        const frame = annotationSelectionFrame(record, view);
+        const frame = frameAtLeast(
+          annotationSelectionFrame(record, view),
+          grabFrameSizeOf(record, chromeGeometry),
+        );
         const knob = placeRotateKnob(frame.corners, chromeGeometry.knobOffset, pageBox);
         if (
           Math.abs(knob.at.x - point.x) <= chromeGeometry.knobTol &&
@@ -248,21 +315,18 @@ export function hitTest(
           };
         }
       }
-      if (hasHandles(model, record)) {
+      if (showsHandles(record)) {
         const style = styleOf(record.annotation);
         const measure = measurementOf(record.annotation);
         const geometry = hitGeomOf(record, view);
         const distance =
           measure?.intent === 'line-dimension' &&
           distanceLayout(geometry, measure, hitStrokeOf(record, view));
-        const handles = distance ? distanceHandles(distance) : geomHandles(geometry);
-        if (distance) {
-          // Nearby endpoint and leader hit areas overlap at small offsets.
-          // The closest visible handle wins, regardless of declaration order.
-          const distanceToPointer = (handle: (typeof handles)[number]) =>
-            Math.hypot(handle.at.x - point.x, handle.at.y - point.y);
-          handles.sort((left, right) => distanceToPointer(left) - distanceToPointer(right));
-        }
+        // A small box's handles stand out on a frame big enough to grab each
+        // of them and the box between them (see `geomHandleSpread`).
+        const handles = distance
+          ? distanceHandles(distance)
+          : geomHandles(geometry, geomHandleSpread(geometry, chromeGeometry.handleFrame, pageBox));
 
         // The text is the drag target. It owns no visible handle, and wins
         // before the annotation's sticky body bounds.
@@ -280,18 +344,14 @@ export function hitTest(
         }
         // Handles live on the projected geometry — the handle gesture then
         // runs entirely in view space (see the `handle` draft).
-        for (const handle of handles) {
-          if (
-            Math.abs(handle.at.x - point.x) <= chromeGeometry.handleTol &&
-            Math.abs(handle.at.y - point.y) <= chromeGeometry.handleTol
-          ) {
-            return {
-              kind: 'handle',
-              id: record.id,
-              handle: handle.id,
-              cursor: cursorOnScreen(handle.cursor, view?.rotation ?? 0),
-            };
-          }
+        const handle = nearestHandle(handles, point, chromeGeometry.handleTol);
+        if (handle) {
+          return {
+            kind: 'handle',
+            id: record.id,
+            handle: handle.id,
+            cursor: cursorOnScreen(handle.cursor, view?.rotation ?? 0),
+          };
         }
       }
     }
@@ -303,12 +363,10 @@ export function hitTest(
     if (gc.rotatable) {
       const union = groupUnionBounds(model, page, view);
       if (union) {
-        const corners: [Point, Point, Point, Point] = [
-          { x: union.x, y: union.y },
-          { x: union.x + union.width, y: union.y },
-          { x: union.x + union.width, y: union.y + union.height },
-          { x: union.x, y: union.y + union.height },
-        ];
+        const frame = gc.resizable
+          ? spreadRect(union, groupSpread(union, chromeGeometry, pageBox))
+          : union;
+        const corners = rectCornerPoints(frame) as [Point, Point, Point, Point];
         const knob = placeRotateKnob(corners, chromeGeometry.knobOffset, pageBox);
         if (
           Math.abs(knob.at.x - point.x) <= chromeGeometry.knobTol &&
@@ -328,21 +386,23 @@ export function hitTest(
     if (gc.resizable) {
       const union = groupUnionBounds(model, page, view);
       if (union) {
-        for (const handle of rectHandlesFor(union)) {
-          if (
-            Math.abs(handle.at.x - point.x) <= chromeGeometry.handleTol &&
-            Math.abs(handle.at.y - point.y) <= chromeGeometry.handleTol
-          ) {
-            return {
-              kind: 'group-handle',
-              ids: model.selected.filter(
-                (id) => model.byId[id]?.annotation.page.objectNumber === pageObjectNumber,
-              ),
-              handle: handle.id,
-              cursor: cursorOnScreen(handle.cursor, view?.rotation ?? 0),
-              box: union,
-            };
-          }
+        const spread = groupSpread(union, chromeGeometry, pageBox);
+        const handle = nearestHandle(
+          rectHandlesFor(union, spread),
+          point,
+          chromeGeometry.handleTol,
+        );
+        if (handle) {
+          return {
+            kind: 'group-handle',
+            ids: model.selected.filter(
+              (id) => model.byId[id]?.annotation.page.objectNumber === pageObjectNumber,
+            ),
+            handle: handle.id,
+            cursor: cursorOnScreen(handle.cursor, view?.rotation ?? 0),
+            box: union,
+            spread,
+          };
         }
       }
     }
@@ -358,7 +418,11 @@ export function hitTest(
     // well as on what it paints, so selecting never shrinks where it is grabbed;
     // any other is grabbed only on its stroke or fill (so a selectable but
     // text-bound kind still re-selects cleanly).
-    if (model.selected.includes(id) && canMove(model, id) && inFrame(record, point, view)) {
+    if (
+      model.selected.includes(id) &&
+      canMove(model, id) &&
+      inFrame(record, point, view, grabFrameSizeOf(record, chromeGeometry))
+    ) {
       return { kind: 'annot', id };
     }
     if (paintedNear(paintedOf(record, view), point, strokeMargin)) {
@@ -370,7 +434,11 @@ export function hitTest(
   // the group as a unit instead of clearing it. Resolve to the top-most selected
   // member so `editDown` keeps the selection and arms the move.
   const union = selectionUnionBounds(model, page, view);
-  if (union && inRect(union, point)) {
+  const spread =
+    union && groupCaps(model, model.selected).resizable
+      ? groupSpread(union, chromeGeometry, pageBox)
+      : NO_SPREAD;
+  if (union && inRect(spreadRect(union, spread), point)) {
     for (let i = order.length - 1; i >= 0; i--) {
       if (model.selected.includes(order[i]) && canMove(model, order[i]))
         return { kind: 'annot', id: order[i] };

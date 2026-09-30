@@ -1,6 +1,6 @@
 import type { AnnotationDTO, PageRef } from '@embedpdf/engine-core/runtime';
 import { rasterPlacement, sourceDuring } from './appearance';
-import { annotationSelectionFrame } from './selection';
+import { annotationSelectionFrame, frameAtLeast } from './selection';
 /**
  * Pure view selectors. `pageItems` is the per-annotation render list (live gesture
  * applied) for customRenderer wrapping; `chrome` is the selection overlay
@@ -19,7 +19,9 @@ import {
 } from './measurement-shape';
 import {
   chordThrough,
+  DEFAULT_CHROME_GEOMETRY,
   geomHandles,
+  geomHandleSpread,
   geomRotateAbout,
   geomRotation,
   geomScaleAbout,
@@ -28,12 +30,19 @@ import {
   groupResizeFactors,
   placeRotateKnob,
   rectHandlesFor,
-  ROTATE_KNOB_OFFSET,
 } from './geometry';
-import { cursorOnScreen, rectFromPoints, rotatePoint, unionRect } from './rect';
+import {
+  cursorOnScreen,
+  isSpread,
+  rectCornerPoints,
+  rectFromPoints,
+  rotatePoint,
+  spreadRect,
+  unionRect,
+} from './rect';
 import { calloutShape } from './shapes/text-box';
 import { groupCaps } from './group';
-import { isSelectable, paintOrder } from './hit';
+import { grabFrameSizeOf, groupSpread, isSelectable, paintOrder, showsHandles } from './hit';
 import { annotTransformable, viewable } from './flags';
 import { anchoredGeom, anchoredStrokeWidth, anchorModeOf, type ViewEnv } from './anchor';
 import { blendFor } from './kinds/styles';
@@ -46,7 +55,18 @@ import {
   rotateDraftDelta,
   toolAnnotation,
 } from './update';
-import type { ChromeNode, Shape, Id, Model, Rect, RenderItem, Style, Point } from './types';
+import type {
+  ChromeGeometry,
+  ChromeNode,
+  Handle,
+  Shape,
+  Id,
+  Model,
+  Rect,
+  RenderItem,
+  Style,
+  Point,
+} from './types';
 import type { CreationDraftAnchor, RotationAnchor } from './types';
 import { kindOf, refOf, shapeOf, styleOf, textOf } from './record';
 
@@ -444,10 +464,11 @@ function placeSelectionKnob(
   model: Model,
   page: PageRef,
   pageBox: Rect | undefined,
-  knobOffset: number,
+  chromeGeometry: ChromeGeometry,
   geomOf: (id: Id) => Shape,
   view?: ViewEnv,
 ): { at: Point; from: Point } | null {
+  const { knobOffset } = chromeGeometry;
   const pageObjectNumber = page.objectNumber;
   const selection = model.selected.filter(
     (id) =>
@@ -462,12 +483,22 @@ function placeSelectionKnob(
     // the projected stroke width (`effStyle`) — with the raw width, the knob
     // drifts off the outline as zoom grows.
     if (!kindOf(record.annotation).caps.rotatable || !annotTransformable(record)) return null;
-    const frame = effectiveSelectionFrame(model, record.id, geomOf(record.id), view);
+    // A small shape's knob hangs off the frame its handles stand out on.
+    const frame = frameAtLeast(
+      effectiveSelectionFrame(model, record.id, geomOf(record.id), view),
+      grabFrameSizeOf(record, chromeGeometry),
+    );
     return placeRotateKnob(frame.corners, knobOffset, pageBox);
   }
-  if (selection.length > 1 && groupCaps(model, selection).rotatable) {
+  const caps = selection.length > 1 ? groupCaps(model, selection) : null;
+  if (caps?.rotatable) {
     const union = unionBoundsOf(model, page, geomOf, view);
-    if (union) return placeRotateKnob(boxCorners(union), knobOffset, pageBox);
+    if (union) {
+      const frame = caps.resizable
+        ? spreadRect(union, groupSpread(union, chromeGeometry, pageBox))
+        : union;
+      return placeRotateKnob(boxCorners(frame), knobOffset, pageBox);
+    }
   }
   return null;
 }
@@ -492,7 +523,7 @@ export function selectionKnob(
   model: Model,
   page: PageRef,
   pageBox?: Rect,
-  knobOffset: number = ROTATE_KNOB_OFFSET,
+  chromeGeometry: ChromeGeometry = DEFAULT_CHROME_GEOMETRY,
   view?: ViewEnv,
 ): { at: Point; from: Point } | null {
   const draft = model.draft;
@@ -504,7 +535,7 @@ export function selectionKnob(
       model,
       page,
       pageBox,
-      knobOffset,
+      chromeGeometry,
       (id) => anchoredGeom(shapeOf(model.byId[id].annotation), anchorModeOf(model.byId[id]), view),
       view,
     );
@@ -519,7 +550,7 @@ export function selectionKnob(
     model,
     page,
     pageBox,
-    knobOffset,
+    chromeGeometry,
     (id) => effGeom(model, id, view),
     view,
   );
@@ -529,7 +560,7 @@ export function chrome(
   model: Model,
   page: PageRef,
   pageBox?: Rect,
-  knobOffset: number = ROTATE_KNOB_OFFSET,
+  chromeGeometry: ChromeGeometry = DEFAULT_CHROME_GEOMETRY,
   view?: ViewEnv,
 ): ChromeNode[] {
   const pageObjectNumber = page.objectNumber;
@@ -611,7 +642,19 @@ export function chrome(
     // additionally tilts each handle glyph so it rides the box's orientation.
     // Suppressed during a live rotate (`rd`) — guides own that mode.
     if (!rd && annotTransformable(record) && (caps.resizable || caps.vertexEditable)) {
-      const handles = distance ? distanceHandles(distance) : geomHandles(geometry);
+      // A small box's handles stand out on a frame big enough to grab each of
+      // them and the box between them; while one is dragged, they stand where
+      // they stood when it was grabbed, so it stays under the pointer.
+      const draft = model.draft;
+      const spread =
+        draft?.kind === 'handle' && draft.id === record.id
+          ? draft.spread
+          : geomHandleSpread(geometry, chromeGeometry.handleFrame, pageBox);
+      const handles = distance ? distanceHandles(distance) : geomHandles(geometry, spread);
+      if (!distance && isSpread(spread)) {
+        const frame = handleFrameOf(handles);
+        if (frame) nodes.push({ kind: 'handle-frame', corners: frame });
+      }
       for (const handle of handles) {
         nodes.push({
           kind: 'handle',
@@ -631,7 +674,16 @@ export function chrome(
       nodes.push({ kind: 'outline', rect: union });
       const gc = groupCaps(model, selection);
       if (gc.resizable) {
-        for (const handle of rectHandlesFor(union))
+        const spread =
+          model.draft?.kind === 'group'
+            ? model.draft.spread
+            : groupSpread(union, chromeGeometry, pageBox);
+        if (isSpread(spread))
+          nodes.push({
+            kind: 'handle-frame',
+            corners: rectCornerPoints(spreadRect(union, spread)) as [Point, Point, Point, Point],
+          });
+        for (const handle of rectHandlesFor(union, spread))
           nodes.push({
             kind: 'handle',
             at: handle.at,
@@ -644,16 +696,29 @@ export function chrome(
   // anchor, so the menu is always pushed clear of exactly this point. Hidden
   // while a rotate runs (the gesture holds capture; the guides own the mode).
   if (!rd) {
-    const knob = selectionKnob(model, page, pageBox, knobOffset, view);
+    const knob = selectionKnob(model, page, pageBox, chromeGeometry, view);
     if (knob) nodes.push({ kind: 'rotate-knob', at: knob.at, from: knob.from });
   }
   return nodes;
 }
 
+/** The corners of the frame box handles stand out on: their four corner handles, in order. */
+function handleFrameOf(handles: readonly Handle[]): [Point, Point, Point, Point] | null {
+  const at = (id: string) => handles.find((handle) => handle.id === id)?.at;
+  const [nw, ne, se, sw] = [at('nw'), at('ne'), at('se'), at('sw')];
+  return nw && ne && se && sw ? [nw, ne, se, sw] : null;
+}
+
 /** The page-space union of the selectable selected items on `page`, or null if
  *  the page holds none. This is the same box the chrome outline draws, so a
- *  floating menu sits exactly on the selection. */
-export function selectionBoundsOnPage(model: Model, page: PageRef, view?: ViewEnv): Rect | null {
+ *  floating menu sits exactly on the selection; each frame grown to at least
+ *  `handleFrame`, so the menu also clears a small shape's handles. */
+export function selectionBoundsOnPage(
+  model: Model,
+  page: PageRef,
+  view?: ViewEnv,
+  handleFrame = 0,
+): Rect | null {
   const pageObjectNumber = page.objectNumber;
   const selection = model.selected.filter(
     (id) =>
@@ -663,9 +728,11 @@ export function selectionBoundsOnPage(model: Model, page: PageRef, view?: ViewEn
   // The rotated AABB: the axis-aligned box that encloses the oriented selection
   // quad. For a tilted shape this tracks the live `rot`, so the upright floating
   // menu floats above the whole tilted shape instead of the (fixed) unrotated box.
-  const corners = selection.flatMap(
-    (id) => effectiveSelectionFrame(model, id, effGeom(model, id, view), view).corners,
-  );
+  const corners = selection.flatMap((id) => {
+    const frame = effectiveSelectionFrame(model, id, effGeom(model, id, view), view);
+    const size = showsHandles(model.byId[id]) ? handleFrame : 0;
+    return frameAtLeast(frame, size).corners;
+  });
   return unionRect(corners);
 }
 
@@ -678,7 +745,7 @@ export function selectionBoundsOnPage(model: Model, page: PageRef, view?: ViewEn
 export function selectionAnchor(
   model: Model,
   pageBoxOf?: (page: PageRef) => Rect | undefined,
-  knobOffsetOf?: (page: PageRef) => number | undefined,
+  chromeGeometryOf?: (page: PageRef) => ChromeGeometry | undefined,
   viewOf?: (page: PageRef) => ViewEnv | undefined,
 ): { page: PageRef; bounds: Rect; knob?: Point } | null {
   // No menu while a rotate gesture runs: the chrome is in
@@ -688,18 +755,13 @@ export function selectionAnchor(
   if (id == null) return null;
   const page = model.byId[id].annotation.page;
   const view = viewOf?.(page);
-  const bounds = selectionBoundsOnPage(model, page, view);
+  const chromeGeometry = chromeGeometryOf?.(page) ?? DEFAULT_CHROME_GEOMETRY;
+  const bounds = selectionBoundsOnPage(model, page, view, chromeGeometry.handleFrame);
   if (!bounds) return null;
   // `bounds` is the plain selection box (the menu stays centred on it). The knob
   // rides alongside it so the menu can nudge only the edge it sits on, and only
   // when the handle would otherwise hide under it — never shifting the centre.
-  const knob = selectionKnob(
-    model,
-    page,
-    pageBoxOf?.(page),
-    knobOffsetOf?.(page) ?? ROTATE_KNOB_OFFSET,
-    view,
-  );
+  const knob = selectionKnob(model, page, pageBoxOf?.(page), chromeGeometry, view);
   return knob ? { page, bounds, knob: knob.at } : { page, bounds };
 }
 

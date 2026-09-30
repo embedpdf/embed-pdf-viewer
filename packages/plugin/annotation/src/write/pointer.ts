@@ -15,6 +15,7 @@ import {
 } from '@embedpdf/engine-core/runtime';
 import { ActionsToken as PublicActionsToken } from '@embedpdf/plugin-actions/contract';
 
+import { setPointerKind } from '../model';
 import type { ChromeReads } from '../read/chrome';
 import type { AnnotationContext, AnnotationServices } from '../services';
 import type { Measurement } from './measurement';
@@ -28,7 +29,7 @@ type Phase = 'down' | 'move' | 'up';
  * plugin's inputs filled in (page box, chrome geometry, engaged ids, view).
  */
 export function createPointer(
-  ctx: Pick<AnnotationContext, 'doc' | 'tryGet'>,
+  ctx: Pick<AnnotationContext, 'doc' | 'tryGet' | 'state'>,
   {
     store,
     geometry,
@@ -74,6 +75,9 @@ export function createPointer(
           ...(rotation != null ? { displayRotation: rotation } : {}),
         },
       });
+      // The press found the handles where they showed; from now on the chrome
+      // is sized for the pointer that pressed.
+      if (phase === 'down') ctx.state.update(setPointerKind, touch ? 'touch' : 'mouse');
     },
     marqueePointer: (
       phase: Phase,

@@ -11,6 +11,7 @@ import { paintedNear, type PaintedPiece } from './painted';
 import {
   DEG2RAD,
   MIN_SIZE,
+  NO_SPREAD,
   OPPOSITE_HANDLE,
   RECT_CURSOR,
   RECT_HANDLES,
@@ -21,9 +22,11 @@ import {
   rectCornerPoints,
   rectHandlePoint,
   resizeRect,
+  spreadOffset,
+  spreadRect,
 } from './rect';
 import { familyOf } from './shapes';
-import type { Shape, Handle, Rect, RenderNode, Point, Stroke } from './types';
+import type { Shape, Handle, HandleSpread, Rect, RenderNode, Point, Stroke } from './types';
 
 /* ── rotation ──────────────────────────────────────────────────────────────
  * Annotation rotation, layered on the generic `@embedpdf/core-geometry` affine
@@ -40,6 +43,7 @@ export const ROTATE_KNOB_OFFSET = 24;
  *  the pre-settings behavior, so bare-core callers and tests stay stable. */
 export const DEFAULT_CHROME_GEOMETRY = {
   handleTol: 6,
+  handleFrame: 24,
   knobTol: 6,
   knobOffset: ROTATE_KNOB_OFFSET,
 } as const;
@@ -181,12 +185,13 @@ export function obbFromGeom(
  * caller (it needs the live selection); these helpers take the resolved factors.
  * ──────────────────────────────────────────────────────────────────────────── */
 
-/** The 8 box resize handles (corner + edge, with cursors) of a plain rect — used
- *  for the multi-target group box. */
-export function rectHandlesFor(rect: Rect): Handle[] {
+/** The 8 box resize handles (corner + edge, with cursors) of a plain rect, standing
+ *  out by `spread` — used for the multi-target group box. */
+export function rectHandlesFor(rect: Rect, spread = NO_SPREAD): Handle[] {
+  const frame = spreadRect(rect, spread);
   return RECT_HANDLES.map((handle) => ({
     id: handle,
-    at: rectHandlePoint(rect, handle),
+    at: rectHandlePoint(frame, handle),
     cursor: RECT_CURSOR[handle],
   }));
 }
@@ -202,8 +207,16 @@ export function groupResizeAnchor(base: Rect, handle: string): Point {
  * larger of the two drag ratios (so the preview matches the committed scale and
  * never shears a rotated member).
  */
-export function groupResizeBox(base: Rect, handle: string, to: Point, isotropic: boolean): Rect {
-  const raw = resizeRect(base, handle as RectHandle, to);
+export function groupResizeBox(
+  base: Rect,
+  handle: string,
+  to: Point,
+  isotropic: boolean,
+  spread = NO_SPREAD,
+): Rect {
+  // A spread handle stands out from its side: the side moves as far as the pointer does.
+  const offset = spreadOffset(handle as RectHandle, spread);
+  const raw = resizeRect(base, handle as RectHandle, { x: to.x - offset.x, y: to.y - offset.y });
   if (!isotropic) return raw;
   const sx = base.width > 0 ? raw.width / base.width : 1;
   const sy = base.height > 0 ? raw.height / base.height : 1;
@@ -431,14 +444,29 @@ export function geomPainted(
   return pieces;
 }
 
-/** The shape's handles: resize corners and sides, a callout's tip and knee, or vertices. */
-export const geomHandles = (geometry: Shape): Handle[] => familyOf(geometry).handles(geometry);
+/**
+ * How far the shape's resize handles stand out so they span at least `frame`
+ * on each side: a small box's handles and the box between them stay
+ * grabbable, and the handles stay on `page` where they can. `NO_SPREAD` for a
+ * shape as big as that, or one whose handles are its points.
+ */
+export const geomHandleSpread = (geometry: Shape, frame: number, page?: Rect): HandleSpread =>
+  familyOf(geometry).handleSpread(geometry, frame, page);
+
+/** The shape's handles: resize corners and sides standing out by `spread`, a callout's tip and knee, or vertices. */
+export const geomHandles = (geometry: Shape, spread = NO_SPREAD): Handle[] =>
+  familyOf(geometry).handles(geometry, spread);
 
 export const geomTranslate = (geometry: Shape, delta: Point): Shape =>
   familyOf(geometry).translate(geometry, delta);
 
-export const geomDragHandle = (geometry: Shape, handle: string, to: Point): Shape =>
-  familyOf(geometry).drag(geometry, handle, to);
+/** The shape with `handle`, standing out by `spread`, dragged to `to`. */
+export const geomDragHandle = (
+  geometry: Shape,
+  handle: string,
+  to: Point,
+  spread = NO_SPREAD,
+): Shape => familyOf(geometry).drag(geometry, handle, to, spread);
 
 /**
  * What the shape draws for the live view. A text box's box — its fill and

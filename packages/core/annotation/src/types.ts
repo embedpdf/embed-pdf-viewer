@@ -254,6 +254,19 @@ export interface Handle {
   cursor: Cursor;
 }
 
+/**
+ * How far a box's resize handles stand out from each of its sides, in its own
+ * frame: a small box's handles sit on a frame big enough to grab each of them
+ * and the box between them. Even on both sides, unless the frame slid to stay
+ * on the page.
+ */
+export interface HandleSpread {
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
+}
+
 /** An alignment guide produced by move-snapping: a vertical (`axis: 'x'`) or
  *  horizontal (`axis: 'y'`) line at `at`, spanning `lo..hi` (content units). */
 export interface Guide {
@@ -396,6 +409,8 @@ export type Draft =
       handle: string;
       base: Shape;
       current: Shape;
+      /** How far the handles stood out when grabbed: held for the whole drag, so the handle stays under the pointer. */
+      spread: HandleSpread;
       view?: ViewEnv;
     }
   // Rotate gesture (single or multi-target). `pivot` is the rotation centre
@@ -429,6 +444,8 @@ export type Draft =
       anchor: Point;
       base: Rect;
       current: Rect;
+      /** How far the group box's handles stood out when grabbed, held for the drag. */
+      spread: HandleSpread;
       view?: ViewEnv;
     }
   | { kind: 'caption'; id: Id; start: Point; delta: Point }
@@ -556,6 +573,12 @@ export interface UpdateResult {
 export interface ChromeGeometry {
   /** Half-side of a resize/vertex handle's square grab zone. */
   handleTol: number;
+  /**
+   * The smallest side the frame resize handles sit on may have, on each axis:
+   * twice a handle's grab zone, so a small annotation's handles never cover
+   * it or each other (see `HandleSpread`).
+   */
+  handleFrame: number;
   /** Half-side of the rotate knob's square grab zone. */
   knobTol: number;
   /** How far the rotate knob hangs off the selection edge. */
@@ -926,6 +949,9 @@ export type ChromeNode =
   | { kind: 'obb'; corners: [Point, Point, Point, Point]; angle: number }
   // `rot` (deg, CW) tilts the handle glyph itself so it rides a rotated box.
   | { kind: 'handle'; at: Point; cursor: Cursor; rot?: number }
+  // The frame a small box's handles stand out on (see `HandleSpread`), its
+  // corners in order: drawn faint, so the spread handles read as one frame.
+  | { kind: 'handle-frame'; corners: [Point, Point, Point, Point] }
   // The rotate knob: `at` is where the grab dot sits (hanging off the top edge),
   // `from` the edge anchor the connector stalk draws to.
   | { kind: 'rotate-knob'; at: Point; from: Point }

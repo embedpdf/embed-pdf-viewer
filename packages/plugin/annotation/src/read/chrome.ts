@@ -18,6 +18,7 @@ import {
 import type { PageRef } from '@embedpdf/engine-core/runtime';
 
 import type { ChromeSettings } from '../contract';
+import type { AnnotationState } from '../model';
 import type { AnnotationContext, AnnotationServices } from '../services';
 import { viewEnv } from '../services/geometry';
 import { refsOfIn } from '../services/store';
@@ -49,12 +50,16 @@ export function createChromeReads(
    *  zoom. No scale → the values are read as content units (headless callers).
    *  `boost` widens the grab tolerances only (never the drawn chrome or the
    *  knob's position) — the touch path passes {@link TOUCH_GRAB_BOOST} so
-   *  handles present finger-sized targets. */
+   *  handles present finger-sized targets. The frame a small annotation's
+   *  handles stand out on is twice their grab size for the pointer the chrome
+   *  is drawn for (`pointerKind`), so a press finds them where they show. */
   const chromeGeomAt = (scale?: number, boost = 1): ChromeGeometry => {
-    const cs = chromeSettings();
+    const { chrome: cs, pointerKind } = ctx.state.get();
     const effectiveScale = scale || 1;
+    const drawnFor = pointerKind === 'touch' ? TOUCH_GRAB_BOOST : 1;
     return {
       handleTol: (cs.handles.hitSize / 2 / effectiveScale) * boost,
+      handleFrame: (cs.handles.hitSize * 2 * drawnFor) / effectiveScale,
       knobTol: (cs.knob.hitSize / 2 / effectiveScale) * boost,
       knobOffset: cs.knob.offset / effectiveScale,
     };
@@ -114,6 +119,7 @@ export function createChromeReads(
     {
       model: Model;
       cs: ChromeSettings;
+      pointerKind: AnnotationState['pointerKind'];
       scale: number | undefined;
       rotation: number | undefined;
       zoom: number | undefined;
@@ -128,12 +134,13 @@ export function createChromeReads(
   ): ChromeNode[] => {
     const pageObjectNumber = page.objectNumber;
     const model = store.model();
-    const cs = chromeSettings();
+    const { chrome: cs, pointerKind } = ctx.state.get();
     const cached = chromeCache.get(pageObjectNumber);
     if (
       cached &&
       cached.model === model &&
       cached.cs === cs &&
+      cached.pointerKind === pointerKind &&
       cached.scale === scale &&
       cached.rotation === rotation &&
       cached.zoom === zoom
@@ -143,13 +150,21 @@ export function createChromeReads(
       model,
       page,
       geometry.pageBoxOf(pageObjectNumber),
-      chromeGeomAt(scale).knobOffset,
+      chromeGeomAt(scale),
       viewEnv(zoom, rotation),
     );
     // `guides.enabled` is presentation config, filtered here so the emitted
     // chrome stays authoritative for every painter (default and headless alike).
     if (!cs.guides.enabled) nodes = nodes.filter((node) => node.kind !== 'rotate-guides');
-    chromeCache.set(pageObjectNumber, { model: model, cs, scale, rotation, zoom, v: nodes });
+    chromeCache.set(pageObjectNumber, {
+      model: model,
+      cs,
+      pointerKind,
+      scale,
+      rotation,
+      zoom,
+      v: nodes,
+    });
     return nodes;
   };
 
@@ -158,6 +173,7 @@ export function createChromeReads(
   let anchorCache: {
     model: Model;
     cs: ChromeSettings;
+    pointerKind: AnnotationState['pointerKind'];
     scale: number | undefined;
     rotation: number | undefined;
     zoom: number | undefined;
@@ -169,11 +185,12 @@ export function createChromeReads(
     zoom?: number,
   ): { page: PageRef; bounds: Rect; knob?: Point } | null => {
     const model = store.model();
-    const cs = chromeSettings();
+    const { chrome: cs, pointerKind } = ctx.state.get();
     if (
       anchorCache &&
       anchorCache.model === model &&
       anchorCache.cs === cs &&
+      anchorCache.pointerKind === pointerKind &&
       anchorCache.scale === scale &&
       anchorCache.rotation === rotation &&
       anchorCache.zoom === zoom
@@ -182,10 +199,10 @@ export function createChromeReads(
     const anchor = coreSelectionAnchor(
       model,
       (page) => geometry.pageBoxOf(page.objectNumber),
-      () => chromeGeomAt(scale).knobOffset,
+      () => chromeGeomAt(scale),
       () => viewEnv(zoom, rotation),
     );
-    anchorCache = { model: model, cs, scale, rotation, zoom, v: anchor };
+    anchorCache = { model: model, cs, pointerKind, scale, rotation, zoom, v: anchor };
     return anchor;
   };
 

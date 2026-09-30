@@ -5,7 +5,7 @@
  * `geometry.ts` share it.
  */
 import { applyPoint, rotateAbout, type Mat2D, type PointIn } from '@embedpdf/core-geometry';
-import type { Cursor, Point, Rect } from './types';
+import type { Cursor, HandleSpread, Point, Rect } from './types';
 
 export const MIN_SIZE = 4;
 
@@ -66,6 +66,66 @@ const rectEdges = (handle: RectHandle) => ({
   n: handle === 'nw' || handle === 'n' || handle === 'ne',
   s: handle === 'sw' || handle === 's' || handle === 'se',
 });
+/** No spread: the handles on the box itself. */
+export const NO_SPREAD: HandleSpread = { left: 0, top: 0, right: 0, bottom: 0 };
+
+/** Does the spread move any handle off the box? */
+export const isSpread = (spread: HandleSpread): boolean =>
+  spread.left > 0 || spread.top > 0 || spread.right > 0 || spread.bottom > 0;
+
+/**
+ * The spread that grows `box`, turned `rotation` about its middle, to at least
+ * `frame` on each side, half each way; slid, where it can be, so that the
+ * frame stays on `page`: a handle off the page can't be grabbed.
+ */
+export function spreadFor(box: Rect, rotation: number, frame: number, page?: Rect): HandleSpread {
+  const across = Math.max(0, (frame - box.width) / 2);
+  const down = Math.max(0, (frame - box.height) / 2);
+  const even = { left: across, top: down, right: across, bottom: down };
+  if (!page || (!across && !down)) return even;
+  const middle = rectCenter(box);
+  const bounds = unionRect(
+    rectCornerPoints(spreadRect(box, even)).map((corner) => rotatePoint(corner, middle, rotation)),
+  );
+  // The page shift that brings the frame onto the page (a frame wider than
+  // the page keeps its left or top edge on it), in the box's own frame, and
+  // no further than the frame reaches past the box.
+  const onPage = (low: number, high: number) => Math.max(low, Math.min(high, 0));
+  const shift = rotatePoint(
+    {
+      x: onPage(page.x - bounds.x, page.x + page.width - (bounds.x + bounds.width)),
+      y: onPage(page.y - bounds.y, page.y + page.height - (bounds.y + bounds.height)),
+    },
+    { x: 0, y: 0 },
+    -rotation,
+  );
+  const slideX = Math.max(-across, Math.min(across, shift.x));
+  const slideY = Math.max(-down, Math.min(down, shift.y));
+  return {
+    left: across - slideX,
+    top: down - slideY,
+    right: across + slideX,
+    bottom: down + slideY,
+  };
+}
+
+/** The rect grown by `spread` on each side: the frame spread handles sit on. */
+export const spreadRect = (rect: Rect, spread: HandleSpread): Rect => ({
+  x: rect.x - spread.left,
+  y: rect.y - spread.top,
+  width: rect.width + spread.left + spread.right,
+  height: rect.height + spread.top + spread.bottom,
+});
+
+/** How far `handle` stands out from its own side of the box when spread, in the box's frame. */
+export function spreadOffset(handle: RectHandle, spread: HandleSpread): Point {
+  const edges = rectEdges(handle);
+  return {
+    x: edges.w ? -spread.left : edges.e ? spread.right : 0,
+    y: edges.n ? -spread.top : edges.s ? spread.bottom : 0,
+  };
+}
+
 export const rectHandlePoint = (rect: Rect, handle: RectHandle): Point => {
   const edges = rectEdges(handle);
   return {

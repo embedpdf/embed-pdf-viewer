@@ -106,6 +106,12 @@ export interface ChromeSettings {
     fill: string;
     /** Overrides `accent`. */
     stroke?: string;
+    /**
+     * How strongly the dashed line shows that joins a small annotation's
+     * handles, which stand out on a frame twice their grab size so each of
+     * them and the annotation stay reachable: 0 to 1, 0 hides it.
+     */
+    frameOpacity: number;
   };
   /** The rotate handle. Page-bound placement (flip/clamp) always applies. */
   knob: {

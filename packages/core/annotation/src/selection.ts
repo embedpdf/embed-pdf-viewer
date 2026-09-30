@@ -3,6 +3,7 @@ import { anchoredGeom, anchoredStrokeWidth, anchorModeOf } from './anchor';
 import { geomRotation, isRotatableGeom, selectionQuad, turnPivotOf } from './geometry';
 import { measurementOf, type MeasurementAppearance } from './measurement';
 import { measurementSelectionQuad } from './measurement-shape';
+import { rotatePoint } from './rect';
 import { shapeOf, styleOf } from './record';
 import type { ModelAnnotation, Shape, QuadRing, Point, Style, ViewEnv } from './types';
 
@@ -46,3 +47,28 @@ export function annotationSelectionFrame(
 export function annotationTurnPivot(record: ModelAnnotation, view?: ViewEnv): Point {
   return turnPivotOf(anchoredGeom(shapeOf(record.annotation), anchorModeOf(record), view));
 }
+
+/**
+ * The frame grown about its middle to at least `size` on each of its own
+ * sides: where a small annotation's rotate knob and grab area sit, so each
+ * can be reached apart from its handles. A frame that big already is unchanged.
+ */
+export function frameAtLeast(frame: SelectionFrame, size: number): SelectionFrame {
+  const along = rotatePoint({ x: 1, y: 0 }, ORIGIN, frame.angle);
+  const across = rotatePoint({ x: 0, y: 1 }, ORIGIN, frame.angle);
+  const [nw, ne, se, sw] = frame.corners;
+  const width = Math.abs((ne.x - nw.x) * along.x + (ne.y - nw.y) * along.y);
+  const height = Math.abs((sw.x - nw.x) * across.x + (sw.y - nw.y) * across.y);
+  const grow = { x: Math.max(0, (size - width) / 2), y: Math.max(0, (size - height) / 2) };
+  if (!grow.x && !grow.y) return frame;
+  const out = (corner: Point, sideX: number, sideY: number): Point => ({
+    x: corner.x + sideX * grow.x * along.x + sideY * grow.y * across.x,
+    y: corner.y + sideX * grow.x * along.y + sideY * grow.y * across.y,
+  });
+  return {
+    ...frame,
+    corners: [out(nw, -1, -1), out(ne, 1, -1), out(se, 1, 1), out(sw, -1, 1)],
+  };
+}
+
+const ORIGIN: Point = { x: 0, y: 0 };

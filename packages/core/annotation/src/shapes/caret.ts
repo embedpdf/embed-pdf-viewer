@@ -8,7 +8,7 @@
 import type { AnnotationDTO } from '@embedpdf/engine-core/runtime';
 
 import { bodyPieces } from '../painted';
-import { normalizeDeg, rectCenter, rotatedAabb } from '../rect';
+import { NO_SPREAD, normalizeDeg, rectCenter, rotatedAabb } from '../rect';
 import type { Rect, RenderNode, TextEndAnchor } from '../types';
 import { boxCorners, boxScaleAbout, boxTranslate, type TurnedBox } from './box';
 import type { ShapeFamily } from './family';
@@ -131,6 +131,7 @@ export const caretFamily: ShapeFamily<CaretShape> = {
   rotateAbout: (shape) => shape,
   scaleAbout: boxScaleAbout,
   upright: (shape) => ({ ...shape, rotation: 0 }),
+  handleSpread: () => NO_SPREAD,
   handles: () => [],
   drag: (shape) => shape,
   // A caret paints its whole box: the mark is small.

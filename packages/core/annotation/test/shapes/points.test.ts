@@ -1,7 +1,7 @@
 import type { AnnotationDTO } from '@embedpdf/engine-core/runtime';
 import { describe, expect, it } from 'vitest';
 
-import { rotatePoint } from '../../src/rect';
+import { NO_SPREAD, rotatePoint } from '../../src/rect';
 import { drawnStrokesOf, pointsFamily, type PolyShape } from '../../src/shapes/points';
 
 const VERTICES = [
@@ -72,7 +72,7 @@ describe('a turn changes the turn, not the upright points', () => {
   it('a vertex dragged on a turned shape lands where it was dropped', () => {
     const turned = pointsFamily.rotateAbout(upright, { x: 150, y: 120 }, 30);
     const to = { x: 260, y: 90 };
-    const dragged = pointsFamily.drag(turned, 'v1', to);
+    const dragged = pointsFamily.drag(turned, 'v1', to, NO_SPREAD);
     expect(dragged.rotation).toBe(30);
     close(drawnStrokesOf(dragged)[0]![1]!, to);
     close(drawnStrokesOf(dragged)[0]![0]!, drawnStrokesOf(turned)[0]![0]!);

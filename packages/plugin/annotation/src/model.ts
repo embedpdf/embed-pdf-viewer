@@ -133,6 +133,13 @@ export interface AnnotationState {
    * change the runs, not the whole body.
    */
   readonly textSelection: TextSelection | null;
+  /**
+   * The pointer the selection chrome is sized for: the one the last edit
+   * gesture began with. A touch grabs with bigger zones, so a small
+   * annotation's handles stand out further; the chrome draws them where the
+   * next press will look for them.
+   */
+  readonly pointerKind: 'mouse' | 'touch';
 }
 
 /**
@@ -146,7 +153,7 @@ export const DEFAULT_CHROME: ChromeSettings = {
   // Solid, like the shape's own resting look — one style at rest and rotated.
   outline: { style: 'solid', width: 1 },
   // 8px squares to look at, 24px to grab (touch-friendly without visual bulk).
-  handles: { size: 8, hitSize: 24, fill: '#ffffff' },
+  handles: { size: 8, hitSize: 24, fill: '#ffffff', frameOpacity: 0.5 },
   knob: { size: 10, hitSize: 24, offset: 32, stalk: true, fill: '#ffffff' },
   // A faint reference cross and a prominent live indicator.
   guides: { enabled: true, style: 'solid', width: 1, axisOpacity: 0.35, indicatorOpacity: 0.8 },
@@ -176,6 +183,7 @@ export const initialAnnotationState = (config: AnnotationConfig = {}): Annotatio
   ghostAt: null,
   placing: null,
   textSelection: null,
+  pointerKind: 'mouse',
 });
 
 /* ── the session and pending changes ─────────────────────────────────────── */
@@ -361,6 +369,12 @@ export const setPlacing = (
   state: AnnotationState,
   placing: ForeignPlacement | null,
 ): AnnotationState => (state.placing === placing ? state : { ...state, placing });
+
+/** The pointer the selection chrome is sized for. */
+export const setPointerKind = (
+  state: AnnotationState,
+  pointerKind: AnnotationState['pointerKind'],
+): AnnotationState => (state.pointerKind === pointerKind ? state : { ...state, pointerKind });
 
 export const setTextSelection = (
   state: AnnotationState,

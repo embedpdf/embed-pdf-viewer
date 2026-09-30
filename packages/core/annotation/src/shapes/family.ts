@@ -11,6 +11,7 @@ import type { PaintedPiece } from '../painted';
 import type {
   FieldValues,
   Handle,
+  HandleSpread,
   Placement,
   Shape,
   Point,
@@ -67,10 +68,16 @@ export interface ShapeFamily<S extends Shape = Shape> {
   scaleAbout(shape: S, anchor: Point, sx: number, sy: number): S;
   /** The shape with its turn cleared, turned back about `pivot` where that matters. */
   upright(shape: S, pivot?: Point): S;
-  /** Its handles: resize corners and sides, or vertices. */
-  handles(shape: S): Handle[];
-  /** The shape with `handle` dragged to `to`. */
-  drag(shape: S, handle: string, to: Point): S;
+  /**
+   * How far its box's resize handles stand out so they span at least `frame`
+   * on each side, kept on `page` where they can be (`NO_SPREAD` for a shape
+   * whose handles are its points).
+   */
+  handleSpread(shape: S, frame: number, page?: Rect): HandleSpread;
+  /** Its handles: resize corners and sides, standing out by `spread`, or vertices. */
+  handles(shape: S, spread: HandleSpread): Handle[];
+  /** The shape with `handle`, standing out by `spread`, dragged to `to`. */
+  drag(shape: S, handle: string, to: Point, spread: HandleSpread): S;
 
   /* ── hitting and drawing ─────────────────────────────────────────────── */
 

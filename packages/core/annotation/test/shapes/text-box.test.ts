@@ -1,6 +1,7 @@
 import type { AnnotationDTO } from '@embedpdf/engine-core/runtime';
 import { describe, expect, it } from 'vitest';
 
+import { NO_SPREAD } from '../../src/rect';
 import { calloutShape, textBoxFamily } from '../../src/shapes/text-box';
 
 const BOX = { x: 200, y: 100, width: 120, height: 40 };
@@ -62,7 +63,12 @@ describe("a callout's end follows its box", () => {
   });
 
   it('a resize puts the end on the middle of the side the knee faces', () => {
-    const resized = textBoxFamily.drag(textBoxFamily.read(callout), 'se', { x: 340, y: 160 });
+    const resized = textBoxFamily.drag(
+      textBoxFamily.read(callout),
+      'se',
+      { x: 340, y: 160 },
+      NO_SPREAD,
+    );
     expect(resized.box).toEqual({ x: 200, y: 100, width: 140, height: 60 });
     expect(resized.calloutLine![2]).toEqual({ x: 200, y: 130 });
   });
@@ -70,7 +76,7 @@ describe("a callout's end follows its box", () => {
   it('a tip drag on a straight line moves the end to the side the tip now faces', () => {
     const straight = calloutShape(BOX, 0, TIP, undefined, 'open-arrow');
     expect(straight.calloutLine).toEqual([TIP, { x: 200, y: 120 }]);
-    const dragged = textBoxFamily.drag(straight, 'callout-tip', { x: 260, y: 0 });
+    const dragged = textBoxFamily.drag(straight, 'callout-tip', { x: 260, y: 0 }, NO_SPREAD);
     expect(dragged.calloutLine).toEqual([
       { x: 260, y: 0 },
       { x: 260, y: 100 },

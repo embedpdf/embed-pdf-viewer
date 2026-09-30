@@ -28,10 +28,11 @@ import {
   rotatedAabb,
   unionRect,
 } from '../rect';
-import type { Handle, Placement, Point, Rect, RenderNode, Stroke } from '../types';
+import type { Handle, HandleSpread, Placement, Point, Rect, RenderNode, Stroke } from '../types';
 import {
   boxCorners,
   boxHandles,
+  boxHandleSpread,
   boxResize,
   boxRotateAbout,
   boxScaleAbout,
@@ -168,9 +169,9 @@ function textBoxUpright(shape: TextBoxShape): TextBoxShape {
   return endFollows({ ...shape, rotation: 0 });
 }
 
-/** The box's eight resize handles, and a callout's tip and knee. */
-function textBoxHandles(shape: TextBoxShape): Handle[] {
-  const handles = boxHandles(shape);
+/** The box's eight resize handles, standing out by `spread`, and a callout's tip and knee. */
+function textBoxHandles(shape: TextBoxShape, spread: HandleSpread): Handle[] {
+  const handles = boxHandles(shape, spread);
   const line = shape.calloutLine;
   if (line) {
     handles.push({ id: 'callout-tip', at: line[0], cursor: 'crosshair' });
@@ -180,7 +181,12 @@ function textBoxHandles(shape: TextBoxShape): Handle[] {
 }
 
 /** The shape with `handle` dragged to `to`: the tip, the knee, or a side of the box. */
-function textBoxDrag(shape: TextBoxShape, handle: string, to: Point): TextBoxShape {
+function textBoxDrag(
+  shape: TextBoxShape,
+  handle: string,
+  to: Point,
+  spread: HandleSpread,
+): TextBoxShape {
   const line = shape.calloutLine;
   if (line && handle === 'callout-tip') {
     return endFollows({
@@ -193,7 +199,7 @@ function textBoxDrag(shape: TextBoxShape, handle: string, to: Point): TextBoxSha
       ? endFollows({ ...shape, calloutLine: [line[0], to, line[2]] })
       : shape;
   }
-  return endFollows(boxResize(shape, handle, to));
+  return endFollows(boxResize(shape, handle, to, spread));
 }
 
 /** The angle the arrow at the tip points: out of the line, into the tip. */
@@ -320,6 +326,7 @@ export const textBoxFamily: ShapeFamily<TextBoxShape> = {
   rotateAbout: textBoxRotateAbout,
   scaleAbout: textBoxScaleAbout,
   upright: textBoxUpright,
+  handleSpread: boxHandleSpread,
   handles: textBoxHandles,
   drag: textBoxDrag,
   // A text box is hit anywhere in its box, filled or not.

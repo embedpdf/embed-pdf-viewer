@@ -8,7 +8,7 @@
 import { quadCorners, quadRing, type Quad } from '@embedpdf/core-geometry';
 import type { AnnotationDTO } from '@embedpdf/engine-core/runtime';
 
-import { expandRect, unionRect } from '../rect';
+import { NO_SPREAD, expandRect, unionRect } from '../rect';
 import type { Point, Rect, RenderNode, Stroke } from '../types';
 import type { ShapeFamily } from './family';
 
@@ -87,6 +87,7 @@ export const quadsFamily: ShapeFamily<QuadsShape> = {
   rotateAbout: (shape) => shape,
   scaleAbout: (shape) => shape,
   upright: (shape) => shape,
+  handleSpread: () => NO_SPREAD,
   handles: () => [],
   drag: (shape) => shape,
   // Each quad is filled: a highlight's colour, or the text a mark covers.

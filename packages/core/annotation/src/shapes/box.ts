@@ -18,6 +18,7 @@ import { cloudyBounds, cloudyOutline, cloudyPath } from '../cloudy';
 import type { PaintedPiece } from '../painted';
 import {
   MIN_SIZE,
+  NO_SPREAD,
   RECT_HANDLES,
   expandRect,
   insetRect,
@@ -27,13 +28,16 @@ import {
   rectCornerPoints,
   rectHandlePoint,
   resizeRotatedRect,
-  rotatePoint,
   rotatedAabb,
   rotatedHandleCursor,
+  rotatePoint,
+  spreadFor,
+  spreadOffset,
+  spreadRect,
   transposedAboutCenter,
   type RectHandle,
 } from '../rect';
-import type { Handle, Placement, Point, Rect, RenderNode, Stroke } from '../types';
+import type { Handle, HandleSpread, Placement, Point, Rect, RenderNode, Stroke } from '../types';
 import type { ShapeFamily } from './family';
 
 /** A box and its turn, as the engine keeps them. */
@@ -179,19 +183,44 @@ export function boxScaleAbout<S extends TurnedBox>(
 }
 
 /** The eight resize handles, on the box as the page shows it; each cursor turns with the box. */
-export function boxHandles(shape: TurnedBox): Handle[] {
+export function boxHandles(shape: TurnedBox, spread = NO_SPREAD): Handle[] {
   const middle = rectCenter(shape.box);
+  const frame = spreadRect(shape.box, spread);
   return RECT_HANDLES.map((handle) => ({
     id: handle,
-    at: rotatePoint(rectHandlePoint(shape.box, handle), middle, shape.rotation),
+    at: rotatePoint(rectHandlePoint(frame, handle), middle, shape.rotation),
     cursor: rotatedHandleCursor(handle, shape.rotation),
   }));
 }
 
-/** The shape resized by dragging `handle` to `to`: the opposite handle stays where it is. */
-export function boxResize<S extends TurnedBox>(shape: S, handle: string, to: Point): S {
-  return { ...shape, box: resizeRotatedRect(shape.box, shape.rotation, handle as RectHandle, to) };
+/**
+ * How far a small box's handles stand out, so they span at least `frame` on
+ * each side, kept on `page` where they can be ({@link spreadFor}).
+ */
+export const boxHandleSpread = (shape: TurnedBox, frame: number, page?: Rect): HandleSpread =>
+  spreadFor(shape.box, shape.rotation, frame, page);
+
+/**
+ * The shape resized by dragging `handle` to `to`: the opposite handle stays
+ * where it is. A spread handle stands out from its side, so its side goes
+ * where the handle is dragged, less that stand-off: it moves as far as the
+ * pointer does.
+ */
+export function boxResize<S extends TurnedBox>(
+  shape: S,
+  handle: string,
+  to: Point,
+  spread = NO_SPREAD,
+): S {
+  const offset = rotatePoint(spreadOffset(handle as RectHandle, spread), ORIGIN, shape.rotation);
+  const side = { x: to.x - offset.x, y: to.y - offset.y };
+  return {
+    ...shape,
+    box: resizeRotatedRect(shape.box, shape.rotation, handle as RectHandle, side),
+  };
 }
+
+const ORIGIN: Point = { x: 0, y: 0 };
 
 /**
  * What the shape paints, turned with the box: a plain border's ink, which
@@ -276,6 +305,7 @@ export const boxFamily: ShapeFamily<BoxShape> = {
   rotateAbout: boxRotateAbout,
   scaleAbout: boxScaleAbout,
   upright: (shape) => ({ ...shape, rotation: 0 }),
+  handleSpread: boxHandleSpread,
   handles: boxHandles,
   drag: boxResize,
   painted: boxPainted,

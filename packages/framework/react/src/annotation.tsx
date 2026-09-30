@@ -448,6 +448,27 @@ function Chrome({ page }: { page: PageContextValue }) {
             />
           );
         }
+        // The frame a small annotation's handles stand out on: a faint dashed
+        // quad joining them, so they read as one frame around it.
+        if (node.kind === 'handle-frame') {
+          const svgPoints = node.corners
+            .map((point) => {
+              const pixel = page.transform.toPixels(point);
+              return `${pixel.x},${pixel.y}`;
+            })
+            .join(' ');
+          return (
+            <polygon
+              key={i}
+              points={svgPoints}
+              fill="none"
+              stroke={outlineStroke}
+              strokeWidth={cs.outline.width}
+              strokeDasharray="3 3"
+              opacity={cs.handles.frameOpacity}
+            />
+          );
+        }
         // An oriented selection box (a tilted shape/group): a closed quad through
         // the four page-space corners — replaces the axis-aligned outline.
         if (node.kind === 'obb') {

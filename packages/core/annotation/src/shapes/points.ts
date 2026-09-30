@@ -31,6 +31,7 @@ import { endingNodes, endingPieces } from '../endings';
 import type { PaintedPiece } from '../painted';
 import {
   expandRect,
+  NO_SPREAD,
   normalizeDeg,
   rectCenter,
   rectCornerPoints,
@@ -541,8 +542,10 @@ export const pointsFamily: ShapeFamily<PointsShape> = {
   rotateAbout: pointsRotateAbout,
   scaleAbout: pointsScaleAbout,
   upright: pointsUpright,
-  handles: pointsHandles,
-  drag: pointsDrag,
+  // Its handles are its points, where they are.
+  handleSpread: () => NO_SPREAD,
+  handles: (shape) => pointsHandles(shape),
+  drag: (shape, handle, to) => pointsDrag(shape, handle, to),
   painted: pointsPainted,
   scene: pointsScene,
 };

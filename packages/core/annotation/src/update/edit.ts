@@ -7,6 +7,7 @@ import { anchoredGeom, anchorModeOf } from '../anchor';
 import {
   DEFAULT_CHROME_GEOMETRY,
   geomDragHandle,
+  geomHandleSpread,
   geomHandles,
   geomRotation,
   groupResizeAnchor,
@@ -130,6 +131,9 @@ export function editDown(model: Model, input: PointerInput): [Model, Effect[]] {
     const record = model.byId[hit.id];
     const view = viewOf(input);
     const base = anchoredGeom(shapeOf(record.annotation), anchorModeOf(record), view);
+    // Where the handles stood when grabbed: held for the drag (see the draft).
+    const frame = (input.chrome ?? DEFAULT_CHROME_GEOMETRY).handleFrame;
+    const spread = geomHandleSpread(base, frame, input.pageBox);
     return [
       {
         ...model,
@@ -139,6 +143,7 @@ export function editDown(model: Model, input: PointerInput): [Model, Effect[]] {
           handle: hit.handle,
           base,
           current: base,
+          spread,
           ...(view ? { view } : {}),
         },
       },
@@ -175,6 +180,7 @@ export function editDown(model: Model, input: PointerInput): [Model, Effect[]] {
           anchor: groupResizeAnchor(hit.box, hit.handle),
           base: hit.box,
           current: hit.box,
+          spread: hit.spread,
           ...(view ? { view } : {}),
         },
       },
@@ -274,9 +280,15 @@ export function editMove(model: Model, input: PointerInput): [Model, Effect[]] {
   if (draft.kind === 'handle') {
     // From where the handle is to the pointer; the base is what the view shows.
     const record = model.byId[draft.id];
-    const from = geomHandles(draft.base).find((handle) => handle.id === draft.handle)?.at ?? point;
+    const handles = geomHandles(draft.base, draft.spread);
+    const from = handles.find((handle) => handle.id === draft.handle)?.at ?? point;
     const draggedBy = (delta: Point) =>
-      geomDragHandle(draft.base, draft.handle, { x: from.x + delta.x, y: from.y + delta.y });
+      geomDragHandle(
+        draft.base,
+        draft.handle,
+        { x: from.x + delta.x, y: from.y + delta.y },
+        draft.spread,
+      );
     const delta = deltaOnPage(input.pageBox, sub(point, from), (moved) => {
       const geometry = draggedBy(moved);
       return annotationSelectionFrame(record, undefined, { geometry }).corners;
@@ -293,7 +305,10 @@ export function editMove(model: Model, input: PointerInput): [Model, Effect[]] {
     return [
       {
         ...model,
-        draft: { ...draft, current: groupResizeBox(draft.base, draft.handle, point, iso) },
+        draft: {
+          ...draft,
+          current: groupResizeBox(draft.base, draft.handle, point, iso, draft.spread),
+        },
       },
       [],
     ];
