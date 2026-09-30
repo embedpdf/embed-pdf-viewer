@@ -43,6 +43,7 @@ export function familyChosenBy(pick: (annotation: AnnotationDTO) => ShapeFamily)
     write: (shape, subtype) => familyOf(shape).write(shape, subtype),
     bounds: (shape) => familyOf(shape).bounds(shape),
     drawnBounds: (shape, stroke) => familyOf(shape).drawnBounds(shape, stroke),
+    rect: (shape, stroke) => familyOf(shape).rect(shape, stroke),
     selectionBounds: (shape, stroke) => familyOf(shape).selectionBounds(shape, stroke),
     oriented: (shape) => familyOf(shape).oriented(shape),
     turnedCorners: (shape, stroke) => familyOf(shape).turnedCorners(shape, stroke),

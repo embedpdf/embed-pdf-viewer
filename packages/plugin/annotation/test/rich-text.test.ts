@@ -45,7 +45,7 @@ const text: TextStyle = {
   textAlign: 'left',
 };
 
-/** A free-text record, its annotation predicted from its draft. */
+/** A free-text record, its annotation read from its draft. */
 const annot = (): ModelAnnotation => {
   const draft = {
     subtype: 'free-text',

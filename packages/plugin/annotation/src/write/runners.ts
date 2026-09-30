@@ -96,7 +96,7 @@ export function registerEffectRunners(
         : deleteWrite(id),
   );
 
-  // A drawn record: written from the draft its annotation was predicted from.
+  // A drawn record: written from the draft its annotation was read from.
   store.onEffect('create', (effect, model) => {
     const record = model.byId[effect.id];
     if (!record) return;

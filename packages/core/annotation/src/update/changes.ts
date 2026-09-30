@@ -6,7 +6,6 @@
 import { annotationKey } from '@embedpdf/core';
 import {
   ANNOTATION_FIELD_NAMES,
-  annotationOfDraft,
   type AnnotationDraft,
   type AnnotationDTO,
   type AnnotationFlags,
@@ -17,8 +16,7 @@ import {
 import { anchoredGeom, anchorModeOf, unanchoredGeom, type ViewEnv } from '../anchor';
 import { sourceOfNew } from '../appearance';
 import { DRAWN_FLAGS } from '../flags';
-import { geomVisualBounds } from '../geometry';
-import { shapeOf, styleOf } from '../record';
+import { annotationOfNew, shapeOf } from '../record';
 import { engineSubtypeOf } from '../record/defaults';
 import { familyOf } from '../shapes';
 import type { FieldValues, Shape, Id, Model, ModelAnnotation, Point, KindName } from '../types';
@@ -68,11 +66,11 @@ export const newRecordId = (model: Model, page: PageRef, offset = 1): Id =>
   annotationKey(newRecordRef(model, page, offset));
 
 /**
- * The draft a drawing creates, complete before anything is predicted: the
+ * The draft a drawing creates, complete before its record is made: the
  * tool's `defaults` (the fields its kind has), the fields that state its
  * `shape`, what the drawing adds (`fields`: an intent, a measurement, first
  * text), and the flags a drawn annotation starts with (`print`, and the
- * tool's own). The view's prediction and the engine's create both come from
+ * tool's own). The view's record and the engine's create both come from
  * it.
  */
 export function draftOf(
@@ -106,10 +104,9 @@ export interface NewRecord {
 /**
  * The `offset`-th record a message creates, from its `draft`: named by the
  * `nm` it will be written under (its key), holding the annotation the engine
- * will read back, appended after the page's other records, and drawn as a
- * new record is (`sourceOfNew`). A kind whose `rect` the engine works out
- * from its drawing gets the drawn bounds. `reply` ties it to the annotation
- * it belongs to; the write states it once that one has a ref.
+ * will read back (`annotationOfNew`), appended after the page's other
+ * records, and drawn as a new record is (`sourceOfNew`). `reply` ties it to
+ * the annotation it belongs to; the write states it once that one has a ref.
  */
 export function newRecord(
   model: Model,
@@ -123,12 +120,8 @@ export function newRecord(
   const onPage = model.order.filter(
     (id) => model.byId[id]?.annotation.page.objectNumber === page.objectNumber,
   ).length;
-  const read = annotationOfDraft(named, { ref, index: onPage + offset - 1 });
-  const annotation: AnnotationDTO = {
-    ...read,
-    ...('rect' in draft ? {} : { rect: geomVisualBounds(shapeOf(read), styleOf(read)) }),
-    ...(options.reply ? { reply: options.reply } : {}),
-  } as AnnotationDTO;
+  const read = annotationOfNew(named, { ref, index: onPage + offset - 1 });
+  const annotation: AnnotationDTO = options.reply ? { ...read, reply: options.reply } : read;
   return {
     record: {
       id: annotationKey(ref),

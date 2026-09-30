@@ -5,7 +5,6 @@
  */
 import { annotationKey } from '@embedpdf/core';
 import {
-  annotationOfDraft,
   type AnnotationDTO,
   type AnnotationFlags,
   type AnnotationRef,
@@ -13,10 +12,10 @@ import {
   type PdfLinkTarget,
 } from '@embedpdf/engine-core/runtime';
 
-import { geomBounds, geomVisualBounds } from '../src/geometry';
+import { geomBounds } from '../src/geometry';
 import { kindNamed } from '../src/kinds';
 import { measurementDraftFields, type MeasurementAppearance } from '../src/measurement';
-import { shapeOf, styleOf, writableTarget } from '../src/record';
+import { annotationOfNew, writableTarget } from '../src/record';
 import { engineSubtypeOf } from '../src/record/defaults';
 import type {
   Effect,
@@ -111,8 +110,8 @@ export const answering = (
 /**
  * A record as the plugin hands one to the core: the annotation its draft
  * reads back as (its style and text as its kind's sidebar sets them), with
- * the annotation fields the test states laid over it. A kind whose `rect`
- * the engine works out gets the drawn bounds; a measurement's stated label
+ * the annotation fields the test states laid over it, read as the engine
+ * writes a create (`annotationOfNew`); a measurement's stated label
  * stands where the engine can't work one out (no scale), as a file's stored
  * label does. A confirmed record keeps its ref; one not written yet is named
  * by its id.
@@ -125,10 +124,8 @@ export function recordOf(input: RecordInput): ModelAnnotation {
   );
   const draft = draftOf(subtype, sidebar, geometry, draftExtras(input), flags);
   const at = ref ?? { kind: 'nm' as const, page, nm: input.id };
-  const read = annotationOfDraft(draft, { ref: at, index: 0 });
-  const predicted =
-    'rect' in draft ? read : { ...read, rect: geomVisualBounds(shapeOf(read), styleOf(read)) };
-  const label = measure?.contents && !predicted.contents ? { contents: measure.contents } : {};
+  const written = annotationOfNew(draft, { ref: at, index: 0 });
+  const label = measure?.contents && !written.contents ? { contents: measure.contents } : {};
   return {
     id: input.id,
     ...(ref === null ? { unconfirmed: true as const } : {}),
@@ -137,7 +134,7 @@ export function recordOf(input: RecordInput): ModelAnnotation {
     ...(input.apRot !== undefined ? { apRot: input.apRot } : {}),
     ...(input.apVersion !== undefined ? { apVersion: input.apVersion } : {}),
     ...(input.authority ? { authority: input.authority } : {}),
-    annotation: { ...predicted, ...label, ...stated } as AnnotationDTO,
+    annotation: { ...written, ...label, ...stated } as AnnotationDTO,
   };
 }
 

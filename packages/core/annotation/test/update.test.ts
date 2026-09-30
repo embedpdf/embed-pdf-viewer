@@ -43,7 +43,7 @@ const square = (id: string, x: number): ModelAnnotation => recordOf(squareInput(
 const squareWith = (id: string, flags: Partial<AnnotationFlags>): ModelAnnotation =>
   withAnnotation(square(id, 100), flags);
 
-/** A plain free text box, as its create predicts it. */
+/** A plain free text box, as its create writes it. */
 const textBox = (id: string): ModelAnnotation =>
   recordOf({
     ...squareInput(id, 100),
@@ -119,7 +119,7 @@ describe('update', () => {
     // `<namePrefix><seq + 1>` on its page, keyed as the engine keys an `nm` ref.
     expect(result.change.put.map((record) => record.id)).toEqual(['nm:1:new-1']);
     expect(result.session.seq).toBe(1);
-    // Written from the draft it was predicted from, under the same name.
+    // Written from the draft it was read from, under the same name.
     expect(result.effects).toEqual([
       {
         type: 'create',
@@ -129,7 +129,7 @@ describe('update', () => {
     ]);
   });
 
-  it('a drawing is predicted from the draft it is written from', () => {
+  it('a drawing reads as the draft it is written from', () => {
     const defaults = { square: { color: '#ff0000', strokeWidth: 3, fontSize: 40 } };
     const result = drawSquare(modelWith([], { defaults }), { x: 0, y: 0 }, { x: 50, y: 30 });
     const [effect] = result.effects;
@@ -315,7 +315,7 @@ describe('every record holds its annotation', () => {
       { x: 40, y: 60 },
     ).change.put[0]!;
 
-  it('a new record predicts its annotation, named with the session’s prefix', () => {
+  it('a new record holds the annotation its create writes, named with the session’s prefix', () => {
     const record = created('session-a-');
     expect(refOf(record)).toBeNull();
     expect(record.annotation).toMatchObject({

@@ -7,7 +7,14 @@
  */
 import type { AnnotationDTO } from '@embedpdf/engine-core/runtime';
 
-import { expandRect, normalizeDeg, rectCenter, rectContains, rotatePoint } from '../rect';
+import {
+  expandRect,
+  normalizeDeg,
+  rectCenter,
+  rectContains,
+  rotatePoint,
+  rotatedAabb,
+} from '../rect';
 import type { Point, Rect, RenderNode, TextEndAnchor } from '../types';
 import { boxCorners, boxScaleAbout, boxTranslate, type TurnedBox } from './box';
 import type { ShapeFamily } from './family';
@@ -85,7 +92,14 @@ function caretHit(shape: CaretShape, point: Point, margin: number): boolean {
   return rectContains(expandRect(shape.box, margin), local);
 }
 
-/** The caret mark in its box, before its turn (the renderer turns it about the box's middle). */
+/** The width of the caret mark's outline, whatever the annotation's stroke. */
+export const CARET_STROKE_WIDTH = 0.5;
+
+/**
+ * The caret mark in its box, before its turn (the renderer turns it about the
+ * box's middle): filled, and its outline stroked from one foot over the peak
+ * to the other, as the engine draws it. The base isn't stroked.
+ */
 function caretScene(shape: CaretShape): RenderNode[] {
   const { x, y, width, height } = shape.box;
   const midX = x + width / 2;
@@ -94,9 +108,19 @@ function caretScene(shape: CaretShape): RenderNode[] {
     `M ${x} ${bottom}`,
     `C ${x + width * 0.27} ${bottom} ${midX} ${y + height * 0.56} ${midX} ${y}`,
     `C ${midX} ${y + height * 0.56} ${x + width * 0.73} ${bottom} ${x + width} ${bottom}`,
-    'Z',
   ].join(' ');
   return [{ kind: 'path', d: pathData }];
+}
+
+/**
+ * What the caret draws, before its turn: its box, and the outline's half
+ * width below its base. The outline runs flat at each foot (a butt end
+ * reaches across it, down) and doubles back at the peak (the renderer bevels
+ * it, so nothing reaches above).
+ */
+function caretDrawnBounds(shape: CaretShape): Rect {
+  const { box } = shape;
+  return { ...box, height: box.height + CARET_STROKE_WIDTH / 2 };
 }
 
 /**
@@ -107,7 +131,8 @@ export const caretFamily: ShapeFamily<CaretShape> = {
   read: readCaret,
   write: writeCaret,
   bounds: (shape) => shape.box,
-  drawnBounds: (shape) => shape.box,
+  drawnBounds: caretDrawnBounds,
+  rect: (shape) => rotatedAabb(caretDrawnBounds(shape), shape.rotation, rectCenter(shape.box)),
   selectionBounds: (shape) => shape.box,
   oriented: () => true,
   turnedCorners: boxCorners,

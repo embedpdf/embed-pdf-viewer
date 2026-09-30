@@ -63,6 +63,15 @@ describe('after a change', () => {
     expect(next.apBox).toEqual({ ...BOX, x: 130, y: 120 });
   });
 
+  it('a move by a rect command is a pure move too; the rect goes along', () => {
+    const record = baked('square');
+    const rect = record.annotation.rect;
+    const next = applyChange(record, square({ rect: { ...rect, x: rect.x + 30 } }));
+    expect(next.source).toBe('baked');
+    expect(next.apBox).toEqual({ ...BOX, x: BOX.x + 30 });
+    expect(next.annotation.rect).toEqual({ ...rect, x: rect.x + 30 });
+  });
+
   it('a pure move of a turned raster keeps its turn: the pixels are the same', () => {
     const turned = baked('square', {
       geometry: { kind: 'box', box: BOX, rotation: 30, ellipse: false },
@@ -102,8 +111,7 @@ describe('after a change', () => {
       shapeOf(resized.annotation),
     );
     expect(placed.box).toEqual({ ...BOX, width: 160 });
-    const restyled = applyChange(stamp, { subtype: 'stamp', opacity: 0.5 } as AnnotationPatch);
-    expect(drawnAfter(stamp, restyled.annotation)).toEqual({});
+    expect(drawnAfter(stamp, { subtype: 'stamp', opacity: 0.5 } as AnnotationPatch)).toEqual({});
   });
 
   it('a gesture and the same change stated in code draw alike', () => {

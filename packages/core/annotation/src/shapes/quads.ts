@@ -83,6 +83,7 @@ export const quadsFamily: ShapeFamily<QuadsShape> = {
   write: (shape) => ({ quadPoints: shape.quadPoints }),
   bounds: quadsBounds,
   drawnBounds: quadsDrawnBounds,
+  rect: quadsDrawnBounds,
   selectionBounds: quadsBounds,
   oriented: () => false,
   turnedCorners: () => null,

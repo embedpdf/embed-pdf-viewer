@@ -236,10 +236,11 @@ export interface ModelAnnotation {
   /**
    * The annotation's data in the engine's shape: what the engine will read
    * back once this session's writes land. A confirmed record's is the
-   * engine's own read; a record this session created predicts it from its
-   * create (`newRecord`); an edit merges the fields it changed, and `update`
-   * applies them as the engine will. Its `rect` (for a kind the engine
-   * draws) and its attribution wait for the engine's answer.
+   * engine's own read; a record this session created reads as its create
+   * writes it (`newRecord`); an edit merges the fields it changed, and
+   * `update` applies them as the engine will, a drawn kind's `rect`
+   * included (`record/written.ts`). Its attribution waits for the engine's
+   * answer.
    */
   annotation: AnnotationDTO;
 }
@@ -728,7 +729,7 @@ export type Message =
 
 export type Effect =
   | { type: 'captured'; tool: string; page: PageRef; geometry: Shape }
-  /** Write a new record: the draft its annotation was predicted from, named as it is keyed. */
+  /** Write a new record: the draft its annotation was read from, named as it is keyed. */
   | { type: 'create'; id: Id; draft: AnnotationDraft }
   /** Write a composite (a replace-text caret and its strikeout): the primary
    *  first, then each member answering it. `drafts` holds each one's draft. */
@@ -765,10 +766,10 @@ export interface RenderItem {
   subtype: KindName;
   geometry: Shape;
   /**
-   * The visual box (geometry + stroke + line endings) in page space — the same
-   * `geomVisualBounds` that feeds the engine `/Rect`. The renderer paints into this
-   * box and does no bounds math of its own, so the on-screen box and the baked
-   * appearance can never drift (the patch computes the rect).
+   * The box the live drawing is painted into (its family's `drawnBounds`:
+   * geometry, stroke, endings, cloud): a box's or caret's own, before its
+   * turn (`rot`), the page's for the rest. The renderer paints into this box
+   * and does no bounds math of its own.
    */
   box: Rect;
   /**

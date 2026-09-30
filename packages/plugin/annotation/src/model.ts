@@ -19,7 +19,7 @@
  * record holds it and every older change of that record has settled, so the
  * view never falls back to an older version of what the user did.
  */
-import { initialSession, sameSession } from '@embedpdf/core-annotation';
+import { annotationAfter, initialSession, sameSession } from '@embedpdf/core-annotation';
 import type { Id, ModelAnnotation, Session } from '@embedpdf/core-annotation';
 import {
   annotationKey,
@@ -49,6 +49,26 @@ export type RecordChange =
     }
   /** The user deleted the record. */
   | { readonly kind: 'delete' };
+
+/**
+ * `record` with a pending edit laid over it: how it is drawn after the edit,
+ * and its annotation as the engine will read it back (`annotationAfter`). A
+ * patch the record no longer takes (another session changed it under the
+ * edit) is one the engine will refuse: the annotation shows as it is until
+ * that refusal drops the change.
+ */
+export function withPendingEdit(
+  record: ModelAnnotation,
+  edit: Extract<RecordChange, { kind: 'edit' }>,
+): ModelAnnotation {
+  const drawn = { ...record, ...edit.fields };
+  if (!edit.patch) return drawn;
+  try {
+    return { ...drawn, annotation: annotationAfter(record.annotation, edit.patch) };
+  } catch {
+    return drawn;
+  }
+}
 
 /** One unconfirmed change to one record, carried by one engine write. */
 export interface PendingChange {

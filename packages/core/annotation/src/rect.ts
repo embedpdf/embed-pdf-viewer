@@ -173,11 +173,10 @@ const rotateAboutM = (pivot: Point, deg: number): Mat2D<'page', 'page'> =>
 export const rotatePoint = (point: Point, pivot: Point, deg: number): Point =>
   applyPoint(rotateAboutM(pivot, deg), point as PointIn<'page'>);
 
-/** The AABB of `rect` rotated `deg` about its own centre. */
-export function rotatedAabb(rect: Rect, deg: number): Rect {
+/** The AABB of `rect` rotated `deg` about `pivot` (its own centre unless given). */
+export function rotatedAabb(rect: Rect, deg: number, pivot: Point = rectCenter(rect)): Rect {
   if (!deg) return rect;
-  const point = rectCenter(rect);
-  return unionRect(rectCornerPoints(rect).map((corner) => rotatePoint(corner, point, deg)));
+  return unionRect(rectCornerPoints(rect).map((corner) => rotatePoint(corner, pivot, deg)));
 }
 
 /** Shrink a rect inward by `pad` on every side, staying centred and never

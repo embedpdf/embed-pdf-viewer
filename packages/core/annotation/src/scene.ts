@@ -14,6 +14,7 @@ import { shapeMeasurementLayout } from './measurement-shape';
 import { quadBounds, quadRing } from '@embedpdf/core-geometry';
 import { geomScene } from './geometry';
 import { dashOf } from './kinds/styles';
+import { CARET_STROKE_WIDTH } from './shapes/caret';
 import type {
   Shape,
   Paint,
@@ -276,7 +277,7 @@ export function scene(item: RenderItem): SceneNode[] {
       paint: {
         fill: item.style.color,
         stroke: item.style.color,
-        width: 0.5,
+        width: CARET_STROKE_WIDTH,
         opacity: item.style.opacity,
       },
     })) as SceneNode[];

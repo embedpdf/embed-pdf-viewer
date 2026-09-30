@@ -463,6 +463,7 @@ export type {
 export { appearanceChangeOf, appearanceImpactOf, semanticEqual } from './annotation/appearance';
 export { pdfAppearanceTurnOf } from './annotation/appearanceTurn';
 export { assertAnnotationDraft } from './annotation/checkWrite';
+export { DRAWN_RECT_KINDS } from './annotation/shapeForRect';
 export {
   annotationPatchBetween,
   assertDeclaredFields,

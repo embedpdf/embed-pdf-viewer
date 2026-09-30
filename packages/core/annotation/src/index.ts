@@ -170,8 +170,11 @@ export {
 } from './shapes/points';
 export { calloutEnd, textPlateInset, type CalloutLine, type TextBoxShape } from './shapes/text-box';
 // A record: the engine annotation it holds, read (who it is, its shape, how
-// it is drawn, how its text is set) and written back as engine fields.
+// it is drawn, how its text is set), written back as engine fields, and
+// read as the engine writes it while a write is on its way.
 export {
+  annotationAfter,
+  annotationOfNew,
   fromDTO,
   groupOf,
   irtOf,

@@ -28,9 +28,8 @@
  * back to the engine's raster (`plugin-annotation`, `sync/confirmed.ts`).
  */
 import {
-  annotationPatchBetween,
   appearanceChangeOf,
-  applyAnnotationPatch,
+  resolveAnnotationPatch,
   type AnnotationDTO,
   type AnnotationPatch,
 } from '@embedpdf/engine-core/runtime';
@@ -38,7 +37,7 @@ import {
 import { anchoredBox, anchorModeOf, anchorOf } from './anchor';
 import { geomRotation } from './geometry';
 import { normalizeDeg } from './rect';
-import { kindOf, shapeOf } from './record';
+import { annotationAfter, kindOf, shapeOf } from './record';
 import type { Id, Model, ModelAnnotation, Shape, Rect, ViewEnv } from './types';
 
 /** The part of a record that says how it is drawn. */
@@ -52,14 +51,16 @@ export const sourceOfNew = (annotation: AnnotationDTO): ModelAnnotation['source'
   drawsLive(annotation) ? 'vector' : 'baked';
 
 /**
- * What changes in how `record` is drawn once its annotation is `after`: the
- * rule at the top of this file. Only the fields that change.
+ * What changes in how `record` is drawn once `patch` is written: the rule at
+ * the top of this file. Only the fields that change. The engine judges the
+ * patch as it will write it: a `rect` command is the shape it moves to by
+ * then.
  */
-export function drawnAfter(record: ModelAnnotation, after: AnnotationDTO): Partial<DrawState> {
+export function drawnAfter(record: ModelAnnotation, patch: AnnotationPatch): Partial<DrawState> {
   if (!drawsLive(record.annotation)) return {};
   const change = appearanceChangeOf(
     record.annotation,
-    annotationPatchBetween(record.annotation, after) as AnnotationPatch,
+    resolveAnnotationPatch(record.annotation, patch),
   );
   switch (change.impact) {
     case 'inert':
@@ -73,10 +74,13 @@ export function drawnAfter(record: ModelAnnotation, after: AnnotationDTO): Parti
   }
 }
 
-/** `record` after `patch`: its annotation as the engine will apply the patch, drawn as the rule says. */
+/** `record` after `patch`: its annotation as the engine will read it back (`annotationAfter`), drawn as the rule says. */
 export function applyChange(record: ModelAnnotation, patch: AnnotationPatch): ModelAnnotation {
-  const annotation = applyAnnotationPatch(record.annotation, patch);
-  return { ...record, annotation, ...drawnAfter(record, annotation) };
+  return {
+    ...record,
+    annotation: annotationAfter(record.annotation, patch),
+    ...drawnAfter(record, patch),
+  };
 }
 
 /**

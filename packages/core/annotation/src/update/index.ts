@@ -116,7 +116,7 @@ export const EMPTY_CHANGE: ChangeSet = { put: [], drop: [], patches: {} };
  * annotation fields it changed), its annotation brought up to date as the
  * engine will apply that patch, and drawn as the appearance rule says
  * (`applyChange`): a transition changes annotations, never how they are
- * drawn. A new record already carries the annotation it predicts. Cheap when
+ * drawn. A new record already carries the annotation its create writes. Cheap when
  * nothing changed: `byId` keeps its identity.
  */
 function changeBetween(before: Model, after: Model): ChangeSet {

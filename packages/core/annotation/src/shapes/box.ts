@@ -14,7 +14,7 @@
  */
 import type { AnnotationDTO } from '@embedpdf/engine-core/runtime';
 
-import { cloudyBorderExtent, cloudyPath } from '../cloudy';
+import { cloudyBorderExtent, cloudyBounds, cloudyPath } from '../cloudy';
 import {
   MIN_SIZE,
   RECT_HANDLES,
@@ -27,6 +27,7 @@ import {
   rectHandlePoint,
   resizeRotatedRect,
   rotatePoint,
+  rotatedAabb,
   rotatedHandleCursor,
   segDist,
   type RectHandle,
@@ -76,7 +77,7 @@ function writeBox(
     : { rect: shape.box };
 }
 
-/** How far a cloudy border's bumps reach out from the box; 0 without a cloud. */
+/** How far a cloudy border's bumps reach out from the box, about (hit-testing's band); 0 without a cloud. */
 function cloudReach(shape: BoxShape, stroke: Stroke): number {
   return stroke.cloudyIntensity
     ? cloudyBorderExtent(stroke.cloudyIntensity, stroke.strokeWidth, shape.ellipse)
@@ -84,11 +85,19 @@ function cloudReach(shape: BoxShape, stroke: Stroke): number {
 }
 
 /**
- * What the shape draws, before its turn: the box, grown by a cloud's reach.
- * A plain stroke draws inside the box.
+ * What the shape draws, before its turn: the box (a plain stroke draws inside
+ * it), or the box around what its cloud paints.
  */
 function boxDrawnBounds(shape: BoxShape, stroke: Stroke): Rect {
-  return expandRect(shape.box, cloudReach(shape, stroke));
+  const { cloudyIntensity, strokeWidth } = stroke;
+  return cloudyIntensity && shape.box.width > 0 && shape.box.height > 0
+    ? cloudyBounds(shape.box, shape.ellipse, cloudyIntensity, strokeWidth)
+    : shape.box;
+}
+
+/** The upright page box around what it paints: what it draws, turned about the box's middle. */
+function boxRect(shape: BoxShape, stroke: Stroke): Rect {
+  return rotatedAabb(boxDrawnBounds(shape, stroke), shape.rotation, rectCenter(shape.box));
 }
 
 /** The box's corners as the page shows them (nw, ne, se, sw), turned about its middle. */
@@ -229,6 +238,7 @@ export const boxFamily: ShapeFamily<BoxShape> = {
   write: writeBox,
   bounds: (shape) => shape.box,
   drawnBounds: boxDrawnBounds,
+  rect: boxRect,
   selectionBounds: (shape) => shape.box,
   oriented: () => true,
   turnedCorners: boxCorners,

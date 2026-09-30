@@ -24,8 +24,14 @@ export interface ShapeFamily<S extends Shape = Shape> {
 
   /** The box around its box or points, the stroke left out. */
   bounds(shape: S): Rect;
-  /** The box around all it draws (the stroke, endings, a cloud's bumps): the engine's `rect`. */
+  /**
+   * The box the live drawing is painted into (the stroke, endings, a cloud's
+   * bumps): a box's or caret's own, before its turn (the renderer turns it),
+   * the page's for the rest.
+   */
   drawnBounds(shape: S, stroke: Stroke): Rect;
+  /** The upright page box around all it paints: the engine's `rect`, as it measures its appearance. */
+  rect(shape: S, stroke: Stroke): Rect;
   /** The box a selection wraps: where its handles sit, and where a selected shape is grabbed. */
   selectionBounds(shape: S, stroke: Stroke): Rect;
   /** Does the shape have a turned box of its own, which a selection outlines turned? */

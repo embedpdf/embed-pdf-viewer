@@ -26,7 +26,7 @@ import {
   type PagePointTurn,
 } from '@embedpdf/engine-core/runtime';
 
-import { cloudyBorderExtent, cloudyPolyPath } from '../cloudy';
+import { cloudyPolyBounds, cloudyPolyPath } from '../cloudy';
 import { endingNodes, endingNodesHit } from '../endings';
 import {
   expandRect,
@@ -365,6 +365,28 @@ function strokeOutlinePoints(points: Point[], closed: boolean, strokeWidth: numb
   return out;
 }
 
+/**
+ * The outline points of `nodes` stroked at `strokeWidth`, as the renderer
+ * draws them: a line or poly with butt caps and mitred joins
+ * (`strokeOutlinePoints`), an ellipse or rect grown by half the stroke.
+ * `unionRect` of them is the box they paint.
+ */
+export function strokedOutlineOf(nodes: readonly RenderNode[], strokeWidth: number): Point[] {
+  return nodes.flatMap((node) => {
+    switch (node.kind) {
+      case 'line':
+        return strokeOutlinePoints([node.a, node.b], false, strokeWidth);
+      case 'poly':
+        return strokeOutlinePoints(node.points, node.closed, strokeWidth);
+      case 'ellipse':
+      case 'rect':
+        return rectCornerPoints(expandRect(node.rect, strokeWidth / 2));
+      case 'path':
+        return [];
+    }
+  });
+}
+
 type EndingSeg = { tip: Point; angle: number; ending: LineEnding | undefined };
 
 /** The start/end tips of a line / open poly as drawn, each with the segment angle
@@ -406,26 +428,16 @@ function pointsDrawnBounds(shape: PointsShape, stroke: Stroke): Rect {
   if (shape.kind === 'ink') return expandRect(unionRect(strokes.flat()), strokeWidth / 2);
   const points = strokes[0]!;
   const closed = shape.kind === 'poly' && shape.closed;
-  if (closed && cloudyIntensity) {
-    // Corner curls are arcs of the cloud radius centred at the vertices, and the
-    // stroke straddles them — so ink reaches radius + strokeWidth/2 beyond the
-    // vertex hull on every side: exactly `cloudyBorderExtent`.
-    return expandRect(unionRect(points), cloudyBorderExtent(cloudyIntensity, strokeWidth, false));
-  }
-  const outline = strokeOutlinePoints(points, closed, strokeWidth);
-  for (const seg of endingSegs(shape)) {
-    for (const node of endingNodes(seg.tip, seg.angle, seg.ending, strokeWidth)) {
-      if (node.kind === 'poly') {
-        // arrowheads / diamonds / squares are stroked polys: their sharp corners
-        // miter exactly like the body, so wrap the real outline (tip included).
-        outline.push(...strokeOutlinePoints(node.points, node.closed, strokeWidth));
-      } else if (node.kind === 'ellipse') {
-        // a stroked ellipse (circle ending) grows uniformly by h — no miters.
-        outline.push(...rectCornerPoints(expandRect(node.rect, strokeWidth / 2)));
-      }
-    }
-  }
-  return unionRect(outline);
+  if (closed && cloudyIntensity) return cloudyPolyBounds(points, cloudyIntensity, strokeWidth);
+  // Arrowheads, diamonds and squares are stroked polys whose sharp corners
+  // miter like the body; a circle ending grows by half the stroke.
+  const endings = endingSegs(shape).flatMap((seg) =>
+    endingNodes(seg.tip, seg.angle, seg.ending, strokeWidth),
+  );
+  return unionRect([
+    ...strokeOutlinePoints(points, closed, strokeWidth),
+    ...strokedOutlineOf(endings, strokeWidth),
+  ]);
 }
 
 /**
@@ -503,6 +515,7 @@ export const pointsFamily: ShapeFamily<PointsShape> = {
   write: writePoints,
   bounds: pointsBounds,
   drawnBounds: pointsDrawnBounds,
+  rect: pointsDrawnBounds,
   selectionBounds: pointsDrawnBounds,
   oriented: () => true,
   turnedCorners: pointsCorners,

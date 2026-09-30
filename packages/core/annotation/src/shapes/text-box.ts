@@ -35,6 +35,7 @@ import {
   type TurnedBox,
 } from './box';
 import type { ShapeFamily } from './family';
+import { strokedOutlineOf } from './points';
 
 type FreeTextAnnotation = Extract<AnnotationDTO, { subtype: 'free-text' }>;
 
@@ -198,6 +199,31 @@ function textBoxDrawnBounds(shape: TextBoxShape, { strokeWidth }: Stroke): Rect 
   return expandRect(unionRect(points), strokeWidth / 2);
 }
 
+/**
+ * The upright page box around all it paints. The box, turned about its
+ * middle: its border lies inside it. A callout's line, stroked from its tip
+ * (a butt end) and run half the stroke into the box's border so it meets the
+ * box without a gap, and the ending at its tip.
+ */
+function textBoxRect(shape: TextBoxShape, { strokeWidth }: Stroke): Rect {
+  const box = rotatedAabb(shape.box, shape.rotation);
+  const line = shape.calloutLine;
+  if (!line) return box;
+  const end = line[line.length - 1]!;
+  const before = line[line.length - 2]!;
+  const length = Math.hypot(end.x - before.x, end.y - before.y) || 1;
+  const reach = strokeWidth / 2 / length;
+  const drawn = [
+    ...line.slice(0, -1),
+    { x: end.x + (end.x - before.x) * reach, y: end.y + (end.y - before.y) * reach },
+  ];
+  const nodes: RenderNode[] = [
+    { kind: 'poly', points: drawn, closed: false },
+    ...endingNodes(line[0], tipAngle(line), shape.lineEnding ?? undefined, strokeWidth),
+  ];
+  return unionRect([...rectCornerPoints(box), ...strokedOutlineOf(nodes, strokeWidth)]);
+}
+
 /** What a selection wraps: the box, or a turned callout box as the page shows it. */
 function textBoxSelectionBounds(shape: TextBoxShape): Rect {
   return shape.calloutLine && shape.rotation ? rotatedAabb(shape.box, shape.rotation) : shape.box;
@@ -281,6 +307,7 @@ export const textBoxFamily: ShapeFamily<TextBoxShape> = {
   write: writeTextBox,
   bounds: (shape) => shape.box,
   drawnBounds: textBoxDrawnBounds,
+  rect: textBoxRect,
   selectionBounds: textBoxSelectionBounds,
   oriented: (shape) => !shape.calloutLine,
   turnedCorners: (shape) => (shape.calloutLine ? null : boxCorners(shape)),

@@ -5,7 +5,7 @@ import { DISTANCE_CAPTION_SIZE as CAPTION_SIZE, distanceCaptionWidth } from './m
 import { geomRotation, selectionQuad } from './geometry';
 import { dashOf } from './kinds/styles';
 import { rotatePoint, segDist, unionRect } from './rect';
-import { drawnLineOf } from './shapes/points';
+import { drawnLineOf, strokedOutlineOf } from './shapes/points';
 import type {
   FieldValues,
   Shape,
@@ -511,6 +511,23 @@ export function moveDistanceCaption(
       perpendicular: (previous?.perpendicular ?? 0) + delta.x * normal.x + delta.y * normal.y,
     },
   };
+}
+
+/**
+ * The upright box around all a distance paints: its dimension line, leader
+ * and connector lines and its endings stroked at `strokeWidth` (what
+ * `distanceScene` draws), and its caption's box.
+ */
+export function distanceDrawnBounds(layout: DistanceLayout, strokeWidth: number): Rect {
+  const lines = [
+    ...layout.dimensionSegments,
+    ...layout.leaderSegments,
+    ...layout.captionConnector,
+  ].map((segment): RenderNode => ({ kind: 'line', a: segment.from, b: segment.to }));
+  return unionRect([
+    ...strokedOutlineOf([...lines, ...layout.endings], strokeWidth),
+    ...(layout.caption?.bounds ?? []),
+  ]);
 }
 
 export function distanceScene(

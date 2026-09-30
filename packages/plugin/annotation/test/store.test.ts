@@ -21,6 +21,8 @@ const FLAGS = {
   lockedContents: false,
 };
 
+type Box = { x: number; y: number; width: number; height: number };
+
 const refOf = (objectNumber: number): AnnotationRef => ({
   kind: 'objectNumber',
   page: PAGE,
@@ -145,6 +147,116 @@ describe('store.apply', () => {
     harness.update.mockResolvedValueOnce({ annotation: { ...shifted, color: '#00ff00' } });
     await harness.capability.update(refOf(20), { subtype: 'square', color: '#00ff00' });
     expect(harness.capability.listPageItems(PAGE)[0]!.source).toBe('vector');
+  });
+
+  it('two moves of one record in one apply: the raster ends where the shape does', async () => {
+    const harness = annotationHarness();
+    await harness.load([square(20)]);
+    const before = harness.capability.listPageItems(PAGE)[0]!;
+    const box = dataOf(harness.capability.get(refOf(20))).box as Box;
+    harness.update.mockReturnValue(held().promise);
+
+    harness.apply([
+      {
+        type: 'update',
+        ref: refOf(20),
+        patch: { subtype: 'square', box: { ...box, x: box.x + 200 } },
+      },
+      { type: 'update', ref: refOf(20), patch: { subtype: 'square', box } },
+    ]);
+    expect(dataOf(harness.capability.get(refOf(20))).box).toEqual(box);
+    const shown = harness.capability.listPageItems(PAGE)[0]!;
+    expect(shown.source).toBe('baked');
+    expect(shown.apBox).toEqual(before.apBox);
+  });
+
+  it('while a move is on its way, its rect moves with the drawing', async () => {
+    const harness = annotationHarness();
+    await harness.load([square(20)]);
+    const read = dataOf(harness.capability.get(refOf(20)));
+    const box = read.box as Box;
+    const rect = read.rect as Box;
+    harness.update.mockReturnValue(held().promise);
+
+    void harness.capability.update(refOf(20), {
+      subtype: 'square',
+      box: { ...box, x: box.x + 200 },
+    });
+    expect(dataOf(harness.capability.get(refOf(20))).rect).toEqual({ ...rect, x: rect.x + 200 });
+  });
+
+  it('a rect command after a move on its way starts from where the move put it', async () => {
+    const harness = annotationHarness();
+    await harness.load([square(20)]);
+    const read = dataOf(harness.capability.get(refOf(20)));
+    const box = read.box as Box;
+    const rect = read.rect as Box;
+    harness.update.mockReturnValue(held().promise);
+
+    harness.apply([
+      {
+        type: 'update',
+        ref: refOf(20),
+        patch: { subtype: 'square', box: { ...box, x: box.x + 200 } },
+      },
+      {
+        type: 'update',
+        ref: refOf(20),
+        patch: { subtype: 'square', rect: { ...rect, x: rect.x + 250 } },
+      },
+    ]);
+    expect(dataOf(harness.capability.get(refOf(20))).box).toEqual({ ...box, x: box.x + 250 });
+  });
+
+  it('a create and then its edit in one apply: the edit is laid over the new record', async () => {
+    const harness = annotationHarness();
+    await harness.load([square(20)]);
+    harness.create.mockReturnValue(held().promise);
+    harness.update.mockReturnValue(held().promise);
+    const ref: AnnotationRef = { kind: 'nm', page: PAGE, nm: 'new-square' };
+
+    const applied = harness.apply([
+      {
+        type: 'create',
+        page: PAGE,
+        draft: {
+          subtype: 'square',
+          nm: 'new-square',
+          box: { x: 10, y: 10, width: 50, height: 40 },
+          color: '#000000',
+          strokeWidth: 2,
+        },
+      },
+      { type: 'update', ref, patch: { subtype: 'square', color: '#00ff00' } },
+    ]);
+    expect(applied.ids[1]).toBe(applied.ids[0]);
+    expect(dataOf(harness.capability.get(ref)).color).toBe('#00ff00');
+  });
+
+  it('a line created in code shows with the rect around its drawing', async () => {
+    const harness = annotationHarness();
+    await harness.load([]);
+    harness.create.mockReturnValue(held().promise);
+
+    const [id] = harness.apply([
+      {
+        type: 'create',
+        page: PAGE,
+        draft: {
+          subtype: 'line',
+          linePoints: { start: { x: 10, y: 20 }, end: { x: 110, y: 20 } },
+          color: '#000000',
+          strokeWidth: 4,
+        },
+      },
+    ]).ids;
+    // The line and half its stroke either side (the engine's answer brings the exact rect).
+    expect(harness.model().byId[id!]!.annotation.rect).toEqual({
+      x: 10,
+      y: 18,
+      width: 100,
+      height: 4,
+    });
   });
 
   it('two changes to one record in one apply each settle with their own write', async () => {

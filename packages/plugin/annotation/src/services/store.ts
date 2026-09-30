@@ -17,6 +17,7 @@
  */
 import { PluginError, toPluginError } from '@embedpdf/core';
 import {
+  annotationOfNew,
   creationDraftAnchor,
   drawnAfter,
   type Effect,
@@ -32,9 +33,8 @@ import {
 } from '@embedpdf/core-annotation';
 import {
   annotationKey,
-  annotationOfDraft,
-  applyAnnotationPatch,
   generateUuid,
+  resolveAnnotationPatch,
   type AnnotationDraft,
   type AnnotationDTO,
   type AnnotationPatch,
@@ -43,7 +43,7 @@ import {
   type PageRef,
 } from '@embedpdf/engine-core/runtime';
 
-import { changedFields, type RecordChange } from '../model';
+import { withPendingEdit, type RecordChange } from '../model';
 import type { AnnotationContext } from './context';
 import type { AnnotationEvents } from './events';
 import type { CarriedWrite, IntentOutcome, Intents, IntentWrite } from './intents';
@@ -159,16 +159,20 @@ export function recordOfRef(model: Model, ref: AnnotationRef): ModelAnnotation |
   return null;
 }
 
+/** A stated change, the record it names, and the pending change it makes (none: nothing to write). */
+interface StatedChange {
+  readonly id: Id;
+  readonly change: StoreChange;
+  readonly pending: RecordChange | null;
+}
+
 /**
  * The pending change a stated change makes, and the record it names. The
- * engine's own functions work it out (`annotationOfDraft`,
- * `applyAnnotationPatch`), so what shows is what the engine will write; they
+ * engine's own rules work it out (core `annotationOfNew`, and the engine's
+ * `resolveAnnotationPatch`), so what shows is what the engine will write; they
  * throw for a change the engine would refuse.
  */
-function statedChangeOf(
-  model: Model,
-  change: StoreChange,
-): { id: Id; change: StoreChange; pending: RecordChange | null } {
+function statedChangeOf(model: Model, change: StoreChange): StatedChange {
   if (change.type === 'create') {
     const nm = change.draft.nm ?? generateUuid();
     const ref: AnnotationRef = { kind: 'nm', page: change.page, nm };
@@ -177,13 +181,13 @@ function statedChangeOf(
       (id) => model.byId[id]?.annotation.page.objectNumber === change.page.objectNumber,
     ).length;
     // The annotations it links to are the engine's to look up as it writes
-    // (as a change set links them): predicted without them, then stated.
+    // (as a change set links them): read without them, then stated.
     const { reply, parent, ...fields } = draft as AnnotationDraft & {
       reply?: { to: AnnotationRef; type?: 'reply' | 'group' } | null;
       parent?: AnnotationRef | null;
     };
     const annotation = {
-      ...annotationOfDraft(fields as AnnotationDraft, { ref, index: onPage }),
+      ...annotationOfNew(fields as AnnotationDraft, { ref, index: onPage }),
       ...(reply ? { reply: { to: reply.to, type: reply.type ?? 'reply' } } : {}),
       ...(parent ? { parent } : {}),
     } as AnnotationDTO;
@@ -206,12 +210,30 @@ function statedChangeOf(
   // The engine's resolve rules, run now: a patch it would refuse throws
   // before anything shows. The record is then drawn as the appearance rule
   // says, exactly as after a gesture (core `appearance.ts`).
-  const after = applyAnnotationPatch(record.annotation, change.patch);
+  resolveAnnotationPatch(record.annotation, change.patch);
   return {
     id: record.id,
     change,
-    pending: { kind: 'edit', patch: change.patch, fields: drawnAfter(record, after) },
+    pending: { kind: 'edit', patch: change.patch, fields: drawnAfter(record, change.patch) },
   };
+}
+
+/**
+ * `model` with a stated change laid over it, as the view will show it. The
+ * next change of the same call is worked out against it: two moves of one
+ * record, or a create and then its edit, are seen as the engine will write
+ * them, in order.
+ */
+function withStated(model: Model, { id, pending }: StatedChange): Model {
+  if (!pending) return model;
+  if (pending.kind === 'create') {
+    return { ...model, byId: { ...model.byId, [id]: pending.record }, order: [...model.order, id] };
+  }
+  if (pending.kind === 'delete') {
+    const { [id]: _deleted, ...byId } = model.byId;
+    return { ...model, byId, order: model.order.filter((each) => each !== id) };
+  }
+  return { ...model, byId: { ...model.byId, [id]: withPendingEdit(model.byId[id]!, pending) } };
 }
 
 export function createStore(
@@ -249,11 +271,16 @@ export function createStore(
   };
 
   const apply = (changes: readonly StoreChange[]): Applied => {
-    const before = model();
-    // Everything is worked out before anything shows: one refused change stages none.
-    let stated: ReturnType<typeof statedChangeOf>[];
+    // Everything is worked out before anything shows: one refused change
+    // stages none. Each change is worked out against the ones before it.
+    const stated: StatedChange[] = [];
+    let current = model();
     try {
-      stated = changes.map((change) => statedChangeOf(before, change));
+      for (const change of changes) {
+        const each = statedChangeOf(current, change);
+        stated.push(each);
+        current = withStated(current, each);
+      }
     } catch (error) {
       throw toPluginError('annotation', error);
     }

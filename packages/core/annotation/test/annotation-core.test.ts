@@ -1136,13 +1136,14 @@ describe('annotation-core', () => {
     const box = { x: 50, y: 50, width: 40, height: 30 };
     const geometry: Shape = { kind: 'box', box, rotation: 0, ellipse: false };
     const cloudy = { strokeWidth: 2, cloudyIntensity: 2 };
+    // The bumps reach the cloud's radius and half the stroke past the box: the
+    // box around their curves, Bézier arcs a hair off a true circle.
     const reach = cloudyBorderExtent(2, 2, false);
-    expect(geomVisualBounds(geometry, cloudy)).toEqual({
-      x: 50 - reach,
-      y: 50 - reach,
-      width: 40 + 2 * reach,
-      height: 30 + 2 * reach,
-    });
+    const drawn = geomVisualBounds(geometry, cloudy);
+    expect(drawn.x).toBeCloseTo(50 - reach, 2);
+    expect(drawn.y).toBeCloseTo(50 - reach, 2);
+    expect(drawn.width).toBeCloseTo(40 + 2 * reach, 2);
+    expect(drawn.height).toBeCloseTo(30 + 2 * reach, 2);
     expect(selectionBounds(geometry, cloudy)).toEqual(box);
     const corners = geomHandles(geometry).filter((handle) => handle.id.length === 2);
     expect(corners.map((handle) => handle.at)).toEqual([

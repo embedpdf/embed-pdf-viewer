@@ -9,6 +9,7 @@
  *   text.ts      how its text is set: its kind's text view
  *   values.ts    engine fields written to it: the one door every edit uses
  *   links.ts     the rects its attached links take, and writable link targets
+ *   written.ts   how it reads as the engine writes a create or an edit
  *   defaults.ts  a tool's defaults, read as an annotation (or a widget appearance)
  */
 import { annotationKey } from '@embedpdf/core';
@@ -24,6 +25,7 @@ export { styleOf } from './style';
 export { textOf } from './text';
 export { withValues } from './values';
 export { linkChildRects, writableTarget } from './links';
+export { annotationAfter, annotationOfNew } from './written';
 
 /**
  * The record an engine annotation reads as: keyed by its ref, drawn from the

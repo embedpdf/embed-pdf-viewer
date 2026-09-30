@@ -59,9 +59,6 @@ import {
 } from './internal/write/writeAnnotationRelationship';
 import { applyEmbedMetadataOnUpdate } from './internal/write/writeEmbedMetadata';
 
-/** `FPDF_ANNOT_APPEARANCEMODE_NORMAL` — the `/AP /N` stream. */
-const APPEARANCE_MODE_NORMAL = 0;
-
 /**
  * Synchronous orchestrator for `create` / `update` / `delete` annotation
  * mutations. Owns the dance between PDFium calls, identity bookkeeping,
@@ -312,20 +309,16 @@ export class AnnotationMutator {
       // image stamp) is destroyed only as the explicit consequence of a
       // semantic edit, never as a side effect of writing back values nobody
       // changed. `inert` patches (metadata-only, or all values no-ops) never
-      // touch /AP; a verified rigid translation preserves an existing /AP
-      // byte-for-byte (ISO 32000: BBox→/Rect fitting translates the pixels);
-      // everything else re-bakes. With no existing normal /AP there is
-      // nothing to preserve, so any appearance-relevant write bakes one
-      // (otherwise the annotation renders as nothing). The verdict is
-      // echoed on the result: clients drive raster invalidation off
+      // touch /AP. A verified rigid translation keeps the appearance as it is:
+      // an existing /AP byte-for-byte (ISO 32000: BBox→/Rect fitting
+      // translates the pixels), and a missing one stays missing (the renderer
+      // draws it in memory where the annotation now is; a move gives the file
+      // no drawing of ours). Everything else bakes one. The verdict is echoed
+      // on the result: clients drive raster invalidation off
       // `appearance.changed` instead of guessing from the patch they sent.
       // New appearance bytes are a new drawing, whatever the patch says.
       let appearance: AppearanceOutcome;
-      if (
-        impact === 'inert' ||
-        (impact === 'translation' &&
-          fn.EPDFAnnot_HasAppearanceStream(annotPtr, APPEARANCE_MODE_NORMAL))
-      ) {
+      if (impact === 'inert' || impact === 'translation') {
         appearance = { action: 'preserved', changed: false };
       } else {
         const ok = generateAppearance(

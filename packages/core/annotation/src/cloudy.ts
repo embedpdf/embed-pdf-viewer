@@ -6,16 +6,17 @@
  * keep it because it visually matches what PDFium bakes into the `/BE` appearance
  * stream, so our live SVG preview and the saved PDF agree.
  *
- * This is a pure function. It takes a page-space box plus
- * the border `intensity`/`strokeWidth` and returns SVG path data in absolute
- * content coordinates (the same space `geomScene`'s rect/ellipse nodes use). The
- * scallops start on the shape's box and reach out from it by
- * `cloudyBorderExtent`, as the engine draws them: the engine's `rect` takes
- * that reach in (its `/RD`).
+ * These are pure functions. They take a page-space box (or a polygon) plus
+ * the border `intensity`/`strokeWidth`, and give the cloud's curves as SVG
+ * path data in absolute content coordinates (the same space `geomScene`'s
+ * rect/ellipse nodes use), or the box around what those curves paint. The
+ * scallops start on the shape's box and reach out from it, as the engine
+ * draws them.
  *
- * The internal math runs in PDFBox's y-up frame; `PathBuilder` flips back to
+ * The internal math runs in PDFBox's y-up frame; a `CurveSink` flips back to
  * y-down and translates into the box's page-space origin on the way out.
  */
+import { expandRect } from './rect';
 import type { Rect, Point } from './types';
 
 const ANGLE_180 = Math.PI;
@@ -31,12 +32,18 @@ interface P {
 
 const formatNumber = (value: number): string => Number(value.toFixed(4)).toString();
 
+/** Where the cloud's curves go: an SVG path (`PathBuilder`), or their bounds (`CurveBounds`). */
+interface CurveSink {
+  moveTo(x: number, y: number): void;
+  curveTo(x1: number, y1: number, x2: number, y2: number, x3: number, y3: number): void;
+}
+
 /**
  * Accumulates SVG path commands. Input is PDFBox's y-up frame; output is y-down
  * page space, offset into the box origin (ox, oy) so the `d` string is in the
  * same absolute coordinates as every other render node.
  */
-class PathBuilder {
+class PathBuilder implements CurveSink {
   private parts: string[] = [];
   private started = false;
   constructor(
@@ -57,6 +64,81 @@ class PathBuilder {
   }
   build(): string {
     return this.parts.join(' ');
+  }
+}
+
+/** Where a cubic Bézier coordinate `p0..p3` turns: the parameters in (0, 1) where its slope is zero. */
+function turnsOf(p0: number, p1: number, p2: number, p3: number): number[] {
+  const a = -p0 + 3 * p1 - 3 * p2 + p3;
+  const b = 2 * (p0 - 2 * p1 + p2);
+  const c = p1 - p0;
+  const roots =
+    Math.abs(a) < 1e-12
+      ? Math.abs(b) < 1e-12
+        ? []
+        : [-c / b]
+      : b * b - 4 * a * c < 0
+        ? []
+        : [
+            (-b + Math.sqrt(b * b - 4 * a * c)) / (2 * a),
+            (-b - Math.sqrt(b * b - 4 * a * c)) / (2 * a),
+          ];
+  return roots.filter((t) => t > 0 && t < 1);
+}
+
+/**
+ * The box around the curves themselves (not their control points), in the
+ * same page space as `PathBuilder`'s path.
+ */
+class CurveBounds implements CurveSink {
+  private left = Infinity;
+  private top = Infinity;
+  private right = -Infinity;
+  private bottom = -Infinity;
+  private current: P = { x: 0, y: 0 };
+  constructor(
+    private ox: number,
+    private oy: number,
+  ) {}
+  private add(point: P): void {
+    this.left = Math.min(this.left, point.x);
+    this.right = Math.max(this.right, point.x);
+    this.top = Math.min(this.top, point.y);
+    this.bottom = Math.max(this.bottom, point.y);
+  }
+  private place(x: number, y: number): P {
+    return { x: x + this.ox, y: -y + this.oy };
+  }
+  moveTo(x: number, y: number): void {
+    this.current = this.place(x, y);
+    this.add(this.current);
+  }
+  curveTo(x1: number, y1: number, x2: number, y2: number, x3: number, y3: number): void {
+    const p0 = this.current;
+    const p1 = this.place(x1, y1);
+    const p2 = this.place(x2, y2);
+    const p3 = this.place(x3, y3);
+    const at = (t: number): P => {
+      const s = 1 - t;
+      const w = [s * s * s, 3 * s * s * t, 3 * s * t * t, t * t * t];
+      return {
+        x: w[0]! * p0.x + w[1]! * p1.x + w[2]! * p2.x + w[3]! * p3.x,
+        y: w[0]! * p0.y + w[1]! * p1.y + w[2]! * p2.y + w[3]! * p3.y,
+      };
+    };
+    for (const t of [...turnsOf(p0.x, p1.x, p2.x, p3.x), ...turnsOf(p0.y, p1.y, p2.y, p3.y)]) {
+      this.add(at(t));
+    }
+    this.add(p3);
+    this.current = p3;
+  }
+  bounds(): Rect {
+    return {
+      x: this.left,
+      y: this.top,
+      width: this.right - this.left,
+      height: this.bottom - this.top,
+    };
   }
 }
 
@@ -100,7 +182,7 @@ function arcSegment(
   cy: number,
   rx: number,
   ry: number,
-  out: PathBuilder,
+  out: CurveSink,
   addMoveTo: boolean,
 ): void {
   const cosA = Math.cos(startAng);
@@ -146,7 +228,7 @@ function getArc(
   ry: number,
   cx: number,
   cy: number,
-  out: PathBuilder,
+  out: CurveSink,
   addMoveTo: boolean,
 ): void {
   let angleTodo = endAng - startAng;
@@ -172,7 +254,7 @@ function addCornerCurl(
   cy: number,
   alpha: number,
   alphaPrev: number,
-  out: PathBuilder,
+  out: CurveSink,
   addMoveTo: boolean,
 ): void {
   const startAngle = anglePrev + ANGLE_180 + alphaPrev;
@@ -187,7 +269,7 @@ function addFirstIntermediateCurl(
   alpha: number,
   cx: number,
   cy: number,
-  out: PathBuilder,
+  out: CurveSink,
 ): void {
   const backAngle = angleCur + ANGLE_180;
   arcSegment(backAngle + alpha, backAngle + alpha - ANGLE_30, cx, cy, rad, rad, out, false);
@@ -203,7 +285,7 @@ function intermediateCurlTemplate(angleCur: number, rad: number): P[] {
     ...arcSegmentToArray(backAngle + ANGLE_90, backAngle + ANGLE_180 - ANGLE_34, rad, rad),
   ];
 }
-function outputCurlTemplate(template: P[], x: number, y: number, out: PathBuilder): void {
+function outputCurlTemplate(template: P[], x: number, y: number, out: CurveSink): void {
   for (let i = 0; i + 2 < template.length; i += 3) {
     out.curveTo(
       template[i].x + x,
@@ -242,7 +324,7 @@ function cloudyPolygonImpl(
   isEllipse: boolean,
   intensity: number,
   lineWidth: number,
-  out: PathBuilder,
+  out: CurveSink,
 ): void {
   const polygon = removeZeroLengthSegments(vertices);
   ensurePositiveWinding(polygon);
@@ -369,7 +451,7 @@ function cloudyEllipseImpl(
   top: number,
   intensity: number,
   lineWidth: number,
-  out: PathBuilder,
+  out: CurveSink,
 ): void {
   const plainEllipse = () => {
     const rx = Math.abs(right - left) / 2;
@@ -490,9 +572,9 @@ function cloudyEllipseImpl(
 /* ── public API ────────────────────────────────────────────────────────────── */
 
 /**
- * How far (content units) a cloud's scallops reach out from the shape's box
- * on each side: the scallop radius plus half the stroke. This is the `/RD`
- * the engine stores.
+ * About how far (content units) a cloud's scallops reach out from the shape's
+ * box on each side: the scallop radius plus half the stroke. A hit band; what
+ * a cloud paints is `cloudyBounds` / `cloudyPolyBounds`.
  */
 export function cloudyBorderExtent(
   intensity: number,
@@ -505,34 +587,72 @@ export function cloudyBorderExtent(
   return cr + strokeWidth / 2;
 }
 
-/**
- * SVG path data for a cloudy polygon border, in absolute content coordinates.
- * A polygon's curls are centred on the vertex path and reach outward by the cloud
- * radius — the same rule PDFium's `GenerateCloudyPolygonPath` bakes into the
- * /AP, so the live preview and the saved appearance agree. The visual therefore
- * extends `cloudyBorderExtent` beyond the vertices (see `geomVisualBounds`).
- *
- * The steps: y-flip, close the ring, run the polygon core. Stroke it with round joins — the curl
- * tails reverse direction by design, and `scene()` sets `join: 'round'` to
- * match PDFium's `1 j`; a miter join turns every seam into a spike.
- */
-export function cloudyPolyPath(points: Point[], intensity: number, strokeWidth: number): string {
-  const out = new PathBuilder(0, 0);
-  // Page space is y-down; the PDFBox core runs y-up (PathBuilder flips back).
+/** The cloud of a closed polygon, its curves into `out`. */
+function polygonCloud(
+  points: Point[],
+  intensity: number,
+  strokeWidth: number,
+  out: CurveSink,
+): void {
+  // Page space is y-down; the PDFBox core runs y-up (the sink flips back).
   const ring = points.map((point) => ({ x: point.x, y: -point.y }));
   const first = ring[0];
   const last = ring[ring.length - 1];
   // The impl walks edges of a closed ring (first vertex repeated at the end).
   if (first && (first.x !== last.x || first.y !== last.y)) ring.push({ ...first });
   cloudyPolygonImpl(ring, false, intensity, strokeWidth, out);
+}
+
+/** The cloud of a square's (rect) or circle's (ellipse) `box`, its curves into `out`. */
+function boxCloud(
+  box: Rect,
+  ellipse: boolean,
+  intensity: number,
+  strokeWidth: number,
+  out: CurveSink,
+): void {
+  const right = box.width;
+  const bottom = box.height;
+  if (ellipse) {
+    cloudyEllipseImpl(0, -bottom, right, 0, intensity, strokeWidth, out);
+  } else {
+    cloudyPolygonImpl(
+      [
+        { x: 0, y: 0 },
+        { x: right, y: 0 },
+        { x: right, y: -bottom },
+        { x: 0, y: -bottom },
+        { x: 0, y: 0 },
+      ],
+      false,
+      intensity,
+      strokeWidth,
+      out,
+    );
+  }
+}
+
+/**
+ * SVG path data for a cloudy polygon border, in absolute content coordinates.
+ * A polygon's curls are centred on the vertex path and reach outward by the
+ * cloud radius, the same rule PDFium's `GenerateCloudyPolygonPath` bakes into
+ * the /AP, so the live drawing and the saved appearance agree.
+ *
+ * Stroke it with round joins: the curl tails reverse direction by design, and
+ * `scene()` sets `join: 'round'` to match PDFium's `1 j`; a miter join turns
+ * every seam into a spike.
+ */
+export function cloudyPolyPath(points: Point[], intensity: number, strokeWidth: number): string {
+  const out = new PathBuilder(0, 0);
+  polygonCloud(points, intensity, strokeWidth, out);
   out.close();
   return out.build();
 }
 
 /**
  * SVG path data for a cloudy square (rect) or circle (ellipse), in absolute
- * content coordinates. The scallops are generated on `box` and bulge out from
- * it by `cloudyBorderExtent`.
+ * content coordinates. The scallops are generated on `box` and bulge out
+ * from it.
  */
 export function cloudyPath(
   box: Rect,
@@ -541,27 +661,29 @@ export function cloudyPath(
   strokeWidth: number,
 ): string {
   const out = new PathBuilder(box.x, box.y);
-  const left = 0;
-  const top = 0;
-  const right = box.width;
-  const bottom = box.height;
-  if (ellipse) {
-    cloudyEllipseImpl(left, -bottom, right, -top, intensity, strokeWidth, out);
-  } else {
-    cloudyPolygonImpl(
-      [
-        { x: left, y: -top },
-        { x: right, y: -top },
-        { x: right, y: -bottom },
-        { x: left, y: -bottom },
-        { x: left, y: -top },
-      ],
-      false,
-      intensity,
-      strokeWidth,
-      out,
-    );
-  }
+  boxCloud(box, ellipse, intensity, strokeWidth, out);
   out.close();
   return out.build();
+}
+
+/**
+ * The box around what a cloudy polygon border paints: its curves, and half
+ * the stroke past them (round joins: the pen reaches that far every way).
+ */
+export function cloudyPolyBounds(points: Point[], intensity: number, strokeWidth: number): Rect {
+  const out = new CurveBounds(0, 0);
+  polygonCloud(points, intensity, strokeWidth, out);
+  return expandRect(out.bounds(), strokeWidth / 2);
+}
+
+/** The box around what a cloudy square's or circle's border paints, as `cloudyPolyBounds`. */
+export function cloudyBounds(
+  box: Rect,
+  ellipse: boolean,
+  intensity: number,
+  strokeWidth: number,
+): Rect {
+  const out = new CurveBounds(box.x, box.y);
+  boxCloud(box, ellipse, intensity, strokeWidth, out);
+  return expandRect(out.bounds(), strokeWidth / 2);
 }
