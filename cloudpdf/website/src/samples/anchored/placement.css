@@ -12,7 +12,7 @@
   --shadow: rgb(7 32 76 / 0.04);
 }
 
-/* The placement and the gap, above the pages */
+/* Where the card goes, above the pages */
 .toolbar {
   display: flex;
   flex-wrap: wrap;
@@ -62,6 +62,23 @@
   font-size: 13px;
   color: var(--ink);
   font-variant-numeric: tabular-nums;
+}
+
+.switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 550;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.switch input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--accent);
 }
 
 /* The card next to the match */

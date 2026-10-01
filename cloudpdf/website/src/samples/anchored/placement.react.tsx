@@ -5,7 +5,7 @@ import { Stage, stagePlugin } from '@embedpdf/react/stage';
 import { RenderLayer, renderPlugin } from '@embedpdf/react/render';
 import { SearchLayer, searchPlugin, useSearch, useSearchState } from '@embedpdf/react/search';
 import { Anchored } from '@embedpdf/react/anchored';
-import type { AnchoredPlacement } from '@embedpdf/react/anchored';
+import type { AnchoredPlacement, AnchoredSide } from '@embedpdf/react/anchored';
 import { cloudEngine } from '@cloudpdf/engine';
 
 import './placement.css';
@@ -15,18 +15,20 @@ const plugins = [stagePlugin(), renderPlugin(), searchPlugin()];
 
 const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
-const PLACEMENTS: AnchoredPlacement[] = ['top', 'right', 'bottom', 'left'];
+const SIDES: AnchoredSide[] = ['top', 'right', 'bottom', 'left'];
+const ALIGNS = ['start', 'center', 'end'] as const;
 
-// A card next to the active match, on the side you pick, `gap` pixels away.
-function MatchCard({ placement, gap }: { placement: AnchoredPlacement; gap: number }) {
+// A card next to the active match, where you put it, `gap` pixels away.
+function MatchCard(props: { placement: AnchoredPlacement; gap: number; pinned: boolean }) {
   const search = useSearch();
   const { activeHit, activeHitIndex, hitCount } = useSearchState();
 
   return (
     <Anchored
       anchor={activeHit && { page: activeHit.page, bounds: activeHit.bounds }}
-      placement={placement}
-      gap={gap}
+      placement={props.placement}
+      gap={props.gap}
+      pinned={props.pinned}
     >
       <div className="card">
         <span className="card-title">
@@ -58,8 +60,11 @@ function MatchCard({ placement, gap }: { placement: AnchoredPlacement; gap: numb
 
 function Pages() {
   const search = useSearch();
-  const [placement, setPlacement] = useState<AnchoredPlacement>('top');
+  const [side, setSide] = useState<AnchoredSide>('top');
+  const [align, setAlign] = useState<(typeof ALIGNS)[number]>('center');
   const [gap, setGap] = useState(8);
+  const [pinned, setPinned] = useState(false);
+  const placement: AnchoredPlacement = align === 'center' ? side : `${side}-${align}`;
 
   useEffect(() => {
     void search.search({ text: 'PDF' }).then(() => search.revealActiveHit());
@@ -68,17 +73,31 @@ function Pages() {
   return (
     <>
       <div className="toolbar">
-        <div className="segmented" role="radiogroup" aria-label="Placement">
-          {PLACEMENTS.map((side) => (
+        <div className="segmented" role="radiogroup" aria-label="Side">
+          {SIDES.map((each) => (
             <button
-              key={side}
+              key={each}
               type="button"
               role="radio"
-              aria-checked={side === placement}
+              aria-checked={each === side}
               className="segment"
-              onClick={() => setPlacement(side)}
+              onClick={() => setSide(each)}
             >
-              {side}
+              {each}
+            </button>
+          ))}
+        </div>
+        <div className="segmented" role="radiogroup" aria-label="Along the side">
+          {ALIGNS.map((each) => (
+            <button
+              key={each}
+              type="button"
+              role="radio"
+              aria-checked={each === align}
+              className="segment"
+              onClick={() => setAlign(each)}
+            >
+              {each}
             </button>
           ))}
         </div>
@@ -86,14 +105,25 @@ function Pages() {
           Gap {gap} px
           <input
             type="range"
-            min={0}
+            min={-24}
             max={32}
             value={gap}
             onChange={(event) => setGap(Number(event.target.value))}
           />
         </label>
+        <label className="switch">
+          <input
+            type="checkbox"
+            checked={pinned}
+            onChange={(event) => setPinned(event.target.checked)}
+          />
+          Pinned
+        </label>
       </div>
-      <Stage className="stage" overlay={<MatchCard placement={placement} gap={gap} />}>
+      <Stage
+        className="stage"
+        overlay={<MatchCard placement={placement} gap={gap} pinned={pinned} />}
+      >
         {() => (
           <>
             <RenderLayer />

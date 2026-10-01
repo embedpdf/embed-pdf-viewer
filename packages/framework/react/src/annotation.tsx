@@ -57,9 +57,12 @@ import {
 import { InteractionToken } from '@embedpdf/plugin-interaction/contract';
 import {
   attachRichTextEditor,
+  frameInPixels,
   mixAccent,
   paint,
   pickFile,
+  rasterInFrame,
+  type FrameFraction,
   type RichTextEditorBinding,
   type RichTextEditorHost,
 } from '@embedpdf/web';
@@ -77,7 +80,6 @@ export type {
   TextAlign,
   TextStyle,
 } from '@embedpdf/core-annotation';
-import { useOptionalProjectorBinding } from './anchored';
 import { devWarn } from './dev';
 import { usePageLayerFact } from './dev-registry';
 import { useAnnotationSettings } from './annotation-hooks';
@@ -108,35 +110,68 @@ export {
 
 // ── renderers ────────────────────────────────────────────────────────────────
 
+/** The box a renderer draws into: the size to draw at, how it's turned, and how it's scaled. */
+export interface AnnotationFrame {
+  /** Its width in pixels at the annotation's 100% size, before its turn: draw at this. */
+  width: number;
+  /** Its height in pixels at the annotation's 100% size, before its turn: draw at this. */
+  height: number;
+  /**
+   * How it's turned on screen, degrees clockwise: the page's turn and the
+   * annotation's own. 0 is upright; turn your content by `-rotation` to keep
+   * it upright.
+   */
+  rotation: number;
+  /**
+   * How much the layer scales what you draw, with the page: the zoom, or for
+   * an annotation that keeps its size on screen, the zoom up to 1.
+   */
+  scale: number;
+}
+
 /**
- * What a renderer's component gets: the annotation, where to draw it, and the
- * layer's own drawing of it to keep or wrap. The layer keeps handling the
- * pointer (select, move, resize) unless the renderer is `interactive`.
+ * What a renderer's component gets: the annotation, the frame to draw into,
+ * and the layer's own drawing of it to keep or wrap. The layer keeps handling
+ * the pointer (select, move, resize) unless the renderer is `interactive`.
  */
 export interface AnnotationRendererProps {
   /** The annotation, as `get()` returns it. */
   annotation: Annotation;
-  /** Where to draw it, in page coordinates. It follows a drag or a resize as it happens. */
-  box: Rect;
-  /** The page: `page.transform.pageToViewRect(box)` turns `box` into pixels. */
-  page: PageContextValue;
-  /** The layer's own drawing of it. Render it to keep the original look and add to it. */
+  /**
+   * The box you draw into. The layer places, turns and scales it like the
+   * annotation's own drawing, also during a drag, a resize or a turn. Fill it
+   * (`width: 100%; height: 100%`) and draw at the annotation's 100% size: your
+   * text and borders scale with the page.
+   */
+  frame: AnnotationFrame;
+  /** The layer's own drawing of it, filling the frame. Render it to keep the original look and add to it. */
   native: React.ReactNode;
-  /** The engine's picture of the annotation (`url`, `box`), or `null`. */
-  appearance: { url: string; box: Rect } | null;
+  /** The engine's picture of the annotation as an image (`url`), or `null`. `native` draws it in place. */
+  appearance: { url: string } | null;
   /** True while the pointer is over it. */
   hovered: boolean;
+  /** True while it's selected. */
+  selected: boolean;
   /** True when what you draw takes the pointer (see `interactive` on the renderer). */
   interactive: boolean;
 }
 
 /**
  * What a sibling plugin's renderer gets for the annotations its behavior owns
- * (the form plugin's fill controls): the props every renderer gets, and the
- * layer's projection of the annotation (`item`: its style, text and raster box).
+ * (the form plugin's fill controls). It places its own controls: `item` is the
+ * layer's projection of the annotation (its box, style, text and raster box,
+ * in page coordinates), and `page.transform.toPixels()` turns those into the
+ * layer's pixels.
  */
-export interface BehaviorRendererProps extends AnnotationRendererProps {
+export interface BehaviorRendererProps {
+  annotation: Annotation;
   item: RenderItem;
+  page: PageContextValue;
+  /** The layer's own drawing of it, where the layer draws it. */
+  native: React.ReactNode;
+  hovered: boolean;
+  selected: boolean;
+  interactive: boolean;
 }
 
 /** What an `interactive` function is asked: the annotation, and the active tool. */
@@ -167,6 +202,12 @@ export type AnnotationRenderer =
       for: (annotation: Annotation) => boolean;
       component: React.ComponentType<AnnotationRendererProps>;
       interactive?: boolean | ((context: AnnotationInteractiveContext) => boolean);
+      /**
+       * Scale what you draw with the page (the default): you draw at the
+       * annotation's 100% size. `false`: you draw at its size on screen, and
+       * size things yourself from `frame.scale`.
+       */
+      scale?: boolean;
     };
 
 /** What a handle component you draw yourself gets. */
@@ -209,6 +250,51 @@ function boxOf(rect: Rect, page: PageContextValue) {
   return { left: tl.x, top: tl.y, width: br.x - tl.x, height: br.y - tl.y };
 }
 
+/** How much the layer scales the look around it: 1 outside a look, or in one drawn at its size on screen. */
+const LookScaleContext = React.createContext(1);
+
+/**
+ * The box an annotation draws into, placed, sized and turned like the
+ * annotation (`item.frame`) inside the page layer, which the page itself
+ * turns. The annotation's own drawing and any look of yours draw inside it.
+ */
+function AnnotationFrame({
+  item,
+  page,
+  interactive = false,
+  inert = false,
+  children,
+}: {
+  item: RenderItem;
+  page: PageContextValue;
+  interactive?: boolean;
+  inert?: boolean;
+  children: React.ReactNode;
+}) {
+  const box = frameInPixels(item.frame, page.transform);
+  return (
+    <div
+      {...(inert ? INERT : {})}
+      style={{
+        position: 'absolute',
+        left: box.left,
+        top: box.top,
+        width: box.width,
+        height: box.height,
+        transform: box.transform,
+        transformOrigin: 'center',
+        // On the frame: a turned frame groups what is inside it, so blending on
+        // an inner element would stop blending with the page.
+        mixBlendMode: item.blend,
+        // An interactive renderer takes the pointer: the layer's own `none` ends here.
+        pointerEvents: interactive ? 'auto' : 'none',
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
 /** Map a core `Paint` to SVG presentation attributes — the whole framework-facing
  *  surface. Everything else about appearance is decided in the core's `scene`. */
 function paintAttrs(paint: Paint) {
@@ -236,34 +322,28 @@ function paintAttrs(paint: Paint) {
 /** How opaque a ghost paints: `--epdf-ghost-opacity` from CSS wins over the tool's own. */
 const ghostOpacity = (opacity: number): string => paint('ghost-opacity', opacity);
 
-function Shape({ item, page }: { item: RenderItem; page: PageContextValue }) {
+/** The scene, filling the item's frame: drawn upright in it, the frame turns it. */
+function Shape({ item }: { item: RenderItem }) {
   // Nothing to draw until the annotation has area (the 0×0 draft at mouse-down).
   if (item.box.width <= 0 || item.box.height <= 0) return null;
-  const { left, top, width, height } = boxOf(item.box, page);
   // The viewBox (content units) and the <svg> on-screen size must stay proportional
   // (scale == zoom). Clamping either — e.g. a `max(1px)` floor on the element while
   // the viewBox keeps shrinking — decouples them, so a sub-pixel box scales content
   // up by ~1/size and a cloudy border's scallops flood the stage. No clamps here.
   const vb = `${item.box.x} ${item.box.y} ${item.box.width} ${item.box.height}`;
-  // Box-family kinds (square/circle, caret) carry an unrotated `box` + a `rot`
-  // angle; rotate the whole <svg> about its centre. Vertex kinds (line/poly/ink)
-  // are already rotated in their geometry, so `rot` is advisory there — never
-  // re-applied.
-  const rot = item.geometry.kind === 'box' || item.geometry.kind === 'caret' ? (item.rot ?? 0) : 0;
   return (
     <svg
       viewBox={vb}
       style={{
         position: 'absolute',
-        left,
-        top,
-        width,
-        height,
+        left: 0,
+        top: 0,
+        width: '100%',
+        height: '100%',
         overflow: 'visible',
         pointerEvents: 'none',
         // A ghost is see-through as a whole, so its fill and stroke don't stack.
         ...(item.source === 'ghost' ? { opacity: ghostOpacity(item.ghostOpacity ?? 0.5) } : {}),
-        ...(rot ? { transform: `rotate(${rot}deg)`, transformOrigin: 'center' } : {}),
       }}
     >
       {sceneNodes(item)}
@@ -327,24 +407,8 @@ function sceneNodes(item: RenderItem): React.ReactNode[] {
   });
 }
 
-function BakedImage({
-  box,
-  url,
-  page,
-  blend,
-  rot,
-}: {
-  box: Rect;
-  url: string;
-  page: PageContextValue;
-  blend?: Paint['blend'];
-  /** The rotation (deg, CW) the engine stripped from this raster
-   *  (`RenderItem.apRot`) — re-applied here as a view transform, so a live
-   *  rotate gesture spins the bitmap with zero engine re-renders. Unset for
-   *  rasters that already contain their rotation (vertex kinds). */
-  rot?: number;
-}) {
-  const frame = boxOf(box, page);
+/** The engine's raster inside the item's frame, where `item.raster` puts it, at any frame size. */
+function BakedImage({ url, box }: { url: string; box: FrameFraction }) {
   return (
     <img
       src={url}
@@ -352,21 +416,21 @@ function BakedImage({
       draggable={false}
       style={{
         position: 'absolute',
-        left: frame.left,
-        top: frame.top,
-        width: frame.width,
-        height: frame.height,
+        left: box.left,
+        top: box.top,
+        width: box.width,
+        height: box.height,
         // The AP box is sized in content units; a global `img { max-width: 100% }`
         // reset would otherwise clamp it to the containing block and distort the
         // aspect. This bites specifically when the box is wider than that block —
         // a landscape stamp whose unrotated box overhangs a view-rotated (portrait)
-        // page — so honour the explicit size and let `rot` place it.
+        // page — so honour the explicit size.
         maxWidth: 'none',
         maxHeight: 'none',
         pointerEvents: 'none',
-        mixBlendMode: blend,
-        // Same CW convention as the free-text element: rotate about the centre.
-        ...(rot ? { transform: `rotate(${rot}deg)`, transformOrigin: 'center' } : {}),
+        // The turn the engine took out of the raster, put back about its middle.
+        transform: box.transform,
+        transformOrigin: 'center',
       }}
     />
   );
@@ -898,7 +962,8 @@ const NO_STYLE: React.CSSProperties = {};
  * and the format shortcuts. The formatting calls (`text.toggleFormat`,
  * `selection.update`) work on it as they do on the built-in one.
  */
-export function useRichTextEditor(annotation: Annotation, page: PageContextValue): RichTextEditor {
+export function useRichTextEditor(annotation: Annotation): RichTextEditor {
+  const page = usePage();
   const zoom = page.transform.zoom;
   const rotation = page.transform.rotation;
   const key = annotationKey(annotation.ref);
@@ -910,10 +975,13 @@ export function useRichTextEditor(annotation: Annotation, page: PageContextValue
         .find((text) => text.ref !== null && annotationKey(text.ref) === key) ?? null,
     null,
   );
+  // Pixels per point where the element is: inside a scaled look, at the
+  // annotation's 100% size; the look's scale does the rest.
+  const lookScale = React.useContext(LookScaleContext);
   const scale =
-    item && item.box.width > 0
+    (item && item.box.width > 0
       ? boxOf(item.box, page).width / item.box.width
-      : page.transform.viewScale;
+      : page.transform.viewScale) / lookScale;
   const ref = useTextBoxEditor(item, scale);
   // While typing, the element takes the pointer (the caret, a drag over words).
   const style = React.useMemo<React.CSSProperties>(
@@ -1106,85 +1174,109 @@ export function AnnotationLayer({ renderers, components }: AnnotationLayerProps 
   return (
     <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
       {items.map((item) => {
-        // The default look: the engine's baked raster (blitted into the live
-        // AP box, which follows a move) or the vector scene.
+        // The default look, inside the item's frame: the engine's raster where
+        // the core places it (following a move as it happens), or the scene.
         const baked = urls[item.id];
         const native: React.ReactNode =
           item.source === 'baked' ? (
-            baked ? (
-              <BakedImage
-                box={item.apBox ?? baked.box}
-                url={baked.url}
-                page={page}
-                blend={item.blend}
-                rot={item.apRot}
-              />
+            baked && item.raster ? (
+              <BakedImage url={baked.url} box={rasterInFrame(item.raster, item.frame)} />
             ) : null
           ) : (
-            <Shape item={item} page={page} /> // shapes, cloudy, markup: all painted via scene()
+            // shapes, cloudy, markup: all painted via scene()
+            <Shape item={item} />
           );
+        const framed = (
+          content: React.ReactNode,
+          options?: { interactive?: boolean; inert?: boolean },
+        ) => (
+          <AnnotationFrame key={item.id} item={item} page={page} {...options}>
+            {content}
+          </AnnotationFrame>
+        );
         const annotation = item.annotation;
-        if (!annotation) return <React.Fragment key={item.id}>{native}</React.Fragment>;
-        const props: AnnotationRendererProps = {
-          annotation,
-          box: item.box,
-          page,
-          native,
-          appearance: baked ?? null,
-          hovered: item.hovered ?? false,
-          interactive: false,
+        if (!annotation) return framed(native);
+        /** Your look in the frame: drawn at the annotation's 100% size and scaled with the page, unless it opts out. */
+        const look = (
+          entry: Extract<AnnotationRenderer, { for: unknown }>,
+          interactive: boolean,
+        ): React.ReactNode => {
+          const pixels = frameInPixels(item.frame, page.transform);
+          const scaled = entry.scale !== false;
+          const Look = entry.component;
+          const drawn = (
+            <Look
+              annotation={annotation}
+              frame={{
+                width: scaled ? pixels.design.width : pixels.width,
+                height: scaled ? pixels.design.height : pixels.height,
+                rotation: pixels.rotationOnScreen,
+                scale: pixels.scale,
+              }}
+              native={native}
+              appearance={baked ? { url: baked.url } : null}
+              hovered={item.hovered ?? false}
+              selected={item.selected}
+              interactive={interactive}
+            />
+          );
+          if (!scaled) return drawn;
+          return (
+            <div
+              style={{
+                position: 'absolute',
+                left: 0,
+                top: 0,
+                width: pixels.design.width,
+                height: pixels.design.height,
+                transform: `scale(${pixels.scale})`,
+                transformOrigin: '0 0',
+              }}
+            >
+              <LookScaleContext.Provider value={pixels.scale}>{drawn}</LookScaleContext.Provider>
+            </div>
+          );
         };
 
         // Ownership beats looks: an engaged behavior's renderer is
         // authoritative (form fill controls own their DOM); `for` rules apply
         // only to what the layer owns, and draw without the pointer.
         const behavior = anno.getBehaviorFor(annotation);
-        let out: React.ReactNode;
         if (behavior) {
           const entry = renderers?.find(
             (renderer) => rendererBehaviorId(anno, renderer) === behavior.id,
           );
           if (entry && 'behavior' in entry) {
+            // Its controls place themselves in the layer; the native drawing keeps its frame.
             const Owner = entry.component;
-            out = <Owner {...props} item={item} interactive />;
-          } else if (entry) {
-            // An interactive renderer takes the pointer: the layer's own `none` ends here.
-            const Owner = entry.component;
-            out = (
-              <div style={{ pointerEvents: 'auto' }}>
-                <Owner {...props} interactive />
-              </div>
-            );
-          } else {
-            // Engaged with no renderer wired: the behavior's plugin owns the
-            // input (a link's anchor takes the click), and the annotation
-            // keeps its own look.
-            out = (
-              <div {...INERT} style={{ pointerEvents: 'none' }}>
-                {native}
-              </div>
+            return (
+              <Owner
+                key={item.id}
+                annotation={annotation}
+                item={item}
+                page={page}
+                native={framed(native)}
+                hovered={item.hovered ?? false}
+                selected={item.selected}
+                interactive
+              />
             );
           }
-        } else {
-          const entry = renderers?.find(
-            (renderer): renderer is Extract<AnnotationRenderer, { for: unknown }> =>
-              'for' in renderer && renderer.for(annotation),
-          );
-          if (entry) {
-            const Look = entry.component;
-            // While its text box is typed in, the renderer's editor
-            // (`useRichTextEditor`) takes the keys: an inert subtree can't.
-            const typing = editingKey !== null && annotationKey(annotation.ref) === editingKey;
-            out = (
-              <div {...(typing ? {} : INERT)} style={{ pointerEvents: 'none' }}>
-                <Look {...props} />
-              </div>
-            );
-          } else {
-            out = native;
-          }
+          if (entry) return framed(look(entry, true), { interactive: true });
+          // Engaged with no renderer wired: the behavior's plugin owns the
+          // input (a link's anchor takes the click), and the annotation keeps
+          // its own look.
+          return framed(native, { inert: true });
         }
-        return <React.Fragment key={item.id}>{out}</React.Fragment>;
+        const entry = renderers?.find(
+          (renderer): renderer is Extract<AnnotationRenderer, { for: unknown }> =>
+            'for' in renderer && renderer.for(annotation),
+        );
+        if (!entry) return framed(native);
+        // While its text box is typed in, the renderer's editor
+        // (`useRichTextEditor`) takes the keys: an inert subtree can't.
+        const typing = editingKey !== null && annotationKey(annotation.ref) === editingKey;
+        return framed(look(entry, false), { inert: !typing });
       })}
       {texts.map((text) =>
         // A text box your renderer draws is edited there (`useRichTextEditor`).
@@ -1315,32 +1407,25 @@ export function useAnnotationProperties(toolId?: string): AnnotationProperties {
 /**
  * An anchor for `<Anchored>` that keeps a card or a badge attached to one
  * annotation: its page and the box around what it shows, following a move
- * as it happens. `null` for `null`, or an annotation that isn't here.
+ * as it happens. `null` for `null`, or an annotation that isn't here. The
+ * component re-renders when the annotation moves, not while people scroll or
+ * zoom: a note that keeps its size on screen hands `<Anchored>` its
+ * `boundsIn`.
  */
 export function useAnnotationAnchor(ref: AnnotationRef | null): AnnotationAnchor | null {
   const key = ref ? annotationKey(ref) : null;
   // Keyed by value, so an inline ref never subscribes again.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const stable = React.useMemo(() => ref, [key]);
-  // Under a page surface, a note that keeps its size on screen anchors where
-  // the page shows it; reading the binding follows the view.
-  const projector = useOptionalProjectorBinding()?.projector ?? null;
   return useOptionalSelector(
     AnnotationHostToken,
-    (annotation) => {
-      if (!stable) return null;
-      const view = projector?.viewEnv(stable.page);
-      return annotation.getAnnotationAnchor(
-        stable,
-        view ? { zoom: view.zoom, rotation: view.rotation } : undefined,
-      );
-    },
+    (annotation) => (stable ? annotation.getAnnotationAnchor(stable) : null),
     null,
     sameAnnotationAnchor,
   );
 }
 
-/** The same anchor: page and box. */
+/** The same anchor: page, box, and how it follows the view. */
 const sameAnnotationAnchor = (
   left: AnnotationAnchor | null,
   right: AnnotationAnchor | null,
@@ -1352,7 +1437,8 @@ const sameAnnotationAnchor = (
     left.bounds.x === right.bounds.x &&
     left.bounds.y === right.bounds.y &&
     left.bounds.width === right.bounds.width &&
-    left.bounds.height === right.bounds.height);
+    left.bounds.height === right.bounds.height &&
+    left.boundsIn === right.boundsIn);
 
 // ── Comments (the conversation plane) ────────────────────────────────────────
 

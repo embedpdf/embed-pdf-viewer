@@ -1,17 +1,14 @@
 <script lang="ts">
   import { useRichTextEditor, type AnnotationRendererProps } from '@embedpdf/svelte/annotation';
 
-  let { annotation, box, page }: AnnotationRendererProps = $props();
+  let { annotation }: AnnotationRendererProps = $props();
 
-  const editor = useRichTextEditor(
-    () => annotation,
-    () => page,
-  );
-  const rect = $derived(page.transform.pageToViewRect(box));
+  const editor = useRichTextEditor(() => annotation);
 </script>
 
+<!-- The element fills its frame (`width` and `height` 100% in your CSS). -->
 <div
   {@attach editor.attach}
   class={['text-box', editor.editing && 'editing']}
-  style="position: absolute; left: {rect.x}px; top: {rect.y}px; width: {rect.width}px; height: {rect.height}px; {editor.style}"
+  style={editor.style}
 ></div>

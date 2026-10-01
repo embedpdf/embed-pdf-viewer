@@ -261,8 +261,8 @@ function textBoxPainted(shape: TextBoxShape, { strokeWidth }: Stroke): PaintedPi
 
 /**
  * What the shape draws, as the AP generator bakes it: a callout's line and
- * the arrow at its tip, then the box's border inset half the stroke, as the
- * page shows it. The line's end reaches under the border by half the stroke
+ * the arrow at its tip, then the box's border inset half the stroke. The line's
+ * end reaches under the border by half the stroke
  * (the generator's `adjusted_conn`), so the two meet without a gap. The text
  * itself is the framework's editable element, not part of the scene.
  */
@@ -285,18 +285,19 @@ function textBoxScene(shape: TextBoxShape, { strokeWidth }: Stroke): RenderNode[
       nodes.push(...endingNodes(line[0], tipAngle(line), shape.lineEnding, strokeWidth));
   }
   const border = insetRect(shape.box, strokeWidth / 2);
+  // A plain box is drawn upright: the frame it is painted in turns it
+  // (`RenderItem.frame`). A callout's frame stays upright around its leader,
+  // so its box is drawn turned, where the page shows it.
+  if (!line || !shape.rotation) {
+    nodes.push({ kind: 'rect', rect: border });
+    return nodes;
+  }
   const middle = rectCenter(shape.box);
-  nodes.push(
-    shape.rotation
-      ? {
-          kind: 'poly',
-          points: rectCornerPoints(border).map((corner) =>
-            rotatePoint(corner, middle, shape.rotation),
-          ),
-          closed: true,
-        }
-      : { kind: 'rect', rect: border },
-  );
+  nodes.push({
+    kind: 'poly',
+    points: rectCornerPoints(border).map((corner) => rotatePoint(corner, middle, shape.rotation)),
+    closed: true,
+  });
   return nodes;
 }
 

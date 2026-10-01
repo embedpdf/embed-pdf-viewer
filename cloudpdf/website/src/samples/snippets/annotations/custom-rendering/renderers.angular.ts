@@ -10,13 +10,12 @@ import {
   imports: [EpdfAnnotationLayer, EpdfAnnotationTemplate],
   template: `
     <epdf-annotation-layer>
-      <ng-template [epdfAnnotation]="isApproved" let-annotation>
+      <ng-template [epdfAnnotation]="isNote" let-annotation>
         <!-- how this annotation looks: see below -->
       </ng-template>
     </epdf-annotation-layer>
   `,
 })
 export class Annotations {
-  protected readonly isApproved = (annotation: Annotation) =>
-    annotation.subtype === 'stamp' && annotation.name === 'Approved';
+  protected readonly isNote = (annotation: Annotation) => annotation.subtype === 'text';
 }

@@ -1,11 +1,8 @@
 import { AnnotationLayer, type AnnotationRenderer } from '@embedpdf/react/annotation';
-import { ApprovedBadge } from './approved-badge';
+import { CommentBubble } from './comment-bubble';
 
 const renderers: AnnotationRenderer[] = [
-  {
-    for: (annotation) => annotation.subtype === 'stamp' && annotation.name === 'Approved',
-    component: ApprovedBadge,
-  },
+  { for: (annotation) => annotation.subtype === 'text', component: CommentBubble },
 ];
 
 export const Annotations = () => <AnnotationLayer renderers={renderers} />;

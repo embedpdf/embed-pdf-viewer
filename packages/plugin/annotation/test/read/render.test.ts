@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { annotationHarness, PAGE } from '../harness';
+import { annotationHarness, PAGE, type FileAnnotation } from '../harness';
 import { annotationOfTool, iconPlaceAt } from '../../src/write/placement';
 
 describe('the tool ghost', () => {
@@ -132,5 +132,55 @@ describe('a click tool’s ghost', () => {
     harness.capability.clearPlacementPreview();
     harness.capability.clearGhost();
     expect(harness.capability.listPageItems(PAGE)).toEqual([]);
+  });
+});
+
+describe('the frame a painter draws into', () => {
+  const note = {
+    ref: { kind: 'objectNumber', page: PAGE, objectNumber: 70 },
+    page: PAGE,
+    index: 0,
+    subtype: 'text',
+    rect: { left: 100, bottom: 600, right: 124, top: 624 },
+    color: '#ffff00',
+    opacity: 1,
+    icon: 'note',
+    state: null,
+    stateModel: null,
+    reply: null,
+    popup: null,
+    groupId: null,
+    userId: null,
+    createdBy: null,
+    modifiedBy: null,
+    importedBy: null,
+    actions: null,
+    contents: '',
+    author: 'A',
+    name: 'n70',
+  } as unknown as FileAnnotation;
+  const frameAt = (harness: ReturnType<typeof annotationHarness>, zoom: number) =>
+    harness.capability.listPageItems(PAGE, { zoom, rotation: 0 }).find((item) => item.ref)!.frame;
+
+  it('a note keeps its size on screen: zoomed in, the page draws it smaller', async () => {
+    const harness = annotationHarness();
+    await harness.load([note]);
+    expect(frameAt(harness, 2).scale).toBe(0.5);
+    // Below 100% it shrinks with the page, so its frame is its own size there.
+    expect(frameAt(harness, 0.5).scale).toBe(1);
+  });
+
+  it('everything else is drawn at its own size on the page', async () => {
+    const harness = annotationHarness();
+    const square = {
+      ...note,
+      subtype: 'square',
+      rect: { left: 100, bottom: 700, right: 180, top: 760 },
+      box: { left: 100, bottom: 700, right: 180, top: 760 },
+      color: '#000000',
+      strokeWidth: 2,
+    } as unknown as FileAnnotation;
+    await harness.load([square]);
+    expect(frameAt(harness, 2).scale).toBe(1);
   });
 });

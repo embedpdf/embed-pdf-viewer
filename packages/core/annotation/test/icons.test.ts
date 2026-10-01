@@ -7,6 +7,7 @@ import { describe, expect, it } from 'vitest';
 import { contrastOf, fileAttachmentIconScene, noteIconScene } from '../src/icons';
 import { scene } from '../src/scene';
 import type { RenderItem, SceneNode, Style } from '../src/types';
+import { placed } from '../src/frame';
 
 const BOX = { x: 100, y: 200, width: 20, height: 20 };
 
@@ -99,7 +100,7 @@ describe('icons', () => {
   });
 
   it("a note's live drawing is its icon", () => {
-    const item: RenderItem = {
+    const item: RenderItem = placed({
       id: 'obj:1',
       ref: null,
       subtype: 'text',
@@ -109,7 +110,7 @@ describe('icons', () => {
       icon: 'help',
       source: 'vector',
       selected: false,
-    };
+    });
     expect(scene(item)).toEqual(noteIconScene('help', BOX, STYLE));
   });
 });

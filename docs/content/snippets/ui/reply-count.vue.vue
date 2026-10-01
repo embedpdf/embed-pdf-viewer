@@ -9,7 +9,7 @@ const thread = useCommentThread(() => props.note.ref);
 </script>
 
 <template>
-  <Anchored :anchor="anchor" placement="right" :gap="4">
+  <Anchored :anchor="anchor" placement="right" :gap="4" pinned>
     <span class="badge">{{ thread?.replies.length ?? 0 }}</span>
   </Anchored>
 </template>

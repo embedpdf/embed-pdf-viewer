@@ -7,6 +7,7 @@ import { DRAWN_FLAGS } from '../src/flags';
 import { layoutRedactLabel, scene } from '../src/scene';
 import type { ModelAnnotation, Model, RenderItem, TextStyle } from '../src/types';
 import { initialModel } from '../src/update';
+import { placed } from '../src/frame';
 
 const REGION = { x: 10, y: 10, width: 200, height: 60 };
 
@@ -17,8 +18,8 @@ const LABEL_STYLE: TextStyle = {
   textAlign: 'left',
 };
 
-function redactItem(overrides: Partial<RenderItem> = {}): RenderItem {
-  return {
+function redactItem(overrides: Partial<Omit<RenderItem, 'frame' | 'raster'>> = {}): RenderItem {
+  return placed({
     id: 'obj:1',
     ref: null,
     subtype: 'redact',
@@ -38,7 +39,7 @@ function redactItem(overrides: Partial<RenderItem> = {}): RenderItem {
     source: 'vector',
     selected: false,
     ...overrides,
-  };
+  });
 }
 
 describe('hover model state', () => {

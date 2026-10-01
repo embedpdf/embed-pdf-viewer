@@ -71,12 +71,12 @@
   color: var(--danger);
 }
 
-/* The pages: as many cards in a row as fit */
-.grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-  align-items: end;
+/* The pages in one row, scrolling sideways when they don't fit */
+.pages {
+  display: flex;
+  align-items: flex-end;
   gap: 12px;
+  overflow-x: auto;
   margin: 0;
   padding: 16px;
   list-style: none;
@@ -88,12 +88,17 @@
     0 18px 40px -28px rgb(7 32 76 / 0.28);
 }
 
+/* A card is as wide as its page: a page turned a quarter makes it wider */
+.pages > li {
+  flex: none;
+}
+
 .card {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 8px;
-  width: 100%;
+  min-width: 140px;
   font: inherit;
   background: transparent;
   border: 2px solid transparent;

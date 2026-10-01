@@ -1332,3 +1332,44 @@ describe.each(['area', 'perimeter'])('%s scale resolution', (tool) => {
     expect(harness.model().draft).toBeNull();
   });
 });
+
+describe('where UI attaches to an annotation', () => {
+  const note = (objectNumber: number): FileAnnotation =>
+    ({
+      ...base(objectNumber),
+      subtype: 'text',
+      rect: { left: 100, bottom: 700, right: 120, top: 720 },
+      color: '#ffff00',
+      opacity: 1,
+      icon: 'note',
+      state: null,
+      stateModel: null,
+      reply: null,
+      popup: null,
+      groupId: null,
+      userId: null,
+      createdBy: null,
+      modifiedBy: null,
+      importedBy: null,
+      actions: null,
+    }) as unknown as FileAnnotation;
+
+  it('a note that keeps its size on screen says where it is in any view; a square needs no view', async () => {
+    const harness = createHarness();
+    await harness.load([note(70), hydrationSquare(80)]);
+    const anchor = harness.capability.getAnnotationAnchor(ref(70))!;
+    // At twice the zoom it takes half the page, so it shows at the same size.
+    const atTwice = anchor.boundsIn!({ zoom: 2, rotation: 0 })!;
+    expect(atTwice.width).toBeCloseTo(anchor.bounds.width / 2);
+    expect(atTwice).toMatchObject({ x: anchor.bounds.x, y: anchor.bounds.y });
+    expect(harness.capability.getAnnotationAnchor(ref(80))!.boundsIn).toBeUndefined();
+  });
+
+  it('is the same object until the annotation itself moves, so UI on it doesn’t render again', async () => {
+    const harness = createHarness();
+    await harness.load([note(70), hydrationSquare(80)]);
+    const first = harness.capability.getAnnotationAnchor(ref(70));
+    harness.capability.selection.set([ref(80)]); // the model changes, the note doesn't
+    expect(harness.capability.getAnnotationAnchor(ref(70))).toBe(first);
+  });
+});

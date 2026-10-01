@@ -32,7 +32,8 @@ They hide while people drag, and show when the selection settles. What's inside 
 
 ## Attach to an annotation
 
-`useAnnotationAnchor(ref)` gives you an annotation's anchor, and follows it while it's moved:
+`useAnnotationAnchor(ref)` gives you an annotation's anchor, and follows it while it's moved. A count
+of replies next to a note stays put, so it's `pinned`:
 
 <Snippet name="ui/reply-count" />
 
@@ -53,15 +54,22 @@ Pass the ref as a function, and the anchor and the thread follow the `note` inpu
 | Prop        | What it is                                                           | Default  |
 | :---------- | :------------------------------------------------------------------- | :------- |
 | `anchor`    | `{ page, bounds }`, or `null` to hide. `avoid` adds points to keep clear of, such as a rotation handle | required |
-| `placement` | `'top'`, `'bottom'`, `'left'` or `'right'` of the box                | `'top'`  |
-| `gap`       | The space between the box and your UI, in pixels                     | `8`      |
+| `placement` | `'top'`, `'bottom'`, `'left'` or `'right'` of the box, centred on that side, or lined up with its start or end: `'top-start'`, `'top-end'`, `'right-start'` and so on | `'top'`  |
+| `gap`       | The space between the box and your UI, in pixels. Negative overlaps the box, for a badge on a corner | `8`      |
+| `pinned`    | Stays exactly where `placement` puts it: no flipping, no moving to stay in view | `false`  |
 
 When there's no room on the side you chose, it flips to the other side, and it stays inside the view.
-Scroll the match close to an edge to see it:
+That's right for a menu. A badge or a status belongs on its spot, so pin it: it stays there and
+scrolls away with its box. Scroll the match close to an edge, then turn on **Pinned**:
 
 <Example name="anchored/placement" />
 
 ## Good to know
+
+### Only what's on screen costs anything
+
+Anchored UI on a page that isn't on screen isn't drawn, and doesn't follow the scroll or the zoom.
+Mount one for every annotation that needs it; a document with hundreds costs only the ones in view.
 
 ### Clicks stay in your menu
 

@@ -96,6 +96,7 @@ import {
   textBoxes,
 } from '../src/view';
 import { groupOf, irtOf, kindOf, shapeOf, styleOf, textOf, withShape } from '../src/record';
+import { placed } from '../src/frame';
 
 const PON = 1;
 const PAGE = toPageRef(PON);
@@ -1377,25 +1378,26 @@ describe('annotation-core', () => {
       kind: 'quads',
       quadPoints: [quadFromRect({ x: 0, y: 0, width: 100, height: 12 })],
     };
-    const mk = (subtype: string): RenderItem => ({
-      id: 'x',
-      ref: null,
-      subtype,
-      geometry: quads,
-      box: { x: 0, y: 0, width: 100, height: 12 },
-      style: {
-        color: '#ffd400',
-        interiorColor: '#ffd400',
-        strokeWidth: 0,
-        opacity: 1,
-        blendMode: subtype === 'highlight' ? 'multiply' : 'normal',
-        borderStyle: 'solid',
-        dashArray: null,
-        cloudyIntensity: null,
-      },
-      source: 'vector',
-      selected: false,
-    });
+    const mk = (subtype: string): RenderItem =>
+      placed({
+        id: 'x',
+        ref: null,
+        subtype,
+        geometry: quads,
+        box: { x: 0, y: 0, width: 100, height: 12 },
+        style: {
+          color: '#ffd400',
+          interiorColor: '#ffd400',
+          strokeWidth: 0,
+          opacity: 1,
+          blendMode: subtype === 'highlight' ? 'multiply' : 'normal',
+          borderStyle: 'solid',
+          dashArray: null,
+          cloudyIntensity: null,
+        },
+        source: 'vector',
+        selected: false,
+      });
     const hi = scene(mk('highlight'));
     expect(hi[0]).toMatchObject({
       kind: 'poly',
@@ -1414,7 +1416,7 @@ describe('annotation-core', () => {
   });
 
   it('scene() paints a shape uniformly: a closed node carries fill + stroke + width', () => {
-    const item: RenderItem = {
+    const item: RenderItem = placed({
       id: 's',
       ref: null,
       subtype: 'square',
@@ -1437,7 +1439,7 @@ describe('annotation-core', () => {
       },
       source: 'vector',
       selected: false,
-    };
+    });
     expect(scene(item)[0]).toMatchObject({
       kind: 'rect',
       paint: { fill: '#eeeeee', stroke: '#000000', width: 3 },
@@ -1459,7 +1461,7 @@ describe('annotation-core', () => {
       dashArray: null,
       cloudyIntensity: 2,
     };
-    const polygon: RenderItem = {
+    const polygon: RenderItem = placed({
       id: 'p',
       ref: null,
       subtype: 'polygon',
@@ -1477,13 +1479,13 @@ describe('annotation-core', () => {
       style: cloudyStyle,
       source: 'vector',
       selected: false,
-    };
+    });
     const polyNodes = scene(polygon);
     expect(polyNodes).toHaveLength(1); // one scalloped ring replaces the plain poly
     expect(polyNodes[0].kind).toBe('path');
     expect(polyNodes[0].paint.join).toBe('round');
 
-    const square: RenderItem = {
+    const square: RenderItem = placed({
       id: 's',
       ref: null,
       subtype: 'square',
@@ -1497,7 +1499,7 @@ describe('annotation-core', () => {
       style: cloudyStyle,
       source: 'vector',
       selected: false,
-    };
+    });
     const sqNodes = scene(square);
     expect(sqNodes[0].kind).toBe('path');
     expect(sqNodes[0].paint.join).toBe('round');
@@ -2020,10 +2022,9 @@ describe('annotation-core callout', () => {
     expect(geomScene(plain, { strokeWidth: 0 })).toEqual([
       { kind: 'rect', rect: { x: 100, y: 100, width: 200, height: 60 } },
     ]);
-    // A tilted box draws as its rotated corner ring.
+    // A tilted plain box is drawn upright: the frame it is painted in turns it.
     const tilted = geomScene({ ...plain, rotation: 90 }, { strokeWidth: 2 });
-    expect(tilted).toHaveLength(1);
-    expect(tilted[0]!.kind).toBe('poly');
+    expect(tilted).toEqual([{ kind: 'rect', rect: { x: 101, y: 101, width: 198, height: 58 } }]);
     // A callout: leader + arrow first, then the same box.
     const callout = geomScene(calloutGeom(), { strokeWidth: 2 });
     expect(callout[0]).toMatchObject({ kind: 'poly', closed: false });
@@ -3107,25 +3108,26 @@ describe('annotation-core — join-aware stroke bounds', () => {
   });
 
   it('scene paint: only ink rounds its joins; shapes and polys stay sharp (miter)', () => {
-    const mk = (subtype: KindName, geometry: Shape): RenderItem => ({
-      id: 'x',
-      ref: null,
-      subtype,
-      geometry,
-      box: geomVisualBounds(geometry, { strokeWidth: 4 }),
-      style: {
-        color: '#000000',
-        interiorColor: null,
-        strokeWidth: 4,
-        opacity: 1,
-        blendMode: 'normal',
-        borderStyle: 'solid',
-        dashArray: null,
-        cloudyIntensity: null,
-      },
-      source: 'vector',
-      selected: false,
-    });
+    const mk = (subtype: KindName, geometry: Shape): RenderItem =>
+      placed({
+        id: 'x',
+        ref: null,
+        subtype,
+        geometry,
+        box: geomVisualBounds(geometry, { strokeWidth: 4 }),
+        style: {
+          color: '#000000',
+          interiorColor: null,
+          strokeWidth: 4,
+          opacity: 1,
+          blendMode: 'normal',
+          borderStyle: 'solid',
+          dashArray: null,
+          cloudyIntensity: null,
+        },
+        source: 'vector',
+        selected: false,
+      });
     const square = mk('square', {
       kind: 'box',
       box: { x: 0, y: 0, width: 50, height: 40 },

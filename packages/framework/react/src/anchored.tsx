@@ -11,8 +11,10 @@
  *   - surfaces (<Stage>, <PageView>) provide a {@link ProjectorBinding}:
  *     the snapshot plus react's way of knowing when it changed.
  *   - <Anchored> renders at the projected position, flips to the other
- *     side and stays inside the view once it knows its size, isolates
- *     pointer events, and portals when the space demands it.
+ *     side and stays inside the view once it knows its size (unless
+ *     pinned), isolates pointer events, and portals when the space demands
+ *     it. On a page that isn't shown it renders nothing and doesn't follow
+ *     the camera at all (see {@link ShownPages}).
  *
  * The scheduling law (this is what keeps menus glued to the content): a
  * state-driven projection change (the Stage camera) reaches consumers as a
@@ -35,7 +37,13 @@ import {
   type ViewProjector,
 } from '@embedpdf/web';
 
-export type { AnchoredPlacement, AnchorTarget, ViewProjector } from '@embedpdf/web';
+export type {
+  AnchoredPlacement,
+  AnchoredSide,
+  AnchorTarget,
+  PageViewEnv,
+  ViewProjector,
+} from '@embedpdf/web';
 
 /**
  * What a page surface provides via context: the pure projection snapshot,
@@ -62,6 +70,19 @@ const ProjectorContext = createContext<ProjectorBinding | null>(null);
 /** Installed by page surfaces (<Stage>, <PageView>) — not by app code. */
 export const ProjectorProvider = ProjectorContext.Provider;
 
+/**
+ * The pages a surface shows right now, by object number. It is a value of its
+ * own, next to the projection, because it changes only when a page comes on
+ * screen or leaves it: anchored UI on other pages reads only this, so it
+ * isn't rendered again on every camera frame.
+ */
+export type ShownPages = ReadonlySet<number>;
+
+const ShownPagesContext = createContext<ShownPages | null>(null);
+
+/** Installed by page surfaces (<Stage>, <PageView>) — not by app code. */
+export const ShownPagesProvider = ShownPagesContext.Provider;
+
 /** The surface's projector binding, or null outside any page surface — for
  *  chrome that degrades (and warns) instead of throwing. */
 export function useOptionalProjectorBinding(): ProjectorBinding | null {
@@ -87,10 +108,22 @@ export interface AnchoredProps {
    * `bounds` (a search match with no geometry), hides it.
    */
   anchor: (Omit<AnchorTarget, 'bounds'> & { bounds?: AnchoredRect }) | null;
-  /** Which side of the box to sit on when there's room. Default 'top'. */
+  /**
+   * Where to sit: a side of the box, centred, or lined up with the side's
+   * start or end (`'top-end'`). Default 'top'.
+   */
   placement?: AnchoredPlacement;
-  /** Gap in screen px between the box and the content, and between the content and the view's edge. Default 8. */
+  /**
+   * Gap in screen px between the box and the content, and between the content
+   * and the view's edge. Negative overlaps the box. Default 8.
+   */
   gap?: number;
+  /**
+   * Stay where `placement` puts it: never flip to the other side, never move
+   * to stay in view, and scroll away with the box. For badges and status;
+   * menus leave it off. Default false.
+   */
+  pinned?: boolean;
   children: React.ReactNode;
 }
 
@@ -117,11 +150,29 @@ const sameFit = (left: AnchoredFit | null, right: AnchoredFit): boolean =>
  * Position `children` around a page-space anchor, on whichever page surface
  * is in scope. Projection runs during render from the shared pure helper.
  * Once the content's size is measured, it flips to the opposite side when
- * the chosen one has no room, and stays inside the view. Pointer isolation
- * keeps a click inside anchored UI from reaching the surface's own listener
- * (which would read it as a click outside).
+ * the chosen one has no room, and stays inside the view, unless `pinned`.
+ * Pointer isolation keeps a click inside anchored UI from reaching the
+ * surface's own listener (which would read it as a click outside).
+ *
+ * Anchored UI on a page that isn't shown renders nothing and reads only the
+ * pages on screen, so a document with hundreds of badges costs only the ones
+ * in view while people scroll and zoom.
  */
-export function Anchored({ anchor, placement = 'top', gap = 8, children }: AnchoredProps) {
+export function Anchored(props: AnchoredProps) {
+  const shown = useContext(ShownPagesContext);
+  if (!props.anchor?.bounds) return null;
+  if (shown && !shown.has(props.anchor.page.objectNumber)) return null;
+  return <PlacedAnchored {...props} />;
+}
+
+/** Anchored UI on a page that is shown: it follows the camera. */
+function PlacedAnchored({
+  anchor,
+  placement = 'top',
+  gap = 8,
+  pinned = false,
+  children,
+}: AnchoredProps) {
   const { projector, subscribe } = useProjectorBinding();
   const [element, setElement] = useState<HTMLDivElement | null>(null);
   // The content's size and the view's: measured after the first commit, and
@@ -171,8 +222,7 @@ export function Anchored({ anchor, placement = 'top', gap = 8, children }: Ancho
   const pos = projectAnchoredTarget(
     projector,
     { ...anchor, bounds: anchor.bounds },
-    placement,
-    gap,
+    { placement, gap, pinned },
     fit,
   );
   if (!pos) return null;

@@ -33,14 +33,30 @@ export interface AnchoredPoint {
   y: number;
 }
 
-export type AnchoredPlacement = 'top' | 'right' | 'bottom' | 'left';
+/** A side of the box. */
+export type AnchoredSide = 'top' | 'right' | 'bottom' | 'left';
+
+/**
+ * Where anchored UI sits: a side of the box, centred on it, or lined up with
+ * the side's start or end (`'top-end'`: above the box, right edges lined up).
+ */
+export type AnchoredPlacement = AnchoredSide | `${AnchoredSide}-${'start' | 'end'}`;
+
+/** How anchored UI is placed: where, how far from the box, and whether it may move to fit. */
+export interface AnchoredOptions {
+  placement: AnchoredPlacement;
+  /** Screen px between the box and the UI; negative overlaps the box. */
+  gap: number;
+  /** Stays where `placement` puts it: never flips, never moves to stay in view. */
+  pinned?: boolean;
+}
 
 /** CSS-ready output: absolute/fixed `left`/`top` plus a centering transform. */
 export interface AnchoredPosition {
   left: number;
   top: number;
   transform: string;
-  /** The side of the box it sits on: the one asked for, or the opposite one when that had no room. */
+  /** Where it sits: the placement asked for, or its opposite side when that had no room. */
   placement: AnchoredPlacement;
 }
 
@@ -59,6 +75,13 @@ export interface AnchoredFit {
   view: AnchoredRect;
 }
 
+/** How a page is shown right now: its view scale, its rotation on screen, and its zoom (1 = 100%). */
+export interface PageViewEnv {
+  scale: number;
+  rotation: 0 | 90 | 180 | 270;
+  zoom: number;
+}
+
 /** What anchored UI attaches to: a page-space rect on a page, plus
  *  optional page-space points the UI must clear (e.g. a rotate knob).
  *  Structural — plugin anchor reads satisfy it without importing this
@@ -66,6 +89,12 @@ export interface AnchoredFit {
 export interface AnchorTarget {
   page: PageRef;
   bounds: AnchoredRect;
+  /**
+   * Where the box is in a given view, for a box whose size or orientation
+   * depends on it (a note that keeps its size on screen). The projection
+   * calls it, so the anchor itself never has to follow the view.
+   */
+  boundsIn?: (view: PageViewEnv) => AnchoredRect | null;
   avoid?: AnchoredPoint[];
 }
 
@@ -92,11 +121,10 @@ export interface ViewProjector {
   toScreenPoint(page: PageRef, at: AnchoredPoint): AnchoredPoint | null;
   /** The page's live view facts (for anchor reads that need them — e.g. the
    *  screen-constant rotate-knob stalk), or null when the page isn't shown. */
-  viewEnv(page: PageRef): {
-    scale: number;
-    rotation: 0 | 90 | 180 | 270;
-    zoom: number;
-  } | null;
+  viewEnv(page: PageRef): PageViewEnv | null;
+  /** The area anchored UI can be seen in, in `space`: the surface's box, or
+   *  the window. Null while it isn't measurable yet. */
+  view(): AnchoredRect | null;
 }
 
 /**
@@ -105,20 +133,39 @@ export interface ViewProjector {
  * Frameworks recompute this inside their native reactive primitive
  * (a React render, a Vue `computed`, an Angular signal, a Svelte
  * `$derived`); nothing here schedules anything.
+ *
+ * Null when there is nothing to show: the page isn't shown, or the box is so
+ * far out of view that the UI around it can't reach into it.
  */
 export function projectAnchoredTarget(
   projector: ViewProjector,
   anchor: AnchorTarget,
-  placement: AnchoredPlacement,
-  gap: number,
+  { placement, gap, pinned = false }: AnchoredOptions,
   fit?: AnchoredFit | null,
 ): AnchoredPosition | null {
-  const box = projector.toScreen(anchor.page, anchor.bounds);
+  const env = anchor.boundsIn ? projector.viewEnv(anchor.page) : null;
+  const bounds = env && anchor.boundsIn ? anchor.boundsIn(env) : anchor.bounds;
+  if (!bounds) return null;
+  const box = projector.toScreen(anchor.page, bounds);
   if (!box) return null;
+  const view = projector.view();
+  // Until its size is measured, assume the UI reaches no further than the gap.
+  const reach = Math.abs(gap) + (fit ? Math.max(fit.size.width, fit.size.height) : 0);
+  if (view && !overlaps(box, view, reach)) return null;
   const avoid = anchor.avoid?.length ? projector.toScreenPoint(anchor.page, anchor.avoid[0]) : null;
-  return fit
+  return fit && !pinned
     ? fitAnchoredRect(box, placement, gap, fit, avoid)
     : positionAnchoredRect(box, placement, gap, avoid);
+}
+
+/** Whether `box`, grown by `margin` on every side, touches `view`. */
+function overlaps(box: AnchoredRect, view: AnchoredRect, margin: number): boolean {
+  return (
+    box.x - margin < view.x + view.width &&
+    box.x + box.width + margin > view.x &&
+    box.y - margin < view.y + view.height &&
+    box.y + box.height + margin > view.y
+  );
 }
 
 /**
@@ -136,14 +183,68 @@ export function observeClientGeometry(callback: () => void): () => void {
   };
 }
 
+/** A placement's side and how it lines up along that side. */
+function splitPlacement(placement: AnchoredPlacement): {
+  side: AnchoredSide;
+  align: 'start' | 'center' | 'end';
+} {
+  const [side, align] = placement.split('-') as [AnchoredSide, 'start' | 'end' | undefined];
+  return { side, align: align ?? 'center' };
+}
+
+/**
+ * The point an element is placed at, and how far its own size shifts it from
+ * there (`0` keeps its left or top edge on the point, `1` its right or bottom
+ * edge, `0.5` its middle).
+ */
+interface Placed {
+  x: number;
+  y: number;
+  shiftX: number;
+  shiftY: number;
+}
+
+function placeAround(
+  box: AnchoredRect,
+  placement: AnchoredPlacement,
+  gap: number,
+  avoid?: AnchoredPoint | null,
+): Placed {
+  const { side, align } = splitPlacement(placement);
+  // Along the side: the box's start edge, middle or end edge.
+  const along = (start: number, length: number) =>
+    align === 'start' ? start : align === 'end' ? start + length : start + length / 2;
+  const alongShift = align === 'start' ? 0 : align === 'end' ? 1 : 0.5;
+  switch (side) {
+    case 'bottom': {
+      const edge = Math.max(box.y + box.height, avoid ? avoid.y : -Infinity);
+      return { x: along(box.x, box.width), y: edge + gap, shiftX: alongShift, shiftY: 0 };
+    }
+    case 'left': {
+      const edge = Math.min(box.x, avoid ? avoid.x : Infinity);
+      return { x: edge - gap, y: along(box.y, box.height), shiftX: 1, shiftY: alongShift };
+    }
+    case 'right': {
+      const edge = Math.max(box.x + box.width, avoid ? avoid.x : -Infinity);
+      return { x: edge + gap, y: along(box.y, box.height), shiftX: 0, shiftY: alongShift };
+    }
+    case 'top':
+    default: {
+      const edge = Math.min(box.y, avoid ? avoid.y : Infinity);
+      return { x: along(box.x, box.width), y: edge - gap, shiftX: alongShift, shiftY: 1 };
+    }
+  }
+}
+
+const shiftCss = (shift: number): string => (shift === 0 ? '0' : `${-shift * 100}%`);
+
 /**
  * Place an upright element around `box` (screen px). `avoid` is a screen
  * point the element must clear (e.g. the rotate knob): the element extends
  * only the edge it sits on, and only when the point protrudes past that
- * edge — so it clears the obstacle without ever shifting off-centre on the
- * other axis. When the point is on another side (e.g. a 90° shape, knob at
- * mid-height for a `top` placement) the edge is untouched and the element
- * stays centred on `box`.
+ * edge — so it clears the obstacle without ever shifting along the side.
+ * When the point is on another side (e.g. a 90° shape, knob at mid-height
+ * for a `top` placement) the edge is untouched.
  */
 export function positionAnchoredRect(
   box: AnchoredRect,
@@ -151,44 +252,36 @@ export function positionAnchoredRect(
   gap: number,
   avoid?: AnchoredPoint | null,
 ): AnchoredPosition {
-  const cx = box.x + box.width / 2;
-  const cy = box.y + box.height / 2;
-
-  switch (placement) {
-    case 'bottom': {
-      const edge = Math.max(box.y + box.height, avoid ? avoid.y : -Infinity);
-      return { left: cx, top: edge + gap, transform: 'translate(-50%, 0)', placement };
-    }
-    case 'left': {
-      const edge = Math.min(box.x, avoid ? avoid.x : Infinity);
-      return { left: edge - gap, top: cy, transform: 'translate(-100%, -50%)', placement };
-    }
-    case 'right': {
-      const edge = Math.max(box.x + box.width, avoid ? avoid.x : -Infinity);
-      return { left: edge + gap, top: cy, transform: 'translate(0, -50%)', placement };
-    }
-    case 'top':
-    default: {
-      const edge = Math.min(box.y, avoid ? avoid.y : Infinity);
-      return { left: cx, top: edge - gap, transform: 'translate(-50%, -100%)', placement: 'top' };
-    }
-  }
+  const placed = placeAround(box, placement, gap, avoid);
+  return {
+    left: placed.x,
+    top: placed.y,
+    transform: `translate(${shiftCss(placed.shiftX)}, ${shiftCss(placed.shiftY)})`,
+    placement,
+  };
 }
 
-const OPPOSITE: Readonly<Record<AnchoredPlacement, AnchoredPlacement>> = {
+const OPPOSITE: Readonly<Record<AnchoredSide, AnchoredSide>> = {
   top: 'bottom',
   bottom: 'top',
   left: 'right',
   right: 'left',
 };
 
+/** The same placement on the other side of the box: `'top-end'` becomes `'bottom-end'`. */
+const opposite = (placement: AnchoredPlacement): AnchoredPlacement => {
+  const { side, align } = splitPlacement(placement);
+  const flipped = OPPOSITE[side];
+  return align === 'center' ? flipped : `${flipped}-${align}`;
+};
+
 /**
  * Place an element of a known size around `box`, inside `fit.view`. It sits
- * on the side `placement` names when it fits there; otherwise on the opposite
- * side when that fits, or has more room. Then, while `box` is in view, it
- * moves along both axes to stay inside the view, `gap` from its edges; UI
- * whose box scrolled out of view goes with it. The result is the element's
- * top-left corner, with no transform.
+ * where `placement` says when it fits there; otherwise on the opposite side,
+ * lined up the same way, when that fits or has more room. Then, while `box`
+ * is in view, it moves along both axes to stay inside the view, `gap` from
+ * its edges; UI whose box scrolled out of view goes with it. The result is
+ * the element's top-left corner, with no transform.
  */
 export function fitAnchoredRect(
   box: AnchoredRect,
@@ -204,34 +297,33 @@ export function fitAnchoredRect(
     right: view.x + view.width - gap,
     bottom: view.y + view.height - gap,
   };
-  const cornerOn = (side: AnchoredPlacement): AnchoredPoint => {
-    const { left, top } = positionAnchoredRect(box, side, gap, avoid);
-    if (side === 'top') return { x: left - size.width / 2, y: top - size.height };
-    if (side === 'bottom') return { x: left - size.width / 2, y: top };
-    if (side === 'left') return { x: left - size.width, y: top - size.height / 2 };
-    return { x: left, y: top - size.height / 2 };
+  const cornerOn = (at: AnchoredPlacement): AnchoredPoint => {
+    const placed = placeAround(box, at, gap, avoid);
+    return { x: placed.x - placed.shiftX * size.width, y: placed.y - placed.shiftY * size.height };
   };
-  const fits = (side: AnchoredPlacement, corner: AnchoredPoint): boolean => {
+  const fits = (at: AnchoredPlacement, corner: AnchoredPoint): boolean => {
+    const { side } = splitPlacement(at);
     if (side === 'top') return corner.y >= inner.top;
     if (side === 'bottom') return corner.y + size.height <= inner.bottom;
     if (side === 'left') return corner.x >= inner.left;
     return corner.x + size.width <= inner.right;
   };
-  /** The space between the box and the view's edge on a side. */
-  const roomOn = (side: AnchoredPlacement): number => {
+  /** The space between the box and the view's edge on a placement's side. */
+  const roomOn = (at: AnchoredPlacement): number => {
+    const { side } = splitPlacement(at);
     if (side === 'top') return box.y - view.y;
     if (side === 'bottom') return view.y + view.height - (box.y + box.height);
     if (side === 'left') return box.x - view.x;
     return view.x + view.width - (box.x + box.width);
   };
 
-  let side = placement;
-  let corner = cornerOn(side);
-  if (!fits(side, corner)) {
-    const other = OPPOSITE[side];
+  let chosen = placement;
+  let corner = cornerOn(chosen);
+  if (!fits(chosen, corner)) {
+    const other = opposite(chosen);
     const otherCorner = cornerOn(other);
-    if (fits(other, otherCorner) || roomOn(other) > roomOn(side)) {
-      side = other;
+    if (fits(other, otherCorner) || roomOn(other) > roomOn(chosen)) {
+      chosen = other;
       corner = otherCorner;
     }
   }
@@ -249,5 +341,5 @@ export function fitAnchoredRect(
       y: clamp(corner.y, inner.top, inner.bottom - size.height),
     };
   }
-  return { left: corner.x, top: corner.y, transform: 'none', placement: side };
+  return { left: corner.x, top: corner.y, transform: 'none', placement: chosen };
 }

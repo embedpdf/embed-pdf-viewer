@@ -13,7 +13,6 @@
   --shadow: rgb(7 32 76 / 0.04);
   --bubble: #7c3aed;
   --bubble-hover: #5b21b6;
-  --approved: #30a46c;
 }
 
 /* The controls, above the pages */
@@ -64,13 +63,13 @@
   outline-offset: 2px;
 }
 
-/* A note as a comment bubble: the author's initials */
+/* A note as a comment bubble: the author's initials, filling its frame */
 .bubble {
-  position: absolute;
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
   display: grid;
   place-items: center;
-  width: 26px;
-  height: 26px;
   font-size: 11px;
   font-weight: 700;
   color: var(--surface);
@@ -84,24 +83,27 @@
   background: var(--bubble-hover);
 }
 
-/* The badge on an approved rectangle */
-.badge {
-  position: absolute;
-  display: grid;
-  place-items: center;
-  width: 24px;
-  height: 24px;
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--surface);
-  background: var(--approved);
-  border: 2px solid var(--surface);
-  border-radius: 50%;
-  box-shadow: 0 2px 6px rgb(7 32 76 / 0.3);
+/* Turns the view */
+.button {
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 550;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  padding: 7px 12px;
+  cursor: pointer;
+  white-space: nowrap;
 }
 
-.badge--hover {
-  transform: scale(1.15);
+.button:hover {
+  background: var(--tint);
+}
+
+.button:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
 }
 
 /* The pages */

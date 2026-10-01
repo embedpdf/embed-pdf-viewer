@@ -56,8 +56,18 @@ function BuildToolbar() {
   useEffect(() => {
     if (status !== 'ready' || !page || added.current) return;
     added.current = true;
-    void addDropdown(form, page, 0).then(() => stage.goToPage(page));
+    void addDropdown(form, page, 0).then(({ field }) =>
+      stage.reveal(page, { rect: field.widgets[0].rect }),
+    );
   }, [form, stage, status, page]);
+
+  // Each new field goes a row further down the page: bring it into view.
+  const add = (addField: typeof addDropdown) => {
+    if (!page) return;
+    void addField(form, page, fields.length).then(({ field }) =>
+      stage.reveal(page, { rect: field.widgets[0].rect }),
+    );
+  };
 
   const last = fields.at(-1);
   const full = fields.length >= 5;
@@ -68,7 +78,7 @@ function BuildToolbar() {
         type="button"
         className="button"
         disabled={!page || full}
-        onClick={() => page && void addDropdown(form, page, fields.length)}
+        onClick={() => add(addDropdown)}
       >
         Add a dropdown
       </button>
@@ -76,7 +86,7 @@ function BuildToolbar() {
         type="button"
         className="button"
         disabled={!page || full}
-        onClick={() => page && void addRadioGroup(form, page, fields.length)}
+        onClick={() => add(addRadioGroup)}
       >
         Add a radio group
       </button>

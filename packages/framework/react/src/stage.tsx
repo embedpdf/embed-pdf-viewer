@@ -21,7 +21,13 @@ import type { PageFrame } from '@embedpdf/core-geometry';
 import { InteractionToken as InteractionPublicToken } from '@embedpdf/plugin-interaction/contract';
 import { InteractionToken } from '@embedpdf/plugin-interaction/contract/host';
 import { createStageSurface, paint } from '@embedpdf/web';
-import { ProjectorProvider, type ProjectorBinding, type ViewProjector } from './anchored';
+import {
+  ProjectorProvider,
+  ShownPagesProvider,
+  type ProjectorBinding,
+  type ShownPages,
+  type ViewProjector,
+} from './anchored';
 import {
   makePageContext,
   PageProvider,
@@ -271,12 +277,23 @@ export function Stage({
           ? { scale: transform.viewScale, rotation: transform.rotation, zoom: transform.zoom }
           : null;
       },
+      view: () => {
+        const size = stage.getViewportSize();
+        return size.width > 0 && size.height > 0 ? { x: 0, y: 0, ...size } : null;
+      },
     }),
     [stage],
   );
   const projectorBinding = useMemo<ProjectorBinding>(
     () => ({ projector, revision: pages }),
     [projector, pages],
+  );
+  // The pages on screen as one value that changes only when a page comes or
+  // goes, so anchored UI on the other pages sits out every camera frame.
+  const shownKey = pages.map((page) => page.ref.objectNumber).join(',');
+  const shownPages = useMemo<ShownPages>(
+    () => new Set(shownKey ? shownKey.split(',').map(Number) : []),
+    [shownKey],
   );
 
   useLayoutEffect(() => {
@@ -333,7 +350,9 @@ export function Stage({
         ))}
         {/* Anchored UI mounts in the overlay: absolute coords here are the
             projector's overlay space (the stage container). */}
-        <ProjectorProvider value={projectorBinding}>{overlay}</ProjectorProvider>
+        <ShownPagesProvider value={shownPages}>
+          <ProjectorProvider value={projectorBinding}>{overlay}</ProjectorProvider>
+        </ShownPagesProvider>
       </StageScope>
     </div>
   );

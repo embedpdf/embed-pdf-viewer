@@ -1,23 +1,24 @@
 import { Component } from '@angular/core';
-import {
-  EpdfAnnotationLayer,
-  EpdfAnnotationTemplate,
-  type Annotation,
-} from '@embedpdf/angular/annotation';
+import { EpdfRenderLayer } from '@embedpdf/angular/render';
+import { EpdfPageTemplate, EpdfStage } from '@embedpdf/angular/stage';
 
 @Component({
-  selector: 'app-annotations',
-  imports: [EpdfAnnotationLayer, EpdfAnnotationTemplate],
+  selector: 'app-pages',
+  imports: [EpdfStage, EpdfPageTemplate, EpdfRenderLayer],
   template: `
-    <epdf-annotation-layer>
-      <ng-template [epdfAnnotation]="isNote" let-box="box" let-page="page">
-        <!-- page coordinates → pixels on this page, at its zoom; the page turns them with it -->
-        @let point = page.transform.toPixels({ x: box.x, y: box.y });
-        <div style="position: absolute" [style.left.px]="point.x" [style.top.px]="point.y">📌</div>
+    <epdf-stage>
+      <ng-template epdfPage let-page>
+        <epdf-render-layer />
+        @for (point of pins.get(page.ref.objectNumber) ?? []; track $index) {
+          <!-- page coordinates → pixels on this page, at its zoom; the page turns them with it -->
+          @let at = page.transform().toPixels(point);
+          <div style="position: absolute" [style.left.px]="at.x" [style.top.px]="at.y">📌</div>
+        }
       </ng-template>
-    </epdf-annotation-layer>
+    </epdf-stage>
   `,
 })
-export class Annotations {
-  protected readonly isNote = (annotation: Annotation) => annotation.subtype === 'text';
+export class Pages {
+  /** Your own data: points in page coordinates, by the page's object number. */
+  protected readonly pins = new Map<number, { x: number; y: number }[]>();
 }

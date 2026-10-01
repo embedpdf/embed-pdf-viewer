@@ -67,21 +67,6 @@
   border-radius: 6px;
 }
 
-/* Side by side once there's room: the pictures in a column */
-@container (min-width: 560px) {
-  .strip {
-    flex: 0 0 120px;
-    flex-direction: column;
-    max-height: 460px;
-    overflow: auto;
-  }
-
-  .preview {
-    flex: 1 1 0;
-    min-width: 0;
-  }
-}
-
 /* The large picture: exactly the pixels asked for, shown at the width there is */
 .preview {
   flex: 1 1 100%;
@@ -98,6 +83,22 @@
 .preview img {
   max-width: 100%;
   box-shadow: 0 6px 18px rgb(0 0 0 / 0.18);
+}
+
+/* Side by side once there's room: the pictures in a column, after the rules
+   above so they win */
+@container (min-width: 560px) {
+  .strip {
+    flex: 0 0 120px;
+    flex-direction: column;
+    max-height: 460px;
+    overflow: auto;
+  }
+
+  .preview {
+    flex: 1 1 0;
+    min-width: 0;
+  }
 }
 
 .loading {

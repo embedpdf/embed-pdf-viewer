@@ -1,12 +1,9 @@
 <script lang="ts">
   import { AnnotationLayer, type AnnotationRenderer } from '@embedpdf/svelte/annotation';
-  import ApprovedBadge from './ApprovedBadge.svelte';
+  import CommentBubble from './CommentBubble.svelte';
 
   const renderers: AnnotationRenderer[] = [
-    {
-      for: (annotation) => annotation.subtype === 'stamp' && annotation.name === 'Approved',
-      component: ApprovedBadge,
-    },
+    { for: (annotation) => annotation.subtype === 'text', component: CommentBubble },
   ];
 </script>
 

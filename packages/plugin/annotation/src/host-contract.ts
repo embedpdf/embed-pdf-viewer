@@ -113,6 +113,8 @@ export interface AnnotationHostCapability extends AnnotationCapability {
   /**
    * Where UI attaches to one annotation (its page and the box around what it
    * shows, a drag in progress included), or `null` for one that isn't here.
+   * Without a view, an annotation that keeps its size on screen carries
+   * `boundsIn` for the view it's shown in.
    */
   getAnnotationAnchor(ref: AnnotationRef, view?: ViewEnv): AnnotationAnchor | null;
   listPageItems(page: PageRef, view?: ViewEnv): RenderItem[];

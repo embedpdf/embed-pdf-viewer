@@ -75,7 +75,7 @@ function PageOrganizer() {
           Delete
         </button>
       </div>
-      <ol className="grid">
+      <ol className="pages">
         {pages.map((page) => (
           <li key={page.ref.objectNumber}>
             <button

@@ -22,16 +22,16 @@ const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), annotationP
 
 const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
-// Your own text box: the element is the editor, in your app's look.
-function BrandedTextBox({ annotation, box, page }: AnnotationRendererProps) {
-  const editor = useRichTextEditor(annotation, page);
-  const { x, y, width, height } = page.transform.pageToViewRect(box);
+// Your own text box: the element is the editor, in your app's look. It fills
+// its frame, which the layer places and turns like the text box.
+function BrandedTextBox({ annotation }: AnnotationRendererProps) {
+  const editor = useRichTextEditor(annotation);
 
   return (
     <div
       ref={editor.ref}
       className={editor.editing ? 'text-box editing' : 'text-box'}
-      style={{ left: x, top: y, width, height, ...editor.style }}
+      style={editor.style}
     />
   );
 }

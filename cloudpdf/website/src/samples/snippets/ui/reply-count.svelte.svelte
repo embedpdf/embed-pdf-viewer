@@ -8,6 +8,6 @@
   const thread = useCommentThread(() => note.ref);
 </script>
 
-<Anchored anchor={anchor.current} placement="right" gap={4}>
+<Anchored anchor={anchor.current} placement="right" gap={4} pinned>
   <span class="badge">{thread.current?.replies.length ?? 0}</span>
 </Anchored>

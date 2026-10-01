@@ -29,6 +29,7 @@ import type {
   Rect,
   RotationAnchor,
   SnapSettings,
+  ViewEnv,
 } from '@embedpdf/core-annotation';
 import type { Point } from '@embedpdf/core-geometry';
 import type {
@@ -413,6 +414,13 @@ export interface AnnotationSelectionAnchor {
 export interface AnnotationAnchor {
   readonly page: PageRef;
   readonly bounds: Rect;
+  /**
+   * For an annotation that keeps its size or stays upright on screen (a note):
+   * the box in a given view, where `bounds` is the box at 100%. `<Anchored>`
+   * calls it, so the anchor doesn't change while people zoom. Absent for
+   * every other annotation.
+   */
+  readonly boundsIn?: (view: ViewEnv) => Rect | null;
 }
 
 // ── events ───────────────────────────────────────────────────────────────────

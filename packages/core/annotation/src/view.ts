@@ -31,11 +31,18 @@ import {
   ROTATE_KNOB_OFFSET,
 } from './geometry';
 import { cursorOnScreen, rectFromPoints, rotatePoint, unionRect } from './rect';
+import { placed } from './frame';
 import { calloutShape } from './shapes/text-box';
 import { groupCaps } from './group';
 import { isSelectable, paintOrder } from './hit';
 import { annotTransformable, viewable } from './flags';
-import { anchoredGeom, anchoredStrokeWidth, anchorModeOf, type ViewEnv } from './anchor';
+import {
+  anchoredGeom,
+  anchoredScale,
+  anchoredStrokeWidth,
+  anchorModeOf,
+  type ViewEnv,
+} from './anchor';
 import { blendFor } from './kinds/styles';
 import { isDrag, placedShape } from './placement';
 import {
@@ -174,22 +181,25 @@ export function unmadeItem(
   const style = effStyle(annotation, view);
   const distance = measure && measurementLayout(geometry, measure, style);
   const text = textOf(annotation);
-  return {
-    id,
-    ref: null,
-    subtype: kindOf(annotation).name,
-    geometry,
-    box: distance?.visualBounds ?? geomVisualBounds(geometry, style),
-    style,
-    ...(text ? { text } : {}),
-    ...iconOf(annotation),
-    ...redactionLabelOf(annotation),
-    ...(measure ? { measure } : {}),
-    source,
-    selected: false,
-    rot: geomRotation(geometry),
-    blend: blendFor(style),
-  };
+  return placed(
+    {
+      id,
+      ref: null,
+      subtype: kindOf(annotation).name,
+      geometry,
+      box: distance?.visualBounds ?? geomVisualBounds(geometry, style),
+      style,
+      ...(text ? { text } : {}),
+      ...iconOf(annotation),
+      ...redactionLabelOf(annotation),
+      ...(measure ? { measure } : {}),
+      source,
+      selected: false,
+      rot: geomRotation(geometry),
+      blend: blendFor(style),
+    },
+    anchoredScale(anchorModeOf({ annotation }), view),
+  );
 }
 
 /** A free-text box renders as a live element (editable / reflowing) while it's
@@ -222,26 +232,31 @@ export function pageItems(model: Model, page: PageRef, view?: ViewEnv): RenderIt
     const ap = rasterPlacement(model, id, view, geometry);
     const measure = effMeasure(model, id);
     const distance = measure && measurementLayout(geometry, measure, style);
-    items.push({
-      id,
-      ref: refOf(record),
-      annotation: record.annotation,
-      subtype: kindOf(record.annotation).name,
-      geometry,
-      box: distance?.visualBounds ?? geomVisualBounds(geometry, style),
-      apBox: ap.box,
-      style,
-      ...(text ? { text } : {}),
-      ...iconOf(record.annotation),
-      ...redactionLabelOf(record.annotation),
-      measure,
-      source: sourceDuring(model, id),
-      selected: model.selected.includes(id),
-      ...(model.hovered === id ? { hovered: true } : {}),
-      rot: geomRotation(geometry),
-      ...(ap.rot ? { apRot: ap.rot } : {}),
-      blend: blendFor(style),
-    });
+    items.push(
+      placed(
+        {
+          id,
+          ref: refOf(record),
+          annotation: record.annotation,
+          subtype: kindOf(record.annotation).name,
+          geometry,
+          box: distance?.visualBounds ?? geomVisualBounds(geometry, style),
+          apBox: ap.box,
+          style,
+          ...(text ? { text } : {}),
+          ...iconOf(record.annotation),
+          ...redactionLabelOf(record.annotation),
+          measure,
+          source: sourceDuring(model, id),
+          selected: model.selected.includes(id),
+          ...(model.hovered === id ? { hovered: true } : {}),
+          rot: geomRotation(geometry),
+          ...(ap.rot ? { apRot: ap.rot } : {}),
+          blend: blendFor(style),
+        },
+        anchoredScale(anchorModeOf(record), view),
+      ),
+    );
   }
   const draft = model.draft;
   // A box or a line being drawn shows what releasing it makes, once it is a
@@ -292,17 +307,19 @@ export function pageItems(model: Model, page: PageRef, view?: ViewEnv): RenderIt
     const measure =
       draft.kind === 'create-distance' || draft.kind === 'create-poly' ? draft.measure : undefined;
     const distance = measure && measurementLayout(geometry, measure, style);
-    items.push({
-      id: DRAFT_ID,
-      ref: null,
-      measure,
-      subtype: draft.subtype,
-      geometry,
-      box: distance?.visualBounds ?? geomVisualBounds(geometry, style),
-      style,
-      source: 'draft',
-      selected: false,
-    });
+    items.push(
+      placed({
+        id: DRAFT_ID,
+        ref: null,
+        measure,
+        subtype: draft.subtype,
+        geometry,
+        box: distance?.visualBounds ?? geomVisualBounds(geometry, style),
+        style,
+        source: 'draft',
+        selected: false,
+      }),
+    );
   }
   // Callout creation drawing: the in-progress leader (tip → cur, then tip → knee →
   // box) and the text-box preview, painted through the same vector scene.
@@ -323,32 +340,36 @@ export function pageItems(model: Model, page: PageRef, view?: ViewEnv): RenderIt
             rotation: 0,
           }
         : calloutShape(calloutBox(draft), rot, draft.tip, draft.knee, ending);
-    items.push({
-      id: DRAFT_ID,
-      ref: null,
-      subtype: draft.subtype,
-      geometry,
-      box: geomVisualBounds(geometry, style),
-      style,
-      source: 'draft',
-      selected: false,
-    });
+    items.push(
+      placed({
+        id: DRAFT_ID,
+        ref: null,
+        subtype: draft.subtype,
+        geometry,
+        box: geomVisualBounds(geometry, style),
+        style,
+        source: 'draft',
+        selected: false,
+      }),
+    );
   }
   // Live text-markup preview: the in-progress selection rendered as the markup it
   // will become (same `scene()` paint as the committed annotation).
   const quads = model.preview?.byPage[pageObjectNumber];
   if (model.preview && quads?.length) {
     const geometry: Shape = { kind: 'quads', quadPoints: quads };
-    items.push({
-      id: PREVIEW_ID,
-      ref: null,
-      subtype: model.preview.subtype,
-      geometry,
-      box: geomVisualBounds(geometry, { strokeWidth: 0 }),
-      style: styleOf(toolAnnotation(model, model.preview.subtype, model.preview.preset)),
-      source: 'draft',
-      selected: false,
-    });
+    items.push(
+      placed({
+        id: PREVIEW_ID,
+        ref: null,
+        subtype: model.preview.subtype,
+        geometry,
+        box: geomVisualBounds(geometry, { strokeWidth: 0 }),
+        style: styleOf(toolAnnotation(model, model.preview.subtype, model.preview.preset)),
+        source: 'draft',
+        selected: false,
+      }),
+    );
   }
   return items;
 }
@@ -399,18 +420,23 @@ export function selectedItems(model: Model, view?: ViewEnv): RenderItem[] {
     if (!record) continue;
     const geometry = effGeom(model, id, view);
     const style = effStyle(record.annotation, view);
-    items.push({
-      id,
-      ref: refOf(record),
-      annotation: record.annotation,
-      subtype: kindOf(record.annotation).name,
-      geometry,
-      box: geomVisualBounds(geometry, style),
-      style,
-      source: record.source,
-      selected: true,
-      rot: geomRotation(geometry),
-    });
+    items.push(
+      placed(
+        {
+          id,
+          ref: refOf(record),
+          annotation: record.annotation,
+          subtype: kindOf(record.annotation).name,
+          geometry,
+          box: geomVisualBounds(geometry, style),
+          style,
+          source: record.source,
+          selected: true,
+          rot: geomRotation(geometry),
+        },
+        anchoredScale(anchorModeOf(record), view),
+      ),
+    );
   }
   return items;
 }

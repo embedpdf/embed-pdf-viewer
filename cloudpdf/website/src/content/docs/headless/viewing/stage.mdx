@@ -90,6 +90,8 @@ stage.goToLastPage();
   spread; zoomed in, one page.
 - **`reveal()` scrolls only as far as needed.** It makes a page visible and does nothing if it
   already is. Use it for a thumbnail strip that follows along without jumping.
+- **You can navigate as soon as the document opens.** A call made before the Stage is on screen
+  waits for it, and the last one is where the Stage opens, without scrolling there.
 
 ## Layouts
 

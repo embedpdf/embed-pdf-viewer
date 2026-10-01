@@ -22,13 +22,25 @@ export {
 export type {
   AnchorTarget,
   AnchoredFit,
+  AnchoredOptions,
   AnchoredPlacement,
   AnchoredPoint,
   AnchoredPosition,
   AnchoredRect,
+  AnchoredSide,
   AnchoredSize,
+  PageViewEnv,
   ViewProjector,
 } from './anchored-position';
+export { frameInPixels, rasterInFrame } from './annotation-frame';
+export type {
+  FrameBox,
+  FrameFraction,
+  FramePixels,
+  PageLayerTransform,
+  PixelBox,
+  TurnedBox,
+} from './annotation-frame';
 export type { PageRef } from './page-ref';
 export { svgCursor } from './cursor';
 export type { SvgCursorOptions } from './cursor';

@@ -857,6 +857,22 @@ export interface RenderItem {
   hovered?: boolean;
   /** Redaction label projection (redact kind only) — see {@link ModelAnnotation.label}. */
   label?: { text: string; repeat: boolean };
+  /**
+   * The box a painter draws into: `box` before its turn, and that turn,
+   * degrees clockwise about the box's middle. Everything the item draws sits
+   * upright inside it: its scene, a custom look, or its raster (`raster`).
+   * `scale` is how large the page draws the item relative to its own size:
+   * 1, except for a body that keeps its size on screen (`noZoom`), drawn
+   * smaller on the page as people zoom in. Made from `box` and `rot` by the
+   * core; painters read this, not `rot`.
+   */
+  frame: { box: Rect; rotation: number; scale: number };
+  /**
+   * The engine's raster inside the frame, for an item that has one: its box
+   * relative to the frame's top-left before the frame's turn, and its own turn
+   * about its middle. Made from `apBox` and `apRot`; null without a raster box.
+   */
+  raster: { box: Rect; rotation: number } | null;
   /** A note's or file attachment's icon (`/Name`), which its live drawing draws. */
   icon?: NoteIcon | FileAttachmentIcon;
   measure?: MeasurementAppearance;

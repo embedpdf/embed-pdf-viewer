@@ -19,9 +19,10 @@ const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), annotationP
 
 const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
-// On load: a rectangle and a text box on the cover, the rectangle selected.
+// On load: a rectangle and a text box on the cover, the rectangle selected and in view.
 function AddAnnotations() {
   const annotation = useAnnotation();
+  const stage = useStage();
   const ready = useAnnotationState((state) => state.status === 'ready');
   const cover = usePageList()[0]?.ref;
   const added = useRef(false);
@@ -37,19 +38,21 @@ function AddAnnotations() {
       fontColor: '#1a2748',
       interiorColor: '#fffbe6',
     });
-    void annotation.create(
-      cover,
-      {
-        subtype: 'square',
-        box: { x: 96, y: 506, width: 178, height: 54 },
-        color: '#e5484d',
-        interiorColor: '#ffe4e1',
-        strokeWidth: 3,
-      },
-      undefined,
-      { select: true },
-    );
-  }, [annotation, ready, cover]);
+    void annotation
+      .create(
+        cover,
+        {
+          subtype: 'square',
+          box: { x: 96, y: 506, width: 178, height: 54 },
+          color: '#e5484d',
+          interiorColor: '#ffe4e1',
+          strokeWidth: 3,
+        },
+        undefined,
+        { select: true },
+      )
+      .then(({ annotation: made }) => stage.reveal(cover, { rect: made.rect }));
+  }, [annotation, stage, ready, cover]);
 
   return null;
 }
@@ -88,7 +91,9 @@ function CopyButton() {
         Copy to the next page
       </button>
       <span className="spacer" />
-      <output className="readout">{status || 'Select an annotation to copy'}</output>
+      <output className="readout">
+        {status || (first ? 'Ready to copy' : 'Select an annotation to copy')}
+      </output>
     </div>
   );
 }

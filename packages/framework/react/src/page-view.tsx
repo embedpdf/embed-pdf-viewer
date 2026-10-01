@@ -15,7 +15,13 @@ import { pageRefsEqual, toPageRef } from '@embedpdf/core';
 import type { PageRef } from '@embedpdf/core';
 import { NO_FRAME, pageTransform, type PageFrame } from '@embedpdf/core-geometry';
 import { observeClientGeometry, paint } from '@embedpdf/web';
-import { ProjectorProvider, type ProjectorBinding, type ViewProjector } from './anchored';
+import {
+  ProjectorProvider,
+  ShownPagesProvider,
+  type ProjectorBinding,
+  type ShownPages,
+  type ViewProjector,
+} from './anchored';
 import {
   DocumentScope,
   makePageContext,
@@ -144,12 +150,26 @@ export function PageView({
               zoom: ctx.transform.zoom,
             }
           : null,
+      view: () =>
+        typeof document === 'undefined'
+          ? null
+          : {
+              x: 0,
+              y: 0,
+              width: document.documentElement.clientWidth,
+              height: document.documentElement.clientHeight,
+            },
     }),
     [ctx],
   );
   const projectorBinding = useMemo<ProjectorBinding>(
     () => ({ projector, revision: ctx, subscribe: observeClientGeometry }),
     [projector, ctx],
+  );
+  // A PageView shows its one page.
+  const shownPages = useMemo<ShownPages>(
+    () => new Set([ctx.ref.objectNumber]),
+    [ctx.ref.objectNumber],
   );
   // The viewer's `page` settings; `--epdf-page-*` CSS variables win over them.
   const look = useViewerSettings((settings) => settings.page);
@@ -160,44 +180,46 @@ export function PageView({
   const contentTop = pageFrame.top + (transform.viewHeight - transform.contentHeight) / 2;
   return (
     <DocumentScope id={docId}>
-      <ProjectorProvider value={projectorBinding}>
-        <div
-          className={className}
-          style={{ position: 'relative', width: outerW, height: outerH, ...style }}
-        >
-          <PageProvider value={ctx}>
-            {/* drop shadow ONLY — transparent, axis-aligned, can't leak behind the bitmap */}
-            <div
-              style={{
-                position: 'absolute',
-                left: pageFrame.left,
-                top: pageFrame.top,
-                width: transform.viewWidth,
-                height: transform.viewHeight,
-                boxShadow: paint('page-shadow', look.shadow),
-              }}
-            />
-            {/* white backing + content as ONE box; rotation 0 carries no transform */}
-            <div
-              ref={ref}
-              style={{
-                position: 'absolute',
-                left: contentLeft,
-                top: contentTop,
-                width: transform.contentWidth,
-                height: transform.contentHeight,
-                background: paint('page-background', look.background),
-                transform: rotation ? `rotate(${rotation}deg)` : undefined,
-                userSelect: 'none',
-                WebkitUserSelect: 'none',
-              }}
-            >
-              {children}
-            </div>
-            {pageChrome}
-          </PageProvider>
-        </div>
-      </ProjectorProvider>
+      <ShownPagesProvider value={shownPages}>
+        <ProjectorProvider value={projectorBinding}>
+          <div
+            className={className}
+            style={{ position: 'relative', width: outerW, height: outerH, ...style }}
+          >
+            <PageProvider value={ctx}>
+              {/* drop shadow ONLY — transparent, axis-aligned, can't leak behind the bitmap */}
+              <div
+                style={{
+                  position: 'absolute',
+                  left: pageFrame.left,
+                  top: pageFrame.top,
+                  width: transform.viewWidth,
+                  height: transform.viewHeight,
+                  boxShadow: paint('page-shadow', look.shadow),
+                }}
+              />
+              {/* white backing + content as ONE box; rotation 0 carries no transform */}
+              <div
+                ref={ref}
+                style={{
+                  position: 'absolute',
+                  left: contentLeft,
+                  top: contentTop,
+                  width: transform.contentWidth,
+                  height: transform.contentHeight,
+                  background: paint('page-background', look.background),
+                  transform: rotation ? `rotate(${rotation}deg)` : undefined,
+                  userSelect: 'none',
+                  WebkitUserSelect: 'none',
+                }}
+              >
+                {children}
+              </div>
+              {pageChrome}
+            </PageProvider>
+          </div>
+        </ProjectorProvider>
+      </ShownPagesProvider>
     </DocumentScope>
   );
 }

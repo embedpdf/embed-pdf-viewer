@@ -1,4 +1,5 @@
 import {
+  anchorModeOf,
   annotationAnchor,
   canMove,
   chrome as coreChrome,
@@ -10,6 +11,7 @@ import {
   isOnTextBox,
   type Model,
   type Point,
+  type Rect,
   rotationAnchor,
   type RotationAnchor,
   selectionAnchor as coreSelectionAnchor,
@@ -208,6 +210,22 @@ export function createChromeReads(
 
   // One annotation's anchor, by ref and view: a new object only when it moved.
   const anchors = new Map<string, { model: Model; view?: ViewEnv; v: AnnotationAnchor | null }>();
+  // A screen-anchored annotation's box in a view, read from the live model:
+  // one function per annotation, so its anchor stays the same object while
+  // people zoom.
+  const boundsInByKey = new Map<string, (view: ViewEnv) => Rect | null>();
+  const boundsInOf = (key: string, ref: AnnotationRef) => {
+    let boundsIn = boundsInByKey.get(key);
+    if (!boundsIn) {
+      boundsIn = (view: ViewEnv) => {
+        const model = store.model();
+        const record = recordOfRef(model, ref);
+        return record ? (annotationAnchor(model, record.id, view)?.bounds ?? null) : null;
+      };
+      boundsInByKey.set(key, boundsIn);
+    }
+    return boundsIn;
+  };
   const annotationAnchorOf = (ref: AnnotationRef, view?: ViewEnv): AnnotationAnchor | null => {
     const model = store.model();
     const key = `${ref.page.objectNumber}:${ref.kind === 'nm' ? ref.nm : ref.kind === 'objectNumber' ? ref.objectNumber : ref.index}`;
@@ -220,7 +238,13 @@ export function createChromeReads(
     )
       return cached.v;
     const record = recordOfRef(model, ref);
-    const found = record ? annotationAnchor(model, record.id, view) : null;
+    if (!record) boundsInByKey.delete(key);
+    const box = record ? annotationAnchor(model, record.id, view) : null;
+    // Without a view, a note that keeps its size on screen says where it is in any view.
+    const found: AnnotationAnchor | null =
+      box && record && !view && anchorModeOf(record)
+        ? { ...box, boundsIn: boundsInOf(key, ref) }
+        : box;
     const previous = cached?.v ?? null;
     const anchor =
       found &&
@@ -229,7 +253,8 @@ export function createChromeReads(
       previous.bounds.x === found.bounds.x &&
       previous.bounds.y === found.bounds.y &&
       previous.bounds.width === found.bounds.width &&
-      previous.bounds.height === found.bounds.height
+      previous.bounds.height === found.bounds.height &&
+      previous.boundsIn === found.boundsIn
         ? previous
         : found;
     anchors.set(key, { model, view, v: anchor });

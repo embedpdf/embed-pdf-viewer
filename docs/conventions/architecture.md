@@ -27,6 +27,14 @@ only through `ctx.doc`, and to other plugins only through their capabilities.
 
 Where each package lives and what it is called: [`packages.md`](./packages.md).
 
+An adapter paints from what a plugin hands out, and decides no geometry. When a
+picture needs a placement, the plugin's read carries it resolved: an
+annotation render item comes with its `frame` and `raster`, and the adapter
+only converts page units to pixels with `@embedpdf/web` (`frameInPixels`,
+`rasterInPixels`). The one core function adapters call is the annotation
+core's `scene()`, the drawing vocabulary every painter maps onto its own
+elements.
+
 ## Scopes and bring-up
 
 A plugin declares `scope: 'workspace'` (the default: one instance for the

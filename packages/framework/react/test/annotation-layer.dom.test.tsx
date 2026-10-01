@@ -43,7 +43,11 @@ const wasmPath = resolve(packages, 'engine', 'runtime', 'npm', 'wasm32', 'lib', 
  * record, your own handles draw in place of the layer's, the chrome paints
  * through its CSS variables, and the hooks follow the annotation.
  */
-async function mount(layer: (page: PageContextValue) => React.ReactNode) {
+async function mount(
+  layer: (page: PageContextValue) => React.ReactNode,
+  rotation: 0 | 90 = 0,
+  zoom = 1,
+) {
   const bytes = new Uint8Array(await readFile(fixturePath));
   const wasmBinary = new Uint8Array(await readFile(wasmPath));
   const engine = await createLocalEngine({ runtime: { prefer: 'wasm', wasmBinary } });
@@ -83,7 +87,8 @@ async function mount(layer: (page: PageContextValue) => React.ReactNode) {
   await annotation.whenSynced();
   const first = annotation.list()[0]!;
   const size = { width: 612, height: 792 };
-  const transform = pageTransform({ pageSize: size, rotation: 0, scale: 1, dpr: 1 });
+  // `zoom` against a 100% of 1 pixel per point.
+  const transform = pageTransform({ pageSize: size, rotation, scale: zoom, baseScale: 1, dpr: 1 });
   act(() =>
     setPage(
       makePageContext(
@@ -118,7 +123,7 @@ async function mount(layer: (page: PageContextValue) => React.ReactNode) {
 describe('the annotation layer', () => {
   afterEach(cleanup);
 
-  it('renderers get the record, the box and the hover; your handles draw in place of the layer’s', async () => {
+  it('renderers get the record, the frame and the hover; your handles draw in place of the layer’s', async () => {
     const seen: AnnotationRendererProps[] = [];
     const handles: HandleProps[] = [];
     const renderers: AnnotationRenderer[] = [
@@ -141,8 +146,9 @@ describe('the annotation layer', () => {
       await waitFor(() => expect(view.getAllByTestId('look').length).toBeGreaterThan(0));
       const last = seen[seen.length - 1]!;
       expect(last.annotation.subtype).toBe('free-text');
-      expect(last.box.width).toBeGreaterThan(0);
+      expect(last.frame.width).toBeGreaterThan(0);
       expect(last.hovered).toBe(false);
+      expect(last.selected).toBe(false);
       expect(last.interactive).toBe(false);
 
       const square = annotation
@@ -182,13 +188,124 @@ describe('the annotation layer', () => {
       const widget = view.getAllByTestId('widget')[0]!;
       expect(widget.textContent).toBe('live');
       expect(widget.closest('[inert]')).toBeNull();
-      expect(widget.parentElement!.style.pointerEvents).toBe('auto');
+      // The frame (around the look's scaled box) takes the pointer.
+      expect(widget.parentElement!.parentElement!.style.pointerEvents).toBe('auto');
       await waitFor(() => expect(view.getAllByTestId('drawn').length).toBeGreaterThan(0));
       expect(view.getAllByTestId('drawn')[0]!.closest('[inert]')).not.toBeNull();
     } finally {
       await close();
     }
   }, 30_000);
+
+  it('a renderer draws into a frame placed and turned like the annotation', async () => {
+    const renderers: AnnotationRenderer[] = [
+      {
+        for: (annotation) => annotation.subtype === 'square' || annotation.subtype === 'circle',
+        component: ({ native }: AnnotationRendererProps) => (
+          <span data-testid="look">{native}</span>
+        ),
+      },
+    ];
+    const { annotation, view, close } = await mount(() => (
+      <AnnotationLayer renderers={renderers} />
+    ));
+    try {
+      await waitFor(() => expect(view.getAllByTestId('look').length).toBeGreaterThan(0));
+      const square = annotation
+        .list()
+        .find((entry) => entry.subtype === 'square' || entry.subtype === 'circle')!;
+      // Turn it: the frame turns with it. Where the native drawing sits inside
+      // the frame is `rasterInFrame`'s, tested in the core.
+      await act(() => annotation.update(square.ref, { rotation: 30 }));
+      await waitFor(() => {
+        const frame = view.getAllByTestId('look')[0]!.parentElement!.parentElement!;
+        expect(frame.style.transform).toBe('rotate(30deg)');
+      });
+      const frame = view.getAllByTestId('look')[0]!.parentElement!.parentElement!;
+      expect(parseFloat(frame.style.width)).toBeGreaterThan(0);
+    } finally {
+      await close();
+    }
+  }, 30_000);
+
+  it('on a turned page, a note drawn your way stays upright like its icon', async () => {
+    const seen: AnnotationRendererProps[] = [];
+    const renderers: AnnotationRenderer[] = [
+      {
+        for: (annotation) => annotation.subtype === 'text',
+        component: (props: AnnotationRendererProps) => {
+          seen.push(props);
+          return <span data-testid="note" />;
+        },
+      },
+    ];
+    const { annotation, view, close } = await mount(
+      () => <AnnotationLayer renderers={renderers} />,
+      90,
+    );
+    try {
+      const page = annotation.list()[0]!.page;
+      await act(() =>
+        annotation.create(page, {
+          subtype: 'text',
+          rect: { x: 100, y: 100, width: 24, height: 24 },
+          contents: 'Upright',
+        }),
+      );
+      await waitFor(() => expect(view.getAllByTestId('note').length).toBeGreaterThan(0));
+      // The page turns the layer a quarter; the frame turns back, so the note reads upright.
+      const frame = view.getAllByTestId('note')[0]!.parentElement!.parentElement!;
+      expect(frame.style.transform).toBe('rotate(270deg)');
+      expect(seen[seen.length - 1]!.frame.rotation).toBe(0);
+    } finally {
+      await close();
+    }
+  }, 30_000);
+
+  it.each([
+    [0.5, 0.5],
+    [2, 1],
+  ])(
+    'at %s zoom a note drawn your way is drawn at its own size and scaled by %s',
+    async (zoom, scale) => {
+      const seen: AnnotationRendererProps[] = [];
+      const renderers: AnnotationRenderer[] = [
+        {
+          for: (annotation) => annotation.subtype === 'text',
+          component: (props: AnnotationRendererProps) => {
+            seen.push(props);
+            return <span data-testid="note" />;
+          },
+        },
+      ];
+      const { annotation, view, close } = await mount(
+        () => <AnnotationLayer renderers={renderers} />,
+        0,
+        zoom,
+      );
+      try {
+        const page = annotation.list()[0]!.page;
+        await act(() =>
+          annotation.create(page, {
+            subtype: 'text',
+            rect: { x: 100, y: 100, width: 24, height: 24 },
+            contents: 'Scaled',
+          }),
+        );
+        await waitFor(() => expect(view.getAllByTestId('note').length).toBeGreaterThan(0));
+        // Drawn at its 100% size, 24 pixels here, and scaled as a whole: text and all.
+        const props = seen[seen.length - 1]!;
+        expect(props.frame.width).toBeCloseTo(24);
+        expect(props.frame.scale).toBeCloseTo(scale);
+        const scaled = view.getAllByTestId('note')[0]!.parentElement!;
+        expect(scaled.style.transform).toBe(`scale(${scale})`);
+        expect(parseFloat(scaled.style.width)).toBeCloseTo(24);
+      } finally {
+        await close();
+      }
+    },
+    30_000,
+  );
 
   it('useAnnotationState, useAnnotationAnchor and useRichTextEditor follow the annotation', async () => {
     const states: { selected: readonly Annotation[]; editing: Annotation | null }[] = [];
@@ -200,8 +317,8 @@ describe('the annotation layer', () => {
       anchors.push(useAnnotationAnchor(target?.ref ?? null));
       return null;
     }
-    const TextBox = ({ annotation, page }: AnnotationRendererProps) => {
-      const editor = useRichTextEditor(annotation, page);
+    const TextBox = ({ annotation }: AnnotationRendererProps) => {
+      const editor = useRichTextEditor(annotation);
       const key = annotationKey(annotation.ref);
       editing.set(key, editor.editing);
       return <div ref={editor.ref} data-testid={key} style={editor.style} />;

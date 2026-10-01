@@ -103,6 +103,16 @@ function factors(
 }
 
 /**
+ * How large a screen-anchored body is drawn on the page relative to its own
+ * size: `1 / max(zoom, 1)` for `noZoom` (it keeps its 100% size on screen as
+ * people zoom in), 1 for everything else.
+ */
+export function anchoredScale(mode: AnchorMode | null, view: ViewEnv | undefined): number {
+  const projection = factors(mode, view);
+  return projection ? 1 / projection.s : 1;
+}
+
+/**
  * The effective page-space geometry of a screen-anchored body at `view`:
  * the stored geometry scaled by `1/max(zoom, 1)` about the anchor (`zoom`
  * exemption, Adobe-clamped) and counter-rotated by `-rotation` about it

@@ -1,10 +1,18 @@
 <script lang="ts">
-  import type { AnnotationRendererProps } from '@embedpdf/svelte/annotation';
+  import { RenderLayer } from '@embedpdf/svelte/render';
+  import { Stage } from '@embedpdf/svelte/stage';
 
-  let { box, page }: AnnotationRendererProps = $props();
-
-  // page coordinates → pixels on this page, at its zoom; the page turns them with it
-  const point = $derived(page.transform.toPixels({ x: box.x, y: box.y }));
+  // Your own data: points in page coordinates, by the page's object number.
+  const pins = new Map<number, { x: number; y: number }[]>();
 </script>
 
-<div style:position="absolute" style:left="{point.x}px" style:top="{point.y}px">📌</div>
+<Stage>
+  {#snippet page(page)}
+    <RenderLayer />
+    {#each pins.get(page.ref.objectNumber) ?? [] as point}
+      <!-- page coordinates → pixels on this page, at its zoom; the page turns them with it -->
+      {@const at = page.transform.toPixels(point)}
+      <div style:position="absolute" style:left="{at.x}px" style:top="{at.y}px">📌</div>
+    {/each}
+  {/snippet}
+</Stage>
