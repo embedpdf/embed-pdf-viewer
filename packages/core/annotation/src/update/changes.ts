@@ -7,7 +7,7 @@ import { annotationKey } from '@embedpdf/core';
 import {
   ANNOTATION_FIELD_NAMES,
   type AnnotationDraft,
-  type AnnotationDTO,
+  type Annotation,
   type AnnotationFlags,
   type AnnotationRef,
   type PageRef,
@@ -112,7 +112,7 @@ export function newRecord(
   model: Model,
   page: PageRef,
   draft: AnnotationDraft,
-  options: { offset?: number; reply?: NonNullable<AnnotationDTO['reply']> } = {},
+  options: { offset?: number; reply?: NonNullable<Annotation['reply']> } = {},
 ): NewRecord {
   const offset = options.offset ?? 1;
   const ref = newRecordRef(model, page, offset);
@@ -121,7 +121,7 @@ export function newRecord(
     (id) => model.byId[id]?.annotation.page.objectNumber === page.objectNumber,
   ).length;
   const read = annotationOfNew(named, { ref, index: onPage + offset - 1 });
-  const annotation: AnnotationDTO = options.reply ? { ...read, reply: options.reply } : read;
+  const annotation: Annotation = options.reply ? { ...read, reply: options.reply } : read;
   return {
     record: {
       id: annotationKey(ref),

@@ -9,7 +9,7 @@ import { EngineErrorCode } from '../../errors/EngineErrorCode';
 import type { PdfCoordinates } from '../../pageSpace/coordinates';
 import { checkAnnotationPatch } from '../checkWrite';
 import { ANNOTATION_FIELD_NAMES } from '../field-names';
-import type { AnnotationDTO, AnnotationPatch } from '../kinds';
+import type { Annotation, AnnotationPatch } from '../kinds';
 import type { AnnotationSubtype } from '../subtype';
 import type { DescribeFont } from '../fontFaces';
 import { calloutEndFollows, freeTextFollows } from './freeText';
@@ -34,7 +34,7 @@ export function assertDeclaredFields(subtype: AnnotationSubtype, write: object):
  * an annotation of a type the engine doesn't model is refused.
  */
 function patchForTarget(
-  current: AnnotationDTO<PdfCoordinates>,
+  current: Annotation<PdfCoordinates>,
   patch: AnnotationPatch<PdfCoordinates>,
 ): AnnotationPatch<PdfCoordinates> {
   if (patch.subtype !== undefined && patch.subtype !== current.subtype) {
@@ -77,7 +77,7 @@ function patchForTarget(
  * but its arguments.
  */
 export function pdfResolveAnnotationPatch(
-  current: AnnotationDTO<PdfCoordinates>,
+  current: Annotation<PdfCoordinates>,
   patch: AnnotationPatch<PdfCoordinates>,
   options: ResolveOptions = {},
 ): AnnotationPatch<PdfCoordinates> {

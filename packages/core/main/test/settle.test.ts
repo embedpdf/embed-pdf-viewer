@@ -6,7 +6,7 @@ import type { AnyPlugin, PluginContext } from '../src/types';
 import { bytesInput, immediateEngine, makeHandle } from './helpers';
 
 /**
- * Settling before a download: `documents.save()` first runs every plugin's `onSettle` flush, then
+ * Settling before a download: `documents.download()` first runs every plugin's `onSettle` flush, then
  * waits for the writes in the document's plugin queues, so the file has everything the user sees.
  */
 
@@ -76,7 +76,7 @@ describe('settle before a download', () => {
       log,
     );
 
-    const saving = kernel.documents.save('d');
+    const saving = kernel.documents.download('d');
     await tick();
     expect(log).toEqual(['flush']); // the file waits for the held-back text
 
@@ -96,7 +96,7 @@ describe('settle before a download', () => {
       await write.promise;
       log.push('written');
     });
-    const saving = kernel.documents.save('d');
+    const saving = kernel.documents.download('d');
     await tick();
     expect(log).toEqual([]);
 
@@ -120,7 +120,7 @@ describe('settle before a download', () => {
       { report },
     );
 
-    await expect(kernel.documents.save('d')).resolves.toBeInstanceOf(Uint8Array);
+    await expect(kernel.documents.download('d')).resolves.toBeInstanceOf(Uint8Array);
     expect(log).toEqual(['download']);
     expect(report).toHaveBeenCalledWith(failure);
     await kernel.destroy();
@@ -131,7 +131,7 @@ describe('settle before a download', () => {
     const { kernel, handle } = await openWith([holderPlugin(() => new Promise(() => {}))], log);
     const cancel = new AbortController();
 
-    const saving = kernel.documents.save('d', { signal: cancel.signal });
+    const saving = kernel.documents.download('d', { signal: cancel.signal });
     cancel.abort();
     await expect(saving).rejects.toMatchObject({ code: 'operation-cancelled' });
     expect(handle.download).not.toHaveBeenCalled();
@@ -142,7 +142,7 @@ describe('settle before a download', () => {
     const log: string[] = [];
     const { kernel, handle } = await openWith([holderPlugin(() => new Promise(() => {}))], log);
 
-    const saving = kernel.documents.save('d', { signal: new AbortController().signal });
+    const saving = kernel.documents.download('d', { signal: new AbortController().signal });
     await tick();
     await kernel.documents.close('d');
     await expect(saving).rejects.toMatchObject({ code: 'operation-cancelled' });
@@ -161,7 +161,7 @@ describe('settle before a download', () => {
         const queue = ctx.serialQueue('verbs'); // carries verbs, not writes: not registered
         return {
           api: {
-            runSave: () => queue(() => kernel.documents.save('d')),
+            runSave: () => queue(() => kernel.documents.download('d')),
           },
         };
       },

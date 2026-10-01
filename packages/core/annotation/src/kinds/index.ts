@@ -36,7 +36,14 @@ import {
 } from './widget';
 import { plainStyle } from './styles';
 
-export { defineKind, NO_CAPS, type AnnotationKind, type FieldSpec, type KindCaps } from './define';
+export {
+  defineKind,
+  NO_CAPS,
+  type AnnotationKind,
+  type AnnotationProperty,
+  type FlagKey,
+  type KindCaps,
+} from './define';
 export { fieldFamilyOfKind, widgetKindOf } from './widget';
 
 /** The kinds, by name. */
@@ -79,7 +86,7 @@ export function kindNamed(name: string): AnnotationKind {
   if (kind) return kind;
   let shown = shownOnly.get(name);
   if (!shown) {
-    shown = { name, family: boxFamily, style: plainStyle, caps: NO_CAPS, fields: [] };
+    shown = { name, family: boxFamily, style: plainStyle, caps: NO_CAPS, properties: [] };
     shownOnly.set(name, shown);
   }
   return shown;

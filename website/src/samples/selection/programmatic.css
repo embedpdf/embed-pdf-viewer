@@ -1,4 +1,4 @@
-/* Colors, for light and dark */
+/* Colors */
 :root {
   --ink: #1a2748;
   --muted: #5a6b92;
@@ -11,20 +11,7 @@
   --shadow: rgb(7 32 76 / 0.04);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --ink: #e6ecfa;
-    --muted: #93a3c7;
-    --line: #27365f;
-    --line-strong: #34467a;
-    --surface: #131d3b;
-    --tint: #1a2750;
-    --canvas: #0b1328;
-    --shadow: rgb(0 0 0 / 0.3);
-  }
-}
-
-/* The controls, above the pages */
+/* The buttons, above the pages */
 .toolbar {
   display: flex;
   flex-wrap: wrap;
@@ -34,10 +21,6 @@
 }
 
 .button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
   font: inherit;
   font-size: 13px;
   font-weight: 550;
@@ -75,12 +58,9 @@
   transform: none;
 }
 
-/* Pushes what follows to the right */
-.spacer {
-  flex: 1 1 auto;
-}
-
+/* What is selected now, pushed to the right while there's room */
 .badge {
+  margin-left: auto;
   font-size: 12.5px;
   font-weight: 600;
   color: var(--muted);
@@ -89,6 +69,7 @@
   border-radius: 8px;
   padding: 6px 11px;
   white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 
 /* The pages */

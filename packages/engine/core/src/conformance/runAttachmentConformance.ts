@@ -1,6 +1,6 @@
 import { iconRect } from './creatables';
 import type { ConformanceTestRunner, ConformanceOptions } from './runMetadataConformance';
-import type { FileAttachmentAnnotationDTO, TextAnnotationDTO } from '../annotation/kinds';
+import type { FileAttachmentAnnotation, TextAnnotation } from '../annotation/kinds';
 import type { DocumentHandle } from '../engine/DocumentHandle';
 import type { Engine } from '../engine/Engine';
 import { toAttachmentRef } from '../dto/Attachment';
@@ -205,7 +205,7 @@ export function runAttachmentConformance(
           { subtype: 'file-attachment', rect: iconRect(rect.x, rect.y) },
           { file: picked },
         );
-        const file = (fromFile as FileAttachmentAnnotationDTO).file!;
+        const file = (fromFile as FileAttachmentAnnotation).file!;
         expect(file.name).toBe('figures.csv');
         expect(file.mimeType).toBe('text/csv');
 
@@ -217,7 +217,7 @@ export function runAttachmentConformance(
           },
           { file: new Uint8Array([4, 5]) },
         );
-        expect((untyped as FileAttachmentAnnotationDTO).file!.mimeType).toBe(null);
+        expect((untyped as FileAttachmentAnnotation).file!.mimeType).toBe(null);
 
         // Bare bytes need a name.
         await expect(
@@ -259,7 +259,7 @@ export function runAttachmentConformance(
         );
 
         // Metadata rides the DTO; bytes never do.
-        const dto = created as FileAttachmentAnnotationDTO;
+        const dto = created as FileAttachmentAnnotation;
         expect(dto.subtype).toBe('file-attachment');
         expect(dto.icon).toBe('paperclip');
         expect(dto.color).toEqual('#dc2626');
@@ -274,6 +274,26 @@ export function runAttachmentConformance(
         expect(bytes.length).toBe(data.length);
         expect(Array.from(bytes.slice(0, 16))).toEqual(Array.from(data.slice(0, 16)));
         expect(bytes.every((byte, i) => byte === data[i])).toBe(true);
+
+        // A read goes back in: into a create (its name cleared, as a copy on
+        // the same page needs), with the bytes it downloaded, and into an
+        // update that sends its file back unchanged.
+        const { annotation: copy } = await annotations.create(
+          { ...dto, nm: null },
+          { file: bytes },
+        );
+        expect((copy as FileAttachmentAnnotation).file).toMatchObject({
+          name: 'conformance.bin',
+          mimeType: 'application/octet-stream',
+          description: 'attachment conformance payload',
+          size: data.length,
+        });
+        const { annotation: updated } = await annotations.update(dto.ref, {
+          ...dto,
+          contents: 'changed',
+        });
+        expect((updated as FileAttachmentAnnotation).file?.name).toBe('conformance.bin');
+        expect(updated.contents).toBe('changed');
       } finally {
         await doc.close();
       }
@@ -291,7 +311,7 @@ export function runAttachmentConformance(
           color: '#facc15',
           contents: 'conformance note',
         });
-        const dto = created as TextAnnotationDTO;
+        const dto = created as TextAnnotation;
         expect(dto.subtype).toBe('text');
         expect(dto.icon).toBe('comment');
         expect(dto.color).toEqual('#facc15');
@@ -303,7 +323,7 @@ export function runAttachmentConformance(
           subtype: 'text',
           icon: 'help',
         });
-        expect((updated as TextAnnotationDTO).icon).toBe('help');
+        expect((updated as TextAnnotation).icon).toBe('help');
       } finally {
         await doc.close();
       }

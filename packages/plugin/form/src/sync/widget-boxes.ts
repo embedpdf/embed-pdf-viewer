@@ -1,14 +1,14 @@
 /**
- * Widget geometry, mirrored per page from the widget plane: one annotation
- * read per page, loaded when a page first needs its fill controls. Value
- * writes never move widgets; structural form changes and edits of widget
- * annotations re-read the pages they touch.
+ * Each page's widgets, where they are and how they look, mirrored from the
+ * widget plane: one annotation read per page, loaded when a page first needs
+ * its fill controls. Value writes never move or restyle widgets; structural
+ * form changes and edits of widget annotations re-read the pages they touch.
  */
 import type { DocumentEvent, PageRef } from '@embedpdf/core';
 import type { PageMirror } from '@embedpdf/core';
 import type { FormWidget } from '@embedpdf/engine-core/runtime';
 
-import type { Box, WidgetBoxes } from '../model';
+import type { PageWidget, PageWidgets } from '../model';
 import type { FormContext } from '../services/context';
 
 const pagesOfWidgets = (widgets: readonly FormWidget[]): PageRef[] =>
@@ -37,17 +37,29 @@ function affectedPages(event: DocumentEvent): readonly PageRef[] | 'all' | null 
   }
 }
 
-export function createWidgetBoxesMirror(ctx: FormContext): PageMirror<WidgetBoxes> {
-  return ctx.pageMirror<WidgetBoxes>({
+export function createWidgetBoxesMirror(ctx: FormContext): PageMirror<PageWidgets> {
+  return ctx.pageMirror<PageWidgets>({
     name: 'widget-boxes',
     load: async (doc, page) => {
       const { annotations } = await doc.page(page).annotations.list();
-      const boxes: Record<number, Box> = {};
+      const widgets: Record<number, PageWidget> = {};
       for (const record of annotations) {
         if (record.subtype !== 'widget' || record.ref.kind !== 'objectNumber') continue;
-        boxes[record.ref.objectNumber] = record.rect;
+        widgets[record.ref.objectNumber] = {
+          box: record.rect,
+          look: {
+            border: record.color ?? null,
+            borderWidth: record.strokeWidth ?? 1,
+            borderStyle: record.borderStyle ?? 'solid',
+            background: record.interiorColor ?? null,
+            color: record.fontColor ?? null,
+            fontFamily: record.fontFamily ?? null,
+            fontSize: record.fontSize ?? null,
+            textAlign: record.textAlign ?? 'left',
+          },
+        };
       }
-      return boxes;
+      return widgets;
     },
     affected: affectedPages,
   });

@@ -8,14 +8,13 @@
  */
 import { useEffect } from 'react';
 import { InteractionToken } from '@embedpdf/react/interaction';
-import { useLocale, useT } from '@embedpdf/react/i18n';
+import { useI18nState, useT } from '@embedpdf/react/i18n';
 import { useDocumentId, useOptionalSelector } from '@embedpdf/react/runtime';
 import {
-  StampToken,
-  useArmStampAsset,
   useStamp,
   useStampAssetPreviewUrl,
   useStampAssets,
+  useStampState,
   type StampAsset,
 } from '@embedpdf/react/stamp';
 import { useStampsConfig } from '../config-context';
@@ -31,20 +30,15 @@ export function QuickStamps() {
   const t = useT();
   const stamp = useStamp();
   const config = useStampsConfig();
-  const { locale } = useLocale();
+  const { locale } = useI18nState();
   const assets = useStampAssets();
   const documentId = useDocumentId();
-  const { armAsset } = useArmStampAsset();
   const activeToolId = useOptionalSelector(
     InteractionToken,
     (interaction) => interaction.getActiveToolId(),
     null,
   );
-  const armedId = useOptionalSelector(
-    StampToken,
-    (stamp) => (documentId ? (stamp.getArmedAsset(documentId)?.id ?? null) : null),
-    null,
-  );
+  const armedId = useStampState((state) => state.armedAsset?.id ?? null);
   const ids = Array.isArray(config.toolbar)
     ? config.toolbar
     : config.toolbar && 'library' in config.toolbar
@@ -76,7 +70,9 @@ export function QuickStamps() {
           asset={asset}
           active={activeToolId === 'stamp' && armedId === asset.id}
           onArm={() =>
-            void armAsset(asset.id).catch((error) => console.error('[embedpdf] arm failed', error))
+            void stamp
+              .armAsset(asset.id)
+              .catch((error) => console.error('[embedpdf] arm failed', error))
           }
         />
       ))}

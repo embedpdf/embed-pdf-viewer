@@ -22,7 +22,7 @@ The search plugin finds text in the whole document and highlights every match. R
 - **Searching again replaces the search.** Type another letter and the old search stops; an empty
   `text` clears it.
 - **The first match becomes the active one** without moving the view. `nextHit()`, `previousHit()`
-  and `goToHit(index)` move to a match and bring it into view, and wrap around at the ends.
+  and `goToHit(hit)` move to a match and bring it into view, and wrap around at the ends.
 
 ## Search options
 
@@ -122,10 +122,18 @@ example in dark mode:
 
 ## Click a match on the page
 
-Give `<SearchLayer onHitClick>` a function, and it's called with the match someone clicks, for
-example to make it the active one. The text under a match stays selectable: a drag that starts on a
-match selects text, and only a click calls the function. Without one, matches are only paint, and
-the pointer goes straight through to the page.
+Give `<SearchLayer onHitClick>` a function, and it's called with the match someone clicks.
+`goToHit()` takes that match as it is, so making it the active one is one line:
+
+```tsx
+<SearchLayer onHitClick={(hit) => search.goToHit(hit)} />
+```
+
+<Example name="search/click-match" />
+
+The text under a match stays selectable: a drag that starts on a match selects text, and only a
+click calls the function. Without one, matches are only paint, and the pointer goes straight through
+to the page.
 
 ## Methods
 
@@ -135,7 +143,7 @@ Everything `useSearch()` gives you.
 | :----------------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `search(query, { from? })`                 | Starts a search, replacing the one before, and highlights the matches as they're found. Resolves `{ status, hitCount }` when it's done, replaced or cancelled. An empty `text` clears. [Search options](#search-options) |
 | `nextHit(reveal?)`, `previousHit(reveal?)` | Makes the next or previous match the active one and scrolls to it, wrapping at the ends. Returns the match, or `null` when there is none.                                          |
-| `goToHit(index, reveal?)`                  | Makes one match the active one and scrolls to it. [A list of results](#a-list-of-results)                                                                                         |
+| `goToHit(hit, reveal?)`                    | Makes one match the active one and scrolls to it: the match itself, or its place in the list. [Click a match on the page](#click-a-match-on-the-page)                            |
 | `revealActiveHit(reveal?)`                 | Scrolls back to the active match without changing it                                                                                                                             |
 | `listHits({ page? })`                      | Every match found so far, or the ones on one page. In a component, use `useSearchHits()`.                                                                                          |
 | `listPagesWithHits()`                      | The pages that have a match, in document order                                                                                                                                   |

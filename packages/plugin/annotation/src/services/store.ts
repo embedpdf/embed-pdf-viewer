@@ -36,7 +36,7 @@ import {
   generateUuid,
   resolveAnnotationPatch,
   type AnnotationDraft,
-  type AnnotationDTO,
+  type Annotation,
   type AnnotationPatch,
   type AnnotationRef,
   type AnnotationResources,
@@ -100,7 +100,7 @@ export interface AppliedOutcome extends IntentOutcome {
    * or update left. `null` for a delete, a change with nothing to write, and
    * a refused one.
    */
-  readonly annotations: readonly (AnnotationDTO | null)[];
+  readonly annotations: readonly (Annotation | null)[];
 }
 
 /**
@@ -115,9 +115,11 @@ export interface AnnotationStore {
   /**
    * Run one message through the core, show its change, and start its engine
    * writes. Throws, before anything shows, for a message the engine would
-   * refuse (a `rect` with a new shape), as `apply` does.
+   * refuse (a `rect` with a new shape), as `apply` does. `adjust` changes the
+   * core's result before it shows: a tool's `afterCreate` decides whether
+   * what it just made is selected (write/after-create.ts).
    */
-  commit(message: Message): Commit;
+  commit(message: Message, adjust?: (result: UpdateResult) => UpdateResult): Commit;
   /**
    * Show changes stated in code at once and start their engine writes, exactly
    * like a gesture's: pending until they settle, dropped when refused. Throws,
@@ -192,7 +194,7 @@ function statedChangeOf(model: Model, change: StoreChange): StatedChange {
       ...annotationOfNew(fields as AnnotationDraft, { ref, index: onPage }),
       ...(reply ? { reply: { to: reply.to, type: reply.type ?? 'reply' } } : {}),
       ...(parent ? { parent } : {}),
-    } as AnnotationDTO;
+    } as Annotation;
     const record: ModelAnnotation = {
       ...fromDTO(annotation),
       unconfirmed: true,
@@ -249,7 +251,7 @@ export function createStore(
   let writer: ApplyWriter | null = null;
   const model = view.model;
 
-  const commit = (message: Message): Commit => {
+  const commit = (message: Message, adjust?: (result: UpdateResult) => UpdateResult): Commit => {
     const before = model();
     // A message the engine would refuse (a `rect` with a new shape) throws
     // before anything shows, as a stated change does.
@@ -259,6 +261,7 @@ export function createStore(
     } catch (error) {
       throw toPluginError('annotation', error);
     }
+    if (adjust) result = adjust(result);
     const staged = intents.begin(before, result);
     // A message changes each record once: an effect's write carries the changes of the records it names.
     const tokenOf = new Map(staged.map((change) => [change.id, change.token]));
@@ -328,6 +331,11 @@ export function createStore(
     if (previous.editing !== next.editing) {
       events.editingChanged.emit({
         ref: next.editing ? refOf(next.byId[next.editing]) : null,
+      });
+    }
+    if (previous.hovered !== next.hovered) {
+      events.hoverChanged.emit({
+        ref: next.hovered ? refOf(next.byId[next.hovered]) : null,
       });
     }
   });

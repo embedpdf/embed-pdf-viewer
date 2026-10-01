@@ -1,4 +1,4 @@
-import type { AnnotationDTO, Color } from '@embedpdf/react/annotation';
+import type { Annotation, Color } from '@embedpdf/react/annotation';
 
 /**
  * How a comment card identifies its annotation at a glance: the type's glyph,
@@ -52,7 +52,7 @@ const FALLBACK: CommentTypeConfig = {
   label: 'Comment',
 };
 
-export const commentTypeConfig = (dto: AnnotationDTO): CommentTypeConfig =>
+export const commentTypeConfig = (dto: Annotation): CommentTypeConfig =>
   TYPE_CONFIG[dto.subtype] ?? FALLBACK;
 
 /**
@@ -60,7 +60,7 @@ export const commentTypeConfig = (dto: AnnotationDTO): CommentTypeConfig =>
  * a card recognizable as "that yellow highlight on page 3". Free-text prefers
  * its `fontColor` override, since that is the color a reader actually sees.
  */
-export const commentIconAccent = (dto: AnnotationDTO): IconAccent => {
+export const commentIconAccent = (dto: Annotation): IconAccent => {
   // Engine colors are `'#rrggbb'`, which CSS takes as they are.
   const anyA = dto as { color?: Color; interiorColor?: Color | null; fontColor?: Color };
   const primary = anyA.fontColor ?? anyA.color;

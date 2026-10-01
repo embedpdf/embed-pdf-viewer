@@ -17,6 +17,8 @@ Then switch tools from your toolbar:
 
 <Snippet name="ui/tool-switch" />
 
+<Example name="tools/switch" />
+
 ## The built-in tools
 
 | Tool      | A drag on the page                              | Also                                     |
@@ -34,6 +36,8 @@ way, with `activateTool(id)`, and `tools` in [State](#state) lists them.
 "hold Space to pan" works:
 
 <Snippet name="ui/hold-space" />
+
+<Example name="tools/hold-space" />
 
 `activateDefaultTool()` goes back to the default tool, `pointer` unless you set another.
 
@@ -54,6 +58,8 @@ const remove = interaction.registerTool({
 interaction.activateTool('pin');
 ```
 
+<Example name="tools/pin" />
+
 | Option          | What it is                                                         |
 | :-------------- | :----------------------------------------------------------------- |
 | `id`            | The tool's name, for `activateTool(id)`                            |
@@ -63,7 +69,10 @@ interaction.activateTool('pin');
 | `onHover`       | The pointer moving over a page, with no button pressed             |
 | `touch`         | `'draw'`: one finger drives the tool; `'tap'` (default): a tap is a click, a drag scrolls |
 
-`registerTool()` returns a function that removes the tool again.
+`registerTool()` returns a function that removes the tool again. A tool you drag with takes the press and
+follows the gesture:
+
+<Example name="tools/ruler" />
 
 ## Cursors
 
@@ -77,6 +86,8 @@ tool's own cursor, in three steps:
 - **An image that changes**, such as a pen in the current color: `useToolCursor()` from a component, which follows the values it reads.
 
 <Snippet name="ui/pen-cursor" />
+
+<Example name="tools/cursor" />
 
 <Fw only="react">
 

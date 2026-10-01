@@ -3,7 +3,7 @@
  * page), the active hit, and progress. Every function below is a pure
  * transition; the controller applies them with `ctx.state.update`.
  */
-import type { PageRef, PluginErrorInfo } from '@embedpdf/core';
+import { pageRefsEqual, type PageRef, type PluginErrorInfo } from '@embedpdf/core';
 import type { SearchQuery } from '@embedpdf/engine-core/runtime';
 
 import type { SearchHit, SearchProgress, SearchStatus } from './contract';
@@ -95,6 +95,22 @@ export const setActiveHit = (state: SearchState, index: number): SearchState =>
 
 export const clearSession = (state: SearchState): SearchState =>
   state.status === 'idle' ? state : initialSearchState();
+
+/**
+ * Where `hit` is in `hits`: the same object, or else the hit that covers the
+ * same characters of the same page, so a hit kept from before the search ran
+ * again still finds its place. -1 when it isn't there.
+ */
+export function indexOfHit(hits: readonly SearchHit[], hit: SearchHit): number {
+  const same = hits.indexOf(hit);
+  if (same >= 0) return same;
+  return hits.findIndex(
+    (candidate) =>
+      candidate.start === hit.start &&
+      candidate.count === hit.count &&
+      pageRefsEqual(candidate.page, hit.page),
+  );
+}
 
 /**
  * The pages that have at least one hit, in document order: `pages` is the

@@ -1,8 +1,8 @@
 import type {
   AnnotationBase,
-  CircleAnnotationDTO,
+  CircleAnnotation,
   ShapeAnnotationFields,
-  SquareAnnotationDTO,
+  SquareAnnotation,
   PdfCoordinates,
 } from '@embedpdf/engine-core/runtime';
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
@@ -35,7 +35,7 @@ export function readCircle(
   mem: PdfRuntimeMemory,
   annotPtr: Ptr,
   base: AnnotationBase<PdfCoordinates>,
-): CircleAnnotationDTO<PdfCoordinates> {
+): CircleAnnotation<PdfCoordinates> {
   return { ...base, subtype: 'circle', ...readShapeExtras(fn, mem, annotPtr) };
 }
 
@@ -44,6 +44,6 @@ export function readSquare(
   mem: PdfRuntimeMemory,
   annotPtr: Ptr,
   base: AnnotationBase<PdfCoordinates>,
-): SquareAnnotationDTO<PdfCoordinates> {
+): SquareAnnotation<PdfCoordinates> {
   return { ...base, subtype: 'square', ...readShapeExtras(fn, mem, annotPtr) };
 }

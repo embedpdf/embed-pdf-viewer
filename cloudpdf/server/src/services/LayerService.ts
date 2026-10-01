@@ -81,7 +81,7 @@ import {
   type SignaturePrepared,
   deletedWith,
   formWidget,
-  type AnnotationDTO,
+  type Annotation,
   type AnnotationSubtype,
 } from '@embedpdf/engine-core/runtime';
 import {
@@ -587,7 +587,7 @@ export class LayerService {
     pageObjectNumber: PageObjectNumber,
     ref: AnnotationRef,
     signal?: AbortSignal,
-  ): Promise<AnnotationDTO[]> {
+  ): Promise<Annotation[]> {
     return deletedWith(
       await this.pageAnnotations(ctx, docId, layerName, pageObjectNumber, signal),
       ref,
@@ -635,7 +635,7 @@ export class LayerService {
     layerName: string,
     pageObjectNumber: PageObjectNumber,
     signal?: AbortSignal,
-  ): Promise<AnnotationDTO[]> {
+  ): Promise<Annotation[]> {
     // The worker job below assumes the layer is already attached to the
     // pool's session for `docId`. Most read paths already do this via
     // `documentService.ensureLayerOnPool`; collab gating runs before any

@@ -1,31 +1,36 @@
 import { Viewer, DocumentGate } from '@embedpdf/react/runtime';
 import type { OpenInput } from '@embedpdf/react/runtime';
-import { Stage, stagePlugin, useZoom } from '@embedpdf/react/stage';
+import { Stage, stagePlugin, useStage, useStageState } from '@embedpdf/react/stage';
 import { RenderLayer, renderPlugin } from '@embedpdf/react/render';
 import { cloudEngine } from '@cloudpdf/engine';
 
 import './deep-zoom.css';
 
 const engine = cloudEngine({ baseUrl: 'https://engine.cloudpdf.com' });
-// Defaults: the base bitmap stops at the 640px budget; tiles carry
-// sharpness beyond it — only for the visible region, at your exact zoom.
-const plugins = [stagePlugin(), renderPlugin()];
+// Open at 250%: past what a whole-page picture shows sharply, so tiles carry it.
+const plugins = [stagePlugin({ zoom: { level: 2.5 } }), renderPlugin()];
 
 const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
 function ZoomBar() {
-  const { zoom, zoomIn, zoomOut, fitWidth } = useZoom();
+  const stage = useStage();
+  const zoomLevel = useStageState((state) => state.zoomLevel);
+
   return (
     <div className="toolbar">
-      <button type="button" className="button" onClick={() => zoomOut()}>
+      <button
+        type="button"
+        className="button"
+        aria-label="Zoom out"
+        onClick={() => stage.zoomOut()}
+      >
         −
       </button>
-      <output className="readout">{Math.round(zoom * 100)}%</output>
-      <button type="button" className="button" onClick={() => zoomIn()}>
+      <output className="readout">{Math.round(zoomLevel * 100)}%</output>
+      <button type="button" className="button" aria-label="Zoom in" onClick={() => stage.zoomIn()}>
         +
       </button>
-      <span className="spacer" />
-      <button type="button" className="button" onClick={() => fitWidth()}>
+      <button type="button" className="button push" onClick={() => stage.fitWidth()}>
         Fit width
       </button>
     </div>

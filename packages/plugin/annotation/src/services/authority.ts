@@ -1,6 +1,5 @@
-import { PluginError, pageRefsEqual } from '@embedpdf/core';
 import { annotDeletable, annotTransformable } from '@embedpdf/core-annotation';
-import { annotationKey, type AnnotationRef, type PageRef } from '@embedpdf/engine-core/runtime';
+import { annotationKey, type AnnotationRef } from '@embedpdf/engine-core/runtime';
 
 import type { AnnotationContext } from './context';
 import type { AnnotationStore } from './store';
@@ -13,10 +12,10 @@ import type { AnnotationStore } from './store';
  * control gated here never disagrees with the write's outcome.
  */
 export function createAuthority(
-  ctx: Pick<AnnotationContext, 'doc' | 'document' | 'allows'>,
+  ctx: Pick<AnnotationContext, 'doc' | 'allows'>,
   store: AnnotationStore,
 ) {
-  const canRead = (): boolean => ctx.doc?.security.allows('doc.annotate.read') ?? true;
+  const canRead = (): boolean => ctx.allows('doc.annotate.read');
   // What `ctx.assertAllowed('annotations:create', …)` refuses on, so the twin and the verbs agree.
   const canCreate = (): boolean => ctx.allows('annotations:create');
 
@@ -33,7 +32,7 @@ export function createAuthority(
   // The twins answer "would the verb succeed?" — authority and flags, via
   // the same fused predicates the gestures and chrome consume, so a false
   // twin and a bare-outline render can never disagree (permissions.md).
-  const canEdit = (ref: AnnotationRef): boolean => {
+  const canUpdate = (ref: AnnotationRef): boolean => {
     const record = store.model().byId[annotationKey(ref)];
     return !!record && annotTransformable(record);
   };
@@ -42,17 +41,7 @@ export function createAuthority(
     return !!record && annotDeletable(record);
   };
 
-  const assertPage = (page: PageRef): void => {
-    if (!ctx.document()?.pages.some((pageInfo) => pageRefsEqual(pageInfo.ref, page))) {
-      throw new PluginError(
-        'not-found',
-        'annotation',
-        `page ${page.objectNumber} is not in this document`,
-      );
-    }
-  };
-
-  return { canRead, canCreate, canEdit, canDelete, allowsMutation, assertPage };
+  return { canRead, canCreate, canUpdate, canDelete, allowsMutation };
 }
 
 export type Authority = ReturnType<typeof createAuthority>;

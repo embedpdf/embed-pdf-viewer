@@ -19,16 +19,17 @@ import {
 import {
   annotationKey,
   positionKey,
-  type AnnotationDTO,
+  type Annotation,
   type FormWidget,
 } from '@embedpdf/engine-core/runtime';
 
+import { moveInOrder } from '../model';
 import type { AnnotationContext } from '../services/context';
 import type { AnnotationEvents } from '../services/events';
 
 /** One confirmed annotation. */
 export interface AnnotationRecord {
-  readonly dto: AnnotationDTO;
+  readonly dto: Annotation;
   /**
    * Revision of the engine-baked appearance. It advances when the engine
    * reports new raster content (a re-bake, a repainted widget, a reload), and
@@ -56,7 +57,7 @@ export const NO_RECORDS: AnnotationRecords = { byKey: {}, order: [] };
  */
 function put(
   records: AnnotationRecords,
-  dtos: readonly AnnotationDTO[],
+  dtos: readonly Annotation[],
   bump: boolean,
 ): AnnotationRecords {
   if (!dtos.length) return records;
@@ -108,10 +109,7 @@ const keysOnPages = (records: AnnotationRecords, pages: readonly PageRef[]): str
  * past the one it had, so a reload after a desync re-fetches every raster
  * (the appearances may have changed while the event stream was not trusted).
  */
-function fromSnapshot(
-  current: AnnotationRecords,
-  dtos: readonly AnnotationDTO[],
-): AnnotationRecords {
+function fromSnapshot(current: AnnotationRecords, dtos: readonly Annotation[]): AnnotationRecords {
   const byKey: Record<string, AnnotationRecord> = {};
   const order: string[] = [];
   for (const dto of dtos) {
@@ -127,7 +125,7 @@ function fromSnapshot(
 function withPages(
   records: AnnotationRecords,
   pages: readonly PageRef[],
-  dtos: readonly AnnotationDTO[],
+  dtos: readonly Annotation[],
 ): AnnotationRecords {
   const read = new Set(dtos.map((dto) => annotationKey(dto.ref)));
   const stale = keysOnPages(records, pages).filter((key) => !read.has(key));
@@ -151,7 +149,7 @@ type AnnotationEvent = Extract<
   }
 >;
 
-const recordsOf = (event: AnnotationEvent): readonly AnnotationDTO[] => {
+const recordsOf = (event: AnnotationEvent): readonly Annotation[] => {
   switch (event.type) {
     case 'annotations.created':
       return [event.annotation];
@@ -211,8 +209,23 @@ export function foldRecords(
         positionsReload(records, event) ??
         put(records, [event.annotation], event.appearance.changed)
       );
-    case 'annotations.moved':
-      return positionsReload(records, event) ?? put(records, event.annotations, false);
+    case 'annotations.moved': {
+      const reloaded = positionsReload(records, event);
+      if (reloaded) return reloaded;
+      // The moved records, in their new order, from the first one's new index.
+      const moved = put(records, event.annotations, false);
+      const keys = event.annotations.map((annotation) => annotationKey(annotation.ref));
+      const page = event.page.objectNumber;
+      return {
+        ...moved,
+        order: moveInOrder(
+          moved.order,
+          (key) => moved.byKey[key]?.dto.page.objectNumber === page,
+          keys,
+          event.annotations[0]?.index ?? 0,
+        ),
+      };
+    }
     case 'annotations.deleted':
       return (
         positionsReload(records, event) ??

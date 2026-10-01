@@ -6,7 +6,7 @@ import { HighlightDeclaration } from './declaration';
 
 export { HighlightDeclaration } from './declaration';
 
-export type HighlightAnnotationDTO<C extends Coordinates = PageCoordinates> = ReadOf<
+export type HighlightAnnotation<C extends Coordinates = PageCoordinates> = ReadOf<
   typeof HighlightDeclaration,
   C
 >;
@@ -25,7 +25,7 @@ export const HighlightPatchSchema = HighlightDeclaration.updateSchema;
 
 export const HighlightKind: AnnotationKindModule<
   'highlight',
-  HighlightAnnotationDTO,
+  HighlightAnnotation,
   HighlightDraft,
   HighlightPatch
 > = {

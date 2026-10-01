@@ -21,11 +21,20 @@ import type { EventHook } from '@embedpdf/core';
 import { createDefaultActionsUiAdapter } from '@embedpdf/web';
 
 import { useCapability, useCapabilityEvent, useOptionalCapability } from './runtime';
+import { settingsHook } from './state';
 
-/** The actions capability (execute / executeNamed / policy) for app code. */
+/**
+ * The actions capability (executeNamed, execute, dispatch, the settings) of
+ * the surrounding `<DocumentScope>`'s document, else the active one. Outside
+ * a document, the settings calls work and every other method throws
+ * `not-ready`.
+ */
 export function useActions(): ActionsCapability {
   return useCapability(ActionsToken);
 }
+
+/** The actions settings (`policy`, `triggers`, `openSequence`, `javascript`), with or without a document. Takes a selector. */
+export const useActionsSettings = settingsHook(ActionsToken);
 
 /** Subscribe to one actions event for the mounted lifetime: `useActionsEvent((actions) => actions.onExecuted, handler)`. */
 export function useActionsEvent<T>(

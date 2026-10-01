@@ -4,6 +4,7 @@ import type { AnnotationFlags, AnnotationRef, PdfQuad } from '@embedpdf/engine-c
 import { toPageRef } from '@embedpdf/engine-core/runtime';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import type { CommentsApi } from '../src/contract';
 import { annotationHarness, type FileAnnotation } from './harness';
 import { groupOf, irtOf, styleOf } from '@embedpdf/core-annotation';
 
@@ -98,6 +99,16 @@ const createHarness = annotationHarness;
 
 afterEach(() => vi.restoreAllMocks());
 
+/** Every comment check for one comment, read at once. */
+const commentChecks = (comments: CommentsApi, target: AnnotationRef) => ({
+  canReply: comments.canReply(target),
+  canEditText: comments.canSetText(target),
+  canSetStatus: comments.canSetStatus(target),
+  canSetMarked: comments.canSetMarked(target),
+  canDelete: comments.canDelete(target),
+  canDeleteThread: comments.canDeleteThread(target),
+});
+
 describe('Replace Text grouped persistence', () => {
   it('creates the Caret first, then writes StrikeOut /IRT + /RT /Group', async () => {
     const harness = createHarness();
@@ -183,10 +194,10 @@ describe('annotation flags', () => {
     const harness = createHarness();
     await loadPage(harness, [squareDTO(20)]);
     const id = harness.model().order[0];
-    harness.capability.select(ref(20));
+    harness.capability.selection.set([ref(20)]);
     harness.update.mockResolvedValueOnce({ annotation: squareDTO(20, { locked: true }) });
 
-    harness.capability.updateSelectionFlags({ locked: true });
+    harness.capability.selection.update({ locked: true });
     // optimistic: the model flips immediately, source untouched (still baked)
     expect(harness.model().byId[id].annotation.locked).toBe(true);
     expect(harness.model().byId[id].source).toBe('baked');
@@ -200,25 +211,27 @@ describe('annotation flags', () => {
     await vi.waitFor(() => expect(harness.model().byId[id].source).toBe('baked'));
   });
 
-  it('getSelectionFlags reports uniform values and null for mixed', async () => {
+  it('selection.getProperties reports the flags: uniform values, and mixed ones', async () => {
     const harness = createHarness();
     await loadPage(harness, [squareDTO(21, { locked: true }), squareDTO(22)]);
-    expect(harness.capability.getSelectionFlags()).toBeNull(); // nothing selected
-    harness.capability.select(ref(21));
-    harness.capability.select(ref(22), { add: true });
-    const flags = harness.capability.getSelectionFlags();
-    expect(flags?.print).toBe(true); // uniform
-    expect(flags?.locked).toBeNull(); // mixed
-    expect(flags?.hidden).toBe(false);
+    expect(harness.capability.selection.getProperties().properties).toEqual([]); // nothing selected
+    harness.capability.selection.set([ref(21)]);
+    harness.capability.selection.add([ref(22)]);
+    const { properties, values, mixed } = harness.capability.selection.getProperties();
+    expect(properties.find((property) => property.key === 'locked')?.control).toBe('flag');
+    expect(values.print).toBe(true); // uniform
+    expect(mixed).toContain('locked');
+    expect(mixed).not.toContain('print');
+    expect(values.hidden).toBe(false);
   });
 
   it('unlocking works on a locked annotation (setFlags bypasses the locked gate)', async () => {
     const harness = createHarness();
     await loadPage(harness, [squareDTO(23, { locked: true })]);
     const id = harness.model().order[0];
-    harness.capability.select(ref(23));
+    harness.capability.selection.set([ref(23)]);
     harness.update.mockResolvedValueOnce({ annotation: squareDTO(23) });
-    harness.capability.updateSelectionFlags({ locked: false });
+    harness.capability.selection.update({ locked: false });
     expect(harness.model().byId[id].annotation.locked).toBe(false);
     await vi.waitFor(() => expect(harness.update).toHaveBeenCalledTimes(1));
   });
@@ -499,13 +512,15 @@ describe('links lens — substrate children, no ledger', () => {
   it('a linked annotation selects as a SINGLE unit: no ungroup, full selection', async () => {
     const harness = createHarness();
     await harness.load([hydrationSquare(20), childDTO(21, 20)]);
-    harness.capability.select(ref(20));
+    harness.capability.selection.set([ref(20)]);
     // One selected id — the child never joins the selection…
-    expect(harness.capability.getSelection()).toEqual([ref(20)]);
+    expect(harness.capability.selection.list().map((annotation) => annotation.ref)).toEqual([
+      ref(20),
+    ]);
     // …and the group verbs stay hidden: ungroup on this "group" would strip
     // the child's /IRT and orphan it into an unmanaged standalone link.
-    expect(harness.capability.canUngroup()).toBe(false);
-    expect(harness.capability.canGroup()).toBe(false);
+    expect(harness.capability.selection.canUngroup()).toBe(false);
+    expect(harness.capability.selection.canGroup()).toBe(false);
   });
 
   it('links.set creates the grouped child and resolves when committed; clear deletes it', async () => {
@@ -698,7 +713,7 @@ describe('the comments lens', () => {
         noRotate: true,
       }),
     );
-    expect(created).toEqual(ref(40));
+    expect(created.annotation.ref).toEqual(ref(40));
     expect(harness.model().byId['obj:40']).toBeDefined();
   });
 
@@ -803,7 +818,7 @@ describe('the comments lens', () => {
       } as unknown as FileAnnotation,
       textDto(21, { reply: { to: ref(20), type: 'reply' } }),
     ]);
-    const perms = harness.capability.comments.getPermissions(ref(20));
+    const perms = commentChecks(harness.capability.comments, ref(20));
     expect(perms.canEditText).toBe(false); // lockedContents gates text
     expect(perms.canDelete).toBe(true); // …but not deletion
     expect(perms.canReply).toBe(true);
@@ -819,7 +834,7 @@ describe('the comments lens', () => {
         locked: true,
       } as unknown as FileAnnotation,
     ]);
-    const perms2 = harness.capability.comments.getPermissions(ref(20));
+    const perms2 = commentChecks(harness.capability.comments, ref(20));
     expect(perms2.canDelete).toBe(true);
     expect(perms2.canDeleteThread).toBe(false);
   });
@@ -847,7 +862,7 @@ describe('the comments lens', () => {
         userId: 'alice',
       }),
     ]);
-    const perms = harness.capability.comments.getPermissions(ref(20));
+    const perms = commentChecks(harness.capability.comments, ref(20));
     // My own root and reply delete fine one-by-one…
     expect(perms.canDelete).toBe(true);
     // …but alice's status is a thread member (statusRefs), and the
@@ -859,7 +874,7 @@ describe('the comments lens', () => {
     const harness = createHarness();
     harness.allowsAnnotationCreate.mockReturnValue(false);
     await seed(harness);
-    const perms = harness.capability.comments.getPermissions(ref(20));
+    const perms = commentChecks(harness.capability.comments, ref(20));
     expect(perms.canReply).toBe(false);
     expect(perms.canSetStatus).toBe(false);
     // Mutation authority is unaffected — separate questions.
@@ -881,20 +896,20 @@ describe('the twin law — authority fused into presentation and gestures', () =
     selfOnly(harness);
     await harness.load([stamped(20, 'me'), stamped(21, 'alice')]);
     // Own record: full selection chrome.
-    harness.capability.select(ref(20));
+    harness.capability.selection.set([ref(20)]);
     expect(
       harness.capability.listChromeNodes(PAGE, 1, 0, 1).filter((node) => node.kind === 'handle')
         .length,
     ).toBeGreaterThan(0);
     // Alice's record under `:self`: selectable, but the same fused predicate
     // that answers canEdit(false) strips every handle — pixels can't lie.
-    harness.capability.select(ref(21));
+    harness.capability.selection.set([ref(21)]);
     expect(
       harness.capability.listChromeNodes(PAGE, 1, 0, 1).filter((node) => node.kind === 'handle'),
     ).toHaveLength(0);
-    expect(harness.capability.canEdit(ref(21))).toBe(false);
+    expect(harness.capability.canUpdate(ref(21))).toBe(false);
     expect(harness.capability.canDelete(ref(21))).toBe(false);
-    expect(harness.capability.canEdit(ref(20))).toBe(true);
+    expect(harness.capability.canUpdate(ref(20))).toBe(true);
   });
 
   it('no create authority → creation gestures are inert (no ghost, no draft, no 403)', async () => {
@@ -941,11 +956,11 @@ describe('the twin law — authority fused into presentation and gestures', () =
     const harness = createHarness();
     vi.spyOn(console, 'error').mockImplementation(() => {});
     await harness.load([stamped(20, 'me')]);
-    harness.capability.select(ref(20));
+    harness.capability.selection.set([ref(20)]);
     const id = harness.model().order[0]!;
     const before = styleOf(harness.model().byId[id]!.annotation).color;
     harness.update.mockRejectedValueOnce(new Error('Forbidden'));
-    harness.capability.updateSelection({ color: '#00ff00' });
+    harness.capability.selection.update({ color: '#00ff00' });
     // optimistic first…
     expect(styleOf(harness.model().byId[id]!.annotation).color).toBe('#00ff00');
     // …then the refusal restores the pre-patch annotation.
@@ -968,8 +983,8 @@ describe('per-record authorization (collab-resolver mirrors)', () => {
     const harness = createHarness();
     selfOnly(harness);
     await harness.load([stamped(20, 'me'), stamped(21, 'alice'), stamped(22)]);
-    expect(harness.capability.canEdit(ref(20))).toBe(true);
-    expect(harness.capability.canEdit(ref(21))).toBe(false);
+    expect(harness.capability.canUpdate(ref(20))).toBe(true);
+    expect(harness.capability.canUpdate(ref(21))).toBe(false);
     expect(harness.capability.canDelete(ref(20))).toBe(true);
     // Unstamped record → `{}` target: denied under narrowing, same as the engine.
     expect(harness.capability.canDelete(ref(22))).toBe(false);
@@ -982,16 +997,16 @@ describe('per-record authorization (collab-resolver mirrors)', () => {
     const harness = createHarness();
     selfOnly(harness);
     await harness.load([stamped(20, 'me'), stamped(21, 'alice')]);
-    harness.capability.select(ref(20));
-    harness.capability.select(ref(21), { add: true });
-    expect(harness.capability.canGroup()).toBe(false);
+    harness.capability.selection.set([ref(20)]);
+    harness.capability.selection.add([ref(21)]);
+    expect(harness.capability.selection.canGroup()).toBe(false);
 
     const h2 = createHarness();
     selfOnly(h2);
     await h2.load([stamped(20, 'me'), stamped(21, 'me')]);
-    h2.capability.select(ref(20));
-    h2.capability.select(ref(21), { add: true });
-    expect(h2.capability.canGroup()).toBe(true);
+    h2.capability.selection.set([ref(20)]);
+    h2.capability.selection.add([ref(21)]);
+    expect(h2.capability.selection.canGroup()).toBe(true);
   });
 });
 
@@ -1083,7 +1098,7 @@ describe.each([
   it('preserves vector rendering through consecutive local edits and engine responses', async () => {
     const harness = createHarness();
     await harness.load([dto]);
-    harness.capability.select(dto.ref);
+    harness.capability.selection.set([dto.ref]);
 
     for (const strokeWidth of [2, 3]) {
       const updated = { ...dto, strokeWidth };
@@ -1093,7 +1108,7 @@ describe.each([
           finishWrite = resolve;
         }),
       );
-      harness.capability.updateSelection({ strokeWidth });
+      harness.capability.selection.update({ strokeWidth });
       expect(harness.capability.listPageItems(PAGE)[0].source).toBe('vector');
       const epoch = harness.capability.getAppearanceEpoch(PAGE);
       expect(epoch).toBe('');
@@ -1162,9 +1177,9 @@ describe('distance authoring and recalibration', () => {
     await vi.waitFor(() => expect(harness.capability.get(ref(71))).toBeTruthy());
     expect(harness.capability.listPageItems(PAGE)[0].source).toBe('vector');
     expect(harness.capability.getAppearanceEpoch(PAGE)).toBe('');
-    expect(harness.capability.comments.getPermissions(ref(71)).canEditText).toBe(false);
+    expect(commentChecks(harness.capability.comments, ref(71)).canEditText).toBe(false);
     await expect(harness.capability.comments.setText(ref(71), 'fake value')).rejects.toThrow(
-      'derived',
+      'worked out',
     );
   });
   it('does not create over a winning foreign viewport or before viewport hydration', async () => {
@@ -1287,7 +1302,7 @@ describe.each(['area', 'perimeter'])('%s scale resolution', (tool) => {
     harness.capability.setPageViewports(PAGE, [], fallback);
     harness.capability.createPointer(tool, 'down', PAGE, { x: 220, y: 20 });
     harness.capability.createPointer(tool, 'down', PAGE, { x: 220, y: 120 });
-    harness.capability.finishCreationDraft();
+    harness.capability.draft.finish();
     expect(harness.create).toHaveBeenCalledWith(
       expect.objectContaining({ subtype, measure: region, captionEnabled: true }),
     );

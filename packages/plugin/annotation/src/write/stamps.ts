@@ -1,9 +1,10 @@
-import { fitStampBox, type Rect, type Point } from '@embedpdf/core-annotation';
+import { PluginError, type OperationOptions } from '@embedpdf/core';
+import { fitStampBox, type Id, type Rect, type Point } from '@embedpdf/core-annotation';
 import {
   resolveBinarySource,
   sniffBinaryMetadata,
   toPageRef,
-  type AnnotationRef,
+  type Annotation,
   type BinarySource,
   type PageRef,
 } from '@embedpdf/engine-core/runtime';
@@ -11,16 +12,25 @@ import { InteractionToken } from '@embedpdf/plugin-interaction/contract';
 
 import {
   type ArmedStampPreview,
+  type StampInput,
   type StampPlacement,
   type StampPreviewProvider,
-  type StampToolInput,
 } from '../contract';
 import type { ArmedStampInfo } from '../contract';
 import { previewBucket } from '../host-contract';
 import { setGhostAt } from '../model';
 import type { AnnotationContext, AnnotationServices } from '../services';
-import { appliedRefOf } from './outcomes';
+import type { Applied } from '../services/store';
+import { appliedAnnotationOf } from './outcomes';
 import { ARMED_STAMP_TOOL_ID } from '../tools/definitions';
+
+/** Bytes that aren't a picture a stamp can show. */
+const notAPicture = (): PluginError =>
+  new PluginError(
+    'invalid-input',
+    'annotation',
+    'a stamp must be PNG, JPEG, or one-page PDF bytes',
+  );
 
 /**
  * The armed stamp-tool payload: the bytes the next click places, plus the
@@ -81,13 +91,17 @@ const desiredStampSize = (
  * both the armed and the click-to-place paths funnel through.
  */
 export function createStamps(
-  ctx: Pick<AnnotationContext, 'doc' | 'state' | 'notify' | 'tryGet'>,
+  ctx: Pick<
+    AnnotationContext,
+    'doc' | 'state' | 'notify' | 'tryGet' | 'pageOf' | 'assertAllowed' | 'cancellable'
+  >,
   {
     store,
     geometry,
     tools,
     filePicker,
-  }: Pick<AnnotationServices, 'store' | 'geometry' | 'tools' | 'filePicker'>,
+    afterCreate,
+  }: Pick<AnnotationServices, 'store' | 'geometry' | 'tools' | 'filePicker' | 'afterCreate'>,
 ) {
   let armed: ArmedStamp | null = null;
   /** The public face of the armed payload: a new object on every arm, null when disarmed. */
@@ -98,15 +112,13 @@ export function createStamps(
     ctx.notify();
   };
 
-  const armStamp = async (input: StampToolInput): Promise<void> => {
+  const armStamp = async (input: StampInput, options: OperationOptions = {}): Promise<void> => {
     // Resolve + sniff up front: a bad payload fails here (at the button),
-    // not at the click. The original `source` is kept for the create call —
-    // normalization inside the engine handles it again from scratch.
-    const resolved = await resolveBinarySource(input.source);
+    // not at the click. The original `source` is kept for the create call:
+    // the engine normalizes it again from scratch.
+    const resolved = await ctx.cancellable(options.signal, resolveBinarySource(input.source));
     const meta = sniffBinaryMetadata(resolved.bytes);
-    if (!meta) {
-      throw new Error('[annotation] stamp source must be PNG, JPEG, or single-page PDF bytes');
-    }
+    if (!meta) throw notAPicture();
     // Ghost preview: an explicit `preview` wins (the only way for PDF sources —
     // browsers can't paint those); a provider renders per size bucket; raster
     // sources default to their own bytes.
@@ -159,7 +171,7 @@ export function createStamps(
     desired: { width: number; height: number },
     rotCW = 0,
     identity: { name?: string; subject?: string } = {},
-  ): Promise<AnnotationRef> | null => {
+  ): Applied | null => {
     const doc = ctx.doc;
     const page = geometry.sizeOf(pageObjectNumber);
     if (!doc || !page) return null;
@@ -180,13 +192,14 @@ export function createStamps(
         resources: { appearance: bytesOf(source) },
       },
     ]);
-    // Every placement selects its stamp (the anchor for menus and editing).
-    store.commit({ type: 'select', ids: [...applied.ids] });
-    return appliedRefOf(applied);
+    return applied;
   };
 
-  /** The click path's fire-and-forget wrapper: a rejected placement is logged,
-   *  never thrown into the gesture. */
+  /**
+   * The click path's fire-and-forget wrapper: the tool's `afterCreate` says
+   * whether the stamp is selected; a rejected placement is logged, never
+   * thrown into the gesture.
+   */
   const stageStampAt = (
     pageObjectNumber: number,
     point: Point,
@@ -197,23 +210,27 @@ export function createStamps(
   ): boolean => {
     const placed = createStampAt(pageObjectNumber, point, source, desired, rotCW, identity);
     if (!placed) return false;
-    placed.catch((error) => console.error('[annotation] stamp placement failed:', error));
+    afterCreate.placed(tools.activeTool()?.id, placed.ids as Id[]);
+    appliedAnnotationOf(placed).catch((error) =>
+      console.error('[annotation] stamp placement failed:', error),
+    );
     return true;
   };
 
-  /** Programmatic placement — the same law as a click, awaited. */
+  /** Placement from code: the same law as a click, awaited; selected only when asked. */
   const placeStamp = async (
-    input: StampToolInput,
+    input: StampInput,
     placement: StampPlacement,
-  ): Promise<AnnotationRef> => {
-    const resolved = await resolveBinarySource(input.source);
+    options: OperationOptions = {},
+  ): Promise<{ annotation: Annotation }> => {
+    ctx.assertAllowed('annotations:create', 'annotation.stamps.place');
+    const { ref: page } = ctx.pageOf(placement.page);
+    const resolved = await ctx.cancellable(options.signal, resolveBinarySource(input.source));
     const meta = sniffBinaryMetadata(resolved.bytes);
-    if (!meta) {
-      throw new Error('[annotation] stamp source must be PNG, JPEG, or single-page PDF bytes');
-    }
+    if (!meta) throw notAPicture();
     const placed = createStampAt(
-      placement.page.objectNumber,
-      placement.at,
+      page.objectNumber,
+      placement.center,
       input.source,
       desiredStampSize(meta, placement.targetWidth ?? input.targetWidth, input.intrinsicSize),
       placement.rotation ?? 0,
@@ -223,11 +240,18 @@ export function createStamps(
       },
     );
     if (!placed) {
-      throw new Error(
-        `[annotation] cannot place a stamp on page ${placement.page.objectNumber}: document or page not ready`,
+      throw new PluginError(
+        'not-ready',
+        'annotation',
+        `page ${page.objectNumber} isn't laid out yet`,
       );
     }
-    return placed;
+    if (placement.select) store.commit({ type: 'select', ids: [...placed.ids] });
+    const annotation = await ctx.cancellable(options.signal, appliedAnnotationOf(placed));
+    if (!annotation) {
+      throw new PluginError('operation-failed', 'annotation', 'the stamp could not be placed');
+    }
+    return { annotation };
   };
 
   const placeArmedStamp = (
@@ -263,7 +287,7 @@ export function createStamps(
     const resolved = await resolveBinarySource(source);
     const meta = sniffBinaryMetadata(resolved.bytes);
     if (!meta) {
-      console.error('[annotation] stamp source must be PNG, JPEG, or single-page PDF bytes');
+      console.error('[annotation]', notAPicture().message);
       return;
     }
     stageStampAt(pageObjectNumber, point, source, desiredStampSize(meta, targetWidth), rotCW);
@@ -306,11 +330,15 @@ export function createStamps(
     );
   };
 
+  /** The `stamps` noun. */
+  const stamps = {
+    arm: armStamp,
+    disarm: disarmStamp,
+    isArmed: () => armed != null,
+    place: placeStamp,
+  };
+
   const api = {
-    armStamp,
-    disarmStamp,
-    placeStamp,
-    hasArmedStamp: () => armed != null,
     placeArmedStamp: (page: PageRef, point: Point, displayRotation?: number) =>
       placeArmedStamp(page.objectNumber, point, displayRotation),
     requestStampAt: (page: PageRef, point: Point, displayRotation?: number) =>
@@ -332,7 +360,7 @@ export function createStamps(
     },
   };
 
-  return { armed: () => armed, placeArmedStamp, requestStampAt, api };
+  return { armed: () => armed, placeArmedStamp, requestStampAt, stamps, api };
 }
 
 export type Stamps = ReturnType<typeof createStamps>;

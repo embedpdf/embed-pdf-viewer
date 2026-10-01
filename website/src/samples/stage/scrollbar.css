@@ -1,20 +1,11 @@
-/* Colors, for light and dark */
+/* Colors */
 :root {
   --muted: #5a6b92;
   --line: #e6eaf2;
-  --tint: #eef3fd;
+  --tint: #f3f7fe;
   --canvas: #f7f9fc;
+  --accent: #054fb3;
   --shadow: rgb(7 32 76 / 0.04);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --muted: #93a3c7;
-    --line: #27365f;
-    --tint: #1a2750;
-    --canvas: #0b1328;
-    --shadow: rgb(0 0 0 / 0.3);
-  }
 }
 
 /* The reading progress, above the pages */
@@ -31,6 +22,34 @@
   border-radius: 999px;
   background: linear-gradient(90deg, #0876fd, #7db6ff);
   transition: width 0.12s linear;
+}
+
+/* The scrollbar: the component places it, these rules give it its look */
+.scrollbar {
+  margin: 6px 2px;
+  border-radius: 999px;
+  transition:
+    opacity 0.2s,
+    background-color 0.15s ease;
+}
+
+.scrollbar:hover,
+.scrollbar[data-dragging] {
+  background: rgb(7 32 76 / 0.06);
+}
+
+.thumb {
+  --epdf-scrollbar-thumb: #9aaccc;
+  cursor: grab;
+}
+
+.scrollbar:hover .thumb,
+.scrollbar[data-dragging] .thumb {
+  --epdf-scrollbar-thumb: var(--accent);
+}
+
+.scrollbar[data-dragging] .thumb {
+  cursor: grabbing;
 }
 
 /* The pages */

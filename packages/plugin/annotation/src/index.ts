@@ -20,10 +20,6 @@ export {
   type Placement,
 } from '@embedpdf/core-annotation';
 export { widgetAppearanceOf } from './authoring';
-// The comments lens's thread shapes (composed in engine-core per
-// ISO 32000 §12.5.6.3) + the annotation identity type its verbs take — re-exported
-// so consumers type against this package alone.
-export { DEFAULT_CHROME } from './model';
 export { DEFAULT_TOOLS } from './tools/definitions';
 export type {
   AnnotationToolDef,
@@ -38,7 +34,7 @@ export type {
   ToolAuthoringKind,
   ToolDefaultsFor,
 } from './tools/definitions';
-// The kinds and their editable-field schema (defined in the portable core;
+// The kinds and their style-panel properties (defined in the portable core;
 // re-exported so app code building property UIs needs only this package):
-// `kindNamed('square').fields`.
-export { kindNamed } from '@embedpdf/core-annotation';
+// `propertiesOf(kindNamed('square'))`.
+export { kindNamed, propertiesOf } from '@embedpdf/core-annotation';

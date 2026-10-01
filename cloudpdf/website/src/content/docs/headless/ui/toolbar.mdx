@@ -16,6 +16,8 @@ and what it does. These are from the [standard commands](commands#the-standard-c
 
 <Snippet name="ui/toolbar" />
 
+<Example name="toolbar/basic" />
+
 Resize the window, and the toolbar adjusts on its own. It measures real rendered widths, so a longer
 translation or a bigger font just works.
 
@@ -46,6 +48,8 @@ Not everything is a command: a page number input, a search box. Put a custom ite
 it:
 
 <Snippet name="ui/toolbar-custom" />
+
+<Example name="toolbar/custom-item" />
 
 The second argument, `'page:go-to'` (a command of your own that opens a "Go to page" dialog), is what
 the item becomes in the "More" menu when there's no room for it. `variants` lets it get smaller first, like a command's variants.
@@ -99,6 +103,8 @@ Most viewers change the toolbar with what people do: annotation tools while anno
 while building a form. Keep a bar per mode and pick one from your state:
 
 <Snippet name="ui/toolbar-mode" />
+
+<Example name="toolbar/modes" />
 
 ## Good to know
 

@@ -35,6 +35,15 @@ business, not yours.
 
 <Snippet name="concepts/annotation-actions" />
 
+<Engine local>
+
+Each control below shows only when its check says yes. Pick another role, and the document opens
+again with its permissions:
+
+<Example name="permissions/checks" />
+
+</Engine>
+
 ## One answer per annotation
 
 Checks that take a `ref` answer for that one annotation, field or comment. In a shared document, a
@@ -49,6 +58,12 @@ Checks are there to keep your UI honest; the engine doesn't rely on them. A refu
 the same way in every plugin:
 
 <Snippet name="concepts/permission-denied" />
+
+<Engine local>
+
+<Example name="permissions/refused" />
+
+</Engine>
 
 The local and the cloud engine refuse the same way, so this one check covers both.
 

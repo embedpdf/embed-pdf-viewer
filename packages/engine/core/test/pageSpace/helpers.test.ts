@@ -2,7 +2,7 @@ import { describe, expect, test } from 'vitest';
 
 import { pdfAppearanceTurnOf } from '../../src/annotation/appearanceTurn';
 import { pdfDrawnPointsOf } from '../../src/annotation/drawnPoints';
-import type { AnnotationDTO } from '../../src/annotation/kinds';
+import type { Annotation } from '../../src/annotation/kinds';
 import {
   glyphLooseBounds,
   glyphLooseQuad,
@@ -142,12 +142,12 @@ describe('page-space helpers agree with the originals', () => {
       { subtype: 'polyline', rotation: null, vertices: [pointAt(), pointAt()] },
     ];
     for (const annotation of cases) {
-      const dto = annotation as unknown as AnnotationDTO<PdfCoordinates>;
+      const dto = annotation as unknown as Annotation<PdfCoordinates>;
       const page = pageAnnotationOf(dto, visible, boxOf);
       const expected = pdfDrawnPointsOf(dto)!.map((set) => set.map(toPage));
       close(drawnPointsOf(page), expected);
     }
-    expect(drawnPointsOf({ subtype: 'square' } as AnnotationDTO)).toBeNull();
+    expect(drawnPointsOf({ subtype: 'square' } as Annotation)).toBeNull();
   });
 
   test('the appearance turn', () => {

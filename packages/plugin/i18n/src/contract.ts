@@ -1,67 +1,91 @@
 /**
- * @embedpdf/plugin-i18n/contract — translations and locale.
+ * @embedpdf/plugin-i18n/contract — translations and the current language.
  *
- * Translation is pure data over pure state: locale packs live in the plugin's
- * state (not in a side-table), so `t()` is a pure read, every consumer is
- * reactive through the one kernel change stream, and the whole thing
- * serializes (SSR, snapshots, persist). Workspace-scoped, `requires: []`,
- * never touches the engine or the DOM — the capability is alive from
- * `createKernel()`, before a single WASM byte is fetched. The plugin ships no
- * strings: mechanism here, content (locale packs) in the product that embeds it.
+ * Languages are data: the packs live in the plugin's state, so `t()` is a pure
+ * read and every reader follows the kernel's one change stream. The plugin is
+ * workspace-scoped and needs no engine or document, so it translates a loading
+ * screen and a password prompt too. It ships EmbedPDF's own strings (the
+ * standard commands' labels) in eight languages, under the app's.
  */
-import type { EventHook, OperationOptions, PluginErrorInfo, Unsubscribe } from '@embedpdf/core';
+import type {
+  DeepPartial,
+  EventHook,
+  OperationOptions,
+  PluginErrorInfo,
+  SettingsApi,
+  Unsubscribe,
+} from '@embedpdf/core';
 
 export { I18nToken } from './token';
 
 /**
- * Nested tree of translation strings. Leaves interpolate `{param}` slots. A dotted key is the
- * same as a nested one: `{ 'review.reject': 'Reject' }` is `{ review: { reject: 'Reject' } }`.
+ * A tree of strings. A leaf may hold `{name}` slots. A dotted key is the same as a nested one:
+ * `{ 'review.reject': 'Reject' }` is `{ review: { reject: 'Reject' } }`.
  */
 export interface TranslationDictionary {
   readonly [key: string]: string | TranslationDictionary;
 }
 
+/** How a language reads. */
+export type TextDirection = 'ltr' | 'rtl';
+
+/** A language and its strings. */
 export interface Locale {
-  /** Language tag (RFC 5646): 'en', 'es', 'ar', 'zh-Hans'. */
+  /** Its language tag (RFC 5646): `'en'`, `'nl'`, `'ar'`, `'zh-CN'`. */
   readonly code: string;
-  /** Native display name: 'Español' — what a locale switcher shows. */
+  /** Its name in itself, as a language picker shows it: `'Nederlands'`. */
   readonly name: string;
-  /** Text direction for viewer chrome. Defaults to 'ltr'. */
-  readonly dir?: 'ltr' | 'rtl';
+  /** How it reads; `'ltr'` when left out. */
+  readonly direction?: TextDirection;
   readonly translations: TranslationDictionary;
 }
 
-export interface I18nConfig {
+/** Loads a language the first time someone switches to it. */
+export type LocaleLoader = () => Promise<Locale>;
+
+/**
+ * The i18n plugin's settings. `i18nPlugin(config)` registers them over
+ * {@link I18N_DEFAULTS}, and `updateSettings()` changes them while the app runs: a new `locale`
+ * switches to it, new `locales` are registered, and `fallbackLocale` and `loaders` apply to the
+ * next lookup and the next switch.
+ */
+export interface I18nSettings {
   /**
-   * Startup locale. Compute platform inputs outside the plugin — it never
-   * touches the DOM:
-   *
-   * ```ts
-   * i18nPlugin({ locale: negotiateLocale(codes, navigator.languages) ?? 'en' })
-   * ```
-   *
-   * May name a `loaders` pack: the fallback locale shows until the pack
-   * arrives (the plugin fetches it once connected). Defaults to `fallbackLocale`.
+   * The language to start with; `null` starts with `fallbackLocale`. Pick it outside the plugin,
+   * which never reads the browser: `negotiateLocale(codes, navigator.languages)`. A language in
+   * `loaders` shows the fallback language until it has loaded.
    */
-  locale?: string;
-  /** The pack tried when a key misses the current locale. Default 'en'. */
-  fallbackLocale?: string;
-  /** Eagerly available packs. */
-  locales?: Locale[];
+  readonly locale: string | null;
+  /** The language to use for a string another language doesn't have. */
+  readonly fallbackLocale: string;
+  /** Languages loaded from the start. */
+  readonly locales: readonly Locale[];
   /**
-   * Lazy packs: code → loader. `setLocale(code)` fetches on demand, registers
-   * the pack, then switches. Until a lazy pack loads, a locale switcher shows
-   * its code as the name — register eagerly (packs are small) when you want
-   * native names in the switcher up front.
+   * Languages loaded the first time someone switches to them, by code. Until then a language
+   * picker shows the code as the name.
    */
-  loaders?: Record<string, () => Promise<Locale>>;
+  readonly loaders: Readonly<Record<string, LocaleLoader>>;
 }
+
+const NO_LOCALES: readonly Locale[] = [];
+const NO_LOADERS: Readonly<Record<string, LocaleLoader>> = {};
+
+/** What the i18n settings are when the app registers none. */
+export const I18N_DEFAULTS: I18nSettings = {
+  locale: null,
+  fallbackLocale: 'en',
+  locales: NO_LOCALES,
+  loaders: NO_LOADERS,
+};
+
+/** What `i18nPlugin(config)` takes: any of the settings, merged over the defaults. */
+export type I18nConfig = DeepPartial<I18nSettings>;
 
 export interface TranslateOptions {
   /**
-   * `{slot}` interpolation values. When `count` is a number and the key
-   * resolves to a branch object, the branch is picked by the locale's plural
-   * category (`Intl.PluralRules`), falling back to `other`:
+   * The values of the string's `{name}` slots. A number `count` also picks the plural: a key
+   * whose string is `{ one, other }` gives the form for the language's plural rule
+   * (`Intl.PluralRules`), and `other` when the rule's form is missing.
    *
    * ```ts
    * // pages: { one: '{count} page', other: '{count} pages' }
@@ -69,16 +93,16 @@ export interface TranslateOptions {
    * ```
    */
   params?: Record<string, string | number>;
-  /** Returned (interpolated) when the key misses every pack — instead of the key. */
+  /** What to show, with its slots filled, when no language has the key; the key itself otherwise. */
   fallback?: string;
 }
 
-/** A locale as a switcher sees it — registered packs plus not-yet-loaded lazy ones. */
+/** A language as a picker shows it: the loaded ones and the ones in `loaders`. */
 export interface LocaleInfo {
   readonly code: string;
-  /** Native name; the bare code until a lazy pack has loaded. */
+  /** Its name in itself; the code until a language in `loaders` has loaded. */
   readonly name: string;
-  readonly dir: 'ltr' | 'rtl';
+  readonly direction: TextDirection;
   readonly loaded: boolean;
 }
 
@@ -92,42 +116,45 @@ export interface LocaleLoadFailedEvent {
   readonly error: PluginErrorInfo;
 }
 
-export interface I18nCapability {
-  /** Translate a key: current locale → fallback locale → `options.fallback` → the key. The one bare-name read. */
+export interface I18nCapability extends SettingsApi<I18nSettings> {
+  /**
+   * A string in the current language, with `params` filled in: the app's strings for the
+   * language, then EmbedPDF's own, then the same for the fallback language, then
+   * `options.fallback`, then the key. A key no language has warns once in the console.
+   */
   t(key: string, options?: TranslateOptions): string;
   /**
-   * A translate function for render code. It calls `t`, and keeps its
-   * identity until the locale or the registered translations change, so a
-   * memoized consumer holding it re-renders exactly when its strings may differ.
+   * A `t` function that stays the same until the language or the strings change, so a memoized
+   * component holding it renders again exactly when its strings may differ.
    */
   getTranslator(): (key: string, options?: TranslateOptions) => string;
-  /** Is a key translated in the current or fallback locale? Never warns. */
+  /** Whether a key has a string in the current or the fallback language. Never warns. */
   hasKey(key: string): boolean;
+  /** The current language's code. */
   getLocale(): string;
-  /** Text direction of the current locale — wire to `dir=` on the shell. */
-  getDirection(): 'ltr' | 'rtl';
-  /** Every known locale (registered + lazy), in registration order. Reference-stable. */
+  /** How the current language reads: set it as `dir` on your viewer's root. */
+  getDirection(): TextDirection;
+  /** Every language you can switch to, loaded or not, in the order they were added. The same array until one changes. */
   listLocales(): readonly LocaleInfo[];
-  /** Code of the lazy pack being fetched right now, if any. */
+  /** The code of the language being loaded, or `null`. */
   getLoadingLocale(): string | null;
   /**
-   * Switch locale. Resolves once the locale is usable (a lazy pack is fetched
-   * first); rejects `not-found` for an unknown code, `operation-failed` when
-   * the pack fails to load (firing `onLocaleLoadFailed`), and
-   * `operation-cancelled` when a newer call supersedes this one. Fires
-   * `onLocaleChanged` once the new locale is current.
+   * Switch the language, loading it first when it's in `loaders`. Resolves once it shows, and
+   * fires `onLocaleChanged`. Rejects `not-found` for a code that is neither loaded nor in
+   * `loaders`, `operation-failed` when it can't load (and fires `onLocaleLoadFailed`), and
+   * `operation-cancelled` when the signal fires or a newer call replaces it.
    */
   setLocale(code: string, options?: OperationOptions): Promise<void>;
-  /** Register a pack at runtime (customer-supplied translations). The remover drops it again. */
+  /** Add a whole language, and get a function that removes it again. */
   registerLocale(locale: Locale): Unsubscribe;
   /**
-   * Merge keys into a pack (later keys win; dotted keys work). A lazy pack that hasn't loaded yet
-   * gets them when it loads, on top of its own strings. Throws `not-found` for a code that is
-   * neither registered nor has a loader.
+   * Add strings to a language, loaded or not, replacing the ones with the same key; dotted keys
+   * work. A language in `loaders` gets them when it loads, on top of its own. Throws `not-found`
+   * for a code that is neither loaded nor in `loaders`.
    */
-  addTranslations(code: string, dictionary: TranslationDictionary): void;
-  /** The current locale changed and is usable; never fires while a lazy pack is still loading. */
+  addTranslations(code: string, translations: TranslationDictionary): void;
+  /** The current language changed and shows; never while a language is still loading. */
   readonly onLocaleChanged: EventHook<LocaleChangedEvent>;
-  /** A lazy pack failed to load; the previous locale stays. */
+  /** A language in `loaders` couldn't be loaded; the current language stays. */
   readonly onLocaleLoadFailed: EventHook<LocaleLoadFailedEvent>;
 }

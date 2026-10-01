@@ -36,10 +36,8 @@ export function createActivation(
   ctx: FormContext,
   services: Pick<FormServices, 'fields' | 'siblings' | 'scripting' | 'enqueue'>,
 ) {
-  const { fields, enqueue } = services;
+  const { fields, enqueue, scripting } = services;
   const annotationHost = services.siblings.annotation;
-  const scripting = services.scripting.controller;
-  const surfaceViaActions = services.scripting.surface;
 
   const annotationActivation = async (ref: AnnotationRef) => {
     const loaded = annotationHost?.get(ref);
@@ -53,7 +51,8 @@ export function createActivation(
     ref: FormFieldRef,
     annotationRef: AnnotationRef,
   ): Promise<FormCommitResult> => {
-    if (!scripting) {
+    const pipeline = scripting.controller();
+    if (!pipeline) {
       return {
         status: 'unchanged',
         scripted: false,
@@ -72,8 +71,8 @@ export function createActivation(
         diagnostics: [],
       };
     }
-    const result = await scripting.activate(ref, action);
-    surfaceViaActions(result, 'user');
+    const result = await pipeline.activate(ref, action);
+    scripting.surface(result, 'user');
     return result;
   };
 
@@ -110,17 +109,20 @@ export function createActivation(
 
   return {
     api: {
-      activateWidget: async (annotationRef): Promise<WidgetActivationResult> => {
+      activateWidget: async (annotationRef, options): Promise<WidgetActivationResult> => {
         const field = fieldForWidget(fields.get(), widgetObjectOf(annotationRef));
         if (!field) throw new PluginError('not-found', 'form', 'no form field owns this widget');
         const actions = ctx.tryGet(ActionsToken);
         if (actions) {
-          const result = await actions.dispatch({
-            scope: 'activate',
-            ref: annotationRef,
-            page: annotationRef.page,
-            source: widgetSource(field.ref, annotationRef),
-          });
+          const result = await ctx.cancellable(
+            options?.signal,
+            actions.dispatch({
+              scope: 'activate',
+              ref: annotationRef,
+              page: annotationRef.page,
+              source: widgetSource(field.ref, annotationRef),
+            }),
+          );
           const noTree =
             result.status === 'inert' &&
             result.steps.length === 0 &&
@@ -129,7 +131,10 @@ export function createActivation(
         }
         return {
           kind: 'form',
-          result: await enqueue(() => activateThroughScripts(field.ref, annotationRef)),
+          result: await enqueue(
+            () => ctx.cancellable(options?.signal, activateThroughScripts(field.ref, annotationRef)),
+            options,
+          ),
         };
       },
       notifyWidgetEvent: (fieldRef, annotationRef, event) => {

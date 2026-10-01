@@ -38,6 +38,7 @@ import { createPageMirror } from './page-mirror';
 import { createSerialQueue, type SerialQueue } from './serial-queue';
 import { cancellable } from './cancellable';
 import { findPage, pageOf } from './page-of';
+import { readWrapped, type DownloadWrap } from './context';
 import { permissionDenied, sessionAllows } from './permissions';
 import { createSettingsStore, type NoSettings, type SettingsDeclaration } from './settings';
 import { settle, type SettleFlush } from './settle';
@@ -45,7 +46,7 @@ import { createStore } from './store';
 import {
   DocumentsToken,
   type CapabilityToken,
-  type DocInfo,
+  type DocumentInfo,
   type DocumentMeta,
   type DocumentsCapability,
   type OperationOptions,
@@ -97,8 +98,13 @@ export interface TestContext<S, T extends object = NoSettings> extends PluginCon
   connect<C>(instance: { api: C; connect?: () => void }): C;
   /** Deliver a confirmed document event, as the engine would (the default `doc.events`). */
   emitDocumentEvent(event: DocumentEvent): void;
-  /** What `documents.save()` does first: run every `onSettle` flush and wait for it (settle.ts). */
+  /** What `documents.download()` does first: run every `onSettle` flush and wait for it (settle.ts). */
   settle(signal?: AbortSignal): Promise<void>;
+  /**
+   * What `documents.download()` does after settling: `read` the file inside every
+   * `aroundDownload` wrap, the first registered outermost.
+   */
+  download(read: () => Promise<Uint8Array>): Promise<Uint8Array>;
   /** Run the registered cleanups and abort the lifetime (the plugin's unmount). */
   dispose(): Promise<void>;
 }
@@ -133,7 +139,12 @@ const layoutOf = (page: TestPage, index: number): PageLayout => {
 
 /** A read-only document registry holding the test's one document. */
 function testDocuments(meta: DocumentMeta): DocumentsCapability {
-  const info: DocInfo = { id: meta.id, status: 'ready', pageCount: meta.pageCount };
+  const info: DocumentInfo = {
+    id: meta.id,
+    status: 'ready',
+    pageCount: meta.pageCount,
+    hasUnsavedChanges: false,
+  };
   const known = (id?: string) => id === undefined || id === meta.id;
   const pagesOf = (id?: string) => (known(id) ? meta.pages : []);
   const unsupported = (verb: string) => () => {
@@ -149,11 +160,11 @@ function testDocuments(meta: DocumentMeta): DocumentsCapability {
     getCount: () => 1,
     getOrder: () => [meta.id],
     listPages: pagesOf,
-    getPage: (ref, id) => pagesOf(id).find((page) => pageRefsEqual(page.ref, ref)) ?? null,
-    getPageAt: (index, id) => pagesOf(id)[index] ?? null,
+    getPage: (page, id) => findPage(pagesOf(id), page),
     getPageIndex: (ref, id) => pagesOf(id).findIndex((page) => pageRefsEqual(page.ref, ref)),
     getRevision: (id) => (known(id) ? meta.revision : -1),
-    allows: () => true,
+    canDownload: () => true,
+    canPrint: () => true,
     open: unsupported('open'),
     retry: unsupported('retry'),
     rename: unsupported('rename'),
@@ -165,15 +176,16 @@ function testDocuments(meta: DocumentMeta): DocumentsCapability {
     setOrder: unsupported('setOrder'),
     move: unsupported('move'),
     swap: unsupported('swap'),
-    save: unsupported('save'),
-    saveLayer: unsupported('saveLayer'),
+    download: unsupported('download'),
+    downloadLayer: unsupported('downloadLayer'),
     onOpened: never,
     onOpenFailed: never,
     onLocked: never,
     onClosed: never,
     onActiveChanged: never,
     onPagesChanged: never,
-  } as DocumentsCapability;
+    onUnsavedChangesChanged: never,
+  } satisfies DocumentsCapability;
 }
 
 export function createTestContext<S = void, T extends object = NoSettings>(
@@ -188,6 +200,7 @@ export function createTestContext<S = void, T extends object = NoSettings>(
   const cleanups: Array<() => void | Promise<void>> = [];
   const lifetime = new AbortController();
   const settleFlushes = new Set<SettleFlush>();
+  const downloadWraps: DownloadWrap[] = [];
   const pages = (options.pages ?? []).map(layoutOf);
   const capabilities = new Map<CapabilityToken<unknown>, unknown>(options.capabilities ?? []);
   const documentEvents = createEventHook<DocumentEvent>(report);
@@ -236,6 +249,7 @@ export function createTestContext<S = void, T extends object = NoSettings>(
     pages,
     revision: 1,
     renderPolicy: { kind: 'continuous' },
+    hasUnsavedChanges: false,
   };
   if (!capabilities.has(DocumentsToken as CapabilityToken<unknown>)) {
     capabilities.set(DocumentsToken as CapabilityToken<unknown>, testDocuments(meta));
@@ -316,6 +330,13 @@ export function createTestContext<S = void, T extends object = NoSettings>(
         settleFlushes.delete(flush);
       });
     },
+    aroundDownload: (wrap) => {
+      downloadWraps.push(wrap);
+      cleanups.push(() => {
+        const index = downloadWraps.indexOf(wrap);
+        if (index >= 0) downloadWraps.splice(index, 1);
+      });
+    },
     events: {
       source: <T>() => {
         const hook = createEventHook<T>((error) =>
@@ -387,6 +408,7 @@ export function createTestContext<S = void, T extends object = NoSettings>(
     },
     emitDocumentEvent: (event) => documentEvents.emit(event),
     settle: (signal) => settle(settleFlushes, [signal, lifetime.signal], report),
+    download: (read) => readWrapped(downloadWraps, read),
     dispose: async () => {
       lifetime.abort();
       for (const fn of cleanups.splice(0).reverse()) await fn();

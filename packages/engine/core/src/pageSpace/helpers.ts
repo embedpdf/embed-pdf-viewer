@@ -18,7 +18,7 @@ import { mirroredRun } from './text';
 import { pdfAppearanceTurnOf } from '../annotation/appearanceTurn';
 import { pdfDrawnPointsOf } from '../annotation/drawnPoints';
 import { semanticEqual } from '../annotation/appearance';
-import type { AnnotationDraft, AnnotationDTO, AnnotationPatch } from '../annotation/kinds';
+import type { AnnotationDraft, Annotation, AnnotationPatch } from '../annotation/kinds';
 import {
   annotationOfResolvedDraft,
   type DraftContext,
@@ -120,7 +120,7 @@ export const pageGlyphLooseBounds = (
  * box. One list for a line (its two ends) or a polygon, one per ink stroke;
  * `null` for any other kind.
  */
-export function drawnPointsOf(annotation: AnnotationDTO): PagePoint[][] | null {
+export function drawnPointsOf(annotation: Annotation): PagePoint[][] | null {
   const flip = (points: readonly PagePoint[]) => points.map(mirroredPoint);
   let mirrored: object;
   switch (annotation.subtype) {
@@ -152,7 +152,7 @@ export function drawnPointsOf(annotation: AnnotationDTO): PagePoint[][] | null {
     default:
       return null;
   }
-  const sets = pdfDrawnPointsOf(mirrored as AnnotationDTO<PdfCoordinates>);
+  const sets = pdfDrawnPointsOf(mirrored as Annotation<PdfCoordinates>);
   return sets && sets.map((set) => set.map(unmirroredPoint));
 }
 
@@ -206,7 +206,7 @@ const noOtherPage: VisibleBoxOf = () => {
  * rect has no width or height to stretch. Each refusal is `InvalidArg` on
  * `rect`.
  */
-export function shapeForRect<A extends AnnotationDTO>(annotation: A, rect: PageBox): Partial<A> {
+export function shapeForRect<A extends Annotation>(annotation: A, rect: PageBox): Partial<A> {
   if (!DRAWN_RECT_KINDS.has(annotation.subtype)) return { rect } as Partial<A>;
   const read = annotation as unknown as Record<string, unknown>;
   const shape = Object.fromEntries(
@@ -214,7 +214,7 @@ export function shapeForRect<A extends AnnotationDTO>(annotation: A, rect: PageB
       .filter((name) => read[name] !== undefined)
       .map((name) => [name, read[name]]),
   );
-  const mirrored = pdfAnnotationOf(shape as AnnotationDTO, MIRROR, noOtherPage);
+  const mirrored = pdfAnnotationOf(shape as Annotation, MIRROR, noOtherPage);
   const placed = pdfShapeForRect(mirrored, mirroredRect(rect));
   // The kind picks what each field holds; the answer is only the shape.
   const { subtype: _kind, ...fields } = pageAnnotationPatchOf(
@@ -240,7 +240,7 @@ export function shapeForRect<A extends AnnotationDTO>(annotation: A, rect: PageB
  * from every door. Values `patch` gives come back as given.
  */
 export function resolveRectCommand(
-  annotation: AnnotationDTO,
+  annotation: Annotation,
   patch: AnnotationPatch,
 ): AnnotationPatch {
   const given = patch as Record<string, unknown>;
@@ -252,7 +252,7 @@ export function resolveRectCommand(
       names.filter((name) => from[name] !== undefined).map((name) => [name, from[name]]),
     );
   const current = pdfAnnotationOf(
-    { subtype: annotation.subtype, ...pick(read, ['rect', ...shapeNames]) } as AnnotationDTO,
+    { subtype: annotation.subtype, ...pick(read, ['rect', ...shapeNames]) } as Annotation,
     MIRROR,
     noOtherPage,
   );
@@ -295,7 +295,7 @@ const mirrorEveryPage: VisibleBoxOf = () => MIRROR;
  * Throws `InvalidArg` for a patch the engine would refuse.
  */
 export function resolveAnnotationPatch(
-  current: AnnotationDTO,
+  current: Annotation,
   patch: AnnotationPatch,
   options: ResolveOptions = {},
 ): AnnotationPatch {
@@ -326,7 +326,7 @@ export function resolveAnnotationPatch(
  * value until the engine's answer brings the new one. A field `patch` leaves
  * alone keeps its very value.
  */
-export function applyAnnotationPatch<A extends AnnotationDTO>(
+export function applyAnnotationPatch<A extends Annotation>(
   current: A,
   patch: AnnotationPatch,
   options: ResolveOptions = {},
@@ -370,7 +370,7 @@ export function resolveAnnotationDraft(
 export function annotationOfDraft(
   draft: AnnotationDraft,
   context: DraftContext<PageBox>,
-): AnnotationDTO {
+): Annotation {
   return annotationOfResolvedDraft(
     resolveAnnotationDraft(draft, { describeFont: context.describeFont }),
     context,

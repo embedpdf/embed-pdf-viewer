@@ -10,6 +10,12 @@
 
 // One-line-per-feature: registration travels with the UI.
 export * from '@embedpdf/core';
+// What a page with a viewer needs from the browser: handing bytes to the user as a download,
+// and a font the engine draws with, for text you draw yourself.
+export { mountWebFont, saveFile } from '@embedpdf/web';
+// A theme written with setting names, as the style for the element around a viewer.
+export { epdfTheme } from './theme';
+export type { EpdfTheme } from './theme';
 import * as React from 'react';
 import {
   createContext,
@@ -24,19 +30,31 @@ import {
 import {
   DocumentsToken,
   PluginError,
+  VIEWER_DEFAULTS,
   createKernel,
-  docInfoListEquals,
+  documentState,
+  documentsState,
   isLocalEngine,
+  shallowEqual,
 } from '@embedpdf/core';
 import type {
   AnyPlugin,
   CapabilityToken,
+  DocumentInfo,
+  DocumentsCapability,
+  DocumentsState,
   Engine,
   EngineFactory,
   EventHook,
+  FailedDocumentInfo,
+  Identity,
   InitialDocument,
   Kernel,
+  LockedDocumentInfo,
+  PageInfo,
   PageRef,
+  ViewerPageSettings,
+  ViewerSettings,
 } from '@embedpdf/core';
 // Pure coordinate math from the geometry base — not from stage-core. The
 // PageContext seam stays stage-agnostic (it must also serve standalone PageView).
@@ -103,9 +121,13 @@ export function DocumentScope({ id, children }: DocumentScopeProps) {
 }
 
 export interface DocumentGateProps {
-  /** Shown while this subtree has no document (empty workspace, docs still opening). */
+  /** Shown while this subtree has no document: none is open, or it's still opening. */
   fallback?: React.ReactNode;
-  children: React.ReactNode;
+  /** Shown while the document waits for its password; `fallback` without it. */
+  locked?: (document: LockedDocumentInfo) => React.ReactNode;
+  /** Shown when the document couldn't be opened, with why; `fallback` without it. */
+  error?: (document: FailedDocumentInfo) => React.ReactNode;
+  children?: React.ReactNode;
 }
 /**
  * Render children only while this subtree has a ready document — the
@@ -113,26 +135,18 @@ export interface DocumentGateProps {
  * workspace is a legitimate, designable state (the Viewer no longer blocks on
  * documents so chrome can render at t≈0): workspace-scoped UI (toolbars,
  * commands, i18n) lives outside the gate; document-scoped UI (Stage, panels,
- * page chrome) lives inside it, or reads through `useOptionalSelector`.
- * A `loading`/`locked`/`error` tab renders `fallback` — so the gate's
- * fallback doubles as the per-tab boot state; richer chrome (a password
- * prompt, an error pane) branches on `useDocumentStatus()` beside the gate.
- * Sibling of <DocumentScope>, which picks which document; this one handles
- * whether.
+ * page chrome) lives inside it. A document that waits for its password, or
+ * failed, renders `locked` or `error` with it, or else `fallback`. Sibling of
+ * <DocumentScope>, which picks which document; this one handles whether.
  */
-export function DocumentGate({ fallback = null, children }: DocumentGateProps) {
-  const docId = useDocumentId();
-  const ready = useKernelValue((kernel) =>
-    docId ? kernel.documents.get(docId)?.status === 'ready' : false,
-  );
-  return <>{ready ? children : fallback}</>;
-}
-
-/** Lifecycle status of this subtree's document (loading/locked/ready/error),
- *  or null with no document. The password prompt and error panes key off it. */
-export function useDocumentStatus() {
-  const docId = useDocumentId();
-  return useKernelValue((kernel) => (docId ? (kernel.documents.get(docId)?.status ?? null) : null));
+export function DocumentGate({ fallback = null, locked, error, children }: DocumentGateProps) {
+  const document = useDocument();
+  if (document.status === 'ready') return <>{children}</>;
+  if (document.status === 'locked' && locked) {
+    return <>{locked(document as LockedDocumentInfo)}</>;
+  }
+  if (document.status === 'error' && error) return <>{error(document as FailedDocumentInfo)}</>;
+  return <>{fallback}</>;
 }
 
 /**
@@ -201,7 +215,7 @@ const SETTINGS_CALLS: ReadonlySet<string> = new Set([
  * Members are cached by path, so `stage.zoomIn` is the same function on every
  * render. `then` and symbol keys read as undefined: the stand-in is no
  * thenable, and inspecting it doesn't throw. The four settings calls forward
- * to `settings()` when called, so a plugin without settings still fails there.
+ * to `settings()` when called; for a plugin without settings, they throw `not-ready` too.
  */
 function createStandIn(capability: string, settings: () => object): object {
   const refuse = (): never => {
@@ -209,8 +223,17 @@ function createStandIn(capability: string, settings: () => object): object {
   };
   const forward =
     (name: string) =>
-    (...args: unknown[]): unknown =>
-      (settings() as Record<string, (...args: unknown[]) => unknown>)[name](...args);
+    (...args: unknown[]): unknown => {
+      // A plugin whose definition declares no settings (the Stage keeps its own, per view) has
+      // none to reach without a document either.
+      let api: Record<string, (...args: unknown[]) => unknown>;
+      try {
+        api = settings() as typeof api;
+      } catch {
+        return refuse();
+      }
+      return api[name](...args);
+    };
   const members = new Map<string, unknown>();
   const memberOf = (parentPath: string, key: string | symbol): unknown => {
     if (typeof key === 'symbol' || key === 'then') return undefined;
@@ -313,40 +336,91 @@ export function useCapabilityEvent<C, T>(
 }
 
 /**
- * The document registry (open/close/active/list), reactive. Inside a
- * <DocumentScope> its methods come from that document's view, so `save()` and
- * `saveLayer()` without an id save the document in scope.
+ * The documents API: open, close, unlock, download, and the tabs. Inside a
+ * <DocumentScope>, the calls that leave out the document use that one, so
+ * `download()` without an id downloads the document in scope. The object
+ * never changes, so it's safe in effects and callbacks. What to show comes
+ * from `useDocument()` and `useDocumentsState()`.
  */
-export function useDocuments() {
-  const documents = useCapability(DocumentsToken);
-  const docs = useKernelValue((kernel) => kernel.documents.list(), docInfoListEquals);
-  const activeId = useActiveDocumentId();
-  return {
-    docs,
-    activeId,
-    open: documents.open,
-    retry: documents.retry,
-    unlock: documents.unlock,
-    close: documents.close,
-    rename: documents.rename,
-    setActive: documents.setActive,
-    move: documents.move,
-    swap: documents.swap,
-    setOrder: documents.setOrder,
-    save: documents.save,
-    saveLayer: documents.saveLayer,
-  };
+export function useDocuments(): DocumentsCapability {
+  return useCapability(DocumentsToken);
 }
 
-/** Subscribe to one document lifecycle event for the mounted lifetime: `useDocumentEvent((documents) => documents.onOpened, handler)`. */
-export function useDocumentEvent<T>(
-  select: (documents: Kernel['documents']) => EventHook<T>,
+/** Read a state declaration's value through the kernel, or the value `select` picks from it. */
+function useDeclared<Capability, State extends object, Selected>(
+  token: CapabilityToken<Capability>,
+  read: (capability: Capability) => State,
+  empty: State,
+  select: ((state: State) => Selected) | undefined,
+): Selected {
+  const scoped = useDocumentScope();
+  return useKernelValue((kernel) => {
+    const capability = kernel.tryCapability(token, scoped ?? undefined);
+    const state = capability ? read(capability) : empty;
+    return select ? select(state) : (state as unknown as Selected);
+  }, shallowEqual);
+}
+
+/**
+ * The document this component talks to: the one its <DocumentScope> names, or
+ * else the active one. Its `id`, `name`, `status`, `pageCount`,
+ * `hasUnsavedChanges`, and why it's locked or failed. With no document, an
+ * empty one that reads as still opening. Takes a selector, and re-renders only
+ * when what it returns changes.
+ */
+export function useDocument<Selected = DocumentInfo>(
+  select?: (document: DocumentInfo) => Selected,
+): Selected {
+  return useDeclared(DocumentsToken, documentState.read, documentState.empty, select);
+}
+
+/**
+ * Every open document, in tab order (loading, locked and failed ones too),
+ * and the active one's id. Takes a selector, and re-renders only when what it
+ * returns changes.
+ */
+export function useDocumentsState<Selected = DocumentsState>(
+  select?: (state: DocumentsState) => Selected,
+): Selected {
+  return useDeclared(DocumentsToken, documentsState.read, documentsState.empty, select);
+}
+
+/** Subscribe to one documents event for the mounted lifetime: `useDocumentsEvent((documents) => documents.onOpened, handler)`. */
+export function useDocumentsEvent<T>(
+  select: (documents: DocumentsCapability) => EventHook<T>,
   handler: (event: T) => void,
 ): void {
-  const kernel = useKernel();
-  const handlerRef = useRef(handler);
-  handlerRef.current = handler;
-  useEffect(() => select(kernel.documents)((event) => handlerRef.current(event)), [kernel, select]);
+  useCapabilityEvent(DocumentsToken, select, handler);
+}
+
+const NO_PAGES: readonly PageInfo[] = Object.freeze([]);
+
+/**
+ * The pages of the document this component talks to, in order: each with its
+ * `ref`, `index`, `label`, size and rotation. Needs no Stage, so a thumbnail
+ * list or a page picker works anywhere. The same array until a page is added,
+ * removed, moved or rotated; empty with no document.
+ */
+export function usePageList(): readonly PageInfo[] {
+  const documentId = useDocumentId();
+  return useKernelValue((kernel) =>
+    documentId ? kernel.documents.listPages(documentId) : NO_PAGES,
+  );
+}
+
+/**
+ * The viewer's own settings (`<Viewer identity scope accent page>`), or the
+ * value `select` picks from them: the accent every part without a color of its
+ * own follows, and how pages look. What paints a page or an accent reads it
+ * here, through `paint()` from `@embedpdf/web`, so a CSS variable still wins.
+ */
+export function useViewerSettings<Selected = ViewerSettings>(
+  select?: (settings: ViewerSettings) => Selected,
+): Selected {
+  return useKernelValue((kernel) => {
+    const settings = kernel.getSettings();
+    return select ? select(settings) : (settings as unknown as Selected);
+  }, shallowEqual);
 }
 
 // `InitialDocument` is the kernel's type (re-exported via `export * from
@@ -383,8 +457,38 @@ export interface ViewerProps {
    *  `initialDocuments` open. The imperative door for code outside React
    *  (register commands, subscribe events). The `ref` carries the same kernel. */
   onReady?: (kernel: Kernel) => void;
-  children: React.ReactNode;
+  /**
+   * Who the user is, for every document opened without an `identity` of its
+   * own (which replaces this one). Documents opened after a change use the new
+   * value; open ones keep theirs. The local engine only: the cloud engine reads
+   * it from the document's token.
+   */
+  identity?: Identity;
+  /**
+   * What the user may do, as permissions, in every document opened without a
+   * `scope` of its own (which replaces this one). Left out, they may do
+   * everything. Changes reach the documents opened after them, as `identity`.
+   */
+  scope?: readonly string[];
+  /** The color every part without a color of its own follows. CSS `--epdf-accent` wins over it. */
+  accent?: string;
+  /** How pages look: `background` before the picture arrives, and the `shadow` under each page. */
+  page?: Partial<ViewerPageSettings>;
+  children?: React.ReactNode;
 }
+
+/** The viewer's settings as the props give them: a prop left out is its default. */
+const viewerSettingsOf = ({
+  identity,
+  scope,
+  accent,
+  page,
+}: Pick<ViewerProps, 'identity' | 'scope' | 'accent' | 'page'>): ViewerSettings => ({
+  identity: identity ?? null,
+  scope: scope ?? null,
+  accent: accent ?? VIEWER_DEFAULTS.accent,
+  page: { ...VIEWER_DEFAULTS.page, ...page },
+});
 
 type BootState =
   | { phase: 'booting'; kernel: Kernel | null }
@@ -420,13 +524,30 @@ type BootState =
  * once and boots once.
  */
 export const Viewer = forwardRef<Kernel | null, ViewerProps>(function Viewer(
-  { engine, plugins, initialDocuments, fallback, renderError, onReady, children }: ViewerProps,
+  {
+    engine,
+    plugins,
+    initialDocuments,
+    fallback,
+    renderError,
+    onReady,
+    identity,
+    scope,
+    accent,
+    page,
+    children,
+  }: ViewerProps,
   ref,
 ) {
   // Init-only inputs: the kernel's lifetime is the component's lifetime, so a
   // changed engine/plugins identity cannot mean "rebuild the workspace" —
   // that would silently drop every open document. Capture once, warn in dev.
   const initial = useRef({ engine, plugins, initialDocuments });
+  // The viewer's settings follow the props. The first ones go to the kernel when it's
+  // created, so the initial documents open with them; later ones as they change.
+  const settings = viewerSettingsOf({ identity, scope, accent, page });
+  const latestSettings = useRef(settings);
+  latestSettings.current = settings;
   const warned = useRef(false);
   if (process.env.NODE_ENV !== 'production' && !warned.current) {
     if (initial.current.engine !== engine || initial.current.plugins !== plugins) {
@@ -461,7 +582,11 @@ export const Viewer = forwardRef<Kernel | null, ViewerProps>(function Viewer(
     if (isLocalEngine(engine)) engine.warmup();
     let kernel: Kernel;
     try {
-      kernel = createKernel({ engine, plugins: captured.plugins });
+      kernel = createKernel({
+        engine,
+        plugins: captured.plugins,
+        settings: latestSettings.current,
+      });
     } catch (error) {
       setBoot({ phase: 'error', error }); // plan/graph errors surface, not throw mid-render
       if (ownsEngine) void engine.destroy();
@@ -494,6 +619,13 @@ export const Viewer = forwardRef<Kernel | null, ViewerProps>(function Viewer(
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // After every render: props compare by value (an inline `page={{ shadow: 'none' }}` is a new
+  // object each time), and settings that didn't change change nothing.
+  const liveKernel = boot.phase === 'error' ? null : boot.kernel;
+  useEffect(() => {
+    liveKernel?.updateSettings(latestSettings.current);
+  });
 
   if (boot.phase === 'error') {
     return <>{renderError ? renderError(boot.error) : null}</>;

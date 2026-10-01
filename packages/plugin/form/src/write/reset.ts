@@ -1,39 +1,43 @@
 /**
  * Resets: one shared core (an effects batch, then recalculation when the
- * document's scripts are enabled) used by both the /ResetForm action executor
- * and the public `reset` / `resetAll`, so the two cannot diverge.
+ * document's scripts run) used by both the ResetForm action executor and the
+ * public `reset`, so the two cannot diverge.
  */
-import { PluginError, toPluginError, type BatchResult } from '@embedpdf/core';
+import { PluginError, toPluginError } from '@embedpdf/core';
 import type { FormFieldRef, PdfActionTargetRef } from '@embedpdf/engine-core/runtime';
 import type { ActionOrigin } from '@embedpdf/plugin-actions/contract';
 
-import type { FormCommitResult } from '../contract';
+import type { FormCommitResult, FormResetResult } from '../contract';
 import { resolveFieldSelection } from '../field-selection';
 import type { FormHostCapability } from '../host-contract';
-import { beginWrite, endWrite } from '../model';
+import { fieldsWithChangedValues } from '../model';
 import type { FormContext, FormServices } from '../services';
+
+const NOT_SCRIPTED: FormCommitResult = {
+  status: 'unchanged',
+  scripted: false,
+  effectsResult: null,
+  uiEffects: [],
+  diagnostics: [],
+};
+
+/** A field ref as an action's target: by object number, or by full name. */
+const targetOf = (ref: FormFieldRef): PdfActionTargetRef =>
+  ref.kind === 'objectNumber'
+    ? { kind: 'objectNumber', objectNumber: ref.objectNumber }
+    : { kind: 'name', name: ref.name };
 
 export function createResetWrites(
   ctx: FormContext,
-  services: Pick<FormServices, 'fields' | 'scripting' | 'enqueue' | 'keyOf'>,
+  services: Pick<FormServices, 'fields' | 'scripting' | 'enqueue'>,
 ) {
-  const { fields, keyOf, enqueue } = services;
-  const scripting = services.scripting.controller;
-  const surfaceViaActions = services.scripting.surface;
-
-  const NOT_SCRIPTED: FormCommitResult = {
-    status: 'unchanged',
-    scripted: false,
-    effectsResult: null,
-    uiEffects: [],
-    diagnostics: [],
-  };
+  const { fields, enqueue, scripting } = services;
 
   /**
    * The shared reset core: one effects batch, then recalculation when the
-   * document's scripts are enabled. `origin` is carried through to the
-   * surfaced recalculation results, so a ResetForm run by a page or hover
-   * trigger never reports its alerts as a user action.
+   * document's scripts run. `origin` is carried through to the surfaced
+   * recalculation results, so a ResetForm run by a page or hover trigger
+   * never reports its alerts as a user action.
    */
   const applyResetBatch = async (
     refs: FormFieldRef[],
@@ -47,7 +51,7 @@ export function createResetWrites(
           { code: 'unsupported-api', message: 'this engine has no form-effects batch door' },
         ],
       };
-      surfaceViaActions(result, origin);
+      scripting.surface(result, origin);
       return result;
     }
     // Zero refs must not reach the engine (it rejects an empty reset); an
@@ -62,19 +66,14 @@ export function createResetWrites(
       (entry) => entry.status === 'failed' || entry.status === 'rejected',
     );
     if (resetFailed) {
-      return {
-        status: 'failed',
-        scripted: false,
-        effectsResult,
-        uiEffects: [],
-        diagnostics: [],
-      };
+      return { status: 'failed', scripted: false, effectsResult, uiEffects: [], diagnostics: [] };
     }
-    // Acrobat recalculates after a reset; boot rides along lazily.
+    // Acrobat recalculates after a reset; the document's open scripts run first, once.
+    const pipeline = scripting.controller();
     let recalc: FormCommitResult | null = null;
-    if (scripting) {
-      recalc = await scripting.recalculate();
-      surfaceViaActions(recalc, origin);
+    if (pipeline) {
+      recalc = await pipeline.recalculate();
+      scripting.surface(recalc, origin);
     }
     return {
       status: 'applied',
@@ -86,100 +85,70 @@ export function createResetWrites(
     };
   };
 
-  const resetFormAction = (
+  /** Reset the selected fields, inside the write queue. */
+  const resetSelection = async (
     targets: PdfActionTargetRef[] | null,
     exclude: boolean,
-    origin: ActionOrigin = 'user',
-  ): Promise<FormCommitResult> =>
-    enqueue(async () => {
-      // Read the field tree from the engine inside the queue: the selection
-      // must see every write queued before this action.
-      const snapshot = await ctx.doc.forms.list();
-      // ISO 32000-2 Tables 241/242: a parent name resets its descendants too.
-      const { selected } = resolveFieldSelection(snapshot.fields, targets, exclude);
-      // Skip fields with nothing to restore: the engine refuses pushbutton
-      // and signature refs, and an exclude-mode complement always includes
-      // the form's buttons.
-      const resettable = selected.filter(
-        (field) => field.family !== 'pushbutton' && field.family !== 'signature',
-      );
-      return applyResetBatch(
-        resettable.map((field) => field.ref),
-        origin,
-      );
-    });
+    origin: ActionOrigin,
+  ): Promise<FormCommitResult> => {
+    // Read the field tree from the engine inside the queue: the selection
+    // must see every write queued before this one.
+    const snapshot = await ctx.doc.forms.list();
+    // ISO 32000-2 Tables 241/242: a parent name resets its descendants too.
+    const { selected } = resolveFieldSelection(snapshot.fields, targets, exclude);
+    // Skip fields with nothing to restore: the engine refuses push button
+    // and signature refs, and an exclude-mode complement always includes
+    // the form's buttons.
+    const resettable = selected.filter(
+      (field) => field.family !== 'pushbutton' && field.family !== 'signature',
+    );
+    return applyResetBatch(
+      resettable.map((field) => field.ref),
+      origin,
+    );
+  };
 
-  const resetAll = async (
-    options: { fields?: readonly FormFieldRef[]; exclude?: boolean } = {},
-  ): Promise<BatchResult<FormFieldRef, FormFieldRef>> => {
-    ctx.assertAllowed('doc.forms.fill', 'form.resetAll');
-    const targets =
-      options.fields?.map(
-        (ref): PdfActionTargetRef =>
-          ref.kind === 'objectNumber'
-            ? { kind: 'objectNumber', objectNumber: ref.objectNumber }
-            : { kind: 'name', name: ref.name },
-      ) ?? null;
-    const snapshot = fields.get().snapshot ?? (await ctx.doc.forms.list());
-    const { selected } = resolveFieldSelection(snapshot.fields, targets, options.exclude ?? false);
-    const refs = selected
-      .filter((field) => field.family !== 'pushbutton' && field.family !== 'signature')
-      .map((field) => field.ref);
-    const result = await resetFormAction(targets, options.exclude ?? false, 'user');
-    if (result.status === 'failed') {
-      const failed = (result.effectsResult?.results ?? [])
-        .filter((entry) => entry.status === 'failed' || entry.status === 'rejected')
-        .flatMap((entry) => entry.fields.map((field) => field.ref));
-      const failedKeys = new Set(failed.map(keyOf));
-      return {
-        applied: refs.filter((ref) => !failedKeys.has(keyOf(ref))),
-        skipped: [],
-        failed: failed.map((ref) => ({
-          ref,
-          error: {
-            code: 'operation-failed' as const,
-            message: 'reset failed',
-            capability: 'form',
-            permission: null,
-          },
-        })),
-      };
-    }
-    return { applied: refs, skipped: [], failed: [] };
+  const reset: FormHostCapability['reset'] = async (refs, options) => {
+    ctx.assertAllowed('doc.forms.fill', 'form.reset');
+    return enqueue(async (): Promise<FormResetResult> => {
+      try {
+        if (refs && refs.length === 0) return { fields: [] };
+        // An engine without the effects batch resets on its own, without recalculating.
+        if (!ctx.doc.forms.applyEffects) {
+          const result = await ctx.cancellable(
+            options?.signal,
+            ctx.doc.forms.reset(refs ? [...refs] : undefined),
+          );
+          return { fields: result.fields };
+        }
+        // What changed is what holds another value after the reset and the
+        // recalculation that follows it: the mirror has both when they land.
+        const before = fields.get();
+        const result = await ctx.cancellable(
+          options?.signal,
+          resetSelection(refs ? refs.map(targetOf) : null, false, 'user'),
+        );
+        if (result.status === 'failed') {
+          throw new PluginError(
+            'operation-failed',
+            'form',
+            result.effectsResult?.results.find(
+              (entry) => entry.status === 'failed' || entry.status === 'rejected',
+            )?.error?.message ?? 'the reset failed',
+          );
+        }
+        return { fields: fieldsWithChangedValues(before, fields.get()) };
+      } catch (error) {
+        throw toPluginError('form', error);
+      }
+    }, options);
   };
 
   return {
     api: {
-      reset: async (ref) => {
-        ctx.assertAllowed('doc.forms.fill', 'form.reset');
-        const key = keyOf(ref);
-        return enqueue(async () => {
-          const doc = ctx.doc;
-          ctx.state.update(beginWrite, key);
-          try {
-            if (!doc.forms.applyEffects) {
-              await doc.forms.reset(ref);
-              return;
-            }
-            const result = await applyResetBatch([ref], 'user');
-            if (result.status === 'failed') {
-              throw new PluginError(
-                'operation-failed',
-                'form',
-                result.effectsResult?.results.find(
-                  (entry) => entry.status === 'failed' || entry.status === 'rejected',
-                )?.error?.message ?? 'reset failed',
-              );
-            }
-          } catch (error) {
-            throw toPluginError('form', error);
-          } finally {
-            ctx.state.update(endWrite, key);
-          }
-        });
-      },
-      resetAll,
-      resetFormAction,
+      reset,
+      resetFormAction: (targets, exclude, origin = 'user') =>
+        enqueue(() => resetSelection(targets, exclude, origin)),
     } satisfies Partial<FormHostCapability>,
   };
 }

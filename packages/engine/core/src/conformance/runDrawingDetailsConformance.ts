@@ -1,7 +1,7 @@
 import type { ConformanceTestRunner } from './runMetadataConformance';
 import { iconRect } from './creatables';
 import { pdfOf } from './pdfOf';
-import type { AnnotationDTO } from '../annotation/kinds';
+import type { Annotation } from '../annotation/kinds';
 import type { DocumentHandle } from '../engine/DocumentHandle';
 import type { Engine } from '../engine/Engine';
 import { EngineErrorCode } from '../errors/EngineErrorCode';
@@ -62,7 +62,7 @@ export function runDrawingDetailsConformance(
       return { page: doc.page(pages[0]!.ref), pageRef: pages[0]!.ref };
     };
 
-    const byNm = async (doc: DocumentHandle, nm: string): Promise<AnnotationDTO> => {
+    const byNm = async (doc: DocumentHandle, nm: string): Promise<Annotation> => {
       const { page } = await firstPage(doc);
       const found = (await page.annotations.list()).annotations.find((a) => a.nm === nm);
       if (!found) throw new Error(`no annotation '${nm}' in the fixture`);
@@ -362,7 +362,7 @@ export function runDrawingDetailsConformance(
 
         const readBoth = async () => {
           const { annotations } = await page.annotations.list();
-          const find = (ref: AnnotationDTO['ref']) =>
+          const find = (ref: Annotation['ref']) =>
             annotations.find((a) => JSON.stringify(a.ref) === JSON.stringify(ref));
           return { note: find(note.annotation.ref), popup: find(popup.annotation.ref) };
         };

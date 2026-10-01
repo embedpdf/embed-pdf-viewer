@@ -6,13 +6,13 @@
  *
  * Reads the selection's current target from selection props (the `linkOf`
  * lens — parents derive from their committed child annotations) and writes
- * through the one `updateSelectionLink(target)` path; the plugin's reconciler
+ * through the one `selection.updateLink(target)` path; the plugin's reconciler
  * materializes/retargets the attached children. Links are a verb on the
  * selection, not a style — which is why this is a popover, not a sidebar
  * section.
  */
 import { useState, type ReactNode } from 'react';
-import { useAnnotation, useSelectionFields } from '@embedpdf/react/annotation';
+import { useAnnotation, useAnnotationProperties } from '@embedpdf/react/annotation';
 import type { PdfLinkTarget } from '@embedpdf/react/link';
 import { useKernel } from '@embedpdf/react/runtime';
 import { useT } from '@embedpdf/react/i18n';
@@ -49,7 +49,7 @@ export function LinkEditorCard({ onClose }: { onClose: () => void }) {
   const t = useT();
   const kernel = useKernel();
   const anno = useAnnotation();
-  const props = useSelectionFields();
+  const props = useAnnotationProperties();
   const value = (props.values.link ?? null) as PdfLinkTarget | null;
   const [mode, setMode] = useState<'uri' | 'page'>(value?.kind === 'goto' ? 'page' : 'uri');
   const [uri, setUri] = useState(value?.kind === 'uri' ? value.uri : '');
@@ -59,14 +59,14 @@ export function LinkEditorCard({ onClose }: { onClose: () => void }) {
     if (mode === 'uri') {
       const trimmed = uri.trim();
       if (!trimmed) return;
-      anno.updateSelectionLink({ kind: 'uri', uri: trimmed });
+      anno.selection.updateLink({ kind: 'uri', uri: trimmed });
       onClose();
       return;
     }
     // Page number (1-based) → the page's object number (stable across moves).
-    const page = kernel.documents.getPageAt(Math.max(0, Number(pageNo) - 1));
+    const page = kernel.documents.getPage(Math.max(0, Number(pageNo) - 1));
     if (!page) return;
-    anno.updateSelectionLink({ kind: 'goto', destination: { kind: 'fit', page: page.ref } });
+    anno.selection.updateLink({ kind: 'goto', destination: { kind: 'fit', page: page.ref } });
     onClose();
   };
 

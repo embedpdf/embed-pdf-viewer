@@ -1,9 +1,9 @@
-import { PluginError, memo, pageRefsEqual } from '@embedpdf/core';
+import { PluginError, memo } from '@embedpdf/core';
 import type { ModelAnnotation, Model } from '@embedpdf/core-annotation';
-import { groupOf, refOf } from '@embedpdf/core-annotation';
+import { refOf } from '@embedpdf/core-annotation';
 import {
   annotationKey,
-  type AnnotationDTO,
+  type Annotation,
   type AnnotationRef,
   type PageRef,
 } from '@embedpdf/engine-core/runtime';
@@ -20,7 +20,7 @@ import { recordOfRef } from '../services/store';
  * reads before the engine confirms it.
  */
 export function createAnnotationReads(
-  ctx: Pick<AnnotationContext, 'state'>,
+  ctx: Pick<AnnotationContext, 'state' | 'getPage'>,
   { store }: Pick<AnnotationServices, 'store'>,
 ) {
   /** The records with a change waiting for the engine. */
@@ -29,7 +29,7 @@ export function createAnnotationReads(
     (pending) => new Set(pending.map((change) => change.id)),
   );
 
-  const get = (ref: AnnotationRef): AnnotationDTO | null =>
+  const get = (ref: AnnotationRef): Annotation | null =>
     recordOfRef(store.model(), ref)?.annotation ?? null;
 
   const isPending = (ref: AnnotationRef): boolean => {
@@ -37,39 +37,47 @@ export function createAnnotationReads(
     return !!record && pendingIds().has(record.id);
   };
 
+  /**
+   * The object numbers of the pages a filter names; `null` without a page
+   * filter. A page that isn't in the document names none: its list is empty.
+   */
+  const pagesOf = (filter?: AnnotationFilter): ReadonlySet<number> | null => {
+    if (!filter?.pages) return null;
+    const numbers = new Set<number>();
+    for (const page of filter.pages) {
+      const info = ctx.getPage(page);
+      if (info) numbers.add(info.ref.objectNumber);
+    }
+    return numbers;
+  };
+
   const listAnnots = (filter?: AnnotationFilter): ModelAnnotation[] => {
     const model = store.model();
-    const group = filter?.group ? annotationKey(filter.group) : undefined;
+    const pages = pagesOf(filter);
     return model.order
       .map((id) => model.byId[id])
       .filter((record): record is ModelAnnotation => record !== undefined)
       .filter(
         (record) =>
-          (!filter?.page || pageRefsEqual(record.annotation.page, filter.page)) &&
-          (!filter?.subtype || record.annotation.subtype === filter.subtype) &&
-          (filter?.author === undefined || record.annotation.author === filter.author) &&
-          (!group || groupOf(record.annotation) === group || record.id === group),
+          (!pages || pages.has(record.annotation.page.objectNumber)) &&
+          (!filter?.subtype || record.annotation.subtype === filter.subtype),
       );
   };
-  const annotationsOf = (records: readonly ModelAnnotation[]): AnnotationDTO[] =>
+  const annotationsOf = (records: readonly ModelAnnotation[]): Annotation[] =>
     records.map((record) => record.annotation);
 
-  // Unfiltered and per-page lists are what layers subscribe to: memoized per model.
-  let listMemo: { model: Model; v: readonly AnnotationDTO[] } | null = null;
-  const pageListMemo = new Map<number, { model: Model; v: readonly AnnotationDTO[] }>();
-  const list = (filter?: AnnotationFilter): readonly AnnotationDTO[] => {
+  // Unfiltered and one-page lists are what layers subscribe to: memoized per model.
+  let listMemo: { model: Model; v: readonly Annotation[] } | null = null;
+  const pageListMemo = new Map<number, { model: Model; v: readonly Annotation[] }>();
+  const list = (filter?: AnnotationFilter): readonly Annotation[] => {
     const model = store.model();
-    if (!filter) {
+    if (!filter || (!filter.pages && filter.subtype === undefined)) {
       if (listMemo?.model !== model) listMemo = { model, v: annotationsOf(listAnnots()) };
       return listMemo.v;
     }
-    if (
-      filter.page &&
-      filter.subtype === undefined &&
-      filter.author === undefined &&
-      !filter.group
-    ) {
-      const pageObjectNumber = filter.page.objectNumber;
+    const page = filter.pages?.length === 1 ? ctx.getPage(filter.pages[0]!) : null;
+    if (page && filter.subtype === undefined) {
+      const pageObjectNumber = page.ref.objectNumber;
       const hit = pageListMemo.get(pageObjectNumber);
       if (hit?.model === model) return hit.v;
       const pageList = annotationsOf(listAnnots(filter));
@@ -79,8 +87,8 @@ export function createAnnotationReads(
     return annotationsOf(listAnnots(filter));
   };
 
-  let selectedMemo: { model: Model; v: readonly AnnotationDTO[] } | null = null;
-  const listSelected = (): readonly AnnotationDTO[] => {
+  let selectedMemo: { model: Model; v: readonly Annotation[] } | null = null;
+  const listSelected = (): readonly Annotation[] => {
     const model = store.model();
     if (selectedMemo?.model !== model) {
       selectedMemo = {
@@ -114,20 +122,30 @@ export function createAnnotationReads(
       .filter((record): record is ModelAnnotation => !!record && !!refOf(record));
   };
 
-  const api = {
-    get,
-    list,
-    isPending,
-    listSelected,
-    getSelection: (): AnnotationRef[] => {
-      const model = store.model();
-      return model.selected
-        .map((id) => refOf(model.byId[id]))
-        .filter((ref): ref is AnnotationRef => ref != null);
-    },
+  /** The annotation under the pointer, as the user sees it. */
+  const getHovered = (): Annotation | null => {
+    const model = store.model();
+    return model.hovered ? (model.byId[model.hovered]?.annotation ?? null) : null;
   };
 
-  return { get, listAnnots, loadedOrThrow, selectedCommitted, pageOf, api };
+  /** The text box being typed in. */
+  const getEditing = (): Annotation | null => {
+    const model = store.model();
+    return model.editing ? (model.byId[model.editing]?.annotation ?? null) : null;
+  };
+
+  const api = { get, list, isPending, getHovered };
+
+  return {
+    get,
+    listAnnots,
+    listSelected,
+    getEditing,
+    loadedOrThrow,
+    selectedCommitted,
+    pageOf,
+    api,
+  };
 }
 
 export type AnnotationReads = ReturnType<typeof createAnnotationReads>;

@@ -6,7 +6,7 @@ import { InkDeclaration } from './declaration';
 
 export { InkDeclaration } from './declaration';
 
-export type InkAnnotationDTO<C extends Coordinates = PageCoordinates> = ReadOf<
+export type InkAnnotation<C extends Coordinates = PageCoordinates> = ReadOf<
   typeof InkDeclaration,
   C
 >;
@@ -17,7 +17,7 @@ export const InkDTOSchema = InkDeclaration.readSchema;
 export const InkDraftSchema = InkDeclaration.createSchema;
 export const InkPatchSchema = InkDeclaration.updateSchema;
 
-export const InkKind: AnnotationKindModule<'ink', InkAnnotationDTO, InkDraft, InkPatch> = {
+export const InkKind: AnnotationKindModule<'ink', InkAnnotation, InkDraft, InkPatch> = {
   subtype: 'ink',
   pdfSubtypeCode: PdfAnnotationSubtypeCode.INK,
   dtoSchema: InkDTOSchema,

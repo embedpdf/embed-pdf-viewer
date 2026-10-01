@@ -1,6 +1,6 @@
 import { textBoxFamily } from '../shapes';
-import { defineKind, NO_CAPS, type FieldSpec, type KindCaps } from './define';
-import { LINKABLE, OPACITY } from './fields';
+import { defineKind, NO_CAPS, type AnnotationProperty, type KindCaps } from './define';
+import { fontFamily, LINKABLE, OPACITY, textAlign } from './fields';
 import { strokedStyle } from './styles';
 import { bodyText } from './texts';
 
@@ -19,18 +19,18 @@ const TEXT_BOX_CAPS: KindCaps = {
 };
 
 // The font first (the text is what it is for), then the box's background and border.
-const TEXT_BOX_FIELDS: readonly FieldSpec[] = [
-  { key: 'fontFamily', label: 'Font' },
-  { key: 'fontSize', label: 'Font size', min: 4, max: 96, step: 1 },
-  { key: 'fontColor', label: 'Text color' },
-  { key: 'bold', label: 'Bold' },
-  { key: 'italic', label: 'Italic' },
-  { key: 'underline', label: 'Underline' },
-  { key: 'textAlign', label: 'Align' },
+const TEXT_BOX_FIELDS: readonly AnnotationProperty[] = [
+  fontFamily('Font'),
+  { key: 'fontSize', control: 'number', label: 'Font size', min: 4, max: 96, step: 1 },
+  { key: 'fontColor', control: 'color', label: 'Text color' },
+  { key: 'bold', control: 'textFormat', label: 'Bold', format: 'bold' },
+  { key: 'italic', control: 'textFormat', label: 'Italic', format: 'italic' },
+  { key: 'underline', control: 'textFormat', label: 'Underline', format: 'underline' },
+  textAlign('Align'),
   OPACITY,
-  { key: 'interiorColor', label: 'Background' },
-  { key: 'color', label: 'Border' },
-  { key: 'strokeWidth', label: 'Border width', min: 0, max: 12, step: 0.5 },
+  { key: 'interiorColor', control: 'color', label: 'Background' },
+  { key: 'color', control: 'color', label: 'Border' },
+  { key: 'strokeWidth', control: 'number', label: 'Border width', min: 0, max: 12, step: 0.5 },
   LINKABLE,
 ];
 
@@ -44,7 +44,7 @@ export const freeText = defineKind({
   style: strokedStyle,
   text: bodyText,
   caps: TEXT_BOX_CAPS,
-  fields: TEXT_BOX_FIELDS,
+  properties: TEXT_BOX_FIELDS,
 });
 
 /**
@@ -59,5 +59,5 @@ export const freeTextCallout = defineKind({
   style: strokedStyle,
   text: bodyText,
   caps: { ...TEXT_BOX_CAPS, rotatable: false, groupResizable: false, groupRotatable: false },
-  fields: TEXT_BOX_FIELDS,
+  properties: TEXT_BOX_FIELDS,
 });

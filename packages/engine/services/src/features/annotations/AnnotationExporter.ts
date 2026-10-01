@@ -12,7 +12,7 @@ import {
   type AnnotationBundleItem,
   type AnnotationBundleLimits,
   type AnnotationBundlePage,
-  type AnnotationDTO,
+  type Annotation,
   type AnnotationExportSelection,
   type AnnotationResourceRole,
   type ResourceId,
@@ -123,7 +123,7 @@ class ResourceCollector {
   ) {}
 
   /** The resources `data` names, by role. */
-  of(data: AnnotationDTO<PdfCoordinates>): AnnotationBundleItem<PdfCoordinates>['resources'] {
+  of(data: Annotation<PdfCoordinates>): AnnotationBundleItem<PdfCoordinates>['resources'] {
     const roles = ANNOTATION_RESOURCE_ROLES[data.subtype];
     if (!roles) return {};
     const { fn } = this.runtime;
@@ -146,7 +146,7 @@ class ResourceCollector {
 
   // The annotation a read returned, through the page's /Annots: no page is
   // loaded. The read and this lookup are one job, so the position holds.
-  private rawHandleOf(data: AnnotationDTO<PdfCoordinates>): Ptr {
+  private rawHandleOf(data: Annotation<PdfCoordinates>): Ptr {
     const { fn } = this.runtime;
     const record = this.session.resolvePageRef(data.ref.page);
     const annotPtr = fn.EPDFPage_GetAnnotRaw(

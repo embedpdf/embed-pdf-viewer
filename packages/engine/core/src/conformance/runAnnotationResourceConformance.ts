@@ -1,7 +1,7 @@
 import { appearanceRaster, maxAlpha, maxDifference, type Raster } from './appearanceRasters';
 import type { ConformanceTestRunner } from './runMetadataConformance';
 import { BANDS_PDF, BANDS_PDF_CONTENT, BANDS_PNG, sameBytes } from './stampFixtures';
-import type { AnnotationDraft, AnnotationDTO } from '../annotation/kinds';
+import type { AnnotationDraft, Annotation } from '../annotation/kinds';
 import type { DocumentHandle } from '../engine/DocumentHandle';
 import type { Engine } from '../engine/Engine';
 import type { PageHandle } from '../engine/PageHandle';
@@ -185,7 +185,7 @@ export function runAnnotationResourceConformance(
     const rewrappedStamp = async (page: PageHandle, name: 'a' | 'b' | 'c') => {
       const { annotations } = await page.annotations.list();
       const stamp = annotations.find(
-        (annotation): annotation is Extract<AnnotationDTO, { subtype: 'stamp' }> =>
+        (annotation): annotation is Extract<Annotation, { subtype: 'stamp' }> =>
           annotation.subtype === 'stamp' && annotation.nm === `rewrapped-${name}`,
       );
       if (!stamp) throw new Error(`no stamp rewrapped-${name}`);
@@ -246,7 +246,7 @@ export function runAnnotationResourceConformance(
         await onPage(fixture, async (page) => {
           const { annotations } = await page.annotations.list();
           const stamp = annotations.find(
-            (annotation): annotation is Extract<AnnotationDTO, { subtype: 'stamp' }> =>
+            (annotation): annotation is Extract<Annotation, { subtype: 'stamp' }> =>
               annotation.subtype === 'stamp',
           )!;
           expect(stamp.rotation !== null).toBe(true);
@@ -294,7 +294,7 @@ export function runAnnotationResourceConformance(
     });
 
     /** Export, make a copy from the export, export the copy: `rounds` times. */
-    const exportCycles = async (page: PageHandle, stamp: AnnotationDTO, rounds: number) => {
+    const exportCycles = async (page: PageHandle, stamp: Annotation, rounds: number) => {
       const drawings = [await page.annotations.downloadResource(stamp.ref, 'appearance')];
       const data = copyOnItsPage(stamp);
       for (let round = 0; round < rounds; round++) {
@@ -515,11 +515,11 @@ const PDF_MAGIC = [0x25, 0x50, 0x44, 0x46]; // %PDF
  * The data of a copy on the annotation's own page: a name is unique on its
  * page (ISO 32000-2 §12.5.2), so the copy has none.
  */
-function copyOnItsPage(dto: AnnotationDTO): AnnotationDraft {
+function copyOnItsPage(dto: Annotation): AnnotationDraft {
   return { ...(JSON.parse(JSON.stringify(dto)) as AnnotationDraft), nm: null };
 }
 
-function dataOf(dto: AnnotationDTO): Record<string, unknown> {
+function dataOf(dto: Annotation): Record<string, unknown> {
   const {
     ref: _ref,
     index: _index,

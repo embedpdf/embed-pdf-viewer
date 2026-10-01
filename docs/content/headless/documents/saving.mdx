@@ -36,6 +36,8 @@ and it keeps existing digital signatures valid. `'rewrite'` writes a new file wi
 revisions; use it after [redaction](../annotations/redaction), so removed content can't be recovered
 from an earlier revision. See [Saving](/docs/engine/documents/saving).
 
+<Example name="documents/download" />
+
 ## Print
 
 `print()` prints the document, not your app: its pages, at print quality, through the browser's
@@ -61,11 +63,17 @@ const layer = await documents.downloadLayer();
 await api.put(`/reviews/${fileId}`, layer);
 
 // later: the original, with the stored changes on top
-await documents.open({ kind: 'layerBytes', baseBytes: original, layer });
+await documents.open({
+  kind: 'layerBytes',
+  baseBytes: original,
+  layer: { kind: 'artifact', bytes: layer },
+});
 ```
 
 A layer is small, since it holds only the changes, and each user can have their own. For annotations
 only, as data rather than PDF bytes, see [Export and import](../annotations/saving#export-and-import).
+
+<Example name="documents/layer" />
 
 </Engine>
 
@@ -77,6 +85,8 @@ only, as data rather than PDF bytes, see [Export and import](../annotations/savi
 
 It becomes `false` again after a `download()`. The document's other fields are listed on
 [Opening documents](opening#state).
+
+<Example name="documents/unsaved" />
 
 <Engine cloud>
 

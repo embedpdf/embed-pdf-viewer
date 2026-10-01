@@ -128,6 +128,9 @@ export interface TilesOptions {
   fadeMs?: number;
 }
 
+/** The default pixel budget of a whole-page picture, in device pixels. */
+const DEFAULT_BUDGET_PX = 640;
+
 /** The ×2 client pyramid used for lattice deployments without a tiles block. */
 export const DEFAULT_TILE_PYRAMID: readonly number[] = [1, 2, 4, 8, 16, 32];
 
@@ -160,6 +163,11 @@ export interface ResolvedRenderOptions {
   debug: boolean;
 }
 
+/**
+ * The settings as the strategy reads them, every value filled in. The base
+ * budget filters an advertised deployment ladder only when the app chose a
+ * width other than the default 640.
+ */
 export function resolveRenderOptions(options: {
   fullPage?: FullPageOptions;
   tiles?: TilesOptions | false;
@@ -170,8 +178,9 @@ export function resolveRenderOptions(options: {
   const tiles = options.tiles === false ? undefined : options.tiles;
   return {
     fullPage: {
-      maxWidth: options.fullPage?.maxWidth ?? 640,
-      maxWidthExplicit: options.fullPage?.maxWidth !== undefined,
+      maxWidth: options.fullPage?.maxWidth ?? DEFAULT_BUDGET_PX,
+      maxWidthExplicit:
+        options.fullPage?.maxWidth !== undefined && options.fullPage.maxWidth !== DEFAULT_BUDGET_PX,
       quantize: options.fullPage?.quantize ?? 'exact',
     },
     tiles: {

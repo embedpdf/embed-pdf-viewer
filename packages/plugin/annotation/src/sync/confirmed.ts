@@ -7,8 +7,8 @@
  *   - how the record renders follows who changed it: this session's creates
  *     render live from their description, another session's changes render
  *     from the engine's raster (their appearance is the truth it baked);
- *   - the record events fire: created, updated, deleted, and resynced after
- *     a load.
+ *   - the record events fire: created, updated, deleted, moved, and
+ *     resynced after a load.
  *
  * The data itself is already in the records mirror when this runs.
  */
@@ -53,10 +53,20 @@ export function followConfirmedChanges(
         announce.updated(event.annotation, origin);
         return;
       case 'annotations.deleted':
-        // A note goes with its thread and popups: each is announced.
-        for (const id of event.deleted) {
-          announce.deleted(refFromStableId(event.page, id), event.page, origin);
-        }
+        // A note goes with its thread and popups: one event names them all, the note first.
+        announce.deleted(
+          event.deleted.map((id) => refFromStableId(event.page, id)),
+          event.page,
+          origin,
+        );
+        return;
+      case 'annotations.moved':
+        announce.moved(
+          event.annotations.map((annotation) => annotation.ref),
+          event.page,
+          event.annotations[0]?.index ?? 0,
+          origin,
+        );
         return;
       default:
         return;

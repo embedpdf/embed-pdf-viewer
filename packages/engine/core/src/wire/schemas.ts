@@ -11,7 +11,7 @@ import {
   AnnotationStableIdSchema,
   RevisionTokenSchema,
 } from '../annotation/base.schema';
-import { AnnotationDTOSchema } from '../annotation/kinds';
+import { AnnotationSchema } from '../annotation/kinds';
 import type {
   AnnotationAppearanceImageOptions,
   AnnotationAppearanceManifest,
@@ -544,7 +544,7 @@ export type { DocumentManifest } from '../dto/DocumentManifest';
 
 /** What both engines' `annotations.list()` return, and the server's list endpoints send. */
 export const AnnotationListSchema: z.ZodType<AnnotationList> = z.object({
-  annotations: z.array(AnnotationDTOSchema),
+  annotations: z.array(AnnotationSchema),
   pages: z.array(PageStateSchema),
   auditHead: z.number().int().nonnegative().optional(),
 });
@@ -929,12 +929,12 @@ export const AnnotationListMutationMetaSchema: z.ZodType<AnnotationListMutationM
 });
 
 export const AnnotationCreateResultSchema: z.ZodType<AnnotationCreateResult> = z.object({
-  annotation: AnnotationDTOSchema,
+  annotation: AnnotationSchema,
   meta: AnnotationListMutationMetaSchema,
 });
 
 export const AnnotationImportResultSchema: z.ZodType<AnnotationImportResult> = z.object({
-  annotations: z.array(AnnotationDTOSchema),
+  annotations: z.array(AnnotationSchema),
   refMap: z.array(z.object({ from: AnnotationRefSchema, to: AnnotationRefSchema })),
   dropped: z.array(
     z.object({
@@ -965,7 +965,7 @@ export const AppearanceOutcomeSchema: z.ZodType<AppearanceOutcome> = z.object({
 });
 
 export const AnnotationUpdateResultSchema: z.ZodType<AnnotationUpdateResult> = z.object({
-  annotation: AnnotationDTOSchema,
+  annotation: AnnotationSchema,
   appearance: AppearanceOutcomeSchema,
   meta: AnnotationListMutationMetaSchema,
 });
@@ -980,7 +980,7 @@ export const AnnotationDeleteResultSchema: z.ZodType<AnnotationDeleteResult> = z
  * carries one), like `PdfActionWireComponents`.
  */
 export const AnnotationWireComponents = {
-  Annotation: AnnotationDTOSchema,
+  Annotation: AnnotationSchema,
   AnnotationList: AnnotationListSchema,
   AnnotationMutationMeta: AnnotationListMutationMetaSchema,
   PageState: PageStateSchema,
@@ -992,7 +992,7 @@ export const AnnotationWireComponents = {
  * `toIndex + i` after the move. One structural envelope per batch.
  */
 export const AnnotationMoveResultSchema: z.ZodType<AnnotationMoveResult> = z.object({
-  annotations: z.array(AnnotationDTOSchema),
+  annotations: z.array(AnnotationSchema),
   meta: AnnotationListMutationMetaSchema,
 });
 

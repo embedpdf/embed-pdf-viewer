@@ -1,4 +1,4 @@
-import type { AnnotationDTO } from './kinds';
+import type { Annotation } from './kinds';
 import type { PdfCoordinates } from '../pageSpace/coordinates';
 import { pdfPointTurned, pdfTurnOfUpright } from '../geometry/pointTurn';
 import type { PdfPoint } from '../geometry/primitives';
@@ -9,7 +9,7 @@ import type { PdfPoint } from '../geometry/primitives';
  * box. One list for a line (its two ends) or a polygon, one per ink stroke;
  * `null` for any other kind.
  */
-export function pdfDrawnPointsOf(annotation: AnnotationDTO<PdfCoordinates>): PdfPoint[][] | null {
+export function pdfDrawnPointsOf(annotation: Annotation<PdfCoordinates>): PdfPoint[][] | null {
   let sets: PdfPoint[][];
   switch (annotation.subtype) {
     case 'line':

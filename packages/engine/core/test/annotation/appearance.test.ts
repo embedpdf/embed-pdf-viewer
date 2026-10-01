@@ -1,14 +1,14 @@
 import { describe, expect, it } from 'vitest';
 
 import { appearanceChangeOf, appearanceImpactOf, semanticEqual } from '../../src/shared';
-import type { AnnotationDTO, AnnotationPatch } from '../../src/shared';
+import type { Annotation, AnnotationPatch } from '../../src/shared';
 import type { PdfCoordinates } from '../../src/pageSpace/coordinates';
 
 /* Minimal DTO/patch fixtures: the classifier only reads the fields it
  * compares, so tests cast focused literals rather than materialise the full
  * AnnotationBase envelope. */
-const dto = (v: Record<string, unknown>): AnnotationDTO<PdfCoordinates> =>
-  v as unknown as AnnotationDTO<PdfCoordinates>;
+const dto = (v: Record<string, unknown>): Annotation<PdfCoordinates> =>
+  v as unknown as Annotation<PdfCoordinates>;
 const patch = (v: Record<string, unknown>): AnnotationPatch<PdfCoordinates> =>
   v as unknown as AnnotationPatch<PdfCoordinates>;
 
@@ -406,7 +406,7 @@ describe('appearanceChangeOf — the distance a translation moves by', () => {
       box: { x: 100, y: 100, width: 100, height: 100 },
       rotation: null,
       color: '#008000',
-    } as unknown as AnnotationDTO;
+    } as unknown as Annotation;
     const moved = { subtype: 'square', box: { x: 130, y: 120, width: 100, height: 100 } };
     expect(appearanceChangeOf(square, moved as AnnotationPatch)).toEqual({
       impact: 'translation',

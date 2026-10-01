@@ -1,21 +1,22 @@
 /**
- * The i18n controller — reads over the state, the locale verbs, the
- * `onLocaleChanged` derivation, and the lazy loader wired at `connect`. Built
- * synchronously in `createKernel()`, so `t()` works before the engine
- * exists — including inside the shell's loading UI.
+ * The i18n controller: reads over the state, the language verbs, the
+ * `onLocaleChanged` derivation, and the loader wired at `connect`. Built
+ * synchronously in `createKernel()`, so `t()` works before the engine exists.
  */
 import {
+  isPluginError,
   memo,
   PluginError,
   toPluginError,
   toPluginErrorInfo,
+  type OperationOptions,
   type PluginContext,
   type Unsubscribe,
 } from '@embedpdf/core';
 
 import type {
   I18nCapability,
-  I18nConfig,
+  I18nSettings,
   LocaleChangedEvent,
   LocaleInfo,
   LocaleLoadFailedEvent,
@@ -23,23 +24,30 @@ import type {
 } from './contract';
 import {
   addTranslations,
+  endLocaleLoad,
   registerLocale,
+  seedFromSettings,
   setLocale as setCurrentLocale,
   startLocaleLoad,
   unregisterLocale,
   type I18nState,
 } from './model';
 import { createLoaders } from './sync/loaders';
-import { translate } from './translate';
+import { translate, type TranslationSources } from './translate';
 
-export function createI18nController(ctx: PluginContext<I18nState>, config: I18nConfig = {}) {
+const unknownLocale = (code: string) =>
+  new PluginError('not-found', 'i18n', `unknown locale '${code}': not loaded and not in loaders`);
+
+export function createI18nController(ctx: PluginContext<I18nState, I18nSettings>) {
+  const settings = ctx.settings();
   const localeChanged = ctx.events.source<LocaleChangedEvent>();
   const localeLoadFailed = ctx.events.source<LocaleLoadFailedEvent>();
 
   const state = () => ctx.state.get();
+  ctx.state.update(seedFromSettings, settings.get());
 
-  // A locale change is announced once it is usable: never while a lazy pack
-  // is still loading, and always against the locale announced last.
+  // A language change is announced once it shows: never while a language is
+  // still loading, and always against the language announced last.
   let announced = state().locale;
   ctx.state.onChange(({ next }) => {
     if (next.loading !== null || next.locale === announced) return;
@@ -48,47 +56,49 @@ export function createI18nController(ctx: PluginContext<I18nState>, config: I18n
     localeChanged.emit({ locale: next.locale, previousLocale });
   });
 
-  // Dev signal, once per offender — a missing key otherwise fails silently
-  // (by design: `t()` always returns a usable string).
-  const warned = new Set<string>();
-  const warnOnce = (id: string, message: string) => {
-    if (warned.has(id)) return;
-    warned.add(id);
-    console.warn(message);
-  };
+  const sources = (): TranslationSources => ({
+    locale: state().locale,
+    fallbackLocale: settings.get().fallbackLocale,
+    locales: state().locales,
+  });
 
+  // A missing key would otherwise go unnoticed, since `t()` always returns
+  // something to show: warn once per key.
+  const warned = new Set<string>();
   const translateKey = (key: string, options?: TranslateOptions): string => {
-    const result = translate(state(), key, options);
-    if (!result.found && options?.fallback === undefined) {
-      warnOnce(`key:${key}`, `[i18n] missing translation "${key}" (locale: ${state().locale})`);
+    const result = translate(sources(), key, options);
+    if (!result.found && options?.fallback === undefined && !warned.has(key)) {
+      warned.add(key);
+      console.warn(`[i18n] missing translation "${key}" (locale: ${state().locale})`);
     }
     return result.text;
   };
 
   /** A new translate function only when the strings it can return may differ. */
   const getTranslator = memo(
-    () => [state().locale, state().locales],
-    (_locale, _locales) => (key: string, options?: TranslateOptions) => translateKey(key, options),
+    () => [state().locale, state().locales, settings.get().fallbackLocale],
+    (_locale, _locales, _fallbackLocale) => (key: string, options?: TranslateOptions) =>
+      translateKey(key, options),
   );
 
-  /** The known-locale list, rebuilt only when the packs change. */
+  /** The languages a picker shows, rebuilt only when the languages or the loaders change. */
   const listLocales = memo(
-    () => [state().locales],
-    (locales): readonly LocaleInfo[] => {
+    () => [state().locales, settings.get().loaders],
+    (locales, loaders): readonly LocaleInfo[] => {
       const known: LocaleInfo[] = Object.values(locales).map((locale) => ({
         code: locale.code,
         name: locale.name,
-        dir: locale.dir ?? 'ltr',
+        direction: locale.direction ?? 'ltr',
         loaded: true,
       }));
-      for (const code of Object.keys(config.loaders ?? {})) {
-        if (!locales[code]) known.push({ code, name: code, dir: 'ltr', loaded: false });
+      for (const code of Object.keys(loaders)) {
+        if (!locales[code]) known.push({ code, name: code, direction: 'ltr', loaded: false });
       }
       return known;
     },
   );
 
-  /** One pending promise per lazy load; a newer request supersedes it. */
+  /** The caller waiting for a language to load; a newer switch replaces it. */
   const pending = new Map<string, { resolve(): void; reject(error: unknown): void }>();
   const settle = (code: string, outcome: { ok: true } | { ok: false; error: unknown }) => {
     const waiter = pending.get(code);
@@ -101,45 +111,75 @@ export function createI18nController(ctx: PluginContext<I18nState>, config: I18n
     for (const [code, waiter] of pending) {
       pending.delete(code);
       waiter.reject(
-        new PluginError('operation-cancelled', 'i18n', `switching to '${code}' was superseded`),
+        new PluginError('operation-cancelled', 'i18n', `switching to '${code}' was replaced`),
       );
     }
   };
-  const loaders = createLoaders(ctx, config, { settle }, (locale, error) =>
+  const loaders = createLoaders(ctx, settings, { settle }, (locale, error) =>
     localeLoadFailed.emit({ locale, error: toPluginErrorInfo(toPluginError('i18n', error)) }),
   );
 
-  const setLocale = (code: string): Promise<void> => {
+  const setLocale = (code: string, options: OperationOptions = {}): Promise<void> => {
+    const { signal } = options;
+    if (signal?.aborted) {
+      return Promise.reject(new PluginError('operation-cancelled', 'i18n', 'operation cancelled'));
+    }
     if (state().locales[code]) {
       supersede();
       ctx.state.update(setCurrentLocale, code);
       return Promise.resolve();
     }
-    if (config.loaders?.[code]) {
-      supersede();
-      return new Promise<void>((resolve, reject) => {
-        pending.set(code, { resolve, reject });
-        ctx.state.update(startLocaleLoad, code);
-      });
-    }
-    return Promise.reject(
-      new PluginError(
-        'not-found',
-        'i18n',
-        `unknown locale '${code}' — not registered and no loader configured`,
-      ),
+    if (!settings.get().loaders[code]) return Promise.reject(unknownLocale(code));
+    supersede();
+    const loaded = new Promise<void>((resolve, reject) => {
+      pending.set(code, { resolve, reject });
+      ctx.state.update(startLocaleLoad, code);
+    });
+    // A cancelled switch stops waiting: the language still registers when it
+    // arrives, but doesn't become current.
+    signal?.addEventListener(
+      'abort',
+      () => {
+        if (!pending.delete(code)) return;
+        ctx.state.update(endLocaleLoad, code);
+      },
+      { once: true },
     );
+    return ctx.cancellable(signal, loaded);
+  };
+
+  /** Follow a settings change: new languages register, and a new `locale` becomes current. */
+  const followSettings = (): void => {
+    let previous = settings.get();
+    ctx.listen(settings.api.onSettingsChanged, ({ settings: next, changed }) => {
+      if (changed.includes('locales')) {
+        for (const locale of previous.locales) {
+          if (!next.locales.some((other) => other.code === locale.code)) {
+            ctx.state.update(unregisterLocale, locale.code);
+          }
+        }
+        for (const locale of next.locales) {
+          if (!previous.locales.includes(locale)) ctx.state.update(registerLocale, locale);
+        }
+      }
+      if (changed.includes('locale')) {
+        const code = next.locale ?? next.fallbackLocale;
+        // A failed load fires onLocaleLoadFailed; only a code nothing knows needs saying here.
+        setLocale(code).catch((error: unknown) => {
+          if (isPluginError(error, 'not-found')) console.warn(`[i18n] ${error.message}`);
+        });
+      }
+      previous = next;
+    });
   };
 
   const api: I18nCapability = {
+    ...settings.api,
     t: translateKey,
     getTranslator,
-    hasKey: (key) => translate(state(), key).found,
+    hasKey: (key) => translate(sources(), key).found,
     getLocale: () => state().locale,
-    getDirection: () => {
-      const { locales, locale } = state();
-      return locales[locale]?.dir ?? 'ltr';
-    },
+    getDirection: () => state().locales[state().locale]?.direction ?? 'ltr',
     listLocales,
     getLoadingLocale: () => state().loading,
     setLocale,
@@ -147,16 +187,10 @@ export function createI18nController(ctx: PluginContext<I18nState>, config: I18n
       ctx.state.update(registerLocale, locale);
       return () => ctx.state.update(unregisterLocale, locale.code);
     },
-    addTranslations: (code, dictionary) => {
-      // A lazy pack takes strings before it has loaded; they merge in when it does.
-      if (!state().locales[code] && !config.loaders?.[code]) {
-        throw new PluginError(
-          'not-found',
-          'i18n',
-          `unknown locale '${code}' — not registered and no loader configured`,
-        );
-      }
-      ctx.state.update(addTranslations, code, dictionary);
+    addTranslations: (code, translations) => {
+      // A language in `loaders` takes strings before it has loaded; they merge in when it does.
+      if (!state().locales[code] && !settings.get().loaders[code]) throw unknownLocale(code);
+      ctx.state.update(addTranslations, code, translations);
     },
     onLocaleChanged: localeChanged.on,
     onLocaleLoadFailed: localeLoadFailed.on,
@@ -166,6 +200,7 @@ export function createI18nController(ctx: PluginContext<I18nState>, config: I18n
     api,
     connect() {
       loaders.connect();
+      followSettings();
     },
   };
 }

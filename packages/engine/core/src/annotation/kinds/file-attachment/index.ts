@@ -8,7 +8,7 @@ export { FileAttachmentDeclaration } from './declaration';
 export { FileAttachmentIconSchema } from './values';
 export type { FileAttachmentIcon } from './values';
 
-export type FileAttachmentAnnotationDTO<C extends Coordinates = PageCoordinates> = ReadOf<
+export type FileAttachmentAnnotation<C extends Coordinates = PageCoordinates> = ReadOf<
   typeof FileAttachmentDeclaration,
   C
 >;
@@ -32,7 +32,7 @@ export const FileAttachmentPatchSchema = FileAttachmentDeclaration.updateSchema;
 
 export const FileAttachmentKind: AnnotationKindModule<
   'file-attachment',
-  FileAttachmentAnnotationDTO,
+  FileAttachmentAnnotation,
   FileAttachmentDraft,
   FileAttachmentPatch
 > = {

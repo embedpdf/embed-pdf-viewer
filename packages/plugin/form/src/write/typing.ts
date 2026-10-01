@@ -6,19 +6,19 @@
  */
 import type { FormFieldRef } from '@embedpdf/engine-core/runtime';
 
-import type { SetValueResult } from '../contract';
+import type { FormSetValueResult } from '../contract';
 import type { FormContext, FormServices } from '../services';
 
 export function createTyping(
   ctx: Pick<FormContext, 'onSettle'>,
   { keyOf }: Pick<FormServices, 'keyOf'>,
-  setText: (field: FormFieldRef, text: string) => Promise<SetValueResult>,
+  setText: (field: FormFieldRef, text: string) => Promise<FormSetValueResult>,
 ) {
   /** The text typed in each field and not written yet, by field key. */
   const drafts = new Map<string, { readonly field: FormFieldRef; readonly text: string }>();
 
   /** Write the field's draft, if it has one; `null` when there is nothing to write. */
-  const commitDraftText = async (field: FormFieldRef): Promise<SetValueResult | null> => {
+  const commitDraftText = async (field: FormFieldRef): Promise<FormSetValueResult | null> => {
     const key = keyOf(field);
     const draft = drafts.get(key);
     if (!draft) return null;

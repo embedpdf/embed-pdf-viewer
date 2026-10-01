@@ -15,9 +15,13 @@ export function createBinaries(ctx: StampContext) {
   const libraryBinaries = new Map<string, Uint8Array>();
 
   /** Whole-PDF rewrites are serialized per library, or two concurrent
-   *  appends could both start from the same bytes and lose one page. */
-  const mutateLibrary = <T>(libraryId: string, mutation: () => Promise<T>): Promise<T> =>
-    ctx.serialQueue(`library:${libraryId}`)(mutation);
+   *  appends could both start from the same bytes and lose one page. A
+   *  mutation whose signal fired while it waited never starts. */
+  const mutateLibrary = <T>(
+    libraryId: string,
+    mutation: () => Promise<T>,
+    signal?: AbortSignal,
+  ): Promise<T> => ctx.serialQueue(`library:${libraryId}`)(mutation, { signal });
 
   /**
    * Ghost renders, one per size bucket per asset, rendered lazily on the

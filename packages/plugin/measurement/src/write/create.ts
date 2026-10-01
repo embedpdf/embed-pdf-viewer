@@ -1,13 +1,13 @@
 /** Measurement creation: a measurement annotation with the page's scale, through the annotation plugin. */
-import { PluginError } from '@embedpdf/core';
-import type { AnnotationDraft, AnnotationRef } from '@embedpdf/engine-core/runtime';
+import { PluginError, type OperationOptions } from '@embedpdf/core';
+import type { Annotation, AnnotationDraft, PageRef } from '@embedpdf/engine-core/runtime';
 
 import type { CreateMeasurementInput, MeasurementCapability } from '../contract';
 import type { MeasurementContext, MeasurementServices } from '../services';
 import type { MeasurementViewportSync } from '../sync/viewports';
 
 export function createMeasuring(
-  ctx: Pick<MeasurementContext, 'assertAllowed'>,
+  ctx: Pick<MeasurementContext, 'assertAllowed' | 'pageOf'>,
   { siblings }: Pick<MeasurementServices, 'siblings'>,
   { scaleOf }: Pick<MeasurementViewportSync, 'scaleOf'>,
 ) {
@@ -18,13 +18,17 @@ export function createMeasuring(
    * caption and leader), the dimension intent, and the page's scale. The
    * engine works out the label from the points and the scale.
    */
-  const draftOf = (input: CreateMeasurementInput, tool: string): AnnotationDraft | Error => {
-    const style = annotation.getToolDefaults(tool);
+  const draftOf = (
+    input: CreateMeasurementInput,
+    page: PageRef,
+    tool: string,
+  ): AnnotationDraft | Error => {
+    const style = annotation.tools.getDefaults(tool);
     const shared = {
       color: style.color,
       strokeWidth: style.strokeWidth,
       opacity: style.opacity,
-      measure: scaleOf(input.page).measure,
+      measure: scaleOf(page).measure,
       captionEnabled: style.captionEnabled ?? true,
     };
     switch (input.kind) {
@@ -68,15 +72,18 @@ export function createMeasuring(
     }
   };
 
-  const createMeasurement = async (input: CreateMeasurementInput): Promise<AnnotationRef> => {
+  const createMeasurement = async (
+    input: CreateMeasurementInput,
+    options?: OperationOptions,
+  ): Promise<{ annotation: Annotation }> => {
     ctx.assertAllowed('annotations:create', 'measurement.createMeasurement');
-    if (!scaleOf(input.page).ready) {
+    const page = ctx.pageOf(input.page).ref;
+    if (!scaleOf(page).ready) {
       throw new PluginError('not-ready', 'measurement', 'the page scale is not known yet');
     }
-    const draft = draftOf(input, input.tool ?? input.kind);
+    const draft = draftOf(input, page, input.tool ?? input.kind);
     if (draft instanceof Error) throw draft;
-    const created = await annotation.create(input.page, draft);
-    return created.annotation.ref;
+    return annotation.create(page, draft, undefined, { signal: options?.signal });
   };
 
   return { api: { createMeasurement } satisfies Partial<MeasurementCapability> };

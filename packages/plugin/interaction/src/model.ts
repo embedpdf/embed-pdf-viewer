@@ -1,38 +1,38 @@
 /**
- * The interaction state: the armed tool, the stack `pushTool` saves, and the
+ * The interaction state: the active tool, the stack `pushTool` saves, and the
  * resolved cursor, so UI can react. Tools, handlers and cursor claims are
  * registries in the controller's closure. Every function below is a pure
  * transition; the controller applies them with `ctx.state.update`.
  */
-import type { Cursor, InteractionConfig, Tool, ToolId } from './contract';
+import type { Cursor, ToolId } from './contract';
+import type { HostTool } from './host-contract';
 
 export interface InteractionState {
   readonly activeToolId: ToolId;
-  readonly defaultToolId: ToolId;
-  /** Tools armed with `pushTool`, oldest first; `popTool` restores the last. */
+  /** Tools activated with `pushTool`, oldest first; `popTool` restores the last. */
   readonly toolStack: readonly ToolId[];
   readonly cursor: Cursor;
 }
 
-export const initialInteractionState = (config: InteractionConfig): InteractionState => ({
-  activeToolId: config.defaultTool ?? 'pointer',
-  defaultToolId: config.defaultTool ?? 'pointer',
+/** A document starts on `pointer`; the controller then activates the `defaultTool` setting. */
+export const initialInteractionState = (): InteractionState => ({
+  activeToolId: 'pointer',
   toolStack: [],
   cursor: 'default',
 });
 
-/** Arm a tool and forget every pushed one. */
+/** Activate a tool and forget every pushed one. */
 export function activateTool(state: InteractionState, toolId: ToolId): InteractionState {
   if (state.activeToolId === toolId && state.toolStack.length === 0) return state;
   return { ...state, activeToolId: toolId, toolStack: [] };
 }
 
-/** Arm a tool temporarily, saving the armed one for {@link popTool}. */
+/** Activate a tool for a moment, saving the active one for {@link popTool}. */
 export function pushTool(state: InteractionState, toolId: ToolId): InteractionState {
   return { ...state, toolStack: [...state.toolStack, state.activeToolId], activeToolId: toolId };
 }
 
-/** Re-arm the tool saved last; an empty stack changes nothing. */
+/** Activate the tool saved last; an empty stack changes nothing. */
 export function popTool(state: InteractionState): InteractionState {
   if (state.toolStack.length === 0) return state;
   return {
@@ -54,7 +54,7 @@ export function setCursor(state: InteractionState, cursor: Cursor): InteractionS
  * Both carry `form-fill` and `link-nav`: filling forms and following links is
  * the resting state of a viewer (Acrobat's hand tool does both).
  */
-export const builtinTools = (): Tool[] => [
+export const builtinTools = (): HostTool[] => [
   {
     id: 'pointer',
     cursor: 'default',

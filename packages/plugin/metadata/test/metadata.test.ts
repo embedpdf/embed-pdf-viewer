@@ -8,7 +8,7 @@ import {
   type Engine,
   type PageLayout,
 } from '@embedpdf/core';
-import { metadataPlugin, MetadataToken } from '../src';
+import { metadataPlugin, metadataState, MetadataToken } from '../src';
 import { changedKeys } from '../src/model';
 
 /** A page whose every box is its crop box, in page space: measured from that box's top-left. */
@@ -187,7 +187,7 @@ describe('metadata controller', () => {
     await kernel.destroy();
   });
 
-  it('update(): resolves with the engine result after the snapshot and onUpdated reflect it', async () => {
+  it('update(): resolves { metadata } after the snapshot and onUpdated reflect it', async () => {
     const doc = fakeDocument();
     const kernel = createKernel({ engine: doc.engine, plugins: [metadataPlugin()] });
     await kernel.start();
@@ -205,7 +205,7 @@ describe('metadata controller', () => {
     const result = await api
       .update({ title: 'New' })
       .then((updateResult) => (order.push('resolved'), updateResult));
-    expect(result.metadata.title).toBe('New');
+    expect(result).toEqual({ metadata: META({ title: 'New' }) });
     expect(api.getSnapshot()?.title).toBe('New');
     expect(order).toEqual(['event:New:title:local', 'resolved']);
     await kernel.destroy();
@@ -217,12 +217,44 @@ describe('metadata controller', () => {
     await kernel.start();
     await open(kernel);
     const api = kernel.capability(MetadataToken, 'doc');
-    expect(api.canEdit()).toBe(false);
+    expect(api.canUpdate()).toBe(false);
     await expect(api.update({ title: 'x' })).rejects.toMatchObject({
       code: 'permission-denied',
       permission: 'doc.metadata.modify',
     });
     expect(doc.handle.metadata.update).not.toHaveBeenCalled();
+    await kernel.destroy();
+  });
+
+  it('update() with a signal that already fired rejects operation-cancelled before the engine', async () => {
+    const doc = fakeDocument();
+    const kernel = createKernel({ engine: doc.engine, plugins: [metadataPlugin()] });
+    await kernel.start();
+    await open(kernel);
+    const api = kernel.capability(MetadataToken, 'doc');
+    const controller = new AbortController();
+    controller.abort();
+    await expect(api.update({ title: 'x' }, { signal: controller.signal })).rejects.toMatchObject({
+      code: 'operation-cancelled',
+    });
+    await expect(
+      api.custom.update({ k: 'v' }, { signal: controller.signal }),
+    ).rejects.toMatchObject({ code: 'operation-cancelled' });
+    expect(doc.handle.metadata.update).not.toHaveBeenCalled();
+    expect(doc.handle.metadata.custom.update).not.toHaveBeenCalled();
+    await kernel.destroy();
+  });
+
+  it('refresh() stops waiting when its signal fires', async () => {
+    const doc = fakeDocument();
+    const kernel = createKernel({ engine: doc.engine, plugins: [metadataPlugin()] });
+    await kernel.start();
+    await open(kernel);
+    const api = kernel.capability(MetadataToken, 'doc');
+    const controller = new AbortController();
+    const refreshing = api.refresh({ signal: controller.signal });
+    controller.abort();
+    await expect(refreshing).rejects.toMatchObject({ code: 'operation-cancelled' });
     await kernel.destroy();
   });
 
@@ -289,7 +321,7 @@ describe('custom metadata', () => {
       .update({ reviewedBy: 'lee', draftOwner: null })
       .then((updateResult) => (order.push('resolved'), updateResult));
 
-    expect(result.custom).toEqual({ reviewedBy: 'lee', keep: 'me' });
+    expect(result).toEqual({ custom: { reviewedBy: 'lee', keep: 'me' } });
     expect(api.custom.getSnapshot()).toEqual({ reviewedBy: 'lee', keep: 'me' });
     expect(order).toEqual(['event:reviewedBy,draftOwner:local', 'resolved']);
     expect(standard).not.toHaveBeenCalled();
@@ -306,6 +338,30 @@ describe('custom metadata', () => {
       isPluginError(error, 'permission-denied'),
     );
     expect(doc.handle.metadata.custom.update).not.toHaveBeenCalled();
+    await kernel.destroy();
+  });
+});
+
+describe('metadataState', () => {
+  it('reads the standard fields, the custom keys and the load state; empty without a document', async () => {
+    expect(metadataState.empty).toEqual({ metadata: null, custom: null, status: 'idle' });
+    const doc = fakeDocument({ custom: { contractId: 'C-1' } });
+    const kernel = createKernel({ engine: doc.engine, plugins: [metadataPlugin()] });
+    await kernel.start();
+    await open(kernel);
+    const api = kernel.capability(MetadataToken, 'doc');
+    doc.reads[0].resolve(META({ title: 'seed' }));
+    await tick();
+    const state = metadataState.read(api);
+    expect(state).toEqual({
+      metadata: META({ title: 'seed' }),
+      custom: { contractId: 'C-1' },
+      status: 'ready',
+    });
+    // Reference-stable while nothing changed, so readers re-render only on a change.
+    const again = metadataState.read(api);
+    expect(again.metadata).toBe(state.metadata);
+    expect(again.custom).toBe(state.custom);
     await kernel.destroy();
   });
 });

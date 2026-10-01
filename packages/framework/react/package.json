@@ -13,7 +13,6 @@
     "./actions": "./src/actions.tsx",
     "./anchored": "./src/anchored.tsx",
     "./annotation": "./src/annotation.tsx",
-    "./annotation-menu": "./src/annotation-menu.tsx",
     "./commands": "./src/commands.ts",
     "./form": "./src/form.tsx",
     "./i18n": "./src/i18n.ts",
@@ -26,7 +25,6 @@
     "./redaction": "./src/redaction.tsx",
     "./render": "./src/render.tsx",
     "./runtime": "./src/runtime.tsx",
-    "./scrollbar": "./src/scrollbar.tsx",
     "./search": "./src/search.tsx",
     "./selection": "./src/selection.tsx",
     "./shell": "./src/shell.ts",
@@ -34,7 +32,7 @@
     "./stage": "./src/stage.tsx",
     "./stamp": "./src/stamp.tsx",
     "./toolbar": "./src/toolbar.tsx",
-    "./views": "./src/views.ts",
+    "./view-manager": "./src/view-manager.ts",
     "./package.json": "./package.json"
   },
   "publishConfig": {
@@ -57,10 +55,6 @@
       "./annotation": {
         "import": "./dist/annotation.js",
         "require": "./dist/annotation.cjs"
-      },
-      "./annotation-menu": {
-        "import": "./dist/annotation-menu.js",
-        "require": "./dist/annotation-menu.cjs"
       },
       "./commands": {
         "import": "./dist/commands.js",
@@ -110,10 +104,6 @@
         "import": "./dist/runtime.js",
         "require": "./dist/runtime.cjs"
       },
-      "./scrollbar": {
-        "import": "./dist/scrollbar.js",
-        "require": "./dist/scrollbar.cjs"
-      },
       "./search": {
         "import": "./dist/search.js",
         "require": "./dist/search.cjs"
@@ -142,9 +132,9 @@
         "import": "./dist/toolbar.js",
         "require": "./dist/toolbar.cjs"
       },
-      "./views": {
-        "import": "./dist/views.js",
-        "require": "./dist/views.cjs"
+      "./view-manager": {
+        "import": "./dist/view-manager.js",
+        "require": "./dist/view-manager.cjs"
       },
       "./package.json": "./package.json"
     }

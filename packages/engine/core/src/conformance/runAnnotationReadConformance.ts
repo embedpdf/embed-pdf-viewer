@@ -4,8 +4,8 @@ import type {
   ConformanceOptions,
 } from './runMetadataConformance';
 import type { AnnotationList } from '../annotation/AnnotationList';
-import { AnnotationDTOSchema } from '../annotation/kinds';
-import type { AnnotationDTO } from '../annotation/kinds';
+import { AnnotationSchema } from '../annotation/kinds';
+import type { Annotation } from '../annotation/kinds';
 import type { Engine } from '../engine/Engine';
 import { EngineError } from '../errors/EngineError';
 import { EngineErrorCode } from '../errors/EngineErrorCode';
@@ -219,14 +219,14 @@ export function runAnnotationReadConformance(
       }
     });
 
-    test('every annotation DTO satisfies AnnotationDTOSchema (discriminated union)', async () => {
+    test('every annotation DTO satisfies AnnotationSchema (discriminated union)', async () => {
       const doc = await openFixture(engine, opts);
       try {
         const snap = await doc.annotations.list({
           pages: [toPageRef(opts.fixture.pageObjectNumber)],
         });
         for (const a of snap.annotations) {
-          const result = AnnotationDTOSchema.safeParse(a);
+          const result = AnnotationSchema.safeParse(a);
           expect(result.success).toBe(true);
         }
       } finally {
@@ -234,7 +234,7 @@ export function runAnnotationReadConformance(
       }
     });
 
-    test('AnnotationDTOSchema rejects an annotation with a foreign subtype', () => {
+    test('AnnotationSchema rejects an annotation with a foreign subtype', () => {
       const bogus: unknown = {
         subtype: 'pretend-not-real',
         ref: {
@@ -253,7 +253,7 @@ export function runAnnotationReadConformance(
         createdAt: null,
         modifiedAt: null,
       };
-      const result = AnnotationDTOSchema.safeParse(bogus);
+      const result = AnnotationSchema.safeParse(bogus);
       expect(result.success).toBe(false);
     });
 
@@ -348,4 +348,4 @@ function emptyFlags() {
 }
 
 // Re-export for convenience: tests can hand a literal snapshot.
-export type { AnnotationList, AnnotationDTO };
+export type { AnnotationList, Annotation };

@@ -49,7 +49,7 @@ describe('a click tool’s ghost', () => {
   it('draws what the click makes, see-through, with the tool’s live defaults', () => {
     const harness = annotationHarness();
     harness.seedToolDefaults();
-    harness.capability.registerTool({ id: 'square', ghost: true });
+    harness.capability.tools.register({ id: 'square', ghost: true });
     harness.capability.hoverGhostAt('square', PAGE, { x: 100, y: 100 });
     expect(ghostOf(harness)).toMatchObject({
       source: 'ghost',
@@ -58,14 +58,14 @@ describe('a click tool’s ghost', () => {
       style: { color: '#e5484d', strokeWidth: 6 },
     });
     // A new color shows at once, without a new hover.
-    harness.capability.updateToolDefaults('square', { color: '#00a000' });
+    harness.capability.tools.updateDefaults('square', { color: '#00a000' });
     expect(ghostOf(harness)?.style.color).toBe('#00a000');
   });
 
   it('an arrow’s ghost is centred on the pointer, its head drawn', () => {
     const harness = annotationHarness();
     harness.seedToolDefaults();
-    harness.capability.registerTool({
+    harness.capability.tools.register({
       id: 'arrow',
       extends: 'line',
       defaults: { lineEndings: { start: 'none', end: 'open-arrow' } },
@@ -85,7 +85,7 @@ describe('a click tool’s ghost', () => {
     harness.seedToolDefaults();
     harness.capability.hoverGhostAt('circle', PAGE, { x: 100, y: 100 }); // drag-first: off
     expect(ghostOf(harness)).toBeUndefined();
-    harness.capability.registerTool({ id: 'ink', ghost: true }); // a click draws no ink
+    harness.capability.tools.register({ id: 'ink', ghost: true }); // a click draws no ink
     harness.capability.hoverGhostAt('ink', PAGE, { x: 100, y: 100 });
     expect(ghostOf(harness)).toBeUndefined();
   });
@@ -93,7 +93,7 @@ describe('a click tool’s ghost', () => {
   it('stays while the press is still a click, and gives way to the drawing once it drags', () => {
     const harness = annotationHarness();
     harness.seedToolDefaults();
-    harness.capability.registerTool({ id: 'square', ghost: true });
+    harness.capability.tools.register({ id: 'square', ghost: true });
     const at = { x: 100, y: 100 };
     harness.capability.hoverGhostAt('square', PAGE, at);
     harness.capability.createPointer('square', 'down', PAGE, at);
@@ -106,7 +106,7 @@ describe('a click tool’s ghost', () => {
 
   it('a form tool’s placement: the ghost until it drags, then the field it places; a radio is round', () => {
     const harness = annotationHarness();
-    harness.capability.registerTool({
+    harness.capability.tools.register({
       id: 'form-radio',
       subtype: 'widget-radio',
       enables: ['form-place', 'annotation-edit'],

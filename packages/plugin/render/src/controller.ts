@@ -21,11 +21,11 @@ import type {
   InvalidateOptions,
   InvalidateScope,
   PageRender,
-  RenderConfig,
   RenderFormat,
   RenderInvalidatedEvent,
   RenderPageOptions,
   RenderPagesOptions,
+  RenderSettings,
 } from './contract';
 import type {
   PaintSettings,
@@ -80,8 +80,13 @@ interface PageDemand {
  * live handles and abort controllers); a re-plan wakes readers with
  * `ctx.notify()`.
  */
-export function createRenderController(ctx: PluginContext<RenderState>, config: RenderConfig = {}) {
-  const resolved: ResolvedRenderOptions = resolveRenderOptions(config);
+export function createRenderController(ctx: PluginContext<RenderState, RenderSettings>) {
+  const settings = ctx.settings();
+  // The settings as the strategy reads them, resolved again when they change.
+  const resolvedOptions: () => ResolvedRenderOptions = memo(
+    () => [settings.get()] as const,
+    (current) => resolveRenderOptions(current),
+  );
   const store = new RasterStore();
   const invalidated = ctx.events.source<RenderInvalidatedEvent>();
   const renderCompleted = ctx.events.source<RenderCompletedEvent>();
@@ -91,18 +96,16 @@ export function createRenderController(ctx: PluginContext<RenderState>, config: 
 
   // One-shot developer hints: misconfigurations, not errors.
   let warnedFormat = false;
-  const warnDroppedFormat = (strategy: ResolvedStrategy) => {
-    if (warnedFormat || resolved.format === undefined || strategy.format === resolved.format) {
-      return;
-    }
+  const warnDroppedFormat = (strategy: ResolvedStrategy, requested: RenderFormat | undefined) => {
+    if (warnedFormat || requested === undefined || strategy.format === requested) return;
     warnedFormat = true;
     console.warn(
-      `[render] format '${resolved.format}' is not in the deployment's formats — using '${strategy.format}'.`,
+      `[render] format '${requested}' is not in the deployment's formats — using '${strategy.format}'.`,
     );
   };
   let warnedBudget = false;
   const warnPastBudgetNoTiles = (demandWidth: number, supplied: number) => {
-    if (warnedBudget || resolved.tiles.enabled || demandWidth <= supplied * 2) return;
+    if (warnedBudget || resolvedOptions().tiles.enabled || demandWidth <= supplied * 2) return;
     warnedBudget = true;
     console.warn(
       `[render] demand is ${(demandWidth / supplied).toFixed(1)}× over the base budget and the ` +
@@ -117,10 +120,10 @@ export function createRenderController(ctx: PluginContext<RenderState>, config: 
   const renderPolicy = (): EngineRenderPolicy =>
     ctx.document()?.renderPolicy ?? CONTINUOUS_RENDER_POLICY;
   const currentStrategy = memo(
-    () => [renderPolicy()],
-    (policy) => {
-      const strategy = resolveStrategy(policy, resolved);
-      warnDroppedFormat(strategy);
+    () => [renderPolicy(), resolvedOptions()] as const,
+    (policy, options) => {
+      const strategy = resolveStrategy(policy, options);
+      warnDroppedFormat(strategy, options.format);
       return strategy;
     },
   );
@@ -243,12 +246,12 @@ export function createRenderController(ctx: PluginContext<RenderState>, config: 
 
   /** The public door: the requested size, exactly. Async so refusals reject. */
   async function renderPage(
-    page: PageRef,
+    pageArgument: PageRef | number,
     options: RenderPageOptions = {},
   ): Promise<PageImageHandle> {
     ctx.assertAllowed(RENDER_SCOPE, 'render.renderPage');
-    const pageWidth = pageWidthOf(page);
-    const width = Math.max(1, Math.round(options.width ?? (options.scale ?? 1) * pageWidth));
+    const { ref: page, size } = ctx.pageOf(pageArgument);
+    const width = Math.max(1, Math.round(options.width ?? (options.scale ?? 1) * size.width));
     const annotations = options.includeAnnotations ?? true;
     const strategy = currentStrategy();
     const format = options.format ?? strategy.format;
@@ -257,39 +260,51 @@ export function createRenderController(ctx: PluginContext<RenderState>, config: 
     // that matches a conformed raster (same format, default quality) is the
     // same key, so the cached image serves it.
     const key = rasterKey(page.objectNumber, width, annotations, format, options.quality);
-    return acquireRaster(
-      page,
-      key,
-      { viewport: { kind: 'width', width }, includeAnnotations: annotations, format, quality },
+    return ctx.cancellable(
       options.signal,
+      acquireRaster(
+        page,
+        key,
+        { viewport: { kind: 'width', width }, includeAnnotations: annotations, format, quality },
+        options.signal,
+      ),
     );
   }
 
   async function renderPages(
-    pages: readonly PageRef[],
+    pages: readonly (PageRef | number)[],
     options: RenderPagesOptions = {},
-  ): Promise<BatchResult<PageRender, PageRef>> {
+  ): Promise<BatchResult<PageRender, PageRef | number>> {
     ctx.assertAllowed(RENDER_SCOPE, 'render.renderPages');
     const concurrency = Math.max(1, options.concurrency ?? DEFAULT_BATCH_CONCURRENCY);
-    const applied: PageRender[] = [];
-    const failed: { ref: PageRef; error: PluginErrorInfo }[] = [];
-    const queue = [...pages];
+    // Each entry keeps its place in the input, so the result reads in the
+    // order given whatever order the renders finished in.
+    const applied: { index: number; render: PageRender }[] = [];
+    const failed: { index: number; ref: PageRef | number; error: PluginErrorInfo }[] = [];
+    const queue = pages.map((page, index) => ({ page, index }));
     const worker = async () => {
-      for (let page = queue.shift(); page; page = queue.shift()) {
+      for (let next = queue.shift(); next; next = queue.shift()) {
+        const { page, index } = next;
         try {
-          applied.push({ page, image: await renderPage(page, options) });
+          const image = await renderPage(page, options);
+          applied.push({ index, render: { page: ctx.pageOf(page).ref, image } });
         } catch (error) {
-          failed.push({ ref: page, error: toPluginErrorInfo(toPluginError('render', error)) });
+          failed.push({
+            index,
+            ref: page,
+            error: toPluginErrorInfo(toPluginError('render', error)),
+          });
         }
       }
     };
-    await Promise.all(Array.from({ length: Math.min(concurrency, queue.length) }, worker));
-    // Report in input order, whatever the completion order was.
-    const inputOrder = new Map(pages.map((page, index) => [page.objectNumber, index] as const));
-    const orderOf = (page: PageRef) => inputOrder.get(page.objectNumber) ?? 0;
-    applied.sort((left, right) => orderOf(left.page) - orderOf(right.page));
-    failed.sort((left, right) => orderOf(left.ref) - orderOf(right.ref));
-    return { applied, skipped: [], failed };
+    const batch = Promise.all(Array.from({ length: Math.min(concurrency, queue.length) }, worker));
+    await ctx.cancellable(options.signal, batch);
+    const byInput = (left: { index: number }, right: { index: number }) => left.index - right.index;
+    return {
+      applied: applied.sort(byInput).map(({ render }) => render),
+      skipped: [],
+      failed: failed.sort(byInput).map(({ ref, error }) => ({ ref, error })),
+    };
   }
 
   // ── invalidation: the one place the ledger bumps and onInvalidated fires ──
@@ -311,11 +326,8 @@ export function createRenderController(ctx: PluginContext<RenderState>, config: 
   }
 
   function invalidate({ pages, scope = 'content' }: InvalidateOptions = {}): void {
-    publishInvalidation(
-      pages?.map((page) => page.objectNumber) ?? allPageObjectNumbers(),
-      scope,
-      null,
-    );
+    const named = pages?.flatMap((page) => ctx.getPage(page)?.ref.objectNumber ?? []);
+    publishInvalidation(named ?? allPageObjectNumbers(), scope, null);
   }
 
   // ── tiles: one manager, per-view demand handles with pure reads ──
@@ -341,7 +353,7 @@ export function createRenderController(ctx: PluginContext<RenderState>, config: 
 
   const tiles = new TileManager({
     store,
-    options: resolved,
+    getOptions: resolvedOptions,
     getPolicy: renderPolicy,
     getPageSize: (pageObjectNumber) => ctx.getPage(toPageRef(pageObjectNumber))?.size,
     getEpoch: epochOf,
@@ -363,7 +375,9 @@ export function createRenderController(ctx: PluginContext<RenderState>, config: 
       return task;
     },
     onAdvance: wake,
-    ...(resolved.debug ? { debug: (message: string) => console.debug(`[render] ${message}`) } : {}),
+    debug: (message: string) => {
+      if (resolvedOptions().debug) console.debug(`[render] ${message}`);
+    },
   });
 
   /** One handle per view id, reference-counted; demands and plans per page. */
@@ -429,21 +443,32 @@ export function createRenderController(ctx: PluginContext<RenderState>, config: 
     return handle;
   }
 
-  const paintSettings: PaintSettings = Object.freeze({
-    fadeMs: resolved.tiles.fadeMs,
-    tiles: resolved.tiles.enabled,
+  // What the layers paint with: the same object until a setting it reads changes.
+  const paintSettings = memo(
+    () => [resolvedOptions().tiles.fadeMs, resolvedOptions().tiles.enabled] as const,
+    (fadeMs, enabled): PaintSettings => Object.freeze({ fadeMs, tiles: enabled }),
+  );
+
+  // A settings change reaches every view's plans at once: re-plan what they show.
+  ctx.listen(settings.api.onSettingsChanged, () => {
+    const shown = new Set<PageObjectNumber>();
+    for (const view of views.values()) for (const page of view.pages.keys()) shown.add(page);
+    for (const page of shown) replanPage(page);
   });
 
   const api: RenderHostCapability = {
     // ── public lens ──
+    ...settings.api,
     canRender,
     renderPage,
     renderThumbnail: (page, { maxWidth, includeAnnotations, signal }) =>
       renderPage(page, { width: maxWidth, includeAnnotations, signal }),
     renderPages,
     getRenderPolicy: renderPolicy,
-    getRenderEpoch: (page, includeAnnotations = true) =>
-      epochOf(page.objectNumber, includeAnnotations),
+    getRenderEpoch: (page, includeAnnotations = true) => {
+      const info = ctx.getPage(page);
+      return info ? epochOf(info.ref.objectNumber, includeAnnotations) : 0;
+    },
     invalidate,
     onInvalidated: invalidated.on,
 
@@ -460,7 +485,7 @@ export function createRenderController(ctx: PluginContext<RenderState>, config: 
       );
     },
     conformViewport,
-    getPaintSettings: () => paintSettings,
+    getPaintSettings: paintSettings,
     createViewDemand,
     onRenderCompleted: renderCompleted.on,
     onRenderFailed: renderFailed.on,

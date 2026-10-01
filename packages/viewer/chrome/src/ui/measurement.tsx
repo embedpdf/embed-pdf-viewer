@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { useCapability, useSelector } from '@embedpdf/react/runtime';
-import { AnnotationToken, useAnnotationSelection } from '@embedpdf/react/annotation';
+import { AnnotationToken, useAnnotationState } from '@embedpdf/react/annotation';
 import { StageToken } from '@embedpdf/react/stage';
 import { useSurface } from '@embedpdf/react/shell';
 import {
   MeasurementToken,
   useMeasurement,
+  useMeasurementState,
   usePageScale,
   type LengthUnit,
   type AreaUnit,
@@ -21,8 +22,7 @@ const button =
   'border-border text-fg hover:bg-hover rounded-md border px-3 py-1.5 text-sm disabled:opacity-50';
 
 /** The current page's address, or null with no page (empty document). */
-const useCurrentPage = () =>
-  useSelector(StageToken, (stage) => stage.getCurrentPage()?.ref ?? null);
+const useCurrentPage = () => useSelector(StageToken, (stage) => stage.getCurrentPage());
 
 export function MeasurementScaleButton() {
   const t = useT();
@@ -54,21 +54,22 @@ export function MeasurementSection() {
   const page = useCurrentPage();
 
   const measurement = useMeasurement();
+  const busy = useMeasurementState((state) => state.busy);
   const canCalibrate = useSelector(MeasurementToken, (current) => current.canCalibrate());
 
   const scale = usePageScale(page);
   const anno = useCapability(AnnotationToken);
-  const selected = useAnnotationSelection();
+  const selected = useAnnotationState((state) => state.selected);
   const resettable = useSelector(
     AnnotationToken,
     (annotation) =>
-      annotation
-        .listSelected()
+      annotation.selection
+        .list()
         .filter(
           (candidate) =>
             (candidate.subtype === 'polygon' || candidate.subtype === 'polyline') &&
             candidate.captionCenter &&
-            annotation.canEdit(candidate.ref) &&
+            annotation.canUpdate(candidate.ref) &&
             !candidate.lockedContents,
         ),
     (left, right) =>
@@ -77,18 +78,18 @@ export function MeasurementSection() {
   const readouts = useSelector(
     MeasurementToken,
     (measurement) =>
-      anno
-        .listSelected()
+      anno.selection
+        .list()
         .map((annotation) => measurement.getReadout(annotation.ref))
         .filter((readout): readout is MeasurementReadout => !('unavailable' in readout)),
     (left, right) => JSON.stringify(left) === JSON.stringify(right),
   );
-  const reports = useSelector(MeasurementToken, (measurement) => measurement.listLastReports());
+  const reports = useMeasurementState((state) => state.lastReports);
   const [allPages, setAllPages] = useState(false);
 
   const [recalculate, setRecalculate] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const disabled = !page || measurement.busy || !canCalibrate || !scale?.ready;
+  const disabled = !page || busy || !canCalibrate || !scale?.ready;
   const rectilinear = scale?.measure?.subtype === 'rectilinear' ? scale.measure : null;
   const target = allPages ? 'all' : page!;
   const options = { recalculate };
@@ -120,7 +121,7 @@ export function MeasurementSection() {
         <input
           type="checkbox"
           checked={allPages}
-          disabled={measurement.busy}
+          disabled={busy}
           onChange={(event) => setAllPages(event.target.checked)}
         />
         {t('measurement.allPages')}
@@ -129,7 +130,7 @@ export function MeasurementSection() {
         <input
           type="checkbox"
           checked={recalculate}
-          disabled={measurement.busy}
+          disabled={busy}
           onChange={(event) => setRecalculate(event.target.checked)}
         />
         {t('measurement.recalculate')}
@@ -251,7 +252,7 @@ export function MeasurementSection() {
           {resettable.length > 0 && (
             <button
               className={button}
-              disabled={measurement.busy}
+              disabled={busy}
               onClick={() =>
                 void run(async () => {
                   for (const annotation of resettable) {
@@ -298,10 +299,8 @@ export function CalibrationDialog() {
   const t = useT();
 
   const measurement = useMeasurement();
+  const { busy, calibrationRequest: request } = useMeasurementState();
   const canCalibrate = useSelector(MeasurementToken, (current) => current.canCalibrate());
-  const request = useSelector(MeasurementToken, (measurement) =>
-    measurement.getCalibrationRequest(),
-  );
   const input = useRef<HTMLInputElement>(null);
   const [value, setValue] = useState('');
 
@@ -337,7 +336,7 @@ export function CalibrationDialog() {
     <div
       className="fixed inset-0 z-50 grid place-items-center bg-black/40"
       onKeyDown={(event) => {
-        if (event.key === 'Escape' && !measurement.busy) measurement.dismissCalibration();
+        if (event.key === 'Escape' && !busy) measurement.dismissCalibration();
       }}
     >
       <form
@@ -405,7 +404,7 @@ export function CalibrationDialog() {
           <button
             type="button"
             className={button}
-            disabled={measurement.busy}
+            disabled={busy}
             onClick={() => measurement.dismissCalibration()}
           >
             {t('demo.cancel')}
@@ -414,13 +413,10 @@ export function CalibrationDialog() {
             className={button}
             type="submit"
             disabled={
-              measurement.busy ||
-              !canCalibrate ||
-              !(Number(value) > 0) ||
-              !Number.isFinite(Number(value))
+              busy || !canCalibrate || !(Number(value) > 0) || !Number.isFinite(Number(value))
             }
           >
-            {measurement.busy ? t('measurement.applying') : t('measurement.apply')}
+            {busy ? t('measurement.applying') : t('measurement.apply')}
           </button>
         </div>
       </form>

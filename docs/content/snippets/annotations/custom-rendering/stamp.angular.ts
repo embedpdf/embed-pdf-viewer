@@ -24,6 +24,7 @@ import { Approvals, StatusDot } from './approvals'; // your own data and UI
       >
         @let approval = approvals.get(key(annotation.ref));
         @let rect = page.transform.pageToViewRect(box);
+        <ng-container [ngTemplateOutlet]="native" />
         <div
           style="position: absolute"
           [style.left.px]="rect.x"
@@ -31,7 +32,6 @@ import { Approvals, StatusDot } from './approvals'; // your own data and UI
           [style.width.px]="rect.width"
           [style.height.px]="rect.height"
         >
-          <ng-container [ngTemplateOutlet]="native" />
           <app-status-dot [status]="approval.status" />
           @if (interactive) {
             <button (click)="approval.open()">Details</button>

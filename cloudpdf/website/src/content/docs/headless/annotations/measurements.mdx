@@ -21,7 +21,10 @@ centimeters on the page reads as 3 meters in the room. Register `measurementPlug
 | `area`      | The area of a shape                           | Click each corner, double-click to end  |
 
 Each measurement is an annotation with its value as a label, so it shows the same in Acrobat and other
-PDF apps, and you can select, move and restyle it like any annotation.
+PDF apps, and you can select, move and restyle it like any annotation. The example measures the
+cover's width at 1:100; pick a tool and measure something else:
+
+<Example name="measurement/basic" mode="open" />
 
 ## Set the scale
 
@@ -34,7 +37,10 @@ await measurement.setPreset([page.ref], 'metric-100');
 await measurement.setPreset('all', 'metric-100'); // every page
 ```
 
-Measurements already on the page are recalculated for the new scale.
+Measurements already on the page are recalculated for the new scale. Change the scale, the units
+or the precision, and the two measurements follow:
+
+<Example name="measurement/scale" />
 
 ## Calibrate from a known length
 
@@ -50,6 +56,8 @@ The plugin asks your UI for the real length, through<Fw only={['react', 'vue', '
 
 `calibrate()` sets the page's scale from the two points and the length you give. Pass
 `{ applyTo: 'all' }` to use the same scale on every page.
+
+<Example name="measurement/calibrate" />
 
 ## Units and precision
 
@@ -68,6 +76,8 @@ the number of steps per unit.
 
 `label` is the text shown on the page, in the page's units. Without a scale to compute from, a
 readout says why: `{ unavailable: 'no-scale' }`.
+
+<Example name="measurement/readout" />
 
 To measure without drawing anything, for a tooltip that follows the pointer:
 
@@ -93,6 +103,8 @@ const { annotation } = await measurement.createMeasurement({
 ```
 
 It makes the same annotation the tool would, with the page's scale and the tool's style.
+
+<Example name="measurement/from-code" />
 
 ## Methods
 

@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import type { AnnotationDTO } from '../../src/annotation/kinds';
+import type { Annotation } from '../../src/annotation/kinds';
 import { EngineErrorCode } from '../../src/errors/EngineErrorCode';
 import {
   assertAnnotationBundle,
@@ -24,7 +24,7 @@ async function bundleWith(
         data: {
           subtype: 'stamp',
           ref: { kind: 'objectNumber', page, objectNumber: 12 },
-        } as unknown as AnnotationDTO,
+        } as unknown as Annotation,
         resources: { appearance: id },
       },
     ],

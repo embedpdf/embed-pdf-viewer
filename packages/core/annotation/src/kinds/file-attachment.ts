@@ -24,5 +24,9 @@ export const fileAttachment = defineKind({
     noZoom: true,
     noRotate: true,
   },
-  fields: [{ key: 'icon', label: 'Icon', options: FILE_ATTACHMENT_ICONS }, COLOR, OPACITY],
+  properties: [
+    { key: 'icon', control: 'choice', label: 'Icon', options: FILE_ATTACHMENT_ICONS },
+    COLOR,
+    OPACITY,
+  ],
 });

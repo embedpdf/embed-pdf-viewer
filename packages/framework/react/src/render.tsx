@@ -32,11 +32,15 @@ import type { EventHook } from '@embedpdf/core';
 import { bindPaintedImage } from '@embedpdf/web';
 import { useCapability, useCapabilityEvent, usePage, useSelector } from './runtime';
 import { usePageLayerFact } from './dev-registry';
+import { settingsHook } from './state';
 
-/** The render capability (renderPage / renderThumbnail / invalidation) for app code. */
+/** The render capability (renderPage / renderThumbnail / invalidation / settings) for app code. */
 export function useRender(): RenderCapability {
   return useCapability(RenderPublicToken);
 }
+
+/** The render settings (`fullPage`, `tiles`, `format`, …), with or without a document. Takes a selector. */
+export const useRenderSettings = settingsHook(RenderPublicToken);
 
 /** Subscribe to one render event for the mounted lifetime: `useRenderEvent((render) => render.onInvalidated, handler)`. */
 export function useRenderEvent<T>(
@@ -65,7 +69,8 @@ let warnedTileSize = false;
 export function RenderLayer({ annotations = true, tiles = true }: RenderLayerProps = {}) {
   const page = usePage();
   const render = useCapability(RenderToken);
-  const settings = render.getPaintSettings();
+  // The same object until a setting it reads changes, so a settings change re-renders the layer.
+  const settings = useSelector(RenderToken, (render) => render.getPaintSettings());
   const ref = useRef<HTMLImageElement>(null);
   usePageLayerFact(page, 'renderBakesAnnotations', annotations);
 

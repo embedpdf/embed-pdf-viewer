@@ -1,5 +1,5 @@
 import type { AnnotationList } from '../annotation/AnnotationList';
-import type { AnnotationDTO } from '../annotation/kinds';
+import type { Annotation } from '../annotation/kinds';
 import type { PageState } from '../revision/PageState';
 
 /**
@@ -37,9 +37,9 @@ export function diffAnnotationList(a: AnnotationList, b: AnnotationList): string
 
 function diffPage(
   stateA: PageState,
-  a: AnnotationDTO[],
+  a: Annotation[],
   stateB: PageState,
-  b: AnnotationDTO[],
+  b: Annotation[],
 ): string[] {
   const errs: string[] = [];
   if (stateA.page.objectNumber !== stateB.page.objectNumber) {
@@ -67,7 +67,7 @@ function diffPage(
   return errs;
 }
 
-function diffAnnotation(i: number, a: AnnotationDTO, b: AnnotationDTO, errs: string[]): void {
+function diffAnnotation(i: number, a: Annotation, b: Annotation, errs: string[]): void {
   if (a.subtype !== b.subtype) {
     errs.push(`annotations[${i}].subtype mismatch: ${a.subtype} vs ${b.subtype}`);
     return;

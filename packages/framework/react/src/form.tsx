@@ -1,90 +1,141 @@
 /**
  * The React view of @embedpdf/plugin-form.
  *
- * Two fill surfaces, one plugin:
+ * `<FormLayer />` puts a real HTML control over each field box of its page,
+ * with or without the annotation plugin. The field's own picture, the
+ * engine's drawing of its value, borders and fonts, is drawn below it: by the
+ * `<RenderLayer>` raster, or by the `<AnnotationLayer>` while the form plugin
+ * keeps widgets inert for filling. The controls add what people interact
+ * with on top of it:
  *
- * 1. `formWidgetRenderer` — the full-viewer path. Widgets are annotations,
- *    so the fill controls plug into the annotation stack:
- *    `<AnnotationLayer renderers={[formWidgetRenderer]} />` routes every
- *    engaged widget here with its live box and its baked /AP raster. The
- *    picture is the resting control (the engine's own rendering of value,
- *    check state, borders, fonts); these components add exactly the
- *    interaction skin on top:
+ *   text   → the picture at rest; focus shows an editor in the field's font
+ *            (the plugin keeps what is typed, so a download writes it);
+ *            blur or Enter commits, Escape puts the value back.
+ *   toggle → the picture is the control; a click writes the toggled value.
+ *   combo  → an invisible native <select> over the picture: the browser
+ *            owns the dropdown, the engine the resting pixels.
+ *   list   → a visible native <select>: one surface owns the rows, the
+ *            keyboard and the scrolling.
+ *   button → a native click target over the picture; activation runs the
+ *            widget's action.
  *
- *      text   → picture at rest; click swaps in an <input>/<textarea> (the
- *               focused element is the draft store — the plugin model only
- *               learns a value on commit); blur/Enter commits, the engine
- *               re-bakes the /AP, the refreshed picture replaces the editor.
- *      toggle → the picture is the whole control; click writes the toggled
- *               value; the re-baked appearance shows the new check state.
- *      combo  → an invisible native <select> over the picture: the browser
- *               owns the dropdown, the engine owns the resting pixels.
- *      list   → a visible native <select>: one surface owns pixels, row
- *               hit-testing, keyboard selection, and scrolling.
- *      button → native keyboard/click target over the picture; activation is
- *               delegated to the form plugin's isolated scripting pipeline.
+ * What the viewer draws itself (the focus ring, the edge of a field without a
+ * border, the editor) takes its colors from the form settings, which the
+ * `--epdf-form-*` CSS variables override.
  *
- * 2. `<FormLayer />` — the annotation-less path (fill-only viewers with no
- *    annotation plugin): synthetic HTML controls positioned from the form
- *    model's own widget geometry. Do not mount it next to an AnnotationLayer
- *    wired with `formWidgetRenderer` — the controls would double up.
- *
- * Every control isolates its pointerdown from the interaction hub with a
- * native listener (the FreeText precedent): the Stage listens natively on an
- * ancestor, so React's synthetic events would run too late.
+ * Every control keeps its pointerdown from the interaction hub with a native
+ * listener: the Stage listens natively on an ancestor, so React's synthetic
+ * events would run too late.
  */
 
 // One-line-per-feature: registration travels with the UI.
 export * from '@embedpdf/plugin-form';
 import * as React from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { EventHook } from '@embedpdf/core';
 import type { PdfAnnotationEventKind } from '@embedpdf/plugin-actions/contract';
 import type { AnnotationRef } from '@embedpdf/plugin-annotation/contract';
-// The fill layer is a host of the form plugin (render feed, geometry warming, widget events).
-// Re-exported as `FormHostToken` for chrome that reads the fill feed; same runtime token.
-import { FormToken } from '@embedpdf/plugin-form/contract/host';
-export { FormToken as FormHostToken } from '@embedpdf/plugin-form/contract/host';
-import { SignatureToken } from '@embedpdf/plugin-signature/contract';
-import { FormToken as FormPublicToken } from '@embedpdf/plugin-form';
-import type {
-  FormCapability,
-  FormFieldRef,
-  FormFieldValue,
-  FillItem,
-  FormFieldDTO,
+import {
+  FormToken,
+  formState,
+  type FormCapability,
+  type FormFieldRef,
+  type FormFieldValue,
+  type FormWidgetItem,
+  type FormWidgetLook,
 } from '@embedpdf/plugin-form';
-import type { EventHook } from '@embedpdf/core';
-import { InteractionToken } from '@embedpdf/plugin-interaction/contract';
-import { StageToken } from '@embedpdf/plugin-stage/contract';
-import type { Rect } from '@embedpdf/core-annotation';
+import { FormToken as FormHostToken } from '@embedpdf/plugin-form/contract/host';
+import { InteractionToken } from '@embedpdf/plugin-interaction/contract/host';
+import { SignatureToken } from '@embedpdf/plugin-signature/contract';
+import { mixAccent, paint } from '@embedpdf/web';
 
-import { useAnnotationSelected } from './annotation-hooks';
-import type { AnnotationRenderer, AnnotationRendererProps } from './annotation';
+import { NativeListBox } from './form-listbox';
+import { FormFocusRing } from './form-focus-ring';
 import {
   shallowArray,
   useCapability,
   useCapabilityEvent,
+  useDocumentScope,
+  useKernelValue,
   useOptionalCapability,
   useOptionalSelector,
   usePage,
   useSelector,
+  useViewerSettings,
 } from './runtime';
-import { usePageLayerFact } from './dev-registry';
 import type { PageContextValue } from './runtime';
-import { FormFocusRing } from './form-focus-ring';
-import { NativeListBox } from './form-listbox';
+import { settingsHook, stateHook } from './state';
 
-/** Content rect → a view-px box (the page wrapper's own coordinate space). */
-function viewBox(rect: Rect, page: PageContextValue) {
-  const tl = page.transform.toPixels({ x: rect.x, y: rect.y });
-  const br = page.transform.toPixels({ x: rect.x + rect.width, y: rect.y + rect.height });
-  return { left: tl.x, top: tl.y, width: br.x - tl.x, height: br.y - tl.y };
+// ── what every control shares ──────────────────────────────────────────────
+
+/** The colors the viewer draws with, each its CSS variable first, then the setting. */
+interface FormColors {
+  focus: string;
+  border: string;
+  background: string;
+  text: string;
+}
+
+function useFormColors(): FormColors {
+  const accent = useViewerSettings((settings) => settings.accent);
+  const focus = useFormSettings((settings) => settings.focus);
+  const fields = useFormSettings((settings) => settings.fields);
+  return useMemo(
+    () => ({
+      focus: paint('form-focus', focus.color ?? accent),
+      border: paint('form-field-border', fields.border ?? mixAccent('form-field-border', accent)),
+      background: paint('form-field-background', fields.background),
+      text: paint('form-field-color', fields.color),
+    }),
+    [accent, focus, fields],
+  );
+}
+
+/** A widget's page-space box as view pixels, in the page wrapper's own coordinates. */
+function viewBox(item: FormWidgetItem, page: PageContextValue) {
+  const { box } = item;
+  const topLeft = page.transform.toPixels({ x: box.x, y: box.y });
+  const bottomRight = page.transform.toPixels({ x: box.x + box.width, y: box.y + box.height });
+  return {
+    left: topLeft.x,
+    top: topLeft.y,
+    width: bottomRight.x - topLeft.x,
+    height: bottomRight.y - topLeft.y,
+  };
+}
+
+/** One of the 14 standard PDF fonts as CSS: a family that looks like it, its weight and style. */
+function cssFont(look: FormWidgetLook): Pick<
+  React.CSSProperties,
+  'fontFamily' | 'fontWeight' | 'fontStyle'
+> {
+  const name = look.fontFamily ?? 'helvetica';
+  const fontFamily = name.startsWith('courier')
+    ? '"Courier New", Courier, monospace'
+    : name.startsWith('times')
+      ? '"Times New Roman", Times, serif'
+      : 'Helvetica, Arial, sans-serif';
+  return {
+    fontFamily,
+    fontWeight: name.includes('bold') ? 700 : 400,
+    fontStyle: name.includes('italic') || name.includes('oblique') ? 'italic' : 'normal',
+  };
 }
 
 /**
- * Keep the interaction hub out of gestures that begin inside a fill control.
- * Native listener (not React's) so it runs during real DOM bubbling, before
- * the Stage's own native listener on an ancestor — same trick as FreeText.
+ * The field's text size in view pixels. A size of 0 means "fit the box" in
+ * PDF: the box height for one line, Acrobat's 12 pt for several.
+ */
+function fontSizeOf(item: FormWidgetItem, scale: number, height: number, multiline: boolean) {
+  const size = item.look.fontSize;
+  if (size) return size * scale;
+  return multiline ? 12 * scale : Math.max(6, height * 0.72);
+}
+
+/**
+ * Keep the interaction hub out of gestures that begin inside a control. A
+ * native listener, not React's, so it runs during real DOM bubbling, before
+ * the Stage's own native listener on an ancestor.
  */
 function useIsolated<T extends HTMLElement>() {
   const ref = useRef<T>(null);
@@ -99,12 +150,11 @@ function useIsolated<T extends HTMLElement>() {
 }
 
 /**
- * The widget DOM-event feed: wire one widget surface's pointer and
- * focus events to `form.notifyWidgetEvent` — the `/AA` E/X/D/U/Fo/Bl trigger
- * door. Handlers live on the always-active event surface, never the inner
- * control: "may edit this field" and "may receive PDF action events" are
- * different rights, and a read-only session (no `doc.forms.fill`) must still
- * see hover tooltips (session Hide needs no write authority).
+ * The widget's pointer and focus events, sent to the actions plugin, which
+ * runs the widget's `/AA` actions (enter, exit, down, up, focus, blur). They
+ * live on the always-active box, never the inner control: "may edit this
+ * field" and "may receive PDF action events" are different rights, and a
+ * session that may not fill must still see hover tooltips.
  */
 function useWidgetEvents(
   fieldRef: FormFieldRef,
@@ -113,7 +163,7 @@ function useWidgetEvents(
   React.DOMAttributes<HTMLElement>,
   'onPointerEnter' | 'onPointerLeave' | 'onPointerDown' | 'onPointerUp' | 'onFocus' | 'onBlur'
 > {
-  const form = useCapability(FormToken);
+  const form = useCapability(FormHostToken);
   const refBox = useRef(annotationRef);
   refBox.current = annotationRef;
   return useMemo(() => {
@@ -126,9 +176,9 @@ function useWidgetEvents(
       onPointerLeave: () => notify('cursorExit'),
       onPointerDown: () => notify('mouseDown'),
       onPointerUp: () => notify('mouseUp'),
-      // React focus/blur bubble (focusin semantics), so the inner control's
-      // focus reaches this surface; blur fires after the control's own
-      // commit handler, so a /Bl script always sees the committed value.
+      // React focus and blur bubble, so the inner control's focus reaches the
+      // box; blur fires after the control's own commit, so a blur script
+      // always sees the committed value.
       onFocus: () => notify('focus'),
       onBlur: () => notify('blur'),
     };
@@ -136,18 +186,13 @@ function useWidgetEvents(
 }
 
 /**
- * Widget activation: a click on any widget runs its `/A`. ISO puts the
- * activate action on the annotation dictionary — any subtype, any field
- * type — so activation is a widget behavior, not a push-button behavior:
- * real-world producers ship "buttons" as read-only text fields carrying an
- * `/A` (the Test Lab's Reset/Next/Hide controls), and Acrobat runs them.
- * A widget without an `/A` resolves inert — dispatching is the cheap,
- * honest way to ask (the dispatcher owns `/A`-vs-`/AA U` precedence).
- * Push buttons keep their own gated door: `disabled` still blocks
- * activation there — unchanged shipped semantics.
+ * A click on a widget runs its `/A` action. ISO 32000 puts the activate
+ * action on the widget, whatever its field, and many forms ship "buttons" as
+ * read-only text fields with an `/A` that Acrobat runs; a widget without one
+ * is inert.
  */
 function useWidgetActivation(annotationRef: AnnotationRef | null): () => void {
-  const form = useCapability(FormToken);
+  const form = useCapability(FormHostToken);
   const refBox = useRef(annotationRef);
   refBox.current = annotationRef;
   return useCallback(() => {
@@ -156,909 +201,427 @@ function useWidgetActivation(annotationRef: AnnotationRef | null): () => void {
   }, [form]);
 }
 
-/* ══════════════════════════ behavior widgets ══════════════════════════ */
+interface ControlProps<C extends FormWidgetItem['control']> {
+  item: Extract<FormWidgetItem, { control: C }>;
+  page: PageContextValue;
+  colors: FormColors;
+}
 
-/** The baked /AP raster, blitted by its own box (exactly like BakedImage). */
-function Picture({
+/**
+ * The positioned box every control sits in: the widget's event surface, and
+ * the edge a field without a border of its own gets, so people see where to
+ * fill in.
+ */
+function WidgetBox({
+  item,
   page,
-  appearance,
-  apBox,
-  frame,
-  hidden,
+  colors,
+  edge = true,
+  onClick,
+  children,
+  ...rest
 }: {
+  item: FormWidgetItem;
   page: PageContextValue;
-  appearance: { url: string; box: Rect } | null;
-  /** The item's live AP box — wins over the fetched box when present. */
-  apBox?: Rect;
-  /** The positioned wrapper this renders inside (its view box) — the blit is
-   *  page-frame, so subtract the wrapper's origin. Omit when rendering
-   *  directly in the layer container. */
-  frame?: { left: number; top: number };
-  hidden?: boolean;
-}) {
-  if (!appearance) return null;
-  const box = viewBox(apBox ?? appearance.box, page);
-  return (
-    <img
-      src={appearance.url}
-      alt=""
-      draggable={false}
-      style={{
-        position: 'absolute',
-        left: box.left - (frame?.left ?? 0),
-        top: box.top - (frame?.top ?? 0),
-        width: box.width,
-        height: box.height,
-        // Content-unit sizing; a global `img { max-width: 100% }` reset would
-        // otherwise clamp it to the containing block and distort the blit.
-        maxWidth: 'none',
-        pointerEvents: 'none',
-        visibility: hidden ? 'hidden' : 'visible',
-      }}
-    />
-  );
-}
-
-interface WidgetProps<C extends FillItem['control']> {
-  fill: Extract<FillItem, { control: C }>;
-  item: AnnotationRendererProps['item'];
-  page: PageContextValue;
-  appearance: AnnotationRendererProps['appearance'];
-}
-
-/**
- * Dispatch one engaged widget to its fill control. The field plane (value,
- * behavior, disabled) comes from the form plugin's single-widget projection;
- * the widget plane (live box, /DA font, baked raster) rides in on the
- * renderer props — no geometry is read from the form model here.
- */
-function FormWidget({ item, page, appearance }: AnnotationRendererProps) {
-  const annotation = item.ref?.kind === 'objectNumber' ? item.ref.objectNumber : 0;
-  // Reference-stable per model change, so the default Object.is equality holds.
-  const fill = useSelector(FormToken, (form) =>
-    annotation > 0 ? form.getFillItem(annotation) : null,
-  );
-  // Field plane not loaded (or no fill control for this family) → picture only.
-  if (!fill) return <Picture page={page} appearance={appearance} apBox={item.apBox} />;
-  switch (fill.control) {
-    case 'text':
-      return <TextWidget fill={fill} item={item} page={page} appearance={appearance} />;
-    case 'toggle':
-      return <ToggleWidget fill={fill} item={item} page={page} appearance={appearance} />;
-    case 'choice':
-      return <ChoiceWidget fill={fill} item={item} page={page} appearance={appearance} />;
-    case 'button':
-      return <ButtonWidget fill={fill} item={item} page={page} appearance={appearance} />;
-    case 'signature':
-      return <SignatureWidget fill={fill} item={item} page={page} appearance={appearance} />;
-  }
-}
-
-/**
- * A signature field's widget: the picture (the mark drawn into it, once
- * there is one) with a click target on top. Unsigned → "sign here": the
- * field becomes the signature plugin's target, so the next mark picked
- * from a signatures panel goes into it. Signed → `inspect`: the chrome shows
- * what the signature says. Without the signature plugin the widget is
- * picture only — the field plane has no fill control of its own here.
- */
-function SignatureWidget({ fill, item, page, appearance }: WidgetProps<'signature'>) {
-  const signature = useOptionalCapability(SignatureToken);
+  colors: FormColors;
+  edge?: boolean;
+  onClick?: () => void;
+  children?: React.ReactNode;
+} & Omit<React.HTMLAttributes<HTMLDivElement>, 'onClick' | 'children'>) {
   const wrap = useIsolated<HTMLDivElement>();
-  const events = useWidgetEvents(fill.fieldRef, item.ref);
-  const frame = viewBox(item.box, page);
-  const ref = fill.fieldRef;
-  // The signature plugin's snapshot is the authority on signed-ness (it
-  // re-reads on every new version); the field plane's /V is the fallback.
-  const signed = useOptionalSelector(
-    SignatureToken,
-    (signature) => signature.getSignature(ref)?.signed ?? fill.signed,
-    fill.signed,
-  );
-  const actionable = signature != null && (signed || !fill.disabled);
+  const events = useWidgetEvents(item.fieldRef, item.annotationRef);
+  const frame = viewBox(item, page);
   return (
     <div
       ref={wrap}
       {...events}
+      {...rest}
+      onFocus={(event) => {
+        events.onFocus?.(event);
+        rest.onFocus?.(event);
+      }}
+      onBlur={(event) => {
+        events.onBlur?.(event);
+        rest.onBlur?.(event);
+      }}
+      onClick={onClick}
       style={{
         position: 'absolute',
         left: frame.left,
         top: frame.top,
         width: frame.width,
         height: frame.height,
-      }}
-    >
-      <Picture page={page} appearance={appearance} apBox={item.apBox} frame={frame} />
-      {actionable ? (
-        <button
-          type="button"
-          aria-label={fill.label}
-          data-signed={signed ? '' : undefined}
-          onClick={() => (signed ? signature.requestInspection(ref) : signature.setTarget(ref))}
-          style={{
-            ...fillControl,
-            padding: 0,
-            border: 0,
-            background: 'transparent',
-            cursor: 'pointer',
-          }}
-        />
-      ) : null}
-    </div>
-  );
-}
-
-function ButtonWidget({ fill, item, page, appearance }: WidgetProps<'button'>) {
-  const form = useCapability(FormToken);
-  const wrap = useIsolated<HTMLDivElement>();
-  const events = useWidgetEvents(fill.fieldRef, item.ref);
-  const frame = viewBox(item.box, page);
-  // The outer div is the event surface — always pointer-active so /AA hover
-  // and pointer triggers fire even for a disabled/read-only button; the
-  // inner button keeps `disabled` as the activation gate only.
-  return (
-    <div
-      ref={wrap}
-      {...events}
-      style={{
-        position: 'absolute',
-        left: frame.left,
-        top: frame.top,
-        width: frame.width,
-        height: frame.height,
-        cursor: fill.disabled ? 'default' : 'pointer',
+        // Always the event surface; the control inside gates the edits.
         pointerEvents: 'auto',
+        boxShadow: edge && item.look.border === null ? `inset 0 0 0 1px ${colors.border}` : undefined,
+        ...rest.style,
       }}
     >
-      <button
-        type="button"
-        aria-label={fill.label}
-        disabled={fill.disabled}
-        onClick={() => {
-          if (item.ref) void form.activateWidget(item.ref);
-        }}
-        style={{
-          position: 'absolute',
-          inset: 0,
-          width: '100%',
-          height: '100%',
-          boxSizing: 'border-box',
-          padding: 0,
-          border: 0,
-          background: 'transparent',
-          cursor: 'inherit',
-          // The event surface is the wrapper; a disabled button must not
-          // swallow the pointer stream before it bubbles.
-          pointerEvents: fill.disabled ? 'none' : 'auto',
-        }}
-      >
-        <Picture page={page} appearance={appearance} apBox={item.apBox} frame={frame} />
-      </button>
+      {children}
     </div>
   );
 }
 
-function TextWidget({ fill, item, page, appearance }: WidgetProps<'text'>) {
-  const form = useCapability(FormToken);
-  const wrap = useIsolated<HTMLDivElement>();
-  const events = useWidgetEvents(fill.fieldRef, item.ref);
-  const activate = useWidgetActivation(item.ref);
-  // The editor is always mounted: transparent over the picture
-  // at rest, visible while focused. That makes the DOM the focus manager —
-  // native Tab order reaches every field, focus enters edit, blur commits —
-  // with zero focus machinery of our own. The focused element shows the
-  // draft and the plugin keeps it (`draftText`), so a download can write it;
-  // the field's value changes only on commit (see model.ts).
+/** Fills the box it sits in. */
+const fill: React.CSSProperties = {
+  position: 'absolute',
+  inset: 0,
+  width: '100%',
+  height: '100%',
+  boxSizing: 'border-box',
+  margin: 0,
+};
+
+// ── the controls ───────────────────────────────────────────────────────────
+
+/** A text box: the picture at rest, an editor in the field's own font while focused. */
+function TextControl({ item, page, colors }: ControlProps<'text'>) {
+  const form = useCapability(FormHostToken);
+  const activate = useWidgetActivation(item.annotationRef);
+  // The editor is always mounted, see-through at rest and shown while
+  // focused: the DOM is the focus manager, so Tab reaches every field.
   const [focused, setFocused] = useState(false);
-  const [draft, setDraft] = useState(fill.value);
+  const [draft, setDraft] = useState(item.value);
   const cancelled = useRef(false);
-  // Adopt engine truth whenever it changes under us — but never mid-edit.
+  // Take the field's value whenever it changes under us, but never mid-edit.
   useEffect(() => {
-    if (!focused) setDraft(fill.value);
-  }, [fill.value, focused]);
+    if (!focused) setDraft(item.value);
+  }, [item.value, focused]);
 
-  const frame = viewBox(item.box, page);
+  const frame = viewBox(item, page);
   const scale = item.box.width > 0 ? frame.width / item.box.width : 1;
-
-  // /DA font, scaled to view px. Size 0 means "auto" in PDF: approximate with
-  // the box height for a single line, Acrobat's 12pt default for multiline.
-  const fontSize =
-    item.text && item.text.fontSize > 0
-      ? item.text.fontSize * scale
-      : fill.multiline
-        ? 12 * scale
-        : Math.max(6, frame.height * 0.72);
   const editorStyle: React.CSSProperties = {
-    position: 'absolute',
-    inset: 0,
-    width: '100%',
-    height: '100%',
-    boxSizing: 'border-box',
+    ...fill,
     border: 'none',
-    outline: focused ? '2px solid rgba(66, 133, 244, 0.8)' : 'none',
+    outline: focused ? `2px solid ${colors.focus}` : 'none',
     outlineOffset: -2,
     padding: '0 2px',
-    margin: 0,
-    background: item.style.interiorColor ?? '#fff',
-    color: item.text?.fontColor ?? '#000',
-    fontFamily: item.text?.fontFamily ?? 'Helvetica, Arial, sans-serif',
-    fontSize,
-    textAlign: item.text?.textAlign ?? 'left',
+    background: item.look.background ?? colors.background,
+    color: item.look.color ?? colors.text,
+    ...cssFont(item.look),
+    fontSize: fontSizeOf(item, scale, frame.height, item.multiline),
+    textAlign: item.look.textAlign,
+    letterSpacing: item.comb && item.maxLength ? frame.width / item.maxLength / 2 : undefined,
     resize: 'none',
     cursor: 'text',
-    opacity: focused ? 1 : 0, // rest: the engine's picture is the field
-    // A disabled control suppresses click events entirely — it must not
-    // swallow the stream before it reaches the wrapper, which owns /A
-    // activation (the read-only "fake button" pattern) and the /AA feed.
-    ...(fill.disabled ? { pointerEvents: 'none' as const } : {}),
+    opacity: focused ? 1 : 0,
+    // A disabled control swallows clicks: the box below runs the widget's
+    // action, the read-only "button" pattern, so let them through.
+    ...(item.disabled ? { pointerEvents: 'none' as const } : {}),
   };
   const editorProps = {
     value: draft,
-    maxLength: fill.maxLength ?? undefined,
-    'aria-label': fill.label,
-    disabled: fill.disabled,
+    maxLength: item.maxLength ?? undefined,
+    'aria-label': item.label,
+    disabled: item.disabled,
     onFocus: () => setFocused(true),
     onChange: (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
       setDraft(event.target.value);
-      form.draftText(fill.fieldRef, event.target.value);
+      form.draftText(item.fieldRef, event.target.value);
     },
     onBlur: () => {
       setFocused(false);
       if (cancelled.current) {
         cancelled.current = false;
-        form.discardDraftText(fill.fieldRef);
-        setDraft(fill.value);
+        form.discardDraftText(item.fieldRef);
+        setDraft(item.value);
         return;
       }
-      if (draft !== fill.value) void form.commitDraftText(fill.fieldRef);
-      else form.discardDraftText(fill.fieldRef);
+      if (draft === item.value) form.discardDraftText(item.fieldRef);
+      else void form.commitDraftText(item.fieldRef).catch(() => setDraft(item.value));
+    },
+    onKeyDown: (event: React.KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+      if (event.key === 'Escape') {
+        cancelled.current = true;
+        event.currentTarget.blur();
+      }
+      // Blur commits; a text box with several lines takes Enter as a new line.
+      if (event.key === 'Enter' && !item.multiline) event.currentTarget.blur();
     },
     style: editorStyle,
   };
-  const onKeys = (event: React.KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    if (event.key === 'Escape') {
-      cancelled.current = true;
-      event.currentTarget.blur();
-    }
-    if (event.key === 'Enter' && !fill.multiline) event.currentTarget.blur(); // blur commits
-  };
-
   return (
-    <div
-      ref={wrap}
-      {...events}
-      // Any widget click runs its /A (see useWidgetActivation): an editable
-      // field's focus click bubbles here (Acrobat runs /A on that click
-      // too); a read-only field's click lands here directly (the disabled
-      // editor is pointer-transparent) — the fake-button pattern.
-      onClick={activate}
-      style={{
-        position: 'absolute',
-        left: frame.left,
-        top: frame.top,
-        width: frame.width,
-        height: frame.height,
-        // Always the event surface (see useWidgetEvents); the editor's own
-        // `disabled` keeps read-only fields uneditable and unfocusable.
-        pointerEvents: 'auto',
-      }}
-    >
-      <Picture
-        page={page}
-        appearance={appearance}
-        apBox={item.apBox}
-        frame={frame}
-        hidden={focused}
-      />
-      {fill.multiline ? (
-        <textarea {...editorProps} onKeyDown={onKeys} />
+    // A click runs the widget's action too, as in Acrobat: the editor's
+    // focus click bubbles here, a read-only field's lands here directly.
+    <WidgetBox item={item} page={page} colors={colors} onClick={activate}>
+      {item.multiline ? (
+        <textarea {...editorProps} />
       ) : (
-        <input {...editorProps} type={fill.password ? 'password' : 'text'} onKeyDown={onKeys} />
+        <input {...editorProps} type={item.password ? 'password' : 'text'} />
       )}
-    </div>
+    </WidgetBox>
   );
 }
 
-function ToggleWidget({ fill, item, page, appearance }: WidgetProps<'toggle'>) {
-  const form = useCapability(FormToken);
-  const wrap = useIsolated<HTMLDivElement>();
-  const events = useWidgetEvents(fill.fieldRef, item.ref);
-  const activate = useWidgetActivation(item.ref);
+/** A checkbox or a radio button: the picture is the control, a click writes the toggled value. */
+function ToggleControl({ item, page, colors }: ControlProps<'toggle'>) {
+  const form = useCapability(FormHostToken);
+  const activate = useWidgetActivation(item.annotationRef);
   const [focused, setFocused] = useState(false);
-  const frame = viewBox(item.box, page);
   const press = () => {
-    // Checkbox: click toggles on/off (null clears). Radio: click always
-    // selects its own button — no untoggle, per PDF/Acrobat convention.
-    // Acrobat's order: the value change first, then the /A — so an /A
-    // script reads the post-toggle state. A read-only toggle still
-    // activates (it just doesn't flip).
-    const flipped = fill.disabled
+    // A checkbox clicked again clears; a radio button always selects its own
+    // value. The value first, then the widget's action (Acrobat's order), so
+    // an action script reads the new state. A read-only toggle still runs it.
+    const written = item.disabled
       ? undefined
-      : form.setChecked(
-          fill.fieldRef,
-          fill.kind === 'checkbox' && fill.checked ? null : fill.exportValue,
-        );
-    void Promise.resolve(flipped).then(activate, activate);
+      : form.setValue(item.fieldRef, {
+          value: item.kind === 'checkbox' && item.checked ? null : item.exportValue,
+        });
+    void Promise.resolve(written).then(activate, activate);
   };
   return (
-    <div
-      ref={wrap}
-      role={fill.kind === 'checkbox' ? 'checkbox' : 'radio'}
-      aria-checked={fill.checked}
-      aria-label={fill.label}
-      tabIndex={fill.disabled ? -1 : 0}
-      {...events}
+    <WidgetBox
+      item={item}
+      page={page}
+      colors={colors}
+      role={item.kind === 'checkbox' ? 'checkbox' : 'radio'}
+      aria-checked={item.checked}
+      aria-label={item.label}
+      tabIndex={item.disabled ? -1 : 0}
       onClick={press}
-      onFocus={(event) => {
-        setFocused(true);
-        events.onFocus?.(event);
-      }}
-      onBlur={(event) => {
-        setFocused(false);
-        events.onBlur?.(event);
-      }}
+      onFocus={() => setFocused(true)}
+      onBlur={() => setFocused(false)}
       onKeyDown={(event) => {
         if (event.key === ' ' || event.key === 'Enter') {
           event.preventDefault();
           press();
         }
       }}
-      style={{
-        position: 'absolute',
-        left: frame.left,
-        top: frame.top,
-        width: frame.width,
-        height: frame.height,
-        cursor: fill.disabled ? 'default' : 'pointer',
-        pointerEvents: 'auto', // always the event surface; toggle() self-gates
-        outline: 'none', // the top-layer FormFocusRing owns focus indication
-      }}
+      style={{ cursor: item.disabled ? 'default' : 'pointer', outline: 'none' }}
     >
-      <Picture page={page} appearance={appearance} apBox={item.apBox} frame={frame} />
-      <FormFocusRing visible={focused} />
-    </div>
+      <FormFocusRing visible={focused} color={colors.focus} />
+    </WidgetBox>
   );
 }
 
-function ChoiceWidget(props: WidgetProps<'choice'>) {
-  return props.fill.kind === 'list' ? <ListBoxWidget {...props} /> : <ComboBoxWidget {...props} />;
-}
-
-function ChoiceFrame({
-  fill,
-  item,
-  page,
-  focused,
-  innerRef,
-  children,
-}: Pick<WidgetProps<'choice'>, 'fill' | 'item' | 'page'> & {
-  focused: boolean;
-  innerRef: React.RefObject<HTMLDivElement>;
-  children: React.ReactNode;
-}) {
-  const events = useWidgetEvents(fill.fieldRef, item.ref);
-  const activate = useWidgetActivation(item.ref);
-  const frame = viewBox(item.box, page);
-  return (
-    <div
-      ref={innerRef}
-      {...events}
-      onClick={activate}
-      style={{
-        position: 'absolute',
-        left: frame.left,
-        top: frame.top,
-        width: frame.width,
-        height: frame.height,
-        pointerEvents: 'auto',
-        outline: 'none', // the top-layer FormFocusRing owns focus indication
-      }}
-    >
-      {children}
-      <FormFocusRing visible={focused} />
-    </div>
-  );
-}
-
-function ComboBoxWidget({ fill, item, page, appearance }: WidgetProps<'choice'>) {
-  const form = useCapability(FormToken);
-  const wrap = useIsolated<HTMLDivElement>();
+/** A dropdown: an invisible native select over the field's picture. */
+function ComboControl({ item, page, colors }: ControlProps<'choice'>) {
+  const form = useCapability(FormHostToken);
+  const activate = useWidgetActivation(item.annotationRef);
   const [focused, setFocused] = useState(false);
-  const frame = viewBox(item.box, page);
   return (
-    <ChoiceFrame fill={fill} item={item} page={page} focused={focused} innerRef={wrap}>
-      <Picture page={page} appearance={appearance} apBox={item.apBox} frame={frame} />
-      {/* A combo's popup is separate from its resting box, so the baked
-          appearance and transparent native trigger do not maintain competing
-          in-place row geometry or scroll state. */}
+    <WidgetBox item={item} page={page} colors={colors} onClick={activate}>
       <select
-        key={fill.selected.join('\0')}
-        defaultValue={fill.selected[0] ?? ''}
-        aria-label={fill.label}
-        disabled={fill.disabled}
-        onFocus={() => setFocused(true)}
-        onBlur={() => setFocused(false)}
-        onChange={(event) => {
-          const values = Array.from(event.currentTarget.selectedOptions).map(
-            (option) => option.value,
-          );
-          void form.setChoice(fill.fieldRef, values);
-        }}
-        style={{
-          position: 'absolute',
-          inset: 0,
-          width: '100%',
-          height: '100%',
-          opacity: 0,
-          cursor: fill.disabled ? 'default' : 'pointer',
-          // A disabled control suppresses clicks — the frame owns /A
-          // activation and must still receive them.
-          ...(fill.disabled ? { pointerEvents: 'none' as const } : {}),
-        }}
-      >
-        {fill.options.map((option, i) => (
-          <option key={i} value={option.value}>
-            {option.label}
-          </option>
-        ))}
-      </select>
-    </ChoiceFrame>
-  );
-}
-
-function ListBoxWidget({ fill, item, page }: WidgetProps<'choice'>) {
-  const form = useCapability(FormToken);
-  const wrap = useIsolated<HTMLDivElement>();
-  const [focused, setFocused] = useState(false);
-  const frame = viewBox(item.box, page);
-  const scale = item.box.width > 0 ? frame.width / item.box.width : 1;
-  const strokeWidth = item.style.strokeWidth * scale;
-  const borderStyle = item.style.borderStyle === 'dashed' ? 'dashed' : 'solid';
-  return (
-    <ChoiceFrame fill={fill} item={item} page={page} focused={focused} innerRef={wrap}>
-      <NativeListBox
-        ariaLabel={fill.label}
-        disabled={fill.disabled}
-        multi={fill.multi}
-        options={fill.options}
-        selected={fill.selected}
-        onFocus={() => setFocused(true)}
-        onBlur={() => setFocused(false)}
-        onSelect={(values) => void form.setChoice(fill.fieldRef, values)}
-        style={{
-          position: 'absolute',
-          inset: 0,
-          width: '100%',
-          height: '100%',
-          boxSizing: 'border-box',
-          margin: 0,
-          padding: 0,
-          borderWidth: strokeWidth,
-          borderStyle,
-          borderColor: item.style.color,
-          borderRadius: 0,
-          outline: 'none',
-          background: item.style.interiorColor ?? '#fff',
-          color: item.text?.fontColor ?? '#000',
-          fontFamily: item.text?.fontFamily ?? 'Helvetica, Arial, sans-serif',
-          fontSize: (item.text?.fontSize || 12) * scale,
-          textAlign: item.text?.textAlign ?? 'left',
-          cursor: fill.disabled ? 'default' : 'pointer',
-          // A disabled control suppresses clicks — the frame owns /A
-          // activation and must still receive them.
-          ...(fill.disabled ? { pointerEvents: 'none' as const } : {}),
-        }}
-      />
-    </ChoiceFrame>
-  );
-}
-
-/**
- * The form plugin's renderer entry, ready for
- * `<AnnotationLayer renderers={[formWidgetRenderer]} />`. It answers for the
- * plugin-registered 'form-widgets' Behavior — the form plugin decides when
- * widgets are fill controls vs. editable annotations, never the app.
- */
-export const formWidgetRenderer: AnnotationRenderer = {
-  behavior: 'form-widgets',
-  component: FormWidget,
-};
-
-/* ══════════════════════ standalone layer (no annotations) ══════════════════ */
-
-const controlBase: React.CSSProperties = {
-  position: 'absolute',
-  boxSizing: 'border-box',
-  border: '1px solid rgba(56, 88, 233, 0.55)',
-  background: 'rgba(255, 255, 255, 0.92)',
-  borderRadius: 2,
-  font: 'inherit',
-};
-
-const fillBox = (item: FillItem, page: PageContextValue) => viewBox(item.box, page);
-
-/** The standalone layer's event surface: positions one control's box and
- *  carries the /AA DOM-event feed — always pointer-active (see
- *  useWidgetEvents); the control inside fills it and self-gates edits.
- *  With `activate`, a click on the box runs the widget's /A (see
- *  useWidgetActivation — activation is a widget behavior); push buttons
- *  keep their own gated inner door and do not set it. */
-function FillEventBox({
-  item,
-  page,
-  cursor,
-  activate,
-  children,
-}: {
-  item: FillItem;
-  page: PageContextValue;
-  cursor?: string;
-  activate?: boolean;
-  children: React.ReactNode;
-}) {
-  const events = useWidgetEvents(item.fieldRef, {
-    kind: 'objectNumber',
-    page: page.ref,
-    objectNumber: item.annotObjectNumber,
-  });
-  const onActivate = useWidgetActivation({
-    kind: 'objectNumber',
-    page: page.ref,
-    objectNumber: item.annotObjectNumber,
-  });
-  const css = fillBox(item, page);
-  return (
-    <div
-      {...events}
-      onClick={activate ? onActivate : undefined}
-      style={{ position: 'absolute', ...css, pointerEvents: 'auto', ...(cursor ? { cursor } : {}) }}
-    >
-      {children}
-    </div>
-  );
-}
-
-const fillControl: React.CSSProperties = {
-  position: 'absolute',
-  inset: 0,
-  width: '100%',
-  height: '100%',
-};
-
-/** Text control: keystrokes go to the plugin's draft (a download writes it);
- *  the engine write happens on blur or Enter. */
-function FillText({
-  item,
-  page,
-}: {
-  item: Extract<FillItem, { control: 'text' }>;
-  page: PageContextValue;
-}) {
-  const form = useCapability(FormToken);
-  const [draft, setDraft] = useState(item.value);
-  // Adopt engine truth whenever it changes under us (remote edit, reset).
-  useEffect(() => setDraft(item.value), [item.value]);
-
-  const css = fillBox(item, page);
-  const fontSize = Math.max(9, Math.min(css.height * 0.62, 24));
-  const type = (text: string) => {
-    setDraft(text);
-    form.draftText(item.fieldRef, text);
-  };
-  const commit = () => {
-    if (draft === item.value) form.discardDraftText(item.fieldRef);
-    else void form.commitDraftText(item.fieldRef).catch(() => setDraft(item.value));
-  };
-  const shared: React.CSSProperties = {
-    ...controlBase,
-    ...fillControl,
-    fontSize,
-    padding: '0 3px',
-    ...(item.comb ? { letterSpacing: css.width / Math.max(1, item.maxLength ?? 1) / 2 } : {}),
-  };
-  // A disabled control suppresses clicks — the box owns /A activation and
-  // must still receive them (the read-only "fake button" pattern).
-  const editorGate = item.disabled ? ({ pointerEvents: 'none' } as const) : {};
-  return (
-    <FillEventBox item={item} page={page} activate>
-      {item.multiline ? (
-        <textarea
-          aria-label={item.label}
-          value={draft}
-          disabled={item.disabled}
-          onChange={(event) => type(event.target.value)}
-          onBlur={commit}
-          style={{ ...shared, resize: 'none', ...editorGate }}
-        />
-      ) : (
-        <input
-          aria-label={item.label}
-          type={item.password ? 'password' : 'text'}
-          value={draft}
-          maxLength={item.maxLength ?? undefined}
-          disabled={item.disabled}
-          onChange={(event) => type(event.target.value)}
-          onBlur={commit}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter') (event.target as HTMLInputElement).blur();
-          }}
-          style={{ ...shared, ...editorGate }}
-        />
-      )}
-    </FillEventBox>
-  );
-}
-
-function FillToggle({
-  item,
-  page,
-}: {
-  item: Extract<FillItem, { control: 'toggle' }>;
-  page: PageContextValue;
-}) {
-  const form = useCapability(FormToken);
-  const activate = useWidgetActivation({
-    kind: 'objectNumber',
-    page: page.ref,
-    objectNumber: item.annotObjectNumber,
-  });
-  const css = fillBox(item, page);
-  const glyphSize = Math.min(css.width, css.height) * 0.72;
-  return (
-    // `activate` covers the disabled path (pointer-transparent button → the
-    // box click activates without toggling — a read-only toggle's /A still
-    // runs); the enabled button below chains toggle-then-/A itself and
-    // stops propagation so the click never double-activates.
-    <FillEventBox item={item} page={page} cursor={item.disabled ? 'default' : 'pointer'} activate>
-      <button
-        role={item.kind}
-        aria-checked={item.checked}
+        key={item.selected.join('\0')}
+        defaultValue={item.selected[0] ?? ''}
         aria-label={item.label}
         disabled={item.disabled}
-        onClick={(event) => {
-          event.stopPropagation();
-          // Checkbox re-click clears; radio click always selects its state.
-          // Acrobat's order: the value change first, then the /A.
-          void Promise.resolve(
-            form.setChecked(
-              item.fieldRef,
-              item.kind === 'checkbox' && item.checked ? null : item.exportValue,
-            ),
-          ).then(activate, activate);
-        }}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
+        onChange={(event) =>
+          void form.setValue(item.fieldRef, { value: event.currentTarget.value || null })
+        }
         style={{
-          ...controlBase,
-          ...fillControl,
-          cursor: 'inherit',
-          display: 'grid',
-          placeItems: 'center',
-          padding: 0,
-          borderRadius: item.kind === 'radio' ? '50%' : 2,
-          fontSize: glyphSize,
-          lineHeight: 1,
-          color: '#1f2a44',
-          // A disabled control suppresses clicks — the box must receive them.
+          ...fill,
+          opacity: 0,
+          cursor: item.disabled ? 'default' : 'pointer',
           ...(item.disabled ? { pointerEvents: 'none' as const } : {}),
         }}
       >
-        {item.checked ? (item.kind === 'radio' ? '●' : '✓') : ''}
-      </button>
-    </FillEventBox>
-  );
-}
-
-function FillChoice({
-  item,
-  page,
-}: {
-  item: Extract<FillItem, { control: 'choice' }>;
-  page: PageContextValue;
-}) {
-  const form = useCapability(FormToken);
-  const css = fillBox(item, page);
-  // A disabled control suppresses clicks — the box owns /A activation and
-  // must still receive them.
-  const controlGate = item.disabled ? ({ pointerEvents: 'none' } as const) : {};
-  if (item.kind === 'list') {
-    return (
-      <FillEventBox item={item} page={page} activate>
-        <NativeListBox
-          ariaLabel={item.label}
-          disabled={item.disabled}
-          multi={item.multi}
-          options={item.options}
-          selected={item.selected}
-          onSelect={(values) => void form.setChoice(item.fieldRef, values)}
-          style={{
-            ...controlBase,
-            ...fillControl,
-            fontSize: Math.max(9, Math.min(css.height * 0.55, 18)),
-            ...controlGate,
-          }}
-        />
-      </FillEventBox>
-    );
-  }
-  return (
-    <FillEventBox item={item} page={page} activate>
-      <select
-        aria-label={item.label}
-        disabled={item.disabled}
-        value={item.selected[0] ?? ''}
-        onChange={(event) => void form.setChoice(item.fieldRef, [event.target.value])}
-        style={{
-          ...controlBase,
-          ...fillControl,
-          fontSize: Math.max(9, Math.min(css.height * 0.55, 18)),
-          ...controlGate,
-        }}
-      >
         {item.selected.length === 0 && <option value="" />}
-        {item.options.map((option) => (
-          <option key={option.value} value={option.value}>
+        {item.options.map((option, index) => (
+          <option key={index} value={option.value}>
             {option.label}
           </option>
         ))}
       </select>
-    </FillEventBox>
+      <FormFocusRing visible={focused} color={colors.focus} />
+    </WidgetBox>
   );
 }
 
-function FillButton({
-  item,
-  page,
-}: {
-  item: Extract<FillItem, { control: 'button' }>;
-  page: PageContextValue;
-}) {
-  const form = useCapability(FormToken);
+/** A list: a visible native select in the field's own look, the settings where it has none. */
+function ListControl({ item, page, colors }: ControlProps<'choice'>) {
+  const form = useCapability(FormHostToken);
+  const activate = useWidgetActivation(item.annotationRef);
+  const [focused, setFocused] = useState(false);
+  const frame = viewBox(item, page);
+  const scale = item.box.width > 0 ? frame.width / item.box.width : 1;
   return (
-    <FillEventBox item={item} page={page} cursor={item.disabled ? 'default' : 'pointer'}>
+    <WidgetBox item={item} page={page} colors={colors} edge={false} onClick={activate}>
+      <NativeListBox
+        ariaLabel={item.label}
+        disabled={item.disabled}
+        multi={item.multi}
+        options={item.options}
+        selected={item.selected}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
+        onSelect={async (values) => {
+          await form.setValue(item.fieldRef, { selectedValues: values });
+        }}
+        style={{
+          ...fill,
+          padding: 0,
+          borderWidth: Math.max(1, item.look.borderWidth * scale),
+          borderStyle: item.look.borderStyle === 'dashed' ? 'dashed' : 'solid',
+          borderColor: item.look.border ?? colors.border,
+          borderRadius: 0,
+          outline: 'none',
+          background: item.look.background ?? colors.background,
+          color: item.look.color ?? colors.text,
+          ...cssFont(item.look),
+          fontSize: (item.look.fontSize || 12) * scale,
+          textAlign: item.look.textAlign,
+          cursor: item.disabled ? 'default' : 'pointer',
+          ...(item.disabled ? { pointerEvents: 'none' as const } : {}),
+        }}
+      />
+      <FormFocusRing visible={focused} color={colors.focus} />
+    </WidgetBox>
+  );
+}
+
+/** A push button: a native click target over its picture that runs its action. */
+function ButtonControl({ item, page, colors }: ControlProps<'button'>) {
+  const activate = useWidgetActivation(item.annotationRef);
+  return (
+    <WidgetBox
+      item={item}
+      page={page}
+      colors={colors}
+      edge={false}
+      style={{ cursor: item.disabled ? 'default' : 'pointer' }}
+    >
       <button
         type="button"
         aria-label={item.label}
         disabled={item.disabled}
-        onClick={() =>
-          void form.activateWidget({
-            kind: 'objectNumber',
-            page: page.ref,
-            objectNumber: item.annotObjectNumber,
-          })
-        }
+        onClick={activate}
         style={{
-          ...controlBase,
-          ...fillControl,
+          ...fill,
           padding: 0,
           border: 0,
           background: 'transparent',
           cursor: 'inherit',
-          // Events live on the box; a disabled button must not swallow them.
+          // The box is the event surface; a disabled button must not swallow the pointer.
           pointerEvents: item.disabled ? 'none' : 'auto',
         }}
       />
-    </FillEventBox>
+    </WidgetBox>
   );
 }
 
-/** The standalone layer's signature control: the same target/inspect
- *  hand-off as {@link SignatureWidget}, over the page raster. */
-function FillSignature({
-  item,
-  page,
-}: {
-  item: Extract<FillItem, { control: 'signature' }>;
-  page: PageContextValue;
-}) {
+/**
+ * A signature field: with the signature plugin, an empty field is "sign
+ * here" (it becomes the target the next mark goes to), and a signed one asks
+ * your UI to show its details. Without it, the field is only its picture.
+ */
+function SignatureControl({ item, page, colors }: ControlProps<'signature'>) {
   const signature = useOptionalCapability(SignatureToken);
   const ref = item.fieldRef;
+  // The signature plugin knows best whether it's signed (it reads again after
+  // every new version); the field's own value is the fallback.
   const signed = useOptionalSelector(
     SignatureToken,
-    (signature) => signature.getSignature(ref)?.signed ?? item.signed,
+    (capability) => capability.getSignature(ref)?.signed ?? item.signed,
     item.signed,
   );
-  const actionable = signature != null && (signed || !item.disabled);
+  const actionable = signature !== null && (signed || !item.disabled);
   return (
-    <FillEventBox item={item} page={page} cursor={actionable ? 'pointer' : 'default'}>
+    <WidgetBox
+      item={item}
+      page={page}
+      colors={colors}
+      style={{ cursor: actionable ? 'pointer' : 'default' }}
+    >
       {actionable ? (
         <button
           type="button"
           aria-label={item.label}
           data-signed={signed ? '' : undefined}
           onClick={() => (signed ? signature.requestInspection(ref) : signature.setTarget(ref))}
-          style={{
-            ...fillControl,
-            padding: 0,
-            border: 0,
-            background: 'transparent',
-            cursor: 'inherit',
-          }}
+          style={{ ...fill, padding: 0, border: 0, background: 'transparent', cursor: 'inherit' }}
         />
       ) : null}
-    </FillEventBox>
+    </WidgetBox>
   );
 }
 
 /**
- * Fill-mode form controls for one page, positioned from the form model's own
- * widget geometry — the annotation-less path (a fill-only viewer whose page
- * pixels come from an annotated RenderLayer raster). Active whenever the
- * active tool carries the 'form-fill' tag (the built-in pointer/pan tools
- * do); any other tool stands the controls down. Do not mount next to an
- * AnnotationLayer wired with `formWidgetBehaviors`.
+ * The form's fields on one page, as controls people fill in. Put it above the
+ * page's picture (`<RenderLayer>`, and `<AnnotationLayer>` when the
+ * annotation plugin is registered). It shows while the active tool fills
+ * forms (the `pointer` and `pan` tools do), and stands down in design mode,
+ * where fields are boxes you select and move.
  */
 export function FormLayer() {
   const page = usePage();
-  const form = useCapability(FormToken);
-  usePageLayerFact(page, 'formLayer', true);
+  const form = useCapability(FormHostToken);
+  const colors = useFormColors();
   const active = useSelector(InteractionToken, (interaction) =>
-    interaction.getActiveTool().enables.has('form-fill'),
+    interaction.activeToolEnables('form-fill'),
   );
 
   useEffect(() => {
-    if (active) form.ensureLoaded(page.ref);
+    if (active) void form.ensureLoaded(page.ref);
   }, [active, form, page.ref]);
 
-  const items = useSelector(FormToken, (form) => form.listFillItems(page.ref), shallowArray);
+  const items = useSelector(FormHostToken, (capability) => capability.listWidgets(page.ref), shallowArray);
   if (!active) return null;
 
   return (
-    <div style={{ position: 'absolute', inset: 0 }}>
-      {items.map((item) =>
-        item.control === 'text' ? (
-          <FillText key={`${item.key}:${item.annotObjectNumber}`} item={item} page={page} />
-        ) : item.control === 'toggle' ? (
-          <FillToggle key={`${item.key}:${item.annotObjectNumber}`} item={item} page={page} />
-        ) : item.control === 'choice' ? (
-          <FillChoice key={`${item.key}:${item.annotObjectNumber}`} item={item} page={page} />
-        ) : item.control === 'button' ? (
-          <FillButton key={`${item.key}:${item.annotObjectNumber}`} item={item} page={page} />
-        ) : item.control === 'signature' ? (
-          <FillSignature key={`${item.key}:${item.annotObjectNumber}`} item={item} page={page} />
-        ) : null,
-      )}
+    <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
+      {items.map((item) => {
+        const key = `${item.key}:${item.annotObjectNumber}`;
+        switch (item.control) {
+          case 'text':
+            return <TextControl key={key} item={item} page={page} colors={colors} />;
+          case 'toggle':
+            return <ToggleControl key={key} item={item} page={page} colors={colors} />;
+          case 'choice':
+            return item.kind === 'list' ? (
+              <ListControl key={key} item={item} page={page} colors={colors} />
+            ) : (
+              <ComboControl key={key} item={item} page={page} colors={colors} />
+            );
+          case 'button':
+            return <ButtonControl key={key} item={item} page={page} colors={colors} />;
+          case 'signature':
+            return <SignatureControl key={key} item={item} page={page} colors={colors} />;
+        }
+      })}
     </div>
   );
 }
 
-/* ═══════════════════════════════ hooks ═══════════════════════════════ */
+// ── hooks ──────────────────────────────────────────────────────────────────
 
-/** The form capability — values, interchange, design-mode verbs. */
-export function useForm() {
+/** The form API for the surrounding document: reading, filling, form data and building. */
+export function useForm(): FormCapability {
   return useCapability(FormToken);
 }
 
-/** Subscribe to one form event for the mounted lifetime: `useFormEvent((form) => form.onValueChanged, handler)`. */
+/** Subscribe to one form event while mounted: `useFormEvent((form) => form.onValueChanged, handler)`. */
 export function useFormEvent<T>(
   select: (form: FormCapability) => EventHook<T>,
   handler: (event: T) => void,
 ): void {
-  useCapabilityEvent(FormPublicToken, select, handler);
-}
-
-/** The reconciled form snapshot (null until the first load lands),
- *  re-rendering on every form model change. */
-export function useFormSnapshot() {
-  return useSelector(FormToken, (form) => form.getSnapshot());
-}
-
-/** One field's current value, subscribed (null for an unknown field). */
-export function useFormValue(ref: FormFieldRef): FormFieldValue | null {
-  const key = ref.kind === 'fqn' ? `n:${ref.name}` : `o:${ref.objectNumber}`;
-  const stable = useMemo(() => ref, [key]);
-  return useSelector(FormPublicToken, (form) => form.getValue(stable));
+  useCapabilityEvent(FormToken, select, handler);
 }
 
 /**
- * The field behind the currently selected widget annotation (single
- * selection), or null. The design-mode join: widget selection lives in the
- * annotation plane, field properties live here.
+ * The form's state: every field, whether it's read, what kind of form the
+ * document has, and the field of the selected widget (the page's State
+ * table, declared once in `formState`). Takes a selector, and re-renders only
+ * when what it returns changes.
  */
-export function useFormField(): FormFieldDTO | null {
-  const selected = useAnnotationSelected();
-  const widget =
-    selected.length === 1 && selected[0]!.subtype.startsWith('widget') ? selected[0]! : null;
-  const objnum = widget && widget.ref.kind === 'objectNumber' ? widget.ref.objectNumber : 0;
-  return useSelector(FormToken, (form) =>
-    objnum > 0 ? form.getFieldForWidget({ objectNumber: objnum }) : null,
+export const useFormState = stateHook(formState);
+
+/** The form settings (`validation`, `focus`, `fields`), with or without a document. Takes a selector. */
+export const useFormSettings = settingsHook(FormToken);
+
+/**
+ * One field's value, in the shape `setValue()` takes, or `null`: re-renders
+ * only when that field's value changes. Empty without a document.
+ */
+export function useFormValue(ref: FormFieldRef): FormFieldValue | null {
+  const scoped = useDocumentScope();
+  const key = ref.kind === 'fqn' ? `n:${ref.name}` : `o:${ref.objectNumber}`;
+  // Keyed by value, so an inline `toFieldRef('total')` never subscribes again.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const stable = useMemo(() => ref, [key]);
+  return useKernelValue(
+    (kernel) => kernel.tryCapability(FormToken, scoped ?? undefined)?.getValue(stable) ?? null,
   );
 }

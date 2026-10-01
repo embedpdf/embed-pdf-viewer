@@ -18,9 +18,8 @@
  * through the surface's open props.
  */
 import { useEffect, useRef, useState } from 'react';
-import { useTool } from '@embedpdf/react/interaction';
+import { useInteractionState } from '@embedpdf/react/interaction';
 import {
-  useArmStampAsset,
   useStamp,
   useStampAssetPreviewUrl,
   useStampAssets,
@@ -28,7 +27,7 @@ import {
   type StampAsset,
 } from '@embedpdf/react/stamp';
 import { useSurface } from '@embedpdf/react/shell';
-import { useLocale, useT } from '@embedpdf/react/i18n';
+import { useI18nState, useT } from '@embedpdf/react/i18n';
 import { useStampsConfig } from '../config-context';
 import {
   DEFAULT_LIBRARY_ID,
@@ -48,9 +47,8 @@ export function StampsPanel() {
   // default — never the people's marks, which have their own panel.
   const libraries = useStampLibraries({ kind: sidebar ?? ['stamps'] });
   const assets = useStampAssets();
-  const { armAsset } = useArmStampAsset();
-  const { activeToolId } = useTool();
-  const { locale } = useLocale();
+  const { activeToolId } = useInteractionState();
+  const { locale } = useI18nState();
   const surface = useSurface('stamps');
   const fileRef = useRef<HTMLInputElement>(null);
   const [armedId, setArmedId] = useState<string | null>(null);
@@ -95,7 +93,7 @@ export function StampsPanel() {
   const arm = (asset: StampAsset) => {
     setError(null);
     setArmedId(asset.id);
-    void armAsset(asset.id).catch((error) => {
+    void stamp.armAsset(asset.id).catch((error) => {
       console.error('[embedpdf] arm stamp failed:', error);
       setArmedId(null);
       setError(t('demo.stampsArmError'));
@@ -109,7 +107,7 @@ export function StampsPanel() {
     // exported library names itself through its /Title.
     stamp
       .importLibrary(file, { name: file.name.replace(/\.pdf$/i, '') })
-      .then((id) => setPicked(id))
+      .then(({ library }) => setPicked(library.id))
       .catch((error) => {
         console.error('[embedpdf] stamp library import failed:', error);
         setError(t('demo.stampsImportError'));

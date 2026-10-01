@@ -4,12 +4,12 @@
  * - `FieldIndex` is the field tree as the engine confirmed it, indexed by
  *   field key and by widget. It is the value of the plugin's `fields` mirror
  *   and changes only through `foldFormEvent` and loads.
- * - `WidgetBoxes` is one page's widget geometry, the value of the
- *   `widgetBoxes` page mirror.
+ * - `PageWidgets` is one page's widgets, where each is and how it looks: the
+ *   value of the `widgetBoxes` page mirror.
  * - `FormState` is the session state: which fields have a write in flight.
  *
- * Keystroke drafts are not here: a focused input already holds its draft,
- * and the plugin learns a value only when it is committed.
+ * The text being typed in a field is not here: it waits in `write/typing.ts`
+ * until it is committed.
  */
 import { reload, type MirrorReload } from '@embedpdf/core';
 import type {
@@ -42,22 +42,31 @@ export interface FieldIndex {
   readonly snapshot: FormSnapshot | null;
   /** Field key → index into `snapshot.fields`. */
   readonly byKey: Readonly<Record<FieldKey, number>>;
+  /** Full name → index into `snapshot.fields`, for a ref made with `toFieldRef(name)`. */
+  readonly byName: Readonly<Record<string, number>>;
   /** Widget annotation object number → index into `snapshot.fields`. */
   readonly byWidget: Readonly<Record<number, number>>;
 }
 
-export const emptyFieldIndex = (): FieldIndex => ({ snapshot: null, byKey: {}, byWidget: {} });
+export const emptyFieldIndex = (): FieldIndex => ({
+  snapshot: null,
+  byKey: {},
+  byName: {},
+  byWidget: {},
+});
 
 export function indexFields(snapshot: FormSnapshot): FieldIndex {
   const byKey: Record<FieldKey, number> = {};
+  const byName: Record<string, number> = {};
   const byWidget: Record<number, number> = {};
   snapshot.fields.forEach((field, position) => {
     byKey[fieldKeyOf(field)] = position;
+    byName[field.name] ??= position;
     for (const widget of field.widgets) {
       if (widget.objectNumber > 0) byWidget[widget.objectNumber] = position;
     }
   });
-  return { snapshot, byKey, byWidget };
+  return { snapshot, byKey, byName, byWidget };
 }
 
 /** Replace a field by key, or append it when it is new. */
@@ -123,6 +132,18 @@ export const fieldByKey = (index: FieldIndex, key: FieldKey): FormFieldDTO | nul
   return position === undefined ? null : (index.snapshot?.fields[position] ?? null);
 };
 
+/** The field a ref names: by object number, or by full name for `toFieldRef(name)`. */
+export function fieldByRef(index: FieldIndex, ref: FormFieldRef): FormFieldDTO | null {
+  const position = ref.kind === 'fqn' ? index.byName[ref.name] : index.byKey[fieldKeyOfRef(ref)];
+  return position === undefined ? null : (index.snapshot?.fields[position] ?? null);
+}
+
+/** The key a field is known by, whichever ref names it: a name ref resolves to its field's key. */
+export const canonicalKey = (index: FieldIndex, ref: FormFieldRef): FieldKey => {
+  const field = fieldByRef(index, ref);
+  return field ? fieldKeyOf(field) : fieldKeyOfRef(ref);
+};
+
 export const fieldForWidget = (
   index: FieldIndex,
   annotObjectNumber: number,
@@ -142,10 +163,38 @@ export function fieldsWithChangedValues(previous: FieldIndex, next: FieldIndex):
 const valueEntryOf = (field: FormFieldDTO): unknown =>
   'valueEntry' in field ? field.valueEntry : null;
 
-// ── widget geometry (the `widgetBoxes` page mirror) ──────────────────────────
+// ── widgets (the `widgetBoxes` page mirror) ──────────────────────────────────
 
-/** One page's widget geometry: widget annotation object number → page-space box. */
-export type WidgetBoxes = Readonly<Record<number, Box>>;
+/**
+ * How a widget looks in the PDF, as its own appearance settings say: `null`
+ * where it has none of its own. A viewer that draws controls over the field
+ * uses these, and its own settings where the field has nothing.
+ */
+export interface FormWidgetLook {
+  /** The border color (`/MK /BC`), or `null` for a widget without a border. */
+  readonly border: string | null;
+  /** The border width in points. */
+  readonly borderWidth: number;
+  readonly borderStyle: 'solid' | 'dashed' | 'beveled' | 'inset';
+  /** The background color (`/MK /BG`), or `null` for a see-through widget. */
+  readonly background: string | null;
+  /** The text color (`/DA`), or `null` when the field names none. */
+  readonly color: string | null;
+  /** One of the 14 standard PDF fonts, such as `'helvetica'`, or `null` when the field names none. */
+  readonly fontFamily: string | null;
+  /** The font size in points; `0` or `null` sizes the text to the box. */
+  readonly fontSize: number | null;
+  readonly textAlign: 'left' | 'center' | 'right';
+}
+
+/** One widget on its page: its page-space box and its look. */
+export interface PageWidget {
+  readonly box: Box;
+  readonly look: FormWidgetLook;
+}
+
+/** One page's widgets: widget annotation object number → where it is and how it looks. */
+export type PageWidgets = Readonly<Record<number, PageWidget>>;
 
 /** A widget hit: the annotation under the point and the field it belongs to. */
 export interface WidgetHit {
@@ -164,12 +213,12 @@ export const boxContains = (box: Box, point: { x: number; y: number }): boolean 
 /** The widget under a page-space point; nested widgets resolve to the smallest box. */
 export function widgetAt(
   index: FieldIndex,
-  boxes: WidgetBoxes | undefined,
+  widgets: PageWidgets | undefined,
   point: { x: number; y: number },
 ): WidgetHit | null {
-  if (!boxes) return null;
+  if (!widgets) return null;
   let best: WidgetHit | null = null;
-  for (const [key, box] of Object.entries(boxes)) {
+  for (const [key, { box }] of Object.entries(widgets)) {
     if (!boxContains(box, point)) continue;
     const annotObjectNumber = Number(key);
     const field = fieldForWidget(index, annotObjectNumber);

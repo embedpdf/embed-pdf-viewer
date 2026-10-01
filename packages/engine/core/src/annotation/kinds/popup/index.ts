@@ -6,7 +6,7 @@ import { PopupDeclaration } from './declaration';
 
 export { PopupDeclaration } from './declaration';
 
-export type PopupAnnotationDTO<C extends Coordinates = PageCoordinates> = ReadOf<
+export type PopupAnnotation<C extends Coordinates = PageCoordinates> = ReadOf<
   typeof PopupDeclaration,
   C
 >;
@@ -23,12 +23,11 @@ export const PopupDTOSchema = PopupDeclaration.readSchema;
 export const PopupDraftSchema = PopupDeclaration.createSchema;
 export const PopupPatchSchema = PopupDeclaration.updateSchema;
 
-export const PopupKind: AnnotationKindModule<'popup', PopupAnnotationDTO, PopupDraft, PopupPatch> =
-  {
-    subtype: 'popup',
-    pdfSubtypeCode: PdfAnnotationSubtypeCode.POPUP,
-    dtoSchema: PopupDTOSchema,
-    draftSchema: PopupDraftSchema,
-    patchSchema: PopupPatchSchema,
-    readBackWrites: PopupDeclaration.readBackWrites,
-  };
+export const PopupKind: AnnotationKindModule<'popup', PopupAnnotation, PopupDraft, PopupPatch> = {
+  subtype: 'popup',
+  pdfSubtypeCode: PdfAnnotationSubtypeCode.POPUP,
+  dtoSchema: PopupDTOSchema,
+  draftSchema: PopupDraftSchema,
+  patchSchema: PopupPatchSchema,
+  readBackWrites: PopupDeclaration.readBackWrites,
+};

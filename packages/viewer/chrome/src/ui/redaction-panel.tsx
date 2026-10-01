@@ -1,7 +1,7 @@
 import { useCapability } from '@embedpdf/react/runtime';
 import { AnnotationToken } from '@embedpdf/react/annotation';
 import { annotationKey } from '@embedpdf/react/annotation';
-import { usePendingRedactions, useRedaction } from '@embedpdf/react/redaction';
+import { usePendingRedactions, useRedaction, useRedactionState } from '@embedpdf/react/redaction';
 import { useSurface } from '@embedpdf/react/shell';
 import { useT } from '@embedpdf/react/i18n';
 import { Icon } from './icons';
@@ -14,6 +14,7 @@ import { Icon } from './icons';
 export function RedactionPanel() {
   const t = useT();
   const redaction = useRedaction();
+  const applying = useRedactionState((state) => state.applying);
   const pending = usePendingRedactions();
   const anno = useCapability(AnnotationToken);
   const confirm = useSurface('redact-confirm');
@@ -33,8 +34,8 @@ export function RedactionPanel() {
                 <div
                   role="button"
                   tabIndex={0}
-                  onClick={() => anno.select(item.ref)}
-                  onKeyDown={(event) => event.key === 'Enter' && anno.select(item.ref)}
+                  onClick={() => anno.selection.set([item.ref])}
+                  onKeyDown={(event) => event.key === 'Enter' && anno.selection.set([item.ref])}
                   className="hover:bg-hover group flex w-full cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-left"
                 >
                   <Icon
@@ -81,7 +82,7 @@ export function RedactionPanel() {
         </button>
         <button
           type="button"
-          disabled={pending.length === 0 || !redaction.canApply() || redaction.applying}
+          disabled={pending.length === 0 || !redaction.canApply() || applying}
           onClick={() => confirm.open()}
           className="flex-1 rounded-md bg-red-600 px-3 py-1.5 text-sm text-white hover:bg-red-700 disabled:opacity-40"
         >

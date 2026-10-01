@@ -3,12 +3,12 @@
  * clickable areas among one page's annotations, in page space.
  */
 import type { PageRef } from '@embedpdf/core';
-import type { AnnotationDTO } from '@embedpdf/engine-core/runtime';
+import type { Annotation } from '@embedpdf/engine-core/runtime';
 
 import type { Link } from './contract';
 
 /** The visible link annotations of a page that have a target. */
-export function linksOf(annotations: readonly AnnotationDTO[], page: PageRef): readonly Link[] {
+export function linksOf(annotations: readonly Annotation[], page: PageRef): readonly Link[] {
   const links: Link[] = [];
   for (const dto of annotations) {
     if (dto.subtype !== 'link' || dto.target == null) continue;

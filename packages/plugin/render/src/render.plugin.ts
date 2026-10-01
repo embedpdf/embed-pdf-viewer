@@ -1,5 +1,5 @@
 import { definePlugin } from '@embedpdf/core';
-import type { RenderConfig } from './contract';
+import { RENDER_DEFAULTS, type RenderConfig } from './contract';
 import { createRenderController } from './controller';
 import { RenderToken } from './host-contract';
 import { initialRenderState } from './model';
@@ -12,11 +12,12 @@ import { initialRenderState } from './model';
  * host-supplied demand into a retention-safe paint plan over the same store.
  * State is the per-page raster-version ledger.
  */
-export const renderPlugin = (config: RenderConfig = {}) =>
+export const renderPlugin = (config?: RenderConfig) =>
   definePlugin({
     id: 'render',
     scope: 'document',
     token: RenderToken,
     state: initialRenderState,
-    create: (ctx) => createRenderController(ctx, config),
+    settings: { defaults: RENDER_DEFAULTS, registered: config },
+    create: createRenderController,
   });

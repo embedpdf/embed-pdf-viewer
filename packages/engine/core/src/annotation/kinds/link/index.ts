@@ -7,7 +7,7 @@ import { LinkDeclaration } from './declaration';
 export { LinkDeclaration } from './declaration';
 export { PdfDestinationSchema, PdfLinkTargetSchema, PdfLinkTargetWritableSchema } from './values';
 
-export type LinkAnnotationDTO<C extends Coordinates = PageCoordinates> = ReadOf<
+export type LinkAnnotation<C extends Coordinates = PageCoordinates> = ReadOf<
   typeof LinkDeclaration,
   C
 >;
@@ -24,7 +24,7 @@ export const LinkDTOSchema = LinkDeclaration.readSchema;
 export const LinkDraftSchema = LinkDeclaration.createSchema;
 export const LinkPatchSchema = LinkDeclaration.updateSchema;
 
-export const LinkKind: AnnotationKindModule<'link', LinkAnnotationDTO, LinkDraft, LinkPatch> = {
+export const LinkKind: AnnotationKindModule<'link', LinkAnnotation, LinkDraft, LinkPatch> = {
   subtype: 'link',
   pdfSubtypeCode: PdfAnnotationSubtypeCode.LINK,
   dtoSchema: LinkDTOSchema,

@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import type {
-  AnnotationDTO,
+  Annotation,
   LinkDraft,
   LinkPatch,
   PdfCoordinates,
@@ -141,7 +141,7 @@ describe('link kind schemas', () => {
       subtype: 'link',
       rect: { left: 10, bottom: 80, right: 110, top: 100 },
       target: { kind: 'named', name: 'GoBack' },
-    } as unknown as AnnotationDTO<PdfCoordinates>;
+    } as unknown as Annotation<PdfCoordinates>;
     // The patch schema takes what a read returns, so a read DTO passes.
     expect(LinkPatchSchema.safeParse({ target: { kind: 'named', name: 'GoBack' } }).success).toBe(
       true,

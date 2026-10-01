@@ -1,7 +1,9 @@
 <script setup lang="ts">
+import { AnnotationToken } from '@embedpdf/vue/annotation';
 import { commandsPlugin, standardCommands } from '@embedpdf/vue/commands';
-import { Viewer } from '@embedpdf/vue/runtime';
+import { DocumentsToken, Viewer } from '@embedpdf/vue/runtime';
 import { engine } from './pdf';
+import { approveDocument } from './review';
 
 const plugins = [
   /* … */

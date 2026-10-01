@@ -14,20 +14,15 @@
  * inspect it.
  */
 import { useEffect, useState } from 'react';
-import { useTool } from '@embedpdf/react/interaction';
+import { useInteractionState } from '@embedpdf/react/interaction';
+import { useSelector } from '@embedpdf/react/runtime';
 import { useT } from '@embedpdf/react/i18n';
 import { useSurface } from '@embedpdf/react/shell';
+import { useStamp, useStampAssetPreviewUrl, type StampAsset } from '@embedpdf/react/stamp';
 import {
-  useArmStampAsset,
-  useStamp,
-  useStampAssetPreviewUrl,
-  type StampAsset,
-} from '@embedpdf/react/stamp';
-import {
+  SignatureToken,
   useSignature,
-  useSignatureSnapshot,
-  useSignatureTarget,
-  useSignatureVerdicts,
+  useSignatureState,
   useSignatureEvent,
   useSignerRows,
   type SignatureDTO,
@@ -48,9 +43,9 @@ export function SignaturesPanel() {
   const signature = useSignature();
   const config = useSignaturesConfig();
   const rows = useSignerRows();
-  const { target, busy } = useSignatureTarget();
-  const { armAsset } = useArmStampAsset();
-  const { activeToolId } = useTool();
+  const target = useSignatureState((state) => state.target);
+  const busy = useSignatureState((state) => state.busy);
+  const { activeToolId } = useInteractionState();
   const maker = useSurface('signature-maker');
   const [armedId, setArmedId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -58,7 +53,7 @@ export function SignaturesPanel() {
   // one a save would invalidate. Shown until the next verdicts land.
   const [invalidating, setInvalidating] = useState<string | null>(null);
   useSignatureEvent(
-    (signature) => signature.onInvalidating,
+    (signature) => signature.onInvalidationPredicted,
     (event) =>
       setInvalidating(signature.getSignature(event.field)?.fieldName ?? fieldLabel(event.field)),
   );
@@ -94,7 +89,7 @@ export function SignaturesPanel() {
       return;
     }
     setArmedId(asset.id);
-    void armAsset(asset.id).catch((error) => {
+    void stamp.armAsset(asset.id).catch((error) => {
       console.error('[embedpdf] arm mark failed:', error);
       setArmedId(null);
       setError(t('demo.stampsArmError'));
@@ -316,13 +311,14 @@ function MarkThumb({
 function DocumentSignatures() {
   const t = useT();
   const signature = useSignature();
-  const snapshot = useSignatureSnapshot();
-  const verdicts = useSignatureVerdicts();
-  const { target } = useSignatureTarget();
+  // Every signature field, signed or not; the signed ones carry their verdict in the state.
+  const snapshot = useSelector(SignatureToken, (capability) => capability.getSnapshot());
+  const signed = useSignatureState((state) => state.signatures);
+  const target = useSignatureState((state) => state.target);
   const [validating, setValidating] = useState(false);
   const fields = snapshot?.signatures ?? [];
   const verdictOf = (dto: SignatureDTO) =>
-    verdicts?.find((verdict) => verdict.signature.index === dto.index) ?? null;
+    signed.find((entry) => entry.index === dto.index)?.verdict ?? null;
   // Three honest states: valid; valid on disk but unsaved edits would
   // invalidate it (the verdict judged the working copy); invalid on disk.
   const verdictLabel = (verdict: SignatureVerdict | null): string =>

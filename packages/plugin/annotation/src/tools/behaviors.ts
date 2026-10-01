@@ -1,27 +1,25 @@
-import type { Id, KindName } from '@embedpdf/core-annotation';
-import { kindOf, refOf } from '@embedpdf/core-annotation';
-import type { AnnotationRef } from '@embedpdf/engine-core/runtime';
+import type { Annotation } from '@embedpdf/engine-core/runtime';
+import type { Id } from '@embedpdf/core-annotation';
 
 import type { Behavior } from '../contract';
 import type { AnnotationStore } from '../services/store';
 
 /**
- * Behaviors: a sibling plugin (forms, links) marks some annotations as
- * interactive. While a behavior is engaged its annotations render their own
- * DOM and are not geometry-editable — hit-test, marquee and the selection
- * must not see them.
+ * Behaviors: a sibling plugin (forms, links) or an interactive renderer marks
+ * some annotations as interactive. While a behavior is engaged its
+ * annotations render their own DOM and are not geometry-editable: hit-test,
+ * marquee and the selection must not see them.
  */
 export function createBehaviors(store: AnnotationStore) {
   const behaviors: Behavior[] = [];
 
-  const matches = (
-    right: Behavior,
-    left: { subtype: KindName; ref: AnnotationRef | null },
-  ): boolean => right.matches(left) && right.engaged();
+  /** The behavior that owns the annotation now: one that matches it and is engaged. */
+  const owner = (annotation: Annotation): Behavior | undefined =>
+    behaviors.find((behavior) => behavior.matches(annotation) && behavior.engaged(annotation));
 
   /**
    * Ids on a page whose Behavior is currently engaged (form widgets under a
-   * fill tool). Resolved per event — engagement follows the active tool live.
+   * fill tool). Resolved per event: engagement follows the active tool live.
    */
   const engagedIdsOn = (pageObjectNumber: number): ReadonlySet<Id> | undefined => {
     if (!behaviors.length) return undefined;
@@ -30,16 +28,7 @@ export function createBehaviors(store: AnnotationStore) {
     for (const id of model.order) {
       const record = model.byId[id];
       if (!record || record.annotation.page.objectNumber !== pageObjectNumber) continue;
-      if (
-        behaviors.some((behavior) =>
-          matches(behavior, {
-            subtype: kindOf(record.annotation).name,
-            ref: refOf(record),
-          }),
-        )
-      ) {
-        (out ??= new Set()).add(id);
-      }
+      if (owner(record.annotation)) (out ??= new Set()).add(id);
     }
     return out;
   };
@@ -52,23 +41,14 @@ export function createBehaviors(store: AnnotationStore) {
         if (index >= 0) behaviors.splice(index, 1);
       };
     },
-    getBehaviorFor: (annotation: { subtype: KindName; ref: AnnotationRef | null }) =>
-      behaviors.find((behavior) => matches(behavior, annotation)) ?? null,
+    getBehaviorFor: (annotation: Annotation) => owner(annotation) ?? null,
     pruneEngagedSelection: () => {
       // Engaged ⇒ hit-test-inert ⇒ must not stay selected either (a widget
       // selected in design mode keeps no chrome once the fill tool engages).
       const model = store.model();
       const drop = model.selected.filter((id) => {
         const record = model.byId[id];
-        return (
-          record &&
-          behaviors.some((behavior) =>
-            matches(behavior, {
-              subtype: kindOf(record.annotation).name,
-              ref: refOf(record),
-            }),
-          )
-        );
+        return !!record && !!owner(record.annotation);
       });
       if (drop.length) store.commit({ type: 'deselect', ids: drop });
     },

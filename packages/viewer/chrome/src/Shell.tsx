@@ -21,19 +21,17 @@
 import { useMemo, type ReactNode } from 'react';
 import {
   DocumentGate,
+  useDocument,
   useDocumentId,
-  useDocumentStatus,
   useOptionalSelector,
 } from '@embedpdf/react/runtime';
-import { Stage } from '@embedpdf/react/stage';
-import { Scrollbar } from '@embedpdf/react/scrollbar';
+import { Scrollbar, Stage } from '@embedpdf/react/stage';
 import { RenderLayer } from '@embedpdf/react/render';
 import { SelectionClipboard, SelectionHandles, SelectionLayer } from '@embedpdf/react/selection';
 import { AnnotationLayer, useFilePickerProvider } from '@embedpdf/react/annotation';
 import { LinkLayer } from '@embedpdf/react/link';
-import type { AnnotationRenderer } from '@embedpdf/react/annotation';
 import { useActionsUiAdapter } from '@embedpdf/react/actions';
-import { formWidgetRenderer } from '@embedpdf/react/form';
+import { FormLayer } from '@embedpdf/react/form';
 import { SearchLayer } from '@embedpdf/react/search';
 import { useCommandShortcuts } from '@embedpdf/react/commands';
 import { ShellToken } from '@embedpdf/react/shell';
@@ -56,11 +54,6 @@ import { SignatureInspector } from './ui/signature-inspector';
 import { SignatureMakerModal } from './ui/signature-maker';
 import { StampLibraryStore } from './ui/stamp-store';
 import { DocumentError, PasswordPrompt } from './ui/document-boot';
-
-// Annotation renderers — module scope, per the AnnotationRenderer identity
-// rule. One entry today: form widgets render as fill controls while the form
-// plugin's Behavior is engaged.
-const ANNOTATION_RENDERERS: AnnotationRenderer[] = [formWidgetRenderer];
 
 function ModeBand({ edge }: { edge: 'top' | 'bottom' }) {
   const schema = useChromeSchema();
@@ -108,7 +101,7 @@ function OpeningDocuments() {
  */
 function DocumentArea({ children }: { children: ReactNode }) {
   const docId = useDocumentId();
-  const status = useDocumentStatus();
+  const status = useDocument((document) => document.status);
   if (status === 'locked') return <PasswordPrompt key={docId} />;
   if (status === 'error') return <DocumentError key={docId} />;
   return <DocumentGate fallback={<OpeningDocuments />}>{children}</DocumentGate>;
@@ -226,11 +219,11 @@ export function Shell() {
                       is pointer-events: none, so clicks fall through to the
                       anchors everywhere else. */}
                     <LinkLayer />
-                    {/* Form widgets plug into the annotation stack: engaged
-                      (fill mode) they render as fill controls over the baked
-                      appearance; under the Form tab they're plain editable
-                      annotations. */}
-                    <AnnotationLayer renderers={ANNOTATION_RENDERERS} />
+                    <AnnotationLayer />
+                    {/* Fill controls over the fields' pictures while the
+                      active tool fills forms; under the Form tab fields are
+                      plain editable annotations and the layer stands down. */}
+                    <FormLayer />
                   </>
                 )}
               </Stage>

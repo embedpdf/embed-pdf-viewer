@@ -1,23 +1,53 @@
 /**
- * The headless <Toolbar> — where measurement meets the pure solver.
- *
- * The schema is structure-only; what fits is observed, not configured:
+ * The headless <Toolbar>: it measures what fits and makes room, and you draw
+ * every part.
  *
  *   1. a hidden measurement layer renders every unit in every variant (plus
- *      collapsed group forms and the overflow trigger), each wrapped in a
- *      ResizeObserver — so locale flips, font loads, browser zoom, and
- *      embedder CSS all re-measure themselves with zero handling code;
- *   2. ui-core's solve() assigns each unit a variant / collapsed / overflow —
- *      pure, deterministic, tested in isolation;
- *   3. the live row renders the assignment; the overflow menu is derived
- *      (projectOverflow) — the complement of the visible set, never authored.
+ *      folded groups and the "More" button), each watched by a ResizeObserver,
+ *      so a new language, a font loading, browser zoom and your CSS all
+ *      re-measure on their own;
+ *   2. core-ui's `solve()` gives each unit a variant, a folded group or the
+ *      "More" menu: pure and tested on its own;
+ *   3. the live row renders that; the "More" menu is derived (`projectOverflow`)
+ *      from what didn't fit, never written by hand.
  *
- * Rendering is render-prop driven with functional defaults: the app owns the
- * pixels, this component owns the physics.
+ * Every part is a render prop with a plain default: the app owns the pixels,
+ * this component owns the fitting. The defaults' colors come from the
+ * `--epdf-toolbar-*` CSS variables only.
  */
 
-// One-line-per-feature: registration travels with the UI.
-export * from '@embedpdf/core-ui';
+// The toolbar's vocabulary: the schema a bar is written in, and the helpers that change one.
+export {
+  DEFAULT_IMPORTANCE,
+  PINNED,
+  addItem,
+  chromeHelpers,
+  custom,
+  defineChrome,
+  group,
+  item,
+  removeItems,
+  replaceItem,
+  validateChrome,
+} from '@embedpdf/core-ui';
+export type {
+  AddItemSpec,
+  BarChild,
+  BarGroup,
+  BarItem,
+  BarSchema,
+  BarSections,
+  ChromeHelpers,
+  ChromeSchema,
+  CustomItem,
+  FrameSchema,
+  Importance,
+  MenuSchema,
+  MenuSection,
+  OverflowRow,
+  OverflowSection,
+  Variant,
+} from '@embedpdf/core-ui';
 import * as React from 'react';
 import { useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { filterBar, normalizeBar, projectOverflow, projectStrip, solve } from '@embedpdf/core-ui';
@@ -30,9 +60,10 @@ import type {
   OverflowSection,
 } from '@embedpdf/core-ui';
 import { resolvedCommandsEqual } from '@embedpdf/plugin-commands/contract';
-// The overflow projection asks a host fact (the menu target), so the host lens is bound here.
+// The "More" menu asks which menu a command opens, a host fact, so the host lens is bound here.
 import { CommandsToken } from '@embedpdf/plugin-commands/contract/host';
 import type { ResolvedCommand } from '@embedpdf/plugin-commands/contract';
+import { paintDefault } from '@embedpdf/web';
 import { useCapability, useDocumentId, useKernel, useKernelValue } from './runtime';
 
 // ── public render-prop contracts ─────────────────────────────────────────────
@@ -147,25 +178,30 @@ export interface ToolbarProps {
   separatorWidth?: number;
   className?: string;
   style?: React.CSSProperties;
-  /** A command button at a given variant. Default: a plain <button>. */
+  /** A command button at a given variant. Default: a plain <button> with the command's label. */
   renderCommand?: (cmd: ResolvedCommand, variant: string, run: () => void) => React.ReactNode;
   /**
    * Renderers for custom slots, per named variant. A custom unit with no
    * entry here renders as a native `<slot name={slot}>` socket with its
    * terminal command as fallback content: in light DOM that displays the
-   * fallback (today's behavior); inside a shadow root the host's light-DOM
+   * fallback; inside a shadow root the host's light-DOM
    * children project into it — the children-as-slots contract. Sockets are
    * measured live (they can't be duplicated into the measurement layer:
    * only the first same-named slot in tree order gets the projected nodes).
    */
   renderCustom?: Record<string, (variant: string, ctx: CustomSlotCtx) => React.ReactNode>;
-  /** A group in its collapsed form. Default: <select> for 'select', menu button for 'menu'. */
+  /**
+   * A group in its collapsed form. Default: <select> for 'select', menu button for 'menu'; a
+   * renderer that returns `undefined` leaves the group to the default.
+   */
   renderCollapsed?: (view: CollapsedGroupView) => React.ReactNode;
   /** A shed group's disclosure trigger (+ its popover — the renderer owns the
-   *  open state). Default: a chevron button opening a radio menu. */
+   *  open state). Default: a chevron button opening a radio menu; `undefined`
+   *  leaves it to the default too. */
   renderGroupTrigger?: (view: GroupDisclosureView) => React.ReactNode;
   /** Derived separator between adjacent visible groups. Default: a 1px line. */
   renderSeparator?: () => React.ReactNode;
+  /** The "More" button. Default: a plain ⋯ button. */
   renderOverflowTrigger?: (isOpen: boolean, toggle: () => void) => React.ReactNode;
   /** The derived overflow menu. Default: a minimal popover. */
   renderOverflowMenu?: (view: OverflowMenuView) => React.ReactNode;
@@ -263,11 +299,15 @@ const measureLayerStyle: React.CSSProperties = {
   whiteSpace: 'nowrap',
 };
 
-// ── defaults (functional, unstyled-ish; products replace them) ───────────────
+// ── defaults: plain, and meant to be replaced ────────────────────────────────
+
+const SURFACE = paintDefault('toolbar-surface');
+const BORDER = paintDefault('toolbar-border');
+const ACTIVE = paintDefault('toolbar-active');
 
 const defaultRenderCommand = (
   cmd: ResolvedCommand,
-  variant: string,
+  _variant: string,
   run: () => void,
 ): React.ReactNode => (
   <button
@@ -283,15 +323,17 @@ const defaultRenderCommand = (
       gap: 4,
       padding: '4px 8px',
       whiteSpace: 'nowrap',
-      background: cmd.active ? 'rgba(0,0,0,0.12)' : 'transparent',
-      border: '1px solid rgba(0,0,0,0.15)',
+      color: 'inherit',
+      font: 'inherit',
+      background: cmd.active ? ACTIVE : 'transparent',
+      border: `1px solid ${BORDER}`,
       borderRadius: 4,
       cursor: cmd.enabled ? 'pointer' : 'default',
       opacity: cmd.enabled ? 1 : 0.4,
     }}
   >
-    {variant === 'label' ? cmd.label : (cmd.icon ?? cmd.label)}
-    {variant === 'icon+label' ? ` ${cmd.label}` : null}
+    {/* Icons are the app's: the plain button shows the label in every variant. */}
+    {cmd.label}
   </button>
 );
 
@@ -310,9 +352,11 @@ const defaultRenderOverflowTrigger = (isOpen: boolean, toggle: () => void): Reac
       display: 'inline-flex',
       alignItems: 'center',
       padding: '4px 8px',
-      border: '1px solid rgba(0,0,0,0.15)',
+      color: 'inherit',
+      font: 'inherit',
+      border: `1px solid ${BORDER}`,
       borderRadius: 4,
-      background: isOpen ? 'rgba(0,0,0,0.12)' : 'transparent',
+      background: isOpen ? ACTIVE : 'transparent',
       cursor: 'pointer',
     }}
   >
@@ -334,15 +378,15 @@ function DefaultOverflowMenu({ view }: { view: OverflowMenuView }) {
           zIndex: 41,
           minWidth: 200,
           padding: 4,
-          background: 'white',
-          border: '1px solid rgba(0,0,0,0.15)',
+          background: SURFACE,
+          border: `1px solid ${BORDER}`,
           borderRadius: 6,
           boxShadow: '0 4px 16px rgba(0,0,0,0.15)',
         }}
       >
         {view.sections.map((section, i) => (
           <React.Fragment key={i}>
-            {i > 0 && <div style={{ height: 1, background: 'rgba(0,0,0,0.1)', margin: '4px 0' }} />}
+            {i > 0 && <div style={{ height: 1, background: BORDER, margin: '4px 0' }} />}
             {section.rows.map((row) => {
               const cmd = view.resolve(row.command);
               if (!cmd) return null;
@@ -366,6 +410,8 @@ function DefaultOverflowMenu({ view }: { view: OverflowMenuView }) {
                     gap: 16,
                     padding: '6px 8px',
                     border: 'none',
+                    color: 'inherit',
+                    font: 'inherit',
                     background: 'transparent',
                     cursor: cmd.enabled ? 'pointer' : 'default',
                     opacity: cmd.enabled ? 1 : 0.4,
@@ -394,7 +440,13 @@ function DefaultCollapsed({ view }: { view: CollapsedGroupView }) {
       <select
         value={active?.id ?? ''}
         onChange={(event) => view.execute(event.target.value)}
-        style={{ padding: '4px 6px', borderRadius: 4 }}
+        style={{
+          padding: '4px 6px',
+          font: 'inherit',
+          borderRadius: 4,
+          border: `1px solid ${BORDER}`,
+          background: SURFACE,
+        }}
       >
         {view.commands.map((command) => (
           <option key={command.id} value={command.id} disabled={!command.enabled}>
@@ -457,10 +509,12 @@ function DefaultGroupTrigger({ view }: { view: GroupDisclosureView }) {
           display: 'inline-flex',
           alignItems: 'center',
           padding: '4px 6px',
-          border: '1px solid rgba(0,0,0,0.15)',
+          color: 'inherit',
+          font: 'inherit',
+          border: `1px solid ${BORDER}`,
           borderRadius: 4,
-          // hint that the active item is hiding in here
-          background: isOpen || someActive ? 'rgba(0,0,0,0.12)' : 'transparent',
+          // A hint that the active item is in here.
+          background: isOpen || someActive ? ACTIVE : 'transparent',
           cursor: 'pointer',
         }}
       >
@@ -632,12 +686,12 @@ export function Toolbar({
     execute: executeCmd,
   });
 
-  const renderCollapsedGroup = (group: NormalizedGroup): React.ReactNode =>
-    renderCollapsed ? (
-      renderCollapsed(collapsedView(group))
-    ) : (
-      <DefaultCollapsed view={collapsedView(group)} />
-    );
+  // A render prop that returns `undefined` leaves the part to the default, as `renderCustom` does.
+  const renderCollapsedGroup = (group: NormalizedGroup): React.ReactNode => {
+    const view = collapsedView(group);
+    const drawn = renderCollapsed?.(view);
+    return drawn === undefined ? <DefaultCollapsed view={view} /> : drawn;
+  };
 
   /** The disclosure view: shed children for the live trigger; the whole group
    *  for the measured trigger, so width is budgeted at its fullest content. */
@@ -652,12 +706,11 @@ export function Toolbar({
     execute: executeCmd,
   });
 
-  const renderDisclosure = (group: NormalizedGroup, allChildren: boolean): React.ReactNode =>
-    renderGroupTrigger ? (
-      renderGroupTrigger(disclosureView(group, allChildren))
-    ) : (
-      <DefaultGroupTrigger view={disclosureView(group, allChildren)} />
-    );
+  const renderDisclosure = (group: NormalizedGroup, allChildren: boolean): React.ReactNode => {
+    const view = disclosureView(group, allChildren);
+    const drawn = renderGroupTrigger?.(view);
+    return drawn === undefined ? <DefaultGroupTrigger view={view} /> : drawn;
+  };
 
   const renderLiveGroup = (group: NormalizedGroup): React.ReactNode[] => {
     const assignment = fit.groups.get(group.id);

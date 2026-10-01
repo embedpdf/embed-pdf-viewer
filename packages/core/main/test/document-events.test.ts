@@ -180,7 +180,9 @@ describe('kernel: document events → page registry', () => {
     const { engine, events } = fakeEngine([page(1, 0), page(2, 1)]);
     const capture = captureDoc();
     const kernel = createKernel({ engine, plugins: [capture.plugin] });
-    const docId = await kernel.documents.open({
+    const {
+      document: { id: docId },
+    } = await kernel.documents.open({
       kind: 'bytes',
       id: 'doc-1',
       bytes: new Uint8Array(),
@@ -209,7 +211,9 @@ describe('kernel: document events → page registry', () => {
       },
     };
     const kernel = createKernel({ engine, plugins: [plugin] });
-    const docId = await kernel.documents.open({
+    const {
+      document: { id: docId },
+    } = await kernel.documents.open({
       kind: 'bytes',
       id: 'doc-1',
       bytes: new Uint8Array(),

@@ -14,6 +14,7 @@ import { createTestContext } from '@embedpdf/core/testing';
 import { createLocalEngine } from '@embedpdf/engine';
 import { LOCALES as SHIPPED, loadDefaultLibrary } from '@embedpdf/default-stamps/library';
 
+import { STAMP_DEFAULTS } from '../src/contract';
 import { createStampController } from '../src/controller';
 import { initialStampState } from '../src/model';
 
@@ -282,10 +283,15 @@ function makeStamp(engine: LocalEngine) {
   const ctx = createTestContext({
     id: 'stamp',
     state: initialStampState(),
+    settings: {
+      defaults: STAMP_DEFAULTS,
+      registered: { assetEngine: engine },
+      whole: ['assetEngine'],
+    },
     engine,
     doc: null,
   });
-  return ctx.connect(createStampController(ctx, { assetEngine: engine }));
+  return ctx.connect(createStampController(ctx));
 }
 
 const libraryPdf = async (locale: string) =>
@@ -341,7 +347,7 @@ describe('@embedpdf/default-stamps', () => {
 
     it(`${locale}: re-imports with no overrides as the manifest described it`, async () => {
       const stamp = makeStamp(engine);
-      const libraryId = await stamp.importLibrary(await libraryPdf(locale));
+      const libraryId = (await stamp.importLibrary(await libraryPdf(locale))).library.id;
       expect(libraryId).toBe(LIBRARY_ID);
       const library = stamp.getLibrary(libraryId)!;
       expect(library.name).toBe(EXPECTED[locale].name);
@@ -373,10 +379,10 @@ describe('@embedpdf/default-stamps', () => {
 
   it('exports what it imported: a second import of the export is identical', async () => {
     const stamp = makeStamp(engine);
-    const id = await stamp.importLibrary(await libraryPdf('nl'));
+    const id = (await stamp.importLibrary(await libraryPdf('nl'))).library.id;
     const exported = await stamp.exportLibrary(id);
     const again = makeStamp(engine);
-    const reimportedId = await again.importLibrary(exported);
+    const reimportedId = (await again.importLibrary(exported)).library.id;
     expect(reimportedId).toBe(id);
     expect(again.getLibrary(reimportedId)!.name).toBe(EXPECTED.nl.name);
     expect(
@@ -386,8 +392,8 @@ describe('@embedpdf/default-stamps', () => {
 
   it('two locales import side by side: one identity, two libraries', async () => {
     const stamp = makeStamp(engine);
-    const en = await stamp.importLibrary(await libraryPdf('en'));
-    const nl = await stamp.importLibrary(await libraryPdf('nl'));
+    const en = (await stamp.importLibrary(await libraryPdf('en'))).library.id;
+    const nl = (await stamp.importLibrary(await libraryPdf('nl'))).library.id;
     expect(en).toBe(LIBRARY_ID);
     expect(nl).not.toBe(en);
     expect(stamp.getLibrary(nl)!.name).toBe(EXPECTED.nl.name);

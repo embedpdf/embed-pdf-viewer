@@ -7,7 +7,7 @@
  * Schema sugar and transforms are re-exported so a consumer needs exactly
  * one import line to go from "pass nothing" to "own the structure".
  */
-export { FullViewer, themeConfigOf } from './viewer';
+export { FullViewer, themeConfigOf, themeTokenProperty } from './viewer';
 export type { FullViewerProps, ThemeConfig, ThemeTokens, ViewerCustomization } from './viewer';
 export type {
   AnnotationFontSpec,
@@ -28,7 +28,7 @@ export { createViewerHandle } from './handle';
 export type { ScopedViewerHandle, ViewerHandle } from './handle';
 export type {
   CapabilityToken,
-  DocInfo,
+  DocumentInfo,
   DocumentsCapability,
   Unsubscribe,
 } from '@embedpdf/react/runtime';
@@ -48,7 +48,7 @@ export type {
 } from '@embedpdf/react/measurement';
 export { RedactionToken } from '@embedpdf/react/redaction';
 // Stamp libraries are workspace state an embedder seeds: `viewer.get(StampToken)
-// .importLibraryPdf(companyStamps)` puts their own stamps in the stamps sidebar.
+// .importLibrary(companyStamps)` puts their own stamps in the stamps sidebar.
 export { StampToken } from '@embedpdf/react/stamp';
 // Signatures: the act (`viewer.get(SignatureToken).sign(…)`) and the
 // signer ports a config names — one import for the whole feature.

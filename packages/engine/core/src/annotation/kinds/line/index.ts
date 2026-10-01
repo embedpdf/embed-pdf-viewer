@@ -6,7 +6,7 @@ import { LineDeclaration } from './declaration';
 
 export { LineDeclaration } from './declaration';
 
-export type LineAnnotationDTO<C extends Coordinates = PageCoordinates> = ReadOf<
+export type LineAnnotation<C extends Coordinates = PageCoordinates> = ReadOf<
   typeof LineDeclaration,
   C
 >;
@@ -23,7 +23,7 @@ export const LineDTOSchema = LineDeclaration.readSchema;
 export const LineDraftSchema = LineDeclaration.createSchema;
 export const LinePatchSchema = LineDeclaration.updateSchema;
 
-export const LineKind: AnnotationKindModule<'line', LineAnnotationDTO, LineDraft, LinePatch> = {
+export const LineKind: AnnotationKindModule<'line', LineAnnotation, LineDraft, LinePatch> = {
   subtype: 'line',
   pdfSubtypeCode: PdfAnnotationSubtypeCode.LINE,
   dtoSchema: LineDTOSchema,

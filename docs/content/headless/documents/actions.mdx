@@ -53,6 +53,8 @@ actionsPlugin({
 });
 ```
 
+<Example name="actions/javascript" />
+
 ## How websites open, printing and alerts
 
 `useActionsUiAdapter()` installs the browser's defaults: a website opens in a new tab after a safety
@@ -60,6 +62,8 @@ check, printing opens the print dialog, and a script's alert shows the browser's
 of them with your own UI:
 
 <Snippet name="documents/actions-ui" />
+
+<Example name="actions/website-links" />
 
 | Handler   | Called when                                               |
 | :-------- | :-------------------------------------------------------- |
@@ -95,6 +99,8 @@ The rules can change while the app runs, for example when the user trusts a docu
 actions.updateSettings({ policy: { javascript: { lifecycle: 'allow' } } });
 ```
 
+<Example name="actions/rules" />
+
 ## Run an action from code
 
 ```ts
@@ -103,6 +109,8 @@ await actions.executeNamed('NextPage');
 
 `executeNamed` runs a viewer action by its name: `'NextPage'`, `'PrevPage'`, `'FirstPage'`,
 `'LastPage'` or `'Print'`. It follows the same rules as a click.
+
+<Example name="actions/run-from-code" />
 
 ## Methods
 
@@ -137,11 +145,11 @@ Set them when you register the plugin, and change them while the app runs with
 
 | Setting               | What it does                                                   | Default           |
 | :-------------------- | :------------------------------------------------------------- | :---------------- |
-| `javascript.enabled`  | Run the document's JavaScript                                  | `false`           |
+| `javascript.enabled`  | Run the document's JavaScript. A change applies to documents opened after it, since a document's script engine starts when it opens | `false` |
 | `javascript.identity` | Who scripts think the user is, on top of the document's user   | the document's user |
 | `policy`              | The rules above, per kind of action and per origin             | as in the table   |
 | `triggers`            | Run actions of the `document`, its `page`s, or `annotation`s   | all `true`        |
-| `openSequence`        | When the document's opening actions run: `'auto'`, `'off'`     | `'auto'`          |
+| `openSequence`        | When the document's opening actions run: `'auto'`, `'headless'` (as the document opens, for an app without a Stage), `'off'`. A change applies to documents whose opening actions haven't run yet | `'auto'` |
 
 ## Events
 

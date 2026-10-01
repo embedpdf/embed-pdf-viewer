@@ -10,12 +10,13 @@ The plugin owns the act and nothing else:
 - marks are the stamp plugin's (`@embedpdf/plugin-stamp`) — one library of kind
   `signatures` per person, holding a `signature` asset and optional `initials`;
 - the key is a `SignerPort` from `@embedpdf/core-signature` (`webCryptoSigner`,
-  `remoteSigner`, `personalSigner`), resolved per signing;
+  `remoteSigner`, `personalSigner`), the `key` setting, resolved per signing;
 - the engine draws the mark's page into the field and seals the bytes
   (`doc.signatures.prepare` → CMS → `complete`); on the cloud the server
   publishes the new version.
 
 ```ts
+import { toFieldRef } from '@embedpdf/plugin-form';
 import {
   signaturePlugin,
   SignatureToken,
@@ -24,14 +25,14 @@ import {
 } from '@embedpdf/plugin-signature';
 
 signaturePlugin({
-  signer: () => personalSigner({ subject: 'Ada Lovelace', store: indexedDbKeyStore('keys') }),
+  key: () => personalSigner({ subject: 'Ada Lovelace', store: indexedDbKeyStore('keys') }),
   trust: { anchors: async () => [rootCertificateDer] },
-  mode: 'sign', // 'sign' (default with a signer) | 'visual' (default without) | 'ask'
+  mode: 'sign', // 'sign' (the default with a key) | 'visual' (the default without) | 'ask'
 });
 
 const signature = ctx.get(SignatureToken);
-await signature.placeMark({ assetId }, { field: { kind: 'fqn', name: 'sig' } }); // sign / fill / ask, by mode
-await signature.placeMark({ assetId }, { page, at: { x: 120, y: 90 } }); // elsewhere: a stamp
+await signature.placeMark({ assetId }, { field: toFieldRef('approval') }); // sign / fill / ask, by mode
+await signature.placeMark({ assetId }, { page, center: { x: 120, y: 90 } }); // elsewhere: a stamp
 ```
 
 With the interaction hub and the stamp plugin present, a mark armed from a

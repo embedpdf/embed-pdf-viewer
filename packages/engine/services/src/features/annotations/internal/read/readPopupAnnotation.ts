@@ -1,6 +1,6 @@
 import type {
   AnnotationBase,
-  PopupAnnotationDTO,
+  PopupAnnotation,
   PdfCoordinates,
 } from '@embedpdf/engine-core/runtime';
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
@@ -14,7 +14,7 @@ export function readPopup(
   mem: PdfRuntimeMemory,
   annotPtr: Ptr,
   base: AnnotationBase<PdfCoordinates>,
-): PopupAnnotationDTO<PdfCoordinates> {
+): PopupAnnotation<PdfCoordinates> {
   return {
     ...base,
     subtype: 'popup',

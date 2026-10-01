@@ -7,6 +7,7 @@
 import type { Camera, Size } from '@embedpdf/core-stage';
 
 import type { StageConfig, StageSettings } from './contract';
+import { mergeSettings } from './responsive';
 import { DEFAULT_SETTINGS } from './settings';
 
 export interface StageState extends StageSettings {
@@ -70,8 +71,7 @@ export const initialStageState = (config: StageConfig): StageState => {
     cursor: 0,
     motionCause: 'user',
     activeRules: [],
-    ...DEFAULT_SETTINGS,
-    ...overrides,
+    ...mergeSettings(DEFAULT_SETTINGS, overrides),
   };
 };
 

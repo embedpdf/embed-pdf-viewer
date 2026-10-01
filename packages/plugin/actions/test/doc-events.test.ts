@@ -1,6 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { createTestContext } from '@embedpdf/core/testing';
 import type {
   DocumentActionsSnapshot,
   DocumentHandle,
@@ -10,7 +9,12 @@ import type {
 } from '@embedpdf/engine-core/runtime';
 
 import { createActionsController } from '../src/controller';
-import type { ActionContext, ActionDiagnostic, ActionsConfig } from '../src/host-contract';
+import type {
+  ActionContext,
+  ActionDiagnosticReportedEvent,
+  ActionsConfig,
+} from '../src/host-contract';
+import { createActionsTestContext } from './helpers/context';
 
 const USER: ActionContext = {
   origin: 'user',
@@ -89,34 +93,36 @@ function docHarness(options: {
     openDestination: null,
     ...(options.trees ?? {}),
   };
-  const ctx = createTestContext<void>({
-    id: 'actions',
-    doc: {
-      actions: {
-        get: () => {
-          readCalls += 1;
-          if (options.readFailsFirst && readCalls === 1) {
-            return Promise.reject(new Error('transient read failure'));
-          }
-          return Promise.resolve(snapshot);
+  const config: ActionsConfig = { openSequence: 'off', ...options.config };
+  const ctx = createActionsTestContext(
+    {
+      id: 'actions',
+      doc: {
+        actions: {
+          get: () => {
+            readCalls += 1;
+            if (options.readFailsFirst && readCalls === 1) {
+              return Promise.reject(new Error('transient read failure'));
+            }
+            return Promise.resolve(snapshot);
+          },
         },
-      },
-      forms: {
-        list: async () => ({ fields: [] }),
-        ...(options.formsSubmit ? { submit: options.formsSubmit } : {}),
-      },
-    } as unknown as Partial<DocumentHandle>,
-  });
-  const capability = ctx.connect(
-    createActionsController(ctx, { openSequence: 'off', ...options.config }),
+        forms: {
+          list: async () => ({ fields: [] }),
+          ...(options.formsSubmit ? { submit: options.formsSubmit } : {}),
+        },
+      } as unknown as Partial<DocumentHandle>,
+    },
+    config,
   );
+  const capability = ctx.connect(createActionsController(ctx, config));
   const log: string[] = [];
   capability.registerExecutor('javascript', (node) => {
     if (node.type === 'javascript') log.push(node.script);
     return { status: 'executed' };
   });
-  const diagnostics: ActionDiagnostic[] = [];
-  capability.onDiagnostic((diagnostic) => diagnostics.push(diagnostic));
+  const diagnostics: ActionDiagnosticReportedEvent[] = [];
+  capability.onDiagnosticReported((diagnostic) => diagnostics.push(diagnostic));
   return { capability, log, diagnostics, readCallCount: () => readCalls };
 }
 
@@ -399,11 +405,11 @@ describe('the submit sink chain', () => {
     // retroactively rewrite the node.
     expect(result.nodes[0]?.status).toBe('executed');
     await tick();
-    expect(
-      detached.diagnostics.some(
-        (diagnostic) =>
-          diagnostic.code === 'executor-failed' && diagnostic.message.includes('detached'),
-      ),
-    ).toBe(true);
+    // Reported after the run's result: only the event tells, with the action and its source.
+    expect(detached.diagnostics).toContainEqual({
+      code: 'executor-failed',
+      action: 'submit-form',
+      source: USER.source,
+    });
   });
 });

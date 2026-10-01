@@ -16,6 +16,7 @@ const rect = computed(() => props.page.transform.pageToViewRect(props.box));
 </script>
 
 <template>
+  <component :is="native" />
   <div
     :style="{
       position: 'absolute',
@@ -25,7 +26,6 @@ const rect = computed(() => props.page.transform.pageToViewRect(props.box));
       height: `${rect.height}px`,
     }"
   >
-    <component :is="native" />
     <StatusDot :status="approval.status" />
     <button v-if="interactive" @click="approval.open">Details</button>
   </div>

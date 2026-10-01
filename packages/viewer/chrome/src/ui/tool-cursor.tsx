@@ -27,8 +27,8 @@
  * Chromium may briefly show the default arrow when a >32px cursor would
  * overlap browser UI (anti-spoofing), which is fine mid-viewport.
  */
-import { useToolCursor, useTool } from '@embedpdf/react/interaction';
-import { useAnnotation, useToolDefaults } from '@embedpdf/react/annotation';
+import { useInteractionState, useToolCursor } from '@embedpdf/react/interaction';
+import { useAnnotation, useAnnotationDefaults } from '@embedpdf/react/annotation';
 import { TOOL_ICONS } from '../config/commands';
 import { ICON_PATHS } from './icons';
 import type { IconAccent, PathSpec } from './icons';
@@ -126,11 +126,12 @@ const GLYPHS: Record<string, Glyph> = {
 /** Mount once (renders nothing): keeps the armed tool's cursor skin in sync
  *  with its toolbar icon + live defaults. */
 export function ArmedToolCursor() {
-  const { activeToolId } = useTool();
-  // Live accent: an `updateToolDefaults` recolor re-renders us and rebuilds the cursor.
-  const defaults = useToolDefaults(activeToolId);
+  // Without a document there is no active tool; the pointer has no cursor image.
+  const activeToolId = useInteractionState((state) => state.activeToolId) ?? 'pointer';
+  // Live accent: a `tools.updateDefaults` recolor re-renders us and rebuilds the cursor.
+  const defaults = useAnnotationDefaults(activeToolId);
   // What a click places follows the pointer: the cursor carries no icon.
-  const ghostFollows = Boolean(useAnnotation().getTool(activeToolId)?.ghost);
+  const ghostFollows = Boolean(useAnnotation().tools.get(activeToolId)?.ghost);
   const entry = ghostFollows ? undefined : TOOL_ICONS[activeToolId];
   const colorOf = (key: string) => (defaults[key] as string | null | undefined) ?? undefined;
   const accent = entry?.accent

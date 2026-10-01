@@ -295,6 +295,29 @@ describe('search session', () => {
     await kernel.destroy();
   });
 
+  it('goToHit takes the hit itself, as a click on the page hands it over', async () => {
+    const stage = fakeStage();
+    const { kernel, api } = await boot([slice([match(5, 0), match(5, 9), match(7, 2)], null, 2)], {
+      plugins: [stage.plugin],
+    });
+    await api.search({ text: 'x' });
+    const [, second, third] = api.listHits();
+
+    expect(api.goToHit(third)).toBe(third);
+    expect(api.getActiveHitIndex()).toBe(2);
+    expect(stage.reveals).toHaveLength(1);
+    // A hit kept from before the search ran again is found by what it covers.
+    expect(api.goToHit({ ...second })).toBe(second);
+    expect(api.getActiveHitIndex()).toBe(1);
+
+    // A hit that isn't among them changes nothing.
+    expect(api.goToHit({ ...second, start: 40 })).toBeNull();
+    expect(api.goToHit({ ...second, page: toPageRef(9) })).toBeNull();
+    expect(api.getActiveHitIndex()).toBe(1);
+    expect(stage.reveals).toHaveLength(2);
+    await kernel.destroy();
+  });
+
   it('findAll never touches the session and rejects operation-cancelled on abort', async () => {
     const { kernel, api, held } = await boot([slice([match(5, 0)], null, 2), 'hold']);
     const hits = await api.findAll({ text: 'x' });

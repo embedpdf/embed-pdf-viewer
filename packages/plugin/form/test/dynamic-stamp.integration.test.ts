@@ -31,6 +31,7 @@ describe('plugin-form dynamic-stamp acceptance', () => {
       pageCount: pages.pageCount,
       pages: pages.pages,
       revision: 0,
+      hasUnsavedChanges: false,
       renderPolicy: { kind: 'continuous' },
     });
     const realm = standaloneRealm(doc, document, {

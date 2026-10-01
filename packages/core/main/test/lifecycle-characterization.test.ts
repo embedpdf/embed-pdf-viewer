@@ -154,7 +154,7 @@ describe('characterization: what plugin code observes', () => {
       token: counterToken,
     };
     const kernel = createKernel({ engine: instantEngine(), plugins: [plugin] });
-    const id = await kernel.documents.open(bytesInput('a'));
+    const { id } = (await kernel.documents.open(bytesInput('a'))).document;
 
     kernel.capability<{ inc: () => void }>(counterToken as never, id).inc();
     expect(seen).toEqual([1]);

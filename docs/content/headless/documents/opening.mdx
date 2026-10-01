@@ -30,7 +30,9 @@ The viewer is on screen at once; the document opens in the background. Component
 <Snippet name="documents/open-button" />
 
 `open()` resolves with `{ document }` once it's open, and the new document becomes the active one.
-Pass `{ activate: false }` to open it in the background.
+Pass `{ activate: false }` to open it in the background. Pick a PDF of your own here:
+
+<Example name="documents/open" />
 
 <Fw only="angular">
 
@@ -144,7 +146,10 @@ A password-protected PDF opens **locked**. Ask for the password and unlock it:
 
 <Snippet name="documents/password-form" />
 
-After an error, such as a network failure, `documents.retry(id)` tries again.
+After an error, such as a network failure, `documents.retry(id)` tries again. Here the second
+document isn't a PDF, so it shows its error:
+
+<Example name="documents/states" />
 
 To show the state yourself, for example on a tab, `useDocument()` gives you the document's
 `status`: `'loading'`, `'locked'`, `'ready'` or `'error'`. Every field is listed under
@@ -162,6 +167,8 @@ Tell the viewer who the user is and what they may do, once. Every document it op
   make.
 - **`scope`** is what they may do, as a list of permissions. Leave it out and they may do
   everything; the engine reminds you once in the console.
+
+<Example name="documents/identity" />
 
 <Fw only={['react', 'vue', 'svelte']}>Change them on the viewer, and the documents you open after
 that use the new values; documents already open keep theirs.</Fw><Fw only="angular">Change them
@@ -208,7 +215,7 @@ the active document are on [Several documents](tabs#methods), downloading and pr
 | `unlock(id, { password })` | Unlocks a locked document. Rejects on a wrong password, and the document stays locked so you can ask again. [Loading, errors and passwords](#loading-errors-and-passwords) |
 | `retry(id)`                | Tries a failed document again, with the same source and options. Resolves like `open()`.                                                                                     |
 | `close(id)`, `closeAll()`  | Closes one document, or every document, and frees its memory. [Close a document](#close-a-document)                                                                        |
-| `get(id)`                  | A document's fields, the ones [`useDocument()`](#state) gives you, or `null` when it isn't open                                                                             |
+| `get(id?)`                 | A document's fields, the ones [`useDocument()`](#state) gives you, or `null` when it isn't open. Without an `id`, the document in scope |
 | `listPages(id?)`           | The document's pages, in order. In a component, use [`usePageList()`](../viewing/page-view#pick-the-page).                                                                  |
 | `getPage(page, id?)`       | One page, by its `ref` or its index, or `null` when the document doesn't have it                                                                                           |
 | `getPageIndex(ref, id?)`   | A page's position, from 0, or `-1` when the document doesn't have it                                                                                                       |
@@ -224,7 +231,8 @@ document: that cancels its download too.
 
 `useDocument()` gives you the document a component talks to: the active one, or the one its
 `<DocumentScope>` names.<Fw only="react"> Your component re-renders when a value changes.</Fw><Fw only="vue"> Its fields are refs: your template updates when one changes.</Fw><Fw only="svelte"> It's one reactive object: read its fields, and your markup updates when they change.</Fw><Fw only="angular"> Each field is a signal: read it in a template or a `computed()`, and your view updates when it changes.</Fw> Outside a component,
-`get(id)` gives the same fields.
+`get(id)` gives the same fields. With no document open yet, it reads as one still on its way: an
+empty `id` and `status: 'loading'`, so a component that shows it never has to check for `null`.
 
 | Field               | What it is                                                                                                   |
 | :------------------ | :----------------------------------------------------------------------------------------------------------- |

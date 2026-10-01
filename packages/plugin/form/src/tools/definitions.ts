@@ -9,7 +9,7 @@
  * "One tool system, two commit planes": the tools live in the annotation
  * registry when that plugin is present (defaults, style panel, click-create —
  * the shared authoring infrastructure), but the commit always goes
- * through `doc.forms.createField` via the form place handler. The tags make
+ * through `form.create()` from the form place handler. The tags make
  * that structural: these tools enable `form-place`, never `annotation-draw`,
  * so the annotation draw handler can't wake up for them.
  */
@@ -21,7 +21,7 @@ export type AuthorableFormFamily = Exclude<FormFieldFamily, 'pushbutton' | 'unkn
 
 export interface FormToolDef {
   id: string;
-  /** The field family `placeField` commits (the form plane's vocabulary). */
+  /** The field family the tool places (the form plane's vocabulary). */
   family: AuthorableFormFamily;
   /** The client kind the annotation registry routes on (props panel).
    *  Not a PDF subtype — every widget is PDF `widget`; this is the view. */

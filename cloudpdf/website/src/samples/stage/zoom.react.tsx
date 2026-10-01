@@ -1,6 +1,6 @@
 import { Viewer, DocumentGate } from '@embedpdf/react/runtime';
 import type { OpenInput } from '@embedpdf/react/runtime';
-import { Stage, stagePlugin, useZoom } from '@embedpdf/react/stage';
+import { Stage, stagePlugin, useStage, useStageState } from '@embedpdf/react/stage';
 import { RenderLayer, renderPlugin } from '@embedpdf/react/render';
 import { cloudEngine } from '@cloudpdf/engine';
 
@@ -12,24 +12,43 @@ const plugins = [stagePlugin(), renderPlugin()];
 const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
 function ZoomToolbar() {
-  const { zoom, mode, zoomIn, zoomOut, fitPage, fitWidth, automatic } = useZoom();
+  const stage = useStage();
+  const { zoomLevel, zoomMode } = useStageState();
+
   return (
     <div className="toolbar">
-      <button type="button" className="button" aria-label="Zoom out" onClick={() => zoomOut()}>
+      <button
+        type="button"
+        className="button"
+        aria-label="Zoom out"
+        onClick={() => stage.zoomOut()}
+      >
         −
       </button>
-      <output className="readout">{Math.round(zoom * 100)}%</output>
-      <button type="button" className="button" aria-label="Zoom in" onClick={() => zoomIn()}>
+      <output className="readout">{Math.round(zoomLevel * 100)}%</output>
+      <button type="button" className="button" aria-label="Zoom in" onClick={() => stage.zoomIn()}>
         +
       </button>
       <div className="segmented" role="group" aria-label="Fit">
-        <button type="button" aria-pressed={mode === 'automatic'} onClick={() => automatic()}>
+        <button
+          type="button"
+          aria-pressed={zoomMode === 'automatic'}
+          onClick={() => stage.fitAutomatic()}
+        >
           Automatic
         </button>
-        <button type="button" aria-pressed={mode === 'fit-page'} onClick={() => fitPage()}>
+        <button
+          type="button"
+          aria-pressed={zoomMode === 'fit-page'}
+          onClick={() => stage.fitPage()}
+        >
           Fit page
         </button>
-        <button type="button" aria-pressed={mode === 'fit-width'} onClick={() => fitWidth()}>
+        <button
+          type="button"
+          aria-pressed={zoomMode === 'fit-width'}
+          onClick={() => stage.fitWidth()}
+        >
           Fit width
         </button>
       </div>

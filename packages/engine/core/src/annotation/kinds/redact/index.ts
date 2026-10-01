@@ -6,7 +6,7 @@ import { RedactDeclaration } from './declaration';
 
 export { RedactDeclaration } from './declaration';
 
-export type RedactAnnotationDTO<C extends Coordinates = PageCoordinates> = ReadOf<
+export type RedactAnnotation<C extends Coordinates = PageCoordinates> = ReadOf<
   typeof RedactDeclaration,
   C
 >;
@@ -25,7 +25,7 @@ export const RedactPatchSchema = RedactDeclaration.updateSchema;
 
 export const RedactKind: AnnotationKindModule<
   'redact',
-  RedactAnnotationDTO,
+  RedactAnnotation,
   RedactDraft,
   RedactPatch
 > = {

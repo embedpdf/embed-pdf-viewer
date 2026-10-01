@@ -35,7 +35,11 @@ export function createPointer(
     authority,
     tools,
     behaviors,
-  }: Pick<AnnotationServices, 'store' | 'geometry' | 'authority' | 'tools' | 'behaviors'>,
+    afterCreate,
+  }: Pick<
+    AnnotationServices,
+    'store' | 'geometry' | 'authority' | 'tools' | 'behaviors' | 'afterCreate'
+  >,
   chrome: Pick<ChromeReads, 'chromeGeomAt' | 'grabBoost' | 'hitAt'>,
   measurement: Pick<Measurement, 'viewportsOf'>,
 ) {
@@ -68,6 +72,8 @@ export function createPointer(
           // Touch grabs with the same widened zones the claim used, so the
           // gesture picks up exactly what claimsTouchAt said it would.
           chrome: chrome.chromeGeomAt(scale, chrome.grabBoost(touch)),
+          // Screen-pixel settings (the alignment threshold) convert by it.
+          ...(scale ? { scale } : {}),
           inert: behaviors.engagedIdsOn(page.objectNumber),
           // the view env (screen-anchored bodies hit/clamp at their footprint)
           ...(zoom != null ? { zoom } : {}),
@@ -111,7 +117,7 @@ export function createPointer(
       // draft, no doomed 403. The engine enforces; this keeps pixels honest.
       const resolvedTool = tools.get(tool);
       if (
-        resolvedTool?.meta?.capture === true
+        resolvedTool?.capture === true
           ? !ctx.doc?.security.allows('doc.annotate.modify')
           : !authority.canCreate()
       )
@@ -184,28 +190,32 @@ export function createPointer(
         )
       )
         return;
-      store.commit({
-        type: 'createPointer',
-        measure,
-        capture: resolvedTool?.meta?.capture === true ? tool : undefined,
-        phase,
-        subtype: resolvedTool?.subtype ?? (tool as KindName),
-        preset: resolvedTool?.preset ?? tool,
-        intent: intent === 'ink-highlight' ? intent : undefined,
-        clickCreate: resolvedTool?.clickCreate,
-        flags: resolvedTool?.flags,
-        deferInkCommit: (resolvedTool?.ink?.groupStrokesMs ?? 0) > 0,
-        straightenInk: resolvedTool?.ink?.straighten,
-        in: {
-          page,
-          point,
-          shift: false,
-          finish,
-          pageBox: geometry.pageBoxOf(pageObjectNumber),
-          displayRotation,
-          upright: resolvedTool?.upright,
+      const committed = store.commit(
+        {
+          type: 'createPointer',
+          measure,
+          capture: resolvedTool?.capture === true ? tool : undefined,
+          phase,
+          subtype: resolvedTool?.subtype ?? (tool as KindName),
+          preset: resolvedTool?.preset ?? tool,
+          intent: intent === 'ink-highlight' ? intent : undefined,
+          clickCreate: resolvedTool?.clickCreate,
+          flags: resolvedTool?.flags,
+          deferInkCommit: (resolvedTool?.ink?.groupStrokesMs ?? 0) > 0,
+          straightenInk: resolvedTool?.ink?.straighten,
+          in: {
+            page,
+            point,
+            shift: false,
+            finish,
+            pageBox: geometry.pageBoxOf(pageObjectNumber),
+            displayRotation,
+            upright: resolvedTool?.upright,
+          },
         },
-      });
+        afterCreate.shape(resolvedTool?.id),
+      );
+      afterCreate.done(resolvedTool?.id, committed);
     },
     hoverAt: (
       at: { page: PageRef; point: Point; scale?: number; rotation?: number; zoom?: number } | null,

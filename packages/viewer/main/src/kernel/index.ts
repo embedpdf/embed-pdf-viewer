@@ -81,7 +81,7 @@ export type {
 } from '@embedpdf/viewer-chrome';
 export type {
   CapabilityToken,
-  DocInfo,
+  DocumentInfo,
   DocumentsCapability,
   ResolvedCommand,
   ScopedViewerHandle,

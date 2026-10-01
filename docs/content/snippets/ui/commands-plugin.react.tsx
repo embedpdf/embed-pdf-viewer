@@ -1,4 +1,7 @@
+import { AnnotationToken } from '@embedpdf/react/annotation';
 import { commandsPlugin, standardCommands } from '@embedpdf/react/commands';
+import { DocumentsToken } from '@embedpdf/react/runtime';
+import { approveDocument } from './review';
 
 export const plugins = [
   /* … */

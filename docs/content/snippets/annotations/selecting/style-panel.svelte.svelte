@@ -11,6 +11,6 @@
     {property}
     value={panel.current.values[property.key]}
     mixed={panel.current.mixed.includes(property.key)}
-    onchange={(value) => annotation.selection.update({ [property.key]: value })}
+    onchange={(value: unknown) => annotation.selection.update({ [property.key]: value })}
   />
 {/each}

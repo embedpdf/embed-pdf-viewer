@@ -6,7 +6,7 @@ import { PolygonDeclaration } from './declaration';
 
 export { PolygonDeclaration } from './declaration';
 
-export type PolygonAnnotationDTO<C extends Coordinates = PageCoordinates> = ReadOf<
+export type PolygonAnnotation<C extends Coordinates = PageCoordinates> = ReadOf<
   typeof PolygonDeclaration,
   C
 >;
@@ -25,7 +25,7 @@ export const PolygonPatchSchema = PolygonDeclaration.updateSchema;
 
 export const PolygonKind: AnnotationKindModule<
   'polygon',
-  PolygonAnnotationDTO,
+  PolygonAnnotation,
   PolygonDraft,
   PolygonPatch
 > = {

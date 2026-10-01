@@ -20,7 +20,7 @@
  */
 import {
   NO_ANNOTATION_FLAGS,
-  type AnnotationDTO,
+  type Annotation,
   type AnnotationFlags,
 } from '@embedpdf/engine-core/runtime';
 import { kindOf } from './record/identity';
@@ -62,7 +62,7 @@ export const interactive = (flags: AnnotationFlags): boolean =>
 /** The part of a ModelAnnotation these predicates read. */
 export interface FlagBearer {
   /** The record's annotation: its kind and `/F` flags are read off it. */
-  annotation: AnnotationDTO;
+  annotation: Annotation;
   /** Session authority projected at ingest (permissions.md). Absent =
    *  unstamped (drafts, wildcard local engines, tests) = allowed. */
   authority?: { update: boolean; delete: boolean };

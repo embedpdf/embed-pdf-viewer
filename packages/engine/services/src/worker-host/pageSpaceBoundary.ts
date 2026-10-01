@@ -18,7 +18,7 @@ import {
   pageSignatureCompleteOf,
   pageSignatureSnapshotOf,
   pdfRenderTargetOf,
-  type AnnotationDTO,
+  type Annotation,
   type PageRef,
   type PageRenderOptions,
   type PdfCoordinates,
@@ -45,7 +45,7 @@ export function resultInPageSpace(
   boxOf: VisibleBoxOf,
 ): WorkerResultPayload {
   const toPage = (destination: PdfDestination) => pageDestinationOf(destination, boxOf);
-  const annotation = (read: AnnotationDTO<PdfCoordinates>) =>
+  const annotation = (read: Annotation<PdfCoordinates>) =>
     pageAnnotationOf(read, boxOf(read.page), boxOf);
   switch (payload.tag) {
     case 'pages.list':

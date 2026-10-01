@@ -3,28 +3,26 @@
  * sources (a SubmitForm node, a script `doc.submitForm()`) land in
  * `performSubmit` after policy. Never a network call from this plugin.
  */
-import type { PluginContext } from '@embedpdf/core';
-
 import type {
   ActionContext,
   ActionDiagnostic,
   ActionNodeStatus,
-  ActionsConfig,
+  ActionsScriptEnvironment,
   ActionSubmitRequest,
   SubmitIntent,
 } from '../contract';
-import type { ActionsServices } from '../services';
+import type { ActionsContext, ActionsServices } from '../services';
 import { toFormSubmissionRequest } from './intent';
 
 export function createSubmit(
-  ctx: PluginContext<void>,
+  ctx: ActionsContext,
   services: Pick<ActionsServices, 'policy' | 'ports' | 'events'>,
-  config: ActionsConfig,
+  environment: ActionsScriptEnvironment,
 ) {
   const policy = services.policy;
   const ports = services.ports.slots;
-  const { diagnosticHook } = services.events;
-  const nowMs = (): number => config.javascript?.now?.() ?? Date.now();
+  const { reportDiagnostic } = services.events;
+  const nowMs = (): number => environment.now?.() ?? Date.now();
 
   /**
    * The one submit door. Sink order: the embedder handler (explicit beats
@@ -39,10 +37,13 @@ export function createSubmit(
   ): Promise<{ status: ActionNodeStatus; detail?: string }> => {
     const decision = policy.current()['submit-form'][actionContext.origin];
     if (decision !== 'adapter' && decision !== 'allow') {
-      diagnose({
-        code: 'blocked',
-        message: `submit-form: policy '${decision}' for origin '${actionContext.origin}'`,
-      });
+      // `block` refuses quietly; `report` says so.
+      if (decision === 'report') {
+        diagnose({
+          code: 'blocked',
+          message: `submit-form: policy 'report' for origin '${actionContext.origin}'`,
+        });
+      }
       return { status: 'blocked' };
     }
     if (!ports.submitResolver) {
@@ -76,12 +77,15 @@ export function createSubmit(
           // embedder"; a later rejection is a diagnostic, never a rewrite of
           // the node result.
           void (outcome as Promise<void>).catch((error: unknown) => {
-            diagnosticHook.emit({
-              code: 'executor-failed',
-              message: `submit handler rejected (detached): ${
-                error instanceof Error ? error.message : String(error)
-              }`,
-            });
+            reportDiagnostic(
+              {
+                code: 'executor-failed',
+                message: `submit handler rejected (detached): ${
+                  error instanceof Error ? error.message : String(error)
+                }`,
+              },
+              { action: 'submit-form', source: actionContext.source },
+            );
           });
         }
         return { status: 'executed' };

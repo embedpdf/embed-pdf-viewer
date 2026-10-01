@@ -6,9 +6,10 @@
  * field's facts and `onSigned` come from the confirmed events the engine
  * publishes for each step (`sync/signatures.ts`), for every session alike.
  */
-import { PluginError } from '@embedpdf/core';
+import { PluginError, type OperationOptions } from '@embedpdf/core';
 import { certificateCommonName, sign as signDocument } from '@embedpdf/core-signature';
 import type {
+  DocumentHandle,
   FormFieldRef,
   SignatureCompleteResult,
   SignaturePrepared,
@@ -34,6 +35,38 @@ export function createSigning(
   /** Two-phase signings this session prepared: the version each one must complete against. */
   const prepared = new Map<string, SignaturePrepared>();
 
+  const cancelled = (signal: AbortSignal): PluginError =>
+    new PluginError('operation-cancelled', 'signature', 'signing cancelled', {
+      cause: signal.reason,
+    });
+
+  /**
+   * The document as one-shot signing sees it, with the caller's signal checked
+   * right before the seal: a signal that fired by then leaves nothing signed
+   * (the signing gives the prepared candidate up), and after it the seal is
+   * done.
+   */
+  const sealUnlessCancelled = (signal: AbortSignal | undefined): DocumentHandle => {
+    const signatures = requireSignatures();
+    if (!signal) return ctx.doc;
+    return {
+      signatures: {
+        prepare: (input: Parameters<typeof signatures.prepare>[0]) => signatures.prepare(input),
+        cancel: (signingId: string) => signatures.cancel(signingId),
+        complete: (input: Parameters<typeof signatures.complete>[0]) => {
+          if (signal.aborted) return Promise.reject(cancelled(signal));
+          return signatures.complete(input);
+        },
+      },
+    } as unknown as DocumentHandle;
+  };
+
+  /** Refused before anything starts: `doc.sign`, and `doc.sign.certify` for a certification. */
+  const assertMaySign = (input: { certify?: unknown }, operation: string): void => {
+    ctx.assertAllowed('doc.sign', operation);
+    if (input.certify) ctx.assertAllowed('doc.sign.certify', operation);
+  };
+
   const appearanceOf = async (input: {
     mark?: SignFieldInput['mark'];
     appearance?: SignFieldInput['appearance'];
@@ -43,9 +76,14 @@ export function createSigning(
     return null;
   };
 
-  const sign = (input: SignFieldInput): Promise<SignatureCompleteResult> =>
-    withBusy(async () => {
-      requireSignatures();
+  const sign = async (
+    input: SignFieldInput,
+    options?: OperationOptions,
+  ): Promise<SignatureCompleteResult> => {
+    assertMaySign(input, 'signature.sign');
+    if (options?.signal?.aborted) throw cancelled(options.signal);
+    return withBusy(async () => {
+      const doc = sealUnlessCancelled(options?.signal);
       const key = await resolveKey(input.key);
       // The certificate's subject is the default /Name; the caller's facts win.
       const subject =
@@ -55,7 +93,7 @@ export function createSigning(
       const signer = { ...(subject ? { name: subject } : {}), ...input.signer };
       // The appearance is the mark: its page is drawn into the widget by the engine.
       const appearance = (await appearanceOf(input))!;
-      const result = await signDocument(ctx.doc, {
+      const result = await signDocument(doc, {
         field: input.field,
         key,
         signer,
@@ -66,12 +104,17 @@ export function createSigning(
       target.clearIfTarget(input.field);
       return result;
     });
+  };
 
-  const prepareSignature = (input: PrepareSignatureInput): Promise<SignaturePrepared> =>
-    withBusy(async () => {
+  const prepareSignature = async (
+    input: PrepareSignatureInput,
+    options?: OperationOptions,
+  ): Promise<SignaturePrepared> => {
+    assertMaySign(input, 'signature.prepareSignature');
+    return withBusy(async () => {
       const signatures = requireSignatures();
       const appearance = await appearanceOf(input);
-      const result = await signatures.prepare({
+      const pending = signatures.prepare({
         field: input.field,
         signer: input.signer,
         certify: input.certify,
@@ -80,15 +123,20 @@ export function createSigning(
         digest: input.digest,
         ...(appearance ? { appearance: { pdf: appearance } } : {}),
       });
+      const result = await ctx.cancellable(options?.signal, pending);
       prepared.set(result.signingId, result);
       return result;
     });
+  };
 
-  const completeSignature = (
+  const completeSignature = async (
     signingId: string,
     cms: Uint8Array,
-  ): Promise<SignatureCompleteResult> =>
-    withBusy(async () => {
+    options?: OperationOptions,
+  ): Promise<SignatureCompleteResult> => {
+    ctx.assertAllowed('doc.sign', 'signature.completeSignature');
+    if (options?.signal?.aborted) throw cancelled(options.signal);
+    return withBusy(async () => {
       const signatures = requireSignatures();
       const parked = prepared.get(signingId);
       if (!parked) {
@@ -107,11 +155,16 @@ export function createSigning(
       target.clearIfTarget(result.signature.field);
       return result;
     });
+  };
 
-  const cancelPending = async (): Promise<void> => {
+  const cancelPending = async (options?: OperationOptions): Promise<void> => {
+    ctx.assertAllowed('doc.sign', 'signature.cancelPending');
     const pending = reads.getPending();
     if (!pending) return;
-    const { status } = await requireSignatures().cancel(pending.signingId);
+    const { status } = await ctx.cancellable(
+      options?.signal,
+      requireSignatures().cancel(pending.signingId),
+    );
     prepared.delete(pending.signingId);
     // A cancel or a completion clears the signing through its event; an
     // unknown signing has none.

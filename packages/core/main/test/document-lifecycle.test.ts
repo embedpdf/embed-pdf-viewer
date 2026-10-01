@@ -177,7 +177,7 @@ describe('kernel: request-time tab slots', () => {
 
     const handle = makeHandle('a');
     resolve('a', handle);
-    await expect(open).rejects.toThrow(/closed while opening/);
+    await expect(open).rejects.toMatchObject({ code: 'operation-cancelled' });
     expect(handle.close).toHaveBeenCalled();
     expect(kernel.documents.list()).toEqual([]);
   });
@@ -220,8 +220,8 @@ describe('kernel: request-time tab slots', () => {
     fetchNow();
     await settle();
     resolve('real-id');
-    const id = await open;
-    expect(id).toBe('real-id');
+    const { document } = await open;
+    expect(document).toMatchObject({ id: 'real-id', status: 'ready' });
     expect(
       kernel.documents.list().map((documentInfo) => [documentInfo.id, documentInfo.status]),
     ).toEqual([['real-id', 'ready']]);

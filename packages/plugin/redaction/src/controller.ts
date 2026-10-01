@@ -6,22 +6,25 @@
  */
 import { composeApi } from '@embedpdf/core';
 
-import type { RedactionCapability, RedactionConfig } from './contract';
+import type { RedactionCapability } from './contract';
 import { createPendingReads } from './read/pending';
 import { createServices, type RedactionContext } from './services';
 import { subscribeChanges } from './sync/document-events';
+import { syncOverlay } from './sync/overlay';
 import { createApplying } from './write/apply';
 import { createMarking } from './write/marks';
 
-export function createRedactionController(ctx: RedactionContext, config: RedactionConfig = {}) {
+export function createRedactionController(ctx: RedactionContext) {
   const services = createServices(ctx);
   const { events, store } = services;
+  const settings = ctx.settings();
 
-  const pending = createPendingReads(services);
-  const marking = createMarking(ctx, services, config, pending);
+  const pending = createPendingReads(ctx, services);
+  const marking = createMarking(ctx, services, pending);
   const applying = createApplying(ctx, services, pending);
 
   const api: RedactionCapability = composeApi('redaction', [
+    settings.api,
     pending.api,
     marking.api,
     applying.api,
@@ -41,6 +44,7 @@ export function createRedactionController(ctx: RedactionContext, config: Redacti
     api,
     connect() {
       subscribeChanges(ctx, services);
+      syncOverlay(ctx, services);
     },
   };
 }

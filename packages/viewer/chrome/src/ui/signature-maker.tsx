@@ -2,7 +2,7 @@
  * The mark maker (`signature-maker` modal surface): a person's signature and
  * initials, drawn, typed, or uploaded, saved as one library of kind
  * `signatures` — the file is the person (Preview's model). Chrome code over
- * the stamp plugin's generic calls: `createLibrary` + `addAsset({ mark })`;
+ * the stamp plugin's generic calls: `createLibrary` + `createAsset({ mark })`;
  * rename/export/delete are the library verbs. Opened on an existing library
  * (`props.libraryId`) it only adds the missing initials.
  */
@@ -248,7 +248,10 @@ export function SignatureMakerModal() {
           mark: initialsMark!,
         });
       } else {
-        const libraryId = await stamp.createLibrary(name.trim(), { kind: SIGNATURES_LIBRARY_KIND });
+        const { library } = await stamp.createLibrary(name.trim(), {
+          kind: SIGNATURES_LIBRARY_KIND,
+        });
+        const libraryId = library.id;
         await stamp.createAsset({
           libraryId,
           name: SIGNATURE_MARK_NAME,

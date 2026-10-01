@@ -35,10 +35,11 @@ function createHarness(options?: { policy?: unknown; tiling?: TilesOptions }) {
   let advances = 0;
   let epoch = 0;
 
+  // bleed 0 keeps the geometry assertions exact; bleed has its own tests.
+  const resolved = resolveRenderOptions({ tiles: { settleMs: 0, bleed: 0, ...options?.tiling } });
   const tileManager = new TileManager({
     store,
-    // bleed 0 keeps the geometry assertions exact; bleed has its own tests.
-    options: resolveRenderOptions({ tiles: { settleMs: 0, bleed: 0, ...options?.tiling } }),
+    getOptions: () => resolved,
     getPolicy: () => (options?.policy === undefined ? LATTICE : options.policy) as never,
     getPageSize: () => PAGE,
     getEpoch: () => epoch,

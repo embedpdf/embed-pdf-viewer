@@ -21,9 +21,9 @@ import type {
   SelectionChangedEvent,
   SelectionClearedEvent,
   SelectionCommittedEvent,
-  SelectionConfig,
   SelectionEndpoint,
   SelectionRangeInput,
+  SelectionSettings,
   SelectionSnapshot,
   TextRange,
 } from './contract';
@@ -32,8 +32,8 @@ import type { SelectionHostCapability } from './host-contract';
 import {
   clearSelection,
   contentChangedPagesOf,
-  setGestureActive,
   setHighlightHidden,
+  setSelecting,
   setSelection,
   type GlyphPosition,
   type SegmentsByPage,
@@ -45,6 +45,7 @@ const SELECT_SCOPE: DocCapability = 'doc.text.select';
 const COPY_SCOPE: DocCapability = 'doc.text.copy';
 const EMPTY_SEGMENTS: readonly SelectionSegment[] = Object.freeze([]);
 const EMPTY_PAGES: readonly PageRef[] = Object.freeze([]);
+const EMPTY_RECTS: readonly Rect[] = Object.freeze([]);
 /** How many page-text reads a `readText` keeps in flight at once. */
 const TEXT_READ_CONCURRENCY = 8;
 /** An open-ended focus: settles to the page's real last character once its geometry loads. */
@@ -79,11 +80,12 @@ interface ReadModel {
  * glyph), so a drag from page 2 into page 4 selects the tail of 2, all of 3,
  * and the head of 4. Stored endpoints are clamped once their page's geometry
  * is known, which is how `selectAll`'s open end settles.
+ *
+ * The settings belong to the plugin registration; the pointer handler reads
+ * the drag threshold from them, and the framework layers read the colors.
  */
-export function createSelectionController(
-  ctx: PluginContext<SelectionState>,
-  config: SelectionConfig = {},
-) {
+export function createSelectionController(ctx: PluginContext<SelectionState, SelectionSettings>) {
+  const settings = ctx.settings();
   const changed = ctx.events.source<SelectionChangedEvent>();
   const committed = ctx.events.source<SelectionCommittedEvent>();
   const cleared = ctx.events.source<SelectionClearedEvent>();
@@ -186,23 +188,25 @@ export function createSelectionController(
     ctx.state.update(setSelection, clamped, segments);
   }
 
-  // ── the read model, built once per state and registry revision ──
+  // ── the read model, built once per selection and registry revision ──
+  // Only the range and the segments go in, so a change to the gesture fact or
+  // the highlight's visibility keeps every read (the range, the page list) as it was.
   const readModel = memo(
-    () => [state(), ctx.document()?.revision ?? 0],
-    (current): ReadModel => buildReadModel(current),
+    () => [state().selection, state().segments, ctx.document()?.revision ?? 0],
+    (selection, segments): ReadModel => buildReadModel(selection, segments),
   );
 
-  function buildReadModel(current: SelectionState): ReadModel {
-    const pagesWithSegments = Object.keys(current.segments)
+  function buildReadModel(selection: SelectionRange | null, segments: SegmentsByPage): ReadModel {
+    const pagesWithSegments = Object.keys(segments)
       .map((key) => toPageRef(Number(key)))
-      .filter((page) => (current.segments[page.objectNumber]?.length ?? 0) > 0)
+      .filter((page) => (segments[page.objectNumber]?.length ?? 0) > 0)
       .sort((left, right) => pageIndexOf(left) - pageIndexOf(right));
     const snapshotPages = pagesWithSegments.map((page) => ({
       page,
-      segments: current.segments[page.objectNumber],
+      segments: segments[page.objectNumber],
     }));
     const pages = pagesWithSegments.length ? pagesWithSegments : EMPTY_PAGES;
-    if (!current.selection) {
+    if (!selection) {
       return {
         snapshot: {
           pages: snapshotPages,
@@ -215,11 +219,11 @@ export function createSelectionController(
         anchor: null,
       };
     }
-    const { start, end, direction } = orderedEnds(current.selection);
+    const { start, end, direction } = orderedEnds(selection);
     const snapshot: SelectionSnapshot = {
       pages: snapshotPages,
-      start: endpointFor(current.segments, start, 'start'),
-      end: endpointFor(current.segments, end, 'end'),
+      start: endpointFor(segments, start, 'start'),
+      end: endpointFor(segments, end, 'end'),
       direction,
       range: {
         start: { page: start.page, index: start.glyph },
@@ -229,11 +233,11 @@ export function createSelectionController(
     // Prefer the gesture's end page; while its geometry is still loading,
     // fall back to the last page (document order) with materialized
     // segments, so the anchor never jumps backwards mid-drag.
-    const endBounds = unionOf(current.segments[end.page.objectNumber]);
+    const endBounds = unionOf(segments[end.page.objectNumber]);
     let anchor: SelectionAnchor | null = endBounds ? { page: end.page, bounds: endBounds } : null;
     const last = pagesWithSegments[pagesWithSegments.length - 1];
     if (!anchor && last) {
-      anchor = { page: last, bounds: unionOf(current.segments[last.objectNumber])! };
+      anchor = { page: last, bounds: unionOf(segments[last.objectNumber])! };
     }
     return { snapshot, pages, anchor };
   }
@@ -335,17 +339,18 @@ export function createSelectionController(
     });
   }
 
-  function selectPage(page: PageRef): void {
+  function selectPage(target: PageRef | number): void {
     ctx.assertAllowed(SELECT_SCOPE, 'selection.selectPage');
-    ctx.assertPageRef(page);
+    const page = ctx.pageOf(target).ref;
     recompute({ anchor: { page, glyph: 0 }, focus: { page, glyph: OPEN_END } });
   }
 
   /** Word / line around a point. Returns whether a span actually engaged
    *  (geometry present and a glyph under the point): the fact haptics and
    *  other success-gated feedback key on, so nothing buzzes over blank space. */
-  function selectSpanAt(page: PageRef, point: Point, expand: 'word' | 'line'): boolean {
+  function selectSpanAt(target: PageRef | number, point: Point, expand: 'word' | 'line'): boolean {
     ctx.assertAllowed(SELECT_SCOPE, `selection.select${expand === 'word' ? 'WordAt' : 'LineAt'}`);
+    const page = ctx.pageOf(target).ref;
     const textLayout = geometryFor(page);
     if (!textLayout) return false;
     const glyph = glyphAt(textLayout, point);
@@ -359,8 +364,9 @@ export function createSelectionController(
     return true;
   }
 
-  function extendTo(page: PageRef, point: Point): void {
+  function extendTo(target: PageRef | number, point: Point): void {
     ctx.assertAllowed(SELECT_SCOPE, 'selection.extendTo');
+    const page = ctx.pageOf(target).ref;
     const current = state().selection;
     if (!current) return;
     const textLayout = geometryFor(page);
@@ -389,8 +395,21 @@ export function createSelectionController(
     return pending;
   }
 
-  async function readTextInRange(range: TextRange, options?: OperationOptions): Promise<string> {
+  async function readText(options?: OperationOptions): Promise<string> {
     ctx.assertAllowed(COPY_SCOPE, 'selection.readText');
+    const range = readModel().snapshot.range;
+    return range ? readRange(range, options) : '';
+  }
+
+  async function readTextInRange(range: TextRange, options?: OperationOptions): Promise<string> {
+    ctx.assertAllowed(COPY_SCOPE, 'selection.readTextInRange');
+    return readRange(range, options);
+  }
+
+  /** A range's text, read a few pages at a time. Cancelling stops the wait at
+   *  once; the page reads it started finish into the cache, which other
+   *  readers share. */
+  async function readRange(range: TextRange, options?: OperationOptions): Promise<string> {
     ctx.assertPageRef(range.start.page);
     ctx.assertPageRef(range.end.page);
     const startPageIndex = pageIndexOf(range.start.page);
@@ -419,24 +438,24 @@ export function createSelectionController(
         to: i === endPageIndex ? endCharIndex : OPEN_END,
       });
     }
+    const signal = options?.signal;
     const parts: string[] = new Array(spans.length);
     for (let base = 0; base < spans.length; base += TEXT_READ_CONCURRENCY) {
-      throwIfAborted(options?.signal);
+      // A signal that has fired starts no more reads.
+      if (signal?.aborted) {
+        throw new PluginError('operation-cancelled', 'selection', 'reading the text was cancelled');
+      }
       const batch = spans.slice(base, base + TEXT_READ_CONCURRENCY);
-      const snapshots = await Promise.all(batch.map((span) => pageText(span.page)));
+      const snapshots = await ctx.cancellable(
+        signal,
+        Promise.all(batch.map((span) => pageText(span.page))),
+      );
       snapshots.forEach((snapshot, index) => {
         const { from, to } = batch[index];
         parts[base + index] = sliceText(snapshot, { start: from, count: to - from });
       });
     }
-    throwIfAborted(options?.signal);
     return parts.join('\n');
-  }
-
-  function throwIfAborted(signal: AbortSignal | undefined): void {
-    if (signal?.aborted) {
-      throw new PluginError('operation-cancelled', 'selection', 'selection.readText was cancelled');
-    }
   }
 
   // ── invalidation ──
@@ -461,9 +480,17 @@ export function createSelectionController(
     ctx.state.update(clearSelection);
   }
 
-  const setGesture = (active: boolean): void => ctx.state.update(setGestureActive, active);
+  const setGesture = (active: boolean): void => ctx.state.update(setSelecting, active);
+
+  /** A page's segments, by its ref or its index: a page that isn't in the document has none. */
+  const segmentsOn = (target: PageRef | number): readonly SelectionSegment[] => {
+    const page = ctx.getPage(target);
+    return page ? (state().segments[page.ref.objectNumber] ?? EMPTY_SEGMENTS) : EMPTY_SEGMENTS;
+  };
 
   const api: SelectionHostCapability = {
+    ...settings.api,
+
     // ── public lens ──
     canSelect,
     canCopy,
@@ -475,16 +502,17 @@ export function createSelectionController(
     extendTo,
     clear: () => ctx.state.update(clearSelection),
     hasSelection: () => state().selection != null,
+    isSelecting: () => state().selecting,
     getSnapshot: () => readModel().snapshot,
     getRange: () => readModel().snapshot.range,
     listSelectedPages: () => readModel().pages,
-    listSegments: (page) => state().segments[page.objectNumber] ?? EMPTY_SEGMENTS,
-    listRects: (page) => rectsOf(page.objectNumber),
-    getAnchor: () => readModel().anchor,
-    readText: (options) => {
-      const range = readModel().snapshot.range;
-      return range ? readTextInRange(range, options) : Promise.resolve('');
+    listSegments: segmentsOn,
+    listRects: (target) => {
+      const page = ctx.getPage(target);
+      return page ? rectsOf(page.ref.objectNumber) : EMPTY_RECTS;
     },
+    getAnchor: () => readModel().anchor,
+    readText,
     readTextInRange,
     onChanged: changed.on,
     onCommitted: committed.on,
@@ -512,12 +540,11 @@ export function createSelectionController(
     },
     endGesture: () => {
       // Settle first, so commit listeners (menus, clipboard prefetch) observe
-      // isGestureActive() === false.
+      // isSelecting() === false.
       setGesture(false);
       const range = readModel().snapshot.range;
       if (range) committed.emit({ range });
     },
-    isGestureActive: () => state().gestureActive,
     setHighlightVisible: (visible) => ctx.state.update(setHighlightHidden, !visible),
     isHighlightVisible: () => !state().highlightHidden,
   };
@@ -531,7 +558,7 @@ export function createSelectionController(
         const pages = contentChangedPagesOf(event);
         if (pages) onContentChanged(pages);
       });
-      connectSelection(ctx, api, config);
+      connectSelection(ctx, api);
     },
   };
 }

@@ -5,7 +5,7 @@ import type {
 } from './runAnnotationResourceConformance';
 import type { ConformanceTestRunner } from './runMetadataConformance';
 import { BANDS_PDF, BANDS_PNG, sameBytes } from './stampFixtures';
-import type { AnnotationDTO } from '../annotation/kinds';
+import type { Annotation } from '../annotation/kinds';
 import type { DocumentHandle } from '../engine/DocumentHandle';
 import type { Engine } from '../engine/Engine';
 import type { PageHandle } from '../engine/PageHandle';
@@ -150,7 +150,7 @@ export function runAnnotationExportConformance(
       await onPage('authoring', async (page, doc) => {
         const rect: PageBox = { x: 300, y: 300, width: 20, height: 20 };
         const create = async (draft: Parameters<PageHandle['annotations']['create']>[0]) =>
-          (await page.annotations.create(draft)).annotation as AnnotationDTO;
+          (await page.annotations.create(draft)).annotation as Annotation;
         const note = await create({
           subtype: 'text',
           rect: iconRect(rect.x, rect.y),
@@ -169,7 +169,7 @@ export function runAnnotationExportConformance(
         });
         await create({ subtype: 'square', box: rect });
 
-        const keys = (refs: AnnotationDTO[]) =>
+        const keys = (refs: Annotation[]) =>
           refs.map((annotation) => annotationKey(annotation.ref));
         expect(keysOf(await doc.annotations.export({ refs: [note.ref] }))).toEqual(
           keys([note, popup, reply, answer]),
@@ -207,7 +207,7 @@ export function runAnnotationExportConformance(
     test('takes a selection larger than a URL holds', async () => {
       await onPage('authoring', async (page, doc) => {
         // Long names push the selection past what an export URL carries.
-        const created: AnnotationDTO[] = [];
+        const created: Annotation[] = [];
         for (let i = 0; i < 24; i++) {
           const { annotation } = await page.annotations.create({
             subtype: 'square',

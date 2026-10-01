@@ -15,7 +15,7 @@ import { InteractionToken } from '@embedpdf/plugin-interaction/contract';
 import { createLinkController } from '../src/controller';
 import { LinkToken } from '../src/host-contract';
 import { linkPlugin } from '../src/link.plugin';
-import { pageSpaceBoxesOf } from '@embedpdf/engine-core/runtime';
+import { pageSpaceBoxesOf, type Annotation } from '@embedpdf/engine-core/runtime';
 
 /** Links through the real kernel with the stand-alone source (no annotation plugin). */
 const crop = { left: 0, bottom: 0, right: 600, top: 800 };
@@ -306,6 +306,76 @@ describe('link plugin', () => {
   });
 });
 
+describe('following a link', () => {
+  it('opens a website through the framework’s opener, and reports one it won’t open', async () => {
+    const harness = await boot();
+    const opened: string[] = [];
+    const stop = harness.link.registerUriOpener((uri) => {
+      if (uri.startsWith('javascript:')) return false;
+      opened.push(uri);
+      return true;
+    });
+    const log: string[] = [];
+    harness.link.onActivated((event) => log.push(event.activation.outcome));
+
+    expect(harness.link.activate({ kind: 'uri', uri: 'https://x' })).toEqual({
+      outcome: 'uri',
+      uri: 'https://x',
+    });
+    expect(harness.link.activate({ kind: 'uri', uri: 'javascript:alert(1)' }).outcome).toBe(
+      'reported',
+    );
+    expect(opened).toEqual(['https://x']);
+    expect(log).toEqual(['uri', 'reported']);
+
+    // Without an opener the address is handed back to open.
+    stop();
+    harness.link.activate({ kind: 'uri', uri: 'https://y' });
+    expect(opened).toEqual(['https://x']);
+    await harness.kernel.destroy();
+  });
+
+  it('moves the view it was followed in, by that view’s scroll behavior', async () => {
+    const harness = await boot();
+    await harness.link.ensureLoaded(0);
+    const calls: unknown[][] = [];
+    const view = { goToDestination: (...args: unknown[]) => calls.push(args) };
+    const activation = harness.link.activateAt(0, { x: 450, y: 650 }, { stage: view as never });
+    expect(activation?.outcome).toBe('revealed');
+    expect(calls).toEqual([[{ page: toPageRef(2), kind: 'fit' }]]);
+    await harness.kernel.destroy();
+  });
+
+  it('takes a page as its ref or its index, and reads a missing page as empty', async () => {
+    const harness = await boot();
+    await harness.link.ensureLoaded(0);
+    expect(harness.link.listLinks(0)).toBe(harness.link.listLinks(toPageRef(1)));
+    expect(harness.link.getLinkAt(0, { x: 130, y: 70 })?.id).toBe('obj:11');
+    expect(harness.link.isLoaded(0)).toBe(true);
+    expect(harness.link.getStatus(1)).toBe('idle');
+    expect(harness.link.listLinks(5)).toEqual([]);
+    expect(harness.link.getLink(5, 'obj:10')).toBeNull();
+    await expect(harness.link.ensureLoaded(5)).rejects.toMatchObject({ code: 'not-found' });
+    let refusal: unknown = null;
+    try {
+      harness.link.activateAt(5, { x: 0, y: 0 });
+    } catch (error) {
+      refusal = error;
+    }
+    expect(refusal).toMatchObject({ code: 'not-found' });
+    await harness.kernel.destroy();
+  });
+
+  it('cancels a read when the signal fires', async () => {
+    const harness = await boot();
+    const controller = new AbortController();
+    const all = harness.link.listAllLinks({ signal: controller.signal });
+    controller.abort();
+    await expect(all).rejects.toMatchObject({ code: 'operation-cancelled' });
+    await harness.kernel.destroy();
+  });
+});
+
 describe('link plugin with the annotation plugin', () => {
   function withAnnotation() {
     const unregister = vi.fn();
@@ -313,7 +383,7 @@ describe('link plugin with the annotation plugin', () => {
       listLinkItems: vi.fn(() => []),
       registerBehavior: vi.fn((_behavior: Behavior) => unregister),
     };
-    const interaction = { getActiveTool: () => ({ enables: new Set(['link-nav']) }) };
+    const interaction = { activeToolEnables: (behavior: string) => behavior === 'link-nav' };
     const read = vi.fn();
     const ctx = createTestContext<void>({
       id: 'link',
@@ -343,9 +413,10 @@ describe('link plugin with the annotation plugin', () => {
     expect(annotation.registerBehavior).toHaveBeenCalledOnce();
     const behavior = annotation.registerBehavior.mock.calls[0]![0];
     expect(behavior.id).toBe('link-nav');
-    expect(behavior.matches({ subtype: 'link', ref: null })).toBe(true);
-    expect(behavior.matches({ subtype: 'square', ref: null })).toBe(false);
-    expect(behavior.engaged()).toBe(true);
+    const link = { subtype: 'link' } as unknown as Annotation;
+    expect(behavior.matches(link)).toBe(true);
+    expect(behavior.matches({ subtype: 'square' } as unknown as Annotation)).toBe(false);
+    expect(behavior.engaged(link)).toBe(true);
     await ctx.dispose();
     expect(unregister).toHaveBeenCalledOnce();
   });

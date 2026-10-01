@@ -12,26 +12,27 @@ import {
   AnnotationMenu,
   AnnotationToken,
   useAnnotation,
-  useAnnotationSelected,
+  useAnnotationState,
   type CreationDraftAnchor,
-  useAnnotationSelection,
-  useSelectionFields,
-  useToolDefaults,
-  useToolFields,
+  useAnnotationProperties,
+  useAnnotationDefaults,
   usePage,
-  useTool,
-  useZoom,
-  usePages,
-  useLayout,
+  useInteraction,
+  useInteractionState,
+  useStage,
+  useStageState,
   useStageSettings,
   useDocuments,
-  usePanes,
-  usePageEditor,
+  useDocumentsState,
+  useViewManager,
+  useViewManagerState,
+  usePageEdit,
   useMetadata,
+  useMetadataState,
   useSelector,
   FormLayer,
   useForm,
-  useFormField,
+  useFormState,
   SearchLayer,
   useSearch,
   useSearchHits,
@@ -39,9 +40,9 @@ import {
   useStamp,
   useStampAssets,
   useStampAssetPreviewUrl,
-  useArmStampAsset,
   useT,
-  useLocale,
+  useI18n,
+  useI18nState,
   stagePlugin,
   interactionPlugin,
   selectionPlugin,
@@ -70,7 +71,7 @@ import {
 } from '@embedpdf/react';
 import type {
   AnnotationPatch,
-  FieldSpec,
+  AnnotationProperty,
   FieldValues,
   LineEndings,
   TextAlign,
@@ -137,7 +138,7 @@ function DraftMenuBar({ anchor }: { anchor: CreationDraftAnchor }) {
               }`
         }
         disabled={!canFinish}
-        onClick={() => anno.finishCreationDraft()}
+        onClick={() => anno.draft.finish()}
         style={{
           ...DRAFT_MENU_BTN,
           opacity: canFinish ? 1 : 0.38,
@@ -149,7 +150,7 @@ function DraftMenuBar({ anchor }: { anchor: CreationDraftAnchor }) {
       <button
         aria-label={`Cancel ${subtype}`}
         title={`Cancel ${subtype}`}
-        onClick={() => anno.cancelCreationDraft()}
+        onClick={() => anno.draft.cancel()}
         style={DRAFT_MENU_BTN}
       >
         ×
@@ -163,9 +164,9 @@ function DraftMenuBar({ anchor }: { anchor: CreationDraftAnchor }) {
  *  its own subscription, so nothing here can go stale. */
 function AnnotationMenuBar() {
   const anno = useAnnotation();
-  const selected = useAnnotationSelected();
-  const canGroup = useSelector(AnnotationToken, (c) => c.canGroup());
-  const canUngroup = useSelector(AnnotationToken, (c) => c.canUngroup());
+  const selected = useAnnotationState((state) => state.selected);
+  const canGroup = useSelector(AnnotationToken, (c) => c.selection.canGroup());
+  const canUngroup = useSelector(AnnotationToken, (c) => c.selection.canUngroup());
   return (
     <div
       style={{
@@ -185,7 +186,7 @@ function AnnotationMenuBar() {
         <button
           key={c}
           title={c}
-          onClick={() => anno.updateSelection({ color: c })}
+          onClick={() => anno.selection.update({ color: c })}
           style={{
             width: 18,
             height: 18,
@@ -199,22 +200,22 @@ function AnnotationMenuBar() {
       ))}
       <span style={{ width: 1, height: 18, background: 'rgba(255,255,255,.18)' }} />
       {canGroup && (
-        <button onClick={() => anno.group()} style={MENU_BTN}>
+        <button onClick={() => anno.selection.group()} style={MENU_BTN}>
           Group{selected.length > 1 ? ` (${selected.length})` : ''}
         </button>
       )}
       {canUngroup && (
-        <button onClick={() => anno.ungroup()} style={MENU_BTN}>
+        <button onClick={() => anno.selection.ungroup()} style={MENU_BTN}>
           Ungroup
         </button>
       )}
       {(canGroup || canUngroup) && (
         <span style={{ width: 1, height: 18, background: 'rgba(255,255,255,.18)' }} />
       )}
-      <button onClick={() => void anno.deleteSelection()} style={MENU_BTN}>
+      <button onClick={() => void anno.selection.delete()} style={MENU_BTN}>
         Delete{selected.length > 1 ? ` (${selected.length})` : ''}
       </button>
-      <button onClick={anno.clearSelection} style={MENU_BTN}>
+      <button onClick={() => anno.selection.clear()} style={MENU_BTN}>
         Done
       </button>
     </div>
@@ -241,6 +242,7 @@ const plugins = [
     pageFrame: { top: 0, right: 0, bottom: 16, left: 0 }, // reserved label band (screen px)
     fitAlign: { x: 'center', y: 'start' }, // few pages? thumbs hug the TOP, not the middle
     scrollBehavior: 'instant',
+    interaction: false, // secondary lens: click-to-navigate, never the document's tools
   }),
   renderPlugin(), // document-scoped: renders pages through the engine handle
   pageEditPlugin(), // document-scoped: PON-addressed rotate/move/delete over the handle
@@ -496,7 +498,7 @@ const FORM_DESIGN_TOOLS: { id: string; label: string; title: string }[] = [
 /**
  * The stamp tool button: opens a file picker (PNG / JPEG / single-page PDF)
  * and arms the payload — every subsequent page click places one stamp until
- * the tool changes. One line of integration: `annotation.armStamp({ source })`.
+ * the tool changes. One line of integration: `annotation.stamps.arm({ source })`.
  */
 function StampButton({ active }: { active: boolean }) {
   const annotation = useAnnotation();
@@ -517,7 +519,7 @@ function StampButton({ active }: { active: boolean }) {
         style={{ display: 'none' }}
         onChange={(e) => {
           const file = e.target.files?.[0];
-          if (file) void annotation.armStamp({ source: file });
+          if (file) void annotation.stamps.arm({ source: file });
           e.target.value = ''; // allow re-picking the same file later
         }}
       />
@@ -534,8 +536,7 @@ function StampButton({ active }: { active: boolean }) {
 function StampLibraryBar() {
   const stamp = useStamp();
   const assets = useStampAssets();
-  const { armAsset } = useArmStampAsset();
-  const { activeToolId } = useTool();
+  const { activeToolId } = useInteractionState();
   const fileRef = useRef<HTMLInputElement>(null);
   const [armedId, setArmedId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -592,7 +593,7 @@ function StampLibraryBar() {
           armed={armedId === a.id}
           onArm={() => {
             setArmedId(a.id);
-            void armAsset(a.id).catch((err) => console.error('[demo] arm failed:', err));
+            void stamp.armAsset(a.id).catch((err) => console.error('[demo] arm failed:', err));
           }}
         />
       ))}
@@ -642,14 +643,16 @@ function AnnotationBar({
   stylesOpen: boolean;
   onToggleStyles: () => void;
 }) {
-  const { activeToolId, activate } = useTool();
+  const interaction = useInteraction();
+  const { activeToolId } = useInteractionState();
+  const activate = interaction.activateTool;
   const annotation = useAnnotation();
   // Seed the line tool with an arrow default (Adobe's "line arrow"), demonstrating
   // per-tool configurable defaults — the sidebar lets you change it live. The fill
   // default makes a CLOSED ending (closed arrow / circle / square) solid out of the
   // box; stroke and fill stay independently editable.
   useEffect(() => {
-    annotation.updateToolDefaults('line', {
+    annotation.tools.updateDefaults('line', {
       interiorColor: '#e5484d',
       lineEndings: { start: 'none', end: 'open-arrow' },
     });
@@ -668,7 +671,7 @@ function AnnotationBar({
           </button>
         ))}
         {/* stamp: pick an image (or single-page PDF), then click a page to place it —
-            `armStamp` validates the bytes and activates the stamp tool itself */}
+            `stamps.arm` validates the bytes and activates the stamp tool itself */}
         <StampButton active={activeToolId === 'stamp'} />
       </div>
       <Divider />
@@ -723,7 +726,7 @@ function FormDataButtons() {
         title="export form data (XFDF)"
         style={tbBtn}
         onClick={async () => {
-          const { bytes } = await form.exportData('xfdf');
+          const { bytes } = await form.export('xfdf');
           saveToDisk(bytes, 'form-data.xfdf');
         }}
       >
@@ -735,7 +738,7 @@ function FormDataButtons() {
         onClick={async () => {
           const file = await pickFile('.xfdf,.fdf');
           if (!file) return;
-          const r = await form.importData(new Uint8Array(await file.arrayBuffer()));
+          const r = await form.import(new Uint8Array(await file.arrayBuffer()));
           setNote(`applied ${r.applied}, skipped ${r.skipped}`);
         }}
       >
@@ -788,7 +791,7 @@ function FieldControl({
   onChange,
   onChangeEach,
 }: {
-  spec: FieldSpec;
+  spec: AnnotationProperty;
   values: FieldValues;
   mixed: boolean;
   onChange: (patch: FieldValues) => void;
@@ -952,10 +955,10 @@ function FieldControl({
  */
 function FieldPanel() {
   const form = useForm();
-  const field = useFormField();
+  const field = useFormState((state) => state.selectedField);
   if (!field) return null;
   const patch = (p: Record<string, unknown>) =>
-    void form.updateField(field.ref, { family: field.family, ...p } as FormFieldPatch);
+    void form.update(field.ref, { family: field.family, ...p } as FormFieldPatch);
   return (
     <div
       style={{
@@ -1011,7 +1014,7 @@ function FieldPanel() {
           <button
             style={tbBtn}
             title="unlink this widget; the field keeps its other widgets"
-            onClick={() => void form.detachWidget(field.ref, field.widgets[0]!.ref!)}
+            onClick={() => void form.removeWidget(field.ref, field.widgets[0]!.ref!)}
           >
             ⛓ Detach widget
           </button>
@@ -1019,7 +1022,7 @@ function FieldPanel() {
         <button
           style={{ ...tbBtn, color: '#c0322b', borderColor: '#e3b3b0' }}
           title="delete the field and all of its widgets"
-          onClick={() => void form.deleteField(field.ref)}
+          onClick={() => void form.delete(field.ref)}
         >
           🗑 Delete field
         </button>
@@ -1031,31 +1034,33 @@ function FieldPanel() {
 /**
  * The annotation style inspector — a right-docked sidebar, opened from the tool
  * band. FULLY SCHEMA-DRIVEN: with a selection it renders the fields every
- * selected kind shares (`useSelectionFields`) and writes via `updateSelection`;
- * with none it renders the active tool's fields over its live defaults
- * (`useToolFields`) and writes via `updateToolDefaults`. No per-subtype
+ * selected kind shares (`useAnnotationProperties()`) and writes via `selection.update`;
+ * with none it renders the active tool's properties over its live defaults
+ * (`useAnnotationProperties(tool)`) and writes via `tools.updateDefaults`. No per-subtype
  * branching here — new kinds get a working sidebar for free.
  */
 function AnnotationSidebar({ onClose }: { onClose: () => void }) {
   const annotation = useAnnotation();
-  const { activeToolId } = useTool();
-  const sel = useSelectionFields();
-  const tool = useToolFields(activeToolId);
-  const defaults = useToolDefaults(activeToolId);
-  const selCount = useAnnotationSelection().length;
+  const activeToolId = useInteractionState((state) => state.activeToolId) ?? 'pointer';
+  const sel = useAnnotationProperties();
+  const tool = useAnnotationProperties(activeToolId);
+  const defaults = useAnnotationDefaults(activeToolId);
+  const selCount = useAnnotationState((state) => state.selected.length);
 
-  const hasSel = sel.fields.length > 0;
-  const { fields: specs, values, mixed } = hasSel ? sel : tool;
+  const hasSel = sel.properties.length > 0;
+  const { properties, values, mixed } = hasSel ? sel : tool;
+  // Flags have no control in this sidebar.
+  const specs = properties.filter((property) => property.control !== 'flag');
   const write = (patch: FieldValues) =>
     hasSel
-      ? annotation.updateSelection(patch as AnnotationPatch)
-      : annotation.updateToolDefaults(activeToolId, patch);
+      ? annotation.selection.update(patch as AnnotationPatch)
+      : annotation.tools.updateDefaults(activeToolId, patch);
   const writeEach = (patchOf: (current: FieldValues) => FieldValues) =>
     hasSel
-      ? annotation.updateSelection(
+      ? annotation.selection.update(
           (member) => patchOf(member as unknown as FieldValues) as AnnotationPatch,
         )
-      : annotation.updateToolDefaults(activeToolId, patchOf(defaults));
+      : annotation.tools.updateDefaults(activeToolId, patchOf(defaults));
 
   return (
     <aside style={annoSidebar}>
@@ -1090,7 +1095,7 @@ function AnnotationSidebar({ onClose }: { onClose: () => void }) {
           )}
           {hasSel && (
             <button
-              onClick={() => annotation.deleteSelection()}
+              onClick={() => annotation.selection.delete()}
               title="delete selected"
               style={{ ...tbBtn, color: '#c0322b', borderColor: '#e3b3b0' }}
             >
@@ -1285,46 +1290,42 @@ function SearchControls() {
 }
 
 function Toolbar() {
-  const { zoom, mode, zoomIn, zoomOut, fitWidth, fitPage, fitAll, automatic } = useZoom();
-  const { currentPage, pageCount, next, previous } = usePages();
+  const stage = useStage();
   const {
-    flow,
-    setFlow,
-    layout,
-    setLayout,
-    spread,
-    setSpread,
-    sizing,
-    setSizing,
-    bounded,
-    setBounded,
-  } = useLayout();
-  const { settings, update, reset } = useStageSettings();
+    zoomLevel: zoom,
+    zoomMode: mode,
+    currentPageIndex: currentPage,
+    pageCount,
+  } = useStageState();
+  const settings = useStageSettings();
+  const { flow, layout, spread, sizing, bounded } = settings;
+  const update = stage.updateSettings;
+  const reset = () => stage.resetSettings();
   const applyZoomMode = (m: string) => {
-    if (m === 'automatic') automatic();
-    else if (m === 'fit-page') fitPage();
-    else if (m === 'fit-width') fitWidth();
-    else if (m === 'fit-all') fitAll();
+    if (m === 'automatic') stage.fitAutomatic();
+    else if (m === 'fit-page') stage.fitPage();
+    else if (m === 'fit-width') stage.fitWidth();
+    else if (m === 'fit-all') stage.fitAll();
   };
   return (
     <div style={{ borderBottom: '1px solid #eee', background: '#fafafa' }}>
       {/* Row 1 — navigate, zoom, presets */}
       <div style={{ ...tbRow, borderBottom: '1px solid #f0f0f0' }}>
-        <button onClick={() => previous()} title="previous page/spread" style={tbBtn}>
+        <button onClick={() => stage.previousPage()} title="previous page/spread" style={tbBtn}>
           ◀
         </button>
         <span>
           p <b>{currentPage + 1}</b>/{pageCount}
         </span>
-        <button onClick={() => next()} title="next page/spread" style={tbBtn}>
+        <button onClick={() => stage.nextPage()} title="next page/spread" style={tbBtn}>
           ▶
         </button>
         <Divider />
-        <button onClick={zoomOut} style={tbBtn}>
+        <button onClick={() => stage.zoomOut()} style={tbBtn}>
           −
         </button>
         <span style={{ minWidth: 34, textAlign: 'center' }}>{Math.round(zoom * 100)}%</span>
-        <button onClick={zoomIn} style={tbBtn}>
+        <button onClick={() => stage.zoomIn()} style={tbBtn}>
           +
         </button>
         <select
@@ -1364,7 +1365,7 @@ function Toolbar() {
         <Field label="flow" title="flow">
           <select
             value={flow}
-            onChange={(e) => setFlow(e.target.value as FlowMode)}
+            onChange={(e) => update({ flow: e.target.value as FlowMode })}
             style={tbSelect}
           >
             <option value="continuous">scroll</option>
@@ -1374,7 +1375,7 @@ function Toolbar() {
         <Field label="layout" title="layout">
           <select
             value={layout}
-            onChange={(e) => setLayout(e.target.value as LayoutKind)}
+            onChange={(e) => update({ layout: e.target.value as LayoutKind })}
             style={tbSelect}
           >
             <option value="vertical">vertical</option>
@@ -1418,7 +1419,7 @@ function Toolbar() {
         <Field label="spread" title="spread">
           <select
             value={spread}
-            onChange={(e) => setSpread(e.target.value as SpreadMode)}
+            onChange={(e) => update({ spread: e.target.value as SpreadMode })}
             style={tbSelect}
           >
             <option value="none">single</option>
@@ -1432,7 +1433,7 @@ function Toolbar() {
         >
           <select
             value={sizing}
-            onChange={(e) => setSizing(e.target.value as SizingMode)}
+            onChange={(e) => update({ sizing: e.target.value as SizingMode })}
             style={tbSelect}
           >
             <option value="intrinsic">true</option>
@@ -1491,7 +1492,11 @@ function Toolbar() {
           title="clamp the camera to the content (off = free infinite pan, for plans/CAD)"
           style={{ display: 'flex', alignItems: 'center', gap: 3, color: '#666' }}
         >
-          <input type="checkbox" checked={bounded} onChange={(e) => setBounded(e.target.checked)} />
+          <input
+            type="checkbox"
+            checked={bounded}
+            onChange={(e) => update({ bounded: e.target.checked })}
+          />
           bounded{bounded ? '' : ' ∞'}
         </label>
       </div>
@@ -1544,18 +1549,19 @@ function DocumentView() {
 // grid, fixed small zoom). Drag its right edge — the grid re-wraps 1 → 2 → 3
 // columns by width. Click a thumb to navigate the MAIN lens.
 function ThumbnailSidebar() {
-  const { currentPage, goToPage } = usePages(); // the MAIN lens
-  const editor = usePageEditor(); // PERSISTED page edits (document-scoped, shared by lenses)
+  const main = useStage(); // the MAIN lens
+  const currentPage = useStageState((state) => state.currentPageIndex);
+  const editor = usePageEdit(); // PERSISTED page edits (document-scoped, shared by lenses)
   const canEdit = editor.canEdit();
-  const { pageCount } = usePages(ThumbsStageToken); // gates move/delete edges
+  const pageCount = useStageState((state) => state.pageCount, ThumbsStageToken); // gates move/delete edges
   const [menuPage, setMenuPage] = useState<number | null>(null); // which thumb's action menu is open
-  const thumbs = useStageSettings(ThumbsStageToken); // the SIDEBAR lens
-  const thumbPx = 'pageWidth' in thumbs.settings.zoom ? thumbs.settings.zoom.pageWidth : 110;
+  const thumbs = useStage(ThumbsStageToken); // the SIDEBAR lens
+  const thumbZoom = useStageSettings((settings) => settings.zoom, ThumbsStageToken);
+  const thumbPx = 'pageWidth' in thumbZoom ? thumbZoom.pageWidth : 110;
   // FOLLOW the main view (Adobe behavior): when its current page changes, make that
   // thumb visible — minimal movement, zero when it's already on screen. Policy in
   // app code; the `reveal` verb is the mechanism.
-  const { reveal } = usePages(ThumbsStageToken);
-  useEffect(() => reveal(currentPage), [currentPage, reveal]);
+  useEffect(() => thumbs.reveal(currentPage), [currentPage, thumbs]);
   return (
     <div
       style={{
@@ -1592,7 +1598,9 @@ function ThumbnailSidebar() {
           step={10}
           value={thumbPx}
           onChange={(e) =>
-            thumbs.update({ zoom: { pageWidth: Math.max(40, Number(e.target.value) || 110) } })
+            thumbs.updateSettings({
+              zoom: { pageWidth: Math.max(40, Number(e.target.value) || 110) },
+            })
           }
           style={{ width: 48 }}
         />
@@ -1600,7 +1608,6 @@ function ThumbnailSidebar() {
       </label>
       <Stage
         token={ThumbsStageToken}
-        interaction={false} // secondary lens: click-to-navigate, never the document's tools
         style={{ flex: 1, position: 'relative' }}
         pageChrome={(page) => {
           // BOX-SPACE chrome: the click target/selection border hug the CONTENT
@@ -1630,7 +1637,7 @@ function ThumbnailSidebar() {
           return (
             <>
               <div
-                onClick={() => goToPage(page.pageIndex)}
+                onClick={() => main.goToPage(page.pageIndex)}
                 style={{
                   position: 'absolute',
                   top: page.frame.top,
@@ -1780,8 +1787,9 @@ function Pane({
   canRemove: boolean;
 }) {
   const { open, close } = useDocuments();
-  const v = usePanes();
-  const focused = view.id === v.focusedPaneId;
+  const v = useViewManager();
+  const { panes, focusedPaneId } = useViewManagerState();
+  const focused = view.id === focusedPaneId;
 
   const dropDoc = (e: React.DragEvent, index: number) => {
     const payload = readPayload(e);
@@ -1795,7 +1803,7 @@ function Pane({
     if (!payload || payload.kind !== 'view' || payload.viewId === view.id) return;
     v.movePane(
       payload.viewId,
-      v.panes.findIndex((x) => x.id === view.id),
+      panes.findIndex((x) => x.id === view.id),
     );
   };
 
@@ -1941,9 +1949,10 @@ function Pane({
 }
 
 function Workspace() {
-  const { docs } = useDocuments();
+  const docs = useDocumentsState((state) => state.documents);
   const t = useT();
-  const { panes: views, createPane: createView } = usePanes();
+  const { createPane: createView } = useViewManager();
+  const views = useViewManagerState((state) => state.panes);
   const names = useMemo(() => Object.fromEntries(docs.map((d) => [d.id, d.name ?? d.id])), [docs]);
   return (
     <div
@@ -1993,8 +2002,8 @@ const pickFile = (accept: string): Promise<File | null> =>
   });
 
 function FileMenu() {
-  const { open, save, saveLayer } = useDocuments();
-  const { panes: views, focusedPaneId: focusedViewId } = usePanes();
+  const { open, download, downloadLayer } = useDocuments();
+  const { panes: views, focusedPaneId: focusedViewId } = useViewManagerState();
   const focused = views.find((v) => v.id === focusedViewId) ?? views[0];
   const targetId = focused?.activeDocumentId ?? null;
   const [sampleId, setSampleId] = useState(SAMPLES[0].id);
@@ -2009,7 +2018,7 @@ function FileMenu() {
   const opened = async (source: OpenInput, name: string, isLayer: boolean) => {
     setMenu(false);
     try {
-      const id = await open(source, { name });
+      const { id } = (await open(source, { name })).document;
       if (isLayer) setLayered((s) => new Set(s).add(id));
       setStatus(
         isLayer
@@ -2060,7 +2069,7 @@ function FileMenu() {
     setMenu(false);
     if (!targetId) return;
     try {
-      const bytes = await saveLayer(targetId);
+      const bytes = await downloadLayer(targetId);
       saveToDisk(bytes, `${sample().id}.layer`);
       setStatus(`Saved layer (${bytes.byteLength.toLocaleString()} bytes).`);
     } catch (e) {
@@ -2071,7 +2080,7 @@ function FileMenu() {
     setMenu(false);
     if (!targetId) return;
     try {
-      const bytes = await save(targetId, { mode });
+      const bytes = await download(targetId, { mode });
       saveToDisk(bytes, `${sample().id}-${mode}.pdf`);
       setStatus(`Saved ${mode} PDF (${bytes.byteLength.toLocaleString()} bytes).`);
     } catch (e) {
@@ -2147,7 +2156,8 @@ function FileMenu() {
 const EDITABLE = ['title', 'author', 'subject', 'keywords', 'creator', 'producer'] as const;
 
 function MetadataDialog({ onClose }: { onClose: () => void }) {
-  const { metadata, update } = useMetadata();
+  const { update } = useMetadata();
+  const { metadata } = useMetadataState();
   const [draft, setDraft] = useState<Record<string, string> | null>(null);
   const [saving, setSaving] = useState(false);
   useEffect(() => {
@@ -2314,12 +2324,13 @@ const modalCard: React.CSSProperties = {
 // 'es' demonstrates a LAZY pack — fetched on first switch ('…' while in flight).
 function LocaleSwitcher() {
   const t = useT();
-  const { locale, locales, loading, setLocale } = useLocale();
+  const i18n = useI18n();
+  const { locale, locales, loading } = useI18nState();
   return (
     <select
       title={t('demo.language')}
       value={locale}
-      onChange={(e) => setLocale(e.target.value)}
+      onChange={(e) => void i18n.setLocale(e.target.value)}
       style={{ font: 'inherit', marginLeft: 'auto' }}
     >
       {locales.map((l) => (
@@ -2334,7 +2345,7 @@ function LocaleSwitcher() {
 
 // Live plural + params: ticks up as background opens stream into the registry.
 function DocCount() {
-  const { docs } = useDocuments();
+  const docs = useDocumentsState((state) => state.documents);
   const t = useT();
   return (
     <span style={{ color: '#888' }}>{t('demo.documents', { params: { count: docs.length } })}</span>

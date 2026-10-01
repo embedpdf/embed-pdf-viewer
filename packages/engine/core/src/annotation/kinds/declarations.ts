@@ -57,10 +57,7 @@ export type WritableAnnotationDeclaration = Exclude<
  * The complete read of any annotation, discriminated by `subtype`: in page
  * space, or in the file's coordinates with `PdfCoordinates`.
  */
-export type AnnotationDTO<C extends Coordinates = PageCoordinates> = ReadOf<
-  AnnotationDeclaration,
-  C
->;
+export type Annotation<C extends Coordinates = PageCoordinates> = ReadOf<AnnotationDeclaration, C>;
 
 /**
  * What `create()` takes, and what the worker protocol and the HTTP surface

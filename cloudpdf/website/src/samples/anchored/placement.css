@@ -1,0 +1,140 @@
+/* Colors */
+:root {
+  --ink: #1a2748;
+  --muted: #5a6b92;
+  --line: #e6eaf2;
+  --surface: #ffffff;
+  --tint: #f3f7fe;
+  --canvas: #f7f9fc;
+  --accent: #054fb3;
+  --accent-tint: #e7f0fe;
+  --focus: #7db6ff;
+  --shadow: rgb(7 32 76 / 0.04);
+}
+
+/* The placement and the gap, above the pages */
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 18px;
+  margin-bottom: 14px;
+}
+
+.segmented {
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  box-shadow: 0 1px 2px var(--shadow);
+}
+
+.segment {
+  min-width: 58px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 550;
+  line-height: 1;
+  color: var(--muted);
+  background: transparent;
+  border: 0;
+  border-radius: 8px;
+  padding: 8px 10px;
+  cursor: pointer;
+}
+
+.segment:hover {
+  color: var(--ink);
+  background: var(--tint);
+}
+
+.segment[aria-checked='true'] {
+  color: var(--accent);
+  background: var(--accent-tint);
+}
+
+.range {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+/* The card next to the match */
+.card {
+  display: grid;
+  grid-template-columns: auto auto;
+  align-items: center;
+  gap: 2px 14px;
+  padding: 10px 12px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: 0 10px 28px rgb(7 32 76 / 0.2);
+}
+
+.card-title {
+  font-size: 13px;
+  font-weight: 650;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.card-page {
+  grid-row: 2;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.card-steps {
+  grid-row: 1 / span 2;
+  grid-column: 2;
+  display: flex;
+  gap: 4px;
+}
+
+.step {
+  width: 30px;
+  height: 30px;
+  font: inherit;
+  font-size: 14px;
+  color: var(--ink);
+  background: var(--tint);
+  border: 0;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.step:hover {
+  color: var(--accent);
+  background: var(--accent-tint);
+}
+
+.segment:focus-visible,
+.step:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+/* The pages */
+.stage {
+  height: 420px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--canvas);
+  box-shadow:
+    0 1px 2px var(--shadow),
+    0 18px 40px -28px rgb(7 32 76 / 0.28);
+}
+
+.loading {
+  margin: 0;
+  padding: 24px 0;
+  text-align: center;
+  font-size: 13px;
+  color: var(--muted);
+}

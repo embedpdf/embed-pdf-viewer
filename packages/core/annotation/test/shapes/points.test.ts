@@ -1,4 +1,4 @@
-import type { AnnotationDTO } from '@embedpdf/engine-core/runtime';
+import type { Annotation } from '@embedpdf/engine-core/runtime';
 import { describe, expect, it } from 'vitest';
 
 import { rotatePoint } from '../../src/rect';
@@ -17,7 +17,7 @@ const polyline = (rotation: number | null) =>
     vertices: VERTICES,
     rotation,
     lineEndings: { start: 'none', end: 'open-arrow' },
-  }) as unknown as AnnotationDTO;
+  }) as unknown as Annotation;
 
 const close = (actual: { x: number; y: number }, expected: { x: number; y: number }) => {
   expect(actual.x).toBeCloseTo(expected.x, 9);

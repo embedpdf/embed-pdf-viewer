@@ -1,5 +1,9 @@
 import { Anchored } from '@embedpdf/react/anchored';
-import { useAnnotationAnchor, useAnnotationState } from '@embedpdf/react/annotation';
+import {
+  AnnotationLayer,
+  useAnnotationAnchor,
+  useAnnotationState,
+} from '@embedpdf/react/annotation';
 import { Stage } from '@embedpdf/react/stage';
 
 function StampCard() {
@@ -14,4 +18,4 @@ function StampCard() {
   );
 }
 
-export const Pages = () => <Stage overlay={<StampCard />}>{/* … */}</Stage>;
+export const Pages = () => <Stage overlay={<StampCard />}>{() => <AnnotationLayer />}</Stage>;

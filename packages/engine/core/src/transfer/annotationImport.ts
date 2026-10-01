@@ -4,7 +4,7 @@ import {
   AnnotationDraftSchema,
   declarationOf,
   type AnnotationDraft,
-  type AnnotationDTO,
+  type Annotation,
 } from '../annotation/kinds';
 import type { KindFields } from '../annotation/declaration';
 import type { AnnotationReplyType } from '../annotation/primitives';
@@ -98,7 +98,7 @@ export interface AnnotationImportDrop {
 
 export interface AnnotationImportResult<C extends Coordinates = PageCoordinates> {
   /** In bundle order, each as it is now. */
-  annotations: AnnotationDTO<C>[];
+  annotations: Annotation<C>[];
   /** Each imported annotation's ref in the bundle, and its ref in this document. */
   refMap: Array<{ from: AnnotationRef; to: AnnotationRef }>;
   /** What was left out, in bundle order. */
@@ -249,7 +249,7 @@ export function planAnnotationImport(input: {
     const found = byKey.get(annotationKey(ref));
     return found !== undefined && pageOf(found) === pageOf(from) ? found : undefined;
   };
-  const linksOf = (data: AnnotationDTO) =>
+  const linksOf = (data: Annotation) =>
     [data.reply?.to, data.subtype === 'popup' ? data.parent : null].filter(
       (ref): ref is AnnotationRef => ref != null,
     );
@@ -360,7 +360,7 @@ function pageTable(
  * The pages an item is on or points at, apart from its links to other
  * annotations (`reply.to`, `parent`, `popup`), which resolve in the bundle.
  */
-function pagesNamedBy(data: AnnotationDTO): PageRef[] {
+function pagesNamedBy(data: Annotation): PageRef[] {
   const { ref, reply: _reply, popup: _popup, ...rest } = data;
   const fields = { ...rest } as Record<string, unknown>;
   if (data.subtype === 'popup') delete fields.parent;
@@ -368,9 +368,7 @@ function pagesNamedBy(data: AnnotationDTO): PageRef[] {
 }
 
 /** The fields of `data` that are markers for something the engine can't write. */
-function fieldMarkersOf(
-  data: AnnotationDTO,
-): Array<{ field: string; reason: AnnotationDropReason }> {
+function fieldMarkersOf(data: Annotation): Array<{ field: string; reason: AnnotationDropReason }> {
   const markers: Array<{ field: string; reason: AnnotationDropReason }> = [];
   const measure = (data as { measure?: { subtype?: unknown } | null }).measure;
   if (measure?.subtype === 'geospatial') markers.push({ field: 'measure', reason: 'geospatial' });
@@ -395,7 +393,7 @@ function fieldMarkersOf(
  * create needs. A link's target is reported by {@link fieldMarkersOf}.
  */
 function unwritableValuesOf(
-  data: AnnotationDTO,
+  data: Annotation,
 ): Array<{ field: string; reason: AnnotationDropReason }> | 'item' {
   const unwritable: Array<{ field: string; reason: AnnotationDropReason }> = [];
   const declaration = declarationOf(data.subtype);
@@ -433,7 +431,7 @@ const STANDARD_NAMED_ACTIONS: ReadonlySet<string> = new Set([
 
 /** The create an item becomes, checked against its kind's create schema. */
 function draftOf(
-  data: AnnotationDTO,
+  data: Annotation,
   markers: ReadonlyArray<{ field: string }>,
   mapPage: (page: PageRef) => PageRef,
   index: number,

@@ -1,4 +1,4 @@
-import type { AnnotationDTO } from '@embedpdf/engine-core/runtime';
+import type { Annotation } from '@embedpdf/engine-core/runtime';
 import { describe, expect, it } from 'vitest';
 
 import { boxCorners, boxFamily, boxHandles, boxResize, type BoxShape } from '../../src/shapes/box';
@@ -11,9 +11,9 @@ const square = (rotation: number | null) =>
     rect: { x: 0, y: 0, width: 1, height: 1 },
     box: BOX,
     rotation,
-  }) as unknown as AnnotationDTO;
+  }) as unknown as Annotation;
 
-const link = { subtype: 'link', rect: BOX } as unknown as AnnotationDTO;
+const link = { subtype: 'link', rect: BOX } as unknown as Annotation;
 
 const close = (actual: { x: number; y: number }, expected: { x: number; y: number }) => {
   expect(actual.x).toBeCloseTo(expected.x, 9);
@@ -34,7 +34,7 @@ describe('the box family reads and writes the engine fields', () => {
   });
 
   it("a circle's shape is drawn as the ellipse in its box", () => {
-    const circle = { ...square(0), subtype: 'circle' } as unknown as AnnotationDTO;
+    const circle = { ...square(0), subtype: 'circle' } as unknown as Annotation;
     expect(boxFamily.read(circle).ellipse).toBe(true);
   });
 

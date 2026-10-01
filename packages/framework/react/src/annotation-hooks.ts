@@ -1,22 +1,23 @@
-import { AnnotationToken } from '@embedpdf/plugin-annotation/contract';
+/**
+ * The annotation hooks other feature entries use too (the form plugin reads
+ * the selection), kept apart so they don't import the whole annotation
+ * feature: the state and the settings, each from its declaration.
+ */
+import { AnnotationToken, annotationState } from '@embedpdf/plugin-annotation/contract';
 
-import { sameRotationAnchor } from './annotation-anchors';
-import { shallowArray, useSelector } from './runtime';
-
-/** The selected annotations as page-space records — for selection-aware toolbars/sidebars. */
-export function useAnnotationSelected() {
-  return useSelector(AnnotationToken, (annotation) => annotation.listSelected(), shallowArray);
-}
+import { settingsHook, stateHook } from './state';
 
 /**
- * The rotation in progress: its page, the pointer there and the selection's
- * angle (degrees clockwise), or `null` when nothing is being turned. What
- * `<AnnotationRotationBadge>` shows; use it to build your own.
+ * The annotation state: `status` (`'loading'` until every annotation is in,
+ * then `'ready'`), the `selected` annotations, the one `hovered` under the
+ * pointer and the text box being typed in (`editing`). Re-renders only when a
+ * field changes, or the value `select` picks. Empty without a document.
  */
-export function useAnnotationRotation() {
-  return useSelector(
-    AnnotationToken,
-    (annotation) => annotation.getRotationAnchor(),
-    sameRotationAnchor,
-  );
-}
+export const useAnnotationState = stateHook(annotationState);
+
+/**
+ * The annotation settings (`snap`, `chrome`, `afterCreate`, `tools`), or the
+ * value `select` picks. They belong to the plugin, so they read without a
+ * document; change them with `useAnnotation().updateSettings()`.
+ */
+export const useAnnotationSettings = settingsHook(AnnotationToken);

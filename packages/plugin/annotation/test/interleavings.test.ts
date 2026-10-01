@@ -114,7 +114,7 @@ async function play(seed: number, steps: number) {
   const harness = annotationHarness();
   const engine: EngineState = { color: '#000000', print: true };
   await harness.load([squareOf(engine)]);
-  harness.capability.select(REF);
+  harness.capability.selection.set([REF]);
 
   const held: HeldWrite[] = [];
   const changes: UserChange[] = [];
@@ -158,7 +158,7 @@ async function play(seed: number, steps: number) {
     const label = `seed ${seed} step ${step}`;
     if (roll < 0.3) {
       const color = rng.pick(COLORS);
-      void harness.capability.updateSelection({ color });
+      void harness.capability.selection.update({ color });
       // The colour it already shows: no change, and no write.
       if (color === expected('color')) {
         check(label);
@@ -178,7 +178,7 @@ async function play(seed: number, steps: number) {
       const print = !harness.capability.get(REF)!.print;
       // Flags leave the appearance alone: the record renders as it did.
       const source = expectedSource();
-      void harness.capability.updateSelectionFlags({ print });
+      void harness.capability.selection.update({ print });
       const change: UserChange = { field: 'print', value: print, state: 'pending', source };
       if (source === 'vector') preferVector = true;
       changes.push(change);

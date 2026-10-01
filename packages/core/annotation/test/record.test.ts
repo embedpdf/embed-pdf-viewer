@@ -1,7 +1,7 @@
 import { annotationKey } from '@embedpdf/core';
 import { quadFromRect } from '@embedpdf/core-geometry';
 import type {
-  AnnotationDTO,
+  Annotation,
   AnnotationFlags,
   AnnotationPatch,
   AnnotationRef,
@@ -22,7 +22,7 @@ import {
 import { describe, expect, it } from 'vitest';
 
 import { DRAWN_FLAGS } from '../src/flags';
-import { KINDS, type FieldSpec } from '../src/kinds';
+import { KINDS, type AnnotationProperty } from '../src/kinds';
 import { linkChildrenOf, linkOf } from '../src/links';
 import { isAttachedLink } from '../src/plane';
 import {
@@ -52,7 +52,7 @@ const CROP: PdfRect = { left: 0, bottom: 0, right: 600, top: 800 };
  */
 const boxOf = () => CROP;
 /** A read as the engine hands it out. */
-const fromFile = (dto: AnnotationDTO<PdfCoordinates>): AnnotationDTO =>
+const fromFile = (dto: Annotation<PdfCoordinates>): Annotation =>
   pageAnnotationOf(dto, CROP, boxOf);
 /** A patch as the engine writes it to the file. */
 const toFile = (
@@ -97,7 +97,7 @@ const NO_FLAGS: AnnotationFlags = {
 function squareDTO(
   objectNumber: number,
   reply: { to: AnnotationRef; type: 'reply' | 'group' } | null = null,
-): AnnotationDTO<PdfCoordinates> {
+): Annotation<PdfCoordinates> {
   const ref: AnnotationRef = { kind: 'objectNumber', page: toPageRef(1), objectNumber };
   return {
     ref,
@@ -130,7 +130,7 @@ function squareDTO(
     strokeWidth: 2,
     opacity: 1,
     borderStyle: 'solid',
-  } as AnnotationDTO<PdfCoordinates>;
+  } as Annotation<PdfCoordinates>;
 }
 
 describe('fromDTO — group/relationship mapping', () => {
@@ -164,7 +164,7 @@ describe('fromDTO — group/relationship mapping', () => {
 });
 
 describe('record — Ink Highlight intent and blend', () => {
-  const dto = (): AnnotationDTO<PdfCoordinates> => ({
+  const dto = (): Annotation<PdfCoordinates> => ({
     ref: { kind: 'objectNumber', page: toPageRef(1), objectNumber: 20 },
     page: toPageRef(1),
     index: 0,
@@ -228,7 +228,7 @@ const CL: CalloutLine = [
   { x: 200, y: 630 }, // connection (ignored on read)
 ];
 
-function calloutDTO(objectNumber = 20): AnnotationDTO<PdfCoordinates> {
+function calloutDTO(objectNumber = 20): Annotation<PdfCoordinates> {
   const ref: AnnotationRef = { kind: 'objectNumber', page: toPageRef(1), objectNumber };
   return {
     ref,
@@ -287,18 +287,18 @@ function calloutDTO(objectNumber = 20): AnnotationDTO<PdfCoordinates> {
       },
       paragraphs: [{ runs: [{ text: 'see here' }] }],
     },
-  } as unknown as AnnotationDTO<PdfCoordinates>;
+  } as unknown as Annotation<PdfCoordinates>;
 }
 
 /** A plain free-text DTO (no leader) for the contrast case. */
-function plainFreeTextDTO(objectNumber = 21): AnnotationDTO<PdfCoordinates> {
+function plainFreeTextDTO(objectNumber = 21): Annotation<PdfCoordinates> {
   return {
     ...calloutDTO(objectNumber),
     intent: 'free-text',
     rect: BOX_PDF,
     calloutLine: null,
     lineEnding: null,
-  } as AnnotationDTO<PdfCoordinates>;
+  } as Annotation<PdfCoordinates>;
 }
 
 /* ── rotation round-trip ───────────────────────────────────────────────────────
@@ -307,16 +307,16 @@ function plainFreeTextDTO(objectNumber = 21): AnnotationDTO<PdfCoordinates> {
  * the engine's upright box around it); points kinds keep their points upright
  * and the turn beside them.
  */
-function rotatedSquareDTO(rotation: number, objectNumber = 30): AnnotationDTO<PdfCoordinates> {
+function rotatedSquareDTO(rotation: number, objectNumber = 30): Annotation<PdfCoordinates> {
   return {
     ...squareDTO(objectNumber),
     // For a square turned 90° the upright box around it is the box itself.
     rect: { left: 100, bottom: 100, right: 200, top: 200 },
     rotation,
-  } as AnnotationDTO<PdfCoordinates>;
+  } as Annotation<PdfCoordinates>;
 }
 
-function rotatedPolylineDTO(rotation: number, objectNumber = 31): AnnotationDTO<PdfCoordinates> {
+function rotatedPolylineDTO(rotation: number, objectNumber = 31): Annotation<PdfCoordinates> {
   const ref: AnnotationRef = { kind: 'objectNumber', page: toPageRef(1), objectNumber };
   return {
     ref,
@@ -353,7 +353,7 @@ function rotatedPolylineDTO(rotation: number, objectNumber = 31): AnnotationDTO<
     ],
     lineEndings: { start: 'none', end: 'none' },
     rotation,
-  } as AnnotationDTO<PdfCoordinates>;
+  } as Annotation<PdfCoordinates>;
 }
 
 describe('record — rotation round-trip', () => {
@@ -500,7 +500,7 @@ describe('record — free-text text', () => {
 function polygonDTO(
   cloudyIntensity: number | undefined,
   objectNumber = 40,
-): AnnotationDTO<PdfCoordinates> {
+): Annotation<PdfCoordinates> {
   const ref: AnnotationRef = { kind: 'objectNumber', page: toPageRef(1), objectNumber };
   return {
     ref,
@@ -536,18 +536,18 @@ function polygonDTO(
       { x: 280, y: 140 },
     ],
     cloudyIntensity,
-  } as AnnotationDTO<PdfCoordinates>;
+  } as Annotation<PdfCoordinates>;
 }
 
 describe('record — cloudy borders', () => {
   it("reads a polygon's and a square's /BE intensity as the cloud; a square's box stays its box", () => {
     expect(styleOf(fromDTO(fromFile(polygonDTO(2))).annotation).cloudyIntensity).toBe(2);
     const square = fromDTO(
-      fromFile({ ...squareDTO(45), cloudyIntensity: 2 } as AnnotationDTO<PdfCoordinates>),
+      fromFile({ ...squareDTO(45), cloudyIntensity: 2 } as Annotation<PdfCoordinates>),
     );
     expect(styleOf(square.annotation).cloudyIntensity).toBe(2);
     const shape = shapeOf(square.annotation);
-    const dto = square.annotation as Extract<AnnotationDTO, { subtype: 'square' }>;
+    const dto = square.annotation as Extract<Annotation, { subtype: 'square' }>;
     expect(shape.kind === 'box' && shape.box).toEqual(dto.box);
   });
 
@@ -564,7 +564,7 @@ describe('record — cloudy borders', () => {
       cloudyIntensity: null,
     });
     const square = fromDTO(
-      fromFile({ ...squareDTO(46), cloudyIntensity: 2 } as AnnotationDTO<PdfCoordinates>),
+      fromFile({ ...squareDTO(46), cloudyIntensity: 2 } as Annotation<PdfCoordinates>),
     );
     expect(fieldsWrite(square, { cloudyIntensity: null })).toEqual({
       subtype: 'square',
@@ -581,7 +581,7 @@ describe('record — cloudy borders', () => {
 describe('record — a change writes only what it changes', () => {
   it('a moved square writes its box alone: no style, and not the turn it already has', () => {
     const record = fromDTO(
-      fromFile({ ...squareDTO(60), rotation: 30 } as AnnotationDTO<PdfCoordinates>),
+      fromFile({ ...squareDTO(60), rotation: 30 } as Annotation<PdfCoordinates>),
     );
     const shape = shapeOf(record.annotation);
     if (shape.kind !== 'box') throw new Error('expected a box');
@@ -592,7 +592,7 @@ describe('record — a change writes only what it changes', () => {
 
   it('a moved link writes its rect alone: a foreign /A survives the move', () => {
     const record = fromDTO(
-      fromFile({ ...squareDTO(61), subtype: 'link' } as AnnotationDTO<PdfCoordinates>),
+      fromFile({ ...squareDTO(61), subtype: 'link' } as Annotation<PdfCoordinates>),
     );
     const shape = shapeOf(record.annotation);
     if (shape.kind !== 'box') throw new Error('expected a box');
@@ -603,7 +603,7 @@ describe('record — a change writes only what it changes', () => {
 
   it('strokeWidth on a cloudy square writes only the width: the box is where the cloud starts', () => {
     const cloudy = fromDTO(
-      fromFile({ ...squareDTO(62), cloudyIntensity: 2 } as AnnotationDTO<PdfCoordinates>),
+      fromFile({ ...squareDTO(62), cloudyIntensity: 2 } as Annotation<PdfCoordinates>),
     );
     expect(fieldsWrite(cloudy, { strokeWidth: 3 })).toEqual({ subtype: 'square', strokeWidth: 3 });
   });
@@ -630,7 +630,7 @@ describe('record — a change writes only what it changes', () => {
       strokeWidth: _strokeWidth,
       borderStyle: _borderStyle,
       ...base
-    } = squareDTO(65) as Extract<AnnotationDTO<PdfCoordinates>, { subtype: 'square' }>;
+    } = squareDTO(65) as Extract<Annotation<PdfCoordinates>, { subtype: 'square' }>;
     const stamp = fromDTO(
       fromFile({
         ...base,
@@ -640,7 +640,7 @@ describe('record — a change writes only what it changes', () => {
         opacity: 0.3,
         box: base.rect,
         rotation: null,
-      } as AnnotationDTO<PdfCoordinates>),
+      } as Annotation<PdfCoordinates>),
     );
     expect(styleOf(stamp.annotation).opacity).toBe(0.3);
     expect(fieldsWrite(stamp, { opacity: 0.6 })).toEqual({ subtype: 'stamp', opacity: 0.6 });
@@ -659,7 +659,7 @@ describe('record — a change writes only what it changes', () => {
 });
 
 describe('record — line endings leave /Rect to the engine', () => {
-  const lineDTO = (lineEndings: { start: string; end: string }): AnnotationDTO<PdfCoordinates> =>
+  const lineDTO = (lineEndings: { start: string; end: string }): Annotation<PdfCoordinates> =>
     ({
       ref: { kind: 'objectNumber', page: toPageRef(1), objectNumber: 77 },
       page: toPageRef(1),
@@ -692,7 +692,7 @@ describe('record — line endings leave /Rect to the engine', () => {
       linePoints: { start: { x: 120, y: 120 }, end: { x: 280, y: 180 } },
       lineEndings,
       rotation: null,
-    }) as unknown as AnnotationDTO<PdfCoordinates>;
+    }) as unknown as Annotation<PdfCoordinates>;
 
   it('new endings on a line state the endings and no rect: the engine measures the arrows', () => {
     const record = fromDTO(fromFile(lineDTO({ start: 'none', end: 'none' })));
@@ -718,12 +718,12 @@ describe('record — attached links (lens + desired state + link kind)', () => {
     objectNumber: number,
     target: PdfLinkTarget | null,
     reply?: { to: AnnotationRef; type: 'group' | 'reply' },
-  ): AnnotationDTO<PdfCoordinates> =>
+  ): Annotation<PdfCoordinates> =>
     ({
       ...squareDTO(objectNumber, reply ?? null),
       subtype: 'link',
       target,
-    }) as unknown as AnnotationDTO<PdfCoordinates>;
+    }) as unknown as Annotation<PdfCoordinates>;
 
   const URI = { kind: 'uri', uri: 'https://www.embedpdf.com/' } as const;
   const parentRef: AnnotationRef = {
@@ -885,7 +885,7 @@ describe('record — every field a kind takes writes only fields its engine kind
     }
   };
   /** The message a sidebar sends for one field spec: a field, a text format or a link. */
-  const messageFor = (spec: FieldSpec, id: string): Message => {
+  const messageFor = (spec: AnnotationProperty, id: string): Message => {
     switch (spec.key) {
       case 'bold':
       case 'italic':
@@ -921,10 +921,11 @@ describe('record — every field a kind takes writes only fields its engine kind
     fontFamily: 'times-roman',
     textAlign: 'center',
     blendMode: 'multiply',
+    overlayText: 'REDACTED',
   };
 
   for (const [subtype, kind] of Object.entries(KINDS)) {
-    for (const spec of kind.fields) {
+    for (const spec of kind.properties) {
       it(`${subtype}: ${spec.key}`, () => {
         const before = recordOf({
           id: 'obj:1',

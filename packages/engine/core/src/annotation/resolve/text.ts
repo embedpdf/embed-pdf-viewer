@@ -3,7 +3,7 @@ import { EngineErrorCode } from '../../errors/EngineErrorCode';
 import { richTextPlainText, type RichTextDocumentInput } from '../../dto/RichText';
 import type { PdfCoordinates } from '../../pageSpace/coordinates';
 import { standardStateModelOf } from '../comments';
-import type { AnnotationDraft, AnnotationDTO, AnnotationPatch } from '../kinds';
+import type { AnnotationDraft, Annotation, AnnotationPatch } from '../kinds';
 
 /**
  * A review state needs its model (ISO 32000 §12.5.6.3): a standard state
@@ -35,7 +35,7 @@ export function noteDraftStateFollows(
  * own; a custom one keeps the annotation's, and needs one.
  */
 export function noteStateFollows(
-  current: AnnotationDTO<PdfCoordinates>,
+  current: Annotation<PdfCoordinates>,
   patch: AnnotationPatch<PdfCoordinates>,
 ): AnnotationPatch<PdfCoordinates> {
   if (current.subtype !== 'text' || patch.subtype !== 'text') return patch;

@@ -1,6 +1,13 @@
 /** @embedpdf/plugin-stamp/contract: the public stamp vocabulary. */
-import type { BatchResult, EventHook, OperationOptions } from '@embedpdf/core';
 import type {
+  BatchResult,
+  DeepPartial,
+  EventHook,
+  OperationOptions,
+  SettingsApi,
+} from '@embedpdf/core';
+import type {
+  Annotation,
   AnnotationRef,
   BinarySource,
   LocalEngine,
@@ -11,6 +18,7 @@ import type { StampPlacement } from '@embedpdf/plugin-annotation/contract';
 export { StampToken } from './token';
 export { DEFAULT_LIBRARY_KIND } from './convention';
 export type { StampLibraryStore } from './persistence';
+export type { StampPlacement } from '@embedpdf/plugin-annotation/contract';
 
 /**
  * The stamp plugin: a workspace-scoped asset substrate.
@@ -96,28 +104,25 @@ export interface StampLibrary {
   assetIds: string[];
 }
 
-/** Why a library's canonical bytes changed: the persistence signal. */
-export interface StampLibraryChange {
-  libraryId: string;
-  reason:
-    | 'created'
-    | 'imported'
-    | 'updated'
-    | 'asset-added'
-    | 'asset-updated'
-    | 'asset-removed'
-    | 'removed';
-}
+// ── settings ──────────────────────────────────────────────────────────────
 
-export interface StampConfig {
+/**
+ * The local engine stamp libraries open in, or a function that makes one. A
+ * function is called on the first import, not at startup, and its engine is
+ * destroyed with the plugin.
+ */
+export type StampAssetEngine = LocalEngine | (() => LocalEngine | Promise<LocalEngine>);
+
+/**
+ * The stamp plugin's settings. `stampPlugin(config)` registers them over
+ * {@link STAMP_DEFAULTS}, and `updateSettings()` changes them while the app
+ * runs.
+ */
+export interface StampSettings {
   /**
-   * The asset engine port: a local engine, used only to slice an imported
-   * library PDF into per-page assets and render their previews.
-   *
-   * Omitted: the kernel's own engine is used, which is exactly right for a
-   * local deployment (same WASM instance, zero extra cost). In a cloud
-   * deployment the kernel engine is not local, so pass a factory;
-   * it is called (and memoized) on the first import, never at viewer boot:
+   * The engine stamp libraries open in. `null` uses the viewer's own engine,
+   * which is right when that engine is local. A cloud viewer passes a local
+   * engine, or a function that makes one:
    *
    * ```ts
    * stampPlugin({
@@ -125,24 +130,60 @@ export interface StampConfig {
    * })
    * ```
    */
-  assetEngine?: LocalEngine | (() => LocalEngine | Promise<LocalEngine>);
-  /** Cached thumbnail width in device px (import-time render). Default 256. */
-  previewWidth?: number;
+  readonly assetEngine: StampAssetEngine | null;
+  /** The width of a stamp's thumbnail, in device pixels. */
+  readonly previewWidth: number;
   /**
-   * Evaluate form-backed (dynamic) PDF stamp assets on arm. Default `true`.
+   * Fill in a dynamic stamp's form fields when it's armed or placed.
    * Scripting itself is the workspace's one JavaScript switch,
-   * `actionsPlugin({ javascript: { enabled } })`: stamp has no switch of its
-   * own. It asks the target document's actions plugin for a detached realm
-   * (same identity, clock, sandbox, and budget; isolated globals), and arms
-   * the template unevaluated when scripting is off or actions is absent.
-   * `false` keeps templates static even with scripting on: a product
-   * choice (a stamp's appearance must equal the reviewed template), not a
-   * trust boundary, since a detached realm can only alert and spend budget.
+   * `actionsPlugin({ javascript: { enabled } })`: without the actions plugin,
+   * or with scripting off, a stamp is placed as it is. `false` keeps every
+   * stamp as reviewed, even with scripting on.
    */
-  dynamic?: boolean;
+  readonly dynamic: boolean;
 }
 
-export interface ImportLibraryOptions {
+/** What the stamp settings are when the app registers none. */
+export const STAMP_DEFAULTS: StampSettings = {
+  assetEngine: null,
+  previewWidth: 256,
+  dynamic: true,
+};
+
+/** What `stampPlugin(config)` takes: any of the settings, merged over the defaults. */
+export type StampConfig = DeepPartial<StampSettings>;
+
+// ── verbs ─────────────────────────────────────────────────────────────────
+
+/**
+ * Which document a placing verb acts on. Left out, it is the document in
+ * scope (`useStamp()` inside a `<DocumentScope>`, a document plugin's
+ * `ctx.get(StampToken)`), else the active document.
+ */
+export interface StampDocumentOptions extends OperationOptions {
+  readonly documentId?: string;
+}
+
+/** `armAsset()`'s options. */
+export interface StampArmOptions extends StampDocumentOptions {
+  /** Placed width in PDF points; the stamp's own width by default. */
+  readonly targetWidth?: number;
+}
+
+export interface CreateLibraryOptions extends OperationOptions {
+  /** The library's id; a fresh one when left out or taken. */
+  readonly id?: string;
+  /** What the library is for. Default `'stamps'`. */
+  readonly kind?: StampLibraryKind;
+  readonly categories?: string[];
+}
+
+export interface StampLibraryPatch {
+  readonly name?: string;
+  readonly categories?: string[];
+}
+
+export interface ImportLibraryOptions extends OperationOptions {
   /**
    * Fallback library name, applied only when the PDF carries no `/Title`
    * (an Acrobat-authored or previously exported library names itself).
@@ -188,6 +229,16 @@ export interface AddAssetInput {
   size?: { width: number; height: number };
 }
 
+/** What `createAssetFromAnnotations()` takes besides the annotations: where the stamp goes and its name. */
+export type AssetFromAnnotationsInput = Omit<AddAssetInput, 'source' | 'mark' | 'size'>;
+
+export interface StampAssetPatch {
+  readonly label?: string;
+  /** `null` drops the subject override, so placements use the label. */
+  readonly subject?: string | null;
+  readonly categories?: string[];
+}
+
 /** A cached, browser-paintable render of an asset (PNG from import; raster assets as-is). */
 export interface StampAssetPreview {
   bytes: Uint8Array;
@@ -203,110 +254,192 @@ export interface StampAssetFilter {
   readonly category?: string;
 }
 
-// ── events ──
-export interface StampLibraryEvent {
+// ── events ────────────────────────────────────────────────────────────────
+
+/** A library's bytes changed, and why: the one to save it on. */
+export interface StampLibraryChangedEvent {
   readonly libraryId: string;
-  /** The library after the change; null once deleted. */
-  readonly library: StampLibrary | null;
+  readonly reason:
+    | 'created'
+    | 'imported'
+    | 'updated'
+    | 'asset-added'
+    | 'asset-updated'
+    | 'asset-removed'
+    | 'removed';
 }
-export interface StampAssetEvent {
+export interface StampLibraryCreatedEvent {
+  readonly libraryId: string;
+  readonly library: StampLibrary;
+}
+export interface StampLibraryUpdatedEvent {
+  readonly libraryId: string;
+  readonly library: StampLibrary;
+}
+export interface StampLibraryDeletedEvent {
+  readonly libraryId: string;
+  readonly library: null;
+}
+export interface StampAssetCreatedEvent {
   readonly assetId: string;
   readonly libraryId: string;
-  /** The asset after the change; null once deleted. */
-  readonly asset: StampAsset | null;
+  readonly asset: StampAsset;
 }
+export interface StampAssetUpdatedEvent {
+  readonly assetId: string;
+  readonly libraryId: string;
+  readonly asset: StampAsset;
+}
+export interface StampAssetDeletedEvent {
+  readonly assetId: string;
+  readonly libraryId: string;
+  readonly asset: null;
+}
+/** A stamp was armed on a document, or disarmed (`asset: null`). */
 export interface StampArmChangedEvent {
   readonly documentId: string;
-  readonly assetId: string | null;
+  readonly asset: StampAsset | null;
 }
 
 /**
- * Stamp libraries and their assets (workspace-scoped); placement targets a
- * document. A library is a PDF (one page per asset): `exportLibrary` returns
- * the persistence format, `importLibrary` reads it back. Every verb rejects
- * with a `PluginError`.
+ * Stamp libraries and their assets, shared by every document, and placing
+ * them on a document. The placing verbs act on the document in scope, else
+ * the active one, or the one their options name (`documentId`). A library is
+ * a PDF (one page per asset): `exportLibrary` returns the persistence format,
+ * `importLibrary` reads it back. Every verb rejects with a `PluginError`, and
+ * every async verb takes a `signal`: cancelled, it rejects
+ * `operation-cancelled` and changes nothing. The settings belong to the
+ * plugin, not to a document.
  */
-export interface StampCapability {
+export interface StampCapability extends SettingsApi<StampSettings> {
   // ── reading ──
   listLibraries(filter?: StampLibraryFilter): readonly StampLibrary[];
-  getLibrary(id: string): StampLibrary | null;
+  getLibrary(libraryId: string): StampLibrary | null;
+  /** Assets in the order a picker shows them: by library, then within it. */
   listAssets(filter?: StampAssetFilter): readonly StampAsset[];
-  getAsset(id: string): StampAsset | null;
-  /** The cached thumbnail (the configured preview width), or null. */
-  getAssetPreview(id: string): StampAssetPreview | null;
-  /** A preview at any width, rendered by the asset engine and cached per width. */
+  getAsset(assetId: string): StampAsset | null;
+  /** The cached thumbnail (the `previewWidth` setting), or null. */
+  getAssetPreview(assetId: string): StampAssetPreview | null;
+  /** A preview at any width, rendered by the asset engine and cached per width. Rejects `not-found`. */
   renderAssetPreview(
-    id: string,
+    assetId: string,
     options: { width: number } & OperationOptions,
   ): Promise<StampAssetPreview | null>;
   /** A copy of the asset's placement bytes (a one-page PDF), or null. */
-  readAssetBytes(id: string): Uint8Array | null;
+  readAssetBytes(assetId: string): Uint8Array | null;
 
   // ── libraries ──
-  createLibrary(
-    name: string,
-    options?: { id?: string; kind?: StampLibraryKind; categories?: string[] },
-  ): Promise<string>;
-  updateLibrary(id: string, patch: { name?: string; categories?: string[] }): Promise<void>;
-  /** Delete a library with its assets. */
-  deleteLibrary(id: string): Promise<void>;
-  /** A PDF becomes a library (one asset per page). */
-  importLibrary(source: BinarySource, options?: ImportLibraryOptions): Promise<string>;
+  /** Create an empty library. Fires `onLibraryCreated` and `onLibraryChanged`. */
+  createLibrary(name: string, options?: CreateLibraryOptions): Promise<{ library: StampLibrary }>;
+  /** Rename a library or change its categories. Rejects `not-found`. Fires `onLibraryUpdated`. */
+  updateLibrary(
+    libraryId: string,
+    changes: StampLibraryPatch,
+    options?: OperationOptions,
+  ): Promise<{ library: StampLibrary }>;
+  /** Delete a library with its assets. Fires `onLibraryDeleted`. */
+  deleteLibrary(libraryId: string, options?: OperationOptions): Promise<void>;
+  /**
+   * A PDF becomes a library (one asset per page). Rejects `invalid-input` for
+   * bytes that aren't a PDF, `unsupported` without a local asset engine.
+   * Fires `onLibraryCreated`, then `onAssetCreated` per stamp.
+   */
+  importLibrary(
+    source: BinarySource,
+    options?: ImportLibraryOptions,
+  ): Promise<{ library: StampLibrary }>;
   /** The library as the PDF it is. Rejects `not-found`. */
-  exportLibrary(id: string): Promise<Uint8Array>;
+  exportLibrary(libraryId: string, options?: OperationOptions): Promise<Uint8Array>;
 
   // ── assets ──
-  createAsset(input: AddAssetInput): Promise<string>;
-  /** Annotations on a page become an asset (their appearance exported as one page). */
+  /**
+   * Add a stamp from bytes or a mark. Rejects `not-found` for an unknown
+   * library, `invalid-input` for bytes that aren't a picture or a taken
+   * identifier. Fires `onAssetCreated`.
+   */
+  createAsset(input: AddAssetInput, options?: OperationOptions): Promise<{ asset: StampAsset }>;
+  /**
+   * Annotations on a page of a document become one stamp, exactly as they
+   * look. All or nothing: a hidden annotation, one without an appearance, or
+   * one on another page fails the call. Rejects `permission-denied` without
+   * `doc.download` (see `canCreateFromAnnotations`), `not-found` for a page
+   * that isn't in the document.
+   */
   createAssetFromAnnotations(
-    documentId: string,
-    page: PageRef,
+    page: PageRef | number,
     refs: readonly AnnotationRef[],
-    input: Omit<AddAssetInput, 'source' | 'size'>,
-  ): Promise<string>;
+    input: AssetFromAnnotationsInput,
+    options?: StampDocumentOptions,
+  ): Promise<{ asset: StampAsset }>;
+  /** Change a stamp's label, subject or categories; its identifier never changes. Rejects `not-found`. */
   updateAsset(
-    id: string,
-    patch: { label?: string; subject?: string | null; categories?: string[] },
-  ): Promise<void>;
-  deleteAsset(id: string): Promise<void>;
-  /** Move an asset to another library (a copy there, then the original is deleted). */
-  moveAsset(id: string, to: { libraryId: string }): Promise<string>;
-  /** Copy an asset within its library. */
-  duplicateAsset(id: string, options?: { label?: string }): Promise<string>;
+    assetId: string,
+    changes: StampAssetPatch,
+    options?: OperationOptions,
+  ): Promise<{ asset: StampAsset }>;
+  /** Remove a stamp from its library. Fires `onAssetDeleted`. */
+  deleteAsset(assetId: string, options?: OperationOptions): Promise<void>;
+  /** Move a stamp to another library: a copy there, with a new id, then the original goes. */
+  moveAsset(
+    assetId: string,
+    to: { libraryId: string },
+    options?: OperationOptions,
+  ): Promise<{ asset: StampAsset }>;
+  /** Copy a stamp within its library. */
+  duplicateAsset(
+    assetId: string,
+    options?: { label?: string } & OperationOptions,
+  ): Promise<{ asset: StampAsset }>;
 
-  // ── placement ──
-  /** Arm on a document; the next click places. */
-  armAsset(documentId: string, assetId: string, options?: { targetWidth?: number }): Promise<void>;
-  disarm(documentId: string): void;
-  /** What is armed on a document. Pure. */
-  getArmedAsset(documentId: string): StampAsset | null;
-  /** Place without the pointer. */
+  // ── placing, on one document ──
+  /**
+   * Arm a stamp: the next click on the document places it, with a preview
+   * under the pointer. Rejects `not-found` for an unknown asset,
+   * `permission-denied` without `annotations:create` (see `canPlace`).
+   * Fires `onArmChanged`.
+   */
+  armAsset(assetId: string, options?: StampArmOptions): Promise<void>;
+  /** Disarm the stamp without placing it. Fires `onArmChanged` when one was armed. */
+  disarm(documentId?: string): void;
+  /** The stamp the next click on the document places, or null. */
+  getArmedAsset(documentId?: string): StampAsset | null;
+  /**
+   * Place a stamp without the pointer, its middle on `center`, sized by its
+   * picture and kept on the page. Resolves `{ annotation }`. Selected only
+   * with `select: true`. Rejects `permission-denied` without
+   * `annotations:create`, `not-found` for an unknown asset or page.
+   */
   placeAsset(
-    documentId: string,
     assetId: string,
     placement: StampPlacement,
-  ): Promise<AnnotationRef>;
-  /** Stamp many pages with one asset at the same page-relative placement. */
+    options?: StampDocumentOptions,
+  ): Promise<{ annotation: Annotation }>;
+  /**
+   * Place one stamp at the same spot on several pages (refs or indexes), or
+   * on `'all'`. Resolves the placed stamps, and the pages that failed.
+   */
   placeAssetOnPages(
-    documentId: string,
     assetId: string,
-    pages: readonly PageRef[] | 'all',
+    pages: readonly (PageRef | number)[] | 'all',
     placement: Omit<StampPlacement, 'page'>,
-    options?: OperationOptions,
-  ): Promise<BatchResult<AnnotationRef, PageRef>>;
-  /** Would placing on this document succeed (annotation create authority)? */
+    options?: StampDocumentOptions,
+  ): Promise<BatchResult<Annotation, PageRef>>;
+  /** Whether a stamp may be armed or placed on the document (`annotations:create`). */
   canPlace(documentId?: string): boolean;
-  /** Can this deployment import library PDFs (an engine that opens local bytes)? */
+  /** Whether annotations of the document may become a stamp, which copies them out (`doc.download`). */
+  canCreateFromAnnotations(documentId?: string): boolean;
+  /** Whether libraries can be imported: false once an import found no local engine to open them in. */
   canImport(): boolean;
 
   // ── events ──
-  readonly onLibraryCreated: EventHook<StampLibraryEvent>;
-  readonly onLibraryUpdated: EventHook<StampLibraryEvent>;
-  readonly onLibraryDeleted: EventHook<StampLibraryEvent>;
-  readonly onAssetCreated: EventHook<StampAssetEvent>;
-  readonly onAssetUpdated: EventHook<StampAssetEvent>;
-  readonly onAssetDeleted: EventHook<StampAssetEvent>;
+  readonly onLibraryCreated: EventHook<StampLibraryCreatedEvent>;
+  readonly onLibraryUpdated: EventHook<StampLibraryUpdatedEvent>;
+  readonly onLibraryDeleted: EventHook<StampLibraryDeletedEvent>;
+  readonly onAssetCreated: EventHook<StampAssetCreatedEvent>;
+  readonly onAssetUpdated: EventHook<StampAssetUpdatedEvent>;
+  readonly onAssetDeleted: EventHook<StampAssetDeletedEvent>;
+  /** A stamp was armed or disarmed on a document. */
   readonly onArmChanged: EventHook<StampArmChangedEvent>;
   /** A library's bytes changed (subscribe to persist). */
-  readonly onLibraryChanged: EventHook<StampLibraryChange>;
+  readonly onLibraryChanged: EventHook<StampLibraryChangedEvent>;
 }

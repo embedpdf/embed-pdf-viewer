@@ -5,13 +5,14 @@
  * save or print), and the adapter print wrapped /WP → print → /DP under the
  * print latch.
  */
+import { PluginError, type OperationOptions } from '@embedpdf/core';
+
 import type {
   ActionContext,
   ActionDiagnostic,
   ActionNodeStatus,
   ActionOrigin,
   ActionsCapability,
-  ActionsConfig,
   ActionStepResult,
   ActionTriggerResult,
   DocumentTriggerEvent,
@@ -24,15 +25,14 @@ import type { ActionsOpenSequence } from './open-sequence';
 export function createDocumentEvents(
   services: Pick<
     ActionsServices,
-    'events' | 'catalog' | 'queue' | 'ports' | 'authority' | 'printLatch'
+    'events' | 'catalog' | 'queue' | 'ports' | 'authority' | 'printLatch' | 'settings'
   >,
-  config: ActionsConfig,
   {
     ensureOpenSequenceBeforeDocEvent,
   }: Pick<ActionsOpenSequence, 'ensureOpenSequenceBeforeDocEvent'>,
   { runAndEmit }: DispatchCore,
 ) {
-  const { diagnosticHook } = services.events;
+  const { reportDiagnostic } = services.events;
   const { readDocumentActions, DOC_EVENT_TREES } = services.catalog;
   const { enqueue, budget } = services.queue;
   const ports = services.ports.slots;
@@ -49,7 +49,7 @@ export function createDocumentEvents(
     event: Exclude<DocumentTriggerEvent, 'open'>,
     diagnose: (diagnostic: ActionDiagnostic) => void,
   ): Promise<ActionStepResult | null> => {
-    if (config.triggers?.document === false) return null;
+    if (!services.settings.get().triggers.document) return null;
     try {
       await ensureOpenSequenceBeforeDocEvent();
       const snapshot = await readDocumentActions();
@@ -127,16 +127,28 @@ export function createDocumentEvents(
     runDocumentEventOp,
     firePrintThroughAdapter,
     api: {
-      runDocumentVerb: <T>(verb: 'save' | 'print', operation: () => Promise<T> | T): Promise<T> =>
+      runDocumentVerb: <T>(
+        verb: 'save' | 'print',
+        operation: () => Promise<T> | T,
+        options?: OperationOptions,
+      ): Promise<T> =>
         enqueue(async () => {
           budget.scriptNodes = 0; // one script budget for the whole verb operation
-          const diagnose = (diagnostic: ActionDiagnostic): void => diagnosticHook.emit(diagnostic);
+          const diagnose = (diagnostic: ActionDiagnostic): void =>
+            reportDiagnostic(diagnostic, { source: { kind: 'document' } });
           const before = verb === 'save' ? ('will-save' as const) : ('will-print' as const);
           const after = verb === 'save' ? ('did-save' as const) : ('did-print' as const);
           const body = async (): Promise<T> => {
             // A before-event failure never cancels the user's verb;
             // runDocEventTreeSafe already degrades to diagnostics.
             await runDocEventTreeSafe(before, diagnose);
+            // The caller can still cancel here; once the operation started,
+            // it finishes, and so does its after-event.
+            if (options?.signal?.aborted) {
+              throw new PluginError('operation-cancelled', 'actions', `${verb} was cancelled`, {
+                cause: options.signal.reason,
+              });
+            }
             // `operation()` throwing skips the after-event and rethrows: no
             // /DS for a failed save.
             const value = await operation();
@@ -153,7 +165,7 @@ export function createDocumentEvents(
           } finally {
             printLatch.active = false;
           }
-        }),
+        }, options),
     } satisfies Partial<ActionsCapability>,
   };
 }

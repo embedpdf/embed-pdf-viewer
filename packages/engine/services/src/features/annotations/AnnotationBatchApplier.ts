@@ -4,7 +4,7 @@ import {
   PDF_SUBTYPE_TO_CODE,
   type AnnotationActor,
   type AnnotationDraft,
-  type AnnotationDTO,
+  type Annotation,
   type AnnotationListMutationMeta,
   type AnnotationRef,
   type AnnotationReplyType,
@@ -81,7 +81,7 @@ export interface BatchCreate {
 
 export interface BatchCreateResult {
   /** In the order of the creates, each as it is now. */
-  created: AnnotationDTO<PdfCoordinates>[];
+  created: Annotation<PdfCoordinates>[];
   meta: AnnotationListMutationMeta;
 }
 

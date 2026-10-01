@@ -1,7 +1,9 @@
 import { Component } from '@angular/core';
+import { AnnotationToken } from '@embedpdf/angular/annotation';
 import { standardCommands, withCommands } from '@embedpdf/angular/commands';
-import { provideEmbedPdf } from '@embedpdf/angular/runtime';
+import { DocumentsToken, provideEmbedPdf } from '@embedpdf/angular/runtime';
 import { engine } from './pdf';
+import { approveDocument } from './review';
 
 @Component({
   selector: 'app-document-viewer',

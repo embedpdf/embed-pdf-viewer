@@ -4,11 +4,7 @@
  * refusal as an error.
  */
 import { PluginError, toPluginError, toPluginErrorInfo, type BatchResult } from '@embedpdf/core';
-import {
-  annotationKey,
-  type AnnotationDTO,
-  type AnnotationRef,
-} from '@embedpdf/engine-core/runtime';
+import { annotationKey, type Annotation, type AnnotationRef } from '@embedpdf/engine-core/runtime';
 
 import type { IntentOutcome } from '../services/intents';
 import type { Applied, AppliedOutcome, Commit } from '../services/store';
@@ -65,10 +61,7 @@ export async function appliedOrThrow(applied: Applied): Promise<AppliedOutcome> 
  * or update left, as the engine read it back; `null` when the change wrote
  * nothing. Rejects with the first refusal.
  */
-export async function appliedAnnotationOf(
-  applied: Applied,
-  index = 0,
-): Promise<AnnotationDTO | null> {
+export async function appliedAnnotationOf(applied: Applied, index = 0): Promise<Annotation | null> {
   const outcome = await appliedOrThrow(applied);
   return outcome.annotations[index] ?? null;
 }

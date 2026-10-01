@@ -4,7 +4,6 @@
  * two standards: the /AA keys are ISO 32000-2 Table 200; the event names
  * live in the JavaScript API layer (ISO 21757-1, Acrobat).
  */
-import type { PluginContext } from '@embedpdf/core';
 import { scriptFieldsFromSnapshot } from '@embedpdf/core-acrojs';
 import type {
   ScriptAnnotInput,
@@ -16,8 +15,9 @@ import { pdfRectOf, rgbOf, toPageRef } from '@embedpdf/engine-core/runtime';
 import type { FormSnapshot, PageObjectNumber } from '@embedpdf/engine-core/runtime';
 
 import type { ActionContext } from '../contract';
+import type { ActionsContext } from '../services';
 
-export function createScriptWorld(ctx: PluginContext<void>) {
+export function createScriptWorld(ctx: ActionsContext) {
   // Acrobat's JavaScript keeps colors as color arrays, so they convert here, at its edge.
   const engineColorToArray = (color: string | null | undefined): ScriptColorArray => {
     if (!color) return ['T'];

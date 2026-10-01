@@ -13,7 +13,7 @@
  *   defaults.ts  a tool's defaults, read as an annotation (or a widget appearance)
  */
 import { annotationKey } from '@embedpdf/core';
-import { appearanceTurnOf, type AnnotationDTO } from '@embedpdf/engine-core/runtime';
+import { appearanceTurnOf, type Annotation } from '@embedpdf/engine-core/runtime';
 
 import { geomRotation } from '../geometry';
 import type { ModelAnnotation } from '../types';
@@ -33,7 +33,7 @@ export { annotationAfter, annotationOfNew } from './written';
  * this session draws it live instead is the appearance rule's
  * (appearance.ts).
  */
-export function fromDTO(dto: AnnotationDTO): ModelAnnotation {
+export function fromDTO(dto: Annotation): ModelAnnotation {
   // Rotation-stripped appearances (`appearanceTurnOf`, the engine's own rule):
   // a box kind drawn turned whose drawing stays inside the turned box has a
   // flat raster placed by its `box`, the stripped rotation re-applied as a

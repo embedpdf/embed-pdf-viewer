@@ -1,5 +1,7 @@
+import { cloudEngine } from '@cloudpdf/engine';
 import { mountWebFont } from '@embedpdf/svelte/runtime';
-import { engine } from './pdf';
+
+export const engine = cloudEngine({ baseUrl: 'https://engine.cloudpdf.com' }); // the engine you give the viewer
 
 const data = await fetch('/fonts/brand-sans.ttf').then((response) => response.arrayBuffer());
 

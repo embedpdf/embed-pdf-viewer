@@ -16,7 +16,7 @@ import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import {
   measureFromKnownLength,
   type AnnotationDraft,
-  type AnnotationDTO,
+  type Annotation,
   type AnnotationPatch,
   type LocalDocumentHandle,
   type LocalEngine,
@@ -31,7 +31,7 @@ import { lastObjectBody, pdf } from './helpers/miniPdf';
 type Rect = { x: number; y: number; width: number; height: number };
 
 /** The object an annotation is, or -1 for one with no object of its own. */
-const objectNumberOf = (ref: AnnotationDTO['ref']): number =>
+const objectNumberOf = (ref: Annotation['ref']): number =>
   ref.kind === 'objectNumber' ? ref.objectNumber : -1;
 
 /** Has the raster a pixel that isn't transparent? */
@@ -247,7 +247,7 @@ function expectSameRect(viewer: Rect, engine: Rect): void {
 }
 
 /** The fields that state where a drawing is, moved by (dx, dy). */
-function movedBy(annotation: AnnotationDTO, dx: number, dy: number): AnnotationPatch {
+function movedBy(annotation: Annotation, dx: number, dy: number): AnnotationPatch {
   const move = (point: { x: number; y: number }) => at(point.x + dx, point.y + dy);
   const fields = annotation as unknown as Record<string, unknown>;
   const patch: Record<string, unknown> = { subtype: annotation.subtype };
@@ -317,7 +317,7 @@ describe.each(['wasm', 'native'] as const)('annotation rect (%s)', (prefer) => {
   }
 
   /** Updates `annotation` by `patch`, and the annotation the viewer shows meanwhile. */
-  async function update(annotation: AnnotationDTO, patch: AnnotationPatch) {
+  async function update(annotation: Annotation, patch: AnnotationPatch) {
     const shown = annotationAfter(annotation, patch);
     const result = await page.annotations.update(annotation.ref, patch);
     return { annotation: result.annotation, shown, appearance: result.appearance };
@@ -447,7 +447,7 @@ describe.each(['wasm', 'native'] as const)('annotation rect: from another app (%
     const { appearances } = await page.annotations.renderAppearancesRaw({
       viewport: { kind: 'scale', scale: 1 },
     });
-    const of = (annotation: AnnotationDTO) =>
+    const of = (annotation: Annotation) =>
       appearances.find(
         (a) => a.mode === 'normal' && objectNumberOf(a.ref) === objectNumberOf(annotation.ref),
       );

@@ -8,9 +8,10 @@ import {
 } from '@embedpdf/engine-core/runtime';
 import type { AreaUnit, LengthUnit, PdfMeasure } from '@embedpdf/engine-core/runtime';
 
-import type { MeasurementConfig, ScalePreset } from './contract';
+import type { MeasurementSettings, ScalePreset } from './contract';
 
-export const DEFAULT_PRESETS: ScalePreset[] = [
+/** The scales offered when the app registers none: metric 1:1 to 1:200, and two imperial ones. */
+export const DEFAULT_PRESETS: readonly ScalePreset[] = [
   ...[1, 10, 20, 50, 100, 200].map((real) => ({
     id: `metric-${real}`,
     label: `1:${real}`,
@@ -22,10 +23,14 @@ export const DEFAULT_PRESETS: ScalePreset[] = [
   { id: 'imperial-eighth', label: '1/8 in = 1 ft', paper: 1, real: 96, unit: 'ft' },
 ];
 
-export const defaultMeasure = (config: MeasurementConfig, userUnit = 1): PdfMeasure =>
-  typeof config.defaultScale === 'object'
-    ? config.defaultScale
-    : measureFromRatio(1, 1, config.defaultScale === 'imperial' ? 'ft' : 'm', { userUnit });
+/** The scale of a page that has none, from the `defaultScale` setting. */
+export const defaultMeasure = (
+  defaultScale: MeasurementSettings['defaultScale'],
+  userUnit = 1,
+): PdfMeasure =>
+  typeof defaultScale === 'object'
+    ? defaultScale
+    : measureFromRatio(1, 1, defaultScale === 'imperial' ? 'ft' : 'm', { userUnit });
 
 export function withUnit(
   measure: PdfMeasure,

@@ -24,7 +24,7 @@ import { AnnotationToken } from '@embedpdf/react/annotation';
 import { copySelection, SelectionToken, type TextRange } from '@embedpdf/react/selection';
 import { FormToken, type FormFieldRef } from '@embedpdf/react/form';
 import { ActionsToken } from '@embedpdf/react/actions';
-import { LinkToken, openLinkTarget, type PdfLinkTarget } from '@embedpdf/react/link';
+import { LinkToken, type PdfLinkTarget } from '@embedpdf/react/link';
 import { SearchToken } from '@embedpdf/react/search';
 import { MeasurementToken } from '@embedpdf/react/measurement';
 import { RedactionToken } from '@embedpdf/react/redaction';
@@ -53,11 +53,11 @@ const sameTextRange = (left: TextRange | null, right: TextRange | null): boolean
 
 // ── annotation-selection predicates (drive the floating strip's contents) ────
 const hasAnnotationSelection = (commandContext: Ctx) =>
-  (anno(commandContext)?.getSelection().length ?? 0) > 0;
+  (anno(commandContext)?.selection.list().length ?? 0) > 0;
 /** Strip items gate per subtype (comment hidden on links/widgets) through
  *  one derivation over the selected DTOs, not per-command lookups. */
 const selectionSubtypes = (commandContext: Ctx) =>
-  new Set((anno(commandContext)?.listSelected() ?? []).map((annotation) => annotation.subtype));
+  new Set((anno(commandContext)?.selection.list() ?? []).map((annotation) => annotation.subtype));
 /**
  * The selection's `link` value: a target, `null` (linkable but none set), or
  * `undefined` when the selection cannot carry a link at all (widgets, mixed
@@ -65,8 +65,12 @@ const selectionSubtypes = (commandContext: Ctx) =>
  */
 /** The selection's link target, as the annotation holds it (destinations in the file's coordinates). */
 const selectionLink = (commandContext: Ctx): PdfLinkTarget | null | undefined => {
-  const props = anno(commandContext)?.getSelectionFields();
-  if (!props || !props.fields.some((spec) => spec.key === 'link') || props.mixed.includes('link'))
+  const props = anno(commandContext)?.selection.getProperties();
+  if (
+    !props ||
+    !props.properties.some((property) => property.key === 'link') ||
+    props.mixed.includes('link')
+  )
     return undefined;
   return (props.values.link ?? null) as PdfLinkTarget | null;
 };
@@ -102,7 +106,7 @@ const toolAccent = (
   if (!accent) return null;
   const anno = commandContext.tryGet(AnnotationToken);
   if (!anno) return null;
-  const defaults = anno.getToolDefaults(toolId);
+  const defaults = anno.tools.getDefaults(toolId);
   const colorOf = (key: ColorKey) => (defaults[key] as string | null | undefined) ?? undefined;
   return {
     primary: colorOf(accent.primary),
@@ -162,7 +166,7 @@ const spread = (id: string, mode: SpreadMode, labelKey: string, icon: string): C
   labelKey,
   icon,
   categories: ['page', 'spread'],
-  run: (commandContext) => stage(commandContext)?.setSpread(mode),
+  run: (commandContext) => stage(commandContext)?.updateSettings({ spread: mode }),
   active: (commandContext) => stage(commandContext)?.getSettings().spread === mode,
   enabled: (commandContext) => stage(commandContext) != null,
 });
@@ -308,13 +312,10 @@ export const defaultCommands: CommandDef[] = [
       const id = commandContext.documentId ?? undefined;
       const documents = commandContext.tryGet(DocumentsToken);
       if (!documents) return;
-      const pull = () => documents.save(id);
-      // The actions plugin owns the save verb: WillSave → serialize → DidSave
-      // run as one queued operation, so the WillSave mutations are in the
-      // downloaded bytes and two rapid saves can never interleave. Without the
-      // actions plugin this degrades to a plain download.
-      const actions = commandContext.tryGet(ActionsToken);
-      (actions ? actions.runDocumentVerb('save', pull) : pull())
+      // The download runs the document's save actions itself (WillSave → read → DidSave)
+      // when the actions plugin is installed, so the WillSave changes are in the bytes.
+      documents
+        .download(id)
         .then((bytes) => {
           const blob = new Blob([bytes as BlobPart], { type: 'application/pdf' });
           const url = URL.createObjectURL(blob);
@@ -326,11 +327,9 @@ export const defaultCommands: CommandDef[] = [
         })
         .catch((error) => console.warn('[snippet-react] download failed', error));
     },
-    // The permissions.md chrome exception: a kernel verb with a 1:1
-    // capability reads the kernel's `allows` directly — no owning plugin.
     enabled: (commandContext) =>
       commandContext.documentId != null &&
-      (commandContext.tryGet(DocumentsToken)?.allows('doc.download') ?? false),
+      (commandContext.tryGet(DocumentsToken)?.canDownload(commandContext.documentId) ?? false),
   },
   {
     id: 'document:print',
@@ -347,11 +346,10 @@ export const defaultCommands: CommandDef[] = [
       if (actions) void actions.runDocumentVerb('print', () => window.print());
       else window.print();
     },
-    // Same exception; documentless chrome (no doc open) keeps print enabled
-    // for whatever the host page shows.
+    // Documentless chrome (no doc open) keeps print enabled for whatever the host page shows.
     enabled: (commandContext) =>
       commandContext.documentId == null ||
-      (commandContext.tryGet(DocumentsToken)?.allows('doc.print') ?? true),
+      (commandContext.tryGet(DocumentsToken)?.canPrint(commandContext.documentId) ?? true),
   },
   {
     id: 'document:fullscreen',
@@ -374,7 +372,7 @@ export const defaultCommands: CommandDef[] = [
     labelKey: 'commands.scroll.vertical',
     icon: 'vertical',
     categories: ['page', 'scroll'],
-    run: (commandContext) => stage(commandContext)?.setLayout('vertical'),
+    run: (commandContext) => stage(commandContext)?.updateSettings({ layout: 'vertical' }),
     active: (commandContext) => stage(commandContext)?.getSettings().layout === 'vertical',
     enabled: (commandContext) => stage(commandContext) != null,
   },
@@ -383,7 +381,7 @@ export const defaultCommands: CommandDef[] = [
     labelKey: 'commands.scroll.horizontal',
     icon: 'horizontal',
     categories: ['page', 'scroll'],
-    run: (commandContext) => stage(commandContext)?.setLayout('horizontal'),
+    run: (commandContext) => stage(commandContext)?.updateSettings({ layout: 'horizontal' }),
     active: (commandContext) => stage(commandContext)?.getSettings().layout === 'horizontal',
     enabled: (commandContext) => stage(commandContext) != null,
   },
@@ -569,7 +567,7 @@ export const defaultCommands: CommandDef[] = [
       primary: 'color',
     }),
     enabled: (commandContext) => {
-      const page = stage(commandContext)?.getCurrentPage()?.ref;
+      const page = stage(commandContext)?.getCurrentPage();
       return page != null && (commandContext.tryGet(MeasurementToken)?.canMeasure(page) ?? false);
     },
   },
@@ -578,7 +576,7 @@ export const defaultCommands: CommandDef[] = [
       primary: 'color',
     }),
     enabled: (commandContext) => {
-      const page = stage(commandContext)?.getCurrentPage()?.ref;
+      const page = stage(commandContext)?.getCurrentPage();
       return page != null && (commandContext.tryGet(MeasurementToken)?.canMeasure(page) ?? false);
     },
   },
@@ -587,7 +585,7 @@ export const defaultCommands: CommandDef[] = [
       primary: 'color',
     }),
     enabled: (commandContext) => {
-      const page = stage(commandContext)?.getCurrentPage()?.ref;
+      const page = stage(commandContext)?.getCurrentPage();
       return page != null && (commandContext.tryGet(MeasurementToken)?.canMeasure(page) ?? false);
     },
   },
@@ -614,8 +612,8 @@ export const defaultCommands: CommandDef[] = [
     labelKey: 'commands.annotate.cancelCreation',
     categories: ['annotation'],
     shortcut: 'Escape',
-    enabled: (commandContext) => anno(commandContext)?.hasCreationDraft() ?? false,
-    run: (commandContext) => anno(commandContext)?.cancelCreationDraft(),
+    enabled: (commandContext) => anno(commandContext)?.draft.get() != null,
+    run: (commandContext) => anno(commandContext)?.draft.cancel(),
   },
   {
     id: 'annotation:delete',
@@ -626,11 +624,11 @@ export const defaultCommands: CommandDef[] = [
       const annotation = anno(commandContext);
       if (!annotation) return;
       const form = commandContext.tryGet(FormToken);
-      const dtos = annotation.listSelected();
+      const dtos = annotation.selection.list();
       const isWidget = (subtype: string) => subtype.startsWith('widget');
       const widgets = form ? dtos.filter((annotation) => isWidget(annotation.subtype)) : [];
       if (widgets.length === 0) {
-        void annotation.deleteSelection();
+        void annotation.selection.delete();
         return;
       }
       // Widgets are field-plane citizens: deleting one goes through doc.forms
@@ -641,17 +639,17 @@ export const defaultCommands: CommandDef[] = [
         const field = form!.getFieldForWidget(annotation.ref);
         if (field) fields.set(field.name, field.ref);
       }
-      for (const ref of fields.values()) void form!.deleteField(ref);
+      for (const ref of fields.values()) void form!.delete(ref);
       for (const dto of dtos) if (!isWidget(dto.subtype)) void annotation.delete(dto.ref);
-      annotation.clearSelection();
+      annotation.selection.clear();
     },
     visible: hasAnnotationSelection,
     // Mirrors the engine's own authorization: locked/unauthorized annotations
     // keep the button visible but disabled (the engine still enforces).
     enabled: (commandContext) => {
       const annotation = anno(commandContext);
-      const refs = annotation?.getSelection() ?? [];
-      return refs.length > 0 && refs.every((ref) => annotation!.canDelete(ref));
+      const selected = annotation?.selection.list() ?? [];
+      return selected.length > 0 && selected.every(({ ref }) => annotation!.canDelete(ref));
     },
   },
   {
@@ -672,7 +670,7 @@ export const defaultCommands: CommandDef[] = [
     panel: { id: 'annotation-style', exclusive: 'right' },
     // The kind table decides: no declared editable props → no style button.
     visible: (commandContext) =>
-      (anno(commandContext)?.getSelectionFields().fields.length ?? 0) > 0,
+      (anno(commandContext)?.selection.getProperties().properties.length ?? 0) > 0,
   },
   {
     // The selection becomes a reusable stamp: the engine flattens the
@@ -688,7 +686,7 @@ export const defaultCommands: CommandDef[] = [
       const stamp = commandContext.tryGet(StampToken);
       const documentId = commandContext.documentId;
       if (!annotation || !stamp || documentId == null) return;
-      const dtos = annotation.listSelected();
+      const dtos = annotation.selection.list();
       const page = dtos[0]?.ref.page;
       if (page === undefined) return;
       const i18n = commandContext.tryGet(I18nToken);
@@ -697,14 +695,16 @@ export const defaultCommands: CommandDef[] = [
       const libraryId = CUSTOM_LIBRARY_ID;
       const ensureLibrary = stamp.getLibrary(libraryId)
         ? Promise.resolve(libraryId)
-        : stamp.createLibrary(libraryName, { id: libraryId, categories: ['custom'] });
+        : stamp
+            .createLibrary(libraryName, { id: libraryId, categories: ['custom'] })
+            .then(({ library }) => library.id);
       ensureLibrary
         .then((id) =>
           stamp.createAssetFromAnnotations(
-            documentId,
             page,
             dtos.map((annotation) => annotation.ref),
             { libraryId: id, label: `${label} ${stamp.listAssets({ libraryId: id }).length + 1}` },
+            { documentId },
           ),
         )
         // Open the stamps sidebar on the custom library; the panel reads the
@@ -727,28 +727,29 @@ export const defaultCommands: CommandDef[] = [
       !selectionSubtypes(commandContext).has('widget') &&
       !selectionSubtypes(commandContext).has('redact') &&
       new Set(
-        (anno(commandContext)?.listSelected() ?? []).map(
+        (anno(commandContext)?.selection.list() ?? []).map(
           (annotation) => annotation.ref.page.objectNumber,
         ),
       ).size === 1,
     enabled: (commandContext) =>
-      commandContext.tryGet(DocumentsToken)?.allows('doc.download') ?? true,
+      commandContext.tryGet(DocumentsToken)?.canDownload(commandContext.documentId ?? undefined) ??
+      true,
   },
   {
     id: 'annotation:group',
     labelKey: 'commands.annotate.group',
     icon: 'group',
     categories: ['annotation'],
-    run: (commandContext) => void anno(commandContext)?.group(),
-    visible: (commandContext) => anno(commandContext)?.canGroup() ?? false,
+    run: (commandContext) => void anno(commandContext)?.selection.group(),
+    visible: (commandContext) => anno(commandContext)?.selection.canGroup() ?? false,
   },
   {
     id: 'annotation:ungroup',
     labelKey: 'commands.annotate.ungroup',
     icon: 'ungroup',
     categories: ['annotation'],
-    run: (commandContext) => void anno(commandContext)?.ungroup(),
-    visible: (commandContext) => anno(commandContext)?.canUngroup() ?? false,
+    run: (commandContext) => void anno(commandContext)?.selection.ungroup(),
+    visible: (commandContext) => anno(commandContext)?.selection.canUngroup() ?? false,
   },
 
   // ── text selection (the selection strip's verbs) ────────────────────────
@@ -786,7 +787,7 @@ export const defaultCommands: CommandDef[] = [
   {
     // Make the selection a link: opens the anchored popover (a link is a
     // verb on the selection, not a style), whose editor sets
-    // the target through `updateSelectionLink(target)`; the plugin's
+    // the target through `selection.updateLink(target)`; the plugin's
     // reconciler materializes the attached child annotations.
     id: 'annotation:link',
     labelKey: 'commands.annotate.link',
@@ -803,10 +804,8 @@ export const defaultCommands: CommandDef[] = [
     categories: ['annotation'],
     run: (commandContext) => {
       const target = selectionLink(commandContext);
-      const link = commandContext.tryGet(LinkToken);
-      // The opener performs the uri outcome (window.open) — bare `activate`
-      // resolves but opens nothing for URL targets.
-      if (target && link) openLinkTarget(link, target);
+      // Following a link opens a website too, through the link layer's opener.
+      if (target) commandContext.tryGet(LinkToken)?.activate(target);
     },
     visible: (commandContext) => selectionLink(commandContext) != null,
   },
@@ -815,7 +814,7 @@ export const defaultCommands: CommandDef[] = [
     labelKey: 'commands.annotate.removeLink',
     icon: 'linkOff',
     categories: ['annotation'],
-    run: (commandContext) => anno(commandContext)?.updateSelectionLink(null),
+    run: (commandContext) => anno(commandContext)?.selection.updateLink(null),
     visible: (commandContext) => selectionLink(commandContext) != null,
   },
 

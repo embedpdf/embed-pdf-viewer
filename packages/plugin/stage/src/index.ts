@@ -2,9 +2,11 @@
  * @embedpdf/plugin-stage: the coordinate core as a kernel plugin. One camera,
  * one scene and a flat settings bag cover viewport, scroll, zoom, pan and
  * spread. `contract.ts` · `model.ts` · `controller.ts` (services, read,
- * camera, navigation, settings, view) · `connect.ts` · `stage.plugin.ts`.
+ * camera, navigation, settings, view) · `connect.ts` · `state.ts` ·
+ * `stage.plugin.ts`.
  */
 export { stagePlugin } from './stage.plugin';
+export { stageState } from './state';
 export * from './contract';
 export { createScrollHandler } from './scroll-handler';
 export type { ScrollHandlerOptions } from './scroll-handler';

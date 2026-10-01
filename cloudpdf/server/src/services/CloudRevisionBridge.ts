@@ -1,7 +1,7 @@
 import type {
   AnnotationCreateResult,
   AnnotationDeleteResult,
-  AnnotationDTO,
+  Annotation,
   AnnotationList,
   AnnotationMoveResult,
   AnnotationRef,
@@ -139,7 +139,7 @@ export class CloudRevisionBridge {
     };
   }
 
-  private decorateAnnotationRef(pageState: PageState, annotation: AnnotationDTO): AnnotationDTO {
+  private decorateAnnotationRef(pageState: PageState, annotation: Annotation): Annotation {
     if (annotation.ref.kind !== 'index') {
       return annotation;
     }

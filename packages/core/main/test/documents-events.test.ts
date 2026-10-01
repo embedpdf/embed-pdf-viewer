@@ -46,7 +46,7 @@ describe('documents · lifecycle events', () => {
     await kernel.destroy();
   });
 
-  it('projects a failed open as DocInfo.error with the plugin vocabulary, and retry() re-runs it', async () => {
+  it('projects a failed open as DocumentInfo.error with the plugin vocabulary, and retry() re-runs it', async () => {
     let attempts = 0;
     const engine = {
       open: () =>
@@ -66,9 +66,11 @@ describe('documents · lifecycle events', () => {
     });
     expect(failed).toHaveBeenCalledTimes(1);
 
-    await expect(kernel.documents.retry('a')).resolves.toBe('a');
+    await expect(kernel.documents.retry('a')).resolves.toMatchObject({
+      document: { id: 'a', status: 'ready' },
+    });
     expect(kernel.documents.get('a')?.status).toBe('ready');
-    await expect(kernel.documents.retry('a')).rejects.toThrow(/not a failed open/);
+    await expect(kernel.documents.retry('a')).rejects.toMatchObject({ code: 'invalid-input' });
     await kernel.destroy();
   });
 

@@ -1,5 +1,5 @@
 /** Visual fills: the mark becomes the widget's appearance, nothing is sealed. */
-import { PluginError } from '@embedpdf/core';
+import { PluginError, type OperationOptions } from '@embedpdf/core';
 import type { FormFieldRef } from '@embedpdf/engine-core/runtime';
 
 import { blankPagePdf } from '../blank-page';
@@ -18,7 +18,11 @@ export function createFills(
   const { withBusy } = store;
   const { markBytes } = marks;
 
-  const setAppearance = async (field: FormFieldRef, pdf: Uint8Array): Promise<void> => {
+  const setAppearance = async (
+    field: FormFieldRef,
+    pdf: Uint8Array,
+    options?: OperationOptions,
+  ): Promise<void> => {
     const forms = ctx.doc.forms;
     if (!forms.setSignatureAppearance) {
       throw new PluginError(
@@ -31,21 +35,29 @@ export function createFills(
     if (signature?.signed) {
       throw new PluginError('conflict', 'signature', `'${signature.fieldName}' is signed`);
     }
-    await forms.setSignatureAppearance(field, { pdf });
+    await ctx.cancellable(options?.signal, forms.setSignatureAppearance(field, { pdf }));
   };
 
-  const fillField = (field: FormFieldRef, mark: Mark): Promise<void> =>
-    withBusy(async () => {
-      await setAppearance(field, await markBytes(mark));
+  const fillField = async (
+    field: FormFieldRef,
+    mark: Mark,
+    options?: OperationOptions,
+  ): Promise<void> => {
+    ctx.assertAllowed('doc.forms.fill', 'signature.fillField');
+    return withBusy(async () => {
+      await setAppearance(field, await markBytes(mark), options);
       target.clearIfTarget(field);
       filled.emit({ field });
     });
+  };
 
-  const clearField = (field: FormFieldRef): Promise<void> =>
-    withBusy(async () => {
-      await setAppearance(field, blankPagePdf());
+  const clearField = async (field: FormFieldRef, options?: OperationOptions): Promise<void> => {
+    ctx.assertAllowed('doc.forms.fill', 'signature.clearField');
+    return withBusy(async () => {
+      await setAppearance(field, blankPagePdf(), options);
       cleared.emit({ field });
     });
+  };
 
   return {
     fillField,

@@ -1,14 +1,20 @@
 /**
  * The settings bag and its responsive resolution. The base (config plus
- * runtime setters) merged with the matching rules' patches is the effective
+ * `updateSettings()` changes) merged with the matching rules' patches is the effective
  * settings the state holds. `applySettings` is the one reactive applier: the
  * strongest effect among the touched settings wins ('reflow' ⊃ 'scene'/'refit'
  * ⊃ 'reclamp' ⊃ 'none'), so a breakpoint crossing gets exactly the invariant a
  * hand-written update would.
  */
-import type { PluginContext } from '@embedpdf/core';
+import { memo, type PluginContext } from '@embedpdf/core';
 
-import type { ResponsiveRule, StageConfig, StageSettings, StageViewState } from '../contract';
+import type {
+  ResponsiveRule,
+  StageConfig,
+  StageSettings,
+  StageSettingsPatch,
+  StageViewState,
+} from '../contract';
 import type { StageAnimation } from '../camera/animation';
 import type { StageCameraWrite } from '../camera/write';
 import type { StageHostCapability } from '../host-contract';
@@ -42,7 +48,11 @@ export function createSettings(
   const { camera, viewport, alignPoint, anchorAt } = scene;
   const state = () => ctx.state.get();
 
-  const snapshotSettings = (): StageSettings => pickSettings(state());
+  // The same object while no setting changed, so readers compare by identity.
+  const snapshotSettings: () => StageSettings = memo(
+    () => SETTING_KEYS.map((key) => state()[key]),
+    () => pickSettings(state()),
+  );
 
   /**
    * React to a settings change per the registry: the strongest effect among
@@ -128,11 +138,11 @@ export function createSettings(
     return strongest;
   };
 
-  const updateSettings = (patch: Partial<StageSettings>): void => {
+  const updateSettings = (changes: StageSettingsPatch): void => {
     // Writes the responsive base; the resolver decides what actually lands (a
     // matching rule's key wins until its rule stops matching). With no rules
     // in play this is a direct update.
-    base = mergeSettings(base, patch);
+    base = mergeSettings(base, changes);
     syncResponsive(true);
   };
 
@@ -169,10 +179,6 @@ export function createSettings(
       },
       matchesRule: (name) => state().activeRules.includes(name),
       listActiveRules: () => state().activeRules,
-      setFlow: (flow) => updateSettings({ flow }),
-      setLayout: (layout) => updateSettings({ layout }),
-      setSpread: (spread) => updateSettings({ spread }),
-      setSizing: (sizing) => updateSettings({ sizing }),
       applyViewState,
     } satisfies Partial<StageHostCapability>,
   };

@@ -142,7 +142,7 @@ export function createEditHandler(
       // leave text edit. This makes exit hub-driven (deterministic) rather than
       // relying on a DOM blur, which races the focus-steal of the entering gesture.
       const wasEditing = anno.getEditingId() != null;
-      if (wasEditing) anno.endTextEdit();
+      if (wasEditing) void anno.text.end();
       if (
         anno.getHitKind(
           sample.page.ref,
@@ -155,7 +155,7 @@ export function createEditHandler(
       ) {
         // Plain empty click drops the selection. Shift-empty preserves it so the
         // lower-priority marquee handler can additive/toggle-select.
-        if (!sample.modifiers.shift) anno.clearSelection();
+        if (!sample.modifiers.shift) anno.selection.clear();
         // A click that dismissed an active edit is consumed: its sole job was to
         // leave edit mode, so the draw tool doesn't also spawn a new annotation.
         // Only when nothing was being edited do we decline, letting
@@ -370,7 +370,7 @@ export function createMarqueeHandler(anno: AnnotationHostCapability): Interactio
       anchor = null;
       last = null;
       dragging = false;
-      anno.cancelCreationDraft();
+      anno.draft.cancel();
     },
   };
 }
@@ -544,7 +544,7 @@ export function createDrawHandler(
       drawingCallout = false;
       followPage = null;
       origin = null;
-      anno.cancelCreationDraft();
+      anno.draft.cancel();
       anno.clearGhost();
     },
     onHover: (sample) => {

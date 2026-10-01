@@ -361,7 +361,12 @@ describe('the public door — exact sizes', () => {
     fixture.tasks[2]!.reject(new Error('engine said no'));
     const result = await batch;
     expect(result.applied.map((entry) => entry.page.objectNumber)).toEqual([22]);
-    expect(result.failed.map((failure) => [failure.ref.objectNumber, failure.error.code])).toEqual([
+    expect(
+      result.failed.map((failure) => [
+        typeof failure.ref === 'number' ? failure.ref : failure.ref.objectNumber,
+        failure.error.code,
+      ]),
+    ).toEqual([
       [99, 'not-found'],
       [33, 'operation-failed'],
     ]);
@@ -472,5 +477,73 @@ describe('the twin law (permissions.md) — canRender and the fetch gates', () =
     expect(allowed.imageCalls).toHaveLength(1);
     await allowed.kernel.destroy();
     await denied.kernel.destroy();
+  });
+});
+
+describe('settings', () => {
+  it('are the defaults with what the app registered over them', async () => {
+    const fixture = await boot({ config: { fullPage: { maxWidth: 1280 }, tiles: { size: 256 } } });
+    const settings = fixture.render.getSettings();
+    expect(settings.fullPage).toEqual({ maxWidth: 1280, quantize: 'exact' });
+    expect(settings.tiles).toMatchObject({ size: 256, maxScale: 128, settleMs: 150 });
+    expect(settings.debug).toBe(false);
+    await fixture.kernel.destroy();
+  });
+
+  it('apply at once: a new budget changes the conformed width, and reset goes back', async () => {
+    const fixture = await boot();
+    const changed: string[][] = [];
+    fixture.render.onSettingsChanged((event) => changed.push([...event.changed]));
+    expect(fixture.render.getSourceKey(toPageRef(11), { scale: 8 })).toBe('11|w640|a1|e0');
+
+    fixture.render.updateSettings({ fullPage: { maxWidth: 1000 } });
+    expect(fixture.render.getSourceKey(toPageRef(11), { scale: 8 })).toBe('11|w1000|a1|e0');
+    expect(fixture.render.getSettings().fullPage.quantize).toBe('exact'); // merged, not replaced
+
+    fixture.render.updateSettings({ tiles: false });
+    expect(fixture.render.getPaintSettings().tiles).toBe(false);
+
+    fixture.render.resetSettings();
+    expect(fixture.render.getSourceKey(toPageRef(11), { scale: 8 })).toBe('11|w640|a1|e0');
+    expect(fixture.render.getPaintSettings().tiles).toBe(true);
+    expect(changed).toEqual([['fullPage'], ['tiles'], ['fullPage', 'tiles']]);
+    await fixture.kernel.destroy();
+  });
+});
+
+describe('page arguments and cancelling', () => {
+  it('take a page as its ref or its index', async () => {
+    const fixture = await boot();
+    const byIndex = fixture.render.renderPage(1, { width: 100 });
+    fixture.tasks[0]!.resolve(image('22'));
+    await byIndex;
+    expect(fixture.imageCalls[0]!.pageObjectNumber).toBe(22);
+
+    fixture.render.invalidate({ pages: [2] });
+    expect(fixture.render.getRenderEpoch(2)).toBe(1);
+    expect(fixture.render.getRenderEpoch(toPageRef(33))).toBe(1);
+    await fixture.kernel.destroy();
+  });
+
+  it('read a page that isn’t in the document as empty, and refuse it in a verb', async () => {
+    const fixture = await boot();
+    expect(fixture.render.getRenderEpoch(7)).toBe(0);
+    await expect(fixture.render.renderPage(7)).rejects.toMatchObject({ code: 'not-found' });
+    const seen: unknown[] = [];
+    fixture.render.onInvalidated((event) => seen.push(event.pages));
+    fixture.render.invalidate({ pages: [7, 0] });
+    expect(seen).toEqual([[toPageRef(11)]]);
+    await fixture.kernel.destroy();
+  });
+
+  it('rejects operation-cancelled when the signal fires', async () => {
+    const fixture = await boot();
+    const controller = new AbortController();
+    const single = fixture.render.renderPage(0, { signal: controller.signal });
+    const batch = fixture.render.renderPages([1, 2], { signal: controller.signal });
+    controller.abort();
+    await expect(single).rejects.toMatchObject({ code: 'operation-cancelled' });
+    await expect(batch).rejects.toMatchObject({ code: 'operation-cancelled' });
+    await fixture.kernel.destroy();
   });
 });

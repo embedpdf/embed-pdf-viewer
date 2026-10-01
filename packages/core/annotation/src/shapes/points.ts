@@ -21,7 +21,7 @@ import {
   pagePointUnturned,
   pageTurnOfDrawn,
   pageTurnOfUpright,
-  type AnnotationDTO,
+  type Annotation,
   type LineEndings,
   type PagePointTurn,
 } from '@embedpdf/engine-core/runtime';
@@ -72,13 +72,10 @@ export interface InkShape {
 /** A points family record's shape. */
 export type PointsShape = LineShape | PolyShape | InkShape;
 
-type PointsAnnotation = Extract<
-  AnnotationDTO,
-  { subtype: 'line' | 'polyline' | 'polygon' | 'ink' }
->;
+type PointsAnnotation = Extract<Annotation, { subtype: 'line' | 'polyline' | 'polygon' | 'ink' }>;
 
 /** A points kind's shape, read off its annotation. */
-function readPoints(read: AnnotationDTO): PointsShape {
+function readPoints(read: Annotation): PointsShape {
   const annotation = read as PointsAnnotation;
   const rotation = annotation.rotation ?? 0;
   switch (annotation.subtype) {
@@ -118,11 +115,11 @@ function readPoints(read: AnnotationDTO): PointsShape {
 const NO_ENDINGS: LineEndings = { start: 'none', end: 'none' };
 
 /** A line's or polyline's endings; none for an annotation that has none. */
-export const lineEndingsOf = (annotation: AnnotationDTO): LineEndings =>
+export const lineEndingsOf = (annotation: Annotation): LineEndings =>
   ('lineEndings' in annotation && annotation.lineEndings) || NO_ENDINGS;
 
 /** A line where a create gesture places a segment, with the tool's endings; no other points kind is placed. */
-function placePoints(placement: Placement, annotation: AnnotationDTO): LineShape | null {
+function placePoints(placement: Placement, annotation: Annotation): LineShape | null {
   if (placement.kind !== 'segment' || annotation.subtype !== 'line') return null;
   return {
     kind: 'line',

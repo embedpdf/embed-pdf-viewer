@@ -14,7 +14,13 @@
  */
 import type { Signal } from '@angular/core';
 import { settingsEqual } from '@embedpdf/plugin-stage';
-import type { StageCapability } from '@embedpdf/plugin-stage';
+import type {
+  FlowMode,
+  LayoutKind,
+  SizingMode,
+  SpreadMode,
+  StageCapability,
+} from '@embedpdf/plugin-stage';
 import type { EventHook } from '@embedpdf/core';
 import {
   injectCapabilityEvent,
@@ -103,10 +109,10 @@ export function injectLayout(explicit?: StageTokenProp) {
     spread: injectSelector(token, (stage) => stage.getSettings().spread),
     sizing: injectSelector(token, (stage) => stage.getSettings().sizing),
     bounded: injectSelector(token, (stage) => stage.getSettings().bounded),
-    setFlow: lazy(signal, 'setFlow'),
-    setLayout: lazy(signal, 'setLayout'),
-    setSpread: lazy(signal, 'setSpread'),
-    setSizing: lazy(signal, 'setSizing'),
+    setFlow: (flow: FlowMode) => signal().updateSettings({ flow }),
+    setLayout: (layout: LayoutKind) => signal().updateSettings({ layout }),
+    setSpread: (spread: SpreadMode) => signal().updateSettings({ spread }),
+    setSizing: (sizing: SizingMode) => signal().updateSettings({ sizing }),
     setBounded: (bounded: boolean) => signal().updateSettings({ bounded }),
   };
 }

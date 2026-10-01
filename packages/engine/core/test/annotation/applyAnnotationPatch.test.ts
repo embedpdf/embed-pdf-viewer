@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import type { AnnotationDTO } from '../../src/annotation/kinds';
+import type { Annotation } from '../../src/annotation/kinds';
 import { applyAnnotationPatch, resolveAnnotationPatch } from '../../src/pageSpace/helpers';
 
 const base = {
@@ -52,7 +52,7 @@ const square = {
   dashArray: null,
   interiorColor: null,
   cloudyIntensity: null,
-} as unknown as AnnotationDTO;
+} as unknown as Annotation;
 
 const ink = {
   ...base,
@@ -71,7 +71,7 @@ const ink = {
   ],
   intent: null,
   rotation: null,
-} as unknown as AnnotationDTO;
+} as unknown as Annotation;
 
 describe('applyAnnotationPatch', () => {
   test('a field the patch leaves alone keeps its very value', () => {
@@ -129,9 +129,9 @@ describe('a callout line follows its box', () => {
       { x: 100, y: 125 },
     ],
     lineEnding: 'open-arrow',
-  } as unknown as AnnotationDTO;
+  } as unknown as Annotation;
 
-  const lineOf = (annotation: AnnotationDTO) =>
+  const lineOf = (annotation: Annotation) =>
     annotation.subtype === 'free-text' ? (annotation.calloutLine ?? []) : [];
 
   test('a moved box: the end moves to the middle of the side facing the tip', () => {

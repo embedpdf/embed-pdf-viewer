@@ -4,9 +4,9 @@
  * operation, reset at every operation boundary and read by the executor, so a
  * /Next chain shares one deterministic cap.
  */
-import type { PluginContext } from '@embedpdf/core';
+import type { ActionsContext } from './context';
 
-export function createQueue(ctx: PluginContext<void>) {
+export function createQueue(ctx: ActionsContext) {
   const enqueue = ctx.serialQueue('actions');
   const budget = { scriptNodes: 0 };
   return { enqueue, budget };

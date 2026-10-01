@@ -26,6 +26,8 @@ A see-through preview of the field follows the pointer, drawn as the field will 
 where it lands before they click. Drag instead of clicking for another size. The tool stays active, so placing ten checkboxes is ten
 clicks.
 
+<Example name="form/designer" />
+
 ## Design mode
 
 The `form-edit` tool is design mode: fields stop being fillable and become boxes you can select, move
@@ -67,6 +69,8 @@ interaction.activateTool('pointer'); // fill it in
 A field's look, such as its border, background and font, belongs to its box: change it like any
 annotation's, with the [style panel](../annotations/selecting#a-style-panel).
 
+<Example name="form/field-settings" />
+
 ## Add fields from code
 
 `create()` takes the same settings the engine takes, with the page and the box for each place the
@@ -99,6 +103,8 @@ await form.create({
 
 A field placed with a tool gets a name like `text_1`; rename it in your settings panel. Every
 family's settings are on [Creating form fields](/docs/engine/forms/authoring).
+
+<Example name="form/create" />
 
 ## Remove a field
 

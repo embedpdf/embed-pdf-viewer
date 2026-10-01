@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 
-import { KIND_BY_SUBTYPE, type AnnotationDTO } from '../../src/annotation/kinds';
+import { KIND_BY_SUBTYPE, type Annotation } from '../../src/annotation/kinds';
 import { DRAWN_RECT_KINDS, pdfShapeForRect } from '../../src/annotation/shapeForRect';
 import type { AnnotationSubtype } from '../../src/annotation/subtype';
 import { EngineErrorCode } from '../../src/errors/EngineErrorCode';
@@ -10,7 +10,7 @@ import { resolveRectCommand, shapeForRect } from '../../src/pageSpace/helpers';
 
 /** An annotation as a read returns it, with the fields the mapping looks at. */
 const read = (fields: Record<string, unknown>) =>
-  fields as unknown as AnnotationDTO<PdfCoordinates>;
+  fields as unknown as Annotation<PdfCoordinates>;
 
 /** Acrobat's `[x1, y1, x2, y2]`. */
 const rect = ([left, bottom, right, top]: number[]): PdfRect => ({ left, bottom, right, top });
@@ -208,7 +208,7 @@ describe('shapeForRect', () => {
       linePoints: { start: { x: 340, y: 122 }, end: { x: 480, y: 62 } },
       measure: null,
       rotation: null,
-    } as unknown as AnnotationDTO;
+    } as unknown as Annotation;
     const { linePoints } = shapeForRect(line, { x: 338.5, y: 60.5, width: 203, height: 93 }) as {
       linePoints: { start: PdfPoint; end: PdfPoint };
     };
@@ -222,7 +222,7 @@ describe('shapeForRect', () => {
   });
 
   test('a kind whose shape is its rect takes the rect as it is', () => {
-    const link = { subtype: 'link', rect: { x: 1, y: 2, width: 3, height: 4 } } as AnnotationDTO;
+    const link = { subtype: 'link', rect: { x: 1, y: 2, width: 3, height: 4 } } as Annotation;
     expect(shapeForRect(link, { x: 0.1, y: 0.2, width: 0.3, height: 0.4 })).toEqual({
       rect: { x: 0.1, y: 0.2, width: 0.3, height: 0.4 },
     });

@@ -34,5 +34,10 @@ export const textNote = defineKind({
     noZoom: true,
     noRotate: true,
   },
-  fields: [{ key: 'icon', label: 'Icon', options: NOTE_ICONS }, COLOR, OPACITY, LINKABLE],
+  properties: [
+    { key: 'icon', control: 'choice', label: 'Icon', options: NOTE_ICONS },
+    COLOR,
+    OPACITY,
+    LINKABLE,
+  ],
 });

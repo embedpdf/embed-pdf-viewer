@@ -6,7 +6,7 @@
  * quad grabs the mark.
  */
 import { quadCorners, quadRing, type Quad } from '@embedpdf/core-geometry';
-import type { AnnotationDTO } from '@embedpdf/engine-core/runtime';
+import type { Annotation } from '@embedpdf/engine-core/runtime';
 
 import { expandRect, unionRect } from '../rect';
 import type { Point, Rect, RenderNode, Stroke } from '../types';
@@ -19,12 +19,12 @@ export interface QuadsShape {
 }
 
 type QuadsAnnotation = Extract<
-  AnnotationDTO,
+  Annotation,
   { subtype: 'highlight' | 'underline' | 'squiggly' | 'strikeout' | 'redact' }
 >;
 
 /** A text markup's or text redaction's shape, read off its annotation. */
-function readQuads(annotation: AnnotationDTO): QuadsShape {
+function readQuads(annotation: Annotation): QuadsShape {
   return { kind: 'quads', quadPoints: (annotation as QuadsAnnotation).quadPoints };
 }
 

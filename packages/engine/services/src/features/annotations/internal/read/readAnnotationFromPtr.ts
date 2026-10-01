@@ -1,5 +1,5 @@
 import type {
-  AnnotationDTO,
+  Annotation,
   PageObjectNumber,
   RevisionToken,
   PdfCoordinates,
@@ -30,7 +30,7 @@ export function readAnnotationFromPtr(
   index: number,
   revision: RevisionToken,
   ctx: AnnotationReadContext,
-): AnnotationDTO<PdfCoordinates> {
+): Annotation<PdfCoordinates> {
   const base = readAnnotationBase(fn, mem, ctx.docPtr, annotPtr, pageObjectNumber, index, revision);
   const subtypeCode = fn.FPDFAnnot_GetSubtype(annotPtr);
   const { reader } = pickReader(subtypeCode);

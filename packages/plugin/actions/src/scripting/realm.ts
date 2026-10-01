@@ -1,25 +1,30 @@
 /**
- * The one ScriptHost per document. Policy (`javascript.enabled`) decides
- * whether a realm factory exists; the factory carries the session
- * environment and mints this document's own realm here, and detached realms
- * on demand (host lens): one environment, any number of isolated realms.
+ * The one ScriptHost per document. The `javascript.enabled` setting, as it is
+ * when the document opens, decides whether a realm factory exists; the
+ * factory carries the session environment and mints this document's own
+ * realm here, and detached realms on demand (host lens): one environment, any
+ * number of isolated realms.
  */
-import type { PluginContext } from '@embedpdf/core';
 import { javaScriptProgramFromActionTree, type ScriptTransaction } from '@embedpdf/core-acrojs';
 
-import type { ActionsConfig } from '../contract';
+import type { ActionsScriptEnvironment } from '../contract';
 import type { ActionsHostCapability } from '../host-contract';
-import type { ActionsServices } from '../services';
+import type { ActionsContext, ActionsServices } from '../services';
 import { createScriptRealmFactory } from './environment';
 
 export function createRealm(
-  ctx: PluginContext<void>,
-  { catalog }: Pick<ActionsServices, 'catalog'>,
-  config: ActionsConfig,
+  ctx: ActionsContext,
+  { catalog, settings }: Pick<ActionsServices, 'catalog' | 'settings'>,
+  environment: ActionsScriptEnvironment,
 ) {
   const { readDocumentActions } = catalog;
-  const javascript = config.javascript;
-  const realms = javascript?.enabled ? createScriptRealmFactory(javascript, ctx.doc) : null;
+  const realms = settings.get().javascript.enabled
+    ? createScriptRealmFactory(
+        environment,
+        () => settings.get().javascript.identity ?? undefined,
+        ctx.doc,
+      )
+    : null;
   const scriptHost = realms
     ? realms.realmFor({
         doc: ctx.doc,

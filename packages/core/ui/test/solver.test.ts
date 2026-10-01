@@ -134,10 +134,10 @@ describe('solve — overflow', () => {
     const normalizedBar = bar({
       start: [group('g1', [item('a'), item('b')]), group('g2', [item('c')])],
       center: [
-        group('g3', { collapse: 'menu' }, [item('d'), item('e')]),
-        group('g5', { shed: true }, [item('f'), item('h'), item('j')]),
+        group('g3', [item('d'), item('e')], { collapse: 'menu' }),
+        group('g5', [item('f'), item('h'), item('j')], { shed: true }),
       ],
-      end: [group('g4', [custom('z', { terminal: 'zmenu' })])],
+      end: [group('g4', [custom('z', 'zmenu')])],
     });
     for (const budget of [0, 50, 100, 150, 200, 500, 1000]) {
       const fit = solve(normalizedBar, metrics(), budget);
@@ -152,11 +152,15 @@ describe('solve — group collapse', () => {
   it('collapses a group only after its children exhaust their ladders, then overflows it whole', () => {
     const normalizedBar = bar({
       center: [
-        group('modes', { collapse: 'select', importance: 2 }, [
-          item('m1', { variants: ['label'] }),
-          item('m2', { variants: ['label'] }),
-          item('m3', { variants: ['label'] }),
-        ]),
+        group(
+          'modes',
+          [
+            item('m1', { variants: ['label'] }),
+            item('m2', { variants: ['label'] }),
+            item('m3', { variants: ['label'] }),
+          ],
+          { collapse: 'select', importance: 2 },
+        ),
       ],
     });
     // labels: 80*3 + 2*10 = 260. collapsed select = 50.
@@ -180,10 +184,14 @@ describe('solve — group collapse', () => {
   it('prefers degrading children variants over collapsing', () => {
     const normalizedBar = bar({
       center: [
-        group('modes', { collapse: 'select' }, [
-          item('m1', { variants: ['icon+label', 'icon'] }),
-          item('m2', { variants: ['icon+label', 'icon'] }),
-        ]),
+        group(
+          'modes',
+          [
+            item('m1', { variants: ['icon+label', 'icon'] }),
+            item('m2', { variants: ['icon+label', 'icon'] }),
+          ],
+          { collapse: 'select' },
+        ),
       ],
     });
     // richest 210; icons 90; collapsed 50. Budget 90 → icons, not collapsed.
@@ -196,7 +204,7 @@ describe('solve — group collapse', () => {
 describe('solve — shed (staged group degradation)', () => {
   it('sheds the rightmost child into the group disclosure, budgeting the trigger — NOT overflow', () => {
     const normalizedBar = bar({
-      start: [group('g', { shed: true }, [item('a'), item('b'), item('c'), item('d')])],
+      start: [group('g', [item('a'), item('b'), item('c'), item('d')], { shed: true })],
     });
     // icons: 4×40 + 3×10 = 190. Budget 150:
     //   shed d → a,b,c + trigger(36) = 156 + 3 gaps = 186 > 150
@@ -214,7 +222,7 @@ describe('solve — shed (staged group degradation)', () => {
 
   it('never sheds below one visible child; without collapse, the whole group overflows at the floor', () => {
     const normalizedBar = bar({
-      start: [group('g', { shed: true }, [item('a'), item('b'), item('c'), item('d')])],
+      start: [group('g', [item('a'), item('b'), item('c'), item('d')], { shed: true })],
     });
     // Floor form is a + trigger = 40+36+10 = 86 > 60 → overflow-group (all
     // children, visible and shed, leave together).
@@ -229,7 +237,7 @@ describe('solve — shed (staged group degradation)', () => {
   it('collapses at the floor when a collapsed form exists (shed → select)', () => {
     const normalizedBar = bar({
       center: [
-        group('modes', { shed: true, collapse: 'select' }, [item('m1'), item('m2'), item('m3')]),
+        group('modes', [item('m1'), item('m2'), item('m3')], { shed: true, collapse: 'select' }),
       ],
     });
     // 3×40+2×10 = 140. Budget 70:
@@ -247,7 +255,7 @@ describe('solve — shed (staged group degradation)', () => {
   it('sheds before collapsing when both are possible', () => {
     const normalizedBar = bar({
       center: [
-        group('modes', { shed: true, collapse: 'select' }, [item('m1'), item('m2'), item('m3')]),
+        group('modes', [item('m1'), item('m2'), item('m3')], { shed: true, collapse: 'select' }),
       ],
     });
     // Budget 100: shed m3 → m1,m2+trigger = 116+20 = 136 > 100 → shed m2 →
@@ -261,11 +269,15 @@ describe('solve — shed (staged group degradation)', () => {
   it('sheds by child importance, regardless of position', () => {
     const normalizedBar = bar({
       start: [
-        group('g', { shed: true }, [
-          item('low', { importance: 1 }),
-          item('high', { importance: 4 }),
-          item('mid', { importance: 3 }),
-        ]),
+        group(
+          'g',
+          [
+            item('low', { importance: 1 }),
+            item('high', { importance: 4 }),
+            item('mid', { importance: 3 }),
+          ],
+          { shed: true },
+        ),
       ],
     });
     // 3×40+2×10 = 140. Budget 130: shed low (importance 1, leftmost!) →
@@ -279,10 +291,14 @@ describe('solve — shed (staged group degradation)', () => {
   it('exhausts variant ladders before shedding', () => {
     const normalizedBar = bar({
       start: [
-        group('g', { shed: true }, [
-          item('a', { variants: ['icon+label', 'icon'] }),
-          item('b', { variants: ['icon+label', 'icon'] }),
-        ]),
+        group(
+          'g',
+          [
+            item('a', { variants: ['icon+label', 'icon'] }),
+            item('b', { variants: ['icon+label', 'icon'] }),
+          ],
+          { shed: true },
+        ),
       ],
     });
     // richest 210; icons 90. Budget 90 → labels drop, nothing shed.
@@ -334,7 +350,7 @@ describe('solve — measurement gaps and determinism', () => {
   it('is deterministic', () => {
     const normalizedBar = bar({
       start: [group('g1', [item('a', { variants: ['icon+label', 'icon'] }), item('b')])],
-      center: [group('g2', { collapse: 'menu' }, [item('c'), item('d')])],
+      center: [group('g2', [item('c'), item('d')], { collapse: 'menu' })],
     });
     const one = solve(normalizedBar, metrics(), 137);
     const two = solve(normalizedBar, metrics(), 137);
@@ -347,8 +363,8 @@ describe('solve — measurement gaps and determinism', () => {
     const normalizedBar = bar({
       start: [
         group('g1', [item('a', { variants: ['icon+label', 'icon'] }), item('b'), item('c')]),
-        group('g2', { collapse: 'menu' }, [item('d'), item('e')]),
-        group('g3', { shed: true, collapse: 'select' }, [item('f'), item('h'), item('j')]),
+        group('g2', [item('d'), item('e')], { collapse: 'menu' }),
+        group('g3', [item('f'), item('h'), item('j')], { shed: true, collapse: 'select' }),
       ],
     });
     let previousOverflowed = new Set<string>();

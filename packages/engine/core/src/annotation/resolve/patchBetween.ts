@@ -1,6 +1,6 @@
 import type { Coordinates } from '../../pageSpace/coordinates';
 import type { KindFields } from '../declaration';
-import { declarationOf, type AnnotationDTO, type AnnotationPatch } from '../kinds';
+import { declarationOf, type Annotation, type AnnotationPatch } from '../kinds';
 import { applyResolvedPatch } from './applyAnnotationPatch';
 
 /** Exact deep equality: the same value, or arrays and objects whose members are. */
@@ -29,8 +29,8 @@ function sameValue(left: unknown, right: unknown): boolean {
  * field name.
  */
 export function annotationPatchBetween<C extends Coordinates>(
-  before: AnnotationDTO<C>,
-  after: AnnotationDTO<C>,
+  before: Annotation<C>,
+  after: Annotation<C>,
 ): AnnotationPatch<C> {
   const patch: Record<string, unknown> = {};
   if (before === after) return patch as AnnotationPatch<C>;
@@ -50,7 +50,7 @@ export function annotationPatchBetween<C extends Coordinates>(
  * patch as given. No field follows from another here; `applyAnnotationPatch`
  * adds what the engine's rules make follow. Works in either space.
  */
-export function mergeAnnotationPatch<A extends AnnotationDTO<Coordinates>>(
+export function mergeAnnotationPatch<A extends Annotation<Coordinates>>(
   current: A,
   patch: AnnotationPatch<Coordinates>,
 ): A {

@@ -7,7 +7,7 @@ import {
 } from '../../dto/RichText';
 import type { Coordinates } from '../../pageSpace/coordinates';
 import type { KindFields } from '../declaration';
-import { declarationOf, type AnnotationDTO, type AnnotationPatch } from '../kinds';
+import { declarationOf, type Annotation, type AnnotationPatch } from '../kinds';
 
 /**
  * A resolved patch's fields as a read spells them. Most fields read as they
@@ -69,7 +69,7 @@ export function readValueOf(name: string, value: unknown, current: unknown): unk
  * the value `current` has: the engine's answer brings the new one. Works in
  * either space: it only moves values by field name.
  */
-export function applyResolvedPatch<A extends AnnotationDTO<Coordinates>>(
+export function applyResolvedPatch<A extends Annotation<Coordinates>>(
   current: A,
   resolved: AnnotationPatch<Coordinates>,
 ): A {
@@ -91,7 +91,7 @@ export function applyResolvedPatch<A extends AnnotationDTO<Coordinates>>(
  * is a new `actions.activate` (and no target, none).
  */
 function followingReads(
-  current: AnnotationDTO<Coordinates>,
+  current: Annotation<Coordinates>,
   resolved: AnnotationPatch<Coordinates>,
 ): Record<string, unknown> {
   if (current.subtype !== 'link' || resolved.subtype !== 'link') return {};

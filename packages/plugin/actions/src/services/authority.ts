@@ -1,8 +1,7 @@
 /** Session authority the action plane enforces itself (permission, not preference). */
-import { DocumentsToken, type PluginContext } from '@embedpdf/core';
+import type { ActionsContext } from './context';
 
-export function createAuthority(ctx: PluginContext<void>) {
-  const allowsPrint = (): boolean =>
-    ctx.tryGet(DocumentsToken)?.allows('doc.print', ctx.documentId) ?? true;
+export function createAuthority(ctx: ActionsContext) {
+  const allowsPrint = (): boolean => ctx.allows('doc.print');
   return { allowsPrint };
 }

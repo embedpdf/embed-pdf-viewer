@@ -11,8 +11,9 @@ above the page:
 
 <Example name="selection/basic" mode="open" />
 
-> **Try it:** drag over text, double-click a word, or triple-click a line. A selection can run from
-> one page onto the next. On a touch screen, long-press a word and drag the handles.
+> **Try it:** the cover's title starts out selected from code. Drag over text, double-click a word,
+> or triple-click a line. A selection can run from one page onto the next. On a touch screen,
+> long-press a word and drag the handles.
 
 `interactionPlugin()` is the input system every tool shares: the Stage passes the pointer to it,
 the selection plugin handles it, and `<SelectionLayer>` draws the result. So you can restyle or
@@ -54,7 +55,8 @@ selection.select({
 
 Ranges include `start` and stop before `end`, and they count characters as the page stores them,
 not JavaScript string positions. `selection.extendTo(page.ref, point)` grows the current selection
-to a point on a page, as dragging a handle does.
+to a point on a page, as dragging a handle does. Every method that takes a page takes its ref or its
+index: `selection.selectPage(0)` selects the first page.
 
 ## Show the selection in your UI
 
@@ -62,6 +64,11 @@ to a point on a page, as dragging a handle does.
 changes:
 
 <Snippet name="text/highlight-button" />
+
+<Example name="selection/state" />
+
+> **Try it:** drag over text. `isSelecting` is `true` until you let go, and `pages` counts the pages
+> the selection reaches.
 
 Every field is listed under [State](#state). For drawing your own highlight, `selection.listSegments(page.ref)` gives you each selected line as
 four corners, turned with the text, and `selection.listRects(page.ref)` a plain box per line.
@@ -90,12 +97,19 @@ button:
 It reads the text as soon as a selection settles, so the browser's copy can answer at once. Set
 `prefetch` to `false` to read text only when someone copies.
 
+<Example name="selection/copy" />
+
+> **Try it:** select other text: the line above the pages shows what `readText()` reads once the
+> selection settles. Then press **Copy**, or Ctrl+C.
+
 ## Add a selection menu
 
 `<SelectionMenu>` places your own UI next to the selection. It hides while the user drags and
 appears when the selection settles:
 
 <Example name="selection/menu" />
+
+> **Try it:** select other text, and the menu follows it. Pick where it goes above the pages.
 
 Mount it <Fw only="react">in the Stage's `overlay`</Fw><Fw only="vue">in the Stage's `#overlay`
 slot</Fw><Fw only="svelte">in the Stage's `overlay` snippet</Fw><Fw only="angular">inside
@@ -109,6 +123,11 @@ A finger has no text cursor, so selection works as it does elsewhere on a phone:
 then drag the handles.** Add `<SelectionHandles>` next to your menu:
 
 <Snippet name="text/selection-handles" />
+
+<Example name="selection/handles" />
+
+> **Try it:** drag a handle's round grip, with a finger or the mouse: the selection grows or shrinks
+> from the other end.
 
 Each handle is the selection's own edge, with a round grip. Dragging one grows the selection from the
 other end, across pages too. Grabbing a handle never scrolls the page, and everywhere else a finger
@@ -165,6 +184,12 @@ Set them when you register the plugin, and change them while the app runs with
 
 A CSS variable wins over the setting, for dark mode or a different look per viewer: see
 [Colors & theming](../ui/theming).
+
+<Example name="selection/colors" />
+
+> **Try it:** pick a color, and `selection.updateSettings({ color, handles })` changes the selection
+> and its handles at once. Then turn on **Override with CSS**: the CSS variables win over the color
+> you picked.
 
 ## Events
 

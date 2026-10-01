@@ -1,4 +1,4 @@
-import type { AnnotationDTO, AnnotationList, PageState } from '@embedpdf/engine-core';
+import type { Annotation, AnnotationList, PageState } from '@embedpdf/engine-core';
 import type { Engine } from '@embedpdf/engine-core/runtime';
 
 /**
@@ -80,7 +80,7 @@ function knownWeakFlag(pageState: PageState): boolean | null {
     : null;
 }
 
-function describeRef(a: AnnotationDTO): string {
+function describeRef(a: Annotation): string {
   switch (a.ref.kind) {
     case 'objectNumber':
       return `objectNumber=${a.ref.objectNumber}`;

@@ -10,6 +10,8 @@ Most PDFs have links: a table of contents that jumps to a chapter, a footnote to
 
 <Snippet name="viewing/link-layer" />
 
+<Example name="links/basic" />
+
 - **A link to a page** goes there, to the exact spot and zoom the link names.
 - **A link to a website** opens in a new tab, after a safety check (see [Good to know](#good-to-know)).
 - **A link with a PDF action**, such as a button that resets a form, runs the action when the
@@ -24,6 +26,8 @@ By default a link area is invisible, as in other PDF apps. `<LinkLayer renderLin
 yourself, for example with an underline on hover:
 
 <Snippet name="viewing/custom-links" />
+
+<Example name="links/custom" />
 
 `native` is the layer's own clickable area: wrap it to keep what a click does.
 <Fw only="react">Return `undefined` for a link you don't want to change.</Fw><Fw only={['vue', 'svelte', 'angular']}>For a link you don't want to change, show `native` alone.</Fw>
@@ -56,6 +60,8 @@ const { outcome } = link.activate(someLink);
 It returns what happened right away, so a website can still open in a new tab: `'revealed'` (the
 view went to a page), `'uri'` (a website opened), or `'dispatched'` (the actions plugin runs the
 link's action). A link it won't follow, such as one to another file, is `'reported'`.
+
+<Example name="links/list" />
 
 ## Methods
 

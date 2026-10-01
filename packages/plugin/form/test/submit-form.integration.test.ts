@@ -75,8 +75,9 @@ async function boot() {
   };
   const press = (name: string) => form.activateWidget(widgetRefOf(name));
   const requests: ActionSubmitRequest[] = [];
+  // Every run's diagnostics, with their messages, as its result lists them.
   const diagnostics: ActionDiagnostic[] = [];
-  actions.onDiagnostic((diagnostic) => diagnostics.push(diagnostic));
+  actions.onExecuted(({ result }) => diagnostics.push(...result.diagnostics));
   return {
     form,
     actions,

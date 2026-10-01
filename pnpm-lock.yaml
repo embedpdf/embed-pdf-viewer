@@ -1407,12 +1407,27 @@ importers:
       '@embedpdf/core-ui':
         specifier: workspace:*
         version: link:../../core/ui
+      '@embedpdf/plugin-actions':
+        specifier: workspace:*
+        version: link:../actions
+      '@embedpdf/plugin-annotation':
+        specifier: workspace:*
+        version: link:../annotation
       '@embedpdf/plugin-i18n':
         specifier: workspace:*
         version: link:../i18n
+      '@embedpdf/plugin-interaction':
+        specifier: workspace:*
+        version: link:../interaction
+      '@embedpdf/plugin-selection':
+        specifier: workspace:*
+        version: link:../selection
       '@embedpdf/plugin-shell':
         specifier: workspace:*
         version: link:../shell
+      '@embedpdf/plugin-stage':
+        specifier: workspace:*
+        version: link:../stage
     devDependencies:
       '@embedpdf/tooling-build':
         specifier: workspace:*

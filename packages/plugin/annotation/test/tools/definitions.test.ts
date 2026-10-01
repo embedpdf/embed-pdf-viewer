@@ -68,6 +68,21 @@ describe('annotation tool registry', () => {
     expect(tools.get('quiet-note')?.ghost).toBe(false);
   });
 
+  it('keeps `meta` as your own data: only the calibrate tool, and tools extending it, capture', () => {
+    const tools = buildToolRegistry([
+      { id: 'labelled', extends: 'line', meta: { label: 'Line', capture: true } },
+      { id: 'my-calibrate', extends: 'calibrate' },
+    ]);
+    expect(tools.get('labelled')).toMatchObject({
+      capture: false,
+      meta: { label: 'Line', capture: true },
+    });
+    expect(tools.get('calibrate')?.capture).toBe(true);
+    expect(tools.get('calibrate')?.meta).toBeUndefined();
+    expect(tools.get('my-calibrate')?.capture).toBe(true);
+    expect(tools.get('line')?.capture).toBe(false);
+  });
+
   it('rejects unsupported defaults from untyped JavaScript/JSON configuration', () => {
     expect(() => buildToolRegistry([invalidCircleDefaults])).toThrow(
       "tool 'invalid-circle' does not support default 'lineEndings'",

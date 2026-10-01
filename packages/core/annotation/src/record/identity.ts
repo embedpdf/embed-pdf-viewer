@@ -3,7 +3,7 @@
  * annotations it answers. The record keeps none of these beside the
  * annotation, so every reader asks here.
  */
-import type { AnnotationDTO, AnnotationRef } from '@embedpdf/engine-core/runtime';
+import type { Annotation, AnnotationRef } from '@embedpdf/engine-core/runtime';
 import { annotationKey } from '@embedpdf/core';
 
 import { kindNamed, widgetKindOf, type AnnotationKind } from '../kinds';
@@ -14,7 +14,7 @@ import type { Id, ModelAnnotation } from '../types';
  * the one its field family picks (`widget-text`…); for a free text with the
  * callout intent, the callout.
  */
-export function kindOf(annotation: AnnotationDTO): AnnotationKind {
+export function kindOf(annotation: Annotation): AnnotationKind {
   switch (annotation.subtype) {
     case 'widget':
       return kindNamed(widgetKindOf(annotation.fieldFamily));
@@ -38,7 +38,7 @@ export const refOf = (record: ModelAnnotation | undefined): AnnotationRef | null
  * The key of the annotation an annotation answers (`/IRT`): a comment reply's
  * parent, or a group member's primary.
  */
-export const irtOf = (annotation: AnnotationDTO): Id | undefined =>
+export const irtOf = (annotation: Annotation): Id | undefined =>
   annotation.reply ? annotationKey(annotation.reply.to) : undefined;
 
 /**
@@ -46,5 +46,5 @@ export const irtOf = (annotation: AnnotationDTO): Id | undefined =>
  * `/RT /Group` member only (a visual group acts as a unit; a comment reply
  * answers its parent but is not part of it).
  */
-export const groupOf = (annotation: AnnotationDTO): Id | undefined =>
+export const groupOf = (annotation: Annotation): Id | undefined =>
   annotation.reply?.type === 'group' ? annotationKey(annotation.reply.to) : undefined;

@@ -66,6 +66,8 @@ Typing is written after a short pause, at every format change, and when editing 
 never gets half a word. `documents.download()` waits for the last write, so the file you download has
 everything the user typed.
 
+<Engine local>
+
 ## Show your own fonts
 
 The engine puts a font into the PDF, but the browser draws the text while people type, so it needs
@@ -78,6 +80,8 @@ The key is the font's name in both places: `fontFamily: 'brand-sans'` on a text 
 PDF fonts need nothing: Helvetica shows as `Helvetica, Arial, sans-serif`, and so on. More in
 [Fonts](/docs/engine/documents/fonts).
 
+</Engine>
+
 ## Draw your own text box
 
 The annotation layer's text box already edits rich text. If you [draw text boxes
@@ -86,6 +90,11 @@ it draws the runs, turns typing back into runs, keeps the caret when the style c
 pasting, input methods and the format shortcuts:
 
 <Snippet name="concepts/branded-text-box" />
+
+<Example name="annotation/branded-text-box" />
+
+> **Try it:** double-click the box and type. The buttons format the selected words, as on the
+> built-in box.
 
 <Fw only="react">`editor.style` is the box's body style as CSS: font, size, color and alignment.</Fw><Fw only="vue">`style` is the box's body style as CSS: font, size, color and alignment.</Fw><Fw only="svelte">`editor.style` is the box's body style as a CSS string: font, size, color and alignment.</Fw><Fw only="angular">The directive gives your element the box's body style: font, size, color and alignment. Its
 `editing()` is true while someone types in the box.</Fw> The formatting calls above work on your element

@@ -24,13 +24,17 @@ thread knows where its first comment is, and that's where the Stage should go:
 
 <Snippet name="concepts/thread-links" />
 
-There's nothing to convert, whether the page is zoomed, rotated or scrolled.
+There's nothing to convert, whether the page is zoomed, rotated or scrolled. A search match says
+where it is the same way, and the Stage goes there:
+
+<Example name="coordinates/pass-through" />
 
 ## Pages
 
 A call that takes a page takes its `ref` or its index. A `ref` stays the same when pages move, so keep
 refs, not indexes, in your own state. Everything that is on a page hands you its page's ref, such as
-`annotation.ref.page` or a search hit's `hit.page`.
+`annotation.ref.page` or a search hit's `hit.page`. A ref is an object, so compare two with
+`pageRefsEqual(left, right)` from `/runtime`, not `===`.
 
 ```ts
 stage.goToPage(4); // the fifth page, counting from 0
@@ -40,19 +44,32 @@ stage.goToPage(hit.page); // the page of a search hit
 ## Pixels, only when you draw
 
 Pixels change with every zoom, rotation and scroll, so nothing in EmbedPDF stores them. When you draw
-something of your own on a page, convert at the last moment with the page's `transform`:
+something of your own on a page, convert at the last moment with the page's `transform`. Which call
+depends on where you draw:
+
+- **On the page**, in the Stage's <Word of="renderFunction" /> or inside `<PageView>`, with the
+  layers: that box turns with the page, so convert for zoom only, with `toPixels`. What you draw turns
+  along.
+- **Over the page**, in its [page chrome](../viewing/stage#labels-and-buttons-on-every-page): that
+  box stays upright, so convert with `pageToView`, which includes the page's turn.
 
 <Snippet name="concepts/pin" />
 
-| From              | To                | Use                                       |
-| :---------------- | :---------------- | :---------------------------------------- |
-| A point on a page | Pixels on it      | `page.transform.pageToView(point)`        |
-| A box on a page   | Pixels on it      | `page.transform.pageToViewRect(box)`      |
-| Pixels on a page  | A point on it     | `page.transform.viewToPage(point)`        |
-| A pointer event   | A point on a page | `page.toPagePoint(event.clientX, event.clientY)` |
+| From              | To                | On the page                         | Over the page                         |
+| :---------------- | :---------------- | :---------------------------------- | :------------------------------------ |
+| A point on a page | Pixels            | `page.transform.toPixels(point)`    | `page.transform.pageToView(point)`    |
+| A box on a page   | Pixels            | two corners through `toPixels`      | `page.transform.pageToViewRect(box)`  |
+| Pixels            | A point on a page | `page.transform.fromPixels(point)`  | `page.transform.viewToPage(point)`    |
+| A pointer event   | A point on a page | `page.toPagePoint(event.clientX, event.clientY)` | the same              |
 
-To place many things at once, put them in a container with `transform: page.transform.cssMatrix` and
-`transform-origin: 0 0`, and give them page coordinates: the browser does the zoom and the rotation.
+To place many things over a page at once, put them in a container with `transform:
+page.transform.cssMatrix` and `transform-origin: 0 0`, and give them page coordinates: the browser
+does the zoom and the turn.
+
+<Example name="coordinates/pins" />
+
+> **Try it:** click a page to drop a pin, then zoom and turn the view. Each pin keeps its numbers
+> and its spot on the page; only its pixels change.
 
 ## Tools that use the PDF file's numbers
 
@@ -67,7 +84,7 @@ engine docs.
 | You're…                                               | Use                 | Shape                                    |
 | :---------------------------------------------------- | :------------------ | :--------------------------------------- |
 | Working with annotations, text, search or `reveal`    | page coordinates    | `{ x, y, width, height }` and `{ x, y }` |
-| Drawing on a page right now                           | `page.transform`    | pixels: convert, never store             |
+| Drawing on a page right now                           | `page.transform`    | pixels: convert, never store (`toPixels` on it, `pageToView` over it) |
 | Talking to a tool that reads the PDF's own numbers    | `pdfRectOf()`       | `{ left, bottom, right, top }`           |
 
 **Bringing your own coordinate system?** Page coordinates are a plain frame in points with y going

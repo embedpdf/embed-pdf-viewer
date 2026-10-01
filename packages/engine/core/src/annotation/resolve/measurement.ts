@@ -4,7 +4,7 @@ import type { PdfPoint } from '../../geometry/primitives';
 import { deriveMeasurementLabel, isReadout, measurementReadout } from '../../measure/derive';
 import { assertPdfFloat, assertWritableMeasure } from '../../measure/validate';
 import type { PdfCoordinates } from '../../pageSpace/coordinates';
-import type { AnnotationDraft, AnnotationDTO, AnnotationPatch } from '../kinds';
+import type { AnnotationDraft, Annotation, AnnotationPatch } from '../kinds';
 
 type DimensionKind = 'line' | 'polygon' | 'polyline';
 type DimensionWrite = Extract<
@@ -166,7 +166,7 @@ export function resolveMeasurementDraft(
  * is worked out from the resulting geometry and scale.
  */
 export function measurementFollows(
-  current: AnnotationDTO<PdfCoordinates>,
+  current: Annotation<PdfCoordinates>,
   patch: AnnotationPatch<PdfCoordinates>,
 ): AnnotationPatch<PdfCoordinates> {
   if (current.subtype !== 'line' && current.subtype !== 'polygon' && current.subtype !== 'polyline')

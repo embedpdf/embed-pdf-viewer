@@ -4,7 +4,7 @@ import {
   compareIsoDateTime,
   annotationKey,
   buildCommentThreads,
-  type AnnotationDTO,
+  type Annotation,
   type AnnotationRef,
   type CommentThread,
 } from '@embedpdf/engine-core/runtime';
@@ -48,7 +48,7 @@ export function createThreadIndex(
     const model = store.model();
     // Confirmed records only: a new annotation joins the index once the
     // engine confirms its create.
-    const dtos: AnnotationDTO[] = [];
+    const dtos: Annotation[] = [];
     for (const id of model.order) {
       const record = model.byId[id];
       if (record && refOf(record)) dtos.push(record.annotation);

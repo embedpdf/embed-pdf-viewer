@@ -15,6 +15,7 @@
   const rect = $derived(page.transform.pageToViewRect(box));
 </script>
 
+{@render native()}
 <div
   style:position="absolute"
   style:left="{rect.x}px"
@@ -22,7 +23,6 @@
   style:width="{rect.width}px"
   style:height="{rect.height}px"
 >
-  {@render native()}
   <StatusDot status={approval.status} />
   {#if interactive}
     <button onclick={approval.open}>Details</button>

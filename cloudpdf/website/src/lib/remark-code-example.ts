@@ -62,8 +62,9 @@ export const remarkCodeExample = (options: RemarkCodeExampleOptions = {}) => {
           value: JSON.stringify(byFramework),
         });
         // Live demos: built by the demo Vite pass before the docs build;
-        // presence in the manifest = a mounted preview exists.
-        const demos = readDemoManifest()[nameAttr.value];
+        // presence in the manifest = a mounted preview exists. A snippet is code only, even
+        // when an example has the same name.
+        const demos = node.name === 'Example' ? readDemoManifest()[nameAttr.value] : undefined;
         if (demos) {
           node.attributes.push({
             type: 'mdxJsxAttribute',

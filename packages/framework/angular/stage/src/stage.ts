@@ -88,33 +88,6 @@ const frameEqual = (left: PageFrame, right: PageFrame) =>
   `,
 })
 export class EpdfStage implements EpdfStageScopeRef {
-  /**
-   * Route this Stage's pointer events to the interaction hub (page-resolved via
-   * `pageAt`) — and register this lens's tool-gated pan-scroll handler with it
-   * (lens-scoped, so multiple stages on one document never pan each other).
-   * Pan is then the `pan` tool's job and dragging in `pointer` mode selects
-   * text (incl. across pages).
-   *
-   * Default true: registering `interactionPlugin()` is the one opt-in — tools
-   * just work; without the hub this is inert and the stage falls back to
-   * built-in drag-to-pan, so a hub-less setup costs nothing. Set `false` on
-   * secondary lenses (a thumbnail rail) that should stay click-to-navigate
-   * instead of feeding the document's tools.
-   */
-  readonly interaction = input(true);
-  /**
-   * With `interaction`: let drags over page gaps pan regardless of the active
-   * tool (and show a grab cursor there) — the gutter always pans; there is
-   * nothing to draw/select outside a page. Default true.
-   */
-  readonly panFallback = input(true);
-  /**
-   * Ambient zoom gestures on this stage: ctrl/cmd+wheel and trackpad pinch
-   * (Safari gesture events included). Default true. Turn off for follower
-   * lenses with a fixed magnification (a thumbnail rail should scroll under
-   * cmd+wheel, not zoom); pinches are still swallowed either way.
-   */
-  readonly zoomGestures = input(true);
   /** The stage lens to drive (default: the nearest `[epdfStageScope]`, else the main StageToken). */
   readonly token = input<StageTokenProp | undefined>(undefined);
   private readonly parentScope = inject(EPDF_STAGE_SCOPE, { optional: true, skipSelf: true });
@@ -130,6 +103,26 @@ export class EpdfStage implements EpdfStageScopeRef {
     () => this.stageToken() as unknown as CapabilityToken<StageHostCapability>,
   );
   private readonly ix = injectOptionalCapability(InteractionToken);
+  // How this view takes pointer input is its own settings (`interaction`,
+  // `panFallback`, `zoomGestures`): a change rebinds the surface below.
+  // Routing input to the interaction hub also registers this view's
+  // tool-gated pan-scroll handler with it, scoped to the view; without the
+  // hub the Stage falls back to its own drag-to-pan.
+  private readonly interaction = injectOptionalSelectorFor(
+    () => this.stageToken(),
+    (stage) => stage.getSettings().interaction,
+    true,
+  );
+  private readonly panFallback = injectOptionalSelectorFor(
+    () => this.stageToken(),
+    (stage) => stage.getSettings().panFallback,
+    true,
+  );
+  private readonly zoomGestures = injectOptionalSelectorFor(
+    () => this.stageToken(),
+    (stage) => stage.getSettings().zoomGestures,
+    true,
+  );
   private readonly useHub = computed(() => this.interaction() && this.ix() !== null);
   // The hub's resolved cursor (text/grab/…), applied to the viewport when driving.
   private readonly hubCursor = this.host.value(() => this.ix()?.getCursor() ?? 'default');

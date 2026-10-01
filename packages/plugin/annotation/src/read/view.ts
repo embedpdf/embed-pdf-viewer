@@ -16,9 +16,9 @@ import {
   type ModelAnnotation,
   sourceOfConfirmed,
 } from '@embedpdf/core-annotation';
-import type { AnnotationDTO } from '@embedpdf/engine-core/runtime';
+import type { Annotation } from '@embedpdf/engine-core/runtime';
 
-import { withPendingEdit, type PendingChange } from '../model';
+import { moveInOrder, withPendingEdit, type PendingChange } from '../model';
 import { fromDTO } from '@embedpdf/core-annotation';
 import type { AnnotationContext } from '../services/context';
 import type { AnnotationRecord, AnnotationRecords } from '../sync/records';
@@ -30,7 +30,7 @@ import type { AnnotationRecord, AnnotationRecords } from '../sync/records';
  */
 export const authorityOf = (
   ctx: Pick<AnnotationContext, 'doc'>,
-  dto: AnnotationDTO,
+  dto: Annotation,
 ): ModelAnnotation['authority'] => {
   const security = ctx.doc?.security;
   if (!security) return undefined;
@@ -104,8 +104,15 @@ export function createView(
   };
 
   const view = memo(
-    () => [records.get(), ctx.state.get().pending, ctx.state.get().vector, ctx.document()] as const,
-    (confirmedRecords, pending, vector): AnnotationView => {
+    () =>
+      [
+        records.get(),
+        ctx.state.get().pending,
+        ctx.state.get().vector,
+        ctx.state.get().moves,
+        ctx.document(),
+      ] as const,
+    (confirmedRecords, pending, vector, moves): AnnotationView => {
       const changesOf = new Map<Id, PendingChange[]>();
       for (const change of pending) {
         const list = changesOf.get(change.id);
@@ -137,7 +144,17 @@ export function createView(
         order.push(id);
       }
       for (const id of layered.keys()) if (!(id in byId)) layered.delete(id);
-      return { byId, order };
+      // Drawing-order changes the engine hasn't confirmed yet, in the order they were made.
+      let shown: Id[] = order;
+      for (const move of moves) {
+        shown = moveInOrder(
+          shown,
+          (id) => byId[id]?.annotation.page.objectNumber === move.page,
+          move.ids,
+          move.toIndex,
+        );
+      }
+      return { byId, order: shown };
     },
   );
 

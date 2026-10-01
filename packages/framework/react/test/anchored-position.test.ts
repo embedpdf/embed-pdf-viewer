@@ -85,11 +85,12 @@ describe('positionAnchoredRect — knob nudges only the placement edge', () => {
     });
   });
 
-  it('no knob behaves exactly as before (centred on the box)', () => {
+  it('without a knob, it is centred on the box', () => {
     expect(positionAnchoredRect(box, 'top', gap)).toEqual({
       left: 150,
       top: 100 - gap,
       transform: 'translate(-50%, -100%)',
+      placement: 'top',
     });
   });
 });

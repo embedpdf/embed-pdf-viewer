@@ -22,7 +22,7 @@ import { UnderlineKind } from './underline';
 import { UnsupportedKind } from './unsupported';
 import { WidgetKind } from './widget';
 import { ANNOTATION_DECLARATIONS, declarationOf } from './declarations';
-import type { AnnotationDTO, AnnotationDraft, AnnotationPatch } from './declarations';
+import type { Annotation, AnnotationDraft, AnnotationPatch } from './declarations';
 
 export * from './highlight';
 export * from './underline';
@@ -52,7 +52,7 @@ export * from './widget.shared';
 export { ANNOTATION_DECLARATIONS, declarationOf };
 export type {
   AnnotationDeclaration,
-  AnnotationDTO,
+  Annotation,
   AnnotationDraft,
   AnnotationPatch,
   WritableAnnotationDeclaration,
@@ -120,7 +120,7 @@ export const KIND_BY_SUBTYPE: Readonly<{
  * needs. Servers and cloud clients use this to validate every annotation
  * payload on the wire.
  */
-export const AnnotationDTOSchema: z.ZodType<AnnotationDTO> = z.discriminatedUnion('subtype', [
+export const AnnotationSchema: z.ZodType<Annotation> = z.discriminatedUnion('subtype', [
   HighlightKind.dtoSchema,
   UnderlineKind.dtoSchema,
   SquigglyKind.dtoSchema,
@@ -144,7 +144,7 @@ export const AnnotationDTOSchema: z.ZodType<AnnotationDTO> = z.discriminatedUnio
 ] as unknown as [
   z.ZodDiscriminatedUnionOption<'subtype'>,
   ...z.ZodDiscriminatedUnionOption<'subtype'>[],
-]) as unknown as z.ZodType<AnnotationDTO>;
+]) as unknown as z.ZodType<Annotation>;
 
 /** Validates a create's data against its kind. */
 export const AnnotationDraftSchema: z.ZodType<AnnotationDraft> = z.discriminatedUnion('subtype', [

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Viewer, DocumentGate } from '@embedpdf/react/runtime';
 import type { OpenInput } from '@embedpdf/react/runtime';
-import { Stage, stagePlugin, usePages } from '@embedpdf/react/stage';
+import { Stage, stagePlugin, useStage, useStageState } from '@embedpdf/react/stage';
 import { RenderLayer, renderPlugin } from '@embedpdf/react/render';
 import { localEngine } from '@embedpdf/engine';
 
@@ -18,25 +18,39 @@ const ebook = async (): Promise<OpenInput> => {
 // [!/doc-source]
 
 function PageToolbar() {
-  const { currentPage, pageCount, goToPage, next, previous } = usePages();
+  const stage = useStage();
+  const { currentPageIndex, pageCount } = useStageState();
   const [typed, setTyped] = useState('');
+
+  // People count from 1, an index from 0. An index past the end goes to the last page.
   const jump = () => {
-    const n = Number(typed);
-    if (n >= 1 && n <= pageCount) goToPage(n - 1); // goToPage counts from 0
+    const number = Number(typed);
+    if (Number.isInteger(number) && number >= 1) stage.goToPage(number - 1);
     setTyped('');
   };
+
   return (
     <div className="toolbar">
-      <button type="button" className="button" onClick={() => previous()}>
+      <button
+        type="button"
+        className="button"
+        disabled={!stage.canGoPrevious()}
+        onClick={() => stage.previousPage()}
+      >
         ‹ Previous
       </button>
       <output className="badge">
         Page{' '}
         <strong>
-          {currentPage + 1} / {pageCount}
+          {currentPageIndex + 1} / {pageCount}
         </strong>
       </output>
-      <button type="button" className="button" onClick={() => next()}>
+      <button
+        type="button"
+        className="button"
+        disabled={!stage.canGoNext()}
+        onClick={() => stage.nextPage()}
+      >
         Next ›
       </button>
       <input

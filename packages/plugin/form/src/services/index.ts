@@ -5,9 +5,9 @@
  * context's (`ctx.allows`, `ctx.assertAllowed`).
  */
 import type { Mirror, PageMirror, SerialQueue } from '@embedpdf/core';
+import type { FormFieldRef } from '@embedpdf/engine-core/runtime';
 
-import type { FormConfig } from '../contract';
-import { fieldKeyOfRef, type FieldIndex, type WidgetBoxes } from '../model';
+import { canonicalKey, type FieldIndex, type FieldKey, type PageWidgets } from '../model';
 import { createFieldsMirror } from '../sync/fields';
 import { createWidgetBoxesMirror } from '../sync/widget-boxes';
 import type { FormContext } from './context';
@@ -19,7 +19,7 @@ export type { FormContext } from './context';
 
 export interface FormServices {
   readonly fields: Mirror<FieldIndex>;
-  readonly widgetBoxes: PageMirror<WidgetBoxes>;
+  readonly widgetBoxes: PageMirror<PageWidgets>;
   readonly events: FormEvents;
   readonly siblings: FormSiblings;
   readonly scripting: FormScripting;
@@ -28,19 +28,21 @@ export interface FormServices {
    * actions plugin never interleaves with a user's in-flight commit.
    */
   readonly enqueue: SerialQueue;
-  readonly keyOf: typeof fieldKeyOfRef;
+  /** The key a field is known by, whichever ref names it (`toFieldRef(name)` too). */
+  readonly keyOf: (ref: FormFieldRef) => FieldKey;
 }
 
-export function createServices(ctx: FormContext, config: FormConfig): FormServices {
+export function createServices(ctx: FormContext): FormServices {
   const siblings = resolveSiblings(ctx);
   const events = createEvents(ctx);
+  const fields = createFieldsMirror(ctx, events);
   return {
-    fields: createFieldsMirror(ctx, events),
+    fields,
     widgetBoxes: createWidgetBoxesMirror(ctx),
     events,
     siblings,
-    scripting: createScriptingSeam(ctx, config, siblings),
+    scripting: createScriptingSeam(ctx, siblings),
     enqueue: ctx.serialQueue('writes'),
-    keyOf: fieldKeyOfRef,
+    keyOf: (ref) => canonicalKey(fields.get(), ref),
   };
 }

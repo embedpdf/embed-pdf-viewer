@@ -4,7 +4,7 @@
  * engine's field names and fills in what the kind doesn't keep (a highlight
  * strokes nothing, a caret draws 1 pt, a redaction's outline 1.5 pt).
  */
-import type { AnnotationDTO } from '@embedpdf/engine-core/runtime';
+import type { Annotation } from '@embedpdf/engine-core/runtime';
 
 import type { Paint, Style } from '../types';
 
@@ -12,7 +12,7 @@ import type { Paint, Style } from '../types';
 const PLAIN_BORDER = { borderStyle: 'solid', dashArray: null, cloudyIntensity: null } as const;
 
 type Stroked = Extract<
-  AnnotationDTO,
+  Annotation,
   { subtype: 'square' | 'circle' | 'line' | 'polygon' | 'polyline' | 'ink' | 'free-text' }
 >;
 
@@ -21,7 +21,7 @@ type Stroked = Extract<
  * (ink has none) and its border, a dash or a cloud (square, circle, line,
  * polygon, polyline, ink, free text).
  */
-export function strokedStyle(annotation: AnnotationDTO): Style {
+export function strokedStyle(annotation: Annotation): Style {
   const stroked = annotation as Stroked;
   return {
     color: stroked.color,
@@ -36,7 +36,7 @@ export function strokedStyle(annotation: AnnotationDTO): Style {
 }
 
 type Coloured = Extract<
-  AnnotationDTO,
+  Annotation,
   {
     subtype:
       | 'highlight'
@@ -53,7 +53,7 @@ type Coloured = Extract<
 /** A kind drawn in its one colour, with the stroke width its drawing uses and no border of its own. */
 const colouredStyle =
   (strokeWidth: number) =>
-  (annotation: AnnotationDTO): Style => {
+  (annotation: Annotation): Style => {
     const coloured = annotation as Coloured;
     return {
       color: coloured.color,
@@ -78,8 +78,8 @@ export const redactStyle = colouredStyle(1.5);
 export const iconStyle = colouredStyle(1);
 
 /** A stamp: its drawing is its appearance, so its opacity is the only style it has. */
-export function stampStyle(annotation: AnnotationDTO): Style {
-  const stamp = annotation as Extract<AnnotationDTO, { subtype: 'stamp' }>;
+export function stampStyle(annotation: Annotation): Style {
+  const stamp = annotation as Extract<Annotation, { subtype: 'stamp' }>;
   return {
     color: '#444444',
     interiorColor: null,
@@ -91,8 +91,8 @@ export function stampStyle(annotation: AnnotationDTO): Style {
 }
 
 /** A form widget: its border and background as the form draws them; a widget has no dash of its own. */
-export function widgetStyle(annotation: AnnotationDTO): Style {
-  const widget = annotation as Extract<AnnotationDTO, { subtype: 'widget' }>;
+export function widgetStyle(annotation: Annotation): Style {
+  const widget = annotation as Extract<Annotation, { subtype: 'widget' }>;
   return {
     color: widget.color ?? '#1a1a1a',
     interiorColor: widget.interiorColor ?? null,
@@ -105,7 +105,7 @@ export function widgetStyle(annotation: AnnotationDTO): Style {
 }
 
 /** A kind the viewer only shows (a link, a popup, an unknown type): an outline it never draws itself. */
-export function plainStyle(annotation: AnnotationDTO): Style {
+export function plainStyle(annotation: Annotation): Style {
   return {
     color: '#444444',
     interiorColor: null,

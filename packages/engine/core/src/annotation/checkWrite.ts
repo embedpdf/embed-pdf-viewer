@@ -9,7 +9,7 @@ import {
   fileAnnotationPatchSchemaOf,
   KIND_BY_SUBTYPE,
   type AnnotationDraft,
-  type AnnotationDTO,
+  type Annotation,
   type AnnotationPatch,
 } from './kinds';
 import type { KindFields } from './declaration';
@@ -58,7 +58,7 @@ export function assertAnnotationDraft(
  * (`pdfShapeForRect`).
  */
 export function checkAnnotationPatch(
-  current: AnnotationDTO<PdfCoordinates>,
+  current: Annotation<PdfCoordinates>,
   patch: AnnotationPatch<PdfCoordinates>,
 ): AnnotationPatch<PdfCoordinates> {
   if (current.subtype === 'unsupported') return patch;
@@ -90,7 +90,7 @@ export function checkAnnotationPatch(
  * store it as sRGB, so leaving it out keeps the file as it is.
  */
 function withoutUnchangedColors(
-  current: AnnotationDTO<PdfCoordinates>,
+  current: Annotation<PdfCoordinates>,
   patch: AnnotationPatch<PdfCoordinates>,
 ): AnnotationPatch<PdfCoordinates> {
   const fields: KindFields = declarationOf(current.subtype)?.fields ?? {};
@@ -117,7 +117,7 @@ function withoutUnchangedColors(
  * values.
  */
 export function pdfResolveRectCommand(
-  current: AnnotationDTO<PdfCoordinates>,
+  current: Annotation<PdfCoordinates>,
   patch: AnnotationPatch<PdfCoordinates>,
 ): AnnotationPatch<PdfCoordinates> {
   const { rect, ...rest } = patch as AnnotationPatch<PdfCoordinates> & { rect?: unknown };

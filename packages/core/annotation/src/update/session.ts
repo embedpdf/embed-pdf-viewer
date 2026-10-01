@@ -3,7 +3,7 @@
  * keeping its references to records right when a record is confirmed under a
  * new id (`rekey`) or leaves the view (`forget`).
  */
-import type { AnnotationDTO } from '@embedpdf/engine-core/runtime';
+import type { Annotation } from '@embedpdf/engine-core/runtime';
 
 import { readOfDefaults } from '../record/defaults';
 import { lineEndingsOf } from '../shapes/points';
@@ -20,8 +20,8 @@ export const initialSession: Session = {
   hitMargin: 6,
   editing: null,
   snap: {
-    guides: true,
-    guideThreshold: 5,
+    alignment: true,
+    alignmentThreshold: 6,
     rotation: true,
     rotationAngles: [0, 90, 180, 270],
     rotationThreshold: 4,
@@ -39,7 +39,7 @@ export const defaultsFor = (model: Model, preset: string): FieldValues =>
  * defaults (by its preset) over the engine's for its `kind`, read as an
  * annotation. A ghost is drawn with its style (`styleOf`).
  */
-export const toolAnnotation = (model: Model, kind: string, preset: string = kind): AnnotationDTO =>
+export const toolAnnotation = (model: Model, kind: string, preset: string = kind): Annotation =>
   readOfDefaults(kind, defaultsFor(model, preset));
 
 // A tool's line endings are read off what it creates, as a line's are (shapes/points.ts).

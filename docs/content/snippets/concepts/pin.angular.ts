@@ -11,8 +11,8 @@ import {
   template: `
     <epdf-annotation-layer>
       <ng-template [epdfAnnotation]="isNote" let-box="box" let-page="page">
-        <!-- page coordinates → this page's pixels, zoom and rotation included -->
-        @let point = page.transform.pageToView({ x: box.x, y: box.y });
+        <!-- page coordinates → pixels on this page, at its zoom; the page turns them with it -->
+        @let point = page.transform.toPixels({ x: box.x, y: box.y });
         <div style="position: absolute" [style.left.px]="point.x" [style.top.px]="point.y">📌</div>
       </ng-template>
     </epdf-annotation-layer>

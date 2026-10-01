@@ -5,36 +5,36 @@
  * page space via PageContext.toPagePoint and forwards normalized samples to the
  * hub. It binds only to the page context, so it works identically inside a
  * virtualized <Stage> page and a standalone <PageView>. Features never attach
- * their own pointer listeners — they register handlers with the hub.
+ * their own pointer listeners: they register handlers with the hub, and a tool
+ * of your own brings its pointer methods (`registerTool`).
  */
 
 // One-line-per-feature: registration travels with the UI.
 export * from '@embedpdf/plugin-interaction';
-// The browser feedback providers live in @embedpdf/web (the plugin is
-// DOM-free); re-exported here so app code has one import for the feature.
-export { vibrationFeedback, wkFeedback } from '@embedpdf/web';
+// The browser helpers live in @embedpdf/web (the plugin is DOM-free); they are
+// re-exported here so app code has one import for the feature.
+export { svgCursor, vibrationFeedback, wkFeedback } from '@embedpdf/web';
+export type { SvgCursorOptions } from '@embedpdf/web';
 import * as React from 'react';
 import { useEffect, useRef } from 'react';
 import { pageRefsEqual } from '@embedpdf/core';
-import { InteractionToken as InteractionHostToken } from '@embedpdf/plugin-interaction/contract/host';
-import { InteractionToken } from '@embedpdf/plugin-interaction';
-import type {
-  InteractionCapability,
-  Modifiers,
-  PointerSample,
-  ToolChangedEvent,
-} from '@embedpdf/plugin-interaction';
+import {
+  InteractionToken as InteractionHostToken,
+  type PointerSample,
+} from '@embedpdf/plugin-interaction/contract/host';
+import { InteractionToken, interactionState } from '@embedpdf/plugin-interaction';
+import type { InteractionCapability, Modifiers } from '@embedpdf/plugin-interaction';
 import type { EventHook } from '@embedpdf/core';
 import { svgCursor } from '@embedpdf/web';
 import type { SvgCursorOptions } from '@embedpdf/web';
 import {
-  shallowArray,
   useCapability,
   useCapabilityEvent,
   useOptionalCapability,
   usePage,
   useSelector,
 } from './runtime';
+import { settingsHook, stateHook } from './state';
 
 const mods = (event: PointerEvent): Modifiers => ({
   shift: event.shiftKey,
@@ -145,7 +145,7 @@ export function PagePointerSource() {
   return <div ref={ref} style={{ position: 'absolute', inset: 0, cursor, touchAction: 'none' }} />;
 }
 
-/** The interaction capability (tools, cursor, handlers) for app chrome. */
+/** The interaction capability: switch tools, add your own, set their cursors. */
 export function useInteraction(): InteractionCapability {
   return useCapability(InteractionToken);
 }
@@ -158,54 +158,38 @@ export function useInteractionEvent<T>(
   useCapabilityEvent(InteractionToken, select, handler);
 }
 
-/** Read + switch the active tool (for a toolbar). `push`/`pop` arm a tool
- *  temporarily (hold space to pan) and restore the previous one. */
-export function useTool() {
-  const interaction = useCapability(InteractionToken);
-  const activeToolId = useSelector(InteractionToken, (interaction) =>
-    interaction.getActiveToolId(),
-  );
-  const tools = useSelector(
-    InteractionToken,
-    (interaction) => interaction.listTools(),
-    shallowArray,
-  );
-  return {
-    activeToolId,
-    activate: interaction.activateTool,
-    tools,
-    push: interaction.pushTool,
-    pop: interaction.popTool,
-  };
-}
+/**
+ * The tools' state: the active tool's id and every tool you can switch to
+ * (the page's State table, declared once in `interactionState`). Takes a
+ * selector, and re-renders only when what it returns changes. Without a
+ * document there is no active tool (`null`) and no tool.
+ */
+export const useInteractionState = stateHook(interactionState);
 
-/** Run `handler` on every tool change of this subtree's document. */
-export function useToolChanged(handler: (event: ToolChangedEvent) => void): void {
-  useCapabilityEvent(InteractionToken, (interaction) => interaction.onToolChanged, handler);
-}
+/** The interaction settings (`defaultTool`, `tools`), with or without a document. Takes a selector. */
+export const useInteractionSettings = settingsHook(InteractionToken);
 
 /** One cursor slot: an SVG image ({@link SvgCursorOptions}) or a plain CSS
  *  cursor string ('crosshair', 'url(…) 4 4, copy'). */
 export type ToolCursorImage = SvgCursorOptions | string;
 
-/** What {@link useToolCursor} installs: the tool to reskin + its keyword map.
+/** What {@link useToolCursor} installs: the tool, and its cursors by name.
  *  Apps build `svg` from the same icon their toolbar renders, so the cursor
  *  and the button can never drift apart. */
 export interface ToolCursorSpec {
   toolId: string;
-  /** keyword → cursor: restyle the keywords this tool can show — its declared
-   *  base ('crosshair', 'copy') and hover claims ('text' over text) — in the
-   *  tool's identity. Keywords the map omits render as-is: a markup tool's
-   *  'default' base stays the bare arrow, a foreign 'move' claim drops the
-   *  icon. An SVG value defaults its keyword `fallback` to the keyword it
-   *  replaces. */
+  /** keyword → cursor: replace the keywords this tool can show (its own
+   *  cursor, 'crosshair' or 'copy', and hover claims, 'text' over text) with
+   *  the tool's look. Keywords the map leaves out show as they are: a markup
+   *  tool's 'default' stays the bare arrow, a 'move' claim drops the icon. An
+   *  SVG value's `fallback` defaults to the keyword it replaces. */
   cursors: Record<string, ToolCursorImage>;
 }
 
-const toCursor = (img: ToolCursorImage, fallback?: string): string =>
-  typeof img === 'string'
-    ? img
-    : svgCursor(img.fallback === undefined && fallback ? { ...img, fallback } : img);
+const toCursor = (image: ToolCursorImage, fallback?: string): string =>
+  typeof image === 'string'
+    ? image
+    : svgCursor(image.fallback === undefined && fallback ? { ...image, fallback } : image);
 
 /**
  * Give a tool image cursors — the armed-tool indicator. The cursor is the only

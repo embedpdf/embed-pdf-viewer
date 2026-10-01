@@ -12,7 +12,7 @@
  */
 import {
   faceForFreeTextFont,
-  type AnnotationDTO,
+  type Annotation,
   type FaceRequest,
   type FontHandle,
   type RichTextBody,
@@ -320,7 +320,7 @@ export function bodyFromTextStyle(style: TextStyle, fonts?: FontLookup): RichTex
 
 /** The annotation's rich document: a free text's own, else one made from
  *  its plain text and how its text is set. */
-export function richDocOf(annotation: AnnotationDTO, fonts?: FontLookup): RichTextDocument {
+export function richDocOf(annotation: Annotation, fonts?: FontLookup): RichTextDocument {
   if (annotation.subtype === 'free-text' && annotation.richText) return annotation.richText;
   const style: TextStyle = textOf(annotation) ?? {
     fontFamily: 'helvetica',

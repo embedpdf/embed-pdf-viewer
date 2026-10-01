@@ -6,7 +6,7 @@ import { SquigglyDeclaration } from './declaration';
 
 export { SquigglyDeclaration } from './declaration';
 
-export type SquigglyAnnotationDTO<C extends Coordinates = PageCoordinates> = ReadOf<
+export type SquigglyAnnotation<C extends Coordinates = PageCoordinates> = ReadOf<
   typeof SquigglyDeclaration,
   C
 >;
@@ -25,7 +25,7 @@ export const SquigglyPatchSchema = SquigglyDeclaration.updateSchema;
 
 export const SquigglyKind: AnnotationKindModule<
   'squiggly',
-  SquigglyAnnotationDTO,
+  SquigglyAnnotation,
   SquigglyDraft,
   SquigglyPatch
 > = {

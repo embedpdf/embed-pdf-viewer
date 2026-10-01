@@ -14,6 +14,7 @@ import {
   emptyFieldIndex,
   endWrite,
   fieldByKey,
+  fieldByRef,
   fieldForWidget,
   fieldKeyOf,
   foldFormEvent,
@@ -21,8 +22,10 @@ import {
   initialFormState,
   widgetAt,
   type FieldIndex,
+  type FormWidgetLook,
+  type PageWidgets,
 } from '../src/model';
-import { fillItemForWidget, fillItems } from '../src/read/fill-items';
+import { fillItems, projectWidget } from '../src/read/fill-items';
 
 const text = (over: Partial<Extract<FormFieldDTO, { family: 'text' }>> = {}): FormFieldDTO => ({
   ref: { kind: 'objectNumber', objectNumber: 4 },
@@ -52,9 +55,29 @@ const snapshot = (fields: FormFieldDTO[]): FormSnapshot =>
 const origin = { kind: 'remote', sessionId: 'them', sub: null, ts: 0, serverId: null };
 const event = (value: object) => ({ origin, ...value }) as unknown as DocumentEvent;
 const NO_WRITES = {};
-const BOXES = { 4: { x: 10, y: 20, width: 200, height: 24 } };
+const LOOK: FormWidgetLook = {
+  border: '#6b7280',
+  borderWidth: 1,
+  borderStyle: 'solid',
+  background: '#ffffff',
+  color: null,
+  fontFamily: 'helvetica',
+  fontSize: 12,
+  textAlign: 'left',
+};
+const placed = (box: { x: number; y: number; width: number; height: number }) => ({ box, look: LOOK });
+const BOXES: PageWidgets = { 4: placed({ x: 10, y: 20, width: 200, height: 24 }) };
 
 describe('field index', () => {
+  test('finds a field by the name a toFieldRef(name) carries', () => {
+    const index = indexFields(snapshot([text()]));
+    expect(fieldByRef(index, { kind: 'fqn', name: 'maxlen_text' })?.ref).toEqual({
+      kind: 'objectNumber',
+      objectNumber: 4,
+    });
+    expect(fieldByRef(index, { kind: 'fqn', name: 'missing' })).toBeNull();
+  });
+
   test('indexes fields by key and by widget', () => {
     const index = indexFields(snapshot([text()]));
     expect(fieldByKey(index, 'obj:4')?.name).toBe('maxlen_text');
@@ -144,6 +167,7 @@ describe('fill projection', () => {
     const item = items[0]!;
     expect(item.control).toBe('text');
     expect(item.box).toEqual({ x: 10, y: 20, width: 200, height: 24 });
+    expect(item.look).toBe(LOOK);
     if (item.control === 'text') {
       expect(item.value).toBe('abc');
       expect(item.maxLength).toBe(5);
@@ -151,14 +175,6 @@ describe('fill projection', () => {
     expect(fillItems(index, 99, BOXES, NO_WRITES)).toEqual([]);
   });
 
-  test('projects one widget with or without geometry', () => {
-    const index = indexFields(snapshot([text()]));
-    const item = fillItemForWidget(index, 4, undefined, NO_WRITES);
-    expect(item?.control).toBe('text');
-    expect(item?.box).toEqual({ x: 0, y: 0, width: 0, height: 0 });
-    expect(fillItemForWidget(index, 4, BOXES[4], NO_WRITES)?.box).toEqual(BOXES[4]);
-    expect(fillItemForWidget(index, 999, undefined, NO_WRITES)).toBeNull();
-  });
 
   test('read-only and in-flight fields project as disabled', () => {
     const readOnly = text({ readOnly: true });
@@ -190,13 +206,13 @@ const signature = (
 
 describe('signature widgets', () => {
   test('an unsigned signature field projects a "signature" fill item', () => {
-    const item = fillItemForWidget(indexFields(snapshot([signature()])), 9, undefined, NO_WRITES);
+    const item = projectWidget(signature(), 9, NO_WRITES, BOXES[4]!);
     expect(item).toMatchObject({ control: 'signature', signed: false, label: 'Sign here' });
   });
 
   test('a /V on the field marks the item signed', () => {
-    const index = indexFields(snapshot([signature({ valueEntry: { kind: 'unsupported' } })]));
-    expect(fillItemForWidget(index, 9, undefined, NO_WRITES)).toMatchObject({
+    const signed = signature({ valueEntry: { kind: 'unsupported' } });
+    expect(projectWidget(signed, 9, NO_WRITES, BOXES[4]!)).toMatchObject({
       control: 'signature',
       signed: true,
     });
@@ -208,8 +224,8 @@ describe('signature widgets', () => {
     );
     expect(widgetAt(index, undefined, { x: 10, y: 10 })).toBeNull();
     const boxes = {
-      4: { x: 0, y: 0, width: 200, height: 200 },
-      9: { x: 50, y: 50, width: 40, height: 20 },
+      4: placed({ x: 0, y: 0, width: 200, height: 200 }),
+      9: placed({ x: 50, y: 50, width: 40, height: 20 }),
     };
     expect(widgetAt(index, boxes, { x: 60, y: 60 })).toMatchObject({
       annotObjectNumber: 9,

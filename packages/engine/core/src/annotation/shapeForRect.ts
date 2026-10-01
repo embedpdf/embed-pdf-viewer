@@ -1,6 +1,6 @@
 import { semanticEqual } from './appearance';
 import { ANNOTATION_FIELD_SPACES, type MeasuredFieldSpace } from './field-spaces';
-import type { AnnotationDTO } from './kinds';
+import type { Annotation } from './kinds';
 import type { AnnotationSubtype } from './subtype';
 import { EngineError } from '../errors/EngineError';
 import { EngineErrorCode } from '../errors/EngineErrorCode';
@@ -69,7 +69,7 @@ export function shapeFieldsOf(subtype: AnnotationSubtype): string[] {
  * rect has no width or height to stretch. Each refusal is `InvalidArg` on
  * `rect`.
  */
-export function pdfShapeForRect<A extends AnnotationDTO<PdfCoordinates>>(
+export function pdfShapeForRect<A extends Annotation<PdfCoordinates>>(
   annotation: A,
   rect: PdfRect,
 ): Partial<A> {

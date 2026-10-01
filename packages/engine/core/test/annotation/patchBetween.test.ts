@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import type { AnnotationDTO } from '../../src/annotation/kinds';
+import type { Annotation } from '../../src/annotation/kinds';
 import {
   annotationPatchBetween,
   mergeAnnotationPatch,
@@ -51,13 +51,13 @@ const square = {
   dashArray: null,
   interiorColor: null,
   cloudyIntensity: null,
-} as unknown as AnnotationDTO;
+} as unknown as Annotation;
 
-const box = (square as Extract<AnnotationDTO, { subtype: 'square' }>).box;
+const box = (square as Extract<Annotation, { subtype: 'square' }>).box;
 
 describe('annotationPatchBetween', () => {
   test('states each data field that changed, whole', () => {
-    const after = { ...square, box: { ...box, x: 50 }, locked: true } as AnnotationDTO;
+    const after = { ...square, box: { ...box, x: 50 }, locked: true } as Annotation;
     expect(annotationPatchBetween(square, after)).toEqual({
       box: { x: 50, y: 20, width: 30, height: 40 },
       locked: true,
@@ -65,7 +65,7 @@ describe('annotationPatchBetween', () => {
   });
 
   test('a value rebuilt with the same content is no change', () => {
-    const after = { ...square, box: { ...box }, dashArray: null } as AnnotationDTO;
+    const after = { ...square, box: { ...box }, dashArray: null } as Annotation;
     expect(annotationPatchBetween(square, after)).toEqual({});
   });
 
@@ -75,7 +75,7 @@ describe('annotationPatchBetween', () => {
       rect: { x: 0, y: 0, width: 1, height: 1 },
       modifiedAt: '2026-09-29T00:00:00Z',
       index: 4,
-    } as AnnotationDTO;
+    } as Annotation;
     expect(annotationPatchBetween(square, after)).toEqual({});
   });
 });

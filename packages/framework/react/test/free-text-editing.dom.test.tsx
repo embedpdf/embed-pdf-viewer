@@ -110,7 +110,7 @@ async function openEditor() {
 
   const writes: AnnotationRef[] = [];
   annotation.onUpdated((event) => writes.push(event.annotation.ref));
-  annotation.beginTextEdit(freeText.ref);
+  annotation.text.begin(freeText.ref);
   const editor = await waitFor(() => {
     const element = view.container.querySelector<HTMLElement>('[contenteditable="true"]');
     expect(element).not.toBeNull();
@@ -160,7 +160,7 @@ describe('free-text typing through the React editor', () => {
     const { annotation, ref, writes, type, close } = await openEditor();
     try {
       type('Finished');
-      await annotation.endTextEdit();
+      await annotation.text.end();
 
       expect(writes).toHaveLength(1);
       expect(annotation.get(ref)!.contents).toContain('Finished');

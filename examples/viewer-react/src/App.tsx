@@ -12,7 +12,7 @@
  */
 import { useEffect, useState } from 'react';
 import { PDFViewer } from '@embedpdf/viewer-react';
-import type { DocInfo, InitialDocument, ViewerHandle } from '@embedpdf/viewer-react';
+import type { DocumentInfo, InitialDocument, ViewerHandle } from '@embedpdf/viewer-react';
 
 const STATUS = {
   draft: { label: 'Draft', color: '#f59e0b' },
@@ -39,7 +39,7 @@ function DocStatus(props: { slot?: string }) {
 /** A fully custom tab bar — region slot + DRIVE. No chrome internals: the
  *  document list, active id, activate and close all ride el.viewer. */
 function AcmeTabBar({ viewer, ...props }: { viewer: ViewerHandle | null; slot?: string }) {
-  const [docs, setDocs] = useState<readonly DocInfo[]>([]);
+  const [docs, setDocs] = useState<readonly DocumentInfo[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   useEffect(() => {
     if (!viewer) return;

@@ -1,4 +1,4 @@
-/* Colors, for light and dark */
+/* Colors */
 :root {
   --ink: #1a2748;
   --muted: #5a6b92;
@@ -7,24 +7,53 @@
   --surface: #ffffff;
   --tint: #f3f7fe;
   --canvas: #f7f9fc;
+  --accent: #054fb3;
   --focus: #7db6ff;
   --shadow: rgb(7 32 76 / 0.04);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --ink: #e6ecfa;
-    --muted: #93a3c7;
-    --line: #27365f;
-    --line-strong: #34467a;
-    --surface: #131d3b;
-    --tint: #1a2750;
-    --canvas: #0b1328;
-    --shadow: rgb(0 0 0 / 0.3);
-  }
+/* Where the menu goes, above the pages */
+.toolbar {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  margin-bottom: 14px;
+  padding: 3px;
+  background: var(--tint);
+  border: 1px solid var(--line);
+  border-radius: 10px;
 }
 
-/* The menu that floats above a selection */
+.segment {
+  font: inherit;
+  font-size: 13px;
+  font-weight: 550;
+  line-height: 1;
+  text-transform: capitalize;
+  color: var(--muted);
+  background: transparent;
+  border: 0;
+  border-radius: 7px;
+  padding: 7px 13px;
+  cursor: pointer;
+}
+
+.segment:hover {
+  color: var(--ink);
+}
+
+.segment[aria-pressed='true'] {
+  color: var(--accent);
+  background: var(--surface);
+  box-shadow: 0 1px 3px rgb(7 32 76 / 0.12);
+}
+
+.segment:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 1px;
+}
+
+/* The menu that floats next to a selection */
 .menu {
   display: flex;
   gap: 6px;
@@ -36,10 +65,6 @@
 }
 
 .button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
   font: inherit;
   font-size: 13px;
   font-weight: 550;
@@ -69,12 +94,6 @@
 .button:focus-visible {
   outline: 2px solid var(--focus);
   outline-offset: 2px;
-}
-
-.button:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-  transform: none;
 }
 
 /* The pages */

@@ -2,21 +2,21 @@
  * An annotation's shape: its kind's family reads it off the annotation, and
  * a changed shape goes back as the engine fields that state it.
  */
-import type { AnnotationDTO } from '@embedpdf/engine-core/runtime';
+import type { Annotation } from '@embedpdf/engine-core/runtime';
 
 import { familyOf } from '../shapes';
 import type { ModelAnnotation, Shape } from '../types';
 import { kindOf } from './identity';
 import { withValues } from './values';
 
-const shapes = new WeakMap<AnnotationDTO, Shape>();
+const shapes = new WeakMap<Annotation, Shape>();
 
 /**
  * The annotation's shape (`shapes/`), read by its kind's family. The same
  * shape for the same annotation, so what is worked out from a shape once
  * (where its points are drawn) is kept.
  */
-export function shapeOf(annotation: AnnotationDTO): Shape {
+export function shapeOf(annotation: Annotation): Shape {
   let shape = shapes.get(annotation);
   if (!shape) {
     shape = kindOf(annotation).family.read(annotation);

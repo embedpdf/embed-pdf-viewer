@@ -7,8 +7,8 @@ const base: ChromeSchema = defineChrome({
     main: {
       id: 'main',
       sections: {
-        start: [group('zoom', [custom('zoom-controls', { terminal: 'zoom:menu' })])],
-        center: [group('modes', { role: 'tabs' }, [item('mode:view', { variants: ['label'] })])],
+        start: [group('zoom', [custom('zoom-controls', 'zoom:menu')])],
+        center: [group('modes', [item('mode:view', { variants: ['label'] })], { role: 'tabs' })],
         end: [group('panels', ['panel:search', 'panel:comment'])],
       },
     },
@@ -104,7 +104,7 @@ describe('replaceItem', () => {
   });
 
   it('keeps menus untouched when the replacement is a custom item', () => {
-    const next = replaceItem(base, 'document:print', custom('x', { terminal: 'y' }));
+    const next = replaceItem(base, 'document:print', custom('x', 'y'));
     expect(next.menus).toBe(base.menus);
   });
 });

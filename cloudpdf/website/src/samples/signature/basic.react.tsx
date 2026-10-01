@@ -1,22 +1,18 @@
-import { useEffect, useState } from 'react';
-import { Viewer, DocumentGate, useDocumentId, useKernelValue } from '@embedpdf/react/runtime';
+import { useEffect, useRef, useState } from 'react';
+import { Viewer, DocumentGate, usePageList } from '@embedpdf/react/runtime';
 import type { OpenInput } from '@embedpdf/react/runtime';
-import { Stage, stagePlugin } from '@embedpdf/react/stage';
+import { Stage, stagePlugin, useStage } from '@embedpdf/react/stage';
 import { RenderLayer, renderPlugin } from '@embedpdf/react/render';
 import { interactionPlugin } from '@embedpdf/react/interaction';
-import { AnnotationLayer, annotationPlugin } from '@embedpdf/react/annotation';
-import { formPlugin, formWidgetRenderer, useForm, useFormSnapshot } from '@embedpdf/react/form';
+import { FormLayer, formPlugin, useForm, useFormState } from '@embedpdf/react/form';
 import { stampPlugin, useStamp, useStampAssetPreviewUrl } from '@embedpdf/react/stamp';
 import {
   createTestSigner,
   signaturePlugin,
   useSignature,
-  useSignatureSnapshot,
-  useSignatureTarget,
-  useSignatureVerdicts,
+  useSignatureState,
   useSignerRows,
 } from '@embedpdf/react/signature';
-import type { SignerRow } from '@embedpdf/react/signature';
 import { cloudEngine } from '@cloudpdf/engine';
 import { localEngine } from '@embedpdf/engine';
 
@@ -24,82 +20,58 @@ import './basic.css';
 
 const engine = cloudEngine({ baseUrl: 'https://engine.cloudpdf.com' });
 const assetEngine = localEngine();
-// [!signer]
 // A throwaway key for the demo. Bring your own with `webCryptoSigner`, a
-// service with `remoteSigner`, or a persisted personal one with `personalSigner`.
-const signer = createTestSigner({ commonName: 'Demo signer' });
-// [!/signer]
+// service with `remoteSigner`, or a person's own with `personalSigner`.
+const signer = createTestSigner({ commonName: 'Ada Lovelace' });
 const plugins = [
   stagePlugin(),
   renderPlugin(),
   interactionPlugin(),
-  annotationPlugin(),
   formPlugin(),
   stampPlugin({ assetEngine }),
   signaturePlugin({
     key: () => signer,
-    // Trust the demo key itself, so its signatures validate as 'valid'.
+    // Trust the demo key itself, so its signatures check out as 'valid'.
     trust: { anchors: async () => [(await signer).certificate] },
   }),
 ];
-const renderers = [formWidgetRenderer];
 
 const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
-/** The ebook has no signature field: author one on the first page, once. */
-function useSignatureField() {
+/**
+ * The ebook has no signature field, and the browser holds no signatures yet:
+ * add a field to the last page, and one person with a typed signature.
+ */
+function useSetUp() {
   const form = useForm();
-  const fields = useFormSnapshot()?.fields ?? null;
-  const documentId = useDocumentId();
-  const firstPage = useKernelValue((kernel) =>
-    documentId ? (kernel.documents.getPageAt(0, documentId)?.ref ?? null) : null,
-  );
-  useEffect(() => {
-    if (!fields || firstPage === null || fields.some((f) => f.family === 'signature')) return;
-    form
-      .createField({
-        family: 'signature',
-        page: firstPage,
-        bounds: { x: 60, y: 620, width: 220, height: 64 },
-      })
-      .catch((err) => console.error(err));
-    // Once the snapshot is known; the field appearing is the outcome.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fields === null, firstPage]);
-}
-
-/** One person, made once: a library of kind 'signatures' with a typed mark. */
-function usePerson(): SignerRow | null {
   const stamp = useStamp();
-  const rows = useSignerRows();
+  const stage = useStage();
+  const status = useFormState((state) => state.status);
+  const page = usePageList().at(-1)?.ref;
+  const done = useRef(false);
+
   useEffect(() => {
-    if (rows.length > 0) return;
-    stamp
-      .createLibrary('Ada Lovelace', { kind: 'signatures' })
-      .then((libraryId) =>
-        stamp.createAsset({
-          libraryId,
-          name: 'signature',
-          label: 'Signature',
-          mark: { kind: 'text', text: 'Ada Lovelace', fontFamily: 'times-italic', fontSize: 36 },
-        }),
-      )
-      .catch((err) => console.error(err));
-    // Create once per workspace; the row list changing is the outcome.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stamp]);
-  return rows[0] ?? null;
+    if (status !== 'ready' || !page || done.current) return;
+    done.current = true;
+    void (async () => {
+      await form.create({
+        family: 'signature',
+        name: 'approval',
+        widgets: [{ page, rect: { x: 72, y: 560, width: 220, height: 64 }, color: '#94a3b8' }],
+      });
+      stage.goToPage(page);
+      const { library } = await stamp.createLibrary('Ada Lovelace', { kind: 'signatures' });
+      await stamp.createAsset({
+        libraryId: library.id,
+        name: 'signature',
+        label: 'Signature',
+        mark: { kind: 'text', text: 'Ada Lovelace', fontFamily: 'times-italic', color: '#1d2b53' },
+      });
+    })();
+  }, [form, stamp, stage, status, page]);
 }
 
-function MarkButton({
-  assetId,
-  label,
-  onPick,
-}: {
-  assetId: string;
-  label: string;
-  onPick: () => void;
-}) {
+function MarkButton({ assetId, label, onPick }: { assetId: string; label: string; onPick: () => void }) {
   const url = useStampAssetPreviewUrl(assetId);
   return (
     <button type="button" className="button" title={label} onClick={onPick}>
@@ -109,53 +81,37 @@ function MarkButton({
 }
 
 function SignBar() {
-  useSignatureField();
-  const person = usePerson();
+  useSetUp();
   const signature = useSignature();
-  const snapshot = useSignatureSnapshot();
-  const verdicts = useSignatureVerdicts();
-  const { target, busy } = useSignatureTarget();
+  const [person] = useSignerRows();
+  const { signatures, target, busy } = useSignatureState();
+  const field = useFormState((state) => state.fields.find((candidate) => candidate.family === 'signature'));
   const [error, setError] = useState<string | null>(null);
-  const field = snapshot?.signatures[0] ?? null;
-  // The check runs after signing; its verdict arrives through the hook.
-  const verdict = field && verdicts?.find((v) => v.signature.index === field.index);
+  const signed = signatures[0];
 
-  const pick = (assetId: string) => {
-    setError(null);
-    const destination = target ?? field?.field;
+  // The target is the field someone clicked; without one, the form's signature field.
+  const sign = (assetId: string) => {
+    const destination = target ?? field?.ref;
     if (!destination) return;
-    // The destination decides: a signature field → sign it (mode 'sign').
+    setError(null);
     signature
       .placeMark({ assetId }, { field: destination })
-      .catch((err) => setError(err instanceof Error ? err.message : String(err)));
+      .catch((reason: Error) => setError(reason.message));
   };
 
-  if (!person) return <output className="readout">Creating a signature…</output>;
+  let status = 'Click the field, or pick the signature';
+  if (!person || !field) status = 'Getting ready…';
+  else if (error) status = error;
+  else if (busy) status = 'Signing…';
+  else if (signed) status = `Signed by ${signed.signer.name}: ${signed.verdict?.summary ?? 'checking…'}`;
+  else if (target) status = 'Now pick the signature';
+
   return (
     <div className="toolbar">
-      <output className="readout">{person.name}</output>
-      {person.signatures.map((asset) => (
-        <MarkButton
-          key={asset.id}
-          assetId={asset.id}
-          label={asset.label}
-          onPick={() => pick(asset.id)}
-        />
+      {person?.signatures.map((asset) => (
+        <MarkButton key={asset.id} assetId={asset.id} label={asset.label} onPick={() => sign(asset.id)} />
       ))}
-      <span className="spacer" />
-      <output className="readout">
-        {error
-          ? `Error: ${error}`
-          : busy
-            ? 'Signing…'
-            : !field
-              ? 'Adding a signature field…'
-              : field.signed
-                ? `Signed by ${field.signer.name ?? '?'} — ${verdict?.summary ?? 'validating…'}`
-                : target
-                  ? 'Field selected: pick the mark'
-                  : 'Click the field, or pick the mark'}
-      </output>
+      <output className="readout">{status}</output>
     </div>
   );
 }
@@ -168,9 +124,9 @@ export default function App() {
         <Stage className="stage">
           {() => (
             <>
-              <RenderLayer annotations={false} />
-              {/* the signature widget renders "sign here" (sets the target) or "inspect" */}
-              <AnnotationLayer renderers={renderers} />
+              <RenderLayer />
+              {/* An empty signature field is "sign here": a click makes it the target */}
+              <FormLayer />
             </>
           )}
         </Stage>

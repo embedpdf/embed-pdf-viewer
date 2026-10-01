@@ -1,5 +1,5 @@
 import type {
-  AnnotationDTO,
+  Annotation,
   AnnotationList,
   PageObjectNumber,
   PdfCoordinates,
@@ -38,7 +38,7 @@ export function collectPageAnnotations(input: {
   const { runtime, session, pageObjectNumber, count, getAnnotPtrAt, signal, fonts } = input;
   const { fn, mem } = runtime;
 
-  const annotations: AnnotationDTO<PdfCoordinates>[] = [];
+  const annotations: Annotation<PdfCoordinates>[] = [];
   let hasWeak = false;
   const revision = session.pageState(pageObjectNumber).revision;
   const actionBudget = new ActionReadBudgetTracker();

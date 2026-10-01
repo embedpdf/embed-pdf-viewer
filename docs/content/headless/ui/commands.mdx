@@ -18,13 +18,15 @@ commands you need:
 
 <Snippet name="ui/command-button" />
 
+<Example name="commands/buttons" />
+
 <Fw only={['vue', 'svelte']}>
 
 Pass the id as a function, and the button follows `id` when it changes.
 
 </Fw>
 
-`shortcut` is formatted for the user's platform: `⌘ K` on a Mac, `Ctrl+K` elsewhere. The
+`shortcut` is formatted for the user's platform: `⌘K` on a Mac, `Ctrl+K` elsewhere. The
 [toolbar](toolbar) draws commands the same way.
 
 ## The standard commands
@@ -54,7 +56,11 @@ of your viewer:</Fw><Fw only="angular">Add it to `provideEmbedPdf()`, next to `w
 <Snippet name="ui/command-shortcuts" />
 
 It ignores keys typed into text fields, runs commands for the active document, and does nothing for a
-command that's disabled. `Mod` means Cmd on a Mac and Ctrl elsewhere.
+command that's disabled. With more than one viewer on a page, pass `target`, a ref to the element
+around one: its keys then work only while focus is inside it. `Mod` means Cmd on a Mac and Ctrl elsewhere. A help sheet lists
+`listShortcuts()`:
+
+<Example name="commands/shortcuts" />
 
 ## Run a command from code
 
@@ -75,6 +81,8 @@ const results = commands.searchCommands(query); // visible commands whose label 
 ```
 
 A disabled command is still in the results, so show it greyed out.
+
+<Example name="commands/palette" />
 
 ## Define a command
 
@@ -104,6 +112,10 @@ and while the app runs:
 commands.disableCategory('annotate');
 commands.enableCategory('annotate');
 ```
+
+A command of your own, a category switch, and a command run from code when the document opens:
+
+<Example name="commands/custom" />
 
 ## Methods
 

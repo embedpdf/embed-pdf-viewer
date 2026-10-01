@@ -1,13 +1,13 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { createTestContext } from '@embedpdf/core/testing';
 import type { ScriptDiagnostic } from '@embedpdf/core-acrojs';
 import type { DocumentHandle } from '@embedpdf/engine-core/runtime';
 
 import { createActionsController } from '../src/controller';
+import { createActionsTestContext } from './helpers/context';
 
 function harness() {
-  const ctx = createTestContext<void>({
+  const ctx = createActionsTestContext({
     id: 'actions',
     doc: { forms: { list: async () => ({ fields: [] }) } } as unknown as Partial<DocumentHandle>,
   });
@@ -22,7 +22,7 @@ describe('detached-realm script surfaces', () => {
     const print = vi.fn();
     capability.setUiAdapter({ openUri: vi.fn(), print, alert, gotoPage });
     const diagnostics: ScriptDiagnostic[] = [];
-    capability.onScriptDiagnostic((diagnostic) => diagnostics.push(diagnostic));
+    capability.onScriptDiagnosticReported((diagnostic) => diagnostics.push(diagnostic));
 
     capability.surfaceScriptResult({
       uiEffects: [
@@ -71,9 +71,9 @@ describe('detached-realm script surfaces', () => {
     const alert = vi.fn();
     capability.setUiAdapter({ openUri: vi.fn(), print: vi.fn(), alert });
     const diagnostics: ScriptDiagnostic[] = [];
-    capability.onScriptDiagnostic((diagnostic) => diagnostics.push(diagnostic));
+    capability.onScriptDiagnosticReported((diagnostic) => diagnostics.push(diagnostic));
     const errors: unknown[] = [];
-    capability.onScriptError((error) => errors.push(error));
+    capability.onScriptFailed((error) => errors.push(error));
 
     capability.surfaceScriptCommit(
       {
@@ -92,7 +92,26 @@ describe('detached-realm script surfaces', () => {
       ['user alert', { origin: 'user', phase: 'user', icon: 1 }],
     ]);
     expect(diagnostics).toEqual([{ code: 'script-error', message: 'one' }]);
-    expect(errors).toHaveLength(1);
+    // No action started this script, so the failure has no source.
+    expect(errors).toEqual([{ error: { kind: 'exception', message: 'boom' }, source: null }]);
+  });
+
+  it('onScriptFailed carries the source of the action that ran the script', () => {
+    const capability = harness();
+    const failures: unknown[] = [];
+    capability.onScriptFailed((event) => failures.push(event));
+    capability.surfaceScriptResult({
+      uiEffects: [],
+      diagnostics: [],
+      error: { kind: 'exception', message: 'boom' },
+      origin: 'user',
+      phase: 'user',
+      realm: 'document',
+      source: { kind: 'document' },
+    });
+    expect(failures).toEqual([
+      { error: { kind: 'exception', message: 'boom' }, source: { kind: 'document' } },
+    ]);
   });
 
   it('a boot phase with no effects is not surfaced at all', () => {

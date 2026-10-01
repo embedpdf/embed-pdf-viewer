@@ -39,6 +39,8 @@ shell.open('outline', { exclusive: 'left' }); // closes thumbnails
 shell.open('comments', { exclusive: 'right' }); // the left panel stays
 ```
 
+<Example name="panels/sidebars" />
+
 ## Open a panel with something in it
 
 A panel can carry data, such as which comment to scroll to:
@@ -53,6 +55,8 @@ The panel reads them:
 
 `shell.updateSurfaceProps('comments', { focus: nextThread.root.ref })` changes them without reopening the
 panel.
+
+<Example name="panels/props" />
 
 ## From commands
 
@@ -76,6 +80,8 @@ shell.closeAllMenus(); // for a click outside, or Escape
 
 `openMenus` in [State](#state) lists the open menus, the last one opened on top.
 
+<Example name="panels/menus" />
+
 ## Remember the layout
 
 ```ts
@@ -84,6 +90,8 @@ localStorage.setItem('panels', JSON.stringify(shell.getSnapshot()));
 // next time
 shell.applySnapshot(JSON.parse(localStorage.getItem('panels')!));
 ```
+
+<Example name="panels/remember" />
 
 ## Methods
 

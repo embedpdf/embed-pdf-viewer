@@ -1,14 +1,15 @@
-import { useState } from 'react';
-import { Viewer, DocumentGate } from '@embedpdf/react/runtime';
+import { useEffect, useRef } from 'react';
+import { Viewer, DocumentGate, usePageList } from '@embedpdf/react/runtime';
 import type { OpenInput } from '@embedpdf/react/runtime';
-import { Stage, stagePlugin, usePageList, usePages } from '@embedpdf/react/stage';
+import { Stage, stagePlugin } from '@embedpdf/react/stage';
 import { RenderLayer, renderPlugin } from '@embedpdf/react/render';
 import { interactionPlugin } from '@embedpdf/react/interaction';
 import {
   AnnotationLayer,
   annotationPlugin,
   useAnnotation,
-  useSelectionFields,
+  useAnnotationProperties,
+  useAnnotationState,
 } from '@embedpdf/react/annotation';
 import { localEngine } from '@embedpdf/engine';
 
@@ -24,41 +25,31 @@ const ebook = async (): Promise<OpenInput> => {
 };
 // [!/doc-source]
 
-type Format = 'bold' | 'italic' | 'underline';
-
-function RichTextToolbar() {
+// On load: a text box born with formatting, selected. Runs change the body only where they differ.
+function AddTextBox() {
   const annotation = useAnnotation();
-  // The selection's editable fields: while the text editor holds a range
-  // these describe the whole range (bold true = every selected run is bold, `mixed`
-  // when they disagree); otherwise the selected boxes' body style.
-  const props = useSelectionFields();
-  const { currentPage } = usePages();
-  const { pages } = usePageList();
-  const page = pages[currentPage];
-  const [status, setStatus] = useState('');
+  const ready = useAnnotationState((state) => state.status === 'ready');
+  const cover = usePageList()[0]?.ref;
+  const added = useRef(false);
 
-  // A text box born with formatting: runs override the body only where they
-  // differ from it. `contents` becomes the plain projection automatically.
-  const addTextBox = async () => {
-    if (!page) return;
-    await annotation.create(
-      page.ref,
+  useEffect(() => {
+    if (!ready || !cover || added.current) return;
+    added.current = true;
+    void annotation.create(
+      cover,
       {
         subtype: 'free-text',
-        intent: 'free-text',
-        box: { x: 60, y: 90, width: 340, height: 60 },
-        fontFamily: 'helvetica',
-        fontSize: 16,
-        textAlign: 'left',
-        color: '#1e1e1e',
-        interiorColor: '#fffacd',
+        box: { x: 106, y: 570, width: 380, height: 60 },
+        interiorColor: '#fffbe6',
         richText: {
-          body: { family: 'Helvetica', size: 16 },
+          body: { family: 'Helvetica', size: 16, color: '#1a2748' },
           paragraphs: [
             {
               runs: [
                 { text: 'Double-click me, select a word, then make it ' },
                 { text: 'bold', style: { weight: 700 } },
+                { text: ' or ' },
+                { text: 'red', style: { color: '#c00000' } },
                 { text: '.' },
               ],
             },
@@ -68,45 +59,52 @@ function RichTextToolbar() {
       undefined,
       { select: true },
     );
-    setStatus('added — double-click the box to edit its text');
-  };
+  }, [annotation, ready, cover]);
 
-  const hasText = props.fields.some((spec) => spec.key === 'bold');
-  const isOn = (format: Format) => props.values[format] === true && !props.mixed.includes(format);
+  return null;
+}
+
+type Format = 'bold' | 'italic' | 'underline';
+
+// The same calls style the selected words while typing, and the whole box otherwise.
+function RichTextToolbar() {
+  const annotation = useAnnotation();
+  const { properties, values, mixed } = useAnnotationProperties();
+  const hasText = properties.some((property) => property.control === 'textFormat');
+  // On when every selected word has it; `mixed` lists what the words disagree on.
+  const isOn = (format: Format) => values[format] === true && !mixed.includes(format);
 
   return (
     <div className="toolbar">
-      <button type="button" className="button" onClick={() => void addTextBox()} disabled={!page}>
-        Add text box
-      </button>
       {(['bold', 'italic', 'underline'] as const).map((format) => (
         <button
-          type="button"
-          className="button"
           key={format}
-          title={`${format} — the selected text while editing, else the whole box`}
+          type="button"
+          className={`button ${format}`}
+          aria-pressed={isOn(format)}
           disabled={!hasText}
-          // The plugin flips the state it reports: the range's runs while the
-          // editor holds a selection, the body otherwise (also Ctrl/Cmd+B/I/U).
-          onClick={() => annotation.toggleTextFormat(format)}
+          onClick={() => annotation.text.toggleFormat(format)}
         >
-          {isOn(format) ? '● ' : ''}
-          {format}
+          {format[0]!.toUpperCase()}
         </button>
       ))}
       <button
         type="button"
         className="button"
-        title="Font size: the same routing — the range, else the box"
         disabled={!hasText}
-        onClick={() =>
-          annotation.updateSelection({ fontSize: props.values.fontSize === 24 ? 16 : 24 })
-        }
+        onClick={() => annotation.selection.update({ fontColor: '#c00000' })}
       >
-        {props.values.fontSize === 24 ? '16 pt' : '24 pt'}
+        Red
       </button>
-      <span className="spacer" />
-      <output className="readout">{status}</output>
+      <button
+        type="button"
+        className="button"
+        disabled={!hasText}
+        onClick={() => annotation.selection.update({ fontSize: values.fontSize === 24 ? 16 : 24 })}
+      >
+        {values.fontSize === 24 ? '16 pt' : '24 pt'}
+      </button>
+      <p className="hint">Ctrl or Cmd with B, I or U works while you type</p>
     </div>
   );
 }
@@ -115,6 +113,7 @@ export default function App() {
   return (
     <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: ebook }]}>
       <DocumentGate fallback={<p className="loading">Loading…</p>}>
+        <AddTextBox />
         <RichTextToolbar />
         <Stage className="stage">
           {() => (

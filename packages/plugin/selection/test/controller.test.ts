@@ -14,12 +14,16 @@ import type {
   PdfCoordinates,
 } from '@embedpdf/engine-core/runtime';
 import { interactionPlugin } from '@embedpdf/plugin-interaction';
+import { InteractionToken } from '@embedpdf/plugin-interaction/contract/host';
+import type { PointerSample } from '@embedpdf/plugin-interaction/contract/host';
 import { selectionPlugin } from '../src/selection.plugin';
-import { SelectionToken } from '../src/host-contract';
+import { SELECTION_DEFAULTS, SelectionToken, type SelectionConfig } from '../src/host-contract';
+import { selectionState } from '../src/state';
 import { pageSpaceBoxesOf } from '@embedpdf/engine-core/runtime';
 
-/** The selection through the real kernel: permissions, the range model, text
- *  extraction, the gesture fact, events, invalidation. */
+/** The selection through the real kernel: permissions, the range model, page
+ *  arguments, text extraction and cancelling it, the gesture fact, the
+ *  declared state, settings, events, invalidation. */
 
 const crop = { left: 0, bottom: 0, right: 200, top: 100 };
 
@@ -71,7 +75,7 @@ const NONE = new Set<string>();
 
 const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
 
-async function boot(fixtures: PageFixture[], allow = ALL) {
+async function boot(fixtures: PageFixture[], allow = ALL, config?: SelectionConfig) {
   const pages = [...fixtures];
   const listeners = new Set<(event: unknown) => void>();
   const failing = new Set<number>();
@@ -136,7 +140,10 @@ async function boot(fixtures: PageFixture[], allow = ALL) {
   } as unknown as Engine;
   const emit = (event: unknown) => listeners.forEach((listener) => listener(event));
 
-  const kernel = createKernel({ engine, plugins: [interactionPlugin(), selectionPlugin()] });
+  const kernel = createKernel({
+    engine,
+    plugins: [interactionPlugin(), selectionPlugin(config)],
+  });
   await kernel.start();
   await kernel.documents.open({ kind: 'bytes', id: 'd', bytes: new Uint8Array() });
   return {
@@ -208,12 +215,15 @@ describe('selection — permissions', () => {
 
   it('readText rejects permission-denied without doc.text.copy, before any read', async () => {
     const fixture = await boot([pageA], SELECT_ONLY);
+    const denied = { code: 'permission-denied', permission: 'doc.text.copy' };
+    // Refused whether or not anything is selected: the answer never depends on the selection.
+    await expect(fixture.selection.readText()).rejects.toMatchObject(denied);
     fixture.selection.select({ page: toPageRef(101), start: 0, count: 5 });
     await settle();
-    await expect(fixture.selection.readText()).rejects.toMatchObject({
-      code: 'permission-denied',
-      permission: 'doc.text.copy',
-    });
+    await expect(fixture.selection.readText()).rejects.toMatchObject(denied);
+    await expect(
+      fixture.selection.readTextInRange(fixture.selection.getRange()!),
+    ).rejects.toMatchObject(denied);
     expect(fixture.textReads).not.toHaveBeenCalled();
     await fixture.kernel.destroy();
   });
@@ -276,7 +286,44 @@ describe('selection — programmatic selection', () => {
       end: { page: toPageRef(103), index: 5 },
     });
     expect(selection.selectWordAt(toPageRef(103), { x: 150, y: 50 })).toBe(false); // blank space
-    expect(selection.isGestureActive()).toBe(false); // programmatic: born settled
+    expect(selection.isSelecting()).toBe(false); // programmatic: born settled
+    await kernel.destroy();
+  });
+});
+
+describe('selection — page arguments', () => {
+  it('verbs take a ref or an index, and refuse a page that is not in the document', async () => {
+    const { kernel, selection } = await boot([pageA, pageW]);
+    selection.selectPage(1);
+    await settle();
+    expect(selection.getRange()).toEqual({
+      start: { page: toPageRef(103), index: 0 },
+      end: { page: toPageRef(103), index: 5 },
+    });
+    expect(selection.selectWordAt(1, { x: 36, y: 5 })).toBe(true); // over "wo"
+    expect(selection.getRange()!.start).toEqual({ page: toPageRef(103), index: 3 });
+    expect(selection.selectLineAt(toPageRef(103), { x: 14, y: 5 })).toBe(true);
+    expect(selection.getRange()!.start).toEqual({ page: toPageRef(103), index: 0 });
+
+    const notFound = expect.objectContaining({ code: 'not-found' });
+    expect(() => selection.selectPage(2)).toThrow(notFound);
+    expect(() => selection.selectPage(toPageRef(999))).toThrow(notFound);
+    expect(() => selection.selectWordAt(-1, { x: 14, y: 5 })).toThrow(notFound);
+    expect(() => selection.selectLineAt(5, { x: 14, y: 5 })).toThrow(notFound);
+    expect(() => selection.extendTo(toPageRef(999), { x: 14, y: 5 })).toThrow(notFound);
+    expect(selection.getRange()!.start).toEqual({ page: toPageRef(103), index: 0 }); // untouched
+    await kernel.destroy();
+  });
+
+  it('reads take a ref or an index, and are empty for a page that is not in the document', async () => {
+    const { kernel, selection } = await boot([pageA, pageW]);
+    selection.selectAll();
+    await settle();
+    expect(selection.listSegments(1).length).toBeGreaterThan(0);
+    expect(selection.listSegments(1)).toBe(selection.listSegments(toPageRef(103)));
+    expect(selection.listRects(0)).toBe(selection.listRects(toPageRef(101)));
+    expect(selection.listSegments(7)).toEqual([]);
+    expect(selection.listRects(toPageRef(999))).toEqual([]);
     await kernel.destroy();
   });
 });
@@ -324,19 +371,54 @@ describe('selection — readText', () => {
   });
 });
 
+describe('selection — cancelling', () => {
+  it('a signal stops a text read at once; the page read it started still fills the cache', async () => {
+    const fixture = await boot([pageA]);
+    fixture.selection.selectAll();
+    await settle();
+    let release: (text: PageTextSnapshot) => void = () => {};
+    fixture.textReads.mockImplementationOnce(
+      () => new Promise<PageTextSnapshot>((resolve) => (release = resolve)),
+    );
+    const controller = new AbortController();
+    const reading = fixture.selection.readText({ signal: controller.signal });
+    await settle();
+    controller.abort();
+    await expect(reading).rejects.toMatchObject({ code: 'operation-cancelled' });
+
+    release(pageA.text);
+    await expect(fixture.selection.readText()).resolves.toBe('Hello!');
+    expect(fixture.textReads).toHaveBeenCalledTimes(1); // the cancelled read's answer was kept
+    await fixture.kernel.destroy();
+  });
+
+  it('a signal that already fired starts no read', async () => {
+    const fixture = await boot([pageA]);
+    fixture.selection.selectAll();
+    await settle();
+    const aborted = new AbortController();
+    aborted.abort();
+    await expect(
+      fixture.selection.readTextInRange(fixture.selection.getRange()!, { signal: aborted.signal }),
+    ).rejects.toMatchObject({ code: 'operation-cancelled' });
+    expect(fixture.textReads).not.toHaveBeenCalled();
+    await fixture.kernel.destroy();
+  });
+});
+
 describe('selection — the gesture fact', () => {
   it('tracks the drag: active from beginGestureAt, settled at endGesture, which commits once', async () => {
     const { kernel, selection } = await boot([pageA]);
     await selection.ensureLoaded(toPageRef(101));
     const commits: unknown[] = [];
     selection.onCommitted((event) => commits.push(event.range));
-    expect(selection.isGestureActive()).toBe(false);
+    expect(selection.isSelecting()).toBe(false);
     expect(selection.beginGestureAt(toPageRef(101), { x: 14, y: 5 })).toBe(true);
-    expect(selection.isGestureActive()).toBe(true);
+    expect(selection.isSelecting()).toBe(true);
     selection.extendTo(toPageRef(101), { x: 30, y: 5 });
-    expect(selection.isGestureActive()).toBe(true);
+    expect(selection.isSelecting()).toBe(true);
     selection.endGesture();
-    expect(selection.isGestureActive()).toBe(false);
+    expect(selection.isSelecting()).toBe(false);
     expect(selection.hasSelection()).toBe(true); // the selection survives settling
     expect(commits).toEqual([
       { start: { page: toPageRef(101), index: 0 }, end: { page: toPageRef(101), index: 3 } },
@@ -352,7 +434,7 @@ describe('selection — the gesture fact', () => {
     selection.onCommitted((event) => commits.push(event));
     selection.select({ page: toPageRef(101), start: 0, count: 4 });
     await settle();
-    expect(selection.isGestureActive()).toBe(false);
+    expect(selection.isSelecting()).toBe(false);
     expect(selection.getAnchor()).not.toBeNull();
     expect(commits).toEqual([]);
     await kernel.destroy();
@@ -364,12 +446,102 @@ describe('selection — the gesture fact', () => {
     fixture.selection.beginGestureAt(toPageRef(101), { x: 14, y: 5 });
     fixture.rotateAll(); // registry refresh → recompute
     await settle();
-    expect(fixture.selection.isGestureActive()).toBe(true);
+    expect(fixture.selection.isSelecting()).toBe(true);
     fixture.selection.clear();
-    expect(fixture.selection.isGestureActive()).toBe(true);
+    expect(fixture.selection.isSelecting()).toBe(true);
     fixture.selection.endGesture(); // nothing to commit
-    expect(fixture.selection.isGestureActive()).toBe(false);
+    expect(fixture.selection.isSelecting()).toBe(false);
     await fixture.kernel.destroy();
+  });
+});
+
+describe('selection — the declared state', () => {
+  it("reads the page's State fields, and follows a drag", async () => {
+    const { kernel, selection } = await boot([pageA, pageB]);
+    expect(selectionState.read(selection)).toEqual(selectionState.empty);
+
+    await selection.ensureLoaded(toPageRef(101));
+    selection.beginGestureAt(toPageRef(101), { x: 14, y: 5 });
+    selection.extendTo(toPageRef(101), { x: 30, y: 5 });
+    expect(selectionState.read(selection)).toEqual({
+      hasSelection: true,
+      isSelecting: true,
+      range: { start: { page: toPageRef(101), index: 0 }, end: { page: toPageRef(101), index: 3 } },
+      pages: [toPageRef(101)],
+    });
+    selection.endGesture();
+    expect(selectionState.read(selection).isSelecting).toBe(false);
+
+    // Unchanged fields keep their values, so a reader compares them field by field.
+    const before = selectionState.read(selection);
+    const after = selectionState.read(selection);
+    expect(after.range).toBe(before.range);
+    expect(after.pages).toBe(before.pages);
+    await kernel.destroy();
+  });
+});
+
+/** A press on page A at its first glyph, then a move of `travelledPx` viewport pixels onto its third. */
+function pressAndDrag(
+  interaction: { dispatchPointer(sample: PointerSample): void },
+  travelledPx: number,
+): void {
+  const sample = (phase: PointerSample['phase'], x: number, pageX: number): PointerSample => ({
+    phase,
+    viewport: { x, y: 0 },
+    page: { ref: toPageRef(101), point: { x: pageX, y: 5 } },
+    modifiers: { shift: false, alt: false, ctrl: false, meta: false },
+    pointerType: 'mouse',
+  });
+  interaction.dispatchPointer(sample('down', 0, 14));
+  interaction.dispatchPointer(sample('move', travelledPx, 30));
+  interaction.dispatchPointer(sample('up', travelledPx, 30));
+}
+
+describe('selection — settings', () => {
+  it('start from the defaults, with what the app registered merged over them', async () => {
+    const { kernel, selection } = await boot([pageA], ALL, { handles: { color: '#e91e63' } });
+    expect(selection.getSettings()).toEqual({
+      ...SELECTION_DEFAULTS,
+      handles: { ...SELECTION_DEFAULTS.handles, color: '#e91e63' },
+    });
+    await kernel.destroy();
+  });
+
+  it('a drag threshold change applies to the next press', async () => {
+    const fixture = await boot([pageA]);
+    await fixture.selection.ensureLoaded(toPageRef(101));
+    const interaction = fixture.kernel.capability(InteractionToken, 'd');
+
+    pressAndDrag(interaction, 6); // past the default 4 px: a drag selects
+    expect(fixture.selection.getRange()).toEqual({
+      start: { page: toPageRef(101), index: 0 },
+      end: { page: toPageRef(101), index: 3 },
+    });
+
+    fixture.selection.updateSettings({ dragThreshold: 10 });
+    pressAndDrag(interaction, 6); // within 10 px: a click, which clears
+    expect(fixture.selection.hasSelection()).toBe(false);
+    await fixture.kernel.destroy();
+  });
+
+  it('a color change keeps what it leaves out, fires once, and reset goes back to what was registered', async () => {
+    const { kernel, selection } = await boot([pageA], ALL, { color: 'rgb(0 0 255 / 0.3)' });
+    const changes: unknown[] = [];
+    selection.onSettingsChanged((event) => changes.push(event.changed));
+
+    selection.updateSettings({ handles: { color: '#e91e63' } });
+    expect(selection.getSettings().handles).toEqual({
+      color: '#e91e63',
+      shadow: SELECTION_DEFAULTS.handles.shadow,
+    });
+    selection.updateSettings({ color: null }); // back to the viewer's accent
+    expect(selection.getSettings().color).toBeNull();
+    expect(changes).toEqual([['handles'], ['color']]);
+
+    selection.resetSettings();
+    expect(selection.getSettings()).toEqual({ ...SELECTION_DEFAULTS, color: 'rgb(0 0 255 / 0.3)' });
+    await kernel.destroy();
   });
 });
 
@@ -409,6 +581,19 @@ describe('selection — reads are reference-stable', () => {
     const before = selection.getSnapshot();
     selection.select({ page: toPageRef(101), start: 0, count: 3 });
     expect(selection.getSnapshot()).not.toBe(before);
+    await kernel.destroy();
+  });
+
+  it('keeps the range and the page list when only the gesture or the highlight changes', async () => {
+    const { kernel, selection } = await boot([pageA]);
+    selection.select({ page: toPageRef(101), start: 0, count: 2 });
+    await settle();
+    const [range, pages] = [selection.getRange(), selection.listSelectedPages()];
+    selection.setHighlightVisible(false);
+    selection.beginGesture();
+    expect(selection.getRange()).toBe(range);
+    expect(selection.listSelectedPages()).toBe(pages);
+    selection.endGesture();
     await kernel.destroy();
   });
 });

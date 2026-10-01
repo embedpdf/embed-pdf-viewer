@@ -5,7 +5,7 @@ import type {
 } from './runAnnotationResourceConformance';
 import type { ConformanceTestRunner } from './runMetadataConformance';
 import { BANDS_PDF } from './stampFixtures';
-import type { AnnotationDTO } from '../annotation/kinds';
+import type { Annotation } from '../annotation/kinds';
 import type { DocumentHandle } from '../engine/DocumentHandle';
 import type { Engine } from '../engine/Engine';
 import type { PageHandle } from '../engine/PageHandle';
@@ -62,7 +62,7 @@ export function runAnnotationImportConformance(
       page: PageHandle,
       draft: Parameters<PageHandle['annotations']['create']>[0],
       resources?: Parameters<PageHandle['annotations']['create']>[1],
-    ) => (await page.annotations.create(draft, resources)).annotation as AnnotationDTO;
+    ) => (await page.annotations.create(draft, resources)).annotation as Annotation;
 
     test('imports every kind a create makes, as the export has it', async () => {
       await twoCopies('authoring', async (source, target, pageRef) => {
@@ -271,7 +271,7 @@ function comparable(bundle: AnnotationBundle, result?: AnnotationImportResult) {
       createdBy: _createdBy,
       modifiedBy: _modifiedBy,
       ...rest
-    } = data as AnnotationDTO & Record<string, unknown>;
+    } = data as Annotation & Record<string, unknown>;
     const fields = rest as Record<string, unknown>;
     // An attached file is dated when it is written, as the stamp dates the annotation.
     if (data.subtype === 'file-attachment' && data.file) {

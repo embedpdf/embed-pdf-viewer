@@ -40,6 +40,11 @@ export interface SettingsDeclaration<T> {
   readonly defaults: T;
   /** What the app registered, usually the plugin factory's config: merged over `defaults`. */
   readonly registered?: DeepPartial<T> | undefined;
+  /**
+   * Top-level settings that are one value each, such as a person: a change replaces them
+   * whole instead of merging into them, so nothing of the previous value stays.
+   */
+  readonly whole?: readonly (keyof T & string)[];
 }
 
 /** What `onSettingsChanged` carries: the settings after the change, and which of them changed. */
@@ -93,10 +98,12 @@ export interface SettingsStore<T> {
  * that poll the capability (selectors over `getSettings()`) read again.
  */
 export function createSettingsStore<T extends object>(
-  { defaults, registered }: SettingsDeclaration<T>,
+  { defaults, registered, whole = [] }: SettingsDeclaration<T>,
   wake: () => void,
   report: (error: unknown) => void,
 ): SettingsStore<T> {
+  const mergeSettings = (settings: T, changes: DeepPartial<T> | undefined): T =>
+    mergeTopLevel(settings, changes, whole);
   const initial = mergeSettings(defaults, registered);
   let current = initial;
   const changedHook = createEventHook<SettingsChangedEvent<T>>(report);
@@ -133,11 +140,31 @@ export function createSettingsStore<T extends object>(
 }
 
 /**
- * `changes` merged into `settings`. What a change leaves as it was keeps its object, so a
- * reader that compares by reference sees only what really changed.
+ * `changes` merged into `settings`, the `whole` ones replaced instead. What a change leaves as it
+ * was keeps its object, so a reader that compares by reference sees only what really changed.
  */
-function mergeSettings<T>(settings: T, changes: DeepPartial<T> | undefined): T {
-  return mergeValue(settings, changes) as T;
+function mergeTopLevel<T>(
+  settings: T,
+  changes: DeepPartial<T> | undefined,
+  whole: readonly string[],
+): T {
+  if (whole.length === 0 || !isPlainObject(changes)) return mergeValue(settings, changes) as T;
+  const merged = mergeValue(settings, omit(changes, whole)) as Record<string, unknown>;
+  let replaced: Record<string, unknown> | null = null;
+  for (const key of whole) {
+    const change = (changes as Record<string, unknown>)[key];
+    if (change === undefined || sameValue(merged[key], change)) continue;
+    replaced ??= { ...merged };
+    replaced[key] = change;
+  }
+  return (replaced ?? merged) as T;
+}
+
+/** `object` without `keys`. */
+function omit(object: Record<string, unknown>, keys: readonly string[]): Record<string, unknown> {
+  const rest: Record<string, unknown> = {};
+  for (const key of Object.keys(object)) if (!keys.includes(key)) rest[key] = object[key];
+  return rest;
 }
 
 function mergeValue(base: unknown, change: unknown): unknown {

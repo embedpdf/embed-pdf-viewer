@@ -101,10 +101,10 @@ export interface BoxQuery {
  * One `@container` block for the settings bag: when the box matches, assert
  * this settings patch. Rules evaluate in source order and all matching rules
  * apply, later winning per key (each key replaced whole — no deep merges).
- * Effective settings = base (config + runtime setters) ⊕ matching patches.
+ * Effective settings = base (config + `updateSettings()`) ⊕ matching patches.
  *
  * Semantics:
- *   • Runtime setters write the base; a matching rule wins over it. Apps
+ *   • `updateSettings()` writes the base; a matching rule wins over it. Apps
  *     needing situational absolute control edit the rules (`setResponsiveRules`).
  *   • Rules assert at transitions (box/base/rules changes), not continuously —
  *     between crossings, interaction owns the state. A rule containing `zoom`
@@ -121,7 +121,7 @@ export interface ResponsiveRule {
   /** Declarative box query, or a predicate for anything the box can answer. */
   when: BoxQuery | ((box: StageBox) => boolean);
   /** The settings this situation asserts. Omit for a pure named query. */
-  settings?: Partial<StageSettings>;
+  settings?: StageSettingsPatch;
 }
 
 /**
@@ -137,10 +137,10 @@ export interface ArrivalAlignment {
 }
 
 /**
- * The stage's orthogonal, independently settable primitives. Every field can be
- * set on its own (setLayout, setFlow, …) or several at once through
- * `updateSettings()`. A preset is a `Partial<StageSettings>` the app keeps and
- * applies; no preset machinery lives here.
+ * The stage's orthogonal settings, one view's own. Any subset changes in one
+ * `updateSettings()` call, and each value given replaces the current one
+ * whole. A preset is a {@link StageSettingsPatch} the app keeps and applies;
+ * no preset machinery lives here.
  */
 export interface StageSettings {
   /** Continuous scroll, or one item at a time. */
@@ -240,6 +240,26 @@ export interface StageSettings {
   /** Default behavior for goToPage, nextPage and previousPage. */
   scrollBehavior: ScrollBehaviorKind;
   /**
+   * Whether this view's pointer input reaches the interaction hub: a drag
+   * selects text or draws with the active tool, and the `pan` tool pans.
+   * Off, the view only scrolls (its own drag-to-pan), which suits a
+   * thumbnail strip. Without the interaction plugin the view only scrolls
+   * either way.
+   */
+  interaction: boolean;
+  /**
+   * With `interaction`: a drag in the space between pages pans whatever the
+   * tool, with a grab cursor there; there is nothing to select or draw off a
+   * page.
+   */
+  panFallback: boolean;
+  /**
+   * Whether a pinch, Ctrl+wheel (Cmd on a Mac) or a trackpad pinch zooms this
+   * view. Off, a zoom wheel scrolls instead, for a view with a fixed
+   * magnification; a pinch never zooms the browser page either way.
+   */
+  zoomGestures: boolean;
+  /**
    * View pixels per PDF point — the platform's physical unit factor, folded into
    * the layout so 100% (zoom 1) is physically accurate. Web = 96/72 (1 pt = 1/72",
    * 1 CSS px = 1/96"); a native platform injects its own (iOS pt, Android dp). It
@@ -248,6 +268,15 @@ export interface StageSettings {
    * (`pageWidth`) are all unaffected — only the pages themselves resize.
    */
   viewUnitsPerPoint: number;
+}
+
+/**
+ * A change to the settings: any of them, each replacing the current value
+ * whole. A `pageFrame` names only the sides it reserves (`{ bottom: 20 }`);
+ * the sides it leaves out are 0.
+ */
+export interface StageSettingsPatch extends Partial<Omit<StageSettings, 'pageFrame'>> {
+  pageFrame?: Partial<PageFrame>;
 }
 
 /**
@@ -397,7 +426,8 @@ export interface RevealOptions {
 
 // ── events ──
 export interface StagePageChangedEvent {
-  readonly page: PageInfo | null;
+  /** The new current page, or null when the document has no pages. */
+  readonly page: PageRef | null;
   readonly pageIndex: number;
   readonly previousPageIndex: number;
 }
@@ -449,16 +479,18 @@ export interface StageCapability {
   getZoomMode(): ZoomModeValue | 'custom';
   /** The lens's view rotation — see {@link StageSettings.viewRotation}. */
   getViewRotation(): PageRotation;
-  /** The cursor page, or null before the document has pages. */
-  getCurrentPage(): PageInfo | null;
-  /** The cursor page's display index. */
+  /** The current page's ref, or null before the document has pages. */
+  getCurrentPage(): PageRef | null;
+  /** The current page's display index, from 0. */
   getCurrentPageIndex(): number;
+  /** How many pages the document has. */
+  getPageCount(): number;
   /** Pages of the current item (one page, or a spread / grid row). */
   listCurrentItemPages(): readonly PageInfo[];
   /** Pages on screen, with their viewport rects and visible page-space rect. Reference-stable. */
   listVisiblePages(): readonly VisiblePage[];
-  /** Is any part of the page on screen. */
-  isPageVisible(page: PageRef): boolean;
+  /** Is any part of the page (its ref or its index) on screen. False for a page that isn't in the document. */
+  isPageVisible(page: PageRef | number): boolean;
   /** What the viewer is looking at plus the zoom intent, for per-page view memory. */
   getViewpoint(): Viewpoint;
   /** Serialisable view state — the unit of session persistence. */
@@ -536,14 +568,14 @@ export interface StageCapability {
   // ── settings ──
   /** Every live setting (build or save a preset). */
   getSettings(): StageSettings;
-  /** Patch any subset in one anchor-preserving update. Writes the responsive base. */
-  updateSettings(patch: Partial<StageSettings>): void;
-  /** Back to the constructed config. */
+  /**
+   * Change any subset in one update that keeps the view on the same page.
+   * Each value replaces the current one whole; a matching responsive rule
+   * still wins on the settings it names. Fires `onSettingsChanged`.
+   */
+  updateSettings(changes: StageSettingsPatch): void;
+  /** Back to the settings the plugin was registered with. Fires `onSettingsChanged`. */
   resetSettings(): void;
-  setFlow(flow: FlowMode): void;
-  setLayout(layout: LayoutKind): void;
-  setSpread(spread: SpreadMode): void;
-  setSizing(sizing: SizingMode): void;
   /** Replace the container-query rules (see {@link ResponsiveRule}). */
   setResponsiveRules(rules: readonly ResponsiveRule[]): void;
   /** Names of the responsive rules matching the current box, in source order. */
@@ -562,14 +594,17 @@ export interface StageCapability {
     /** The hit page's zoom relative to its 100% baseline. */
     zoom: number;
   } | null;
-  /** Project a viewport point onto one page's frame, unclamped; null when the page is not laid out. */
-  viewportToPage(page: PageRef, point: ViewportPoint): Point | null;
-  /** A page-space point → this stage's viewport. */
-  pageToViewport(page: PageRef, point: Point): ViewportPoint | null;
-  /** A page-space rect → its viewport-space bounding box. */
-  pageRectToViewport(page: PageRef, rect: Rect): ViewportRect | null;
-  /** The laid-out box for a page, or null before placement. */
-  getPageFrame(page: PageRef): VisiblePage | null;
+  /**
+   * Project a viewport point onto one page (its ref or its index), unclamped;
+   * null when the page is not on screen or not in the document.
+   */
+  viewportToPage(page: PageRef | number, point: ViewportPoint): Point | null;
+  /** A page-space point → this stage's viewport; null when the page is not laid out. */
+  pageToViewport(page: PageRef | number, point: Point): ViewportPoint | null;
+  /** A page-space rect → its viewport-space bounding box; null when the page is not laid out. */
+  pageRectToViewport(page: PageRef | number, rect: Rect): ViewportRect | null;
+  /** The laid-out box for a page (its ref or its index), on screen or not; null before placement. */
+  getPageFrame(page: PageRef | number): VisiblePage | null;
 
   // ── events ──
   /** The cursor page changed. */
@@ -586,7 +621,7 @@ export interface StageCapability {
   readonly onViewportChanged: EventHook<StageViewportChangedEvent>;
 }
 
-export interface StageConfig extends Partial<StageSettings> {
+export interface StageConfig extends StageSettingsPatch {
   /** Override the host timing seam (tests/SSR). Defaults to browser rAF. */
   scheduler?: Scheduler;
   /**

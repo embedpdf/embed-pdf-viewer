@@ -1,5 +1,7 @@
+import { localEngine } from '@embedpdf/engine';
 import { mountWebFont } from '@embedpdf/svelte/runtime';
-import { engine } from './pdf';
+
+export const engine = localEngine(); // the engine you give the viewer
 
 const data = await fetch('/fonts/brand-sans.ttf').then((response) => response.arrayBuffer());
 

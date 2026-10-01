@@ -8,7 +8,8 @@
  * have no setting, only a variable and a built-in look.
  *
  * {@link EPDF_VARIABLES} is plain data with no imports, so a script can read the
- * list without a browser.
+ * list without a browser. {@link epdfThemeVariables} turns a theme written with
+ * setting names into the variables.
  */
 
 /**
@@ -240,4 +241,85 @@ export function mixAccent(name: EpdfTranslucentVariable, accentValue: string): s
  */
 export function paintDefault(name: EpdfCssOnlyVariable): string {
   return `var(--epdf-${name}, ${EPDF_VARIABLES[name].default})`;
+}
+
+// ── a theme as setting names ──
+
+/** A setting's path as a theme writes it: the viewer's own at the top, a list's entries as one. */
+type ThemePath<Setting extends string> = Setting extends `viewer.${infer Rest}`
+  ? Rest
+  : Setting extends `${infer Head}[]${infer Tail}`
+    ? `${Head}${Tail}`
+    : Setting;
+
+/** What a part takes: one of its keywords, or a CSS value. */
+type ThemeValue<Name extends EpdfSettingVariable> = Definitions[Name] extends {
+  readonly keywords: infer Keywords;
+}
+  ? keyof Keywords & string
+  : string | number;
+
+/** One setting as a nested object: `'page.shadow'` is `{ page?: { shadow?: … } }`. */
+type ThemeBranch<Path extends string, Value> = Path extends `${infer Head}.${infer Rest}`
+  ? { readonly [Key in Head]?: ThemeBranch<Rest, Value> }
+  : { readonly [Key in Path]?: Value };
+
+type Intersection<Union> = (Union extends unknown ? (value: Union) => void : never) extends (
+  value: infer Both,
+) => void
+  ? Both
+  : never;
+
+/**
+ * A theme by setting names, every part optional: `{ accent: '#e91e63', search: { highlight:
+ * { color: '#7dd3fc' } } }`. The viewer's own settings sit at the top; each plugin's under its
+ * name, as the theming page lists them.
+ */
+export type EpdfTheme = Intersection<
+  {
+    [Name in EpdfSettingVariable]: ThemeBranch<
+      ThemePath<Definitions[Name]['setting']>,
+      ThemeValue<Name>
+    >;
+  }[EpdfSettingVariable]
+>;
+
+/** The CSS variables of a theme, by their full name: `{ '--epdf-accent': '#e91e63' }`. */
+export type EpdfThemeVariables = Readonly<Record<`--epdf-${EpdfVariable}`, string>>;
+
+/** The value at a dotted path of a theme, or `undefined`. */
+function valueAt(theme: EpdfTheme, path: readonly string[]): unknown {
+  let node: unknown = theme;
+  for (const key of path) {
+    if (typeof node !== 'object' || node === null) return undefined;
+    node = (node as Record<string, unknown>)[key];
+  }
+  return node;
+}
+
+/**
+ * The CSS variables that set a theme, for a style on an element around the viewer: CSS variables
+ * win over settings, and reach everything inside the element. A part left out keeps its own
+ * look, so the parts that follow the accent follow a new `accent`.
+ *
+ * `epdfThemeVariables({ accent: '#e91e63', page: { shadow: 'none' } })` is
+ * `{ '--epdf-accent': '#e91e63', '--epdf-page-shadow': 'none' }`.
+ */
+export function epdfThemeVariables(theme: EpdfTheme): Partial<EpdfThemeVariables> {
+  const variables: Partial<Record<`--epdf-${EpdfVariable}`, string>> = {};
+  for (const [name, definition] of Object.entries(EPDF_VARIABLES) as [
+    EpdfVariable,
+    EpdfVariableDefinition,
+  ][]) {
+    if (!definition.setting) continue;
+    const path = definition.setting
+      .replace(/^viewer\./, '')
+      .replace('[]', '')
+      .split('.');
+    const value = valueAt(theme, path);
+    if (value === undefined || value === null) continue;
+    const css = String(value);
+    variables[`--epdf-${name}`] = definition.keywords?.[css] ?? css;
+  }
+  return variables;
 }

@@ -8,12 +8,9 @@ import './page-labels.css';
 
 const engine = localEngine();
 
-// Reserve a 26px band below every page — the label lives there, so it never
-// overlaps the page and never scales away when you zoom.
-const plugins = [
-  stagePlugin({ pageFrame: { top: 0, right: 0, bottom: 26, left: 0 } }),
-  renderPlugin(),
-];
+// Reserve a 26px band below every page: the label lives there, so it never
+// covers the page and keeps its size when you zoom.
+const plugins = [stagePlugin({ pageFrame: { bottom: 26 } }), renderPlugin()];
 
 // [!doc-source ebook]
 const ebook = async (): Promise<OpenInput> => {

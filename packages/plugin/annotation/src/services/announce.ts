@@ -1,5 +1,5 @@
 import type { EventOrigin } from '@embedpdf/core';
-import type { AnnotationDTO, AnnotationRef, PageRef } from '@embedpdf/engine-core/runtime';
+import type { Annotation, AnnotationRef, PageRef } from '@embedpdf/engine-core/runtime';
 
 import type { AnnotationEvents } from './events';
 
@@ -9,12 +9,14 @@ import type { AnnotationEvents } from './events';
  */
 export function createAnnouncer(events: AnnotationEvents) {
   return {
-    created: (annotation: AnnotationDTO, origin: EventOrigin) =>
+    created: (annotation: Annotation, origin: EventOrigin) =>
       events.created.emit({ annotation, origin }),
-    updated: (annotation: AnnotationDTO, origin: EventOrigin) =>
+    updated: (annotation: Annotation, origin: EventOrigin) =>
       events.updated.emit({ annotation, origin }),
-    deleted: (ref: AnnotationRef, page: PageRef, origin: EventOrigin) =>
-      events.deleted.emit({ ref, page, origin }),
+    deleted: (refs: readonly AnnotationRef[], page: PageRef, origin: EventOrigin) =>
+      events.deleted.emit({ refs, page, origin }),
+    moved: (refs: readonly AnnotationRef[], page: PageRef, toIndex: number, origin: EventOrigin) =>
+      events.moved.emit({ refs, page, toIndex, origin }),
   };
 }
 

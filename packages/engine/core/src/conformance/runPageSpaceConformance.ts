@@ -2,7 +2,7 @@ import { decodePng, type Raster } from './appearanceRasters';
 import type { PageSpaceFixture, PageSpaceFixturePage } from './pageSpaceFixtures';
 import { PAGE_SPACE_FIXTURES } from './pageSpaceFixtures';
 import type { ConformanceTestRunner } from './runMetadataConformance';
-import type { AnnotationDTO } from '../annotation/kinds';
+import type { Annotation } from '../annotation/kinds';
 import type { PageLayout } from '../dto/PageLayout';
 import type { PageImageHandle, PageImageOptions } from '../dto/PageRender';
 import type { PageDestination } from '../dto/PdfDestination';
@@ -235,7 +235,7 @@ export function runPageSpaceConformance(
               if (!page.links?.length) return;
               const { annotations } = await doc.page(layout.ref).annotations.list();
               const links = annotations.filter(
-                (a): a is Extract<AnnotationDTO, { subtype: 'link' }> => a.subtype === 'link',
+                (a): a is Extract<Annotation, { subtype: 'link' }> => a.subtype === 'link',
               );
               for (const link of page.links) {
                 const read = links.find((a) =>

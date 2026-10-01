@@ -23,7 +23,7 @@ export interface SelectionHostCapability extends SelectionCapability {
   isOverText(page: PageRef, point: Point): boolean;
   /**
    * A pointer gesture that drives the selection opened (pointer-down). From
-   * here until {@link endGesture}, {@link isGestureActive} is true and
+   * here until {@link endGesture}, `isSelecting()` is true and
    * selection-scoped UI hides. Programmatic writes never open a gesture.
    */
   beginGesture(): void;
@@ -33,9 +33,6 @@ export interface SelectionHostCapability extends SelectionCapability {
   /** The gesture ended (pointer-up). Settles first, then emits `onCommitted`
    *  when a selection is in place. */
   endGesture(): void;
-  /** Whether a selection gesture is in flight. A readable fact: derived
-   *  recomputes never touch it, programmatic selections are born settled. */
-  isGestureActive(): boolean;
   /** Suppress / restore the default highlight visual (a consumer drawing its
    *  own preview — the markup ghost). */
   setHighlightVisible(visible: boolean): void;

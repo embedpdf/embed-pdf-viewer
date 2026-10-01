@@ -3,11 +3,10 @@ import { useCapability } from '@embedpdf/react/runtime';
 import {
   AnnotationToken,
   annotationKey,
-  useAnnotationSelection,
+  useAnnotationState,
   useComments,
   useCommentThreads,
-  useAnnotationStatus,
-  type AnnotationDTO,
+  type Annotation,
   type AnnotationRef,
   type CommentThreadView,
 } from '@embedpdf/react/annotation';
@@ -47,12 +46,13 @@ const dateLabel = (iso: string | null): string => {
 
 export function CommentsPanel() {
   const t = useT();
-  const status = useAnnotationStatus();
+  const status = useAnnotationState((state) => state.status);
   const comments = useComments();
   const threads = useCommentThreads();
   const anno = useCapability(AnnotationToken);
   const stage = useCapability(StageToken);
-  const selection = useAnnotationSelection();
+  const selected = useAnnotationState((state) => state.selected);
+  const selection = useMemo(() => selected.map((annotation) => annotation.ref), [selected]);
   const scrollRef = useRef<HTMLDivElement>(null);
   const cardRefs = useRef<Record<string, HTMLLIElement | null>>({});
 
@@ -83,7 +83,7 @@ export function CommentsPanel() {
 
   /** Click a card: select the annotation and fly the camera to it. */
   const goTo = (view: CommentThreadView) => {
-    anno.select(view.root.ref);
+    anno.selection.set([view.root.ref]);
     if (view.pageIndex < 0) return;
     // Anchor values are viewport fractions (0–1), not percentages:
     // the annotation lands a third down the viewport, the find-bar feel.
@@ -194,7 +194,12 @@ function ThreadCard({
   const t = useT();
   const comments = useComments();
   const [reply, setReply] = useState('');
-  const perms = comments.getPermissions(view.root.ref);
+  const root = view.root.ref;
+  const perms = {
+    canDeleteThread: comments.canDeleteThread(root),
+    canSetStatus: comments.canSetStatus(root),
+    canReply: comments.canReply(root),
+  };
   const config = commentTypeConfig(view.root);
   const status = view.review.mine?.state ?? 'none';
   const latest = view.review.lastChange;
@@ -319,7 +324,7 @@ function ThreadCard({
   );
 }
 
-function Reply({ dto }: { dto: AnnotationDTO }) {
+function Reply({ dto }: { dto: Annotation }) {
   const t = useT();
   return (
     <div className="border-border-subtle ml-1 border-l-2 pl-2">
@@ -348,7 +353,10 @@ function CommentBody({
 }) {
   const t = useT();
   const comments = useComments();
-  const perms = comments.getPermissions(annotationRef);
+  const perms = {
+    canEditText: comments.canSetText(annotationRef),
+    canDelete: comments.canDelete(annotationRef),
+  };
   const [draft, setDraft] = useState<string | null>(null);
 
   if (draft !== null) {

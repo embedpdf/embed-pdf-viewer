@@ -13,6 +13,8 @@ document, and every component talks to it unless you say otherwise:
 Each document keeps its own state: its zoom and scroll position, its selection, its search and its
 active tool. Switch tabs and back, and everything is where you left it.
 
+<Example name="documents/tabs" />
+
 ## Manage the tabs
 
 ```ts
@@ -36,6 +38,8 @@ whatever is active:
 Everything inside, such as the Stage, `useSearch()` and `useSelection()`, uses that document.
 That's how you show two documents at once, or a preview of one while another is active.
 
+<Example name="documents/scope" />
+
 ## Side by side
 
 The view manager arranges documents into panes, each with its own tabs, like split editors in a
@@ -52,6 +56,8 @@ views.removePane(paneId); // its documents move to another pane
 
 A document opened with `documents.open()` lands in the focused pane. Every call is listed under
 [Methods](#methods).
+
+<Example name="documents/panes" />
 
 ## Methods
 

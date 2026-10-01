@@ -6,7 +6,7 @@ import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import type {
   LocalDocumentHandle,
   LocalEngine,
-  StampAnnotationDTO,
+  StampAnnotation,
 } from '@embedpdf/engine-core/runtime';
 import { EngineErrorCode, sniffBinaryMetadata, toPageRef } from '@embedpdf/engine-core/runtime';
 import { createLocalEngine } from '../src/index';
@@ -119,7 +119,7 @@ describe('stamp annotations: engine-local (inline transport, wasm runtime)', () 
     );
 
     expect(result.annotation.subtype).toBe('stamp');
-    const created = result.annotation as StampAnnotationDTO;
+    const created = result.annotation as StampAnnotation;
     expect(created.name).toBe('Approved');
     expect(created.rect.x).toBeCloseTo(rect.x, 0);
     expect(created.rect.y).toBeCloseTo(rect.y, 0);
@@ -170,7 +170,7 @@ describe('stamp annotations: engine-local (inline transport, wasm runtime)', () 
     try {
       const snapshot = await reopened.page(toPageRef(PAGE_OBJECT_NUMBER)).annotations.list();
       const stamps = snapshot.annotations.filter(
-        (a): a is StampAnnotationDTO => a.subtype === 'stamp',
+        (a): a is StampAnnotation => a.subtype === 'stamp',
       );
       expect(stamps.length).toBeGreaterThanOrEqual(2);
       expect(stamps.some((s) => s.name === 'Approved')).toBe(true);
@@ -217,7 +217,7 @@ describe('stamp annotations: engine-local (inline transport, wasm runtime)', () 
       },
       { appearance: png },
     );
-    expect((created as StampAnnotationDTO).rotation).toBe(90);
+    expect((created as StampAnnotation).rotation).toBe(90);
 
     const rendered = await page.annotations.renderAppearancesRaw();
     const entry = rendered.appearances.find(
@@ -267,7 +267,7 @@ describe('stamp annotations: engine-local (inline transport, wasm runtime)', () 
       },
       { appearance: png },
     );
-    expect((created as StampAnnotationDTO).rotation).toBe(90);
+    expect((created as StampAnnotation).rotation).toBe(90);
 
     const rendered = await page.annotations.renderAppearancesRaw();
     const entry = rendered.appearances.find(
@@ -317,14 +317,14 @@ describe('stamp annotations: engine-local (inline transport, wasm runtime)', () 
       },
       { appearance: png },
     );
-    expect((created as StampAnnotationDTO).rotation).toBe(90);
+    expect((created as StampAnnotation).rotation).toBe(90);
 
     // A rect-only re-position preserves the omitted rotation…
     const moved = await page.annotations.update(created.ref, {
       subtype: 'stamp',
       box: { x: 205, y: 205, width: 50, height: 50 },
     });
-    expect((moved.annotation as StampAnnotationDTO).rotation).toBe(90);
+    expect((moved.annotation as StampAnnotation).rotation).toBe(90);
 
     // …and dropping the tilt is an explicit tri-state clear.
     const flat = { x: 210, y: 210, width: 60, height: 50 };
@@ -333,7 +333,7 @@ describe('stamp annotations: engine-local (inline transport, wasm runtime)', () 
       box: flat,
       rotation: null,
     });
-    expect((updated.annotation as StampAnnotationDTO).rotation ?? 0).toBe(0);
+    expect((updated.annotation as StampAnnotation).rotation ?? 0).toBe(0);
 
     // Re-read from the annot dict (not just the patch echo) to prove it persists.
     const list = await page.annotations.list();
@@ -342,7 +342,7 @@ describe('stamp annotations: engine-local (inline transport, wasm runtime)', () 
         a.ref.kind === 'objectNumber' &&
         created.ref.kind === 'objectNumber' &&
         a.ref.objectNumber === created.ref.objectNumber,
-    ) as StampAnnotationDTO;
+    ) as StampAnnotation;
     expect(re.rotation ?? 0).toBe(0);
     expect(re.rect.x).toBeCloseTo(flat.x, 0);
     expect(re.rect.x + re.rect.width).toBeCloseTo(flat.x + flat.width, 0);

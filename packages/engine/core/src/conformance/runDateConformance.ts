@@ -1,5 +1,5 @@
 import type { ConformanceTestRunner } from './runMetadataConformance';
-import type { AnnotationDTO } from '../annotation/kinds';
+import type { Annotation } from '../annotation/kinds';
 import type { DocumentHandle } from '../engine/DocumentHandle';
 import type { Engine } from '../engine/Engine';
 import { toPageRef } from '../identity/PageRef';
@@ -50,7 +50,7 @@ export function runDateConformance(
 
     const annotationsOf = async (doc: DocumentHandle) => {
       const { annotations } = await doc.page(toPageRef(3)).annotations.list();
-      const byName = (nm: string): AnnotationDTO => {
+      const byName = (nm: string): Annotation => {
         const found = annotations.find((annotation) => annotation.nm === nm);
         if (!found) throw new Error(`no annotation named ${nm}`);
         return found;
@@ -120,7 +120,7 @@ export function runDateConformance(
 
     test('an attached file reads the dates of its /Params', async () => {
       await withDocument(async (doc) => {
-        const file = (await annotationsOf(doc))('dates-file') as AnnotationDTO & {
+        const file = (await annotationsOf(doc))('dates-file') as Annotation & {
           file: { createdAt?: string; modifiedAt?: string } | null;
         };
         expect(file.file).toMatchObject({

@@ -6,24 +6,22 @@
  * headless), and emission is a diff against the last-emitted state, so
  * pre-open motion collapses to one open with no phantom close.
  */
-import { toPageRef, type PluginContext } from '@embedpdf/core';
+import { toPageRef } from '@embedpdf/core';
 import type { PageObjectNumber } from '@embedpdf/engine-core/runtime';
 
-import type { ActionsConfig } from '../contract';
 import type { DispatchCore } from '../dispatch/core';
 import type { ActionsHostCapability, PageStateReport } from '../host-contract';
-import type { ActionsServices } from '../services';
+import type { ActionsContext, ActionsServices } from '../services';
 
 /** Consecutive programmatic rounds after which page-lifecycle emission is suppressed. */
 const CASCADE_LIMIT = 8;
 
 export function createPageLifecycle(
-  ctx: PluginContext<void>,
-  { events }: Pick<ActionsServices, 'events'>,
-  config: ActionsConfig,
+  ctx: ActionsContext,
+  { events, settings }: Pick<ActionsServices, 'events' | 'settings'>,
   { dispatch }: DispatchCore,
 ) {
-  const { diagnosticHook } = events;
+  const { reportDiagnostic } = events;
   let barrierOpen = false;
   let bufferedReport: PageStateReport | null = null;
   let lastEmitted: {
@@ -53,7 +51,7 @@ export function createPageLifecycle(
     if (report.cause === 'programmatic') {
       cascadeRounds += 1;
       if (cascadeRounds > CASCADE_LIMIT) {
-        diagnosticHook.emit({
+        reportDiagnostic({
           code: 'cascade-budget',
           message: `page-lifecycle emission suppressed: ${cascadeRounds} consecutive programmatic rounds (cap ${CASCADE_LIMIT})`,
         });
@@ -94,7 +92,7 @@ export function createPageLifecycle(
     try {
       if (report) {
         emitForReport(report);
-      } else if (fireFallback && config.openSequence === 'headless') {
+      } else if (fireFallback && settings.get().openSequence === 'headless') {
         // The initial page open falls back to the document's first page only
         // in declared-headless mode (no stage will ever report). In 'auto',
         // the stage report owns the initial open: firing a first-page /O
@@ -109,7 +107,7 @@ export function createPageLifecycle(
       }
     } catch (error) {
       // The barrier is open either way: feeds must never stay buffered.
-      diagnosticHook.emit({
+      reportDiagnostic({
         code: 'trigger-failed',
         message: `barrier release failed: ${error instanceof Error ? error.message : String(error)}`,
       });

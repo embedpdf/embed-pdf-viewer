@@ -49,7 +49,19 @@ export interface SessionRef {
   readonly leases: Map<AnyPlugin, SliceLease<unknown>>;
   /** The flushes to run before the document's file is read (settle.ts). */
   readonly settleFlushes: Set<SettleFlush>;
+  /** What runs around each read of the document's file, first registered outermost. */
+  readonly downloadWraps: DownloadWrap[];
 }
+
+/** Something of the document's own that runs around a download: it gets the read and returns its bytes. */
+export type DownloadWrap = (read: () => Promise<Uint8Array>) => Promise<Uint8Array>;
+
+/** `read`, inside every wrap: the first registered is the outermost. */
+export const readWrapped = (
+  wraps: readonly DownloadWrap[],
+  read: () => Promise<Uint8Array>,
+): Promise<Uint8Array> =>
+  wraps.reduceRight<() => Promise<Uint8Array>>((inner, wrap) => () => wrap(inner), read)();
 
 /**
  * Everything a context needs from the kernel, injected so this module has no cycles
@@ -348,6 +360,18 @@ export function createPluginContext(
       session.settleFlushes.add(flush);
       scope.defer(() => {
         session.settleFlushes.delete(flush);
+      });
+    },
+    aroundDownload(wrap) {
+      if (!session) {
+        throw new Error(
+          `[kernel] workspace plugin "${plugin.id}" has no document to download; ctx.aroundDownload() is for document-scoped plugins.`,
+        );
+      }
+      session.downloadWraps.push(wrap);
+      scope.defer(() => {
+        const index = session.downloadWraps.indexOf(wrap);
+        if (index >= 0) session.downloadWraps.splice(index, 1);
       });
     },
     async acquire(get, dispose) {

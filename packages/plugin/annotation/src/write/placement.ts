@@ -14,7 +14,7 @@ import {
 } from '@embedpdf/core-annotation';
 import type {
   AnnotationDraft,
-  AnnotationDTO,
+  Annotation,
   AnnotationFlags,
   AnnotationResources,
   AttachmentFileSource,
@@ -48,8 +48,8 @@ export const isIconPlaceKind = (subtype: KindName): subtype is IconPlaceKind =>
 export const annotationOfTool = (
   model: Model,
   tool: { subtype: KindName; preset: string; flags?: Partial<AnnotationFlags> },
-): AnnotationDTO =>
-  ({ ...toolAnnotation(model, tool.subtype, tool.preset), ...tool.flags }) as AnnotationDTO;
+): Annotation =>
+  ({ ...toolAnnotation(model, tool.subtype, tool.preset), ...tool.flags }) as Annotation;
 
 /**
  * Where an icon placed at `point` goes, at the view the user sees. An icon is
@@ -62,7 +62,7 @@ export const annotationOfTool = (
  * the two are the same box.
  */
 export function iconPlaceAt(
-  annotation: AnnotationDTO,
+  annotation: Annotation,
   point: Point,
   page: { width: number; height: number },
   view: ViewEnv | undefined,

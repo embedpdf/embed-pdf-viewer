@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test, vi } from 'vitest';
-import type { AnnotationDTO } from '../../src/annotation/kinds';
+import type { Annotation } from '../../src/annotation/kinds';
 import { EngineErrorCode } from '../../src/errors/EngineErrorCode';
 import { toBase64 } from '../../src/resource/base64';
 import {
@@ -24,7 +24,7 @@ const stamp = (annotObjectNumber: number) =>
     ref: { kind: 'objectNumber', page, objectNumber: annotObjectNumber },
     rect: { x: 10, y: 10, width: 100, height: 50 },
     contents: 'Apprové ✓',
-  }) as unknown as AnnotationDTO;
+  }) as unknown as Annotation;
 
 /** Two stamps sharing one drawing and an attachment with its file. */
 async function sample(): Promise<AnnotationBundle> {
@@ -41,7 +41,7 @@ async function sample(): Promise<AnnotationBundle> {
         data: {
           subtype: 'file-attachment',
           ref: { kind: 'objectNumber', page, objectNumber: 14 },
-        } as unknown as AnnotationDTO,
+        } as unknown as Annotation,
         resources: { file: fileId },
       },
     ],

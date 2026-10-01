@@ -41,6 +41,7 @@ export {
   selectionKnob,
   creationDraftAnchor,
   rotationAnchor,
+  annotationAnchor,
 } from './view';
 export type { TextBox } from './view';
 export {
@@ -112,10 +113,12 @@ export {
   kindNamed,
   NO_CAPS,
   type AnnotationKind,
-  type FieldSpec,
+  type AnnotationProperty,
+  type FlagKey,
   type KindCaps,
 } from './kinds';
-export { initialTextStyle, kindTakesLink, sharedFields } from './props';
+export { initialTextStyle, kindTakesLink, propertiesOf, sharedProperties } from './props';
+export { FLAG_PROPERTIES, LINE_ENDING_NAMES } from './kinds/fields';
 export { engineSubtypeOf, readOfDefaults, widgetAppearanceOf } from './record/defaults';
 export {
   geomScene,
@@ -220,6 +223,7 @@ export type {
   ModelAnnotation,
   ChromeGeometry,
   ChromeNode,
+  HandleRole,
   Cursor,
   CreationDraftAnchor,
   RotationAnchor,

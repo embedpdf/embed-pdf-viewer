@@ -20,18 +20,17 @@
  * view never falls back to an older version of what the user did.
  */
 import { annotationAfter, initialSession, sameSession } from '@embedpdf/core-annotation';
-import type { Id, ModelAnnotation, Point, Session } from '@embedpdf/core-annotation';
+import type { Id, ModelAnnotation, Point, Session, SnapSettings } from '@embedpdf/core-annotation';
 import type { PageRotation } from '@embedpdf/core-geometry';
 import {
   annotationKey,
   generateUuid,
-  type AnnotationDTO,
+  type Annotation,
   type AnnotationPatch,
   type AnnotationRef,
   type PageRef,
 } from '@embedpdf/engine-core/runtime';
 
-import type { AnnotationConfig, ChromeSettings, ChromeSettingsPatch } from './contract';
 import type { TextSelection } from './rich-text';
 
 /** What one pending change does to its record. */
@@ -94,6 +93,40 @@ export interface GhostPointer {
   readonly zoom?: number;
 }
 
+/**
+ * A change of a page's drawing order the engine hasn't confirmed yet: these
+ * records sit from `toIndex` on, in this order. The view shows it at once.
+ */
+export interface PendingMove {
+  /** Unique: the write that carries it removes exactly it. */
+  readonly token: number;
+  readonly page: number;
+  readonly ids: readonly Id[];
+  readonly toIndex: number;
+}
+
+/**
+ * `order` with one page's `ids` moved to `toIndex` among that page's other
+ * records, in the order given. Other pages keep their places: the page's
+ * records take back the slots they had. The engine's rule for a move.
+ */
+export function moveInOrder<Key>(
+  order: readonly Key[],
+  onPage: (key: Key) => boolean,
+  ids: readonly Key[],
+  toIndex: number,
+): Key[] {
+  const moving = new Set(ids);
+  const page = order.filter(onPage);
+  const rest = page.filter((key) => !moving.has(key));
+  const moved = ids.filter((key) => page.includes(key));
+  if (!moved.length) return [...order];
+  const at = Math.max(0, Math.min(toIndex, rest.length));
+  const next = [...rest.slice(0, at), ...moved, ...rest.slice(at)];
+  let slot = 0;
+  return order.map((key) => (onPage(key) ? next[slot++]! : key));
+}
+
 /** A sibling plugin's placement gesture with one of this plugin's tools: its press, and the pointer now. */
 export interface ForeignPlacement {
   readonly toolId: string;
@@ -113,7 +146,8 @@ export interface AnnotationState {
    * hands a record back to the raster (see sync/confirmed.ts).
    */
   readonly vector: Readonly<Record<Id, true>>;
-  readonly chrome: ChromeSettings;
+  /** Drawing-order changes the engine hasn't confirmed yet, oldest first. */
+  readonly moves: readonly PendingMove[];
   /**
    * Where the active tool's ghost is: the pointer, while a click there would
    * make something. Only the pointer is state; what the ghost paints is
@@ -135,48 +169,24 @@ export interface AnnotationState {
   readonly textSelection: TextSelection | null;
 }
 
-/**
- * Out-of-the-box selection chrome — a sensible document-annotation feel. Every
- * length is CSS px (screen-constant across zoom); every color falls back to
- * `accent`. Just defaults: override any field at registration
- * (`annotationPlugin({ chrome })`) or at runtime (`setChrome`).
- */
-export const DEFAULT_CHROME: ChromeSettings = {
-  accent: '#3858e9',
-  // Solid, like the shape's own resting look — one style at rest and rotated.
-  outline: { style: 'solid', width: 1 },
-  // 8px squares to look at, 24px to grab (touch-friendly without visual bulk).
-  handles: { size: 8, hitSize: 24, fill: '#ffffff' },
-  knob: { size: 10, hitSize: 24, offset: 32, stalk: true, fill: '#ffffff' },
-  // A faint reference cross and a prominent live indicator.
-  guides: { enabled: true, style: 'solid', width: 1, axisOpacity: 0.35, indicatorOpacity: 0.8 },
-};
-
-/** Deep-partial merge of a chrome patch — one level per piece, like the
- *  stage-settings convention (align pairs / pageFrame). */
-export const mergeChrome = (base: ChromeSettings, patch: ChromeSettingsPatch): ChromeSettings => ({
-  accent: patch.accent ?? base.accent,
-  outline: { ...base.outline, ...patch.outline },
-  handles: { ...base.handles, ...patch.handles },
-  knob: { ...base.knob, ...patch.knob },
-  guides: { ...base.guides, ...patch.guides },
-});
-
-/** The initial state; the registration config seeds the session's snapping and the chrome. */
-export const initialAnnotationState = (config: AnnotationConfig = {}): AnnotationState => ({
+/** The initial state. The session's snapping comes from the settings (`withSnap`). */
+export const initialAnnotationState = (): AnnotationState => ({
   session: {
     ...initialSession,
     // Each session names the annotations it creates apart from every other session's.
     namePrefix: `${generateUuid()}-`,
-    snap: { ...initialSession.snap, ...config.snap },
   },
   pending: [],
   vector: {},
-  chrome: mergeChrome(DEFAULT_CHROME, config.chrome ?? {}),
+  moves: [],
   ghostAt: null,
   placing: null,
   textSelection: null,
 });
+
+/** The session snaps as the settings say. */
+export const withSnap = (state: AnnotationState, snap: SnapSettings): AnnotationState =>
+  state.session.snap === snap ? state : { ...state, session: { ...state.session, snap } };
 
 /* ── the session and pending changes ─────────────────────────────────────── */
 
@@ -276,7 +286,7 @@ export function followRecord(
 ): AnnotationState {
   const answers = (reply: { to: AnnotationRef } | null | undefined): boolean =>
     !!reply && annotationKey(reply.to) === from;
-  const answering = (annotation: AnnotationDTO): AnnotationDTO =>
+  const answering = (annotation: Annotation): Annotation =>
     annotation.reply && answers(annotation.reply)
       ? { ...annotation, reply: { ...annotation.reply, to: ref } }
       : annotation;
@@ -342,15 +352,17 @@ export function preferBaked(state: AnnotationState, ids: readonly Id[]): Annotat
   return { ...state, vector };
 }
 
-/* ── chrome, ghost and text selection ────────────────────────────────────── */
+/* ── drawing order, ghost and text selection ─────────────────────────────── */
 
-export const patchChrome = (
-  state: AnnotationState,
-  patch: ChromeSettingsPatch,
-): AnnotationState => ({
+export const addMove = (state: AnnotationState, move: PendingMove): AnnotationState => ({
   ...state,
-  chrome: mergeChrome(state.chrome, patch),
+  moves: [...state.moves, move],
 });
+
+export const dropMove = (state: AnnotationState, token: number): AnnotationState =>
+  state.moves.some((move) => move.token === token)
+    ? { ...state, moves: state.moves.filter((move) => move.token !== token) }
+    : state;
 
 export const setGhostAt = (
   state: AnnotationState,

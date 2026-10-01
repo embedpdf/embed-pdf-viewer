@@ -83,6 +83,11 @@ annotationPlugin({
 
 `annotation.tools.list()` returns every tool, so a toolbar can build itself from it.
 
+<Example name="annotation/custom-tools" />
+
+> **Try it:** every button but **Select** comes from a tool's `meta`. Draw with **Red pen**, then
+> place a **To do** note.
+
 Tools can also be added while the app runs. `register()` returns a function that removes the tool
 again:
 
@@ -129,6 +134,10 @@ annotationPlugin({
 });
 ```
 
+<Example name="annotation/tool-defaults" />
+
+> **Try it:** pick a color and a width, and draw. Reload the page: the pen still has them.
+
 ## What happens after drawing
 
 By default the new annotation is selected, so its handles and your menu appear at once, and the
@@ -156,6 +165,11 @@ The setting can change while the app runs. A "keep tool" button in your toolbar 
 ```ts
 annotation.updateSettings({ afterCreate: { tool: keepTool ? 'stay' : 'default' } });
 ```
+
+<Example name="annotation/after-create" />
+
+> **Try it:** draw a rectangle, then turn off **Keep the tool** and draw another: the tool goes back
+> to selecting.
 
 Annotations your code creates are never selected unless you ask for it; see
 [Create an annotation](with-code#create-an-annotation).
@@ -193,6 +207,10 @@ annotationPlugin({
 });
 ```
 
+<Example name="annotation/click-create" />
+
+> **Try it:** click the page with each tool. The arrow's tip lands where you click.
+
 What a click makes always stays on the page: near an edge, it's moved inside.
 
 ## The cursor
@@ -226,6 +244,11 @@ it can change with the tool's color:
 replace the text cursor a markup tool shows over text. The cursor goes back to the tool's own when
 the component is removed.
 
+<Example name="annotation/cursor" />
+
+> **Try it:** move the pointer over the page, then pick another color. **Rectangle** shows the
+> standard `cell` cursor.
+
 ## Show a preview before placing
 
 A **preview** (a ghost) is a see-through copy of what a click would place, following the pointer. It
@@ -245,6 +268,10 @@ The preview is the annotation the click will make, drawn with the tool's current
 color, its width, an arrow's head, a form field's border and background. Change a default and the
 preview changes with it. It's half see-through unless you set `opacity`; `--epdf-ghost-opacity`
 sets it from CSS for every tool (see [Colors & theming](../ui/theming)).
+
+<Example name="annotation/ghost" />
+
+> **Try it:** move the pointer over the page: the note follows it, faintly. Then move the slider.
 
 It shows only where a click would place something. Over an annotation the click selects it, and
 over text a text tool selects text, so the preview hides there. It hides too when the person may
@@ -278,6 +305,11 @@ to your other features:
 </Fw>
 
 <Snippet name="annotations/tools/file-picker" />
+
+<Example name="annotation/file-picker" />
+
+> **Try it:** click the page with **Stamp**, and pick a PNG or a JPEG. The paper clip on the cover
+> is a file attached from code.
 
 To pick from your own library or a cloud drive instead, pass a function. It gets the tool and the
 spot, and returns the file, or `null` to cancel:

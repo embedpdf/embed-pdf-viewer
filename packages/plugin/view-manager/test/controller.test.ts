@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 
 import { createViewManagerController } from '../src/controller';
 import { initialViewManagerState } from '../src/model';
+import { viewManagerState } from '../src/state';
 
 function harness(open: string[] = []) {
   const documents = { getOrder: () => open } as unknown as DocumentsCapability;
@@ -24,7 +25,9 @@ describe('view-manager', () => {
     const log: string[] = [];
     api.onPaneCreated((event) => log.push(`+pane:${event.paneId}`));
     api.onFocusChanged((event) => log.push(`focus:${event.paneId}`));
-    api.onDocumentMoved((event) => log.push(`doc:${event.documentId}:${event.fromPaneId}->${event.toPaneId}`));
+    api.onDocumentMoved((event) =>
+      log.push(`doc:${event.documentId}:${event.fromPaneId}->${event.toPaneId}`),
+    );
     connect();
     expect(api.listPanes().map((pane) => pane.id)).toEqual(['pane-1']);
     expect(api.getPane('pane-1')?.documentIds).toEqual(['a', 'b']);
@@ -44,7 +47,9 @@ describe('view-manager', () => {
     const { api, connect } = harness(['a', 'b']);
     connect();
     const log: string[] = [];
-    api.onDocumentMoved((event) => log.push(`${event.documentId}:${event.fromPaneId}->${event.toPaneId}`));
+    api.onDocumentMoved((event) =>
+      log.push(`${event.documentId}:${event.fromPaneId}->${event.toPaneId}`),
+    );
     api.onPaneRemoved((event) => log.push(`-pane:${event.paneId}`));
     const split = api.splitPane('b');
     expect(split).toBe('pane-2');
@@ -67,5 +72,59 @@ describe('view-manager', () => {
       'a:pane-2->pane-1',
       '-pane:pane-2',
     ]);
+  });
+});
+
+describe('splitting', () => {
+  it('puts the new pane beside the focused pane, or beside `from`', () => {
+    const { api, connect } = harness(['a', 'b', 'c', 'd']);
+    connect();
+    api.createPane(); // pane-2, at the end, focused
+    api.setFocusedPane('pane-1');
+    expect(api.splitPane('b')).toBe('pane-3');
+    expect(api.getPaneOrder()).toEqual(['pane-1', 'pane-3', 'pane-2']);
+    expect(api.getFocusedPaneId()).toBe('pane-3');
+
+    expect(api.splitPane('c', { from: 'pane-2' })).toBe('pane-4');
+    expect(api.getPaneOrder()).toEqual(['pane-1', 'pane-3', 'pane-2', 'pane-4']);
+    expect(api.getPane('pane-4')?.documentIds).toEqual(['c']);
+    expect(api.getPaneOfDocument('c')).toBe('pane-4');
+
+    api.setFocusedPane(null);
+    expect(api.splitPane('d')).toBe('pane-5'); // no pane to go beside: the end
+    expect(api.getPaneOrder().at(-1)).toBe('pane-5');
+  });
+});
+
+describe('the State table', () => {
+  it('reads the panes and the focused pane, and is empty with no capability', () => {
+    const { api, connect } = harness(['a']);
+    connect();
+    expect(viewManagerState.read(api)).toEqual({
+      panes: api.listPanes(),
+      focusedPaneId: 'pane-1',
+    });
+    expect(viewManagerState.read(api).panes).toBe(api.listPanes());
+    expect(viewManagerState.empty).toEqual({ panes: [], focusedPaneId: null });
+  });
+});
+
+describe('a document that gets its real id while opening', () => {
+  it('keeps its pane and its place in the tabs', () => {
+    let order = ['a', 'pending:1'];
+    const documents = { getOrder: () => order } as unknown as DocumentsCapability;
+    const ctx = createTestContext({
+      id: 'view-manager',
+      state: initialViewManagerState(),
+      capabilities: [[DocumentsToken, documents]],
+      doc: null,
+    });
+    const api = ctx.connect(createViewManagerController(ctx));
+    api.splitPane('pending:1');
+    order = ['a', 'real-id']; // the kernel gives it its real id, in the same place
+    ctx.notify();
+    expect(api.getPane('pane-1')?.documentIds).toEqual(['a']);
+    expect(api.getPane('pane-2')?.documentIds).toEqual(['real-id']);
+    expect(api.getPane('pane-2')?.activeDocumentId).toBe('real-id');
   });
 });

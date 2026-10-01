@@ -6,7 +6,7 @@ import { StrikeoutDeclaration } from './declaration';
 
 export { StrikeoutDeclaration } from './declaration';
 
-export type StrikeoutAnnotationDTO<C extends Coordinates = PageCoordinates> = ReadOf<
+export type StrikeoutAnnotation<C extends Coordinates = PageCoordinates> = ReadOf<
   typeof StrikeoutDeclaration,
   C
 >;
@@ -25,7 +25,7 @@ export const StrikeoutPatchSchema = StrikeoutDeclaration.updateSchema;
 
 export const StrikeoutKind: AnnotationKindModule<
   'strikeout',
-  StrikeoutAnnotationDTO,
+  StrikeoutAnnotation,
   StrikeoutDraft,
   StrikeoutPatch
 > = {

@@ -11,7 +11,7 @@ import { pageTransform } from '@embedpdf/core-geometry';
 import type { Kernel } from '@embedpdf/core';
 import { createLocalEngine } from '@embedpdf/engine';
 import { actionsPlugin, ActionsToken } from '@embedpdf/plugin-actions';
-import type { ActionDispatchEvent } from '@embedpdf/plugin-actions';
+import type { ActionExecutedEvent } from '@embedpdf/plugin-actions';
 import { annotationPlugin } from '@embedpdf/plugin-annotation';
 import { formPlugin, FormToken } from '@embedpdf/plugin-form';
 import { interactionPlugin } from '@embedpdf/plugin-interaction';
@@ -125,7 +125,7 @@ describe('widget activation through the DOM (the fake-button pattern)', () => {
         expect(fake?.readOnly).toBe(true); // the Test Lab shape, pinned
         const page = fake!.widgets[0]!.page!;
 
-        const dispatched: ActionDispatchEvent[] = [];
+        const dispatched: ActionExecutedEvent[] = [];
         actions.onExecuted((event) => dispatched.push(event));
 
         // A synthetic page context — the layer only needs the transform seam.
@@ -173,7 +173,7 @@ describe('widget activation through the DOM (the fake-button pattern)', () => {
           expect(hide!.result.nodes).toEqual([
             expect.objectContaining({ type: 'hide', status: 'executed' }),
           ]);
-          expect(hide!.ctx.origin).toBe('user');
+          expect(hide!.source).toMatchObject({ kind: 'widget' });
         });
       } finally {
         view.unmount();

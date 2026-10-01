@@ -1,4 +1,4 @@
-import type { AnnotationDTO } from '../annotation/kinds';
+import type { Annotation } from '../annotation/kinds';
 import type { PdfCoordinates } from '../pageSpace/coordinates';
 import { EngineError } from '../errors/EngineError';
 import { EngineErrorCode } from '../errors/EngineErrorCode';
@@ -33,7 +33,7 @@ export interface AnnotationExportSelection {
  * the selection is on. `pages` is the document's pages in order. A selected
  * page or annotation the document doesn't have is refused with `NotFound`.
  */
-export function closeExportSelection<A extends AnnotationDTO | AnnotationDTO<PdfCoordinates>>(
+export function closeExportSelection<A extends Annotation | Annotation<PdfCoordinates>>(
   selection: AnnotationExportSelection,
   pages: readonly PageRef[],
   readPage: (page: PageRef) => readonly A[],

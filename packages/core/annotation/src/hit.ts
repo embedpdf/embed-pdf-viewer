@@ -238,6 +238,7 @@ export function hitTest(
         const frame = annotationSelectionFrame(record, view);
         const knob = placeRotateKnob(frame.corners, chromeGeometry.knobOffset, pageBox);
         if (
+          chromeGeometry.rotationHandle !== false &&
           Math.abs(knob.at.x - point.x) <= chromeGeometry.knobTol &&
           Math.abs(knob.at.y - point.y) <= chromeGeometry.knobTol
         ) {
@@ -311,6 +312,7 @@ export function hitTest(
         ];
         const knob = placeRotateKnob(corners, chromeGeometry.knobOffset, pageBox);
         if (
+          chromeGeometry.rotationHandle !== false &&
           Math.abs(knob.at.x - point.x) <= chromeGeometry.knobTol &&
           Math.abs(knob.at.y - point.y) <= chromeGeometry.knobTol
         ) {

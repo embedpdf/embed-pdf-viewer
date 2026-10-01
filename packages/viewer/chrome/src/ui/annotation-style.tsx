@@ -1,12 +1,12 @@
 /**
  * The annotation style panel. The plugin owns the schema and the state; this
- * file owns only how each FieldSpec renders and the engine fields it writes
+ * file owns only how each property renders and the engine fields it writes
  * back. There is no per-subtype branching here: a new annotation kind that
- * declares its `FieldSpec[]` in the kind table gets a working style panel for free.
+ * declares its properties in the kind table gets a working style panel for free.
  *
  * Data flow (mirrors examples/react's AnnotationSidebar):
- *   selection present → useSelectionFields(), write updateSelection()
- *   nothing selected  → useToolFields(tool), write updateToolDefaults(tool, …)
+ *   selection present → useAnnotationProperties(), write selection.update()
+ *   nothing selected  → useAnnotationProperties(tool), write tools.updateDefaults(tool, …)
  *
  * The look: a six-column swatch grid, range slider, SVG stroke / line-ending
  * dropdowns, font-size combo and align toggles, styled with this app's
@@ -17,19 +17,18 @@ import { annotationKey } from '@embedpdf/react/annotation';
 import type { ReactNode } from 'react';
 import {
   useAnnotation,
-  useAnnotationSelected,
-  useSelectionFields,
-  useToolDefaults,
-  useToolFields,
+  useAnnotationDefaults,
+  useAnnotationProperties,
+  useAnnotationState,
   type AnnotationPatch,
+  type AnnotationProperty,
   type BlendMode,
-  type FieldSpec,
   type FieldValues,
   type LineEnding,
   type LineEndings,
   type TextAlign,
 } from '@embedpdf/react/annotation';
-import { useTool } from '@embedpdf/react/interaction';
+import { useInteractionState } from '@embedpdf/react/interaction';
 import { useOptionalCapability } from '@embedpdf/react/runtime';
 import { RedactionToken } from '@embedpdf/react/redaction';
 import { useT } from '@embedpdf/react/i18n';
@@ -611,9 +610,9 @@ function Toggle({
 }
 
 // ── rich-text formatting: bold / italic / underline in one row ──────────────
-type FormatSpec = Extract<FieldSpec, { key: 'bold' | 'italic' | 'underline' }>;
+type FormatSpec = Extract<AnnotationProperty, { key: 'bold' | 'italic' | 'underline' }>;
 type Format = FormatSpec['key'];
-const isFormatSpec = (spec: FieldSpec): spec is FormatSpec =>
+const isFormatSpec = (spec: AnnotationProperty): spec is FormatSpec =>
   spec.key === 'bold' || spec.key === 'italic' || spec.key === 'underline';
 
 /**
@@ -659,7 +658,7 @@ function FormatToggles({
   );
 }
 
-// ── one control per FieldSpec — the entire surface an app customizes ─────────
+// ── one control per property: the entire surface an app customizes ──────────
 function FieldControl({
   spec,
   values,
@@ -667,7 +666,7 @@ function FieldControl({
   onChange,
   onChangeEach,
 }: {
-  spec: FieldSpec;
+  spec: AnnotationProperty;
   values: FieldValues;
   mixed: boolean;
   onChange: (patch: FieldValues) => void;
@@ -863,28 +862,33 @@ const FORMAT_BODY: Record<Format, (on: boolean) => Record<string, unknown>> = {
  */
 export function AnnotationStylePanel() {
   const annotation = useAnnotation();
-  const { activeToolId } = useTool();
-  const selection = useSelectionFields();
-  const tool = useToolFields(activeToolId);
-  const toolDefaults = useToolDefaults(activeToolId);
-  const selected = useAnnotationSelected();
+  // Without a document there is no active tool; the pointer's defaults are empty.
+  const activeToolId = useInteractionState((state) => state.activeToolId) ?? 'pointer';
+  const selection = useAnnotationProperties();
+  const tool = useAnnotationProperties(activeToolId);
+  const toolDefaults = useAnnotationDefaults(activeToolId);
+  const selected = useAnnotationState((state) => state.selected);
 
-  const hasSel = selection.fields.length > 0;
-  const { fields, values, mixed } = hasSel ? selection : tool;
+  const hasSel = selection.properties.length > 0;
+  const { properties, values, mixed } = hasSel ? selection : tool;
+  // The flags have their own section below, and a redaction's label its own.
+  const fields = properties.filter(
+    (property) => property.control !== 'flag' && property.control !== 'text',
+  );
   const write = (patch: FieldValues) =>
     hasSel
-      ? annotation.updateSelection(patch as AnnotationPatch)
-      : annotation.updateToolDefaults(activeToolId, patch);
+      ? annotation.selection.update(patch as AnnotationPatch)
+      : annotation.tools.updateDefaults(activeToolId, patch);
   const writeEach = (patchOf: (current: FieldValues) => FieldValues) =>
     hasSel
-      ? annotation.updateSelection(
+      ? annotation.selection.update(
           (member) => patchOf(member as unknown as FieldValues) as AnnotationPatch,
         )
-      : annotation.updateToolDefaults(activeToolId, patchOf(toolDefaults));
+      : annotation.tools.updateDefaults(activeToolId, patchOf(toolDefaults));
   const toggleFormat = (format: Format, on: boolean) => {
-    if (hasSel) return void annotation.toggleTextFormat(format);
+    if (hasSel) return void annotation.text.toggleFormat(format);
     const body = (toolDefaults.richText as { body?: Record<string, unknown> } | undefined)?.body;
-    annotation.updateToolDefaults(activeToolId, {
+    annotation.tools.updateDefaults(activeToolId, {
       richText: { body: { ...body, ...FORMAT_BODY[format](on) } },
     });
   };
@@ -938,7 +942,7 @@ export function AnnotationStylePanel() {
 function RedactionLabelSection() {
   const t = useT();
   const redaction = useOptionalCapability(RedactionToken);
-  const selected = useAnnotationSelected();
+  const selected = useAnnotationState((state) => state.selected);
   const mark = selected.length === 1 && selected[0]!.subtype === 'redact' ? selected[0]! : null;
   const [draft, setDraft] = useState<string | null>(null);
   useEffect(() => setDraft(null), [mark?.ref && annotationKey(mark.ref)]);

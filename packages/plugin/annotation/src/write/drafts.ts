@@ -3,16 +3,27 @@ import {
   type CreationDraftAnchor,
   type Model,
 } from '@embedpdf/core-annotation';
+import type { Annotation } from '@embedpdf/engine-core/runtime';
 
-import type { AnnotationServices } from '../services';
+import type { AnnotationReads } from '../read/annotations';
+import type { AnnotationContext, AnnotationServices } from '../services';
 import { createdRefOf } from './outcomes';
 
 /**
- * Creation drafts: the live multi-click or buffered-ink draft a gesture
- * builds, its commit and cancel doors, and the captured-draft seam the
- * measurement plugin calibrates from.
+ * Creation drafts: the polygon or polyline a click per point builds (and the
+ * buffered ink strokes), its finish and cancel doors, and the captured-draft
+ * seam the measurement plugin calibrates from.
  */
-export function createDrafts({ store, events }: Pick<AnnotationServices, 'store' | 'events'>) {
+export function createDrafts(
+  ctx: Pick<AnnotationContext, 'cancellable'>,
+  {
+    store,
+    events,
+    tools,
+    afterCreate,
+  }: Pick<AnnotationServices, 'store' | 'events' | 'tools' | 'afterCreate'>,
+  annotations: Pick<AnnotationReads, 'get'>,
+) {
   let anchorCache: { model: Model; v: CreationDraftAnchor | null } | null = null;
   const draftAnchorOf = (): CreationDraftAnchor | null => {
     const model = store.model();
@@ -35,24 +46,37 @@ export function createDrafts({ store, events }: Pick<AnnotationServices, 'store'
     }
   });
 
-  const api = {
-    getCreationDraft: () => draftAnchorOf(),
-    hasCreationDraft: () => store.model().draft?.kind.startsWith('create-') ?? false,
-    finishCreationDraft: async () => {
-      const draft = store.model().draft;
-      if (!draft || !draft.kind.startsWith('create-')) return null;
-      const commit = store.commit({
-        type: draft.kind === 'create-ink' ? 'finishInkDraft' : 'finishCreationDraft',
-      });
-      return commit.effects.some((effect) => effect.type === 'create')
-        ? createdRefOf(commit)
-        : null;
-    },
-    finishInkDraft: () => {
-      store.commit({ type: 'finishInkDraft' });
-    },
-    cancelCreationDraft: () => {
+  /** End the draft as a double-click does, through the active tool's `afterCreate`. */
+  const finish = async (
+    options: { signal?: AbortSignal } = {},
+  ): Promise<{ annotation: Annotation } | null> => {
+    const draft = store.model().draft;
+    if (!draft || !draft.kind.startsWith('create-')) return null;
+    const toolId = tools.activeTool()?.id;
+    const commit = store.commit(
+      { type: draft.kind === 'create-ink' ? 'finishInkDraft' : 'finishCreationDraft' },
+      afterCreate.shape(toolId),
+    );
+    afterCreate.done(toolId, commit);
+    if (!commit.effects.some((effect) => effect.type === 'create')) return null;
+    const ref = await ctx.cancellable(options.signal, createdRefOf(commit));
+    const annotation = annotations.get(ref);
+    return annotation ? { annotation } : null;
+  };
+
+  /** The `draft` noun. */
+  const draftApi = {
+    get: () => draftAnchorOf(),
+    finish,
+    cancel: () => {
       store.commit({ type: 'cancel' });
+    },
+  };
+
+  const api = {
+    finishInkDraft: () => {
+      const toolId = tools.activeTool()?.id;
+      afterCreate.done(toolId, store.commit({ type: 'finishInkDraft' }, afterCreate.shape(toolId)));
     },
     cancel: () => {
       store.commit({ type: 'cancel' });
@@ -64,5 +88,5 @@ export function createDrafts({ store, events }: Pick<AnnotationServices, 'store'
     onDraftCaptured: events.draftCaptured.on,
   };
 
-  return { api };
+  return { draft: draftApi, api };
 }

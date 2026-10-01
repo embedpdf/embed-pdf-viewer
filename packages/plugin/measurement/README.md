@@ -27,8 +27,10 @@ The annotation plugin supplies the `distance`, `perimeter`, `area`, and
 default scale is used only outside all viewports. Until the page's viewport reads
 finish, measurement creation is unavailable.
 `createMeasurement({ kind, page, points })` creates the same annotations from
-code and rejects with `not-ready` before the page's scale is known.
-`startCalibration()` arms the calibrate tool; its two points arrive as
+code, resolves `{ annotation }`, and rejects with `not-ready` before the page's
+scale is known. A page is a ref or an index everywhere.
+`startCalibration()` arms the calibrate tool, and throws `permission-denied`
+without `doc.annotate.modify`; its two points arrive as
 `onCalibrationRequested` (and `getCalibrationRequest()`) awaiting the real
 length, and `dismissCalibration()` drops the request.
 
@@ -55,9 +57,14 @@ derived and cannot be edited as comment text. `getReadout(ref)` formats a
 measurement annotation; `measureDistance` and `measureArea` convert page-space
 points in the page's scale without creating anything.
 
-React consumers import `measurementPlugin`, `useMeasurement`, `usePageScale`,
-`useMeasurementReadout`, `useCalibrationRequest`, and `useMeasurementEvent` from
-`@embedpdf/react/measurement`. The full viewer includes a Measure toolbar
+The settings, `defaultScale` and `presets`, change while the app runs:
+`updateSettings()`, `resetSettings()` and `onSettingsChanged`, shared by every
+document.
+
+React consumers import `measurementPlugin`, `useMeasurement` (the capability),
+`useMeasurementState` (`busy`, `calibrationRequest`, `lastReports`),
+`useMeasurementSettings`, `usePageScale`, `useMeasurementReadout` and
+`useMeasurementEvent` from `@embedpdf/react/measurement`. The full viewer includes a Measure toolbar
 (distance, perimeter, area, calibrate), a scale sidebar, and a known-length
 calibration dialog.
 

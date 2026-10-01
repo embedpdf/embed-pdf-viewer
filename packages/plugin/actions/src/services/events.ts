@@ -1,20 +1,40 @@
-/** The five observability events, disposed with the plugin. */
-import type { PluginContext } from '@embedpdf/core';
-import type { ScriptDiagnostic, ScriptExecutionError } from '@embedpdf/core-acrojs';
+/** The plugin's events, disposed with it, and the one way a diagnostic is reported. */
+import type { PdfActionType } from '@embedpdf/engine-core/runtime';
 
 import type {
   ActionDiagnostic,
-  ActionDispatchEvent,
+  ActionDiagnosticReportedEvent,
+  ActionExecutedEvent,
+  ActionSource,
   OpenSequenceCompletedEvent,
+  ScriptDiagnosticReportedEvent,
+  ScriptFailedEvent,
 } from '../contract';
+import type { ActionsContext } from './context';
 
-export function createEvents(ctx: PluginContext<void>) {
+/** Which action a diagnostic is about, and what started it, when one is concerned. */
+export interface DiagnosticPlace {
+  readonly action?: PdfActionType | null;
+  readonly source?: ActionSource | null;
+}
+
+export function createEvents(ctx: ActionsContext) {
+  const executed = ctx.events.source<ActionExecutedEvent>();
+  const diagnosticReported = ctx.events.source<ActionDiagnosticReportedEvent>();
   return {
-    actionHook: ctx.events.source<ActionDispatchEvent>(),
-    openSequenceHook: ctx.events.source<OpenSequenceCompletedEvent>(),
-    diagnosticHook: ctx.events.source<ActionDiagnostic>(),
-    scriptDiagnosticHook: ctx.events.source<ScriptDiagnostic>(),
-    scriptErrorHook: ctx.events.source<ScriptExecutionError>(),
+    executed,
+    diagnosticReported,
+    scriptDiagnosticReported: ctx.events.source<ScriptDiagnosticReportedEvent>(),
+    scriptFailed: ctx.events.source<ScriptFailedEvent>(),
+    openSequenceCompleted: ctx.events.source<OpenSequenceCompletedEvent>(),
+    /** Fire `onDiagnosticReported` with the action and source it concerns (`null` for none). */
+    reportDiagnostic(diagnostic: ActionDiagnostic, place: DiagnosticPlace = {}): void {
+      diagnosticReported.emit({
+        code: diagnostic.code,
+        action: place.action ?? null,
+        source: place.source ?? null,
+      });
+    },
   };
 }
 export type ActionsEvents = ReturnType<typeof createEvents>;

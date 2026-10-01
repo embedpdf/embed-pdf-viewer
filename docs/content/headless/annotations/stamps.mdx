@@ -92,13 +92,16 @@ await stamp.createAsset({ libraryId, label: 'Seal', mark: { kind: 'pdf', source:
 ```
 
 Ink and text are drawn by the engine as vector artwork, exactly as a placed annotation would show.
+The example makes a drawn signature and typed initials; type more, and place them:
+
+<Example name="stamp/marks" />
 
 ## Place a stamp with code
 
 A click after `armAsset()` and a call to `placeAsset()` make the same annotation from the same
 inputs:
 
-<Example name="stamp/programmatic" mode="open" />
+<Example name="stamp/programmatic" />
 
 ```ts
 const { annotation } = await stamp.placeAsset(assetId, {
@@ -121,7 +124,7 @@ stamp's identifier as its `name`. A placement from code is selected only when yo
 Select annotations on a page and turn them into a stamp. They become one stamp exactly as they look
 on the page, vector and all:
 
-<Example name="stamp/from-selection" mode="open" />
+<Example name="stamp/from-selection" />
 
 ```ts
 const { asset } = await stamp.createAssetFromAnnotations(page.ref, refs, {
@@ -138,7 +141,7 @@ the whole call.
 The plugin tells you when a library changes and gives you its bytes; where you store them is up to
 you. `persistStampLibraries` and `restoreStampLibraries` connect a library to a store:
 
-<Example name="stamp/persist" mode="open" />
+<Example name="stamp/persist" />
 
 <Snippet name="annotations/stamps/persist" />
 
@@ -166,6 +169,10 @@ import { LOCALES, loadDefaultLibrary } from '@embedpdf/default-stamps/library';
 const locale = negotiateLocale(LOCALES, navigator.languages) ?? 'en';
 await stamp.importLibrary(await loadDefaultLibrary(locale));
 ```
+
+Pick a language: the same stamps come back with their labels translated.
+
+<Example name="stamp/languages" />
 
 ## Methods
 

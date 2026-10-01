@@ -71,14 +71,17 @@ export function createMetadataController(ctx: PluginContext<void>) {
     },
   });
 
-  const canEdit = () => ctx.allows(METADATA_MODIFY);
+  const canUpdate = () => ctx.allows(METADATA_MODIFY);
 
-  /** Both writes refuse the same way before reaching the engine (the verbs are async, so it rejects). */
+  /**
+   * Both writes refuse the same way before reaching the engine: the verbs are
+   * async, so a refusal rejects, and nothing changes.
+   */
   const refuseWrite = (verb: string, options?: OperationOptions): void => {
+    ctx.assertAllowed(METADATA_MODIFY, verb);
     if (options?.signal?.aborted) {
       throw new PluginError('operation-cancelled', 'metadata', `${verb} was cancelled`);
     }
-    ctx.assertAllowed(METADATA_MODIFY, verb);
   };
 
   const customApi: CustomMetadataCapability = {
@@ -86,9 +89,10 @@ export function createMetadataController(ctx: PluginContext<void>) {
     getStatus: custom.getStatus,
     update: async (patch, options) => {
       refuseWrite('metadata.custom.update', options);
-      return ctx.doc.metadata.custom.update(patch);
+      const result = await ctx.cancellable(options?.signal, ctx.doc.metadata.custom.update(patch));
+      return { custom: result.custom };
     },
-    refresh: () => custom.refresh(),
+    refresh: (options) => ctx.cancellable(options?.signal, custom.refresh()),
     onUpdated: customUpdated.on,
     onResynced: customResynced.on,
   };
@@ -96,12 +100,13 @@ export function createMetadataController(ctx: PluginContext<void>) {
   const api: MetadataCapability = {
     getSnapshot: metadata.get,
     getStatus: metadata.getStatus,
-    canEdit,
+    canUpdate,
     update: async (patch, options) => {
       refuseWrite('metadata.update', options);
-      return ctx.doc.metadata.update(patch);
+      const result = await ctx.cancellable(options?.signal, ctx.doc.metadata.update(patch));
+      return { metadata: result.metadata };
     },
-    refresh: () => metadata.refresh(),
+    refresh: (options) => ctx.cancellable(options?.signal, metadata.refresh()),
     onUpdated: updated.on,
     onResynced: resynced.on,
     custom: customApi,

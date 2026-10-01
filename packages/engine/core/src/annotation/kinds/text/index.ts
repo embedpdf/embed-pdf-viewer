@@ -8,7 +8,7 @@ export { TextDeclaration } from './declaration';
 export type { NoteIcon } from './values';
 export { NoteIconSchema } from './values';
 
-export type TextAnnotationDTO<C extends Coordinates = PageCoordinates> = ReadOf<
+export type TextAnnotation<C extends Coordinates = PageCoordinates> = ReadOf<
   typeof TextDeclaration,
   C
 >;
@@ -25,7 +25,7 @@ export const TextDTOSchema = TextDeclaration.readSchema;
 export const TextDraftSchema = TextDeclaration.createSchema;
 export const TextPatchSchema = TextDeclaration.updateSchema;
 
-export const TextKind: AnnotationKindModule<'text', TextAnnotationDTO, TextDraft, TextPatch> = {
+export const TextKind: AnnotationKindModule<'text', TextAnnotation, TextDraft, TextPatch> = {
   subtype: 'text',
   pdfSubtypeCode: PdfAnnotationSubtypeCode.TEXT,
   dtoSchema: TextDTOSchema,

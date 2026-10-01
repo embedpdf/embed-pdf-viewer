@@ -16,11 +16,12 @@ import type { StageCameraWrite } from '../camera/write';
 import type { StageHostCapability } from '../host-contract';
 import { patchSettings, setCursor, type StageState } from '../model';
 import type { StageServices } from '../services';
+import { whenPlaced } from '../services/placement-latch';
 import type { StageArrival } from './arrive';
 
 export function createReveal(
   ctx: PluginContext<StageState>,
-  { scene }: Pick<StageServices, 'scene'>,
+  { scene, placement }: Pick<StageServices, 'scene' | 'placement'>,
   { writeCamera, markCause }: Pick<StageCameraWrite, 'writeCamera' | 'markCause'>,
   { cancelAnimation, animateTo }: Pick<StageAnimation, 'cancelAnimation' | 'animateTo'>,
   { stabilized, goToTarget }: Pick<StageArrival, 'stabilized' | 'goToTarget'>,
@@ -198,7 +199,7 @@ export function createReveal(
 
   const reveal = (page: PageRef | number, options?: RevealOptions): void => {
     const index = indexOfTarget(page);
-    if (index !== null) revealAt(index, options);
+    if (index !== null) whenPlaced(placement, options, (go) => revealAt(index, go));
   };
 
   const goToDestination = (
@@ -207,10 +208,10 @@ export function createReveal(
   ): void => {
     const layout = ctx.getPage(destination.page);
     if (!layout) return;
-    revealAt(layout.index, {
-      ...revealOfDestination(destination, layout.size),
-      behavior: options?.behavior,
-    });
+    const spot = revealOfDestination(destination, layout.size);
+    whenPlaced(placement, { ...spot, behavior: options?.behavior }, (go) =>
+      revealAt(layout.index, go),
+    );
   };
 
   return {

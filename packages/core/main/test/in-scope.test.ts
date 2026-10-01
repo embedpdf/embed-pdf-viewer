@@ -36,7 +36,7 @@ async function twoDocuments(plugins: AnyPlugin[] = [targetPlugin]) {
   const handles: Record<string, DocumentHandle> = {
     a: {
       ...makeHandle('a', [page(1, 0), page(2, 1)]),
-      security: { allows: () => false },
+      security: { allows: (permission: string) => permission !== 'doc.print' },
       download: () => Promise.resolve(new Uint8Array([0xa])),
     } as unknown as DocumentHandle,
     b: {
@@ -108,22 +108,22 @@ describe('the documents capability in a document scope', () => {
     const kernel = await twoDocuments();
     const inA = kernel.capability(DocumentsToken, 'a');
     expect(inA.listPages()).toBe(kernel.documents.listPages('a'));
-    expect(inA.getPageAt(1)?.ref).toEqual(page(2, 1).ref);
+    expect(inA.getPage(1)?.ref).toEqual(page(2, 1).ref);
     expect(inA.getPage(page(7, 0).ref)).toBeNull(); // b's page
     expect(inA.getPageIndex(page(2, 1).ref)).toBe(1);
     expect(inA.getRevision()).toBe(0);
-    expect(inA.allows('doc.print')).toBe(false);
+    expect(inA.canPrint()).toBe(false);
 
     expect(kernel.documents.listPages()).toHaveLength(1); // the active document, b
-    expect(kernel.documents.allows('doc.print')).toBe(true);
+    expect(kernel.documents.canPrint()).toBe(true);
     expect(inA.listPages('b')).toBe(kernel.documents.listPages('b')); // a named document wins
     await kernel.destroy();
   });
 
-  it('saves the document in scope', async () => {
+  it('downloads the document in scope', async () => {
     const kernel = await twoDocuments();
-    expect(await kernel.capability(DocumentsToken, 'a').save()).toEqual(new Uint8Array([0xa]));
-    expect(await kernel.documents.save()).toEqual(new Uint8Array([0xb]));
+    expect(await kernel.capability(DocumentsToken, 'a').download()).toEqual(new Uint8Array([0xa]));
+    expect(await kernel.documents.download()).toEqual(new Uint8Array([0xb]));
     await kernel.destroy();
   });
 

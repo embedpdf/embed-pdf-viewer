@@ -10,7 +10,7 @@
  * makes by construction. A form field takes the placed box as its bounds.
  */
 import type { PageRotation } from '@embedpdf/core-geometry';
-import type { AnnotationDTO } from '@embedpdf/engine-core/runtime';
+import type { Annotation } from '@embedpdf/engine-core/runtime';
 
 import { uprightAnchoredRect, uprightRotation } from './geometry';
 import { kindOf } from './record';
@@ -140,6 +140,6 @@ export function resolveClickPlacement(
  * tool creates before it has a shape (`toolAnnotation`): its kind, and what
  * the shape takes from it (a line's endings, a circle's roundness).
  */
-export function placedShape(annotation: AnnotationDTO, placement: Placement): Shape | null {
+export function placedShape(annotation: Annotation, placement: Placement): Shape | null {
   return kindOf(annotation).family.placed(placement, annotation);
 }

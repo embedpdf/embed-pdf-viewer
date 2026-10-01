@@ -9,8 +9,7 @@ import type {
   PageRef,
 } from '@embedpdf/engine-core/runtime';
 
-import type { MeasurementCapability, MeasurementConfig } from '../contract';
-import { DEFAULT_PRESETS } from '../scale';
+import type { MeasurementCapability } from '../contract';
 import type { MeasurementContext, MeasurementServices } from '../services';
 import type { MeasurementViewportSync } from '../sync/viewports';
 
@@ -19,12 +18,11 @@ const AREA_UNITS: readonly AreaUnit[] = [...UNITS.map(squareOf), 'ha', 'acre'];
 
 export function createScaleReads(
   ctx: MeasurementContext,
-  { store, siblings }: Pick<MeasurementServices, 'store' | 'siblings'>,
-  config: MeasurementConfig,
+  { siblings }: Pick<MeasurementServices, 'siblings'>,
   { scaleOf }: Pick<MeasurementViewportSync, 'scaleOf'>,
 ) {
   const { annotation } = siblings;
-  const presets = config.presets ?? DEFAULT_PRESETS;
+  const settings = ctx.settings();
   const state = () => ctx.state.get();
 
   const getReadout = (ref: AnnotationRef): MeasurementReadout | MeasurementUnavailable => {
@@ -32,7 +30,7 @@ export function createScaleReads(
     return raw ? measurementReadout(raw) : { unavailable: 'not-dimension' };
   };
   const measureDistance = (
-    page: PageRef,
+    page: PageRef | number,
     from: Point,
     to: Point,
   ): MeasurementReadout | MeasurementUnavailable =>
@@ -43,7 +41,7 @@ export function createScaleReads(
       linePoints: { start: from, end: to },
     });
   const measureArea = (
-    page: PageRef,
+    page: PageRef | number,
     vertices: readonly Point[],
   ): MeasurementReadout | MeasurementUnavailable =>
     measurementReadout({
@@ -54,13 +52,12 @@ export function createScaleReads(
     });
 
   return {
-    presets,
     api: {
       canMeasure: (page) => ctx.allows('annotations:create') && scaleOf(page).ready,
       getPageScale: scaleOf,
       isBusy: () => state().pending > 0,
       listLastReports: () => state().reports,
-      listPresets: () => presets,
+      listPresets: () => settings.get().presets,
       listUnits: () => UNITS,
       listAreaUnits: () => AREA_UNITS,
       getReadout,

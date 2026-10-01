@@ -12,7 +12,7 @@ import {
   ANNOTATION_FIELD_SPACES_BY_NAME,
   type MeasuredFieldSpace,
 } from '../annotation/field-spaces';
-import type { AnnotationDTO, AnnotationDraft, AnnotationPatch } from '../annotation/kinds';
+import type { Annotation, AnnotationDraft, AnnotationPatch } from '../annotation/kinds';
 import type { AnnotationSubtype } from '../annotation/subtype';
 import type { PdfMeasurement } from '../dto/Measure';
 import type { PdfAnnotationActions } from '../dto/PdfAction';
@@ -136,30 +136,25 @@ function notInPageSpace(name: string, space: MeasuredFieldSpace): EngineError {
 
 /** A read in page space. `visible` is its page's visible box, in the file's coordinates. */
 export function pageAnnotationOf(
-  annotation: AnnotationDTO<PdfCoordinates>,
+  annotation: Annotation<PdfCoordinates>,
   visible: PdfRect,
   boxOf: VisibleBoxOf,
-): AnnotationDTO {
-  return convertFields(
-    annotation.subtype,
-    annotation,
-    { visible, boxOf },
-    TO_PAGE,
-  ) as AnnotationDTO;
+): Annotation {
+  return convertFields(annotation.subtype, annotation, { visible, boxOf }, TO_PAGE) as Annotation;
 }
 
 /** A page-space read in the file's coordinates. */
 export function pdfAnnotationOf(
-  annotation: AnnotationDTO,
+  annotation: Annotation,
   visible: PdfRect,
   boxOf: VisibleBoxOf,
-): AnnotationDTO<PdfCoordinates> {
+): Annotation<PdfCoordinates> {
   return convertFields(
     annotation.subtype,
     annotation,
     { visible, boxOf },
     TO_PDF,
-  ) as AnnotationDTO<PdfCoordinates>;
+  ) as Annotation<PdfCoordinates>;
 }
 
 /** A page-space create in the file's coordinates. */

@@ -395,19 +395,26 @@ function callsIn(capabilityFile, callee) {
   return calls;
 }
 
-/** The fields of the capability's `defineState(Token, { read, empty })`, or null without one. */
+/**
+ * The fields of every `defineState(Token, { read, empty })` of the capability, or null without
+ * one: a capability may declare more than one State table (the documents capability: the
+ * document in scope, and every document).
+ */
 function declaredStateFields(capabilityFile, token) {
+  let fields = null;
   for (const { file, node } of callsIn(capabilityFile, 'defineState')) {
     if (node.arguments[0]?.getText() !== token) continue;
     const declaration = objectLiteralOf(file, node.arguments[1]);
     const empty = declaration && propertyOf(declaration.node, 'empty');
     const literal = empty && objectLiteralOf(declaration.file, empty.initializer);
-    if (literal)
-      return literal.node.properties.map((property) =>
-        property.name.getText().replace(/['"]/g, ''),
-      );
+    if (literal) {
+      fields = [
+        ...(fields ?? []),
+        ...literal.node.properties.map((property) => property.name.getText().replace(/['"]/g, '')),
+      ];
+    }
   }
-  return null;
+  return fields;
 }
 
 /**
@@ -431,8 +438,12 @@ function declaredSettingPaths(capabilityFile) {
   return null;
 }
 
-/** State: the page's `Field` column has exactly the declaration's fields. */
-function checkState(pages, fields) {
+/**
+ * State: the page's `Field` column has exactly the declaration's fields. A field another
+ * capability on the same page declares is that capability's (Several documents lists the
+ * documents and the view manager's panes).
+ */
+function checkState(pages, fields, ownedElsewhere = new Set()) {
   const documented = new Set();
   for (const page of pages) {
     const mdx = fs.readFileSync(path.join(contentRoot, page), 'utf8');
@@ -448,7 +459,7 @@ function checkState(pages, fields) {
       .filter((field) => !documented.has(field))
       .map((field) => `state field \`${field}\` is in defineState() but not in a State table`),
     ...[...documented]
-      .filter((name) => !fields.includes(name))
+      .filter((name) => !fields.includes(name) && !ownedElsewhere.has(name))
       .map((name) => `State table lists \`${name}\`, which defineState() doesn't declare`),
   ];
 }
@@ -634,7 +645,21 @@ async function run() {
     const fields = declaredStateFields(capabilityFile, label.replace(/Capability$/, 'Token'));
     if (fields) {
       declared.push('state');
-      found.push(...checkState(pageFiles, fields));
+      // The State fields of the other capabilities that share a page with this one.
+      const ownedElsewhere = new Set(
+        loaded.flatMap(({ entry: other }, otherIndex) => {
+          if (otherIndex === index) return [];
+          if (!pagesOf(other).some(({ page }) => pageFiles.includes(page))) return [];
+          const [otherFile, otherName] = other.capability.split('#');
+          return (
+            declaredStateFields(
+              path.join(packagesRoot, otherFile),
+              otherName.replace(/Capability$/, 'Token'),
+            ) ?? []
+          );
+        }),
+      );
+      found.push(...checkState(pageFiles, fields, ownedElsewhere));
     }
     const settingPaths = declaredSettingPaths(capabilityFile);
     if (settingPaths) {

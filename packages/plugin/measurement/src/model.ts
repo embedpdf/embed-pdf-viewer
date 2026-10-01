@@ -29,10 +29,13 @@ export interface MeasurementState {
   readonly localViewports: Readonly<Record<number, readonly PageMeasurementViewport[]>>;
 }
 
+/** No reports yet: the same array every time. */
+export const NO_REPORTS: readonly ScaleChangeReport[] = Object.freeze([]);
+
 export const initialMeasurementState = (): MeasurementState => ({
   pending: 0,
   calibration: null,
-  reports: [],
+  reports: NO_REPORTS,
   loadErrors: {},
   localViewports: {},
 });

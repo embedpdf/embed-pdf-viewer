@@ -7,7 +7,7 @@ import {
   clearSelection,
   contentChangedPagesOf,
   initialSelectionState,
-  setGestureActive,
+  setSelecting,
   setHighlightHidden,
   setSelection,
   type SelectionRange,
@@ -65,8 +65,8 @@ describe('selection model', () => {
     const state = initialSelectionState();
     expect(setHighlightHidden(state, false)).toBe(state);
     expect(setHighlightHidden(state, true).highlightHidden).toBe(true);
-    expect(setGestureActive(state, false)).toBe(state);
-    expect(setGestureActive(state, true).gestureActive).toBe(true);
+    expect(setSelecting(state, false)).toBe(state);
+    expect(setSelecting(state, true).selecting).toBe(true);
   });
 
   it('contentChangedPagesOf names the page an annotation flatten painted into', () => {

@@ -1,6 +1,6 @@
 import type {
   AnnotationBase,
-  AnnotationDTO,
+  Annotation,
   AnnotationSubtype,
   PdfCoordinates,
 } from '@embedpdf/engine-core/runtime';
@@ -48,7 +48,7 @@ export type AnnotationSubtypeReader = (
   base: AnnotationBase<PdfCoordinates>,
   rawSubtypeCode: number,
   ctx: AnnotationReadContext,
-) => AnnotationDTO<PdfCoordinates>;
+) => Annotation<PdfCoordinates>;
 
 const READER_BY_SUBTYPE: Partial<Record<AnnotationSubtype, AnnotationSubtypeReader>> = {
   highlight: readHighlight,

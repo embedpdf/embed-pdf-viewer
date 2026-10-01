@@ -1,4 +1,4 @@
-/* Colors, for light and dark */
+/* Colors */
 :root {
   --ink: #1a2748;
   --muted: #5a6b92;
@@ -7,21 +7,9 @@
   --surface: #ffffff;
   --tint: #f3f7fe;
   --canvas: #f7f9fc;
+  --accent: #054fb3;
   --focus: #7db6ff;
   --shadow: rgb(7 32 76 / 0.04);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --ink: #e6ecfa;
-    --muted: #93a3c7;
-    --line: #27365f;
-    --line-strong: #34467a;
-    --surface: #131d3b;
-    --tint: #1a2750;
-    --canvas: #0b1328;
-    --shadow: rgb(0 0 0 / 0.3);
-  }
 }
 
 /* The controls, above the pages */
@@ -33,34 +21,22 @@
   margin-bottom: 14px;
 }
 
-.readout {
-  min-width: 52px;
-  text-align: center;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--ink);
-  font-variant-numeric: tabular-nums;
-}
-
-/* Pushes what follows to the right */
-.spacer {
-  flex: 1 1 auto;
-}
-
 .button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 6px;
+  min-height: 34px;
+  box-sizing: border-box;
   font: inherit;
   font-size: 13px;
   font-weight: 550;
-  line-height: 1;
+  line-height: 1.1;
   color: var(--ink);
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: 9px;
-  padding: 8px 13px;
+  padding: 7px 12px;
   cursor: pointer;
   white-space: nowrap;
   box-shadow: 0 1px 2px var(--shadow);
@@ -87,6 +63,37 @@
   opacity: 0.45;
   cursor: not-allowed;
   transform: none;
+}
+
+/* A button that stays down while its tool or stamp is on */
+.button[aria-pressed='true'] {
+  color: var(--accent);
+  background: var(--tint);
+  border-color: var(--accent);
+}
+
+.readout {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Pushes what follows to the right */
+.spacer {
+  flex: 1 1 auto;
+}
+
+/* A stamp's picture, inside its button */
+.preview {
+  display: block;
+  height: 22px;
+  max-width: 120px;
+}
+
+/* A library's two buttons sit in the row like the rest */
+.group {
+  display: contents;
 }
 
 /* The pages */

@@ -1,8 +1,8 @@
-import type { Mirror } from '@embedpdf/core';
+import type { Mirror, Settings } from '@embedpdf/core';
 import { refOf, type FontLookup } from '@embedpdf/core-annotation';
 import { isLocalEngine } from '@embedpdf/engine-core/runtime';
 
-import type { AnnotationConfig } from '../contract';
+import type { AnnotationSettings } from '../contract';
 import { createAuthority, type Authority } from './authority';
 import { createView, type View } from '../read/view';
 import type { AnnotationContext } from './context';
@@ -15,6 +15,7 @@ import { createStore, type AnnotationStore } from './store';
 import { createRecordsMirror, type AnnotationRecords } from '../sync/records';
 import { createBehaviors, type Behaviors } from '../tools/behaviors';
 import { createToolRegistry, type ToolRegistry } from '../tools/registry';
+import { createAfterCreate, type AfterCreate } from '../write/after-create';
 
 export type { AnnotationContext } from './context';
 
@@ -25,6 +26,8 @@ export type { AnnotationContext } from './context';
  * wrappers over `ctx`.
  */
 export interface AnnotationServices {
+  /** The plugin's settings, shared by every document: read `get()` where a setting is used. */
+  readonly settings: Settings<AnnotationSettings>;
   readonly events: AnnotationEvents;
   /** The confirmed layer: every record the engine confirmed. */
   readonly records: Mirror<AnnotationRecords>;
@@ -42,12 +45,12 @@ export interface AnnotationServices {
   readonly fonts: FontLookup;
   readonly tools: ToolRegistry;
   readonly behaviors: Behaviors;
+  /** What happens after a tool creates an annotation (`afterCreate`). */
+  readonly afterCreate: AfterCreate;
 }
 
-export function createServices(
-  ctx: AnnotationContext,
-  config: AnnotationConfig,
-): AnnotationServices {
+export function createServices(ctx: AnnotationContext): AnnotationServices {
+  const settings = ctx.settings();
   const events = createAnnotationEvents(ctx);
   const geometry = createPageLookup(ctx);
   const records = createRecordsMirror(ctx, events);
@@ -55,7 +58,10 @@ export function createServices(
   const intents = createIntents(ctx, records, events, (id) => refOf(view.model().byId[id]));
   const store = createStore(ctx, view, intents, events);
   const identity = createRecordIdentity(ctx, store, view, records);
+  // The tools a document has are read once, when it opens.
+  const tools = createToolRegistry(ctx, settings.get().tools, store, events);
   return {
+    settings,
     events,
     records,
     view,
@@ -65,7 +71,8 @@ export function createServices(
     authority: createAuthority(ctx, store),
     filePicker: createFilePickerPort(ctx),
     fonts: () => (isLocalEngine(ctx.engine) ? ctx.engine.fonts.list() : []),
-    tools: createToolRegistry(ctx, config, store),
+    tools,
     behaviors: createBehaviors(store),
+    afterCreate: createAfterCreate(ctx, { settings, tools, store }),
   };
 }

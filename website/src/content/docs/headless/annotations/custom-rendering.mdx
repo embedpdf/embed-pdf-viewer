@@ -54,6 +54,11 @@ the annotation is `let-annotation`, and the rest are named, such as `let-box="bo
 
 <Snippet name="annotations/custom-rendering/badge" />
 
+<Example name="annotation/renderers" />
+
+> **Try it:** the notes are bubbles with their author's initials, and the approved rectangle has a
+> badge. Switch to **The PDF's look**: that's what the saved PDF shows.
+
 People can still select, move, resize and delete the annotation: your <Fw only={['react', 'vue', 'svelte']}>component</Fw><Fw only="angular">template</Fw> draws, and the
 viewer keeps handling the pointer. That's also why it gets no clicks of its own. For that, see
 [Take over the pointer](#take-over-the-pointer).
@@ -64,6 +69,8 @@ A hover card sits next to an annotation while the pointer is over it. It needs t
 annotation under the pointer, and an anchor that keeps a card attached to it:
 
 <Snippet name="annotations/custom-rendering/hover-card" />
+
+<Example name="annotation/hover-card" />
 
 <Fw only="react">Mount it in the Stage's `overlay`</Fw><Fw only="vue">Mount it in the Stage's `#overlay`
 slot</Fw><Fw only="svelte">Mount it in the Stage's `overlay` snippet</Fw><Fw only="angular">Put it inside
@@ -92,6 +99,11 @@ A stamp that's an ordinary stamp in the PDF, but on screen shows its approval st
 with details on hover, and working buttons when you're reading:
 
 <Snippet name="annotations/custom-rendering/stamp" />
+
+<Example name="annotation/interactive" />
+
+> **Try it:** press **Sign off** while reading. Switch to **Edit**: the button goes, and the stamp
+> moves like any other.
 
 1. The stamp is placed like any stamp, so the PDF holds the real one; see [Stamps](stamps).
 2. <Fw only={['react', 'vue', 'svelte']}>`for`</Fw><Fw only="angular">`epdfAnnotation`</Fw> picks it out by its `name`, which the stamp keeps in every PDF app.

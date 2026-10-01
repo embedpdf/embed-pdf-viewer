@@ -90,6 +90,8 @@ stage.goToLastPage();
   spread; zoomed in, one page.
 - **`reveal()` scrolls only as far as needed.** It makes a page visible and does nothing if it
   already is. Use it for a thumbnail strip that follows along without jumping.
+- **You can navigate as soon as the document opens.** A call made before the Stage is on screen
+  waits for it, and the last one is where the Stage opens, without scrolling there.
 
 ## Layouts
 
@@ -134,6 +136,8 @@ number fixes the count.
 stagePlugin({ padding: 32, gap: { px: 12 } });
 ```
 
+<Example name="stage/spacing" />
+
 ## Adapt to the space you have
 
 A generous margin on a desktop wastes half a phone screen. Settings can depend on how much room
@@ -158,6 +162,11 @@ Every rule whose `when` matches applies, in order, and a later rule wins on the 
   Stages in one window decide on their own.
 - **A rule applies when the size crosses it.** In between, the user is in charge: pinch to 300%,
   resize the window, and the zoom stays while the padding rule still applies.
+
+<Example name="stage/responsive" />
+
+> **Try it:** switch the Stage to 360 pixels. The rule turns on, the facing pages become one, and
+> the toolbar's buttons get shorter, all from the same breakpoint.
 
 Out of the box there's one rule, the `compact` margin above. Pass your own list to replace it, or
 `responsive: []` for none. `stage.setResponsiveRules([…])` changes the rules while the app runs.
@@ -238,6 +247,8 @@ stage.reveal(hit.page, {
 
 Search results, comments and bookmarks all come down to this one call.
 
+<Example name="stage/reveal" />
+
 ## Follow a destination
 
 A destination is where a link, a bookmark or the document's opening view points: a page, a spot on
@@ -260,6 +271,8 @@ stage.goToDestination({ kind: 'xyz', page: pages[4].ref, x: 72, y: 100, zoom: 2 
 | `'fitB'`, `'fitBH'`, `'fitBV'` | The same as `fit`, `fitH` and `fitV`              |
 
 Any of `x`, `y` and `zoom` can be `null` or left out: the view keeps what it has on that axis.
+
+<Example name="stage/destination" />
 
 ## Make it feel right
 
@@ -322,6 +335,10 @@ stage.applyViewState(JSON.parse(localStorage.getItem('view')!));
 A viewpoint remembers *what* you were looking at, not pixel offsets, so it restores correctly in a
 window of another size.
 
+<Example name="stage/viewpoint" />
+
+> **Try it:** scroll and zoom somewhere else, then press **Go back to page 1**.
+
 ## Two views of one document
 
 Register the Stage twice, with its own id and token, for two independent views of the same
@@ -332,14 +349,16 @@ document, such as a thumbnail strip next to the main view:
 <Fw only={['react', 'svelte']}>
 
 Pass the token to the component and the <Word of="hooks" />: `<Stage token={ThumbsToken}>` and
-`useStage(ThumbsToken)`. Each view has its own zoom and layout; both show the same live document.
+`useStage(ThumbsToken)`; the state and settings take it after the selector,
+`useStageState(select, ThumbsToken)`. Each view has its own zoom and layout; both show the same live document.
 
 </Fw>
 
 <Fw only="vue">
 
 Pass the token to the component and the composables: `<Stage :token="ThumbsToken">` and
-`useStage(ThumbsToken)`. Each view has its own zoom and layout; both show the same live document.
+`useStage(ThumbsToken)`; the state and settings take it after the selector,
+`useStageState(select, ThumbsToken)`. Each view has its own zoom and layout; both show the same live document.
 
 </Fw>
 
@@ -350,6 +369,8 @@ Pass the token to a second `<epdf-stage>`, and give it its own reference:
 own zoom and layout; both show the same live document.
 
 </Fw>
+
+<Example name="stage/two-views" />
 
 A thumbnail strip should usually not start text selection or drawing when someone drags it. Turn
 off its `interaction` setting; it keeps its own drag-to-scroll:
@@ -469,6 +490,7 @@ Set them when you register the plugin, and change them while the app runs with
 | `interaction`    | Drags reach the active tool, such as text selection; `false` for a view that only scrolls | `true`                         |
 | `panFallback`    | A drag in the space between pages scrolls, whatever the tool                              | `true`                         |
 | `zoomGestures`   | A pinch or Ctrl+wheel zooms; `false` keeps the zoom fixed                                 | `true`                         |
+| `viewUnitsPerPoint` | Screen pixels per PDF point at 100%, so 100% is the page's real size; a native app sets its own | `96 / 72` on the web           |
 
 Set once, when you register the plugin:
 
@@ -480,6 +502,8 @@ Set once, when you register the plugin:
 ## Events
 
 <Snippet name="viewing/page-analytics" />
+
+<Example name="stage/events" />
 
 <Fw only="angular">
 

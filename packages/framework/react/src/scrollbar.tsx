@@ -28,15 +28,36 @@ import { useEffect, useRef, useState } from 'react';
 import type { StageCapability } from '@embedpdf/plugin-stage/contract';
 import type { ScrollMetrics, StageHostCapability } from '@embedpdf/plugin-stage/contract/host';
 import type { CapabilityToken } from '@embedpdf/core';
-import { useCapability, useSelector } from './runtime';
+import { paintDefault } from '@embedpdf/web';
+import { useCapability, useDocumentScope, useKernelValue } from './runtime';
 import { useStageToken } from './stage-scope';
 
 export type ScrollbarAxis = 'x' | 'y';
 
-/** Live scroll metrics for a stage lens (reference-stable; see
- *  `StageHostCapability.getScrollMetrics`). The raw material for custom scroll UI. */
+/** What a view with nothing to scroll measures: no document, or not placed yet. */
+const NO_SCROLL: ScrollMetrics = Object.freeze({
+  scrollLeft: 0,
+  scrollTop: 0,
+  scrollWidth: 0,
+  scrollHeight: 0,
+  clientWidth: 0,
+  clientHeight: 0,
+  scrollableX: false,
+  scrollableY: false,
+});
+
+/**
+ * The view's scroll position as a scrolling element has it: `scrollTop`,
+ * `scrollHeight`, `clientHeight` and their horizontal twins, in screen pixels.
+ * The raw material for scroll UI of your own; all zero without a document.
+ */
 export function useScrollMetrics(token?: CapabilityToken<StageCapability>): ScrollMetrics {
-  return useSelector(asHost(useStageToken(token)), (stage) => stage.getScrollMetrics());
+  const lens = asHost(useStageToken(token));
+  const scoped = useDocumentScope();
+  // The capability keeps the same metrics object until a number moves.
+  return useKernelValue(
+    (kernel) => kernel.tryCapability(lens, scoped ?? undefined)?.getScrollMetrics() ?? NO_SCROLL,
+  );
 }
 
 // Scroll metrics live on the host lens (the same runtime token, typed wider):
@@ -301,7 +322,7 @@ export function Scrollbar({
         style={{
           ...thumbDefaults,
           borderRadius: 6,
-          background: 'var(--epdf-scrollbar-thumb, rgba(0, 0, 0, 0.4))',
+          background: paintDefault('scrollbar-thumb'),
           ...thumbStyle,
         }}
         onPointerDown={onThumbDown}

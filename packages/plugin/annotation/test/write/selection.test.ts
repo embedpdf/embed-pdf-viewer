@@ -58,16 +58,17 @@ describe('selectInRect', () => {
       square(11, 300, { reply: { to: refOf(10), type: 'group' } }),
     ]);
     const { capability } = harness;
-    const selectedKeys = () => new Set(capability.getSelection().map(annotationKey));
+    const selectedKeys = () =>
+      new Set(capability.selection.list().map((annotation) => annotationKey(annotation.ref)));
 
     // The empty middle of the unfilled square: nothing.
     const middle = { x: 130, y: 120, width: 40, height: 20 };
-    capability.selectInRect(PAGE, middle);
+    capability.selection.selectInRect(PAGE, middle);
     expect(selectedKeys()).toEqual(new Set());
 
     // Its border: it, and the other member of its group.
     const border = { x: 90, y: 120, width: 15, height: 20 };
-    capability.selectInRect(PAGE, border);
+    capability.selection.selectInRect(PAGE, border);
     expect(selectedKeys()).toEqual(new Set([annotationKey(refOf(10)), annotationKey(refOf(11))]));
     expect(selectedKeys()).toEqual(new Set(selectionInBox(harness.model(), PAGE, border)));
   });

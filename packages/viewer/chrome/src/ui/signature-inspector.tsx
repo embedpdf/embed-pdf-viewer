@@ -8,15 +8,11 @@
  */
 import { useEffect, useState } from 'react';
 import { Anchored } from '@embedpdf/react/anchored';
-import { useSelector } from '@embedpdf/react/runtime';
-// The inspector reads the fill feed (a host projection); same runtime token, wider type.
-import { FormHostToken } from '@embedpdf/react/form';
 import { useSurface } from '@embedpdf/react/shell';
 import { useT } from '@embedpdf/react/i18n';
 import {
   useSignature,
-  useSignatureSnapshot,
-  useSignatureVerdicts,
+  useSignatureState,
   type FormFieldRef,
   type SignatureVerdict,
 } from '@embedpdf/react/signature';
@@ -55,26 +51,25 @@ export function SignatureInspector() {
   const t = useT();
   const surface = useSurface('signature-inspector');
   const signature = useSignature();
-  const snapshot = useSignatureSnapshot();
-  const verdicts = useSignatureVerdicts();
+  // Re-render when the signatures are read, and when one or its verdict changes.
+  const status = useSignatureState((state) => state.status);
+  useSignatureState((state) => state.signatures);
   const [validating, setValidating] = useState(false);
   const field = surface.props?.field as FormFieldRef | undefined;
   const dto = field ? signature.getSignature(field) : null;
   const verdict = field ? signature.getVerdict(field) : null;
   const widget = dto?.widget ?? null;
-  const box = useSelector(FormHostToken, (form) =>
-    widget && widget.objectNumber > 0 ? (form.getFillItem(widget.objectNumber)?.box ?? null) : null,
-  );
+  const box = widget?.rect ?? null;
 
   // Open on a field never validated: judge it now.
   useEffect(() => {
-    if (!surface.isOpen || !dto?.signed || verdicts) return;
+    if (!surface.isOpen || !dto?.signed || signature.listVerdicts()) return;
     setValidating(true);
     void signature.validate().finally(() => setValidating(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [surface.isOpen, dto?.index]);
 
-  if (!surface.isOpen || !field || !dto || !snapshot) return null;
+  if (!surface.isOpen || !field || !dto || status !== 'ready') return null;
 
   const revalidate = () => {
     setValidating(true);

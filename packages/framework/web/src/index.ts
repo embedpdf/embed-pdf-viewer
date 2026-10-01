@@ -11,17 +11,22 @@ export { pickImageFile, pickFile, saveFile } from './file-picker';
 export type { PickFileOptions } from './file-picker';
 export { copySelection, wireSelectionClipboard } from './clipboard';
 export type { ClipboardSelectionSource, SelectionClipboardOptions } from './clipboard';
+export { bindCommandShortcuts, isMacPlatform } from './command-shortcuts';
+export type { CommandShortcutOptions, ShortcutCommands } from './command-shortcuts';
 export {
+  fitAnchoredRect,
   observeClientGeometry,
   positionAnchoredRect,
   projectAnchoredTarget,
 } from './anchored-position';
 export type {
   AnchorTarget,
+  AnchoredFit,
   AnchoredPlacement,
   AnchoredPoint,
   AnchoredPosition,
   AnchoredRect,
+  AnchoredSize,
   ViewProjector,
 } from './anchored-position';
 export type { PageRef } from './page-ref';
@@ -92,9 +97,11 @@ export type {
 export { mountWebFont } from './web-font';
 export { firstLineShiftFor, lineModelFor, webFontMetrics } from './web-font-metrics';
 export type { LineModel, WebFontMetrics } from './web-font-metrics';
-export { EPDF_VARIABLES, mixAccent, paint, paintDefault } from './theme';
+export { EPDF_VARIABLES, epdfThemeVariables, mixAccent, paint, paintDefault } from './theme';
 export type {
   EpdfCssOnlyVariable,
+  EpdfTheme,
+  EpdfThemeVariables,
   EpdfFollowedVariable,
   EpdfSettingVariable,
   EpdfTranslucentVariable,

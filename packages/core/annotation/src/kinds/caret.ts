@@ -9,5 +9,5 @@ export const caret = defineKind({
   family: caretFamily,
   style: caretStyle,
   caps: { ...NO_CAPS, selectable: true, anchored: true, commentable: true },
-  fields: [COLOR, OPACITY],
+  properties: [COLOR, OPACITY],
 });

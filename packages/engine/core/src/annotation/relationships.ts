@@ -15,7 +15,7 @@
  */
 
 import type { AnnotationBase } from './base';
-import type { AnnotationDTO } from './kinds';
+import type { Annotation } from './kinds';
 import type { PdfCoordinates } from '../pageSpace/coordinates';
 import type { AnnotationRef } from '../identity/AnnotationRef';
 import { annotationKey, annotationKeysOf } from '../identity/annotationKey';
@@ -54,7 +54,7 @@ export function classifyRelation(a: Pick<AnnotationBase, 'reply'>): AnnotationRe
  * A primary may legitimately have both (e.g. a replace-text Caret with its
  * StrikeOut group part and a Text reply).
  */
-export interface AnnotationThread<T extends AnnotationDTO = AnnotationDTO> {
+export interface AnnotationThread<T extends Annotation = Annotation> {
   primary: T;
   /** `/RT /Group` children — merge into the primary, don't list separately. */
   groupedParts: T[];
@@ -80,8 +80,8 @@ export interface AnnotationThread<T extends AnnotationDTO = AnnotationDTO> {
  * sidebar of "most annotations, not widgets/popups" should pre-filter the
  * input; this helper is intentionally unopinionated about eligibility.
  */
-export function buildThreads(annotations: readonly AnnotationDTO[]): AnnotationThread[] {
-  const byKey = new Map<string, AnnotationDTO>();
+export function buildThreads(annotations: readonly Annotation[]): AnnotationThread[] {
+  const byKey = new Map<string, Annotation>();
   for (const a of annotations) {
     byKey.set(annotationKey(a.ref), a);
     // Index under /NM too, so a child that points at the parent by name
@@ -94,7 +94,7 @@ export function buildThreads(annotations: readonly AnnotationDTO[]): AnnotationT
   const threads: AnnotationThread[] = [];
   const threadByPrimaryKey = new Map<string, AnnotationThread>();
 
-  const primaryThread = (primary: AnnotationDTO): AnnotationThread => {
+  const primaryThread = (primary: Annotation): AnnotationThread => {
     const key = annotationKey(primary.ref);
     let thread = threadByPrimaryKey.get(key);
     if (!thread) {
@@ -138,7 +138,7 @@ export function buildThreads(annotations: readonly AnnotationDTO[]): AnnotationT
  * popup before the annotation it shows, so the annotation itself is last.
  * Empty when `ref` names nothing in `annotations`.
  */
-export function deletedWith<A extends AnnotationDTO | AnnotationDTO<PdfCoordinates>>(
+export function deletedWith<A extends Annotation | Annotation<PdfCoordinates>>(
   annotations: readonly A[],
   ref: AnnotationRef,
 ): A[] {

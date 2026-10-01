@@ -21,5 +21,5 @@ export const ink = defineKind({
     groupRotatable: true,
     commentable: true,
   },
-  fields: [COLOR, OPACITY, STROKE_WIDTH, BLEND_MODE, LINKABLE],
+  properties: [COLOR, OPACITY, STROKE_WIDTH, BLEND_MODE, LINKABLE],
 });

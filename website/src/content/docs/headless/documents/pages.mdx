@@ -35,6 +35,8 @@ await pageEdit.rotateBy([page.ref], -90); // and back
 await pageEdit.setRotation([pageA.ref, pageB.ref], 180); // the same rotation for several
 ```
 
+<Example name="page-edit/rotate" />
+
 This rotates the page in the file. To only turn how pages are shown, use the Stage's
 [view rotation](../viewing/stage#rotate-the-view). Keep the two on different buttons.
 
@@ -50,6 +52,8 @@ await pageEdit.move([page.ref], { before: pageC.ref });
 ```
 
 Several pages keep their order and land together.
+
+<Example name="page-edit/reorder" />
 
 ## Delete pages
 
@@ -79,6 +83,8 @@ await pageEdit.duplicate([page.ref]);
 Each resolves with `{ pages }`: the new pages, so you can scroll to them or select them. Without a
 `size`, a blank page takes the size of the page it's placed next to.
 
+<Example name="page-edit/insert" />
+
 ## Extract pages
 
 `extract()` gives you some pages as a new PDF, without changing this document:
@@ -87,6 +93,8 @@ Each resolves with `{ pages }`: the new pages, so you can scroll to them or sele
 const bytes = await pageEdit.extract([pageA.ref, pageB.ref]);
 saveFile(bytes, 'chapter-2.pdf');
 ```
+
+<Example name="page-edit/extract" />
 
 ## Where a page goes
 

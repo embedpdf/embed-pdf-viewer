@@ -25,6 +25,7 @@ import type {
   ActionDiagnostic,
   ActionOrigin,
   ActionsCapability,
+  ActionSource,
   ActionSubmitRequest,
   SubmitIntent,
 } from './contract';
@@ -97,6 +98,8 @@ export interface ScriptSurfaceResult {
   origin: ActionOrigin;
   phase: 'boot' | 'user';
   realm: ScriptRealmKind;
+  /** What started the script, when an action did: `onScriptFailed` and diagnostics carry it. */
+  source?: ActionSource;
 }
 
 /** A K/V/C/F transaction's result as the form controller reports it: effects
@@ -180,7 +183,7 @@ export interface ActionsHostCapability extends ActionsCapability {
    *  user phase); the one place that split lives. */
   surfaceScriptCommit(
     commit: ScriptCommitSurface,
-    context: { origin: ActionOrigin; realm: ScriptRealmKind },
+    context: { origin: ActionOrigin; realm: ScriptRealmKind; source?: ActionSource },
   ): void;
   /** The stage's page-truth report (see {@link PageStateReport}). */
   reportPageState(report: PageStateReport): void;

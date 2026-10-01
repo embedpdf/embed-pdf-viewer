@@ -7,7 +7,7 @@ import { EpdfSearch } from '@embedpdf/angular/search';
     <ol>
       @for (hit of search.hits(); track $index) {
         <li>
-          <button type="button" (click)="search.goToHit($index)">
+          <button type="button" (click)="search.goToHit(hit)">
             Page {{ hit.pageIndex + 1 }}: …{{ hit.snippet?.before }}
             <mark>{{ hit.snippet?.match }}</mark>
             {{ hit.snippet?.after }}…

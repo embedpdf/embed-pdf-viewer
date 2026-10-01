@@ -12,6 +12,11 @@ a shared document. Listen for them to keep your own UI or server in step:
 
 <Snippet name="annotations/saving/events" />
 
+<Example name="annotation/events" />
+
+> **Try it:** draw, move and delete. Each change is logged once the engine has saved it, as
+> `local`: this viewer made it.
+
 <Fw only={['react', 'vue', 'svelte']}>
 
 The <Word of="hook" /> listens while the component is mounted. Outside a component, call the event on the
@@ -92,6 +97,8 @@ Annotations are part of the document. Save the document and they're in the file:
 const bytes = await documents.download(); // the whole PDF, with every annotation
 ```
 
+<Example name="annotation/download" />
+
 A save waits for pending changes, so what you save is what the user sees. For the difference
 between a quick save that appends the changes and a full rewrite, see
 [Saving](/docs/engine/documents/saving).
@@ -118,6 +125,11 @@ Use it to:
 - keep annotations in your own database, apart from the PDF;
 - carry a review over to a new version of a document;
 - let a user paste annotations from one document into another.
+
+<Example name="annotation/export-import" />
+
+> **Try it:** **Delete all**, then **Import**: they come back from the text. Import again: the
+> annotations with a name are left out, since they're there already.
 
 Export waits for pending changes, and imported annotations show at once, like any other change.
 

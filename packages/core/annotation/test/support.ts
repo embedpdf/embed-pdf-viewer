@@ -5,7 +5,7 @@
  */
 import { annotationKey } from '@embedpdf/core';
 import {
-  type AnnotationDTO,
+  type Annotation,
   type AnnotationFlags,
   type AnnotationRef,
   type PageRef,
@@ -55,13 +55,13 @@ export interface RecordInput extends Omit<ModelAnnotation, 'annotation'> {
   readonly link?: PdfLinkTarget | null;
   readonly icon?: string;
   readonly flags: AnnotationFlags;
-  readonly annotation?: Partial<AnnotationDTO>;
+  readonly annotation?: Partial<Annotation>;
 }
 
 /** The engine fields a kind's sidebar edits: a border picker's are its three. */
 function editedFields(kind: KindName): Set<string> {
   return new Set(
-    kindNamed(kind).fields.flatMap((spec) =>
+    kindNamed(kind).properties.flatMap((spec) =>
       spec.key === 'borderStyle'
         ? ['borderStyle', 'dashArray', ...(spec.cloudy ? ['cloudyIntensity'] : [])]
         : [spec.key],
@@ -105,7 +105,7 @@ export function named(name: string, page: PageRef): { id: Id; ref: AnnotationRef
 export const answering = (
   parent: AnnotationRef,
   type: 'reply' | 'group' = 'reply',
-): Partial<AnnotationDTO> => ({ reply: { to: parent, type } });
+): Partial<Annotation> => ({ reply: { to: parent, type } });
 
 /**
  * A record as the plugin hands one to the core: the annotation its draft
@@ -134,17 +134,17 @@ export function recordOf(input: RecordInput): ModelAnnotation {
     ...(input.apRot !== undefined ? { apRot: input.apRot } : {}),
     ...(input.apVersion !== undefined ? { apVersion: input.apVersion } : {}),
     ...(input.authority ? { authority: input.authority } : {}),
-    annotation: { ...written, ...label, ...stated } as AnnotationDTO,
+    annotation: { ...written, ...label, ...stated } as Annotation,
   };
 }
 
 /** The record with these annotation fields stated over its own: how a test locks one, or gives it a file's value. */
 export const withAnnotation = (
   record: ModelAnnotation,
-  fields: Partial<AnnotationDTO>,
+  fields: Partial<Annotation>,
 ): ModelAnnotation => ({
   ...record,
-  annotation: { ...record.annotation, ...fields } as AnnotationDTO,
+  annotation: { ...record.annotation, ...fields } as Annotation,
 });
 
 /** A model over these records (in this order), with an optional session on top of the initial one. */

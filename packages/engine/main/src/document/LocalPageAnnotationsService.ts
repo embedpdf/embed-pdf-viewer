@@ -18,7 +18,7 @@ import {
   type AnnotationAppearanceRenderOptions,
   type AnnotationAppearancesResult,
   type AnnotationDraft,
-  type AnnotationDTO,
+  type Annotation,
   type AnnotationList,
   type AnnotationPatch,
   type AnnotationRef,
@@ -581,7 +581,7 @@ export class LocalPageAnnotationsService implements LocalPageAnnotationsServiceC
   }
 
   /** The page's annotations as the worker reads them, for a check before a write. */
-  private async pageAnnotations(page: PageRef, signal: AbortSignal): Promise<AnnotationDTO[]> {
+  private async pageAnnotations(page: PageRef, signal: AbortSignal): Promise<Annotation[]> {
     const submission = this.queue.enqueue<WorkerResultPayload>(
       {
         buildPack: (jobId: JobId) =>

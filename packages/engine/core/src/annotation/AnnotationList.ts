@@ -1,4 +1,4 @@
-import type { AnnotationDTO } from './kinds';
+import type { Annotation } from './kinds';
 import type { Coordinates, PageCoordinates } from '../pageSpace/coordinates';
 import type { PageRef } from '../identity/PageRef';
 import type { PageState } from '../revision/PageState';
@@ -15,7 +15,7 @@ import type { PageState } from '../revision/PageState';
  * `pages[i].page` against `pages.list()` (by ref) when display order matters.
  */
 export interface AnnotationList<C extends Coordinates = PageCoordinates> {
-  annotations: AnnotationDTO<C>[];
+  annotations: Annotation<C>[];
   pages: PageState[];
   /**
    * Cloud, whole document only: the audit-log position the list is

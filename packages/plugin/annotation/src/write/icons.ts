@@ -1,21 +1,17 @@
-import { PluginError, toPluginError } from '@embedpdf/core';
 import { defaultsFor, type Point, type ViewEnv } from '@embedpdf/core-annotation';
 import {
   toPageRef,
   type AnnotationDraft,
-  type AnnotationRef,
   type AnnotationResources,
-  type AttachmentContent,
   type AttachmentFileSource,
   type PageRef,
 } from '@embedpdf/engine-core/runtime';
 
 import { annotationOfTool, iconPlaceAt, iconPlacement, isIconPlaceKind } from './placement';
 import type { FilePickerProvider } from '../contract';
-import type { AnnotationReads } from '../read/annotations';
 import type { AnnotationContext, AnnotationServices } from '../services';
 import { viewEnv } from '../services/geometry';
-import { appliedRefOf } from './outcomes';
+import { appliedOrThrow } from './outcomes';
 import type { Stamps } from './stamps';
 import type { ResolvedTool } from '../tools/definitions';
 
@@ -25,27 +21,30 @@ import type { ResolvedTool } from '../tools/definitions';
  * down to.
  */
 export function createIcons(
-  ctx: Pick<AnnotationContext, 'doc' | 'assertAllowed'>,
+  ctx: Pick<AnnotationContext, 'doc'>,
   {
     store,
     geometry,
-    authority,
     tools,
     filePicker,
-  }: Pick<AnnotationServices, 'store' | 'geometry' | 'authority' | 'tools' | 'filePicker'>,
-  annotations: Pick<AnnotationReads, 'pageOf' | 'get'>,
+    afterCreate,
+  }: Pick<AnnotationServices, 'store' | 'geometry' | 'tools' | 'filePicker' | 'afterCreate'>,
   stamps: Pick<Stamps, 'placeArmedStamp' | 'requestStampAt'>,
 ) {
-  /** Create an icon annotation and select it (the anchor for its menu and comment popup). */
+  /**
+   * Create an icon annotation with a tool's click: its `afterCreate` says
+   * whether it is selected (the anchor for its menu and comment popup).
+   */
   const createIcon = (
+    tool: ResolvedTool,
     pageObjectNumber: number,
     { data, resources }: { data: AnnotationDraft; resources?: AnnotationResources },
-  ): Promise<AnnotationRef> => {
+  ): Promise<unknown> => {
     const applied = store.apply([
       { type: 'create', page: toPageRef(pageObjectNumber), draft: data, resources },
     ]);
-    store.commit({ type: 'select', ids: [...applied.ids] });
-    return appliedRefOf(applied);
+    afterCreate.placed(tool.id, applied.ids);
+    return appliedOrThrow(applied);
   };
 
   /** Place an icon annotation (note / file attachment) at its usual size,
@@ -70,7 +69,7 @@ export function createIcons(
       tool.flags,
       file,
     );
-    void createIcon(pageObjectNumber, placement).catch((error) =>
+    void createIcon(tool, pageObjectNumber, placement).catch((error) =>
       console.error('[annotation] icon placement failed:', error),
     );
     return true;
@@ -111,42 +110,6 @@ export function createIcons(
   const api = {
     placeAt: (page: PageRef, point: Point, displayRotation?: number, zoom?: number) =>
       placeAt(page.objectNumber, point, displayRotation, zoom),
-    createAttachment: async (page: PageRef, at: Point, file: AttachmentFileSource) => {
-      ctx.assertAllowed('annotations:create', 'annotation.createAttachment');
-      authority.assertPage(page);
-      const doc = ctx.doc;
-      const pageObjectNumber = page.objectNumber;
-      const size = geometry.sizeOf(pageObjectNumber);
-      const tool = tools.get('attachment');
-      if (!doc || !size || !tool || !isIconPlaceKind(tool.subtype)) {
-        throw new PluginError('unsupported', 'annotation', 'no attachment tool is registered');
-      }
-      const { rect } = iconPlaceAt(annotationOfTool(store.model(), tool), at, size, undefined);
-      const placement = iconPlacement(
-        tool.subtype,
-        { rect },
-        defaultsFor(store.model(), tool.preset),
-        tool.flags,
-        file,
-      );
-      return createIcon(pageObjectNumber, placement).catch((error) => {
-        throw toPluginError('annotation', error);
-      });
-    },
-    readAttachment: async (ref: AnnotationRef): Promise<AttachmentContent> => {
-      const doc = ctx.doc;
-      if (!doc) throw new Error('[annotation] no document bound');
-      // The name and MIME type are the annotation's data; the bytes are its `file` resource.
-      const dto = annotations.get(ref);
-      const file = dto?.subtype === 'file-attachment' ? dto.file : null;
-      if (!file) {
-        throw new PluginError('not-found', 'annotation', 'the annotation has no attached file');
-      }
-      const bytes = await doc
-        .page(annotations.pageOf(ref))
-        .annotations.downloadResource(ref, 'file');
-      return { bytes, name: file.name, mimeType: file.mimeType };
-    },
     setFilePickerProvider: (provider: FilePickerProvider | null) => filePicker.set(provider),
   };
 

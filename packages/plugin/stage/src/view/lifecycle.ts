@@ -42,15 +42,18 @@ export function createViewLifecycle(
     const byPriority = [...initialViewProviders].sort(
       (left, right) => right.priority - left.priority,
     );
+    let view: StageViewState | null = null;
     for (const provider of byPriority) {
-      const view = provider.provide();
-      if (view) {
-        settings.applyViewState(view);
-        ctx.state.update(markPlaced);
-        return;
-      }
+      view = provider.provide();
+      if (view) break;
     }
-    arrive.resetView();
+    if (view) settings.applyViewState(view);
+    else arrive.resetView();
+    // Navigation the app asked for before there was a viewport lands last,
+    // from the initial view, so the first frame already shows it.
+    const pending = placement.pending;
+    placement.pending = null;
+    pending?.();
     // Publish renderability last. The viewport, responsive and camera writes
     // above are ordinary observable state changes, but page and scroll reads
     // return stable empty values until this commit lands.

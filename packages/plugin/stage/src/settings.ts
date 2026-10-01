@@ -4,10 +4,10 @@ import { eqSetting } from './responsive';
 
 /**
  * Out-of-the-box defaults: a document-reading feel. Every field is overridable
- * in `stagePlugin(config)` and at runtime through the setters and
- * `updateSettings()`. The plugin ships no named presets ("document",
- * "canvas", …): a preset is an object the app keeps and passes to
- * `updateSettings()`, so that taxonomy stays the app's concern.
+ * in `stagePlugin(config)` and at runtime through `updateSettings()`. The
+ * plugin ships no named presets ("document", "canvas", …): a preset is an
+ * object the app keeps and passes to `updateSettings()`, so that taxonomy
+ * stays the app's concern.
  */
 export const DEFAULT_SETTINGS: StageSettings = {
   flow: 'continuous',
@@ -31,6 +31,9 @@ export const DEFAULT_SETTINGS: StageSettings = {
   viewRotation: 0,
   zoom: { mode: ZoomMode.Automatic },
   scrollBehavior: 'smooth',
+  interaction: true,
+  panFallback: true,
+  zoomGestures: true,
   // Web: 1 PDF point = 96/72 CSS px, so 100% is physically accurate. A native
   // adapter overrides this at registration with its own logical-unit factor.
   viewUnitsPerPoint: 96 / 72,
@@ -61,8 +64,8 @@ export const DEFAULT_RESPONSIVE: readonly ResponsiveRule[] = [
  *   'refit'   — re-resolves zoom against the (possibly re-keyed) scene: re-applies
  *               the anchor without an explicit invalidation.
  *   'reclamp' — pure clamp policy: re-clamp the current camera in place.
- *   'none'    — guides future verbs only (arrival/zoom/anchor alignment,
- *               scroll behavior).
+ *   'none'    — guides future verbs and the surface binding only
+ *               (arrival/zoom/anchor alignment, scroll behavior, input).
  *
  * The classes also carry each change's invariant — what stays fixed while the
  * view reacts: 'refit' (a zoom-intent change) holds the zoomAlign focal point;
@@ -87,12 +90,16 @@ export const SETTINGS_EFFECT: Record<keyof StageSettings, SettingEffect> = {
   viewRotation: 'scene', // a layout input: every page's footprint swaps w↔h
   zoom: 'refit',
   scrollBehavior: 'none',
+  // Read by the surface binding, which rebinds its pointer input when they change.
+  interaction: 'none',
+  panFallback: 'none',
+  zoomGestures: 'none',
   viewUnitsPerPoint: 'scene', // a layout input: changing it resizes every page
 };
 export const SETTING_KEYS = Object.keys(SETTINGS_EFFECT) as Array<keyof StageSettings>;
 
 /** Field-by-field settings equality, derived from the registry, so a new
- *  setting is covered automatically (the React `useStageSettings` equality). */
+ *  setting is covered automatically: what an adapter compares settings with. */
 export const settingsEqual = (left: StageSettings, right: StageSettings): boolean =>
   SETTING_KEYS.every((key) => eqSetting(left[key], right[key]));
 

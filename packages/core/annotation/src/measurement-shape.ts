@@ -1,5 +1,5 @@
 import { isReadout, measurementReadout } from '@embedpdf/engine-core/runtime';
-import type { AnnotationDTO } from '@embedpdf/engine-core/runtime';
+import type { Annotation } from '@embedpdf/engine-core/runtime';
 import { geomRotation, selectionQuad } from './geometry';
 import { pointInPoly, rotatePoint, unionRect } from './rect';
 import { drawnPointOf, drawnVerticesOf, uprightPointOf } from './shapes/points';
@@ -8,7 +8,7 @@ import { distanceLayout, distanceSelectionQuad, moveDistanceCaption } from './me
 import type { DistanceCaptionLayout, MeasurementAppearance } from './measurement';
 import type { Shape, QuadRing, Rect, Style, Point } from './types';
 
-type ShapeAnnotation = Extract<AnnotationDTO, { subtype: 'polygon' | 'polyline' }>;
+type ShapeAnnotation = Extract<Annotation, { subtype: 'polygon' | 'polyline' }>;
 
 /**
  * A perimeter's or area's measurement: the engine's own fields for its scale,

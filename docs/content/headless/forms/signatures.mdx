@@ -57,6 +57,8 @@ await signature.placeMark({ assetId }, { page: page.ref, center: { x: 120, y: 90
 What happens in a field depends on `mode`: `'sign'` signs it, `'visual'` only draws the mark in,
 and `'ask'` asks your UI first through <Fw only={['react', 'vue', 'svelte']}>`onSignRequested`</Fw><Fw only="angular">`signRequested$`</Fw>, so you can show your own sign dialog.
 
+<Example name="signature/click-to-sign" />
+
 ## Fill a field without signing
 
 Sometimes a signature only needs to look signed, such as for a form that gets printed. Draw the mark
@@ -68,6 +70,8 @@ await signature.clearField(toFieldRef('approval'));
 ```
 
 A signed field can't be filled or cleared: what it shows is part of what was signed.
+
+<Example name="signature/fill" />
 
 ## The key
 
@@ -133,6 +137,8 @@ as Acrobat does:
 
 `signature.getProtection()` tells you what the document's signatures allow, before anyone tries. A
 signer who wants comments to stay allowed signs with a certification that allows them.
+
+<Example name="signature/break-warning" />
 
 ## A person's signatures
 

@@ -129,6 +129,29 @@ describe('create, update and delete', () => {
     expect(harness.model().order).toEqual([]); // the shown record was dropped
   });
 
+  it('makes the same annotation again from a read, and refuses a kind the engine doesn’t know', async () => {
+    const harness = await createHarness();
+    harness.create.mockResolvedValueOnce({ annotation: squareDTO(42) });
+    const { annotation: original } = await harness.capability.create(PAGE, {
+      subtype: 'square',
+      box: { x: 30, y: 40, width: 20, height: 10 },
+    });
+    const read = harness.capability.get(original.ref);
+    if (read?.subtype !== 'square') throw new Error('the square reads back as a square');
+
+    harness.create.mockResolvedValueOnce({ annotation: squareDTO(43) });
+    const { annotation: copy } = await harness.capability.create(PAGE, { ...read, nm: null });
+    expect(annotationKey(copy.ref)).toBe('obj:43');
+    const written = harness.create.mock.calls[1]![0];
+    expect(written).toMatchObject({ subtype: 'square', color: read.color });
+    expect(typeof written.nm).toBe('string');
+
+    await expect(
+      harness.capability.create(PAGE, { ...read, subtype: 'unsupported' } as never),
+    ).rejects.toSatisfy((error) => isPluginError(error, 'invalid-input'));
+    expect(harness.create).toHaveBeenCalledTimes(2);
+  });
+
   it('onUpdated and onDeleted fire once per confirmed change, carrying the engine’s record', async () => {
     const harness = await createHarness();
     harness.create.mockResolvedValueOnce({ annotation: squareDTO(5) });
@@ -141,7 +164,7 @@ describe('create, update and delete', () => {
       log.push(`updated:${annotationKey(event.annotation.ref)}:${event.origin.kind}`),
     );
     harness.capability.onDeleted((event) =>
-      log.push(`deleted:${annotationKey(event.ref)}:${event.origin.kind}`),
+      log.push(`deleted:${event.refs.map(annotationKey).join(',')}:${event.origin.kind}`),
     );
 
     harness.update.mockResolvedValueOnce({

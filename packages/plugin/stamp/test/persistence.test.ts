@@ -1,13 +1,13 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { memoryStampStore, persistStampLibraries, restoreStampLibraries } from '../src/persistence';
-import type { StampCapability, StampLibraryChange } from '../src/contract';
+import type { StampCapability, StampLibraryChangedEvent } from '../src/contract';
 
 function fakeStamp() {
-  const listeners = new Set<(change: StampLibraryChange) => void>();
+  const listeners = new Set<(change: StampLibraryChangedEvent) => void>();
   const bytes = new Map<string, Uint8Array>();
   const stamp = {
-    onLibraryChanged: (listener: (change: StampLibraryChange) => void) => {
+    onLibraryChanged: (listener: (change: StampLibraryChangedEvent) => void) => {
       listeners.add(listener);
       return () => listeners.delete(listener);
     },
@@ -19,10 +19,11 @@ function fakeStamp() {
     importLibrary: vi.fn(async (source: Uint8Array) => {
       const id = new TextDecoder().decode(source).replace('%PDF-', '');
       bytes.set(id, source);
-      return id;
+      return { library: { id } };
     }),
   } as unknown as StampCapability;
-  const emit = (change: StampLibraryChange) => listeners.forEach((listener) => listener(change));
+  const emit = (change: StampLibraryChangedEvent) =>
+    listeners.forEach((listener) => listener(change));
   return { stamp, bytes, emit };
 }
 

@@ -74,11 +74,13 @@ without `state` is stateless (`void`), and one without `settings` has
 | `create`   | `(ctx) => { api, connect? }`: builds one instance.                                                                                                                                                                                   |
 | `inScope`  | Workspace plugins that take a document: `(api, documentId) => api`, the capability as seen from inside that document's scope, where calls that leave out the document use it. The kernel builds it once per document.                |
 
-Configuration is an argument of the factory, passed on to the controller:
+Configuration is an argument of the factory: its settings go into the
+definition (see [Settings and state](#settings-and-state)), and anything else
+is passed on to the controller through `create`:
 
 ```ts
 // packages/plugin/form/src/form.plugin.ts
-export const formPlugin = (config: FormConfig = {}) =>
+export const formPlugin = (config?: FormConfig) =>
   definePlugin({
     id: 'form',
     token: FormToken,
@@ -86,7 +88,8 @@ export const formPlugin = (config: FormConfig = {}) =>
     requires: [InteractionToken],
     optional: [AnnotationToken, ActionsToken],
     state: initialFormState,
-    create: (ctx) => createFormController(ctx, config),
+    settings: { defaults: FORM_DEFAULTS, registered: config },
+    create: createFormController,
   });
 ```
 
@@ -121,8 +124,8 @@ over the same runtime token:
 ```ts
 // packages/plugin/form/src/host-contract.ts
 export interface FormHostCapability extends FormCapability {
-  listFillItems(page: PageRef): FillItem[];
   ensureLoaded(page: PageRef): Promise<void>;
+  notifyWidgetEvent(field: FormFieldRef, widget: AnnotationRef, event: PdfAnnotationEventKind): void;
   // …
 }
 
@@ -196,25 +199,23 @@ slices and throws if two slices define the same member:
 
 ```ts
 // packages/plugin/form/src/controller.ts
-export function createFormController(
-  ctx: FormContext,
-  config: FormConfig = {},
-) {
-  const services = createServices(ctx, config);
-  const { events, authority } = services;
+export function createFormController(ctx: FormContext) {
+  const services = createServices(ctx);
+  const { events } = services;
 
-  const fields = createFieldReads(services);
+  const fields = createFieldReads(ctx, services);
   const widgets = createWidgetReads(ctx, services);
   const values = createValueWrites(ctx, services);
   // …
 
   const api = composeApi('form', [
+    ctx.settings().api,
     fields.api,
     widgets.api,
     values.api,
     // …
     {
-      canFill: () => authority.can('doc.forms.fill'),
+      canFill: () => ctx.allows('doc.forms.fill'),
       onValueChanged: events.valueChanged.on,
       // …
     },
@@ -228,10 +229,10 @@ export function createFormController(
 ```
 
 `services/` holds what several areas share, built once by
-`createServices(ctx, config)`: the mirrors, the event sources, the authority
-checks, resolved siblings, queues. A plugin that uses the context in many
-files names its type once: `export type FormContext = PluginContext<FormState>`
-in `services/context.ts`.
+`createServices(ctx)`: the mirrors, the event sources, resolved siblings,
+queues. A plugin that uses the context in many files names its type once:
+`export type FormContext = PluginContext<FormState, FormSettings>` in
+`services/context.ts`.
 
 ## `connect.ts`
 
@@ -252,8 +253,7 @@ export function connectLink(ctx: PluginContext<void>): void {
     annotation.registerBehavior({
       id: 'link-nav',
       matches: (target) => target.subtype === 'link',
-      engaged: () =>
-        interaction.getActiveTool()?.enables.has('link-nav') ?? false,
+      engaged: () => interaction.activeToolEnables('link-nav'),
     }),
   );
 }
@@ -295,7 +295,8 @@ export function connectLink(ctx: PluginContext<void>): void {
   declares their tokens as `optional`.
 - A workspace capability resolved for a document (`ctx.get` in a document
   plugin, `useCommands()` inside a `<DocumentScope>`) is its `inScope` view:
-  `commands.execute(id)` runs for that document, `documents.save()` saves it.
+  `commands.execute(id)` runs for that document, `documents.download()`
+  downloads it.
 
 ## The document
 
@@ -317,7 +318,8 @@ export function connectLink(ctx: PluginContext<void>): void {
 - `ctx.allows(permission)` is what every `can*` twin reads, and
   `ctx.assertAllowed(permission, operation)` is how the verb refuses: it
   throws `permission-denied` with `error.permission` set. Both read the bound
-  document, so a workspace plugin uses `documents.allows(permission, id)`.
+  document, so a workspace plugin asks the `can*` twin of the document plugin
+  it acts through (`ctx.forDocument(token, documentId)`).
 - Engine values are in page space, the space plugins work in, so nothing
   converts them.
 
@@ -335,6 +337,7 @@ plugin).
 | `ctx.latest(key)`               | A newest-wins lane: `lane.run(async (run) => …, options)`. Starting a run aborts the previous one; a superseded run cannot publish (`run.commit(fn)` returns false) and rejects `operation-cancelled`.                                                                          |
 | `ctx.serialQueue(key?)`         | A per-key queue: operations run one at a time, in submission order, and a failure does not affect later operations. `queue.idle()` resolves once everything queued so far has finished. `queue(operation, { signal })` skips an operation whose signal fired before it started. |
 | `ctx.onSettle(flush)`           | Run `flush` before the document's file is read, and wait for it: send what the plugin holds back from the engine. Document plugins only. See [`state-and-sync.md`](./state-and-sync.md#held-back-writes).                                                                       |
+| `ctx.aroundDownload(wrap)`      | Run something of the document's own around every read of its file: `wrap(read)` returns the bytes `read()` gives, doing what comes before and after (the actions plugin's save actions). Document plugins only; the first registered is outermost.                            |
 | `ctx.cancellable(signal, task)` | Run an engine call the caller can cancel: it is aborted when `signal` fires, and rejects `operation-cancelled`. Every async verb passes its `options.signal` through it.                                                                                                        |
 | `ctx.events.source<T>()`        | An event source, disposed at close.                                                                                                                                                                                                                                             |
 
@@ -422,6 +425,11 @@ export const searchState = defineState(SearchToken, {
   only when a field does. The settings hook reads through the kernel, so it
   works without a document, and so do the settings calls of `useSearch()`'s
   stand-in.
+- A color setting whose default follows the accent defaults to `null` in the
+  plugin's defaults (selection's `color`, `handles.color`): the adapter paints
+  it with `paint()` and, for a translucent one, `mixAccent()` from
+  `@embedpdf/web`, so `--epdf-accent` and the viewer's `accent` reach it. A
+  color with its own default (Search's `highlight.color`) is a plain value.
 - The docs' Settings and State tables are checked against these declarations.
 
 ## Errors

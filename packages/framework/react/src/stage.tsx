@@ -1,24 +1,26 @@
 /**
- * Stage / RenderLayer + facade hooks.
+ * The Stage and its hooks.
  *
  * <Stage> virtualizes and positions page surfaces by the camera, and hands each
  * one to your render prop — you bring the layers. (The standalone, Stage-free
  * single-page surface lives in `./page-view` so it never pulls the stage plugin.)
+ * The hooks are the plugin's four: `useStage()` (the API), `useStageState()`,
+ * `useStageEvent()` and `useStageSettings()`; `<Scrollbar>` is the Stage's too.
  */
 
 // One-line-per-feature: registration travels with the UI.
 export * from '@embedpdf/plugin-stage';
 import * as React from 'react';
 import { useEffect, useLayoutEffect, useMemo, useRef } from 'react';
-import { createScrollHandler, settingsEqual } from '@embedpdf/plugin-stage';
-import type { StageCapability, VisiblePage } from '@embedpdf/plugin-stage';
+import { createScrollHandler, DEFAULT_SETTINGS, stageState } from '@embedpdf/plugin-stage';
+import type { StageCapability, StageSettings, VisiblePage } from '@embedpdf/plugin-stage';
 import type { StageHostCapability } from '@embedpdf/plugin-stage/contract/host';
-import { toPageRef } from '@embedpdf/core';
+import { shallowEqual, toPageRef } from '@embedpdf/core';
 import type { CapabilityToken, EventHook } from '@embedpdf/core';
 import type { PageFrame } from '@embedpdf/core-geometry';
 import { InteractionToken as InteractionPublicToken } from '@embedpdf/plugin-interaction/contract';
 import { InteractionToken } from '@embedpdf/plugin-interaction/contract/host';
-import { createStageSurface } from '@embedpdf/web';
+import { createStageSurface, paint } from '@embedpdf/web';
 import { ProjectorProvider, type ProjectorBinding, type ViewProjector } from './anchored';
 import {
   makePageContext,
@@ -26,9 +28,11 @@ import {
   useCapability,
   useCapabilityEvent,
   useDocumentId,
+  useDocumentScope,
   useKernelValue,
   useOptionalCapability,
   useSelector,
+  useViewerSettings,
 } from './runtime';
 import type { PageContextValue } from './runtime';
 import { StageScope, useStageToken } from './stage-scope';
@@ -36,6 +40,8 @@ import type { StageTokenProp } from './stage-scope';
 
 export { StageScope, useStageToken } from './stage-scope';
 export type { StageScopeProps, StageTokenProp } from './stage-scope';
+export { Scrollbar, useScrollMetrics } from './scrollbar';
+export type { ScrollbarAxis, ScrollbarProps } from './scrollbar';
 
 function PageSurface({
   documentId,
@@ -58,6 +64,8 @@ function PageSurface({
   const ref = useRef<HTMLDivElement>(null);
   const transform = page.transform;
   const rotation = page.rotation;
+  // The viewer's `page` settings; `--epdf-page-*` CSS variables win over them.
+  const look = useViewerSettings((settings) => settings.page);
   // All geometry comes from the transform: the display footprint (viewWidth/Height,
   // already w↔h-swapped + device-snapped) and the un-rotated content box
   // (contentWidth/Height). The shell never re-derives `* zoom` / `* dpr` / snapping.
@@ -122,8 +130,7 @@ function PageSurface({
             top: frame.top,
             width: transform.viewWidth,
             height: transform.viewHeight,
-            // themeable: override via the CSS variable (app stylesheet), no props
-            boxShadow: 'var(--epdf-page-shadow, 0 6px 18px rgba(0,0,0,.18))',
+            boxShadow: paint('page-shadow', look.shadow),
           }}
         />
         {/* the page: white backing + bitmap as ONE rasterized box, so there is no
@@ -138,7 +145,7 @@ function PageSurface({
             top: contentTop,
             width: transform.contentWidth,
             height: transform.contentHeight,
-            background: '#fff',
+            background: paint('page-background', look.background),
             transform: rotation ? `rotate(${rotation}deg)` : undefined,
             // We render our own selection highlights — suppress native text/image
             // selection (and the double-click image grab) on the whole page subtree.
@@ -176,38 +183,10 @@ export interface StageProps {
   /** Viewport-space UI (menus, controls) rendered above the pages. */
   overlay?: React.ReactNode;
   /**
-   * Route this Stage's pointer events to the interaction hub (page-resolved via
-   * `pageAt`) — and register this lens's tool-gated pan-scroll handler with it
-   * (lens-scoped, so multiple stages on one document never pan each other).
-   * Pan is then the `pan` tool's job and dragging in `pointer` mode selects
-   * text (incl. across pages).
-   *
-   * Default true: registering `interactionPlugin()` is the one opt-in — tools
-   * just work; without the hub this is inert and the stage falls back to
-   * built-in drag-to-pan, so a hub-less setup costs nothing. Set `false` on
-   * secondary lenses (a thumbnail rail) that should stay click-to-navigate
-   * instead of feeding the document's tools.
-   */
-  interaction?: boolean;
-  /**
-   * With {@link interaction}: let drags over page gaps pan regardless of the
-   * active tool (and show a grab cursor there) — the gutter always pans; there
-   * is nothing to draw/select outside a page. Default true.
-   */
-  panFallback?: boolean;
-  /**
-   * Ambient zoom gestures on this stage: ctrl/cmd+wheel and trackpad pinch
-   * (Safari gesture events included). Default true. Turn off for follower
-   * lenses with a fixed magnification — a thumbnail rail should scroll under
-   * cmd+wheel, not zoom — so a zoom-wheel falls through to ordinary wheel
-   * pan, and pinches are still swallowed (they never page-zoom the browser).
-   */
-  zoomGestures?: boolean;
-  /**
    * The controlled form of the active tool: while set, the interaction hub's
    * active tool follows this value (re-applied when the document changes),
    * and `onToolChange` reports every change so the owner can update it. Omit
-   * both for the uncontrolled default (`useTool().activate`).
+   * both for the uncontrolled default (`useInteraction().activateTool`).
    */
   tool?: string;
   /** Fires on every tool change of this stage's document (controlled or not). */
@@ -222,9 +201,6 @@ export function Stage({
   children,
   pageChrome,
   overlay,
-  interaction = true,
-  panFallback = true,
-  zoomGestures = true,
   tool,
   onToolChange,
   token: explicitToken,
@@ -246,6 +222,15 @@ export function Stage({
     (interaction) => interaction.onToolChanged,
     (event) => onToolChange?.(event.toolId),
   );
+  // How this view takes pointer input is its own settings (`interaction`,
+  // `panFallback`, `zoomGestures`): a change rebinds the surface below.
+  const interaction = useSelector(token, (stage) => stage.getSettings().interaction);
+  const panFallback = useSelector(token, (stage) => stage.getSettings().panFallback);
+  const zoomGestures = useSelector(token, (stage) => stage.getSettings().zoomGestures);
+  // Routing pointer input to the interaction hub (page-resolved) also
+  // registers this view's tool-gated pan-scroll handler with it, scoped to
+  // the view, so two Stages on one document never pan each other. Without
+  // the hub the Stage falls back to its own drag-to-pan.
   const useHub = interaction && !!ix;
   // The hub's resolved cursor (text/grab/…), applied to the viewport when driving.
   const hubCursor = useKernelValue(() => ix?.getCursor() ?? 'default');
@@ -332,8 +317,8 @@ export function Stage({
         ...style,
       }}
     >
-      {/* Everything inside binds to THIS lens by default: a `useZoom()` in a
-          page's chrome or a `<SelectionHandles>` in the overlay needs no token. */}
+      {/* Everything inside binds to this lens by default: a `useStageState()` in
+          a page's chrome or a `<SelectionHandles>` in the overlay needs no token. */}
       <StageScope token={token}>
         {pages.map((visiblePage) => (
           <PageSurface
@@ -354,12 +339,15 @@ export function Stage({
   );
 }
 
-// ── Facade hooks — thin sugar over the capability + generic binding ───────────
+// ── The hooks ────────────────────────────────────────────────────────────────
 // Every hook takes an optional token; without one it binds to the nearest
-// `<StageScope>` / `<Stage>`, else the main lens.
-export function useStage(token?: StageTokenProp) {
+// `<StageScope>` / `<Stage>`, else the main view.
+
+/** The Stage's API (zoom, navigation, reveal, settings), for app chrome. */
+export function useStage(token?: StageTokenProp): StageCapability {
   return useCapability(useStageToken(token));
 }
+
 /** Subscribe to one stage event for the mounted lifetime: `useStageEvent((stage) => stage.onZoomChanged, handler)`. */
 export function useStageEvent<T>(
   select: (stage: StageCapability) => EventHook<T>,
@@ -368,100 +356,45 @@ export function useStageEvent<T>(
 ): void {
   useCapabilityEvent(useStageToken(token), select, handler);
 }
-export function useZoom(explicitToken?: StageTokenProp) {
-  const token = useStageToken(explicitToken);
-  const stage = useCapability(token);
-  const zoom = useSelector(token, (stage) => stage.getZoomLevel());
-  const mode = useSelector(token, (stage) => stage.getZoomMode());
-  return {
-    zoom,
-    /** Active zoom intent: 'automatic' | 'fit-page' | 'fit-width' | 'fit-all' | 'custom'. */
-    mode,
-    zoomIn: stage.zoomIn,
-    zoomOut: stage.zoomOut,
-    fitWidth: stage.fitWidth,
-    fitPage: stage.fitPage,
-    fitAll: stage.fitAll,
-    automatic: stage.fitAutomatic,
-    zoomTo: stage.zoomTo,
-  };
-}
-export function usePages(explicitToken?: StageTokenProp) {
-  const token = useStageToken(explicitToken);
-  const stage = useCapability(token);
-  const currentPage = useSelector(token, (stage) => stage.getCurrentPageIndex());
-  const documentId = useDocumentId();
-  const pageCount = useKernelValue(
-    (kernel) => kernel.documents.listPages(documentId ?? undefined).length,
-  );
-  return {
-    currentPage,
-    pageCount,
-    goToPage: stage.goToPage,
-    goToDestination: stage.goToDestination,
-    next: stage.nextPage,
-    previous: stage.previousPage,
-    reveal: stage.reveal,
-  };
-}
-export function useLayout(explicitToken?: StageTokenProp) {
-  const token = useStageToken(explicitToken);
-  const stage = useCapability(token);
-  const flow = useSelector(token, (stage) => stage.getSettings().flow);
-  const layout = useSelector(token, (stage) => stage.getSettings().layout);
-  const spread = useSelector(token, (stage) => stage.getSettings().spread);
-  const sizing = useSelector(token, (stage) => stage.getSettings().sizing);
-  const bounded = useSelector(token, (stage) => stage.getSettings().bounded);
-  return {
-    flow,
-    layout,
-    spread,
-    sizing,
-    bounded,
-    setFlow: stage.setFlow,
-    setLayout: stage.setLayout,
-    setSpread: stage.setSpread,
-    setSizing: stage.setSizing,
-    setBounded: (bounded: boolean) => stage.updateSettings({ bounded }),
-  };
-}
 
-/** The document's page list (with PDF labels) + the current item's pages — the
- *  data for page thumbnails / worksheet-style page tabs. */
-export function usePageList(explicitToken?: StageTokenProp) {
-  const token = useStageToken(explicitToken);
-  const documentId = useDocumentId();
-  // The page list is document truth (order, labels, sizes), so it comes from the
-  // kernel's page registry; Stage only knows which of those pages it is showing.
-  const pages = useKernelValue(
-    (kernel) => kernel.documents.listPages(documentId ?? undefined),
-    (left, right) =>
-      left.length === right.length &&
-      left.every(
-        (pageInfo, i) =>
-          pageInfo.ref.objectNumber === right[i].ref.objectNumber &&
-          pageInfo.label === right[i].label,
-      ),
-  );
-  const current = useSelector(
-    token,
-    (stage) => stage.listCurrentItemPages().map((pageInfo) => pageInfo.index),
-    (left, right) =>
-      left.length === right.length && left.every((pageIndex, i) => pageIndex === right[i]),
-  );
-  return { pages, currentItemPages: current };
+/** What `useStageState()` returns: the Stage page's State table. */
+type StageStateValue = (typeof stageState)['empty'];
+
+/**
+ * The view's state: the zoom, the current page, the page count, the view
+ * rotation and the responsive rules that apply (the page's State table,
+ * declared once in `stageState`). Takes a selector, and re-renders only when
+ * what it returns changes. Without a document it is `stageState.empty`.
+ */
+export function useStageState<Selected = StageStateValue>(
+  select?: (state: StageStateValue) => Selected,
+  token?: StageTokenProp,
+): Selected {
+  const lens = useStageToken(token);
+  const scoped = useDocumentScope();
+  // Resolved on every read: a document that closes reads as `empty`, never
+  // through its closed capability.
+  return useKernelValue((kernel) => {
+    const stage = kernel.tryCapability(lens, scoped ?? undefined);
+    const state = stage ? stageState.read(stage) : stageState.empty;
+    return select ? select(state) : (state as unknown as Selected);
+  }, shallowEqual);
 }
 
 /**
- * All Stage settings + the batch `update`. This is the seam for "presets are a
- * customer concern": keep your own `Partial<StageSettings>` objects and apply them
- * with `update(preset)` (one anchor-preserving change).
+ * The view's settings, or the value `select` picks from them. They belong to
+ * the view, so without a document there is none yet and this reads the
+ * defaults. Change them with `useStage().updateSettings()`.
  */
-export function useStageSettings(explicitToken?: StageTokenProp) {
-  const token = useStageToken(explicitToken);
-  const stage = useCapability(token);
-  // settingsEqual derives from the plugin's settings registry — a new setting is
-  // covered here automatically, without this package spelling out the shape.
-  const settings = useSelector(token, (stage) => stage.getSettings(), settingsEqual);
-  return { settings, update: stage.updateSettings, reset: stage.resetSettings };
+export function useStageSettings<Selected = StageSettings>(
+  select?: (settings: StageSettings) => Selected,
+  token?: StageTokenProp,
+): Selected {
+  const lens = useStageToken(token);
+  const scoped = useDocumentScope();
+  return useKernelValue((kernel) => {
+    const settings = kernel.tryCapability(lens, scoped ?? undefined)?.getSettings();
+    const value = settings ?? DEFAULT_SETTINGS;
+    return select ? select(value) : (value as unknown as Selected);
+  }, shallowEqual);
 }

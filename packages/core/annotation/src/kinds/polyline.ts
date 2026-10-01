@@ -20,5 +20,5 @@ export const polyline = defineKind({
     commentable: true,
     hasEndings: true,
   },
-  fields: LINE_FIELDS,
+  properties: LINE_FIELDS,
 });

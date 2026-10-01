@@ -93,6 +93,20 @@ async function boot() {
       lastServerId: () => null,
     },
     pages: { list: () => Promise.resolve({ pageCount: 1, pages: [page] }) },
+    page: () => ({
+      annotations: {
+        list: () =>
+          Promise.resolve({
+            annotations: [
+              {
+                subtype: 'widget',
+                ref: { kind: 'objectNumber', page: toPageRef(1), objectNumber: 9 },
+                rect: { x: 10, y: 10, width: 100, height: 20 },
+              },
+            ],
+          }),
+      },
+    }),
     security: { allows: () => true },
     forms: {
       list: () => new Promise<FormSnapshot>((resolve) => reads.push(resolve)),
@@ -130,12 +144,7 @@ describe('form fields mirror', () => {
     await settle();
     expect(harness.form.getStatus()).toBe('ready');
 
-    const written = harness.form.setValueRaw(
-      { kind: 'objectNumber', objectNumber: 5 },
-      {
-        value: 'own',
-      },
-    );
+    const written = harness.form.setValue({ kind: 'objectNumber', objectNumber: 5 }, { value: 'own' });
     await settle();
     harness.writes[0]!();
     await written;
@@ -156,7 +165,12 @@ describe('form fields mirror', () => {
     const harness = await boot();
     harness.reads[0]!(snapshot('initial'));
     await settle();
-    const written = harness.form.setText({ kind: 'objectNumber', objectNumber: 5 }, 'typed');
+    await harness.form.ensureLoaded(toPageRef(1));
+    expect(harness.form.listWidgets(0)[0]?.disabled).toBe(false);
+    const written = harness.form.setValue(
+      { kind: 'objectNumber', objectNumber: 5 },
+      { value: 'typed' },
+    );
     await settle();
     harness.emit({
       type: 'forms.valueSet',
@@ -164,10 +178,10 @@ describe('form fields mirror', () => {
       field: textField('remote edit'),
       meta: NOTHING_CHANGED,
     });
-    expect(harness.form.getFillItem(9)?.disabled).toBe(true);
+    expect(harness.form.listWidgets(0)[0]?.disabled).toBe(true);
     harness.writes[0]!();
     await written;
-    expect(harness.form.getFillItem(9)?.disabled).toBe(false);
+    expect(harness.form.listWidgets(0)[0]?.disabled).toBe(false);
     await harness.kernel.destroy();
   });
 

@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import {
   EngineErrorCode,
   toPageRef,
-  type FreeTextAnnotationDTO,
+  type FreeTextAnnotation,
 } from '@embedpdf/engine-core/runtime';
 import { afterEach, beforeAll, describe, expect, test } from 'vitest';
 
@@ -70,7 +70,7 @@ describe('rich text FreeText (local engine)', () => {
       contents: 'Plain\rtext',
       box: RECT,
     });
-    const dto = created.annotation as FreeTextAnnotationDTO;
+    const dto = created.annotation as FreeTextAnnotation;
     expect(dto.fontFamily).toBe('helvetica-bold');
     expect(dto.richText.body.family).toBe('Helvetica');
     expect(dto.richText.body.weight).toBe(700);
@@ -108,7 +108,7 @@ describe('rich text FreeText (local engine)', () => {
         ],
       },
     });
-    const dto = created.annotation as FreeTextAnnotationDTO;
+    const dto = created.annotation as FreeTextAnnotation;
     expect(dto.contents).toBe('Hello bold red\rH2');
     // The body became the /DA font and size; the /DA colour, the border's,
     // stayed the draft's, and the text is the body's color.
@@ -144,7 +144,7 @@ describe('rich text FreeText (local engine)', () => {
       box: RECT,
     });
     const ref = created.annotation.ref;
-    const plain = created.annotation as FreeTextAnnotationDTO;
+    const plain = created.annotation as FreeTextAnnotation;
     expect(plain.textAlign).toBe('center');
     expect(plain.richText.body.align).toBe('center');
     // The first bold: paragraphs only, no body, no alignment (the editor's commit).
@@ -155,7 +155,7 @@ describe('rich text FreeText (local engine)', () => {
           paragraphs: [{ runs: [{ text: 'cen' }, { text: 'tred', style: { weight: 700 } }] }],
         },
       })
-    ).annotation as FreeTextAnnotationDTO;
+    ).annotation as FreeTextAnnotation;
     expect(rich.textAlign).toBe('center');
     expect(rich.richText.body.align).toBe('center');
     expect(rich.richText.paragraphs[0]!.align).toBeUndefined();
@@ -164,7 +164,7 @@ describe('rich text FreeText (local engine)', () => {
       await doc
         .page(toPageRef(PAGE))
         .annotations.update(ref, { subtype: 'free-text', textAlign: 'right' })
-    ).annotation as FreeTextAnnotationDTO;
+    ).annotation as FreeTextAnnotation;
     expect(right.textAlign).toBe('right');
     expect(right.richText.body.align).toBe('right');
     expect(right.richText.paragraphs[0]!.align).toBeUndefined();
@@ -193,7 +193,7 @@ describe('rich text FreeText (local engine)', () => {
       subtype: 'free-text',
       contents: 'one\rtwo',
     });
-    const dto = updated.annotation as FreeTextAnnotationDTO;
+    const dto = updated.annotation as FreeTextAnnotation;
     expect(dto.contents).toBe('one\rtwo');
     // A paragraph names alignment/direction only where it differs from the body.
     expect(dto.richText.paragraphs).toEqual([
@@ -226,7 +226,7 @@ describe('rich text FreeText (local engine)', () => {
       fontColor: '#ff0000',
       fontFamily: 'times-bold',
     });
-    const dto = updated.annotation as FreeTextAnnotationDTO;
+    const dto = updated.annotation as FreeTextAnnotation;
     expect(dto.fontSize).toBe(20);
     expect(dto.fontFamily).toBe('times-bold');
     expect(dto.richText.body.color).toBe('#ff0000');
@@ -263,7 +263,7 @@ describe('rich text FreeText (local engine)', () => {
       contents: 'fresh',
       richText: { paragraphs: [{ runs: [{ text: 'fresh' }] }] },
     });
-    expect((updated.annotation as FreeTextAnnotationDTO).contents).toBe('fresh');
+    expect((updated.annotation as FreeTextAnnotation).contents).toBe('fresh');
     await doc.close();
   });
 
@@ -294,7 +294,7 @@ describe('rich text FreeText (local engine)', () => {
         paragraphs: [{ runs: [{ text: 'Key ' }, { text: 'family', style: { family: 'Roboto' } }] }],
       },
     });
-    const richDto = rich.annotation as FreeTextAnnotationDTO;
+    const richDto = rich.annotation as FreeTextAnnotation;
     expect(richDto.fontFamily).toBe('my-roboto');
     expect(richDto.richText.body.family).toBe('Roboto');
 
@@ -307,7 +307,7 @@ describe('rich text FreeText (local engine)', () => {
       contents: 'Plain',
       box: { x: 50, y: 150, width: 300, height: 70 },
     });
-    expect((plain.annotation as FreeTextAnnotationDTO).fontFamily).toBe('my-roboto');
+    expect((plain.annotation as FreeTextAnnotation).fontFamily).toBe('my-roboto');
     await doc.close();
   });
 
@@ -363,7 +363,7 @@ describe('rich text FreeText (local engine)', () => {
         paragraphs: [{ runs: [{ text: 'Hello world' }] }],
       },
     });
-    const dto = created.annotation as FreeTextAnnotationDTO;
+    const dto = created.annotation as FreeTextAnnotation;
     expect(dto.fontFamily).toBe('helvetica');
     expect(dto.richText.paragraphs[0]!.runs).toEqual([{ text: 'Hello world' }]);
 

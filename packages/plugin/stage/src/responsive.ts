@@ -1,5 +1,12 @@
+import { NO_FRAME } from '@embedpdf/core-geometry';
 import type { Size } from '@embedpdf/core-stage';
-import type { BoxQuery, ResponsiveRule, StageBox, StageSettings } from './contract';
+import type {
+  BoxQuery,
+  ResponsiveRule,
+  StageBox,
+  StageSettings,
+  StageSettingsPatch,
+} from './contract';
 
 /**
  * Container queries for the settings bag, the pure half. The capability owns
@@ -32,19 +39,23 @@ export const matchesQuery = (query: BoxQuery, box: StageBox): boolean =>
 const ruleMatches = (rule: ResponsiveRule, box: StageBox): boolean =>
   typeof rule.when === 'function' ? !!rule.when(box) : matchesQuery(rule.when, box);
 
-/** Merge a patch over settings, skipping undefined values (Partial semantics). */
-export const mergeSettings = (
-  into: StageSettings,
-  patch: Partial<StageSettings>,
-): StageSettings => {
+/**
+ * Merge a patch over settings, skipping undefined values (Partial semantics).
+ * Each value replaces the setting whole; a `pageFrame` that names only some
+ * sides reserves 0 on the others.
+ */
+export const mergeSettings = (into: StageSettings, patch: StageSettingsPatch): StageSettings => {
   const merged = { ...into };
-  let key: keyof StageSettings;
+  let key: keyof StageSettingsPatch;
   for (key in patch) {
-    const value = patch[key];
+    const value = key === 'pageFrame' ? frameOf(patch.pageFrame) : patch[key];
     if (value !== undefined) Object.assign(merged, { [key]: value });
   }
   return merged;
 };
+
+const frameOf = (frame: StageSettingsPatch['pageFrame']) =>
+  frame === undefined ? undefined : { ...NO_FRAME, ...frame };
 
 /**
  * Setting-value equality: primitives by identity, the flat objects the

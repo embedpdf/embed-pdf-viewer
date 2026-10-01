@@ -225,7 +225,7 @@ describe('action buttons e2e (scripting ON)', () => {
     // the actions queue and its executors enter the form queue; the write
     // enters the form queue directly. form → actions → form would hang here.
     const dispatched = harness.press('btn-chain');
-    const committed = harness.form.setText(harness.fieldOf('beta').ref, 'raced');
+    const committed = harness.form.setValue(harness.fieldOf('beta').ref, { value: 'raced' });
     const [chain] = await Promise.all([dispatched, committed]);
     expect(chain.kind).toBe('dispatched');
     expect(harness.valueOf('log')).toBe('AB');
@@ -264,8 +264,8 @@ describe('widget /AA events (Phase 2/3 — the DOM-event feed, full ISO)', () =>
     expect(harness.paintedIds()).not.toContain(tipId);
 
     const diagnostics: string[] = [];
-    harness.actions.onDiagnostic((diagnostic) =>
-      diagnostics.push(`${diagnostic.code}:${diagnostic.message}`),
+    harness.actions.onDiagnosticReported((diagnostic) =>
+      diagnostics.push(`${diagnostic.code}:${diagnostic.action}`),
     );
     harness.notify('alpha', 'cursorEnter');
     await harness.drainActions();

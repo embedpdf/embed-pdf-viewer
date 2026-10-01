@@ -32,12 +32,19 @@ import {
 } from '@embedpdf/engine-core/runtime';
 import { createLocalEngine } from '@embedpdf/engine';
 import { FormToken } from '@embedpdf/plugin-form/contract';
-import type { PointerSample } from '@embedpdf/plugin-interaction/contract';
+import type { PointerSample } from '@embedpdf/plugin-interaction/contract/host';
 import { StampToken } from '@embedpdf/plugin-stamp/contract';
 
-import type { SignatureCapability, SignatureConfig, SignatureSignedEvent } from '../src/contract';
+import {
+  SIGNATURE_DEFAULTS,
+  type SignatureCapability,
+  type SignatureConfig,
+  type SignatureSettings,
+  type SignatureSignedEvent,
+} from '../src/contract';
 import { createSignatureController } from '../src/controller';
 import { initialSignatureState, type SignatureState } from '../src/model';
+import { signatureState } from '../src/state';
 import { createArmedMarkHandler } from '../src/tools/armed-mark';
 
 /** Every event the capability fires, in one list the cases can read in order. */
@@ -63,7 +70,7 @@ const collectEvents = (signature: SignatureCapability, into: SignatureChange[]):
   signature.onInspectionRequested((event) => into.push({ type: 'inspect', field: event.field }));
   signature.onTargetChanged((event) => into.push({ type: 'target', field: event.field }));
   signature.onValidated((event) => into.push({ type: 'validated', verdicts: event.verdicts }));
-  signature.onInvalidating((event) =>
+  signature.onInvalidationPredicted((event) =>
     into.push({ type: 'invalidating', field: event.field, detail: event.detail }),
   );
   signature.onProtectionChanged(() => into.push({ type: 'protectionChanged' }));
@@ -108,7 +115,7 @@ function signatureField(overrides: Partial<FormFieldDTO> = {}): FormFieldDTO {
 }
 
 /** Contexts a case opened; disposed after it, so no re-judgement timer outlives its case. */
-const contexts: TestContext<SignatureState>[] = [];
+const contexts: TestContext<SignatureState, SignatureSettings>[] = [];
 afterEach(async () => {
   for (const ctx of contexts.splice(0)) await ctx.dispose();
 });
@@ -125,12 +132,13 @@ function makeSignature(
   const ctx = createTestContext({
     id: 'signature',
     state: initialSignatureState(),
+    settings: { defaults: SIGNATURE_DEFAULTS, registered: config, whole: ['key', 'trust'] },
     documentId: 'doc-1',
     doc,
     capabilities,
   });
   contexts.push(ctx);
-  return { ctx, signature: ctx.connect(createSignatureController(ctx, config)) };
+  return { ctx, signature: ctx.connect(createSignatureController(ctx)) };
 }
 
 async function openDoc() {
@@ -146,9 +154,7 @@ const stampStub = (bytes: Uint8Array) => ({
   getArmedAsset: vi.fn(() => ({ id: 'people:signature', libraryId: 'people', name: 'signature' })),
   disarm: vi.fn(),
   placeAsset: vi.fn(async () => ({
-    kind: 'objectNumber',
-    objectNumber: 1,
-    page: toPageRef(3),
+    annotation: { ref: { kind: 'objectNumber', objectNumber: 1, page: toPageRef(3) } },
   })),
 });
 
@@ -160,7 +166,8 @@ describe('mode', () => {
     try {
       const { signature: visual } = makeSignature(doc, {});
       expect(visual.getMode()).toBe('visual');
-      expect(visual.canSign()).toBe(false);
+      // Signing is a permission: a per-call key or two-step signing needs no key setting.
+      expect(visual.canSign()).toBe(true);
       const signer = await createTestSigner();
       const { signature: signing } = makeSignature(doc, { key: signer });
       expect(signing.getMode()).toBe('sign');
@@ -173,6 +180,86 @@ describe('mode', () => {
       });
       expect(asking.getMode()).toBe('ask');
       expect(asking.canCertify()).toBe(true);
+    } finally {
+      await doc.close();
+    }
+  });
+});
+
+describe('settings, permissions and cancelling', () => {
+  it('follows a settings change at once: the mode, and the key it signs with', async () => {
+    const doc = await openDoc();
+    try {
+      const { signature } = makeSignature(doc, {});
+      expect(signature.getMode()).toBe('visual');
+      const signer = await createTestSigner();
+      signature.updateSettings({ key: () => signer });
+      expect(signature.getMode()).toBe('sign');
+      signature.updateSettings({ mode: 'ask' });
+      expect(signature.getMode()).toBe('ask');
+      signature.resetSettings();
+      expect(signature.getSettings()).toEqual(SIGNATURE_DEFAULTS);
+    } finally {
+      await doc.close();
+    }
+  });
+
+  it('refuses before anything starts without the permission, naming it', async () => {
+    const doc = await engine.open(
+      { kind: 'bytes', id: `sig-plugin-${++openCount}`, bytes: base },
+      { scope: ['doc.open', 'doc.render', 'doc.forms.read'] },
+    );
+    try {
+      const signer = await createTestSigner();
+      const { signature } = makeSignature(doc, { key: signer }, { stamp: stampStub(artwork) });
+      expect(signature.canSign()).toBe(false);
+      expect(signature.canFill()).toBe(false);
+      expect(signature.canReadRevision()).toBe(false);
+      await expect(
+        signature.sign({ field: SIG, mark: { assetId: 'people:signature' } }),
+      ).rejects.toMatchObject({ code: 'permission-denied', permission: 'doc.sign' });
+      await expect(
+        signature.fillField(SIG, { assetId: 'people:signature' }),
+      ).rejects.toMatchObject({ code: 'permission-denied', permission: 'doc.forms.fill' });
+      await expect(signature.readRevision({ revisionIndex: 0 })).rejects.toMatchObject({
+        code: 'permission-denied',
+        permission: 'doc.download',
+      });
+      expect(signature.isBusy()).toBe(false);
+    } finally {
+      await doc.close();
+    }
+  });
+
+  it('a signal that fires before the seal leaves nothing signed', async () => {
+    const doc = await openDoc();
+    try {
+      const signer = await createTestSigner();
+      const controller = new AbortController();
+      // A key that is asked for its signature after the field was prepared: cancel then.
+      const slowKey = remoteSigner({
+        sign: async (request) => {
+          controller.abort();
+          const cms = await buildDetachedCms({
+            digest: request.digest,
+            hash: request.algorithm,
+            profile: profileFor(request.subFilter as 'ETSI.CAdES.detached'),
+            signer,
+          });
+          return cms;
+        },
+      });
+      const { signature } = makeSignature(doc, {}, { stamp: stampStub(artwork) });
+      await signature.refresh();
+      await expect(
+        signature.sign(
+          { field: SIG, mark: { assetId: 'people:signature' }, key: slowKey },
+          { signal: controller.signal },
+        ),
+      ).rejects.toMatchObject({ code: 'operation-cancelled' });
+      expect((await doc.signatures.list()).signatures[0]!.signed).toBe(false);
+      expect(signature.getPending()).toBeNull();
+      expect(signatureState.read(signature)).toMatchObject({ busy: false, pending: null });
     } finally {
       await doc.close();
     }
@@ -259,6 +346,13 @@ describe('signing', () => {
       expect(verdicts[0]!.summary).toBe('valid');
       expect(signature.getVerdict(SIG)?.integrity).toBe('valid');
       expect(signature.listVerdicts()).toBe(verdicts);
+      // The state's signatures carry their verdict, and stay the same array until one changes.
+      const state = signatureState.read(signature);
+      expect(state.signatures.map((entry) => entry.verdict?.summary)).toEqual(['valid']);
+      expect(signatureState.read(signature).signatures).toBe(state.signatures);
+      expect(state).toMatchObject({ status: 'ready', target: null, busy: false, pending: null });
+      expect(signature.canReadRevision()).toBe(true);
+      expect((await signature.readRevision(SIG)).byteLength).toBeGreaterThan(0);
 
       // Sealed: no visual fill, no second seal of the same field.
       await expect(signature.fillField(SIG, { assetId: 'people:signature' })).rejects.toMatchObject(
@@ -488,12 +582,13 @@ describe('the destination rule', () => {
 
       await ask.placeMark(
         { assetId: 'people:signature' },
-        { page: toPageRef(3), at: { x: 10, y: 10 } },
+        { page: toPageRef(3), center: { x: 10, y: 10 } },
       );
-      expect(stamp.placeAsset).toHaveBeenCalledWith('doc-1', 'people:signature', {
-        page: toPageRef(3),
-        at: { x: 10, y: 10 },
-      });
+      expect(stamp.placeAsset).toHaveBeenCalledWith(
+        'people:signature',
+        { page: toPageRef(3), center: { x: 10, y: 10 } },
+        { documentId: 'doc-1' },
+      );
 
       const { signature: visual } = makeSignature(doc, { mode: 'visual' }, { stamp });
       const seen: SignatureChange[] = [];

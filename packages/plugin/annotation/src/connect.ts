@@ -10,7 +10,7 @@ import { SelectionToken } from '@embedpdf/plugin-selection/contract/host';
 
 import type { AnnotationHostCapability } from './host-contract';
 import type { AnnotationContext } from './services';
-import { ARMED_STAMP_TOOL_ID, isTouchDirect } from './tools/definitions';
+import { ARMED_STAMP_TOOL_ID, toolTouchOf } from './tools/definitions';
 import {
   createDrawHandler,
   createEditHandler,
@@ -34,10 +34,11 @@ export function connectAnnotation(
     );
   }
 
-  // Register every resolved tool (built-ins plus the embedder's) and seed its
-  // defaults. Markup and caret tools ride the selection plugin's text-select
-  // gesture, so they are skipped when there is no selection plugin. A tool a
-  // sibling already registered on the hub (the form palette) is left alone.
+  // Register every resolved tool (built-ins plus the embedder's; the registry
+  // seeded their defaults). Markup and caret tools ride the selection plugin's
+  // text-select gesture, so they are skipped when there is no selection
+  // plugin. A tool a sibling already registered on the hub (the form palette)
+  // is left alone.
   for (const tool of annotation.listResolvedTools()) {
     if (tool.enables.has('text-select') && !selection) continue;
     if (interaction.hasTool(tool.id)) continue;
@@ -47,10 +48,9 @@ export function connectAnnotation(
         cursor: tool.cursor,
         enables: tool.enables,
         // Drag-create tools own single-finger touch; click-place tools do not.
-        touchDirect: isTouchDirect(tool.enables),
+        touch: toolTouchOf(tool.enables),
       }),
     );
-    if (tool.defaults) annotation.updateToolDefaults(tool.id, tool.defaults);
   }
 
   for (const handler of [
@@ -74,7 +74,7 @@ export function connectAnnotation(
     // embedder tools tagged 'annotation-stamp' also hold a payload.
     const active = interaction.getActiveTool();
     if (active.id !== ARMED_STAMP_TOOL_ID && !active.enables.has('annotation-stamp')) {
-      annotation.disarmStamp();
+      annotation.stamps.disarm();
     }
   });
 

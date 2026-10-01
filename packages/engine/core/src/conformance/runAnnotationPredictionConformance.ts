@@ -1,7 +1,7 @@
 import type { ConformanceTestRunner } from './runMetadataConformance';
 import { pdfOf } from './pdfOf';
 import { iconRect, PNG_1X1 } from './creatables';
-import type { AnnotationDraft, AnnotationDTO, AnnotationPatch } from '../annotation/kinds';
+import type { AnnotationDraft, Annotation, AnnotationPatch } from '../annotation/kinds';
 import type { AnnotationResources } from '../annotation/resources';
 import { DRAWN_RECT_KINDS } from '../annotation/shapeForRect';
 import type { DocumentHandle } from '../engine/DocumentHandle';
@@ -32,7 +32,7 @@ interface PredictionCase {
   draft: AnnotationDraft;
   resources?: AnnotationResources;
   /** The patch, or a patch made from the created annotation. */
-  patch: AnnotationPatch | ((created: AnnotationDTO) => AnnotationPatch);
+  patch: AnnotationPatch | ((created: Annotation) => AnnotationPatch);
   updateResources?: AnnotationResources;
 }
 
@@ -442,7 +442,7 @@ const CREATE_CASES: CreateCase[] = [
  * Fields a prediction leaves as they were: the engine works them out from its
  * drawing, or stamps them on every write.
  */
-function unpredicted(annotation: AnnotationDTO): Set<string> {
+function unpredicted(annotation: Annotation): Set<string> {
   const names = new Set(['modifiedAt', 'modifiedBy']);
   if (DRAWN_RECT_KINDS.has(annotation.subtype)) names.add('rect');
   // A widget without its own font reads the form's default appearance, which
@@ -476,17 +476,17 @@ const metadataOf = (file: unknown) =>
     : file;
 
 /** The fields where the engine's answer differs from the prediction. */
-function differences(predicted: AnnotationDTO, actual: AnnotationDTO) {
+function differences(predicted: Annotation, actual: Annotation) {
   if (predicted.subtype === 'file-attachment' && actual.subtype === 'file-attachment') {
     return fieldDifferences(
-      { ...predicted, file: metadataOf(predicted.file) } as AnnotationDTO,
-      { ...actual, file: metadataOf(actual.file) } as AnnotationDTO,
+      { ...predicted, file: metadataOf(predicted.file) } as Annotation,
+      { ...actual, file: metadataOf(actual.file) } as Annotation,
     );
   }
   return fieldDifferences(predicted, actual);
 }
 
-function fieldDifferences(predicted: AnnotationDTO, actual: AnnotationDTO) {
+function fieldDifferences(predicted: Annotation, actual: Annotation) {
   const skip = unpredicted(actual);
   const names = new Set([...Object.keys(predicted), ...Object.keys(actual)]);
   return [...names]

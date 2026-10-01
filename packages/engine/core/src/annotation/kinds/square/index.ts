@@ -6,7 +6,7 @@ import { SquareDeclaration } from './declaration';
 
 export { SquareDeclaration } from './declaration';
 
-export type SquareAnnotationDTO<C extends Coordinates = PageCoordinates> = ReadOf<
+export type SquareAnnotation<C extends Coordinates = PageCoordinates> = ReadOf<
   typeof SquareDeclaration,
   C
 >;
@@ -25,7 +25,7 @@ export const SquarePatchSchema = SquareDeclaration.updateSchema;
 
 export const SquareKind: AnnotationKindModule<
   'square',
-  SquareAnnotationDTO,
+  SquareAnnotation,
   SquareDraft,
   SquarePatch
 > = {

@@ -1,6 +1,6 @@
 import type {
   AnnotationBase,
-  StampAnnotationDTO,
+  StampAnnotation,
   StampFit,
   PdfCoordinates,
 } from '@embedpdf/engine-core/runtime';
@@ -36,7 +36,7 @@ export function readStamp(
   mem: PdfRuntimeMemory,
   annotPtr: Ptr,
   base: AnnotationBase<PdfCoordinates>,
-): StampAnnotationDTO<PdfCoordinates> {
+): StampAnnotation<PdfCoordinates> {
   return {
     ...base,
     subtype: 'stamp',

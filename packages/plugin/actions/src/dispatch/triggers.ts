@@ -1,9 +1,8 @@
 /**
- * Trigger resolution helpers: the config gates, annotation identity, the
+ * Trigger resolution helpers: the `triggers` setting, annotation identity, the
  * per-page cache of annotations bearing page-lifecycle trees (the fan-out's
  * read amplifier) and ISO 32000-2 Table 197's page-step order.
  */
-import type { PluginContext } from '@embedpdf/core';
 import type {
   AnnotationRef,
   DocumentEvent,
@@ -14,7 +13,8 @@ import type {
   PdfPageActions,
 } from '@embedpdf/engine-core/runtime';
 
-import type { ActionsConfig, ActionSource, ActionTrigger } from '../contract';
+import type { ActionSource, ActionTrigger } from '../contract';
+import type { ActionsContext, ActionsServices } from '../services';
 
 export const sameRef = (left: AnnotationRef, right: AnnotationRef): boolean => {
   if (left.kind === 'objectNumber' && right.kind === 'objectNumber') {
@@ -59,17 +59,21 @@ const annotationPagesOf = (event: DocumentEvent): readonly PageRef[] | 'all' | n
   }
 };
 
-export function createTriggers(ctx: PluginContext<void>, config: ActionsConfig) {
+export function createTriggers(
+  ctx: ActionsContext,
+  { settings }: Pick<ActionsServices, 'settings'>,
+) {
   const triggerEnabled = (trigger: ActionTrigger): boolean => {
+    const { triggers } = settings.get();
     switch (trigger.scope) {
       case 'activate':
         return true; // the click door is never gated
       case 'annotation':
-        return config.triggers?.annotation !== false;
+        return triggers.annotation;
       case 'page':
-        return config.triggers?.page !== false;
+        return triggers.page;
       case 'document':
-        return config.triggers?.document !== false;
+        return triggers.document;
     }
   };
 

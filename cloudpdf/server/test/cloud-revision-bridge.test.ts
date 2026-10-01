@@ -3,7 +3,7 @@ import {
   EngineError,
   EngineErrorCode,
   toPageRef,
-  type AnnotationDTO,
+  type Annotation,
   type AnnotationList,
   type AnnotationRef,
   type PageState,
@@ -103,7 +103,7 @@ function indexRef(docSessionId: string, generation: number): AnnotationRef {
   };
 }
 
-function annotation(ref: AnnotationRef): AnnotationDTO {
+function annotation(ref: AnnotationRef): Annotation {
   return {
     subtype: 'unsupported',
     rawSubtypeCode: 999,

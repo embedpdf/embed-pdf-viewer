@@ -3,7 +3,7 @@
  * file), which reads its font, size, colour and alignment off the annotation
  * by the engine's field names and fills in what the kind doesn't keep.
  */
-import type { AnnotationDTO } from '@embedpdf/engine-core/runtime';
+import type { Annotation } from '@embedpdf/engine-core/runtime';
 
 import type { TextStyle } from '../types';
 
@@ -14,8 +14,8 @@ import type { TextStyle } from '../types';
  * justified box shows left-aligned, and keeps its justify until another
  * alignment is picked.
  */
-export function bodyText(annotation: AnnotationDTO): TextStyle {
-  const freeText = annotation as Extract<AnnotationDTO, { subtype: 'free-text' }>;
+export function bodyText(annotation: Annotation): TextStyle {
+  const freeText = annotation as Extract<Annotation, { subtype: 'free-text' }>;
   const body = freeText.richText?.body;
   return {
     fontFamily: freeText.fontFamily,
@@ -32,8 +32,8 @@ export function bodyText(annotation: AnnotationDTO): TextStyle {
  * A form field's text (`/DA`): its font (Helvetica when it names none), its
  * size (0 fits the box), its colour (black when it has none) and alignment.
  */
-export function fieldText(annotation: AnnotationDTO): TextStyle {
-  const widget = annotation as Extract<AnnotationDTO, { subtype: 'widget' }>;
+export function fieldText(annotation: Annotation): TextStyle {
+  const widget = annotation as Extract<Annotation, { subtype: 'widget' }>;
   return {
     fontFamily: widget.fontFamily ?? 'helvetica',
     fontSize: widget.fontSize ?? 0,
@@ -43,8 +43,8 @@ export function fieldText(annotation: AnnotationDTO): TextStyle {
 }
 
 /** A redaction's label (`/DA`), set like free text; a size of 0 fits the region (the engine's convention). */
-export function labelText(annotation: AnnotationDTO): TextStyle {
-  const redact = annotation as Extract<AnnotationDTO, { subtype: 'redact' }>;
+export function labelText(annotation: Annotation): TextStyle {
+  const redact = annotation as Extract<Annotation, { subtype: 'redact' }>;
   return {
     fontFamily: redact.fontFamily,
     fontSize: redact.fontSize,

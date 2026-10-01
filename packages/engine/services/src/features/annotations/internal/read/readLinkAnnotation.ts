@@ -1,6 +1,6 @@
 import type {
   AnnotationBase,
-  LinkAnnotationDTO,
+  LinkAnnotation,
   PdfActionTree,
   PdfDestination,
   PdfLinkTarget,
@@ -34,7 +34,7 @@ export function readLink(
   base: AnnotationBase<PdfCoordinates>,
   _rawSubtypeCode: number,
   ctx: AnnotationReadContext,
-): LinkAnnotationDTO<PdfCoordinates> {
+): LinkAnnotation<PdfCoordinates> {
   return { ...base, subtype: 'link', target: readLinkTarget(fn, mem, annotPtr, base, ctx) };
 }
 

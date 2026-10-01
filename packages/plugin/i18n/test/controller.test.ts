@@ -1,7 +1,7 @@
 import { createTestContext } from '@embedpdf/core/testing';
 import { describe, expect, it } from 'vitest';
 
-import type { I18nConfig, Locale } from '../src/contract';
+import { I18N_DEFAULTS, type I18nConfig, type Locale } from '../src/contract';
 import { createI18nController } from '../src/controller';
 import { initialI18nState } from '../src/model';
 
@@ -11,12 +11,17 @@ const en: Locale = {
   translations: { hi: 'Hello', nested: { first: 'A' } },
 };
 const nl: Locale = { code: 'nl', name: 'Nederlands', translations: { hi: 'Hallo' } };
-const ar: Locale = { code: 'ar', name: 'العربية', dir: 'rtl', translations: { hi: 'مرحبا' } };
+const ar: Locale = { code: 'ar', name: 'العربية', direction: 'rtl', translations: { hi: 'مرحبا' } };
 
 /** The controller over a real test context, connected as the kernel would. */
 function harness(config: I18nConfig) {
-  const ctx = createTestContext({ id: 'i18n', state: initialI18nState(config), doc: null });
-  return ctx.connect(createI18nController(ctx, config));
+  const ctx = createTestContext({
+    id: 'i18n',
+    state: initialI18nState(),
+    settings: { defaults: I18N_DEFAULTS, registered: config },
+    doc: null,
+  });
+  return ctx.connect(createI18nController(ctx));
 }
 
 /** A promise with its settle functions, for a loader the test resolves by hand. */
@@ -84,16 +89,75 @@ describe('i18n controller', () => {
     expect(seen).toEqual(['en>nl']);
   });
 
-  it('does not announce a lazy startup locale when its pack arrives', async () => {
+  it('shows the fallback language until a start language from loaders arrives', async () => {
     const i18n = harness({ locales: [en], locale: 'ar', loaders: { ar: async () => ar } });
     const seen: string[] = [];
-    i18n.onLocaleChanged((event) => seen.push(event.locale));
+    i18n.onLocaleChanged((event) => seen.push(`${event.previousLocale}>${event.locale}`));
     expect(i18n.getLoadingLocale()).toBe('ar');
-    expect(i18n.t('hi')).toBe('Hello'); // the fallback chain until the pack lands
+    expect(i18n.getLocale()).toBe('en');
+    expect(i18n.t('hi')).toBe('Hello');
     await flush();
     expect(i18n.getLoadingLocale()).toBeNull();
+    expect(i18n.getLocale()).toBe('ar');
+    expect(i18n.getDirection()).toBe('rtl');
     expect(i18n.t('hi')).toBe('مرحبا');
-    expect(seen).toEqual([]);
+    expect(seen).toEqual(['en>ar']);
+  });
+
+  it('stops waiting when the signal fires, and the language arriving later stays unused', async () => {
+    const pack = deferred<Locale>();
+    const i18n = harness({ locales: [en], loaders: { nl: () => pack.promise } });
+    const controller = new AbortController();
+    const switching = i18n.setLocale('nl', { signal: controller.signal });
+    expect(i18n.getLoadingLocale()).toBe('nl');
+    controller.abort();
+    await expect(switching).rejects.toMatchObject({ code: 'operation-cancelled' });
+    expect(i18n.getLoadingLocale()).toBeNull();
+    pack.resolve(nl);
+    await flush();
+    expect(i18n.getLocale()).toBe('en');
+    expect(i18n.listLocales().find((locale) => locale.code === 'nl')?.loaded).toBe(true);
+    // A signal that already fired refuses before anything starts.
+    await expect(i18n.setLocale('nl', { signal: controller.signal })).rejects.toMatchObject({
+      code: 'operation-cancelled',
+    });
+    expect(i18n.getLocale()).toBe('en');
+  });
+
+  it("translates EmbedPDF's own strings in every language the app loads", async () => {
+    const i18n = harness({});
+    expect(i18n.getLocale()).toBe('en');
+    expect(i18n.t('commands.zoom.in')).toBe('Zoom in');
+    expect(i18n.hasKey('commands.tool.highlight')).toBe(true);
+    i18n.registerLocale({ code: 'de', name: 'Deutsch', translations: {} });
+    await i18n.setLocale('de');
+    expect(i18n.t('commands.document.print')).toBe('Drucken');
+    i18n.addTranslations('de', { 'commands.document.print': 'Ausdrucken' });
+    expect(i18n.t('commands.document.print')).toBe('Ausdrucken');
+  });
+
+  it('follows its settings while the app runs', async () => {
+    const i18n = harness({ locales: [en], loaders: { ar: async () => ar } });
+    expect(i18n.getSettings()).toMatchObject({ locale: null, fallbackLocale: 'en' });
+
+    i18n.updateSettings({ locales: [en, nl] });
+    expect(i18n.listLocales().map((locale) => locale.code)).toEqual(['en', 'nl', 'ar']);
+
+    i18n.updateSettings({ locale: 'nl' });
+    expect(i18n.getLocale()).toBe('nl');
+    expect(i18n.t('nested.first')).toBe('A'); // from the fallback language
+
+    i18n.updateSettings({ fallbackLocale: 'nl' });
+    expect(i18n.hasKey('nested.first')).toBe(false);
+
+    i18n.updateSettings({ locale: 'ar' });
+    await flush();
+    expect(i18n.getLocale()).toBe('ar');
+
+    i18n.resetSettings();
+    expect(i18n.getSettings().locales).toEqual([en]);
+    expect(i18n.getLocale()).toBe('en');
+    expect(i18n.listLocales().map((locale) => locale.code)).toEqual(['en', 'ar']);
   });
 
   it('supersedes a pending lazy switch with a newer one', async () => {

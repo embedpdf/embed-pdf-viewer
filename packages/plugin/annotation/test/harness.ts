@@ -9,7 +9,7 @@
 import { createEventHook, type DocumentEvent } from '@embedpdf/core';
 import { createTestContext } from '@embedpdf/core/testing';
 import type {
-  AnnotationDTO,
+  Annotation,
   AnnotationRef,
   PageRef,
   PdfCoordinates,
@@ -20,13 +20,18 @@ import { InteractionToken } from '@embedpdf/plugin-interaction/contract/host';
 import { SelectionToken } from '@embedpdf/plugin-selection/contract';
 import { vi } from 'vitest';
 
+import {
+  ANNOTATION_DEFAULTS,
+  type AnnotationConfig,
+  type AnnotationSettings,
+} from '../src/contract';
 import { createAnnotationController } from '../src/controller';
 import { initialAnnotationState, type AnnotationState } from '../src/model';
 
 export const PAGE = toPageRef(1);
 
 /** A read's data by field name, for assertions that span kinds (`color` is a square's, not a widget's). */
-export const dataOf = (annotation: AnnotationDTO | null | undefined): Record<string, unknown> =>
+export const dataOf = (annotation: Annotation | null | undefined): Record<string, unknown> =>
   (annotation ?? {}) as unknown as Record<string, unknown>;
 export const PAGE2 = toPageRef(2);
 
@@ -42,7 +47,7 @@ const metaOf = (weakRefsInvalidated = false) => ({
 });
 
 /** An annotation as the fake engine keeps it: the file's values. */
-export type FileAnnotation = AnnotationDTO<PdfCoordinates>;
+export type FileAnnotation = Annotation<PdfCoordinates>;
 
 /** The whole-document list `listAll` resolves with: the records and their pages. */
 export const snapshotOf = (records: readonly FileAnnotation[], auditHead?: number) => {
@@ -60,6 +65,8 @@ export interface AnnotationHarnessOptions {
   readonly crop?: { left: number; bottom: number; right: number; top: number };
   /** A text selection plugin to read and clear (`applyToolToSelection`, `createFromSelection`). */
   readonly selection?: object;
+  /** The settings the app registers (`annotationPlugin(config)`). */
+  readonly config?: AnnotationConfig;
 }
 
 const DEFAULT_CROP: PdfRect = { left: 0, bottom: 0, right: 600, top: 800 };
@@ -68,7 +75,7 @@ export function annotationHarness(options: AnnotationHarnessOptions = {}) {
   const cropOf = (page: PageRef): PdfRect =>
     page.objectNumber === PAGE.objectNumber ? (options.crop ?? DEFAULT_CROP) : DEFAULT_CROP;
   /** A read as the engine hands it out. */
-  const read = (annotation: FileAnnotation): AnnotationDTO =>
+  const read = (annotation: FileAnnotation): Annotation =>
     pageAnnotationOf(annotation, cropOf(annotation.page), cropOf);
   const readAll = <List extends { annotations: FileAnnotation[] }>(list: List) =>
     list && { ...list, annotations: list.annotations.map(read) };
@@ -77,6 +84,18 @@ export function annotationHarness(options: AnnotationHarnessOptions = {}) {
   const create = vi.fn();
   const update = vi.fn();
   const remove = vi.fn(async (_ref: AnnotationRef) => ({}));
+  /** A page's drawing-order move: resolves with the moved annotations (the file's values) in their new order. */
+  const move = vi.fn(async (_refs: AnnotationRef[], _toIndex: number) => ({
+    annotations: [] as FileAnnotation[],
+  }));
+  const downloadResource = vi.fn(async (_ref: AnnotationRef, _role: string) => new Uint8Array([1]));
+  const exportBundle = vi.fn(async (_selection?: unknown) => ({ version: 1 }) as unknown);
+  const importBundle = vi.fn(async (_bundle: unknown, _options?: unknown) => ({
+    annotations: [] as Annotation[],
+    refMap: [] as { from: AnnotationRef; to: AnnotationRef }[],
+    dropped: [] as unknown[],
+    meta: metaOf(),
+  }));
   /** One page's list. */
   const list = vi.fn();
   /** The whole document's list. */
@@ -91,6 +110,7 @@ export function annotationHarness(options: AnnotationHarnessOptions = {}) {
   // A minimal interaction hub, enough for the plugin's `connect` wiring.
   const toolChanged = createEventHook<unknown>();
   const interaction = {
+    activateDefaultTool: vi.fn(),
     registerTool: () => () => {},
     registerHandler: () => () => {},
     hasTool: () => false,
@@ -99,9 +119,10 @@ export function annotationHarness(options: AnnotationHarnessOptions = {}) {
     onToolChanged: toolChanged.on,
   };
 
-  const ctx = createTestContext<AnnotationState>({
+  const ctx = createTestContext<AnnotationState, AnnotationSettings>({
     id: 'annotation',
     state: initialAnnotationState(),
+    settings: { defaults: ANNOTATION_DEFAULTS, registered: options.config },
     capabilities: [
       [InteractionToken, interaction],
       ...(options.selection ? [[SelectionToken, options.selection] as const] : []),
@@ -161,9 +182,24 @@ export function annotationHarness(options: AnnotationHarnessOptions = {}) {
             return result;
           },
           list: async () => readAll(await list()),
+          move: async (refs: AnnotationRef[], toIndex: number) => {
+            const result = await move(refs, toIndex);
+            const annotations = result.annotations.map(read);
+            ctx.emitDocumentEvent({
+              type: 'annotations.moved',
+              page,
+              origin: localOrigin,
+              annotations,
+              meta: metaOf(),
+            } as unknown as DocumentEvent);
+            return { annotations, meta: metaOf() };
+          },
+          downloadResource: (ref: AnnotationRef, role: string) => downloadResource(ref, role),
         },
       }),
       annotations: {
+        export: (selection?: unknown) => exportBundle(selection),
+        import: (bundle: unknown, options?: unknown) => importBundle(bundle, options),
         // Some pages read through each page's list, so a test queues page reads once.
         list: async (options?: { pages?: readonly PageRef[] }) => {
           if (!options?.pages) return readAll(await listAll());
@@ -208,10 +244,10 @@ export function annotationHarness(options: AnnotationHarnessOptions = {}) {
     started = true;
     ctx.connect(instance);
   };
-  /** Seed each tool's defaults into the session, as `connect` does. */
+  /** Seed each tool's defaults into the session again (the registry seeds them when it's built). */
   const seedToolDefaults = () => {
     for (const tool of api.listResolvedTools())
-      if (tool.defaults) api.updateToolDefaults(tool.id, tool.defaults);
+      if (tool.defaults) api.tools.updateDefaults(tool.id, tool.defaults);
   };
 
   return {
@@ -220,6 +256,11 @@ export function annotationHarness(options: AnnotationHarnessOptions = {}) {
     create,
     update,
     remove,
+    move,
+    downloadResource,
+    exportBundle,
+    importBundle,
+    interaction,
     list,
     listAll,
     allows,

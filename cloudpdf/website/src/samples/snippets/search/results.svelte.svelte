@@ -8,7 +8,7 @@
 <ol>
   {#each hits.current as hit, index (index)}
     <li>
-      <button type="button" onclick={() => search.goToHit(index)}>
+      <button type="button" onclick={() => search.goToHit(hit)}>
         Page {hit.pageIndex + 1}: …{hit.snippet?.before}
         <mark>{hit.snippet?.match}</mark>
         {hit.snippet?.after}…

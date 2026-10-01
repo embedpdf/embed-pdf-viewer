@@ -6,7 +6,7 @@ import { CircleDeclaration } from './declaration';
 
 export { CircleDeclaration } from './declaration';
 
-export type CircleAnnotationDTO<C extends Coordinates = PageCoordinates> = ReadOf<
+export type CircleAnnotation<C extends Coordinates = PageCoordinates> = ReadOf<
   typeof CircleDeclaration,
   C
 >;
@@ -25,7 +25,7 @@ export const CirclePatchSchema = CircleDeclaration.updateSchema;
 
 export const CircleKind: AnnotationKindModule<
   'circle',
-  CircleAnnotationDTO,
+  CircleAnnotation,
   CircleDraft,
   CirclePatch
 > = {

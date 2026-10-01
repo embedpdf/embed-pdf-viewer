@@ -146,32 +146,30 @@ export interface ChromeSchema {
 
 // ── authoring sugar ───────────────────────────────────────────────────────────
 
+/** A command button: `item('zoom:in', { variants: ['icon+label', 'icon'] })`. */
 export function item(command: string, options?: Omit<BarItem, 'command'>): BarItem {
   return { command, ...options };
 }
 
-export function custom(slot: string, options: Omit<CustomItem, 'slot'>): CustomItem {
-  return { slot, ...options };
+/**
+ * An item you draw yourself, by its slot name, and the command it becomes in the "More" menu:
+ * `custom('page-number', 'page:go-to', { variants: ['full', 'compact'] })`.
+ */
+export function custom(
+  slot: string,
+  terminal: string,
+  options?: Omit<CustomItem, 'slot' | 'terminal'>,
+): CustomItem {
+  return { slot, terminal, ...options };
 }
 
-export function group(id: string, items: readonly BarChild[]): BarGroup;
+/** A group of items, with a separator between groups: `group('zoom', ['zoom:out', 'zoom:in'])`. */
 export function group(
   id: string,
-  options: Omit<BarGroup, 'id' | 'items'> & { items?: readonly BarChild[] },
-  items?: readonly BarChild[],
-): BarGroup;
-export function group(
-  id: string,
-  optsOrItems:
-    | readonly BarChild[]
-    | (Omit<BarGroup, 'id' | 'items'> & { items?: readonly BarChild[] }),
-  items?: readonly BarChild[],
+  items: readonly BarChild[],
+  options?: Omit<BarGroup, 'id' | 'items'>,
 ): BarGroup {
-  if (Array.isArray(optsOrItems)) return { id, items: optsOrItems as readonly BarChild[] };
-  const { items: optItems, ...options } = optsOrItems as Omit<BarGroup, 'id' | 'items'> & {
-    items?: readonly BarChild[];
-  };
-  return { id, ...options, items: items ?? optItems ?? [] };
+  return { id, ...options, items };
 }
 
 // ── normalized form — what the solver and projection consume ─────────────────

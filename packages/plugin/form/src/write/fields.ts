@@ -1,107 +1,79 @@
 /**
- * Design mode: fields are created, patched and deleted, and widgets detached,
- * through `doc.forms`. The fields and widget-geometry mirrors apply
- * the confirmed results, and the annotation plugin applies the widget changes
- * from the same events.
+ * Building the form: fields are created, changed and deleted, and widgets
+ * taken out of their field, through `doc.forms`. The fields and widget
+ * mirrors apply the confirmed results, and the annotation plugin applies the
+ * widget changes from the same events.
  */
-import { PluginError } from '@embedpdf/core';
-import type {
-  AnnotationRef,
-  FormFieldDraft,
-  FormFieldRef,
-  PageRef,
-} from '@embedpdf/engine-core/runtime';
+import type { OperationOptions } from '@embedpdf/core';
 
-import type { CreatedField, CreateFieldInput, FormCapability } from '../contract';
-import type { Box } from '../model';
+import type { FormCapability, FormFieldResult } from '../contract';
 import type { FormContext, FormServices } from '../services';
+
+const MODIFY = 'doc.forms.modify';
 
 export function createFieldWrites(
   ctx: FormContext,
-  services: Pick<FormServices, 'fields' | 'siblings' | 'enqueue'>,
-  widgets: { getPageBox(page: PageRef): Box | null },
+  services: Pick<FormServices, 'siblings' | 'enqueue'>,
 ) {
-  const { fields, enqueue } = services;
+  const { enqueue } = services;
   const annotationHost = services.siblings.annotation;
-  const { getPageBox } = widgets;
 
-  /** A deterministic, collision-free name: `text_1`, `text_2`, … against the current fields. */
-  const autoName = (family: string): string => {
-    const names = new Set((fields.get().snapshot?.fields ?? []).map((field) => field.name));
-    let count = 1;
-    while (names.has(`${family}_${count}`)) count++;
-    return `${family}_${count}`;
+  /** Run one building write in the queue, refused up front without `doc.forms.modify`. */
+  const design = async <T>(
+    operation: string,
+    run: () => Promise<T>,
+    options?: OperationOptions,
+  ): Promise<T> => {
+    ctx.assertAllowed(MODIFY, operation);
+    return enqueue(() => ctx.cancellable(options?.signal, run()), options);
   };
 
-  const placeField = async (input: CreateFieldInput): Promise<CreatedField> => {
-    const page = input.page;
-    const bounds = getPageBox(page);
-    if (!bounds) {
-      throw new PluginError('not-ready', 'form', 'createField: the page is not laid out');
-    }
-    // Placement is page-bound: intersect a (possibly overshooting) drag box
-    // with the page. Sizing is the caller's job (the place handler's click
-    // policy or drag rectangle); a degenerate result is a caller bug.
-    const x = Math.max(bounds.x, Math.min(input.bounds.x, bounds.width));
-    const y = Math.max(bounds.y, Math.min(input.bounds.y, bounds.height));
-    const box: Box = {
-      x,
-      y,
-      width: Math.max(0, Math.min(input.bounds.x + input.bounds.width, bounds.width) - x),
-      height: Math.max(0, Math.min(input.bounds.y + input.bounds.height, bounds.height) - y),
-    };
-    if (box.width < 1 || box.height < 1) {
-      throw new PluginError(
-        'invalid-input',
-        'form',
-        'createField: degenerate bounds (size the box before placing)',
-      );
-    }
-    const { family, appearance } = input;
-    const name = input.name ?? autoName(family);
-    const placement = { page, rect: box, ...appearance };
-    const draft: FormFieldDraft =
-      family === 'radio'
-        ? { family, name, widgets: [{ ...placement, exportValue: 'option1' }] }
-        : family === 'combobox' || family === 'listbox'
-          ? {
-              family,
-              name,
-              widgets: [placement],
-              options: input.options
-                ? input.options.map((option) => ({ ...option }))
-                : [
-                    { label: 'Option 1', value: 'Option 1' },
-                    { label: 'Option 2', value: 'Option 2' },
-                  ],
-            }
-          : { family, name, widgets: [placement] };
-    const result = await ctx.doc.forms.create(draft);
-    // Wait for the annotation plugin to read the new widget, so a caller can
-    // select it right away.
-    if (annotationHost) await annotationHost.whenSynced();
-    const widget =
-      result.field.widgets.find(
-        (candidate) => candidate.page?.objectNumber === page.objectNumber,
-      ) ?? null;
-    return { field: result.field, widget };
-  };
+  const create: FormCapability['create'] = (draft, options) =>
+    design(
+      'form.create',
+      async (): Promise<FormFieldResult> => {
+        const { field } = await ctx.doc.forms.create(draft);
+        // Wait for the annotation plugin to read the new widgets, so a caller
+        // can select one right away.
+        if (annotationHost) await annotationHost.whenSynced();
+        return { field };
+      },
+      options,
+    );
 
   return {
     api: {
-      createField: (input) => enqueue(() => placeField(input)),
-      updateField: (ref, patch) =>
-        enqueue(async () => {
-          await ctx.doc.forms.update(ref, patch);
-        }),
-      deleteField: (ref) =>
-        enqueue(async () => {
-          await ctx.doc.forms.delete(ref);
-        }),
-      detachWidget: (ref, widget) =>
-        enqueue(async () => {
-          await ctx.doc.forms.removeWidget(ref, widget);
-        }),
+      create,
+      update: (ref, patch, options) =>
+        design(
+          'form.update',
+          async () => ({ field: (await ctx.doc.forms.update(ref, patch)).field }),
+          options,
+        ),
+      delete: (ref, options) =>
+        design(
+          'form.delete',
+          async () => {
+            await ctx.doc.forms.delete(ref);
+          },
+          options,
+        ),
+      removeWidget: (ref, widget, options) =>
+        design(
+          'form.removeWidget',
+          async () => ({ field: (await ctx.doc.forms.removeWidget(ref, widget)).field }),
+          options,
+        ),
+      repair: (options) =>
+        design(
+          'form.repair',
+          () => {
+            if (!options) return ctx.doc.forms.repair();
+            const { signal: _signal, ...repair } = options;
+            return ctx.doc.forms.repair(repair);
+          },
+          options,
+        ),
     } satisfies Partial<FormCapability>,
   };
 }

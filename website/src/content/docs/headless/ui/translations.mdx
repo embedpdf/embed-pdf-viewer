@@ -50,6 +50,8 @@ t('search.results', { params: { count: 3 } }); // '3 resultaten'
 
 <Snippet name="ui/language-picker" />
 
+<Example name="translations/basic" />
+
 `setLocale()` loads the language if it needs to, then switches. <Fw only={['react', 'vue', 'svelte']}>Everything that uses `useT()`
 <Word of="rerenders" /> in the new language.</Fw><Fw only="angular">Every `epdfT` pipe updates to the new
 language.</Fw>
@@ -77,6 +79,8 @@ A language can say it reads right to left with `direction: 'rtl'`. `direction` i
 you, so you can set it on your viewer's root:
 
 <Snippet name="ui/direction" />
+
+<Example name="translations/rtl" />
 
 For documents that read right to left, such as a book in Arabic, set the Stage's `direction` too, so
 pages and spreads run from right to left.

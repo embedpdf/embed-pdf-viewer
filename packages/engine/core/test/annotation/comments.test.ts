@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { buildCommentThreads, isStateAnnotation } from '../../src/shared';
-import type { AnnotationDTO, AnnotationRef } from '../../src/shared';
+import type { Annotation, AnnotationRef } from '../../src/shared';
 
 /* The composer only reads identity, relationship, state, and attribution
  * fields; fixtures cast focused literals rather than materialise the full
@@ -14,7 +14,7 @@ const ref = (n: number): AnnotationRef => ({
 });
 
 let autoIndex = 0;
-const annot = (n: number, over: Record<string, unknown> = {}): AnnotationDTO =>
+const annot = (n: number, over: Record<string, unknown> = {}): Annotation =>
   ({
     subtype: 'highlight',
     ref: ref(n),
@@ -27,9 +27,9 @@ const annot = (n: number, over: Record<string, unknown> = {}): AnnotationDTO =>
     modifiedAt: null,
     reply: null,
     ...over,
-  }) as unknown as AnnotationDTO;
+  }) as unknown as Annotation;
 
-const reply = (n: number, parent: number, over: Record<string, unknown> = {}): AnnotationDTO =>
+const reply = (n: number, parent: number, over: Record<string, unknown> = {}): Annotation =>
   annot(n, {
     subtype: 'text',
     state: null,
@@ -42,7 +42,7 @@ const state = (
   n: number,
   parent: number | null,
   fields: { state?: string | null; stateModel?: string | null; by?: string; at?: string },
-): AnnotationDTO =>
+): Annotation =>
   annot(n, {
     subtype: 'text',
     reply: parent === null ? null : { to: ref(parent), type: 'reply' },

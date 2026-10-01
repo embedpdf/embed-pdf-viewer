@@ -12,7 +12,7 @@ import {
   type AppearanceOutcome,
   type AnnotationCreateResult,
   type AnnotationDeleteResult,
-  type AnnotationDTO,
+  type Annotation,
   type AnnotationDraft,
   type AnnotationListMutationMeta,
   type AnnotationMoveResult,
@@ -440,7 +440,7 @@ export class AnnotationMutator {
       pageObjectNumber,
       signal,
     );
-    const hasWeak = (list: readonly AnnotationDTO<PdfCoordinates>[]) =>
+    const hasWeak = (list: readonly Annotation<PdfCoordinates>[]) =>
       list.some((annotation) => annotation.ref.kind === 'index');
     if (this.session.weakAnnotationState(pageObjectNumber).kind !== 'known') {
       this.session.recordWeakFlag(pageObjectNumber, hasWeak(annotations));
@@ -804,7 +804,7 @@ export class AnnotationMutator {
       const bumpedRev = this.session.bumpRevision(pageObjectNumber);
       bumpRequested = false;
 
-      const moved: AnnotationDTO<PdfCoordinates>[] = new Array(fromIndices.length);
+      const moved: Annotation<PdfCoordinates>[] = new Array(fromIndices.length);
       for (let i = 0; i < fromIndices.length; i++) {
         throwIfAborted(signal);
         const newIdx = toIndex + i;

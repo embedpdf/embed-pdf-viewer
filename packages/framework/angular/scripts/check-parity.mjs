@@ -13,15 +13,13 @@ import { fileURLToPath } from 'node:url';
 // this set as entries land; never grow it silently — a new React vertical
 // should either be ported or added here in the same change, consciously.
 const PENDING = new Set([
-  'scrollbar',
   'page-view',
   'interaction',
   'selection',
   'annotation',
-  'annotation-menu',
   'search',
   'stamp',
-  'views',
+  'view-manager',
   'page-edit',
   'metadata',
   'i18n',

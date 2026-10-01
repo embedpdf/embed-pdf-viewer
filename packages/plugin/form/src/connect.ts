@@ -49,7 +49,7 @@ export function connectForm(ctx: FormContext, form: FormHostCapability): void {
   for (const tool of FORM_TOOLS) {
     ctx.cleanup(
       annotation
-        ? annotation.registerTool({
+        ? annotation.tools.register({
             id: tool.id,
             subtype: tool.visualKind,
             cursor: tool.cursor,

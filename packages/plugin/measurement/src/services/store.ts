@@ -1,5 +1,4 @@
 /** The page registry, the calibrate twin, and the page-target expansion. */
-import { PluginError } from '@embedpdf/core';
 import type { PageRef } from '@embedpdf/engine-core/runtime';
 
 import type { PageTarget } from '../contract';
@@ -9,18 +8,17 @@ import type { MeasurementContext } from './context';
 export const SCALE_PERMISSION = 'doc.annotate.modify';
 
 export function createStore(ctx: MeasurementContext) {
-  const requirePage = (page: PageRef) => {
-    const layout = ctx.getPage(page);
-    if (!layout) throw new PluginError('not-found', 'measurement', 'no such page');
-    return layout;
-  };
+  /** A page argument of a verb, as a ref or an index: the page, or `not-found`. */
+  const requirePage = (page: PageRef | number) => ctx.pageOf(page);
   const canCalibrate = () => ctx.allows(SCALE_PERMISSION);
-  const targets = (pages: PageTarget): readonly PageRef[] =>
-    pages === 'all'
-      ? (ctx.document()?.pages ?? []).map((layout) => layout.ref)
-      : Array.isArray(pages)
-        ? (pages as readonly PageRef[])
-        : [pages as PageRef];
+  /** The pages a verb changes, each resolved: a page that isn't there refuses the whole call. */
+  const targets = (pages: PageTarget): readonly PageRef[] => {
+    if (pages === 'all') return (ctx.document()?.pages ?? []).map((layout) => layout.ref);
+    const list: readonly (PageRef | number)[] = Array.isArray(pages)
+      ? pages
+      : [pages as PageRef | number];
+    return list.map((page) => ctx.pageOf(page).ref);
+  };
   return { requirePage, canCalibrate, targets };
 }
 export type MeasurementStore = ReturnType<typeof createStore>;

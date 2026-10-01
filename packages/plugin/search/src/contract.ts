@@ -220,8 +220,12 @@ export interface SearchCapability extends SettingsApi<SearchSettings> {
   /** Step to the next / previous hit, wrapping, and reveal it. */
   nextHit(options?: SearchRevealOptions): SearchHit | null;
   previousHit(options?: SearchRevealOptions): SearchHit | null;
-  /** Jump to a hit by index (wraps) and reveal it. */
-  goToHit(index: number, options?: SearchRevealOptions): SearchHit | null;
+  /**
+   * Make a hit the active one and reveal it: the hit itself, such as the one
+   * `<SearchLayer onHitClick>` hands you, or its index (which wraps). Returns
+   * the hit, or null when there are no hits or the given one isn't among them.
+   */
+  goToHit(hit: SearchHit | number, options?: SearchRevealOptions): SearchHit | null;
   /** Bring the active hit back into view without changing it. */
   revealActiveHit(options?: SearchRevealOptions): void;
 

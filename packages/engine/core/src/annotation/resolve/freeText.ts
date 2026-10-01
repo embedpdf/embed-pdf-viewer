@@ -8,11 +8,11 @@ import {
 import type { PdfCoordinates } from '../../pageSpace/coordinates';
 import { pdfCalloutEnd } from '../calloutEnd';
 import { faceForFreeTextFont, type DescribeFont } from '../fontFaces';
-import type { AnnotationDraft, AnnotationDTO, AnnotationPatch } from '../kinds';
+import type { AnnotationDraft, Annotation, AnnotationPatch } from '../kinds';
 import type { FreeTextIntent } from '../primitives';
 
 type FreeTextPatch = Extract<AnnotationPatch<PdfCoordinates>, { subtype?: 'free-text' }>;
-type FreeTextRead = Extract<AnnotationDTO<PdfCoordinates>, { subtype: 'free-text' }>;
+type FreeTextRead = Extract<Annotation<PdfCoordinates>, { subtype: 'free-text' }>;
 
 /** A free text's text style: the four fields that are its rich body's. */
 type TextStyle = Pick<FreeTextPatch, 'fontFamily' | 'fontSize' | 'fontColor' | 'textAlign'>;
@@ -97,7 +97,7 @@ function styleOfBody(
  * - A callout line needs the callout intent.
  */
 export function freeTextFollows(
-  current: AnnotationDTO<PdfCoordinates>,
+  current: Annotation<PdfCoordinates>,
   patch: AnnotationPatch<PdfCoordinates>,
   describe?: DescribeFont,
 ): AnnotationPatch<PdfCoordinates> {
@@ -136,7 +136,7 @@ export function freeTextFollows(
  * nor its turn keeps the stored end.
  */
 export function calloutEndFollows(
-  current: AnnotationDTO<PdfCoordinates>,
+  current: Annotation<PdfCoordinates>,
   patch: AnnotationPatch<PdfCoordinates>,
 ): AnnotationPatch<PdfCoordinates> {
   if (current.subtype !== 'free-text' || patch.subtype !== 'free-text') return patch;

@@ -2,7 +2,7 @@ import {
   EngineError,
   EngineErrorCode,
   touchesCaption,
-  type AnnotationDTO,
+  type Annotation,
   type AnnotationPatch,
   type PdfCoordinates,
 } from '@embedpdf/engine-core/runtime';
@@ -17,7 +17,7 @@ import type { PdfFunctions, Ptr } from '@embedpdf/engine-runtime';
 export function assertCaptionMetadataWritable(
   fn: PdfFunctions,
   annot: Ptr,
-  current: AnnotationDTO<PdfCoordinates>,
+  current: Annotation<PdfCoordinates>,
   patch: AnnotationPatch<PdfCoordinates>,
 ): void {
   if (current.subtype !== 'polygon' && current.subtype !== 'polyline') return;

@@ -28,15 +28,15 @@ export interface SelectionState {
   readonly segments: SegmentsByPage;
   /** A consumer owns the selection visual (a markup tool draws its own preview). */
   readonly highlightHidden: boolean;
-  /** A selection gesture is in flight (pointer-down … pointer-up). */
-  readonly gestureActive: boolean;
+  /** The user is still selecting: a gesture is in flight (pointer-down … pointer-up). */
+  readonly selecting: boolean;
 }
 
 export const initialSelectionState = (): SelectionState => ({
   selection: null,
   segments: {},
   highlightHidden: false,
-  gestureActive: false,
+  selecting: false,
 });
 
 const samePosition = (left: GlyphPosition, right: GlyphPosition): boolean =>
@@ -106,8 +106,8 @@ export function clearSelection(state: SelectionState): SelectionState {
 export const setHighlightHidden = (state: SelectionState, hidden: boolean): SelectionState =>
   state.highlightHidden === hidden ? state : { ...state, highlightHidden: hidden };
 
-export const setGestureActive = (state: SelectionState, active: boolean): SelectionState =>
-  state.gestureActive === active ? state : { ...state, gestureActive: active };
+export const setSelecting = (state: SelectionState, selecting: boolean): SelectionState =>
+  state.selecting === selecting ? state : { ...state, selecting };
 
 /**
  * The pages whose content (and so character space) a confirmed event

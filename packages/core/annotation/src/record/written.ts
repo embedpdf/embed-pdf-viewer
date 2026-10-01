@@ -35,7 +35,7 @@ import {
   resolveAnnotationPatch,
   UNBAKED_KINDS,
   type AnnotationDraft,
-  type AnnotationDTO,
+  type Annotation,
   type AnnotationPatch,
   type AnnotationRef,
 } from '@embedpdf/engine-core/runtime';
@@ -49,7 +49,7 @@ import { shapeOf } from './shape';
 import { styleOf } from './style';
 
 /** Does the engine work out this annotation's `rect` from its drawing? */
-const rectFollowsDrawing = (annotation: AnnotationDTO): boolean =>
+const rectFollowsDrawing = (annotation: Annotation): boolean =>
   DRAWN_RECT_KINDS.has(annotation.subtype);
 
 /**
@@ -57,7 +57,7 @@ const rectFollowsDrawing = (annotation: AnnotationDTO): boolean =>
  * family paints it (stroke, endings, cloud, turn), and a measurement's
  * dimension line, leader lines and caption.
  */
-function drawnBoundsOf(annotation: AnnotationDTO): Rect {
+function drawnBoundsOf(annotation: Annotation): Rect {
   const shape = shapeOf(annotation);
   const style = styleOf(annotation);
   const bounds = familyOf(shape).rect(shape, style);
@@ -79,7 +79,7 @@ function drawnBoundsOf(annotation: AnnotationDTO): Rect {
 export function annotationOfNew(
   draft: AnnotationDraft,
   at: { readonly ref: AnnotationRef; readonly index: number },
-): AnnotationDTO {
+): Annotation {
   const annotation = annotationOfDraft(draft, at);
   return rectFollowsDrawing(annotation)
     ? { ...annotation, rect: drawnBoundsOf(annotation) }
@@ -92,7 +92,7 @@ export function annotationOfNew(
  * verdict on the change says (the table at the top of this file). Throws, as
  * the engine would refuse it, for a patch the annotation doesn't take.
  */
-export function annotationAfter(annotation: AnnotationDTO, patch: AnnotationPatch): AnnotationDTO {
+export function annotationAfter(annotation: Annotation, patch: AnnotationPatch): Annotation {
   const after = applyAnnotationPatch(annotation, patch);
   const change = appearanceChangeOf(annotation, resolveAnnotationPatch(annotation, patch));
   switch (change.impact) {

@@ -79,4 +79,13 @@ describe('formatShortcut', () => {
     expect(formatShortcut('Ctrl+Shift+Z', { isMac: true })).toBe('⌃⇧Z');
     expect(formatShortcut('Ctrl+Shift+Z', { isMac: false })).toBe('Ctrl+Shift+Z');
   });
+
+  it('shows named keys as each platform does', () => {
+    expect(formatShortcut('ArrowRight', { isMac: true })).toBe('→');
+    expect(formatShortcut('Home', { isMac: false })).toBe('Home');
+    expect(formatShortcut('Delete', { isMac: true })).toBe('⌦');
+    expect(formatShortcut('Delete', { isMac: false })).toBe('Delete');
+    expect(formatShortcut('Mod+NumpadAdd', { isMac: false })).toBe('Ctrl+Num +');
+    expect(formatShortcut('F1', { isMac: false })).toBe('F1');
+  });
 });

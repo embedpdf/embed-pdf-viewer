@@ -62,7 +62,7 @@ function Results() {
             type="button"
             className="result"
             aria-current={index === activeHitIndex}
-            onClick={() => search.goToHit(index)}
+            onClick={() => search.goToHit(hit)}
           >
             <span className="result-page">Page {hit.pageIndex + 1}</span>
             {/* A match has no snippet when the user may search but not copy text. */}

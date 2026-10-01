@@ -1,0 +1,114 @@
+/* Colors */
+:root {
+  --ink: #1a2748;
+  --text: #3b4b7a;
+  --muted: #5a6b92;
+  --line: #e6eaf2;
+  --surface: #ffffff;
+  --canvas: #f7f9fc;
+  --shadow: rgb(7 32 76 / 0.04);
+}
+
+/* The greeting, above the pages */
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.readout {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.note {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+/* The pages and the fields: stacked, and side by side where there's room */
+.viewer {
+  container-type: inline-size;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.stage,
+.fields {
+  flex: 1 1 100%;
+  box-sizing: border-box;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  box-shadow:
+    0 1px 2px var(--shadow),
+    0 18px 40px -28px rgb(7 32 76 / 0.28);
+}
+
+.stage {
+  height: 340px;
+  background: var(--canvas);
+}
+
+.fields {
+  margin: 0;
+  padding: 6px;
+  list-style: none;
+  background: var(--surface);
+}
+
+@container (min-width: 620px) {
+  .stage {
+    flex: 1 1 0;
+    min-width: 0;
+    height: 440px;
+  }
+
+  .fields {
+    flex: 0 0 220px;
+    max-height: 440px;
+    overflow-y: auto;
+  }
+}
+
+/* One field: its name and family, then its value */
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 8px 10px;
+  border-radius: 9px;
+}
+
+.field + .field {
+  border-top: 1px solid var(--line);
+}
+
+.field-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.family {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--muted);
+}
+
+.field-value {
+  font-size: 13px;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+.loading {
+  margin: 0;
+  padding: 24px 0;
+  text-align: center;
+  font-size: 13px;
+  color: var(--muted);
+}

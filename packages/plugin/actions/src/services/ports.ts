@@ -28,7 +28,7 @@ export interface ActionPorts {
   submitResolver: SubmitResolver | null;
 }
 
-export function createPorts({ diagnosticHook }: Pick<ActionsEvents, 'diagnosticHook'>) {
+export function createPorts({ reportDiagnostic }: Pick<ActionsEvents, 'reportDiagnostic'>) {
   const ports: ActionPorts = {
     executors: new Map(),
     annotCommitSink: null,
@@ -40,10 +40,10 @@ export function createPorts({ diagnosticHook }: Pick<ActionsEvents, 'diagnosticH
   const api = {
     registerExecutor: (type, executor): Unsubscribe => {
       if (ports.executors.has(type)) {
-        diagnosticHook.emit({
-          code: 'duplicate-executor',
-          message: `executor for '${type}' replaced (last-wins)`,
-        });
+        reportDiagnostic(
+          { code: 'duplicate-executor', message: `executor for '${type}' replaced (last-wins)` },
+          { action: type },
+        );
       }
       ports.executors.set(type, executor);
       return () => {

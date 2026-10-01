@@ -1,7 +1,7 @@
 import {
   toPageRef,
   type AnnotationDraft,
-  type AnnotationDTO,
+  type Annotation,
   type AnnotationPatch,
 } from '@embedpdf/engine-core/runtime';
 import { describe, expect, it } from 'vitest';
@@ -11,7 +11,7 @@ import { annotationAfter, annotationOfNew } from '../../src/record/written';
 const PAGE = toPageRef(1);
 
 /** The annotation `draft` creates, as the engine writes it. */
-const created = (draft: Record<string, unknown>): AnnotationDTO =>
+const created = (draft: Record<string, unknown>): Annotation =>
   annotationOfNew(draft as unknown as AnnotationDraft, {
     ref: { kind: 'nm', page: PAGE, nm: 'a' },
     index: 0,
@@ -34,7 +34,7 @@ const SQUARE = {
 const LINK = { subtype: 'link', target: { kind: 'uri', uri: 'https://example.com' } };
 
 /** From another app: its rect padded past its drawing on every side. */
-const foreign = (annotation: AnnotationDTO): AnnotationDTO => {
+const foreign = (annotation: Annotation): Annotation => {
   const { x, y, width, height } = annotation.rect;
   return { ...annotation, rect: { x: x - 3, y: y - 3, width: width + 6, height: height + 6 } };
 };
@@ -109,7 +109,7 @@ describe('annotationAfter: the rect follows the engine’s verdict on the change
 
 describe('whether the file holds an appearance after the write', () => {
   /** From another app, with no appearance in the file. */
-  const bare = (annotation: AnnotationDTO): AnnotationDTO => ({
+  const bare = (annotation: Annotation): Annotation => ({
     ...annotation,
     hasAppearance: false,
   });

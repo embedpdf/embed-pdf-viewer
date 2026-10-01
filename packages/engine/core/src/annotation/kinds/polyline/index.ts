@@ -6,7 +6,7 @@ import { PolylineDeclaration } from './declaration';
 
 export { PolylineDeclaration } from './declaration';
 
-export type PolylineAnnotationDTO<C extends Coordinates = PageCoordinates> = ReadOf<
+export type PolylineAnnotation<C extends Coordinates = PageCoordinates> = ReadOf<
   typeof PolylineDeclaration,
   C
 >;
@@ -25,7 +25,7 @@ export const PolylinePatchSchema = PolylineDeclaration.updateSchema;
 
 export const PolylineKind: AnnotationKindModule<
   'polyline',
-  PolylineAnnotationDTO,
+  PolylineAnnotation,
   PolylineDraft,
   PolylinePatch
 > = {

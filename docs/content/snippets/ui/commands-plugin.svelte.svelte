@@ -1,7 +1,9 @@
 <script lang="ts">
+  import { AnnotationToken } from '@embedpdf/svelte/annotation';
   import { commandsPlugin, standardCommands } from '@embedpdf/svelte/commands';
-  import { Viewer } from '@embedpdf/svelte/runtime';
+  import { DocumentsToken, Viewer } from '@embedpdf/svelte/runtime';
   import { engine } from './pdf';
+  import { approveDocument } from './review';
 
   const plugins = [
     /* … */

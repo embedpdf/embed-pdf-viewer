@@ -4,12 +4,16 @@
  * effects are external: replayed after the transaction releases, still inside
  * the queued dispatch operation.
  */
-import type { PluginContext } from '@embedpdf/core';
 import type { ScriptOutput, ScriptUiEffect } from '@embedpdf/core-acrojs';
 
-import type { ActionDiagnostic, ActionNodeStatus, ActionOrigin, ActionsConfig } from '../contract';
+import type {
+  ActionDiagnostic,
+  ActionNodeStatus,
+  ActionOrigin,
+  ActionsScriptEnvironment,
+} from '../contract';
 import type { AnnotCommitEntry } from '../host-contract';
-import type { ActionsServices } from '../services';
+import type { ActionsContext, ActionsServices } from '../services';
 import { intentOfSubmitEffect } from '../submit/intent';
 import type { ActionsSubmit } from '../submit/perform';
 import type { ActionsRealm } from './realm';
@@ -25,15 +29,15 @@ type FirePrint = (
 const DEFAULT_SCRIPT_NODES_PER_DISPATCH = 16;
 
 export function registerScriptExecutor(
-  ctx: PluginContext<void>,
+  ctx: ActionsContext,
   services: Pick<ActionsServices, 'events' | 'ports' | 'queue'>,
-  config: ActionsConfig,
+  environment: ActionsScriptEnvironment,
   { scriptHost }: Pick<ActionsRealm, 'scriptHost'>,
   { performSubmit }: ActionsSubmit,
   { surfaceScriptResult }: Pick<ActionsScriptSurface, 'surfaceScriptResult'>,
   documentEvents: { firePrintThroughAdapter: FirePrint },
 ): void {
-  const { diagnosticHook } = services.events;
+  const { reportDiagnostic } = services.events;
   const ports = services.ports.slots;
   const { budget } = services.queue;
   const { firePrintThroughAdapter } = documentEvents;
@@ -90,8 +94,7 @@ export function registerScriptExecutor(
   };
 
   if (!scriptHost) return;
-  const nodeLimit =
-    config.javascript?.maxScriptNodesPerDispatch ?? DEFAULT_SCRIPT_NODES_PER_DISPATCH;
+  const nodeLimit = environment.maxScriptNodesPerDispatch ?? DEFAULT_SCRIPT_NODES_PER_DISPATCH;
   ports.executors.set('javascript', async (node, actionContext) => {
     if (node.type !== 'javascript') return { status: 'inert', reason: 'not a JS node' };
     if (budget.scriptNodes >= nodeLimit) {
@@ -112,7 +115,8 @@ export function registerScriptExecutor(
     if (pageObjectNumber === undefined) {
       return { status: 'inert', reason: 'no page to anchor the world on' };
     }
-    const diagnose = (diagnostic: ActionDiagnostic): void => diagnosticHook.emit(diagnostic);
+    const diagnose = (diagnostic: ActionDiagnostic): void =>
+      reportDiagnostic(diagnostic, { action: 'javascript', source });
     // Print and submit effects are external: the /WP and /DP wrap runs
     // action trees (which may need their own host transactions) and the
     // submit dataset must be resolved from post-commit truth, so both run
@@ -149,6 +153,7 @@ export function registerScriptExecutor(
           origin: actionContext.origin,
           phase: 'boot',
           realm: 'document',
+          source,
         });
         if (boot.formEffects.length || boot.annotEffects.length) {
           built = await scriptWorldFor(pageObjectNumber);
@@ -165,6 +170,7 @@ export function registerScriptExecutor(
         origin: actionContext.origin,
         phase: 'user',
         realm: 'document',
+        source,
       });
       if (output.error) return { status: 'failed', error: output.error.message };
       const failure = await commitScriptOutput(output, diagnose);

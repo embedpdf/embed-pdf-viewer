@@ -1,4 +1,4 @@
-/* Colors, for light and dark */
+/* Colors */
 :root {
   --ink: #1a2748;
   --muted: #5a6b92;
@@ -10,20 +10,6 @@
   --accent: #054fb3;
   --focus: #7db6ff;
   --shadow: rgb(7 32 76 / 0.04);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --ink: #e6ecfa;
-    --muted: #93a3c7;
-    --line: #27365f;
-    --line-strong: #34467a;
-    --surface: #131d3b;
-    --tint: #1a2750;
-    --canvas: #0b1328;
-    --accent: #7db6ff;
-    --shadow: rgb(0 0 0 / 0.3);
-  }
 }
 
 /* The zoom controls, above the pages */
@@ -38,15 +24,16 @@
 .button {
   min-width: 38px;
   font: inherit;
-  font-size: 15px;
+  font-size: 13.5px;
   font-weight: 550;
-  line-height: 1;
+  line-height: 1.1;
   color: var(--ink);
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: 9px;
-  padding: 8px;
+  padding: 8px 11px;
   cursor: pointer;
+  white-space: nowrap;
   box-shadow: 0 1px 2px var(--shadow);
   transition:
     background-color 0.15s ease,
@@ -67,6 +54,12 @@
   outline-offset: 2px;
 }
 
+.button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none;
+}
+
 .readout {
   min-width: 52px;
   text-align: center;
@@ -79,12 +72,13 @@
 /* One choice of a few: the pressed button is the current one */
 .segmented {
   display: inline-flex;
+  flex-wrap: wrap;
   gap: 2px;
-  margin-left: auto;
   padding: 3px;
   background: var(--tint);
   border: 1px solid var(--line);
   border-radius: 11px;
+  margin-left: auto;
 }
 
 .segmented button {

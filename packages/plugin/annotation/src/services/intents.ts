@@ -28,7 +28,7 @@
  */
 import { toPluginError, toPluginErrorInfo, type Mirror, type PluginError } from '@embedpdf/core';
 import type { Id, Model, UpdateResult } from '@embedpdf/core-annotation';
-import type { AnnotationDTO, AnnotationRef } from '@embedpdf/engine-core/runtime';
+import type { Annotation, AnnotationRef } from '@embedpdf/engine-core/runtime';
 
 import {
   changedFields,
@@ -49,7 +49,7 @@ export interface WriteAnswer {
   /** The confirmed ref of each record the write created, by the id it was created under. */
   readonly created?: CreatedRefs;
   /** The annotation a single create or update left, as the engine read it back. */
-  readonly annotation?: AnnotationDTO;
+  readonly annotation?: Annotation;
 }
 
 /** One engine write an effect or a stated change asks for. */

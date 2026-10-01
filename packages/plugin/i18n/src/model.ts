@@ -1,37 +1,50 @@
 /**
- * The i18n state. Pure and serializable: locale packs are data, so they live
- * in state rather than a side-table, `t()` is a pure function of it, and
- * reactivity rides the kernel's one change stream. Every function below is a
- * pure transition; the controller applies them with `ctx.state.update`.
+ * The i18n state: the current language, the loaded languages' strings, and the
+ * language being loaded. Plain data, so `t()` is a pure function of it. Every
+ * function below is a pure transition; the controller applies them with
+ * `ctx.state.update`.
  */
-import type { I18nConfig, Locale, TranslationDictionary } from './contract';
+import type { Locale, TranslationDictionary } from './contract';
 
 export interface I18nState {
+  /** The current language's code. */
   readonly locale: string;
-  readonly fallbackLocale: string;
-  /** Registered packs by code — the lookup table `t()` reads. */
+  /** The loaded languages, by code: what `t()` reads. */
   readonly locales: Readonly<Record<string, Locale>>;
-  /** Code of a lazy pack currently being fetched (drives switcher spinners). */
+  /** The code of a language in `loaders` being fetched, or `null`. */
   readonly loading: string | null;
-  /** Strings added to a lazy pack before it loaded, by code; they merge in when it registers. */
+  /** Strings added to a language before it loaded, by code; they merge in when it does. */
   readonly waitingTranslations: Readonly<Record<string, TranslationDictionary>>;
 }
 
-export function initialI18nState(config: I18nConfig): I18nState {
-  const fallbackLocale = config.fallbackLocale ?? 'en';
-  const locales: Record<string, Locale> = {};
-  for (const locale of config.locales ?? []) locales[locale.code] = withNestedKeys(locale);
-  const locale = config.locale ?? fallbackLocale;
-  // A startup locale that is a lazy pack: show the fallback chain until the
-  // pack arrives — seeding `loading` makes the loader fetch it at connect.
-  const needsLoad = !locales[locale] && config.loaders?.[locale] !== undefined;
-  return {
-    locale,
-    fallbackLocale,
-    locales,
-    loading: needsLoad ? locale : null,
-    waitingTranslations: {},
-  };
+/** Nothing loaded yet: the controller seeds the state from the settings. */
+export const initialI18nState = (): I18nState => ({
+  locale: '',
+  locales: {},
+  loading: null,
+  waitingTranslations: {},
+});
+
+/**
+ * The state the settings start with: their languages loaded, and their `locale` current. A start
+ * language that is still to load shows `fallbackLocale` meanwhile, and `loading` names it, so the
+ * loader fetches it once connected.
+ */
+export function seedFromSettings(
+  state: I18nState,
+  settings: {
+    readonly locale: string | null;
+    readonly fallbackLocale: string;
+    readonly locales: readonly Locale[];
+    readonly loaders: Readonly<Record<string, unknown>>;
+  },
+): I18nState {
+  const seeded = settings.locales.reduce(registerLocale, state);
+  const locale = settings.locale ?? settings.fallbackLocale;
+  if (seeded.locales[locale] || settings.loaders[locale] === undefined) {
+    return { ...seeded, locale };
+  }
+  return { ...seeded, locale: settings.fallbackLocale, loading: locale };
 }
 
 /** Deep merge of two dictionaries: later leaves win, branches merge. */
@@ -79,9 +92,9 @@ const withNestedKeys = (locale: Locale): Locale => {
 };
 
 /**
- * Switch to a registered locale and end any load. Unregistered codes change
- * nothing: a lazy pack becomes current through {@link startLocaleLoad},
- * {@link registerLocale} and then this transition, which the loader drives.
+ * Switch to a loaded language and end any load. A code that isn't loaded changes nothing: a
+ * language in `loaders` becomes current through {@link startLocaleLoad}, {@link registerLocale}
+ * and then this transition, which the loader drives.
  */
 export function setLocale(state: I18nState, code: string): I18nState {
   if (!state.locales[code]) return state;
@@ -89,7 +102,7 @@ export function setLocale(state: I18nState, code: string): I18nState {
   return { ...state, locale: code, loading: null };
 }
 
-/** Register a pack, with any strings that were added to it before it loaded on top. */
+/** Add a language, with any strings that were added to it before it loaded on top. */
 export function registerLocale(state: I18nState, locale: Locale): I18nState {
   const pack = withNestedKeys(locale);
   const waiting = state.waitingTranslations[locale.code];
@@ -112,9 +125,9 @@ export function unregisterLocale(state: I18nState, code: string): I18nState {
 }
 
 /**
- * Merge keys into a pack, later keys winning. For a pack that isn't registered yet (a lazy pack
- * still to load), the strings wait and merge in when it registers; the controller only lets
- * codes with a loader get here.
+ * Merge strings into a language, later keys winning. For a language that isn't loaded yet (one in
+ * `loaders`), the strings wait and merge in when it loads; the controller only lets codes with a
+ * loader get here.
  */
 export function addTranslations(
   state: I18nState,
@@ -142,12 +155,12 @@ export function addTranslations(
   };
 }
 
-/** A lazy pack is wanted: the loader fetches whatever `loading` names. */
+/** A language in `loaders` is wanted: the loader fetches whatever `loading` names. */
 export function startLocaleLoad(state: I18nState, code: string): I18nState {
   return state.loading === code ? state : { ...state, loading: code };
 }
 
-/** A lazy pack failed to load; only the load still in flight is ended. */
-export function failLocaleLoad(state: I18nState, code: string): I18nState {
+/** A load ended without switching: it failed or was cancelled. Only the load still wanted ends. */
+export function endLocaleLoad(state: I18nState, code: string): I18nState {
   return state.loading === code ? { ...state, loading: null } : state;
 }

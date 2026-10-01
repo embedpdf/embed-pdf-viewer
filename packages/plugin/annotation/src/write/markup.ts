@@ -1,12 +1,12 @@
-import { pageRefsEqual } from '@embedpdf/core';
-import type { KindName, TextEndAnchor, Quad } from '@embedpdf/core-annotation';
-import type { AnnotationRef, PageRef } from '@embedpdf/engine-core/runtime';
+import { PluginError, pageRefsEqual, type OperationOptions } from '@embedpdf/core';
+import type { KindName, TextEndAnchor, Quad, UpdateResult } from '@embedpdf/core-annotation';
+import type { Annotation, PageRef } from '@embedpdf/engine-core/runtime';
 import {
   SelectionToken as SelectionPublicToken,
   type SelectionSnapshot,
 } from '@embedpdf/plugin-selection/contract';
 
-import type { MarkupSubtype } from '../contract';
+import type { AnnotationReads } from '../read/annotations';
 import type { AnnotationContext, AnnotationServices } from '../services';
 import type { Commit } from '../services/store';
 import type { ResolvedTool } from '../tools/definitions';
@@ -36,27 +36,46 @@ const selectionMarkupOf = (tool: ResolvedTool): SelectionMarkup | null => {
  * a text tool) and the programmatic `createFromSelection`.
  */
 export function createMarkupWrites(
-  ctx: Pick<AnnotationContext, 'tryGet' | 'assertAllowed'>,
-  { store, authority, tools }: Pick<AnnotationServices, 'store' | 'authority' | 'tools'>,
+  ctx: Pick<AnnotationContext, 'tryGet' | 'assertAllowed' | 'cancellable'>,
+  {
+    store,
+    authority,
+    tools,
+    afterCreate,
+  }: Pick<AnnotationServices, 'store' | 'authority' | 'tools' | 'afterCreate'>,
+  annotations: Pick<AnnotationReads, 'get'>,
 ) {
+  /** How a create's result shows: a tool's `afterCreate`, or code's (nothing selected changes). */
+  type Adjust = (result: UpdateResult) => UpdateResult;
+
   // A markup tool's `/F` seed rides along (the preset is the tool id).
-  const commitMarkup = (subtype: KindName, page: PageRef, quads: Quad[], preset?: string) =>
-    store.commit({
-      type: 'createMarkup',
-      subtype,
-      page,
-      quads,
-      preset,
-      flags: preset ? tools.get(preset)?.flags : undefined,
-    });
-  const commitCaret = (page: PageRef, anchor: TextEndAnchor) =>
-    store.commit({ type: 'createCaret', page, anchor });
+  const commitMarkup = (
+    subtype: KindName,
+    page: PageRef,
+    quads: Quad[],
+    preset?: string,
+    adjust?: Adjust,
+  ) =>
+    store.commit(
+      {
+        type: 'createMarkup',
+        subtype,
+        page,
+        quads,
+        preset,
+        flags: preset ? tools.get(preset)?.flags : undefined,
+      },
+      adjust,
+    );
+  const commitCaret = (page: PageRef, anchor: TextEndAnchor, adjust?: Adjust) =>
+    store.commit({ type: 'createCaret', page, anchor }, adjust);
   const commitReplaceText = (
     page: PageRef,
     quads: Quad[],
     anchor: TextEndAnchor,
     preset?: string,
-  ) => store.commit({ type: 'createReplaceText', page, quads, anchor, preset });
+    adjust?: Adjust,
+  ) => store.commit({ type: 'createReplaceText', page, quads, anchor, preset }, adjust);
 
   /**
    * The selection as `markup`: one annotation per page, over the page's
@@ -69,11 +88,14 @@ export function createMarkupWrites(
   const markupFromSelection = (
     markup: SelectionMarkup,
     snapshot: SelectionSnapshot,
-    preset?: string,
+    preset: string | undefined,
+    adjust: Adjust,
   ): Commit[] => {
     const end = snapshot.end;
     if (markup.kind === 'insert') {
-      return end ? [commitCaret(end.page, { glyphQuad: end.glyphQuad, advance: end.advance })] : [];
+      return end
+        ? [commitCaret(end.page, { glyphQuad: end.glyphQuad, advance: end.advance }, adjust)]
+        : [];
     }
     const commits: Commit[] = [];
     for (const entry of snapshot.pages) {
@@ -81,14 +103,14 @@ export function createMarkupWrites(
       if (!last) continue;
       const quads = entry.segments.map((segment) => segment.quad);
       if (markup.kind === 'markup') {
-        commits.push(commitMarkup(markup.subtype, entry.page, quads, preset));
+        commits.push(commitMarkup(markup.subtype, entry.page, quads, preset, adjust));
         continue;
       }
       const anchor =
         end && pageRefsEqual(end.page, entry.page)
           ? { glyphQuad: end.glyphQuad, advance: end.advance }
           : { glyphQuad: last.quad, advance: last.advance };
-      commits.push(commitReplaceText(entry.page, quads, anchor, preset));
+      commits.push(commitReplaceText(entry.page, quads, anchor, preset, adjust));
     }
     return commits;
   };
@@ -118,8 +140,14 @@ export function createMarkupWrites(
       if (!tool || !markup || !authority.canCreate()) return false;
       const selection = ctx.tryGet(SelectionPublicToken);
       if (!selection || !selection.hasSelection()) return false;
-      markupFromSelection(markup, selection.getSnapshot(), tool.preset);
+      const commits = markupFromSelection(
+        markup,
+        selection.getSnapshot(),
+        tool.preset,
+        afterCreate.shape(tool.id),
+      );
       selection.clear();
+      for (const commit of commits) afterCreate.done(tool.id, commit);
       return true;
     },
     previewMarkup: (subtype: KindName, quadsByPage: Record<number, Quad[]>, preset?: string) => {
@@ -129,23 +157,45 @@ export function createMarkupWrites(
       store.commit({ type: 'clearMarkupPreview' });
     },
     createFromSelection: async (
-      subtype: MarkupSubtype | 'insert-text' | 'replace-text' | 'redact',
-      options?: { preset?: string; clear?: boolean },
-    ): Promise<readonly AnnotationRef[]> => {
+      toolId: string,
+      options: OperationOptions & { clear?: boolean } = {},
+    ): Promise<{ annotations: readonly Annotation[] }> => {
       ctx.assertAllowed('annotations:create', 'annotation.createFromSelection');
+      const tool = tools.get(toolId);
+      const markup = tool && selectionMarkupOf(tool);
+      if (!tool || !markup) {
+        throw new PluginError(
+          'not-found',
+          'annotation',
+          `no tool '${toolId}' that makes something of selected text`,
+        );
+      }
       const selection = ctx.tryGet(SelectionPublicToken);
-      if (!selection || !selection.hasSelection()) return [];
-      const markup: SelectionMarkup =
-        subtype === 'insert-text'
-          ? { kind: 'insert' }
-          : subtype === 'replace-text'
-            ? { kind: 'replace' }
-            : { kind: 'markup', subtype };
-      const commits = markupFromSelection(markup, selection.getSnapshot(), options?.preset);
-      if (options?.clear !== false) selection.clear();
-      return Promise.all(
-        commits.filter((commit) => commit.effects.length).map((commit) => createdRefOf(commit)),
+      if (!selection || !selection.hasSelection()) return { annotations: [] };
+      // Code never changes the annotation selection: what the core selects goes.
+      const before = store.model();
+      const keepSelection: Adjust = (result) => ({
+        ...result,
+        session: { ...result.session, selected: before.selected, editing: before.editing },
+      });
+      const commits = markupFromSelection(
+        markup,
+        selection.getSnapshot(),
+        tool.preset,
+        keepSelection,
       );
+      if (options.clear !== false) selection.clear();
+      const refs = await ctx.cancellable(
+        options.signal,
+        Promise.all(
+          commits.filter((commit) => commit.effects.length).map((commit) => createdRefOf(commit)),
+        ),
+      );
+      return {
+        annotations: refs
+          .map((ref) => annotations.get(ref))
+          .filter((annotation): annotation is Annotation => annotation !== null),
+      };
     },
   };
 

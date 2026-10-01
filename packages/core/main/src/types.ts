@@ -42,6 +42,7 @@ import type {
   EngineRenderPolicy,
   PageDestination,
   PdfDestination,
+  Identity,
 } from '@embedpdf/engine-core/runtime';
 
 // re-export the engine contracts so consumers import them from @embedpdf/core
@@ -71,6 +72,8 @@ export type {
   CustomMetadataPatch,
   CustomMetadataUpdateResult,
   DocumentEvent,
+  /** Who the user is: the author of what they make, and whom `:self` and `:group` permissions are checked against. */
+  Identity,
   /**
    * Where a confirmed document change came from, on every fact event a plugin
    * emits: `kind` (`'local'` for this engine instance, `'remote'` for another
@@ -172,6 +175,12 @@ export interface DocumentMeta {
    * `renderPolicy` on flat envelopes like this one and `/v1/access`.
    */
   readonly renderPolicy: EngineRenderPolicy;
+  /**
+   * Whether the document changed since it was opened or last downloaded. Only an engine whose
+   * changes live in this tab sets it (the local engine); the cloud engine stores every change
+   * as it's made.
+   */
+  readonly hasUnsavedChanges: boolean;
 }
 
 /**
@@ -258,8 +267,8 @@ export interface PluginContext<S = unknown, T extends object = NoSettings> {
    * Whether the bound document's session holds `permission`: the same answer
    * the engine enforces with. What every `can<Verb>()` reads.
    * Document-scoped plugins only: a workspace context has no bound document,
-   * so this throws as reading `doc` does. A workspace plugin asks
-   * `documents.allows(capability, documentId)` for the document it acts on.
+   * so this throws as reading `doc` does. A workspace plugin asks the `can<Verb>()` of the
+   * document plugin it acts through (`ctx.forDocument(token, documentId)`).
    */
   allows(permission: Permission): boolean;
   /**
@@ -343,12 +352,20 @@ export interface PluginContext<S = unknown, T extends object = NoSettings> {
   /**
    * Register what this plugin holds back from the engine, such as text typed a moment ago or
    * the writes in its write queue (`() => queue.idle()`). Before anything reads the whole
-   * document (`documents.save()`, `saveLayer()`), the kernel calls every plugin's `flush` and
+   * document (`documents.download()`, `downloadLayer()`), the kernel calls every plugin's `flush` and
    * waits for it: send what's held back, and resolve once the engine has it. Document-scoped
    * plugins only; unregistered when the instance closes. The rules are in
    * `docs/conventions/state-and-sync.md`.
    */
   onSettle(flush: (signal: AbortSignal) => Promise<void> | void): void;
+  /**
+   * Run something of the document's own around every download of its file
+   * (`documents.download()`, `downloadLayer()`): `wrap` gets the read and returns its bytes,
+   * doing what comes before and after it. The actions plugin runs the document's save actions
+   * this way. The document has settled before `wrap` is called; the first registered wraps the
+   * others. Document-scoped plugins only; unregistered when the instance closes.
+   */
+  aroundDownload(wrap: (read: () => Promise<Uint8Array>) => Promise<Uint8Array>): void;
   /** Acquire a resource whose disposal the instance owns; a late arrival after close is disposed, not returned. */
   acquire<R>(
     get: (lifetime: AbortSignal) => Promise<R>,
@@ -441,52 +458,89 @@ export type AnyPlugin = PluginDef<any, any, any>;
 
 // ── Built-in: the document registry, exposed as a capability ─────────────────
 
-export type DocStatus = 'loading' | 'locked' | 'ready' | 'error';
-
-export interface DocInfo {
-  id: string;
-  name?: string;
-  /** Lifecycle state — the tab bar renders directly off this. */
-  status: DocStatus;
-  /** 0 until the document is `ready`. */
-  pageCount: number;
-  /** `locked` only: a supplied password was rejected (show "incorrect"). */
-  passwordProvided?: boolean;
-  /** `error` only: why the open failed, in the plugin error vocabulary. */
-  error?: PluginErrorInfo;
-}
-
-/** Field-wise DocInfo equality — the one definition every adapter's reactive
- *  `docs` read keys on, so a new lifecycle field can never silently stop
- *  re-rendering one framework's tab bar. */
-export const docInfoEquals = (left: DocInfo, right: DocInfo): boolean =>
-  left.id === right.id &&
-  left.name === right.name &&
-  left.status === right.status &&
-  left.pageCount === right.pageCount &&
-  left.passwordProvided === right.passwordProvided &&
-  left.error?.code === right.error?.code &&
-  left.error?.message === right.error?.message;
-
-export const docInfoListEquals = (left: readonly DocInfo[], right: readonly DocInfo[]): boolean =>
-  left === right ||
-  (left.length === right.length &&
-    left.every((documentInfo, i) => docInfoEquals(documentInfo, right[i])));
-
-/** Options for opening a document: kernel concerns (activate/name) + engine OpenOptions. */
-export type OpenDocumentOptions = OpenOptions & { activate?: boolean; name?: string };
+/** Where a document is: opening, waiting for its password, open, or failed to open. */
+export type DocumentStatus = 'loading' | 'locked' | 'ready' | 'error';
 
 /**
- * What `open()` accepts: an engine `OpenInput`, or a thunk producing one.
- * The thunk form makes the fetch happen under the loading tab — the slot is
- * reserved synchronously, then the thunk runs (network), then the engine
- * opens. Prefer it for anything that isn't already in memory.
- *
- * The thunk receives an AbortSignal that fires if the tab is closed while
- * the fetch is still running — pass it to `fetch()` so a closed tab stops
- * the network work. Zero-argument thunks keep working unchanged.
+ * An open document, as its tab shows it. The same object until one of its fields changes, so a
+ * reader that compares by reference re-renders only for its own document.
  */
-export type OpenSource = OpenInput | ((signal: AbortSignal) => OpenInput | Promise<OpenInput>);
+export interface DocumentInfo {
+  /** The document's id, for `close(id)`, `unlock(id, …)` and a document scope. */
+  readonly id: string;
+  /** The name its tab shows, from `open()` or `rename()`. */
+  readonly name?: string;
+  readonly status: DocumentStatus;
+  /** How many pages it has; 0 until it's `ready`. */
+  readonly pageCount: number;
+  /**
+   * Whether it has changes that weren't downloaded yet. Always false on an engine that stores
+   * every change as it's made (the cloud engine).
+   */
+  readonly hasUnsavedChanges: boolean;
+  /** `locked` only: a password was tried and was wrong. */
+  readonly passwordProvided?: boolean;
+  /** `error` only: why it couldn't be opened, in the plugin error vocabulary. */
+  readonly error?: PluginErrorInfo;
+}
+
+/** A document waiting for its password. */
+export interface LockedDocumentInfo extends DocumentInfo {
+  readonly status: 'locked';
+  readonly passwordProvided: boolean;
+}
+
+/** A document that couldn't be opened, and why. */
+export interface FailedDocumentInfo extends DocumentInfo {
+  readonly status: 'error';
+  readonly error: PluginErrorInfo;
+}
+
+/** A file the viewer downloads itself, with the document's cancel signal: relative to the page, or absolute. */
+export interface UrlSource {
+  readonly kind: 'url';
+  readonly url: string;
+}
+
+/** Options for opening a document: the tab (`name`, `activate`), the engine's `OpenOptions`, and a `signal`. */
+export type OpenDocumentOptions = OpenOptions & {
+  /** Make it the active document; true unless given. */
+  readonly activate?: boolean;
+  /** The name its tab shows. */
+  readonly name?: string;
+  /** Cancels the open: the document closes, and `open()` rejects `operation-cancelled`. */
+  readonly signal?: AbortSignal;
+};
+
+/**
+ * What `open()` accepts: an engine `OpenInput`, a URL the viewer downloads, or a function that
+ * returns one of them. A function runs under the document's loading state, so the tab exists
+ * while it fetches; the `signal` it receives fires when the document is closed first, so pass it
+ * to `fetch()`.
+ */
+export type OpenSource =
+  | OpenInput
+  | UrlSource
+  | ((signal: AbortSignal) => OpenInput | UrlSource | Promise<OpenInput | UrlSource>);
+
+/** What `open()` and `retry()` resolve: the document, ready or locked. */
+export interface OpenDocumentResult {
+  readonly document: DocumentInfo;
+}
+
+/** Options for `unlock()`: the password, and a `signal` that stops trying it. */
+export interface UnlockOptions extends OperationOptions {
+  readonly password: string;
+}
+
+/** Options for `download()`. */
+export interface DownloadOptions extends OperationOptions {
+  /**
+   * `'incremental'` (the default) appends the changes to the original file, so existing
+   * signatures stay valid; `'rewrite'` writes a fresh file without earlier revisions.
+   */
+  readonly mode?: PdfSaveMode;
+}
 
 /**
  * One boot document for `documents.openAll()` — the shared shape every
@@ -497,13 +551,13 @@ export type OpenSource = OpenInput | ((signal: AbortSignal) => OpenInput | Promi
  */
 export type InitialDocument = { source: OpenSource; active?: boolean } & Omit<
   OpenDocumentOptions,
-  'activate'
+  'activate' | 'signal'
 >;
 
 // ── document lifecycle events ─────────────────────────────────────────────
 export interface DocumentOpenedEvent {
   readonly documentId: string;
-  readonly info: DocInfo;
+  readonly info: DocumentInfo;
 }
 export interface DocumentOpenFailedEvent {
   readonly documentId: string;
@@ -516,7 +570,7 @@ export interface DocumentLockedEvent {
 export interface DocumentClosedEvent {
   readonly documentId: string;
 }
-export interface ActiveDocumentChangedEvent {
+export interface DocumentActiveChangedEvent {
   readonly documentId: string | null;
   readonly previousDocumentId: string | null;
 }
@@ -525,109 +579,116 @@ export interface DocumentPagesChangedEvent {
   readonly revision: number;
   readonly pages: readonly PageInfo[];
 }
+export interface DocumentUnsavedChangesChangedEvent {
+  readonly documentId: string;
+  readonly hasUnsavedChanges: boolean;
+}
 
 /**
  * The document registry. A call that leaves out the document uses the document in scope when
  * the capability was resolved for one (`kernel.capability(DocumentsToken, documentId)`, a
- * `<DocumentScope>`), and the active document otherwise.
+ * `<DocumentScope>`), and the active document otherwise. Its verbs reject with `PluginError`.
  */
 export interface DocumentsCapability {
-  /** Open a document; the tab exists synchronously, content arrives on resolve. */
-  open(input: OpenSource, options?: OpenDocumentOptions): Promise<string>;
-  /** Re-run a failed open (`status: 'error'`) with the same source and options. */
-  retry(id: string): Promise<string>;
-  /** Change the tab name. */
+  /**
+   * Open a document and make it the active one (unless `activate: false`). Its tab exists at
+   * once; the promise resolves `{ document }` once it's ready, or locked with a password.
+   * The document's own `scope` and `identity` replace the viewer's. Rejects with the reason it
+   * couldn't be opened (the tab then shows `error`), or `operation-cancelled` when it was closed
+   * or `signal` fired first.
+   */
+  open(source: OpenSource, options?: OpenDocumentOptions): Promise<OpenDocumentResult>;
+  /**
+   * Open a failed document (`status: 'error'`) again, with the same source and options.
+   * Resolves like `open()`. Rejects `invalid-input` for a document that didn't fail.
+   */
+  retry(id: string, options?: OperationOptions): Promise<OpenDocumentResult>;
+  /** Change the name its tab shows; the file doesn't change. */
   rename(id: string, name: string): void;
   /**
-   * Boot-open a batch: fires every `open()` without awaiting, so each tab
-   * slot is reserved synchronously — all tabs exist immediately, in array
-   * order — and exactly one is selected (the `active` entry, else the
-   * first), decided at request time so a slow document can never steal
-   * focus. Failures surface as the tab's `error`/`locked` status, never as
-   * unhandled rejections. This is kernel-owned policy: adapters call this
-   * one line instead of each re-implementing activation and error handling.
+   * Open several documents, as `initialDocuments` does: every tab appears at once, in array
+   * order, and the one marked `active` (else the first) becomes the active one, decided now, so
+   * a slow document never steals the focus. A failure shows in that document's `status`
+   * instead of rejecting. Returns the tabs' ids.
    */
-  openAll(docs: readonly InitialDocument[]): readonly string[];
+  openAll(documents: readonly InitialDocument[]): readonly string[];
   /**
-   * Unlock a `locked` document with a password and promote it to `ready`.
-   * Rejects with the engine's DocPasswordIncorrect on a wrong password —
-   * the document stays locked and unlock can be called again. Identical
-   * behavior on the local (worker loads the parked bytes) and cloud
-   * (/access grant) engines.
+   * Unlock a `locked` document with its password; it opens as it would have. Rejects
+   * `permission-denied` on a wrong password, and the document stays locked so you can ask
+   * again; `invalid-input` for a document that isn't locked.
    */
-  unlock(id: string, input: { password: string }): Promise<void>;
+  unlock(id: string, options: UnlockOptions): Promise<void>;
+  /** Close a document and free its memory; the next one becomes active. Closing one still opening cancels it. */
   close(id: string): Promise<void>;
+  /** Close every document. */
   closeAll(): Promise<void>;
+  /** Make a document the active one: the one every component talks to outside a document scope. */
   setActive(id: string): void;
-  /** The selected tab's id. */
+  /** The active document's id, or null with none open. */
   getActiveId(): string | null;
-  /** The selected tab's info. */
-  getActive(): DocInfo | null;
-  /** Every tab in order (ready documents and pending slots), reference-stable until it changes. */
-  list(): readonly DocInfo[];
-  get(id: string): DocInfo | null;
+  /** The active document's fields, or null with none open. */
+  getActive(): DocumentInfo | null;
+  /** Every open document in tab order, loading, locked and failed ones included; the same array until one changes. */
+  list(): readonly DocumentInfo[];
+  /** A document's fields (the one in scope without an id), or null when it isn't open. */
+  get(id?: string): DocumentInfo | null;
+  /** Whether a document is open. */
   has(id: string): boolean;
+  /** How many documents are open. */
   getCount(): number;
+  /** The open documents' ids, in tab order. */
   getOrder(): readonly string[];
-  /** Reorder every tab at once; `ids` must be a permutation of the current order. */
+  /** Put every document in a new order at once; `ids` holds the id of every open document. */
   setOrder(ids: readonly string[]): void;
-  /** Move a document (tab) to a new position in the order. */
+  /** Move a document to another place in the tab order. */
   move(id: string, toIndex: number): void;
-  /** Swap two documents (tabs) in the order. */
-  swap(left: string, right: string): void;
+  /** Swap two documents in the tab order. */
+  swap(id: string, otherId: string): void;
   /**
-   * The complete document (base + layer) as PDF bytes. `mode` is
-   * `'incremental'` (append changes, original bytes preserved) or `'rewrite'`
-   * (flatten to a fresh PDF). Defaults to the document in scope. Saving to
-   * disk is a web adapter verb (`saveAs`), not a kernel one. It first waits
-   * for what plugins hold back (text typed a moment ago) and for writes on
-   * their way, so the file has everything the user sees (`ctx.onSettle`).
+   * The PDF with every change, as bytes. It first waits for changes still on their way (text
+   * typed a moment ago, writes queued), and runs the document's own save actions around the
+   * read when the actions plugin is installed. Afterwards `hasUnsavedChanges` is false, unless
+   * something changed meanwhile. Rejects `permission-denied` without `doc.download`,
+   * `not-ready` with no open document, `operation-cancelled` when `signal` fires.
    */
-  save(id?: string, options?: { mode?: PdfSaveMode } & OperationOptions): Promise<Uint8Array>;
+  download(id?: string, options?: DownloadOptions): Promise<Uint8Array>;
   /**
-   * Export just the document's layer artifact (re-openable via `OpenInputLayerBytes`).
-   * Rejects when the document was opened without a layer, or the engine can't
-   * export one (cloud manages layers server-side — `DocumentHandle.downloadLayer`
-   * is absent there). Defaults to the document in scope. Waits for held-back
-   * writes first, like `save`.
+   * Only the changes, as a layer artifact you open again over the original
+   * (`{ kind: 'layerBytes', baseBytes, layer: { kind: 'artifact', bytes } }`). Waits and runs the
+   * save actions like `download()`. Rejects `unsupported` when the document wasn't opened with a
+   * layer or the engine keeps layers itself (the cloud engine), and as `download()` does.
    */
-  saveLayer(id?: string, options?: OperationOptions): Promise<Uint8Array>;
+  downloadLayer(id?: string, options?: OperationOptions): Promise<Uint8Array>;
+  /** Whether the document (the one in scope without an id) may be downloaded: `doc.download`. */
+  canDownload(id?: string): boolean;
+  /** Whether the document (the one in scope without an id) may be printed: `doc.print`. */
+  canPrint(id?: string): boolean;
   /**
-   * The page registry of a document (the one in scope by default), in display
-   * order. Reference-stable per registry revision: the array only changes
-   * when a structural mutation replaced it.
+   * The document's pages, in order (the one in scope without an id). The same array until a
+   * page is added, removed, moved or rotated.
    */
-  listPages(documentId?: string): readonly PageInfo[];
-  /** One page by its durable `PageRef`, or null when unknown to that document. */
-  getPage(ref: PageRef, documentId?: string): PageInfo | null;
-  /** One page by zero-based display index. */
-  getPageAt(index: number, documentId?: string): PageInfo | null;
-  /** Display index of a page, `-1` when the document does not have it. */
-  getPageIndex(ref: PageRef, documentId?: string): number;
-  /** The registry revision (bumps on rotate/move/delete/insert); `-1` with no document. */
-  getRevision(documentId?: string): number;
-  /**
-   * Session authority over a document — the sanctioned surface for the one
-   * chrome exception in permissions.md: kernel-level features with a 1:1
-   * capability and no owning plugin (print via `'doc.print'`, download via
-   * `'doc.download'` — the verbs live on this capability). Everything else
-   * asks the owning plugin's twins, never a raw capability string. Defaults
-   * to the document in scope; `false` with no (ready) document.
-   */
-  allows(doc: DocCapability, id?: string): boolean;
+  listPages(id?: string): readonly PageInfo[];
+  /** One page, by its `PageRef` or its zero-based index, or null when the document doesn't have it. */
+  getPage(page: PageRef | number, id?: string): PageInfo | null;
+  /** A page's position, from 0, or `-1` when the document doesn't have it. */
+  getPageIndex(ref: PageRef, id?: string): number;
+  /** A number that goes up each time pages are added, removed, moved or rotated; `-1` with no document. */
+  getRevision(id?: string): number;
 
-  /** A document became `ready`. */
+  /** A document is open and ready. */
   readonly onOpened: EventHook<DocumentOpenedEvent>;
-  /** An open failed; the tab shows `error`. */
+  /** A document couldn't be opened; its tab shows `error`. */
   readonly onOpenFailed: EventHook<DocumentOpenFailedEvent>;
-  /** A document parked on a password. */
+  /** A document needs its password. */
   readonly onLocked: EventHook<DocumentLockedEvent>;
   /** A document was closed, after its resources were released. */
   readonly onClosed: EventHook<DocumentClosedEvent>;
-  /** The selected tab changed. */
-  readonly onActiveChanged: EventHook<ActiveDocumentChangedEvent>;
-  /** The page registry was replaced (rotate, move, delete, insert). */
+  /** Another document became the active one. */
+  readonly onActiveChanged: EventHook<DocumentActiveChangedEvent>;
+  /** Pages were added, removed, moved or rotated. */
   readonly onPagesChanged: EventHook<DocumentPagesChangedEvent>;
+  /** A document got its first unsaved change, or was downloaded. */
+  readonly onUnsavedChangesChanged: EventHook<DocumentUnsavedChangesChangedEvent>;
 }
 
 /** Built-in token for the document registry capability (provided by the kernel). */

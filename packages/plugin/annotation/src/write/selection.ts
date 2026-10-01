@@ -1,6 +1,5 @@
-import { pageRefsEqual } from '@embedpdf/core';
+import type { OperationOptions } from '@embedpdf/core';
 import {
-  type AnnotationFlags,
   applyStyleToRange,
   expandGroups,
   type FieldValues,
@@ -16,15 +15,17 @@ import {
 } from '@embedpdf/core-annotation';
 import {
   annotationKey,
-  type AnnotationDTO,
+  type Annotation,
   type AnnotationPatch,
   type AnnotationRef,
   type PageRef,
   type PdfLinkTarget,
 } from '@embedpdf/engine-core/runtime';
 
+import type { AnnotationContext } from '../services';
 import type { AnnotationReads } from '../read/annotations';
-import type { SelectionFieldsReads } from '../read/selection-fields';
+import type { ChromeReads } from '../read/chrome';
+import type { PropertyReads } from '../read/properties';
 import { runDeltaForFields, type TextFormat } from '../rich-text';
 import type { AnnotationServices } from '../services';
 import type { LinkWrites } from './links';
@@ -34,27 +35,32 @@ import { refsOfIn, type Commit } from '../services/store';
 
 /**
  * The selection: what is selected, and the verbs that change its fields,
- * link, flag, delete, rotate, group and ungroup it as one — every member
- * through the same `update → patch effect` path a gesture takes.
+ * link, delete, rotate, group and ungroup it as one, every member through the
+ * same `update → patch effect` path a gesture takes.
  */
 export function createSelectionWrites(
+  ctx: Pick<AnnotationContext, 'pageOf' | 'getPage' | 'cancellable'>,
   {
     store,
     authority,
     fonts,
     behaviors,
   }: Pick<AnnotationServices, 'store' | 'authority' | 'fonts' | 'behaviors'>,
-  annotations: Pick<AnnotationReads, 'selectedCommitted'>,
-  selectionFields: Pick<SelectionFieldsReads, 'activeTextRange' | 'selectionFieldsOf'>,
+  annotations: Pick<AnnotationReads, 'selectedCommitted' | 'listSelected'>,
+  properties: Pick<PropertyReads, 'activeTextRange' | 'selectionPropertiesOf'>,
+  chrome: Pick<ChromeReads, 'selectionAnchor' | 'rotationAnchor'>,
   text: Pick<TextEditing, 'flushAllText'>,
   links: Pick<LinkWrites, 'writeRelationship'>,
 ) {
   const selectedRefs = () => refsOfIn(store.model(), store.model().selected);
 
   /** Commit a selection message; resolves with its outcome over the refs that were selected. */
-  const commitOverSelection = async (commit: () => Commit[]) => {
+  const commitOverSelection = async (commit: () => Commit[], signal?: AbortSignal) => {
     const refs = selectedRefs();
-    const outcomes = await Promise.all(commit().map((committed) => committed.written));
+    const outcomes = await ctx.cancellable(
+      signal,
+      Promise.all(commit().map((committed) => committed.written)),
+    );
     return batchResultOf(refs, { failed: outcomes.flatMap((outcome) => outcome.failed) });
   };
 
@@ -67,9 +73,9 @@ export function createSelectionWrites(
    * the body, through the pure run algebra) and the rest goes to the
    * annotation.
    */
-  const restyle = (patch: FieldValues | ((annotation: AnnotationDTO) => FieldValues)): Commit[] => {
+  const restyle = (patch: FieldValues | ((annotation: Annotation) => FieldValues)): Commit[] => {
     const model = store.model();
-    const range = selectionFields.activeTextRange(model);
+    const range = properties.activeTextRange(model);
     const commits: Commit[] = [];
     const patches: Record<Id, FieldValues> = {};
     for (const id of model.selected) {
@@ -100,66 +106,83 @@ export function createSelectionWrites(
     return commits;
   };
 
-  const api = {
-    select: (refs: AnnotationRef | readonly AnnotationRef[], options?: { add?: boolean }) => {
-      const list = Array.isArray(refs)
-        ? (refs as readonly AnnotationRef[])
-        : [refs as AnnotationRef];
-      store.commit({
-        type: 'select',
-        ids: list.map((ref) => annotationKey(ref)),
-        add: options?.add,
-      });
-    },
-    selectAll: (page?: PageRef) => {
+  /** Select by refs, group-aware; `add` keeps the current selection. */
+  const select = (refs: readonly AnnotationRef[], add: boolean): void => {
+    store.commit({ type: 'select', ids: refs.map((ref) => annotationKey(ref)), add });
+  };
+
+  /**
+   * Bold, italic or underline on or off: the words selected while typing, or
+   * the whole of each selected text box once the text being typed has landed.
+   */
+  const toggleFormat = async (format: TextFormat, options: OperationOptions = {}) => {
+    const on = properties.selectionPropertiesOf().values[format] !== true;
+    const model = store.model();
+    const range = properties.activeTextRange(model);
+    if (!range && model.editing) text.flushAllText();
+    const commits = range
+      ? restyle({ [format]: on })
+      : [store.commit({ type: 'setTextFormat', format, on })];
+    const outcomes = await ctx.cancellable(
+      options.signal,
+      Promise.all(commits.map((commit) => commit.written)),
+    );
+    outcomes.forEach(throwIfFailed);
+  };
+
+  /** The `selection` noun (its reads come from the property and chrome reads). */
+  const selection = {
+    set: (refs: readonly AnnotationRef[]) => select(refs, false),
+    add: (refs: readonly AnnotationRef[]) => select(refs, true),
+    selectAll: (page?: PageRef | number) => {
+      // A page that isn't in the document has nothing to select.
+      const only = page === undefined ? null : ctx.getPage(page);
+      if (page !== undefined && !only) {
+        store.commit({ type: 'deselect' });
+        return;
+      }
       const model = store.model();
       const ids = model.order.filter((id) => {
         const record = model.byId[id];
         return (
           !!record &&
-          (!page || pageRefsEqual(record.annotation.page, page)) &&
+          (!only || record.annotation.page.objectNumber === only.ref.objectNumber) &&
           isSelectable(model, id)
         );
       });
       store.commit({ type: 'select', ids });
     },
-    selectInRect: (page: PageRef, rect: Rect, options?: { add?: boolean }) => {
-      const engaged = behaviors.engagedIdsOn(page.objectNumber);
-      const ids = selectionInBox(store.model(), page, rect, engaged);
-      if (ids.length || !options?.add) store.commit({ type: 'select', ids, add: options?.add });
+    selectInRect: (page: PageRef | number, rect: Rect) => {
+      const { ref } = ctx.pageOf(page);
+      const engaged = behaviors.engagedIdsOn(ref.objectNumber);
+      store.commit({ type: 'select', ids: selectionInBox(store.model(), ref, rect, engaged) });
     },
-    clearSelection: () => {
+    clear: () => {
       store.commit({ type: 'deselect' });
     },
-    updateSelection: (patch: AnnotationPatch | ((annotation: AnnotationDTO) => AnnotationPatch)) =>
-      commitOverSelection(() => restyle(patch as FieldValues)),
-    updateSelectionLink: (target: PdfLinkTarget | null) =>
-      commitOverSelection(() => [store.commit({ type: 'setLink', target })]),
-    updateSelectionFlags: (patch: Partial<AnnotationFlags>) =>
-      commitOverSelection(() => [store.commit({ type: 'setFlags', patch })]),
-    deleteSelection: () => commitOverSelection(() => [store.commit({ type: 'delete' })]),
-    rotateSelectionBy: async (delta: 90 | -90) => {
-      throwIfFailed(await store.commit({ type: 'rotateSelection', degrees: delta }).written);
+    list: () => annotations.listSelected(),
+    update: (
+      changes: AnnotationPatch | ((annotation: Annotation) => AnnotationPatch),
+      options: OperationOptions = {},
+    ) => commitOverSelection(() => restyle(changes as FieldValues), options.signal),
+    updateLink: (target: PdfLinkTarget | null, options: OperationOptions = {}) =>
+      commitOverSelection(() => [store.commit({ type: 'setLink', target })], options.signal),
+    getProperties: () => properties.selectionPropertiesOf(),
+    delete: (options: OperationOptions = {}) =>
+      commitOverSelection(() => [store.commit({ type: 'delete' })], options.signal),
+    rotateBy: async (degrees: 90 | -90, options: OperationOptions = {}) => {
+      const commit = store.commit({ type: 'rotateSelection', degrees });
+      throwIfFailed(await ctx.cancellable(options.signal, commit.written));
     },
-    resetSelectionRotation: async () => {
-      throwIfFailed(await store.commit({ type: 'resetRotation' }).written);
+    resetRotation: async (options: OperationOptions = {}) => {
+      const commit = store.commit({ type: 'resetRotation' });
+      throwIfFailed(await ctx.cancellable(options.signal, commit.written));
     },
-    toggleTextFormat: async (format: TextFormat) => {
-      const on = selectionFields.selectionFieldsOf().values[format] !== true;
-      const model = store.model();
-      const range = selectionFields.activeTextRange(model);
-      // A held range takes the format as a run delta; otherwise each body
-      // does, once the text being typed has landed.
-      if (!range && model.editing) text.flushAllText();
-      const commits = range
-        ? restyle({ [format]: on })
-        : [store.commit({ type: 'setTextFormat', format, on })];
-      const outcomes = await Promise.all(commits.map((commit) => commit.written));
-      outcomes.forEach(throwIfFailed);
-    },
+    getAnchor: () => chrome.selectionAnchor(),
+    getRotationAnchor: () => chrome.rotationAnchor(),
     // Grouping writes a relationship (`/IRT` + `/RT /Group`) onto every
     // subordinate; ungrouping clears it, so each member becomes top-level again.
-    group: async (): Promise<void> => {
+    group: async (options: OperationOptions = {}): Promise<void> => {
       const model = store.model();
       const members = annotations.selectedCommitted();
       if (members.length < 2) return;
@@ -172,11 +195,14 @@ export function createSelectionWrites(
       const [primary, ...rest] = ordered;
       const primaryRef = refOf(primary);
       if (!primaryRef) return;
-      await Promise.all(
-        rest.map((record) => links.writeRelationship(record, { to: primaryRef, type: 'group' })),
+      await ctx.cancellable(
+        options.signal,
+        Promise.all(
+          rest.map((record) => links.writeRelationship(record, { to: primaryRef, type: 'group' })),
+        ),
       );
     },
-    ungroup: async (): Promise<void> => {
+    ungroup: async (options: OperationOptions = {}): Promise<void> => {
       const model = store.model();
       const subs = expandGroups(model, model.selected)
         .map((id) => model.byId[id])
@@ -184,7 +210,10 @@ export function createSelectionWrites(
           (record): record is ModelAnnotation =>
             !!record && !!refOf(record) && !!groupOf(record.annotation),
         );
-      await Promise.all(subs.map((record) => links.writeRelationship(record, null)));
+      await ctx.cancellable(
+        options.signal,
+        Promise.all(subs.map((record) => links.writeRelationship(record, null))),
+      );
     },
     canGroup: (): boolean => {
       const model = store.model();
@@ -228,5 +257,5 @@ export function createSelectionWrites(
     },
   };
 
-  return { api };
+  return { selection, toggleFormat };
 }

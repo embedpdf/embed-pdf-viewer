@@ -16,6 +16,8 @@ Register `redactionPlugin()` next to `interactionPlugin()` and `annotationPlugin
 
 <Snippet name="annotations/redaction/bar" />
 
+<Example name="redaction/basic" mode="open" />
+
 A mark is an annotation, so until it's applied, people can move it, resize it, delete it, and see it
 in other PDF apps. Applying it is what removes the content.
 
@@ -32,6 +34,8 @@ await redaction.markMatches({ text: '\\d{3}-\\d{2}-\\d{4}', regex: true }); // l
 `markMatches` takes the same query as [search](../text/search), and resolves with `{ marks }`, one per
 match.
 
+<Example name="redaction/from-code" />
+
 ## Review the marks
 
 `usePendingRedactions()` lists the marks that haven't been applied yet, for a review panel:
@@ -40,6 +44,8 @@ match.
 
 `redaction.clearPending()` removes every mark.<Fw only={['react', 'vue', 'svelte']}> `usePendingRedactions({ page: page.ref })`
 lists one page's.</Fw><Fw only="angular"> `redaction.pendingOn(page.ref)` lists one page's.</Fw>
+
+<Example name="redaction/review" />
 
 ## Apply
 
@@ -61,6 +67,8 @@ await redaction.applyAll();
 After applying, download the document with `{ mode: 'rewrite' }`, so the removed content isn't left in
 an earlier revision of the file. See [Saving & downloading](../documents/saving).
 
+<Example name="redaction/apply" />
+
 ## What shows in place of the content
 
 By default a redacted area is black. Give it a label, such as "Classified", on a mark:
@@ -71,6 +79,8 @@ await redaction.updateLabel(mark.ref, { overlayText: 'Classified', repeat: true 
 
 `repeat` fills the area with the label over and over; otherwise it shows once. The color and font of
 every mark are settings.
+
+<Example name="redaction/label" />
 
 ## Methods
 

@@ -23,6 +23,11 @@ the same in every other PDF app.
 Register `interactionPlugin()` and `annotationPlugin()`, then put an `<AnnotationLayer>` above the
 rendered page:
 
+<Example name="annotation/layer" />
+
+> **Try it:** click the rectangle and drag it, or a corner to resize it. Double-click the text box
+> to type in it.
+
 <Snippet name="annotations/index/layer" />
 
 Setting `annotations` to `false` tells the render layer to leave annotations out of the page
@@ -34,6 +39,11 @@ speaks through it; see [Selecting & copying](text/selection) for how it works.
 ## Let people draw
 
 A **tool** says what a click or a drag on the page creates. Activate one and people can draw:
+
+<Example name="annotation/draw" />
+
+> **Try it:** drag on the page to draw a rectangle, then pick another tool. **Highlight** marks the
+> text you select.
 
 <Snippet name="annotations/index/toolbar" />
 
@@ -92,6 +102,10 @@ opened for.
 <Engine local>
 
 Tell the viewer who the user is, once. Every document it opens uses it:
+
+<Example name="annotation/identity" />
+
+> **Try it:** draw a rectangle. The list says Dana Smith made it, and when.
 
 <Snippet name="annotations/index/identity" />
 

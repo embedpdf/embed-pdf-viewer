@@ -13,6 +13,6 @@ const panel = useAnnotationProperties(); // a ref: { properties, values, mixed }
     :property="property"
     :value="panel.values[property.key]"
     :mixed="panel.mixed.includes(property.key)"
-    @change="(value) => annotation.selection.update({ [property.key]: value })"
+    @change="(value: unknown) => annotation.selection.update({ [property.key]: value })"
   />
 </template>

@@ -1,4 +1,4 @@
-import type { AnnotationDTO, AnnotationPatch } from './kinds';
+import type { Annotation, AnnotationPatch } from './kinds';
 import type { AnnotationSubtype } from './subtype';
 import type { Coordinates, PdfCoordinates } from '../pageSpace/coordinates';
 
@@ -312,7 +312,7 @@ const REGENERATE: AppearanceChange = { impact: 'regenerate' };
  * 3. Anything else — style, text, unknown keys, unknown kinds → `'regenerate'`.
  */
 export function appearanceChangeOf<C extends Coordinates>(
-  current: AnnotationDTO<C>,
+  current: Annotation<C>,
   patch: AnnotationPatch<C>,
 ): AppearanceChange {
   if (patch.subtype !== undefined && patch.subtype !== current.subtype) return REGENERATE;
@@ -348,7 +348,7 @@ export function appearanceChangeOf<C extends Coordinates>(
 
 /** {@link appearanceChangeOf}'s verdict alone, on the file's values: what the engine's update decides. */
 export function appearanceImpactOf(
-  current: AnnotationDTO<PdfCoordinates>,
+  current: Annotation<PdfCoordinates>,
   patch: AnnotationPatch<PdfCoordinates>,
 ): AppearanceImpact {
   return appearanceChangeOf(current, patch).impact;

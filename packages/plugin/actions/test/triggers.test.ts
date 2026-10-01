@@ -1,6 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { createTestContext } from '@embedpdf/core/testing';
 import { toPageRef } from '@embedpdf/engine-core/runtime';
 import type {
   AnnotationRef,
@@ -16,11 +15,13 @@ import type {
 import { createActionsController } from '../src/controller';
 import { triggerOriginOf } from '../src/host-contract';
 import type {
-  ActionDiagnostic,
-  ActionDispatchEvent,
+  ActionDiagnosticReportedEvent,
+  ActionExecutedEvent,
+  ActionOrigin,
   ActionsConfig,
   ActionTrigger,
 } from '../src/host-contract';
+import { createActionsTestContext } from './helpers/context';
 
 const tree = (root: PdfActionNode | null, incomplete = false): PdfActionTree => ({
   root,
@@ -78,39 +79,44 @@ function harness(options?: {
   const pages = options?.pages ?? [];
   const listCalls: number[] = [];
 
-  const ctx = createTestContext<void>({
-    id: 'actions',
-    pages: pages.map((page) => ({ ref: toPageRef(page.pageObjectNumber) })),
-    doc: {
-      page: ({ objectNumber: pageObjectNumber }: PageRef) => ({
-        annotations: {
-          list: async () => {
-            listCalls.push(pageObjectNumber);
-            await options?.listDelay?.(pageObjectNumber);
-            const page = pages.find((candidate) => candidate.pageObjectNumber === pageObjectNumber);
-            return {
-              annotations: (page?.annotations ?? []).map((annotation) => ({
-                subtype: 'square',
-                ref: ref(pageObjectNumber, annotation.objectNumber),
-                actions: annotation.actions,
-              })),
-            };
-          },
-        },
-      }),
-      forms: { list: async () => ({ fields: [] }) },
-      ...(options?.docActions !== undefined
-        ? {
-            actions: {
-              get: async () => ({
-                openAction: options.docActions?.openAction ?? null,
-                openDestination: options.docActions?.openDestination ?? null,
-              }),
+  const ctx = createActionsTestContext(
+    {
+      id: 'actions',
+      pages: pages.map((page) => ({ ref: toPageRef(page.pageObjectNumber) })),
+      doc: {
+        page: ({ objectNumber: pageObjectNumber }: PageRef) => ({
+          annotations: {
+            list: async () => {
+              listCalls.push(pageObjectNumber);
+              await options?.listDelay?.(pageObjectNumber);
+              const page = pages.find(
+                (candidate) => candidate.pageObjectNumber === pageObjectNumber,
+              );
+              return {
+                annotations: (page?.annotations ?? []).map((annotation) => ({
+                  subtype: 'square',
+                  ref: ref(pageObjectNumber, annotation.objectNumber),
+                  actions: annotation.actions,
+                })),
+              };
             },
-          }
-        : {}),
-    } as unknown as Partial<DocumentHandle>,
-  });
+          },
+        }),
+        forms: { list: async () => ({ fields: [] }) },
+        ...(options?.docActions !== undefined
+          ? {
+              actions: {
+                get: async () => ({
+                  openAction: options.docActions?.openAction ?? null,
+                  openDestination: options.docActions?.openDestination ?? null,
+                }),
+              },
+            }
+          : {}),
+      } as unknown as Partial<DocumentHandle>,
+    },
+    options?.config,
+  );
   // The pages' own /AA trees, as the kernel's page registry carries them.
   for (const layout of ctx.document()!.pages) {
     const page = pages.find((candidate) => candidate.pageObjectNumber === layout.ref.objectNumber);
@@ -120,8 +126,11 @@ function harness(options?: {
   const capability = ctx.connect(createActionsController(ctx, options?.config));
 
   const seam: string[] = [];
-  capability.registerExecutor('named', (node) => {
+  /** The origin each named node ran with, in order. */
+  const origins: ActionOrigin[] = [];
+  capability.registerExecutor('named', (node, actionContext) => {
     seam.push(`named:${node.type === 'named' ? node.name : '?'}`);
+    origins.push(actionContext.origin);
     return { status: 'executed' };
   });
   capability.registerExecutor('goto', (node) => {
@@ -131,10 +140,10 @@ function harness(options?: {
     return { status: 'executed' };
   });
 
-  const events: ActionDispatchEvent[] = [];
+  const events: ActionExecutedEvent[] = [];
   capability.onExecuted((event) => events.push(event));
-  const diagnostics: ActionDiagnostic[] = [];
-  capability.onDiagnostic((diagnostic) => diagnostics.push(diagnostic));
+  const diagnostics: ActionDiagnosticReportedEvent[] = [];
+  capability.onDiagnosticReported((diagnostic) => diagnostics.push(diagnostic));
 
   /** Await this to drain the serial queue behind every prior submission. */
   const drain = () =>
@@ -148,6 +157,7 @@ function harness(options?: {
   return {
     capability,
     seam,
+    origins,
     events,
     diagnostics,
     listCalls,
@@ -276,7 +286,7 @@ describe('queued trigger resolution', () => {
       annotation: ref(4, 7),
       page: toPageRef(4),
     });
-    expect(fixture.events.at(-1)?.ctx.origin).toBe('hover'); // hint can't launder origin
+    expect(fixture.origins.at(-1)).toBe('hover'); // hint can't launder origin
   });
 });
 
@@ -329,7 +339,8 @@ describe('page fan-out (ISO Table 197/198 order)', () => {
       (event) => (event.tree.root as { name?: string } | null)?.name,
     );
     expect(emitted).toEqual(['PV-11', 'PI-11']);
-    expect(fixture.events.every((event) => event.ctx.origin === 'lifecycle')).toBe(true);
+    expect(fixture.events.map((event) => event.source.kind)).toEqual(['annotation', 'annotation']);
+    expect(fixture.origins).toEqual(['lifecycle', 'lifecycle']);
   });
 
   it('a failed step never skips its siblings', async () => {

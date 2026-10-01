@@ -6,7 +6,7 @@
  */
 import { composeApi } from '@embedpdf/core';
 
-import type { MeasurementCapability, MeasurementConfig } from './contract';
+import type { MeasurementCapability } from './contract';
 import { createScaleReads } from './read/scale';
 import { createServices, type MeasurementContext } from './services';
 import { createViewportSync } from './sync/viewports';
@@ -14,20 +14,19 @@ import { createCalibration } from './write/calibration';
 import { createMeasuring } from './write/create';
 import { createScaleWrites } from './write/scale';
 
-export function createMeasurementController(
-  ctx: MeasurementContext,
-  config: MeasurementConfig = {},
-) {
+export function createMeasurementController(ctx: MeasurementContext) {
   const services = createServices(ctx);
   const { events, store } = services;
+  const settings = ctx.settings();
 
-  const viewports = createViewportSync(ctx, services, config);
-  const reads = createScaleReads(ctx, services, config, viewports);
-  const scale = createScaleWrites(ctx, services, config, reads, viewports);
+  const viewports = createViewportSync(ctx, services);
+  const reads = createScaleReads(ctx, services, viewports);
+  const scale = createScaleWrites(ctx, services, viewports);
   const calibration = createCalibration(ctx, services);
   const measuring = createMeasuring(ctx, services, viewports);
 
   const api: MeasurementCapability = composeApi('measurement', [
+    settings.api,
     reads.api,
     scale.api,
     calibration.api,

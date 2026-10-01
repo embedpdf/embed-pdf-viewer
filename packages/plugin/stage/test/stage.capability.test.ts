@@ -141,6 +141,44 @@ describe('initial placement is level-triggered', () => {
     stage.setViewportSize({ width: 1000, height: 700 });
     expect(stage.getCurrentPageIndex()).toBe(3); // restored, not reset to page 0
   });
+
+  it('navigation asked for before placement lands at placement, on the first frame', () => {
+    const { stage, transitions } = harness(PORTRAIT, undefined, { skipViewport: true });
+    stage.goToPage(3); // the app navigates as the document opens, before the box is sized
+    expect(stage.getCamera()).toEqual({ x: 0, y: 0, zoom: 1 }); // nothing to move yet
+    stage.setViewportSize({ width: 1000, height: 700 });
+    expect(stage.getCurrentPageIndex()).toBe(3); // not reset to page 0
+    const box = stage.getPageFrame(toPageRef(4))!;
+    expect(stage.worldToViewport({ x: box.x, y: box.y }).y).toBeCloseTo(PAD, 0);
+    // instant even when the call asked for nothing: the placed commit is already there
+    const commit = transitions.find((transition) => transition.placed)!;
+    expect(commit.pages.map((page) => page.pageIndex)).toContain(3);
+  });
+
+  it('a reveal before placement lands too, and the last call wins', () => {
+    const { stage } = harness(PORTRAIT, undefined, { skipViewport: true });
+    stage.goToPage(4);
+    // an annotation made as the document opens, low on page 1
+    stage.reveal(0, { rect: { x: 96, y: 700, width: 178, height: 54 }, behavior: 'smooth' });
+    stage.setViewportSize({ width: 1000, height: 700 });
+    expect(stage.getCurrentPageIndex()).toBe(0);
+    const page = stage.getPageFrame(toPageRef(1))!;
+    const bottom = stage.worldToViewport({ x: page.x, y: page.y + 754 }).y;
+    // in view now: 'smooth' became instant (no frame has ticked), no tween from the reset
+    expect(bottom).toBeLessThanOrEqual(700 - PAD + 0.5);
+  });
+
+  it('a provider restores first; a call made before placement still lands after it', () => {
+    const { stage } = harness(PORTRAIT, undefined, { skipViewport: true });
+    stage.provideInitialView(50, () => ({
+      ...stage.getSettings(),
+      cursor: 3,
+      anchor: { pageIndex: 3, fx: 0.5, fy: 0.5 },
+    }));
+    stage.goToPage(1);
+    stage.setViewportSize({ width: 1000, height: 700 });
+    expect(stage.getCurrentPageIndex()).toBe(1); // the app's explicit call is the later intent
+  });
 });
 
 describe('goToPage', () => {
@@ -231,7 +269,7 @@ describe('anchor-preserving transitions', () => {
     const { stage } = harness(PORTRAIT);
     stage.goToPage(3, { behavior: 'instant' });
     expect(stage.getCurrentPageIndex()).toBe(3);
-    stage.setLayout('horizontal');
+    stage.updateSettings({ layout: 'horizontal' });
     expect(stage.getCurrentPageIndex()).toBe(3);
   });
 
@@ -529,11 +567,11 @@ describe('flow: paged (same scene, smaller clamp rect — no index state)', () =
     const { stage } = harness(PORTRAIT); // continuous
     stage.goToPage(3, { behavior: 'instant' });
     expect(stage.getCurrentPageIndex()).toBe(3);
-    stage.setFlow('paged');
+    stage.updateSettings({ flow: 'paged' });
     expect(stage.getSettings().flow).toBe('paged');
     expect(stage.getCurrentPageIndex()).toBe(3);
     expect(stage.listVisiblePages().map((page) => page.pageIndex)).toEqual([3]);
-    stage.setFlow('continuous');
+    stage.updateSettings({ flow: 'continuous' });
     expect(stage.getCurrentPageIndex()).toBe(3);
   });
 
@@ -1179,7 +1217,7 @@ describe('direction: rtl — layout flips, navigation does not', () => {
       stage.getPageFrame(toPageRef(2))!.x,
     );
     // paged too: the slice inherits the swap
-    stage.setFlow('paged');
+    stage.updateSettings({ flow: 'paged' });
     expect(stage.getPageFrame(toPageRef(1))!.x).toBeGreaterThan(
       stage.getPageFrame(toPageRef(2))!.x,
     );

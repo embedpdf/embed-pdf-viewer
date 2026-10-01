@@ -4,11 +4,11 @@ import { memo, type Mirror } from '@embedpdf/core';
 import type { SignatureVerdict } from '@embedpdf/core-signature';
 import type { FormFieldRef, SignatureDTO } from '@embedpdf/engine-core/runtime';
 
-import type { SignatureCapability, SignatureFieldAddress } from '../contract';
+import type { SignatureCapability, SignatureFieldAddress, SignatureInfo } from '../contract';
 import { sameFieldRef, type SignatureRecord } from '../model';
 import type { SignatureContext, SignatureServices } from '../services';
 
-const EMPTY_SIGNATURES: readonly SignatureDTO[] = [];
+const EMPTY_SIGNATURES: readonly SignatureInfo[] = [];
 const EMPTY_FIELDS: readonly FormFieldRef[] = [];
 
 /** The widget object number an address names, or null for a field ref. */
@@ -32,16 +32,20 @@ export function createSignatureReads(
   const snapshot = () => signatures.get().snapshot;
 
   const lists = memo(
-    () => [snapshot()],
-    (current) =>
-      current
-        ? {
-            signed: current.signatures.filter((signature) => signature.signed),
-            unsigned: current.signatures
-              .filter((signature) => !signature.signed)
-              .map((signature) => signature.field),
-          }
-        : { signed: EMPTY_SIGNATURES, unsigned: EMPTY_FIELDS },
+    () => [snapshot(), ctx.state.get().verdicts],
+    (current, verdicts) => {
+      if (!current) return { signed: EMPTY_SIGNATURES, unsigned: EMPTY_FIELDS };
+      const verdictOf = (signature: SignatureDTO): SignatureVerdict | null =>
+        verdicts?.find((verdict) => verdict.signature.index === signature.index) ?? null;
+      return {
+        signed: current.signatures
+          .filter((signature) => signature.signed)
+          .map((signature): SignatureInfo => ({ ...signature, verdict: verdictOf(signature) })),
+        unsigned: current.signatures
+          .filter((signature) => !signature.signed)
+          .map((signature) => signature.field),
+      };
+    },
   );
 
   const getSignature = (field: SignatureFieldAddress): SignatureDTO | null => {

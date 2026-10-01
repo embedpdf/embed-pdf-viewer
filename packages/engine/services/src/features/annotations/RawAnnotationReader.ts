@@ -17,7 +17,7 @@ import { collectPageAnnotations } from './internal/read/collectPageAnnotations';
  * `EPDFAnnot_GetObjectNumber` directly off the docPtr.
  *
  * Per-subtype dispatch is the same as the full reader (both share
- * `collectPageAnnotations`), so the wire shape `AnnotationDTO[]` is
+ * `collectPageAnnotations`), so the wire shape `Annotation[]` is
  * identical between raw and full read paths for the subtypes that don't
  * actually need a pagePtr to materialise their fields.
  */

@@ -1,11 +1,12 @@
 /**
- * The fill projection: what a framework paints for one page. Pure data in
- * page space (top-left origin, y-down PDF points), the same space
+ * The widget projection: what a framework draws for one page's fields. Pure
+ * data in page space (top-left origin, y-down PDF points), the same space
  * annotation render items use, so layers position with the page transform
  * and never re-derive scale.
  *
- * Geometry comes from the widget plane (widgets are annotations; their
- * records carry `/Rect`), identity, value and behavior from the field plane.
+ * Where a widget is and how it looks come from the widget plane (widgets are
+ * annotations; their records carry `/Rect` and `/MK`), identity, value and
+ * behavior from the field plane.
  */
 import type {
   AnnotationRef,
@@ -15,33 +16,38 @@ import type {
 } from '@embedpdf/engine-core/runtime';
 
 import {
-  fieldForWidget,
   fieldKeyOf,
   type Box,
   type FieldIndex,
   type FieldKey,
   type FormState,
-  type WidgetBoxes,
+  type FormWidgetLook,
+  type PageWidget,
+  type PageWidgets,
 } from '../model';
 
-export type { Box } from '../model';
+export type { Box, FormWidgetLook } from '../model';
 
-interface FillItemBase {
+interface FormWidgetItemBase {
   key: FieldKey;
-  /** The field this widget belongs to — what the public write verbs take. */
+  /** The field this widget belongs to: what the write verbs take. */
   fieldRef: FormFieldRef;
-  /** Widget identity — joins to the annotation plane. */
+  /** The widget's annotation object number. */
   annotObjectNumber: number;
   /** The widget's annotation address (null until the engine has placed it). */
   annotationRef: AnnotationRef | null;
+  /** Where the widget is on its page. */
   box: Box;
-  /** Read-only field or write in flight: render, don't accept input. */
+  /** How the widget looks in the PDF. */
+  look: FormWidgetLook;
+  /** A read-only field, no permission to fill, or a write on its way: draw it, don't take input. */
   disabled: boolean;
-  /** Accessible name: /TU when present, else the fully qualified name. */
+  /** Accessible name: the field's tooltip (`/TU`) when it has one, else its full name. */
   label: string;
 }
 
-export type FillItem = FillItemBase &
+/** One widget as a fill control draws it: where, how it looks, its control and its value. */
+export type FormWidgetItem = FormWidgetItemBase &
   (
     | {
         control: 'text';
@@ -68,37 +74,33 @@ export type FillItem = FillItemBase &
       }
     | { control: 'button' }
     /**
-     * A signature field's widget. `signed` = it carries a `/V` (a signature
-     * dictionary): the field is final and its appearance sealed — the
-     * control inspects rather than signs. Unsigned: "sign here" — the
-     * signing act itself belongs to the signature plugin.
+     * A signature field's widget. `signed`: it carries a `/V` (a signature
+     * dictionary), so the field is final and its appearance sealed, and the
+     * control shows what the signature says rather than signing. Unsigned, it
+     * is "sign here": signing belongs to the signature plugin.
      */
     | { control: 'signature'; signed: boolean }
   );
 
-const ZERO_BOX: Box = { x: 0, y: 0, width: 0, height: 0 };
-
 /**
- * Project one widget of a field into a fill control. `box` is supplied by the
- * caller: the page projection reads the page's widget geometry; a consumer
- * that already owns a live box (the annotation plane's render item) passes
- * it, or nothing when only the semantics matter. Null for families with no
- * fill control (those are rendered by the annotation plane only).
+ * Project one widget of a field into a fill control. Null for families with
+ * no fill control (the annotation plane draws those alone).
  */
 export function projectWidget(
   field: FormFieldDTO,
   annotObjectNumber: number,
   writing: FormState['writing'],
-  box: Box = ZERO_BOX,
-): FillItem | null {
+  widget: PageWidget,
+): FormWidgetItem | null {
   const key = fieldKeyOf(field);
-  const base: FillItemBase = {
+  const base: FormWidgetItemBase = {
     key,
     fieldRef: field.ref,
     annotObjectNumber,
     annotationRef:
-      field.widgets.find((widget) => widget.objectNumber === annotObjectNumber)?.ref ?? null,
-    box,
+      field.widgets.find((candidate) => candidate.objectNumber === annotObjectNumber)?.ref ?? null,
+    box: widget.box,
+    look: widget.look,
     disabled: field.readOnly || writing[key] === true,
     label: field.alternateName ?? field.name,
   };
@@ -114,7 +116,7 @@ export function projectWidget(
         comb: field.comb,
       };
     case 'checkbox': {
-      const toggle = field.widgets.find((widget) => widget.objectNumber === annotObjectNumber);
+      const toggle = field.widgets.find((candidate) => candidate.objectNumber === annotObjectNumber);
       return {
         ...base,
         control: 'toggle',
@@ -124,7 +126,7 @@ export function projectWidget(
       };
     }
     case 'radio': {
-      const toggle = field.widgets.find((widget) => widget.objectNumber === annotObjectNumber);
+      const toggle = field.widgets.find((candidate) => candidate.objectNumber === annotObjectNumber);
       return {
         ...base,
         control: 'toggle',
@@ -163,45 +165,26 @@ export function projectWidget(
 }
 
 /**
- * Project one page's widgets into fill controls. Widgets whose geometry has
- * not loaded (or that are direct objects with no join key) are skipped; the
- * projection re-runs when the page's geometry lands.
+ * Project one page's widgets into fill controls. Widgets whose page has not
+ * loaded (or that are direct objects with no join key) are skipped; the
+ * projection runs again when the page's widgets land.
  */
 export function fillItems(
   index: FieldIndex,
   pageObjectNumber: number,
-  boxes: WidgetBoxes | undefined,
+  widgets: PageWidgets | undefined,
   writing: FormState['writing'],
-): FillItem[] {
-  if (!index.snapshot || !boxes) return [];
-  const items: FillItem[] = [];
+): FormWidgetItem[] {
+  if (!index.snapshot || !widgets) return [];
+  const items: FormWidgetItem[] = [];
   for (const field of index.snapshot.fields) {
     for (const widget of field.widgets) {
       if (widget.page?.objectNumber !== pageObjectNumber) continue;
-      const box = boxes[widget.objectNumber];
-      if (!box) continue;
-      const item = projectWidget(field, widget.objectNumber, writing, box);
+      const placed = widgets[widget.objectNumber];
+      if (!placed) continue;
+      const item = projectWidget(field, widget.objectNumber, writing, placed);
       if (item) items.push(item);
     }
   }
   return items;
-}
-
-/**
- * Project a single widget by its annotation object number, the join the
- * annotation plane's render layer uses. It owns a live box already, so the
- * page's loaded geometry is used only when available; the item's semantics
- * never depend on it. Null while the fields have not loaded, or for families
- * with no fill control.
- */
-export function fillItemForWidget(
-  index: FieldIndex,
-  annotObjectNumber: number,
-  box: Box | undefined,
-  writing: FormState['writing'],
-): FillItem | null {
-  const field = fieldForWidget(index, annotObjectNumber);
-  if (!field) return null;
-  if (!field.widgets.some((widget) => widget.objectNumber === annotObjectNumber)) return null;
-  return projectWidget(field, annotObjectNumber, writing, box);
 }

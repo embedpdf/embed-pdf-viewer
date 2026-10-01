@@ -34,23 +34,23 @@ export function createFieldsMirror(ctx: FormContext, events: FormEvents): Mirror
       const { origin } = event;
       switch (event.type) {
         case 'forms.valueSet':
-          events.valueChanged.emit({ ref: event.field.ref, field: event.field, origin });
+          events.valueChanged.emit({ field: event.field, origin });
           return;
         case 'forms.created':
-          events.fieldCreated.emit({ ref: event.field.ref, field: event.field, origin });
+          events.fieldCreated.emit({ field: event.field, origin });
           return;
         case 'forms.updated':
         case 'forms.widgetAdded':
         case 'forms.widgetRemoved':
-          events.fieldUpdated.emit({ ref: event.field.ref, field: event.field, origin });
+          events.fieldUpdated.emit({ field: event.field, origin });
           return;
         case 'forms.deleted':
-          if (event.deleted) events.fieldDeleted.emit({ ref: event.deleted, field: null, origin });
+          if (event.deleted) events.fieldDeleted.emit({ ref: event.deleted, origin });
           return;
         case 'forms.effectsApplied':
         case 'forms.imported':
           for (const field of fieldsWithChangedValues(previous, next)) {
-            events.valueChanged.emit({ ref: field.ref, field, origin });
+            events.valueChanged.emit({ field, origin });
           }
           return;
         default:

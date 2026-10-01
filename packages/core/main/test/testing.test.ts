@@ -26,7 +26,7 @@ describe('createTestContext', () => {
     const ctx = make();
     const documents = ctx.get(DocumentsToken);
     expect(documents.getActiveId()).toBe('doc');
-    expect(documents.getPageAt(0)?.ref).toEqual(toPageRef(7));
+    expect(documents.getPage(0)?.ref).toEqual(toPageRef(7));
     expect(documents.listPages('elsewhere')).toEqual([]);
   });
 
@@ -70,5 +70,23 @@ describe('createTestContext', () => {
     expect(ctx.settings().get()).toEqual({ color: 'red', width: 2 });
     // A context without settings has none to read.
     expect(() => createTestContext().settings()).toThrow('declares no settings');
+  });
+
+  it('reads a download inside what a plugin wrapped around it, until it is disposed', async () => {
+    const ctx = make();
+    const log: string[] = [];
+    ctx.aroundDownload(async (read) => {
+      log.push('before');
+      const bytes = await read();
+      log.push('after');
+      return bytes;
+    });
+    const read = async () => (log.push('read'), new Uint8Array([1]));
+    expect(await ctx.download(read)).toEqual(new Uint8Array([1]));
+    expect(log).toEqual(['before', 'read', 'after']);
+    await ctx.dispose();
+    log.length = 0;
+    await ctx.download(read);
+    expect(log).toEqual(['read']);
   });
 });

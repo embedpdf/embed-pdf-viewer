@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import type { AnnotationDTO } from '../../src/annotation/kinds';
+import type { Annotation } from '../../src/annotation/kinds';
 import { EngineErrorCode } from '../../src/errors/EngineErrorCode';
 import type { AnnotationRef } from '../../src/identity/AnnotationRef';
 import { encodePageKey, toPageRef, type PageRef } from '../../src/identity/PageRef';
@@ -26,7 +26,7 @@ function annotation(
   annotObjectNumber: number,
   index: number,
   fields: Record<string, unknown> = {},
-): AnnotationDTO {
+): Annotation {
   return {
     subtype: 'square',
     ref: refOf(page, annotObjectNumber),
@@ -41,10 +41,10 @@ function annotation(
     reply: null,
     popup: null,
     ...fields,
-  } as unknown as AnnotationDTO;
+  } as unknown as Annotation;
 }
 
-function bundleOf(...items: AnnotationDTO[]): Pick<AnnotationBundle, 'pages' | 'items'> {
+function bundleOf(...items: Annotation[]): Pick<AnnotationBundle, 'pages' | 'items'> {
   const pages = [first, second]
     .filter((page) => items.some((item) => item.ref.page.objectNumber === page.objectNumber))
     .map((page, position) => ({ page, position: position === 0 ? 0 : 4, size }));
@@ -255,8 +255,8 @@ describe('planAnnotationImport', () => {
     const unknown = annotation(first, 11, 1, { subtype: 'line', measure: { subtype: 'unknown' } });
     const { creates, dropped } = plan(
       bundleOf(
-        { ...geo, linePoints: { start: { x: 0, y: 0 }, end: { x: 1, y: 1 } } } as AnnotationDTO,
-        { ...unknown, linePoints: { start: { x: 0, y: 0 }, end: { x: 1, y: 1 } } } as AnnotationDTO,
+        { ...geo, linePoints: { start: { x: 0, y: 0 }, end: { x: 1, y: 1 } } } as Annotation,
+        { ...unknown, linePoints: { start: { x: 0, y: 0 }, end: { x: 1, y: 1 } } } as Annotation,
       ),
     );
     expect(creates).toHaveLength(2);

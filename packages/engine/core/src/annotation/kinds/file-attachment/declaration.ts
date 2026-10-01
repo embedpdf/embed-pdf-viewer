@@ -24,11 +24,16 @@ export const FileAttachmentDeclaration = defineKind(
     ...annotationBaseFields,
     ...colorStyleFields,
     icon: field.data(FileAttachmentIconSchema).optional(),
-    /** `null` when the file specification has no embedded file. */
+    /**
+     * `null` when the file specification has no embedded file. A write takes
+     * what a read returns, so a read can be copied: on a create `null` is the
+     * same as leaving it out, and an update that sends back the `null` a read
+     * returned changes nothing (a file can't be removed).
+     */
     file: field
       .data(AttachmentFileInfoSchema)
       .writes(AttachmentFileWriteSchema)
-      .nullableOnRead()
+      .nullable()
       .optional(),
   },
   { file: 'required' },

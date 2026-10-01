@@ -13,13 +13,14 @@
  * `passwordProvided` (a config-supplied password the engine already rejected).
  */
 import { useState } from 'react';
-import { useDocumentId, useDocuments } from '@embedpdf/react/runtime';
+import { useDocumentId, useDocuments, useDocumentsState } from '@embedpdf/react/runtime';
 import { useT } from '@embedpdf/react/i18n';
 import { Icon } from './icons';
 
 export function PasswordPrompt() {
   const docId = useDocumentId();
-  const { docs, unlock, close } = useDocuments();
+  const { unlock, close } = useDocuments();
+  const docs = useDocumentsState((state) => state.documents);
   const t = useT();
   const [password, setPassword] = useState('');
   const [rejected, setRejected] = useState(false);
@@ -107,7 +108,8 @@ export function PasswordPrompt() {
 
 export function DocumentError() {
   const docId = useDocumentId();
-  const { docs, close } = useDocuments();
+  const { close } = useDocuments();
+  const docs = useDocumentsState((state) => state.documents);
   const t = useT();
   const doc = docs.find((documentInfo) => documentInfo.id === docId);
   if (!docId || !doc) return null;

@@ -142,7 +142,7 @@ export type {
   PixelBox,
   PixelQuad,
   AnnotationRef,
-  AnnotationDTO,
+  Annotation,
   AnnotationDraft,
   AnnotationPatch,
   AnnotationSubtype,

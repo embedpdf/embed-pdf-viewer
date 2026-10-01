@@ -24,7 +24,9 @@ function harness(config: StageConfig = {}) {
     log.push(`zoom:${event.previousLevel}→${event.level}:${event.mode}`),
   );
   stage.onPageChanged((event) =>
-    log.push(`page:${event.previousPageIndex}→${event.pageIndex}:${event.page?.index ?? '-'}`),
+    log.push(
+      `page:${event.previousPageIndex}→${event.pageIndex}:${event.page?.objectNumber ?? '-'}`,
+    ),
   );
   stage.onViewportChanged((event) => log.push(`viewport:${event.size.width}x${event.size.height}`));
   stage.onSettingsChanged((event) => log.push(`settings:${event.changed.join(',')}`));
@@ -41,7 +43,7 @@ describe('stage events', () => {
     log.length = 0;
 
     stage.goToPage(2, { behavior: 'instant' });
-    expect(log).toEqual(['page:0→2:2', 'camera']);
+    expect(log).toEqual(['page:0→2:3', 'camera']); // the third page, object number 3
     log.length = 0;
 
     stage.zoomTo({ level: 2 });

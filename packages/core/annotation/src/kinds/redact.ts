@@ -1,13 +1,13 @@
-import type { AnnotationDTO } from '@embedpdf/engine-core/runtime';
+import type { Annotation } from '@embedpdf/engine-core/runtime';
 
 import { boxFamily, familyChosenBy, quadsFamily } from '../shapes';
 import { defineKind, NO_CAPS } from './define';
-import { FILL, OPACITY } from './fields';
+import { FILL, fontFamily, OPACITY, textAlign } from './fields';
 import { redactStyle } from './styles';
 import { labelText } from './texts';
 
 /** A mark over text has its quads; an area mark has none, and its shape is its rect, a box. */
-const markShape = familyChosenBy((annotation: AnnotationDTO) =>
+const markShape = familyChosenBy((annotation: Annotation) =>
   annotation.subtype === 'redact' && annotation.quadPoints.length > 0 ? quadsFamily : boxFamily,
 );
 
@@ -35,13 +35,14 @@ export const redact = defineKind({
     commentable: true,
     hasFill: true,
   },
-  fields: [
-    { key: 'color', label: 'Outline' },
+  properties: [
+    { key: 'color', control: 'color', label: 'Outline' },
     FILL,
     OPACITY,
-    { key: 'fontFamily', label: 'Label font' },
-    { key: 'fontSize', label: 'Label size', min: 0, max: 96, step: 1 },
-    { key: 'fontColor', label: 'Label color' },
-    { key: 'textAlign', label: 'Align' },
+    { key: 'overlayText', control: 'text', label: 'Label' },
+    fontFamily('Label font'),
+    { key: 'fontSize', control: 'number', label: 'Label size', min: 0, max: 96, step: 1 },
+    { key: 'fontColor', control: 'color', label: 'Label color' },
+    textAlign('Align'),
   ],
 });

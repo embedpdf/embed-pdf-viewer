@@ -2,7 +2,7 @@ import type { PageRotation, Point, Rect as GeometryRect, Quad } from '@embedpdf/
 import type {
   AnnotationBorderStyle,
   AnnotationDraft,
-  AnnotationDTO,
+  Annotation,
   AnnotationPatch,
   AnnotationFlags,
   AnnotationRef,
@@ -167,7 +167,7 @@ export interface TextStyle {
 /**
  * Engine fields by name, as a create or an update states them: a tool's
  * defaults (a draft without its shape), or what a selection edit writes to
- * each member. The kind table's {@link FieldSpec}s say which a sidebar edits.
+ * each member. The kind table's {@link AnnotationProperty} lists say which a style panel edits.
  */
 export type FieldValues = Readonly<Record<string, unknown>>;
 
@@ -244,7 +244,7 @@ export interface ModelAnnotation {
    * included (`record/written.ts`). Its attribution waits for the engine's
    * answer.
    */
-  annotation: AnnotationDTO;
+  annotation: Annotation;
 }
 
 /** A draggable handle: a resize corner/edge (rect) or a vertex (line/poly). */
@@ -263,18 +263,25 @@ export interface Guide {
   hi: number;
 }
 
-/** Snapping behaviour — seeded from the plugin config, live-adjustable via the
- *  `setSnap` msg (so an app can wire a UI toggle). */
+/**
+ * Snapping: to other annotations and the page while moving, and to angles
+ * while turning. The plugin keeps it in its settings and hands it in with
+ * `setSnap`.
+ */
 export interface SnapSettings {
-  /** Alignment guides while moving (snap to other annotations + the page). */
-  guides: boolean;
-  /** Guide snap tolerance, content units (PDF pt) — the `hitMargin` convention. */
-  guideThreshold: number;
-  /** Snap the rotate gesture onto `rotationAngles`. */
-  rotation: boolean;
-  rotationAngles: number[];
-  /** Rotation snap tolerance, degrees. */
-  rotationThreshold: number;
+  /** Snap to the edges and centres of other annotations and of the page while moving. */
+  readonly alignment: boolean;
+  /**
+   * How close a move comes before it snaps, in screen pixels: each pointer
+   * sample converts it by its `scale`. Without one it is in page units.
+   */
+  readonly alignmentThreshold: number;
+  /** Snap a turn onto `rotationAngles`. */
+  readonly rotation: boolean;
+  /** The angles a turn snaps to, in degrees clockwise. */
+  readonly rotationAngles: readonly number[];
+  /** How close a turn comes before it snaps, in degrees. */
+  readonly rotationThreshold: number;
 }
 
 /**
@@ -560,6 +567,8 @@ export interface ChromeGeometry {
   knobTol: number;
   /** How far the rotate knob hangs off the selection edge. */
   knobOffset: number;
+  /** `false`: the selection has no rotation handle to grab (it isn't drawn either). */
+  rotationHandle?: boolean;
 }
 
 export interface PointerInput {
@@ -590,6 +599,12 @@ export interface PointerInput {
    * clamp at their effective geometry. Page space itself never rotates.
    */
   displayRotation?: PageRotation;
+  /**
+   * Screen pixels per page unit at the event: the page's view scale. A
+   * setting in screen pixels (`snap.alignmentThreshold`) is converted by it,
+   * so snapping feels the same at every zoom. Absent → 1.
+   */
+  scale?: number;
   /**
    * The page's zoom relative to its 100% baseline at the event — the other
    * half of the {@link ViewEnv} pair with `displayRotation` (dimensionless,
@@ -794,6 +809,12 @@ export type Effect =
 export interface RenderItem {
   id: Id;
   ref: AnnotationRef | null;
+  /**
+   * The annotation it draws, as the user sees it (the record's, a gesture
+   * in progress aside: that is in `geometry` and `box`). Absent for what isn't
+   * made yet: a drawing in progress or a tool's ghost.
+   */
+  annotation?: Annotation;
   subtype: KindName;
   geometry: Shape;
   /**
@@ -917,6 +938,9 @@ export interface InkStraightenOptions {
   axisSnapDegrees: number;
 }
 
+/** What a selection handle reshapes: a box's corner or side, or one point of a line or a polygon. */
+export type HandleRole = 'corner' | 'side' | 'point';
+
 export type ChromeNode =
   | { kind: 'outline'; rect: Rect }
   // An oriented selection box: the four corners of the (possibly tilted) OBB in
@@ -925,7 +949,16 @@ export type ChromeNode =
   // shape (or group) carries rotation.
   | { kind: 'obb'; corners: [Point, Point, Point, Point]; angle: number }
   // `rot` (deg, CW) tilts the handle glyph itself so it rides a rotated box.
-  | { kind: 'handle'; at: Point; cursor: Cursor; rot?: number }
+  // `role` says what it reshapes: a box's corner or side, or one point of a
+  // line or a polygon; `active` is true while it is being dragged.
+  | {
+      kind: 'handle';
+      at: Point;
+      cursor: Cursor;
+      rot?: number;
+      role: HandleRole;
+      active: boolean;
+    }
   // The rotate knob: `at` is where the grab dot sits (hanging off the top edge),
   // `from` the edge anchor the connector stalk draws to.
   | { kind: 'rotate-knob'; at: Point; from: Point }

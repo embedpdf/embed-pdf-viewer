@@ -29,9 +29,10 @@ function createHarness(
   let liveFetches = 0;
   let maxLiveFetches = 0;
 
+  const resolved = resolveRenderOptions({ tiles: { settleMs: 0, bleed: 0, ...options?.tiling } });
   const tileManager = new TileManager({
     store,
-    options: resolveRenderOptions({ tiles: { settleMs: 0, bleed: 0, ...options?.tiling } }),
+    getOptions: () => resolved,
     getPolicy: () => ({ kind: 'continuous' }) as never,
     getPageSize: () => PAGE,
     getEpoch: () => 0,

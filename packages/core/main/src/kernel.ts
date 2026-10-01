@@ -2,16 +2,21 @@ import { createStore } from './store';
 import {
   createPluginContext,
   markConnected,
+  readWrapped,
   sliceKey,
   type ContextServices,
   type SessionRef,
 } from './context';
 import type { SliceLease } from './store';
+import { cancellable } from './cancellable';
 import { createEventHook } from './event-hook';
-import { toPluginError, toPluginErrorInfo } from './errors';
+import { PluginError, toPluginError, toPluginErrorInfo } from './errors';
+import { findPage } from './page-of';
+import { permissionDenied, sessionAllows } from './permissions';
 import { settle } from './settle';
 import {
   createSettingsStore,
+  type DeepPartial,
   type SettingsApi,
   type SettingsOf,
   type SettingsStore,
@@ -23,25 +28,31 @@ import {
   type AnyPlugin,
   type CapabilityToken,
   type CoreState,
-  type DocInfo,
   type DocumentHandle,
+  type DocumentInfo,
   type DocumentMeta,
   type DocumentsCapability,
   type Engine,
   type GlobalState,
   type OpenDocumentOptions,
+  type OpenDocumentResult,
   type OpenInput,
   type OpenSource,
   type DocumentOpenedEvent,
   type DocumentOpenFailedEvent,
   type DocumentLockedEvent,
   type DocumentClosedEvent,
-  type ActiveDocumentChangedEvent,
+  type DocumentActiveChangedEvent,
   type DocumentPagesChangedEvent,
+  type DocumentUnsavedChangesChangedEvent,
   type PendingMeta,
+  type Permission,
   type PluginScope,
   type Unsubscribe,
+  type UnlockOptions,
+  type UrlSource,
 } from './types';
+import { VIEWER_DEFAULTS, VIEWER_WHOLE_SETTINGS, type ViewerSettings } from './viewer-settings';
 import {
   CONTINUOUS_RENDER_POLICY,
   isLocalDocument,
@@ -78,7 +89,12 @@ export type KernelStatus =
   | 'destroying'
   | 'destroyed';
 
-export interface Kernel {
+/**
+ * The viewer: the engine, the plugins and the open documents. Its own settings
+ * (`getSettings()`, `updateSettings()`, …) are what every document gets unless it says
+ * otherwise, and what every plugin's colors fall back to (`viewer-settings.ts`).
+ */
+export interface Kernel extends SettingsApi<ViewerSettings> {
   readonly engine: Engine;
   readonly documents: DocumentsCapability;
   /**
@@ -123,22 +139,78 @@ export interface Kernel {
 
 const isDocumentScoped = (plugin: AnyPlugin) => plugin.scope === 'document';
 const initialStateOf = (plugin: AnyPlugin): unknown => plugin.state?.();
-const toDocInfo = (meta: DocumentMeta): DocInfo => ({
-  id: meta.id,
-  name: meta.name,
-  status: 'ready',
-  pageCount: meta.pageCount,
-});
-const pendingToDocInfo = (meta: PendingMeta): DocInfo => ({
-  id: meta.id,
-  name: meta.name,
-  status: meta.status,
-  pageCount: 0,
-  passwordProvided: meta.passwordProvided,
-  ...(meta.status === 'error' && meta.error !== undefined
-    ? { error: toPluginErrorInfo(toPluginError('documents', meta.error)) }
-    : {}),
-});
+/**
+ * A document's public fields, one object per registry entry: the entries are replaced, never
+ * changed, so the same entry gives the same object, and readers re-render only for their own.
+ */
+const infoByEntry = new WeakMap<DocumentMeta | PendingMeta, DocumentInfo>();
+function documentInfoOf(entry: DocumentMeta | PendingMeta): DocumentInfo {
+  let info = infoByEntry.get(entry);
+  if (!info) {
+    info = 'pages' in entry ? readyInfo(entry) : pendingInfo(entry);
+    infoByEntry.set(entry, info);
+  }
+  return info;
+}
+const readyInfo = (meta: DocumentMeta): DocumentInfo =>
+  Object.freeze({
+    id: meta.id,
+    name: meta.name,
+    status: 'ready',
+    pageCount: meta.pageCount,
+    hasUnsavedChanges: meta.hasUnsavedChanges,
+  });
+const pendingInfo = (meta: PendingMeta): DocumentInfo =>
+  Object.freeze({
+    id: meta.id,
+    name: meta.name,
+    status: meta.status,
+    pageCount: 0,
+    hasUnsavedChanges: false,
+    ...(meta.status === 'locked' ? { passwordProvided: meta.passwordProvided ?? false } : {}),
+    ...(meta.status === 'error' && meta.error !== undefined
+      ? { error: toPluginErrorInfo(toPluginError('documents', meta.error)) }
+      : {}),
+  });
+
+/** Whether an event is a change to the document, one a download would carry. */
+const changesDocument = (event: DocumentEvent): boolean =>
+  event.type !== 'stream.desynced' &&
+  event.type !== 'document.versioned' &&
+  event.type !== 'signatures.prepared' &&
+  event.type !== 'signatures.cancelled';
+
+/** The part of `fetch` a `{ kind: 'url' }` source needs. */
+type FetchFile = (
+  url: string,
+  init: { readonly signal: AbortSignal },
+) => Promise<{
+  readonly ok: boolean;
+  readonly status: number;
+  arrayBuffer(): Promise<ArrayBuffer>;
+}>;
+
+/** Download a URL source's file; its tab shows the failure when the server says no. */
+async function fetchUrlSource(source: UrlSource, signal: AbortSignal): Promise<OpenInput> {
+  const fetchFile = (globalThis as { fetch?: FetchFile }).fetch;
+  if (!fetchFile) {
+    throw new PluginError('unsupported', 'documents', `can't download ${source.url}: no fetch()`);
+  }
+  const response = await fetchFile(source.url, { signal });
+  if (!response.ok) {
+    throw new PluginError(
+      response.status === 404 ? 'not-found' : 'operation-failed',
+      'documents',
+      `couldn't download ${source.url} (HTTP ${response.status})`,
+    );
+  }
+  return { kind: 'bytes', bytes: new Uint8Array(await response.arrayBuffer()) };
+}
+
+const isUrlSource = (source: OpenInput | UrlSource): source is UrlSource => source.kind === 'url';
+
+const noLayer = () =>
+  new PluginError('unsupported', 'documents', 'only the local engine gives a layer to download');
 
 /**
  * The documents capability as seen from inside one document's scope: every call whose document
@@ -149,18 +221,19 @@ const documentsInScope = (
   documentId: string,
 ): DocumentsCapability => ({
   ...documents,
-  save: (id = documentId, options) => documents.save(id, options),
-  saveLayer: (id = documentId, options) => documents.saveLayer(id, options),
+  get: (id = documentId) => documents.get(id),
+  download: (id = documentId, options) => documents.download(id, options),
+  downloadLayer: (id = documentId, options) => documents.downloadLayer(id, options),
+  canDownload: (id = documentId) => documents.canDownload(id),
+  canPrint: (id = documentId) => documents.canPrint(id),
   listPages: (id = documentId) => documents.listPages(id),
-  getPage: (ref, id = documentId) => documents.getPage(ref, id),
-  getPageAt: (index, id = documentId) => documents.getPageAt(index, id),
+  getPage: (page, id = documentId) => documents.getPage(page, id),
   getPageIndex: (ref, id = documentId) => documents.getPageIndex(ref, id),
   getRevision: (id = documentId) => documents.getRevision(id),
-  allows: (doc, id = documentId) => documents.allows(doc, id),
 });
 
 /** The stable id an input implies, if it carries one ('bytes'/'layerBytes'/'id'). */
-const idOfInput = (input: OpenInput): string | null =>
+const idOfInput = (input: OpenInput | UrlSource): string | null =>
   'id' in input && typeof input.id === 'string' ? input.id : null;
 
 /**
@@ -195,6 +268,8 @@ interface DocumentSession extends SessionRef {
   views: Map<CapabilityToken<unknown>, unknown>;
   /** `connect` halves of `create()`, run once every instance of the document is built. */
   connectors: Map<AnyPlugin, () => void>;
+  /** How many changes the document has had since it opened: a download that read them all clears `hasUnsavedChanges`. */
+  changes: number;
   close(): Promise<void>;
 }
 
@@ -223,6 +298,8 @@ const isAbortLike = (error: unknown): boolean =>
 export function createKernel(config: {
   engine: Engine;
   plugins: AnyPlugin[];
+  /** The viewer's own settings, over `VIEWER_DEFAULTS`: what `resetSettings()` goes back to. */
+  settings?: DeepPartial<ViewerSettings>;
   /** Observability seam: teardown, listener and join failures land here. Default: console.error. */
   report?: (error: unknown) => void;
 }): Kernel {
@@ -253,10 +330,19 @@ export function createKernel(config: {
   const openFailed = createEventHook<DocumentOpenFailedEvent>(report);
   const locked = createEventHook<DocumentLockedEvent>(report);
   const closed = createEventHook<DocumentClosedEvent>(report);
-  const activeChanged = createEventHook<ActiveDocumentChangedEvent>(report);
+  const activeChanged = createEventHook<DocumentActiveChangedEvent>(report);
   const pagesChanged = createEventHook<DocumentPagesChangedEvent>(report);
+  const unsavedChangesChanged = createEventHook<DocumentUnsavedChangesChangedEvent>(report);
   workspaceScope.defer(() => {
-    for (const hook of [opened, openFailed, locked, closed, activeChanged, pagesChanged])
+    for (const hook of [
+      opened,
+      openFailed,
+      locked,
+      closed,
+      activeChanged,
+      pagesChanged,
+      unsavedChangesChanged,
+    ])
       hook.dispose();
   });
   /** Every core write goes through here so an active-tab change is observed exactly once. */
@@ -351,6 +437,8 @@ export function createKernel(config: {
       connectors: new Map(),
       leases: new Map(),
       settleFlushes: new Set(),
+      downloadWraps: [],
+      changes: 0,
       close: () => closeSession(session),
     };
     return session;
@@ -375,7 +463,7 @@ export function createKernel(config: {
     if (previousId === nextId) return;
     const core = store.getCore();
     if (sessions.has(nextId) || core.documents[nextId] || core.pending[nextId]) {
-      throw new Error(`[documents] duplicate document id: ${nextId}`);
+      throw new PluginError('conflict', 'documents', `duplicate document id: ${nextId}`);
     }
     sessions.delete(previousId);
     session.id = nextId;
@@ -486,7 +574,27 @@ export function createKernel(config: {
     const core = store.getCore();
     const { [session.id]: _resolved, ...pending } = core.pending;
     setCore({ documents: { ...core.documents, [session.id]: meta }, pending });
-    opened.emit({ documentId: session.id, info: toDocInfo(meta) });
+    opened.emit({ documentId: session.id, info: documentInfoOf(meta) });
+  }
+
+  /**
+   * The document changed, or a download read every change it had: set `hasUnsavedChanges` and
+   * announce a flip. Before the document is published, its staged meta carries the flag.
+   */
+  function setUnsavedChanges(session: DocumentSession, hasUnsavedChanges: boolean): void {
+    const core = store.getCore();
+    const published = core.documents[session.id];
+    if (!published) {
+      if (session.stagedMeta && session.stagedMeta.hasUnsavedChanges !== hasUnsavedChanges) {
+        session.stagedMeta = { ...session.stagedMeta, hasUnsavedChanges };
+      }
+      return;
+    }
+    if (published.hasUnsavedChanges === hasUnsavedChanges) return;
+    setCore({
+      documents: { ...core.documents, [session.id]: { ...published, hasUnsavedChanges } },
+    });
+    unsavedChangesChanged.emit({ documentId: session.id, hasUnsavedChanges });
   }
 
   // ── capability resolution ────────────────────────────────────────────────────
@@ -504,25 +612,56 @@ export function createKernel(config: {
     return session.phase === 'bringup' || session.phase === 'ready' ? session.handle : null;
   };
 
+  /** The session a per-document verb acts on: `documentId`, or the active document. */
+  function readySession(documentId: string | undefined, verb: string): DocumentSession {
+    const session = sessionOf(documentId);
+    if (!session || !documentHandle(session.id)) {
+      throw new PluginError('not-ready', 'documents', `no open document to ${verb}`);
+    }
+    return session;
+  }
+
+  const allowsOn = (documentId: string | undefined, permission: Permission): boolean => {
+    const handle = documentHandle(documentId);
+    return handle ? sessionAllows(handle.security, permission) : false;
+  };
+
   /**
-   * The document's handle once it has settled: what its plugins held back is
-   * sent and answered, so reading the file now gives everything the user sees
-   * (settle.ts). Closing the document cancels the wait.
+   * Read the document's file, with everything the user sees: refuse without `doc.download`, let
+   * it settle (what its plugins held back is sent and answered, settle.ts), then read it inside
+   * every `aroundDownload` wrap (the document's own save actions). A read that saw every change
+   * the document had clears `hasUnsavedChanges`; a change during the read, or after it (a
+   * did-save script), keeps it. Closing the document, or `signal`, cancels it.
    */
-  async function settledHandle(
+  async function downloadFile(
     documentId: string | undefined,
     signal: AbortSignal | undefined,
     verb: string,
-  ): Promise<DocumentHandle> {
-    const session = sessionOf(documentId);
-    if (!session || !documentHandle(documentId)) {
-      throw new Error(`[documents] no document to ${verb}`);
+    read: (handle: DocumentHandle) => Promise<Uint8Array>,
+    refuse?: (handle: DocumentHandle) => PluginError | null,
+  ): Promise<Uint8Array> {
+    const session = readySession(documentId, verb);
+    if (!allowsOn(session.id, 'doc.download')) {
+      throw permissionDenied('documents', 'doc.download', `documents.${verb}`);
     }
-    await settle(session.settleFlushes, [signal, session.signal], report);
-    // The same document, even if another became active while it settled.
-    const handle = documentHandle(session.id);
-    if (!handle) throw new Error(`[documents] no document to ${verb}`);
-    return handle;
+    const refusal = refuse?.(session.handle!);
+    if (refusal) throw refusal;
+    try {
+      await settle(session.settleFlushes, [signal, session.signal], report);
+      // The same document, even if another became active while it settled.
+      const handle = documentHandle(session.id);
+      if (!handle) throw new PluginError('not-ready', 'documents', `no open document to ${verb}`);
+      let readAt = -1;
+      const readFile = () => {
+        readAt = session.changes;
+        return cancellable('documents', signal, read(handle));
+      };
+      const bytes = await readWrapped(session.downloadWraps, readFile);
+      if (readAt === session.changes) setUnsavedChanges(session, false);
+      return bytes;
+    } catch (error) {
+      throw toPluginError('documents', error);
+    }
   }
 
   function buildDocumentCapability(plugin: AnyPlugin, session: DocumentSession): unknown {
@@ -609,6 +748,15 @@ export function createKernel(config: {
   }
 
   // ── settings ─────────────────────────────────────────────────────────────────
+  // The viewer's own settings: one store, read when a document opens (its scope and identity)
+  // and by every adapter that paints (the accent, the page).
+  const viewerSettings = createSettingsStore<ViewerSettings>(
+    { defaults: VIEWER_DEFAULTS, registered: config.settings, whole: VIEWER_WHOLE_SETTINGS },
+    store.notify,
+    report,
+  );
+  workspaceScope.defer(() => viewerSettings.dispose());
+
   // A plugin's settings belong to the plugin as the app registered it, not to one document.
   // Each registration's store is built here, before any plugin is created, so the settings
   // can be read and changed before any document opens. Every instance of the plugin then
@@ -684,14 +832,22 @@ export function createKernel(config: {
       pages: snapshot.pages,
       revision: 0,
       renderPolicy,
+      hasUnsavedChanges: false,
     };
 
+    // Changes are unsaved only where they live in this tab until a download (the local
+    // engine); the cloud engine stores each one as it's made.
+    const tracksChanges = isLocalDocument(session.handle!);
     // Document mutation events (rotate/move/delete) replace the page
     // registry in place — the snapshot they carry is byte-identical to
     // pages.list(), so this is a direct swap, no merge. Own mutations and
     // remote (collaborator) mutations arrive identically; the handler is
     // origin-agnostic, as the event model intends.
     const unsubscribeEvents = session.handle!.events.subscribe((event) => {
+      if (tracksChanges && changesDocument(event)) {
+        session.changes += 1;
+        setUnsavedChanges(session, true);
+      }
       const layout = layoutFromEvent(event);
       if (!layout) return;
       const now = store.getCore();
@@ -734,19 +890,62 @@ export function createKernel(config: {
     checkpoint(session);
   }
 
+  /** What `open()` and `retry()` resolve: the document as its tab shows it, ready or locked. */
+  function openedResult(session: DocumentSession): OpenDocumentResult {
+    const core = store.getCore();
+    const entry = core.documents[session.id] ?? core.pending[session.id];
+    if (!entry) throw new PluginError('instance-closed', 'documents', `${session.id} was closed`);
+    return { document: documentInfoOf(entry) };
+  }
+
   // `async` on purpose: a refused reservation (duplicate id, destroyed kernel)
   // is a rejection, never a synchronous throw, like every other open failure.
-  async function openDocument(input: OpenSource, options?: OpenDocumentOptions): Promise<string> {
-    return reserveAndOpen(input, options).done;
+  async function openDocument(
+    input: OpenSource,
+    options?: OpenDocumentOptions,
+  ): Promise<OpenDocumentResult> {
+    const signal = options?.signal;
+    if (signal?.aborted) {
+      throw new PluginError('operation-cancelled', 'documents', 'the open was cancelled');
+    }
+    try {
+      const { session, done } = reserveAndOpen(input, options);
+      // Cancelling closes the document while it opens; once it's open, the signal is spent.
+      const cancel = () => void session.close();
+      signal?.addEventListener('abort', cancel, { once: true });
+      try {
+        return openedResult(await done);
+      } finally {
+        signal?.removeEventListener('abort', cancel);
+      }
+    } catch (error) {
+      throw toPluginError('documents', error);
+    }
+  }
+
+  /**
+   * The engine's open options for a document: its own, and the viewer's `scope` and
+   * `identity` where it has none. A document's own replace the viewer's, never merge.
+   */
+  function engineOptionsOf(options: OpenDocumentOptions | undefined) {
+    const { activate: _activate, name: _name, signal: _signal, ...own } = options ?? {};
+    const viewer = viewerSettings.api.getSettings();
+    const scope = own.scope ?? viewer.scope ?? undefined;
+    const identity = own.identity ?? viewer.identity ?? undefined;
+    return {
+      ...own,
+      ...(scope !== undefined ? { scope } : {}),
+      ...(identity !== undefined ? { identity } : {}),
+    };
   }
 
   /** Reserve the tab slot synchronously and start the open; returns the slot id at once. */
   function reserveAndOpen(
     input: OpenSource,
     options?: OpenDocumentOptions,
-  ): { id: string; done: Promise<string> } {
+  ): { session: DocumentSession; done: Promise<DocumentSession> } {
     guardUsable('documents.open()');
-    const { activate, name, ...engineOptions } = options ?? {};
+    const engineOptions = engineOptionsOf(options);
 
     // 1. Reserve the tab slot synchronously (before the first await): id,
     //    order position, and activation are decided at request time; only the
@@ -755,20 +954,25 @@ export function createKernel(config: {
     const requestedId =
       typeof input === 'function' ? nextTicket() : (idOfInput(input) ?? nextTicket());
     if (sessions.has(requestedId)) {
-      throw new Error(`[documents] document already open: ${requestedId}`);
+      throw new PluginError('conflict', 'documents', `document already open: ${requestedId}`);
     }
-    const session = createSession(requestedId, name);
+    const session = createSession(requestedId, options?.name);
     session.source = input;
     session.openOptions = options;
     sessions.set(session.id, session);
-    publishPendingSlot(session, activate ?? true);
+    publishPendingSlot(session, options?.activate ?? true);
 
     const done = beginOperation(session, async () => {
       try {
-        const source =
+        const given =
           typeof input === 'function'
             ? await engineCall(session, Promise.resolve(input(session.cancel.signal)))
             : input;
+        checkpoint(session);
+        // A URL is downloaded here, under the loading tab; closing the tab stops the download.
+        const source = isUrlSource(given)
+          ? await engineCall(session, fetchUrlSource(given, session.cancel.signal))
+          : given;
         checkpoint(session);
         const sourceId = idOfInput(source);
         if (sourceId) rekeySession(session, sourceId);
@@ -790,14 +994,14 @@ export function createKernel(config: {
         if (prompt?.state === 'required') {
           session.phase = 'locked';
           publishLocked(session, prompt.incorrect);
-          return session.id;
+          return session;
         }
 
         const snapshot = await engineCall(session, handle.pages.list());
         checkpoint(session);
         await bringUp(session, snapshot);
         commitReady(session);
-        return session.id;
+        return session;
       } catch (error) {
         // Close won the race: close() owns unpublish + disposal; just get out
         // of its way, rejecting with the typed cancellation either way.
@@ -814,22 +1018,27 @@ export function createKernel(config: {
         throw error;
       }
     });
-    return { id: session.id, done };
+    return { session, done };
   }
 
-  async function unlockDocument(id: string, input: { password: string }): Promise<void> {
+  async function unlockDocument(id: string, options: UnlockOptions): Promise<void> {
     guardUsable('documents.unlock()');
     const session = sessions.get(id);
     if (!session || session.phase !== 'locked' || !session.handle) {
-      throw new Error(`[documents] document is not locked: ${id}`);
+      throw new PluginError('invalid-input', 'documents', `document is not locked: ${id}`);
     }
     const handle = session.handle;
     return beginOperation(session, async () => {
       // Engine-agnostic by design: local loads the parked worker bytes, cloud
       // POSTs /access — same call, same result. A wrong password rejects here
-      // and nothing changes: the document stays locked, unlock is retryable.
+      // and nothing changes: the document stays locked, unlock is retryable,
+      // and so does a password check the caller's signal stopped.
       try {
-        await engineCall(session, handle.security.unlock({ password: input.password }));
+        await cancellable(
+          'documents',
+          options.signal,
+          engineCall(session, handle.security.unlock({ password: options.password })),
+        );
       } catch (error) {
         if (session.phase === 'closing' || isAbortLike(error)) {
           throw new CancelledError(`closed while opening: ${session.id}`);
@@ -854,6 +1063,8 @@ export function createKernel(config: {
         publishError(session, error);
         throw error;
       }
+    }).catch((error: unknown) => {
+      throw toPluginError('documents', error);
     });
   }
 
@@ -873,31 +1084,44 @@ export function createKernel(config: {
     return id ? (core.documents[id] ?? null) : null;
   };
 
-  /** Memoised tab list: the same array until the registry or a slot changes. */
-  let listMemo: { core: CoreState; value: readonly DocInfo[] } | null = null;
-  const listDocuments = (): readonly DocInfo[] => {
+  /** The tab list: the same array until one of its documents changes, or the order does. */
+  let listMemo: { core: CoreState; value: readonly DocumentInfo[] } | null = null;
+  const listDocuments = (): readonly DocumentInfo[] => {
     const core = store.getCore();
     if (listMemo?.core === core) return listMemo.value;
-    const value = Object.freeze(
-      core.order.map((id) => {
-        const meta = core.documents[id];
-        return meta ? toDocInfo(meta) : pendingToDocInfo(core.pending[id]);
-      }),
-    );
+    const next = core.order.map((id) => documentInfoOf(core.documents[id] ?? core.pending[id]));
+    const previous = listMemo?.value;
+    const same =
+      previous !== undefined &&
+      previous.length === next.length &&
+      previous.every((info, i) => info === next[i]);
+    const value = same ? previous : Object.freeze(next);
     listMemo = { core, value };
     return value;
   };
 
+  /** A document's fields: `documentId`, or the active document's. */
+  const getDocument = (documentId?: string): DocumentInfo | null => {
+    const core = store.getCore();
+    const id = documentId ?? core.activeId;
+    const entry = id ? (core.documents[id] ?? core.pending[id]) : undefined;
+    return entry ? documentInfoOf(entry) : null;
+  };
+
   const documents: DocumentsCapability = {
     open: openDocument,
-    retry: async (id) => {
+    retry: async (id, options) => {
       const session = sessions.get(id);
       if (!session || session.phase !== 'error' || session.source === null) {
-        throw new Error(`[documents] "${id}" is not a failed open; nothing to retry`);
+        throw new PluginError(
+          'invalid-input',
+          'documents',
+          `${id} didn't fail to open; nothing to retry`,
+        );
       }
       const { source, openOptions } = session;
       await session.close();
-      return openDocument(source, openOptions);
+      return openDocument(source, { ...openOptions, signal: options?.signal });
     },
     rename: (id, name) => {
       const core = store.getCore();
@@ -909,7 +1133,7 @@ export function createKernel(config: {
       const session = sessions.get(id);
       if (session) session.name = name;
     },
-    openAll: (docs) => {
+    openAll: (initialDocuments) => {
       guardUsable('documents.openAll()');
       // Fire-and-forget on purpose: each open() reserves its tab slot
       // synchronously, so tabs exist immediately in array order; exactly one
@@ -917,18 +1141,18 @@ export function createKernel(config: {
       // (`error`/`locked`), never unhandled rejections.
       const activeIndex = Math.max(
         0,
-        docs.findIndex((initialDocument) => initialDocument.active),
+        initialDocuments.findIndex((initialDocument) => initialDocument.active),
       );
       // The returned ids are the reserved slots: a thunk source's ticket is
       // rekeyed to the real id on resolve (`onOpened` carries the final id).
-      return docs.map(({ source, active: _active, ...options }, index) => {
+      return initialDocuments.map(({ source, active: _active, ...options }, index) => {
         try {
-          const { id, done } = reserveAndOpen(source, {
+          const { session, done } = reserveAndOpen(source, {
             ...options,
             activate: index === activeIndex,
           });
           void done.catch(() => {});
-          return id;
+          return session.id;
         } catch {
           // A refused reservation (an id already open) is not a boot failure:
           // the existing tab stands; report the id the caller asked for.
@@ -947,18 +1171,9 @@ export function createKernel(config: {
       if (core.documents[id] || core.pending[id]) setCore({ activeId: id });
     },
     getActiveId: () => store.getCore().activeId,
-    getActive: () => {
-      const id = store.getCore().activeId;
-      return id ? documents.get(id) : null;
-    },
+    getActive: () => getDocument(),
     list: listDocuments,
-    get: (id) => {
-      const core = store.getCore();
-      const meta = core.documents[id];
-      if (meta) return toDocInfo(meta);
-      const pending = core.pending[id];
-      return pending ? pendingToDocInfo(pending) : null;
-    },
+    get: getDocument,
     has: (id) => {
       const core = store.getCore();
       return core.documents[id] !== undefined || core.pending[id] !== undefined;
@@ -970,7 +1185,13 @@ export function createKernel(config: {
       const same =
         ids.length === current.length &&
         [...ids].sort().join('\0') === [...current].sort().join('\0');
-      if (!same) throw new Error('[documents] setOrder() needs a permutation of the current order');
+      if (!same) {
+        throw new PluginError(
+          'invalid-input',
+          'documents',
+          'setOrder() needs a permutation of the current order',
+        );
+      }
       reorder([...ids]);
     },
     move: (id, toIndex) => {
@@ -981,45 +1202,46 @@ export function createKernel(config: {
       without.splice(clamped, 0, id);
       reorder(without);
     },
-    swap: (left, right) => {
+    swap: (id, otherId) => {
       const core = store.getCore();
-      const indexA = core.order.indexOf(left);
-      const indexB = core.order.indexOf(right);
-      if (indexA < 0 || indexB < 0) return;
+      const index = core.order.indexOf(id);
+      const otherIndex = core.order.indexOf(otherId);
+      if (index < 0 || otherIndex < 0) return;
       const next = [...core.order];
-      next[indexA] = right;
-      next[indexB] = left;
+      next[index] = otherId;
+      next[otherIndex] = id;
       reorder(next);
     },
-    // Document IO — siblings of open/close, straight to the live engine handle.
-    save: async (id, options) => {
-      const handle = await settledHandle(id, options?.signal, 'save');
-      return handle.download(options?.mode !== undefined ? { mode: options.mode } : undefined);
-    },
-    saveLayer: async (id, options) => {
-      const handle = await settledHandle(id, options?.signal, 'download');
-      if (!isLocalDocument(handle)) {
-        throw new Error('[documents] only the local engine can export a layer (open with a layer)');
-      }
-      return handle.downloadLayer();
-    },
+    // Reading the file: download() and downloadLayer() (downloadFile above).
+    download: (id, options) =>
+      downloadFile(id, options?.signal, 'download', (handle) =>
+        handle.download(options?.mode !== undefined ? { mode: options.mode } : undefined),
+      ),
+    downloadLayer: (id, options) =>
+      downloadFile(
+        id,
+        options?.signal,
+        'downloadLayer',
+        (handle) => (isLocalDocument(handle) ? handle.downloadLayer() : Promise.reject(noLayer())),
+        // Refused before anything runs: the cloud engine keeps layers itself.
+        (handle) => (isLocalDocument(handle) ? null : noLayer()),
+      ),
+    // The verbs that need them live here, so their checks do too (permissions.md).
+    canDownload: (id) => allowsOn(id, 'doc.download'),
+    canPrint: (id) => allowsOn(id, 'doc.print'),
     // The page registry, addressed by PageRef (durable) or display index.
     listPages: (id) => metaOf(id)?.pages ?? EMPTY_PAGES,
-    getPage: (ref, id) =>
-      metaOf(id)?.pages.find((pageInfo) => pageRefsEqual(pageInfo.ref, ref)) ?? null,
-    getPageAt: (index, id) => metaOf(id)?.pages[index] ?? null,
+    getPage: (page, id) => findPage(metaOf(id)?.pages ?? EMPTY_PAGES, page),
     getPageIndex: (ref, id) =>
       metaOf(id)?.pages.findIndex((pageInfo) => pageRefsEqual(pageInfo.ref, ref)) ?? -1,
     getRevision: (id) => metaOf(id)?.revision ?? -1,
-    // The permissions.md chrome exception: print/download are kernel verbs
-    // with 1:1 capabilities, so their authority question is answered here.
-    allows: (doc, id) => documentHandle(id)?.security.allows(doc) ?? false,
     onOpened: opened.on,
     onOpenFailed: openFailed.on,
     onLocked: locked.on,
     onClosed: closed.on,
     onActiveChanged: activeChanged.on,
     onPagesChanged: pagesChanged.on,
+    onUnsavedChangesChanged: unsavedChangesChanged.on,
   };
   workspaceCapabilities.set(DocumentsToken, documents);
 
@@ -1047,6 +1269,7 @@ export function createKernel(config: {
   }
 
   return {
+    ...viewerSettings.api,
     engine,
     documents,
     capability: resolveCapability,

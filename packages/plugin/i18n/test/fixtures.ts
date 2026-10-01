@@ -14,4 +14,4 @@ export const es: Locale = {
   name: 'Español',
   translations: { commands: { save: 'Guardar' } },
 };
-export const ar: Locale = { code: 'ar', name: 'العربية', dir: 'rtl', translations: {} };
+export const ar: Locale = { code: 'ar', name: 'العربية', direction: 'rtl', translations: {} };

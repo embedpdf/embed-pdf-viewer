@@ -8,7 +8,7 @@ export { StampDeclaration } from './declaration';
 export { StampFitSchema } from './values';
 export type { StampFit } from './values';
 
-export type StampAnnotationDTO<C extends Coordinates = PageCoordinates> = ReadOf<
+export type StampAnnotation<C extends Coordinates = PageCoordinates> = ReadOf<
   typeof StampDeclaration,
   C
 >;
@@ -26,12 +26,11 @@ export const StampDTOSchema = StampDeclaration.readSchema;
 export const StampDraftSchema = StampDeclaration.createSchema;
 export const StampPatchSchema = StampDeclaration.updateSchema;
 
-export const StampKind: AnnotationKindModule<'stamp', StampAnnotationDTO, StampDraft, StampPatch> =
-  {
-    subtype: 'stamp',
-    pdfSubtypeCode: PdfAnnotationSubtypeCode.STAMP,
-    dtoSchema: StampDTOSchema,
-    draftSchema: StampDraftSchema,
-    patchSchema: StampPatchSchema,
-    readBackWrites: StampDeclaration.readBackWrites,
-  };
+export const StampKind: AnnotationKindModule<'stamp', StampAnnotation, StampDraft, StampPatch> = {
+  subtype: 'stamp',
+  pdfSubtypeCode: PdfAnnotationSubtypeCode.STAMP,
+  dtoSchema: StampDTOSchema,
+  draftSchema: StampDraftSchema,
+  patchSchema: StampPatchSchema,
+  readBackWrites: StampDeclaration.readBackWrites,
+};

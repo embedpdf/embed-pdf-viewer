@@ -1,3 +1,4 @@
+import type { OperationOptions } from '@embedpdf/core';
 import {
   type Id,
   kindOf,
@@ -11,7 +12,7 @@ import {
 import {
   annotationKey,
   type AnnotationDraft,
-  type AnnotationDTO,
+  type Annotation,
   type AnnotationPatch,
   type AnnotationRef,
   type PdfLinkTarget,
@@ -28,7 +29,7 @@ import { appliedOrThrow, throwIfFailed } from './outcomes';
  * deletes link children, and the relationship-only patch grouping uses.
  */
 export function createLinkWrites(
-  ctx: Pick<AnnotationContext, 'doc'>,
+  ctx: Pick<AnnotationContext, 'doc' | 'cancellable'>,
   { store, geometry, identity }: Pick<AnnotationServices, 'store' | 'geometry' | 'identity'>,
 ) {
   /**
@@ -127,7 +128,7 @@ export function createLinkWrites(
   /** A relationship-only engine patch (sets/clears `/IRT` + `/RT`) — geometry and
    *  style are left untouched, so grouping never re-bakes an appearance. */
   const relationshipPatch = (
-    subtype: AnnotationDTO['subtype'],
+    subtype: Annotation['subtype'],
     reply: { to: AnnotationRef; type?: 'group' } | null,
   ): AnnotationPatch => ({ subtype, reply }) as AnnotationPatch;
 
@@ -167,9 +168,10 @@ export function createLinkWrites(
       // The verbs go straight to the reconciler chain (latest-wins per
       // parent) and resolve when the children are committed — `get` reads
       // the new value the moment the promise settles.
-      set: (ref: AnnotationRef, target: PdfLinkTarget) =>
-        scheduleSync(annotationKey(ref), { target }),
-      clear: (ref: AnnotationRef) => scheduleSync(annotationKey(ref), { target: null }),
+      set: (ref: AnnotationRef, target: PdfLinkTarget, options: OperationOptions = {}) =>
+        ctx.cancellable(options.signal, scheduleSync(annotationKey(ref), { target })),
+      clear: (ref: AnnotationRef, options: OperationOptions = {}) =>
+        ctx.cancellable(options.signal, scheduleSync(annotationKey(ref), { target: null })),
     },
   };
 

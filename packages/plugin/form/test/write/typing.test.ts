@@ -122,7 +122,7 @@ describe('the text being typed in a field', () => {
     form.draftText(NAME, 'Ada Lovelace'); // typing: nothing is written yet
     expect(writes).toHaveLength(0);
 
-    const saving = kernel.documents.save('d');
+    const saving = kernel.documents.download('d');
     await tick();
     expect(writes).toHaveLength(1); // the download committed the draft
     expect(log).toEqual([]);
@@ -144,7 +144,7 @@ describe('the text being typed in a field', () => {
 
     form.draftText(NAME, 'Grace');
     form.discardDraftText(NAME); // Escape
-    await kernel.documents.save('d');
+    await kernel.documents.download('d');
     expect(writes).toHaveLength(1);
     await kernel.destroy();
   });

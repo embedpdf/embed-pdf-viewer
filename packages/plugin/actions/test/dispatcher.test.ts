@@ -1,6 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { createTestContext } from '@embedpdf/core/testing';
 import {
   toPageRef,
   type DocumentHandle,
@@ -10,6 +9,7 @@ import {
 
 import { createActionsController } from '../src/controller';
 import type { ActionContext, ActionsConfig, ActionUiAdapter } from '../src/host-contract';
+import { createActionsTestContext } from './helpers/context';
 
 const USER: ActionContext = {
   origin: 'user',
@@ -60,20 +60,23 @@ const hide = (
 ): PdfActionNode => ({ type: 'hide', subtype: 'Hide', targets, hide: hidden, next: [] });
 
 function harness(config?: ActionsConfig, fields: Array<{ name: string; widgets: number[] }> = []) {
-  const ctx = createTestContext<void>({
-    id: 'actions',
-    doc: {
-      forms: {
-        list: async () => ({
-          fields: fields.map(({ name, widgets }, index) => ({
-            name,
-            ref: { kind: 'objectNumber', objectNumber: 100 + index },
-            widgets: widgets.map((objectNumber) => ({ objectNumber, page: toPageRef(3) })),
-          })),
-        }),
-      },
-    } as unknown as Partial<DocumentHandle>,
-  });
+  const ctx = createActionsTestContext(
+    {
+      id: 'actions',
+      doc: {
+        forms: {
+          list: async () => ({
+            fields: fields.map(({ name, widgets }, index) => ({
+              name,
+              ref: { kind: 'objectNumber', objectNumber: 100 + index },
+              widgets: widgets.map((objectNumber) => ({ objectNumber, page: toPageRef(3) })),
+            })),
+          }),
+        },
+      } as unknown as Partial<DocumentHandle>,
+    },
+    config,
+  );
   const capability = ctx.connect(createActionsController(ctx, config));
   return { capability };
 }

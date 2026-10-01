@@ -14,7 +14,7 @@ import { useId, useMemo, useRef } from 'react';
 import { pageRefsEqual, toPageRef } from '@embedpdf/core';
 import type { PageRef } from '@embedpdf/core';
 import { NO_FRAME, pageTransform, type PageFrame } from '@embedpdf/core-geometry';
-import { observeClientGeometry } from '@embedpdf/web';
+import { observeClientGeometry, paint } from '@embedpdf/web';
 import { ProjectorProvider, type ProjectorBinding, type ViewProjector } from './anchored';
 import {
   DocumentScope,
@@ -22,49 +22,51 @@ import {
   PageProvider,
   useActiveDocumentId,
   useKernelValue,
+  useViewerSettings,
 } from './runtime';
 
-export type PageViewProps = {
+export interface PageViewProps {
+  /** The page: its `ref`, which follows it when pages move, or its index, from 0. */
+  page: PageRef | number;
   /** Which document to show. Defaults to the active document. */
   documentId?: string;
   /** Shown while the document or the page is not available yet (default: nothing). */
   fallback?: React.ReactNode;
-  /** Target width for the page content; the display box is the rotated footprint. */
+  /** The width of the page, in pixels; the display box is the rotated footprint. Default 240. */
   width?: number;
-  /** Reserved chrome bands around the page (screen px) — same model as `<Stage>`. */
-  pageFrame?: PageFrame;
+  /** Space reserved around the page for your own labels, in pixels per side; the sides left out are 0. */
+  pageFrame?: Partial<PageFrame>;
   /** Page-space content (rotates with the page). */
   children: React.ReactNode;
   /** Box-space chrome (label, border, …) — never rotated. Mirrors `<Stage pageChrome>`. */
   pageChrome?: React.ReactNode;
+  /** On the outer box. */
+  className?: string;
+  /** On the outer box. */
   style?: React.CSSProperties;
-} & (
-  | {
-      /** The page by its durable address. */
-      pageRef: PageRef;
-      pageIndex?: never;
-    }
-  | {
-      /** The page by display index (0-based). */
-      pageIndex: number;
-      pageRef?: never;
-    }
-);
+}
 
 /** A single page surface with no Stage — same layers + rotation + chrome frame,
  *  no camera/scroll/zoom. */
-export function PageView(props: PageViewProps) {
-  const {
-    documentId,
-    fallback = null,
-    width = 240,
-    pageFrame = NO_FRAME,
-    children,
-    pageChrome,
-    style,
-  } = props;
-  const wantedRef = props.pageRef ?? null;
-  const wantedIndex = props.pageIndex ?? null;
+export function PageView({
+  page: wanted,
+  documentId,
+  fallback = null,
+  width = 240,
+  pageFrame: framePatch,
+  children,
+  pageChrome,
+  className,
+  style,
+}: PageViewProps) {
+  const wantedRef = typeof wanted === 'number' ? null : wanted;
+  const wantedIndex = typeof wanted === 'number' ? wanted : null;
+  // The sides left out reserve nothing; memoized by value so the context stays stable.
+  const { top = 0, right = 0, bottom = 0, left = 0 } = framePatch ?? NO_FRAME;
+  const pageFrame = useMemo<PageFrame>(
+    () => ({ top, right, bottom, left }),
+    [top, right, bottom, left],
+  );
   const active = useActiveDocumentId();
   const ref = useRef<HTMLDivElement>(null);
   const docId = documentId ?? active;
@@ -149,6 +151,8 @@ export function PageView(props: PageViewProps) {
     () => ({ projector, revision: ctx, subscribe: observeClientGeometry }),
     [projector, ctx],
   );
+  // The viewer's `page` settings; `--epdf-page-*` CSS variables win over them.
+  const look = useViewerSettings((settings) => settings.page);
   if (!docId || !base) return <>{fallback}</>;
   const outerW = transform.viewWidth + pageFrame.left + pageFrame.right;
   const outerH = transform.viewHeight + pageFrame.top + pageFrame.bottom;
@@ -157,7 +161,10 @@ export function PageView(props: PageViewProps) {
   return (
     <DocumentScope id={docId}>
       <ProjectorProvider value={projectorBinding}>
-        <div style={{ position: 'relative', width: outerW, height: outerH, ...style }}>
+        <div
+          className={className}
+          style={{ position: 'relative', width: outerW, height: outerH, ...style }}
+        >
           <PageProvider value={ctx}>
             {/* drop shadow ONLY — transparent, axis-aligned, can't leak behind the bitmap */}
             <div
@@ -167,7 +174,7 @@ export function PageView(props: PageViewProps) {
                 top: pageFrame.top,
                 width: transform.viewWidth,
                 height: transform.viewHeight,
-                boxShadow: 'var(--epdf-page-shadow, 0 6px 18px rgba(0,0,0,.18))',
+                boxShadow: paint('page-shadow', look.shadow),
               }}
             />
             {/* white backing + content as ONE box; rotation 0 carries no transform */}
@@ -179,7 +186,7 @@ export function PageView(props: PageViewProps) {
                 top: contentTop,
                 width: transform.contentWidth,
                 height: transform.contentHeight,
-                background: '#fff',
+                background: paint('page-background', look.background),
                 transform: rotation ? `rotate(${rotation}deg)` : undefined,
                 userSelect: 'none',
                 WebkitUserSelect: 'none',

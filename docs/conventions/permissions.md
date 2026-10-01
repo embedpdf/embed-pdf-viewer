@@ -17,9 +17,9 @@ the engine will refuse.
 Each layer consumes only the layer below. A UI never touches scope strings or
 `allows()` directly — what a verb requires is the owning plugin's knowledge
 (search `'full'` needs `doc.text.search` **and** `doc.text.copy`; only the
-search plugin should know that). The one sanctioned exception: a kernel/chrome
-feature with no owning plugin and a 1:1 capability (print, download) may read
-`allows()` directly.
+search plugin should know that). Download and print have no plugin of their
+own: their verbs live on the kernel's documents capability, and so do their
+twins, `documents.canDownload()` and `documents.canPrint()`.
 
 ## The twin law
 
@@ -106,7 +106,8 @@ so every twin's subscribers re-render.
 | selection        | `canSelect()` · `canCopy()`                                                                     | `doc.text.select` / `doc.text.copy`                                                                                                                                                           |
 | search           | `canSearch(mode?)`                                                                              | `doc.text.search`; `'full'` also `doc.text.copy` (a snippet reproduces text). No verb gate — pure request.                                                                                    |
 | render           | `canRender()`                                                                                   | `doc.render`; gate case: `renderPage` and tile fetches refuse locally (else a denied viewport 403s per tile, forever)                                                                         |
-| page-edit        | `canEdit()` — the collapse rule                                                                 | `doc.pages.assemble` (rotate/move/delete/insert are one answer; PDF has one assemble bit)                                                                                                     |
+| page-edit        | `canEdit()` (the collapse rule) · `canExtract()`                                                | `doc.pages.assemble` (rotate/move/delete/insert are one answer; PDF has one assemble bit); `doc.download` for extract and duplicate                                                           |
+| metadata         | `canUpdate()`                                                                                   | `doc.metadata.modify` (the standard fields and your own)                                                                                                                                      |
 | form             | `canRead()` · `canFill()` · `canDesign()`                                                       | `doc.forms.read` (hydration gate) / `doc.forms.fill` (fused into `FillItem.disabled` + write/reset gates) / `doc.forms.modify` (place/update/delete/detach; the draw-to-place handler's gate) |
 | redaction        | `canMark()` · `canApply()`                                                                      | marks are annotations ⇒ `canMark` is `annotation.canCreate()`; apply mirrors all three engine assertions: `doc.redact` ∧ `doc.pages.modify` ∧ `doc.annotate.modify` (+ engine support)        |
-| kernel documents | `allows(cap, id?)`                                                                              | The 1:1 exception surface: chrome print/download read `documents.allows('doc.print' / 'doc.download')` — the verbs live on the kernel, no owning plugin                                       |
+| kernel documents | `canDownload(id?)` · `canPrint(id?)`                                                            | `doc.download` / `doc.print`: the verbs (`download()`, `downloadLayer()`, `print()`) live on the kernel's documents capability, so their twins do too                                         |

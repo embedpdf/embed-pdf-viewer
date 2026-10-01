@@ -186,7 +186,7 @@ export function createPageReads(
   const visiblePages = (): VisiblePage[] =>
     state().placed ? placedVisiblePages() : noVisiblePages;
 
-  const getPageFrame = (page: PageRef): VisiblePage | null => {
+  const getPageFrame = (page: PageRef | number): VisiblePage | null => {
     if (!state().placed) return null;
     const index = ctx.getPage(page)?.index ?? -1;
     if (index < 0) return null;
@@ -198,7 +198,7 @@ export function createPageReads(
     return box ? withTransform(box) : null;
   };
 
-  const pageToWorld = (page: PageRef, point: Point): Point | null => {
+  const pageToWorld = (page: PageRef | number, point: Point): Point | null => {
     const frame = getPageFrame(page);
     if (!frame) return null;
     // Place the page point into the page's display box through the same
@@ -217,6 +217,14 @@ export function createPageReads(
     return { x: frame.x + offset.x, y: frame.y + offset.y };
   };
 
+  // The visible entry of a page given by its ref or its index; null when it is
+  // off screen or not in the document.
+  const visiblePageOf = (page: PageRef | number): VisiblePage | null => {
+    const objectNumber = ctx.getPage(page)?.ref.objectNumber;
+    if (objectNumber === undefined) return null;
+    return visiblePages().find((visible) => visible.ref.objectNumber === objectNumber) ?? null;
+  };
+
   return {
     scrollMetricsNow,
     visiblePages,
@@ -225,10 +233,10 @@ export function createPageReads(
       getViewportSize: viewport,
       getScrollMetrics: scrollMetricsNow,
       listVisiblePages: visiblePages,
-      isPageVisible: (page) =>
-        visiblePages().some((visiblePage) => visiblePage.ref.objectNumber === page.objectNumber),
+      isPageVisible: (page) => visiblePageOf(page) !== null,
       getCurrentPageIndex: () => state().cursor,
-      getCurrentPage: () => ctx.document()?.pages[state().cursor] ?? null,
+      getCurrentPage: () => ctx.document()?.pages[state().cursor]?.ref ?? null,
+      getPageCount: () => ctx.document()?.pageCount ?? 0,
       listCurrentItemPages: () => {
         const item = cursorItem();
         const pages = ctx.document()?.pages ?? [];
@@ -264,9 +272,7 @@ export function createPageReads(
       viewportToPage: (page, point) => {
         // `getPageAt` without the containment check: project onto one page's
         // plane, valid outside its bounds, through the same inverse transform.
-        const target = visiblePages().find(
-          (visiblePage) => visiblePage.ref.objectNumber === page.objectNumber,
-        );
+        const target = visiblePageOf(page);
         if (!target) return null;
         return target.transform.viewToPage({
           x: point.x - target.screenX,

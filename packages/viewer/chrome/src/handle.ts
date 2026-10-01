@@ -14,7 +14,7 @@
  * between "what our UI can do" and "what el.viewer can do" is structural.
  */
 import type {
-  ActiveDocumentChangedEvent,
+  DocumentActiveChangedEvent,
   CapabilityToken,
   DocumentClosedEvent,
   DocumentLockedEvent,
@@ -34,7 +34,7 @@ export interface ViewerEvents {
   openFailed: DocumentOpenFailedEvent;
   locked: DocumentLockedEvent;
   closed: DocumentClosedEvent;
-  activeChanged: ActiveDocumentChangedEvent;
+  activeChanged: DocumentActiveChangedEvent;
   pagesChanged: DocumentPagesChangedEvent;
 }
 import { CommandsToken, resolvedCommandsEqual } from '@embedpdf/react/commands';

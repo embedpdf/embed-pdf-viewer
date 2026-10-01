@@ -1,4 +1,4 @@
-import type { AnnotationDTO, PageRef } from '@embedpdf/engine-core/runtime';
+import type { Annotation, PageRef } from '@embedpdf/engine-core/runtime';
 import { rasterPlacement, sourceDuring } from './appearance';
 import { annotationSelectionFrame } from './selection';
 /**
@@ -46,7 +46,17 @@ import {
   rotateDraftDelta,
   toolAnnotation,
 } from './update';
-import type { ChromeNode, Shape, Id, Model, Rect, RenderItem, Style, Point } from './types';
+import type {
+  ChromeNode,
+  HandleRole,
+  Shape,
+  Id,
+  Model,
+  Rect,
+  RenderItem,
+  Style,
+  Point,
+} from './types';
 import type { CreationDraftAnchor, RotationAnchor } from './types';
 import { kindOf, refOf, shapeOf, styleOf, textOf } from './record';
 
@@ -59,13 +69,13 @@ const polyPreviewPoints = (points: Point[], current: Point): Point[] => {
 };
 
 /** A redaction's overlay text: the label its hover preview draws. */
-const redactionLabelOf = (annotation: AnnotationDTO): Pick<RenderItem, 'label'> =>
+const redactionLabelOf = (annotation: Annotation): Pick<RenderItem, 'label'> =>
   annotation.subtype === 'redact' && annotation.overlayText
     ? { label: { text: annotation.overlayText, repeat: annotation.repeat } }
     : {};
 
 /** A note's or file attachment's icon: what its live drawing draws. */
-export const iconOf = (annotation: AnnotationDTO): Pick<RenderItem, 'icon'> =>
+export const iconOf = (annotation: Annotation): Pick<RenderItem, 'icon'> =>
   (annotation.subtype === 'text' || annotation.subtype === 'file-attachment') && annotation.icon
     ? { icon: annotation.icon }
     : {};
@@ -138,7 +148,7 @@ function effGeom(model: Model, id: Id, view: ViewEnv | undefined): Shape {
 
 /** Style with the stroke width an anchored vector body renders at (screen-
  *  constant line weight); everyone else keeps their style verbatim. */
-function effStyle(annotation: AnnotationDTO, view: ViewEnv | undefined): Style {
+function effStyle(annotation: Annotation, view: ViewEnv | undefined): Style {
   const mode = anchorModeOf({ annotation });
   const style = styleOf(annotation);
   if (!mode?.zoom || !view) return style;
@@ -154,7 +164,7 @@ function effStyle(annotation: AnnotationDTO, view: ViewEnv | undefined): Style {
  */
 export function unmadeItem(
   id: Id,
-  annotation: AnnotationDTO,
+  annotation: Annotation,
   shape: Shape,
   source: 'draft' | 'ghost',
   view?: ViewEnv,
@@ -215,6 +225,7 @@ export function pageItems(model: Model, page: PageRef, view?: ViewEnv): RenderIt
     items.push({
       id,
       ref: refOf(record),
+      annotation: record.annotation,
       subtype: kindOf(record.annotation).name,
       geometry,
       box: distance?.visualBounds ?? geomVisualBounds(geometry, style),
@@ -391,6 +402,7 @@ export function selectedItems(model: Model, view?: ViewEnv): RenderItem[] {
     items.push({
       id,
       ref: refOf(record),
+      annotation: record.annotation,
       subtype: kindOf(record.annotation).name,
       geometry,
       box: geomVisualBounds(geometry, style),
@@ -612,12 +624,16 @@ export function chrome(
     // Suppressed during a live rotate (`rd`) — guides own that mode.
     if (!rd && annotTransformable(record) && (caps.resizable || caps.vertexEditable)) {
       const handles = distance ? distanceHandles(distance) : geomHandles(geometry);
+      const dragged =
+        model.draft?.kind === 'handle' && model.draft.id === record.id ? model.draft.handle : null;
       for (const handle of handles) {
         nodes.push({
           kind: 'handle',
           at: handle.at,
           cursor: cursorOnScreen(handle.cursor, view?.rotation ?? 0),
           ...(rot ? { rot } : {}),
+          role: handleRole(handle.id),
+          active: handle.id === dragged,
         });
       }
     }
@@ -631,11 +647,15 @@ export function chrome(
       nodes.push({ kind: 'outline', rect: union });
       const gc = groupCaps(model, selection);
       if (gc.resizable) {
+        const dragged =
+          model.draft?.kind === 'group' && model.draft.op === 'resize' ? model.draft.handle : null;
         for (const handle of rectHandlesFor(union))
           nodes.push({
             kind: 'handle',
             at: handle.at,
             cursor: cursorOnScreen(handle.cursor, view?.rotation ?? 0),
+            role: handleRole(handle.id),
+            active: handle.id === dragged,
           });
       }
     }
@@ -681,9 +701,10 @@ export function selectionAnchor(
   knobOffsetOf?: (page: PageRef) => number | undefined,
   viewOf?: (page: PageRef) => ViewEnv | undefined,
 ): { page: PageRef; bounds: Rect; knob?: Point } | null {
-  // No menu while a rotate gesture runs: the chrome is in
-  // guides mode and a floating menu chasing a spinning box is pure noise.
-  if (model.draft?.kind === 'rotate') return null;
+  // No menu while a gesture moves, resizes or turns the selection, or a box
+  // selects: a floating menu chasing the pointer is noise, and it would cover
+  // what the user is placing.
+  if (model.draft && !model.draft.kind.startsWith('create-')) return null;
   const id = model.selected.find((selectedId) => isSelectable(model, selectedId));
   if (id == null) return null;
   const page = model.byId[id].annotation.page;
@@ -746,4 +767,27 @@ export function creationDraftAnchor(model: Model): CreationDraftAnchor | null {
           )
         )),
   };
+}
+
+/** A box's corner handle (`nw`), a side's (`n`), or one point of a line, polygon or dimension. */
+function handleRole(id: string): HandleRole {
+  if (id === 'nw' || id === 'ne' || id === 'se' || id === 'sw') return 'corner';
+  if (id === 'n' || id === 'e' || id === 's' || id === 'w') return 'side';
+  return 'point';
+}
+
+/**
+ * Where UI attaches to one annotation: its page and the box around what it
+ * shows, a gesture in progress included, so an overlay follows a drag. `null`
+ * for a record the model doesn't have.
+ */
+export function annotationAnchor(
+  model: Model,
+  id: Id,
+  view?: ViewEnv,
+): { page: PageRef; bounds: Rect } | null {
+  const record = model.byId[id];
+  if (!record) return null;
+  const frame = effectiveSelectionFrame(model, id, effGeom(model, id, view), view);
+  return { page: record.annotation.page, bounds: unionRect(frame.corners) };
 }

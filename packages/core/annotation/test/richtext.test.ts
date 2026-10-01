@@ -1,4 +1,4 @@
-import type { AnnotationDTO, FontHandle } from '@embedpdf/engine-core/runtime';
+import type { Annotation, FontHandle } from '@embedpdf/engine-core/runtime';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -172,7 +172,7 @@ describe('a free text’s document', () => {
       subtype: 'free-text',
       contents: 'a\rb',
       ...text,
-    } as unknown as AnnotationDTO;
+    } as unknown as Annotation;
     const doc = richDocOf(annotation);
     expect(doc.paragraphs).toEqual([{ runs: [{ text: 'a' }] }, { runs: [{ text: 'b' }] }]);
     expect(doc.body.family).toBe('Helvetica');

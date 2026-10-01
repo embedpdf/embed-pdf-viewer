@@ -38,7 +38,7 @@ const script = (source: string, next: PdfActionNode[] = []): PdfActionNode => ({
   next,
 });
 
-async function boot() {
+async function boot(identity?: { name: string; corporation?: string }) {
   const engine = await createLocalEngine({ runtime: { prefer: 'wasm' } });
   const kernel = createKernel({
     engine,
@@ -47,6 +47,7 @@ async function boot() {
         openSequence: 'off',
         javascript: {
           enabled: true,
+          ...(identity ? { identity } : {}),
           sandboxFactory: createQuickJsSandbox,
           now: () => Date.UTC(2026, 6, 15),
           utcOffsetMinutes: () => 0,
@@ -149,5 +150,33 @@ describe('the ScriptHost executor (real VM, real engine world)', () => {
         diagnostic.message.includes('dispatch script budget exhausted'),
       ),
     ).toBe(true);
+  });
+
+  it('scripts see the identity setting, live, and alert through the UI adapter', async () => {
+    await using booted = await boot({ name: 'Dana Smith', corporation: 'Acme' });
+    const alerts: string[] = [];
+    booted.actions.setUiAdapter({
+      openUri: () => {},
+      print: () => {},
+      alert: (message) => alerts.push(message),
+    });
+    const greet = tree(script(`app.alert(identity.name + ' / ' + identity.corporation);`));
+    await booted.actions.execute(greet, hoverContext);
+    // A change applies to the next script; the fields left out stay.
+    booted.actions.updateSettings({ javascript: { identity: { name: 'Lee' } } });
+    await booted.actions.execute(greet, hoverContext);
+    expect(alerts).toEqual(['Dana Smith / Acme', 'Lee / Acme']);
+  });
+
+  it('a script that throws fires onScriptFailed with what started it', async () => {
+    await using booted = await boot();
+    const failures: Array<{ message: string; source: unknown }> = [];
+    booted.actions.onScriptFailed(({ error, source }) =>
+      failures.push({ message: error.message, source }),
+    );
+    const result = await booted.actions.execute(tree(script('app.alrt("typo");')), hoverContext);
+    expect(result.nodes[0]?.status).toBe('failed');
+    expect(failures).toHaveLength(1);
+    expect(failures[0]?.source).toEqual(hoverContext.source);
   });
 });

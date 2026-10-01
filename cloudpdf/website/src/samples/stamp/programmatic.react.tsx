@@ -1,10 +1,15 @@
-import { useEffect, useState } from 'react';
-import { Viewer, DocumentGate, useDocumentId } from '@embedpdf/react/runtime';
+import { useEffect, useRef } from 'react';
+import { Viewer, DocumentGate } from '@embedpdf/react/runtime';
 import type { OpenInput } from '@embedpdf/react/runtime';
-import { Stage, stagePlugin, usePageList, usePages } from '@embedpdf/react/stage';
+import { Stage, stagePlugin, useStage, useStageState } from '@embedpdf/react/stage';
 import { RenderLayer, renderPlugin } from '@embedpdf/react/render';
 import { interactionPlugin } from '@embedpdf/react/interaction';
-import { AnnotationLayer, annotationPlugin } from '@embedpdf/react/annotation';
+import {
+  AnnotationLayer,
+  annotationPlugin,
+  useAnnotationList,
+  useAnnotationState,
+} from '@embedpdf/react/annotation';
 import { stampPlugin, useStamp, useStampAssets } from '@embedpdf/react/stamp';
 import { loadDefaultLibrary } from '@embedpdf/default-stamps/library';
 import { cloudEngine } from '@cloudpdf/engine';
@@ -24,62 +29,75 @@ const plugins = [
 
 const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
-function PlaceByCode() {
+// The middle of a Letter page, and the cover's empty corner, in page coordinates.
+const MIDDLE = { x: 306, y: 396 };
+const CORNER = { x: 60, y: 590, width: 220, height: 180 };
+
+function PlaceStamps() {
   const stamp = useStamp();
+  const stage = useStage();
   const assets = useStampAssets();
-  const documentId = useDocumentId();
-  const { currentPage } = usePages();
-  const { pages } = usePageList();
-  const page = pages[currentPage];
-  const [status, setStatus] = useState('');
+  const ready = useAnnotationState((state) => state.status === 'ready');
+  const currentPage = useStageState((state) => state.currentPageIndex);
+  const stamps = useAnnotationList({ subtype: 'stamp' });
+  const placed = useRef(false);
 
+  const approved = assets.find((asset) => asset.name === 'Approved');
+  const draft = assets.find((asset) => asset.name === 'Draft');
+
+  // On load: the standard stamps, and "Approved" in the cover's empty corner, scrolled into view.
   useEffect(() => {
-    if (assets.length > 0) return;
-    loadDefaultLibrary('en')
+    if (!ready || placed.current) return;
+    placed.current = true;
+    void loadDefaultLibrary('en')
       .then((bytes) => stamp.importLibrary(bytes))
-      .catch((err) => setStatus(err instanceof Error ? err.message : String(err)));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stamp]);
-
-  // The same box a click would produce: centred on `at` (page points, origin
-  // top-left), fitted and clamped to the page, /Name and /Subj written.
-  const place = async (identifier: string, at: { x: number; y: number }, rotation = 0) => {
-    const asset = assets.find((a) => a.name === identifier);
-    if (!asset || !documentId || !page) return;
-    const ref = await stamp.placeAsset(documentId, asset.id, {
-      page: page.ref,
-      at,
-      targetWidth: 160,
-      rotation,
-    });
-    setStatus(
-      `placed ${asset.label} on page ${ref.page.objectNumber === page.ref.objectNumber ? currentPage + 1 : '?'}`,
-    );
-  };
+      .then(({ library }) => {
+        const asset = stamp
+          .listAssets({ libraryId: library.id })
+          .find((candidate) => candidate.name === 'Approved');
+        if (!asset) return;
+        return stamp.placeAsset(asset.id, {
+          page: 0,
+          center: { x: 170, y: 680 },
+          targetWidth: 180,
+          rotation: -8,
+        });
+      })
+      .then(() => stage.reveal(0, { rect: CORNER }));
+  }, [stamp, stage, ready]);
 
   return (
     <div className="toolbar">
-      <output className="readout">page {currentPage + 1}</output>
       <button
         type="button"
         className="button"
-        title="Place the Approved stamp near the top-left corner of this page"
-        disabled={assets.length === 0}
-        onClick={() => void place('Approved', { x: 120, y: 90 })}
+        disabled={!approved}
+        onClick={() =>
+          approved &&
+          void stamp.placeAsset(approved.id, { page: currentPage, center: MIDDLE, select: true })
+        }
       >
-        Approve
+        Approve this page
       </button>
       <button
         type="button"
         className="button"
-        title="Place the Draft stamp, rotated"
-        disabled={assets.length === 0}
-        onClick={() => void place('Draft', { x: 300, y: 200 }, 15)}
+        disabled={!draft}
+        onClick={() =>
+          draft &&
+          void stamp.placeAssetOnPages(draft.id, 'all', {
+            center: MIDDLE,
+            targetWidth: 320,
+            rotation: -30,
+          })
+        }
       >
-        Mark as draft
+        “Draft” on every page
       </button>
       <span className="spacer" />
-      <output className="readout">{status}</output>
+      <output className="readout">
+        {stamps.length} {stamps.length === 1 ? 'stamp' : 'stamps'} in the document
+      </output>
     </div>
   );
 }
@@ -88,7 +106,7 @@ export default function App() {
   return (
     <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: ebook }]}>
       <DocumentGate fallback={<p className="loading">Loading…</p>}>
-        <PlaceByCode />
+        <PlaceStamps />
         <Stage className="stage">
           {() => (
             <>

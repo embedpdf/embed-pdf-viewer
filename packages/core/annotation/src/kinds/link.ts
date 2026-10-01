@@ -23,5 +23,5 @@ export const link = defineKind({
     opaqueBody: true,
     rasterOnly: true,
   },
-  fields: [LINKABLE],
+  properties: [LINKABLE],
 });

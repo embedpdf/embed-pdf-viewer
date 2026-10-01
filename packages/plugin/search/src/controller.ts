@@ -31,6 +31,7 @@ import {
   clearSession,
   completeSession,
   failSession,
+  indexOfHit,
   pagesWithHits,
   setActiveHit,
   startSession,
@@ -183,7 +184,7 @@ export function createSearchController(ctx: PluginContext<SearchState, SearchSet
 
   const viewportFirstPage = (): PageRef | undefined => {
     const stage = ctx.tryGet(StageToken);
-    return stage ? (stage.getCurrentPage()?.ref ?? undefined) : undefined;
+    return stage?.getCurrentPage() ?? undefined;
   };
 
   // Async so a refusal or a page that isn't in the document rejects, like any other failure,
@@ -248,13 +249,17 @@ export function createSearchController(ctx: PluginContext<SearchState, SearchSet
     ctx.state.update(clearSession);
   }
 
-  function goToHit(index: number, options?: SearchRevealOptions): SearchHit | null {
+  function goToHit(target: SearchHit | number, options?: SearchRevealOptions): SearchHit | null {
     const { hits } = state();
     if (hits.length === 0) return null;
-    const wrapped = ((index % hits.length) + hits.length) % hits.length;
-    ctx.state.update(setActiveHit, wrapped);
-    reveal(hits[wrapped], options);
-    return hits[wrapped];
+    const index =
+      typeof target === 'number'
+        ? ((target % hits.length) + hits.length) % hits.length
+        : indexOfHit(hits, target);
+    if (index < 0) return null;
+    ctx.state.update(setActiveHit, index);
+    reveal(hits[index], options);
+    return hits[index];
   }
 
   function reveal(hit: SearchHit, options?: SearchRevealOptions): void {

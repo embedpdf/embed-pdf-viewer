@@ -3,7 +3,7 @@
  * document, selection and the property surface do to the model and the
  * engine — the same for every framework's glue.
  */
-import type { AnnotationDTO, AnnotationFlags, AnnotationRef } from '@embedpdf/engine-core/runtime';
+import type { Annotation, AnnotationFlags, AnnotationRef } from '@embedpdf/engine-core/runtime';
 import { toPageRef } from '@embedpdf/engine-core/runtime';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -89,7 +89,7 @@ async function loaded(dto: FileAnnotation) {
     ...harness,
     id,
     data: () =>
-      harness.model().byId[id]!.annotation as Extract<AnnotationDTO, { subtype: 'free-text' }>,
+      harness.model().byId[id]!.annotation as Extract<Annotation, { subtype: 'free-text' }>,
   };
 }
 
@@ -102,7 +102,7 @@ afterEach(() => {
 describe('the editor document', () => {
   it('applies rich paragraphs optimistically and commits them, debounced', async () => {
     const harness = await loaded(freeTextDTO('hello'));
-    harness.capability.beginTextEdit(REF);
+    harness.capability.text.begin(REF);
     harness.capability.draftRichText(REF, { paragraphs: [{ runs: [{ text: 'hello world' }] }] });
     expect(harness.data().contents).toBe('hello world');
     expect(harness.capability.listTextItems(PAGE)[0]!.richText.paragraphs).toEqual([
@@ -127,7 +127,7 @@ describe('the editor document', () => {
       annotation: freeTextDTO('stale'),
       appearance: { changed: true },
     });
-    harness.capability.beginTextEdit(REF);
+    harness.capability.text.begin(REF);
     const paragraphs = [{ runs: [{ text: 'hel', style: { weight: 700 } }, { text: 'lo' }] }];
     harness.capability.draftRichText(REF, { paragraphs });
     vi.advanceTimersByTime(300);
@@ -139,13 +139,13 @@ describe('the editor document', () => {
     expect(harness.data().contents).toBe('hello');
   });
 
-  it('flushes the pending write and drops the selection on endTextEdit', async () => {
+  it('flushes the pending write and drops the selection on text.end', async () => {
     const harness = await loaded(freeTextDTO('hello'));
-    harness.capability.beginTextEdit(REF);
+    harness.capability.text.begin(REF);
     harness.capability.setTextSelection(REF, { start: 1, end: 3 });
     expect(harness.state().textSelection).toEqual({ id: harness.id, start: 1, end: 3 });
     harness.capability.draftRichText(REF, { paragraphs: [{ runs: [{ text: 'bye' }] }] });
-    harness.capability.endTextEdit();
+    harness.capability.text.end();
     expect(harness.update).toHaveBeenCalledTimes(1);
     expect(harness.update).toHaveBeenCalledWith(REF, {
       subtype: 'free-text',
@@ -161,10 +161,10 @@ describe('the editor document', () => {
 describe('the property surface while editing', () => {
   it('restyles the RANGE when the editor holds one, and reports it', async () => {
     const harness = await loaded(freeTextDTO('hello world'));
-    harness.capability.beginTextEdit(REF);
+    harness.capability.text.begin(REF);
     harness.capability.setTextSelection(REF, { start: 0, end: 5 });
-    harness.capability.toggleTextFormat('bold');
-    harness.capability.updateSelection({ fontColor: '#ff0000' });
+    harness.capability.text.toggleFormat('bold');
+    harness.capability.selection.update({ fontColor: '#ff0000' });
     // As the engine will read it back: colours in lowercase.
     expect(harness.data().richText.paragraphs).toEqual([
       {
@@ -172,11 +172,11 @@ describe('the property surface while editing', () => {
       },
     ]);
     expect(textOf(harness.model().byId[harness.id]!.annotation)!.bold).toBeUndefined(); // the body is untouched
-    const props = harness.capability.getSelectionFields();
+    const props = harness.capability.selection.getProperties();
     expect(props.values).toMatchObject({ bold: true, fontColor: '#ff0000', italic: false });
     expect(props.mixed).toEqual([]);
     harness.capability.setTextSelection(REF, { start: 3, end: 8 });
-    const across = harness.capability.getSelectionFields();
+    const across = harness.capability.selection.getProperties();
     expect([...across.mixed].sort()).toEqual(['bold', 'fontColor']);
     vi.advanceTimersByTime(300);
     expect(harness.update).toHaveBeenCalledTimes(1);
@@ -188,23 +188,23 @@ describe('the property surface while editing', () => {
 
   it('toggleTextFormat flips the range state; a caret or no editor restyles the body', async () => {
     const harness = await loaded(freeTextDTO('hello world'));
-    harness.capability.beginTextEdit(REF);
+    harness.capability.text.begin(REF);
     harness.capability.setTextSelection(REF, { start: 0, end: 5 });
-    harness.capability.toggleTextFormat('italic');
+    harness.capability.text.toggleFormat('italic');
     expect(harness.data().richText.paragraphs[0]!.runs[0]).toEqual({
       text: 'hello',
       style: { italic: true },
     });
-    harness.capability.toggleTextFormat('italic');
+    harness.capability.text.toggleFormat('italic');
     expect(harness.data().richText.paragraphs[0]!.runs[0]).toEqual({
       text: 'hello',
       style: { italic: false },
     });
     // A bare caret: the body takes the toggle, written as a rich body patch.
     harness.capability.setTextSelection(REF, { start: 2, end: 2 });
-    harness.capability.toggleTextFormat('bold');
+    harness.capability.text.toggleFormat('bold');
     expect(textOf(harness.model().byId[harness.id]!.annotation)!.bold).toBe(true);
-    expect(harness.capability.getSelectionFields().values.bold).toBe(true);
+    expect(harness.capability.selection.getProperties().values.bold).toBe(true);
     expect(harness.capability.listTextItems(PAGE)[0]!.css.fontWeight).toBe(700);
     const bodyWrite = harness.update.mock.calls.find((call) => call[1].richText?.body);
     // The complete body rides along: a partial one would mean engine
@@ -219,11 +219,11 @@ describe('the property surface while editing', () => {
 
   it('keeps non-text keys on the annotation and lands the text before them', async () => {
     const harness = await loaded(freeTextDTO('hello'));
-    harness.capability.beginTextEdit(REF);
+    harness.capability.text.begin(REF);
     harness.capability.draftRichText(REF, { paragraphs: [{ runs: [{ text: 'typed' }] }] });
     harness.capability.setTextSelection(REF, { start: 0, end: 5 });
-    harness.capability.toggleTextFormat('underline');
-    harness.capability.updateSelection({ opacity: 0.5 });
+    harness.capability.text.toggleFormat('underline');
+    harness.capability.selection.update({ opacity: 0.5 });
     expect(styleOf(harness.model().byId[harness.id]!.annotation).opacity).toBe(0.5);
     // order: the (flushed) text write, then the opacity write
     expect(harness.update.mock.calls.map((call) => Object.keys(call[1]).sort().join(','))).toEqual([

@@ -19,6 +19,7 @@ import {
   defaultCommands,
   defaultIcons,
   themeConfigOf,
+  themeTokenProperty,
   validateChrome,
   type ThemeTokens,
   type Unsubscribe,
@@ -51,7 +52,7 @@ const adoptSheets = (): CSSStyleSheet[] => {
 };
 
 /**
- * The theme-token sheet: `--ep-*` overrides from `theme.tokens`/`theme.dark`,
+ * The theme-token sheet: the overrides from `theme.tokens`/`theme.dark`,
  * adopted after the chrome sheet so same-specificity declarations win by
  * order. Base tokens are re-stated inside `.dark` (then dark overrides on
  * top), because the chrome's own `.dark` block would otherwise out-cascade a
@@ -65,7 +66,7 @@ function buildTokenSheet(tokens?: ThemeTokens, dark?: ThemeTokens): CSSStyleShee
         if (!ok) console.warn(`[embedpdf] theme: ignoring invalid token "${name}"`);
         return ok;
       })
-      .map(([name, value]) => `--ep-${name}:${value};`)
+      .map(([name, value]) => `${themeTokenProperty(name)}:${value};`)
       .join('');
 
   const base = tokens ? decl(tokens) : '';

@@ -279,16 +279,21 @@ DOM events (`epdf:ready`, `epdf:documentchange`) are sugar over `watch`.
 ```tsx
 theme={{
   preference: 'system',
-  tokens: { accent: '#7c3aed', 'accent-hover': '#6d28d9' },  // both modes
-  dark: { accent: '#a78bfa' },                               // dark overrides
+  tokens: { accent: '#7c3aed', surface: '#fdfcff' }, // both modes
+  dark: { accent: '#a78bfa' },                       // dark overrides
 }}
 ```
 
-Token names are the `--ep-*` variables in `styles.css` without the prefix —
-the prefix exists because custom properties inherit through shadow boundaries,
-so unprefixed names could collide with the host page. The custom element
-adopts the overrides into its shadow root; direct consumers of this package
-just set the `--ep-*` variables in their own CSS.
+Token names are the variables in `styles.css` without their prefix. The
+light and dark themes set EmbedPDF's own theming variables (`--epdf-accent`,
+`--epdf-scrollbar-thumb`, `--epdf-toolbar-*`, the headless docs' "Colors &
+theming" list), so `accent` themes the pages and the chrome together: the
+chrome's hover, pressed and tinted shades are mixed from it. Every other name
+is one of the chrome's own `--ep-*` tokens. The prefixes exist because custom
+properties inherit through shadow boundaries, so unprefixed names could
+collide with the host page. The custom element adopts the overrides into its
+shadow root; direct consumers of this package just set the variables in their
+own CSS.
 
 ### Restyle — reshape built-ins with page CSS
 

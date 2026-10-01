@@ -40,7 +40,7 @@ export function createEvents(ctx: PluginContext<StageState>) {
     }
     if (previous.cursor !== next.cursor) {
       pageChanged.emit({
-        page: ctx.document()?.pages[next.cursor] ?? null,
+        page: ctx.document()?.pages[next.cursor]?.ref ?? null,
         pageIndex: next.cursor,
         previousPageIndex: previous.cursor,
       });

@@ -338,7 +338,7 @@ duration of its write (`beginWrite` / `endWrite` in
 Some writes wait on purpose: the annotation plugin writes typed text once
 typing pauses, the ink tool waits for the next stroke of a drawing, a form
 field is written on blur. A write queue holds writes that are on their way.
-Before anything reads the whole file (`documents.save()`, `saveLayer()`), the
+Before anything reads the whole file (`documents.download()`, `downloadLayer()`), the
 kernel settles the document (`packages/core/main/src/settle.ts`): it runs every
 flush plugins registered with `ctx.onSettle(flush)` and waits for them, so the
 file has everything the user sees.
@@ -349,8 +349,8 @@ file has everything the user sees.
   (matches Acrobat: the field being edited is committed before a save).
 - A plugin whose queue carries document writes registers it:
   `ctx.onSettle(() => queue.idle())`. A queue whose operations read the file
-  themselves is never registered: the actions plugin's queued
-  `runDocumentVerb('save', …)` calls `documents.save()` from inside its queue,
+  themselves is never registered: the actions plugin runs every download
+  inside its queue (`ctx.aroundDownload`, for the document's save actions),
   and waiting for that queue would wait for itself.
 - A failed flush is reported and does not stop the read: the file is then what
   the engine has.

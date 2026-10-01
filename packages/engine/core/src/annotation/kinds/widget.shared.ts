@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import type { WidgetAnnotationDTO, WidgetPatch } from './widget';
+import type { WidgetAnnotation, WidgetPatch } from './widget';
 import { WidgetDeclaration } from './widget/declaration';
 
 const WIDGET_STYLE_NAMES = [
@@ -17,7 +17,7 @@ const WIDGET_STYLE_NAMES = [
 type WidgetStyleName = (typeof WIDGET_STYLE_NAMES)[number];
 
 /** A widget's appearance characteristics (`/MK`) and default appearance (`/DA`). */
-export type WidgetStyleFields = Pick<WidgetAnnotationDTO, WidgetStyleName>;
+export type WidgetStyleFields = Pick<WidgetAnnotation, WidgetStyleName>;
 export type WidgetStyleDraftFields = Pick<WidgetPatch, WidgetStyleName>;
 export type WidgetStylePatchFields = WidgetStyleDraftFields;
 export type WidgetAppearance = WidgetStyleDraftFields;

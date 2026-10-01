@@ -2,7 +2,7 @@ import { annotationReadDriftOf } from './annotationReadDrift';
 import { creatables, iconRect, PNG_1X1 } from './creatables';
 import type { ConformanceTestRunner } from './runMetadataConformance';
 import { TWO_PAGE_PDF } from './stampFixtures';
-import type { AnnotationDTO } from '../annotation/kinds';
+import type { Annotation } from '../annotation/kinds';
 import type { DocumentHandle } from '../engine/DocumentHandle';
 import type { PageHandle } from '../engine/PageHandle';
 import { EngineErrorCode } from '../errors/EngineErrorCode';
@@ -483,7 +483,7 @@ export function runAnnotationDeclarationConformance(
             annotation.target !== null &&
             annotation.target.kind !== 'goto' &&
             annotation.target.kind !== 'uri',
-        ) as Extract<AnnotationDTO, { subtype: 'link' }> | undefined;
+        ) as Extract<Annotation, { subtype: 'link' }> | undefined;
         expect(link !== undefined).toBe(true);
         const page = doc.page(link!.ref.page);
         const sentBack = await page.annotations.update(link!.ref, {

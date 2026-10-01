@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 
-import type { AnnotationDTO } from '../../src/annotation/kinds';
+import type { Annotation } from '../../src/annotation/kinds';
 import type { PdfRect } from '../../src/geometry/primitives';
 import { toPageRef } from '../../src/identity/PageRef';
 import {
@@ -21,7 +21,7 @@ const boxes = new Map<number, PdfRect>([
 const boxOf = (page: { objectNumber: number }) => boxes.get(page.objectNumber)!;
 
 /** Only the fields a test looks at; the codec leaves every other field alone. */
-const read = (value: object) => value as unknown as AnnotationDTO<PdfCoordinates>;
+const read = (value: object) => value as unknown as Annotation<PdfCoordinates>;
 
 describe('annotations in page space', () => {
   test('a box kind: rect and box become boxes, everything else stays', () => {

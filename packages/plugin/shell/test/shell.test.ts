@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 
 import { createShellController } from '../src/controller';
 import { initialShellState } from '../src/model';
+import { shellState } from '../src/state';
 
 const harness = () => {
   const ctx = createTestContext({ id: 'shell', state: initialShellState() });
@@ -31,6 +32,27 @@ describe('shell', () => {
     shell.closeAll();
     expect(shell.listOpenSurfaces()).toEqual([]);
     expect(log).toEqual(['open:search', 'close:search', 'open:comments', 'close:comments']);
+  });
+
+  it('announces an open with its props, and a close with the id only', () => {
+    const shell = harness();
+    const events: unknown[] = [];
+    shell.onSurfaceOpened((event) => events.push(event));
+    shell.onSurfaceClosed((event) => events.push(event));
+    shell.open('comments', { props: { focus: 3 } });
+    shell.close('comments');
+    expect(events).toEqual([{ id: 'comments', props: { focus: 3 } }, { id: 'comments' }]);
+  });
+
+  it('declares the State table: open surfaces and open menus, empty without a document', () => {
+    const shell = harness();
+    shell.open('thumbnails', { exclusive: 'left' });
+    shell.openMenu('more');
+    const state = shellState.read(shell);
+    expect(state.openSurfaces.map((surface) => surface.id)).toEqual(['thumbnails']);
+    expect(state.openMenus).toEqual(['more']);
+    expect(shellState.read(shell).openSurfaces).toBe(state.openSurfaces);
+    expect(shellState.empty).toEqual({ openSurfaces: [], openMenus: [] });
   });
 
   it('keeps a menu stack and round-trips a snapshot', () => {

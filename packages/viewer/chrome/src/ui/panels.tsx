@@ -9,8 +9,8 @@
  * socket for a slotted one (see Shell).
  */
 import { useEffect } from 'react';
-import { useSelector, useDocumentId } from '@embedpdf/react/runtime';
-import { Stage, StageToken, usePages } from '@embedpdf/react/stage';
+import { useDocumentId } from '@embedpdf/react/runtime';
+import { Stage, useStage, useStageState } from '@embedpdf/react/stage';
 import { RenderLayer } from '@embedpdf/react/render';
 import { useSurface } from '@embedpdf/react/shell';
 import { useT } from '@embedpdf/react/i18n';
@@ -57,16 +57,15 @@ export function LeftSidebar() {
 // thumb to navigate the main lens; the rail follows the main view. Read-only —
 // no page edits (rotate/move/delete), just the page bitmap and its number.
 function ThumbnailList() {
-  const { currentPage, goToPage } = usePages(); // the main lens
-  const { reveal } = usePages(ThumbsStageToken); // the sidebar lens
+  const main = useStage(); // the main lens
+  const thumbs = useStage(ThumbsStageToken); // the sidebar lens
+  const currentPage = useStageState((state) => state.currentPageIndex);
   // Follow the main view: when its current page changes, make that thumb visible —
   // minimal movement, zero when it's already on screen.
-  useEffect(() => reveal(currentPage), [currentPage, reveal]);
+  useEffect(() => thumbs.reveal(currentPage), [currentPage, thumbs]);
   return (
     <Stage
       token={ThumbsStageToken}
-      interaction={false} // a secondary lens: click-to-navigate, never the document's tools
-      zoomGestures={false} // fixed-magnification rail: cmd+wheel/pinch scrolls, never zooms
       className="flex-1"
       style={{ position: 'relative' }}
       pageChrome={(page) => (
@@ -75,7 +74,7 @@ function ThumbnailList() {
               box; the number sits in the reserved bottom band. Neither rotates. */}
           <button
             type="button"
-            onClick={() => goToPage(page.pageIndex)}
+            onClick={() => main.goToPage(page.pageIndex)}
             title={`Page ${page.pageIndex + 1}`}
             style={{
               position: 'absolute',
@@ -88,7 +87,7 @@ function ThumbnailList() {
               borderRadius: 4,
               border:
                 page.pageIndex === currentPage
-                  ? '2px solid var(--ep-accent)'
+                  ? '2px solid var(--epdf-accent)'
                   : '1px solid var(--ep-border-subtle)',
               boxShadow:
                 page.pageIndex === currentPage ? '0 0 0 2px var(--ep-accent-light)' : 'none',
@@ -215,8 +214,8 @@ export function RightSidebar() {
 export function PageControls() {
   const t = useT();
   // the Stage cursor is a 0-based display index; people count from 1
-  const current = useSelector(StageToken, (stage) => stage.getCurrentPageIndex() + 1);
-  const { pageCount: total } = usePages();
+  const current = useStageState((state) => state.currentPageIndex + 1);
+  const total = useStageState((state) => state.pageCount);
   if (!total) return null;
   return (
     <div className="pointer-events-none absolute inset-x-0 bottom-5 flex justify-center">

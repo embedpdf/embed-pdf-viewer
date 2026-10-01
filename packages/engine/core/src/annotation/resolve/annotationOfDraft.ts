@@ -8,7 +8,7 @@ import type { Coordinates } from '../../pageSpace/coordinates';
 import { UNBAKED_KINDS } from '../appearance';
 import { annotationDefaultsOf } from '../defaults';
 import type { DescribeFont } from '../fontFaces';
-import { declarationOf, type AnnotationDraft, type AnnotationDTO } from '../kinds';
+import { declarationOf, type AnnotationDraft, type Annotation } from '../kinds';
 import { actionTreeOf, readValueOf } from './applyAnnotationPatch';
 
 /** Who the engine stamps as creating an annotation, and when. */
@@ -65,7 +65,7 @@ function freeTextReadOf(given: Record<string, unknown>, read: Record<string, unk
 export function annotationOfResolvedDraft<C extends Coordinates>(
   resolved: AnnotationDraft<C>,
   context: DraftContext,
-): AnnotationDTO<C> {
+): Annotation<C> {
   const subtype = resolved.subtype;
   const fields = declarationOf(subtype)?.fields ?? {};
   const defaults = annotationDefaultsOf(subtype);
@@ -102,5 +102,5 @@ export function annotationOfResolvedDraft<C extends Coordinates>(
     // A widget created on its own belongs to no field (`field: null`) until a form adopts it.
     read.fieldFamily = 'unknown';
   }
-  return read as unknown as AnnotationDTO<C>;
+  return read as unknown as Annotation<C>;
 }

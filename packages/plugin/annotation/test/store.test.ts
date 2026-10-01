@@ -311,10 +311,10 @@ describe('store.apply', () => {
     await expect(toBlue).rejects.toMatchObject({ code: 'operation-failed' });
   });
 
-  it('updateSelection moves a square by its rect, as update does', async () => {
+  it('selection.update moves a square by its rect, as update does', async () => {
     const harness = annotationHarness();
     await harness.load([square(20)]);
-    harness.capability.select(refOf(20));
+    harness.capability.selection.set([refOf(20)]);
     const read = dataOf(harness.capability.get(refOf(20)));
     const rect = read.rect as { x: number; y: number; width: number; height: number };
     const box = read.box as { x: number; y: number; width: number; height: number };
@@ -325,7 +325,7 @@ describe('store.apply', () => {
         box: { left: 300, bottom: 600, right: 400, top: 660 },
       },
     });
-    await harness.capability.updateSelection({ rect: { ...rect, x: rect.x + 200 } });
+    await harness.capability.selection.update({ rect: { ...rect, x: rect.x + 200 } });
     const written = harness.update.mock.calls[0]![1];
     expect(written).toMatchObject({ subtype: 'square', box: { ...box, x: box.x + 200 } });
     expect(written).not.toHaveProperty('rect');
@@ -334,12 +334,12 @@ describe('store.apply', () => {
   it('a rect with a new shape is refused the same way from the sidebar and the API', async () => {
     const harness = annotationHarness();
     await harness.load([square(20)]);
-    harness.capability.select(refOf(20));
+    harness.capability.selection.set([refOf(20)]);
     const read = dataOf(harness.capability.get(refOf(20)));
     const rect = read.rect as { x: number; y: number; width: number; height: number };
     const box = read.box as { x: number; y: number; width: number; height: number };
     const conflict = { rect: { ...rect, x: rect.x + 200 }, box: { ...box, width: 10 } };
-    await expect(harness.capability.updateSelection(conflict)).rejects.toMatchObject({
+    await expect(harness.capability.selection.update(conflict)).rejects.toMatchObject({
       code: 'invalid-input',
     });
     await expect(
@@ -352,13 +352,13 @@ describe('store.apply', () => {
   it('a locked square unlocks from the sidebar and from the flags verb', async () => {
     type Harness = ReturnType<typeof annotationHarness>;
     const doors = [
-      (harness: Harness) => harness.capability.updateSelection({ locked: false }),
-      (harness: Harness) => harness.capability.updateSelectionFlags({ locked: false }),
+      (harness: Harness) => harness.capability.selection.update({ locked: false }),
+      (harness: Harness) => harness.capability.selection.update({ locked: false }),
     ];
     for (const unlock of doors) {
       const harness = annotationHarness();
       await harness.load([{ ...square(20), locked: true } as FileAnnotation]);
-      harness.capability.select(refOf(20));
+      harness.capability.selection.set([refOf(20)]);
       harness.update.mockResolvedValueOnce({ annotation: square(20) });
       await unlock(harness);
       expect(harness.update.mock.calls[0]![1]).toEqual({ subtype: 'square', locked: false });

@@ -2,25 +2,42 @@
  * The pages' viewports: a page mirror re-read whenever a confirmed
  * `pages.scaleSet` names a loaded page, from this session or another
  * (stream gaps and version moves re-read every loaded page). Its `changed`
- * callback is the one place the annotation plugin learns a page's viewports.
- * `connect` loads every page in the registry, including pages inserted later.
+ * callback tells the annotation plugin a page's viewports, and a new
+ * `defaultScale` setting tells it again. `connect` loads every page in the
+ * registry, including pages inserted later.
  */
-import { PluginError, memoByKey, toPageRef, type PageInfo } from '@embedpdf/core';
+import {
+  PluginError,
+  memoByKey,
+  toPageRef,
+  type OperationOptions,
+  type PageInfo,
+} from '@embedpdf/core';
 import { serializeError } from '@embedpdf/engine-core/runtime';
 import type { PageMeasurementViewport, PageRef } from '@embedpdf/engine-core/runtime';
 
-import type { MeasurementConfig, PageScale } from '../contract';
+import type { PageScale } from '../contract';
 import { clearLoadError, pageScaleOf, recordLoadError } from '../model';
 import { defaultMeasure } from '../scale';
 import type { MeasurementContext, MeasurementServices } from '../services';
 
+/** The scale of a page index past the end: none, and never ready. */
+const NO_PAGE: PageScale = Object.freeze({
+  measure: null,
+  source: 'default',
+  ready: false,
+  persistent: false,
+});
+
 export function createViewportSync(
   ctx: MeasurementContext,
   { siblings }: Pick<MeasurementServices, 'siblings'>,
-  config: MeasurementConfig,
 ) {
   const { annotation } = siblings;
-  const fallbackOf = (layout: PageInfo | null) => defaultMeasure(config, layout?.userUnit ?? 1);
+  const settings = ctx.settings();
+  /** The scale of a page without one: the `defaultScale` setting, in the page's user unit. */
+  const fallbackOf = (layout: PageInfo | null) =>
+    defaultMeasure(settings.get().defaultScale, layout?.userUnit ?? 1);
 
   const viewports = ctx.pageMirror<readonly PageMeasurementViewport[]>({
     name: 'viewports',
@@ -59,6 +76,7 @@ export function createViewportSync(
         ctx.state.get().loadErrors[pageObjectNumber],
         layout,
         layout ? isPersistent(page) : false,
+        settings.get().defaultScale,
       ] as const;
     },
     (_pageObjectNumber, pageViewports, status, error, layout, persistent): PageScale =>
@@ -71,13 +89,19 @@ export function createViewportSync(
         persistent,
       }),
   );
-  const scaleOf = (page: PageRef): PageScale => scaleOfPage(page.objectNumber);
+  /** A page's scale, by ref or index; a page that isn't there has none, and isn't ready. */
+  const scaleOf = (page: PageRef | number): PageScale => {
+    if (typeof page !== 'number') return scaleOfPage(page.objectNumber);
+    const layout = ctx.getPage(page);
+    return layout ? scaleOfPage(layout.ref.objectNumber) : NO_PAGE;
+  };
 
-  const ensureLoaded = (page: PageRef): Promise<void> => {
-    if (!ctx.getPage(page)) {
+  const ensureLoaded = (page: PageRef | number, options?: OperationOptions): Promise<void> => {
+    const layout = ctx.getPage(page);
+    if (!layout) {
       return Promise.reject(new PluginError('not-found', 'measurement', 'no such page'));
     }
-    return viewports.ensureLoaded(page);
+    return ctx.cancellable(options?.signal, viewports.ensureLoaded(layout.ref));
   };
 
   const connect = (): void => {
@@ -91,6 +115,15 @@ export function createViewportSync(
     };
     hydrate(ctx.document()?.pages);
     ctx.watch(() => ctx.document()?.pages, hydrate);
+    // A new default scale reaches the pages without one: the annotation
+    // plugin measures new drawings on them with it.
+    ctx.listen(settings.api.onSettingsChanged, ({ changed }) => {
+      if (!changed.includes('defaultScale')) return;
+      for (const layout of ctx.document()?.pages ?? []) {
+        const known = viewports.get(layout.ref);
+        if (known) annotation.setPageViewports(layout.ref, [...known], fallbackOf(layout));
+      }
+    });
   };
 
   return {

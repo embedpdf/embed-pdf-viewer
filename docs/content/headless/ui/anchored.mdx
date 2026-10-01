@@ -14,6 +14,8 @@ there while people scroll, zoom and rotate. <Fw only="react">Put it in the Stage
 The anchor is a box on a page, in page coordinates: the same `page` and `bounds` every plugin gives
 you. The overlay moves with the view in the same frame as the pages, so your menu never lags behind.
 
+<Example name="anchored/overlay" />
+
 ## Ready-made menus
 
 Most menus follow something that's already on the page. These place themselves:
@@ -53,6 +55,9 @@ Pass the ref as a function, and the anchor and the thread follow the `note` inpu
 | `gap`       | The space between the box and your UI, in pixels                     | `8`      |
 
 When there's no room on the side you chose, it flips to the other side, and it stays inside the view.
+Scroll the match close to an edge to see it:
+
+<Example name="anchored/placement" />
 
 ## Good to know
 

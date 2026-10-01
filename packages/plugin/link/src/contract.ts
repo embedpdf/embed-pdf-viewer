@@ -9,6 +9,7 @@ import type {
 } from '@embedpdf/engine-core/runtime';
 import type { ActionDispatchResult } from '@embedpdf/plugin-actions/contract';
 import type { LinkNavItem } from '@embedpdf/plugin-annotation/contract';
+import type { StageCapability } from '@embedpdf/plugin-stage/contract';
 
 export { LinkToken } from './token';
 
@@ -20,7 +21,12 @@ export { LinkToken } from './token';
 export type Link = LinkNavItem;
 export type { PageDestination, PdfLinkTarget };
 
-/** What activation did, or hands to the host to do (a `uri`/`named` outcome is the host's). */
+/**
+ * What activation did: `revealed` (the view went to a page), `uri` (a website
+ * opened), `dispatched` (the actions plugin runs the link's action), or
+ * `reported` (a link it won't follow). `destination`, `named` and a `uri`
+ * with no framework to open it are handed to the caller to perform.
+ */
 export type LinkActivation =
   | { outcome: 'revealed' }
   | { outcome: 'destination'; destination: PageDestination }
@@ -46,6 +52,11 @@ export interface LinkActivateContext {
   activate?: PdfActionTree;
   ref?: AnnotationRef;
   page?: PageRef;
+  /**
+   * The view the link was followed in: a page destination moves this Stage.
+   * Defaults to the main view.
+   */
+  stage?: StageCapability;
 }
 
 /** A link target was activated through this capability. */
@@ -59,34 +70,52 @@ export interface LinkLoadedEvent {
 }
 
 export interface LinkCapability {
-  /** Clickable areas on a page, page space. Reference-stable per page while unchanged. */
-  listLinks(page: PageRef): readonly Link[];
-  /** One link by its stable id. */
-  getLink(page: PageRef, linkId: string): Link | null;
-  /** The topmost (smallest) link under a page point. */
-  getLinkAt(page: PageRef, point: Point): Link | null;
-  /** Every link in the document; loads pages as needed. Rejects when a page's read fails. */
+  /**
+   * Clickable areas on a page (its ref or its index), page space.
+   * Reference-stable per page while unchanged; empty for a page that isn't in
+   * the document.
+   */
+  listLinks(page: PageRef | number): readonly Link[];
+  /** One link by its stable id, or null. */
+  getLink(page: PageRef | number, linkId: string): Link | null;
+  /** The topmost (smallest) link under a page point, or null. */
+  getLinkAt(page: PageRef | number, point: Point): Link | null;
+  /**
+   * Every link in the document; loads pages as needed. Rejects when a page's
+   * read fails, and `operation-cancelled` when `signal` fires.
+   */
   listAllLinks(options?: OperationOptions): Promise<readonly Link[]>;
   /**
    * Load a page's links. Resolves at once when the annotation plugin owns
-   * them; rejects when the read fails, which `getStatus(page)` then reports.
+   * them; rejects when the read fails, which `getStatus(page)` then reports,
+   * `not-found` for a page that isn't in the document, and
+   * `operation-cancelled` when `signal` fires.
    */
-  ensureLoaded(page: PageRef, options?: OperationOptions): Promise<void>;
+  ensureLoaded(page: PageRef | number, options?: OperationOptions): Promise<void>;
   /** The page's links were read and are current. Always true with the annotation plugin. */
-  isLoaded(page: PageRef): boolean;
+  isLoaded(page: PageRef | number): boolean;
   /** Load state of a page's links: `idle`, `loading`, `ready`, `error` or `forbidden`. */
-  getStatus(page: PageRef): ResourceStatus;
+  getStatus(page: PageRef | number): ResourceStatus;
   /** What activation would do, with no side effect. */
   resolve(target: PdfLinkTarget): LinkResolution;
   /**
-   * Perform the activation. A `goto` goes to its destination through the stage; `uri` and
-   * `named` are reported for the host to perform synchronously (a user
-   * gesture is preserved); a link with an `/A` tree dispatches through the
-   * actions plugin.
+   * Follow a link, or a link's target, as a click does, and return what
+   * happened at once (the user's gesture is still on the stack, so a website
+   * can open in a new tab). A `goto` moves the Stage, by its `scrollBehavior`
+   * setting; a website opens through the framework (an `http`, `https`,
+   * `mailto` or `tel` address only); a link with an `/A` tree dispatches
+   * through the actions plugin. Fires `onActivated`.
    */
   activate(target: PdfLinkTarget | Link, context?: LinkActivateContext): LinkActivation;
-  /** Hit test, then activate. Null when nothing is there. */
-  activateAt(page: PageRef, point: Point, context?: LinkActivateContext): LinkActivation | null;
+  /**
+   * Hit test, then activate. Null when no link is there; throws `not-found`
+   * for a page that isn't in the document.
+   */
+  activateAt(
+    page: PageRef | number,
+    point: Point,
+    context?: LinkActivateContext,
+  ): LinkActivation | null;
   /** A human label for tooltips. */
   getLabel(link: Link | PdfLinkTarget): string;
   /** After the built-in handling of any activation. */

@@ -23,6 +23,10 @@ await annotation.update(square.ref, { contents: 'Check this table' });
 await annotation.delete(square.ref);
 ```
 
+<Example name="annotation/create-update" />
+
+> **Try it:** each button is one call. **Saving…** shows while the engine writes a change.
+
 An annotation here is the engine's record: the same kinds, fields and names as the
 [engine's annotation pages](/docs/engine/annotations). Each kind's page there lists its fields.
 These pages cover what the plugin adds on top.
@@ -41,6 +45,10 @@ To keep a component up to date, use `useAnnotationList()`. Your component <Word 
 when the list changes:
 
 <Snippet name="annotations/with-code/list" />
+
+<Example name="annotation/list" />
+
+> **Try it:** pick a kind, then click a row to go to it.
 
 Each annotation has a `subtype` (its kind), a `rect` (where it is on its page), a `page` and a
 `ref`. Keep the `ref`: it's how you change or delete the annotation later. Positions are in
@@ -108,6 +116,11 @@ const { annotations } = await annotation.createFromSelection('highlight');
 It takes a tool id, so your own markup tools work too. The text selection is cleared afterwards;
 pass `{ clear: false }` to keep it.
 
+<Example name="annotation/from-selection" />
+
+> **Try it:** the title's first line is selected: press **Highlight**. Then select other words
+> with the pointer and mark them.
+
 ## Change an annotation
 
 `update()` takes the `ref` and only the fields you want to change:
@@ -121,8 +134,8 @@ fill). You can also pass an annotation you read straight back, which makes "chan
 save it" simple:
 
 ```ts
-const square = annotation.get(ref)!;
-await annotation.update(ref, { ...square, opacity: 0.5 });
+const square = annotation.get(ref);
+if (square?.subtype === 'square') await annotation.update(ref, { ...square, opacity: 0.5 });
 ```
 
 To move or resize any annotation, send a new `rect`:
@@ -156,6 +169,11 @@ await annotation.move([ref], 0); // to the back
 await annotation.move([ref], annotation.list({ pages: [page.ref] }).length - 1); // to the front
 ```
 
+<Example name="annotation/order" />
+
+> **Try it:** send the green rectangle to the back, then select another and bring it to the
+> front.
+
 ## Changes show at once
 
 A change shows the moment you make it. The engine saves it in the background, and your `await`
@@ -185,6 +203,11 @@ const copy = annotation.get(ref)!;
 
 await annotation.create(otherPage.ref, copy);
 ```
+
+<Example name="annotation/copy" />
+
+> **Try it:** copy the rectangle, then copy the copy: it moves a page further each time. Select the
+> text box to copy it instead.
 
 Stamps and file attachments also need their bytes. Download them first:
 
@@ -254,10 +277,12 @@ too, check the flags first.
 
 ### What a copy can't carry
 
-A few annotations can't be made again from their read:
+A few annotations can't be made again from their read, and `create()` refuses them with
+`invalid-input`:
 
 - a link whose action the engine can't create, such as one that runs JavaScript;
 - a popup whose annotation is gone;
+- a value another app wrote that the engine can't write, such as a beveled border;
 - a kind the engine doesn't know (`subtype: 'unsupported'`).
 
 [Import](saving#export-and-import) leaves these out and tells you which ones, and why.

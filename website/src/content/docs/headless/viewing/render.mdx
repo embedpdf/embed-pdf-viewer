@@ -26,8 +26,9 @@ picture can show sharply, tiles take over for the part you can see:
 
 <Example name="render/deep-zoom" />
 
-> **Try it:** zoom past 200%. Only the tiles you can see load, the area under the pointer sharpens
-> first, and when you stop, the tiles redraw at exactly your zoom.
+> **Try it:** it opens at 250%, past what a whole-page picture shows sharply. Zoom in further: only
+> the tiles you can see load, the area under the pointer sharpens first, and when you stop, the
+> tiles redraw at exactly your zoom.
 
 While you pinch, the pixels you have scale along, so nothing reloads mid-gesture. About 150
 milliseconds after the zoom comes to rest, the page redraws at the new size. You configure none of
@@ -46,6 +47,11 @@ sharpness at normal reading zooms. A bigger budget means fewer tiles but a slowe
 more memory. For a view that should never tile, such as a thumbnail strip, set `tiles` to `false` on
 its layer.
 
+<Example name="render/budget" />
+
+> **Try it:** turn the tiles off, then pick a smaller budget. At 200% the page goes soft: the
+> whole-page picture is all there is.
+
 ## Annotations in the picture
 
 By default the page picture includes the annotations, so a plain `<RenderLayer>` shows the document
@@ -53,6 +59,8 @@ as it is: right for thumbnails and read-only views. When an [annotation layer](.
 the annotations so people can edit them, leave them out of the picture:
 
 <Snippet name="viewing/render-without-annotations" />
+
+<Example name="render/annotations" />
 
 ## Render a page yourself
 
@@ -85,6 +93,8 @@ const { applied } = await render.renderPages(
 | `quality`            | For WebP, from `0` to `1`                                      | per engine |
 | `concurrency`        | For `renderPages`, how many pages render at once               | `4`       |
 
+<Example name="render/render-page" />
+
 ## When a page changes
 
 A rendered page is a snapshot, so the plugin watches the document and redraws exactly the pages an
@@ -100,6 +110,8 @@ render.invalidate({ pages: [page.ref], scope: 'annotations' }); // only their an
 
 Your own long-lived renders can keep up the same way: `render.getRenderEpoch(page.ref)` changes
 whenever the page's pixels do.
+
+<Example name="render/redraws" />
 
 ## Methods
 

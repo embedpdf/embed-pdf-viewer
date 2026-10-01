@@ -1,4 +1,4 @@
-/* Colors, for light and dark */
+/* Colors */
 :root {
   --ink: #1a2748;
   --muted: #5a6b92;
@@ -7,24 +7,13 @@
   --surface: #ffffff;
   --tint: #f3f7fe;
   --canvas: #f7f9fc;
+  --accent: #0876fd;
+  --danger: #c62a2a;
   --focus: #7db6ff;
   --shadow: rgb(7 32 76 / 0.04);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --ink: #e6ecfa;
-    --muted: #93a3c7;
-    --line: #27365f;
-    --line-strong: #34467a;
-    --surface: #131d3b;
-    --tint: #1a2750;
-    --canvas: #0b1328;
-    --shadow: rgb(0 0 0 / 0.3);
-  }
-}
-
-/* The controls, above the pages */
+/* The toolbar: it wraps on a phone */
 .toolbar {
   display: flex;
   flex-wrap: wrap;
@@ -34,8 +23,6 @@
 }
 
 .readout {
-  min-width: 52px;
-  text-align: center;
   font-size: 13px;
   font-weight: 600;
   color: var(--ink);
@@ -48,10 +35,6 @@
 }
 
 .button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
   font: inherit;
   font-size: 13px;
   font-weight: 550;
@@ -60,7 +43,7 @@
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: 9px;
-  padding: 8px 13px;
+  padding: 8px 12px;
   cursor: pointer;
   white-space: nowrap;
   box-shadow: 0 1px 2px var(--shadow);
@@ -74,10 +57,6 @@
   border-color: var(--line-strong);
 }
 
-.button:active {
-  transform: translateY(1px);
-}
-
 .button:focus-visible {
   outline: 2px solid var(--focus);
   outline-offset: 2px;
@@ -86,18 +65,75 @@
 .button:disabled {
   opacity: 0.45;
   cursor: not-allowed;
-  transform: none;
 }
 
-/* The pages */
-.stage {
-  height: 420px;
+.button.danger {
+  color: var(--danger);
+}
+
+/* The pages: as many cards in a row as fit */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  align-items: end;
+  gap: 12px;
+  margin: 0;
+  padding: 16px;
+  list-style: none;
+  background: var(--canvas);
   border: 1px solid var(--line);
   border-radius: 14px;
-  background: var(--canvas);
   box-shadow:
     0 1px 2px var(--shadow),
     0 18px 40px -28px rgb(7 32 76 / 0.28);
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  font: inherit;
+  background: transparent;
+  border: 2px solid transparent;
+  border-radius: 12px;
+  padding: 10px 8px 8px;
+  cursor: pointer;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.card:hover {
+  background: var(--tint);
+}
+
+.card[aria-pressed='true'] {
+  background: var(--tint);
+  border-color: var(--accent);
+}
+
+.card:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.thumbnail {
+  box-shadow:
+    0 0 0 1px var(--line),
+    0 2px 6px rgb(7 32 76 / 0.12);
+}
+
+.label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.turn {
+  font-weight: 500;
+  color: var(--muted);
 }
 
 .loading {

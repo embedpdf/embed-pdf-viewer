@@ -186,7 +186,7 @@ function layoutSnapshot(meta) {
   };
 }
 
-/** Full AnnotationDTO for a stored session annotation. */
+/** Full Annotation for a stored session annotation. */
 function annotationDto(a, index) {
   return {
     subtype: 'unsupported',

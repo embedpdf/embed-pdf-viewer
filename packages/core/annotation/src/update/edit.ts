@@ -217,7 +217,7 @@ export function editMove(model: Model, input: PointerInput): [Model, Effect[]] {
       input.pageBox,
       view,
     );
-    if (!model.snap.guides || input.shift)
+    if (!model.snap.alignment || input.shift)
       return [{ ...model, draft: { ...draft, delta: raw, guides: [] } }, []];
     // Snap guides read stored geometry (an anchored mover aligns by its /Rect
     // box) — a deliberate simplification; the clamp above is view-exact.
@@ -226,7 +226,8 @@ export function editMove(model: Model, input: PointerInput): [Model, Effect[]] {
       draft.ids,
       input.page,
       raw,
-      model.snap.guideThreshold,
+      // Screen pixels to page units at this sample's view.
+      model.snap.alignmentThreshold / (input.scale || 1),
       input.pageBox,
     );
     // A snap adjusts by ≤ threshold, but never past the page edge: re-clamp, and

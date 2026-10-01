@@ -46,7 +46,7 @@ export async function restoreStampLibraries(
   const restored: string[] = [];
   for (const { id, bytes } of await store.list()) {
     try {
-      restored.push(await stamp.importLibrary(bytes));
+      restored.push((await stamp.importLibrary(bytes)).library.id);
     } catch (error) {
       globalThis.console?.warn(`[stamp] stored library '${id}' could not be restored:`, error);
     }

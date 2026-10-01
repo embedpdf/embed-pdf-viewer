@@ -10,8 +10,9 @@
  *     `projectAnchoredTarget`).
  *   - surfaces (<Stage>, <PageView>) provide a {@link ProjectorBinding}:
  *     the snapshot plus react's way of knowing when it changed.
- *   - <Anchored> renders at the projected position, isolates pointer
- *     events, and portals when the space demands it.
+ *   - <Anchored> renders at the projected position, flips to the other
+ *     side and stays inside the view once it knows its size, isolates
+ *     pointer events, and portals when the space demands it.
  *
  * The scheduling law (this is what keeps menus glued to the content): a
  * state-driven projection change (the Stage camera) reaches consumers as a
@@ -23,11 +24,13 @@
  * announces the move.
  */
 import * as React from 'react';
-import { createContext, useContext, useEffect, useLayoutEffect, useReducer, useRef } from 'react';
+import { createContext, useContext, useEffect, useLayoutEffect, useReducer, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
   projectAnchoredTarget,
+  type AnchoredFit,
   type AnchoredPlacement,
+  type AnchoredRect,
   type AnchorTarget,
   type ViewProjector,
 } from '@embedpdf/web';
@@ -78,22 +81,52 @@ export function useProjectorBinding(): ProjectorBinding {
 }
 
 export interface AnchoredProps {
-  anchor: AnchorTarget | null;
-  /** Which side of the anchor to sit on. Default 'top'. */
+  /**
+   * The box on a page to sit next to, in page coordinates: `{ page, bounds }`,
+   * with `avoid` points to keep clear of. `null`, or a target without
+   * `bounds` (a search match with no geometry), hides it.
+   */
+  anchor: (Omit<AnchorTarget, 'bounds'> & { bounds?: AnchoredRect }) | null;
+  /** Which side of the box to sit on when there's room. Default 'top'. */
   placement?: AnchoredPlacement;
-  /** Gap in screen px between the anchor box and the content. Default 8. */
+  /** Gap in screen px between the box and the content, and between the content and the view's edge. Default 8. */
   gap?: number;
   children: React.ReactNode;
 }
 
+/** The area anchored UI stays inside: the surface's own box (overlay space) or the window (client space). */
+function viewOf(element: HTMLElement, space: ViewProjector['space']): AnchoredRect | null {
+  if (space === 'client') {
+    const { clientWidth, clientHeight } = element.ownerDocument.documentElement;
+    return { x: 0, y: 0, width: clientWidth, height: clientHeight };
+  }
+  const container = element.offsetParent;
+  return container
+    ? { x: 0, y: 0, width: container.clientWidth, height: container.clientHeight }
+    : null;
+}
+
+const sameFit = (left: AnchoredFit | null, right: AnchoredFit): boolean =>
+  left !== null &&
+  left.size.width === right.size.width &&
+  left.size.height === right.size.height &&
+  left.view.width === right.view.width &&
+  left.view.height === right.view.height;
+
 /**
- * Position `children` around a page-space anchor, on whichever page
- * surface is in scope. Projection runs during render from the shared pure
- * helper; pointer isolation keeps a click inside anchored UI from reaching
- * the surface's own listener (which would read it as click-outside).
+ * Position `children` around a page-space anchor, on whichever page surface
+ * is in scope. Projection runs during render from the shared pure helper.
+ * Once the content's size is measured, it flips to the opposite side when
+ * the chosen one has no room, and stays inside the view. Pointer isolation
+ * keeps a click inside anchored UI from reaching the surface's own listener
+ * (which would read it as a click outside).
  */
 export function Anchored({ anchor, placement = 'top', gap = 8, children }: AnchoredProps) {
   const { projector, subscribe } = useProjectorBinding();
+  const [element, setElement] = useState<HTMLDivElement | null>(null);
+  // The content's size and the view's: measured after the first commit, and
+  // again whenever either resizes. A camera move changes neither.
+  const [fit, setFit] = useState<AnchoredFit | null>(null);
 
   // Browser-driven invalidation only (PageView). State-driven changes come
   // through the binding identity — no local bump involved.
@@ -107,26 +140,52 @@ export function Anchored({ anchor, placement = 'top', gap = 8, children }: Ancho
     if (projector.space === 'client') force();
   }, [projector, anchor]);
 
-  const ref = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    if (!element) return;
+    const measure = () => {
+      const view = viewOf(element, projector.space);
+      if (!view) return;
+      const next = { size: { width: element.offsetWidth, height: element.offsetHeight }, view };
+      setFit((current) => (sameFit(current, next) ? current : next));
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(element);
+    if (projector.space === 'overlay' && element.offsetParent)
+      observer.observe(element.offsetParent);
+    else window.addEventListener('resize', measure);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('resize', measure);
+    };
+  }, [element, projector.space]);
+
   useEffect(() => {
-    const element = ref.current;
     if (!element) return;
     const stop = (event: Event) => event.stopPropagation();
     element.addEventListener('pointerdown', stop);
     return () => element.removeEventListener('pointerdown', stop);
-  });
+  }, [element]);
 
-  if (!anchor) return null;
-  const pos = projectAnchoredTarget(projector, anchor, placement, gap);
+  if (!anchor?.bounds) return null;
+  const pos = projectAnchoredTarget(
+    projector,
+    { ...anchor, bounds: anchor.bounds },
+    placement,
+    gap,
+    fit,
+  );
   if (!pos) return null;
 
   const node = (
     <div
-      ref={ref}
+      ref={setElement}
       style={{
         position: projector.space === 'client' ? 'fixed' : 'absolute',
         left: pos.left,
         top: pos.top,
+        // Its own width, wherever it sits: the size the placement measured.
+        width: 'max-content',
         transform: pos.transform,
         pointerEvents: 'auto',
       }}

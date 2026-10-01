@@ -26,5 +26,5 @@ export const stamp = defineKind({
     opaqueBody: true,
     rasterOnly: true,
   },
-  fields: [OPACITY, LINKABLE],
+  properties: [OPACITY, LINKABLE],
 });

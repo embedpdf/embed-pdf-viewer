@@ -15,7 +15,7 @@
  * grouped and kept on the page as one object; its handles still act on the
  * box, the tip and the knee.
  */
-import type { AnnotationDTO, LineEnding } from '@embedpdf/engine-core/runtime';
+import type { Annotation, LineEnding } from '@embedpdf/engine-core/runtime';
 
 import { endingNodes, endingPieces, endingPoints } from '../endings';
 import { bodyPieces, type PaintedPiece } from '../painted';
@@ -41,7 +41,7 @@ import {
 import type { ShapeFamily } from './family';
 import { strokedOutlineOf } from './points';
 
-type FreeTextAnnotation = Extract<AnnotationDTO, { subtype: 'free-text' }>;
+type FreeTextAnnotation = Extract<Annotation, { subtype: 'free-text' }>;
 
 /** A callout's line: its tip, its knee when it bends, and where it meets the box. */
 export type CalloutLine = NonNullable<FreeTextAnnotation['calloutLine']>;
@@ -68,7 +68,7 @@ function placeTextBox(placement: Placement): TextBoxShape | null {
 }
 
 /** A free text's shape, read off its annotation. A line counts only on a callout. */
-function readTextBox(read: AnnotationDTO): TextBoxShape {
+function readTextBox(read: Annotation): TextBoxShape {
   const annotation = read as FreeTextAnnotation;
   const line = annotation.intent === 'free-text-callout' ? (annotation.calloutLine ?? null) : null;
   return {

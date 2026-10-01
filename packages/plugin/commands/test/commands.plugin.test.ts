@@ -29,8 +29,8 @@ const openDocument = (id: string) => ({ kind: 'bytes' as const, id, bytes: new U
 async function twoDocuments() {
   const ran: (string | null)[] = [];
   const commands: CommandDef[] = [
-    { id: 'show', labelKey: 'show', run: (context) => void ran.push(context.documentId) },
-    { id: 'only-a', labelKey: 'only a', enabled: (context) => context.documentId === 'a' },
+    { id: 'show', label: 'show', run: (context) => void ran.push(context.documentId) },
+    { id: 'only-a', label: 'only a', enabled: (context) => context.documentId === 'a' },
   ];
   const kernel = createKernel({ engine, plugins: [commandsPlugin({ commands })] });
   await kernel.start();

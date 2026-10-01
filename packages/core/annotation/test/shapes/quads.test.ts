@@ -1,5 +1,5 @@
 import { quadFromRect } from '@embedpdf/core-geometry';
-import type { AnnotationDTO } from '@embedpdf/engine-core/runtime';
+import type { Annotation } from '@embedpdf/engine-core/runtime';
 import { describe, expect, it } from 'vitest';
 
 import { paintedNear } from '../../src/painted';
@@ -13,7 +13,7 @@ describe('the quads family', () => {
       subtype: 'highlight',
       rect: { x: 100, y: 200, width: 80, height: 12 },
       quadPoints: [QUAD],
-    } as unknown as AnnotationDTO;
+    } as unknown as Annotation;
     expect(quadsFamily.read(highlight)).toEqual({ kind: 'quads', quadPoints: [QUAD] });
   });
 

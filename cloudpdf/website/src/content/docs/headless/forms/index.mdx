@@ -12,6 +12,8 @@ put `<FormLayer>` in each page, and people can fill them in:
 
 <Snippet name="forms/form-layer" />
 
+<Example name="form/basic" />
+
 Each field becomes a real HTML control, placed and styled like the field in the PDF: people type in text
 boxes, tick checkboxes, pick from lists, and move between fields with Tab. A value is saved into the
 document as it's entered, so it's there when the PDF is downloaded, and every PDF app shows it.
@@ -42,6 +44,8 @@ For one field, such as a total you show in your own UI, use `useFormValue()`:
 <Snippet name="forms/invoice-total" />
 
 `toFieldRef(name)` makes a ref from a field's full name, for when you know a field by name.
+
+<Example name="form/read" />
 
 ## Fill in a field
 
@@ -74,6 +78,8 @@ To fill many fields at once, such as from your backend, pass them by name:
 await form.importValues({ 'billing.name': 'Ada Lovelace', 'billing.country': 'NL', agree: true });
 ```
 
+<Example name="form/fill" />
+
 ## Check required fields
 
 A form marks some fields as required. Check them before you submit or download:
@@ -88,6 +94,8 @@ if (!valid) {
 
 `missing` lists the required fields that are empty, in page order, so you can take the user to the
 first one.
+
+<Example name="form/validate" />
 
 ## Calculations, formatting and validation
 
@@ -124,6 +132,8 @@ await form.importValues(values);
 
 Fields are matched by their full name. A field the form doesn't have, or a value it can't take, is
 skipped; the rest still land.
+
+<Example name="form/data" />
 
 ## Methods
 
@@ -185,6 +195,8 @@ Scripts need JavaScript on in the actions plugin; without it, `'scripts'` accept
 The colors are what the viewer draws around fields; a field's own colors are saved in the PDF (see
 [Building forms](forms/building)). A CSS variable wins over the setting: see
 [Colors & theming](ui/theming).
+
+<Example name="form/colors" />
 
 ## Events
 

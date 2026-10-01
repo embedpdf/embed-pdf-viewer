@@ -4,7 +4,13 @@
  * the capability itself. Sibling-plugin registration (commit sinks, script
  * realms, the page-state report) is the host lens (`/contract/host`).
  */
-import type { EventHook, Unsubscribe } from '@embedpdf/core';
+import type {
+  DeepPartial,
+  EventHook,
+  OperationOptions,
+  SettingsApi,
+  Unsubscribe,
+} from '@embedpdf/core';
 import type {
   ScriptBudget,
   ScriptDiagnostic,
@@ -25,6 +31,8 @@ import type {
 } from '@embedpdf/engine-core/runtime';
 
 export { ActionsToken } from './token';
+/** The action trees the verbs take and resolve: what a PDF's links, buttons, pages and document carry. */
+export type { PdfActionNode, PdfActionTree, PdfActionType } from '@embedpdf/engine-core/runtime';
 export { createHoverPump } from './hover-pump';
 export type { HoverPump, HoverTarget } from './hover-pump';
 export { submitEntriesToUrlEncoded } from './submit-encoding';
@@ -198,7 +206,7 @@ export interface ActionDiagnostic {
     | 'duplicate-executor'
     | 'executor-inert'
     | 'executor-failed'
-    | 'trigger-disabled' // config.triggers gated this family off
+    | 'trigger-disabled' // the `triggers` setting turned this family off
     | 'no-commit-sink' // a document effect had no registered owner sink
     | 'trigger-failed' // resolution threw — dispatch() never rejects
     | 'cascade-budget' // programmatic page-lifecycle rounds exceeded the cap
@@ -215,19 +223,14 @@ export interface ActionDiagnostic {
  * One logical dispatch transaction's outcome. Document-lifetime work is not
  * rolled back: an earlier successful reset or script write survives a later
  * failure; `status: 'partial'` says so, and `nodes` carries the per-node
- * truth.
+ * truth. `'cancelled'`: the caller's signal fired while the tree ran, so the
+ * walk stopped before its next node and no navigation or external effect
+ * fired.
  */
 export interface ActionDispatchResult {
-  status: 'executed' | 'partial' | 'inert' | 'refused';
+  status: 'executed' | 'partial' | 'inert' | 'refused' | 'cancelled';
   nodes: ActionNodeResult[];
   diagnostics: ActionDiagnostic[];
-}
-
-export interface ActionDispatchEvent {
-  /** The context the tree ran under. */
-  ctx: ActionContext;
-  tree: PdfActionTree;
-  result: ActionDispatchResult;
 }
 
 /**
@@ -249,11 +252,50 @@ export interface ActionStepResult {
  * not per trigger.
  */
 export interface ActionTriggerResult {
-  status: 'executed' | 'partial' | 'inert' | 'refused';
+  /** `'cancelled'`: the caller's signal fired before or while the trigger ran. */
+  status: 'executed' | 'partial' | 'inert' | 'refused' | 'cancelled';
   steps: ActionStepResult[];
   /** Trigger-level diagnostics (disabled family, resolution failure);
    *  per-node diagnostics live inside each step's `result`. */
   diagnostics: ActionDiagnostic[];
+}
+
+// ── events ─────────────────────────────────────────────────────────────────
+
+/** Actions ran: one tree, whatever started it (a click, a page, the document, your code). */
+export interface ActionExecutedEvent {
+  readonly tree: PdfActionTree;
+  readonly result: ActionDispatchResult;
+  /** What started them. */
+  readonly source: ActionSource;
+}
+
+/**
+ * An action was blocked, reported or couldn't run. `action` is its type and
+ * `source` what started it; both are `null` for a diagnostic about no one
+ * action (a trigger family turned off, an executor replaced). The result of
+ * the run that reported it lists the same diagnostic with its message.
+ */
+export interface ActionDiagnosticReportedEvent {
+  readonly code: ActionDiagnostic['code'];
+  readonly action: PdfActionType | null;
+  readonly source: ActionSource | null;
+}
+
+/**
+ * A script was stopped from doing something, such as reaching the network,
+ * or used something the viewer doesn't support.
+ */
+export type ScriptDiagnosticReportedEvent = Readonly<ScriptDiagnostic>;
+
+/**
+ * A script threw an error. `source` is what started it, or `null` for a
+ * script no action started: a form field's keystroke, format, validate or
+ * calculate script, or a stamp's template.
+ */
+export interface ScriptFailedEvent {
+  readonly error: ScriptExecutionError;
+  readonly source: ActionSource | null;
 }
 
 // ── policy ─────────────────────────────────────────────────────────────────
@@ -265,71 +307,111 @@ export interface ActionTriggerResult {
  *  `goto-remote`, `goto-embedded` and media types are fixed `'never'` and
  *  not configurable. */
 export type ActionPolicyDecision = 'allow' | 'adapter' | 'report' | 'block';
-export type ActionPolicyRow = Record<ActionOrigin, ActionPolicyDecision>;
+export type ActionPolicyRow = Readonly<Record<ActionOrigin, ActionPolicyDecision>>;
 
 export interface ActionPolicy {
-  goto: ActionPolicyRow;
-  named: ActionPolicyRow;
-  hide: ActionPolicyRow;
-  'reset-form': ActionPolicyRow;
-  javascript: ActionPolicyRow;
-  uri: ActionPolicyRow;
+  readonly goto: ActionPolicyRow;
+  readonly named: ActionPolicyRow;
+  readonly hide: ActionPolicyRow;
+  readonly 'reset-form': ActionPolicyRow;
+  readonly javascript: ActionPolicyRow;
+  readonly uri: ActionPolicyRow;
   /** The Named `Print` verb, owned by policy and the UI adapter, never the
    *  stage. (An Acrobat-compatible extension: ISO 32000-2 Table 215 defines
    *  only the four page verbs; an unrecognized name "shall take no action".) */
-  print: ActionPolicyRow;
+  readonly print: ActionPolicyRow;
   /** SubmitForm: `'adapter'` routes through the sink chain. Default: user
    *  origin only; hover and lifecycle submits stay blocked. */
-  'submit-form': ActionPolicyRow;
+  readonly 'submit-form': ActionPolicyRow;
 }
 
-/** Row-wise policy overrides: name only the origins you change. */
-export type ActionPolicyPatch = { readonly [K in keyof ActionPolicy]?: Partial<ActionPolicyRow> };
+/** Who scripts think the user is: fields over the document's user, or a function that returns them. */
+export type ActionsScriptIdentity = Partial<ScriptIdentity> | (() => Partial<ScriptIdentity>);
 
-export interface ActionsConfig {
-  /** Declarative overrides merged row-wise over the defaults (see {@link ActionPolicy}). */
-  policy?: ActionPolicyPatch;
-  /** Trigger-family gates, default all true. `activate` (the /A click) is
-   *  never gated. */
-  triggers?: { document?: boolean; page?: boolean; annotation?: boolean };
-  /**
-   * The document-open sequence: the open destination, then the catalog
-   * /OpenAction, then the initial page /O. `'auto'` (default) fires it once
-   * at the earliest of a UI adapter installing or the first user-origin
-   * dispatch, and the initial page open then comes from the stage's
-   * page-state report (a stage-less embedder drives page triggers itself, or
-   * declares headless); `'headless'` fires at bringup and falls back to the
-   * first page for the initial open (no stage will ever report); `'off'`
-   * never fires it but still releases the page-lifecycle barrier.
-   */
-  openSequence?: 'auto' | 'headless' | 'off';
-  /**
-   * The JavaScript switch. Default off: no VM ever loads. When enabled, the
-   * plugin owns the one ScriptHost realm per document, registers the
-   * `javascript` executor, and exposes the transaction port on the host lens
-   * (the form plugin's K/V/C/F pipeline rides it).
-   */
-  javascript?: {
-    enabled: boolean;
-    /** Override the lazy QuickJS factory (tests or another isolated VM). */
-    sandboxFactory?: ScriptSandboxFactory;
-    /** Embedder identity fields layered over engine/JWT identity. */
-    identity?: Partial<ScriptIdentity> | (() => Partial<ScriptIdentity>);
-    fileName?: () => string;
-    /** Injected deterministic transaction environment. */
-    now?: () => number;
-    utcOffsetMinutes?: () => number;
-    randomSeed?: () => number;
-    budget?: ScriptBudget;
-    /**
-     * The deterministic aggregate: the most JavaScript nodes one dispatch may
-     * run (default 16). A /Next chain shares it instead of multiplying the
-     * per-run time budget, and a count stays deterministic where a wall-clock
-     * aggregate would not. Once exhausted, the remaining JavaScript nodes
-     * report inert with a budget reason.
-     */
-    maxScriptNodesPerDispatch?: number;
+/**
+ * The actions plugin's settings. `actionsPlugin(config)` registers them over
+ * {@link ACTIONS_DEFAULTS}, and `updateSettings()` changes them for every
+ * document while the app runs. `policy`, `triggers` and
+ * `javascript.identity` apply to the next action; `javascript.enabled`
+ * applies to the documents opened after the change (a document's script
+ * engine starts when it opens); `openSequence` applies until a document's
+ * opening actions have run.
+ */
+export interface ActionsSettings {
+  /** The rules: per kind of action and per origin. Rows merge, so a change names only what it changes. */
+  readonly policy: ActionPolicy;
+  /** Run the actions of the `document`, its `page`s, or `annotation`s. A click on a link or button always runs. */
+  readonly triggers: {
+    readonly document: boolean;
+    readonly page: boolean;
+    readonly annotation: boolean;
   };
+  /**
+   * When the document's opening actions run (the open destination, then the
+   * catalog /OpenAction, then the first page's /O). `'auto'` runs them once
+   * at the first sign of a person: a UI adapter installing, or a first
+   * click; the first page's /O then comes from the Stage's page report.
+   * `'headless'` runs them as the document opens, for an app without a
+   * Stage; `'off'` never runs them.
+   */
+  readonly openSequence: 'auto' | 'headless' | 'off';
+  readonly javascript: {
+    /** Run the document's JavaScript. Off by default: no script engine ever loads. */
+    readonly enabled: boolean;
+    /** Who scripts think the user is, on top of the document's user. `null`: the document's user. */
+    readonly identity: ActionsScriptIdentity | null;
+  };
+}
+
+/** What the actions settings are when the app registers none. */
+export const ACTIONS_DEFAULTS: ActionsSettings = {
+  policy: {
+    goto: { user: 'allow', hover: 'allow', lifecycle: 'allow' },
+    named: { user: 'allow', hover: 'allow', lifecycle: 'allow' },
+    hide: { user: 'allow', hover: 'allow', lifecycle: 'allow' },
+    'reset-form': { user: 'allow', hover: 'allow', lifecycle: 'allow' },
+    javascript: { user: 'allow', hover: 'allow', lifecycle: 'allow' },
+    // No tab opens by itself: only a real click reaches the adapter.
+    uri: { user: 'adapter', hover: 'report', lifecycle: 'report' },
+    print: { user: 'adapter', hover: 'block', lifecycle: 'block' },
+    // Form data leaves the viewer only on a click: handler, then the document's home.
+    'submit-form': { user: 'adapter', hover: 'block', lifecycle: 'block' },
+  },
+  triggers: { document: true, page: true, annotation: true },
+  openSequence: 'auto',
+  javascript: { enabled: false, identity: null },
+};
+
+/**
+ * The script environment, given once when the plugin is registered: not a
+ * setting, because a document's script engine is built with it when the
+ * document opens.
+ */
+export interface ActionsScriptEnvironment {
+  /** Override the lazy QuickJS factory (tests or another isolated VM). */
+  readonly sandboxFactory?: ScriptSandboxFactory;
+  readonly fileName?: () => string;
+  /** Injected deterministic transaction environment. */
+  readonly now?: () => number;
+  readonly utcOffsetMinutes?: () => number;
+  readonly randomSeed?: () => number;
+  readonly budget?: ScriptBudget;
+  /**
+   * The deterministic aggregate: the most JavaScript nodes one dispatch may
+   * run (default 16). A /Next chain shares it instead of multiplying the
+   * per-run time budget, and a count stays deterministic where a wall-clock
+   * aggregate would not. Once exhausted, the remaining JavaScript nodes
+   * report inert with a budget reason.
+   */
+  readonly maxScriptNodesPerDispatch?: number;
+}
+
+/**
+ * What `actionsPlugin(config)` takes: any of the settings, merged over the
+ * defaults, and the script environment beside `javascript`'s settings.
+ */
+export interface ActionsConfig extends DeepPartial<Omit<ActionsSettings, 'javascript'>> {
+  readonly javascript?: DeepPartial<ActionsSettings['javascript']> & ActionsScriptEnvironment;
 }
 
 // ── registration surfaces (host lens) ──────────────────────────────────────
@@ -427,36 +509,54 @@ export type ActionSubmitHandler = (
 
 // ── capabilities ───────────────────────────────────────────────────────────
 
-/** The public capability, for embedders and chrome. Each `can*` twin takes
- *  the same arguments as its verb and answers "would the dispatcher accept
- *  this and attempt execution" (per-node truth lives in the result's
- *  `nodes`). */
-export interface ActionsCapability {
-  /** Run a resolved tree on the dispatch queue and fire `onExecuted`; a failing node is reported in the result, not thrown. */
-  execute(tree: PdfActionTree, actionContext: ActionContext): Promise<ActionDispatchResult>;
+/**
+ * The public capability, for embedders and chrome. Each `can*` twin takes the
+ * same arguments as its verb and answers "would the dispatcher accept this
+ * and attempt execution" (per-node truth lives in the result's `nodes`). Its
+ * settings (`getSettings`, `updateSettings`, `resetSettings`,
+ * `onSettingsChanged`) belong to the plugin, not to a document: a change
+ * reaches every open document.
+ */
+export interface ActionsCapability extends SettingsApi<ActionsSettings> {
+  /**
+   * Run a resolved tree on the dispatch queue and fire `onExecuted`; a
+   * failing node is reported in the result, not thrown. Rejects
+   * `operation-cancelled` when `options.signal` fires: before the tree
+   * starts, nothing runs; while it runs, it stops before its next node.
+   */
+  execute(
+    tree: PdfActionTree,
+    actionContext: ActionContext,
+    options?: OperationOptions,
+  ): Promise<ActionDispatchResult>;
   /** The tree is complete and its root node's policy decision is `allow` or `adapter`. */
   canExecute(tree: PdfActionTree, actionContext: ActionContext): boolean;
   /**
    * Run one Named verb (`NextPage`, `Print`, …) as a user-origin action
    * without building a tree — the programmatic twin of a Named link click.
    * `context` overrides the default `{ origin: 'user', source: { kind: 'api' } }`.
+   * Rejects `operation-cancelled` like `execute()`.
    */
   executeNamed(
     name: PdfNamedAction,
     context?: Partial<ActionContext>,
+    options?: OperationOptions,
   ): Promise<ActionDispatchResult>;
+  /**
+   * Whether the rules would run this Named verb from `context` (a click from
+   * your code by default); `'Print'` also needs `doc.print`.
+   */
+  canExecuteNamed(name: PdfNamedAction, context?: Partial<ActionContext>): boolean;
   /**
    * Read the /A or /AA tree behind a source straight from the document
    * (`null` when absent). This is the raw tree: dispatch-time rules such as
-   * ISO 32000-2 Table 197's "/A shadows /AA U" are not applied here.
+   * ISO 32000-2 Table 197's "/A shadows /AA U" are not applied here. Rejects
+   * `operation-cancelled` when `options.signal` fires.
    */
-  getActionTree(source: ActionTreeSource): Promise<PdfActionTree | null>;
-  /** The effective policy — a reference-stable snapshot until
-   *  {@link updatePolicy} replaces it. */
-  getPolicy(): ActionPolicy;
-  /** Live policy change: rows merge over the current policy, and later
-   *  dispatches decide with the new one. */
-  updatePolicy(patch: ActionPolicyPatch): void;
+  getActionTree(
+    source: ActionTreeSource,
+    options?: OperationOptions,
+  ): Promise<PdfActionTree | null>;
   /** Did `javascript.enabled` take effect — a script realm exists for this
    *  document. */
   isScriptingEnabled(): boolean;
@@ -465,10 +565,11 @@ export interface ActionsCapability {
    * before this returns, so two dispatch calls execute in call order even
    * when their resolutions race; all reads happen inside the queued
    * operation. Never rejects: resolution failures come back as `refused`
-   * with a `trigger-failed` diagnostic, so `void dispatch(...)` is safe.
+   * with a `trigger-failed` diagnostic, and a fired `options.signal` as
+   * `cancelled`, so `void dispatch(...)` is safe.
    */
-  dispatch(trigger: ActionTrigger): Promise<ActionTriggerResult>;
-  /** The trigger's family is enabled (see `ActionsConfig.triggers`). */
+  dispatch(trigger: ActionTrigger, options?: OperationOptions): Promise<ActionTriggerResult>;
+  /** The trigger's family is enabled (the `triggers` setting). */
   canDispatch(trigger: ActionTrigger): boolean;
   /** Identity-safe port install: the returned disposer clears the slot only
    *  while this adapter is still current; `null` force-clears. Installing an
@@ -485,17 +586,23 @@ export interface ActionsCapability {
    * document-print latch, so nested `doc.print()` calls are suppressed with
    * a `reentrant-print` diagnostic. The queue is held for the operation's
    * duration on purpose: that is the serialization (/WS mutations are in the
-   * bytes a save operation pulls).
+   * bytes a save operation pulls). `options.signal` firing before
+   * `operation()` starts skips it and rejects `operation-cancelled`; once it
+   * has started, it finishes, and so does the after-event.
    */
-  runDocumentVerb<T>(verb: 'save' | 'print', operation: () => Promise<T> | T): Promise<T>;
+  runDocumentVerb<T>(
+    verb: 'save' | 'print',
+    operation: () => Promise<T> | T,
+    options?: OperationOptions,
+  ): Promise<T>;
   /**
    * The cooperative /WC door: runs the catalog will-close tree (after the
    * document-open sequence) and resolves when its effects are committed.
    * Call `documents.close()` after this resolves. Scripts never run inside
    * teardown, so closing without this call skips /WC (unlike Acrobat); it is
-   * not an error.
+   * not an error. Never rejects, like `dispatch()`.
    */
-  prepareClose(): Promise<ActionTriggerResult>;
+  prepareClose(options?: OperationOptions): Promise<ActionTriggerResult>;
   /**
    * The first sink of the submit chain (an identity-safe slot like the UI
    * adapter, but installing it does not fire the document-open sequence).
@@ -507,19 +614,18 @@ export interface ActionsCapability {
    * Interpret (or override) one action type from application code: the same
    * door the stage and form plugins use for GoTo, Named, Hide and ResetForm.
    * Deterministic last-wins on duplicates (a `duplicate-executor` diagnostic
-   * is emitted); the disposer removes the entry only while it is still the
+   * is reported); the disposer removes the entry only while it is still the
    * current one.
    */
   registerExecutor(type: PdfActionType, executor: ActionExecutor): Unsubscribe;
-  /** Every executed tree: dispatch-driven, verb-driven and lifecycle-driven. */
-  onExecuted: EventHook<ActionDispatchEvent>;
-  /** A dispatch, policy, sink or budget diagnostic. */
-  onDiagnostic: EventHook<ActionDiagnostic>;
-  /** Script-plane observability, dispatch-driven and K/V/C/F-driven (the
-   *  form pipeline surfaces through the same doors). */
-  onScriptDiagnostic: EventHook<ScriptDiagnostic>;
+  /** Actions ran, whatever started them: one event per tree. */
+  readonly onExecuted: EventHook<ActionExecutedEvent>;
+  /** An action was blocked, reported or couldn't run; also dispatch, sink and budget problems. */
+  readonly onDiagnosticReported: EventHook<ActionDiagnosticReportedEvent>;
+  /** A script was stopped from doing something, or used something the viewer doesn't support. */
+  readonly onScriptDiagnosticReported: EventHook<ScriptDiagnosticReportedEvent>;
   /** A script run ended with an error. */
-  onScriptError: EventHook<ScriptExecutionError>;
+  readonly onScriptFailed: EventHook<ScriptFailedEvent>;
   /** The document-open sequence ran (OpenAction / open destination). */
-  onOpenSequenceCompleted: EventHook<OpenSequenceCompletedEvent>;
+  readonly onOpenSequenceCompleted: EventHook<OpenSequenceCompletedEvent>;
 }

@@ -83,6 +83,7 @@ const handleFor = (id: string) =>
     id,
     events: { subscribe: () => () => {}, lastServerId: () => null },
     pages: { list: () => Promise.resolve({ pageCount: 1, pages: [page] }) },
+    security: { allows: () => true, allowsAnnotation: () => true },
     // The "file" is the document's id, so a test can tell which document was saved.
     download: () => Promise.resolve(new TextEncoder().encode(id)),
     close: () => Promise.resolve(),

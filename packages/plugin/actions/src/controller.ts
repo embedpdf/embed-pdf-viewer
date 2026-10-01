@@ -3,10 +3,11 @@
  * services once, wires each area with the services it declares, and
  * assembles the host capability from the areas' API slices. No behavior
  * lives here: every verb and read has a home in `submit/`, `scripting/`,
- * `dispatch/` or `lifecycle/`. The plugin keeps no session state; its live
- * data (policy, ports, queue, latches) are resources of the areas.
+ * `dispatch/` or `lifecycle/`. The plugin keeps no session state: its rules
+ * are its settings, and its live data (ports, queue, latches) are resources
+ * of the areas.
  */
-import { composeApi, type PluginContext } from '@embedpdf/core';
+import { composeApi } from '@embedpdf/core';
 
 import type { ActionsConfig } from './contract';
 import type { DispatchCore } from './dispatch/core';
@@ -20,12 +21,17 @@ import { createPageLifecycle } from './lifecycle/page-lifecycle';
 import { registerScriptExecutor } from './scripting/executor';
 import { createRealm } from './scripting/realm';
 import { createScriptSurface } from './scripting/surface';
-import { createServices } from './services';
+import { createServices, type ActionsContext } from './services';
 import { createSubmit } from './submit/perform';
 
-export function createActionsController(ctx: PluginContext<void>, config: ActionsConfig = {}) {
-  const services = createServices(ctx, config);
-  const { events, policy, ports } = services;
+/**
+ * `config` is what the app registered; the settings in it reach the
+ * controller through `ctx.settings()`, and only the script environment is
+ * read from it here.
+ */
+export function createActionsController(ctx: ActionsContext, config: ActionsConfig = {}) {
+  const services = createServices(ctx);
+  const { events, ports, settings } = services;
 
   // The lifecycle areas dispatch and run trees through the dispatcher that
   // is assembled last, bound late and explicitly (see `dispatch/core.ts`).
@@ -34,13 +40,14 @@ export function createActionsController(ctx: PluginContext<void>, config: Action
     runAndEmit: (tree, actionContext) => dispatcher.runAndEmit(tree, actionContext),
   };
 
-  const submit = createSubmit(ctx, services, config);
-  const realm = createRealm(ctx, services, config);
+  const environment = config.javascript ?? {};
+  const submit = createSubmit(ctx, services, environment);
+  const realm = createRealm(ctx, services, environment);
   const surface = createScriptSurface(services, submit);
-  const pageLifecycle = createPageLifecycle(ctx, services, config, core);
-  const openSequence = createOpenSequence(services, config, pageLifecycle, core);
-  const documentEvents = createDocumentEvents(services, config, openSequence, core);
-  const triggers = createTriggers(ctx, config);
+  const pageLifecycle = createPageLifecycle(ctx, services, core);
+  const openSequence = createOpenSequence(services, pageLifecycle, core);
+  const documentEvents = createDocumentEvents(services, openSequence, core);
+  const triggers = createTriggers(ctx, services);
   const runner = createRunner(ctx, services, submit, documentEvents);
   const dispatcher = createDispatcher(
     ctx,
@@ -50,10 +57,10 @@ export function createActionsController(ctx: PluginContext<void>, config: Action
     openSequence,
     documentEvents,
   );
-  registerScriptExecutor(ctx, services, config, realm, submit, surface, documentEvents);
+  registerScriptExecutor(ctx, services, environment, realm, submit, surface, documentEvents);
 
   const api: ActionsHostCapability = composeApi('actions', [
-    policy.api,
+    settings.api,
     ports.api,
     realm.api,
     surface.api,
@@ -62,11 +69,11 @@ export function createActionsController(ctx: PluginContext<void>, config: Action
     documentEvents.api,
     dispatcher.api,
     {
-      onExecuted: events.actionHook.on,
-      onDiagnostic: events.diagnosticHook.on,
-      onScriptDiagnostic: events.scriptDiagnosticHook.on,
-      onScriptError: events.scriptErrorHook.on,
-      onOpenSequenceCompleted: events.openSequenceHook.on,
+      onExecuted: events.executed.on,
+      onDiagnosticReported: events.diagnosticReported.on,
+      onScriptDiagnosticReported: events.scriptDiagnosticReported.on,
+      onScriptFailed: events.scriptFailed.on,
+      onOpenSequenceCompleted: events.openSequenceCompleted.on,
     },
   ]);
 
@@ -79,6 +86,9 @@ export function createActionsController(ctx: PluginContext<void>, config: Action
       // Fires the open sequence at once for 'headless', releases the page
       // barrier for 'off', and waits for an adapter or user activity for 'auto'.
       openSequence.arm();
+      // The document's save actions (/WS, /DS) run around every download of its file, so
+      // what WillSave changes is in the bytes.
+      ctx.aroundDownload((read) => documentEvents.api.runDocumentVerb('save', read));
     },
   };
 }

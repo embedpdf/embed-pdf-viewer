@@ -11,8 +11,7 @@
  * slot. The pixels are the shared <StripBar>.
  */
 import { useEffect } from 'react';
-import { AnnotationMenu } from '@embedpdf/react/annotation-menu';
-import { useAnnotationSelection } from '@embedpdf/react/annotation';
+import { AnnotationMenu, useAnnotationState } from '@embedpdf/react/annotation';
 import { useSurface } from '@embedpdf/react/shell';
 import { useStripView } from '@embedpdf/react/toolbar';
 import { useT } from '@embedpdf/react/i18n';
@@ -26,7 +25,7 @@ export function AnnotationStrip() {
   // The link editor popover rides the same anchor and replaces the strip
   // while open — one anchored card at a time, on the projector.
   const editor = useSurface('link-editor');
-  const selection = useAnnotationSelection();
+  const selection = useAnnotationState((state) => state.selected);
   // A stale editor never outlives its selection.
   useEffect(() => {
     if (!selection.length && editor.isOpen) editor.close();

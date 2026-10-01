@@ -90,10 +90,37 @@ export function matchShortcut(
   );
 }
 
-/** Display form for menu rows: '⌘K' on mac, 'Ctrl+K' elsewhere. */
+/**
+ * How a key shows, by its lowercase name, where that isn't the name itself:
+ * on a Mac, then elsewhere. Matches what each platform's own menus show.
+ */
+const KEY_NAMES: Readonly<Record<string, readonly [mac: string, other: string]>> = {
+  arrowleft: ['←', '←'],
+  arrowright: ['→', '→'],
+  arrowup: ['↑', '↑'],
+  arrowdown: ['↓', '↓'],
+  backspace: ['⌫', 'Backspace'],
+  delete: ['⌦', 'Delete'],
+  enter: ['↩', 'Enter'],
+  escape: ['Esc', 'Esc'],
+  tab: ['⇥', 'Tab'],
+  ' ': ['Space', 'Space'],
+  space: ['Space', 'Space'],
+  pageup: ['Page Up', 'Page Up'],
+  pagedown: ['Page Down', 'Page Down'],
+  numpadadd: ['Num +', 'Num +'],
+  numpadsubtract: ['Num -', 'Num -'],
+};
+
+/** A shortcut as a menu or a tooltip shows it: `'⌘K'` on a Mac, `'Ctrl+K'` elsewhere. */
 export function formatShortcut(shortcut: string, options: { isMac: boolean }): string {
   const parsed = parseShortcut(shortcut);
-  const key = parsed.key.length === 1 ? parsed.key.toUpperCase() : capitalize(parsed.key);
+  const named = KEY_NAMES[parsed.key];
+  const key = named
+    ? named[options.isMac ? 0 : 1]
+    : parsed.key.length === 1
+      ? parsed.key.toUpperCase()
+      : capitalize(parsed.key);
   if (options.isMac) {
     const mods = [
       parsed.ctrl ? '⌃' : '',

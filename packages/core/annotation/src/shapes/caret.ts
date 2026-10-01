@@ -5,7 +5,7 @@
  * line. The caret follows its text: no gesture resizes or turns it, though
  * straightening clears its turn.
  */
-import type { AnnotationDTO } from '@embedpdf/engine-core/runtime';
+import type { Annotation } from '@embedpdf/engine-core/runtime';
 
 import { bodyPieces } from '../painted';
 import { normalizeDeg, rectCenter, rotatedAabb } from '../rect';
@@ -19,8 +19,8 @@ export interface CaretShape extends TurnedBox {
 }
 
 /** A caret's shape, read off its annotation. */
-function readCaret(annotation: AnnotationDTO): CaretShape {
-  const { box, rotation } = annotation as Extract<AnnotationDTO, { subtype: 'caret' }>;
+function readCaret(annotation: Annotation): CaretShape {
+  const { box, rotation } = annotation as Extract<Annotation, { subtype: 'caret' }>;
   return { kind: 'caret', box, rotation: rotation ?? 0 };
 }
 

@@ -38,7 +38,7 @@ changed: ({ cause, event, previous, next }) => {
   const { origin } = event;
   switch (event.type) {
     case 'forms.valueSet':
-      events.valueChanged.emit({ ref: event.field.ref, field: event.field, origin });
+      events.valueChanged.emit({ field: event.field, origin });
       return;
     // …
   }
@@ -98,8 +98,9 @@ not an `EventOrigin`.
 
 - An event fires from exactly one place.
 - A verb never emits a fact or state-change event.
-- A session value a getter returns is announced by a state-change event,
-  never by an occurrence, even when the value is an operation's progress.
+- When a session value a getter returns is announced, it's by a state-change
+  event, never by an occurrence, even when the value is an operation's
+  progress. Not every value needs an event: the state hook follows them all.
 - A refusal before an operation started fires nothing: it only rejects. An
   operation's failure event (`onFailed`) is for work that started.
 - Loads and reloads are announced once, as `onResynced`. They never produce
@@ -215,4 +216,4 @@ A subscriber that cares about the new content reads it through the getters.
 
 The kernel's own document lifecycle events live on the documents capability
 (`DocumentsToken`): `onOpened`, `onOpenFailed`, `onLocked`, `onClosed`,
-`onActiveChanged` and `onPagesChanged`.
+`onActiveChanged`, `onPagesChanged` and `onUnsavedChangesChanged`.

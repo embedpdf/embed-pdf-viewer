@@ -22,6 +22,10 @@ export type {
 } from './settings';
 export { defineState, shallowEqual } from './state';
 export type { StateDeclaration } from './state';
+export { documentState, documentsState } from './documents-state';
+export type { DocumentsState } from './documents-state';
+export { VIEWER_DEFAULTS } from './viewer-settings';
+export type { ViewerPageSettings, ViewerSettings } from './viewer-settings';
 export type { SliceChange } from './store';
 export type { SliceLease } from './store';
 export { CancelledError, isCancelled } from './scope';

@@ -21,5 +21,5 @@ export const square = defineKind({
     hasFill: true,
     hasCloudy: true,
   },
-  fields: SHAPE_FIELDS,
+  properties: SHAPE_FIELDS,
 });

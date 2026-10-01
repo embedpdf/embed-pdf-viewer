@@ -14,7 +14,6 @@ import type {
   ActionContext,
   ActionDiagnostic,
   ActionsCapability,
-  ActionsConfig,
   ActionStepResult,
   ActionTriggerResult,
 } from '../contract';
@@ -24,12 +23,13 @@ import type { ActionsServices } from '../services';
 import type { ActionsPageLifecycle } from './page-lifecycle';
 
 export function createOpenSequence(
-  services: Pick<ActionsServices, 'events' | 'catalog' | 'queue' | 'ports'>,
-  config: ActionsConfig,
+  services: Pick<ActionsServices, 'events' | 'catalog' | 'queue' | 'ports' | 'settings'>,
   { releaseBarrier, resetCascade }: Pick<ActionsPageLifecycle, 'releaseBarrier' | 'resetCascade'>,
   { runAndEmit }: DispatchCore,
 ) {
-  const { diagnosticHook, openSequenceHook } = services.events;
+  const { reportDiagnostic, openSequenceCompleted } = services.events;
+  /** The `openSequence` setting, read when it decides: it applies until the sequence has run. */
+  const mode = () => services.settings.get().openSequence;
   const { readDocumentActions } = services.catalog;
   const { enqueue } = services.queue;
   const ports = services.ports.slots;
@@ -81,7 +81,7 @@ export function createOpenSequence(
         message: `open sequence failed: ${error instanceof Error ? error.message : String(error)}`,
       };
       diagnostics.push(diagnostic);
-      diagnosticHook.emit(diagnostic);
+      reportDiagnostic(diagnostic, { source: { kind: 'document' } });
     } finally {
       // Release after the document steps, on every path; page-open emission
       // enqueues behind this operation (never awaited here: awaiting our own
@@ -89,7 +89,7 @@ export function createOpenSequence(
       releaseBarrier(true);
     }
     const result = foldSteps(steps, diagnostics);
-    openSequenceHook.emit({ result });
+    openSequenceCompleted.emit({ result });
     return result;
   };
 
@@ -101,20 +101,20 @@ export function createOpenSequence(
    * is catalog-level.
    */
   const ensureOpenSequenceBeforeDocEvent = async (): Promise<void> => {
-    if (openFired || config.openSequence === 'off') return;
+    if (openFired || mode() === 'off') return;
     openFired = true;
     await runOpenSequenceOp();
   };
 
   const maybeFireOpenSequence = (): void => {
     if (openFired) return;
-    if (config.openSequence === 'off') {
+    if (mode() === 'off') {
       // The sequence never runs, but feeds must not buffer forever.
       openFired = true;
       releaseBarrier(false);
       return;
     }
-    if (!ports.uiAdapter && config.openSequence !== 'headless' && !sawUserActivity) return;
+    if (!ports.uiAdapter && mode() !== 'headless' && !sawUserActivity) return;
     openFired = true;
     void enqueue(() => runOpenSequenceOp());
   };

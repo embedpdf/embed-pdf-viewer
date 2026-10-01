@@ -1,6 +1,6 @@
 /**
  * Closed-world string catalog of annotation subtypes the wire format knows
- * about. The TypeScript discriminated union `AnnotationDTO` is keyed on this
+ * about. The TypeScript discriminated union `Annotation` is keyed on this
  * literal type. PDFium's integer subtype code is mapped onto these strings
  * by the reader registry.
  *

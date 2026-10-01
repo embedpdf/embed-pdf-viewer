@@ -1,6 +1,6 @@
 import type { AnnotationListMutationMeta } from './AnnotationListMutationMeta';
 import type { AppearanceOutcome } from '../annotation/appearance';
-import type { AnnotationDTO } from '../annotation/kinds';
+import type { Annotation } from '../annotation/kinds';
 import type { AnnotationStableId } from '../identity/AnnotationStableId';
 import type { Coordinates, PageCoordinates } from '../pageSpace/coordinates';
 
@@ -11,7 +11,7 @@ import type { Coordinates, PageCoordinates } from '../pageSpace/coordinates';
  * object) and reads it back via `EPDFPage_GetAnnotByObjectNumber`.
  */
 export interface AnnotationCreateResult<C extends Coordinates = PageCoordinates> {
-  annotation: AnnotationDTO<C>;
+  annotation: Annotation<C>;
   meta: AnnotationListMutationMeta;
 }
 
@@ -39,7 +39,7 @@ export interface AnnotationUpdateResult<C extends Coordinates = PageCoordinates>
    * intentionally no `patch.nm` — a stable id that callers can rename
    * mid-session is not stable.
    */
-  annotation: AnnotationDTO<C>;
+  annotation: Annotation<C>;
   /**
    * The engine's appearance verdict for this update (see
    * {@link AppearanceOutcome}). Clients drive raster invalidation off
@@ -91,7 +91,7 @@ export interface AnnotationMoveResult<C extends Coordinates = PageCoordinates> {
    * `annotations[i]` is the post-move DTO of `refs[i]`, and lives at index
    * `toIndex + i` in the page's /Annots array.
    */
-  annotations: AnnotationDTO<C>[];
+  annotations: Annotation<C>[];
   /**
    * One structural envelope per batch. One revision bump, one impact
    * computation, regardless of `refs.length`. `meta.changed` lists the

@@ -1,8 +1,8 @@
 import type {
   AnnotationBase,
   PdfPoint,
-  PolygonAnnotationDTO,
-  PolylineAnnotationDTO,
+  PolygonAnnotation,
+  PolylineAnnotation,
   VertexAnnotationFields,
   PdfCoordinates,
 } from '@embedpdf/engine-core/runtime';
@@ -46,7 +46,7 @@ export function readPolygon(
   mem: PdfRuntimeMemory,
   annotPtr: Ptr,
   base: AnnotationBase<PdfCoordinates>,
-): PolygonAnnotationDTO<PdfCoordinates> {
+): PolygonAnnotation<PdfCoordinates> {
   const { captionEnabled, captionCenter, ...geometry } = readVertexGeometry(fn, mem, annotPtr);
   const intent = readIntent(fn, mem, annotPtr);
   return {
@@ -69,7 +69,7 @@ export function readPolyline(
   mem: PdfRuntimeMemory,
   annotPtr: Ptr,
   base: AnnotationBase<PdfCoordinates>,
-): PolylineAnnotationDTO<PdfCoordinates> {
+): PolylineAnnotation<PdfCoordinates> {
   const { captionEnabled, captionCenter, ...geometry } = readVertexGeometry(fn, mem, annotPtr);
   const intent = readIntent(fn, mem, annotPtr);
   return {

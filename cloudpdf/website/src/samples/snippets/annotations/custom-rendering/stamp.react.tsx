@@ -19,11 +19,13 @@ function ApprovalStamp({ annotation, box, page, native, interactive }: Annotatio
   const { x, y, width, height } = page.transform.pageToViewRect(box);
 
   return (
-    <div style={{ position: 'absolute', left: x, top: y, width, height }}>
+    <>
       {native}
-      <StatusDot status={approval.status} />
-      {interactive && <button onClick={approval.open}>Details</button>}
-    </div>
+      <div style={{ position: 'absolute', left: x, top: y, width, height }}>
+        <StatusDot status={approval.status} />
+        {interactive && <button onClick={approval.open}>Details</button>}
+      </div>
+    </>
   );
 }
 

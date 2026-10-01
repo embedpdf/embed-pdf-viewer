@@ -4,8 +4,9 @@
  * five document events share one memoized read; a rejected read is evicted,
  * so a transient failure cannot poison every later lifecycle event.
  */
-import type { PluginContext } from '@embedpdf/core';
 import type { DocumentActionsSnapshot } from '@embedpdf/engine-core/runtime';
+
+import type { ActionsContext } from './context';
 
 /** The ISO 32000-2 Table 200 key for each verb-shaped document trigger event. */
 const DOC_EVENT_TREES = {
@@ -16,7 +17,7 @@ const DOC_EVENT_TREES = {
   'will-close': 'willClose',
 } as const;
 
-export function createCatalog(ctx: PluginContext<void>) {
+export function createCatalog(ctx: ActionsContext) {
   let snapshotRead: Promise<DocumentActionsSnapshot | null> | null = null;
   const readDocumentActions = (): Promise<DocumentActionsSnapshot | null> => {
     if (!snapshotRead) {

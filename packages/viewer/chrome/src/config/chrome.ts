@@ -17,8 +17,8 @@ import {
 } from '@embedpdf/react/toolbar';
 
 // Reused across every mode band — plain values, so composition is just a const.
-const style = group('style', { importance: 4 }, [item('panel:annotation-style')]);
-const history = group('history', { importance: 3 }, ['history:undo', 'history:redo']);
+const style = group('style', [item('panel:annotation-style')], { importance: 4 });
+const history = group('history', ['history:undo', 'history:redo'], { importance: 3 });
 
 // ── main toolbar ─────────────────────────────────────────────────────────────
 const mainBar: BarSchema = {
@@ -27,30 +27,21 @@ const mainBar: BarSchema = {
     // The start section sits left-aligned — document menu, workspace, zoom
     // strip, pan/pointer. Only the mode tabs are truly centered.
     start: [
-      group('document', { importance: 5 }, [item('document:menu')]),
-      group('workspace', { importance: 4 }, [
-        item('panel:sidebar', { importance: 5 }),
-        item('page:settings'),
-      ]),
+      group('document', [item('document:menu')], { importance: 5 }),
+      group('workspace', [item('panel:sidebar', { importance: 5 }), item('page:settings')], {
+        importance: 4,
+      }),
       // The inline zoom strip; when it can't fit it renders its 'button'
       // variant, and in the overflow menu it projects through zoom:menu.
-      group('zoom', { importance: 4 }, [
-        custom('zoom-controls', { variants: ['inline', 'button'], terminal: 'zoom:menu' }),
-      ]),
-      group('tools', { importance: 2 }, ['pan:toggle', 'pointer:toggle']),
+      group('zoom', [custom('zoom-controls', 'zoom:menu', { variants: ['inline', 'button'] })], {
+        importance: 4,
+      }),
+      group('tools', ['pan:toggle', 'pointer:toggle'], { importance: 2 }),
     ],
     center: [
-      group('modes', {
-        role: 'tabs',
-        // The group ladder: full strip → trailing tabs shed behind a derived
-        // in-strip chevron → select → global overflow. Tab items at importance 1
-        // so the strip is the first thing to compact; the group at 4 so its
-        // compact forms survive long.
-        shed: true,
-        collapse: 'select',
-        importance: 4,
-        labelKey: 'commands.mode.group',
-        items: [
+      group(
+        'modes',
+        [
           item('mode:view', { variants: ['label'], importance: 1 }),
           item('mode:annotate', { variants: ['label'], importance: 1 }),
           item('mode:shapes', { variants: ['label'], importance: 1 }),
@@ -59,9 +50,20 @@ const mainBar: BarSchema = {
           item('mode:redact', { variants: ['label'], importance: 1 }),
           item('mode:measure', { variants: ['label'], importance: 1 }),
         ],
-      }),
+        {
+          role: 'tabs',
+          // The group ladder: full strip → trailing tabs shed behind a derived
+          // in-strip chevron → select → global overflow. Tab items at importance 1
+          // so the strip is the first thing to compact; the group at 4 so its
+          // compact forms survive long.
+          shed: true,
+          collapse: 'select',
+          importance: 4,
+          labelKey: 'commands.mode.group',
+        },
+      ),
     ],
-    end: [group('panels', { importance: 5 }, ['panel:search', 'panel:comment'])],
+    end: [group('panels', ['panel:search', 'panel:comment'], { importance: 5 })],
   },
 };
 
@@ -70,20 +72,28 @@ const annotateBar: BarSchema = {
   id: 'annotate',
   sections: {
     center: [
-      group('comment', { importance: 4 }, ['annotation:add-note', 'annotation:add-link']),
-      group('markup', { importance: 4 }, [
-        'annotation:add-highlight',
-        'annotation:add-strikeout',
-        'annotation:add-underline',
-        'annotation:add-squiggly',
-      ]),
-      group('draw', { importance: 3 }, ['annotation:add-ink', 'annotation:add-ink-highlight']),
-      group('text', { importance: 2 }, [
-        'annotation:add-text',
-        'annotation:add-insert-text',
-        'annotation:add-replace-text',
-        'annotation:add-callout',
-      ]),
+      group('comment', ['annotation:add-note', 'annotation:add-link'], { importance: 4 }),
+      group(
+        'markup',
+        [
+          'annotation:add-highlight',
+          'annotation:add-strikeout',
+          'annotation:add-underline',
+          'annotation:add-squiggly',
+        ],
+        { importance: 4 },
+      ),
+      group('draw', ['annotation:add-ink', 'annotation:add-ink-highlight'], { importance: 3 }),
+      group(
+        'text',
+        [
+          'annotation:add-text',
+          'annotation:add-insert-text',
+          'annotation:add-replace-text',
+          'annotation:add-callout',
+        ],
+        { importance: 2 },
+      ),
       style,
       history,
     ],
@@ -94,13 +104,17 @@ const shapesBar: BarSchema = {
   id: 'shapes',
   sections: {
     center: [
-      group('shapes', { importance: 4 }, [
-        'annotation:add-rectangle',
-        'annotation:add-circle',
-        'annotation:add-line',
-        'annotation:add-arrow',
-      ]),
-      group('polygons', { importance: 2 }, ['annotation:add-polygon', 'annotation:add-polyline']),
+      group(
+        'shapes',
+        [
+          'annotation:add-rectangle',
+          'annotation:add-circle',
+          'annotation:add-line',
+          'annotation:add-arrow',
+        ],
+        { importance: 4 },
+      ),
+      group('polygons', ['annotation:add-polygon', 'annotation:add-polyline'], { importance: 2 }),
       style,
       history,
     ],
@@ -111,15 +125,19 @@ const insertBar: BarSchema = {
   id: 'insert',
   sections: {
     center: [
-      group('stamps', { importance: 4 }, [
-        'insert:add-stamp',
-        // Quick marks (`stamps.toolbar`): thumbnails that arm on click; in a
-        // menu the stamps panel stands in for them.
-        custom('quick-stamps', { terminal: 'insert:add-stamp', importance: 3 }),
-        'insert:add-attachment',
-        'insert:add-signature',
-        'insert:add-image',
-      ]),
+      group(
+        'stamps',
+        [
+          'insert:add-stamp',
+          // Quick marks (`stamps.toolbar`): thumbnails that arm on click; in a
+          // menu the stamps panel stands in for them.
+          custom('quick-stamps', 'insert:add-stamp', { importance: 3 }),
+          'insert:add-attachment',
+          'insert:add-signature',
+          'insert:add-image',
+        ],
+        { importance: 4 },
+      ),
       style,
       history,
     ],
@@ -130,13 +148,11 @@ const formBar: BarSchema = {
   id: 'form',
   sections: {
     center: [
-      group('fields', { importance: 4 }, [
-        'form:add-textfield',
-        'form:add-checkbox',
-        'form:add-radio',
-      ]),
-      group('choice-fields', { importance: 2 }, ['form:add-select', 'form:add-listbox']),
-      group('signature-fields', { importance: 2 }, ['form:add-signature']),
+      group('fields', ['form:add-textfield', 'form:add-checkbox', 'form:add-radio'], {
+        importance: 4,
+      }),
+      group('choice-fields', ['form:add-select', 'form:add-listbox'], { importance: 2 }),
+      group('signature-fields', ['form:add-signature'], { importance: 2 }),
       history,
     ],
   },
@@ -146,15 +162,19 @@ const measureBar: BarSchema = {
   id: 'measure',
   sections: {
     center: [
-      group('measure', { importance: 5 }, [
-        'measurement:distance',
-        'measurement:perimeter',
-        'measurement:area',
-        'measurement:calibrate',
-      ]),
-      group('scale', { importance: 4 }, [
-        custom('measurement-scale', { variants: ['inline'], terminal: 'panel:measurement' }),
-      ]),
+      group(
+        'measure',
+        [
+          'measurement:distance',
+          'measurement:perimeter',
+          'measurement:area',
+          'measurement:calibrate',
+        ],
+        { importance: 5 },
+      ),
+      group('scale', [custom('measurement-scale', 'panel:measurement', { variants: ['inline'] })], {
+        importance: 4,
+      }),
       style,
     ],
   },
@@ -164,7 +184,7 @@ const redactBar: BarSchema = {
   id: 'redact',
   sections: {
     center: [
-      group('redact', { importance: 4 }, ['redaction:redact', 'panel:redaction']),
+      group('redact', ['redaction:redact', 'panel:redaction'], { importance: 4 }),
       style,
       history,
     ],
@@ -210,18 +230,22 @@ const annotationStrip: BarSchema = {
   id: 'annotation-strip',
   sections: {
     center: [
-      group('annotation-actions', { importance: 4 }, [
-        'annotation:comment',
-        'annotation:style',
-        'annotation:stamp-from-selection',
-        'annotation:link',
-        'annotation:goto-link',
-        'annotation:remove-link',
-        'annotation:group',
-        'annotation:ungroup',
-      ]),
+      group(
+        'annotation-actions',
+        [
+          'annotation:comment',
+          'annotation:style',
+          'annotation:stamp-from-selection',
+          'annotation:link',
+          'annotation:goto-link',
+          'annotation:remove-link',
+          'annotation:group',
+          'annotation:ungroup',
+        ],
+        { importance: 4 },
+      ),
       // Its own group → a derived separator; delete stands apart.
-      group('annotation-danger', { importance: 5 }, ['annotation:delete']),
+      group('annotation-danger', ['annotation:delete'], { importance: 5 }),
     ],
   },
 };
@@ -232,7 +256,7 @@ const annotationStrip: BarSchema = {
 const selectionStrip: BarSchema = {
   id: 'selection-strip',
   sections: {
-    center: [group('selection-actions', { importance: 4 }, ['selection:copy'])],
+    center: [group('selection-actions', ['selection:copy'], { importance: 4 })],
   },
 };
 

@@ -4,53 +4,87 @@
  * Each kind is declared in its own file in this folder; `index.ts` lists
  * them all.
  */
-import type { AnnotationDTO } from '@embedpdf/engine-core/runtime';
+import type { Annotation } from '@embedpdf/engine-core/runtime';
 
 import type { ShapeFamily } from '../shapes';
 import type { Style, TextStyle } from '../types';
 
+/** The flags an annotation carries, each a `flag` property of every kind. */
+export type FlagKey =
+  | 'invisible'
+  | 'hidden'
+  | 'print'
+  | 'noZoom'
+  | 'noRotate'
+  | 'noView'
+  | 'readOnly'
+  | 'locked'
+  | 'toggleNoView'
+  | 'lockedContents';
+
 /**
- * One editable field of a kind, as a UI contract: which engine field, rendered
- * how (the union arm fixes the control and its constraints), labelled what by
- * default. A property sidebar is a `switch (field.key)` over these; it reads
- * `values[field.key]` and writes `{ [field.key]: value }`, so each kind's
- * list is its property schema, kept in the library so every consumer gets it
- * for free.
+ * One property a style panel edits, as a UI contract: which field, edited
+ * with which control, labelled what by default. A panel switches on
+ * `control` (or on `key`, for a richer editor of its own), reads
+ * `values[property.key]` and writes `{ [property.key]: value }`, so each
+ * kind's list is its property schema, kept in the library so every consumer
+ * gets it for free.
  *
- * `key` is the engine's field name, with three exceptions: the border picker
- * reads and writes `borderStyle`, `dashArray` and `cloudyIntensity` together;
- * `bold`, `italic` and `underline` are the rich body's formatting; and `link`
- * is an attached link, not a field of the annotation.
+ * `key` is the engine's field name, with three exceptions: the border's
+ * `borderStyle` reads and writes `borderStyle`, `dashArray` and
+ * `cloudyIntensity` together; `bold`, `italic` and `underline` are the rich
+ * body's formatting; and `link` is an attached link, not a field of the
+ * annotation.
  *
- * `label` is a default (English) display name — apps with i18n map `key`s to
- * their own strings and ignore it. Array order is display order.
+ * `label` is a default (English) display name: apps with translations map
+ * `key`s to their own strings and ignore it. Array order is display order.
  */
-export type FieldSpec =
-  | { key: 'color'; label: string }
-  | { key: 'interiorColor'; label: string }
-  | { key: 'fontColor'; label: string }
-  | { key: 'opacity'; label: string; min: number; max: number; step: number }
-  | { key: 'strokeWidth'; label: string; min: number; max: number; step: number }
-  | { key: 'fontSize'; label: string; min: number; max: number; step: number }
-  /** Border picker over `borderStyle`, `dashArray` and `cloudyIntensity`;
+export type AnnotationProperty =
+  | {
+      readonly key: 'color' | 'interiorColor' | 'fontColor';
+      readonly control: 'color';
+      readonly label: string;
+    }
+  | {
+      readonly key: 'opacity' | 'strokeWidth' | 'fontSize';
+      readonly control: 'number';
+      readonly label: string;
+      readonly min: number;
+      readonly max: number;
+      readonly step: number;
+    }
+  /** The border over `borderStyle`, `dashArray` and `cloudyIntensity`;
    *  `cloudy` says whether this kind takes a cloudy border. */
-  | { key: 'borderStyle'; label: string; cloudy: boolean }
-  | { key: 'lineEndings'; label: string }
-  | { key: 'fontFamily'; label: string }
-  | { key: 'textAlign'; label: string }
-  /** Rich-text formatting toggles (free text): the body's formatting, or —
-   *  while the text editor has a range — that range's runs. */
-  | { key: 'bold'; label: string }
-  | { key: 'italic'; label: string }
-  | { key: 'underline'; label: string }
-  | { key: 'blendMode'; label: string }
-  /** `/Name` icon picker for icon kinds; `options` are the legal names. */
-  | { key: 'icon'; label: string; options: readonly string[] }
-  /** Link-target editor (URL / page destination). Declared by the link kind
-   *  (its own target) and by every kind that may carry an attached link;
-   *  kinds that omit it (widgets, caret, redact…) simply cannot be links —
-   *  menus never show the control. */
-  | { key: 'link'; label: string };
+  | {
+      readonly key: 'borderStyle';
+      readonly control: 'choice';
+      readonly label: string;
+      readonly options: readonly string[];
+      readonly cloudy: boolean;
+    }
+  /** A value from a list: line endings, a font, an alignment, a blend mode, an icon. */
+  | {
+      readonly key: 'lineEndings' | 'fontFamily' | 'textAlign' | 'blendMode' | 'icon';
+      readonly control: 'choice';
+      readonly label: string;
+      readonly options: readonly string[];
+    }
+  /** One of the annotation's flags, on or off. */
+  | { readonly key: FlagKey; readonly control: 'flag'; readonly label: string }
+  /** Free text, such as a redaction's label. */
+  | { readonly key: 'overlayText'; readonly control: 'text'; readonly label: string }
+  /** Bold, italic or underline of a text box: the body's formatting, or,
+   *  while the text editor has a range, that range's runs. */
+  | {
+      readonly key: 'bold' | 'italic' | 'underline';
+      readonly control: 'textFormat';
+      readonly label: string;
+      readonly format: 'bold' | 'italic' | 'underline';
+    }
+  /** Where it links to (a website or a page). Declared by the link kind (its
+   *  own target) and by every kind that may carry an attached link; kinds
+   *  that omit it (widgets, caret, redaction…) can't be links. */
+  | { readonly key: 'link'; readonly control: 'link'; readonly label: string };
 
 /** Orthogonal capability flags. Static data — the annotation's `/F` flags are
  *  the runtime overrides (a locked annotation is never transformable, a hidden
@@ -147,16 +181,19 @@ export interface AnnotationKind {
    * How it is drawn: its colours, stroke and border, read off the annotation
    * with its kind's fill-ins (`styles.ts`).
    */
-  readonly style: (annotation: AnnotationDTO) => Style;
+  readonly style: (annotation: Annotation) => Style;
   /**
    * How its text is set, for a kind with text: its font, size, colour and
    * alignment, read off the annotation (`texts.ts`).
    */
-  readonly text?: (annotation: AnnotationDTO) => TextStyle;
+  readonly text?: (annotation: Annotation) => TextStyle;
   /** What a user can do to it. The annotation's `/F` flags override these at runtime (flags.ts). */
   readonly caps: KindCaps;
-  /** What a sidebar edits, in display order, keyed by the engine's field names. */
-  readonly fields: readonly FieldSpec[];
+  /**
+   * What a style panel edits, in display order, keyed by the engine's field
+   * names. The flags every kind has are added by `propertiesOf`.
+   */
+  readonly properties: readonly AnnotationProperty[];
 }
 
 /**

@@ -154,7 +154,9 @@ describe("the Phase-3 gate: 02's hover colors", () => {
     ]);
     const before = harness.squareStyle();
     const scriptDiagnostics: string[] = [];
-    harness.actions.onDiagnostic((diagnostic) => scriptDiagnostics.push(`${diagnostic.code}`));
+    harness.actions.onDiagnosticReported((diagnostic) =>
+      scriptDiagnostics.push(`${diagnostic.code}`),
+    );
 
     harness.notify('cursorEnter');
     await harness.drain();

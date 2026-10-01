@@ -2,20 +2,21 @@ import { describe, expect, it } from 'vitest';
 
 import {
   addTranslations,
-  failLocaleLoad,
+  endLocaleLoad,
   initialI18nState,
   nestKeys,
   registerLocale,
+  seedFromSettings,
   setLocale,
   startLocaleLoad,
   unregisterLocale,
   type I18nState,
 } from '../src/model';
+import { I18N_DEFAULTS, type I18nSettings } from '../src/contract';
 import { ar, en, es } from './fixtures';
 
 const stateWith = (overrides: Partial<I18nState> = {}): I18nState => ({
   locale: 'es',
-  fallbackLocale: 'en',
   locales: { en, es },
   loading: null,
   waitingTranslations: {},
@@ -23,21 +24,29 @@ const stateWith = (overrides: Partial<I18nState> = {}): I18nState => ({
 });
 
 describe('i18n transitions', () => {
-  it('seeds from config: eager packs registered, locale defaulted', () => {
-    const state = initialI18nState({ locales: [en, es], locale: 'es' });
-    expect(state.locale).toBe('es');
-    expect(state.fallbackLocale).toBe('en');
-    expect(Object.keys(state.locales)).toEqual(['en', 'es']);
-    expect(state.loading).toBeNull();
+  const settingsWith = (changes: Partial<I18nSettings>): I18nSettings => ({
+    ...I18N_DEFAULTS,
+    ...changes,
   });
 
-  it('seeds loading when the startup locale is a lazy pack', () => {
-    const state = initialI18nState({
-      locales: [en],
-      locale: 'ar',
-      loaders: { ar: async () => ar },
-    });
-    expect(state.locale).toBe('ar'); // t() falls back to en until the pack lands
+  it('seeds from the settings: their languages loaded, the start language current', () => {
+    const state = seedFromSettings(
+      initialI18nState(),
+      settingsWith({ locales: [en, es], locale: 'es' }),
+    );
+    expect(state.locale).toBe('es');
+    expect(Object.keys(state.locales)).toEqual(['en', 'es']);
+    expect(state.loading).toBeNull();
+    const fallback = seedFromSettings(initialI18nState(), settingsWith({ locales: [en] }));
+    expect(fallback.locale).toBe('en');
+  });
+
+  it('shows the fallback language while a start language from loaders loads', () => {
+    const state = seedFromSettings(
+      initialI18nState(),
+      settingsWith({ locales: [en], locale: 'ar', loaders: { ar: async () => ar } }),
+    );
+    expect(state.locale).toBe('en');
     expect(state.loading).toBe('ar');
   });
 
@@ -60,14 +69,14 @@ describe('i18n transitions', () => {
     state = registerLocale(state, ar);
     state = setLocale(state, 'ar');
     expect(state.locale).toBe('ar');
-    expect(state.locales['ar'].dir).toBe('rtl');
+    expect(state.locales['ar'].direction).toBe('rtl');
     expect(state.loading).toBeNull();
   });
 
-  it('ends a load on failure only for the code in flight', () => {
+  it('ends a load only for the code in flight', () => {
     const state = stateWith({ loading: 'ar' });
-    expect(failLocaleLoad(state, 'fr')).toBe(state);
-    expect(failLocaleLoad(state, 'ar').loading).toBeNull();
+    expect(endLocaleLoad(state, 'fr')).toBe(state);
+    expect(endLocaleLoad(state, 'ar').loading).toBeNull();
   });
 
   it('unregisters a pack, changing nothing for an unknown code', () => {

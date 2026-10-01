@@ -1,7 +1,7 @@
 import type {
   AnnotationBase,
   Color,
-  RedactAnnotationDTO,
+  RedactAnnotation,
   PdfCoordinates,
 } from '@embedpdf/engine-core/runtime';
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
@@ -40,7 +40,7 @@ export function readRedact(
   base: AnnotationBase<PdfCoordinates>,
   _subtypeCode?: number,
   ctx?: AnnotationReadContext,
-): RedactAnnotationDTO<PdfCoordinates> {
+): RedactAnnotation<PdfCoordinates> {
   const color =
     readAnnotColor(fn, mem, annotPtr, FPDFANNOT_COLORTYPE.Color) ?? DEFAULT_REDACT_COLOR;
   const ca = readAnnotOpacity(fn, mem, annotPtr);

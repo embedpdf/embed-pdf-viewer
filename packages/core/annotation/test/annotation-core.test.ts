@@ -3,7 +3,7 @@ import { quadFromRect } from '@embedpdf/core-geometry';
 import {
   ANNOTATION_DEFAULTS,
   toPageRef,
-  type AnnotationDTO,
+  type Annotation,
   type AnnotationFlags,
 } from '@embedpdf/engine-core/runtime';
 import { describe, expect, it } from 'vitest';
@@ -85,6 +85,7 @@ import {
   toolAnnotation,
 } from '../src/update';
 import {
+  annotationAnchor,
   chrome,
   creationDraftAnchor,
   pageItems,
@@ -2331,7 +2332,7 @@ describe('annotation-core callout', () => {
       calloutPtr('down', 220, 180),
       calloutPtr('up', 220, 180),
     ]);
-    model = { ...model, snap: { ...model.snap, guides: false } };
+    model = { ...model, snap: { ...model.snap, alignment: false } };
     const a0 = model.byId[model.order[0]];
     const a0Geometry = shapeOf(a0.annotation);
     if (a0Geometry.kind !== 'text-box' || !a0Geometry.calloutLine)
@@ -3306,7 +3307,7 @@ describe('page-bound gestures', () => {
     // against page 2: y≈18 (page-2-local, near its top).
     // Guides off: this tests the frame rule, and the (10,10) move below would
     // otherwise land the centre within snap range of the page centre.
-    const seeded = { ...nearBottom(), snap: { ...initialModel.snap, guides: false } };
+    const seeded = { ...nearBottom(), snap: { ...initialModel.snap, alignment: false } };
     let model = run(seeded, [edit('down', 270, 710)]);
     expect(moveDraft(model)).toBeTruthy();
     model = run(model, [edit('move', 270, 18, PAGE2)]);
@@ -3399,7 +3400,7 @@ describe('page-bound gestures', () => {
 
 /* ── snapping: alignment guides (move) + rotation snap ──────────────────────
  * Guides: the moving selection's edges/centers snap to other annotations on the
- * page (and the page box) within `snap.guideThreshold`, nudging the delta and
+ * page (and the page box) within `snap.alignmentThreshold`, nudging the delta and
  * reporting guide lines. Rotation: the selection's absolute angle locks onto
  * `snap.rotationAngles` within `snap.rotationThreshold`. Shift bypasses both.
  */
@@ -3503,7 +3504,45 @@ describe('annotation-core — snapping', () => {
     expect(chrome(model, PAGE).some((node) => node.kind === 'guide')).toBe(false); // cleared
   });
 
-  it('shift bypasses guide snapping; setSnap({guides:false}) disables it', () => {
+  it('a moved selection has no menu anchor, and its handles say what they reshape', () => {
+    const m0 = seeded(seededSquare('s1', { x: 100, y: 100, width: 100, height: 100 }));
+    const selected = run(m0, [editPtr('down', 100, 150), editPtr('up', 100, 150)]);
+    expect(selectionAnchor(selected)).not.toBeNull();
+    const roles = chrome(selected, PAGE).flatMap((node) =>
+      node.kind === 'handle' ? [node.role] : [],
+    );
+    expect(roles.filter((role) => role === 'corner')).toHaveLength(4);
+    expect(roles.filter((role) => role === 'side')).toHaveLength(4);
+    const dragging = run(selected, [editPtr('down', 100, 150), editPtr('move', 140, 150)]);
+    expect(selectionAnchor(dragging)).toBeNull(); // the menu hides while it moves
+    // An annotation's own anchor follows the move as it happens.
+    expect(annotationAnchor(dragging, 's1')?.bounds.x).toBeGreaterThan(
+      annotationAnchor(selected, 's1')!.bounds.x,
+    );
+    expect(annotationAnchor(dragging, 'nope')).toBeNull();
+  });
+
+  it('the alignment threshold is screen pixels: each sample converts it by its scale', () => {
+    const m0 = seeded(
+      seededSquare('s1', { x: 100, y: 100, width: 100, height: 100 }),
+      seededSquare('s2', { x: 300, y: 300, width: 50, height: 50 }),
+    );
+    // s2's left edge ends 4 units from s1's right edge (200).
+    const movedTo = (scale?: number) =>
+      run(m0, [
+        editPtr('down', 300, 325),
+        {
+          type: 'editPointer',
+          phase: 'move',
+          in: { page: PAGE, point: { x: 204, y: 325 }, shift: false, ...(scale ? { scale } : {}) },
+        },
+      ]);
+    expect(moveDraft(movedTo())!.guides).toHaveLength(1); // no scale: 6 page units
+    expect(moveDraft(movedTo(1))!.guides).toHaveLength(1);
+    expect(moveDraft(movedTo(2))!.guides).toEqual([]); // 6 px are 3 units at 2×
+  });
+
+  it('shift bypasses guide snapping; setSnap({ alignment: false }) disables it', () => {
     const m0 = seeded(
       seededSquare('s1', { x: 100, y: 100, width: 100, height: 100 }),
       seededSquare('s2', { x: 300, y: 300, width: 50, height: 50 }),
@@ -3512,8 +3551,8 @@ describe('annotation-core — snapping', () => {
     expect(moveDraft(shifted)!.delta).toEqual({ x: -97, y: 0 });
     expect(moveDraft(shifted)!.guides).toEqual([]);
 
-    const off = step(m0, { type: 'setSnap', patch: { guides: false } })[0];
-    expect(off.snap.guides).toBe(false);
+    const off = step(m0, { type: 'setSnap', patch: { alignment: false } })[0];
+    expect(off.snap.alignment).toBe(false);
     const dragged = run(off, [editPtr('down', 300, 325), editPtr('move', 203, 325)]);
     expect(moveDraft(dragged)!.delta).toEqual({ x: -97, y: 0 });
     expect(moveDraft(dragged)!.guides).toEqual([]);
@@ -4145,7 +4184,7 @@ describe('upright creation (counter-rotating the display rotation)', () => {
     x: number,
     y: number,
     extra: { displayRotation?: 0 | 90 | 180 | 270; upright?: boolean } = {},
-  ): Message => ({
+  ): Extract<Message, { type: 'createPointer' }> => ({
     type: 'createPointer',
     phase,
     subtype,
@@ -4712,7 +4751,7 @@ describe('conversation plane — replies and review states never reach the page'
       ...over,
     });
   const stateData = (state: string | null, stateModel: string | null) =>
-    ({ state, stateModel }) as Partial<AnnotationDTO>;
+    ({ state, stateModel }) as Partial<Annotation>;
 
   const root = annotation('root', {});
   const reply = annotation('reply', {

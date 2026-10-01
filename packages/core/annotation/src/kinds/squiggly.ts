@@ -13,5 +13,5 @@ export const squiggly = defineKind({
   family: quadsFamily,
   style: markupStyle,
   caps: { ...NO_CAPS, paintsBeneath: true, selectable: true, anchored: true, commentable: true },
-  fields: MARKUP_FIELDS,
+  properties: MARKUP_FIELDS,
 });

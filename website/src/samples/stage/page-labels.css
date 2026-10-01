@@ -1,31 +1,10 @@
-/* Colors, for light and dark */
+/* Colors */
 :root {
   --muted: #5a6b92;
-  --label: #6b7b9d;
+  --label: #5a6b92;
   --line: #e6eaf2;
   --canvas: #f7f9fc;
   --shadow: rgb(7 32 76 / 0.04);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --muted: #93a3c7;
-    --label: #93a3c7;
-    --line: #27365f;
-    --canvas: #0b1328;
-    --shadow: rgb(0 0 0 / 0.3);
-  }
-}
-
-/* The pages */
-.stage {
-  height: 460px;
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  background: var(--canvas);
-  box-shadow:
-    0 1px 2px var(--shadow),
-    0 18px 40px -28px rgb(7 32 76 / 0.28);
 }
 
 /* The label, in the band reserved below each page */
@@ -41,6 +20,17 @@
   font-weight: 600;
   color: var(--label);
   font-variant-numeric: tabular-nums;
+}
+
+/* The pages */
+.stage {
+  height: 420px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--canvas);
+  box-shadow:
+    0 1px 2px var(--shadow),
+    0 18px 40px -28px rgb(7 32 76 / 0.28);
 }
 
 .loading {

@@ -23,10 +23,11 @@ import type { StageCameraWrite } from '../camera/write';
 import type { StageHostCapability } from '../host-contract';
 import { patchSettings, setCursor, type StageState } from '../model';
 import type { StageServices } from '../services';
+import { whenPlaced } from '../services/placement-latch';
 
 export function createArrival(
   ctx: PluginContext<StageState>,
-  { scene }: Pick<StageServices, 'scene'>,
+  { scene, placement }: Pick<StageServices, 'scene' | 'placement'>,
   { writeCamera, markCause }: Pick<StageCameraWrite, 'writeCamera' | 'markCause'>,
   { cancelAnimation, animateTo }: Pick<StageAnimation, 'cancelAnimation' | 'animateTo'>,
 ) {
@@ -190,15 +191,17 @@ export function createArrival(
     api: {
       goToPage: (page, options) => {
         const index = indexOfTarget(page);
-        if (index !== null) goToTarget(index, options);
+        if (index !== null) whenPlaced(placement, options, (go) => goToTarget(index, go));
       },
-      goToFirstPage: (options) => goToTarget(0, options),
+      goToFirstPage: (options) => whenPlaced(placement, options, (go) => goToTarget(0, go)),
       goToLastPage: (options) =>
-        goToTarget(Math.max(0, (ctx.document()?.pageCount ?? 1) - 1), options),
+        whenPlaced(placement, options, (go) =>
+          goToTarget(Math.max(0, (ctx.document()?.pageCount ?? 1) - 1), go),
+        ),
       canGoNext: () => state().cursor < pageCount() - 1,
       canGoPrevious: () => state().cursor > 0,
-      nextPage: (options) => step(1, options),
-      previousPage: (options) => step(-1, options),
+      nextPage: (options) => whenPlaced(placement, options, (go) => step(1, go)),
+      previousPage: (options) => whenPlaced(placement, options, (go) => step(-1, go)),
       resetView,
     } satisfies Partial<StageHostCapability>,
   };

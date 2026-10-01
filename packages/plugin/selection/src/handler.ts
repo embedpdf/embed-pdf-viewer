@@ -4,14 +4,14 @@ import type {
   PlatformFeedback,
 } from '@embedpdf/plugin-interaction/contract/host';
 import type { PageRef } from '@embedpdf/engine-core/runtime';
+import { SELECTION_DEFAULTS } from './contract';
 import type { SelectionHostCapability } from './host-contract';
 
 const CURSOR_TOKEN = 'selection-text';
-/** Viewport px the pointer must move before a drag-select begins. */
-const DEFAULT_DRAG_THRESHOLD = 4;
 
 export interface TextSelectHandlerOptions {
-  dragThreshold?: number;
+  /** Viewport px the pointer must move before a drag-select begins, read when the drag would start. */
+  dragThreshold?: () => number;
 }
 
 /**
@@ -33,7 +33,7 @@ export function createTextSelectHandler(
   feedback?: PlatformFeedback,
   options: TextSelectHandlerOptions = {},
 ): InteractionHandler {
-  const dragThreshold = options.dragThreshold ?? DEFAULT_DRAG_THRESHOLD;
+  const dragThreshold = options.dragThreshold ?? (() => SELECTION_DEFAULTS.dragThreshold);
   // Per-gesture drag-threshold state (one active gesture at a time — the hub owner).
   let anchor: {
     page: PageRef;
@@ -88,7 +88,7 @@ export function createTextSelectHandler(
           sample.viewport.x - anchor.viewportX,
           sample.viewport.y - anchor.viewportY,
         );
-        if (travelled < dragThreshold) {
+        if (travelled < dragThreshold()) {
           return; // still a click, not a drag — select nothing yet
         }
         dragging = true;

@@ -3,9 +3,11 @@ import { describe, expect, it, vi } from 'vitest';
 import { AbortablePromise } from '@embedpdf/engine-core/runtime';
 import type { DocumentHandle, Engine, PageLayout } from '@embedpdf/engine-core/runtime';
 import { createKernel } from '../src/kernel';
-import { isCancelled } from '../src/scope';
+import { isPluginError } from '../src/errors';
 import type { AnyPlugin, PluginContext } from '../src/types';
 import { pageSpaceBoxesOf } from '@embedpdf/engine-core/runtime';
+
+const cancelled = (error: unknown) => isPluginError(error, 'operation-cancelled');
 
 /**
  * Interleaving tests for the session lifecycle: close/destroy racing every
@@ -121,7 +123,7 @@ describe('interleaving: close racing every open await', () => {
 
     await kernel.documents.close(kernel.documents.list()[0].id);
     fetchGate.open();
-    await expect(open).rejects.toSatisfy(isCancelled);
+    await expect(open).rejects.toSatisfy(cancelled);
     expect(kernel.documents.list()).toEqual([]);
   });
 
@@ -139,7 +141,7 @@ describe('interleaving: close racing every open await', () => {
     await kernel.documents.close(kernel.documents.list()[0].id);
     expect(seenSignal!.aborted).toBe(true); // a well-behaved fetch stops here
     fetchGate.open();
-    await expect(open).rejects.toSatisfy(isCancelled);
+    await expect(open).rejects.toSatisfy(cancelled);
   });
 
   it('close during an ABORTABLE engine.open: the worker-side work is aborted', async () => {
@@ -156,7 +158,7 @@ describe('interleaving: close racing every open await', () => {
 
     await kernel.documents.close('a');
     expect(abortedReason).not.toBeNull(); // close reached into the engine call
-    await expect(open).rejects.toSatisfy(isCancelled);
+    await expect(open).rejects.toSatisfy(cancelled);
     expect(kernel.documents.list()).toEqual([]);
   });
 
@@ -173,7 +175,7 @@ describe('interleaving: close racing every open await', () => {
     const closed = kernel.documents.close('a');
     listGate.open();
     await closed;
-    await expect(open).rejects.toSatisfy(isCancelled);
+    await expect(open).rejects.toSatisfy(cancelled);
     expect(close).toHaveBeenCalledTimes(1);
     expect(events.subscriberCount).toBe(0);
   });
@@ -206,7 +208,7 @@ describe('interleaving: close racing every open await', () => {
     expect(close).toHaveBeenCalledTimes(1);
     expect(events.subscriberCount).toBe(0);
     expect(Object.keys(kernel.getState().plugins)).toEqual([]); // no slice survived
-    await expect(open).rejects.toSatisfy(isCancelled);
+    await expect(open).rejects.toSatisfy(cancelled);
   });
 });
 
@@ -301,7 +303,7 @@ describe('interleaving: transactional open (publish-last)', () => {
     const { handle } = makeHandle('a');
     const open = kernel.documents.open(bytesInput('a'));
     resolve('a', handle);
-    const id = await open;
+    const { id } = (await open).document;
 
     kernel.capability<{ poke: () => void }>(observer.token as never, id).poke();
     expect(sane).toEqual(['saw it']); // sibling listener still ran
@@ -363,7 +365,7 @@ describe('interleaving: locked documents', () => {
     const closed = kernel.documents.close('a');
     unlockGate.open();
     await closed;
-    await expect(unlock).rejects.toSatisfy(isCancelled);
+    await expect(unlock).rejects.toSatisfy(cancelled);
     expect(close).toHaveBeenCalledTimes(1);
     expect(kernel.documents.list()).toEqual([]);
   });

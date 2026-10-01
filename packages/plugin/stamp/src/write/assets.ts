@@ -4,10 +4,19 @@
  * Removal deletes the page; relabel renames the registry entry. All through
  * the per-library mutation queue.
  */
+import type { OperationOptions } from '@embedpdf/core';
 import { resolveBinarySource, sniffBinaryMetadata } from '@embedpdf/engine-core/runtime';
 import type { AnnotationRef, PageRef } from '@embedpdf/engine-core/runtime';
 
-import type { AddAssetInput, StampAsset, StampAssetPreview, StampCapability } from '../contract';
+import type {
+  AddAssetInput,
+  AssetFromAnnotationsInput,
+  StampAsset,
+  StampAssetPatch,
+  StampAssetPreview,
+  StampCapability,
+  StampDocumentOptions,
+} from '../contract';
 import {
   assetIdFor,
   customStampName,
@@ -17,25 +26,38 @@ import {
 } from '../convention';
 import { addAsset, removeAsset, setAsset } from '../model';
 import type { StampContext, StampServices } from '../services';
-import { notFound, stampError, verb } from '../services/errors';
+import { notFound, permissionDenied, stampError, throwIfCancelled, verb } from '../services/errors';
 import type { StampLibraryWrites } from './libraries';
 import type { StampMarks } from './marks';
+import type { StampCatalog } from '../read/catalog';
 
 export function createAssetWrites(
   ctx: StampContext,
-  { events, binaries, assetEngine }: Pick<StampServices, 'events' | 'binaries' | 'assetEngine'>,
+  {
+    events,
+    binaries,
+    assetEngine,
+    targets,
+  }: Pick<StampServices, 'events' | 'binaries' | 'assetEngine' | 'targets'>,
   { resolveAssetSource }: StampMarks,
   { createLibrary }: Pick<StampLibraryWrites, 'createLibrary'>,
+  { canCreateFromAnnotations }: Pick<StampCatalog, 'canCreateFromAnnotations'>,
 ) {
   const { libraryChanged, assetCreated, assetUpdated, assetDeleted } = events;
   const { binaries: assetBinaries, libraryBinaries, ghostRenders, mutateLibrary } = binaries;
   const { openAssetDocument, renderThumbnail } = assetEngine;
+  const { targetOf, pageOf } = targets;
 
-  const createAsset = async (input: AddAssetInput): Promise<string> => {
+  const createAsset = async (
+    input: AddAssetInput,
+    options?: OperationOptions,
+  ): Promise<{ asset: StampAsset }> => {
+    const signal = options?.signal;
+    throwIfCancelled(signal);
     if (input.libraryId && !ctx.state.get().libraries[input.libraryId]) {
       throw notFound('library', input.libraryId);
     }
-    const resolved = await resolveAssetSource(input);
+    const resolved = await ctx.cancellable(signal, resolveAssetSource(input));
     const meta = sniffBinaryMetadata(resolved.bytes);
     if (!meta) {
       throw stampError('invalid-input', 'asset source must be PNG, JPEG, or single-page PDF bytes');
@@ -68,247 +90,291 @@ export function createAssetWrites(
     }
 
     // No library named: one of its own, named after the label.
-    const libraryId = input.libraryId ?? (await createLibrary(label));
+    const libraryId = input.libraryId ?? (await createLibrary(label, { signal })).library.id;
 
-    return mutateLibrary(libraryId, async () => {
-      const liveLibrary = ctx.state.get().libraries[libraryId];
-      if (!liveLibrary) {
-        throw stampError('not-found', `library '${libraryId}' no longer exists`);
-      }
-      const assetId = assetIdFor(liveLibrary.id, name);
-      if (ctx.state.get().assets[assetId]) {
-        throw stampError(
-          'invalid-input',
-          `library '${liveLibrary.name}' already has a stamp named '${name}'`,
-        );
-      }
-      const canonicalBytes = libraryBinaries.get(liveLibrary.id);
-      if (!canonicalBytes) {
-        throw stampError(
-          'operation-failed',
-          `canonical bytes are missing for library '${liveLibrary.id}'`,
-        );
-      }
-
-      const doc = await openAssetDocument(canonicalBytes);
-      let appended:
-        | {
-            asset: StampAsset;
-            bytes: Uint8Array;
-            preview: StampAssetPreview;
-            canonical: Uint8Array;
-          }
-        | undefined;
-      try {
-        let page: PageRef;
-        if (isPdf) {
-          const result = await doc.pages.insert(new Uint8Array(resolved.bytes));
-          if (result.insertedPages.length !== 1) {
-            throw stampError('invalid-input', 'a library asset must be a single-page PDF');
-          }
-          page = result.insertedPages[0];
-        } else {
-          // A raster becomes a page: a blank page the image's size, the image
-          // placed to fill it, flattened into content. From here on it is a
-          // page like any other: exportable, persistable, Acrobat-readable.
-          if (!doc.pages.flatten) {
-            throw stampError(
-              'unsupported',
-              'raster assets need an asset engine with pages.flatten',
-            );
-          }
-          const blank = await doc.pages.insertBlank({ size: rasterSize! });
-          page = blank.insertedPages[0];
-          await doc.page(page).annotations.create(
-            {
-              subtype: 'stamp',
-              box: { x: 0, y: 0, width: rasterSize!.width, height: rasterSize!.height },
-              fit: 'fill',
-            },
-            { appearance: new Uint8Array(resolved.bytes) },
+    return mutateLibrary(
+      libraryId,
+      async () => {
+        const liveLibrary = ctx.state.get().libraries[libraryId];
+        if (!liveLibrary) {
+          throw stampError('not-found', `library '${libraryId}' no longer exists`);
+        }
+        const assetId = assetIdFor(liveLibrary.id, name);
+        if (ctx.state.get().assets[assetId]) {
+          throw stampError(
+            'invalid-input',
+            `library '${liveLibrary.name}' already has a stamp named '${name}'`,
           );
-          const flattened = await doc.pages.flatten([page], { usage: 'display' });
-          if (flattened.results.some(({ status }) => status !== 'applied')) {
-            throw stampError('operation-failed', 'flattening the raster into its page failed');
-          }
         }
-        const layout = (await doc.pages.list()).pages.find(
-          (candidate) => candidate.ref.objectNumber === page.objectNumber,
-        );
-        const handle = doc.page(page);
-        if (!layout) {
-          throw stampError('operation-failed', 'the new page is missing from the library layout');
+        const canonicalBytes = libraryBinaries.get(liveLibrary.id);
+        if (!canonicalBytes) {
+          throw stampError(
+            'operation-failed',
+            `canonical bytes are missing for library '${liveLibrary.id}'`,
+          );
         }
-        // Insert copies the page only: register it in the same mutation.
-        await doc.pages.setName({ name: stampKey(name, label), page });
-        const asset: StampAsset = {
-          id: assetId,
-          libraryId: liveLibrary.id,
-          kind: input.kind ?? 'stamp',
-          name,
-          label,
-          size: { width: layout.size.width, height: layout.size.height },
-          page,
-          ...(input.subject !== undefined ? { subject: input.subject } : {}),
-          ...(input.categories !== undefined ? { categories: input.categories } : {}),
-        };
-        await handle.pieceInfo.update(
-          STAMP_PIECEINFO_APP,
-          stampPieceInfo(asset.kind, { subject: asset.subject, categories: asset.categories }),
-        );
-        const bytes = await doc.pages.extract([page]);
-        const preview = suppliedPreview ?? (await renderThumbnail(handle));
-        appended = { asset, bytes, preview, canonical: await doc.download() };
-      } finally {
-        await doc.close();
-      }
 
-      libraryBinaries.set(liveLibrary.id, appended.canonical);
-      assetBinaries.set(appended.asset.id, { bytes: appended.bytes, preview: appended.preview });
-      ctx.state.update(addAsset, appended.asset);
-      libraryChanged.emit({ libraryId: liveLibrary.id, reason: 'asset-added' });
-      assetCreated.emit({
-        assetId: appended.asset.id,
-        libraryId: liveLibrary.id,
-        asset: appended.asset,
-      });
-      return appended.asset.id;
-    });
+        const doc = await ctx.cancellable(signal, openAssetDocument(canonicalBytes));
+        let appended:
+          | {
+              asset: StampAsset;
+              bytes: Uint8Array;
+              preview: StampAssetPreview;
+              canonical: Uint8Array;
+            }
+          | undefined;
+        try {
+          let page: PageRef;
+          if (isPdf) {
+            const result = await doc.pages.insert(new Uint8Array(resolved.bytes));
+            if (result.insertedPages.length !== 1) {
+              throw stampError('invalid-input', 'a library asset must be a single-page PDF');
+            }
+            page = result.insertedPages[0];
+          } else {
+            // A raster becomes a page: a blank page the image's size, the image
+            // placed to fill it, flattened into content. From here on it is a
+            // page like any other: exportable, persistable, Acrobat-readable.
+            if (!doc.pages.flatten) {
+              throw stampError(
+                'unsupported',
+                'raster assets need an asset engine with pages.flatten',
+              );
+            }
+            const blank = await doc.pages.insertBlank({ size: rasterSize! });
+            page = blank.insertedPages[0];
+            await doc.page(page).annotations.create(
+              {
+                subtype: 'stamp',
+                box: { x: 0, y: 0, width: rasterSize!.width, height: rasterSize!.height },
+                fit: 'fill',
+              },
+              { appearance: new Uint8Array(resolved.bytes) },
+            );
+            const flattened = await doc.pages.flatten([page], { usage: 'display' });
+            if (flattened.results.some(({ status }) => status !== 'applied')) {
+              throw stampError('operation-failed', 'flattening the raster into its page failed');
+            }
+          }
+          const layout = (await doc.pages.list()).pages.find(
+            (candidate) => candidate.ref.objectNumber === page.objectNumber,
+          );
+          const handle = doc.page(page);
+          if (!layout) {
+            throw stampError('operation-failed', 'the new page is missing from the library layout');
+          }
+          // Insert copies the page only: register it in the same mutation.
+          await doc.pages.setName({ name: stampKey(name, label), page });
+          const asset: StampAsset = {
+            id: assetId,
+            libraryId: liveLibrary.id,
+            kind: input.kind ?? 'stamp',
+            name,
+            label,
+            size: { width: layout.size.width, height: layout.size.height },
+            page,
+            ...(input.subject !== undefined ? { subject: input.subject } : {}),
+            ...(input.categories !== undefined ? { categories: input.categories } : {}),
+          };
+          await handle.pieceInfo.update(
+            STAMP_PIECEINFO_APP,
+            stampPieceInfo(asset.kind, { subject: asset.subject, categories: asset.categories }),
+          );
+          const bytes = await doc.pages.extract([page]);
+          const preview = suppliedPreview ?? (await renderThumbnail(handle));
+          appended = { asset, bytes, preview, canonical: await doc.download() };
+        } finally {
+          await doc.close();
+        }
+
+        throwIfCancelled(signal);
+        libraryBinaries.set(liveLibrary.id, appended.canonical);
+        assetBinaries.set(appended.asset.id, { bytes: appended.bytes, preview: appended.preview });
+        ctx.state.update(addAsset, appended.asset);
+        libraryChanged.emit({ libraryId: liveLibrary.id, reason: 'asset-added' });
+        assetCreated.emit({
+          assetId: appended.asset.id,
+          libraryId: liveLibrary.id,
+          asset: appended.asset,
+        });
+        return { asset: appended.asset };
+      },
+      signal,
+    );
   };
 
   const createAssetFromAnnotations = async (
-    documentId: string,
-    page: PageRef,
+    page: PageRef | number,
     refs: readonly AnnotationRef[],
-    input: Omit<AddAssetInput, 'source' | 'size'>,
-  ): Promise<string> => {
+    input: AssetFromAnnotationsInput,
+    options?: StampDocumentOptions,
+  ): Promise<{ asset: StampAsset }> => {
+    const signal = options?.signal;
+    throwIfCancelled(signal);
+    const documentId = targetOf(options);
+    if (!canCreateFromAnnotations(documentId)) {
+      throw permissionDenied('doc.download', 'stamp.createAssetFromAnnotations');
+    }
     const doc = ctx.documentHandle(documentId);
-    if (!doc) throw stampError('not-found', `target document '${documentId}' is not open`);
-    const handle = doc.page(page);
+    if (!doc) throw stampError('not-found', `document '${documentId}' is not open`);
+    const handle = doc.page(pageOf(documentId, page).ref);
     // The engine flattens the selection into a fresh single-page PDF: the
     // same placement whole-page flatten uses, aimed at a new page.
-    const source = await handle.annotations.exportAppearance([...refs]);
-    return createAsset({ ...input, source });
+    const source = await ctx.cancellable(signal, handle.annotations.exportAppearance([...refs]));
+    return createAsset({ ...input, source }, { signal });
   };
 
-  const deleteAsset = async (id: string): Promise<void> => {
+  const deleteAsset = async (id: string, options?: OperationOptions): Promise<void> => {
+    const signal = options?.signal;
+    throwIfCancelled(signal);
     const initialAsset = ctx.state.get().assets[id];
     if (!initialAsset) return;
-    return mutateLibrary(initialAsset.libraryId, async () => {
-      const asset = ctx.state.get().assets[id];
-      if (!asset) return;
-      const library = ctx.state.get().libraries[asset.libraryId];
-      if (!library) return;
-      const canonicalBytes = libraryBinaries.get(library.id);
-      if (!canonicalBytes) {
-        throw stampError(
-          'operation-failed',
-          `canonical bytes are missing for library '${library.id}'`,
-        );
-      }
-      // The page goes; the engine drops its registry entry inside the
-      // delete. The unregistered blank keeps the file valid when this was
-      // the last stamp: a library with no stamps is still a library.
-      const doc = await openAssetDocument(canonicalBytes);
-      let rewritten: Uint8Array | undefined;
-      try {
-        await doc.pages.delete([asset.page]);
-        rewritten = await doc.download();
-      } finally {
-        await doc.close();
-      }
-      libraryBinaries.set(library.id, rewritten);
-      assetBinaries.delete(id);
-      ghostRenders.delete(id);
-      ctx.state.update(removeAsset, id);
-      libraryChanged.emit({ libraryId: library.id, reason: 'asset-removed' });
-      assetDeleted.emit({ assetId: id, libraryId: library.id, asset: null });
-    });
+    return mutateLibrary(
+      initialAsset.libraryId,
+      async () => {
+        const asset = ctx.state.get().assets[id];
+        if (!asset) return;
+        const library = ctx.state.get().libraries[asset.libraryId];
+        if (!library) return;
+        const canonicalBytes = libraryBinaries.get(library.id);
+        if (!canonicalBytes) {
+          throw stampError(
+            'operation-failed',
+            `canonical bytes are missing for library '${library.id}'`,
+          );
+        }
+        // The page goes; the engine drops its registry entry inside the
+        // delete. The unregistered blank keeps the file valid when this was
+        // the last stamp: a library with no stamps is still a library.
+        const doc = await ctx.cancellable(signal, openAssetDocument(canonicalBytes));
+        let rewritten: Uint8Array | undefined;
+        try {
+          await doc.pages.delete([asset.page]);
+          rewritten = await doc.download();
+        } finally {
+          await doc.close();
+        }
+        throwIfCancelled(signal);
+        libraryBinaries.set(library.id, rewritten);
+        assetBinaries.delete(id);
+        ghostRenders.delete(id);
+        ctx.state.update(removeAsset, id);
+        libraryChanged.emit({ libraryId: library.id, reason: 'asset-removed' });
+        assetDeleted.emit({ assetId: id, libraryId: library.id, asset: null });
+      },
+      signal,
+    );
   };
 
   const updateAsset = async (
     id: string,
-    patch: { label?: string; subject?: string | null; categories?: string[] },
-  ): Promise<void> => {
+    patch: StampAssetPatch,
+    options?: OperationOptions,
+  ): Promise<{ asset: StampAsset }> => {
+    const signal = options?.signal;
+    throwIfCancelled(signal);
     const initial = ctx.state.get().assets[id];
     if (!initial) throw notFound('asset', id);
-    return mutateLibrary(initial.libraryId, async () => {
-      const asset = ctx.state.get().assets[id];
-      const library = asset ? ctx.state.get().libraries[asset.libraryId] : undefined;
-      if (!asset || !library) throw notFound('asset', id);
-      const next: StampAsset = {
-        ...asset,
-        ...(patch.label !== undefined ? { label: patch.label } : {}),
-        ...(patch.categories !== undefined ? { categories: patch.categories } : {}),
-      };
-      if (patch.subject === null) delete next.subject;
-      else if (patch.subject !== undefined) next.subject = patch.subject;
+    return mutateLibrary(
+      initial.libraryId,
+      async () => {
+        const asset = ctx.state.get().assets[id];
+        const library = asset ? ctx.state.get().libraries[asset.libraryId] : undefined;
+        if (!asset || !library) throw notFound('asset', id);
+        const next: StampAsset = {
+          ...asset,
+          ...(patch.label !== undefined ? { label: patch.label } : {}),
+          ...(patch.categories !== undefined ? { categories: patch.categories } : {}),
+        };
+        if (patch.subject === null) delete next.subject;
+        else if (patch.subject !== undefined) next.subject = patch.subject;
 
-      const canonicalBytes = libraryBinaries.get(library.id);
-      if (!canonicalBytes) {
-        throw stampError(
-          'operation-failed',
-          `canonical bytes are missing for library '${library.id}'`,
-        );
-      }
-      const doc = await openAssetDocument(canonicalBytes);
-      let rewritten: Uint8Array | undefined;
-      try {
-        if (next.label !== asset.label) {
-          // A relabel is a registry rename: one job, the identifier untouched.
-          await doc.pages.setName({
-            name: stampKey(asset.name, next.label),
-            page: asset.page,
-            replace: stampKey(asset.name, asset.label),
-          });
+        const canonicalBytes = libraryBinaries.get(library.id);
+        if (!canonicalBytes) {
+          throw stampError(
+            'operation-failed',
+            `canonical bytes are missing for library '${library.id}'`,
+          );
         }
-        const page = doc.page(asset.page);
-        await page.pieceInfo.update(
-          STAMP_PIECEINFO_APP,
-          stampPieceInfo(next.kind, { subject: next.subject, categories: next.categories }),
-        );
-        rewritten = await doc.download();
-      } finally {
-        await doc.close();
-      }
-      libraryBinaries.set(library.id, rewritten);
-      ctx.state.update(setAsset, next);
-      libraryChanged.emit({ libraryId: library.id, reason: 'asset-updated' });
-      assetUpdated.emit({ assetId: next.id, libraryId: library.id, asset: next });
-    });
+        const doc = await ctx.cancellable(signal, openAssetDocument(canonicalBytes));
+        let rewritten: Uint8Array | undefined;
+        try {
+          if (next.label !== asset.label) {
+            // A relabel is a registry rename: one job, the identifier untouched.
+            await doc.pages.setName({
+              name: stampKey(asset.name, next.label),
+              page: asset.page,
+              replace: stampKey(asset.name, asset.label),
+            });
+          }
+          const page = doc.page(asset.page);
+          await page.pieceInfo.update(
+            STAMP_PIECEINFO_APP,
+            stampPieceInfo(next.kind, { subject: next.subject, categories: next.categories }),
+          );
+          rewritten = await doc.download();
+        } finally {
+          await doc.close();
+        }
+        throwIfCancelled(signal);
+        libraryBinaries.set(library.id, rewritten);
+        ctx.state.update(setAsset, next);
+        libraryChanged.emit({ libraryId: library.id, reason: 'asset-updated' });
+        assetUpdated.emit({ assetId: next.id, libraryId: library.id, asset: next });
+        return { asset: next };
+      },
+      signal,
+    );
   };
 
-  const moveAsset = async (id: string, to: { libraryId: string }): Promise<string> => {
+  const moveAsset = async (
+    id: string,
+    to: { libraryId: string },
+    options?: OperationOptions,
+  ): Promise<{ asset: StampAsset }> => {
+    const signal = options?.signal;
+    throwIfCancelled(signal);
     const asset = ctx.state.get().assets[id];
     const binary = assetBinaries.get(id);
     if (!asset || !binary) throw notFound('asset', id);
-    if (to.libraryId === asset.libraryId) return id;
-    const copy = await createAsset({
-      libraryId: to.libraryId,
-      source: new Uint8Array(binary.bytes),
-      kind: asset.kind,
-      label: asset.label,
-      ...(asset.subject !== undefined ? { subject: asset.subject } : {}),
-      ...(asset.categories ? { categories: [...asset.categories] } : {}),
-      ...(binary.preview ? { preview: binary.preview.bytes } : {}),
-    });
+    if (to.libraryId === asset.libraryId) return { asset };
+    const copy = await createAsset(
+      {
+        libraryId: to.libraryId,
+        source: new Uint8Array(binary.bytes),
+        kind: asset.kind,
+        label: asset.label,
+        ...(asset.subject !== undefined ? { subject: asset.subject } : {}),
+        ...(asset.categories ? { categories: [...asset.categories] } : {}),
+        ...(binary.preview ? { preview: binary.preview.bytes } : {}),
+      },
+      { signal },
+    );
+    // The copy is in place: the original goes even if the caller cancels now.
     await deleteAsset(id);
     return copy;
   };
 
-  const duplicateAsset = async (id: string, options?: { label?: string }): Promise<string> => {
+  const duplicateAsset = async (
+    id: string,
+    options?: { label?: string } & OperationOptions,
+  ): Promise<{ asset: StampAsset }> => {
+    throwIfCancelled(options?.signal);
     const asset = ctx.state.get().assets[id];
     const binary = assetBinaries.get(id);
     if (!asset || !binary) throw notFound('asset', id);
-    return createAsset({
-      libraryId: asset.libraryId,
-      source: new Uint8Array(binary.bytes),
-      kind: asset.kind,
-      label: options?.label ?? `${asset.label} copy`,
-      ...(asset.subject !== undefined ? { subject: asset.subject } : {}),
-      ...(asset.categories ? { categories: [...asset.categories] } : {}),
-      ...(binary.preview ? { preview: binary.preview.bytes } : {}),
-    });
+    return createAsset(
+      {
+        libraryId: asset.libraryId,
+        source: new Uint8Array(binary.bytes),
+        kind: asset.kind,
+        label: options?.label ?? `${asset.label} copy`,
+        ...(asset.subject !== undefined ? { subject: asset.subject } : {}),
+        ...(asset.categories ? { categories: [...asset.categories] } : {}),
+        ...(binary.preview ? { preview: binary.preview.bytes } : {}),
+      },
+      { signal: options?.signal },
+    );
   };
 
   return {

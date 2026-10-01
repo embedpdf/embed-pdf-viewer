@@ -29,9 +29,9 @@ function makeAnno(hit: 'annot' | 'empty' = 'annot') {
   const calls: Call[] = [];
   const anno = {
     getEditingId: () => null,
-    endTextEdit: () => {},
+    text: { end: async () => {} },
     getHitKind: () => hit,
-    clearSelection: () => {},
+    selection: { clear: () => {} },
     beginTextEditAt: () => {},
     getCursorAt: () => null,
     editPointer: (phase: string, page: PageRef, point: Point) => calls.push({ phase, page, point }),
@@ -288,7 +288,7 @@ describe('annotation draw handler — cancel discards the draft', () => {
       getToolSubtype: () => 'square',
       getResolvedTool: () => undefined,
       createPointer: (...args: unknown[]) => calls.push({ fn: 'createPointer', args }),
-      cancelCreationDraft: () => calls.push({ fn: 'cancelCreationDraft', args: [] }),
+      draft: { cancel: () => calls.push({ fn: 'draft.cancel', args: [] }) },
       finishInkDraft: () => calls.push({ fn: 'finishInkDraft', args: [] }),
     } as unknown as AnnotationHostCapability;
     return { anno, calls };
@@ -307,7 +307,7 @@ describe('annotation draw handler — cancel discards the draft', () => {
     // the cancel sample carries the second finger's position — it must never
     // become the shape's final point
     handler.onCancel?.(sample({ phase: 'cancel', page: { ref: PAGE_1, point: { x: 40, y: 40 } } }));
-    expect(calls.at(-1)?.fn).toBe('cancelCreationDraft');
+    expect(calls.at(-1)?.fn).toBe('draft.cancel');
     expect(
       calls.filter((call) => call.fn === 'createPointer' && call.args[1] === 'up'),
     ).toHaveLength(0);
@@ -323,9 +323,9 @@ describe('annotation edit handler — double-click / long-press routing', () => 
     const calls: string[] = [];
     const anno = {
       getEditingId: () => null,
-      endTextEdit: () => {},
+      text: { end: async () => {} },
       getHitKind: () => 'annot',
-      clearSelection: () => {},
+      selection: { clear: () => {} },
       beginTextEditAt: () => {
         calls.push('beginTextEditAt');
         return freeText;

@@ -39,10 +39,13 @@ Requires `plugin-annotation`. With `plugin-selection` and
 `plugin-interaction` present (the usual viewer setup), the marking tool
 and `markSelection()` light up too; `markMatches()` needs `plugin-search`.
 
-`redactionPlugin({ overlay })` sets the look of marks created by
-`markArea`, `markPage` and `markMatches`: `overlay.fill` is the colour
-painted on apply (default black) and `overlay.text` styles the label
-(`color`, default white; `fontFamily`; `fontSize`, where 0 auto-fits).
+`redactionPlugin({ overlay })` sets what applying paints over every mark,
+whichever way it was made (the `redact` tool, the selected text, or code):
+`overlay.fill` is the colour painted on apply (default black) and
+`overlay.text` styles the label (`color`, default white; `fontFamily`,
+default Helvetica; `fontSize`, where the default 0 fits the area). The
+settings become the redact tool's defaults, and `redaction.updateSettings()`
+changes them for the marks made from then on.
 
 ## Marking
 
@@ -51,23 +54,24 @@ text marks the selected text (per-line quads, like a highlight), and
 dragging anywhere else marks a rectangular area. One tool, both modes.
 
 ```ts
-import { useTool } from '@embedpdf/react/interaction';
+import { useInteraction, useInteractionState } from '@embedpdf/react/interaction';
 import { useRedaction } from '@embedpdf/react/redaction';
 
 const redaction = useRedaction();
-const tool = useTool();
+const interaction = useInteraction();
+const { activeToolId } = useInteractionState();
 
-tool.activate('redact'); // arm the redact tool
-tool.activeToolId === 'redact';
+interaction.activateTool('redact'); // arm the redact tool
+activeToolId === 'redact';
 
 // Mark the current text selection without switching tools
 // (context-menu "Mark for Redaction"):
-await redaction.markSelection();
+const { marks } = await redaction.markSelection();
 
-// Or mark from code (page space):
-await redaction.markArea(page, { x: 72, y: 72, width: 200, height: 40 });
-await redaction.markPage(page);
-await redaction.markMatches({ text: 'Confidential' }); // every search hit
+// Or mark from code (page space; a page is a ref or an index):
+const { mark } = await redaction.markArea(page, { x: 72, y: 72, width: 200, height: 40 });
+await redaction.markPage(0);
+await redaction.markMatches({ text: 'Confidential' }); // every search hit: { marks }
 ```
 
 `canMark()` is annotation create authority: a mark is an ordinary
@@ -80,8 +84,11 @@ styled by `fontFamily`/`fontSize`/`fontColor`/`textAlign` with
 normal annotation style panel; the label text itself:
 
 ```ts
-await redaction.updateLabel(ref, { overlayText: 'REDACTED', repeat: true });
+const { mark } = await redaction.updateLabel(ref, { overlayText: 'REDACTED', repeat: true });
 ```
+
+`canUnmark(ref)` and `canUpdateLabel(ref)` answer per mark, as the
+annotation's own delete and update checks do.
 
 ## The pending queue
 
@@ -90,7 +97,7 @@ annotation plane (`subtype === 'redact'`). Deleting a mark is just
 deleting an annotation.
 
 ```ts
-redaction.listPending(); // RedactionMark[] — ref, page, pageIndex, kind: 'area' | 'text', bounds, overlayText
+redaction.listPending(); // RedactionMark[] — ref, page, pageIndex, kind: 'area' | 'text', bounds, overlayText, repeat
 redaction.listPending({ page }); // one page's marks
 redaction.getPending(ref); // one mark, or null
 redaction.getPendingCount();
@@ -98,7 +105,7 @@ redaction.estimateCollateral(); // { count, refs }: a client-side estimate of th
 // other annotations the pending marks would destroy — show
 // this in your confirm dialog before applying
 
-await redaction.unmark([ref]); // remove marks; refs that are not marks are skipped
+await redaction.unmark([ref]); // remove marks; refs that are not marks are skipped, refused ones fail
 await redaction.clearPending(); // remove every mark
 
 redaction.onPendingChanged(({ pages }) => {
@@ -137,7 +144,8 @@ redaction.isApplying(); // in-flight state for spinners
 redaction.getLastResult(); // the last confirmed apply, from this session or another
 ```
 
-In React, `useRedaction()` adds reactive `applying` and `lastResult`,
-`usePendingRedactions(filter?)` is the reactive pending list, and
+In React, `useRedaction()` is the capability, `useRedactionState()` reads
+`{ pendingCount, applying, lastResult }`, `usePendingRedactions(filter?)` is
+the reactive pending list, `useRedactionSettings()` the settings, and
 `useRedactionEvent((redaction) => redaction.onApplied, handler)` subscribes
 for the mounted lifetime — all from `@embedpdf/react/redaction`.

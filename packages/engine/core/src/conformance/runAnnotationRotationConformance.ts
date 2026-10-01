@@ -1,6 +1,6 @@
 import { decodePng, type Raster } from './appearanceRasters';
 import type { ConformanceTestRunner } from './runMetadataConformance';
-import type { AnnotationDTO } from '../annotation/kinds';
+import type { Annotation } from '../annotation/kinds';
 import type { DocumentHandle } from '../engine/DocumentHandle';
 import type { Engine } from '../engine/Engine';
 import type { PageHandle } from '../engine/PageHandle';
@@ -25,8 +25,8 @@ export interface AnnotationRotationConformanceOptions {
   open: (engine: Engine, fixture: AnnotationRotationFixture) => Promise<DocumentHandle>;
 }
 
-type Stamp = Extract<AnnotationDTO, { subtype: 'stamp' }>;
-type FreeText = Extract<AnnotationDTO, { subtype: 'free-text' }>;
+type Stamp = Extract<Annotation, { subtype: 'stamp' }>;
+type FreeText = Extract<Annotation, { subtype: 'free-text' }>;
 
 /**
  * An annotation's `rotation` is degrees clockwise, as every rotation in the
@@ -89,7 +89,7 @@ export function runAnnotationRotationConformance(
       return box;
     };
 
-    const appearanceOf = async (page: PageHandle, ref: AnnotationDTO['ref']): Promise<Raster> => {
+    const appearanceOf = async (page: PageHandle, ref: Annotation['ref']): Promise<Raster> => {
       const { appearances } = await page.annotations.renderAppearances({ format: 'png' });
       const found = appearances.find(
         (a) => a.mode === 'normal' && annotationKey(a.ref) === annotationKey(ref),
@@ -223,7 +223,7 @@ export function runAnnotationRotationConformance(
         // Inside its turned box, a drawing renders upright over its box, for
         // the consumer to turn. Past it, it renders as the page shows it.
         const { appearances } = await page.annotations.renderAppearances();
-        const rectOf = (ref: AnnotationDTO['ref']) =>
+        const rectOf = (ref: Annotation['ref']) =>
           appearances.find(
             (a) => a.mode === 'normal' && annotationKey(a.ref) === annotationKey(ref),
           )!.rect;

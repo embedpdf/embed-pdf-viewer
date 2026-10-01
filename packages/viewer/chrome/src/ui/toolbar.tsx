@@ -16,7 +16,7 @@ import type {
 import { useCommands } from '@embedpdf/react/commands';
 import type { ResolvedCommand } from '@embedpdf/react/commands';
 import { QuickStamps } from './quick-stamps';
-import { useMenus } from '@embedpdf/react/shell';
+import { ShellToken, useShellState } from '@embedpdf/react/shell';
 import { useT } from '@embedpdf/react/i18n';
 import { StageToken } from '@embedpdf/react/stage';
 import { Icon } from './icons';
@@ -102,14 +102,15 @@ function MenuAnchoredButton({
   cmd: ResolvedCommand;
   children: React.ReactNode;
 }) {
-  const menus = useMenus();
-  const open = cmd.menu ? menus.isOpen(cmd.menu) : false;
+  const { openMenus } = useShellState();
+  const shell = useOptionalCapability(ShellToken);
+  const open = cmd.menu ? openMenus.includes(cmd.menu) : false;
   return (
     <span className="relative inline-flex">
       {children}
       {open && cmd.menu && (
-        <Popover onClose={() => menus.close(cmd.menu!)}>
-          <MenuBody menuId={cmd.menu} onRun={() => menus.close(cmd.menu!)} />
+        <Popover onClose={() => shell?.closeMenu(cmd.menu!)}>
+          <MenuBody menuId={cmd.menu} onRun={() => shell?.closeMenu(cmd.menu!)} />
         </Popover>
       )}
     </span>
@@ -119,7 +120,8 @@ function MenuAnchoredButton({
 // ── the inline zoom widget ───────────────────────────────────────────────────
 function ZoomControls() {
   const commands = useCommands();
-  const menus = useMenus();
+  const zoomOpen = useShellState((state) => state.openMenus.includes('zoom'));
+  const shell = useOptionalCapability(ShellToken);
   const stage = useOptionalCapability(StageToken);
   // Null-safe: the zoom strip is main-toolbar chrome, mounted before any
   // document exists — it reads 100% until a Stage is there to ask.
@@ -161,10 +163,10 @@ function ZoomControls() {
         <button
           type="button"
           aria-haspopup="menu"
-          aria-expanded={menus.isOpen('zoom')}
+          aria-expanded={zoomOpen}
           title="Zoom options"
           className={buttonClass(false)}
-          onClick={() => menus.toggle('zoom')}
+          onClick={() => shell?.toggleMenu('zoom')}
         >
           <Icon name="chevronDown" size={20} />
         </button>
@@ -185,9 +187,9 @@ function ZoomControls() {
           <Icon name="zoomIn" size={20} />
         </button>
       </div>
-      {menus.isOpen('zoom') && (
-        <Popover onClose={() => menus.close('zoom')}>
-          <MenuBody menuId="zoom" onRun={() => menus.close('zoom')} />
+      {zoomOpen && (
+        <Popover onClose={() => shell?.closeMenu('zoom')}>
+          <MenuBody menuId="zoom" onRun={() => shell?.closeMenu('zoom')} />
         </Popover>
       )}
     </div>
@@ -196,22 +198,23 @@ function ZoomControls() {
 
 /** The 'button' variant of the zoom slot — a single icon that opens the menu. */
 function ZoomButton() {
-  const menus = useMenus();
+  const zoomOpen = useShellState((state) => state.openMenus.includes('zoom'));
+  const shell = useOptionalCapability(ShellToken);
   return (
     <span className="relative inline-flex">
       <button
         type="button"
         title="Zoom"
         aria-haspopup="menu"
-        aria-expanded={menus.isOpen('zoom')}
-        className={buttonClass(menus.isOpen('zoom'))}
-        onClick={() => menus.toggle('zoom')}
+        aria-expanded={zoomOpen}
+        className={buttonClass(zoomOpen)}
+        onClick={() => shell?.toggleMenu('zoom')}
       >
         <Icon name="zoomIn" size={20} />
       </button>
-      {menus.isOpen('zoom') && (
-        <Popover onClose={() => menus.close('zoom')}>
-          <MenuBody menuId="zoom" onRun={() => menus.close('zoom')} />
+      {zoomOpen && (
+        <Popover onClose={() => shell?.closeMenu('zoom')}>
+          <MenuBody menuId="zoom" onRun={() => shell?.closeMenu('zoom')} />
         </Popover>
       )}
     </span>

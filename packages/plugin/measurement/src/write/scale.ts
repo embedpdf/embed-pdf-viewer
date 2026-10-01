@@ -17,7 +17,6 @@ import type { PageRef, PdfMeasure } from '@embedpdf/engine-core/runtime';
 import type {
   CalibrateInput,
   MeasurementCapability,
-  MeasurementConfig,
   PageTarget,
   ScaleChangeOptions,
   ScaleChangeReport,
@@ -29,7 +28,6 @@ import {
   setLocalViewports,
   setReports,
 } from '../model';
-import type { MeasurementScaleReads } from '../read/scale';
 import { defaultMeasure, withAreaUnit, withPrecision, withUnit } from '../scale';
 import type { MeasurementContext, MeasurementServices } from '../services';
 import { SCALE_PERMISSION } from '../services/store';
@@ -38,8 +36,6 @@ import type { MeasurementViewportSync } from '../sync/viewports';
 export function createScaleWrites(
   ctx: MeasurementContext,
   { events, store, siblings }: Pick<MeasurementServices, 'events' | 'store' | 'siblings'>,
-  config: MeasurementConfig,
-  { presets }: Pick<MeasurementScaleReads, 'presets'>,
   {
     ensureLoaded,
     refresh,
@@ -49,6 +45,7 @@ export function createScaleWrites(
   const { scaleChanged, calibrationCompleted } = events;
   const { requirePage, targets } = store;
   const { annotation } = siblings;
+  const settings = ctx.settings();
 
   /** One write queue per page, so a page's scale changes land in order. */
   const pageQueues = new Map<number, SerialQueue>();
@@ -71,12 +68,13 @@ export function createScaleWrites(
     scale: PdfMeasure | null,
     options: ScaleChangeOptions,
   ): Promise<ScaleChangeReport> => {
+    const { signal } = options;
     ctx.assertAllowed(SCALE_PERMISSION, 'changing a scale');
-    await ensureLoaded(page);
+    await ensureLoaded(page, { signal });
     ctx.assertAllowed(SCALE_PERMISSION, 'changing a scale');
     const service = ctx.doc.page(page).measure;
     if (service) {
-      await service.setScale(scale);
+      await ctx.cancellable(signal, service.setScale(scale));
       // The engine published `pages.scaleSet` before resolving, so the
       // mirror is already re-reading this page: join that read, never start another.
       await ensureLoaded(page);
@@ -101,11 +99,12 @@ export function createScaleWrites(
       ]);
       await refresh(page);
     }
-    const effective = scale ?? defaultMeasure(config, requirePage(page).userUnit);
+    const effective =
+      scale ?? defaultMeasure(settings.get().defaultScale, requirePage(page).userUnit);
     const report =
       options.recalculate === false
         ? { page, scale: effective, updated: [], skipped: [], failed: [] }
-        : await annotation.remeasurePage(page, effective);
+        : await ctx.cancellable(signal, annotation.remeasurePage(page, effective));
     scaleChanged.emit({ page, report });
     return report;
   };
@@ -116,7 +115,13 @@ export function createScaleWrites(
     options: ScaleChangeOptions = {},
   ): Promise<readonly ScaleChangeReport[]> => {
     ctx.assertAllowed(SCALE_PERMISSION, 'changing a scale');
+    // Every page is resolved first: a page that isn't there refuses the call.
     const target = targets(pages);
+    if (options.signal?.aborted) {
+      throw new PluginError('operation-cancelled', 'measurement', 'operation cancelled', {
+        cause: options.signal.reason,
+      });
+    }
     // One page: a failure rejects. Several: each page reports its own outcome.
     const tolerant = pages === 'all' || target.length > 1;
     ctx.state.update(beginScaleChange);
@@ -125,12 +130,14 @@ export function createScaleWrites(
         target.map((page) =>
           queueOf(page)(async (): Promise<ScaleChangeReport> => {
             try {
-              await ensureLoaded(page);
+              await ensureLoaded(page, { signal: options.signal });
               const scale = measure(page);
               if (scale) assertWritableMeasure(scale);
               return await save(page, scale, options);
             } catch (error) {
-              if (!tolerant) throw toPluginError('measurement', error);
+              const refused = toPluginError('measurement', error);
+              // A cancel ends the whole change, however many pages it has.
+              if (!tolerant || refused.code === 'operation-cancelled') throw refused;
               return {
                 page,
                 updated: [],
@@ -139,7 +146,7 @@ export function createScaleWrites(
                 scaleError: serializeError(error),
               };
             }
-          }),
+          }, options),
         ),
       );
       ctx.state.update(setReports, reports);
@@ -179,12 +186,13 @@ export function createScaleWrites(
       );
     }
     const { applyTo, ...rest } = options;
-    const reports = await change(applyTo ?? input.page, () => scale, rest);
+    const page = requirePage(input.page).ref;
+    const reports = await change(applyTo ?? page, () => scale, rest);
     const request = ctx.state.get().calibration;
-    if (request && pageRefsEqual(request.page, input.page)) {
+    if (request && pageRefsEqual(request.page, page)) {
       ctx.state.update(setCalibration, null);
     }
-    calibrationCompleted.emit({ page: input.page });
+    calibrationCompleted.emit({ page });
     return reports;
   };
 
@@ -199,7 +207,7 @@ export function createScaleWrites(
       setPrecision: (pages, precision, options) =>
         change(pages, (page) => withPrecision(rectilinearOf(page), precision), options),
       setPreset: (pages, presetId, options) => {
-        const preset = presets.find((candidate) => candidate.id === presetId);
+        const preset = settings.get().presets.find((candidate) => candidate.id === presetId);
         if (!preset) {
           return Promise.reject(
             new PluginError('not-found', 'measurement', `unknown scale preset '${presetId}'`),

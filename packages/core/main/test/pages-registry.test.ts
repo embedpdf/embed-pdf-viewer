@@ -20,8 +20,8 @@ describe('documents · page registry', () => {
     ]);
     expect(documents.getPage({ kind: 'objectNumber', objectNumber: 12 })?.index).toBe(1);
     expect(documents.getPage({ kind: 'objectNumber', objectNumber: 99 })).toBeNull();
-    expect(documents.getPageAt(2)?.ref.objectNumber).toBe(13);
-    expect(documents.getPageAt(3)).toBeNull();
+    expect(documents.getPage(2)?.ref.objectNumber).toBe(13);
+    expect(documents.getPage(3)).toBeNull();
     expect(documents.getPageIndex({ kind: 'objectNumber', objectNumber: 13 })).toBe(2);
     expect(documents.getPageIndex({ kind: 'objectNumber', objectNumber: 99 })).toBe(-1);
     expect(documents.getRevision()).toBe(0);

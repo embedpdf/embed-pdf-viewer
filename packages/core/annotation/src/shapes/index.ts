@@ -3,7 +3,7 @@
  * that reads its shape off the annotation (`kinds/`); from then on the shape
  * itself says which family answers for it, by its `kind`.
  */
-import type { AnnotationDTO } from '@embedpdf/engine-core/runtime';
+import type { Annotation } from '@embedpdf/engine-core/runtime';
 
 import type { Shape } from '../types';
 import { boxFamily } from './box';
@@ -37,7 +37,7 @@ export const familyOf = (shape: Shape): ShapeFamily => FAMILY_OF[shape.kind];
  * The family of a kind whose annotation says which shape it has: `pick`
  * names the family that reads it, and the shape's own family does the rest.
  */
-export function familyChosenBy(pick: (annotation: AnnotationDTO) => ShapeFamily): ShapeFamily {
+export function familyChosenBy(pick: (annotation: Annotation) => ShapeFamily): ShapeFamily {
   return {
     read: (annotation) => pick(annotation).read(annotation),
     write: (shape, subtype) => familyOf(shape).write(shape, subtype),

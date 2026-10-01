@@ -1,4 +1,4 @@
-import type { AnnotationDTO } from '@embedpdf/engine-core/runtime';
+import type { Annotation } from '@embedpdf/engine-core/runtime';
 import { describe, expect, it } from 'vitest';
 
 import { paintedNear } from '../../src/painted';
@@ -12,7 +12,7 @@ const caret = (rotation: number | null) =>
     rect: BOX,
     box: BOX,
     rotation,
-  }) as unknown as Extract<AnnotationDTO, { subtype: 'caret' }>;
+  }) as unknown as Extract<Annotation, { subtype: 'caret' }>;
 
 describe('the caret family', () => {
   it("a caret's shape is its engine box and turn, written back unchanged", () => {

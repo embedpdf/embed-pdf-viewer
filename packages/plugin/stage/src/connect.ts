@@ -48,7 +48,7 @@ function feedPageState(
     const state = ctx.state.get();
     if (!state.placed) return null;
     return {
-      currentPage: stage.getCurrentPage()?.ref ?? null,
+      currentPage: stage.getCurrentPage(),
       visiblePages: stage.listVisiblePages().map((page) => page.ref),
       cause: state.motionCause,
     };
@@ -82,7 +82,8 @@ function feedPageState(
 /**
  * The GoTo and Named page verbs for the action engine. The dispatcher runs
  * them as deferred navigation effects, after every document node of a tree
- * succeeded, never in the middle of a walk. /N Print is not handled here: the
+ * succeeded, never in the middle of a walk. They move the view by its own
+ * `scrollBehavior` setting, as a link does. /N Print is not handled here: the
  * dispatcher owns it (policy and the UI adapter).
  */
 function registerNavigationExecutors(
@@ -95,7 +96,7 @@ function registerNavigationExecutors(
       if (node.type !== 'goto') return { status: 'inert', reason: 'not a goto node' };
       if (!ctx.getPage(node.destination.page))
         return { status: 'failed', error: 'the destination page is not in this document' };
-      stage.goToDestination(node.destination, { behavior: 'smooth' });
+      stage.goToDestination(node.destination);
       return { status: 'executed' };
     }),
   );
@@ -104,16 +105,16 @@ function registerNavigationExecutors(
       if (node.type !== 'named') return { status: 'inert', reason: 'not a named node' };
       switch (node.name) {
         case 'NextPage':
-          stage.nextPage({ behavior: 'smooth' });
+          stage.nextPage();
           return { status: 'executed' };
         case 'PrevPage':
-          stage.previousPage({ behavior: 'smooth' });
+          stage.previousPage();
           return { status: 'executed' };
         case 'FirstPage':
-          stage.goToFirstPage({ behavior: 'smooth' });
+          stage.goToFirstPage();
           return { status: 'executed' };
         case 'LastPage':
-          stage.goToLastPage({ behavior: 'smooth' });
+          stage.goToLastPage();
           return { status: 'executed' };
         default:
           return { status: 'inert', reason: `unknown named action '${node.name}'` };

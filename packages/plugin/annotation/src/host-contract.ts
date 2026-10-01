@@ -29,7 +29,10 @@ import type {
 import type { AnnotCommitEntry, AnnotCommitResult } from '@embedpdf/plugin-actions/contract/host';
 
 import type {
+  Annotation,
+  AnnotationAnchor,
   AnnotationCapability,
+  AnnotationSelectionAnchor,
   ArmedStampInfo,
   ArmedStampPreview,
   Behavior,
@@ -97,6 +100,21 @@ export interface AnnotationHostCapability extends AnnotationCapability {
   distanceCreationPage(): PageRef | null;
 
   // ── render projections (page space; a view env projects for a rotated / zoomed view) ──
+  /**
+   * The selection's anchor as a page shows it: its rotation handle where the
+   * page's view puts it (screen-sized, so it depends on the zoom), for a menu
+   * that stays clear of it. `selection.getAnchor()` is the same without a view.
+   */
+  getSelectionAnchorIn(view: {
+    scale?: number;
+    rotation?: PageRotation;
+    zoom?: number;
+  }): AnnotationSelectionAnchor | null;
+  /**
+   * Where UI attaches to one annotation (its page and the box around what it
+   * shows, a drag in progress included), or `null` for one that isn't here.
+   */
+  getAnnotationAnchor(ref: AnnotationRef, view?: ViewEnv): AnnotationAnchor | null;
   listPageItems(page: PageRef, view?: ViewEnv): RenderItem[];
   listTextItems(page: PageRef, view?: ViewEnv): TextItem[];
   listChromeNodes(
@@ -249,7 +267,8 @@ export interface AnnotationHostCapability extends AnnotationCapability {
   getResolvedTool(id: string): ResolvedTool | null;
   getToolSubtype(id: string): KindName;
   registerBehavior(behavior: Behavior): Unsubscribe;
-  getBehaviorFor(annotation: { subtype: KindName; ref: AnnotationRef | null }): Behavior | null;
+  /** The engaged behavior that owns this annotation now, or `null`. */
+  getBehaviorFor(annotation: Annotation): Behavior | null;
   pruneEngagedSelection(): void;
   commitScriptEffects(entries: AnnotCommitEntry[]): Promise<AnnotCommitResult>;
 }

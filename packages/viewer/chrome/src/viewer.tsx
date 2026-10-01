@@ -42,6 +42,7 @@ import type { CommandDef } from '@embedpdf/react/commands';
 import { shellPlugin } from '@embedpdf/react/shell';
 import { chromeHelpers, validateChrome } from '@embedpdf/react/toolbar';
 import type { ChromeHelpers, ChromeSchema } from '@embedpdf/react/toolbar';
+import { EPDF_VARIABLES } from '@embedpdf/web';
 import { ThumbsStageToken } from './config/stage';
 import { defaultChrome } from './config/chrome';
 import { defaultCommands } from './config/commands';
@@ -129,14 +130,22 @@ export interface ViewerCustomization {
    *  14 — fetched, registered on the engine and mounted for the live editor. */
   annotations?: AnnotationsCustomization;
   /** Light/dark preference (string shorthand), or the full theme config with
-   *  `--ep-*` token overrides. Tokens are applied by the delivery (the custom
-   *  element adopts them into its shadow root); direct consumers of this
-   *  package set the `--ep-*` variables in their own CSS instead. */
+   *  token overrides. Tokens are applied by the delivery (the custom element
+   *  adopts them into its shadow root); direct consumers of this package set
+   *  the variables in their own CSS instead. */
   theme?: ThemePreference | ThemeConfig;
 }
 
-/** Token overrides — names without the `--ep-` prefix ('accent', 'surface'…). */
+/**
+ * Token overrides, by variable name without its prefix: an EmbedPDF theming
+ * variable (`accent` sets `--epdf-accent`, which the pages and the chrome both
+ * follow), else one of the chrome's own `--ep-*` tokens (`surface`, `fg`, …).
+ */
 export type ThemeTokens = Readonly<Record<string, string>>;
+
+/** The CSS variable a theme token sets: see {@link ThemeTokens}. */
+export const themeTokenProperty = (name: string): string =>
+  Object.prototype.hasOwnProperty.call(EPDF_VARIABLES, name) ? `--epdf-${name}` : `--ep-${name}`;
 
 export interface ThemeConfig {
   /** 'system' (default) follows the OS. */
@@ -286,6 +295,8 @@ export function FullViewer({
       pageFrame: { top: 0, right: 0, bottom: 20, left: 0 }, // reserved label band (screen px)
       fitAlign: { x: 'center', y: 'start' }, // few pages? thumbs hug the top
       scrollBehavior: 'instant',
+      interaction: false, // click-to-navigate: a drag never reaches the document's tools
+      zoomGestures: false, // a fixed-magnification rail: Cmd+wheel and pinch scroll it
     }),
     renderPlugin(),
     pageEditPlugin(),
@@ -331,9 +342,9 @@ export function FullViewer({
     // executor spine, and the JavaScript switch lives here (the per-document
     // ScriptHost realm; form's K/V/C/F pipeline rides its transaction port,
     // stamp's dynamic templates evaluate in detached realms it mints).
-    actionsPlugin({
-      javascript: { enabled: true, identity: { name: 'John Doe', corporation: 'Acme Inc' } },
-    }),
+    // Scripts ask who the user is (`identity.name`): the document's user, from
+    // the viewer's identity or the token.
+    actionsPlugin({ javascript: { enabled: true } }),
     // Forms: fillable under the default pointer/pan (widgets render as fill
     // controls), editable under the Form tab's 'form-edit' + palette tools.
     formPlugin(),

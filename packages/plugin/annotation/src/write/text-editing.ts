@@ -6,7 +6,7 @@
  * when editing ends) and sends the latest text, so it carries every keystroke
  * that waited for it: they settle together, accepted or refused.
  */
-import { type Id, type Point, refOf, richDocOf } from '@embedpdf/core-annotation';
+import { type Id, type Point, richDocOf } from '@embedpdf/core-annotation';
 import {
   annotationKey,
   type AnnotationRef,
@@ -27,7 +27,7 @@ interface Waiter {
 }
 
 export function createTextEditing(
-  ctx: Pick<AnnotationContext, 'doc' | 'state' | 'cleanup'>,
+  ctx: Pick<AnnotationContext, 'doc' | 'state' | 'cleanup' | 'cancellable'>,
   { store, identity, fonts }: Pick<AnnotationServices, 'store' | 'identity' | 'fonts'>,
   chrome: Pick<ChromeReads, 'textBoxAt'>,
 ) {
@@ -99,10 +99,22 @@ export function createTextEditing(
       }),
   }));
 
-  const api = {
-    beginTextEdit: (ref: AnnotationRef) => {
+  /** The `text` noun (its `getEditing` and `toggleFormat` come from the reads and the selection). */
+  const text = {
+    begin: (ref: AnnotationRef) => {
       store.commit({ type: 'beginTextEdit', id: annotationKey(ref) });
     },
+    end: async (options: { signal?: AbortSignal } = {}) => {
+      const writes = flushAllText();
+      if (ctx.state.get().textSelection) {
+        ctx.state.update(setTextSelection, null);
+      }
+      store.commit({ type: 'endTextEdit' });
+      await ctx.cancellable(options.signal, Promise.all(writes));
+    },
+  };
+
+  const api = {
     beginTextEditAt: (
       page: PageRef,
       point: Point,
@@ -118,18 +130,6 @@ export function createTextEditing(
       // Nothing editable here — report it so the caller can fall through to a
       // normal press instead of swallowing the gesture on a non-text annotation.
       return false;
-    },
-    endTextEdit: async () => {
-      const writes = flushAllText();
-      if (ctx.state.get().textSelection) {
-        ctx.state.update(setTextSelection, null);
-      }
-      store.commit({ type: 'endTextEdit' });
-      await Promise.all(writes);
-    },
-    getEditingRef: () => {
-      const model = store.model();
-      return model.editing ? refOf(model.byId[model.editing]) : null;
     },
     getEditingId: () => store.model().editing,
     draftContents: (ref: AnnotationRef, text: string) => {
@@ -159,7 +159,7 @@ export function createTextEditing(
     getCssFontFamily: (family: string) => cssFontFamilyForFace(family, fonts),
   };
 
-  return { flushText, flushAllText, api };
+  return { flushText, flushAllText, text, api };
 }
 
 export type TextEditing = ReturnType<typeof createTextEditing>;

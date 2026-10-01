@@ -289,7 +289,7 @@ export {
 export {
   ANNOTATION_KINDS,
   KIND_BY_SUBTYPE,
-  AnnotationDTOSchema,
+  AnnotationSchema,
   AnnotationDraftSchema,
   AnnotationPatchSchema,
   annotationPatchSchemaOf,

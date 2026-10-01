@@ -9,7 +9,8 @@
  * read-only field; the form-filling layer enforces it itself.
  */
 import { boxFamily } from '../shapes';
-import { defineKind, NO_CAPS, type FieldSpec, type KindCaps } from './define';
+import { defineKind, NO_CAPS, type AnnotationProperty, type KindCaps } from './define';
+import { BORDER_PLAIN, fontFamily, textAlign } from './fields';
 import { widgetStyle } from './styles';
 import { fieldText } from './texts';
 
@@ -25,19 +26,19 @@ const WIDGET_CAPS: KindCaps = {
   ignoresReadOnly: true,
 };
 
-const BOX_FIELDS: readonly FieldSpec[] = [
-  { key: 'color', label: 'Border color' },
-  { key: 'interiorColor', label: 'Background' },
-  { key: 'strokeWidth', label: 'Border width', min: 0, max: 12, step: 0.5 },
-  { key: 'borderStyle', label: 'Border style', cloudy: false },
+const BOX_FIELDS: readonly AnnotationProperty[] = [
+  { key: 'color', control: 'color', label: 'Border color' },
+  { key: 'interiorColor', control: 'color', label: 'Background' },
+  { key: 'strokeWidth', control: 'number', label: 'Border width', min: 0, max: 12, step: 0.5 },
+  { ...BORDER_PLAIN, label: 'Border style' },
 ];
 
-const TEXT_FIELDS: readonly FieldSpec[] = [
+const TEXT_FIELDS: readonly AnnotationProperty[] = [
   ...BOX_FIELDS,
-  { key: 'fontFamily', label: 'Font' },
-  { key: 'fontSize', label: 'Font size', min: 0, max: 96, step: 1 },
-  { key: 'fontColor', label: 'Text color' },
-  { key: 'textAlign', label: 'Alignment' },
+  fontFamily('Font'),
+  { key: 'fontSize', control: 'number', label: 'Font size', min: 0, max: 96, step: 1 },
+  { key: 'fontColor', control: 'color', label: 'Text color' },
+  textAlign('Alignment'),
 ];
 
 /** A text field. */
@@ -47,7 +48,7 @@ export const widgetText = defineKind({
   style: widgetStyle,
   text: fieldText,
   caps: WIDGET_CAPS,
-  fields: TEXT_FIELDS,
+  properties: TEXT_FIELDS,
 });
 
 /** A combo box or a list box. */
@@ -57,7 +58,7 @@ export const widgetChoice = defineKind({
   style: widgetStyle,
   text: fieldText,
   caps: WIDGET_CAPS,
-  fields: TEXT_FIELDS,
+  properties: TEXT_FIELDS,
 });
 
 /** A push button: its caption is text. */
@@ -67,7 +68,7 @@ export const widgetButton = defineKind({
   style: widgetStyle,
   text: fieldText,
   caps: WIDGET_CAPS,
-  fields: TEXT_FIELDS,
+  properties: TEXT_FIELDS,
 });
 
 /** A checkbox: no text. */
@@ -76,7 +77,7 @@ export const widgetToggle = defineKind({
   family: boxFamily,
   style: widgetStyle,
   caps: WIDGET_CAPS,
-  fields: BOX_FIELDS,
+  properties: BOX_FIELDS,
 });
 
 /** A radio button: no text, and round (its box draws the ellipse in it, as the engine draws one). */
@@ -85,7 +86,7 @@ export const widgetRadio = defineKind({
   family: boxFamily,
   style: widgetStyle,
   caps: WIDGET_CAPS,
-  fields: BOX_FIELDS,
+  properties: BOX_FIELDS,
 });
 
 /** Any other widget (a signature field, one in no field): a box. */
@@ -94,7 +95,7 @@ export const widgetBox = defineKind({
   family: boxFamily,
   style: widgetStyle,
   caps: WIDGET_CAPS,
-  fields: BOX_FIELDS,
+  properties: BOX_FIELDS,
 });
 
 /** The widget kind for a field family. */

@@ -95,7 +95,7 @@ export class EpdfKernelHost implements OnDestroy {
   /** Boot lifecycle. `ready`/`error` are derived sugar over it. */
   readonly status = signal<EpdfKernelStatus>('starting');
   /** The startup failure, if any. Per-document open failures are tab state
-   *  (`DocInfo.status === 'error'`), not host state. */
+   *  (`DocumentInfo.status === 'error'`), not host state. */
   readonly error = signal<unknown>(null);
   /** True once `kernel.start()` resolved — which never touches the engine, so
    *  the shell (and every workspace capability: i18n, view-manager, …) is alive

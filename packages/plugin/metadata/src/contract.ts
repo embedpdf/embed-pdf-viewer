@@ -1,12 +1,10 @@
 import {
   type CustomMetadata,
   type CustomMetadataPatch,
-  type CustomMetadataUpdateResult,
   type DocumentMetadata,
   type EventHook,
   type EventOrigin,
   type MetadataPatch,
-  type MetadataUpdateResult,
   type OperationOptions,
   type ResourceStatus,
 } from '@embedpdf/core';
@@ -45,8 +43,8 @@ export interface CustomMetadataResyncedEvent {
 
 /**
  * The Info dict's custom keys: the same reads and verbs as the standard
- * fields, on an object of their own. Editing needs the same capability, so
- * `canEdit()` on the metadata capability answers for both.
+ * fields, on an object of their own. Changing them needs the same permission,
+ * so `canUpdate()` on the metadata capability answers for both.
  */
 export interface CustomMetadataCapability {
   /** The current keys, reference-stable until they change; `null` until the first read lands. */
@@ -55,16 +53,17 @@ export interface CustomMetadataCapability {
   getStatus(): ResourceStatus;
   /**
    * Set and remove keys: a key left out stays, `null` removes it, a string
-   * sets it. Resolves once the snapshot reflects the write and `onUpdated`
-   * has fired. Rejects with `permission-denied`, `instance-closed` or
+   * sets it. Resolves `{ custom }`, the keys after the change; by then the
+   * snapshot shows it and `onUpdated` has fired. Rejects with
+   * `permission-denied`, `invalid-input`, `instance-closed` or
    * `operation-cancelled`.
    */
   update(
     patch: CustomMetadataPatch,
     options?: OperationOptions,
-  ): Promise<CustomMetadataUpdateResult>;
+  ): Promise<{ readonly custom: CustomMetadata }>;
   /** Re-read from the engine. Rarely needed: the event stream keeps the snapshot fresh. */
-  refresh(): Promise<void>;
+  refresh(options?: OperationOptions): Promise<void>;
   /** A confirmed change, whoever caused it. Fires after the snapshot changed. */
   readonly onUpdated: EventHook<CustomMetadataUpdatedEvent>;
   /** The keys were loaded or reloaded from the engine. */
@@ -80,20 +79,22 @@ export interface MetadataCapability {
   /** Load state: `idle` → `loading` → `ready`, or `forbidden` / `error`. */
   getStatus(): ResourceStatus;
   /**
-   * Whether this caller may edit the Info dict (`doc.metadata.modify`), its
-   * custom keys included. The engine enforces the same capability; this is
-   * the UI mirror of that guard.
+   * Whether this session may change the Info dict (`doc.metadata.modify`):
+   * `update()` and `custom.update()`. The engine enforces the same permission.
    */
-  canEdit(): boolean;
+  canUpdate(): boolean;
   /**
-   * Patch the standard fields: `undefined` leaves a field, `null` clears it,
-   * a value sets it. Writes to the layer. Resolves with the engine result; by
-   * then the snapshot reflects the write and `onUpdated` has fired. Rejects
-   * with `permission-denied`, `instance-closed` or `operation-cancelled`.
+   * Change the standard fields: a field left out stays, `null` clears it, a
+   * value sets it. Resolves `{ metadata }`, the fields after the change; by
+   * then the snapshot shows it and `onUpdated` has fired. Rejects with
+   * `permission-denied`, `instance-closed` or `operation-cancelled`.
    */
-  update(patch: MetadataPatch, options?: OperationOptions): Promise<MetadataUpdateResult>;
+  update(
+    patch: MetadataPatch,
+    options?: OperationOptions,
+  ): Promise<{ readonly metadata: DocumentMetadata }>;
   /** Re-read from the engine. Rarely needed: the event stream keeps the snapshot fresh. */
-  refresh(): Promise<void>;
+  refresh(options?: OperationOptions): Promise<void>;
   /** A confirmed change, whoever caused it. Fires after the snapshot changed. */
   readonly onUpdated: EventHook<MetadataUpdatedEvent>;
   /** The metadata was loaded or reloaded from the engine. */

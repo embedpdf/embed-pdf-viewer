@@ -1,5 +1,5 @@
 import { isReadout, measurementReadout } from '@embedpdf/engine-core/runtime';
-import type { AnnotationDTO } from '@embedpdf/engine-core/runtime';
+import type { Annotation } from '@embedpdf/engine-core/runtime';
 import { endingNodes, endingPieces, endingPoints } from './endings';
 import { DISTANCE_CAPTION_SIZE as CAPTION_SIZE, distanceCaptionWidth } from './measurement-font';
 import { geomRotation, selectionQuad } from './geometry';
@@ -23,7 +23,7 @@ import type { ShapeMeasurementAppearance } from './measurement-shape';
 
 export type MeasurementAppearance = DistanceAppearance | ShapeMeasurementAppearance;
 
-type LineAnnotation = Extract<AnnotationDTO, { subtype: 'line' }>;
+type LineAnnotation = Extract<Annotation, { subtype: 'line' }>;
 
 /**
  * A distance's measurement: the engine's own fields for its scale, its
@@ -40,7 +40,7 @@ export type DistanceAppearance = { intent: 'line-dimension' } & Pick<
  * distance, a polyline a perimeter, a polygon an area, as its intent says.
  * Its measurement fields, read off it for drawing and hit-testing.
  */
-export function measurementOf(annotation: AnnotationDTO): MeasurementAppearance | undefined {
+export function measurementOf(annotation: Annotation): MeasurementAppearance | undefined {
   if (annotation.subtype === 'line' && annotation.intent === 'line-dimension') {
     return {
       intent: annotation.intent,

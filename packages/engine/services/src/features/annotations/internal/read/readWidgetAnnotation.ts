@@ -1,7 +1,7 @@
 import type {
   AnnotationBase,
   Color,
-  WidgetAnnotationDTO,
+  WidgetAnnotation,
   PdfCoordinates,
 } from '@embedpdf/engine-core/runtime';
 import { colorOf } from '@embedpdf/engine-core/runtime';
@@ -40,7 +40,7 @@ export function readWidget(
   mem: PdfRuntimeMemory,
   annotPtr: Ptr,
   base: AnnotationBase<PdfCoordinates>,
-): WidgetAnnotationDTO<PdfCoordinates> {
+): WidgetAnnotation<PdfCoordinates> {
   const border = readBorderFields(fn, mem, annotPtr);
   const da = readDefaultAppearance(fn, mem, annotPtr);
   return {

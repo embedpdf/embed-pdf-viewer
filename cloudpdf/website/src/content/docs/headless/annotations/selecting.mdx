@@ -38,6 +38,11 @@ To show the selection in a component, use `useAnnotationState()`. Your component
 
 <Snippet name="annotations/selecting/selected" />
 
+<Example name="annotation/select-code" />
+
+> **Try it:** **The top half** selects the two shapes the box touches. Shift-click a shape to add
+> it, or take it out.
+
 Every field is listed under [State](#state).
 
 ## Add a menu
@@ -48,6 +53,11 @@ Stage's `overlay` snippet</Fw><Fw only="angular">Put it inside `<epdf-stage>`, n
 and it stays attached while the user scrolls and zooms:
 
 <Snippet name="annotations/selecting/menu" />
+
+<Example name="annotation/menu" />
+
+> **Try it:** select the rectangle: the menu loses **Bold** and **Edit text**. Drag it, and the
+> menu hides until you let go.
 
 - **The menu only places things.** What's in it is yours: build it from the selection, as above,
   to show buttons that fit what's selected.
@@ -68,9 +78,17 @@ their current values. `useAnnotationProperties()` gives you everything to draw i
 
 When different kinds are selected, you get only the properties they all have.
 
-Each property's `key` is the annotation's own field name, so reading and writing need no mapping:
+Each property's `key` is the annotation's own field name, so most read and write with no mapping.
+Two group several fields: `borderStyle` is the style, the dashes and the cloudy edge together, and
+`lineEndings` reads as a `{ start, end }` pair while its options are single endings. The panel below
+shows both:
 
 <Snippet name="annotations/selecting/style-panel" />
+
+<Example name="annotation/style-panel" />
+
+> **Try it:** change the rectangle's colors and width, then select the arrow or the text box: the
+> panel shows what each one has. Shift-click two to see what they share.
 
 | `property.control` | What to show                                                                                                | Also on the property |
 | :-------------- | :------------------------------------------------------------------------------------------------------------- | :------------------- |
@@ -165,8 +183,13 @@ place of its handles:</Fw>
 | `kind`     | `'corner'`, `'side'` or `'point'` (a point of a line or a polygon). |
 | `active`   | True while it's being dragged.                                      |
 
-The rotation handle gets the same, plus `from`, where its stalk starts on the box. You only draw:
+The rotation handle gets the same props except `kind`, plus `from`, where its stalk starts on the box. You only draw:
 the viewer still decides where a handle can be grabbed, so what you draw can't break dragging.
+
+<Example name="annotation/handles" />
+
+> **Try it:** pick an accent and round handles, then **Draw them myself**. **Reset** goes back to
+> what the plugin was registered with.
 
 ## Snapping
 
@@ -187,6 +210,11 @@ annotation.updateSettings({ snap: { alignment: false } }); // while the app runs
 The threshold is in screen pixels, so snapping feels the same at every zoom. The lines that show
 what an annotation snaps to are `--epdf-annotation-guide`.
 
+<Example name="annotation/snapping" />
+
+> **Try it:** drag the red rectangle until its edge lines up with the blue one, then turn it with
+> the round handle.
+
 ## Turn and group
 
 ```ts
@@ -201,6 +229,10 @@ Acrobat saves it, so it stays a group there too:
 if (annotation.selection.canGroup()) await annotation.selection.group();
 if (annotation.selection.canUngroup()) await annotation.selection.ungroup();
 ```
+
+<Example name="annotation/turn-group" />
+
+> **Try it:** **Group** the two shapes, click empty space, then click one: both are selected.
 
 To bring an annotation to the front or send it to the back, see
 [Change the drawing order](with-code#change-the-drawing-order).
@@ -231,6 +263,11 @@ The headless plugin doesn't take over any keys, since your app may already use t
 Escape are a few lines:
 
 <Snippet name="annotations/selecting/keyboard" />
+
+<Example name="annotation/polygon" />
+
+> **Try it:** click a few points on the page, then **Done**, or double-click. Select a shape and
+> press Delete; Escape stops a shape you're drawing.
 
 ## Methods
 

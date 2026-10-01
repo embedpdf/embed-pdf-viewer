@@ -3,7 +3,7 @@ import type {
   CalloutLine,
   LocalDocumentHandle,
   LocalEngine,
-  FreeTextAnnotationDTO,
+  FreeTextAnnotation,
   FreeTextPatch,
 } from '@embedpdf/engine-core/runtime';
 import { toPageRef } from '@embedpdf/engine-core/runtime';
@@ -37,11 +37,11 @@ function fixture(legacy: boolean, callout: boolean): Uint8Array {
   return new TextEncoder().encode(text);
 }
 
-async function annotation(doc: LocalDocumentHandle): Promise<FreeTextAnnotationDTO> {
-  return (await doc.page(toPageRef(3)).annotations.list()).annotations[0] as FreeTextAnnotationDTO;
+async function annotation(doc: LocalDocumentHandle): Promise<FreeTextAnnotation> {
+  return (await doc.page(toPageRef(3)).annotations.list()).annotations[0] as FreeTextAnnotation;
 }
 
-function expectText(dto: FreeTextAnnotationDTO): void {
+function expectText(dto: FreeTextAnnotation): void {
   expect(dto.contents).toBe(TEXT);
   expect(dto.richText.paragraphs.flatMap((p) => p.runs.map((r) => r.text)).join('')).toBe(TEXT);
 }
@@ -126,7 +126,7 @@ describe('FreeText and Callout partial updates preserve text (wasm)', () => {
             for (const patch of patches) {
               // Deliberately never re-attach contents or richText to these patches.
               const result = await doc.page(toPageRef(3)).annotations.update(ref, patch);
-              expectText(result.annotation as FreeTextAnnotationDTO);
+              expectText(result.annotation as FreeTextAnnotation);
               expectText(await annotation(doc));
             }
 

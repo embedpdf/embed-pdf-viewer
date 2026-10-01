@@ -7,7 +7,7 @@
  *
  * Mounted in the Stage `overlay` slot; it shows only while a rotation runs.
  */
-import { AnnotationRotationBadge } from '@embedpdf/react/annotation-menu';
+import { AnnotationRotationBadge } from '@embedpdf/react/annotation';
 
 export function RotationBadge() {
   return (

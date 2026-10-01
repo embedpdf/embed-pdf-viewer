@@ -12,7 +12,7 @@
  * Moving, turning, scaling and resizing work on any turned box
  * ({@link TurnedBox}), so the text box family shares them.
  */
-import type { AnnotationDTO } from '@embedpdf/engine-core/runtime';
+import type { Annotation } from '@embedpdf/engine-core/runtime';
 
 import { cloudyBounds, cloudyOutline, cloudyPath } from '../cloudy';
 import type { PaintedPiece } from '../painted';
@@ -54,15 +54,15 @@ export interface BoxShape extends TurnedBox {
 /** The kinds that keep their box in `box` and turn it by `rotation`; the rest keep it in `rect`. */
 const TURNING_KINDS: ReadonlySet<string> = new Set(['square', 'circle', 'stamp']);
 
-type TurningAnnotation = Extract<AnnotationDTO, { subtype: 'square' | 'circle' | 'stamp' }>;
+type TurningAnnotation = Extract<Annotation, { subtype: 'square' | 'circle' | 'stamp' }>;
 
 /** Whether a box kind draws the ellipse in its box: a circle, and a radio button (the engine draws one round). */
-const drawsEllipse = (annotation: AnnotationDTO): boolean =>
+const drawsEllipse = (annotation: Annotation): boolean =>
   annotation.subtype === 'circle' ||
   (annotation.subtype === 'widget' && annotation.fieldFamily === 'radio');
 
 /** A box kind's shape, read off its annotation. */
-function readBox(annotation: AnnotationDTO): BoxShape {
+function readBox(annotation: Annotation): BoxShape {
   if (!TURNING_KINDS.has(annotation.subtype)) {
     return { kind: 'box', box: annotation.rect, rotation: 0, ellipse: drawsEllipse(annotation) };
   }
@@ -77,7 +77,7 @@ function readBox(annotation: AnnotationDTO): BoxShape {
  * widget) takes the region the turned box covers, a quarter turn swapping
  * its sides, and stores no turn: it shows as the author saw it, unturned.
  */
-function placeBox(placement: Placement, annotation: AnnotationDTO): BoxShape | null {
+function placeBox(placement: Placement, annotation: Annotation): BoxShape | null {
   if (placement.kind !== 'box') return null;
   const keepsTurn = annotation.subtype === 'stamp';
   const quarter = placement.rot % 180 !== 0;

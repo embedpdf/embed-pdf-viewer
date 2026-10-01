@@ -8,13 +8,17 @@ import { resolveBinarySource, sniffBinaryMetadata } from '@embedpdf/engine-core/
 import type { BinarySource, PageRef, PieceInfoEntry } from '@embedpdf/engine-core/runtime';
 
 import { blankLibraryPdf } from '../blank-library';
+import type { OperationOptions } from '@embedpdf/core';
+
 import type {
+  CreateLibraryOptions,
   ImportLibraryOptions,
   StampAsset,
   StampAssetKind,
   StampAssetPreview,
   StampCapability,
   StampLibrary,
+  StampLibraryPatch,
 } from '../contract';
 import {
   assetIdFor,
@@ -30,7 +34,7 @@ import {
 import { addAsset, addLibrary, removeLibrary, setLibrary } from '../model';
 import type { StampContext, StampServices } from '../services';
 import { uid } from '../services/asset-engine';
-import { notFound, stampError, verb } from '../services/errors';
+import { notFound, stampError, throwIfCancelled, verb } from '../services/errors';
 
 const entryString = (entries: Record<string, PieceInfoEntry>, key: string): string | undefined => {
   const entry = entries[key];
@@ -83,12 +87,14 @@ export function createLibraryWrites(
 
   const createLibrary = async (
     name: string,
-    options?: { id?: string; kind?: string; categories?: string[] },
-  ): Promise<string> => {
+    options?: CreateLibraryOptions,
+  ): Promise<{ library: StampLibrary }> => {
+    const signal = options?.signal;
+    throwIfCancelled(signal);
     const kind = options?.kind ?? DEFAULT_LIBRARY_KIND;
     const taken = new Set(Object.keys(ctx.state.get().libraries));
     const id = allocateId(options?.id, 'stamp-lib', taken);
-    const doc = await openAssetDocument(blankLibraryPdf());
+    const doc = await ctx.cancellable(signal, openAssetDocument(blankLibraryPdf()));
     let bytes: Uint8Array;
     try {
       await doc.metadata.update({ title: name });
@@ -100,24 +106,28 @@ export function createLibraryWrites(
     } finally {
       await doc.close();
     }
-    libraryBinaries.set(id, bytes);
-    ctx.state.update(addLibrary, {
+    throwIfCancelled(signal);
+    const library: StampLibrary = {
       id,
       name,
       kind,
       assetIds: [],
       ...(options?.categories ? { categories: options.categories } : {}),
-    });
+    };
+    libraryBinaries.set(id, bytes);
+    ctx.state.update(addLibrary, library);
     libraryChanged.emit({ libraryId: id, reason: 'created' });
-    libraryCreated.emit({ libraryId: id, library: ctx.state.get().libraries[id] ?? null });
-    return id;
+    libraryCreated.emit({ libraryId: id, library });
+    return { library };
   };
 
   const importLibrary = async (
     source: BinarySource,
     options?: ImportLibraryOptions,
-  ): Promise<string> => {
-    const resolved = await resolveBinarySource(source);
+  ): Promise<{ library: StampLibrary }> => {
+    const signal = options?.signal;
+    throwIfCancelled(signal);
+    const resolved = await ctx.cancellable(signal, resolveBinarySource(source));
     const meta = sniffBinaryMetadata(resolved.bytes);
     if (meta?.mimeType !== 'application/pdf') {
       throw stampError(
@@ -125,7 +135,7 @@ export function createLibraryWrites(
         'importLibrary needs PDF bytes (use createAsset for a raster image)',
       );
     }
-    const doc = await openAssetDocument(new Uint8Array(resolved.bytes));
+    const doc = await ctx.cancellable(signal, openAssetDocument(new Uint8Array(resolved.bytes)));
     let imported:
       | {
           library: StampLibrary;
@@ -285,6 +295,7 @@ export function createLibraryWrites(
       await doc.close();
     }
 
+    throwIfCancelled(signal);
     libraryBinaries.set(imported.library.id, imported.canonicalBytes);
     ctx.state.update(addLibrary, imported.library);
     for (const { asset, bytes, preview } of imported.assets) {
@@ -296,7 +307,7 @@ export function createLibraryWrites(
     for (const { asset } of imported.assets) {
       assetCreated.emit({ assetId: asset.id, libraryId: imported.library.id, asset });
     }
-    return imported.library.id;
+    return { library: ctx.state.get().libraries[imported.library.id] ?? imported.library };
   };
 
   const dropLibrary = (id: string): void => {
@@ -311,55 +322,68 @@ export function createLibraryWrites(
     ctx.state.update(removeLibrary, id);
   };
 
-  const deleteLibrary = (id: string): Promise<void> =>
-    mutateLibrary(id, async () => {
-      const existed = ctx.state.get().libraries[id] !== undefined;
-      dropLibrary(id);
-      if (existed) {
-        libraryChanged.emit({ libraryId: id, reason: 'removed' });
-        libraryDeleted.emit({ libraryId: id, library: null });
-      }
-    });
+  const deleteLibrary = (id: string, options?: OperationOptions): Promise<void> =>
+    mutateLibrary(
+      id,
+      async () => {
+        const existed = ctx.state.get().libraries[id] !== undefined;
+        dropLibrary(id);
+        if (existed) {
+          libraryChanged.emit({ libraryId: id, reason: 'removed' });
+          libraryDeleted.emit({ libraryId: id, library: null });
+        }
+      },
+      options?.signal,
+    );
 
   const updateLibrary = async (
     id: string,
-    patch: { name?: string; categories?: string[] },
-  ): Promise<void> => {
+    patch: StampLibraryPatch,
+    options?: OperationOptions,
+  ): Promise<{ library: StampLibrary }> => {
+    const signal = options?.signal;
+    throwIfCancelled(signal);
     if (!ctx.state.get().libraries[id]) throw notFound('library', id);
-    return mutateLibrary(id, async () => {
-      const library = ctx.state.get().libraries[id];
-      if (!library) throw notFound('library', id);
-      const canonicalBytes = libraryBinaries.get(id);
-      if (!canonicalBytes) {
-        throw stampError('operation-failed', `canonical bytes are missing for library '${id}'`);
-      }
-      const next: StampLibrary = {
-        ...library,
-        ...(patch.name !== undefined ? { name: patch.name } : {}),
-        ...(patch.categories !== undefined ? { categories: patch.categories } : {}),
-      };
-      const doc = await openAssetDocument(canonicalBytes);
-      let rewritten: Uint8Array | undefined;
-      try {
-        // The name is the PDF's /Title; kind, id, categories, locale ride PieceInfo.
-        if (next.name !== library.name) await doc.metadata.update({ title: next.name });
-        await doc.pieceInfo.update(
-          STAMP_LIBRARY_PIECEINFO_APP,
-          stampLibraryPieceInfo(id, {
-            kind: next.kind,
-            categories: next.categories,
-            locale: next.locale,
-          }),
-        );
-        rewritten = await doc.download();
-      } finally {
-        await doc.close();
-      }
-      libraryBinaries.set(id, rewritten);
-      ctx.state.update(setLibrary, next);
-      libraryChanged.emit({ libraryId: id, reason: 'updated' });
-      libraryUpdated.emit({ libraryId: id, library: next });
-    });
+    return mutateLibrary(
+      id,
+      async () => {
+        const library = ctx.state.get().libraries[id];
+        if (!library) throw notFound('library', id);
+        const canonicalBytes = libraryBinaries.get(id);
+        if (!canonicalBytes) {
+          throw stampError('operation-failed', `canonical bytes are missing for library '${id}'`);
+        }
+        const next: StampLibrary = {
+          ...library,
+          ...(patch.name !== undefined ? { name: patch.name } : {}),
+          ...(patch.categories !== undefined ? { categories: patch.categories } : {}),
+        };
+        const doc = await ctx.cancellable(signal, openAssetDocument(canonicalBytes));
+        let rewritten: Uint8Array | undefined;
+        try {
+          // The name is the PDF's /Title; kind, id, categories, locale ride PieceInfo.
+          if (next.name !== library.name) await doc.metadata.update({ title: next.name });
+          await doc.pieceInfo.update(
+            STAMP_LIBRARY_PIECEINFO_APP,
+            stampLibraryPieceInfo(id, {
+              kind: next.kind,
+              categories: next.categories,
+              locale: next.locale,
+            }),
+          );
+          rewritten = await doc.download();
+        } finally {
+          await doc.close();
+        }
+        throwIfCancelled(signal);
+        libraryBinaries.set(id, rewritten);
+        ctx.state.update(setLibrary, next);
+        libraryChanged.emit({ libraryId: id, reason: 'updated' });
+        libraryUpdated.emit({ libraryId: id, library: next });
+        return { library: next };
+      },
+      signal,
+    );
   };
 
   return {

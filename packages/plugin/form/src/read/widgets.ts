@@ -1,6 +1,6 @@
 /**
- * The widget plane's reads: per-page widget geometry (the `widgetBoxes`
- * mirror), the fill projection with session authority fused in, and the
+ * The widget plane's reads: each page's widgets (the `widgetBoxes` mirror),
+ * the fill projection with the session's fill permission folded in, and the
  * widget hit test.
  */
 import { memoByKey } from '@embedpdf/core';
@@ -9,7 +9,9 @@ import type { PageRef } from '@embedpdf/engine-core/runtime';
 import type { FormHostCapability } from '../host-contract';
 import { boxContains, fieldForWidget, widgetAt, type Box, type WidgetHit } from '../model';
 import type { FormContext, FormServices } from '../services';
-import { fillItemForWidget, fillItems, type FillItem } from './fill-items';
+import { fillItems, type FormWidgetItem } from './fill-items';
+
+const NO_WIDGETS: readonly FormWidgetItem[] = Object.freeze([]);
 
 export function createWidgetReads(
   ctx: FormContext,
@@ -20,21 +22,26 @@ export function createWidgetReads(
   }: Pick<FormServices, 'fields' | 'widgetBoxes' | 'siblings'>,
 ) {
   const annotationHost = siblings.annotation;
-  const loadBoxes = (page: PageRef): Promise<void> =>
+  const loadWidgets = (page: PageRef): Promise<void> =>
     widgetBoxes.ensureLoaded(page).catch(() => {
       /* the failure is reported through the page's status */
     });
 
   /**
-   * The widget under a page point. Uses the page's loaded geometry, starting
-   * its load when missing; until it lands, falls back to the annotation
+   * The widget under a page point. Uses the page's loaded widgets, starting
+   * their load when missing; until it lands, falls back to the annotation
    * plane's live boxes, which are loaded for the whole document, so a first
    * click on a page already resolves.
    */
-  const getWidgetAt = (page: PageRef, point: { x: number; y: number }): WidgetHit | null => {
-    const boxes = widgetBoxes.get(page);
-    if (boxes) return widgetAt(fields.get(), boxes, point);
-    void loadBoxes(page);
+  const getWidgetAt = (
+    pageArgument: PageRef | number,
+    point: { x: number; y: number },
+  ): WidgetHit | null => {
+    const page = ctx.getPage(pageArgument)?.ref;
+    if (!page) return null;
+    const widgets = widgetBoxes.get(page);
+    if (widgets) return widgetAt(fields.get(), widgets, point);
+    void loadWidgets(page);
     if (!annotationHost) return null;
     let best: WidgetHit | null = null;
     for (const item of annotationHost.listPageItems(page)) {
@@ -49,40 +56,23 @@ export function createWidgetReads(
     return best;
   };
 
-  // Session fill authority fuses into the same `disabled` flag a field's
-  // ReadOnly flag feeds: without `doc.forms.fill` every widget renders inert,
-  // so the controls never offer a write the engine would refuse.
-  const fuseFill = (item: FillItem | null, fillable: boolean): FillItem | null =>
-    item === null || fillable || item.disabled ? item : { ...item, disabled: true };
+  // Without `doc.forms.fill` every widget is `disabled`, the same flag a
+  // field's read-only flag sets, so the controls never offer a write the
+  // engine would refuse.
+  const withFillPermission = (item: FormWidgetItem, fillable: boolean): FormWidgetItem =>
+    fillable || item.disabled ? item : { ...item, disabled: true };
 
-  const listFillItems = memoByKey(
+  const widgetsOfPage = memoByKey(
     (pageObjectNumber: number) => [
       fields.get(),
       widgetBoxes.get({ kind: 'objectNumber', objectNumber: pageObjectNumber }),
       ctx.state.get().writing,
       ctx.allows('doc.forms.fill'),
     ],
-    (pageObjectNumber, index, boxes, writing, fillable) =>
-      fillItems(index, pageObjectNumber, boxes, writing).map(
-        (item) => fuseFill(item, fillable) as FillItem,
+    (pageObjectNumber, index, widgets, writing, fillable): readonly FormWidgetItem[] =>
+      fillItems(index, pageObjectNumber, widgets, writing).map((item) =>
+        withFillPermission(item, fillable),
       ),
-  );
-
-  const getFillItem = memoByKey(
-    (annotObjectNumber: number) => {
-      const index = fields.get();
-      const page = fieldForWidget(index, annotObjectNumber)?.widgets.find(
-        (widget) => widget.objectNumber === annotObjectNumber,
-      )?.page;
-      return [
-        index,
-        page ? widgetBoxes.get(page)?.[annotObjectNumber] : undefined,
-        ctx.state.get().writing,
-        ctx.allows('doc.forms.fill'),
-      ];
-    },
-    (annotObjectNumber, index, box, writing, fillable) =>
-      fuseFill(fillItemForWidget(index, annotObjectNumber, box, writing), fillable),
   );
 
   /** The page's content box (`{0, 0, width, height}`), for page-bound placement. */
@@ -94,10 +84,11 @@ export function createWidgetReads(
   return {
     getPageBox,
     api: {
-      listFillItems: (page: PageRef) => listFillItems(page.objectNumber),
-      listWidgets: (page: PageRef) => listFillItems(page.objectNumber),
-      getFillItem,
-      ensureLoaded: loadBoxes,
+      listWidgets: (pageArgument) => {
+        const page = ctx.getPage(pageArgument)?.ref;
+        return page ? widgetsOfPage(page.objectNumber) : NO_WIDGETS;
+      },
+      ensureLoaded: loadWidgets,
       getWidgetAt,
       getPageBox,
     } satisfies Partial<FormHostCapability>,

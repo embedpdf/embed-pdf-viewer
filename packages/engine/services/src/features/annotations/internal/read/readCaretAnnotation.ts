@@ -1,6 +1,6 @@
 import type {
   AnnotationBase,
-  CaretAnnotationDTO,
+  CaretAnnotation,
   Color,
   PdfCoordinates,
 } from '@embedpdf/engine-core/runtime';
@@ -18,7 +18,7 @@ export function readCaret(
   mem: PdfRuntimeMemory,
   annotPtr: Ptr,
   base: AnnotationBase<PdfCoordinates>,
-): CaretAnnotationDTO<PdfCoordinates> {
+): CaretAnnotation<PdfCoordinates> {
   const color = readAnnotColor(fn, mem, annotPtr) ?? DEFAULT_CARET_COLOR;
   const ca = readAnnotOpacity(fn, mem, annotPtr);
   const opacity = ca == null ? 1 : Math.max(0, Math.min(1, ca));

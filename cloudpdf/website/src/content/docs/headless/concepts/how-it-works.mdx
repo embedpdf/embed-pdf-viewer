@@ -142,6 +142,11 @@ through a template reference, `<epdf-stage #stage="epdfStage">`, or `viewChild(E
 
 <Snippet name="concepts/match-announcer" />
 
+All four together: the API searches, the state shows the count, the event announces each finished
+search, and the settings change the highlight color.
+
+<Example name="how-it-works/hooks" />
+
 <Fw only={['react', 'vue', 'svelte']}>
 
 A few <Word of="hooks" /> read one specific thing and are named after it, such as
@@ -172,6 +177,8 @@ plugin gives you is in page coordinates, and the layer places it.
 **Overlays** float above the pages, attached to something on them: a menu next to the selected
 text, a card next to an annotation. They go <Fw only="react">in the Stage's `overlay`</Fw><Fw only="vue">in the Stage's `#overlay` slot</Fw><Fw only="svelte">in the Stage's `overlay` snippet</Fw><Fw only="angular">inside `<epdf-stage>`, next to the page template</Fw>, which keeps them attached
 while the user scrolls and zooms. See [Menus over the page](../ui/anchored).
+
+<Example name="how-it-works/layers" />
 
 ## Settings
 

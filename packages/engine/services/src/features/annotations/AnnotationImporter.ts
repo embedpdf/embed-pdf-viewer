@@ -10,7 +10,7 @@ import {
   type AnnotationActor,
   type AnnotationBundleLimits,
   type AnnotationDraft,
-  type AnnotationDTO,
+  type Annotation,
   type AnnotationImportPages,
   type AnnotationImportResult,
   type WireAnnotationBundle,
@@ -173,7 +173,7 @@ export class AnnotationImporter {
 function attributionOf(
   request: AnnotationImportRequest,
   draft: AnnotationDraft,
-  data: AnnotationDTO,
+  data: Annotation,
 ): BatchCreate['attribution'] {
   const { actor } = request;
   if (request.attribution === 'stamp') {

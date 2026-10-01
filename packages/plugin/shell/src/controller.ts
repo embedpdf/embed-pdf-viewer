@@ -5,7 +5,14 @@
  */
 import { memo, memoByKey, type PluginContext } from '@embedpdf/core';
 
-import type { MenuEvent, ShellCapability, SurfaceEvent, SurfaceState } from './contract';
+import type {
+  MenuClosedEvent,
+  MenuOpenedEvent,
+  ShellCapability,
+  SurfaceClosedEvent,
+  SurfaceOpenedEvent,
+  SurfaceState,
+} from './contract';
 import {
   applySnapshot,
   closeAllMenus,
@@ -21,10 +28,10 @@ import {
 } from './model';
 
 export function createShellController(ctx: PluginContext<ShellState>) {
-  const surfaceOpened = ctx.events.source<SurfaceEvent>();
-  const surfaceClosed = ctx.events.source<SurfaceEvent>();
-  const menuOpened = ctx.events.source<MenuEvent>();
-  const menuClosed = ctx.events.source<MenuEvent>();
+  const surfaceOpened = ctx.events.source<SurfaceOpenedEvent>();
+  const surfaceClosed = ctx.events.source<SurfaceClosedEvent>();
+  const menuOpened = ctx.events.source<MenuOpenedEvent>();
+  const menuClosed = ctx.events.source<MenuClosedEvent>();
 
   ctx.state.onChange(({ previous, next }) => {
     if (previous.surfaces !== next.surfaces) {
@@ -33,7 +40,8 @@ export function createShellController(ctx: PluginContext<ShellState>) {
         const wasOpen = previous.surfaces[id]?.open ?? false;
         const isOpen = next.surfaces[id]?.open ?? false;
         if (wasOpen === isOpen) continue;
-        (isOpen ? surfaceOpened : surfaceClosed).emit({ id, props: next.surfaces[id]?.props });
+        if (isOpen) surfaceOpened.emit({ id, props: next.surfaces[id].props });
+        else surfaceClosed.emit({ id });
       }
     }
     if (previous.openMenus !== next.openMenus) {

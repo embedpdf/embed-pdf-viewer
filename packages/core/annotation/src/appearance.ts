@@ -35,7 +35,7 @@
 import {
   appearanceChangeOf,
   resolveAnnotationPatch,
-  type AnnotationDTO,
+  type Annotation,
   type AnnotationPatch,
 } from '@embedpdf/engine-core/runtime';
 
@@ -49,10 +49,10 @@ import type { Id, Model, ModelAnnotation, Shape, Rect, ViewEnv } from './types';
 export type DrawState = Pick<ModelAnnotation, 'source' | 'apBox'>;
 
 /** Has the annotation a live drawing? Stamps, form widgets and links don't: their raster is the drawing. */
-const drawsLive = (annotation: AnnotationDTO): boolean => !kindOf(annotation).caps.rasterOnly;
+const drawsLive = (annotation: Annotation): boolean => !kindOf(annotation).caps.rasterOnly;
 
 /** How a record this session creates is drawn at first. */
-export const sourceOfNew = (annotation: AnnotationDTO): ModelAnnotation['source'] =>
+export const sourceOfNew = (annotation: Annotation): ModelAnnotation['source'] =>
   drawsLive(annotation) ? 'vector' : 'baked';
 
 /**
@@ -61,7 +61,7 @@ export const sourceOfNew = (annotation: AnnotationDTO): ModelAnnotation['source'
  * appearance for it; otherwise from the engine's raster.
  */
 export const sourceOfConfirmed = (
-  annotation: AnnotationDTO,
+  annotation: Annotation,
   vector: boolean,
 ): ModelAnnotation['source'] =>
   drawsLive(annotation) && (vector || !annotation.hasAppearance) ? 'vector' : 'baked';

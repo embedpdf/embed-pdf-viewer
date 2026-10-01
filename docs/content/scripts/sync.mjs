@@ -54,17 +54,12 @@ const MOUNTS = {
     { from: 'engine', to: 'src/content/docs/engine', swapsEngineImports: true },
     { from: 'viewer', to: 'src/content/docs/viewer' },
   ],
+  // Every folder of live examples (samples/<area>/), so a new area needs no entry here.
   samples: [
-    { from: 'samples/stage', to: 'src/samples/stage' },
-    { from: 'samples/render', to: 'src/samples/render' },
-    { from: 'samples/selection', to: 'src/samples/selection' },
-    { from: 'samples/search', to: 'src/samples/search' },
-    { from: 'samples/page-edit', to: 'src/samples/page-edit' },
-    { from: 'samples/stamp', to: 'src/samples/stamp' },
-    { from: 'samples/annotation', to: 'src/samples/annotation' },
-    { from: 'samples/signature', to: 'src/samples/signature' },
-    { from: 'samples/getting-started', to: 'src/samples/getting-started' },
-    { from: 'samples/viewer', to: 'src/samples/viewer' },
+    ...fs
+      .readdirSync(path.join(contentRoot, 'samples'), { withFileTypes: true })
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => ({ from: `samples/${entry.name}`, to: `src/samples/${entry.name}` })),
     // Code-only snippets, one file per framework (<Snippet name>); demos never build them.
     { from: 'snippets', to: 'src/samples/snippets' },
   ],

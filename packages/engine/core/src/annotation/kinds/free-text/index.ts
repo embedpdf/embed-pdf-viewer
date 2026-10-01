@@ -7,7 +7,7 @@ import { FreeTextDeclaration } from './declaration';
 export { FreeTextDeclaration } from './declaration';
 export { RichTextDocumentInputSchema, RichTextDocumentSchema } from './values';
 
-export type FreeTextAnnotationDTO<C extends Coordinates = PageCoordinates> = ReadOf<
+export type FreeTextAnnotation<C extends Coordinates = PageCoordinates> = ReadOf<
   typeof FreeTextDeclaration,
   C
 >;
@@ -26,7 +26,7 @@ export const FreeTextPatchSchema = FreeTextDeclaration.updateSchema;
 
 export const FreeTextKind: AnnotationKindModule<
   'free-text',
-  FreeTextAnnotationDTO,
+  FreeTextAnnotation,
   FreeTextDraft,
   FreeTextPatch
 > = {

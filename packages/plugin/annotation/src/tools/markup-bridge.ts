@@ -60,8 +60,7 @@ export function wireMarkup(
     annotation.applyToolToSelection(interaction.getActiveToolId());
   });
   interaction.onToolChanged(() => {
-    if (!selection.isGestureActive())
-      annotation.applyToolToSelection(interaction.getActiveToolId());
+    if (!selection.isSelecting()) annotation.applyToolToSelection(interaction.getActiveToolId());
     sync(); // entering/leaving a markup tool → restore blue / clear ghost
   });
 }

@@ -1,18 +1,9 @@
-/* Colors, for light and dark */
+/* Colors */
 :root {
   --muted: #5a6b92;
   --line: #e6eaf2;
   --canvas: #f7f9fc;
   --shadow: rgb(7 32 76 / 0.04);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --muted: #93a3c7;
-    --line: #27365f;
-    --canvas: #0b1328;
-    --shadow: rgb(0 0 0 / 0.3);
-  }
 }
 
 /* The pages */

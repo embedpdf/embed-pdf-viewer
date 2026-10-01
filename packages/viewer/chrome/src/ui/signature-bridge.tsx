@@ -33,7 +33,7 @@ export function SignatureBridge() {
   );
   // The notice lives in the signatures panel; make sure it is seen.
   useSignatureEvent(
-    (signature) => signature.onInvalidating,
+    (signature) => signature.onInvalidationPredicted,
     () => shell.open('signatures', { exclusive: 'right' }),
   );
   return null;

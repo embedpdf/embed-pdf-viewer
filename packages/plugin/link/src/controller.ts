@@ -1,9 +1,15 @@
-import { PluginError, type PluginContext, type DocumentEvent, type PageRef } from '@embedpdf/core';
+import {
+  PluginError,
+  type PluginContext,
+  type DocumentEvent,
+  type OperationOptions,
+  type PageRef,
+} from '@embedpdf/core';
 import type { Point } from '@embedpdf/core-geometry';
 import type { PdfLinkTarget } from '@embedpdf/engine-core/runtime';
 import { ActionsToken } from '@embedpdf/plugin-actions/contract';
 import { AnnotationToken as AnnotationHostToken } from '@embedpdf/plugin-annotation/contract/host';
-import { InteractionToken } from '@embedpdf/plugin-interaction/contract';
+import { InteractionToken } from '@embedpdf/plugin-interaction/contract/host';
 import { StageToken } from '@embedpdf/plugin-stage/contract';
 
 import { connectLink } from './connect';
@@ -15,7 +21,7 @@ import type {
   LinkLoadedEvent,
   LinkResolution,
 } from './contract';
-import type { LinkHostCapability } from './host-contract';
+import type { LinkHostCapability, UriOpener } from './host-contract';
 import { linksOf } from './source';
 
 const EMPTY: readonly Link[] = Object.freeze([]);
@@ -90,15 +96,27 @@ export function createLinkController(ctx: PluginContext<void>) {
     },
   });
 
-  const listLinks = (page: PageRef): readonly Link[] => {
+  // Reads take a page's ref or its index; a page that isn't there has no links.
+  const listLinks = (pageArgument: PageRef | number): readonly Link[] => {
+    const page = ctx.getPage(pageArgument)?.ref;
+    if (!page) return EMPTY;
     const host = annotationHost();
     if (host) return host.listLinkItems(page);
     return pages.get(page) ?? EMPTY;
   };
 
-  const ensureLoaded = (page: PageRef): Promise<void> =>
+  const ensureLoaded = async (
+    pageArgument: PageRef | number,
+    options?: OperationOptions,
+  ): Promise<void> => {
+    const { ref } = ctx.pageOf(pageArgument);
     // With the annotation plugin installed, its model owns the data.
-    annotationHost() ? Promise.resolve() : pages.ensureLoaded(page);
+    if (annotationHost()) return;
+    await ctx.cancellable(options?.signal, pages.ensureLoaded(ref));
+  };
+
+  // The framework's website openers, the latest first: the plugin never opens one itself.
+  const uriOpeners: UriOpener[] = [];
 
   const resolve = (target: PdfLinkTarget): LinkResolution => {
     switch (target.kind) {
@@ -129,13 +147,17 @@ export function createLinkController(ctx: PluginContext<void>) {
     const resolution = resolve(target);
     switch (resolution.kind) {
       case 'destination': {
-        const stage = ctx.tryGet(StageToken);
+        // The view the link was followed in, by its own scroll behavior.
+        const stage = context?.stage ?? ctx.tryGet(StageToken);
         if (!stage) return { outcome: 'destination', destination: resolution.destination };
-        stage.goToDestination(resolution.destination, { behavior: 'smooth' });
+        stage.goToDestination(resolution.destination);
         return { outcome: 'revealed' };
       }
-      case 'uri':
-        return { outcome: 'uri', uri: resolution.uri };
+      case 'uri': {
+        const open = uriOpeners[0];
+        if (!open || open(resolution.uri)) return { outcome: 'uri', uri: resolution.uri };
+        return { outcome: 'reported', target };
+      }
       case 'named':
         return { outcome: 'named', name: resolution.name };
       default:
@@ -153,7 +175,7 @@ export function createLinkController(ctx: PluginContext<void>) {
     return activation;
   };
 
-  const getLinkAt = (page: PageRef, point: Point): Link | null => {
+  const getLinkAt = (page: PageRef | number, point: Point): Link | null => {
     let best: Link | null = null;
     for (const link of listLinks(page)) {
       if (!contains(link.bounds, point)) continue;
@@ -185,25 +207,42 @@ export function createLinkController(ctx: PluginContext<void>) {
     listLinks,
     getLink: (page, linkId) => listLinks(page).find((link) => link.id === linkId) ?? null,
     getLinkAt,
-    listAllLinks: async () => {
+    listAllLinks: async (options) => {
       const layouts = ctx.document()?.pages ?? [];
-      await Promise.all(layouts.map((layout) => ensureLoaded(layout.ref)));
+      await ctx.cancellable(
+        options?.signal,
+        Promise.all(layouts.map((layout) => ensureLoaded(layout.ref, options))),
+      );
       return layouts.flatMap((layout) => listLinks(layout.ref));
     },
     ensureLoaded,
-    isLoaded: (page) => annotationHost() !== null || pages.getStatus(page) === 'ready',
-    getStatus: (page) => (annotationHost() ? 'ready' : pages.getStatus(page)),
+    isLoaded: (page) => {
+      const ref = ctx.getPage(page)?.ref;
+      return !!ref && (annotationHost() !== null || pages.getStatus(ref) === 'ready');
+    },
+    getStatus: (page) => {
+      const ref = ctx.getPage(page)?.ref;
+      if (!ref) return 'idle';
+      return annotationHost() ? 'ready' : pages.getStatus(ref);
+    },
     resolve,
     activate,
-    activateAt: (page, point, context) => {
+    activateAt: (pageArgument, point, context) => {
+      const page = ctx.pageOf(pageArgument).ref;
       const link = getLinkAt(page, point);
       return link ? activate(link, { page, ...context }) : null;
     },
     getLabel,
     onActivated: activated.on,
     onLoaded: loaded.on,
-    isNavigationEngaged: () =>
-      ctx.tryGet(InteractionToken)?.getActiveTool()?.enables.has('link-nav') ?? false,
+    registerUriOpener: (opener) => {
+      uriOpeners.unshift(opener);
+      return () => {
+        const index = uriOpeners.indexOf(opener);
+        if (index >= 0) uriOpeners.splice(index, 1);
+      };
+    },
+    isNavigationEngaged: () => ctx.tryGet(InteractionToken)?.activeToolEnables('link-nav') ?? false,
   };
 
   return {

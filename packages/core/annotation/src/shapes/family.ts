@@ -5,7 +5,7 @@
  * (`kinds/`), and `familyOf` finds the family of any shape. The compiler
  * checks that a family answers every question, so a new family is one file.
  */
-import type { AnnotationDTO } from '@embedpdf/engine-core/runtime';
+import type { Annotation } from '@embedpdf/engine-core/runtime';
 
 import type { PaintedPiece } from '../painted';
 import type {
@@ -26,7 +26,7 @@ export interface ShapeFamily<S extends Shape = Shape> {
   /* ── reading and writing: the shape is engine fields ─────────────────── */
 
   /** The shape, read off an annotation of a kind in this family. */
-  read(annotation: AnnotationDTO): S;
+  read(annotation: Annotation): S;
   /** The engine fields that state `shape` on an annotation of `subtype`. */
   write(shape: S, subtype: string): FieldValues;
   /**
@@ -34,7 +34,7 @@ export interface ShapeFamily<S extends Shape = Shape> {
    * or segment, `placement.ts`) for `annotation`, what the tool creates before
    * it has a shape; `null` when this family's kinds aren't made that way.
    */
-  placed(placement: Placement, annotation: AnnotationDTO): S | null;
+  placed(placement: Placement, annotation: Annotation): S | null;
 
   /* ── where it is ─────────────────────────────────────────────────────── */
 

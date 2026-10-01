@@ -1,7 +1,7 @@
 /** The link plugin's wiring to its siblings, run from the controller's `connect`. */
 import type { PluginContext } from '@embedpdf/core';
 import { AnnotationToken } from '@embedpdf/plugin-annotation/contract/host';
-import { InteractionToken } from '@embedpdf/plugin-interaction/contract';
+import { InteractionToken } from '@embedpdf/plugin-interaction/contract/host';
 
 /**
  * Links are annotations: while a navigation tool is active the link layer
@@ -16,7 +16,7 @@ export function connectLink(ctx: PluginContext<void>): void {
     annotation.registerBehavior({
       id: 'link-nav',
       matches: (target) => target.subtype === 'link',
-      engaged: () => interaction.getActiveTool()?.enables.has('link-nav') ?? false,
+      engaged: () => interaction.activeToolEnables('link-nav'),
     }),
   );
 }

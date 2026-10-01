@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import type { AnnotationDTO } from '../../src/annotation/kinds';
+import type { Annotation } from '../../src/annotation/kinds';
 import { EngineErrorCode } from '../../src/errors/EngineErrorCode';
 import type { AnnotationRef } from '../../src/identity/AnnotationRef';
 import { toPageRef, type PageRef } from '../../src/identity/PageRef';
@@ -21,7 +21,7 @@ function annotation(
   annotObjectNumber: number,
   index: number,
   fields: Record<string, unknown> = {},
-): AnnotationDTO {
+): Annotation {
   return {
     subtype: 'text',
     ref: refOf(page, annotObjectNumber),
@@ -30,7 +30,7 @@ function annotation(
     reply: null,
     popup: null,
     ...fields,
-  } as unknown as AnnotationDTO;
+  } as unknown as Annotation;
 }
 
 /**
@@ -39,7 +39,7 @@ function annotation(
  * (14). A reply is on its parent's page (ISO 32000-2 §12.5.6.2). The second
  * page holds an unrelated square (21).
  */
-const document: Record<number, AnnotationDTO[]> = {
+const document: Record<number, Annotation[]> = {
   3: [
     annotation(first, 10, 0, { popup: refOf(first, 11) }),
     annotation(first, 11, 1, { subtype: 'popup', parent: refOf(first, 10) }),

@@ -116,10 +116,17 @@ function writeFileChange(
 ): void {
   const bytes = ctx?.resources?.file;
   if (metadata === undefined && bytes === undefined) return;
-  if (metadata === null) {
-    throw new EngineError(EngineErrorCode.InvalidArg, "a file attachment's file can't be removed");
-  }
   let attachmentPtr = fn.FPDFAnnot_GetFileAttachment(annotPtr);
+  if (metadata === null) {
+    if (attachmentPtr) {
+      throw new EngineError(
+        EngineErrorCode.InvalidArg,
+        "a file attachment's file can't be removed",
+      );
+    }
+    // The `null` a read returns for an annotation without a file, sent back: nothing changes.
+    if (bytes === undefined) return;
+  }
   const current: AttachmentFileInfo | null = attachmentPtr
     ? readAttachmentFileInfo(fn, mem, attachmentPtr)
     : null;

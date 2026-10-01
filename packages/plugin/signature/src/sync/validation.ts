@@ -5,37 +5,33 @@
  * `onValidated` fires where one completes. Re-judging after an edit waits
  * for a pause: a pen stroke is many events, one analysis.
  */
-import {
-  validateSignatures,
-  type SignatureVerdict,
-  type ValidationTime,
-} from '@embedpdf/core-signature';
+import { validateSignatures, type SignatureVerdict } from '@embedpdf/core-signature';
 
-import type { SignatureConfig } from '../contract';
+import type { SignatureValidateOptions } from '../contract';
 import { setVerdicts } from '../model';
 import type { SignatureContext, SignatureServices } from '../services';
 
 const REVALIDATE_DELAY_MS = 300;
 
-export interface ValidateOptions {
-  readonly at?: ValidationTime;
-  readonly until?: 'persisted' | 'working-copy';
-}
-
 export function createValidation(
   ctx: SignatureContext,
   { events }: Pick<SignatureServices, 'events'>,
-  config: SignatureConfig,
 ) {
   const { validated } = events;
+  const settings = ctx.settings();
 
-  const validate = async (options?: ValidateOptions): Promise<readonly SignatureVerdict[]> => {
+  const validate = async (
+    options?: SignatureValidateOptions,
+  ): Promise<readonly SignatureVerdict[]> => {
     if (!ctx.doc.signatures) return [];
-    const verdicts = await validateSignatures(ctx.doc, {
-      trust: config.trust ?? null,
-      at: options?.at,
-      until: options?.until ?? 'working-copy',
-    });
+    const verdicts = await ctx.cancellable(
+      options?.signal,
+      validateSignatures(ctx.doc, {
+        trust: settings.get().trust,
+        at: options?.at,
+        until: options?.until ?? 'working-copy',
+      }),
+    );
     ctx.state.update(setVerdicts, verdicts);
     validated.emit({ verdicts });
     return verdicts;

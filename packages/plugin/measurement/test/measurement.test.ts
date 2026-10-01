@@ -10,7 +10,9 @@ import {
 import { InteractionToken } from '@embedpdf/plugin-interaction/contract';
 
 import { createMeasurementController } from '../src/controller';
-import { initialMeasurementState, type MeasurementState } from '../src/model';
+import { MEASUREMENT_DEFAULTS, type MeasurementConfig } from '../src/contract';
+import { initialMeasurementState } from '../src/model';
+import { measurementState } from '../src/state';
 
 const PAGE = toPageRef(1);
 const PAGE_BOX = { x: 0, y: 0, width: 600, height: 800 };
@@ -37,6 +39,7 @@ function harness(
     engine?: boolean;
     viewports?: PageMeasurementViewport[];
     failReads?: boolean;
+    config?: MeasurementConfig;
   } = {},
 ) {
   const draftCaptured = createEventHook<CapturedAnnotationDraft>();
@@ -51,16 +54,18 @@ function harness(
     })),
     onDraftCaptured: draftCaptured.on,
     get: () => null,
-    getToolDefaults: () => ({
-      color: '#ef4444',
-      interiorColor: null,
-      strokeWidth: 1,
-      opacity: 1,
-      lineEndings: { start: 'closed-arrow', end: 'closed-arrow' },
-      captionEnabled: true,
-      captionPosition: 'inline',
-      leader: { length: 12, extension: 5, offset: 0 },
-    }),
+    tools: {
+      getDefaults: () => ({
+        color: '#ef4444',
+        interiorColor: null,
+        strokeWidth: 1,
+        opacity: 1,
+        lineEndings: { start: 'closed-arrow', end: 'closed-arrow' },
+        captionEnabled: true,
+        captionPosition: 'inline',
+        leader: { length: 12, extension: 5, offset: 0 },
+      }),
+    },
     create: vi.fn(async () => ({
       annotation: { ref: { kind: 'objectNumber', objectNumber: 9, page: PAGE } },
     })),
@@ -80,9 +85,14 @@ function harness(
       return result;
     }),
   };
-  const ctx = createTestContext<MeasurementState>({
+  const ctx = createTestContext({
     id: 'measurement',
     state: initialMeasurementState(),
+    settings: {
+      defaults: MEASUREMENT_DEFAULTS,
+      registered: options.config,
+      whole: ['defaultScale'],
+    },
     pages: [{ ref: PAGE, size: { width: 600, height: 800 } }],
     capabilities: [
       [AnnotationToken, annotation],
@@ -96,7 +106,7 @@ function harness(
       page: () => ({ measure: options.engine ? service : undefined }),
     } as never,
   });
-  const measurement = ctx.connect(createMeasurementController(ctx, {}));
+  const measurement = ctx.connect(createMeasurementController(ctx));
   return {
     ctx,
     measurement,
@@ -186,15 +196,15 @@ describe('measurement', () => {
   it('creates a measurement annotation through the annotation plugin, with the page’s scale', async () => {
     const { measurement, annotation } = harness({ viewports: [owned(ONE_TO_HUNDRED)] });
     await settle();
-    const ref = await measurement.createMeasurement({
+    const { annotation: created } = await measurement.createMeasurement({
       kind: 'distance',
-      page: PAGE,
+      page: 0,
       points: [
         { x: 0, y: 0 },
         { x: 10, y: 0 },
       ],
     });
-    expect(ref).toMatchObject({ objectNumber: 9 });
+    expect(created.ref).toMatchObject({ objectNumber: 9 });
     // A dimension line: the tool's style, caption and leader, and the page's scale.
     expect(annotation.create).toHaveBeenCalledWith(
       PAGE,
@@ -209,6 +219,8 @@ describe('measurement', () => {
         leader: { length: 12, extension: 5, offset: 0 },
         measure: expect.objectContaining({ subtype: 'rectilinear' }),
       }),
+      undefined,
+      { signal: undefined },
     );
     await expect(
       measurement.createMeasurement({ kind: 'distance', page: PAGE, points: [{ x: 0, y: 0 }] }),
@@ -349,5 +361,87 @@ describe('page viewports from the engine', () => {
 
     expect(service.listViewports).toHaveBeenCalledTimes(2);
     expect(measurement.getPageScale(inserted).ready).toBe(true);
+  });
+
+  it('refuses to start calibrating without doc.annotate.modify, and names the permission', () => {
+    const { measurement, interaction } = harness({ allowed: false });
+    expect(measurement.canCalibrate()).toBe(false);
+    expect(() => measurement.startCalibration()).toThrow(
+      expect.objectContaining({ code: 'permission-denied', permission: 'doc.annotate.modify' }),
+    );
+    expect(interaction.activateTool).not.toHaveBeenCalled();
+  });
+
+  it('takes a page as a ref or an index, and refuses one that is not there', async () => {
+    const { measurement, service } = harness({ engine: true });
+    await settle();
+    expect(measurement.getPageScale(0)).toBe(measurement.getPageScale(PAGE));
+    expect(measurement.getPageScale(5)).toMatchObject({ ready: false, measure: null });
+    expect(measurement.canMeasure(0)).toBe(true);
+    expect(measurement.canMeasure(5)).toBe(false);
+
+    await measurement.setPreset(0, 'metric-100');
+    expect(service.setScale).toHaveBeenCalledTimes(1);
+    await expect(measurement.setPreset([0, 5], 'metric-100')).rejects.toMatchObject({
+      code: 'not-found',
+    });
+    // Nothing was written for the page that was there either.
+    expect(service.setScale).toHaveBeenCalledTimes(1);
+  });
+
+  it('has the state the page lists, the same arrays while nothing changed', async () => {
+    const { measurement } = harness({ engine: true });
+    await settle();
+    const before = measurementState.read(measurement);
+    expect(before).toEqual({ busy: false, calibrationRequest: null, lastReports: [] });
+    expect(measurementState.read(measurement).lastReports).toBe(before.lastReports);
+
+    const change = measurement.setPreset(PAGE, 'metric-100');
+    expect(measurementState.read(measurement).busy).toBe(true);
+    const reports = await change;
+    expect(measurementState.read(measurement)).toEqual({
+      busy: false,
+      calibrationRequest: null,
+      lastReports: reports,
+    });
+  });
+
+  it('has live settings: the presets and the default scale change while it runs', async () => {
+    const { measurement, annotation } = harness({ engine: true });
+    await settle();
+    expect(measurement.getSettings()).toEqual(MEASUREMENT_DEFAULTS);
+    const unitOf = () => {
+      const measure = measurement.getPageScale(PAGE).measure;
+      return measure && 'x' in measure ? measure.x[0]?.unit.trim() : null;
+    };
+    expect(unitOf()).toBe('m');
+
+    const mine = { id: 'mine', label: '1:5', paper: 1, real: 5, unit: 'm' as const };
+    measurement.updateSettings({ presets: [mine] });
+    expect(measurement.listPresets()).toEqual([mine]);
+    await expect(measurement.setPreset(PAGE, 'metric-100')).rejects.toMatchObject({
+      code: 'not-found',
+    });
+
+    annotation.setPageViewports.mockClear();
+    measurement.updateSettings({ defaultScale: 'imperial' });
+    expect(unitOf()).toBe('ft');
+    // The annotation plugin measures new drawings with the new default.
+    expect(annotation.setPageViewports).toHaveBeenCalledWith(PAGE, [], expect.anything());
+
+    measurement.resetSettings();
+    expect(measurement.getSettings()).toEqual(MEASUREMENT_DEFAULTS);
+  });
+
+  it('a cancelled scale change rejects operation-cancelled and writes nothing', async () => {
+    const { measurement, service } = harness({ engine: true });
+    await settle();
+    const cancel = new AbortController();
+    cancel.abort();
+    await expect(
+      measurement.setPreset(PAGE, 'metric-100', { signal: cancel.signal }),
+    ).rejects.toMatchObject({ code: 'operation-cancelled' });
+    expect(service.setScale).not.toHaveBeenCalled();
+    expect(measurement.isBusy()).toBe(false);
   });
 });

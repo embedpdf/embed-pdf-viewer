@@ -11,11 +11,9 @@ import type {
   PageImageHandle,
 } from '@embedpdf/engine-core/runtime';
 
-import type { StampAssetPreview, StampConfig } from '../contract';
+import type { StampAssetEngine, StampAssetPreview } from '../contract';
 import type { StampContext } from './context';
 import { stampError } from './errors';
-
-export const DEFAULT_PREVIEW_WIDTH = 256;
 
 /** Session-unique ids (scratch documents, library ids a file does not carry):
  *  a timestamp plus a counter. */
@@ -23,26 +21,33 @@ let idCounter = 0;
 export const uid = (prefix: string): string =>
   `${prefix}-${Date.now().toString(36)}-${(idCounter++).toString(36)}`;
 
-export function createAssetEngine(ctx: StampContext, config: StampConfig) {
+export function createAssetEngine(ctx: StampContext) {
+  const settings = ctx.settings();
   /** Set once an import finds the asset engine is not local (cloud). */
   let importSupported: boolean | null = null;
 
-  // The asset engine port. A configured factory is called (and memoized) on
-  // the first import, not at viewer start; a configured instance is used
-  // as-is; nothing configured falls back to the kernel's engine: correct for
-  // local deployments, and refused with an actionable error at the first
-  // import when it is a cloud engine.
-  let assetEngineRef: Engine | Promise<Engine> | null = null;
+  // The asset engine port, read from the setting. A configured function is
+  // called (and memoized) on the first import, not at viewer start; a
+  // configured engine is used as it is; none falls back to the kernel's
+  // engine: right for local deployments, and refused with an actionable
+  // error at the first import when it is a cloud engine. A change of the
+  // setting takes effect at the next library operation.
+  let resolved: { from: StampAssetEngine | null; engine: Engine | Promise<Engine> } | null = null;
+  /** Engines this plugin made through a configured function: destroyed with it. */
+  const owned: Array<Engine | Promise<Engine>> = [];
   const assetEngine = (): Engine | Promise<Engine> => {
-    if (!assetEngineRef) {
-      const configured = config.assetEngine;
-      assetEngineRef = !configured
+    const configured = settings.get().assetEngine;
+    if (resolved?.from !== configured) {
+      const engine = !configured
         ? ctx.engine
         : typeof configured === 'function'
           ? configured()
           : configured;
+      if (typeof configured === 'function') owned.push(engine);
+      resolved = { from: configured, engine };
+      importSupported = null;
     }
-    return assetEngineRef;
+    return resolved.engine;
   };
 
   /** Library PDFs are sliced and tagged (`/PieceInfo`) on a local engine only. */
@@ -55,7 +60,7 @@ export function createAssetEngine(ctx: StampContext, config: StampConfig) {
       }
       throw stampError(
         'unsupported',
-        config.assetEngine
+        settings.get().assetEngine
           ? "the stamp plugin's assetEngine must be a local engine (createLocalEngine())"
           : "importing a library PDF needs a local engine, and this viewer's engine is a cloud engine. Pass stampPlugin({ assetEngine: () => import('@embedpdf/engine').then((module) => module.createLocalEngine()) }): it loads lazily, on first import.",
       );
@@ -79,7 +84,7 @@ export function createAssetEngine(ctx: StampContext, config: StampConfig) {
   const renderThumbnail = async (handle: LocalPageHandle): Promise<StampAssetPreview> =>
     imageToPreview(
       await handle.render.image({
-        viewport: { kind: 'width', width: config.previewWidth ?? DEFAULT_PREVIEW_WIDTH },
+        viewport: { kind: 'width', width: settings.get().previewWidth },
         background: 'transparent',
         includeAnnotations: true,
         format: 'png',
@@ -87,11 +92,10 @@ export function createAssetEngine(ctx: StampContext, config: StampConfig) {
     );
 
   ctx.cleanup(() => {
-    const ownedAssetEngine = typeof config.assetEngine === 'function' ? assetEngineRef : null;
-    assetEngineRef = null;
-    if (ownedAssetEngine) {
-      void Promise.resolve(ownedAssetEngine)
-        .then((engine) => engine.destroy())
+    resolved = null;
+    for (const engine of owned.splice(0)) {
+      void Promise.resolve(engine)
+        .then((made) => made.destroy())
         .catch(() => {});
     }
   });
@@ -101,7 +105,11 @@ export function createAssetEngine(ctx: StampContext, config: StampConfig) {
     imageToPreview,
     renderThumbnail,
     /** Optimistic until an import finds the asset engine is not local (cloud). */
-    canImport: (): boolean => importSupported !== false,
+    canImport: (): boolean => {
+      // Reading the setting re-resolves after a change, which makes imports possible again.
+      if (resolved && resolved.from !== settings.get().assetEngine) return true;
+      return importSupported !== false;
+    },
   };
 }
-export type StampAssetEngine = ReturnType<typeof createAssetEngine>;
+export type StampAssetEngineService = ReturnType<typeof createAssetEngine>;

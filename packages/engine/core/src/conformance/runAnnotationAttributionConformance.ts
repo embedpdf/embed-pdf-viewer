@@ -1,6 +1,6 @@
 import { iconRect } from './creatables';
 import type { ConformanceTestRunner } from './runMetadataConformance';
-import type { AnnotationDTO, AnnotationDraft } from '../annotation/kinds';
+import type { Annotation, AnnotationDraft } from '../annotation/kinds';
 import type { Identity } from '../auth/scope';
 import type { DocumentHandle } from '../engine/DocumentHandle';
 import type { Engine } from '../engine/Engine';
@@ -155,7 +155,7 @@ export function runAnnotationAttributionConformance(
 
     test("update stamps modifiedAt and modifiedBy, and keeps the creator's attribution", async () => {
       const alice = await opts.openAs(engine, { scope: SCOPE, identity: ALICE });
-      let original: AnnotationDTO;
+      let original: Annotation;
       try {
         const page = await firstPage(alice);
         ({ annotation: original } = await page.annotations.create({
@@ -383,7 +383,7 @@ export function runAnnotationAttributionConformance(
     test("a note with someone else's reply is deleted whole or not at all", async () => {
       const rect = { x: 200, y: 40, width: 20, height: 20 };
       const alice = await opts.openAs(engine, { scope: SCOPE, identity: ALICE });
-      let note: AnnotationDTO;
+      let note: Annotation;
       try {
         ({ annotation: note } = await (
           await firstPage(alice)
@@ -398,7 +398,7 @@ export function runAnnotationAttributionConformance(
       }
       const bob = await opts.openAs(engine, { scope: SCOPE, identity: BOB }, alice);
       await alice.close();
-      let reply: AnnotationDTO;
+      let reply: Annotation;
       try {
         const page = await firstPage(bob);
         const current = await findByNm(page, 'attribution-conformance-thread');
@@ -448,7 +448,7 @@ async function firstPage(doc: DocumentHandle): Promise<PageHandle> {
   return doc.page(first.page);
 }
 
-async function readBack(page: PageHandle, ref: AnnotationRef): Promise<AnnotationDTO> {
+async function readBack(page: PageHandle, ref: AnnotationRef): Promise<Annotation> {
   const found = (await page.annotations.list()).annotations.find(
     (annotation) => annotationKey(annotation.ref) === annotationKey(ref),
   );
@@ -456,7 +456,7 @@ async function readBack(page: PageHandle, ref: AnnotationRef): Promise<Annotatio
   return found;
 }
 
-async function findByNm(page: PageHandle, nm: string): Promise<AnnotationDTO> {
+async function findByNm(page: PageHandle, nm: string): Promise<Annotation> {
   const found = (await page.annotations.list()).annotations.find(
     (annotation) => annotation.nm === nm,
   );
@@ -464,7 +464,7 @@ async function findByNm(page: PageHandle, nm: string): Promise<AnnotationDTO> {
   return found;
 }
 
-function attributionOf(read: AnnotationDTO) {
+function attributionOf(read: Annotation) {
   return {
     author: read.author,
     userId: read.userId,

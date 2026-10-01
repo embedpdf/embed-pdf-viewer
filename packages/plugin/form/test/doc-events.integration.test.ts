@@ -7,7 +7,7 @@ import { createKernel } from '@embedpdf/core';
 import { createQuickJsSandbox } from '@embedpdf/core-js-sandbox';
 import { createLocalEngine } from '@embedpdf/engine';
 import { actionsPlugin, ActionsToken } from '@embedpdf/plugin-actions';
-import type { ActionDiagnostic } from '@embedpdf/plugin-actions';
+import type { ActionDiagnosticReportedEvent } from '@embedpdf/plugin-actions';
 import { annotationPlugin } from '@embedpdf/plugin-annotation';
 import { interactionPlugin } from '@embedpdf/plugin-interaction';
 
@@ -66,8 +66,8 @@ async function boot(options: { scope?: string[]; openSequence?: 'auto' | 'off' }
     const field = form.getSnapshot()?.fields.find((candidate) => candidate.name === name);
     return field?.valueEntry.kind === 'scalar' ? field.valueEntry.value : '';
   };
-  const diagnostics: ActionDiagnostic[] = [];
-  actions.onDiagnostic((diagnostic) => diagnostics.push(diagnostic));
+  const diagnostics: ActionDiagnosticReportedEvent[] = [];
+  actions.onDiagnosticReported((diagnostic) => diagnostics.push(diagnostic));
   return {
     kernel,
     form,
@@ -113,9 +113,8 @@ describe('document lifecycle actions (WS/DS/WP/DP/WC) on a real document', () =>
     await using harness = await boot({ openSequence: 'auto' });
     expect(harness.valueOf('eventLog')).toBe(''); // nothing ran yet
 
-    const bytes = await harness.actions.runDocumentVerb('save', () =>
-      harness.kernel.documents.save('doc-events'),
-    );
+    // A download runs the save actions itself: WillSave → the bytes → DidSave.
+    const bytes = await harness.kernel.documents.download('doc-events');
 
     // The saved bytes show OpenAction ran before WillSave, the document-level
     // names resolve, event.target is the document, and DidSave is absent
@@ -129,9 +128,7 @@ describe('document lifecycle actions (WS/DS/WP/DP/WC) on a real document', () =>
     expect(harness.valueOf('eventLog')).toBe('Open WillSave DidSave');
 
     // ...and the next save includes it (plus its own WillSave).
-    const bytes2 = await harness.actions.runDocumentVerb('save', () =>
-      harness.kernel.documents.save('doc-events'),
-    );
+    const bytes2 = await harness.kernel.documents.download('doc-events');
     const saved2 = await readSavedFields(bytes2);
     expect(saved2.eventLog).toBe('Open WillSave DidSave WillSave');
   });

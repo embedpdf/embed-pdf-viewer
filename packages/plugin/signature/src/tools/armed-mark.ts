@@ -1,4 +1,4 @@
-import type { InteractionHandler } from '@embedpdf/plugin-interaction/contract';
+import type { InteractionHandler } from '@embedpdf/plugin-interaction/contract/host';
 import {
   ANNOTATION_EDIT_PRIORITY,
   ARMED_STAMP_TOOL_ID,

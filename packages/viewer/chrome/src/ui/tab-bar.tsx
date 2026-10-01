@@ -3,11 +3,12 @@
  * tab merging into the toolbar surface below, close-× on the active tab, and a
  * + button opening a real file dialog.
  *
- * The kernel's document registry (useDocuments) is the tab model —
- * open/close/setActive, reactive; there is no separate document manager.
+ * The kernel's document registry is the tab model: `useDocumentsState()` for
+ * the tabs, `useDocuments()` for open/close/setActive; there is no separate
+ * document manager.
  */
 import { useRef } from 'react';
-import { useDocuments } from '@embedpdf/react/runtime';
+import { useDocuments, useDocumentsState } from '@embedpdf/react/runtime';
 import type { OpenInput } from '@embedpdf/react/runtime';
 import { Icon } from './icons';
 
@@ -20,7 +21,8 @@ export function TabBar({
   visibility?: TabBarVisibility;
   allowOpenFile?: boolean;
 }) {
-  const { docs, activeId, setActive, close, open } = useDocuments();
+  const { setActive, close, open } = useDocuments();
+  const { documents: docs, activeId } = useDocumentsState();
   const fileInput = useRef<HTMLInputElement>(null);
 
   const shouldShow = visibility === 'always' || (visibility === 'multiple' && docs.length > 1);

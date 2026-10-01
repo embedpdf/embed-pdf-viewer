@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { NO_ANNOTATION_FLAGS } from '../../src/annotation/primitives';
 import { buildThreads, classifyRelation } from '../../src/annotation/relationships';
 import { annotationKey, refFromStableId } from '../../src/identity/annotationKey';
-import type { AnnotationDTO } from '../../src/annotation/kinds';
+import type { Annotation } from '../../src/annotation/kinds';
 import type { AnnotationRef } from '../../src/identity/AnnotationRef';
 import type { AnnotationReplyType } from '../../src/annotation/primitives';
 
@@ -28,7 +28,7 @@ function annot(
     reply?: { to: AnnotationRef; type: AnnotationReplyType } | null;
     nm?: string;
   } = {},
-): AnnotationDTO {
+): Annotation {
   return {
     ref: objRef(objNum),
     page: { kind: 'objectNumber', objectNumber: PAGE },
@@ -47,7 +47,7 @@ function annot(
     color: '#000000',
     opacity: 1,
     quadPoints: [],
-  } as unknown as AnnotationDTO;
+  } as unknown as Annotation;
 }
 
 describe('classifyRelation', () => {

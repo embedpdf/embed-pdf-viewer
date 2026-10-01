@@ -168,9 +168,9 @@ describe('a refused write shows the truth', () => {
     const harness = annotationHarness();
     await harness.load([square(20)]);
     harness.remove.mockRejectedValueOnce(new Error('revoked'));
-    harness.capability.select(ref(20));
+    harness.capability.selection.set([ref(20)]);
 
-    const result = await harness.capability.deleteSelection();
+    const result = await harness.capability.selection.delete();
 
     expect(result.failed.map((failure) => failure.ref)).toEqual([ref(20)]);
     expect(harness.capability.get(ref(20))).not.toBeNull();
@@ -181,9 +181,9 @@ describe('a refused write shows the truth', () => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
     await harness.load([square(20)]);
     harness.update.mockRejectedValueOnce(new Error('Forbidden'));
-    harness.capability.select(ref(20));
+    harness.capability.selection.set([ref(20)]);
 
-    const result = await harness.capability.updateSelectionFlags({ locked: true });
+    const result = await harness.capability.selection.update({ locked: true });
 
     expect(result.failed).toHaveLength(1);
     expect(harness.capability.get(ref(20))!.locked).toBe(false);
@@ -194,9 +194,9 @@ describe('a refused write shows the truth', () => {
     await harness.load([square(20)]);
     const write = deferred<unknown>();
     harness.update.mockReturnValueOnce(write.promise);
-    harness.capability.select(ref(20));
+    harness.capability.selection.set([ref(20)]);
 
-    const restyle = harness.capability.updateSelection({ color: '#00ff00' });
+    const restyle = harness.capability.selection.update({ color: '#00ff00' });
     expect(dataOf(harness.capability.get(ref(20))).color).toBe('#00ff00');
     harness.emit(remoteUpdate(square(20, { contents: 'from Bob' })));
     write.reject(new Error('Forbidden'));
@@ -216,9 +216,9 @@ describe('a refused write shows the truth', () => {
       }
       return { annotation: square(20, { color: '#00ff00' }) };
     });
-    harness.capability.select([ref(20), ref(21)]);
+    harness.capability.selection.set([ref(20), ref(21)]);
 
-    const result = await harness.capability.updateSelection({ color: '#00ff00' });
+    const result = await harness.capability.selection.update({ color: '#00ff00' });
 
     expect(result.failed.map((failure) => failure.ref)).toEqual([ref(21)]);
     expect(dataOf(harness.capability.get(ref(20))).color).toBe('#00ff00');
@@ -233,9 +233,9 @@ describe('what the capability says about a write', () => {
     const failures = vi.fn();
     harness.capability.onWriteFailed(failures);
     harness.update.mockRejectedValueOnce(new Error('Forbidden'));
-    harness.capability.select(ref(20));
+    harness.capability.selection.set([ref(20)]);
 
-    await harness.capability.updateSelection({ color: '#00ff00' });
+    await harness.capability.selection.update({ color: '#00ff00' });
 
     expect(failures).toHaveBeenCalledTimes(1);
     expect(failures.mock.calls[0]![0].refs).toEqual([ref(20)]);
@@ -246,9 +246,9 @@ describe('what the capability says about a write', () => {
     await harness.load([square(20)]);
     const write = deferred<unknown>();
     harness.update.mockReturnValueOnce(write.promise);
-    harness.capability.select(ref(20));
+    harness.capability.selection.set([ref(20)]);
 
-    const restyle = harness.capability.updateSelection({ color: '#00ff00' });
+    const restyle = harness.capability.selection.update({ color: '#00ff00' });
     expect(harness.capability.isPending(ref(20))).toBe(true);
     write.resolve({ annotation: square(20, { color: '#00ff00' }) });
     await restyle;
@@ -346,22 +346,24 @@ describe('weak annotations (direct objects without /NM)', () => {
       annotation: square(0, { ref: named, index: 3, nm: 'u-1', color: '#00ff00' }),
       appearance: { changed: true },
     });
-    harness.capability.select(WEAK_REF);
+    harness.capability.selection.set([WEAK_REF]);
 
-    await harness.capability.updateSelection({ color: '#00ff00' });
+    await harness.capability.selection.update({ color: '#00ff00' });
 
     expect(harness.capability.list()).toHaveLength(1);
     expect(dataOf(harness.capability.get(named)).color).toBe('#00ff00');
-    expect(harness.capability.getSelection()).toEqual([named]);
+    expect(harness.capability.selection.list().map((annotation) => annotation.ref)).toEqual([
+      named,
+    ]);
   });
 
   it('a deleted weak annotation does not come back', async () => {
     const harness = annotationHarness();
     await harness.load([weakSquare()]);
     harness.list.mockResolvedValue({ annotations: [] });
-    harness.capability.select(WEAK_REF);
+    harness.capability.selection.set([WEAK_REF]);
 
-    await harness.capability.deleteSelection();
+    await harness.capability.selection.delete();
     await harness.capability.whenSynced();
 
     expect(harness.capability.list()).toHaveLength(0);
@@ -373,12 +375,12 @@ describe('several changes to one record', () => {
     vi.useFakeTimers();
     const harness = annotationHarness();
     await harness.load([freeText('Hello')]);
-    harness.capability.select(ref(30));
+    harness.capability.selection.set([ref(30)]);
     const locked = { ...NO_FLAGS, locked: true };
 
     harness.capability.draftContents(ref(30), 'Hello world'); // written after a pause
     harness.update.mockResolvedValueOnce({ annotation: freeText('Hello', { flags: locked }) });
-    await harness.capability.updateSelectionFlags({ locked: true });
+    await harness.capability.selection.update({ locked: true });
     expect(harness.capability.get(ref(30))!.contents).toBe('Hello world');
     expect(harness.capability.get(ref(30))!.locked).toBe(true);
 
@@ -415,14 +417,14 @@ describe('several changes to one record', () => {
   it('two restyles settling out of order show the newer value', async () => {
     const harness = annotationHarness();
     await harness.load([square(20)]);
-    harness.capability.select(ref(20));
+    harness.capability.selection.set([ref(20)]);
     const older = deferred<unknown>();
     harness.update
       .mockReturnValueOnce(older.promise)
       .mockResolvedValueOnce({ annotation: square(20, { color: '#0000ff' }) });
 
-    const red = harness.capability.updateSelection({ color: '#ff0000' });
-    await harness.capability.updateSelection({ color: '#0000ff' });
+    const red = harness.capability.selection.update({ color: '#ff0000' });
+    await harness.capability.selection.update({ color: '#0000ff' });
     expect(dataOf(harness.capability.get(ref(20))).color).toBe('#0000ff');
 
     older.resolve({ annotation: square(20, { color: '#0000ff' }) });
@@ -433,14 +435,14 @@ describe('several changes to one record', () => {
   it('an older write refused after a newer one succeeded shows the newer value', async () => {
     const harness = annotationHarness();
     await harness.load([square(20)]);
-    harness.capability.select(ref(20));
+    harness.capability.selection.set([ref(20)]);
     const older = deferred<unknown>();
     harness.update
       .mockReturnValueOnce(older.promise)
       .mockResolvedValueOnce({ annotation: square(20, { color: '#0000ff' }) });
 
-    const red = harness.capability.updateSelection({ color: '#ff0000' });
-    await harness.capability.updateSelection({ color: '#0000ff' });
+    const red = harness.capability.selection.update({ color: '#ff0000' });
+    await harness.capability.selection.update({ color: '#0000ff' });
     older.reject(new Error('Forbidden'));
     await red;
 
@@ -450,7 +452,7 @@ describe('several changes to one record', () => {
   it('a slow older write never drops newer work', async () => {
     const harness = annotationHarness();
     await harness.load([square(20)]);
-    harness.capability.select(ref(20));
+    harness.capability.selection.set([ref(20)]);
     const slow = deferred<unknown>();
     const newest = deferred<unknown>();
     harness.update
@@ -458,9 +460,9 @@ describe('several changes to one record', () => {
       .mockResolvedValueOnce({ annotation: square(20, { color: '#0000ff' }) })
       .mockReturnValueOnce(newest.promise);
 
-    const red = harness.capability.updateSelection({ color: '#ff0000' });
-    await harness.capability.updateSelection({ color: '#0000ff' });
-    void harness.capability.updateSelection({ color: '#00ff00' });
+    const red = harness.capability.selection.update({ color: '#ff0000' });
+    await harness.capability.selection.update({ color: '#0000ff' });
+    void harness.capability.selection.update({ color: '#00ff00' });
     slow.resolve({ annotation: square(20, { color: '#ff0000' }) });
     await red;
 
@@ -488,7 +490,7 @@ describe('a new record before the engine confirms it', () => {
       annotation: square(60, { color: '#00ff00' }),
     });
 
-    const restyle = harness.capability.updateSelection({ color: '#00ff00' });
+    const restyle = harness.capability.selection.update({ color: '#00ff00' });
     expect(harness.model().order).toEqual([firstCreated(harness)]);
     expect(styleOf(harness.model().byId[firstCreated(harness)]!.annotation).color).toBe('#00ff00');
     expect(harness.update).not.toHaveBeenCalled();
@@ -505,7 +507,7 @@ describe('a new record before the engine confirms it', () => {
   it('a delete hides it for good: the engine deletes it after the create', async () => {
     const { harness, created, confirm } = await createHeld();
 
-    const deleted = harness.capability.deleteSelection();
+    const deleted = harness.capability.selection.delete();
     expect(harness.model().order).toEqual([]);
 
     confirm();
@@ -520,7 +522,7 @@ describe('a new record before the engine confirms it', () => {
     const failures = vi.fn();
     harness.capability.onWriteFailed(failures);
 
-    const restyle = harness.capability.updateSelection({ color: '#00ff00' });
+    const restyle = harness.capability.selection.update({ color: '#00ff00' });
     create.reject(new Error('Forbidden'));
     await expect(created).rejects.toBeDefined();
     await restyle;
@@ -535,14 +537,14 @@ describe('a weak record the engine names', () => {
   it('a second edit in flight stays visible on the renamed record', async () => {
     const harness = annotationHarness();
     await harness.load([weakSquare()]);
-    harness.capability.select(WEAK_REF);
+    harness.capability.selection.set([WEAK_REF]);
     const first = deferred<unknown>();
     const second = deferred<unknown>();
     harness.update.mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise);
     const named = { kind: 'nm', page: PAGE, nm: 'u-1' } as const;
 
-    const green = harness.capability.updateSelection({ color: '#00ff00' });
-    const wide = harness.capability.updateSelection({ strokeWidth: 5 });
+    const green = harness.capability.selection.update({ color: '#00ff00' });
+    const wide = harness.capability.selection.update({ strokeWidth: 5 });
     first.resolve({
       annotation: square(0, { ref: named, index: 3, nm: 'u-1', color: '#00ff00' }),
     });
@@ -550,7 +552,9 @@ describe('a weak record the engine names', () => {
 
     expect(harness.capability.list()).toHaveLength(1);
     expect(dataOf(harness.capability.get(named)).strokeWidth).toBe(5);
-    expect(harness.capability.getSelection()).toEqual([named]);
+    expect(harness.capability.selection.list().map((annotation) => annotation.ref)).toEqual([
+      named,
+    ]);
 
     second.resolve({
       annotation: square(0, {
@@ -571,9 +575,9 @@ describe('a weak record the engine names', () => {
     const harness = annotationHarness();
     await harness.load([weakSquare()]);
     harness.list.mockRejectedValueOnce(new Error('offline'));
-    harness.capability.select(WEAK_REF);
+    harness.capability.selection.set([WEAK_REF]);
 
-    await harness.capability.deleteSelection();
+    await harness.capability.selection.delete();
     await harness.capability.whenSynced();
     expect(harness.capability.list()).toHaveLength(0);
     expect(harness.capability.getStatus()).toBe('error');
@@ -589,10 +593,10 @@ describe('what stays as it is', () => {
   it('a pending edit never brings back a record deleted elsewhere', async () => {
     const harness = annotationHarness();
     await harness.load([square(20)]);
-    harness.capability.select(ref(20));
+    harness.capability.selection.set([ref(20)]);
     harness.update.mockReturnValueOnce(deferred<unknown>().promise);
 
-    void harness.capability.updateSelection({ color: '#00ff00' });
+    void harness.capability.selection.update({ color: '#00ff00' });
     harness.emit({
       type: 'annotations.deleted',
       page: PAGE,
@@ -608,7 +612,7 @@ describe('what stays as it is', () => {
     } as unknown as DocumentEvent);
 
     expect(harness.capability.get(ref(20))).toBeNull();
-    expect(harness.capability.getSelection()).toEqual([]);
+    expect(harness.capability.selection.list().map((annotation) => annotation.ref)).toEqual([]);
   });
 
   it("a change on one page does not rebuild another page's items", async () => {
@@ -616,9 +620,9 @@ describe('what stays as it is', () => {
     await harness.load([square(20), square(21, { ref: { ...ref(21), page: PAGE2 }, page: PAGE2 })]);
     const before = harness.capability.listPageItems(PAGE2);
 
-    harness.capability.select(ref(20));
+    harness.capability.selection.set([ref(20)]);
     harness.update.mockReturnValueOnce(deferred<unknown>().promise);
-    void harness.capability.updateSelection({ color: '#00ff00' });
+    void harness.capability.selection.update({ color: '#00ff00' });
 
     expect(harness.capability.listPageItems(PAGE2)).toBe(before);
   });
@@ -631,14 +635,14 @@ describe('a record whose key changes keeps everything that belongs to it', () =>
     vi.useFakeTimers();
     const harness = annotationHarness();
     await harness.load([freeText('Hello', { ref: WEAK_REF, index: 3 })]);
-    harness.capability.select(WEAK_REF);
+    harness.capability.selection.set([WEAK_REF]);
     harness.capability.draftContents(WEAK_REF, 'Hello world');
     const hidden = { ...NO_FLAGS, print: false };
 
     harness.update.mockResolvedValueOnce({
       annotation: freeText('Hello', { ref: NAMED, index: 3, nm: 'named-text', flags: hidden }),
     });
-    await harness.capability.updateSelectionFlags({ print: false });
+    await harness.capability.selection.update({ print: false });
     expect(harness.capability.get(NAMED)!.contents).toBe('Hello world');
 
     harness.update.mockResolvedValueOnce({
@@ -659,13 +663,13 @@ describe('a record whose key changes keeps everything that belongs to it', () =>
     vi.useFakeTimers();
     const harness = annotationHarness();
     await harness.load([freeText('Hello', { ref: WEAK_REF, index: 3 })]);
-    harness.capability.select(WEAK_REF);
+    harness.capability.selection.set([WEAK_REF]);
     harness.capability.draftContents(WEAK_REF, 'Hello world');
     const hidden = { ...NO_FLAGS, print: false };
     harness.update.mockResolvedValueOnce({
       annotation: freeText('Hello', { ref: NAMED, index: 3, nm: 'named-text', flags: hidden }),
     });
-    await harness.capability.updateSelectionFlags({ print: false });
+    await harness.capability.selection.update({ print: false });
 
     await vi.advanceTimersByTimeAsync(100);
     harness.capability.draftContents(NAMED, 'Hello world!');
@@ -690,8 +694,8 @@ describe('a record whose key changes keeps everything that belongs to it', () =>
   it('the text range follows a weak record the engine names', async () => {
     const harness = annotationHarness();
     await harness.load([freeText('Hello', { ref: WEAK_REF, index: 3 })]);
-    harness.capability.select(WEAK_REF);
-    harness.capability.beginTextEdit(WEAK_REF);
+    harness.capability.selection.set([WEAK_REF]);
+    harness.capability.text.begin(WEAK_REF);
     harness.capability.setTextSelection(WEAK_REF, { start: 1, end: 3 });
 
     harness.update.mockResolvedValueOnce({
@@ -703,10 +707,10 @@ describe('a record whose key changes keeps everything that belongs to it', () =>
         print: false,
       }),
     });
-    await harness.capability.updateSelectionFlags({ print: false });
+    await harness.capability.selection.update({ print: false });
 
     expect(harness.state().textSelection).toEqual({ id: 'nm:1:named-text', start: 1, end: 3 });
-    expect(harness.capability.getEditingRef()).toEqual(NAMED);
+    expect(harness.capability.text.getEditing()?.ref ?? null).toEqual(NAMED);
   });
 
   it('a create the engine confirms while a full load runs stays on screen and selected', async () => {
@@ -722,7 +726,9 @@ describe('a record whose key changes keeps everything that belongs to it', () =>
     const created = drawSquare(harness);
     await new Promise((resolve) => setTimeout(resolve, 0));
     expect(harness.model().order).toEqual(['obj:60']);
-    expect(harness.capability.getSelection()).toEqual([ref(60)]);
+    expect(harness.capability.selection.list().map((annotation) => annotation.ref)).toEqual([
+      ref(60),
+    ]);
 
     // The load read the page before the create: the create's event, queued
     // behind it, brings the record in.
@@ -730,7 +736,9 @@ describe('a record whose key changes keeps everything that belongs to it', () =>
     await refreshed;
     await created;
     expect(harness.model().order).toEqual(['obj:60']);
-    expect(harness.capability.getSelection()).toEqual([ref(60)]);
+    expect(harness.capability.selection.list().map((annotation) => annotation.ref)).toEqual([
+      ref(60),
+    ]);
     expect(harness.state().pending).toEqual([]);
   });
 
@@ -742,7 +750,7 @@ describe('a record whose key changes keeps everything that belongs to it', () =>
       square(0, { ref: B_REF, index: 4, identityQuality: 'weak' }),
     ]);
     const A_NAMED = { kind: 'nm', page: PAGE, nm: 'annotation-a' } as const;
-    harness.capability.select(WEAK_REF);
+    harness.capability.selection.set([WEAK_REF]);
     harness.update.mockResolvedValueOnce({
       annotation: square(0, {
         ref: A_NAMED,
@@ -751,7 +759,7 @@ describe('a record whose key changes keeps everything that belongs to it', () =>
         color: '#ff0000',
       }),
     });
-    await harness.capability.updateSelection({ color: '#ff0000' });
+    await harness.capability.selection.update({ color: '#ff0000' });
 
     // An edit ahead of both moves A to position 2 and B into A's old position 3.
     const B_MOVED: AnnotationRef = {
@@ -762,11 +770,11 @@ describe('a record whose key changes keeps everything that belongs to it', () =>
       square(0, { ref: A_NAMED, index: 2, nm: 'annotation-a' }),
       square(0, { ref: B_MOVED, index: 3, identityQuality: 'weak' }),
     ]);
-    harness.capability.select(B_MOVED);
+    harness.capability.selection.set([B_MOVED]);
     harness.update.mockResolvedValueOnce({
       annotation: square(0, { ref: B_MOVED, index: 3, color: '#00ff00' }),
     });
-    await harness.capability.updateSelection({ color: '#00ff00' });
+    await harness.capability.selection.update({ color: '#00ff00' });
 
     expect(harness.update.mock.calls[1]![0]).toEqual(B_MOVED);
   });
@@ -882,7 +890,7 @@ describe('a record whose key changes keeps everything that belongs to it', () =>
     harness.update.mockResolvedValueOnce({
       annotation: square(60, { color: '#00ff00' }),
     });
-    const restyled = harness.capability.updateSelection({ color: '#00ff00' });
+    const restyled = harness.capability.selection.update({ color: '#00ff00' });
     expect(harness.update).toHaveBeenCalledWith(ref(60), expect.anything());
 
     load.resolve(snapshotOf([]));
@@ -899,7 +907,7 @@ describe('a record whose key changes keeps everything that belongs to it', () =>
     harness.create.mockReturnValueOnce(create.promise);
     const TARGET = { kind: 'uri', uri: 'https://www.embedpdf.com/' } as const;
     const created = drawSquare(harness);
-    const linked = harness.capability.updateSelectionLink(TARGET);
+    const linked = harness.capability.selection.updateLink(TARGET);
     harness.create.mockResolvedValueOnce({
       annotation: square(61, {
         subtype: 'link',
@@ -936,12 +944,12 @@ describe('one engine write carrying several changes', () => {
     vi.useFakeTimers();
     const harness = annotationHarness();
     await harness.load([freeText('Hello')]);
-    harness.capability.select(ref(30));
+    harness.capability.selection.set([ref(30)]);
     const failures = vi.fn();
     harness.capability.onWriteFailed(failures);
     const flags = deferred<unknown>();
     harness.update.mockReturnValueOnce(flags.promise);
-    const settingFlags = harness.capability.updateSelectionFlags({ print: false });
+    const settingFlags = harness.capability.selection.update({ print: false });
 
     harness.capability.draftContents(ref(30), 'Hello a');
     harness.capability.draftContents(ref(30), 'Hello ab');
@@ -962,7 +970,7 @@ describe('one engine write carrying several changes', () => {
     const NAMED = { kind: 'nm', page: PAGE, nm: 'named-text' } as const;
     const failures = vi.fn();
     harness.capability.onWriteFailed(failures);
-    harness.capability.select(WEAK_REF);
+    harness.capability.selection.set([WEAK_REF]);
     harness.capability.draftContents(WEAK_REF, 'Hello world');
     harness.update.mockResolvedValueOnce({
       annotation: freeText('Hello', {
@@ -973,7 +981,7 @@ describe('one engine write carrying several changes', () => {
         print: false,
       }),
     });
-    await harness.capability.updateSelectionFlags({ print: false });
+    await harness.capability.selection.update({ print: false });
 
     harness.update.mockRejectedValueOnce(new Error('text write refused'));
     await vi.advanceTimersByTimeAsync(300);
@@ -987,15 +995,15 @@ describe('how a record with a pending change renders', () => {
   it("a pending restyle stays live after another session's update resets the preference", async () => {
     const harness = annotationHarness();
     await harness.load([square(20)]);
-    harness.capability.select(ref(20));
+    harness.capability.selection.set([ref(20)]);
     harness.update.mockResolvedValueOnce({
       annotation: square(20, { color: '#ff0000' }),
     });
-    await harness.capability.updateSelection({ color: '#ff0000' });
+    await harness.capability.selection.update({ color: '#ff0000' });
     const pending = deferred<unknown>();
     harness.update.mockReturnValueOnce(pending.promise);
 
-    const restyle = harness.capability.updateSelection({ color: '#00ff00' });
+    const restyle = harness.capability.selection.update({ color: '#00ff00' });
     harness.emit(remoteUpdate(square(20, { color: '#ff0000', author: 'Bob' })));
 
     const item = () => harness.capability.listPageItems(PAGE).find(({ id }) => id === 'obj:20')!;

@@ -1,4 +1,5 @@
 import {
+  annotationAnchor,
   canMove,
   chrome as coreChrome,
   type ChromeGeometry,
@@ -9,18 +10,17 @@ import {
   isOnTextBox,
   type Model,
   type Point,
-  type Rect,
-  refOf,
   rotationAnchor,
   type RotationAnchor,
   selectionAnchor as coreSelectionAnchor,
+  type ViewEnv,
 } from '@embedpdf/core-annotation';
-import type { PageRef } from '@embedpdf/engine-core/runtime';
+import type { Annotation, AnnotationRef, PageRef } from '@embedpdf/engine-core/runtime';
 
-import type { ChromeSettings } from '../contract';
+import type { AnnotationAnchor, AnnotationSelectionAnchor, ChromeSettings } from '../contract';
 import type { AnnotationContext, AnnotationServices } from '../services';
 import { viewEnv } from '../services/geometry';
-import { refsOfIn } from '../services/store';
+import { recordOfRef } from '../services/store';
 
 /** The view a pointer sample arrives in: px per page unit, display rotation, relative zoom. */
 export interface HitView {
@@ -39,10 +39,15 @@ export const TOUCH_GRAB_BOOST = 2;
  * projected through the live chrome settings and the page's view scale.
  */
 export function createChromeReads(
-  ctx: Pick<AnnotationContext, 'state'>,
-  { store, geometry, behaviors }: Pick<AnnotationServices, 'store' | 'geometry' | 'behaviors'>,
+  ctx: Pick<AnnotationContext, 'getPage'>,
+  {
+    store,
+    geometry,
+    behaviors,
+    settings,
+  }: Pick<AnnotationServices, 'store' | 'geometry' | 'behaviors' | 'settings'>,
 ) {
-  const chromeSettings = (): ChromeSettings => ctx.state.get().chrome;
+  const chromeSettings = (): ChromeSettings => settings.get().chrome;
 
   /** The CSS-px chrome settings converted to content units by the page's view
    *  scale (px per page unit) — screen-constant grab zones + stalk at every
@@ -55,8 +60,9 @@ export function createChromeReads(
     const effectiveScale = scale || 1;
     return {
       handleTol: (cs.handles.hitSize / 2 / effectiveScale) * boost,
-      knobTol: (cs.knob.hitSize / 2 / effectiveScale) * boost,
-      knobOffset: cs.knob.offset / effectiveScale,
+      knobTol: (cs.rotationHandle.hitSize / 2 / effectiveScale) * boost,
+      knobOffset: cs.rotationHandle.offset / effectiveScale,
+      rotationHandle: cs.rotationHandle.enabled,
     };
   };
   const grabBoost = (touch?: boolean): number => (touch ? TOUCH_GRAB_BOOST : 1);
@@ -146,14 +152,17 @@ export function createChromeReads(
       chromeGeomAt(scale).knobOffset,
       viewEnv(zoom, rotation),
     );
-    // `guides.enabled` is presentation config, filtered here so the emitted
-    // chrome stays authoritative for every painter (default and headless alike).
+    // `guides.enabled` and `rotationHandle.enabled` are presentation
+    // settings, filtered here so the emitted chrome stays authoritative for
+    // every painter (default and headless alike). A disabled rotation handle
+    // can't be grabbed either (`chromeGeomAt`).
     if (!cs.guides.enabled) nodes = nodes.filter((node) => node.kind !== 'rotate-guides');
+    if (!cs.rotationHandle.enabled) nodes = nodes.filter((node) => node.kind !== 'rotate-knob');
     chromeCache.set(pageObjectNumber, { model: model, cs, scale, rotation, zoom, v: nodes });
     return nodes;
   };
 
-  // Anchor for the selection menu — memoized by input identity so the selector
+  // Anchor for the selection menu: memoized by input identity so the selector
   // returns a stable reference between unrelated dispatches.
   let anchorCache: {
     model: Model;
@@ -161,13 +170,13 @@ export function createChromeReads(
     scale: number | undefined;
     rotation: number | undefined;
     zoom: number | undefined;
-    v: { page: PageRef; bounds: Rect; knob?: Point } | null;
+    v: AnnotationSelectionAnchor | null;
   } | null = null;
   const selectionAnchorOf = (
     scale?: number,
     rotation?: number,
     zoom?: number,
-  ): { page: PageRef; bounds: Rect; knob?: Point } | null => {
+  ): AnnotationSelectionAnchor | null => {
     const model = store.model();
     const cs = chromeSettings();
     if (
@@ -179,14 +188,69 @@ export function createChromeReads(
       anchorCache.zoom === zoom
     )
       return anchorCache.v;
-    const anchor = coreSelectionAnchor(
+    const found = coreSelectionAnchor(
       model,
       (page) => geometry.pageBoxOf(page.objectNumber),
       () => chromeGeomAt(scale).knobOffset,
       () => viewEnv(zoom, rotation),
     );
+    // Without a rotation handle, a menu has nothing to stay clear of.
+    const anchor: AnnotationSelectionAnchor | null = found
+      ? {
+          page: found.page,
+          bounds: found.bounds,
+          ...(found.knob && cs.rotationHandle.enabled ? { rotationHandle: found.knob } : {}),
+        }
+      : null;
     anchorCache = { model: model, cs, scale, rotation, zoom, v: anchor };
     return anchor;
+  };
+
+  // One annotation's anchor, by ref and view: a new object only when it moved.
+  const anchors = new Map<string, { model: Model; view?: ViewEnv; v: AnnotationAnchor | null }>();
+  const annotationAnchorOf = (ref: AnnotationRef, view?: ViewEnv): AnnotationAnchor | null => {
+    const model = store.model();
+    const key = `${ref.page.objectNumber}:${ref.kind === 'nm' ? ref.nm : ref.kind === 'objectNumber' ? ref.objectNumber : ref.index}`;
+    const cached = anchors.get(key);
+    if (
+      cached &&
+      cached.model === model &&
+      cached.view?.zoom === view?.zoom &&
+      cached.view?.rotation === view?.rotation
+    )
+      return cached.v;
+    const record = recordOfRef(model, ref);
+    const found = record ? annotationAnchor(model, record.id, view) : null;
+    const previous = cached?.v ?? null;
+    const anchor =
+      found &&
+      previous &&
+      previous.page.objectNumber === found.page.objectNumber &&
+      previous.bounds.x === found.bounds.x &&
+      previous.bounds.y === found.bounds.y &&
+      previous.bounds.width === found.bounds.width &&
+      previous.bounds.height === found.bounds.height
+        ? previous
+        : found;
+    anchors.set(key, { model, view, v: anchor });
+    return anchor;
+  };
+
+  /**
+   * The topmost annotation at a page point: the one under it, or the
+   * selection's first when the point is on its handles; `null` on a page that
+   * isn't in the document.
+   */
+  const annotationAt = (page: PageRef | number, point: Point): Annotation | null => {
+    const info = ctx.getPage(page);
+    if (!info) return null;
+    const model = store.model();
+    const target = hitAt(info.ref, point);
+    if (target.kind === 'annot') return model.byId[target.id]?.annotation ?? null;
+    if (target.kind === 'empty') return null;
+    // A handle or the rotation handle belongs to the selection.
+    const first = model.selected[0];
+    return first ? (model.byId[first]?.annotation ?? null) : null;
   };
 
   /** The rotation in progress, cached per model: the same object until it changes. */
@@ -202,16 +266,9 @@ export function createChromeReads(
   const api = {
     listChromeNodes: (page: PageRef, scale?: number, rotation?: number, zoom?: number) =>
       chromeNodesOf(page, scale, rotation, zoom),
-    getSelectionAnchor: (view?: HitView) =>
-      selectionAnchorOf(view?.scale, view?.rotation, view?.zoom),
-    getRotationAnchor: () => rotationOf(),
-    hitTestAt: (page: PageRef, point: Point) => {
-      const model = store.model();
-      const target = hitAt(page, point);
-      if (target.kind === 'annot') return refOf(model.byId[target.id]);
-      if (target.kind === 'empty') return null;
-      return refsOfIn(model, model.selected)[0] ?? null; // a handle or the knob belongs to the selection
-    },
+    getSelectionAnchorIn: (view: HitView) =>
+      selectionAnchorOf(view.scale, view.rotation, view.zoom),
+    getAnnotationAnchor: (ref: AnnotationRef, view?: ViewEnv) => annotationAnchorOf(ref, view),
     getHitKind: (
       page: PageRef,
       point: Point,
@@ -268,7 +325,17 @@ export function createChromeReads(
     },
   };
 
-  return { chromeSettings, chromeGeomAt, grabBoost, hitAt, textBoxAt, api };
+  return {
+    chromeSettings,
+    chromeGeomAt,
+    grabBoost,
+    hitAt,
+    textBoxAt,
+    annotationAt,
+    selectionAnchor: () => selectionAnchorOf(),
+    rotationAnchor: () => rotationOf(),
+    api,
+  };
 }
 
 export type ChromeReads = ReturnType<typeof createChromeReads>;

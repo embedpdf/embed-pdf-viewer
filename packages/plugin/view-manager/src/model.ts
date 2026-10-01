@@ -73,13 +73,13 @@ const withPane = (state: ViewManagerState, pane: Pane): ViewManagerState => ({
 
 // ── transitions ────────────────────────────────────────────────────────────
 
-/** Append an empty pane with the next id and focus it. */
-export function createPane(state: ViewManagerState): ViewManagerState {
+/** Add an empty pane with the next id at `index` (the end when left out), and focus it. */
+export function createPane(state: ViewManagerState, index?: number): ViewManagerState {
   const id = nextPaneId(state);
   return {
     ...state,
     panes: { ...state.panes, [id]: { id, documentIds: [], activeDocumentId: null } },
-    order: [...state.order, id],
+    order: insertAt(state.order, id, index),
     focusedPaneId: id,
     seq: state.seq + 1,
   };
@@ -126,7 +126,9 @@ export function addDocument(
   const pane = state.panes[paneId];
   if (!pane || pane.documentIds.includes(documentId)) return state;
   const holderId = paneOfDocument(state, documentId);
-  const base = holderId ? withPane(state, withoutDocument(state.panes[holderId], documentId)) : state;
+  const base = holderId
+    ? withPane(state, withoutDocument(state.panes[holderId], documentId))
+    : state;
   const target = base.panes[paneId];
   return withPane(base, {
     ...target,
@@ -182,6 +184,25 @@ export function moveDocumentBetween(
     panes: { ...state.panes, [nextFrom.id]: nextFrom, [nextTo.id]: nextTo },
     focusedPaneId: toPaneId,
   };
+}
+
+/**
+ * A document's id changed where it is (a document still opening gets its real id): it keeps
+ * its pane, its place in the tabs, and whether it's shown.
+ */
+export function renameDocument(
+  state: ViewManagerState,
+  previousId: string,
+  nextId: string,
+): ViewManagerState {
+  const paneId = paneOfDocument(state, previousId);
+  if (!paneId) return state;
+  const pane = state.panes[paneId];
+  return withPane(state, {
+    ...pane,
+    documentIds: pane.documentIds.map((id) => (id === previousId ? nextId : id)),
+    activeDocumentId: pane.activeDocumentId === previousId ? nextId : pane.activeDocumentId,
+  });
 }
 
 /**

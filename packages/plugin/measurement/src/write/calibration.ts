@@ -5,6 +5,7 @@ import { measurementPoint } from '@embedpdf/engine-core/runtime';
 import type { MeasurementCapability } from '../contract';
 import { setCalibration } from '../model';
 import type { MeasurementContext, MeasurementServices } from '../services';
+import { SCALE_PERMISSION } from '../services/store';
 
 export function createCalibration(
   ctx: MeasurementContext,
@@ -15,7 +16,7 @@ export function createCalibration(
   const { annotation, interaction } = siblings;
 
   const startCalibration = (): void => {
-    if (!canCalibrate()) return;
+    ctx.assertAllowed(SCALE_PERMISSION, 'measurement.startCalibration');
     ctx.state.update(setCalibration, null);
     interaction.activateTool('calibrate');
   };

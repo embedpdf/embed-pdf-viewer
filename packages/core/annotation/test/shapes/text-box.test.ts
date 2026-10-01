@@ -1,4 +1,4 @@
-import type { AnnotationDTO } from '@embedpdf/engine-core/runtime';
+import type { Annotation } from '@embedpdf/engine-core/runtime';
 import { describe, expect, it } from 'vitest';
 
 import { calloutShape, textBoxFamily } from '../../src/shapes/text-box';
@@ -17,7 +17,7 @@ const freeText = (fields: Record<string, unknown>) =>
     rotation: null,
     intent: 'free-text',
     ...fields,
-  }) as unknown as Extract<AnnotationDTO, { subtype: 'free-text' }>;
+  }) as unknown as Extract<Annotation, { subtype: 'free-text' }>;
 
 const callout = freeText({
   intent: 'free-text-callout',

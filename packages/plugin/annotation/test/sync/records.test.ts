@@ -1,6 +1,6 @@
 import type { DocumentEvent } from '@embedpdf/core';
 import { reload } from '@embedpdf/core';
-import type { AnnotationDTO, AnnotationRef } from '@embedpdf/engine-core/runtime';
+import type { Annotation, AnnotationRef } from '@embedpdf/engine-core/runtime';
 import { annotationKey, formWidget, toPageRef } from '@embedpdf/engine-core/runtime';
 import { describe, expect, it } from 'vitest';
 
@@ -23,7 +23,7 @@ const recordOn = (
   pageObjectNumber: number,
   annotObjectNumber: number,
   extra: Record<string, unknown> = {},
-): AnnotationDTO =>
+): Annotation =>
   ({
     ref: {
       kind: 'objectNumber',
@@ -34,19 +34,19 @@ const recordOn = (
     index: annotObjectNumber,
     subtype: 'square',
     ...extra,
-  }) as unknown as AnnotationDTO;
+  }) as unknown as Annotation;
 
 /** A direct-object annotation without /NM, addressed by its position on the page. */
-const weakOn = (pageObjectNumber: number, index: number): AnnotationDTO =>
+const weakOn = (pageObjectNumber: number, index: number): Annotation =>
   recordOn(pageObjectNumber, 0, {
     ref: { kind: 'index', page: toPageRef(pageObjectNumber), index, revision: {} },
     index,
   });
 
-const named = (dto: AnnotationDTO, nm: string): AnnotationDTO =>
-  ({ ...dto, nm, ref: { kind: 'nm', page: dto.page, nm } as AnnotationRef }) as AnnotationDTO;
+const named = (dto: Annotation, nm: string): Annotation =>
+  ({ ...dto, nm, ref: { kind: 'nm', page: dto.page, nm } as AnnotationRef }) as Annotation;
 
-const recordsOf = (...dtos: AnnotationDTO[]): AnnotationRecords => ({
+const recordsOf = (...dtos: Annotation[]): AnnotationRecords => ({
   byKey: Object.fromEntries(dtos.map((dto) => [annotationKey(dto.ref), { dto, apVersion: 0 }])),
   order: dtos.map((dto) => annotationKey(dto.ref)),
 });
@@ -323,7 +323,7 @@ describe('records mirror through the controller', () => {
       modifiedBy: null,
       importedBy: null,
       actions: null,
-    } as unknown as AnnotationDTO;
+    } as unknown as Annotation;
     harness.listAll.mockResolvedValueOnce({
       annotations: [widget],
       pages: [{ page: toPageRef(1) }],

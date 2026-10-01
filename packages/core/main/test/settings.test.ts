@@ -80,6 +80,29 @@ describe('merging', () => {
   });
 });
 
+describe('whole settings', () => {
+  it('replaces a whole setting instead of merging into it, and keeps it when it is equal', () => {
+    const store = createSettingsStore(
+      { defaults: DEFAULTS, registered: { highlight: { color: 'red' } }, whole: ['highlight'] },
+      () => {},
+      (error) => {
+        throw error;
+      },
+    );
+    const settings = store.forInstance(() => {}).api;
+    // What the app registered replaces the default whole too.
+    expect(settings.getSettings().highlight).toEqual({ color: 'red' });
+    settings.updateSettings({ highlight: { activeColor: 'blue' }, reveal: false });
+    expect(settings.getSettings()).toMatchObject({
+      highlight: { activeColor: 'blue' },
+      reveal: false,
+    });
+    const before = settings.getSettings();
+    settings.updateSettings({ highlight: { activeColor: 'blue' } });
+    expect(settings.getSettings()).toBe(before);
+  });
+});
+
 describe('reset', () => {
   it('goes back to what the app registered, not to the defaults', () => {
     const settings = storeWith({ highlight: { color: 'green' } });

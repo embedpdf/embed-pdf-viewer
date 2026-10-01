@@ -4,7 +4,7 @@ import {
   manifestBytesOf,
   type AnnotationBundleLimits,
 } from './bundleLimits';
-import type { AnnotationDTO } from '../annotation/kinds';
+import type { Annotation } from '../annotation/kinds';
 import {
   ANNOTATION_RESOURCE_ROLE_NAMES,
   type AnnotationResourceRole,
@@ -49,7 +49,7 @@ export interface AnnotationBundlePage {
 }
 
 export interface AnnotationBundleItem<C extends Coordinates = PageCoordinates> {
-  readonly data: AnnotationDTO<C>;
+  readonly data: Annotation<C>;
   readonly resources: Readonly<Partial<Record<AnnotationResourceRole, ResourceId>>>;
 }
 

@@ -3,8 +3,10 @@
  *
  * <SelectionLayer> is a dumb renderer: it warms the page's geometry on mount,
  * reads the page-space highlight rects from the capability, and paints them —
- * mapping each rect through PageContext.toPixels (the same path markers use).
- * Zero pointer handling here; that's the PagePointerSource + the hub.
+ * mapping each rect through PageContext.toPixels (the same path markers use),
+ * in the plugin's `color` setting, which the `--epdf-text-selection` CSS
+ * variable overrides. Zero pointer handling here; that's the
+ * PagePointerSource + the hub.
  *
  * The layer resolves the host lens (`/contract/host`: geometry warming, the
  * highlight handshake) — the adapter is exactly what that entry exists for.
@@ -19,7 +21,7 @@ export { copySelection } from '@embedpdf/web';
 import * as React from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { quadEquals } from '@embedpdf/core-geometry';
-import type { CapabilityToken, EventHook, PageRef } from '@embedpdf/core';
+import type { CapabilityToken, EventHook } from '@embedpdf/core';
 import {
   HANDLE_BAR,
   HANDLE_HEAD,
@@ -27,16 +29,18 @@ import {
   SelectionToken,
   createSelectionHandleDrag,
   selectionHandleGeom,
+  selectionState,
   type SelectionHandleEndpoint,
   type SelectionHandleView,
   type SelectionAnchor,
   type SelectionCapability,
-  type TextRange,
 } from '@embedpdf/plugin-selection';
 import { SelectionToken as SelectionHostToken } from '@embedpdf/plugin-selection/contract/host';
 import type { StageCapability } from '@embedpdf/plugin-stage/contract';
 import {
   attachSelectionHandle,
+  mixAccent,
+  paint,
   wireSelectionClipboard,
   type SelectionClipboardOptions,
 } from '@embedpdf/web';
@@ -51,14 +55,15 @@ import {
   useOptionalCapability,
   usePage,
   useSelector,
+  useViewerSettings,
 } from './runtime';
+import { settingsHook, stateHook } from './state';
 
-export interface SelectionLayerProps {
-  /** Highlight colour (default: translucent blue). */
-  color?: string;
-}
-
-export function SelectionLayer({ color = 'rgba(33, 150, 243, 0.35)' }: SelectionLayerProps) {
+/**
+ * The highlight of the selected text on one page, in the selection plugin's
+ * `color` setting; the `--epdf-text-selection` CSS variable wins over it.
+ */
+export function SelectionLayer() {
   const page = usePage();
   const selection = useCapability(SelectionHostToken);
   const segments = useSelector(
@@ -69,6 +74,9 @@ export function SelectionLayer({ color = 'rgba(33, 150, 243, 0.35)' }: Selection
   // A consumer (e.g. a markup tool drawing its own preview) can take over the
   // selection visual; when it does, we render nothing so the two never overlap.
   const visible = useSelector(SelectionHostToken, (selection) => selection.isHighlightVisible());
+  const color = useSelectionSettings((settings) => settings.color);
+  // An unset color follows the viewer's accent, behind the `--epdf-accent` variable.
+  const accent = useViewerSettings((settings) => settings.accent);
 
   // Warm this page's text geometry as soon as it's on screen, so the first
   // pointer-down can hit-test without waiting on the engine round-trip.
@@ -78,6 +86,9 @@ export function SelectionLayer({ color = 'rgba(33, 150, 243, 0.35)' }: Selection
   }, [selection, page.ref]);
 
   if (!visible) return null;
+
+  // Unset, the color is the accent at 35%, the accent variables included.
+  const fill = paint('text-selection', color ?? mixAccent('text-selection', accent));
 
   return (
     <svg
@@ -104,7 +115,8 @@ export function SelectionLayer({ color = 'rgba(33, 150, 243, 0.35)' }: Selection
           <polygon
             key={i}
             points={ring.map((point) => `${point.x},${point.y}`).join(' ')}
-            fill={color}
+            // In `style`: an SVG attribute doesn't read var().
+            style={{ fill }}
           />
         );
       })}
@@ -126,35 +138,16 @@ export function useSelectionEvent<T>(
   useCapabilityEvent(SelectionToken, select, handler);
 }
 
-const sameRange = (left: TextRange | null, right: TextRange | null): boolean =>
-  left === right ||
-  (!!left &&
-    !!right &&
-    left.start.page.objectNumber === right.start.page.objectNumber &&
-    left.start.index === right.start.index &&
-    left.end.page.objectNumber === right.end.page.objectNumber &&
-    left.end.index === right.end.index);
-const samePages = (left: readonly PageRef[], right: readonly PageRef[]): boolean =>
-  left === right ||
-  (left.length === right.length &&
-    left.every((page, i) => page.objectNumber === right[i]!.objectNumber));
+/**
+ * The selection's state: whether anything is selected, whether the user is
+ * still selecting, the character range and the pages it's on (the page's State
+ * table, declared once in `selectionState`). Takes a selector, re-renders only
+ * when what it returns changes, and returns the empty state without a document.
+ */
+export const useSelectionState = stateHook(selectionState);
 
-/** The selection's reactive read-model for chrome: whether anything is
- *  selected, the character range (persist/restore), and the pages it spans. */
-export function useSelectionState(): {
-  hasSelection: boolean;
-  range: TextRange | null;
-  pageRefs: readonly PageRef[];
-} {
-  const hasSelection = useSelector(SelectionToken, (selection) => selection.hasSelection());
-  const range = useSelector(SelectionToken, (selection) => selection.getRange(), sameRange);
-  const pageRefs = useSelector(
-    SelectionToken,
-    (selection) => selection.listSelectedPages(),
-    samePages,
-  );
-  return { hasSelection, range, pageRefs };
-}
+/** The selection settings (`dragThreshold`, `color`, `handles`), with or without a document. Takes a selector. */
+export const useSelectionSettings = settingsHook(SelectionToken);
 
 /** Structural equality for the selection's menu anchor — keeps the menu from
  *  re-rendering on unrelated dispatches (the capability returns a fresh
@@ -192,7 +185,7 @@ export interface SelectionMenuProps {
  * `getAnchor()` yourself — the primitive carries no policy.
  */
 export function SelectionMenu({ children, gap = 8, placement = 'top' }: SelectionMenuProps) {
-  const selecting = useSelector(SelectionHostToken, (selection) => selection.isGestureActive());
+  const selecting = useSelectionState((state) => state.isSelecting);
   const anchor = useSelector(SelectionToken, (selection) => selection.getAnchor(), sameAnchor);
   if (selecting || !anchor) return null;
   return (
@@ -242,8 +235,6 @@ const handleView = (stage: StageCapability): SelectionHandleView => ({
 });
 
 export interface SelectionHandlesProps {
-  /** Handle colour (default: the selection blue). */
-  color?: string;
   /** The stage lens hosting this overlay (default: the enclosing `<Stage>`'s lens). */
   token?: CapabilityToken<StageCapability>;
 }
@@ -263,11 +254,11 @@ export interface SelectionHandlesProps {
  * identically. Mount in the `<Stage>` overlay slot next to `<SelectionMenu>`;
  * outside a Stage it renders nothing (a `PageView` has no camera to project
  * through). Pointer-isolated, so grabbing a handle never pans the stage.
+ * Painted in the plugin's `handles` setting, which the
+ * `--epdf-text-selection-handle` and `--epdf-text-selection-handle-shadow` CSS
+ * variables override.
  */
-export function SelectionHandles({
-  color = '#2196f3',
-  token: explicitToken,
-}: SelectionHandlesProps) {
+export function SelectionHandles({ token: explicitToken }: SelectionHandlesProps = {}) {
   const token = useStageToken(explicitToken);
   const host = useCapability(SelectionHostToken);
   const stage = useOptionalCapability(token);
@@ -281,8 +272,10 @@ export function SelectionHandles({
         '(a <PageView> has no camera to project the handles through).',
     );
   }
-  const selecting = useSelector(SelectionHostToken, (selection) => selection.isGestureActive());
+  const selecting = useSelectionState((state) => state.isSelecting);
   const visible = useSelector(SelectionHostToken, (selection) => selection.isHighlightVisible());
+  const handles = useSelectionSettings((settings) => settings.handles);
+  const accent = useViewerSettings((settings) => settings.accent);
   const endpoints = useSelector(
     SelectionHostToken,
     (selection): Endpoints | null => {
@@ -355,6 +348,9 @@ export function SelectionHandles({
   // handle drag is itself a selection gesture, so it keeps its handles.
   if (selecting && !dragging) return null;
   const view = handleView(stage);
+  // Each is its CSS variable first, then the setting; an unset color is the accent.
+  const color = paint('text-selection-handle', handles.color ?? accent);
+  const shadow = paint('text-selection-handle-shadow', handles.shadow);
 
   const renderHandle = (role: 'start' | 'end') => {
     const geometry = selectionHandleGeom(view, endpoints[role], role);
@@ -412,7 +408,7 @@ export function SelectionHandles({
             height: HANDLE_HEAD,
             borderRadius: '50%',
             background: color,
-            boxShadow: '0 1px 4px rgba(0, 0, 0, 0.35)',
+            boxShadow: shadow,
           }}
         />
       </div>

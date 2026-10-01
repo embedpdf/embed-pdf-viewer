@@ -5,51 +5,59 @@
  * document's detached script realm, so neither the canonical library nor
  * its reusable per-page extraction becomes target/user/time specific.
  */
-import { DocumentsToken, toPluginError, toPluginErrorInfo } from '@embedpdf/core';
+import {
+  DocumentsToken,
+  toPluginError,
+  toPluginErrorInfo,
+  type BatchResult,
+  type PageRef,
+} from '@embedpdf/core';
 import { javaScriptProgramFromActionTree } from '@embedpdf/core-acrojs';
-import type { AnnotationRef, PageRef } from '@embedpdf/engine-core/runtime';
+import type { Annotation } from '@embedpdf/engine-core/runtime';
 import { ActionsToken as ActionsHostToken } from '@embedpdf/plugin-actions/contract/host';
 import { AnnotationToken, type StampPlacement } from '@embedpdf/plugin-annotation/contract';
 import { AnnotationToken as AnnotationHostToken } from '@embedpdf/plugin-annotation/contract/host';
 import { createFormScriptingController } from '@embedpdf/plugin-form/scripting';
 
-import type { StampAsset, StampAssetPreview, StampCapability, StampConfig } from '../contract';
+import type {
+  StampArmOptions,
+  StampAsset,
+  StampAssetPreview,
+  StampCapability,
+  StampDocumentOptions,
+} from '../contract';
+import { armAsset as rememberArm, disarmDocuments } from '../model';
+import type { StampCatalog } from '../read/catalog';
 import type { StampContext, StampServices } from '../services';
-import { DEFAULT_PREVIEW_WIDTH } from '../services/asset-engine';
-import { notFound, stampError, verb } from '../services/errors';
+import { notFound, permissionDenied, stampError, throwIfCancelled, verb } from '../services/errors';
 
 export function createPlacement(
   ctx: StampContext,
   {
-    events,
     binaries,
     assetEngine,
     ghosts,
-  }: Pick<StampServices, 'events' | 'binaries' | 'assetEngine' | 'ghosts'>,
-  config: StampConfig,
+    targets,
+  }: Pick<StampServices, 'binaries' | 'assetEngine' | 'ghosts' | 'targets'>,
+  { canPlace }: Pick<StampCatalog, 'canPlace'>,
 ) {
-  const { armChanged } = events;
   const { binaries: assetBinaries, libraryBinaries } = binaries;
   const { openAssetDocument, imageToPreview } = assetEngine;
   const { ghostProvider } = ghosts;
+  const { documentIdOf, targetOf, pageOf } = targets;
+  const settings = ctx.settings();
 
-  /** Which asset this plugin armed per document, a resource read by
-   *  `getArmedAsset`. The annotation plugin owns the arm itself (a tool
-   *  switch disarms it), so a read checks the entry against it. */
-  const armedByDocument = new Map<string, string>();
-
-  // The annotation plugin drops an arm on its own (a tool switch, a closed
-  // document). Forget those arms here too, so readers of `getArmedAsset`
-  // wake and `onArmChanged` announces the disarm.
+  // The annotation plugin owns the arm itself and drops it on its own (a
+  // tool switch, a closed document). Forget those arms here too, so
+  // `getArmedAsset` and `onArmChanged` follow.
   const droppedArms = (): string =>
-    [...armedByDocument.keys()]
-      .filter((documentId) => !ctx.tryForDocument(AnnotationHostToken, documentId)?.hasArmedStamp())
+    Object.keys(ctx.state.get().armed)
+      .filter(
+        (documentId) => !ctx.tryForDocument(AnnotationHostToken, documentId)?.stamps.isArmed(),
+      )
       .join('\n');
   ctx.watch(droppedArms, (dropped) => {
-    if (!dropped) return;
-    for (const documentId of dropped.split('\n')) armedByDocument.delete(documentId);
-    ctx.notify();
-    for (const documentId of dropped.split('\n')) armChanged.emit({ documentId, assetId: null });
+    if (dropped) ctx.state.update(disarmDocuments, dropped.split('\n'));
   });
 
   /** The one payload both entry points hand the annotation plugin: artwork,
@@ -82,7 +90,7 @@ export function createPlacement(
     asset: StampAsset,
     binary: { bytes: Uint8Array; preview: StampAssetPreview | null },
   ): Promise<{ bytes: Uint8Array; preview: StampAssetPreview | null }> => {
-    if (config.dynamic === false) return binary;
+    if (!settings.get().dynamic) return binary;
     const actions = ctx.tryForDocument(ActionsHostToken, documentId);
     const mintRealm = actions?.createDetachedScriptRealm;
     if (!actions || !mintRealm) return binary;
@@ -90,7 +98,7 @@ export function createPlacement(
     const documents = ctx.get(DocumentsToken);
     const target = documents.get(documentId);
     if (target?.status !== 'ready') {
-      throw stampError('not-found', `target document '${documentId}' is not open`);
+      throw stampError('not-found', `document '${documentId}' is not open`);
     }
     const targetDocument = {
       name: target.name,
@@ -178,7 +186,7 @@ export function createPlacement(
 
       const bytes = await doc.pages.extract([page]);
       const image = await doc.page(page).render.image({
-        viewport: { kind: 'width', width: config.previewWidth ?? DEFAULT_PREVIEW_WIDTH },
+        viewport: { kind: 'width', width: settings.get().previewWidth },
         background: 'transparent',
         includeAnnotations: false,
         format: 'png',
@@ -191,84 +199,137 @@ export function createPlacement(
     }
   };
 
-  const armAsset = async (
-    documentId: string,
-    assetId: string,
-    options?: { targetWidth?: number },
-  ): Promise<void> => {
+  /** An asset and its bytes, or `not-found`. */
+  const assetOf = (assetId: string) => {
     const asset = ctx.state.get().assets[assetId];
     const binary = assetBinaries.get(assetId);
     if (!asset || !binary) throw notFound('asset', assetId);
-    const placement = await materializeForPlacement(documentId, asset, binary);
-    // The placement itself remains one armStamp call. Dynamic evaluation,
+    return { asset, binary };
+  };
+
+  /** Placing is annotation work: refused where the document's annotation plugin refuses a create. */
+  const assertMayPlace = (documentId: string, operation: string): void => {
+    if (!canPlace(documentId)) throw permissionDenied('annotations:create', operation);
+  };
+
+  const armAsset = async (assetId: string, options?: StampArmOptions): Promise<void> => {
+    const signal = options?.signal;
+    throwIfCancelled(signal);
+    const documentId = targetOf(options);
+    const { asset, binary } = assetOf(assetId);
+    assertMayPlace(documentId, 'stamp.armAsset');
+    const placement = await ctx.cancellable(
+      signal,
+      materializeForPlacement(documentId, asset, binary),
+    );
+    throwIfCancelled(signal);
+    // The placement itself remains one `stamps.arm` call. Dynamic evaluation,
     // when enabled and applicable, has already produced an ephemeral static
     // page and matching preview at this boundary.
     const annotation = ctx.forDocument(AnnotationToken, documentId);
-    await annotation.armStamp({
-      ...stampPayload(asset, placement, placement !== binary),
-      targetWidth: options?.targetWidth,
-    });
-    armedByDocument.set(documentId, assetId);
-    ctx.notify();
-    armChanged.emit({ documentId, assetId });
+    await annotation.stamps.arm(
+      {
+        ...stampPayload(asset, placement, placement !== binary),
+        targetWidth: options?.targetWidth,
+      },
+      { signal },
+    );
+    ctx.state.update(rememberArm, documentId, assetId);
   };
 
-  const armedAsset = (documentId: string): StampAsset | null => {
-    const assetId = armedByDocument.get(documentId);
-    if (assetId === undefined) return null;
+  const getArmedAsset = (documentId?: string): StampAsset | null => {
+    const id = documentIdOf(documentId);
+    const assetId = id === null ? undefined : ctx.state.get().armed[id];
+    if (id === null || assetId === undefined) return null;
     // An arm the annotation plugin just dropped reads as nothing armed, even
     // for a reader that runs before the watch above forgets it.
-    const annotation = ctx.tryForDocument(AnnotationHostToken, documentId);
-    if (!annotation?.hasArmedStamp()) return null;
+    if (!ctx.tryForDocument(AnnotationHostToken, id)?.stamps.isArmed()) return null;
     return ctx.state.get().assets[assetId] ?? null;
   };
 
-  const placeAsset = async (
+  const disarm = (documentId?: string): void => {
+    const id = documentIdOf(documentId);
+    if (id === null) return;
+    ctx.tryForDocument(AnnotationToken, id)?.stamps.disarm();
+    ctx.state.update(disarmDocuments, [id]);
+  };
+
+  /** Place on one document, its permission already checked. */
+  const placeOn = async (
     documentId: string,
     assetId: string,
     placement: StampPlacement,
-  ): Promise<AnnotationRef> => {
-    const asset = ctx.state.get().assets[assetId];
-    const binary = assetBinaries.get(assetId);
-    if (!asset || !binary) throw notFound('asset', assetId);
-    const materialized = await materializeForPlacement(documentId, asset, binary);
+    signal: AbortSignal | undefined,
+  ): Promise<{ annotation: Annotation }> => {
+    const { asset, binary } = assetOf(assetId);
+    const materialized = await ctx.cancellable(
+      signal,
+      materializeForPlacement(documentId, asset, binary),
+    );
+    throwIfCancelled(signal);
     const annotation = ctx.forDocument(AnnotationToken, documentId);
-    return annotation.placeStamp(
+    return annotation.stamps.place(
       stampPayload(asset, materialized, materialized !== binary),
       placement,
+      { signal },
     );
+  };
+
+  const placeAsset = async (
+    assetId: string,
+    placement: StampPlacement,
+    options?: StampDocumentOptions,
+  ): Promise<{ annotation: Annotation }> => {
+    throwIfCancelled(options?.signal);
+    const documentId = targetOf(options);
+    assetOf(assetId);
+    assertMayPlace(documentId, 'stamp.placeAsset');
+    return placeOn(documentId, assetId, placement, options?.signal);
+  };
+
+  const placeAssetOnPages = async (
+    assetId: string,
+    pages: readonly (PageRef | number)[] | 'all',
+    placement: Omit<StampPlacement, 'page'>,
+    options?: StampDocumentOptions,
+  ): Promise<BatchResult<Annotation, PageRef>> => {
+    const signal = options?.signal;
+    throwIfCancelled(signal);
+    const documentId = targetOf(options);
+    assetOf(assetId);
+    assertMayPlace(documentId, 'stamp.placeAssetOnPages');
+    // Every page is resolved before the first placement: a page that isn't
+    // there refuses the call, and nothing is placed.
+    const targetPages =
+      pages === 'all'
+        ? ctx
+            .get(DocumentsToken)
+            .listPages(documentId)
+            .map((page) => page.ref)
+        : pages.map((page) => pageOf(documentId, page).ref);
+    const applied: Annotation[] = [];
+    const failed: { ref: PageRef; error: ReturnType<typeof toPluginErrorInfo> }[] = [];
+    for (const page of targetPages) {
+      try {
+        const placed = await placeOn(documentId, assetId, { ...placement, page }, signal);
+        applied.push(placed.annotation);
+      } catch (error) {
+        const refused = toPluginError('stamp', error);
+        // A cancel stops the whole batch: what was placed stays placed.
+        if (refused.code === 'operation-cancelled') throw refused;
+        failed.push({ ref: page, error: toPluginErrorInfo(refused) });
+      }
+    }
+    return { applied, skipped: [], failed };
   };
 
   return {
     api: {
       armAsset: verb(armAsset),
+      disarm,
+      getArmedAsset,
       placeAsset: verb(placeAsset),
-      placeAssetOnPages: async (documentId, assetId, pages, placement) => {
-        const targets =
-          pages === 'all'
-            ? ctx
-                .get(DocumentsToken)
-                .listPages(documentId)
-                .map((page) => page.ref)
-            : [...pages];
-        const applied: AnnotationRef[] = [];
-        const failed: { ref: PageRef; error: ReturnType<typeof toPluginErrorInfo> }[] = [];
-        for (const page of targets) {
-          try {
-            applied.push(await placeAsset(documentId, assetId, { ...placement, page }));
-          } catch (error) {
-            failed.push({ ref: page, error: toPluginErrorInfo(toPluginError('stamp', error)) });
-          }
-        }
-        return { applied, skipped: [], failed };
-      },
-      disarm: (documentId) => {
-        const wasArmed = armedByDocument.delete(documentId);
-        if (wasArmed) ctx.notify();
-        ctx.forDocument(AnnotationToken, documentId).disarmStamp();
-        if (wasArmed) armChanged.emit({ documentId, assetId: null });
-      },
-      getArmedAsset: armedAsset,
+      placeAssetOnPages: verb(placeAssetOnPages),
     } satisfies Partial<StampCapability>,
   };
 }

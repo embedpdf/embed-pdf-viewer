@@ -5,7 +5,7 @@ import { deflateSync } from 'node:zlib';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import type {
   DocumentHandle,
-  StampAnnotationDTO,
+  StampAnnotation,
   WirePack,
   WorkerRequest,
   WorkerResponse,
@@ -158,7 +158,7 @@ describe('stamp annotations: resource buffers survive a detaching transport', ()
       },
       { appearance: png },
     );
-    expect((second.annotation as StampAnnotationDTO).name).toBe('Approved');
+    expect((second.annotation as StampAnnotation).name).toBe('Approved');
     expect(png.byteLength).toBe(original.length);
 
     // Source update through the same path.

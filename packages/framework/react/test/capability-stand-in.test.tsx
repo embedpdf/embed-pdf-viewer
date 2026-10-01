@@ -107,6 +107,23 @@ describe('useCapability without a document', () => {
     await expect(Promise.resolve(standIn)).resolves.toBe(standIn);
   });
 
+  it('refuses the settings calls with not-ready for a plugin whose definition declares no settings', async () => {
+    const PlainToken = createCapabilityToken<{ getSettings(): object }>('plain-probe');
+    const plainPlugin: AnyPlugin = {
+      id: 'plain-probe',
+      token: PlainToken,
+      scope: 'document',
+      create: () => ({ api: { getSettings: () => ({}) } }),
+    };
+    const seen: { getSettings(): object }[] = [];
+    function PlainProbe() {
+      seen.push(useCapability(PlainToken));
+      return null;
+    }
+    await viewerWith([...plugins, plainPlugin], <PlainProbe />);
+    expect(isPluginError(refusal(() => seen[seen.length - 1].getSettings()), 'not-ready')).toBe(true);
+  });
+
   it('resolves a workspace plugin with no document', async () => {
     const pings: string[] = [];
     function WorkspaceProbe() {

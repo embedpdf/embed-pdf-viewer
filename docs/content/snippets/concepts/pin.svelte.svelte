@@ -3,8 +3,8 @@
 
   let { box, page }: AnnotationRendererProps = $props();
 
-  // page coordinates → this page's pixels, zoom and rotation included
-  const point = $derived(page.transform.pageToView({ x: box.x, y: box.y }));
+  // page coordinates → pixels on this page, at its zoom; the page turns them with it
+  const point = $derived(page.transform.toPixels({ x: box.x, y: box.y }));
 </script>
 
 <div style:position="absolute" style:left="{point.x}px" style:top="{point.y}px">📌</div>

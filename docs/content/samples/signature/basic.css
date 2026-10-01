@@ -1,4 +1,4 @@
-/* Colors, for light and dark */
+/* Colors */
 :root {
   --ink: #1a2748;
   --muted: #5a6b92;
@@ -11,19 +11,6 @@
   --shadow: rgb(7 32 76 / 0.04);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --ink: #e6ecfa;
-    --muted: #93a3c7;
-    --line: #27365f;
-    --line-strong: #34467a;
-    --surface: #131d3b;
-    --tint: #1a2750;
-    --canvas: #0b1328;
-    --shadow: rgb(0 0 0 / 0.3);
-  }
-}
-
 /* The controls, above the pages */
 .toolbar {
   display: flex;
@@ -33,20 +20,10 @@
   margin-bottom: 14px;
 }
 
-.readout {
-  min-width: 52px;
-  text-align: center;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--ink);
-  font-variant-numeric: tabular-nums;
-}
-
 .button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
   font: inherit;
   font-size: 13px;
   font-weight: 550;
@@ -84,20 +61,21 @@
   transform: none;
 }
 
-/* A stamp's picture, inside its button */
+.readout {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+/* A mark's picture, inside its button */
 .preview {
   display: block;
   height: 22px;
 }
 
-/* Pushes what follows to the right */
-.spacer {
-  flex: 1 1 auto;
-}
-
 /* The pages */
 .stage {
-  height: 420px;
+  height: 440px;
   border: 1px solid var(--line);
   border-radius: 14px;
   background: var(--canvas);

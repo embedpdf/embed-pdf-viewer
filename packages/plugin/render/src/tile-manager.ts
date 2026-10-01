@@ -75,10 +75,10 @@ export class TileManager {
    * stays shared — bytes dedupe across views by conformed width.
    */
   private readonly pages = new Map<string, PageTileState>();
-  /** The resolved strategy, recomputed when the policy reference changes. */
+  /** The resolved strategy, recomputed when the policy or the settings change. */
   private readonly strategy = memo(
-    () => [this.deps.getPolicy()],
-    (policy) => resolveStrategy(policy, this.deps.options),
+    () => [this.deps.getPolicy(), this.deps.getOptions()] as const,
+    (policy, options) => resolveStrategy(policy, options),
   );
   /** Live fetches across all pages — the backpressure counter. */
   private inFlight = 0;
@@ -87,7 +87,8 @@ export class TileManager {
   constructor(
     private readonly deps: {
       store: RasterStore;
-      options: ResolvedRenderOptions;
+      /** The render settings as they are now: read at every use, so a change applies at once. */
+      getOptions(): ResolvedRenderOptions;
       /** The document fact off the kernel registry — never null: the kernel
        *  materializes it (continuous fallback) before the doc publishes. */
       getPolicy(): EngineRenderPolicy;
@@ -103,7 +104,7 @@ export class TileManager {
       ): Promise<PageImageHandle>;
       /** A page's plans changed outside `plan()`: re-plan it and wake subscribed layers. */
       onAdvance(pageObjectNumber: number): void;
-      /** Diagnostic sink (options.debug) — scheduling and fetch outcomes. */
+      /** Diagnostic sink — scheduling and fetch outcomes; it logs while `debug` is set. */
       debug?(message: string): void;
     },
   ) {}
@@ -114,7 +115,7 @@ export class TileManager {
     demand: PageViewDemand,
     includeAnnotations: boolean,
   ): TilePaintPlan {
-    const { options } = this.deps;
+    const options = this.deps.getOptions();
     if (!options.tiles.enabled) return EMPTY_TILE_PLAN;
     const strategy = this.strategy();
     const page = this.deps.getPageSize(pageObjectNumber);
@@ -257,7 +258,7 @@ export class TileManager {
     const paint: TilePaintSource[] = [];
     const fetching: string[] = [];
     const stale: string[] = [];
-    const bleedPx = this.deps.options.tiles.bleedPx;
+    const bleedPx = this.deps.getOptions().tiles.bleedPx;
     for (const entry of state.entries.values()) {
       const visiblePart = intersectRects(entry.rect, visible);
       if (entry.resolved) {
@@ -373,7 +374,7 @@ export class TileManager {
     prefetchCoords: TileCoord[],
     visible: Rect,
   ): void {
-    const { options } = this.deps;
+    const options = this.deps.getOptions();
     const firstEngage = state.wantWidth === null;
     const levelChanged = state.wantWidth !== null && state.wantWidth !== wantWidth;
     if (levelChanged) state.failedKeys.clear(); // a new level gets fresh chances
@@ -486,7 +487,7 @@ export class TileManager {
   ): boolean {
     let allReady = true;
     let started = 0;
-    const bleedPt = this.deps.options.tiles.bleedPx / grid.scale;
+    const bleedPt = this.deps.getOptions().tiles.bleedPx / grid.scale;
     for (const coord of coords) {
       const key = this.tileKey(pageObjectNumber, wantWidth, coord, includeAnnotations, epoch);
       // A key that failed (non-abort) at this level is not retried until the
@@ -603,7 +604,7 @@ export class TileManager {
       if (regionCovered(grid, page, region, paintedAt)) {
         state.entries.delete(key);
         released = true;
-      } else if (this.deps.debug) {
+      } else if (this.deps.debug && this.deps.getOptions().debug) {
         const missing = tilesInRect(grid, page, region).filter((coord) => !paintedAt(coord));
         const detail = missing.slice(0, 3).map((coord) => {
           const missingEntry = state.entries.get(wantKeyOf(coord));
@@ -665,7 +666,7 @@ export class TileManager {
     includeAnnotations: boolean,
     epoch: number,
   ): string {
-    const { tiles } = this.deps.options;
+    const { tiles } = this.deps.getOptions();
     const format = this.strategy().format;
     const geometry = `g${tiles.size}.${tiles.bleedPx}${format ? `.${format}` : ''}`;
     return (

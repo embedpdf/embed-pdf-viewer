@@ -8,7 +8,7 @@ import { UnsupportedDeclaration } from './declaration';
 
 export { UnsupportedDeclaration } from './declaration';
 
-export type UnsupportedAnnotationDTO<C extends Coordinates = PageCoordinates> = ReadOf<
+export type UnsupportedAnnotation<C extends Coordinates = PageCoordinates> = ReadOf<
   typeof UnsupportedDeclaration,
   C
 >;
@@ -22,7 +22,7 @@ export const UnsupportedPatchSchema: z.ZodType<never> = z.never();
 
 export const UnsupportedKind: AnnotationKindModule<
   'unsupported',
-  UnsupportedAnnotationDTO,
+  UnsupportedAnnotation,
   UnsupportedDraft,
   UnsupportedPatch
 > = {

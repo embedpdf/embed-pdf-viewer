@@ -1,4 +1,4 @@
-/* Colors, for light and dark */
+/* Colors */
 :root {
   --ink: #1a2748;
   --muted: #5a6b92;
@@ -11,20 +11,7 @@
   --shadow: rgb(7 32 76 / 0.04);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --ink: #e6ecfa;
-    --muted: #93a3c7;
-    --line: #27365f;
-    --line-strong: #34467a;
-    --surface: #131d3b;
-    --tint: #1a2750;
-    --canvas: #0b1328;
-    --shadow: rgb(0 0 0 / 0.3);
-  }
-}
-
-/* The controls, above the pages */
+/* The zoom controls, above the pages */
 .toolbar {
   display: flex;
   flex-wrap: wrap;
@@ -34,19 +21,16 @@
 }
 
 .button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
+  min-width: 38px;
   font: inherit;
-  font-size: 13px;
+  font-size: 13.5px;
   font-weight: 550;
-  line-height: 1;
+  line-height: 1.1;
   color: var(--ink);
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: 9px;
-  padding: 8px 13px;
+  padding: 8px 11px;
   cursor: pointer;
   white-space: nowrap;
   box-shadow: 0 1px 2px var(--shadow);
@@ -84,14 +68,14 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* Pushes what follows to the right */
-.spacer {
-  flex: 1 1 auto;
+/* Fit width sits at the far end */
+.push {
+  margin-left: auto;
 }
 
 /* The pages */
 .stage {
-  height: 460px;
+  height: 440px;
   border: 1px solid var(--line);
   border-radius: 14px;
   background: var(--canvas);

@@ -31,7 +31,7 @@ describe('selection authoring bridge', () => {
     } as unknown as AnnotationHostCapability;
     const selection = {
       hasSelection: () => true,
-      isGestureActive: () => options.gestureActive ?? false,
+      isSelecting: () => options.gestureActive ?? false,
       getSnapshot: () => ({ pages: [{ page: toPageRef(1), segments }] }),
       setHighlightVisible: vi.fn(),
       onChanged: (callback: () => void) => {

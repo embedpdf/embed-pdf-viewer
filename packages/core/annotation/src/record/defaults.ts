@@ -5,7 +5,7 @@
  */
 import {
   annotationDefaultsOf,
-  type AnnotationDTO,
+  type Annotation,
   type AnnotationSubtype,
   type WidgetAppearance,
 } from '@embedpdf/engine-core/runtime';
@@ -26,7 +26,7 @@ export const engineSubtypeOf = (kind: string): AnnotationSubtype =>
  * from the tool starts from. A form tool's reads as a widget of its field
  * family, so it reads as the tool's own kind (a radio tool's is round).
  */
-export function readOfDefaults(kind: string, defaults: FieldValues): AnnotationDTO {
+export function readOfDefaults(kind: string, defaults: FieldValues): Annotation {
   const subtype = engineSubtypeOf(kind);
   const fieldFamily = subtype === 'widget' ? fieldFamilyOfKind(kind) : undefined;
   return {
@@ -34,7 +34,7 @@ export function readOfDefaults(kind: string, defaults: FieldValues): AnnotationD
     ...annotationDefaultsOf(subtype),
     ...(fieldFamily ? { fieldFamily } : {}),
     ...defaults,
-  } as unknown as AnnotationDTO;
+  } as unknown as Annotation;
 }
 
 const WIDGET_APPEARANCE_FIELDS = [

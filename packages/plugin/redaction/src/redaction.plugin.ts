@@ -3,7 +3,7 @@ import { AnnotationToken } from '@embedpdf/plugin-annotation/contract/host';
 import { SearchToken } from '@embedpdf/plugin-search/contract';
 import { SelectionToken } from '@embedpdf/plugin-selection/contract';
 
-import { RedactionToken, type RedactionConfig } from './contract';
+import { REDACTION_DEFAULTS, RedactionToken, type RedactionConfig } from './contract';
 import { createRedactionController } from './controller';
 import { initialRedactionState } from './model';
 
@@ -16,8 +16,9 @@ import { initialRedactionState } from './model';
  *
  * Trust boundary: on a layered document, applying rewrites the layer's bytes;
  * the immutable base keeps the original. The package README explains the consequences.
+ * `config` is the settings the app registers, over {@link REDACTION_DEFAULTS}.
  */
-export const redactionPlugin = (config: RedactionConfig = {}) =>
+export const redactionPlugin = (config?: RedactionConfig) =>
   definePlugin({
     id: 'redaction',
     token: RedactionToken,
@@ -25,5 +26,6 @@ export const redactionPlugin = (config: RedactionConfig = {}) =>
     requires: [AnnotationToken],
     optional: [SelectionToken, SearchToken],
     state: initialRedactionState,
-    create: (ctx) => createRedactionController(ctx, config),
+    settings: { defaults: REDACTION_DEFAULTS, registered: config },
+    create: createRedactionController,
   });

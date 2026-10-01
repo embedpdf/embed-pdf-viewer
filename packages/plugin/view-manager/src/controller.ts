@@ -8,9 +8,10 @@ import { DocumentsToken, memo, memoByKey, type PluginContext } from '@embedpdf/c
 
 import type {
   DocumentMovedEvent,
-  PaneEvent,
+  PaneCreatedEvent,
   PaneFocusChangedEvent,
   PaneInfo,
+  PaneRemovedEvent,
   ViewManagerCapability,
 } from './contract';
 import {
@@ -23,6 +24,7 @@ import {
   paneOfDocument,
   reconcile,
   removeDocument,
+  renameDocument,
   removePane,
   setActiveDocument,
   setFocusedPane,
@@ -33,8 +35,8 @@ const sameIds = (left: readonly string[], right: readonly string[]): boolean =>
   left.length === right.length && left.every((id, index) => id === right[index]);
 
 export function createViewManagerController(ctx: PluginContext<ViewManagerState>) {
-  const paneCreated = ctx.events.source<PaneEvent>();
-  const paneRemoved = ctx.events.source<PaneEvent>();
+  const paneCreated = ctx.events.source<PaneCreatedEvent>();
+  const paneRemoved = ctx.events.source<PaneRemovedEvent>();
   const focusChanged = ctx.events.source<PaneFocusChangedEvent>();
   const documentMoved = ctx.events.source<DocumentMovedEvent>();
 
@@ -71,9 +73,10 @@ export function createViewManagerController(ctx: PluginContext<ViewManagerState>
     (_panes, order) => order.map((id) => paneInfoOf(id)!),
   );
 
-  const createPaneWith = (documentIds: readonly string[] = []): string => {
+  /** A new pane at `index` (the end when left out), focused, with these documents moved into it. */
+  const createPaneWith = (documentIds: readonly string[] = [], index?: number): string => {
     const id = nextPaneId(state());
-    ctx.state.update(createPane);
+    ctx.state.update(createPane, index);
     for (const documentId of documentIds) ctx.state.update(addDocument, id, documentId);
     return id;
   };
@@ -104,7 +107,11 @@ export function createViewManagerController(ctx: PluginContext<ViewManagerState>
     },
     movePane: (id, toIndex) => ctx.state.update(movePane, id, toIndex),
     setFocusedPane: (id) => ctx.state.update(setFocusedPane, id),
-    splitPane: (documentId) => createPaneWith([documentId]),
+    splitPane: (documentId, options) => {
+      // Beside `from`, or the focused pane; at the end when neither is a pane.
+      const beside = state().order.indexOf(options?.from ?? state().focusedPaneId ?? '');
+      return createPaneWith([documentId], beside < 0 ? undefined : beside + 1);
+    },
     setActiveDocument: (paneId, documentId) =>
       ctx.state.update(setActiveDocument, paneId, documentId),
     addDocument: (paneId, documentId, index) =>
@@ -129,8 +136,18 @@ export function createViewManagerController(ctx: PluginContext<ViewManagerState>
      */
     connect() {
       const documents = ctx.get(DocumentsToken);
-      const sync = (open: readonly string[]) =>
+      const sync = (open: readonly string[], previous: readonly string[] = []) => {
+        // A document that got its real id while opening is in the same place in the order.
+        if (open.length === previous.length) {
+          open.forEach((id, index) => {
+            const previousId = previous[index];
+            if (id !== previousId && !open.includes(previousId) && !previous.includes(id)) {
+              ctx.state.update(renameDocument, previousId, id);
+            }
+          });
+        }
         ctx.state.update(reconcile, open, state().focusedPaneId);
+      };
       sync(documents.getOrder());
       ctx.watch(() => documents.getOrder(), sync, sameIds);
     },

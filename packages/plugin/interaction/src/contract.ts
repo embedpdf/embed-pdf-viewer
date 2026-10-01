@@ -1,119 +1,105 @@
-import { type EventHook, type PageRef, type Unsubscribe } from '@embedpdf/core';
-import type { PageRotation, Point } from '@embedpdf/core-geometry';
+import {
+  type DeepPartial,
+  type EventHook,
+  type PageRef,
+  type SettingsApi,
+  type Unsubscribe,
+} from '@embedpdf/core';
+import type { Point } from '@embedpdf/core-geometry';
 
 export { FeedbackToken } from './feedback.types';
 export type { FeedbackPluginOptions, PlatformFeedback } from './feedback.types';
 
 export type ToolId = string;
+
+/** A CSS cursor: a keyword such as `'crosshair'`, or an image built with `svgCursor()`. */
 export type Cursor = string;
 
 export interface Modifiers {
-  shift: boolean;
-  alt: boolean;
-  ctrl: boolean;
-  meta: boolean;
+  readonly shift: boolean;
+  readonly alt: boolean;
+  readonly ctrl: boolean;
+  readonly meta: boolean;
 }
 
-/**
- * The single active arbiter of what the pointer does. `pan` and `pointer` are
- * built in; features add more (`highlight`, `square`, `redact`…) via
- * `registerTool`. A tool carries no behaviour itself — it turns on capability
- * tags that handlers opt into (`enables`), so tools compose features without
- * coupling to them.
- */
-export interface Tool {
-  id: ToolId;
-  cursor: Cursor;
-  /**
-   * Cursor over the viewport's page gaps. Most tools act only on pages, so
-   * gaps fall back to the neutral arrow (`'default'`); a tool that works
-   * anywhere (pan) declares its own (`'grab'`). Hover claims outrank both.
-   */
-  gapCursor?: Cursor;
-  enables: ReadonlySet<string>;
-  /**
-   * Touch consent, first rung — "arming this tool is consent to create with
-   * a finger": while it is active, single-finger touch routes to the hub
-   * wholesale and navigation moves to two fingers. Default false.
-   */
-  touchDirect?: boolean;
-}
-
-export type Phase = 'down' | 'move' | 'up' | 'cancel';
-
-/** The physical device class behind a sample — `PointerEvent.pointerType`. */
+/** The physical device class behind a pointer: `PointerEvent.pointerType`. */
 export type PointerKind = 'mouse' | 'pen' | 'touch';
 
 /**
- * One normalized pointer event. `viewport` is the source container's px. `page`
- * is the resolved page hit — its `ref` + page-space point — present when the
- * pointer is over a page, absent over gaps.
+ * What one finger does on a touch screen while the tool is active. `'draw'`:
+ * one finger drives the tool, and two fingers scroll and zoom, for tools you
+ * drag with. `'tap'`: a tap is a click and a drag scrolls, for tools you click
+ * with.
  */
-export interface PointerSample {
-  phase: Phase;
-  viewport: Point;
-  /** `scale` = view px per page unit; `rotation` = the page's total display
-   *  rotation; `zoom` = the page's zoom relative to its 100% baseline. */
-  page?: {
-    ref: PageRef;
-    point: Point;
-    scale?: number;
-    rotation?: PageRotation;
-    zoom?: number;
-  };
-  modifiers: Modifiers;
-  /** Click count for a `down` (1 single, 2 double, 3 triple). Defaults to 1. */
-  clickCount?: number;
-  /** Absent when the source can't say — treat as 'mouse'. */
-  pointerType?: PointerKind;
-  /** Present when the sample was synthesized from a recognized gesture. */
-  gesture?: 'long-press';
-  /** The lens this sample came from (the stage plugin id); absent = route everywhere. */
-  source?: string;
-  /** Project this event onto a specific page's frame, unclamped; null when the source cannot. */
-  project?(page: PageRef): Point | null;
+export type ToolTouch = 'draw' | 'tap';
+
+/** The pointer on a page, as a tool's own pointer methods receive it. */
+export interface ToolPointerEvent {
+  /** The page under the pointer. During a gesture the tool took, the page it started on. */
+  readonly page: PageRef;
+  /**
+   * Where on that page, in page coordinates. During a gesture that leaves its
+   * page, the point lies outside the page's box.
+   */
+  readonly point: Point;
+  readonly modifiers: Modifiers;
+  readonly pointerType: PointerKind;
 }
 
 /**
- * A pointer handler contributed by a feature plugin: it declares which tools
- * it is live under and a priority; the hub routes each gesture to the first
- * handler that captures it. Registered through the host contract.
+ * A tool: what the pointer does on the page while it is active. `pointer` and
+ * `pan` are built in, and plugins add their own. A tool of your own handles
+ * the pointer itself with its pointer methods, in page coordinates.
  */
-export interface InteractionHandler {
-  id: string;
-  /** Higher wins the gesture. */
-  priority: number;
-  /** Usually `tool.enables.has('my-tag')`. */
-  enabledFor(tool: Tool): boolean;
-  /** Return true to capture: subsequent move/up route here until pointer-up. */
-  onDown(sample: PointerSample): boolean;
-  onMove?(sample: PointerSample): void;
-  onUp?(sample: PointerSample): void;
-  /** The gesture was aborted, not completed. Falls back to `onUp` when absent. */
-  onCancel?(sample: PointerSample): void;
-  /** Pointer moved with no active gesture — cursor feedback only. */
-  onHover?(sample: PointerSample): void;
-  /** Touch consent, second rung: a pure read asked before a touch contact is classified. */
-  claimsTouch?(sample: PointerSample): boolean;
+export interface Tool {
+  /** The tool's name, for `activateTool(id)`. */
+  readonly id: ToolId;
+  /** The cursor over the page while the tool is active. */
+  readonly cursor: Cursor;
+  /** What one finger does on a touch screen. Default `'tap'`. */
+  readonly touch?: ToolTouch;
+  /**
+   * A press on a page. Return `true` to take the gesture: its moves and its
+   * release then come to `onPointerMove` and `onPointerUp`, and nothing else
+   * acts on it.
+   */
+  onPointerDown?(event: ToolPointerEvent): boolean | void;
+  /** The pointer moved during a gesture the tool took. */
+  onPointerMove?(event: ToolPointerEvent): void;
+  /**
+   * The gesture the tool took ended: the button or finger was released, or the
+   * gesture was cancelled, for example by a second finger.
+   */
+  onPointerUp?(event: ToolPointerEvent): void;
+  /** The pointer moved over a page with no button pressed. */
+  onHover?(event: ToolPointerEvent): void;
 }
 
-/** A tool's runtime cursor skin: "while this tool is armed, keyword X looks like Y." */
-export type ToolCursorSkin = Record<Cursor, Cursor>;
+/** A tool's cursors replaced by name: "while this tool is active, show cursor X as Y". */
+export type ToolCursors = Readonly<Record<Cursor, Cursor>>;
 
-export interface InteractionConfig {
-  /** Tool active when a document opens. Default `'pointer'`. */
-  defaultTool?: ToolId;
-  /** Tools registered at construction, beside the built-in `pointer` and `pan`. */
-  tools?: readonly Tool[];
+// ── settings ──────────────────────────────────────────────────────────────
+
+/**
+ * The interaction plugin's settings. `interactionPlugin(config)` registers
+ * them over {@link INTERACTION_DEFAULTS}, and `updateSettings()` changes them
+ * for every document while the app runs.
+ */
+export interface InteractionSettings {
+  /** The tool that's active when a document opens. */
+  readonly defaultTool: ToolId;
+  /** Tools of your own, registered from the start beside the built-in ones. */
+  readonly tools: readonly Tool[];
 }
 
-export interface ActivateToolOptions {
-  /** Handed to the owning plugin through `ToolChangedEvent.payload` (an armed stamp, a preset). */
-  readonly payload?: unknown;
-}
+/** What the interaction settings are when the app registers none. */
+export const INTERACTION_DEFAULTS: InteractionSettings = { defaultTool: 'pointer', tools: [] };
+
+/** What `interactionPlugin(config)` takes: any of the settings, merged over the defaults. */
+export type InteractionConfig = DeepPartial<InteractionSettings>;
 
 export interface RegisterToolOptions {
-  /** Replace an existing registration with the same id instead of rejecting it. */
+  /** Replace a tool registered under the same id instead of refusing. */
   readonly replace?: boolean;
 }
 
@@ -122,69 +108,87 @@ export interface RegisterToolOptions {
 export interface ToolChangedEvent {
   readonly toolId: ToolId;
   readonly previousToolId: ToolId;
-  readonly tool: Tool;
-  readonly payload?: unknown;
 }
 
-export interface GestureEvent {
-  readonly handlerId: string;
+export interface GestureStartedEvent {
+  /** The tool that was active when the gesture began. */
+  readonly toolId: ToolId;
+  /** The page the gesture began on, or null over the space between pages. */
+  readonly page: PageRef | null;
+  readonly pointerType: PointerKind;
+}
+
+export interface GestureEndedEvent {
+  /** The tool that was active when the gesture began. */
+  readonly toolId: ToolId;
+  /** The page the gesture began on, or null over the space between pages. */
+  readonly page: PageRef | null;
+  readonly pointerType: PointerKind;
+}
+
+export interface GestureCancelledEvent {
+  /** The tool that was active when the gesture began. */
+  readonly toolId: ToolId;
+  /** The page the gesture began on, or null over the space between pages. */
   readonly page: PageRef | null;
   readonly pointerType: PointerKind;
 }
 
 /**
- * The tool hub: one active tool per document, a tool registry, and the
- * events that report tool and gesture changes. Pointer routing, cursor
- * claims and handler registration live on the host contract
- * (`@embedpdf/plugin-interaction/contract/host`).
+ * The tools of one document: which one is active, the tools you can switch
+ * to, and the events that report tool changes and gestures. Its settings
+ * (`getSettings`, `updateSettings`, `resetSettings`, `onSettingsChanged`)
+ * belong to the plugin, not to a document: a change reaches every open
+ * document.
  */
-export interface InteractionCapability {
-  /** The armed tool. */
+export interface InteractionCapability extends SettingsApi<InteractionSettings> {
+  /** The active tool. */
   getActiveTool(): Tool;
   getActiveToolId(): ToolId;
-  /** The tool configured for a freshly opened document. */
+  /** The tool a document opens with: the `defaultTool` setting. */
   getDefaultToolId(): ToolId;
-  /** Registered tools in registration order. Reference-stable until a tool is registered or removed. */
+  /** Every tool, in the order they were added, the built-in ones first. The same array until a tool is added or removed. */
   listTools(): readonly Tool[];
   getTool(id: ToolId): Tool | null;
   hasTool(id: ToolId): boolean;
-  /** Does the active tool enable a behaviour tag such as `'text-select'`. */
-  activeToolEnables(behavior: string): boolean;
-  /** Arm a tool and fire `onToolChanged`. Throws `not-found` for an unknown id. */
-  activateTool(id: ToolId, options?: ActivateToolOptions): void;
-  activateDefaultTool(): void;
-  /** Temporarily arm a tool (hold space to pan); `popTool` restores the previous one. */
-  pushTool(id: ToolId, options?: ActivateToolOptions): void;
-  popTool(): void;
-  /** Reskin a tool's cursor keywords at runtime; `null` removes the skin. */
-  setToolCursor(id: ToolId, skin: ToolCursorSkin | null): void;
   /**
-   * Add a tool and wake readers. A duplicate id throws `conflict` unless
-   * `{ replace: true }`; the remover only removes this registration.
+   * Make a tool the active one, and forget the tools `pushTool` saved. Fires
+   * `onToolChanged`. Throws `not-found` for an id that isn't registered.
+   */
+  activateTool(id: ToolId): void;
+  /** Make the default tool the active one. Fires `onToolChanged`. */
+  activateDefaultTool(): void;
+  /**
+   * Make a tool the active one for a moment, remembering the active one for
+   * `popTool`. Fires `onToolChanged`. Throws `not-found` for an id that isn't
+   * registered.
+   */
+  pushTool(id: ToolId): void;
+  /** Go back to the tool active before the last `pushTool`; nothing to go back to does nothing. */
+  popTool(): void;
+  /**
+   * Replace a tool's cursors by name while the app runs (`{ crosshair: penCursor }`);
+   * `null` brings the tool's own back.
+   */
+  setToolCursor(id: ToolId, cursors: ToolCursors | null): void;
+  /**
+   * Add a tool, and return a function that removes it again. Throws
+   * `conflict` for an id that's taken, unless `{ replace: true }`; the
+   * function only removes this registration, not a later one with its id.
    */
   registerTool(tool: Tool, options?: RegisterToolOptions): Unsubscribe;
 
   /**
-   * A tool was armed (`activateTool`, `activateDefaultTool`, `pushTool`,
-   * `popTool`). Fires on every activation, including re-arming the armed
-   * tool, because the payload may be new.
+   * A tool became active (`activateTool`, `activateDefaultTool`, `pushTool`,
+   * `popTool`), including activating the active tool again.
    */
   readonly onToolChanged: EventHook<ToolChangedEvent>;
-  /** A handler captured a pointer-down. */
-  readonly onGestureStarted: EventHook<GestureEvent>;
-  /** The captured gesture completed on pointer-up. */
-  readonly onGestureEnded: EventHook<GestureEvent>;
-  /** The captured gesture was aborted. */
-  readonly onGestureCancelled: EventHook<GestureEvent>;
+  /** A press began a gesture that a tool took. */
+  readonly onGestureStarted: EventHook<GestureStartedEvent>;
+  /** That gesture ended with a release. */
+  readonly onGestureEnded: EventHook<GestureEndedEvent>;
+  /** That gesture was cancelled, for example by a second finger. */
+  readonly onGestureCancelled: EventHook<GestureCancelledEvent>;
 }
 
 export { InteractionToken } from './token';
-
-/**
- * Resolve a sample against a gesture's home page: prefer the source's
- * unclamped projection, fall back to the page hit only when it is the same
- * page. Null → this sample can't speak for the home page.
- */
-export const samplePointOn = (sample: PointerSample, page: PageRef): Point | null =>
-  sample.project?.(page) ??
-  (sample.page?.ref.objectNumber === page.objectNumber ? sample.page.point : null);

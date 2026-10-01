@@ -184,7 +184,7 @@ export interface DocumentUnlockResult {
 
 /**
  * Whose an annotation is: what `allowsAnnotation('update' | 'delete', …)`
- * reads. An `AnnotationDTO` is one; so is `{ userId, groupId }`.
+ * reads. An `Annotation` is one; so is `{ userId, groupId }`.
  */
 export interface AnnotationOwner {
   userId?: string | null;

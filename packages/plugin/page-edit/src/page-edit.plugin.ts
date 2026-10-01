@@ -4,9 +4,9 @@ import { PageEditToken } from './contract';
 import { createPageEditController } from './controller';
 
 /**
- * Document-scoped, stateless: turns the engine handle's page service into a
- * ref-addressed edit capability. The relative→absolute rotation lives in the
- * controller so the framework adapters never re-derive it.
+ * Document-scoped and stateless: the engine handle's page service as page
+ * edits that take refs or indexes. Turning a page relative to its own
+ * rotation lives in the controller, so no app re-derives it.
  */
 export const pageEditPlugin = () =>
   definePlugin({

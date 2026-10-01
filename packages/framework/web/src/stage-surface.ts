@@ -76,7 +76,7 @@ export interface StageSurfaceSample {
 /** What the binding needs from the interaction hub — `InteractionHostCapability` satisfies it. */
 export interface StageSurfaceHub {
   dispatchPointer(sample: StageSurfaceSample): void;
-  getActiveTool(): { touchDirect?: boolean };
+  getActiveTool(): { touch?: 'draw' | 'tap' };
   wouldClaimTouch(sample: StageSurfaceSample): boolean;
 }
 
@@ -177,7 +177,7 @@ export function createStageSurface(
         // otherwise per-point claims (a selected annotation's body or handles)
         // decide. A pure pre-flight — nothing captures.
         claimsPoint: (event) =>
-          !!hub.getActiveTool().touchDirect || hub.wouldClaimTouch(sampleOf('down', event)),
+          hub.getActiveTool().touch === 'draw' || hub.wouldClaimTouch(sampleOf('down', event)),
       }
     : null;
   cleanups.push(

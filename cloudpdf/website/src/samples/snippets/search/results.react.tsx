@@ -8,7 +8,7 @@ export function Results() {
     <ol>
       {hits.map((hit, index) => (
         <li key={index}>
-          <button type="button" onClick={() => search.goToHit(index)}>
+          <button type="button" onClick={() => search.goToHit(hit)}>
             Page {hit.pageIndex + 1}: …{hit.snippet?.before}
             <mark>{hit.snippet?.match}</mark>
             {hit.snippet?.after}…

@@ -3,28 +3,32 @@
  * signed, drawn, or handed to the chrome by mode; a free placement is a
  * stamp (one placement law, the stamp plugin's).
  */
-import { PluginError } from '@embedpdf/core';
+import { PluginError, type OperationOptions } from '@embedpdf/core';
 import type { FormFieldRef, SignatureCompleteResult } from '@embedpdf/engine-core/runtime';
 import type { StampPlacement } from '@embedpdf/plugin-annotation/contract';
 
-import type {
-  Mark,
-  PlaceMarkResult,
-  SignatureCapability,
-  SignatureConfig,
-  SignFieldInput,
-} from '../contract';
+import type { Mark, PlaceMarkResult, SignatureCapability, SignFieldInput } from '../contract';
 import { hasSignedField, sameFieldRef, setTarget } from '../model';
 import type { SignatureReads } from '../read/signatures';
 import type { SignatureContext, SignatureServices } from '../services';
 import { verb } from '../services/errors';
 
-export function createTarget(ctx: SignatureContext, { events }: Pick<SignatureServices, 'events'>) {
+export function createTarget(
+  ctx: SignatureContext,
+  { events }: Pick<SignatureServices, 'events'>,
+  { getSignature }: Pick<SignatureReads, 'getSignature'>,
+) {
   const { inspectionRequested } = events;
+  /** One field, whether a ref names it by object number or by name. */
+  const sameField = (left: FormFieldRef, right: FormFieldRef): boolean => {
+    if (sameFieldRef(left, right)) return true;
+    const signature = getSignature(left);
+    return signature !== null && signature.index === getSignature(right)?.index;
+  };
   /** A field that was just signed or filled is no longer the target. */
   const clearIfTarget = (field: FormFieldRef): void => {
     const current = ctx.state.get().target;
-    if (current && sameFieldRef(current, field)) ctx.state.update(setTarget, null);
+    if (current && sameField(current, field)) ctx.state.update(setTarget, null);
   };
   return {
     clearIfTarget,
@@ -37,25 +41,31 @@ export function createTarget(ctx: SignatureContext, { events }: Pick<SignatureSe
 export type SignatureTarget = ReturnType<typeof createTarget>;
 
 export function createPlacement(
+  ctx: SignatureContext,
   {
     events,
     store,
     authority,
     siblings,
   }: Pick<SignatureServices, 'events' | 'store' | 'authority' | 'siblings'>,
-  config: SignatureConfig,
   { snapshot }: Pick<SignatureReads, 'snapshot'>,
-  { sign }: { sign(input: SignFieldInput): Promise<SignatureCompleteResult> },
-  { fillField }: { fillField(field: FormFieldRef, mark: Mark): Promise<void> },
+  {
+    sign,
+  }: { sign(input: SignFieldInput, options?: OperationOptions): Promise<SignatureCompleteResult> },
+  {
+    fillField,
+  }: { fillField(field: FormFieldRef, mark: Mark, options?: OperationOptions): Promise<void> },
 ) {
   const { signRequested } = events;
   const { documentId } = store;
   const { mode } = authority;
   const { stamp, annotation } = siblings;
+  const settings = ctx.settings();
 
   const placeMark = async (
     mark: Mark,
     target: { field: FormFieldRef } | StampPlacement,
+    options?: OperationOptions,
   ): Promise<PlaceMarkResult> => {
     if (!('field' in target)) {
       // Free placement: a stamp, as in Preview; one placement law, the stamp plugin's.
@@ -64,28 +74,31 @@ export function createPlacement(
         if (!library) {
           throw new PluginError('unsupported', 'signature', 'no stamp plugin to place an asset');
         }
-        const ref = await library.placeAsset(documentId(), mark.assetId, target);
-        return { kind: 'placed', annotation: ref };
+        const placed = await library.placeAsset(mark.assetId, target, {
+          documentId: documentId(),
+          signal: options?.signal,
+        });
+        return { kind: 'placed', annotation: placed.annotation.ref };
       }
-      const ref = await annotation().placeStamp({ source: mark.source }, target);
-      return { kind: 'placed', annotation: ref };
+      const placed = await annotation().stamps.place({ source: mark.source }, target, options);
+      return { kind: 'placed', annotation: placed.annotation.ref };
     }
     switch (mode()) {
       case 'sign':
-        // The first signature is the one that can certify: when the config
-        // allows a certification, let the chrome offer the choice (its sign
+        // The first signature is the one that can certify: when the settings
+        // allow a certification, let the chrome offer the choice (its sign
         // dialog) instead of sealing a plain approval on the spot.
-        if (config.allowCertify && !hasSignedField(snapshot())) {
+        if (settings.get().allowCertify && !hasSignedField(snapshot())) {
           signRequested.emit({ field: target.field, mark });
           return { kind: 'requested', field: target.field };
         }
         return {
           kind: 'signed',
           field: target.field,
-          result: await sign({ field: target.field, mark }),
+          result: await sign({ field: target.field, mark }, options),
         };
       case 'visual':
-        await fillField(target.field, mark);
+        await fillField(target.field, mark, options);
         return { kind: 'filled', field: target.field };
       case 'ask':
         signRequested.emit({ field: target.field, mark });

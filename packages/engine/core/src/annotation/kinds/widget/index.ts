@@ -6,7 +6,7 @@ import { WidgetDeclaration } from './declaration';
 
 export { WidgetDeclaration } from './declaration';
 
-export type WidgetAnnotationDTO<C extends Coordinates = PageCoordinates> = ReadOf<
+export type WidgetAnnotation<C extends Coordinates = PageCoordinates> = ReadOf<
   typeof WidgetDeclaration,
   C
 >;
@@ -25,7 +25,7 @@ export const WidgetPatchSchema = WidgetDeclaration.updateSchema;
 
 export const WidgetKind: AnnotationKindModule<
   'widget',
-  WidgetAnnotationDTO,
+  WidgetAnnotation,
   WidgetDraft,
   WidgetPatch
 > = {

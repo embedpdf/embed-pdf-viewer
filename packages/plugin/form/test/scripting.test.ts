@@ -114,6 +114,7 @@ const documentMeta = (): DocumentMeta => ({
   // Only the page's identity matters to the scripting controller.
   pages: [{ ref: toPageRef(10) } as PageLayout],
   revision: 0,
+  hasUnsavedChanges: false,
   renderPolicy: { kind: 'continuous' },
 });
 

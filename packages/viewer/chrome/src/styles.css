@@ -31,14 +31,24 @@
   --ep-border: #d1d5db;
   --ep-border-subtle: #e5e7eb;
   --ep-border-strong: #9ca3af;
-  --ep-accent: #3b82f6;
-  --ep-accent-hover: #2563eb;
-  --ep-accent-active: #1d4ed8;
-  --ep-accent-light: #eff6ff;
   --ep-hover: #f3f4f6;
   --ep-active: #e5e7eb;
-  --ep-selected: #eff6ff;
   --ep-canvas: #f3f4f6;
+
+  /* EmbedPDF's own theming variables (the headless docs' "Colors & theming"):
+     the pages and what is drawn on them read these. The chrome's accent is
+     the same variable, and its shades are mixed from it, so one
+     `--epdf-accent` themes both. */
+  --epdf-accent: #3b82f6;
+  --epdf-scrollbar-thumb: rgba(17, 24, 39, 0.35);
+  --epdf-toolbar-surface: var(--ep-elevated);
+  --epdf-toolbar-border: var(--ep-border);
+  --epdf-toolbar-active: var(--ep-active);
+  --ep-accent: var(--epdf-accent);
+  --ep-accent-hover: color-mix(in srgb, var(--epdf-accent) 80%, black);
+  --ep-accent-active: color-mix(in srgb, var(--epdf-accent) 65%, black);
+  --ep-accent-light: color-mix(in srgb, var(--epdf-accent) 8%, white);
+  --ep-selected: var(--ep-accent-light);
 }
 
 .dark {
@@ -54,14 +64,23 @@
   --ep-border: #4b5563;
   --ep-border-subtle: #374151;
   --ep-border-strong: #6b7280;
-  --ep-accent: #60a5fa;
-  --ep-accent-hover: #3b82f6;
-  --ep-accent-active: #2563eb;
-  --ep-accent-light: #1e3a5f;
   --ep-hover: #374151;
   --ep-active: #4b5563;
-  --ep-selected: #1e3a5f;
   --ep-canvas: #0d1117;
+
+  /* Restated, not inherited: the dark class may sit below the element the
+     light block themes (the custom element's shadow wrapper), and a variable
+     made of others is worked out where it is declared. */
+  --epdf-accent: #60a5fa;
+  --epdf-scrollbar-thumb: rgba(249, 250, 251, 0.28);
+  --epdf-toolbar-surface: var(--ep-elevated);
+  --epdf-toolbar-border: var(--ep-border);
+  --epdf-toolbar-active: var(--ep-active);
+  --ep-accent: var(--epdf-accent);
+  --ep-accent-hover: color-mix(in srgb, var(--epdf-accent) 80%, black);
+  --ep-accent-active: color-mix(in srgb, var(--epdf-accent) 65%, black);
+  --ep-accent-light: color-mix(in srgb, var(--epdf-accent) 25%, var(--ep-surface));
+  --ep-selected: var(--ep-accent-light);
 }
 
 @theme inline {
@@ -115,14 +134,9 @@ body {
 }
 
 /* Headless scrollbar theming. The component ships geometry + behavior only
-   (thumb drag, track paging, auto-hide → data-state); everything visual is
-   these few rules — restyle or replace them freely. */
-:root {
-  --epdf-scrollbar-thumb: rgba(17, 24, 39, 0.35);
-}
-.dark {
-  --epdf-scrollbar-thumb: rgba(249, 250, 251, 0.28);
-}
+   (thumb drag, track paging, auto-hide → data-state); its color is
+   `--epdf-scrollbar-thumb` above, and everything else is these few rules —
+   restyle or replace them freely. */
 [data-embedpdf-scrollbar-thumb] {
   transition: background 150ms;
 }

@@ -6,7 +6,7 @@ import { UnderlineDeclaration } from './declaration';
 
 export { UnderlineDeclaration } from './declaration';
 
-export type UnderlineAnnotationDTO<C extends Coordinates = PageCoordinates> = ReadOf<
+export type UnderlineAnnotation<C extends Coordinates = PageCoordinates> = ReadOf<
   typeof UnderlineDeclaration,
   C
 >;
@@ -25,7 +25,7 @@ export const UnderlinePatchSchema = UnderlineDeclaration.updateSchema;
 
 export const UnderlineKind: AnnotationKindModule<
   'underline',
-  UnderlineAnnotationDTO,
+  UnderlineAnnotation,
   UnderlineDraft,
   UnderlinePatch
 > = {

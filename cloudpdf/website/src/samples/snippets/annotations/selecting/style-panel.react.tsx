@@ -11,7 +11,7 @@ export function StylePanel() {
       property={property}
       value={values[property.key]}
       mixed={mixed.includes(property.key)}
-      onChange={(value) => annotation.selection.update({ [property.key]: value })}
+      onChange={(value: unknown) => annotation.selection.update({ [property.key]: value })}
     />
   ));
 }

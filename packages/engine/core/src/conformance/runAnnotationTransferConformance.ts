@@ -3,7 +3,7 @@ import { creatables, iconRect } from './creatables';
 import type { ConformanceTestRunner } from './runMetadataConformance';
 import { BANDS_PDF, sameBytes } from './stampFixtures';
 import { drawnPointsOf } from '../pageSpace/helpers';
-import type { AnnotationDTO } from '../annotation/kinds';
+import type { Annotation } from '../annotation/kinds';
 import type { DocumentHandle } from '../engine/DocumentHandle';
 import type { Engine } from '../engine/Engine';
 import type { PageHandle } from '../engine/PageHandle';
@@ -268,7 +268,7 @@ const FRAMED: ReadonlySet<string> = new Set([
 ]);
 
 /** The points an annotation's data places on the page: its line, vertices, strokes or quads. */
-function geometryOf(data: AnnotationDTO): Array<{ x: number; y: number }> {
+function geometryOf(data: Annotation): Array<{ x: number; y: number }> {
   // A turned line's, polygon's or ink's points are upright: the drawing turns them.
   const drawn = drawnPointsOf(data);
   if (drawn) return drawn.flat();
@@ -286,7 +286,7 @@ function geometryOf(data: AnnotationDTO): Array<{ x: number; y: number }> {
 }
 
 /** A form field's widget: it stays with its field. */
-function isFieldWidget(annotation: AnnotationDTO): boolean {
+function isFieldWidget(annotation: Annotation): boolean {
   return annotation.subtype === 'widget' && annotation.field !== null;
 }
 
@@ -331,7 +331,7 @@ function asTaken(bundle: AnnotationBundle, dropped: readonly AnnotationImportDro
       if (!cleared) return item;
       const data = { ...item.data } as Record<string, unknown>;
       for (const field of cleared) data[field] = null;
-      return { ...item, data: data as unknown as AnnotationDTO };
+      return { ...item, data: data as unknown as Annotation };
     });
   return pruned({ ...bundle, items });
 }
@@ -355,7 +355,7 @@ const edgesOf = (box: PageBox): PdfRect => ({
   top: box.y + box.height,
 });
 
-function turnOf(data: AnnotationDTO): { rotation: number; box: PageBox } | null {
+function turnOf(data: Annotation): { rotation: number; box: PageBox } | null {
   const { rotation, box } = data as { rotation?: number | null; box?: PageBox };
   return rotation && box ? { rotation, box } : null;
 }
@@ -433,7 +433,7 @@ async function fill(doc: DocumentHandle): Promise<void> {
   const create = async (
     draft: Parameters<PageHandle['annotations']['create']>[0],
     resources?: Parameters<PageHandle['annotations']['create']>[1],
-  ) => (await page.annotations.create(draft, resources)).annotation as AnnotationDTO;
+  ) => (await page.annotations.create(draft, resources)).annotation as Annotation;
   for (const { data, resources } of creatables()) await create(data, resources);
   const box = (x: number): PageBox => ({ x, y: 300, width: 40, height: 30 });
   await create({ subtype: 'stamp', box: box(20), nm: 'approved' }, { appearance: BANDS_PDF });

@@ -174,7 +174,7 @@ stage.scrollBy({ top: metrics.clientHeight * 0.9 }); // page down
 
 In React, `useScrollMetrics()` reads the same numbers reactively and
 `<Scrollbar axis="y" />` draws a native-feeling bar from them (both from
-`@embedpdf/react/scrollbar`).
+`@embedpdf/react/stage`).
 
 That is the whole contract. A scrollbar thumb is
 `clientHeight / scrollHeight` of the track, positioned at

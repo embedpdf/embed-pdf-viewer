@@ -7,9 +7,10 @@ import { rectsOverlap } from '@embedpdf/core-geometry';
 import { annotationKey, memo, memoByKey, toPageRef } from '@embedpdf/core';
 import {
   pageQuadBounds,
-  type AnnotationDTO,
+  type Annotation,
   type AnnotationRef,
   type PageBox,
+  type PageRef,
 } from '@embedpdf/engine-core';
 
 import type {
@@ -18,9 +19,9 @@ import type {
   RedactionMark,
   RedactionMarkFilter,
 } from '../contract';
-import type { RedactionServices } from '../services';
+import type { RedactionContext, RedactionServices } from '../services';
 
-type RedactDTO = Extract<AnnotationDTO, { subtype: 'redact' }>;
+type RedactDTO = Extract<Annotation, { subtype: 'redact' }>;
 
 /** The regions a redact mark targets: its quads' boxes, else its `rect`. */
 const regionsOf = (dto: RedactDTO): readonly PageBox[] =>
@@ -28,10 +29,21 @@ const regionsOf = (dto: RedactDTO): readonly PageBox[] =>
 
 const EMPTY: readonly RedactionMark[] = [];
 
-export function createPendingReads({
-  store,
-  siblings,
-}: Pick<RedactionServices, 'store' | 'siblings'>) {
+/** A `redact` annotation as a mark; `pageIndex` is its page's display index. */
+export const markOf = (record: RedactDTO, pageIndex: number): RedactionMark => ({
+  ref: record.ref,
+  page: record.ref.page,
+  pageIndex,
+  kind: record.quadPoints.length > 0 ? 'text' : 'area',
+  bounds: record.rect,
+  overlayText: record.overlayText ?? null,
+  repeat: record.repeat ?? false,
+});
+
+export function createPendingReads(
+  ctx: Pick<RedactionContext, 'getPage'>,
+  { store, siblings }: Pick<RedactionServices, 'store' | 'siblings'>,
+) {
   const { pages, pageIndexOf } = store;
   const { annotation } = siblings;
 
@@ -39,23 +51,13 @@ export function createPendingReads({
   const marksOn = memoByKey(
     (pageObjectNumber: number) => {
       const page = toPageRef(pageObjectNumber);
-      return [annotation.list({ page, subtype: 'redact' }), pageIndexOf(page)] as const;
+      // The page's list is the same array while it holds; the marks are picked from it.
+      return [annotation.list({ pages: [page] }), pageIndexOf(page)] as const;
     },
-    (pageObjectNumber, records, pageIndex): readonly RedactionMark[] => {
-      const page = toPageRef(pageObjectNumber);
-      const marks = records.flatMap((record): RedactionMark[] => {
-        if (record.subtype !== 'redact') return [];
-        return [
-          {
-            ref: record.ref,
-            page,
-            pageIndex,
-            kind: record.quadPoints.length > 0 ? 'text' : 'area',
-            bounds: record.rect,
-            overlayText: record.overlayText,
-          },
-        ];
-      });
+    (_pageObjectNumber, records, pageIndex): readonly RedactionMark[] => {
+      const marks = records.flatMap((record): RedactionMark[] =>
+        record.subtype === 'redact' ? [markOf(record, pageIndex)] : [],
+      );
       return marks.length ? marks : EMPTY;
     },
   );
@@ -67,8 +69,16 @@ export function createPendingReads({
       perPage.some((marks) => marks.length) ? perPage.flat() : EMPTY,
   );
 
-  const listPending = (filter?: RedactionMarkFilter): readonly RedactionMark[] =>
-    filter?.page ? marksOn(filter.page.objectNumber) : allMarks();
+  /** One page's marks (a ref or an index; none for a page that isn't there), or every mark. */
+  const listPending = (filter?: RedactionMarkFilter): readonly RedactionMark[] => {
+    if (filter?.page === undefined) return allMarks();
+    const layout = ctx.getPage(filter.page);
+    return layout ? marksOn(layout.ref.objectNumber) : EMPTY;
+  };
+
+  /** A record the annotation plugin made or changed, as the mark it is. */
+  const markFor = (record: Annotation): RedactionMark | null =>
+    record.subtype === 'redact' ? markOf(record, pageIndexOf(record.ref.page)) : null;
 
   const getPending = (ref: AnnotationRef): RedactionMark | null => {
     const key = annotationKey(ref);
@@ -79,7 +89,7 @@ export function createPendingReads({
     const wanted = refs ? new Set(refs.map(annotationKey)) : null;
     const hits: AnnotationRef[] = [];
     for (const page of pages()) {
-      const onPage = annotation.list({ page });
+      const onPage = annotation.list({ pages: [page] });
       const marks = onPage.filter(
         (dto): dto is RedactDTO =>
           dto.subtype === 'redact' && (!wanted || wanted.has(annotationKey(dto.ref))),
@@ -96,10 +106,12 @@ export function createPendingReads({
 
   return {
     listPending,
+    markFor,
     api: {
       listPending,
       getPending,
-      getPendingCount: (page) => listPending(page ? { page } : undefined).length,
+      getPendingCount: (page?: PageRef | number) =>
+        listPending(page === undefined ? undefined : { page }).length,
       estimateCollateral,
     } satisfies Partial<RedactionCapability>,
   };

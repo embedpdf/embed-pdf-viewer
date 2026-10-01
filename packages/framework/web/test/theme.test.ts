@@ -2,9 +2,11 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
   EPDF_VARIABLES,
+  epdfThemeVariables,
   mixAccent,
   paint,
   paintDefault,
+  type EpdfTheme,
   type EpdfVariable,
   type EpdfVariableDefinition,
 } from '../src/theme';
@@ -247,5 +249,43 @@ describe('EPDF_VARIABLES', () => {
   it('never gives one setting two variables', () => {
     const settings = definitions.flatMap(([, definition]) => definition.setting ?? []);
     expect(settings).toHaveLength(new Set(settings).size);
+  });
+});
+
+// ── a theme as setting names ──
+
+describe('epdfThemeVariables', () => {
+  it('turns setting names into the variables that override them', () => {
+    expect(
+      epdfThemeVariables({
+        accent: '#e91e63',
+        page: { shadow: 'none' },
+        search: { highlight: { color: '#7dd3fc' } },
+        annotation: {
+          chrome: { outline: { style: 'dashed', width: 2 } },
+          tools: { ghost: { opacity: 0.3 } },
+        },
+      }),
+    ).toEqual({
+      '--epdf-accent': '#e91e63',
+      '--epdf-page-shadow': 'none',
+      '--epdf-annotation-outline-width': '2',
+      '--epdf-annotation-outline-dash': '4 3',
+      '--epdf-ghost-opacity': '0.3',
+      '--epdf-search-highlight': '#7dd3fc',
+    });
+    expect(epdfThemeVariables({})).toEqual({});
+  });
+
+  it('reaches every variable that overrides a setting', () => {
+    const settingVariables = definitions.filter(([, definition]) => definition.setting);
+    for (const [name, definition] of settingVariables) {
+      const path = definition
+        .setting!.replace(/^viewer\./, '')
+        .replace('[]', '')
+        .split('.');
+      const theme = path.reduceRight<unknown>((inner, key) => ({ [key]: inner }), 'x');
+      expect(Object.keys(epdfThemeVariables(theme as EpdfTheme)), name).toEqual([`--epdf-${name}`]);
+    }
   });
 });

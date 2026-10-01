@@ -33,7 +33,7 @@
  * (`index`) as the final deterministic tiebreak.
  */
 
-import type { AnnotationDTO } from './kinds';
+import type { Annotation } from './kinds';
 import type { KnownAnnotationState, KnownAnnotationStateModel } from './primitives';
 import { classifyRelation } from './relationships';
 import { annotationKey } from '../identity/annotationKey';
@@ -79,7 +79,7 @@ export interface CommentThreadReview {
   mine?: ReviewStatus | null;
 }
 
-export interface CommentThread<T extends AnnotationDTO = AnnotationDTO> {
+export interface CommentThread<T extends Annotation = Annotation> {
   root: T;
   page: PageRef;
   /** Whole-subtree replies, flattened chronologically; states excluded. */
@@ -126,12 +126,12 @@ const nonEmpty = (v: string | null | undefined): v is string => typeof v === 'st
  * non-empty `/State` or `/StateModel`. Classification never relies on
  * flags — producers disagree on how state annotations are flagged.
  */
-export function isStateAnnotation(a: AnnotationDTO): boolean {
+export function isStateAnnotation(a: Annotation): boolean {
   return a.subtype === 'text' && (nonEmpty(a.state) || nonEmpty(a.stateModel));
 }
 
 export function buildCommentThreads(
-  annotations: readonly AnnotationDTO[],
+  annotations: readonly Annotation[],
   opts: BuildCommentThreadsOptions = {},
 ): CommentThread[] {
   const eligible = annotations.filter((a) => !EXCLUDED_SUBTYPES.has(a.subtype));
@@ -140,7 +140,7 @@ export function buildCommentThreads(
   // parent by name still resolves when the parent's own ref is
   // objectNumber-form (same dual index as buildThreads). ObjectNumber
   // entries win over nm aliases on duplicate /NM.
-  const byKey = new Map<string, AnnotationDTO>();
+  const byKey = new Map<string, Annotation>();
   for (const a of eligible) {
     const key = annotationKey(a.ref);
     if (!byKey.has(key)) byKey.set(key, a);
@@ -151,7 +151,7 @@ export function buildCommentThreads(
   }
 
   // Children adjacency over resolvable /IRT edges.
-  const children = new Map<string, AnnotationDTO[]>();
+  const children = new Map<string, Annotation[]>();
   for (const a of eligible) {
     if (!a.reply) continue;
     const parent = byKey.get(annotationKey(a.reply.to));
@@ -165,10 +165,10 @@ export function buildCommentThreads(
   const visited = new Set<string>();
   const threads: CommentThread[] = [];
 
-  const walk = (root: AnnotationDTO): void => {
-    const replies: AnnotationDTO[] = [];
-    const groupedParts: AnnotationDTO[] = [];
-    const states: AnnotationDTO[] = [];
+  const walk = (root: Annotation): void => {
+    const replies: Annotation[] = [];
+    const groupedParts: Annotation[] = [];
+    const states: Annotation[] = [];
 
     visited.add(annotationKey(root.ref));
     const stack = [...(children.get(annotationKey(root.ref)) ?? [])];
@@ -215,7 +215,7 @@ export function buildCommentThreads(
 }
 
 /** `createdAt ?? modifiedAt` ascending; undated last; z-order tiebreak. */
-function chronological(a: AnnotationDTO, b: AnnotationDTO): number {
+function chronological(a: Annotation, b: Annotation): number {
   const at = a.createdAt ?? a.modifiedAt;
   const bt = b.createdAt ?? b.modifiedAt;
   const order = at !== null && bt !== null ? compareIsoDateTime(at, bt) : 0;
@@ -226,7 +226,7 @@ function chronological(a: AnnotationDTO, b: AnnotationDTO): number {
 }
 
 function computeReview(
-  states: readonly AnnotationDTO[],
+  states: readonly Annotation[],
   opts: BuildCommentThreadsOptions,
 ): CommentThreadReview {
   const byReviewer: Record<string, ReviewStatus> = {};
@@ -271,7 +271,7 @@ function computeReview(
  * `unmarked`; an absent model infers from a known state; a custom model
  * with no state has no derivable status.
  */
-function toReviewStatus(a: AnnotationDTO): ReviewStatus | null {
+function toReviewStatus(a: Annotation): ReviewStatus | null {
   if (a.subtype !== 'text') return null;
   const rawState = nonEmpty(a.state) ? a.state : null;
   const rawModel = nonEmpty(a.stateModel) ? a.stateModel : null;

@@ -21,5 +21,5 @@ export const circle = defineKind({
     hasFill: true,
     hasCloudy: true,
   },
-  fields: SHAPE_FIELDS,
+  properties: SHAPE_FIELDS,
 });
