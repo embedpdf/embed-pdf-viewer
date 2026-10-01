@@ -22,6 +22,9 @@
  *
  * `--check` also runs the headless reference check (`reference.mjs`): the pages
  * list every public member of every plugin, and nothing the code doesn't have.
+ * Then it compiles the snippets and writes which pages are live
+ * (`publish-gate.mjs`), which the site's build reads. That part only reports: a
+ * snippet that doesn't compile holds its page back, never the build.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -29,6 +32,7 @@ import { fileURLToPath } from 'node:url';
 
 import { DEMO_DOCUMENTS } from '../documents.mjs';
 import { ENGINES } from '../engines.mjs';
+import { writePublishStatus } from './publish-gate.mjs';
 import { checkReference } from './reference.mjs';
 
 const contentRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -54,6 +58,7 @@ const MOUNTS = {
     { from: 'samples/stage', to: 'src/samples/stage' },
     { from: 'samples/render', to: 'src/samples/render' },
     { from: 'samples/selection', to: 'src/samples/selection' },
+    { from: 'samples/search', to: 'src/samples/search' },
     { from: 'samples/page-edit', to: 'src/samples/page-edit' },
     { from: 'samples/stamp', to: 'src/samples/stamp' },
     { from: 'samples/annotation', to: 'src/samples/annotation' },
@@ -255,7 +260,7 @@ function buildExpected(engine, frameworks) {
       const framework = frameworkOf(relative);
       if (framework && !frameworks.includes(framework)) continue;
       const source = fs.readFileSync(absolute, 'utf8');
-      const emitted = framework ? transformSample(source, engine, relative) : source; // _shared chrome, css — engine-neutral lesson scaffolding
+      const emitted = framework ? transformSample(source, engine, relative) : source; // an example's stylesheet: engine-neutral
       expected.set(path.join(mount.to, relative), emitted);
     }
   }
@@ -310,6 +315,7 @@ async function main() {
     }
     console.log(`Docs content is current (${expected.size} files, engine=${args.engine}).`);
     await checkReference();
+    await writePublishStatus();
     return;
   }
 

@@ -99,7 +99,7 @@ Rules:
           │
           ├─► new mirror value (its store cell)
           ├─► overlay entries matching the confirmation are dropped
-          └─► the plugin's fact events fire (origin = originOf(event))
+          └─► the plugin's fact events fire (origin = event.origin)
           │
           ▼
    store change ─► adapters re-run selectors ─► pure memoized reads ─► UI
@@ -118,7 +118,7 @@ A capability exposes three kinds of events:
 
 | Kind         | Meaning                              | Fired from                                                                                                                | Origin                            |
 | ------------ | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------- | --------------------------------- |
-| Fact         | Something changed in the document    | Where the confirmed document event is applied: a mirror's `changed` callback, or the plugin's one listener for that event | `originOf(event)`                 |
+| Fact         | Something changed in the document    | Where the confirmed document event is applied: a mirror's `changed` callback, or the plugin's one listener for that event | `event.origin`                    |
 | State change | A session value changed              | The plugin's `ctx.state.onChange` listener, comparing previous and next                                                   | none                              |
 | Occurrence   | An operation ran, finished or failed | Where the operation reaches that point                                                                                    | a domain field when one is needed |
 

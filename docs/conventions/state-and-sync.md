@@ -136,7 +136,7 @@ const metadata = ctx.mirror<DocumentMetadata | null>({
         metadata: next,
         previous,
         changedKeys: changedKeys(previous, next),
-        origin: originOf(event),
+        origin: event.origin,
       });
     }
   },
@@ -382,7 +382,7 @@ connect() {
   ctx.listen(ctx.doc.events, (event) => {
     const change = pixelChangeOf(event, allPageObjectNumbers);
     if (!change) return;
-    publishInvalidation(change.pages, change.scope, 'origin' in event ? originOf(event) : null);
+    publishInvalidation(change.pages, change.scope, 'origin' in event ? event.origin : null);
   });
 },
 ```
@@ -408,7 +408,7 @@ the actions plugin clears its per-page trigger cache.
    session's own mutation before the mutation's promise settles, so the fold
    and the fact events have run by the time the verb resumes.
 6. Fact events come from `changed` (or from the plugin's one listener for that
-   event) with `originOf(event)`. Loads announce `onResynced`.
+   event) with `event.origin`. Loads announce `onResynced`.
 7. Reactions subscribe with `ctx.listen` in `connect`.
 8. `refresh()` exists for recovery and for callers that want a fresh read. No
    write path calls it.

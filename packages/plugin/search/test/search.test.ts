@@ -3,19 +3,28 @@ import {
   createKernel,
   isPluginError,
   toPageRef,
+  type AnyPlugin,
   type DocumentHandle,
   type Engine,
   type PageLayout,
 } from '@embedpdf/core';
 import { AbortablePromise, EngineError, PermissionDenied } from '@embedpdf/engine-core/runtime';
 import type { SearchRequest, SearchSlice } from '@embedpdf/engine-core/runtime';
-import { searchPlugin, SearchToken } from '../src';
+import { StageToken } from '@embedpdf/plugin-stage/contract';
+import {
+  SEARCH_DEFAULTS,
+  searchPlugin,
+  SearchToken,
+  type SearchCapability,
+  type SearchConfig,
+} from '../src';
 import { pageSpaceBoxesOf } from '@embedpdf/engine-core/runtime';
 
 /**
  * The search plugin through the real kernel: a newest-wins lane for the
  * session, an awaitable `search` with typed events, `cancel` versus `clear`,
- * the permission fallback, and a session-free `findAll`.
+ * cancelling through a signal, the permission fallback and refusal, page
+ * arguments, live settings, and a session-free `findAll`.
  */
 
 const box = { left: 10, bottom: 20, right: 210, top: 320 } as const;
@@ -58,8 +67,15 @@ const match = (pageObjectNumber: number, start: number) => ({
 
 type Answer = SearchSlice | Error | 'hold';
 
-/** A document whose search answers slices from a script; `'hold'` parks a request until released. */
-function fakeDocument(script: Answer[]) {
+/**
+ * A document whose search answers slices from a script; `'hold'` parks a request until released.
+ * The session may search and copy unless `allows` says otherwise.
+ */
+function fakeDocument(
+  script: Answer[],
+  allows: (permission: string) => boolean = (permission) =>
+    permission === 'doc.text.search' || permission === 'doc.text.copy',
+) {
   const requests: SearchRequest[] = [];
   const held: Array<{
     resolve(slice: SearchSlice): void;
@@ -77,7 +93,7 @@ function fakeDocument(script: Answer[]) {
       lastServerId: () => null,
     },
     pages: { list: () => Promise.resolve({ pageCount: 2, pages: [page(5, 0), page(7, 1)] }) },
-    security: { allows: (cap: string) => cap === 'doc.text.search' || cap === 'doc.text.copy' },
+    security: { allows },
     search: {
       query: (request: SearchRequest) => {
         requests.push(request);
@@ -117,15 +133,55 @@ const slice = (
   pageCount = 2,
 ): SearchSlice => ({ matches, nextCursor: next, pagesSearched, pageCount }) as SearchSlice;
 
-async function boot(script: Answer[]) {
-  const doc = fakeDocument(script);
-  const kernel = createKernel({ engine: doc.engine, plugins: [searchPlugin()] });
+/** A stage that records where search reveals hits, standing in for the real one. */
+function fakeStage() {
+  const reveals: unknown[] = [];
+  const plugin: AnyPlugin = {
+    id: 'stage',
+    token: StageToken,
+    scope: 'document',
+    create: () => ({
+      api: {
+        getCurrentPage: () => null,
+        reveal: (_page: unknown, options: unknown) => reveals.push(options),
+      },
+    }),
+  };
+  return { plugin, reveals };
+}
+
+async function boot(
+  script: Answer[],
+  options: {
+    config?: SearchConfig;
+    plugins?: AnyPlugin[];
+    allows?: (permission: string) => boolean;
+  } = {},
+) {
+  const doc = fakeDocument(script, options.allows);
+  const kernel = createKernel({
+    engine: doc.engine,
+    plugins: [searchPlugin(options.config), ...(options.plugins ?? [])],
+  });
   await kernel.start();
   await kernel.documents.open({ kind: 'bytes', id: 'doc', bytes: new Uint8Array() });
   return { ...doc, kernel, api: kernel.capability(SearchToken, 'doc') };
 }
 
 const tick = () => new Promise((resolve) => setTimeout(resolve));
+
+/** Every event the session fires, by name, from now on. */
+function recordEvents(api: SearchCapability): string[] {
+  const events: string[] = [];
+  api.onStarted(() => events.push('started'));
+  api.onProgressChanged(() => events.push('progressChanged'));
+  api.onCompleted(() => events.push('completed'));
+  api.onCancelled(() => events.push('cancelled'));
+  api.onFailed(() => events.push('failed'));
+  api.onActiveHitChanged(() => events.push('activeHitChanged'));
+  api.onCleared(() => events.push('cleared'));
+  return events;
+}
 
 describe('search session', () => {
   afterEach(() => vi.useRealTimers());
@@ -137,7 +193,7 @@ describe('search session', () => {
     ]);
     const log: string[] = [];
     api.onStarted((event) => log.push(`started:${event.query.text}`));
-    api.onProgress((event) =>
+    api.onProgressChanged((event) =>
       log.push(`progress:${event.pagesSearched}/${event.pageCount}:${event.hitCount}`),
     );
     api.onCompleted((event) => log.push(`completed:${event.hitCount}`));
@@ -270,6 +326,215 @@ describe('search session', () => {
     const { kernel, api } = await boot([]);
     expect(api.canSearch()).toBe(true);
     expect(api.canSearch({ snippets: true })).toBe(true);
+    await kernel.destroy();
+
+    const searchOnly = await boot([], { allows: (permission) => permission === 'doc.text.search' });
+    expect(searchOnly.api.canSearch()).toBe(true);
+    expect(searchOnly.api.canSearch({ snippets: true })).toBe(false);
+    await searchOnly.kernel.destroy();
+  });
+
+  it('refuses to search without doc.text.search, naming it, before the engine is asked', async () => {
+    const { kernel, api, requests } = await boot([], { allows: () => false });
+    const events = recordEvents(api);
+    expect(api.canSearch()).toBe(false);
+    for (const refused of [api.search({ text: 'x' }), api.findAll({ text: 'x' })]) {
+      await expect(refused).rejects.toSatisfy(
+        (error) =>
+          isPluginError(error, 'permission-denied') && error.permission === 'doc.text.search',
+      );
+    }
+    expect(requests).toEqual([]);
+    // A refusal only rejects: the session is as it was, and nothing is announced.
+    expect(api.getStatus()).toBe('idle');
+    expect(api.getError()).toBeNull();
+    expect(events).toEqual([]);
+    await expect(api.search({ text: '' })).resolves.toEqual({ status: 'complete', hitCount: 0 });
+    await kernel.destroy();
+  });
+
+  it('onProgressChanged carries the pages searched, of how many, and the matches so far', async () => {
+    const { kernel, api } = await boot([slice([match(5, 0)], 'c1', 1), slice([], null, 2)]);
+    const events: unknown[] = [];
+    api.onProgressChanged((event) => events.push(event));
+    await api.search({ text: 'x' });
+    expect(events).toEqual([
+      { hitCount: 1, pagesSearched: 1, pageCount: 2 },
+      { hitCount: 1, pagesSearched: 2, pageCount: 2 },
+    ]);
+    await kernel.destroy();
+  });
+
+  it('onProgressChanged follows getProgress(): back to none when a new search starts or the session clears', async () => {
+    const { kernel, api } = await boot([
+      slice([match(5, 0)], null, 2),
+      slice([match(7, 2)], null, 2),
+    ]);
+    await api.search({ text: 'x' });
+    const events: string[] = [];
+    api.onProgressChanged((event) => {
+      // Fired from the state change, so the getters already agree with it.
+      expect(api.getProgress()).toEqual({
+        pagesSearched: event.pagesSearched,
+        pageCount: event.pageCount,
+      });
+      expect(api.getHitCount()).toBe(event.hitCount);
+      events.push(`${event.pagesSearched}/${event.pageCount}:${event.hitCount}`);
+    });
+    api.onStarted(() => events.push('started'));
+
+    await api.search({ text: 'y' });
+    expect(events).toEqual(['0/0:0', 'started', '2/2:1']);
+
+    api.goToHit(0); // the active hit is already 0, and progress doesn't move
+    api.clear();
+    expect(events).toEqual(['0/0:0', 'started', '2/2:1', '0/0:0']);
+    await kernel.destroy();
+  });
+});
+
+describe('page arguments', () => {
+  it('take a ref or an index, and refuse a page that is not in the document', async () => {
+    const { kernel, api, requests } = await boot([
+      slice([match(5, 0), match(5, 9), match(7, 2)], null, 2),
+    ]);
+    await api.search({ text: 'x' }, { from: 1 });
+    expect(requests[0].from).toEqual(toPageRef(7)); // index 1 is page 7
+
+    expect(api.listHits({ page: 0 })).toBe(api.listHits({ page: toPageRef(5) }));
+    expect(api.getHitCount(1)).toBe(1);
+    expect(api.getHitCount(toPageRef(5))).toBe(2);
+
+    // A read of a page that isn't there is empty: a layer may read while its page is deleted.
+    expect(api.listHits({ page: 2 })).toEqual([]);
+    expect(api.listHits({ page: toPageRef(9) })).toEqual([]);
+    expect(api.getHitCount(toPageRef(9))).toBe(0);
+    expect(api.getHitCount(-1)).toBe(0);
+
+    // A verb refuses it, and only rejects: the finished session stays as it was.
+    const events = recordEvents(api);
+    await expect(api.search({ text: 'x' }, { from: toPageRef(9) })).rejects.toSatisfy((error) =>
+      isPluginError(error, 'not-found'),
+    );
+    expect(requests.length).toBe(1); // the refused search never reached the engine
+    expect(api.getStatus()).toBe('complete');
+    expect(api.getHitCount()).toBe(3);
+    expect(events).toEqual([]);
+    await kernel.destroy();
+  });
+});
+
+describe('cancelling', () => {
+  it('a signal cancels a running search: the slice is aborted and the hits so far stay', async () => {
+    const { kernel, api, held } = await boot([slice([match(5, 0)], 'c1', 1), 'hold']);
+    const reasons: string[] = [];
+    api.onCancelled((event) => reasons.push(event.reason));
+    const controller = new AbortController();
+
+    const running = api.search({ text: 'x' }, { signal: controller.signal });
+    await tick();
+    controller.abort();
+    await expect(running).resolves.toEqual({ status: 'cancelled', hitCount: 1 });
+    expect(held[0].aborted).toBe(true); // the engine stopped working on the slice
+    expect(api.getStatus()).toBe('cancelled');
+    expect(api.getHitCount()).toBe(1);
+    expect(reasons).toEqual(['cancelled']);
+    await kernel.destroy();
+  });
+
+  it('a signal that already fired starts nothing, and refresh() takes one too', async () => {
+    const { kernel, api, requests, held } = await boot([slice([], null, 2), 'hold']);
+    const fired = AbortSignal.abort();
+    await expect(api.search({ text: 'x' }, { signal: fired })).resolves.toMatchObject({
+      status: 'cancelled',
+    });
+    expect(requests).toEqual([]);
+
+    await api.search({ text: 'x' });
+    const controller = new AbortController();
+    const refreshing = api.refresh({ signal: controller.signal });
+    await tick();
+    controller.abort();
+    await expect(refreshing).resolves.toMatchObject({ status: 'cancelled' });
+    expect(held[0].aborted).toBe(true);
+    await kernel.destroy();
+  });
+
+  it('a newer search still supersedes one running with a signal', async () => {
+    const { kernel, api } = await boot(['hold', slice([], null, 2)]);
+    const controller = new AbortController();
+    const first = api.search({ text: 'first' }, { signal: controller.signal });
+    await tick();
+    const second = api.search({ text: 'second' });
+    await expect(first).resolves.toMatchObject({ status: 'superseded' });
+    await expect(second).resolves.toMatchObject({ status: 'complete' });
+    controller.abort(); // too late to matter
+    expect(api.getQuery()?.text).toBe('second');
+    await kernel.destroy();
+  });
+});
+
+describe('settings', () => {
+  it('start from the defaults, with what the app registered merged over them', async () => {
+    const { kernel, api } = await boot([], { config: { highlight: { color: '#00ff00' } } });
+    expect(api.getSettings()).toEqual({
+      ...SEARCH_DEFAULTS,
+      highlight: { ...SEARCH_DEFAULTS.highlight, color: '#00ff00' },
+    });
+    await kernel.destroy();
+  });
+
+  it('a reveal change applies to the next move at once, and a call can still override it', async () => {
+    const stage = fakeStage();
+    const { kernel, api } = await boot([slice([match(5, 0), match(5, 9)], null, 2)], {
+      plugins: [stage.plugin],
+    });
+    await api.search({ text: 'x' });
+
+    api.nextHit();
+    expect(stage.reveals.at(-1)).toMatchObject({ anchor: { y: 0.35 }, behavior: 'smooth' });
+
+    api.updateSettings({ reveal: { anchor: { y: 'center' }, behavior: 'instant' } });
+    api.nextHit();
+    expect(stage.reveals.at(-1)).toMatchObject({ anchor: { y: 'center' }, behavior: 'instant' });
+
+    api.revealActiveHit({ behavior: 'smooth' });
+    expect(stage.reveals.at(-1)).toMatchObject({ anchor: { y: 'center' }, behavior: 'smooth' });
+    await kernel.destroy();
+  });
+
+  it('a highlight change keeps the colors it leaves out, fires once, and reset goes back to what was registered', async () => {
+    const { kernel, api } = await boot([], { config: { highlight: { activeColor: '#ff0000' } } });
+    const changes: unknown[] = [];
+    api.onSettingsChanged((event) => changes.push(event.changed));
+
+    api.updateSettings({ highlight: { color: 'rgb(253 224 71 / 0.4)', blendMode: 'normal' } });
+    expect(api.getSettings().highlight).toEqual({
+      color: 'rgb(253 224 71 / 0.4)',
+      activeColor: '#ff0000',
+      blendMode: 'normal',
+    });
+    expect(changes).toEqual([['highlight']]);
+
+    api.resetSettings();
+    expect(api.getSettings().highlight).toEqual({
+      ...SEARCH_DEFAULTS.highlight,
+      activeColor: '#ff0000',
+    });
+    expect(changes).toEqual([['highlight'], ['highlight']]);
+    await kernel.destroy();
+  });
+
+  it('work without a document: changed before the first opens, seen by it', async () => {
+    const doc = fakeDocument([]);
+    const kernel = createKernel({ engine: doc.engine, plugins: [searchPlugin()] });
+    await kernel.start();
+    const settings = kernel.settingsOf(SearchToken);
+    expect(settings.getSettings()).toEqual(SEARCH_DEFAULTS);
+
+    settings.updateSettings({ highlight: { color: '#00ff00' } });
+    await kernel.documents.open({ kind: 'bytes', id: 'doc', bytes: new Uint8Array() });
+    expect(kernel.capability(SearchToken, 'doc').getSettings().highlight.color).toBe('#00ff00');
     await kernel.destroy();
   });
 });

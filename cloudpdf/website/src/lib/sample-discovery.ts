@@ -39,6 +39,18 @@ export type SampleVariant = {
   entry: string;
 };
 
+/**
+ * The class that scopes one example's stylesheet on a docs page. A demo mounts
+ * into the page itself, not an iframe, and its `<base>.css` uses plain class
+ * names (`.toolbar`, `.button`), as a reader copies it. So the demo build
+ * prefixes every rule with this class and the demo's mount element carries it:
+ * examples on one page never restyle each other or the site. `key` is the
+ * framework-neutral `topic/base`.
+ */
+export function sampleScopeClass(key: string): string {
+  return `epdf-example--${key.replace(/[^a-zA-Z0-9]+/g, '-')}`;
+}
+
 function isExcluded(relativeTopic: string): boolean {
   return DEMO_EXCLUDED_TOPICS.some((t) => relativeTopic === t || relativeTopic.startsWith(`${t}/`));
 }

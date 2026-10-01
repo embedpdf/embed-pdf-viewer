@@ -56,7 +56,7 @@ export function createScaleReads(
   return {
     presets,
     api: {
-      canMeasure: (page) => annotation.canCreate() && scaleOf(page).ready,
+      canMeasure: (page) => ctx.allows('annotations:create') && scaleOf(page).ready,
       getPageScale: scaleOf,
       isBusy: () => state().pending > 0,
       listLastReports: () => state().reports,

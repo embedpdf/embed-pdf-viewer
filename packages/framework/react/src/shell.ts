@@ -7,8 +7,8 @@
  * it (panel buttons, mode bands, menu anchors) stays mounted across the
  * empty-workspace state. With no document, surfaces read as closed, menus as
  * none, and intents no-op — mirroring how command execution `tryGet`s the
- * shell. Use the raw capability (`useShell`) when you need fail-fast access
- * inside a <DocumentGate>.
+ * shell. The raw capability (`useShell`) is for code that knows a document
+ * exists: without one, its methods throw `not-ready`.
  */
 
 // One-line-per-feature: registration travels with the UI.
@@ -24,7 +24,7 @@ import {
   useOptionalSelector,
 } from './runtime';
 
-/** The raw capability — throws without a document; for gated subtrees. */
+/** The raw capability. Without a document it renders, and its methods throw `not-ready`. */
 export function useShell(): ShellCapability {
   return useCapability(ShellToken);
 }

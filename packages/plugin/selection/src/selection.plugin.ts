@@ -2,8 +2,8 @@ import { definePlugin } from '@embedpdf/core';
 import { FeedbackToken, InteractionToken } from '@embedpdf/plugin-interaction/contract/host';
 import type { SelectionConfig } from './contract';
 import { createSelectionController } from './controller';
-import { SelectionToken, type SelectionHostCapability } from './host-contract';
-import { initialSelectionState, type SelectionState } from './model';
+import { SelectionToken } from './host-contract';
+import { initialSelectionState } from './model';
 
 /**
  * Text selection: document-scoped, requires the interaction hub, whose
@@ -13,7 +13,7 @@ import { initialSelectionState, type SelectionState } from './model';
  * optional.
  */
 export const selectionPlugin = (config: SelectionConfig = {}) =>
-  definePlugin<SelectionState, SelectionHostCapability>({
+  definePlugin({
     id: 'selection',
     token: SelectionToken,
     scope: 'document',

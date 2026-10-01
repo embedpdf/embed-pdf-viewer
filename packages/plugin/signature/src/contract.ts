@@ -3,7 +3,7 @@
  * act of signing (one-shot and two-phase), visual fills, validation, the
  * sign-here flow, and the facts about a document's signatures.
  */
-import type { ChangeOrigin, EventHook, OperationOptions, ResourceStatus } from '@embedpdf/core';
+import type { EventHook, EventOrigin, OperationOptions, ResourceStatus } from '@embedpdf/core';
 import type {
   SignatureVerdict,
   SignerPort,
@@ -131,7 +131,7 @@ export interface SignatureSignedEvent {
   /** The sealed field, by its durable object-number ref. */
   readonly field: FormFieldRef;
   readonly result: SignatureCompleteResult;
-  readonly origin: ChangeOrigin;
+  readonly origin: EventOrigin;
 }
 /** This session's `fillField` or `clearField` finished drawing into a field. */
 export interface SignatureFieldEvent {

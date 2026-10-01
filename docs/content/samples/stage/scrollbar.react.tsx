@@ -5,7 +5,7 @@ import { Scrollbar, useScrollMetrics } from '@embedpdf/react/scrollbar';
 import { RenderLayer, renderPlugin } from '@embedpdf/react/render';
 import { localEngine } from '@embedpdf/engine';
 
-import { Demo, ProgressBar, StageFrame, stageFill } from './_shared/chrome';
+import './scrollbar.css';
 
 const engine = localEngine();
 const plugins = [stagePlugin(), renderPlugin()];
@@ -22,22 +22,22 @@ function ReadingProgress() {
   const m = useScrollMetrics();
   const travel = m.scrollHeight - m.clientHeight;
   const progress = travel > 0 ? m.scrollTop / travel : 0;
-  return <ProgressBar value={progress} />;
+  return (
+    <div className="progress">
+      <div className="progress-fill" style={{ width: `${progress * 100}%` }} />
+    </div>
+  );
 }
 
 export default function App() {
   return (
     <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: ebook }]}>
-      <Demo>
-        <DocumentGate fallback={<p>Loading…</p>}>
-          <ReadingProgress />
-          <StageFrame height={440}>
-            <Stage style={stageFill} overlay={<Scrollbar axis="y" />}>
-              {() => <RenderLayer />}
-            </Stage>
-          </StageFrame>
-        </DocumentGate>
-      </Demo>
+      <DocumentGate fallback={<p className="loading">Loading…</p>}>
+        <ReadingProgress />
+        <Stage className="stage" overlay={<Scrollbar axis="y" />}>
+          {() => <RenderLayer />}
+        </Stage>
+      </DocumentGate>
     </Viewer>
   );
 }

@@ -10,15 +10,7 @@ import { loadDefaultLibrary } from '@embedpdf/default-stamps/library';
 import { cloudEngine } from '@cloudpdf/engine';
 import { localEngine } from '@embedpdf/engine';
 
-import {
-  Button,
-  Demo,
-  Readout,
-  Spacer,
-  StageFrame,
-  Toolbar,
-  stageFill,
-} from '../stage/_shared/chrome';
+import './programmatic.css';
 
 const engine = cloudEngine({ baseUrl: 'https://engine.cloudpdf.com' });
 const assetEngine = localEngine();
@@ -66,46 +58,46 @@ function PlaceByCode() {
   };
 
   return (
-    <Toolbar>
-      <Readout>page {currentPage + 1}</Readout>
-      <Button
+    <div className="toolbar">
+      <output className="readout">page {currentPage + 1}</output>
+      <button
+        type="button"
+        className="button"
         title="Place the Approved stamp near the top-left corner of this page"
         disabled={assets.length === 0}
         onClick={() => void place('Approved', { x: 120, y: 90 })}
       >
         Approve
-      </Button>
-      <Button
+      </button>
+      <button
+        type="button"
+        className="button"
         title="Place the Draft stamp, rotated"
         disabled={assets.length === 0}
         onClick={() => void place('Draft', { x: 300, y: 200 }, 15)}
       >
         Mark as draft
-      </Button>
-      <Spacer />
-      <Readout>{status}</Readout>
-    </Toolbar>
+      </button>
+      <span className="spacer" />
+      <output className="readout">{status}</output>
+    </div>
   );
 }
 
 export default function App() {
   return (
     <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: ebook }]}>
-      <Demo>
-        <DocumentGate fallback={<p>Loading…</p>}>
-          <PlaceByCode />
-          <StageFrame height={420}>
-            <Stage style={stageFill}>
-              {() => (
-                <>
-                  <RenderLayer annotations={false} />
-                  <AnnotationLayer />
-                </>
-              )}
-            </Stage>
-          </StageFrame>
-        </DocumentGate>
-      </Demo>
+      <DocumentGate fallback={<p className="loading">Loading…</p>}>
+        <PlaceByCode />
+        <Stage className="stage">
+          {() => (
+            <>
+              <RenderLayer annotations={false} />
+              <AnnotationLayer />
+            </>
+          )}
+        </Stage>
+      </DocumentGate>
     </Viewer>
   );
 }

@@ -15,14 +15,6 @@ export const REFERENCE = [
   {
     capability: 'plugin/search/src/contract.ts#SearchCapability',
     pages: ['headless/text/search.mdx'],
-    pending: {
-      getSettings: 'every plugin has the live settings trio (G3)',
-      updateSettings: 'every plugin has the live settings trio (G3)',
-      resetSettings: 'every plugin has the live settings trio (G3)',
-      onSettingsChanged: 'every plugin has the live settings trio (G3)',
-      onProgressChanged: 'onProgress is renamed (T4, G1)',
-      onProgress: 'renamed to onProgressChanged (T4, G1)',
-    },
   },
   {
     capability: 'plugin/selection/src/contract.ts#SelectionCapability',
@@ -156,6 +148,7 @@ export const REFERENCE = [
       'selection.getProperties': 'getSelectionFields under its noun, named properties so they never read as form fields (A-N1, A-S1)',
       'selection.updateLink': 'updateSelectionLink under its noun (A-N1)',
       'selection.getAnchor': 'getSelectionAnchor under its noun (A-N1)',
+      'selection.getRotationAnchor': 'getRotationAnchor under its noun (A-N1)',
       'selection.update': 'updateSelection under its noun, takes a function too (A-N1, A-S1)',
       'selection.delete': 'deleteSelection under its noun (A-N1)',
       'selection.rotateBy': 'rotateSelectionBy under its noun (A-N1)',
@@ -209,6 +202,7 @@ export const REFERENCE = [
       listSelected: 'now selection.list (A-N1)',
       getSelectionFlags: 'dropped: flags are fields, in selection.getFields (A-S1)',
       getSelectionAnchor: 'now selection.getAnchor (A-N1)',
+      getRotationAnchor: 'now selection.getRotationAnchor (A-N1)',
       updateSelection: 'now selection.update (A-N1)',
       updateSelectionFlags: 'dropped: flags are fields, selection.update({ locked: true }) (A-S1)',
       deleteSelection: 'now selection.delete (A-N1)',

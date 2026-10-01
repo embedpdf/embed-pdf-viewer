@@ -3,9 +3,9 @@ import { AnnotationToken } from '@embedpdf/plugin-annotation/contract/host';
 import { SearchToken } from '@embedpdf/plugin-search/contract';
 import { SelectionToken } from '@embedpdf/plugin-selection/contract';
 
-import { RedactionToken, type RedactionCapability, type RedactionConfig } from './contract';
+import { RedactionToken, type RedactionConfig } from './contract';
 import { createRedactionController } from './controller';
-import { initialRedactionState, type RedactionState } from './model';
+import { initialRedactionState } from './model';
 
 /**
  * Document-scoped redaction plugin: the destructive half of the two-stage
@@ -18,7 +18,7 @@ import { initialRedactionState, type RedactionState } from './model';
  * the immutable base keeps the original. The package README explains the consequences.
  */
 export const redactionPlugin = (config: RedactionConfig = {}) =>
-  definePlugin<RedactionState, RedactionCapability>({
+  definePlugin({
     id: 'redaction',
     token: RedactionToken,
     scope: 'document',

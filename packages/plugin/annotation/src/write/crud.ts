@@ -23,8 +23,8 @@ import type { AnnotationContext, AnnotationServices } from '../services';
 import { appliedAnnotationOf, appliedOrThrow } from './outcomes';
 
 export function createCrud(
-  ctx: Pick<AnnotationContext, 'document'>,
-  { store, authority, tools }: Pick<AnnotationServices, 'store' | 'authority' | 'tools'>,
+  ctx: Pick<AnnotationContext, 'document' | 'assertAllowed'>,
+  { store, tools }: Pick<AnnotationServices, 'store' | 'tools'>,
   annotations: Pick<AnnotationReads, 'get'>,
 ) {
   /** The annotation `ref` names, as the view holds it: for a change that wrote nothing. */
@@ -57,13 +57,7 @@ export function createCrud(
     resources?: AnnotationResources,
     options: OperationOptions & { tool?: string; select?: boolean } = {},
   ): Promise<{ annotation: AnnotationDTO }> => {
-    if (!authority.canCreate()) {
-      throw new PluginError(
-        'permission-denied',
-        'annotation',
-        'create requires doc.annotate.create',
-      );
-    }
+    ctx.assertAllowed('annotations:create', 'annotation.create');
     if (!ctx.document()?.pages.some((pageInfo) => pageRefsEqual(pageInfo.ref, page))) {
       throw new PluginError(
         'not-found',

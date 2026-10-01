@@ -51,6 +51,11 @@ export type DocsSection = {
   variantProse: Record<string, string>;
   /** Identifiers worth exact-matching, keyed by integration ('*' = shared). */
   symbols: Record<string, string[]>;
+  /**
+   * The integrations the page isn't published for yet (the publish gate):
+   * their readers don't find it.
+   */
+  withheldFrom?: string[];
 };
 
 export type DocsSearchHit = {

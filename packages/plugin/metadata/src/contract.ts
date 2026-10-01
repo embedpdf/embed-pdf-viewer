@@ -1,10 +1,10 @@
 import {
-  type ChangeOrigin,
   type CustomMetadata,
   type CustomMetadataPatch,
   type CustomMetadataUpdateResult,
   type DocumentMetadata,
   type EventHook,
+  type EventOrigin,
   type MetadataPatch,
   type MetadataUpdateResult,
   type OperationOptions,
@@ -21,7 +21,7 @@ export interface MetadataUpdatedEvent {
   readonly metadata: DocumentMetadata;
   readonly previous: DocumentMetadata | null;
   readonly changedKeys: readonly (keyof DocumentMetadata)[];
-  readonly origin: ChangeOrigin;
+  readonly origin: EventOrigin;
 }
 
 /** The metadata was (re)loaded from the engine. */
@@ -35,7 +35,7 @@ export interface CustomMetadataUpdatedEvent {
   readonly previous: CustomMetadata | null;
   /** The keys that were added, changed or removed. */
   readonly changedKeys: readonly string[];
-  readonly origin: ChangeOrigin;
+  readonly origin: EventOrigin;
 }
 
 /** The custom keys were (re)loaded from the engine. */

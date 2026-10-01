@@ -5,7 +5,7 @@ import { InteractionToken } from '@embedpdf/plugin-interaction/contract';
 import { StageToken } from '@embedpdf/plugin-stage/contract';
 
 import { createLinkController } from './controller';
-import { LinkToken, type LinkHostCapability } from './host-contract';
+import { LinkToken } from './host-contract';
 
 /**
  * Clickable link regions and their activation. Document-scoped; needs the
@@ -13,7 +13,7 @@ import { LinkToken, type LinkHostCapability } from './host-contract';
  * the annotation plugin (the folded link model) and actions (`/A` trees).
  */
 export const linkPlugin = () =>
-  definePlugin<void, LinkHostCapability>({
+  definePlugin({
     id: 'link',
     token: LinkToken,
     scope: 'document',

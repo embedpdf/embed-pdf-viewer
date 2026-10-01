@@ -7,6 +7,7 @@ import {
 } from '../docs-integrations';
 import { resolveDocsTree } from '../docs-markdown';
 import { docsProductFromPath } from '../docs-products';
+import { docsRelease } from '../docs-release';
 
 /**
  * This site's binding of the kit search extractor: sections resolve through
@@ -25,4 +26,7 @@ export const searchExtractSite: SearchExtractSite = {
     const supported = PRODUCT_INTEGRATIONS[product as IntegrationDocsProduct];
     return supported.length > 0 ? [...supported] : [undefined];
   },
+  // A page the publish gate holds back for a framework isn't indexed for it.
+  publishedIntegrations: (contentPath, integrations) =>
+    integrations.filter((integration) => docsRelease(contentPath.split('/'), integration).live),
 };

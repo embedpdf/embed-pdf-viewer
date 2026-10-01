@@ -18,15 +18,7 @@ import {
 import { cloudEngine } from '@cloudpdf/engine';
 import { localEngine } from '@embedpdf/engine';
 
-import {
-  Button,
-  Demo,
-  Readout,
-  Spacer,
-  StageFrame,
-  Toolbar,
-  stageFill,
-} from '../stage/_shared/chrome';
+import './persist.css';
 
 const engine = cloudEngine({ baseUrl: 'https://engine.cloudpdf.com' });
 const assetEngine = localEngine();
@@ -70,37 +62,43 @@ function Libraries() {
   };
 
   return (
-    <Toolbar>
-      <Readout>
+    <div className="toolbar">
+      <output className="readout">
         {restored === null
           ? 'restoring…'
           : `${restored} restored · reload the page to see them come back`}
-      </Readout>
-      <Spacer />
+      </output>
+      <span className="spacer" />
       {libraries.map((library) => (
-        <Button
+        <button
+          type="button"
+          className="button"
           key={library.id}
           title={`Download "${library.name}" as a PDF — open it in Acrobat, or import it here again`}
           onClick={() => exportPdf(library.id, library.name)}
         >
           ⬇ {library.name}
-        </Button>
+        </button>
       ))}
       {assets.slice(0, 3).map((asset) => (
-        <Button
+        <button
+          type="button"
+          className="button"
           key={asset.id}
           title={`Place "${asset.label}"`}
           onClick={() => void armAsset(asset.id)}
         >
           {asset.label}
-        </Button>
+        </button>
       ))}
-      <Button
+      <button
+        type="button"
+        className="button"
         title="Import any PDF as a library: one stamp per page"
         onClick={() => fileRef.current?.click()}
       >
         + Import PDF
-      </Button>
+      </button>
       <input
         ref={fileRef}
         type="file"
@@ -112,28 +110,24 @@ function Libraries() {
           if (file) importPdf(file);
         }}
       />
-    </Toolbar>
+    </div>
   );
 }
 
 export default function App() {
   return (
     <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: ebook }]}>
-      <Demo>
-        <DocumentGate fallback={<p>Loading…</p>}>
-          <Libraries />
-          <StageFrame height={420}>
-            <Stage style={stageFill}>
-              {() => (
-                <>
-                  <RenderLayer annotations={false} />
-                  <AnnotationLayer />
-                </>
-              )}
-            </Stage>
-          </StageFrame>
-        </DocumentGate>
-      </Demo>
+      <DocumentGate fallback={<p className="loading">Loading…</p>}>
+        <Libraries />
+        <Stage className="stage">
+          {() => (
+            <>
+              <RenderLayer annotations={false} />
+              <AnnotationLayer />
+            </>
+          )}
+        </Stage>
+      </DocumentGate>
     </Viewer>
   );
 }

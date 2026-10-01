@@ -41,7 +41,6 @@ function harness(
 ) {
   const draftCaptured = createEventHook<CapturedAnnotationDraft>();
   const annotation = {
-    canCreate: () => options.canCreate ?? true,
     setPageViewports: vi.fn(),
     remeasurePage: vi.fn(async (page: unknown, scale: unknown) => ({
       page,
@@ -90,7 +89,10 @@ function harness(
       [InteractionToken, interaction],
     ],
     doc: {
-      security: { allows: () => options.allowed ?? true },
+      security: {
+        allows: () => options.allowed ?? true,
+        allowsAnnotation: (action: string) => action !== 'create' || (options.canCreate ?? true),
+      },
       page: () => ({ measure: options.engine ? service : undefined }),
     } as never,
   });
@@ -152,12 +154,33 @@ describe('measurement', () => {
     await settle();
     await expect(denied.measurement.clearScale(PAGE)).rejects.toMatchObject({
       code: 'permission-denied',
+      permission: 'doc.annotate.modify',
     });
     const { measurement } = harness();
     await settle();
     await expect(measurement.setPreset(PAGE, 'nope')).rejects.toMatchObject({
       code: 'not-found',
     });
+  });
+
+  it('refuses to measure without permission to create annotations', async () => {
+    const { measurement, annotation } = harness({
+      canCreate: false,
+      viewports: [owned(ONE_TO_HUNDRED)],
+    });
+    await settle();
+    expect(measurement.canMeasure(PAGE)).toBe(false);
+    await expect(
+      measurement.createMeasurement({
+        kind: 'distance',
+        page: PAGE,
+        points: [
+          { x: 0, y: 0 },
+          { x: 10, y: 0 },
+        ],
+      }),
+    ).rejects.toMatchObject({ code: 'permission-denied', permission: 'annotations:create' });
+    expect(annotation.create).not.toHaveBeenCalled();
   });
 
   it('creates a measurement annotation through the annotation plugin, with the page’s scale', async () => {

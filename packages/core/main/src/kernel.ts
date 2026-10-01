@@ -10,6 +10,12 @@ import type { SliceLease } from './store';
 import { createEventHook } from './event-hook';
 import { toPluginError, toPluginErrorInfo } from './errors';
 import { settle } from './settle';
+import {
+  createSettingsStore,
+  type SettingsApi,
+  type SettingsOf,
+  type SettingsStore,
+} from './settings';
 import { planPlugins } from './order';
 import { createScope, CancelledError, isCancelled, type Scope } from './scope';
 import {
@@ -75,7 +81,12 @@ export type KernelStatus =
 export interface Kernel {
   readonly engine: Engine;
   readonly documents: DocumentsCapability;
-  /** Resolve a capability. For document-scoped tokens, `documentId` defaults to the active doc. */
+  /**
+   * Resolve a capability. For document-scoped tokens, `documentId` defaults to the active doc.
+   * For a workspace token, a `documentId` gives the capability as seen from that document's
+   * scope (`PluginDef.inScope`; the documents capability too): the same object on every call
+   * while the document is open.
+   */
   capability<T>(token: CapabilityToken<T>, documentId?: string): T;
   /**
    * Total sibling of `capability()`: `null` instead of throwing — no
@@ -90,6 +101,13 @@ export interface Kernel {
   tryCapability<T>(token: CapabilityToken<T>, documentId?: string): T | null;
   /** A token's scope — adapters use this to decide whether to bind a document. */
   scopeOf(token: CapabilityToken<unknown>): PluginScope;
+  /**
+   * A plugin's settings calls, with or without a document open: settings belong to the plugin
+   * as the app registered it, not to a document. For adapters (a settings hook renders before
+   * the first document opens) and for an app that changes them before opening one. Throws
+   * when no installed plugin provides `token`, or its plugin declares no settings.
+   */
+  settingsOf<C>(token: CapabilityToken<C>): SettingsApi<SettingsOf<C>>;
   subscribe(listener: () => void): Unsubscribe;
   getState(): GlobalState;
   status(): KernelStatus;
@@ -120,6 +138,25 @@ const pendingToDocInfo = (meta: PendingMeta): DocInfo => ({
   ...(meta.status === 'error' && meta.error !== undefined
     ? { error: toPluginErrorInfo(toPluginError('documents', meta.error)) }
     : {}),
+});
+
+/**
+ * The documents capability as seen from inside one document's scope: every call whose document
+ * is optional uses that document instead of the active one. The rest is the registry itself.
+ */
+const documentsInScope = (
+  documents: DocumentsCapability,
+  documentId: string,
+): DocumentsCapability => ({
+  ...documents,
+  save: (id = documentId, options) => documents.save(id, options),
+  saveLayer: (id = documentId, options) => documents.saveLayer(id, options),
+  listPages: (id = documentId) => documents.listPages(id),
+  getPage: (ref, id = documentId) => documents.getPage(ref, id),
+  getPageAt: (index, id = documentId) => documents.getPageAt(index, id),
+  getPageIndex: (ref, id = documentId) => documents.getPageIndex(ref, id),
+  getRevision: (id = documentId) => documents.getRevision(id),
+  allows: (doc, id = documentId) => documents.allows(doc, id),
 });
 
 /** The stable id an input implies, if it carries one ('bytes'/'layerBytes'/'id'). */
@@ -154,6 +191,8 @@ interface DocumentSession extends SessionRef {
   engineOp: { abort(reason?: unknown): void } | null;
   cancel: AbortController;
   capabilities: Map<AnyPlugin, unknown>;
+  /** Workspace capabilities as seen from this document's scope (`PluginDef.inScope`), by token. */
+  views: Map<CapabilityToken<unknown>, unknown>;
   /** `connect` halves of `create()`, run once every instance of the document is built. */
   connectors: Map<AnyPlugin, () => void>;
   close(): Promise<void>;
@@ -170,7 +209,10 @@ const isAbortLike = (error: unknown): boolean =>
  * Assemble a kernel from an engine + plugins.
  *
  *   planPlugins        — validate dependencies, order them
- *   resolveCapability  — workspace singletons, or per-document instances built lazily
+ *   resolveCapability  — workspace singletons (or their view from a document's scope),
+ *                        or per-document instances built lazily
+ *   settings           — one store per plugin registration, built up front, shared
+ *                        by its instances and readable with no document
  *   document lifecycle — one DocumentSession per document: transactional open
  *                        (publish-last), one idempotent close for every phase
  *   start / destroy    — explicit status machine; destroy closes everything
@@ -195,6 +237,16 @@ export function createKernel(config: {
   const workspaceConnectors = new Map<AnyPlugin, () => void>();
   const workspaceCancel = new AbortController();
   const workspaceScope = createScope(report);
+  /** How each workspace capability looks from inside a document's scope, by token. The
+   *  documents capability is built in, so its view is declared here; plugins declare theirs. */
+  const inScopeByToken = new Map<CapabilityToken<unknown>, NonNullable<AnyPlugin['inScope']>>([
+    [DocumentsToken, documentsInScope],
+  ]);
+  for (const plugin of plan.ordered) {
+    if (plugin.token && plugin.inScope && !isDocumentScoped(plugin)) {
+      inScopeByToken.set(plugin.token, plugin.inScope);
+    }
+  }
 
   // ── lifecycle events (the kernel primitive; disposed at destroy) ──────────
   const opened = createEventHook<DocumentOpenedEvent>(report);
@@ -295,6 +347,7 @@ export function createKernel(config: {
       cancel,
       signal: cancel.signal,
       capabilities: new Map(),
+      views: new Map(),
       connectors: new Map(),
       leases: new Map(),
       settleFlushes: new Set(),
@@ -327,6 +380,7 @@ export function createKernel(config: {
     sessions.delete(previousId);
     session.id = nextId;
     sessions.set(nextId, session);
+    session.views.clear(); // a view is bound to the id it was built for
     const slot = core.pending[previousId];
     if (slot) {
       const { [previousId]: _moved, ...pending } = core.pending;
@@ -357,6 +411,7 @@ export function createKernel(config: {
       });
       await session.scope.dispose();
       if (sessions.get(session.id) === session) sessions.delete(session.id);
+      session.views.clear();
       closed.emit({ documentId: session.id });
     })();
     closingSessions.set(session, closing);
@@ -485,10 +540,32 @@ export function createKernel(config: {
     return capability;
   }
 
+  /**
+   * A workspace capability as a document's scope sees it: the view its plugin declares
+   * (`inScope`), built once per document and kept on the session, so it is the same object on
+   * every call and goes when the document closes. Without a document, or for a document the
+   * kernel doesn't know, it is the capability itself.
+   */
+  function workspaceViewOf<T>(
+    token: CapabilityToken<T>,
+    capability: T,
+    documentId: string | undefined,
+  ): T {
+    const inScope = inScopeByToken.get(token);
+    const session = documentId === undefined ? undefined : sessions.get(documentId);
+    if (!inScope || !session) return capability;
+    let view = session.views.get(token);
+    if (view === undefined) {
+      view = inScope(capability, session.id);
+      session.views.set(token, view);
+    }
+    return view as T;
+  }
+
   function resolveCapability<T>(token: CapabilityToken<T>, documentId?: string): T {
     guardUsable(`capability("${token.name}")`);
     const workspaceCapability = workspaceCapabilities.get(token);
-    if (workspaceCapability) return workspaceCapability as T;
+    if (workspaceCapability) return workspaceViewOf(token, workspaceCapability as T, documentId);
     const provider = plan.providerOf(token);
     if (!provider) throw new Error(`No capability "${token.name}".`);
     const id = documentId ?? store.getCore().activeId;
@@ -510,7 +587,7 @@ export function createKernel(config: {
   function tryResolveInternal<T>(token: CapabilityToken<T>, documentId?: string): T | null {
     if (status === 'destroying' || status === 'destroyed') return null;
     const workspaceCapability = workspaceCapabilities.get(token);
-    if (workspaceCapability) return workspaceCapability as T;
+    if (workspaceCapability) return workspaceViewOf(token, workspaceCapability as T, documentId);
     const provider = plan.providerOf(token);
     if (!provider) return null;
     const session = sessionOf(documentId);
@@ -523,12 +600,38 @@ export function createKernel(config: {
   function tryResolveCapability<T>(token: CapabilityToken<T>, documentId?: string): T | null {
     if (status === 'destroying' || status === 'destroyed') return null;
     const workspaceCapability = workspaceCapabilities.get(token);
-    if (workspaceCapability) return workspaceCapability as T;
+    if (workspaceCapability) return workspaceViewOf(token, workspaceCapability as T, documentId);
     const provider = plan.providerOf(token);
     if (!provider) return null;
     const session = sessionOf(documentId);
     if (!session || session.phase !== 'ready') return null;
     return buildDocumentCapability(provider, session) as T;
+  }
+
+  // ── settings ─────────────────────────────────────────────────────────────────
+  // A plugin's settings belong to the plugin as the app registered it, not to one document.
+  // Each registration's store is built here, before any plugin is created, so the settings
+  // can be read and changed before any document opens. Every instance of the plugin then
+  // shares it, so a change reaches every open document and the ones opened later, and wakes
+  // every reader through the store's one change stream.
+  const settingsStores = new Map<AnyPlugin, SettingsStore<object>>();
+  for (const plugin of plan.ordered) {
+    if (plugin.settings) {
+      settingsStores.set(plugin, createSettingsStore(plugin.settings, store.notify, report));
+    }
+  }
+  // Destroy ends the listeners; the values stay readable, so a reader unmounting late never throws.
+  workspaceScope.defer(() => {
+    for (const settings of settingsStores.values()) settings.dispose();
+  });
+
+  function settingsOf<C>(token: CapabilityToken<C>): SettingsApi<SettingsOf<C>> {
+    const provider = plan.providerOf(token);
+    if (!provider) throw new Error(`No capability "${token.name}".`);
+    const settings = settingsStores.get(provider);
+    if (!settings) throw new Error(`Plugin "${provider.id}" has no settings.`);
+    // The token's capability type names the settings type; the store was built untyped.
+    return settings.api as unknown as SettingsApi<SettingsOf<C>>;
   }
 
   const services: ContextServices = {
@@ -541,6 +644,7 @@ export function createKernel(config: {
     resolveCapability,
     tryResolveCapability: tryResolveInternal,
     documentHandle,
+    settingsStoreOf: (plugin) => settingsStores.get(plugin),
   };
 
   // ── document lifecycle ───────────────────────────────────────────────────────
@@ -948,6 +1052,7 @@ export function createKernel(config: {
     capability: resolveCapability,
     tryCapability: tryResolveCapability,
     scopeOf: plan.scopeOf,
+    settingsOf,
     subscribe: store.subscribe,
     getState: store.getState,
     status: () => status,

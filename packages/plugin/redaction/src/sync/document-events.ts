@@ -5,7 +5,6 @@
  * their own plugins. Marks are annotations, so the pending view changes
  * whenever a `redact` annotation does.
  */
-import { originOf } from '@embedpdf/core';
 import type { AnnotationChangedEvent } from '@embedpdf/plugin-annotation/contract';
 
 import { setLastResult } from '../model';
@@ -20,9 +19,9 @@ export function subscribeChanges(
 
   ctx.listen(ctx.doc.events, (event) => {
     if (event.type !== 'redaction.applied') return;
-    const { type: _type, origin: _origin, ...result } = event;
+    const { type: _type, origin, ...result } = event;
     ctx.state.update(setLastResult, result);
-    applied.emit({ result, origin: originOf(event) });
+    applied.emit({ result, origin });
   });
 
   const markChanged = ({ annotation: changed }: AnnotationChangedEvent) => {

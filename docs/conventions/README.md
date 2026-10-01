@@ -24,11 +24,11 @@ verbs that do work, and events. A plugin talks to the engine only through
 
 ### Three kinds of events
 
-| Kind         | Meaning                              | Fired from                                                            |
-| ------------ | ------------------------------------ | --------------------------------------------------------------------- |
-| Fact         | Something changed in the document    | Where the confirmed document event is applied, with `originOf(event)` |
-| State change | A session value changed              | The plugin's one `ctx.state.onChange` listener                        |
-| Occurrence   | An operation ran, finished or failed | Where the operation reaches that point                                |
+| Kind         | Meaning                              | Fired from                                                         |
+| ------------ | ------------------------------------ | ------------------------------------------------------------------ |
+| Fact         | Something changed in the document    | Where the confirmed document event is applied, with `event.origin` |
+| State change | A session value changed              | The plugin's one `ctx.state.onChange` listener                     |
+| Occurrence   | An operation ran, finished or failed | Where the operation reaches that point                             |
 
 ## Core rules
 
@@ -45,7 +45,7 @@ verbs that do work, and events. A plugin talks to the engine only through
    event before the call resolves, so the verb's `await` already sees its own
    write: no refetch, no waiting, no hand-made events.
 6. Every event fires from exactly one place. Fact events carry
-   `originOf(event)`; no plugin builds an origin by hand. Loads announce
+   `event.origin` as it is; no plugin builds an origin by hand. Loads announce
    `onResynced`.
 7. Reads are synchronous, pure and identity-stable (`memo`, `memoByKey`).
    They never start engine work.
@@ -64,7 +64,7 @@ verbs that do work, and events. A plugin talks to the engine only through
 | -------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
 | [`architecture.md`](./architecture.md)                   | Layers, scopes and bring-up, the four kinds of state, data flow, reads, reactions, pure cores, plugin anatomy                            |
 | [`state-and-sync.md`](./state-and-sync.md)               | `ctx.state`, `notify`, `watch`, `waitFor`, mirrors, page mirrors, overlays, resources, reactions, the sync rules                         |
-| [`events.md`](./events.md)                               | Fact, state-change and occurrence events, event sources, naming, `ChangeOrigin`, `onResynced`, subscribing                               |
+| [`events.md`](./events.md)                               | Fact, state-change and occurrence events, event sources, naming, `EventOrigin`, `onResynced`, subscribing                                |
 | [`plugins.md`](./plugins.md)                             | Plugin files, manifest, tokens and contracts, package entries, controller, `connect`, dependencies, lifetime, errors, a complete example |
 | [`testing.md`](./testing.md)                             | Where tests live, the test context, fake engines, mirror tests, kernel tests, conformance suites, type tests                             |
 | [`naming.md`](./naming.md)                               | Identifiers, the glossary, type suffixes, the capability vocabulary                                                                      |

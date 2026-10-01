@@ -24,7 +24,8 @@ export { CommandsToken } from './token';
 export type CommandId = string;
 
 /** What a derivation or `run` sees: capability resolution bound to the
- *  command's target document (explicit, else the active one). */
+ *  command's target document (explicit, else the document in scope, else the
+ *  active one). */
 export interface CommandContext {
   /** The target document, or null when no document is open. */
   readonly documentId: string | null;
@@ -155,6 +156,11 @@ export interface CommandExecutionFailedEvent {
   readonly error: PluginErrorInfo;
 }
 
+/**
+ * The command registry. A call that leaves out the document targets the document in scope when
+ * the capability was resolved for one (`ctx.forDocument`, a `<DocumentScope>`), and the active
+ * document otherwise.
+ */
 export interface CommandsCapability {
   // ── registry ──
   /**

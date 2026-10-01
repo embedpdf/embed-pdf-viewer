@@ -250,7 +250,7 @@ describe('signing', () => {
       expect(signedEvents).toHaveLength(1);
       expect(signedEvents[0]).toMatchObject({
         field: result.signature.field,
-        origin: { locality: 'local' },
+        origin: { kind: 'local' },
       });
       expect(events.some((event) => event.type === 'protectionChanged')).toBe(true);
 
@@ -462,7 +462,7 @@ describe('facts from every session', () => {
       {
         type: 'signed',
         field: field.field,
-        origin: { locality: 'remote', sessionId: 'other-session', actorId: 'alice' },
+        origin: remote,
       },
     ]);
     expect(events.at(-1)).toMatchObject({ type: 'signed' });

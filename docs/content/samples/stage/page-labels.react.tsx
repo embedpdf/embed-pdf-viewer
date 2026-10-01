@@ -4,7 +4,7 @@ import { Stage, stagePlugin } from '@embedpdf/react/stage';
 import { RenderLayer, renderPlugin } from '@embedpdf/react/render';
 import { localEngine } from '@embedpdf/engine';
 
-import { Demo, StageFrame, stageFill } from './_shared/chrome';
+import './page-labels.css';
 
 const engine = localEngine();
 
@@ -25,22 +25,18 @@ const ebook = async (): Promise<OpenInput> => {
 export default function App() {
   return (
     <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: ebook }]}>
-      <Demo>
-        <DocumentGate fallback={<p>Loading…</p>}>
-          <StageFrame height={460}>
-            <Stage
-              style={stageFill}
-              pageChrome={(page) => (
-                <div className="epdf-page-label" style={{ height: page.frame.bottom }}>
-                  Page {page.pageIndex + 1}
-                </div>
-              )}
-            >
-              {() => <RenderLayer />}
-            </Stage>
-          </StageFrame>
-        </DocumentGate>
-      </Demo>
+      <DocumentGate fallback={<p className="loading">Loading…</p>}>
+        <Stage
+          className="stage"
+          pageChrome={(page) => (
+            <div className="page-label" style={{ height: page.frame.bottom }}>
+              Page {page.pageIndex + 1}
+            </div>
+          )}
+        >
+          {() => <RenderLayer />}
+        </Stage>
+      </DocumentGate>
     </Viewer>
   );
 }

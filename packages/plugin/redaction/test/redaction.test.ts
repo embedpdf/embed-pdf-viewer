@@ -55,14 +55,13 @@ const resultOf = (scope: RedactionApplyScope): RedactionApplyResult => ({
 });
 
 /** The annotation plugin's host lens, reduced to what redaction reads; lists stay stable until `setRaws`. */
-function fakeAnnotation(options: { canCreate?: boolean; raws?: AnnotationDTO[] } = {}) {
+function fakeAnnotation(options: { raws?: AnnotationDTO[] } = {}) {
   let raws = options.raws ?? [];
   let lists = new Map<number, readonly AnnotationDTO[]>();
   const created = createEventHook<AnnotationChangedEvent>();
   const updated = createEventHook<AnnotationChangedEvent>();
   const deleted = createEventHook<AnnotationDeletedEvent>();
   return {
-    canCreate: () => options.canCreate ?? true,
     createFromSelection: vi.fn(async () => [MARK]),
     list: ({ page }: { page: { objectNumber: number } }) => {
       let list = lists.get(page.objectNumber);
@@ -97,7 +96,7 @@ function harness(
     apply?: (scope: RedactionApplyScope) => Promise<RedactionApplyResult>;
   } = {},
 ) {
-  const annotation = fakeAnnotation({ canCreate: options.canCreate, raws: options.raws });
+  const annotation = fakeAnnotation({ raws: options.raws });
   const granted = new Set<string>(options.granted ?? APPLY_CAPABILITIES);
   // Like the engines: the event for this session's apply is published before the apply resolves.
   const apply = vi.fn(
@@ -118,7 +117,10 @@ function harness(
     ],
     doc: {
       redaction: (options.engineSupport ?? true) ? { apply } : undefined,
-      security: { allows: (capability: string) => granted.has(capability) },
+      security: {
+        allows: (capability: string) => granted.has(capability),
+        allowsAnnotation: (action: string) => action !== 'create' || (options.canCreate ?? true),
+      },
     } as never,
   });
   const redaction = ctx.connect(createRedactionController(ctx));
@@ -151,7 +153,10 @@ describe('marking the selection', () => {
       canCreate: false,
       selection: { hasSelection: () => true },
     });
-    await expect(redaction.markSelection()).rejects.toMatchObject({ code: 'permission-denied' });
+    await expect(redaction.markSelection()).rejects.toMatchObject({
+      code: 'permission-denied',
+      permission: 'annotations:create',
+    });
     expect(annotation.createFromSelection).not.toHaveBeenCalled();
   });
 });
@@ -238,11 +243,7 @@ describe('applying', () => {
     expect(redaction.getLastResult()).toEqual(result);
     expect(applied).toHaveLength(1);
     expect(applied[0]!.result).toEqual(result);
-    expect(applied[0]!.origin).toEqual({
-      locality: 'local',
-      sessionId: 'session-a',
-      actorId: null,
-    });
+    expect(applied[0]!.origin).toEqual(LOCAL_ORIGIN);
     expect(redaction.isApplying()).toBe(false);
   });
 
@@ -256,7 +257,7 @@ describe('applying', () => {
 
     expect(redaction.getLastResult()).toEqual(result);
     expect(applied).toEqual([
-      { result, origin: { locality: 'remote', sessionId: 'session-b', actorId: 'user-b' } },
+      { result, origin: REMOTE_ORIGIN },
     ]);
   });
 

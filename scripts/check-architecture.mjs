@@ -8,7 +8,8 @@
  * - document events are subscribed with `ctx.listen(ctx.doc.events, …)` or a
  *   mirror, never `doc.events.subscribe(…)`, so the kernel owns the unsubscribe;
  * - no `as never` casts: they switch the type checker off instead of stating a type;
- * - no hand-made `ChangeOrigin` literals: an origin always comes from `originOf(event)`.
+ * - no hand-made `EventOrigin` literals: an event's origin is always the engine
+ *   event's own `origin`, passed on as it is.
  *
  *   node scripts/check-architecture.mjs            # fail on any finding
  *   node scripts/check-architecture.mjs packages/plugin/form
@@ -88,16 +89,16 @@ for (const file of files) {
     ) {
       report(file, node, sourceFile, 'subscribe with ctx.listen(ctx.doc.events, …) or a mirror');
     }
-    if (
-      ts.isObjectLiteralExpression(node) &&
-      node.properties.some(
-        (property) =>
-          ts.isPropertyAssignment(property) &&
-          ts.isIdentifier(property.name) &&
-          property.name.text === 'locality',
-      )
-    ) {
-      report(file, node, sourceFile, 'a ChangeOrigin comes from originOf(event), never a literal');
+    if (ts.isObjectLiteralExpression(node)) {
+      // An origin literal names the session and the user behind it.
+      const names = new Set(
+        node.properties
+          .filter((property) => ts.isPropertyAssignment(property) && ts.isIdentifier(property.name))
+          .map((property) => property.name.text),
+      );
+      if (names.has('sessionId') && names.has('sub')) {
+        report(file, node, sourceFile, 'an origin is the engine event’s own `origin`, never a literal');
+      }
     }
     ts.forEachChild(node, visit);
   };

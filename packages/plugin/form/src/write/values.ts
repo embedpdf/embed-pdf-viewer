@@ -15,11 +15,10 @@ export function createValueWrites(
   ctx: FormContext,
   services: Pick<
     FormServices,
-    'events' | 'authority' | 'scripting' | 'enqueue' | 'keyOf' | 'fields'
+    'events' | 'scripting' | 'enqueue' | 'keyOf' | 'fields'
   >,
 ) {
   const { validationRejected } = services.events;
-  const { assertFill } = services.authority;
   const { enqueue, keyOf, fields } = services;
   const scripting = services.scripting.controller;
   // A download waits for the values on their way.
@@ -46,7 +45,7 @@ export function createValueWrites(
   };
 
   const write = async (ref: FormFieldRef, value: FormFieldValue): Promise<SetValueResult> => {
-    assertFill('form.setValue');
+    ctx.assertAllowed('doc.forms.fill', 'form.setValue');
     const key = keyOf(ref);
     return enqueue(async () => {
       ctx.state.update(beginWrite, key);
@@ -81,6 +80,7 @@ export function createValueWrites(
               code: result.status === 'rejected' ? 'invalid-input' : 'operation-failed',
               message: result.error?.message ?? result.diagnostics[0]?.message ?? result.status,
               capability: 'form',
+              permission: null,
             },
           });
         } else {

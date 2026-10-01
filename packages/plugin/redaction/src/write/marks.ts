@@ -28,15 +28,6 @@ export function createMarking(
 ) {
   const { annotation, selection, search } = siblings;
 
-  const assertCanMark = (): void => {
-    if (!annotation.canCreate()) {
-      throw new PluginError(
-        'permission-denied',
-        'redaction',
-        'marking needs annotation create authority',
-      );
-    }
-  };
   /** The configured overlay look, as annotation props. */
   /**
    * A new mark's style, as the engine takes it: the redact tool's current
@@ -58,7 +49,7 @@ export function createMarking(
   };
 
   const markSelection = async (): Promise<readonly AnnotationRef[]> => {
-    assertCanMark();
+    ctx.assertAllowed('annotations:create', 'redaction.markSelection');
     const plane = selection();
     if (!plane) throw new PluginError('unsupported', 'redaction', 'no selection plugin');
     if (!plane.hasSelection()) return [];
@@ -68,7 +59,7 @@ export function createMarking(
   };
 
   const markArea = async (page: PageRef, bounds: Rect): Promise<AnnotationRef> => {
-    assertCanMark();
+    ctx.assertAllowed('annotations:create', 'redaction.markArea');
     const created = await annotation.create(page, {
       subtype: 'redact',
       rect: bounds,
@@ -87,7 +78,7 @@ export function createMarking(
     query: SearchQuery,
     options?: { pages?: readonly PageRef[] },
   ): Promise<readonly AnnotationRef[]> => {
-    assertCanMark();
+    ctx.assertAllowed('annotations:create', 'redaction.markMatches');
     const finder = search();
     if (!finder) throw new PluginError('unsupported', 'redaction', 'no search plugin');
     await finder.search(query);

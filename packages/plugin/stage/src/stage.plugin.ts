@@ -5,7 +5,7 @@ import { DEFAULT_LENS_ID } from './connect';
 import type { StagePluginOptions } from './contract';
 import { createStageController } from './controller';
 import type { StageHostCapability } from './host-contract';
-import { initialStageState, type StageState } from './model';
+import { initialStageState } from './model';
 import { StageToken } from './token';
 
 /**
@@ -18,7 +18,7 @@ import { StageToken } from './token';
  */
 export const stagePlugin = (options: StagePluginOptions = {}) => {
   const { id = DEFAULT_LENS_ID, token = StageToken, ...config } = options;
-  return definePlugin<StageState, StageHostCapability>({
+  return definePlugin({
     id,
     token: createHostToken<StageHostCapability>(token),
     scope: 'document',

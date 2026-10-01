@@ -249,6 +249,7 @@ What `useAnnotation()` gives you for selecting, drawing and editing text: its `s
 | `selection.group()`, `selection.ungroup()`                 | Makes the selected annotations one group, saved the way Acrobat saves it, or splits the selected group up again                  |
 | `selection.canGroup()`, `selection.canUngroup()`           | Whether the selection can be grouped, or is a group that can be split                                                            |
 | `selection.getAnchor()`                                    | Where a menu attaches: `{ page, bounds }` around the selection, or `null`. `<AnnotationMenu>` uses it. [Add a menu](#add-a-menu) |
+| `selection.getRotationAnchor()`                            | While a selection is being turned: `{ page, at, angle }`, the pointer's point and the angle so far in degrees clockwise, or `null`. `<AnnotationRotationBadge>` uses it to show the angle next to the pointer. |
 | `draft.get()`                                              | The polygon or polyline being drawn (`{ page, bounds, pointCount, canFinish }`), or `null`. `<AnnotationDraftMenu>` uses it. [Shapes with many points](#shapes-with-many-points) |
 | `draft.finish()`, `draft.cancel()`                         | Ends the shape and creates it, as a double-click does, or drops it                                                               |
 | `text.begin(ref)`, `text.end()`                            | Starts typing in a text box, as a double-click does, or stops and saves what was typed. [Edit text](#edit-text)                  |

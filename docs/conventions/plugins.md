@@ -45,7 +45,7 @@ packages/plugin/<name>/
 ```ts
 // packages/plugin/metadata/src/metadata.plugin.ts
 export const metadataPlugin = () =>
-  definePlugin<void, MetadataCapability>({
+  definePlugin({
     id: 'metadata',
     token: MetadataToken,
     scope: 'document',
@@ -53,26 +53,33 @@ export const metadataPlugin = () =>
   });
 ```
 
-`definePlugin<State, Capability>(definition)` returns its argument; it exists to
-pin the two types, so `create` receives a `PluginContext<State>` and must
-return a `Capability`.
+`definePlugin(definition)` returns its argument, and reads the plugin's types
+from it: the capability from `token`, the state from `state`, the settings from
+`settings.defaults`. A manifest passes no type arguments. `create` receives a
+`PluginContext<State, Settings>` and must return the capability; it is checked
+against those types and never names them, so a controller that returns less
+than the capability is a type error, not a narrower capability. A plugin
+without `state` is stateless (`void`), and one without `settings` has
+`NoSettings`: `ctx.settings()` throws there.
 
-| Field      | Meaning                                                                                          |
-| ---------- | ------------------------------------------------------------------------------------------------ |
-| `id`       | Unique in the plugin list. Names the state slice and appears in errors.                          |
-| `token`    | The capability token this plugin provides. Omit for a plugin without a capability.               |
-| `scope`    | `'workspace'` (the default: one instance) or `'document'` (one instance per open document).      |
-| `requires` | Tokens that must be installed. Validated when the kernel is created.                             |
-| `optional` | Tokens this plugin uses when they are installed.                                                 |
-| `state`    | `() => State`: the initial session state, built for every instance. Omit for a stateless plugin. |
-| `create`   | `(ctx) => { api, connect? }`: builds one instance.                                               |
+| Field      | Meaning                                                                                                                                                                                                                              |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `id`       | Unique in the plugin list. Names the state slice and appears in errors.                                                                                                                                                              |
+| `token`    | The capability token this plugin provides. Omit for a plugin without a capability.                                                                                                                                                   |
+| `scope`    | `'workspace'` (the default: one instance) or `'document'` (one instance per open document).                                                                                                                                          |
+| `requires` | Tokens that must be installed. Validated when the kernel is created.                                                                                                                                                                 |
+| `optional` | Tokens this plugin uses when they are installed.                                                                                                                                                                                     |
+| `state`    | `() => State`: the initial session state, built for every instance. Omit for a stateless plugin.                                                                                                                                     |
+| `settings` | `{ defaults, registered }`: the plugin's settings, what the app registered over the defaults. The kernel builds their store when it plans the plugin list; `ctx.settings()` reads it. See [Settings and state](#settings-and-state). |
+| `create`   | `(ctx) => { api, connect? }`: builds one instance.                                                                                                                                                                                   |
+| `inScope`  | Workspace plugins that take a document: `(api, documentId) => api`, the capability as seen from inside that document's scope, where calls that leave out the document use it. The kernel builds it once per document.                |
 
 Configuration is an argument of the factory, passed on to the controller:
 
 ```ts
 // packages/plugin/form/src/form.plugin.ts
 export const formPlugin = (config: FormConfig = {}) =>
-  definePlugin<FormState, FormHostCapability>({
+  definePlugin({
     id: 'form',
     token: FormToken,
     scope: 'document',
@@ -124,7 +131,7 @@ export const FormToken = createHostToken<FormHostCapability>(PublicFormToken);
 
 `createHostToken` returns the same object typed wider, so both lenses resolve
 the same instance. A plugin with a host lens registers the host token in its
-manifest and types `definePlugin` with the host capability.
+manifest, so `definePlugin` reads the host capability from it.
 
 **Framework-only helpers.** `internal.ts` holds what adapters need and
 applications must not use. It is a visibility boundary, not a bundle
@@ -286,6 +293,9 @@ export function connectLink(ctx: PluginContext<void>): void {
   sibling exists when `create` runs.
 - A workspace plugin reaches document plugins with `ctx.forDocument` and
   declares their tokens as `optional`.
+- A workspace capability resolved for a document (`ctx.get` in a document
+  plugin, `useCommands()` inside a `<DocumentScope>`) is its `inScope` view:
+  `commands.execute(id)` runs for that document, `documents.save()` saves it.
 
 ## The document
 
@@ -295,8 +305,19 @@ export function connectLink(ctx: PluginContext<void>): void {
   engine errors. It is never null in a document plugin, so it is never
   null-checked. Reading it in a workspace plugin throws.
 - `ctx.document()` is the page registry (`DocumentMeta`: pages, revision,
-  render policy). `ctx.getPage(ref)` returns one page or `null`;
+  render policy). A page argument is a `PageRef` or an index, looked up two
+  ways. Reads use `ctx.getPage(page)`, which returns the page or `null`; verbs
+  use `ctx.pageOf(page)`, which returns the page or throws `not-found`.
   `ctx.assertPageRef(ref)` throws `not-found` for a foreign page.
+- A read given a page that no longer exists returns empty (`[]`, `0` or
+  `null`); a verb refuses it. Reads run while rendering, and a page deleted
+  mid-render must not break a layer: Search's `listHits({ page })` and
+  `getHitCount(page)` answer `[]` and `0` for it, and `search({ from })`
+  rejects `not-found`.
+- `ctx.allows(permission)` is what every `can*` twin reads, and
+  `ctx.assertAllowed(permission, operation)` is how the verb refuses: it
+  throws `permission-denied` with `error.permission` set. Both read the bound
+  document, so a workspace plugin uses `documents.allows(permission, id)`.
 - Engine values are in page space, the space plugins work in, so nothing
   converts them.
 
@@ -306,15 +327,16 @@ Everything a plugin acquires is owned by its instance and released when the
 instance closes (a document plugin) or the kernel is destroyed (a workspace
 plugin).
 
-| Member                         | Behavior                                                                                                                                                                                                  |
-| ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `ctx.cleanup(teardown)`        | Run `teardown` at close. Asynchronous teardowns are awaited. Registering after the owner closed runs the teardown immediately.                                                                            |
-| `ctx.listen(source, listener)` | Subscribe to an `EventHook` or anything with `subscribe` for the instance's lifetime. The kernel owns the unsubscribe.                                                                                    |
-| `ctx.acquire(get, dispose)`    | `get(lifetime)` a resource and register `dispose`. A resource that arrives after close is disposed and the call rejects `instance-closed`.                                                                |
-| `ctx.latest(key)`              | A newest-wins lane: `lane.run(async (run) => …, options)`. Starting a run aborts the previous one; a superseded run cannot publish (`run.commit(fn)` returns false) and rejects `operation-cancelled`.    |
-| `ctx.serialQueue(key?)`        | A per-key queue: operations run one at a time, in submission order, and a failure does not affect later operations. `queue.idle()` resolves once everything queued so far has finished.                   |
-| `ctx.onSettle(flush)`          | Run `flush` before the document's file is read, and wait for it: send what the plugin holds back from the engine. Document plugins only. See [`state-and-sync.md`](./state-and-sync.md#held-back-writes). |
-| `ctx.events.source<T>()`       | An event source, disposed at close.                                                                                                                                                                       |
+| Member                          | Behavior                                                                                                                                                                                                                                                                        |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ctx.cleanup(teardown)`         | Run `teardown` at close. Asynchronous teardowns are awaited. Registering after the owner closed runs the teardown immediately.                                                                                                                                                  |
+| `ctx.listen(source, listener)`  | Subscribe to an `EventHook` or anything with `subscribe` for the instance's lifetime. The kernel owns the unsubscribe.                                                                                                                                                          |
+| `ctx.acquire(get, dispose)`     | `get(lifetime)` a resource and register `dispose`. A resource that arrives after close is disposed and the call rejects `instance-closed`.                                                                                                                                      |
+| `ctx.latest(key)`               | A newest-wins lane: `lane.run(async (run) => …, options)`. Starting a run aborts the previous one; a superseded run cannot publish (`run.commit(fn)` returns false) and rejects `operation-cancelled`.                                                                          |
+| `ctx.serialQueue(key?)`         | A per-key queue: operations run one at a time, in submission order, and a failure does not affect later operations. `queue.idle()` resolves once everything queued so far has finished. `queue(operation, { signal })` skips an operation whose signal fired before it started. |
+| `ctx.onSettle(flush)`           | Run `flush` before the document's file is read, and wait for it: send what the plugin holds back from the engine. Document plugins only. See [`state-and-sync.md`](./state-and-sync.md#held-back-writes).                                                                       |
+| `ctx.cancellable(signal, task)` | Run an engine call the caller can cancel: it is aborted when `signal` fires, and rejects `operation-cancelled`. Every async verb passes its `options.signal` through it.                                                                                                        |
+| `ctx.events.source<T>()`        | An event source, disposed at close.                                                                                                                                                                                                                                             |
 
 - Queues come from `ctx.serialQueue(key)`, never from a local
   `createSerialQueue()`.
@@ -323,17 +345,96 @@ plugin).
 - The search plugin runs every search on `ctx.latest('session')`, so a new
   query cancels the previous scan and a stale scan can never write its hits.
 
+## Settings and state
+
+Every plugin with settings declares them in its definition, and declares the
+state a UI shows once, next to its contract.
+
+```ts
+// search.plugin.ts: the settings, what the app registered over the defaults.
+// SearchConfig is DeepPartial<SearchSettings>. No type arguments: the settings
+// type comes from SEARCH_DEFAULTS, the state from initialSearchState, the
+// capability from SearchToken.
+export const searchPlugin = (config?: SearchConfig) =>
+  definePlugin({
+    id: 'search',
+    token: SearchToken,
+    // …
+    state: initialSearchState,
+    settings: { defaults: SEARCH_DEFAULTS, registered: config },
+    create: createSearchController,
+  });
+
+// controller.ts: the context type is the controller's parameter, and the
+// definition is checked against it. The capability spreads the settings calls;
+// the controller reads get() where it uses a setting, so a change is live.
+export function createSearchController(
+  ctx: PluginContext<SearchState, SearchSettings>,
+) {
+  const settings = ctx.settings();
+  // …
+  const arrival = { ...settings.get().reveal, ...options };
+  // …
+  return {
+    api: {
+      ...settings.api /* getSettings, updateSettings, resetSettings, onSettingsChanged */,
+      search,
+    },
+  };
+}
+
+// state.ts: the page's State table, as code
+export const searchState = defineState(SearchToken, {
+  read: (search) => ({
+    hitCount: search.getHitCount(),
+    status: search.getStatus(),
+  }),
+  empty: { hitCount: 0, status: 'idle' }, // with no document
+});
+```
+
+- There is one settings store per plugin registration. The kernel builds it
+  when it plans the plugin list, so the settings exist before any document
+  opens: `kernel.settingsOf(token)` reads and changes them with no document,
+  and an app may set them before opening one. Every open document shares the
+  store, so `updateSettings()` reaches them all, and the ones opened later.
+- Nested objects merge, arrays and values replace, `undefined` is ignored, and
+  `resetSettings()` goes back to what the app registered. `onSettingsChanged`
+  carries `{ settings, changed }`, `changed` naming the top-level settings
+  whose value changed.
+- A controller reads `settings.get()` where it uses a setting, never a copy
+  made in `create`, so a change applies at once. The Stage keeps its own
+  per-view settings.
+- A controller names its context type in its parameter,
+  `PluginContext<State, Settings>`, and the definition must match it: a
+  definition that forgets `settings` while the controller reads them is a
+  type error, and so is `ctx.settings()` in a plugin that declares none.
+- Every value in the State table is state, and its event is a state-change
+  event derived in the plugin's one `ctx.state.onChange` listener, even when
+  it reads like progress: Search's `onProgressChanged` fires when `progress`
+  changes, including its reset when a new search starts
+  ([`events.md`](./events.md#state-change-events)).
+- An adapter turns a state declaration into its framework's form with one
+  generic function, and a plugin's settings with another (React:
+  `export const useSearchState = stateHook(searchState)` and
+  `export const useSearchSettings = settingsHook(SearchToken)`). Getters in
+  `read` return the same value while nothing changed, so readers re-render
+  only when a field does. The settings hook reads through the kernel, so it
+  works without a document, and so do the settings calls of `useSearch()`'s
+  stand-in.
+- The docs' Settings and State tables are checked against these declarations.
+
 ## Errors
 
 A capability rejects (or throws) with `PluginError` only:
 
 ```ts
-new PluginError(code, capability, message, { cause?, details? });
+new PluginError(code, capability, message, { cause?, details?, permission? });
 ```
 
 | Code                  | Meaning                                                                       |
 | --------------------- | ----------------------------------------------------------------------------- |
-| `permission-denied`   | The session may not do this. `details.required` names the missing capability. |
+| `permission-denied`   | The session may not do this. `error.permission` names the missing permission. |
 | `unsupported`         | The engine or document cannot do this.                                        |
 | `not-found`           | A ref names nothing in this document.                                         |
 | `not-ready`           | The resource is not loaded or the document not open yet.                      |
@@ -351,9 +452,14 @@ new PluginError(code, capability, message, { cause?, details? });
   `toPluginErrorInfo(error)`, never the error object.
 - Callers match on `code` (`isPluginError(error, 'conflict')`), never on the
   message.
-- A verb that can refuse has a `can*` twin, and its refusal is
-  `permission-denied` with `details: { required }`
-  ([`permissions.md`](./permissions.md)).
+- A verb that can refuse has a `can*` twin reading `ctx.allows(permission)`,
+  and refuses with `ctx.assertAllowed(permission, operation)`, never a
+  hand-built `PluginError` ([`permissions.md`](./permissions.md)).
+- A refusal before anything started only rejects: no state changes and no
+  event fires, not even the verb's failure event. Search refuses a search
+  without `doc.text.search`, or from a page that isn't there, before its
+  session is touched, so `getStatus()` is what it was and `onFailed` stays
+  quiet. `onFailed` is for work that started and then failed.
 - A best-effort batch verb resolves with `BatchResult<T, R>`
   (`applied`, `skipped`, `failed`) instead of rejecting on the first failure.
 
@@ -378,8 +484,8 @@ export const TitleToken = createCapabilityToken<TitleCapability>('title', {
 ```ts
 // contract.ts
 import type {
-  ChangeOrigin,
   EventHook,
+  EventOrigin,
   OperationOptions,
   ResourceStatus,
 } from '@embedpdf/core';
@@ -390,7 +496,7 @@ export { TitleToken } from './token';
 export interface TitleChangedEvent {
   readonly title: string | null;
   readonly previous: string | null;
-  readonly origin: ChangeOrigin;
+  readonly origin: EventOrigin;
 }
 
 /** The title was loaded or reloaded from the engine. */
@@ -460,12 +566,7 @@ export const foldTitle = (
 
 ```ts
 // controller.ts
-import {
-  originOf,
-  PluginError,
-  type DocCapability,
-  type PluginContext,
-} from '@embedpdf/core';
+import type { DocCapability, PluginContext } from '@embedpdf/core';
 
 import type {
   TitleCapability,
@@ -491,7 +592,7 @@ export function createTitleController(ctx: PluginContext<TitleState>) {
     changed: ({ cause, event, previous, next }) => {
       if (cause === 'load') resynced.emit({ title: next });
       else if (event?.type === 'metadata.updated') {
-        titleChanged.emit({ title: next, previous, origin: originOf(event) });
+        titleChanged.emit({ title: next, previous, origin: event.origin });
       }
     },
   });
@@ -502,33 +603,20 @@ export function createTitleController(ctx: PluginContext<TitleState>) {
       editorChanged.emit({ open: next.editorOpen });
   });
 
-  const canEdit = () => ctx.doc.security.allows(EDIT_SCOPE);
+  const canEdit = () => ctx.allows(EDIT_SCOPE);
 
   const api: TitleCapability = {
     getTitle: title.get,
     getStatus: title.getStatus,
     canEdit,
     async setTitle(next, options) {
-      if (options?.signal?.aborted) {
-        throw new PluginError(
-          'operation-cancelled',
-          'title',
-          'setTitle was cancelled',
-        );
-      }
-      if (!canEdit()) {
-        throw new PluginError(
-          'permission-denied',
-          'title',
-          `setTitle requires ${EDIT_SCOPE}`,
-          {
-            details: { required: EDIT_SCOPE },
-          },
-        );
-      }
+      ctx.assertAllowed(EDIT_SCOPE, 'title.setTitle');
       // The engine publishes `metadata.updated` before this resolves, so the
       // mirror holds the new title when the await returns.
-      await ctx.doc.metadata.update({ title: next });
+      await ctx.cancellable(
+        options?.signal,
+        ctx.doc.metadata.update({ title: next }),
+      );
     },
     isEditorOpen: () => ctx.state.get().editorOpen,
     openEditor: () => ctx.state.update(openEditor),
@@ -547,13 +635,13 @@ export function createTitleController(ctx: PluginContext<TitleState>) {
 // title.plugin.ts
 import { definePlugin } from '@embedpdf/core';
 
-import { TitleToken, type TitleCapability } from './contract';
+import { TitleToken } from './contract';
 import { createTitleController } from './controller';
-import { initialTitleState, type TitleState } from './model';
+import { initialTitleState } from './model';
 
 /** The document title, mirrored from the engine, and whether its editor is open. */
 export const titlePlugin = () =>
-  definePlugin<TitleState, TitleCapability>({
+  definePlugin({
     id: 'title',
     token: TitleToken,
     scope: 'document',
@@ -572,8 +660,9 @@ Its tests are in [`testing.md`](./testing.md#the-test-context).
 
 ## Checklist
 
-- The manifest only calls `definePlugin`; configuration reaches the
-  controller through `create`.
+- The manifest only calls `definePlugin`, with no type arguments; settings
+  are declared in it (`settings: { defaults, registered: config }`), and other
+  configuration reaches the controller through `create`.
 - One `createCapabilityToken` call, in `token.ts`; a host lens uses
   `createHostToken`.
 - Every token the plugin resolves is in `requires` or `optional`, and is
@@ -582,6 +671,11 @@ Its tests are in [`testing.md`](./testing.md#the-test-context).
 - Engine data lives in a mirror or page mirror; verbs never write it.
 - Events come from `ctx.events.source()`; fact events from where the
   confirmed event is applied, state-change events from `ctx.state.onChange`.
+  A value in the State table is announced only from there.
+- A getter given a page that isn't in the document returns empty; a verb
+  refuses it with `not-found` (`ctx.getPage` for reads, `ctx.pageOf` for
+  verbs).
+- A refusal before the work starts only rejects: no state change, no event.
 - Sibling registrations and subscriptions are in `connect`, and every
   `Unsubscribe` goes to `ctx.cleanup`.
 - Every rejection is a `PluginError`, and the contract's TSDoc lists its codes.

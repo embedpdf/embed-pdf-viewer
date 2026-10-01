@@ -1,8 +1,8 @@
 import { definePlugin } from '@embedpdf/core';
 import type { RenderConfig } from './contract';
 import { createRenderController } from './controller';
-import { RenderToken, type RenderHostCapability } from './host-contract';
-import { initialRenderState, type RenderState } from './model';
+import { RenderToken } from './host-contract';
+import { initialRenderState } from './model';
 
 /**
  * Document-scoped page rasters. The only render-policy consumer in the
@@ -13,7 +13,7 @@ import { initialRenderState, type RenderState } from './model';
  * State is the per-page raster-version ledger.
  */
 export const renderPlugin = (config: RenderConfig = {}) =>
-  definePlugin<RenderState, RenderHostCapability>({
+  definePlugin({
     id: 'render',
     scope: 'document',
     token: RenderToken,

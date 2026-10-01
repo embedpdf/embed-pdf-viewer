@@ -26,7 +26,7 @@ const increment = (state: Counter, by: number): Counter => ({ count: state.count
 const keep = (state: Counter): Counter => state;
 
 const counterPlugin = () =>
-  definePlugin<Counter, CounterApi>({
+  definePlugin({
     id: 'counter',
     scope: 'document',
     token,
@@ -110,7 +110,7 @@ describe('ctx.notify', () => {
 describe('ctx.watch', () => {
   it('calls the handler only when the selected value changes', async () => {
     const seen: [number, number][] = [];
-    const watcher = definePlugin<void, { poke(): void }>({
+    const watcher = definePlugin({
       id: 'watcher',
       scope: 'document',
       token: createCapabilityToken<{ poke(): void }>('watcher'),

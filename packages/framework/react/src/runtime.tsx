@@ -3,8 +3,9 @@
  *
  * Binds the kernel's one change stream to React (useSyncExternalStore), resolves
  * capabilities (document-scoped ones against the active or `<DocumentScope>`-given
- * document), and provides the page coordinate context. Every plugin and layer rides
- * on this — there is no per-plugin framework code.
+ * document, with a stand-in while there is none), and provides the page
+ * coordinate context. Every plugin and layer rides on this — there is no
+ * per-plugin framework code.
  */
 
 // One-line-per-feature: registration travels with the UI.
@@ -20,7 +21,13 @@ import {
   useState,
   useSyncExternalStore,
 } from 'react';
-import { createKernel, docInfoListEquals, isLocalEngine } from '@embedpdf/core';
+import {
+  DocumentsToken,
+  PluginError,
+  createKernel,
+  docInfoListEquals,
+  isLocalEngine,
+} from '@embedpdf/core';
 import type {
   AnyPlugin,
   CapabilityToken,
@@ -71,9 +78,19 @@ export function useActiveDocumentId(): string | null {
 
 /** The document id for this subtree: the nearest <DocumentScope>, else the active doc. */
 export function useDocumentId(): string | null {
-  const scoped = useContext(DocumentScopeCtx);
+  const scoped = useDocumentScope();
   const active = useActiveDocumentId();
   return scoped ?? active;
+}
+
+/**
+ * The document the nearest <DocumentScope> binds this subtree to, or null when
+ * it follows the active document. For resolvers that pass it to
+ * `kernel.tryCapability`, which reads the active document at call time; UI
+ * that needs the id itself uses {@link useDocumentId}.
+ */
+export function useDocumentScope(): string | null {
+  return useContext(DocumentScopeCtx);
 }
 
 export interface DocumentScopeProps {
@@ -124,32 +141,108 @@ export function useDocumentStatus() {
  * the kernel's one change stream), not a memoized call — under the
  * request-time lifecycle a document can become resolvable while its id stays
  * the same, so any id-keyed cache goes stale; subscribing makes staleness
- * structurally impossible. Fail-fast: while unresolvable, this re-runs the
- * strict resolver so the kernel's truthful reason (`no capability` / `no
- * document` / `document is loading|locked`) is what throws.
+ * structurally impossible.
+ *
+ * Outside a document (none open, not ready yet, or none in scope), a document
+ * plugin resolves to its stand-in ({@link standInFor}): rendering never fails,
+ * and a method called too early throws `not-ready`. A token no plugin provides
+ * still throws the kernel's reason, because that is a setup mistake.
  */
 export function useCapability<T>(token: CapabilityToken<T>): T {
   const kernel = useKernel();
-  const scoped = useContext(DocumentScopeCtx);
-  const capability = useKernelValue((kernel) => kernel.tryCapability(token, scoped ?? undefined));
-  return capability ?? kernel.capability(token, scoped ?? undefined);
+  const capability = useOptionalCapability(token);
+  if (capability) return capability;
+  if (kernel.scopeOf(token) === 'document') return standInFor(kernel, token);
+  return kernel.capability(token);
 }
 
 /** Like `useCapability`, but null while the token can't resolve (no plugin,
  *  no document, or a document that isn't ready yet). */
 export function useOptionalCapability<T>(token: CapabilityToken<T>): T | null {
-  const scoped = useContext(DocumentScopeCtx);
+  const scoped = useDocumentScope();
   return useKernelValue((kernel) => kernel.tryCapability(token, scoped ?? undefined));
 }
 
-/** Subscribe to a selector over a (document-resolved) capability. */
+const standIns = new WeakMap<Kernel, WeakMap<CapabilityToken<unknown>, object>>();
+
+/**
+ * What `useCapability` returns for a document plugin while its subtree has no
+ * ready document. Reading a member never throws, so chrome renders before the
+ * first document opens; calling one throws `PluginError('not-ready')`, so a
+ * verb called too early says why. The settings calls are the exception: they
+ * need no document, so they reach the plugin's settings. One per kernel and
+ * token, so it holds across renders.
+ */
+function standInFor<T>(kernel: Kernel, token: CapabilityToken<T>): T {
+  let byToken = standIns.get(kernel);
+  if (!byToken) {
+    byToken = new WeakMap();
+    standIns.set(kernel, byToken);
+  }
+  let standIn = byToken.get(token);
+  if (!standIn) {
+    standIn = createStandIn(token.name, () => kernel.settingsOf(token));
+    byToken.set(token, standIn);
+  }
+  return standIn as T;
+}
+
+/** The capability members that work without a document: a plugin's settings are the plugin's own. */
+const SETTINGS_CALLS: ReadonlySet<string> = new Set([
+  'getSettings',
+  'updateSettings',
+  'resetSettings',
+  'onSettingsChanged',
+]);
+
+/**
+ * A Proxy whose every member is a function that throws `not-ready`. A member
+ * is itself such a Proxy, so namespaces work too (`annotation.comments.addReply`).
+ * Members are cached by path, so `stage.zoomIn` is the same function on every
+ * render. `then` and symbol keys read as undefined: the stand-in is no
+ * thenable, and inspecting it doesn't throw. The four settings calls forward
+ * to `settings()` when called, so a plugin without settings still fails there.
+ */
+function createStandIn(capability: string, settings: () => object): object {
+  const refuse = (): never => {
+    throw new PluginError('not-ready', capability, 'no document is open');
+  };
+  const forward =
+    (name: string) =>
+    (...args: unknown[]): unknown =>
+      (settings() as Record<string, (...args: unknown[]) => unknown>)[name](...args);
+  const members = new Map<string, unknown>();
+  const memberOf = (parentPath: string, key: string | symbol): unknown => {
+    if (typeof key === 'symbol' || key === 'then') return undefined;
+    const path = parentPath ? `${parentPath}.${key}` : key;
+    let member = members.get(path);
+    if (!member) {
+      member =
+        !parentPath && SETTINGS_CALLS.has(key)
+          ? forward(key)
+          : new Proxy(refuse, { get: (_refuse, next) => memberOf(path, next) });
+      members.set(path, member);
+    }
+    return member;
+  };
+  return new Proxy({}, { get: (_capability, key) => memberOf('', key) });
+}
+
+/**
+ * Subscribe to a selector over a (document-resolved) capability. Strict:
+ * while the token can't resolve, it throws the kernel's reason (`no
+ * document`, `document is loading`), for code that knows a document exists,
+ * such as anything inside a <DocumentGate>. `useOptionalSelector` is its
+ * total twin.
+ */
 export function useSelector<C, R>(
   token: CapabilityToken<C>,
   select: (capability: C) => R,
   isEqual: (left: R, right: R) => boolean = Object.is,
 ): R {
   const kernel = useKernel();
-  const capability = useCapability(token);
+  const scoped = useDocumentScope();
+  const capability = useOptionalCapability(token) ?? kernel.capability(token, scoped ?? undefined);
   const last = useRef<{ v: R } | null>(null);
   const get = () => {
     const next = select(capability);
@@ -164,8 +257,6 @@ export function useSelector<C, R>(
  * Null-safe `useSelector`: `fallback` whenever the token can't resolve — no
  * provider, or a document-scoped token with no document. For chrome that stays
  * mounted across the empty-workspace state (a zoom readout, a mode band).
- * `useSelector` stays strict (fail-fast) for code that knows a document exists
- * — e.g. anything inside a <DocumentGate>.
  *
  * The `select` guard also swallows reads through a capability whose document
  * closed between the store notification and this render — that teardown race
@@ -221,25 +312,29 @@ export function useCapabilityEvent<C, T>(
   }, [capability]);
 }
 
-/** The document registry (open/close/active/list), reactive. */
+/**
+ * The document registry (open/close/active/list), reactive. Inside a
+ * <DocumentScope> its methods come from that document's view, so `save()` and
+ * `saveLayer()` without an id save the document in scope.
+ */
 export function useDocuments() {
-  const kernel = useKernel();
+  const documents = useCapability(DocumentsToken);
   const docs = useKernelValue((kernel) => kernel.documents.list(), docInfoListEquals);
   const activeId = useActiveDocumentId();
   return {
     docs,
     activeId,
-    open: kernel.documents.open,
-    retry: kernel.documents.retry,
-    unlock: kernel.documents.unlock,
-    close: kernel.documents.close,
-    rename: kernel.documents.rename,
-    setActive: kernel.documents.setActive,
-    move: kernel.documents.move,
-    swap: kernel.documents.swap,
-    setOrder: kernel.documents.setOrder,
-    save: kernel.documents.save,
-    saveLayer: kernel.documents.saveLayer,
+    open: documents.open,
+    retry: documents.retry,
+    unlock: documents.unlock,
+    close: documents.close,
+    rename: documents.rename,
+    setActive: documents.setActive,
+    move: documents.move,
+    swap: documents.swap,
+    setOrder: documents.setOrder,
+    save: documents.save,
+    saveLayer: documents.saveLayer,
   };
 }
 

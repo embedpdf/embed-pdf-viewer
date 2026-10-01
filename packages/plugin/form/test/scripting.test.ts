@@ -305,7 +305,7 @@ describe('form scripting transaction', () => {
 
 describe('form mutation queue', () => {
   it('serializes overlapping operations and continues after a rejection', async () => {
-    const enqueue = createSerialQueue();
+    const enqueue = createSerialQueue('form');
     const order: string[] = [];
     let release!: () => void;
     const held = new Promise<void>((resolve) => {

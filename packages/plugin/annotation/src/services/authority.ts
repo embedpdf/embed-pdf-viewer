@@ -13,11 +13,12 @@ import type { AnnotationStore } from './store';
  * control gated here never disagrees with the write's outcome.
  */
 export function createAuthority(
-  ctx: Pick<AnnotationContext, 'doc' | 'document'>,
+  ctx: Pick<AnnotationContext, 'doc' | 'document' | 'allows'>,
   store: AnnotationStore,
 ) {
   const canRead = (): boolean => ctx.doc?.security.allows('doc.annotate.read') ?? true;
-  const canCreate = (): boolean => ctx.doc?.security.allowsAnnotation('create') ?? false;
+  // What `ctx.assertAllowed('annotations:create', …)` refuses on, so the twin and the verbs agree.
+  const canCreate = (): boolean => ctx.allows('annotations:create');
 
   const mutationTarget = (ref: AnnotationRef): { userId?: string; groupId?: string } => {
     const dto = store.model().byId[annotationKey(ref)]?.annotation;
@@ -41,16 +42,6 @@ export function createAuthority(
     return !!record && annotDeletable(record);
   };
 
-  const assertCreate = (): void => {
-    if (!canCreate()) {
-      throw new PluginError(
-        'permission-denied',
-        'annotation',
-        'create requires doc.annotate.create',
-        { details: { required: 'doc.annotate.create' } },
-      );
-    }
-  };
   const assertPage = (page: PageRef): void => {
     if (!ctx.document()?.pages.some((pageInfo) => pageRefsEqual(pageInfo.ref, page))) {
       throw new PluginError(
@@ -61,7 +52,7 @@ export function createAuthority(
     }
   };
 
-  return { canRead, canCreate, canEdit, canDelete, allowsMutation, assertCreate, assertPage };
+  return { canRead, canCreate, canEdit, canDelete, allowsMutation, assertPage };
 }
 
 export type Authority = ReturnType<typeof createAuthority>;

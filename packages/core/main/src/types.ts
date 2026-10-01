@@ -11,6 +11,7 @@ import type { EventHook } from './event-hook';
 import type { Mirror, MirrorSpec } from './mirror';
 import type { PageMirror, PageMirrorSpec } from './page-mirror';
 import type { SerialQueue } from './serial-queue';
+import type { NoSettings, Settings, SettingsDeclaration } from './settings';
 import type { PluginErrorInfo } from './errors';
 import type {
   DocumentHandle,
@@ -37,6 +38,7 @@ import type {
   CustomMetadataPatch,
   CustomMetadataUpdateResult,
   DocumentEvent,
+  EventOrigin,
   EngineRenderPolicy,
   PageDestination,
   PdfDestination,
@@ -69,6 +71,14 @@ export type {
   CustomMetadataPatch,
   CustomMetadataUpdateResult,
   DocumentEvent,
+  /**
+   * Where a confirmed document change came from, on every fact event a plugin
+   * emits: `kind` (`'local'` for this engine instance, `'remote'` for another
+   * session), `sessionId`, `sub` (the signed-in user on the cloud, null
+   * locally), `ts`, `serverId` and `tx`. Always the engine event's own
+   * `origin`, passed on as it is, never built by hand.
+   */
+  EventOrigin,
 };
 
 export type Unsubscribe = () => void;
@@ -93,29 +103,13 @@ export interface BatchResult<T, R = unknown> {
 }
 
 /**
- * Where a confirmed document change came from, on every fact event a plugin
- * emits. It is always taken from the engine's event (`originOf`), never built
- * by hand.
+ * A permission a verb can need, named as the engine names it: a document
+ * capability (`'doc.forms.fill'`), or `'annotations:create'`. Creating is the
+ * one annotation action that needs no target: whether the session may change
+ * or delete an annotation depends on whose it is, so the annotation plugin
+ * asks that per annotation (`doc.security.allowsAnnotation`).
  */
-export interface ChangeOrigin {
-  /** `local` when this engine instance made the change, `remote` for another session. */
-  readonly locality: 'local' | 'remote';
-  /** The engine session that made the change. */
-  readonly sessionId: string;
-  /** The authenticated user behind the change (cloud); null for local engines. */
-  readonly actorId: string | null;
-}
-
-/** The origin of a confirmed engine event, in the plugin vocabulary. */
-export function originOf(event: {
-  origin: { kind: 'local' | 'remote'; sessionId: string; sub: string | null };
-}): ChangeOrigin {
-  return {
-    locality: event.origin.kind === 'remote' ? 'remote' : 'local',
-    sessionId: event.origin.sessionId,
-    actorId: event.origin.sub ?? null,
-  };
-}
+export type Permission = DocCapability | 'annotations:create';
 
 /** Anything `ctx.listen` can subscribe to: an EventHook, or an object with `subscribe`. */
 export type Subscribable<T> =
@@ -220,8 +214,10 @@ export type PluginScope = 'workspace' | 'document';
  * context bound to one document; workspace plugins reach documents through
  * `forDocument`. Everything here is bound to the instance's lifetime, so a
  * controller written as plain async code is lifetime-safe by construction.
+ * `S` is the plugin's session state and `T` its settings, `NoSettings` for a
+ * plugin that declares none.
  */
-export interface PluginContext<S = unknown> {
+export interface PluginContext<S = unknown, T extends object = NoSettings> {
   // ── identity ──
   readonly id: string;
   /** Unique per open of this document (workspace plugins: `workspace:<id>`). */
@@ -242,10 +238,36 @@ export interface PluginContext<S = unknown> {
   documentHandle(documentId?: string): DocumentHandle | null;
   /** The bound document's metadata; for workspace plugins, the active document's, or null. */
   document(): DocumentMeta | null;
-  /** The page registry entry for a ref, or null. */
-  getPage(ref: PageRef): PageInfo | null;
+  /**
+   * The page a `PageRef` or a zero-based index names, or null when it names
+   * no page of this document. What reads use: they run while rendering, and a
+   * page deleted mid-render reads as no page instead of breaking a layer.
+   */
+  getPage(page: PageRef | number): PageInfo | null;
+  /**
+   * A page argument as every verb takes it: a `PageRef`, or a zero-based
+   * index into the document's page list. Throws `not-found` when neither
+   * names a page of this document: a verb refuses a page that isn't there.
+   */
+  pageOf(page: PageRef | number): PageInfo;
   /** Throw `not-found` unless the ref names a page of this document. */
   assertPageRef(ref: PageRef): void;
+
+  // ── permissions ──
+  /**
+   * Whether the bound document's session holds `permission`: the same answer
+   * the engine enforces with. What every `can<Verb>()` reads.
+   * Document-scoped plugins only: a workspace context has no bound document,
+   * so this throws as reading `doc` does. A workspace plugin asks
+   * `documents.allows(capability, documentId)` for the document it acts on.
+   */
+  allows(permission: Permission): boolean;
+  /**
+   * Refuse a verb the session may not run, before any engine call: throws
+   * `permission-denied` ("`operation` requires `permission`") with
+   * `error.permission` set. Document-scoped plugins only, like `allows`.
+   */
+  assertAllowed(permission: Permission, operation: string): void;
 
   // ── capabilities ──
   get<T>(token: CapabilityToken<T>): T;
@@ -258,6 +280,18 @@ export interface PluginContext<S = unknown> {
   // ── state ──
   /** This instance's session state, changed only through pure transitions. */
   readonly state: StateCell<S>;
+
+  // ── settings ──
+  /**
+   * The plugin's settings, as its definition declares them (`definePlugin({ settings })`):
+   * what the app registered over the defaults. They belong to the plugin as registered, not to
+   * this instance: the kernel builds them when it plans the plugin list, before any document
+   * opens, and `updateSettings()` reaches every open document and the ones opened later. Spread
+   * `api` into the capability and read `get()` in the controller; the instance's
+   * `onSettingsChanged` listeners go when it closes. The merge rules are in `settings.ts`.
+   * A plugin whose definition declares no settings has none to read: calling it throws.
+   */
+  readonly settings: () => Settings<T>;
 
   // ── reactivity ──
   /**
@@ -320,9 +354,20 @@ export interface PluginContext<S = unknown> {
     get: (lifetime: AbortSignal) => Promise<R>,
     dispose: (resource: R) => void | Promise<void>,
   ): Promise<R>;
+  /**
+   * Run an engine call the caller can cancel: when `signal` fires, the call is
+   * aborted (if the engine can abort it) and the returned promise rejects
+   * `operation-cancelled` at once. A signal that already fired rejects
+   * straight away; without a signal, `task` is returned as it is.
+   */
+  cancellable<T>(signal: AbortSignal | undefined, task: Promise<T>): Promise<T>;
   /** Newest-wins lane for reads a newer call should cancel (visible search, validation). */
   latest(key: string): import('./lanes').LatestLane;
-  /** Per-key submission-order queue for multi-step writes; failures do not poison later work. */
+  /**
+   * Per-key submission-order queue for multi-step writes; failures do not
+   * poison later work. An operation queued with `{ signal }` whose signal
+   * fired while it waited is skipped and rejects `operation-cancelled`.
+   */
   serialQueue(key?: string): SerialQueue;
 }
 
@@ -348,8 +393,14 @@ export interface StateChange<S> {
  * A plugin definition. `scope` decides multiplexing:
  *   'workspace' (default) — one instance; can see every document.
  *   'document'            — one instance per open document; authored single-document.
+ *
+ * Its types come from its own fields: the state `S` from `state`, the capability
+ * `C` from `token`, the settings `T` from `settings.defaults`. `create` and
+ * `inScope` are checked against them and never name them (`NoInfer`), so a
+ * controller that returns less than the capability is a type error, not a
+ * narrower capability.
  */
-export interface PluginDef<S = unknown, C = unknown> {
+export interface PluginDef<S = unknown, C = unknown, T extends object = NoSettings> {
   readonly id: string;
   readonly token?: CapabilityToken<C>;
   readonly scope?: PluginScope;
@@ -365,14 +416,28 @@ export interface PluginDef<S = unknown, C = unknown> {
   /** Initial session state, built fresh for every instance. Omit for stateless plugins. */
   readonly state?: () => S;
   /**
+   * The plugin's settings: its defaults, and what the app registered (the factory's config).
+   * The kernel builds one store per registration from it when it plans the plugin list, so the
+   * settings can be read and changed before any document opens (`kernel.settingsOf(token)`).
+   * The plugin reads them with `ctx.settings()`. Omit for a plugin without settings.
+   */
+  readonly settings?: SettingsDeclaration<T>;
+  /**
    * Build the instance's API and, optionally, the connections (subscriptions
    * to engine events and sibling capabilities) that start once every
    * dependency is constructed. Runs once per instance.
    */
-  readonly create: (ctx: PluginContext<S>) => { api: C; connect?: () => void };
+  readonly create: NoInfer<(ctx: PluginContext<S, T>) => { api: C; connect?: () => void }>;
+  /**
+   * This capability as seen from inside a document's scope: calls that leave out the document
+   * use `documentId` instead of the active one. Workspace plugins only. The kernel builds the
+   * view once per document and hands it out whenever that document is named
+   * (`kernel.capability(token, documentId)`, `ctx.forDocument`, a `<DocumentScope>`).
+   */
+  readonly inScope?: NoInfer<(api: C, documentId: string) => C>;
 }
 
-export type AnyPlugin = PluginDef<any, any>;
+export type AnyPlugin = PluginDef<any, any, any>;
 
 // ── Built-in: the document registry, exposed as a capability ─────────────────
 
@@ -461,6 +526,11 @@ export interface DocumentPagesChangedEvent {
   readonly pages: readonly PageInfo[];
 }
 
+/**
+ * The document registry. A call that leaves out the document uses the document in scope when
+ * the capability was resolved for one (`kernel.capability(DocumentsToken, documentId)`, a
+ * `<DocumentScope>`), and the active document otherwise.
+ */
 export interface DocumentsCapability {
   /** Open a document; the tab exists synchronously, content arrives on resolve. */
   open(input: OpenSource, options?: OpenDocumentOptions): Promise<string>;
@@ -508,7 +578,7 @@ export interface DocumentsCapability {
   /**
    * The complete document (base + layer) as PDF bytes. `mode` is
    * `'incremental'` (append changes, original bytes preserved) or `'rewrite'`
-   * (flatten to a fresh PDF). Defaults to the active document. Saving to
+   * (flatten to a fresh PDF). Defaults to the document in scope. Saving to
    * disk is a web adapter verb (`saveAs`), not a kernel one. It first waits
    * for what plugins hold back (text typed a moment ago) and for writes on
    * their way, so the file has everything the user sees (`ctx.onSettle`).
@@ -518,12 +588,12 @@ export interface DocumentsCapability {
    * Export just the document's layer artifact (re-openable via `OpenInputLayerBytes`).
    * Rejects when the document was opened without a layer, or the engine can't
    * export one (cloud manages layers server-side — `DocumentHandle.downloadLayer`
-   * is absent there). Defaults to the active document. Waits for held-back
+   * is absent there). Defaults to the document in scope. Waits for held-back
    * writes first, like `save`.
    */
   saveLayer(id?: string, options?: OperationOptions): Promise<Uint8Array>;
   /**
-   * The page registry of a document (the active one by default), in display
+   * The page registry of a document (the one in scope by default), in display
    * order. Reference-stable per registry revision: the array only changes
    * when a structural mutation replaced it.
    */
@@ -542,7 +612,7 @@ export interface DocumentsCapability {
    * capability and no owning plugin (print via `'doc.print'`, download via
    * `'doc.download'` — the verbs live on this capability). Everything else
    * asks the owning plugin's twins, never a raw capability string. Defaults
-   * to the active document; `false` with no (ready) document.
+   * to the document in scope; `false` with no (ready) document.
    */
   allows(doc: DocCapability, id?: string): boolean;
 

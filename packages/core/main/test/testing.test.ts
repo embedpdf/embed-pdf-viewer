@@ -57,4 +57,18 @@ describe('createTestContext', () => {
     await ctx.dispose();
     expect(cleaned).toBe(true);
   });
+
+  it('holds the settings a definition declares, and wakes subscribers when they change', () => {
+    const ctx = createTestContext({
+      settings: { defaults: { color: 'yellow', width: 1 }, registered: { width: 2 } },
+    });
+    expect(ctx.settings().get()).toEqual({ color: 'yellow', width: 2 });
+    let woken = 0;
+    ctx.subscribe(() => woken++);
+    ctx.settings().api.updateSettings({ color: 'red' });
+    expect(woken).toBe(1);
+    expect(ctx.settings().get()).toEqual({ color: 'red', width: 2 });
+    // A context without settings has none to read.
+    expect(() => createTestContext().settings()).toThrow('declares no settings');
+  });
 });

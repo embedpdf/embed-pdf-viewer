@@ -15,10 +15,9 @@ import type { FormContext, FormServices } from '../services';
 
 export function createResetWrites(
   ctx: FormContext,
-  services: Pick<FormServices, 'fields' | 'authority' | 'scripting' | 'enqueue' | 'keyOf'>,
+  services: Pick<FormServices, 'fields' | 'scripting' | 'enqueue' | 'keyOf'>,
 ) {
   const { fields, keyOf, enqueue } = services;
-  const { assertFill } = services.authority;
   const scripting = services.scripting.controller;
   const surfaceViaActions = services.scripting.surface;
 
@@ -113,7 +112,7 @@ export function createResetWrites(
   const resetAll = async (
     options: { fields?: readonly FormFieldRef[]; exclude?: boolean } = {},
   ): Promise<BatchResult<FormFieldRef, FormFieldRef>> => {
-    assertFill('form.resetAll');
+    ctx.assertAllowed('doc.forms.fill', 'form.resetAll');
     const targets =
       options.fields?.map(
         (ref): PdfActionTargetRef =>
@@ -137,7 +136,12 @@ export function createResetWrites(
         skipped: [],
         failed: failed.map((ref) => ({
           ref,
-          error: { code: 'operation-failed' as const, message: 'reset failed', capability: 'form' },
+          error: {
+            code: 'operation-failed' as const,
+            message: 'reset failed',
+            capability: 'form',
+            permission: null,
+          },
         })),
       };
     }
@@ -147,7 +151,7 @@ export function createResetWrites(
   return {
     api: {
       reset: async (ref) => {
-        assertFill('form.reset');
+        ctx.assertAllowed('doc.forms.fill', 'form.reset');
         const key = keyOf(ref);
         return enqueue(async () => {
           const doc = ctx.doc;

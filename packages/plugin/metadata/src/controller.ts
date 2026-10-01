@@ -1,5 +1,4 @@
 import {
-  originOf,
   PluginError,
   type PluginContext,
   type CustomMetadata,
@@ -46,7 +45,7 @@ export function createMetadataController(ctx: PluginContext<void>) {
           metadata: next,
           previous,
           changedKeys: changedKeys(previous, next),
-          origin: originOf(event),
+          origin: event.origin,
         });
       }
     },
@@ -66,36 +65,29 @@ export function createMetadataController(ctx: PluginContext<void>) {
           custom: next,
           previous,
           changedKeys: changedKeys(previous, next),
-          origin: originOf(event),
+          origin: event.origin,
         });
       }
     },
   });
 
-  const canEdit = () => ctx.doc.security.allows(METADATA_MODIFY);
+  const canEdit = () => ctx.allows(METADATA_MODIFY);
 
-  /** Both writes refuse the same way before reaching the engine. */
-  const refuseWrite = (verb: string, options?: OperationOptions): Promise<never> | null => {
+  /** Both writes refuse the same way before reaching the engine (the verbs are async, so it rejects). */
+  const refuseWrite = (verb: string, options?: OperationOptions): void => {
     if (options?.signal?.aborted) {
-      return Promise.reject(
-        new PluginError('operation-cancelled', 'metadata', `${verb} was cancelled`),
-      );
+      throw new PluginError('operation-cancelled', 'metadata', `${verb} was cancelled`);
     }
-    if (!canEdit()) {
-      return Promise.reject(
-        new PluginError('permission-denied', 'metadata', `${verb} requires ${METADATA_MODIFY}`, {
-          details: { required: METADATA_MODIFY },
-        }),
-      );
-    }
-    return null;
+    ctx.assertAllowed(METADATA_MODIFY, verb);
   };
 
   const customApi: CustomMetadataCapability = {
     getSnapshot: custom.get,
     getStatus: custom.getStatus,
-    update: (patch, options) =>
-      refuseWrite('metadata.custom.update', options) ?? ctx.doc.metadata.custom.update(patch),
+    update: async (patch, options) => {
+      refuseWrite('metadata.custom.update', options);
+      return ctx.doc.metadata.custom.update(patch);
+    },
     refresh: () => custom.refresh(),
     onUpdated: customUpdated.on,
     onResynced: customResynced.on,
@@ -105,8 +97,10 @@ export function createMetadataController(ctx: PluginContext<void>) {
     getSnapshot: metadata.get,
     getStatus: metadata.getStatus,
     canEdit,
-    update: (patch, options) =>
-      refuseWrite('metadata.update', options) ?? ctx.doc.metadata.update(patch),
+    update: async (patch, options) => {
+      refuseWrite('metadata.update', options);
+      return ctx.doc.metadata.update(patch);
+    },
     refresh: () => metadata.refresh(),
     onUpdated: updated.on,
     onResynced: resynced.on,

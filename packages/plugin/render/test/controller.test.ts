@@ -144,7 +144,7 @@ describe('the ledger — confirmed events and the invalidate verb', () => {
     const seen: string[] = [];
     fixture.render.onInvalidated((event) =>
       seen.push(
-        `${event.scope}:${event.origin?.locality ?? 'caller'}:` +
+        `${event.scope}:${event.origin?.kind ?? 'caller'}:` +
           event.pages.map((page) => page.objectNumber),
       ),
     );
@@ -459,6 +459,7 @@ describe('the twin law (permissions.md) — canRender and the fetch gates', () =
     expect(denied.render.canRender()).toBe(false);
     await expect(denied.render.renderPage(toPageRef(11))).rejects.toMatchObject({
       code: 'permission-denied',
+      permission: 'doc.render',
     });
     await expect(denied.render.renderSource(toPageRef(11), { scale: 1 })).rejects.toMatchObject({
       code: 'permission-denied',

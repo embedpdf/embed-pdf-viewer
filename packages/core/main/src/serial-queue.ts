@@ -1,3 +1,6 @@
+import { PluginError } from './errors';
+import type { OperationOptions } from './types';
+
 /**
  * Small promise-tail queue: operations run strictly one at a time, in
  * submission order, and failures never poison later operations. The shared
@@ -8,15 +11,30 @@
  * a B-operation enqueueing back into A self-deadlocks behind its caller.
  */
 export interface SerialQueue {
-  <T>(operation: () => Promise<T>): Promise<T>;
+  /**
+   * Run `operation` once everything queued before it has finished. With
+   * `{ signal }`, an operation whose signal fired while it waited never
+   * starts: it rejects `operation-cancelled`. Once it has started, cancelling
+   * is up to the operation (`ctx.cancellable`).
+   */
+  <T>(operation: () => Promise<T>, options?: OperationOptions): Promise<T>;
   /** Resolves once every operation queued so far has finished, however it ended. */
   idle(): Promise<void>;
 }
 
-export function createSerialQueue(): SerialQueue {
+/** `capability` names the plugin in the error a skipped operation rejects with. */
+export function createSerialQueue(capability: string): SerialQueue {
   let tail: Promise<void> = Promise.resolve();
-  const queue = <T>(operation: () => Promise<T>): Promise<T> => {
-    const result = tail.then(operation, operation);
+  const queue = <T>(operation: () => Promise<T>, options?: OperationOptions): Promise<T> => {
+    const start = (): Promise<T> =>
+      options?.signal?.aborted
+        ? Promise.reject(
+            new PluginError('operation-cancelled', capability, 'cancelled before it started', {
+              cause: options.signal.reason,
+            }),
+          )
+        : operation();
+    const result = tail.then(start, start);
     tail = result.then(
       () => undefined,
       () => undefined,

@@ -433,14 +433,15 @@ export type SelectionClipboardProps = Pick<SelectionClipboardOptions, 'prefetch'
  * Mount once per viewer to wire clipboard copy: prefetches the selected text
  * when the selection settles, answers the native `copy` event synchronously,
  * and falls back to the async Clipboard API for ctrl/cmd+C when the page has
- * no DOM selection. Renders nothing. For a toolbar Copy button, call
- * `copySelection(useSelection())` from its click handler instead.
+ * no DOM selection. Renders nothing, and wires nothing until a document is
+ * ready. For a toolbar Copy button, call `copySelection(useSelection())` from
+ * its click handler instead.
  */
 export function SelectionClipboard({ prefetch }: SelectionClipboardProps = {}) {
-  const selection = useCapability(SelectionToken);
-  useEffect(
-    () => wireSelectionClipboard(selection, prefetch === undefined ? {} : { prefetch }),
-    [selection, prefetch],
-  );
+  const selection = useOptionalCapability(SelectionToken);
+  useEffect(() => {
+    if (!selection) return;
+    return wireSelectionClipboard(selection, prefetch === undefined ? {} : { prefetch });
+  }, [selection, prefetch]);
   return null;
 }

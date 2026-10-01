@@ -1,8 +1,8 @@
 import { definePlugin } from '@embedpdf/core';
 
-import { ShellToken, type ShellCapability } from './contract';
+import { ShellToken } from './contract';
 import { createShellController } from './controller';
-import { initialShellState, type ShellState } from './model';
+import { initialShellState } from './model';
 
 /**
  * The shell plugin: which surfaces (panels, modals, overlays) and menus are
@@ -11,7 +11,7 @@ import { initialShellState, type ShellState } from './model';
  * their state.
  */
 export const shellPlugin = () =>
-  definePlugin<ShellState, ShellCapability>({
+  definePlugin({
     id: 'shell',
     scope: 'document',
     token: ShellToken,

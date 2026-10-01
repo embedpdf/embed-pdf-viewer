@@ -3,10 +3,11 @@ import { PluginError } from '@embedpdf/core';
 import type { AnnotationDraft, AnnotationRef } from '@embedpdf/engine-core/runtime';
 
 import type { CreateMeasurementInput, MeasurementCapability } from '../contract';
-import type { MeasurementServices } from '../services';
+import type { MeasurementContext, MeasurementServices } from '../services';
 import type { MeasurementViewportSync } from '../sync/viewports';
 
 export function createMeasuring(
+  ctx: Pick<MeasurementContext, 'assertAllowed'>,
   { siblings }: Pick<MeasurementServices, 'siblings'>,
   { scaleOf }: Pick<MeasurementViewportSync, 'scaleOf'>,
 ) {
@@ -68,13 +69,7 @@ export function createMeasuring(
   };
 
   const createMeasurement = async (input: CreateMeasurementInput): Promise<AnnotationRef> => {
-    if (!annotation.canCreate()) {
-      throw new PluginError(
-        'permission-denied',
-        'measurement',
-        'measuring needs annotation create authority',
-      );
-    }
+    ctx.assertAllowed('annotations:create', 'measurement.createMeasurement');
     if (!scaleOf(input.page).ready) {
       throw new PluginError('not-ready', 'measurement', 'the page scale is not known yet');
     }

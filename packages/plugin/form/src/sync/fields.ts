@@ -4,7 +4,7 @@
  * document's scripts, or another session. This is also the one place the
  * value and field events fire.
  */
-import { originOf, type Mirror } from '@embedpdf/core';
+import type { Mirror } from '@embedpdf/core';
 
 import {
   emptyFieldIndex,
@@ -13,21 +13,16 @@ import {
   indexFields,
   type FieldIndex,
 } from '../model';
-import type { FormAuthority } from '../services/authority';
 import type { FormContext } from '../services/context';
 import type { FormEvents } from '../services/events';
 
-export function createFieldsMirror(
-  ctx: FormContext,
-  events: FormEvents,
-  authority: FormAuthority,
-): Mirror<FieldIndex> {
+export function createFieldsMirror(ctx: FormContext, events: FormEvents): Mirror<FieldIndex> {
   return ctx.mirror<FieldIndex>({
     name: 'fields',
     initial: emptyFieldIndex,
     // A reviewer-shaped token without `doc.forms.read` is a common narrowed
     // scope: skip the doomed read and report `forbidden`.
-    readable: () => authority.can('doc.forms.read'),
+    readable: () => ctx.allows('doc.forms.read'),
     load: async (doc) => ({ value: indexFields(await doc.forms.list()) }),
     fold: foldFormEvent,
     changed: ({ cause, event, previous, next }) => {
@@ -36,7 +31,7 @@ export function createFieldsMirror(
         return;
       }
       if (!event || !('origin' in event)) return;
-      const origin = originOf(event);
+      const { origin } = event;
       switch (event.type) {
         case 'forms.valueSet':
           events.valueChanged.emit({ ref: event.field.ref, field: event.field, origin });

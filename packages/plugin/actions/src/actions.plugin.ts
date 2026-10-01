@@ -2,7 +2,7 @@ import { definePlugin } from '@embedpdf/core';
 
 import type { ActionsConfig } from './contract';
 import { createActionsController } from './controller';
-import { ActionsToken, type ActionsHostCapability } from './host-contract';
+import { ActionsToken } from './host-contract';
 
 /**
  * The action engine, the dependency root of the action architecture. It
@@ -15,7 +15,7 @@ import { ActionsToken, type ActionsHostCapability } from './host-contract';
  * stateless.
  */
 export const actionsPlugin = (config?: ActionsConfig) =>
-  definePlugin<void, ActionsHostCapability>({
+  definePlugin({
     id: 'actions',
     token: ActionsToken,
     scope: 'document',

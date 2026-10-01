@@ -4,18 +4,19 @@ import { ShellToken } from '@embedpdf/plugin-shell/contract';
 
 import type { CommandsConfig } from './contract';
 import { createCommandsController } from './controller';
-import { CommandsToken, type CommandsHostCapability } from './host-contract';
-import { initialCommandsState, type CommandsState } from './model';
+import { CommandsToken } from './host-contract';
+import { initialCommandsState } from './model';
 
 /**
  * The commands plugin: workspace-scoped (one vocabulary for the whole
- * workspace; resolution and execution bind to a target document per call).
+ * workspace; resolution and execution bind to a target document per call:
+ * the one named, else the document in scope, else the active one).
  * Definitions live in the instance's registry — never in state (they hold
  * functions) and never in the plugin definition (an immutable recipe two
  * kernels may share); state holds only `disabledCategories`.
  */
 export const commandsPlugin = (config: CommandsConfig = {}) =>
-  definePlugin<CommandsState, CommandsHostCapability>({
+  definePlugin({
     id: 'commands',
     scope: 'workspace',
     token: CommandsToken,
@@ -26,4 +27,14 @@ export const commandsPlugin = (config: CommandsConfig = {}) =>
     resolvesAnyCapability: true,
     state: () => initialCommandsState(config.disabledCategories),
     create: (ctx) => createCommandsController(ctx, config),
+    // Inside a document's scope, a call that leaves out the document targets that one.
+    inScope: (commands, documentId) => ({
+      ...commands,
+      resolveCommand: (id, target = documentId) => commands.resolveCommand(id, target),
+      listCommands: (target = documentId) => commands.listCommands(target),
+      searchCommands: (query, target = documentId) => commands.searchCommands(query, target),
+      execute: (id, options) =>
+        commands.execute(id, { ...options, documentId: options?.documentId ?? documentId }),
+      canExecute: (id, target = documentId) => commands.canExecute(id, target),
+    }),
   });

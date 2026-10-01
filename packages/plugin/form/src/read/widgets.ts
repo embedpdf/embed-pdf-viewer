@@ -16,9 +16,8 @@ export function createWidgetReads(
   {
     fields,
     widgetBoxes,
-    authority,
     siblings,
-  }: Pick<FormServices, 'fields' | 'widgetBoxes' | 'authority' | 'siblings'>,
+  }: Pick<FormServices, 'fields' | 'widgetBoxes' | 'siblings'>,
 ) {
   const annotationHost = siblings.annotation;
   const loadBoxes = (page: PageRef): Promise<void> =>
@@ -61,7 +60,7 @@ export function createWidgetReads(
       fields.get(),
       widgetBoxes.get({ kind: 'objectNumber', objectNumber: pageObjectNumber }),
       ctx.state.get().writing,
-      authority.can('doc.forms.fill'),
+      ctx.allows('doc.forms.fill'),
     ],
     (pageObjectNumber, index, boxes, writing, fillable) =>
       fillItems(index, pageObjectNumber, boxes, writing).map(
@@ -79,7 +78,7 @@ export function createWidgetReads(
         index,
         page ? widgetBoxes.get(page)?.[annotObjectNumber] : undefined,
         ctx.state.get().writing,
-        authority.can('doc.forms.fill'),
+        ctx.allows('doc.forms.fill'),
       ];
     },
     (annotObjectNumber, index, box, writing, fillable) =>

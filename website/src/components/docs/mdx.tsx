@@ -1,6 +1,6 @@
 import type { MDXComponents } from 'mdx/types';
 import { FrameworkLink, FwCode, FwVariant, Framework, StateIntroText, Word } from '@embedpdf/docs-kit';
-import type { AnchorHTMLAttributes, ReactNode } from 'react';
+import type { AnchorHTMLAttributes, HTMLAttributes, ReactNode } from 'react';
 
 import { CloudPdfCallout } from './cloudpdf-callout';
 import { DocsOverview } from './docs-overview';
@@ -28,15 +28,20 @@ function Wrapper({ children, toc }: WrapperProps) {
   );
 }
 
+/** A page's title: its `# heading`, or the title a held-back page still shows. */
+export function PageTitle(props: HTMLAttributes<HTMLHeadingElement>) {
+  return (
+    <h1
+      className="font-display text-ep-navy scroll-mt-[100px] text-[clamp(34px,4vw,46px)] font-extrabold leading-[1.08] tracking-[-0.025em]"
+      {...props}
+    />
+  );
+}
+
 export function useMDXComponents(components?: MDXComponents): MDXComponents {
   return {
     wrapper: Wrapper,
-    h1: (props) => (
-      <h1
-        className="font-display text-ep-navy scroll-mt-[100px] text-[clamp(34px,4vw,46px)] font-extrabold leading-[1.08] tracking-[-0.025em]"
-        {...props}
-      />
-    ),
+    h1: PageTitle,
     h2: createHeading('h2'),
     h3: createHeading('h3'),
     h4: createHeading('h4'),

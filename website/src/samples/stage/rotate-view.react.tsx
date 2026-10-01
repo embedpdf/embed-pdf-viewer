@@ -4,7 +4,7 @@ import { Stage, stagePlugin, useStage } from '@embedpdf/react/stage';
 import { RenderLayer, renderPlugin } from '@embedpdf/react/render';
 import { localEngine } from '@embedpdf/engine';
 
-import { Demo, Toolbar, Button, StageFrame, stageFill } from './_shared/chrome';
+import './rotate-view.css';
 
 const engine = localEngine();
 const plugins = [stagePlugin(), renderPlugin()];
@@ -17,24 +17,24 @@ const ebook = async (): Promise<OpenInput> => {
 function RotateButtons() {
   const stage = useStage();
   return (
-    <Toolbar>
-      <Button onClick={() => stage.rotateViewBy(-90)}>⟲ Rotate left</Button>
-      <Button onClick={() => stage.rotateViewBy(90)}>⟳ Rotate right</Button>
-    </Toolbar>
+    <div className="toolbar">
+      <button type="button" className="button" onClick={() => stage.rotateViewBy(-90)}>
+        ⟲ Rotate left
+      </button>
+      <button type="button" className="button" onClick={() => stage.rotateViewBy(90)}>
+        ⟳ Rotate right
+      </button>
+    </div>
   );
 }
 
 export default function App() {
   return (
     <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: ebook }]}>
-      <Demo>
-        <DocumentGate fallback={<p>Loading…</p>}>
-          <RotateButtons />
-          <StageFrame height={420}>
-            <Stage style={stageFill}>{() => <RenderLayer />}</Stage>
-          </StageFrame>
-        </DocumentGate>
-      </Demo>
+      <DocumentGate fallback={<p className="loading">Loading…</p>}>
+        <RotateButtons />
+        <Stage className="stage">{() => <RenderLayer />}</Stage>
+      </DocumentGate>
     </Viewer>
   );
 }

@@ -4,7 +4,7 @@
  * is the destructive document mutation. The plugin owns no mark state: the
  * pending view is a live projection of the annotation plane.
  */
-import type { BatchResult, ChangeOrigin, EventHook, OperationOptions } from '@embedpdf/core';
+import type { BatchResult, EventHook, EventOrigin, OperationOptions } from '@embedpdf/core';
 import type { Rect } from '@embedpdf/core-geometry';
 import type {
   AnnotationRef,
@@ -73,7 +73,7 @@ export interface RedactionCollateral {
 /** A confirmed apply, from this session or another. */
 export interface RedactionAppliedEvent {
   readonly result: RedactionApplyResult;
-  readonly origin: ChangeOrigin;
+  readonly origin: EventOrigin;
 }
 /** Marks were created, changed or removed on these pages. */
 export interface RedactionPendingChangedEvent {

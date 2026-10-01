@@ -153,7 +153,7 @@ describe('metadata controller', () => {
     await open(kernel);
     const api = kernel.capability(MetadataToken, 'doc');
     const seen: string[] = [];
-    api.onUpdated((event) => seen.push(`${event.origin.locality}:${event.metadata.title}`));
+    api.onUpdated((event) => seen.push(`${event.origin.kind}:${event.metadata.title}`));
 
     doc.emit({
       type: 'metadata.updated',
@@ -199,7 +199,7 @@ describe('metadata controller', () => {
     const order: string[] = [];
     api.onUpdated((event) =>
       order.push(
-        `event:${event.metadata.title}:${event.changedKeys.join(',')}:${event.origin.locality}`,
+        `event:${event.metadata.title}:${event.changedKeys.join(',')}:${event.origin.kind}`,
       ),
     );
     const result = await api
@@ -218,9 +218,10 @@ describe('metadata controller', () => {
     await open(kernel);
     const api = kernel.capability(MetadataToken, 'doc');
     expect(api.canEdit()).toBe(false);
-    await expect(api.update({ title: 'x' })).rejects.toSatisfy((error) =>
-      isPluginError(error, 'permission-denied'),
-    );
+    await expect(api.update({ title: 'x' })).rejects.toMatchObject({
+      code: 'permission-denied',
+      permission: 'doc.metadata.modify',
+    });
     expect(doc.handle.metadata.update).not.toHaveBeenCalled();
     await kernel.destroy();
   });
@@ -280,7 +281,7 @@ describe('custom metadata', () => {
 
     const order: string[] = [];
     api.custom.onUpdated((event) =>
-      order.push(`event:${event.changedKeys.join(',')}:${event.origin.locality}`),
+      order.push(`event:${event.changedKeys.join(',')}:${event.origin.kind}`),
     );
     const standard = vi.fn();
     api.onUpdated(standard);

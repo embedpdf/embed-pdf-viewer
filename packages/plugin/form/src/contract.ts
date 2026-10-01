@@ -6,8 +6,8 @@
  */
 import type {
   BatchResult,
-  ChangeOrigin,
   EventHook,
+  EventOrigin,
   OperationOptions,
   ResourceStatus,
 } from '@embedpdf/core';
@@ -143,13 +143,13 @@ export interface FormFilter {
 export interface FormValueChangedEvent {
   readonly ref: FormFieldRef;
   readonly field: FormFieldDTO;
-  readonly origin: ChangeOrigin;
+  readonly origin: EventOrigin;
 }
 export interface FormFieldChangedEvent {
   readonly ref: FormFieldRef;
   /** The field after the change; null once deleted. */
   readonly field: FormFieldDTO | null;
-  readonly origin: ChangeOrigin;
+  readonly origin: EventOrigin;
 }
 export interface FormValidationRejectedEvent {
   readonly ref: FormFieldRef;

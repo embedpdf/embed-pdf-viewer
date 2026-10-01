@@ -22,7 +22,7 @@ import { createValueWrites } from './write/values';
 
 export function createFormController(ctx: FormContext, config: FormConfig = {}) {
   const services = createServices(ctx, config);
-  const { events, authority } = services;
+  const { events } = services;
 
   const fields = createFieldReads(services);
   const widgets = createWidgetReads(ctx, services);
@@ -46,9 +46,9 @@ export function createFormController(ctx: FormContext, config: FormConfig = {}) 
     activation.api,
     scripts.api,
     {
-      canRead: () => authority.can('doc.forms.read'),
-      canFill: () => authority.can('doc.forms.fill'),
-      canDesign: () => authority.can('doc.forms.modify'),
+      canRead: () => ctx.allows('doc.forms.read'),
+      canFill: () => ctx.allows('doc.forms.fill'),
+      canDesign: () => ctx.allows('doc.forms.modify'),
       onValueChanged: events.valueChanged.on,
       onFieldCreated: events.fieldCreated.on,
       onFieldUpdated: events.fieldUpdated.on,

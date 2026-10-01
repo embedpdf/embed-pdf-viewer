@@ -66,7 +66,7 @@ describe('create, update and delete', () => {
     harness.create.mockResolvedValueOnce({ annotation: squareDTO(42) });
     const order: string[] = [];
     harness.capability.onCreated((event) =>
-      order.push(`created:${annotationKey(event.annotation.ref)}:${event.origin.locality}`),
+      order.push(`created:${annotationKey(event.annotation.ref)}:${event.origin.kind}`),
     );
 
     const draft = {
@@ -138,10 +138,10 @@ describe('create, update and delete', () => {
     });
     const log: string[] = [];
     harness.capability.onUpdated((event) =>
-      log.push(`updated:${annotationKey(event.annotation.ref)}:${event.origin.locality}`),
+      log.push(`updated:${annotationKey(event.annotation.ref)}:${event.origin.kind}`),
     );
     harness.capability.onDeleted((event) =>
-      log.push(`deleted:${annotationKey(event.ref)}:${event.origin.locality}`),
+      log.push(`deleted:${annotationKey(event.ref)}:${event.origin.kind}`),
     );
 
     harness.update.mockResolvedValueOnce({

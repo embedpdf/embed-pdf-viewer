@@ -8,8 +8,8 @@
  */
 import type {
   BatchResult,
-  ChangeOrigin,
   EventHook,
+  EventOrigin,
   OperationOptions,
   PluginErrorInfo,
   ResourceStatus,
@@ -397,7 +397,7 @@ export interface AnnotationSelectionAnchor {
 /** A confirmed creation or update: the engine's record, whoever caused it. */
 export interface AnnotationChangedEvent {
   readonly annotation: AnnotationDTO;
-  readonly origin: ChangeOrigin;
+  readonly origin: EventOrigin;
 }
 
 export type AnnotationCreatedEvent = AnnotationChangedEvent;
@@ -407,7 +407,7 @@ export type AnnotationUpdatedEvent = AnnotationChangedEvent;
 export interface AnnotationDeletedEvent {
   readonly ref: AnnotationRef;
   readonly page: PageRef;
-  readonly origin: ChangeOrigin;
+  readonly origin: EventOrigin;
 }
 
 /** Records were replaced after a stream gap or a page reload — not a fabricated history. */

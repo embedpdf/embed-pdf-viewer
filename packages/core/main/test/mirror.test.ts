@@ -324,7 +324,7 @@ describe('ctx.mirror', () => {
       get(): Records;
     }
     const token = createCapabilityToken<Api>('records');
-    const plugin = definePlugin<void, Api>({
+    const plugin = definePlugin({
       id: 'records',
       scope: 'document',
       token,

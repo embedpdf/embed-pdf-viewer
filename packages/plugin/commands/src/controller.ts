@@ -94,7 +94,7 @@ export function createCommandsController(
   const state = () => ctx.state.get();
 
   /** Bind capability resolution to the command's target document. The kernel
-   *  resolves workspace tokens regardless of the document argument, so one
+   *  resolves workspace tokens as that document's scope sees them, so one
    *  code path serves both scopes. */
   const commandContext = (documentId?: string, args?: unknown): CommandContext => {
     const target = documentId ?? ctx.get(DocumentsToken).getActiveId();

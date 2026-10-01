@@ -2,9 +2,9 @@ import { definePlugin } from '@embedpdf/core';
 import { AnnotationToken } from '@embedpdf/plugin-annotation/contract/host';
 import { InteractionToken } from '@embedpdf/plugin-interaction/contract';
 
-import { MeasurementToken, type MeasurementCapability, type MeasurementConfig } from './contract';
+import { MeasurementToken, type MeasurementConfig } from './contract';
 import { createMeasurementController } from './controller';
-import { initialMeasurementState, type MeasurementState } from './model';
+import { initialMeasurementState } from './model';
 
 /**
  * Page scale, calibration and measurement readouts, document-scoped. The
@@ -13,7 +13,7 @@ import { initialMeasurementState, type MeasurementState } from './model';
  * and turns the calibrate tool's drafts into scale requests.
  */
 export const measurementPlugin = (config: MeasurementConfig = {}) =>
-  definePlugin<MeasurementState, MeasurementCapability>({
+  definePlugin({
     id: 'measurement',
     scope: 'document',
     token: MeasurementToken,

@@ -90,15 +90,8 @@ export function createSelectionController(
   const textSnapshots = new Map<PageObjectNumber, Promise<PageTextSnapshot>>();
 
   const state = () => ctx.state.get();
-  const canSelect = (): boolean => ctx.doc.security.allows(SELECT_SCOPE);
-  const canCopy = (): boolean => ctx.doc.security.allows(COPY_SCOPE);
-  const assertScope = (scope: DocCapability, operation: string): void => {
-    if (!ctx.doc.security.allows(scope)) {
-      throw new PluginError('permission-denied', 'selection', `${operation} requires ${scope}`, {
-        details: { required: scope },
-      });
-    }
-  };
+  const canSelect = (): boolean => ctx.allows(SELECT_SCOPE);
+  const canCopy = (): boolean => ctx.allows(COPY_SCOPE);
 
   // ── page addressing (the registry is the truth for order and layout) ──
   const pageIndexOf = (page: PageRef): number => ctx.getPage(page)?.index ?? -1;
@@ -294,7 +287,7 @@ export function createSelectionController(
 
   // ── writes ──
   function select(input: SelectionRangeInput): void {
-    assertScope(SELECT_SCOPE, 'selection.select');
+    ctx.assertAllowed(SELECT_SCOPE, 'selection.select');
     const range: TextRange =
       'page' in input
         ? {
@@ -333,7 +326,7 @@ export function createSelectionController(
   }
 
   function selectAll(): void {
-    assertScope(SELECT_SCOPE, 'selection.selectAll');
+    ctx.assertAllowed(SELECT_SCOPE, 'selection.selectAll');
     const pages = ctx.document()?.pages ?? [];
     if (pages.length === 0) return;
     recompute({
@@ -343,7 +336,7 @@ export function createSelectionController(
   }
 
   function selectPage(page: PageRef): void {
-    assertScope(SELECT_SCOPE, 'selection.selectPage');
+    ctx.assertAllowed(SELECT_SCOPE, 'selection.selectPage');
     ctx.assertPageRef(page);
     recompute({ anchor: { page, glyph: 0 }, focus: { page, glyph: OPEN_END } });
   }
@@ -352,7 +345,7 @@ export function createSelectionController(
    *  (geometry present and a glyph under the point): the fact haptics and
    *  other success-gated feedback key on, so nothing buzzes over blank space. */
   function selectSpanAt(page: PageRef, point: Point, expand: 'word' | 'line'): boolean {
-    assertScope(SELECT_SCOPE, `selection.select${expand === 'word' ? 'WordAt' : 'LineAt'}`);
+    ctx.assertAllowed(SELECT_SCOPE, `selection.select${expand === 'word' ? 'WordAt' : 'LineAt'}`);
     const textLayout = geometryFor(page);
     if (!textLayout) return false;
     const glyph = glyphAt(textLayout, point);
@@ -367,7 +360,7 @@ export function createSelectionController(
   }
 
   function extendTo(page: PageRef, point: Point): void {
-    assertScope(SELECT_SCOPE, 'selection.extendTo');
+    ctx.assertAllowed(SELECT_SCOPE, 'selection.extendTo');
     const current = state().selection;
     if (!current) return;
     const textLayout = geometryFor(page);
@@ -397,7 +390,7 @@ export function createSelectionController(
   }
 
   async function readTextInRange(range: TextRange, options?: OperationOptions): Promise<string> {
-    assertScope(COPY_SCOPE, 'selection.readText');
+    ctx.assertAllowed(COPY_SCOPE, 'selection.readText');
     ctx.assertPageRef(range.start.page);
     ctx.assertPageRef(range.end.page);
     const startPageIndex = pageIndexOf(range.start.page);

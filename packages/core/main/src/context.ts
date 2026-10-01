@@ -9,6 +9,10 @@ import { createMirror, type MirrorEnvironment } from './mirror';
 import { createPageMirror } from './page-mirror';
 import type { Scope } from './scope';
 import { createSerialQueue, type SerialQueue } from './serial-queue';
+import { cancellable } from './cancellable';
+import { findPage, pageOf } from './page-of';
+import { permissionDenied, sessionAllows } from './permissions';
+import type { Settings, SettingsStore } from './settings';
 import type { SettleFlush } from './settle';
 import type { SliceLease, Store } from './store';
 import type {
@@ -17,7 +21,6 @@ import type {
   DocumentMeta,
   Engine,
   OperationOptions,
-  PageInfo,
   PluginContext,
 } from './types';
 import { DocumentsToken } from './types';
@@ -66,6 +69,8 @@ export interface ContextServices {
    *  constructor is a bug and propagates. */
   tryResolveCapability<T>(token: CapabilityToken<T>, documentId?: string): T | null;
   documentHandle(documentId?: string): DocumentHandle | null;
+  /** The plugin registration's settings store, built when the plugin list was planned; undefined when it declares none. */
+  settingsStoreOf(plugin: AnyPlugin): SettingsStore<object> | undefined;
 }
 
 /**
@@ -95,7 +100,9 @@ export function markConnected(context: object): void {
  * Build the context a plugin's `create()` receives. With a `session` the
  * context is bound to that document: its state slice, `document()`, the
  * guarded `doc`, and `get()` resolving document-scoped capabilities for it.
- * `lifetime` aborts and `scope` disposes when the instance closes.
+ * `lifetime` aborts and `scope` disposes when the instance closes. One kind of
+ * context serves every plugin, so `settings()` is always there and throws for
+ * a plugin that declares none; the plugin's own types hide it (`definePlugin`).
  */
 export function createPluginContext(
   services: ContextServices,
@@ -103,7 +110,7 @@ export function createPluginContext(
   session: SessionRef | undefined,
   lifetime: AbortSignal,
   scope: Scope,
-): PluginContext<unknown> {
+): PluginContext<unknown, object> {
   const { engine, store } = services;
   const documentId = session?.id;
   const instanceId = session?.instanceId ?? `workspace:${plugin.id}`;
@@ -165,6 +172,7 @@ export function createPluginContext(
 
   const queues = new Map<string, SerialQueue>();
   const lanes = new Map<string, LatestLane>();
+  let instanceSettings: Settings<object> | null = null;
 
   // Mirrors hold their values in store cells of their own, revoked with the
   // instance; their first load waits until the plugin is connected.
@@ -185,7 +193,7 @@ export function createPluginContext(
     report: services.report,
   });
 
-  const context: PluginContext<unknown> = {
+  const context: PluginContext<unknown, object> = {
     id: plugin.id,
     instanceId,
     documentId,
@@ -204,11 +212,20 @@ export function createPluginContext(
       const id = store.getCore().activeId;
       return id ? (store.getCore().documents[id] ?? null) : null;
     },
-    getPage: (ref): PageInfo | null =>
-      metaOf()?.pages.find((pageInfo) => pageRefsEqual(pageInfo.ref, ref)) ?? null,
+    getPage: (page) => findPage(metaOf()?.pages ?? [], page),
+    pageOf: (page) => pageOf(metaOf()?.pages ?? [], page, capability),
     assertPageRef: (ref) => {
       if (!metaOf()?.pages.some((pageInfo) => pageRefsEqual(pageInfo.ref, ref)))
         throw notFound(ref);
+    },
+
+    // Both read the bound document through `doc()`, so a workspace context
+    // throws here exactly as reading `ctx.doc` does.
+    allows: (permission) => sessionAllows(doc().security, permission),
+    assertAllowed: (permission, operation) => {
+      if (!sessionAllows(doc().security, permission)) {
+        throw permissionDenied(capability, permission, operation);
+      }
     },
 
     get: <T>(token: CapabilityToken<T>): T => (
@@ -234,6 +251,19 @@ export function createPluginContext(
         if (!lease.write(transition(lease.read(), ...args))) reportClosed('a state update');
       },
       onChange: lease.onChange,
+    },
+
+    settings: () => {
+      if (instanceSettings) return instanceSettings;
+      const registration = services.settingsStoreOf(plugin);
+      if (!registration) {
+        throw new Error(
+          `[kernel] plugin "${plugin.id}" read ctx.settings() but declares no settings; ` +
+            `add \`settings: { defaults, registered }\` to its definition.`,
+        );
+      }
+      // The instance's own view, so its listeners go when it closes.
+      return (instanceSettings = registration.forInstance((teardown) => scope.defer(teardown)));
     },
 
     notify: () => {
@@ -329,6 +359,7 @@ export function createPluginContext(
       scope.defer(() => dispose(value));
       return value;
     },
+    cancellable: (signal, task) => cancellable(capability, signal, task),
     latest(key) {
       let lane = lanes.get(key);
       if (!lane) {
@@ -340,7 +371,7 @@ export function createPluginContext(
     serialQueue(key = 'default') {
       let queue = queues.get(key);
       if (!queue) {
-        queue = createSerialQueue();
+        queue = createSerialQueue(capability);
         queues.set(key, queue);
       }
       return queue;

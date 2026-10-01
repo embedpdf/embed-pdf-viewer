@@ -188,7 +188,7 @@ describe('through the kernel', () => {
     const { commandsPlugin } = await import('../src/commands.plugin');
     const { CommandsToken } = await import('../src/token');
     const toggleToken = createCapabilityToken<{ isOn(): boolean }>('toggle');
-    const toggle = definePlugin<void, { isOn(): boolean }>({
+    const toggle = definePlugin({
       id: 'toggle',
       token: toggleToken,
       create: () => ({ api: { isOn: () => true } }),

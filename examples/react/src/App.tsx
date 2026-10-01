@@ -34,6 +34,7 @@ import {
   useFormField,
   SearchLayer,
   useSearch,
+  useSearchHits,
   useSearchState,
   useStamp,
   useStampAssets,
@@ -51,7 +52,6 @@ import {
   formPlugin,
   searchPlugin,
   validateSearchRegex,
-  SearchToken,
   stampPlugin,
   i18nPlugin,
   negotiateLocale,
@@ -1131,7 +1131,7 @@ function SearchToggle({
  */
 function SearchControls() {
   const search = useSearch();
-  const { status, hitCount, activeIndex, progress, error } = useSearchState();
+  const { status, hitCount, activeHitIndex, progress, error } = useSearchState();
   const [text, setText] = useState('');
   const [matchCase, setMatchCase] = useState(false);
   const [wholeWord, setWholeWord] = useState(false);
@@ -1152,10 +1152,10 @@ function SearchControls() {
     return () => clearTimeout(t);
   }, [text, matchCase, wholeWord, regex, patternError, search]);
 
-  const hits = useSelector(SearchToken, (c) => c.listHits());
+  const hits = useSearchHits();
   const counter =
     hitCount > 0
-      ? `${activeIndex + 1}/${hitCount}`
+      ? `${activeHitIndex + 1}/${hitCount}`
       : status === 'searching'
         ? '…'
         : text.trim()
@@ -1247,7 +1247,7 @@ function SearchControls() {
                 padding: '5px 8px',
                 border: 'none',
                 borderBottom: '1px solid #f2f2f2',
-                background: i === activeIndex ? '#fff7df' : '#fff',
+                background: i === activeHitIndex ? '#fff7df' : '#fff',
                 cursor: 'pointer',
                 fontSize: 11,
                 color: '#444',

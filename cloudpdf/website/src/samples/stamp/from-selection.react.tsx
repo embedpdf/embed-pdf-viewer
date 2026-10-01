@@ -21,15 +21,7 @@ import type { StampAsset } from '@embedpdf/react/stamp';
 import { cloudEngine } from '@cloudpdf/engine';
 import { localEngine } from '@embedpdf/engine';
 
-import {
-  Button,
-  Demo,
-  Readout,
-  Spacer,
-  StageFrame,
-  Toolbar,
-  stageFill,
-} from '../stage/_shared/chrome';
+import './from-selection.css';
 
 const engine = cloudEngine({ baseUrl: 'https://engine.cloudpdf.com' });
 const assetEngine = localEngine();
@@ -48,9 +40,9 @@ const MY_STAMPS = 'my-stamps';
 function MyStamp({ asset, onArm }: { asset: StampAsset; onArm: () => void }) {
   const url = useStampAssetPreviewUrl(asset.id);
   return (
-    <Button title={`Place "${asset.label}"`} onClick={onArm}>
-      {url ? <img src={url} alt={asset.label} style={{ height: 22 }} /> : asset.label}
-    </Button>
+    <button type="button" className="button" title={`Place "${asset.label}"`} onClick={onArm}>
+      {url ? <img src={url} alt={asset.label} className="preview" /> : asset.label}
+    </button>
   );
 }
 
@@ -93,47 +85,47 @@ function MakeStamp() {
   };
 
   return (
-    <Toolbar>
-      <Button
+    <div className="toolbar">
+      <button
+        type="button"
+        className="button"
         title="Draw a rectangle on the page"
         onClick={() => activate(activeToolId === 'square' ? 'pointer' : 'square')}
       >
         {activeToolId === 'square' ? '▸ ' : ''}▭ Draw
-      </Button>
-      <Button
+      </button>
+      <button
+        type="button"
+        className="button"
         title="Turn the selected annotation(s) into a reusable stamp"
         disabled={!canMake}
         onClick={() => void make().catch((err) => setStatus(String(err)))}
       >
         Make stamp
-      </Button>
+      </button>
       {mine.map((asset) => (
         <MyStamp key={asset.id} asset={asset} onArm={() => void armAsset(asset.id)} />
       ))}
-      <Spacer />
-      <Readout>{status}</Readout>
-    </Toolbar>
+      <span className="spacer" />
+      <output className="readout">{status}</output>
+    </div>
   );
 }
 
 export default function App() {
   return (
     <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: ebook }]}>
-      <Demo>
-        <DocumentGate fallback={<p>Loading…</p>}>
-          <MakeStamp />
-          <StageFrame height={420}>
-            <Stage style={stageFill}>
-              {() => (
-                <>
-                  <RenderLayer annotations={false} />
-                  <AnnotationLayer />
-                </>
-              )}
-            </Stage>
-          </StageFrame>
-        </DocumentGate>
-      </Demo>
+      <DocumentGate fallback={<p className="loading">Loading…</p>}>
+        <MakeStamp />
+        <Stage className="stage">
+          {() => (
+            <>
+              <RenderLayer annotations={false} />
+              <AnnotationLayer />
+            </>
+          )}
+        </Stage>
+      </DocumentGate>
     </Viewer>
   );
 }

@@ -92,3 +92,12 @@ export type {
 export { mountWebFont } from './web-font';
 export { firstLineShiftFor, lineModelFor, webFontMetrics } from './web-font-metrics';
 export type { LineModel, WebFontMetrics } from './web-font-metrics';
+export { EPDF_VARIABLES, mixAccent, paint, paintDefault } from './theme';
+export type {
+  EpdfCssOnlyVariable,
+  EpdfFollowedVariable,
+  EpdfSettingVariable,
+  EpdfTranslucentVariable,
+  EpdfVariable,
+  EpdfVariableDefinition,
+} from './theme';

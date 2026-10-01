@@ -7,8 +7,8 @@
  *
  * Data flow:
  *   type / toggle → validateSearchQuery → (debounced) search(draftQuery)
- *   useSearchState() → query / status / hitCount / activeIndex (reactive)
- *   useSelector(SearchToken, (search) => search.listHits()) → the streamed hit list
+ *   useSearchState() → query / status / hitCount / activeHitIndex (reactive)
+ *   useSearchHits() → the streamed hit list
  *   click a hit / prev / next → goTo/prev/next (capability reveals it on-page)
  *
  * The look: a magnifier input with a clear button, option checkboxes, a
@@ -20,12 +20,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   useSearch,
+  useSearchHits,
   useSearchState,
   validateSearchQuery,
-  SearchToken,
 } from '@embedpdf/react/search';
 import type { SearchHit, SearchQuery, SearchSnippet } from '@embedpdf/react/search';
-import { useSelector } from '@embedpdf/react/runtime';
 import { useT } from '@embedpdf/react/i18n';
 import { Icon } from './icons';
 import { buttonClass } from './toolbar';
@@ -122,8 +121,8 @@ function HitLine({
 export function SearchPanel() {
   const t = useT();
   const search = useSearch();
-  const { query, status, hitCount, activeIndex } = useSearchState();
-  const hits = useSelector(SearchToken, (search) => search.listHits());
+  const { query, status, hitCount, activeHitIndex } = useSearchState();
+  const hits = useSearchHits();
 
   // `query` is the document-scoped stored search (survives the sidebar
   // closing). The box is a controlled draft that starts from it; the panel is
@@ -261,7 +260,7 @@ export function SearchPanel() {
                 <HitLine
                   key={index}
                   hit={hit}
-                  active={index === activeIndex}
+                  active={index === activeHitIndex}
                   onClick={() => search.goToHit(index)}
                 />
               ))}

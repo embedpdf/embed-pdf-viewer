@@ -17,8 +17,8 @@
     "lint": "next lint",
     "og:preview": "node ../../docs/kit/scripts/collect-og-cards.mjs",
     "prebuild": "pnpm api:check && pnpm run docs:check && pnpm run search:index:build",
-    "search:index": "tsx scripts/build-search-index.ts",
-    "search:index:build": "tsx scripts/build-search-index.ts --if-configured",
+    "search:index": "node ../../docs/content/scripts/publish-gate.mjs --if-missing && tsx scripts/build-search-index.ts",
+    "search:index:build": "node ../../docs/content/scripts/publish-gate.mjs --if-missing && tsx scripts/build-search-index.ts --if-configured",
     "start": "next start"
   },
   "dependencies": {

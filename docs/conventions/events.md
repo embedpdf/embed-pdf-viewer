@@ -7,11 +7,11 @@ its change came from.
 
 ## Three kinds
 
-| Kind         | Meaning                                             | Fired from                                     | Origin                            | Examples                                                                                                                                             |
-| ------------ | --------------------------------------------------- | ---------------------------------------------- | --------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Fact         | Something changed in the document                   | Where the confirmed document event is applied  | `originOf(event)`                 | metadata `onUpdated`; form `onValueChanged`, `onFieldCreated`; annotation `onCreated`, `onDeleted`; signature `onSigned`; redaction `onApplied`      |
-| State change | A session value changed                             | The plugin's one `ctx.state.onChange` listener | none: session state has no origin | shell `onSurfaceOpened`; stage `onZoomChanged`, `onPageChanged`; search `onActiveHitChanged`                                                         |
-| Occurrence   | An operation ran, was requested, finished or failed | Where the operation reaches that point         | a domain field when one is needed | search `onStarted`, `onCompleted`, `onFailed`; stage `onMotionEnded`; form `onValidationRejected`; commands `onExecuted`; annotation `onWriteFailed` |
+| Kind         | Meaning                                             | Fired from                                     | Origin                                | Examples                                                                                                                                             |
+| ------------ | --------------------------------------------------- | ---------------------------------------------- | ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Fact         | Something changed in the document                   | Where the confirmed document event is applied  | `event.origin`, as the engine sent it | metadata `onUpdated`; form `onValueChanged`, `onFieldCreated`; annotation `onCreated`, `onDeleted`; signature `onSigned`; redaction `onApplied`      |
+| State change | A session value changed                             | The plugin's one `ctx.state.onChange` listener | none: session state has no origin     | shell `onSurfaceOpened`; stage `onZoomChanged`, `onPageChanged`; search `onActiveHitChanged`, `onProgressChanged`                                    |
+| Occurrence   | An operation ran, was requested, finished or failed | Where the operation reaches that point         | a domain field when one is needed     | search `onStarted`, `onCompleted`, `onFailed`; stage `onMotionEnded`; form `onValidationRejected`; commands `onExecuted`; annotation `onWriteFailed` |
 
 ### Fact events
 
@@ -35,7 +35,7 @@ changed: ({ cause, event, previous, next }) => {
     return;
   }
   if (!event || !('origin' in event)) return;
-  const origin = originOf(event);
+  const { origin } = event;
   switch (event.type) {
     case 'forms.valueSet':
       events.valueChanged.emit({ ref: event.field.ref, field: event.field, origin });
@@ -52,6 +52,15 @@ listener, from the value before and after each committed change. A new verb
 therefore cannot forget to announce, and a verb never emits a state-change
 event itself.
 
+A state-change event is derived from state even when it reads like progress.
+If a value is state (a getter returns it, and it is in the page's State
+table), its event fires from the listener when the value changes, never from
+the operation that moves it. Search's `progress` is state, so
+`onProgressChanged` fires when `progress` changes: once for each slice of
+pages a search gets through, and back to none when a new search starts or
+the session is cleared. The event and `getProgress()` then never disagree,
+whichever verb or reset changed the value.
+
 ```ts
 // packages/plugin/shell/src/controller.ts
 ctx.state.onChange(({ previous, next }) => {
@@ -64,22 +73,35 @@ ctx.state.onChange(({ previous, next }) => {
     }
   }
 });
+
+// packages/plugin/search/src/controller.ts
+ctx.state.onChange(({ previous, next }) => {
+  // A slice moves it forward; a new search or clear() puts it back to none.
+  if (previous.progress !== next.progress) {
+    progressChanged.emit({ ...next.progress, hitCount: next.hits.length });
+  }
+  // …
+});
 ```
 
 ### Occurrence events
 
 An occurrence fires where the operation reaches the point it reports: the
-search scan emits `onProgress` per slice and `onCompleted` when the scan is
+search scan emits `onStarted` when it starts and `onCompleted` when it is
 complete; the stage's camera animation emits `onMotionEnded` where a tween or
 fling ends; the form write path emits `onValidationRejected` when the
 document's scripts refuse a value. An occurrence that needs to say who asked
 carries a domain field for it (the actions plugin's `ActionContext.origin`),
-not a `ChangeOrigin`.
+not an `EventOrigin`.
 
 ## Rules
 
 - An event fires from exactly one place.
 - A verb never emits a fact or state-change event.
+- A session value a getter returns is announced by a state-change event,
+  never by an occurrence, even when the value is an operation's progress.
+- A refusal before an operation started fires nothing: it only rejects. An
+  operation's failure event (`onFailed`) is for work that started.
 - Loads and reloads are announced once, as `onResynced`. They never produce
   per-item fact events.
 - Events are for things that happened. A UI never keeps its own copy of state
@@ -133,37 +155,35 @@ The full vocabulary is in [`naming.md`](./naming.md#capability-vocabulary).
 
 ## Origin
 
-Every fact event carries `origin: ChangeOrigin`, taken from the engine's event
-with `originOf`. No plugin builds an origin by hand.
+Every fact event carries `origin: EventOrigin`: the engine event's own
+`origin`, passed on as it is. No plugin builds or translates an origin
+(`scripts/check-architecture.mjs` flags an object literal with `sessionId`
+and `sub`).
 
 ```ts
-// packages/core/main/src/types.ts
-interface ChangeOrigin {
-  /** `local` when this engine instance made the change, `remote` for another session. */
-  readonly locality: 'local' | 'remote';
-  /** The engine session that made the change. */
-  readonly sessionId: string;
-  /** The authenticated user behind the change (cloud); null for local engines. */
-  readonly actorId: string | null;
+// @embedpdf/engine-core, re-exported from @embedpdf/core
+interface EventOrigin {
+  kind: 'local' | 'remote'; // this engine instance, or another session
+  sessionId: string; // the engine session that made the change
+  sub: string | null; // the authenticated user behind it (cloud); null locally
+  ts: number; // when it happened
+  serverId: number | null; // the server's audit row, the resume cursor
+  tx?: { id: string; index: number; count: number }; // one of several committed together
 }
-
-function originOf(event: {
-  origin: { kind: 'local' | 'remote'; sessionId: string; sub: string | null };
-}): ChangeOrigin;
 ```
 
-- `locality: 'local'` means this engine instance, not this user: the same
-  user in two tabs is two sessions, and each tab sees the other's changes as
+- `kind: 'local'` means this engine instance, not this user: the same user in
+  two tabs is two sessions, and each tab sees the other's changes as
   `remote`.
-- Ask `locality` or `sessionId` for "is this my own action?" (undo,
-  reconciling optimistic state). Ask `actorId` for attribution.
+- Ask `kind` or `sessionId` for "is this my own action?" (undo, reconciling
+  optimistic state). Ask `sub` for attribution.
 - Handlers that update state ignore origin (see
   [`state-and-sync.md`](./state-and-sync.md#rules)); origin is for the few
   features that care about provenance.
 - `stream.desynced` carries no origin: it is a transport notice, not a
   mutation. A mirror turns it into a reload and an `onResynced`.
 - An event that a verb can cause as well as a document event carries
-  `origin: ChangeOrigin | null`, with `null` for the verb: render's
+  `origin: EventOrigin | null`, with `null` for the verb: render's
   `onInvalidated` after `invalidate()`.
 
 ## Resynced

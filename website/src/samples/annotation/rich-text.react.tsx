@@ -12,15 +12,7 @@ import {
 } from '@embedpdf/react/annotation';
 import { localEngine } from '@embedpdf/engine';
 
-import {
-  Button,
-  Demo,
-  Readout,
-  Spacer,
-  StageFrame,
-  Toolbar,
-  stageFill,
-} from '../stage/_shared/chrome';
+import './rich-text.css';
 
 const engine = localEngine();
 const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), annotationPlugin()];
@@ -81,12 +73,14 @@ function RichTextToolbar() {
   const isOn = (format: Format) => props.values[format] === true && !props.mixed.includes(format);
 
   return (
-    <Toolbar>
-      <Button onClick={() => void addTextBox()} disabled={!page}>
+    <div className="toolbar">
+      <button type="button" className="button" onClick={() => void addTextBox()} disabled={!page}>
         Add text box
-      </Button>
+      </button>
       {(['bold', 'italic', 'underline'] as const).map((format) => (
-        <Button
+        <button
+          type="button"
+          className="button"
           key={format}
           title={`${format} — the selected text while editing, else the whole box`}
           disabled={!hasText}
@@ -96,9 +90,11 @@ function RichTextToolbar() {
         >
           {isOn(format) ? '● ' : ''}
           {format}
-        </Button>
+        </button>
       ))}
-      <Button
+      <button
+        type="button"
+        className="button"
         title="Font size: the same routing — the range, else the box"
         disabled={!hasText}
         onClick={() =>
@@ -106,31 +102,27 @@ function RichTextToolbar() {
         }
       >
         {props.values.fontSize === 24 ? '16 pt' : '24 pt'}
-      </Button>
-      <Spacer />
-      <Readout>{status}</Readout>
-    </Toolbar>
+      </button>
+      <span className="spacer" />
+      <output className="readout">{status}</output>
+    </div>
   );
 }
 
 export default function App() {
   return (
     <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: ebook }]}>
-      <Demo>
-        <DocumentGate fallback={<p>Loading…</p>}>
-          <RichTextToolbar />
-          <StageFrame height={420}>
-            <Stage style={stageFill}>
-              {() => (
-                <>
-                  <RenderLayer annotations={false} />
-                  <AnnotationLayer />
-                </>
-              )}
-            </Stage>
-          </StageFrame>
-        </DocumentGate>
-      </Demo>
+      <DocumentGate fallback={<p className="loading">Loading…</p>}>
+        <RichTextToolbar />
+        <Stage className="stage">
+          {() => (
+            <>
+              <RenderLayer annotations={false} />
+              <AnnotationLayer />
+            </>
+          )}
+        </Stage>
+      </DocumentGate>
     </Viewer>
   );
 }

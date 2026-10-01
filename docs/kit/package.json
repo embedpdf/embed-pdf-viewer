@@ -13,6 +13,7 @@
     "./mdx/install-channel": "./mdx/install-channel.mjs",
     "./mdx/frameworks": "./mdx/frameworks.mjs",
     "./llms": "./src/llms.ts",
+    "./publish": "./src/publish.ts",
     "./og": "./src/og/index.ts"
   },
   "peerDependencies": {

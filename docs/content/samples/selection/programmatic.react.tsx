@@ -11,15 +11,7 @@ import {
 } from '@embedpdf/react/selection';
 import { localEngine } from '@embedpdf/engine';
 
-import {
-  Badge,
-  Button,
-  Demo,
-  Spacer,
-  StageFrame,
-  Toolbar,
-  stageFill,
-} from '../stage/_shared/chrome';
+import './programmatic.css';
 
 const engine = localEngine();
 const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), selectionPlugin()];
@@ -43,40 +35,51 @@ function SelectionToolbar() {
   };
 
   return (
-    <Toolbar>
-      <Button onClick={selectCurrentPage} disabled={!selection.canSelect()}>
+    <div className="toolbar">
+      <button
+        type="button"
+        className="button"
+        onClick={selectCurrentPage}
+        disabled={!selection.canSelect()}
+      >
         Select first 120 characters
-      </Button>
-      <Button onClick={() => selection.selectAll()} disabled={!selection.canSelect()}>
+      </button>
+      <button
+        type="button"
+        className="button"
+        onClick={() => selection.selectAll()}
+        disabled={!selection.canSelect()}
+      >
         Select all
-      </Button>
-      <Button onClick={() => selection.clear()} disabled={!hasSelection}>
+      </button>
+      <button
+        type="button"
+        className="button"
+        onClick={() => selection.clear()}
+        disabled={!hasSelection}
+      >
         Clear
-      </Button>
-      <Spacer />
-      <Badge>{hasSelection ? 'Selection active' : 'Nothing selected'}</Badge>
-    </Toolbar>
+      </button>
+      <span className="spacer" />
+      <output className="badge">{hasSelection ? 'Selection active' : 'Nothing selected'}</output>
+    </div>
   );
 }
 
 export default function App() {
   return (
     <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: ebook }]}>
-      <Demo>
-        <DocumentGate fallback={<p>Loading…</p>}>
-          <SelectionToolbar />
-          <StageFrame height={420}>
-            <Stage style={stageFill}>
-              {() => (
-                <>
-                  <RenderLayer />
-                  <SelectionLayer />
-                </>
-              )}
-            </Stage>
-          </StageFrame>
-        </DocumentGate>
-      </Demo>
+      <DocumentGate fallback={<p className="loading">Loading…</p>}>
+        <SelectionToolbar />
+        <Stage className="stage">
+          {() => (
+            <>
+              <RenderLayer />
+              <SelectionLayer />
+            </>
+          )}
+        </Stage>
+      </DocumentGate>
     </Viewer>
   );
 }

@@ -185,7 +185,11 @@ describe('selection — permissions', () => {
 
   it('writes throw permission-denied without doc.text.select; clear stays allowed', async () => {
     const { kernel, selection } = await boot([pageA], NONE);
-    const denied = expect.objectContaining({ code: 'permission-denied', capability: 'selection' });
+    const denied = expect.objectContaining({
+      code: 'permission-denied',
+      capability: 'selection',
+      permission: 'doc.text.select',
+    });
     expect(() => selection.select({ page: toPageRef(101), start: 0, count: 2 })).toThrow(denied);
     expect(() => selection.selectAll()).toThrow(denied);
     expect(() => selection.selectPage(toPageRef(101))).toThrow(denied);
@@ -206,7 +210,10 @@ describe('selection — permissions', () => {
     const fixture = await boot([pageA], SELECT_ONLY);
     fixture.selection.select({ page: toPageRef(101), start: 0, count: 5 });
     await settle();
-    await expect(fixture.selection.readText()).rejects.toMatchObject({ code: 'permission-denied' });
+    await expect(fixture.selection.readText()).rejects.toMatchObject({
+      code: 'permission-denied',
+      permission: 'doc.text.copy',
+    });
     expect(fixture.textReads).not.toHaveBeenCalled();
     await fixture.kernel.destroy();
   });

@@ -27,7 +27,14 @@ import type {
 import type { EventHook } from '@embedpdf/core';
 import { svgCursor } from '@embedpdf/web';
 import type { SvgCursorOptions } from '@embedpdf/web';
-import { shallowArray, useCapability, useCapabilityEvent, usePage, useSelector } from './runtime';
+import {
+  shallowArray,
+  useCapability,
+  useCapabilityEvent,
+  useOptionalCapability,
+  usePage,
+  useSelector,
+} from './runtime';
 
 const mods = (event: PointerEvent): Modifiers => ({
   shift: event.shiftKey,
@@ -208,10 +215,10 @@ const toCursor = (img: ToolCursorImage, fallback?: string): string =>
  * controls) carries its own CSS cursor — so nothing chases the pointer in
  * DOM. `null` installs nothing. A re-render with new content rebuilds the
  * cursor (live recolor from tool defaults); unmount restores the tool's
- * declared cursors.
+ * declared cursors. Without a document it installs nothing until one is ready.
  */
 export function useToolCursor(spec: ToolCursorSpec | null): void {
-  const interaction = useCapability(InteractionHostToken);
+  const interaction = useOptionalCapability(InteractionHostToken);
   // Key the effect by value: specs are built inline in render, and a
   // fresh-but-identical object must not thrash the skin.
   const key = spec && JSON.stringify(spec);
@@ -219,7 +226,7 @@ export function useToolCursor(spec: ToolCursorSpec | null): void {
   ref.current = spec;
   useEffect(() => {
     const cursorSpec = ref.current;
-    if (!cursorSpec) return;
+    if (!cursorSpec || !interaction) return;
     interaction.setToolCursor(
       cursorSpec.toolId,
       Object.fromEntries(

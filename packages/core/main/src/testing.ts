@@ -36,6 +36,10 @@ import { createLatestLane, type LatestLane } from './lanes';
 import { createMirror, type MirrorController, type MirrorEnvironment } from './mirror';
 import { createPageMirror } from './page-mirror';
 import { createSerialQueue, type SerialQueue } from './serial-queue';
+import { cancellable } from './cancellable';
+import { findPage, pageOf } from './page-of';
+import { permissionDenied, sessionAllows } from './permissions';
+import { createSettingsStore, type NoSettings, type SettingsDeclaration } from './settings';
 import { settle, type SettleFlush } from './settle';
 import { createStore } from './store';
 import {
@@ -45,7 +49,6 @@ import {
   type DocumentMeta,
   type DocumentsCapability,
   type OperationOptions,
-  type PageInfo,
   type PluginContext,
   type Unsubscribe,
 } from './types';
@@ -60,11 +63,16 @@ export interface TestPage {
   readonly label?: string | null;
 }
 
-export interface TestContextOptions<S> {
+export interface TestContextOptions<S, T extends object = NoSettings> {
   /** The plugin id (`ctx.id`, error prefixes). Default `'test'`. */
   readonly id?: string;
   /** The instance's initial state; omit for a stateless plugin. */
   readonly state?: S;
+  /**
+   * The plugin's settings, as its definition declares them; `ctx.settings()` reads them.
+   * Without them the context has none, and `ctx.settings()` throws.
+   */
+  readonly settings?: SettingsDeclaration<T>;
   /** The document's pages; `document()` and `geometry` derive from them. */
   readonly pages?: readonly TestPage[];
   readonly documentId?: string;
@@ -77,7 +85,7 @@ export interface TestContextOptions<S> {
   readonly engine?: Partial<Engine>;
 }
 
-export interface TestContext<S> extends PluginContext<S> {
+export interface TestContext<S, T extends object = NoSettings> extends PluginContext<S, T> {
   /** Every capability `get` can resolve — add or replace during a test. */
   readonly capabilities: Map<CapabilityToken<unknown>, unknown>;
   /** Observe the change stream: state updates and `notify` wake the listener. */
@@ -168,7 +176,9 @@ function testDocuments(meta: DocumentMeta): DocumentsCapability {
   } as DocumentsCapability;
 }
 
-export function createTestContext<S = void>(options: TestContextOptions<S> = {}): TestContext<S> {
+export function createTestContext<S = void, T extends object = NoSettings>(
+  options: TestContextOptions<S, T> = {},
+): TestContext<S, T> {
   const id = options.id ?? 'test';
   const documentId = options.documentId ?? 'doc';
   const report = (error: unknown) => console.error(`[${id}]`, error);
@@ -198,7 +208,7 @@ export function createTestContext<S = void>(options: TestContextOptions<S> = {})
                 subscribeToType(documentEvents.on, type, listener),
               lastServerId: () => null,
             },
-            security: { allows: () => true },
+            security: { allows: () => true, allowsAnnotation: () => true },
             ...options.doc,
           } as unknown as DocumentHandle);
   const requireDoc = (): DocumentHandle => {
@@ -245,8 +255,14 @@ export function createTestContext<S = void>(options: TestContextOptions<S> = {})
   };
   const queues = new Map<string, SerialQueue>();
   const lanes = new Map<string, LatestLane>();
+  // The context is the plugin's only instance, so it holds the registration's settings itself.
+  const settingsStore = options.settings
+    ? createSettingsStore(options.settings, store.notify, report)
+    : null;
+  if (settingsStore) cleanups.push(() => settingsStore.dispose());
+  const settings = settingsStore?.forInstance((teardown) => cleanups.push(teardown)) ?? null;
 
-  const context: TestContext<S> = {
+  const context: TestContext<S, T> = {
     id,
     instanceId: meta.instanceId,
     engine: (options.engine ?? {}) as Engine,
@@ -262,6 +278,10 @@ export function createTestContext<S = void>(options: TestContextOptions<S> = {})
         lease.write(transition(lease.read(), ...args));
       },
       onChange: lease.onChange,
+    },
+    settings: () => {
+      if (!settings) throw new Error(`[${id}] the test context declares no settings`);
+      return settings;
     },
     notify: store.notify,
     watch: (select, handler, isEqual = Object.is) => {
@@ -325,7 +345,7 @@ export function createTestContext<S = void>(options: TestContextOptions<S> = {})
     serialQueue: (key = 'default') => {
       let queue = queues.get(key);
       if (!queue) {
-        queue = createSerialQueue();
+        queue = createSerialQueue(id);
         queues.set(key, queue);
       }
       return queue;
@@ -350,8 +370,15 @@ export function createTestContext<S = void>(options: TestContextOptions<S> = {})
     assertPageRef: (ref) => {
       if (!pages.some((pageInfo) => pageRefsEqual(pageInfo.ref, ref))) throw notFound(ref);
     },
-    getPage: (ref): PageInfo | null =>
-      pages.find((pageInfo) => pageRefsEqual(pageInfo.ref, ref)) ?? null,
+    getPage: (page) => findPage(pages, page),
+    pageOf: (page) => pageOf(pages, page, id),
+    allows: (permission) => sessionAllows(requireDoc().security, permission),
+    assertAllowed: (permission, operation) => {
+      if (!sessionAllows(requireDoc().security, permission)) {
+        throw permissionDenied(id, permission, operation);
+      }
+    },
+    cancellable: (signal, task) => cancellable(id, signal, task),
     capabilities,
     connect: (instance) => {
       instance.connect?.();

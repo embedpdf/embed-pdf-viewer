@@ -99,10 +99,12 @@ describe('form authority twins', () => {
     await expect(fixture.capability.setText(fieldRef.byObjectNumber(5), 'x')).rejects.toMatchObject(
       {
         code: 'permission-denied',
+        permission: 'doc.forms.fill',
       },
     );
     await expect(fixture.capability.reset(fieldRef.byObjectNumber(5))).rejects.toMatchObject({
       code: 'permission-denied',
+      permission: 'doc.forms.fill',
     });
     expect(fixture.setValue).not.toHaveBeenCalled();
   });

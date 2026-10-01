@@ -115,6 +115,45 @@ in plain words, each linking to the section that shows it.
 - The pages describe the API the code is moving to. Where they're ahead, the
   name is `pending` in the manifest, with why; the check fails once a pending
   entry is no longer needed, so the list only shrinks.
+- The same check compares the tables with the declarations next to each
+  contract, once a plugin has them: a State table's `Field` column with its
+  `defineState()` fields, a Settings table's `Setting` column with its settings
+  defaults (a row may name a group), and every `From CSS` column with
+  `EPDF_VARIABLES` in `@embedpdf/web`, both ways.
+
+## A page goes live when its code does
+
+The pages describe the API the code is moving to, so a page isn't shown as
+released until its code exists. Two machine checks decide it, per page and per
+framework, and run in `docs:check`:
+
+- `docs/content/scripts/snippets.mjs` compiles each framework's snippets against
+  the packages in the same commit (React with `tsc`, Angular with `ngc` and
+  `strictTemplates`, Vue with `vue-tsc`, Svelte with `svelte-check`) and writes
+  `generated/snippet-status.json`. It never fails the build.
+- `docs/content/scripts/publish-gate.mjs` writes `generated/live-pages.json`: a
+  page is live for a framework when its snippets compile for it and none of the
+  names its Methods, State or Events tables list is `pending`.
+
+Live examples (`docs/content/samples/`) are complete apps, so every one must compile.
+`docs/content/scripts/samples.mjs` checks them straight from `docs/content`, without syncing them
+into a site or starting one, and fails on an error:
+
+```sh
+pnpm --filter @embedpdf/docs-content samples          # every example
+pnpm --filter @embedpdf/docs-content samples search   # one area's examples
+```
+
+Both checks compile in a run directory of their own (`scripts/compile.mjs`), so several can run
+at the same time. The sites' `check:samples` still compiles what each site ships, the cloud form
+included.
+
+A page that isn't live shows its title and a notice that it describes 3.0 for
+that framework, linking to the React version when that one is live; it stays out
+of `llms.txt`, that framework's search index and search engines. With
+`DOCS_PREVIEW=1` (the preview site, and `next dev` unless `DOCS_PREVIEW=0`),
+every page is live under a banner. The sites read the gate through
+`@embedpdf/docs-kit/publish`. Both generated files are built, never committed.
 
 ## The support matrix is generated, not written
 

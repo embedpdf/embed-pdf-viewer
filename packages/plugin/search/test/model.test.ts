@@ -43,14 +43,14 @@ describe('search transitions', () => {
       ...initialSearchState(),
       hits: [hit(5, 0)],
       hitsByPage: { 5: [hit(5, 0)] },
-      activeIndex: 0,
+      activeHitIndex: 0,
       status: 'complete',
     };
     const state = startSession(dirty, { text: 'x', matchCase: true }, 'session#2');
     expect(state.status).toBe('searching');
     expect(state.hits).toEqual([]);
     expect(state.hitsByPage).toEqual({});
-    expect(state.activeIndex).toBe(-1);
+    expect(state.activeHitIndex).toBe(-1);
     expect(state.operationId).toBe('session#2');
     expect(state.query).toEqual({ text: 'x', matchCase: true });
   });
@@ -63,20 +63,31 @@ describe('search transitions', () => {
     expect(state.hits.length).toBe(3);
     expect(state.hitsByPage[5]).toBe(page5); // an untouched page keeps its array
     expect(state.hitsByPage[7].map((found) => found.start)).toEqual([2]);
-    expect(state.activeIndex).toBe(0);
+    expect(state.activeHitIndex).toBe(0);
     expect(state.progress).toEqual({ pagesSearched: 3, pageCount: 8 });
-    expect(pagesWithHits(state).map((page) => page.objectNumber)).toEqual([5, 7]);
+    // In document order, which moving a page changes: page 7 is first here.
+    const pages = [{ ref: toPageRef(7) }, { ref: toPageRef(6) }, { ref: toPageRef(5) }];
+    expect(pagesWithHits(state, pages).map((page) => page.objectNumber)).toEqual([7, 5]);
   });
 
   test('an empty slice only advances progress; an explicit active index survives appends', () => {
     let state = started();
     state = appendHits(state, [], { pagesSearched: 4, pageCount: 8 });
     expect(state.hits.length).toBe(0);
-    expect(state.activeIndex).toBe(-1);
+    expect(state.activeHitIndex).toBe(-1);
     state = appendHits(state, [hit(5, 0), hit(5, 9)], { pagesSearched: 5, pageCount: 8 });
     state = setActiveHit(state, 1);
     state = appendHits(state, [hit(7, 2)], { pagesSearched: 6, pageCount: 8 });
-    expect(state.activeIndex).toBe(1);
+    expect(state.activeHitIndex).toBe(1);
+  });
+
+  test('progress with the same counts keeps its object, and an empty slice with it changes nothing', () => {
+    let state = appendHits(started(), [hit(5, 0)], { pagesSearched: 1, pageCount: 8 });
+    const { progress } = state;
+    state = appendHits(state, [hit(5, 9)], { pagesSearched: 1, pageCount: 8 });
+    expect(state.progress).toBe(progress);
+    expect(state.hits.length).toBe(2);
+    expect(appendHits(state, [], { pagesSearched: 1, pageCount: 8 })).toBe(state);
   });
 
   test('complete, cancelled and failed are terminal; clearing returns to idle', () => {
@@ -87,6 +98,7 @@ describe('search transitions', () => {
       code: 'operation-failed',
       message: 'boom',
       capability: 'search',
+      permission: null,
     });
     expect(failed.status).toBe('error');
     expect(failed.error?.message).toBe('boom');

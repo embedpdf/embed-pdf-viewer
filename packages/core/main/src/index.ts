@@ -11,6 +11,17 @@ export { memo, memoByKey } from './memo';
 export { reload } from './mirror';
 export type { Mirror, MirrorChange, MirrorReload, MirrorSpec } from './mirror';
 export type { PageMirror, PageMirrorChange, PageMirrorSpec } from './page-mirror';
+export type {
+  DeepPartial,
+  NoSettings,
+  Settings,
+  SettingsApi,
+  SettingsChangedEvent,
+  SettingsDeclaration,
+  SettingsOf,
+} from './settings';
+export { defineState, shallowEqual } from './state';
+export type { StateDeclaration } from './state';
 export type { SliceChange } from './store';
 export type { SliceLease } from './store';
 export { CancelledError, isCancelled } from './scope';
@@ -48,6 +59,7 @@ export type {
   PdfRect,
 } from '@embedpdf/engine-core/runtime';
 
+import type { NoSettings } from './settings';
 import type { CapabilityToken, PluginDef } from './types';
 
 /**
@@ -70,9 +82,15 @@ export function createHostToken<Host>(token: CapabilityToken<unknown>): Capabili
   return token as CapabilityToken<Host>;
 }
 
-/** Identity helper that pins a plugin's state and capability types. */
-export function definePlugin<State, Capability>(
-  definition: PluginDef<State, Capability>,
-): PluginDef<State, Capability> {
+/**
+ * Define a plugin. It returns the definition as it is, and reads the types from it, so a
+ * plugin passes no type arguments: the capability from `token`, the state from `state`, the
+ * settings from `settings.defaults`. `create` receives a `PluginContext<State, Settings>`
+ * and must return the capability. A plugin without `state` is stateless (`void`); one
+ * without `settings` has `NoSettings`, and `ctx.settings()` throws there.
+ */
+export function definePlugin<State = void, Capability = unknown, Settings extends object = NoSettings>(
+  definition: PluginDef<State, Capability, Settings>,
+): PluginDef<State, Capability, Settings> {
   return definition;
 }

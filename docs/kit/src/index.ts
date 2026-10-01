@@ -57,5 +57,12 @@ export {
   type RenderDocsMarkdownOptions,
 } from './docs-markdown';
 export { PageMarkdownActions } from './page-markdown-actions';
+export {
+  PreviewBanner,
+  previewSentence,
+  releasedMarkdownSource,
+  UnreleasedNotice,
+  unreleasedSentence,
+} from './release';
 export { CodeExampleCard, type ExampleFile, type ExampleMode } from './code-example-card';
 export { CodeExample } from './code-example';

@@ -4,9 +4,9 @@ import { FormToken } from '@embedpdf/plugin-form/contract';
 import { InteractionToken } from '@embedpdf/plugin-interaction/contract/host';
 import { StampToken } from '@embedpdf/plugin-stamp/contract';
 
-import { SignatureToken, type SignatureCapability, type SignatureConfig } from './contract';
+import { SignatureToken, type SignatureConfig } from './contract';
 import { createSignatureController } from './controller';
-import { initialSignatureState, type SignatureState } from './model';
+import { initialSignatureState } from './model';
 
 /**
  * The signature plugin: the act of signing, document-scoped. It owns no
@@ -20,7 +20,7 @@ import { initialSignatureState, type SignatureState } from './model';
  * the field (sign, visual fill or ask, by mode) instead of onto the page.
  */
 export const signaturePlugin = (config: SignatureConfig = {}) =>
-  definePlugin<SignatureState, SignatureCapability>({
+  definePlugin({
     id: 'signature',
     token: SignatureToken,
     scope: 'document',

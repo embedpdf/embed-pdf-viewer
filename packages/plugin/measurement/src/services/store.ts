@@ -1,9 +1,12 @@
-/** The page registry, the authority guards, and the page-target expansion. */
+/** The page registry, the calibrate twin, and the page-target expansion. */
 import { PluginError } from '@embedpdf/core';
 import type { PageRef } from '@embedpdf/engine-core/runtime';
 
 import type { PageTarget } from '../contract';
 import type { MeasurementContext } from './context';
+
+/** Changing a page's scale rewrites its measurement annotations. */
+export const SCALE_PERMISSION = 'doc.annotate.modify';
 
 export function createStore(ctx: MeasurementContext) {
   const requirePage = (page: PageRef) => {
@@ -11,22 +14,13 @@ export function createStore(ctx: MeasurementContext) {
     if (!layout) throw new PluginError('not-found', 'measurement', 'no such page');
     return layout;
   };
-  const canCalibrate = () => ctx.doc.security.allows('doc.annotate.modify');
-  const assertAllowed = () => {
-    if (!canCalibrate()) {
-      throw new PluginError(
-        'permission-denied',
-        'measurement',
-        'changing a scale requires doc.annotate.modify',
-      );
-    }
-  };
+  const canCalibrate = () => ctx.allows(SCALE_PERMISSION);
   const targets = (pages: PageTarget): readonly PageRef[] =>
     pages === 'all'
       ? (ctx.document()?.pages ?? []).map((layout) => layout.ref)
       : Array.isArray(pages)
         ? (pages as readonly PageRef[])
         : [pages as PageRef];
-  return { requirePage, canCalibrate, assertAllowed, targets };
+  return { requirePage, canCalibrate, targets };
 }
 export type MeasurementStore = ReturnType<typeof createStore>;

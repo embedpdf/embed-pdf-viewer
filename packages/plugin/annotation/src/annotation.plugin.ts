@@ -5,8 +5,8 @@ import { SelectionToken } from '@embedpdf/plugin-selection/contract/host';
 
 import type { AnnotationConfig } from './contract';
 import { createAnnotationController } from './controller';
-import { AnnotationToken, type AnnotationHostCapability } from './host-contract';
-import { initialAnnotationState, type AnnotationState } from './model';
+import { AnnotationToken } from './host-contract';
+import { initialAnnotationState } from './model';
 
 /**
  * The annotation plugin. Document-scoped; requires the interaction hub and
@@ -14,7 +14,7 @@ import { initialAnnotationState, type AnnotationState } from './model';
  * markup lights up only when it is present.
  */
 export const annotationPlugin = (config: AnnotationConfig = {}) =>
-  definePlugin<AnnotationState, AnnotationHostCapability>({
+  definePlugin({
     id: 'annotation',
     token: AnnotationToken,
     scope: 'document',

@@ -25,7 +25,7 @@ export function createMeasurementController(
   const reads = createScaleReads(ctx, services, config, viewports);
   const scale = createScaleWrites(ctx, services, config, reads, viewports);
   const calibration = createCalibration(ctx, services);
-  const measuring = createMeasuring(services, viewports);
+  const measuring = createMeasuring(ctx, services, viewports);
 
   const api: MeasurementCapability = composeApi('measurement', [
     reads.api,

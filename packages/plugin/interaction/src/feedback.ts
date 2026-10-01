@@ -30,7 +30,7 @@ const NOOP: PlatformFeedback = { selection() {}, impact() {}, notify() {} };
  * is the provider (or the no-op).
  */
 export const feedbackPlugin = (options: FeedbackPluginOptions = {}) =>
-  definePlugin<void, PlatformFeedback>({
+  definePlugin({
     id: 'feedback',
     scope: 'workspace',
     token: FeedbackToken,

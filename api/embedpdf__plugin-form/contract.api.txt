@@ -10,7 +10,7 @@ FormCommitStatus [TypeAliasDeclaration]: export type FormCommitStatus = 'applied
 FormConfig [InterfaceDeclaration]: export interface FormConfig{ validation?: 'scripts' | 'none'; }
 FormDataExport [InterfaceDeclaration] (from packages/engine/core/src/mutation/FormMutationResults.ts): export interface FormDataExport{ format: 'fdf' | 'xfdf'; bytes: Uint8Array; }
 FormDataFormat [TypeAliasDeclaration] (from packages/engine/core/src/forms/value.ts): export type FormDataFormat = 'fdf' | 'xfdf';
-FormFieldChangedEvent [InterfaceDeclaration]: export interface FormFieldChangedEvent{ readonly ref: FormFieldRef; readonly field: FormFieldDTO | null; readonly origin: ChangeOrigin; }
+FormFieldChangedEvent [InterfaceDeclaration]: export interface FormFieldChangedEvent{ readonly ref: FormFieldRef; readonly field: FormFieldDTO | null; readonly origin: EventOrigin; }
 FormFieldDTO [TypeAliasDeclaration] (from packages/engine/core/src/forms/field.ts): export type FormFieldDTO<C extends Coordinates = PageCoordinates> = | TextFieldDTO<C> | CheckboxFieldDTO<C> | RadioFieldDTO<C> | ComboBoxFieldDTO<C> | ListBoxFieldDTO<C> | PushButtonFieldDTO<C> | SignatureFieldDTO<C> | UnknownFieldDTO<C>;
 FormFieldFamily [TypeAliasDeclaration] (from packages/engine/core/src/forms/field.ts): export type FormFieldFamily = | 'text' | 'checkbox' | 'radio' | 'combobox' | 'listbox' | 'pushbutton' | 'signature' | 'unknown';
 FormFieldPatch [TypeAliasDeclaration] (from packages/engine/core/src/forms/patch.ts): export type FormFieldPatch = | TextFieldPatch | CheckboxFieldPatch | RadioFieldPatch | ComboBoxFieldPatch | ListBoxFieldPatch | SignatureFieldPatch;
@@ -26,7 +26,7 @@ FormSnapshot [InterfaceDeclaration] (from packages/engine/core/src/forms/snapsho
 FormToken [VariableDeclaration] (from packages/plugin/form/src/token.ts): FormToken = createCapabilityToken<FormCapability>('form', { hint: `add formPlugin() from '@embedpdf/plugin-form' to your plugins list`, } )
 FormUiEffect [TypeAliasDeclaration]: export type FormUiEffect = ScriptUiEffect &{ phase: 'boot' | 'user'; origin?: ActionOrigin; } ;
 FormValidationRejectedEvent [InterfaceDeclaration]: export interface FormValidationRejectedEvent{ readonly ref: FormFieldRef; readonly issues: readonly ScriptDiagnostic[]; }
-FormValueChangedEvent [InterfaceDeclaration]: export interface FormValueChangedEvent{ readonly ref: FormFieldRef; readonly field: FormFieldDTO; readonly origin: ChangeOrigin; }
+FormValueChangedEvent [InterfaceDeclaration]: export interface FormValueChangedEvent{ readonly ref: FormFieldRef; readonly field: FormFieldDTO; readonly origin: EventOrigin; }
 FormWidgetItem [TypeAliasDeclaration]: export type FormWidgetItem = FillItem;
 SetValueResult [TypeAliasDeclaration]: export type SetValueResult = FormCommitResult;
 WidgetActivationResult [TypeAliasDeclaration]: export type WidgetActivationResult = |{ kind: 'form'; result: FormCommitResult} |{ kind: 'dispatched'; result: ActionTriggerResult} ;

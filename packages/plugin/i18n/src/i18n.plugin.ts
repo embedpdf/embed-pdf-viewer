@@ -1,8 +1,8 @@
 import { definePlugin } from '@embedpdf/core';
 
-import { I18nToken, type I18nCapability, type I18nConfig } from './contract';
+import { I18nToken, type I18nConfig } from './contract';
 import { createI18nController } from './controller';
-import { initialI18nState, type I18nState } from './model';
+import { initialI18nState } from './model';
 
 /**
  * The i18n plugin: workspace-scoped (locale is a workspace concern) with no
@@ -11,7 +11,7 @@ import { initialI18nState, type I18nState } from './model';
  * the engine is still booting.
  */
 export const i18nPlugin = (config: I18nConfig = {}) =>
-  definePlugin<I18nState, I18nCapability>({
+  definePlugin({
     id: 'i18n',
     scope: 'workspace',
     token: I18nToken,

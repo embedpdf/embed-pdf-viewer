@@ -7,7 +7,7 @@
  * load re-judges at once when anything is signed; a changed snapshot and
  * every edit of the working copy re-judge once the edits pause.
  */
-import { originOf, type Mirror } from '@embedpdf/core';
+import type { Mirror } from '@embedpdf/core';
 import type { DocumentEvent, DocumentProtection } from '@embedpdf/engine-core/runtime';
 
 import {
@@ -71,7 +71,7 @@ export function createSignaturesMirror(
         signed.emit({
           field: event.signature.field,
           result: completeResultOf(event),
-          origin: originOf(event),
+          origin: event.origin,
         });
       }
       if (!hasSignedField(next.snapshot)) return;

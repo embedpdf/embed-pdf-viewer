@@ -35,6 +35,7 @@ shaped by the test.
 | -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `id`           | The plugin id (`ctx.id`, error messages). Default `'test'`.                                                                                                                      |
 | `state`        | The initial session state; omit for a stateless plugin.                                                                                                                          |
+| `settings`     | The plugin's settings as its definition declares them, `{ defaults, registered? }`; `ctx.settings()` reads them. Without them, `ctx.settings()` doesn't compile.                 |
 | `pages`        | The document's pages: `{ ref, size?, crop?, rotation?, userUnit?, label? }`. `document()`, `getPage` and `geometry` derive from them.                                            |
 | `capabilities` | `[token, capability]` pairs that `get` and `tryGet` resolve.                                                                                                                     |
 | `doc`          | The document handle members the test uses (`metadata`, `forms`, `page`, …). The default has an event stream and `security.allows` answering true. `null` for a workspace plugin. |
@@ -134,11 +135,11 @@ describe('title controller', () => {
   it('sees its own write when setTitle resolves', async () => {
     const { title } = harness('Draft');
     await settle();
-    const localities: string[] = [];
-    title.onTitleChanged((event) => localities.push(event.origin.locality));
+    const kinds: string[] = [];
+    title.onTitleChanged((event) => kinds.push(event.origin.kind));
     await title.setTitle('Final');
     expect(title.getTitle()).toBe('Final');
-    expect(localities).toEqual(['local']);
+    expect(kinds).toEqual(['local']);
   });
 
   it("applies another session's change through the same fold", async () => {

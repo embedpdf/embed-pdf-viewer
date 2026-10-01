@@ -8,6 +8,11 @@ description: Find text in the document, highlight every match on the page, step 
 The search plugin finds text in the whole document and highlights every match. Register
 `searchPlugin()`, put `<SearchLayer>` in each page, and search from your own search box:
 
+<Example name="search/basic" />
+
+> **Try it:** type a word, then press **Enter** for the next match and **Shift+Enter** for the one
+> before. Each move scrolls the match into view.
+
 <Snippet name="search/search-box" />
 
 - **Matches appear as they're found.** Large documents are searched a few pages at a time, and the
@@ -23,6 +28,11 @@ The search plugin finds text in the whole document and highlights every match. R
 search.search({ text: 'invoice total', wholeWord: true, matchCase: false });
 ```
 
+<Example name="search/options" />
+
+> **Try it:** turn on **Match case** and `pdf` no longer finds `PDF`; turn on **Whole words** and it
+> no longer finds `EmbedPDF`.
+
 | Option             | What it does                                                 | Default  |
 | :----------------- | :----------------------------------------------------------- | :------- |
 | `text`             | What to find                                                 | required |
@@ -37,6 +47,8 @@ A search starts from the page the reader is on, and `{ from: page.ref }` starts 
 ## A list of results
 
 `useSearchHits()` gives you every match found so far, each with a few words around it:
+
+<Example name="search/results-list" />
 
 <Snippet name="search/results" />
 
@@ -99,6 +111,12 @@ example in dark mode:
   }
 }
 ```
+
+<Example name="search/highlight-colors" />
+
+> **Try it:** pick a color, and `search.updateSettings({ highlight })` changes it at once. Then turn
+> on **Override with CSS**: the CSS variables win over the color you picked, and their translucent
+> highlights, drawn with `blendMode: 'normal'`, stay visible on the dark cover.
 
 ## Click a match on the page
 
@@ -167,7 +185,7 @@ Set them when you register the plugin, and change them while the app runs with
 | Event                | Fires when                                              | Carries                   |
 | :------------------- | :------------------------------------------------------ | :------------------------ |
 | `onStarted`          | A search started                                        | `query`                   |
-| `onProgressChanged`  | More pages were searched                                | `hitCount`, `pagesSearched`, `pageCount` |
+| `onProgressChanged`  | The search's progress changed: more pages were searched, or a new search started over | `hitCount`, `pagesSearched`, `pageCount` |
 | `onCompleted`        | The whole document was searched                         | `hitCount`                |
 | `onCancelled`        | A search stopped before the end                         | `reason`                  |
 | `onFailed`           | A search failed                                         | `error`                   |

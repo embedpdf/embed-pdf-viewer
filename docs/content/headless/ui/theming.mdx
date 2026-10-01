@@ -39,11 +39,12 @@ Use it for dark mode, for a different look per viewer, or to keep colors in your
 ```
 
 Put the class on an element around your viewer; nothing needs importing. The rule is short: any CSS
-variable wins over any setting. A part looks for its own variable, then its plugin's accent variable
-(such as `--epdf-annotation-accent`), then `--epdf-accent`. Only when none is set does its setting
-apply, then the setting it follows, then the built-in color.
+variable wins over any setting. A part looks for its own variable first, then the variable of the
+part it follows: the rotation handle uses `--epdf-annotation-handle-fill` unless you give it its
+own, and a part that follows the accent uses `--epdf-annotation-accent`, then `--epdf-accent`. Only
+when none is set does its setting apply, then the setting it follows, then the built-in color.
 
-Only paint comes from CSS: colors, line widths, dashes, shadows and opacity. How big a handle is,
+Only paint comes from CSS: colors, line widths, dashes, shadows, opacity and blend modes. How big a handle is,
 where the rotation handle sits and how close snapping starts are settings only, because they decide
 where a click lands.
 
@@ -206,7 +207,9 @@ EmbedPDF's elements inside your own components, whatever their `encapsulation`.
 ### Translucent defaults
 
 Defaults such as "the accent at 35%" are mixed with `color-mix()`, which every current browser
-supports, so they always match the color they follow.
+supports, so they always match the color they follow. A translucent part you set yourself, such as
+`selectionPlugin({ color })`, keeps that color when `--epdf-accent` changes; set its own variable
+(`--epdf-text-selection`) to change it from CSS.
 
 ### The ready-made Viewer
 

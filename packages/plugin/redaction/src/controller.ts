@@ -15,7 +15,7 @@ import { createMarking } from './write/marks';
 
 export function createRedactionController(ctx: RedactionContext, config: RedactionConfig = {}) {
   const services = createServices(ctx);
-  const { events, store, siblings } = services;
+  const { events, store } = services;
 
   const pending = createPendingReads(services);
   const marking = createMarking(ctx, services, config, pending);
@@ -26,9 +26,9 @@ export function createRedactionController(ctx: RedactionContext, config: Redacti
     marking.api,
     applying.api,
     {
-      // Marks are annotations, so marking authority is annotation create
-      // authority: the annotation plugin's own twin, not a re-derivation.
-      canMark: () => siblings.annotation.canCreate(),
+      // Marks are annotations, so marking needs the session's annotation
+      // create permission: what the annotation plugin's `canCreate` reads too.
+      canMark: () => ctx.allows('annotations:create'),
       canApply: store.canApply,
       isApplying: () => ctx.state.get().applying,
       getLastResult: () => ctx.state.get().lastResult,

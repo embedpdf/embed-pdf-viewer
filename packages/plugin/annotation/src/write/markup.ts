@@ -36,7 +36,7 @@ const selectionMarkupOf = (tool: ResolvedTool): SelectionMarkup | null => {
  * a text tool) and the programmatic `createFromSelection`.
  */
 export function createMarkupWrites(
-  ctx: Pick<AnnotationContext, 'tryGet'>,
+  ctx: Pick<AnnotationContext, 'tryGet' | 'assertAllowed'>,
   { store, authority, tools }: Pick<AnnotationServices, 'store' | 'authority' | 'tools'>,
 ) {
   // A markup tool's `/F` seed rides along (the preset is the tool id).
@@ -132,7 +132,7 @@ export function createMarkupWrites(
       subtype: MarkupSubtype | 'insert-text' | 'replace-text' | 'redact',
       options?: { preset?: string; clear?: boolean },
     ): Promise<readonly AnnotationRef[]> => {
-      authority.assertCreate();
+      ctx.assertAllowed('annotations:create', 'annotation.createFromSelection');
       const selection = ctx.tryGet(SelectionPublicToken);
       if (!selection || !selection.hasSelection()) return [];
       const markup: SelectionMarkup =

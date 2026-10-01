@@ -13,15 +13,10 @@ import {
 } from '@embedpdf/react/selection';
 import { localEngine } from '@embedpdf/engine';
 
-import { Button, Demo, StageFrame, stageFill } from '../stage/_shared/chrome';
+import './menu.css';
 
 const engine = localEngine();
-const plugins = [
-  stagePlugin(),
-  renderPlugin(),
-  interactionPlugin(),
-  selectionPlugin(),
-];
+const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), selectionPlugin()];
 
 const ebook = async (): Promise<OpenInput> => {
   const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
@@ -38,19 +33,15 @@ function SelectionActions() {
   };
 
   return (
-    <div
-      style={{
-        display: 'flex',
-        gap: 6,
-        padding: 6,
-        border: '1px solid #e6eaf2',
-        borderRadius: 12,
-        background: '#fff',
-        boxShadow: '0 8px 24px rgba(7, 32, 76, 0.18)',
-      }}
-    >
-      {selection.canCopy() && <Button onClick={copy}>Copy</Button>}
-      <Button onClick={() => selection.clear()}>Clear</Button>
+    <div className="menu">
+      {selection.canCopy() && (
+        <button type="button" className="button" onClick={copy}>
+          Copy
+        </button>
+      )}
+      <button type="button" className="button" onClick={() => selection.clear()}>
+        Clear
+      </button>
     </div>
   );
 }
@@ -58,28 +49,24 @@ function SelectionActions() {
 export default function App() {
   return (
     <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: ebook }]}>
-      <Demo>
-        <DocumentGate fallback={<p>Loading…</p>}>
-          <SelectionClipboard />
-          <StageFrame height={460}>
-            <Stage
-              style={stageFill}
-              overlay={
-                <SelectionMenu>
-                  <SelectionActions />
-                </SelectionMenu>
-              }
-            >
-              {() => (
-                <>
-                  <RenderLayer />
-                  <SelectionLayer />
-                </>
-              )}
-            </Stage>
-          </StageFrame>
-        </DocumentGate>
-      </Demo>
+      <DocumentGate fallback={<p className="loading">Loading…</p>}>
+        <SelectionClipboard />
+        <Stage
+          className="stage"
+          overlay={
+            <SelectionMenu>
+              <SelectionActions />
+            </SelectionMenu>
+          }
+        >
+          {() => (
+            <>
+              <RenderLayer />
+              <SelectionLayer />
+            </>
+          )}
+        </Stage>
+      </DocumentGate>
     </Viewer>
   );
 }

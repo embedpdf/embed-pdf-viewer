@@ -9,9 +9,9 @@
  */
 import {
   type BatchResult,
-  type ChangeOrigin,
   type EngineRenderPolicy,
   type EventHook,
+  type EventOrigin,
   type OperationOptions,
   type PageImageHandle,
   type PageImageOptions,
@@ -119,7 +119,7 @@ export interface RenderInvalidatedEvent {
    * Where the document mutation came from. Null when a caller requested the
    * invalidation through {@link RenderCapability.invalidate}.
    */
-  readonly origin: ChangeOrigin | null;
+  readonly origin: EventOrigin | null;
 }
 
 // ── the public capability ───────────────────────────────────────────────────

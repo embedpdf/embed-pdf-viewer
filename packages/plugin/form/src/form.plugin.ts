@@ -5,8 +5,8 @@ import { InteractionToken } from '@embedpdf/plugin-interaction/contract/host';
 
 import type { FormConfig } from './contract';
 import { createFormController } from './controller';
-import { FormToken, type FormHostCapability } from './host-contract';
-import { initialFormState, type FormState } from './model';
+import { FormToken } from './host-contract';
+import { initialFormState } from './model';
 
 /**
  * The form plugin: the field plane. Document-scoped; requires the
@@ -20,7 +20,7 @@ import { initialFormState, type FormState } from './model';
  * annotations.
  */
 export const formPlugin = (config: FormConfig = {}) =>
-  definePlugin<FormState, FormHostCapability>({
+  definePlugin({
     id: 'form',
     token: FormToken,
     scope: 'document',

@@ -453,9 +453,11 @@ describe('the records mirror', () => {
     await harness.capability.update(ref(70), { subtype: 'square', contents: 'x' } as never);
     expect(updated).toHaveBeenCalledTimes(1);
     expect(updated.mock.calls[0]![0].origin).toEqual({
-      locality: 'local',
+      kind: 'local',
       sessionId: 'me',
-      actorId: null,
+      sub: null,
+      ts: 0,
+      serverId: null,
     });
   });
 });
@@ -920,6 +922,7 @@ describe('the twin law — authority fused into presentation and gestures', () =
     );
     await expect(harness.capability.createFromSelection('highlight')).rejects.toMatchObject({
       code: 'permission-denied',
+      permission: 'annotations:create',
     });
     expect(harness.model().order).toHaveLength(0);
     expect(harness.create).not.toHaveBeenCalled();

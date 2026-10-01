@@ -25,7 +25,7 @@ import type { ResolvedTool } from '../tools/definitions';
  * down to.
  */
 export function createIcons(
-  ctx: Pick<AnnotationContext, 'doc'>,
+  ctx: Pick<AnnotationContext, 'doc' | 'assertAllowed'>,
   {
     store,
     geometry,
@@ -112,7 +112,7 @@ export function createIcons(
     placeAt: (page: PageRef, point: Point, displayRotation?: number, zoom?: number) =>
       placeAt(page.objectNumber, point, displayRotation, zoom),
     createAttachment: async (page: PageRef, at: Point, file: AttachmentFileSource) => {
-      authority.assertCreate();
+      ctx.assertAllowed('annotations:create', 'annotation.createAttachment');
       authority.assertPage(page);
       const doc = ctx.doc;
       const pageObjectNumber = page.objectNumber;

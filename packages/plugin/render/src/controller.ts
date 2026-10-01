@@ -1,14 +1,12 @@
 import {
   CONTINUOUS_RENDER_POLICY,
-  PluginError,
   isPluginError,
   memo,
-  originOf,
   toPageRef,
   toPluginError,
   toPluginErrorInfo,
   type BatchResult,
-  type ChangeOrigin,
+  type EventOrigin,
   type PluginContext,
   type DocCapability,
   type EngineRenderPolicy,
@@ -89,14 +87,7 @@ export function createRenderController(ctx: PluginContext<RenderState>, config: 
   const renderCompleted = ctx.events.source<RenderCompletedEvent>();
   const renderFailed = ctx.events.source<RenderFailedEvent>();
 
-  const canRender = (): boolean => ctx.doc.security.allows(RENDER_SCOPE);
-  const permissionDenied = (operation: string): PluginError =>
-    new PluginError('permission-denied', 'render', `${operation} requires ${RENDER_SCOPE}`, {
-      details: { required: RENDER_SCOPE },
-    });
-  const assertCanRender = (operation: string): void => {
-    if (!canRender()) throw permissionDenied(operation);
-  };
+  const canRender = (): boolean => ctx.allows(RENDER_SCOPE);
 
   // One-shot developer hints: misconfigurations, not errors.
   let warnedFormat = false;
@@ -226,7 +217,7 @@ export function createRenderController(ctx: PluginContext<RenderState>, config: 
       signal,
     }: { scale: number; includeAnnotations?: boolean; signal?: AbortSignal },
   ): Promise<PageImageHandle> {
-    assertCanRender('render.renderSource');
+    ctx.assertAllowed(RENDER_SCOPE, 'render.renderSource');
     const annotations = includeAnnotations ?? true;
     const viewport = conformViewport(page, scale);
     const strategy = currentStrategy();
@@ -255,7 +246,7 @@ export function createRenderController(ctx: PluginContext<RenderState>, config: 
     page: PageRef,
     options: RenderPageOptions = {},
   ): Promise<PageImageHandle> {
-    assertCanRender('render.renderPage');
+    ctx.assertAllowed(RENDER_SCOPE, 'render.renderPage');
     const pageWidth = pageWidthOf(page);
     const width = Math.max(1, Math.round(options.width ?? (options.scale ?? 1) * pageWidth));
     const annotations = options.includeAnnotations ?? true;
@@ -278,7 +269,7 @@ export function createRenderController(ctx: PluginContext<RenderState>, config: 
     pages: readonly PageRef[],
     options: RenderPagesOptions = {},
   ): Promise<BatchResult<PageRender, PageRef>> {
-    assertCanRender('render.renderPages');
+    ctx.assertAllowed(RENDER_SCOPE, 'render.renderPages');
     const concurrency = Math.max(1, options.concurrency ?? DEFAULT_BATCH_CONCURRENCY);
     const applied: PageRender[] = [];
     const failed: { ref: PageRef; error: PluginErrorInfo }[] = [];
@@ -305,7 +296,7 @@ export function createRenderController(ctx: PluginContext<RenderState>, config: 
   function publishInvalidation(
     pageObjectNumbers: readonly PageObjectNumber[],
     scope: InvalidateScope,
-    origin: ChangeOrigin | null,
+    origin: EventOrigin | null,
   ): void {
     if (pageObjectNumbers.length === 0) return;
     ctx.state.update(invalidatePages, pageObjectNumbers, scope);
@@ -354,10 +345,10 @@ export function createRenderController(ctx: PluginContext<RenderState>, config: 
     getPolicy: renderPolicy,
     getPageSize: (pageObjectNumber) => ctx.getPage(toPageRef(pageObjectNumber))?.size,
     getEpoch: epochOf,
-    fetchTile: (pageObjectNumber, rect: Rect, scale, includeAnnotations, signal) => {
+    fetchTile: async (pageObjectNumber, rect: Rect, scale, includeAnnotations, signal) => {
       // The same refusal the engine would send, without the round trip: a
       // denied session's viewport would otherwise be refused once per tile.
-      if (!canRender()) return Promise.reject(permissionDenied('render.tile'));
+      ctx.assertAllowed(RENDER_SCOPE, 'render.tile');
       const page = toPageRef(pageObjectNumber);
       const strategy = currentStrategy();
       const task = ctx.doc.page(page).render.image({
@@ -483,7 +474,7 @@ export function createRenderController(ctx: PluginContext<RenderState>, config: 
       ctx.listen(ctx.doc.events, (event) => {
         const change = pixelChangeOf(event, allPageObjectNumbers);
         if (!change) return;
-        publishInvalidation(change.pages, change.scope, 'origin' in event ? originOf(event) : null);
+        publishInvalidation(change.pages, change.scope, 'origin' in event ? event.origin : null);
       });
     },
   };

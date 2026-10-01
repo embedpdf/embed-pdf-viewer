@@ -12,7 +12,7 @@
  *
  * The data itself is already in the records mirror when this runs.
  */
-import { originOf, type MirrorChange } from '@embedpdf/core';
+import type { MirrorChange } from '@embedpdf/core';
 import { annotationKey, refFromStableId } from '@embedpdf/engine-core/runtime';
 
 import { preferBaked, preferVector } from '../model';
@@ -37,8 +37,8 @@ export function followConfirmedChanges(
     }
     const event = change.event;
     if (!event || !('origin' in event)) return;
-    const origin = originOf(event);
-    const remote = event.origin.kind === 'remote';
+    const { origin } = event;
+    const remote = origin.kind === 'remote';
     switch (event.type) {
       case 'annotations.created': {
         const { annotation: created } = event;

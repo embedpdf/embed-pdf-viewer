@@ -4,11 +4,16 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 import { renderDocsMarkdown } from './docs-markdown';
+import type { DocsRelease } from './docs-release';
 
 /**
  * The headless docs, written for each framework (docs/conventions/docs-architecture.md): a page
  * that's been written for every framework never shows another one. The check reads each
  * framework's Markdown export, which says exactly what the page says.
+ *
+ * It follows the publish gate (`./docs-release`): each page as the preview site shows it, in
+ * full, which is everything the live site shows too; and each page as it shows where the gate
+ * holds it back.
  */
 
 const HEADLESS = path.resolve(process.cwd(), 'src/content/docs/headless');
@@ -47,11 +52,20 @@ const KNOWN: Record<string, Partial<Record<Framework, string[]>>> = {
   'quick-start': { angular: ['stagePlugin(', 'renderPlugin('] },
 };
 
-function markdownFor(page: string, framework: Framework) {
+const PREVIEW: DocsRelease = { live: true, preview: true, reactLive: true };
+/** Held back, with the React version live (so the notice links to it) unless it's React's own. */
+const heldBack = (framework: Framework): DocsRelease => ({
+  live: false,
+  preview: false,
+  reactLive: framework !== 'react',
+});
+
+function markdownFor(page: string, framework: Framework, release = PREVIEW) {
   return renderDocsMarkdown({
     sourceCode: fs.readFileSync(path.join(HEADLESS, `${page}.mdx`), 'utf8'),
     canonicalPath: `/docs/headless/${framework}/${page.replace(/\/?index$/, '')}`,
     integration: framework,
+    release,
   });
 }
 
@@ -69,6 +83,14 @@ describe('headless pages written for each framework', () => {
         expect(leaks(page, markdownFor(page, framework), framework)).toEqual([]);
       });
     }
+  }
+
+  for (const framework of FRAMEWORKS) {
+    it(`a page held back for ${framework} shows only ${framework}`, () => {
+      for (const page of PAGES) {
+        expect(leaks(page, markdownFor(page, framework, heldBack(framework)), framework)).toEqual([]);
+      }
+    });
   }
 
   it('shows each framework its own names and code', () => {

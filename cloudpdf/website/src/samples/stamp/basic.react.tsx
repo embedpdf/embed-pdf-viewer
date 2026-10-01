@@ -18,15 +18,7 @@ import { loadDefaultLibrary } from '@embedpdf/default-stamps/library';
 import { cloudEngine } from '@cloudpdf/engine';
 import { localEngine } from '@embedpdf/engine';
 
-import {
-  Button,
-  Demo,
-  Readout,
-  Spacer,
-  StageFrame,
-  Toolbar,
-  stageFill,
-} from '../stage/_shared/chrome';
+import './basic.css';
 
 const engine = cloudEngine({ baseUrl: 'https://engine.cloudpdf.com' });
 const assetEngine = localEngine();
@@ -69,10 +61,15 @@ function StampCell({
 }) {
   const url = useStampAssetPreviewUrl(asset.id);
   return (
-    <Button title={`${asset.label} (/Name ${asset.name})`} onClick={onArm}>
+    <button
+      type="button"
+      className="button"
+      title={`${asset.label} (/Name ${asset.name})`}
+      onClick={onArm}
+    >
       {armed ? '▸ ' : ''}
-      {url ? <img src={url} alt={asset.label} style={{ height: 22 }} /> : asset.label}
-    </Button>
+      {url ? <img src={url} alt={asset.label} className="preview" /> : asset.label}
+    </button>
   );
 }
 
@@ -85,11 +82,11 @@ function StampPicker() {
   // Leaving the stamp tool (Escape, another tool) un-highlights the picker.
   const armed = activeToolId === 'stamp' ? armedId : null;
 
-  if (error) return <Readout>Could not load the stamps: {error}</Readout>;
-  if (libraries.length === 0) return <Readout>Loading stamps…</Readout>;
+  if (error) return <output className="readout">Could not load the stamps: {error}</output>;
+  if (libraries.length === 0) return <output className="readout">Loading stamps…</output>;
   return (
-    <Toolbar>
-      <Readout>{libraries[0].name}</Readout>
+    <div className="toolbar">
+      <output className="readout">{libraries[0].name}</output>
       {assets.slice(0, 5).map((asset) => (
         <StampCell
           key={asset.id}
@@ -101,32 +98,34 @@ function StampPicker() {
           }}
         />
       ))}
-      <Spacer />
-      <Button title="Put the stamp tool down" disabled={!armed} onClick={disarm}>
+      <span className="spacer" />
+      <button
+        type="button"
+        className="button"
+        title="Put the stamp tool down"
+        disabled={!armed}
+        onClick={disarm}
+      >
         Done
-      </Button>
-    </Toolbar>
+      </button>
+    </div>
   );
 }
 
 export default function App() {
   return (
     <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: ebook }]}>
-      <Demo>
-        <DocumentGate fallback={<p>Loading…</p>}>
-          <StampPicker />
-          <StageFrame height={420}>
-            <Stage style={stageFill}>
-              {() => (
-                <>
-                  <RenderLayer annotations={false} />
-                  <AnnotationLayer />
-                </>
-              )}
-            </Stage>
-          </StageFrame>
-        </DocumentGate>
-      </Demo>
+      <DocumentGate fallback={<p className="loading">Loading…</p>}>
+        <StampPicker />
+        <Stage className="stage">
+          {() => (
+            <>
+              <RenderLayer annotations={false} />
+              <AnnotationLayer />
+            </>
+          )}
+        </Stage>
+      </DocumentGate>
     </Viewer>
   );
 }

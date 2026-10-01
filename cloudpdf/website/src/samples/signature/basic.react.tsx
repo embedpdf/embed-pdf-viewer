@@ -20,15 +20,7 @@ import type { SignerRow } from '@embedpdf/react/signature';
 import { cloudEngine } from '@cloudpdf/engine';
 import { localEngine } from '@embedpdf/engine';
 
-import {
-  Button,
-  Demo,
-  Readout,
-  Spacer,
-  StageFrame,
-  Toolbar,
-  stageFill,
-} from '../stage/_shared/chrome';
+import './basic.css';
 
 const engine = cloudEngine({ baseUrl: 'https://engine.cloudpdf.com' });
 const assetEngine = localEngine();
@@ -110,9 +102,9 @@ function MarkButton({
 }) {
   const url = useStampAssetPreviewUrl(assetId);
   return (
-    <Button title={label} onClick={onPick}>
-      {url ? <img src={url} alt={label} style={{ height: 22 }} /> : label}
-    </Button>
+    <button type="button" className="button" title={label} onClick={onPick}>
+      {url ? <img src={url} alt={label} className="preview" /> : label}
+    </button>
   );
 }
 
@@ -138,10 +130,10 @@ function SignBar() {
       .catch((err) => setError(err instanceof Error ? err.message : String(err)));
   };
 
-  if (!person) return <Readout>Creating a signature…</Readout>;
+  if (!person) return <output className="readout">Creating a signature…</output>;
   return (
-    <Toolbar>
-      <Readout>{person.name}</Readout>
+    <div className="toolbar">
+      <output className="readout">{person.name}</output>
       {person.signatures.map((asset) => (
         <MarkButton
           key={asset.id}
@@ -150,8 +142,8 @@ function SignBar() {
           onPick={() => pick(asset.id)}
         />
       ))}
-      <Spacer />
-      <Readout>
+      <span className="spacer" />
+      <output className="readout">
         {error
           ? `Error: ${error}`
           : busy
@@ -163,30 +155,26 @@ function SignBar() {
                 : target
                   ? 'Field selected: pick the mark'
                   : 'Click the field, or pick the mark'}
-      </Readout>
-    </Toolbar>
+      </output>
+    </div>
   );
 }
 
 export default function App() {
   return (
     <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: ebook }]}>
-      <Demo>
-        <DocumentGate fallback={<p>Loading…</p>}>
-          <SignBar />
-          <StageFrame height={420}>
-            <Stage style={stageFill}>
-              {() => (
-                <>
-                  <RenderLayer annotations={false} />
-                  {/* the signature widget renders "sign here" (sets the target) or "inspect" */}
-                  <AnnotationLayer renderers={renderers} />
-                </>
-              )}
-            </Stage>
-          </StageFrame>
-        </DocumentGate>
-      </Demo>
+      <DocumentGate fallback={<p className="loading">Loading…</p>}>
+        <SignBar />
+        <Stage className="stage">
+          {() => (
+            <>
+              <RenderLayer annotations={false} />
+              {/* the signature widget renders "sign here" (sets the target) or "inspect" */}
+              <AnnotationLayer renderers={renderers} />
+            </>
+          )}
+        </Stage>
+      </DocumentGate>
     </Viewer>
   );
 }

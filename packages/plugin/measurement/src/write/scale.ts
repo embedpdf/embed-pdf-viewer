@@ -32,6 +32,7 @@ import {
 import type { MeasurementScaleReads } from '../read/scale';
 import { defaultMeasure, withAreaUnit, withPrecision, withUnit } from '../scale';
 import type { MeasurementContext, MeasurementServices } from '../services';
+import { SCALE_PERMISSION } from '../services/store';
 import type { MeasurementViewportSync } from '../sync/viewports';
 
 export function createScaleWrites(
@@ -46,7 +47,7 @@ export function createScaleWrites(
   }: Pick<MeasurementViewportSync, 'ensureLoaded' | 'refresh' | 'scaleOf'>,
 ) {
   const { scaleChanged, calibrationCompleted } = events;
-  const { requirePage, assertAllowed, targets } = store;
+  const { requirePage, targets } = store;
   const { annotation } = siblings;
 
   /** One write queue per page, so a page's scale changes land in order. */
@@ -70,9 +71,9 @@ export function createScaleWrites(
     scale: PdfMeasure | null,
     options: ScaleChangeOptions,
   ): Promise<ScaleChangeReport> => {
-    assertAllowed();
+    ctx.assertAllowed(SCALE_PERMISSION, 'changing a scale');
     await ensureLoaded(page);
-    assertAllowed();
+    ctx.assertAllowed(SCALE_PERMISSION, 'changing a scale');
     const service = ctx.doc.page(page).measure;
     if (service) {
       await service.setScale(scale);
@@ -114,7 +115,7 @@ export function createScaleWrites(
     measure: (page: PageRef) => PdfMeasure | null,
     options: ScaleChangeOptions = {},
   ): Promise<readonly ScaleChangeReport[]> => {
-    assertAllowed();
+    ctx.assertAllowed(SCALE_PERMISSION, 'changing a scale');
     const target = targets(pages);
     // One page: a failure rejects. Several: each page reports its own outcome.
     const tolerant = pages === 'all' || target.length > 1;
