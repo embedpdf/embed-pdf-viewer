@@ -10,14 +10,14 @@ describe("PagesClient", () => {
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
         const rawRequestBody = {};
         const rawResponseBody = {
-            page: { kind: "objectNumber", pageObjectNumber: 1 },
+            page: { kind: "objectNumber", objectNumber: 1 },
             meta: {
                 affectedPages: [
                     {
-                        page: { kind: "objectNumber", pageObjectNumber: 1 },
+                        page: { kind: "objectNumber", objectNumber: 1 },
                         revision: {
                             docSessionId: "docSessionId",
-                            page: { kind: "objectNumber", pageObjectNumber: 1 },
+                            page: { kind: "objectNumber", objectNumber: 1 },
                             generation: 1,
                         },
                         weakAnnotationState: { kind: "unknown" },
@@ -27,11 +27,14 @@ describe("PagesClient", () => {
                     previousDocVersion: 1,
                     docVersion: 1,
                     annotationsVersion: 1,
+                    layoutVersion: 1,
+                    metadataVersion: 1,
+                    attachmentsVersion: 1,
                     layerVersion: 1,
                     working: true,
                     pages: [
                         {
-                            page: { kind: "objectNumber", pageObjectNumber: 1 },
+                            page: { kind: "objectNumber", objectNumber: 1 },
                             cache: { contentVersion: 1, annotationVersion: 1 },
                         },
                     ],
@@ -110,25 +113,21 @@ describe("PagesClient", () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
 
-        const rawResponseBody = [
-            {
-                bbox: { left: 1.1, bottom: 1.1, right: 1.1, top: 1.1 },
-                name: "name",
-                measure: {
-                    subtype: "RL",
-                    ratio: "ratio",
-                    x: [{ unit: "unit" }],
-                    y: [{ unit: "unit" }],
-                    distance: [{ unit: "unit" }],
-                    area: [{ unit: "unit" }],
-                    angle: [{ unit: "unit" }],
-                    slope: [{ unit: "unit" }],
-                    origin: { x: 1.1, y: 1.1 },
-                    cyx: 1.1,
+        const rawResponseBody = {
+            viewports: [
+                {
+                    bbox: { x: 1.1, y: 1.1, width: 1.1, height: 1.1 },
+                    name: "name",
+                    measure: {
+                        subtype: "rectilinear",
+                        x: [{ unit: "unit" }],
+                        distance: [{ unit: "unit" }],
+                        area: [{ unit: "unit" }],
+                    },
+                    owned: true,
                 },
-                owned: true,
-            },
-        ];
+            ],
+        };
 
         server
             .mockEndpoint()
@@ -174,13 +173,37 @@ describe("PagesClient", () => {
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
         const rawRequestBody = { key: "value" };
         const rawResponseBody = {
+            layout: {
+                pageCount: 1,
+                pages: [
+                    {
+                        index: 1,
+                        ref: { kind: "objectNumber", objectNumber: 1 },
+                        label: null,
+                        size: { width: 1.1, height: 1.1 },
+                        rotation: 1.1,
+                        userUnit: 1.1,
+                        boxes: {
+                            media: { x: 1.1, y: 1.1, width: 1.1, height: 1.1 },
+                            crop: { x: 1.1, y: 1.1, width: 1.1, height: 1.1 },
+                            bleed: { x: 1.1, y: 1.1, width: 1.1, height: 1.1 },
+                            trim: { x: 1.1, y: 1.1, width: 1.1, height: 1.1 },
+                            art: { x: 1.1, y: 1.1, width: 1.1, height: 1.1 },
+                        },
+                        pdfCropBox: { left: 1.1, bottom: 1.1, right: 1.1, top: 1.1 },
+                    },
+                ],
+                namedPages: [
+                    { name: "name", target: { kind: "page", page: { kind: "objectNumber", objectNumber: 1 } } },
+                ],
+            },
             meta: {
                 affectedPages: [
                     {
-                        page: { kind: "objectNumber", pageObjectNumber: 1 },
+                        page: { kind: "objectNumber", objectNumber: 1 },
                         revision: {
                             docSessionId: "docSessionId",
-                            page: { kind: "objectNumber", pageObjectNumber: 1 },
+                            page: { kind: "objectNumber", objectNumber: 1 },
                             generation: 1,
                         },
                         weakAnnotationState: { kind: "unknown" },
@@ -190,11 +213,14 @@ describe("PagesClient", () => {
                     previousDocVersion: 1,
                     docVersion: 1,
                     annotationsVersion: 1,
+                    layoutVersion: 1,
+                    metadataVersion: 1,
+                    attachmentsVersion: 1,
                     layerVersion: 1,
                     working: true,
                     pages: [
                         {
-                            page: { kind: "objectNumber", pageObjectNumber: 1 },
+                            page: { kind: "objectNumber", objectNumber: 1 },
                             cache: { contentVersion: 1, annotationVersion: 1 },
                         },
                     ],
@@ -282,13 +308,22 @@ describe("PagesClient", () => {
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
         const rawRequestBody = { key: "value" };
         const rawResponseBody = {
+            pages: [{ kind: "objectNumber", objectNumber: 1 }],
+            usage: "display",
+            results: [
+                {
+                    page: { kind: "objectNumber", objectNumber: 1 },
+                    status: "applied",
+                    error: { name: "EngineError", code: "Unknown", message: "message" },
+                },
+            ],
             meta: {
                 affectedPages: [
                     {
-                        page: { kind: "objectNumber", pageObjectNumber: 1 },
+                        page: { kind: "objectNumber", objectNumber: 1 },
                         revision: {
                             docSessionId: "docSessionId",
-                            page: { kind: "objectNumber", pageObjectNumber: 1 },
+                            page: { kind: "objectNumber", objectNumber: 1 },
                             generation: 1,
                         },
                         weakAnnotationState: { kind: "unknown" },
@@ -298,11 +333,14 @@ describe("PagesClient", () => {
                     previousDocVersion: 1,
                     docVersion: 1,
                     annotationsVersion: 1,
+                    layoutVersion: 1,
+                    metadataVersion: 1,
+                    attachmentsVersion: 1,
                     layerVersion: 1,
                     working: true,
                     pages: [
                         {
-                            page: { kind: "objectNumber", pageObjectNumber: 1 },
+                            page: { kind: "objectNumber", objectNumber: 1 },
                             cache: { contentVersion: 1, annotationVersion: 1 },
                         },
                     ],
@@ -390,13 +428,38 @@ describe("PagesClient", () => {
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
         const rawRequestBody = { key: "value" };
         const rawResponseBody = {
+            insertedPages: [{ kind: "objectNumber", objectNumber: 1 }],
+            layout: {
+                pageCount: 1,
+                pages: [
+                    {
+                        index: 1,
+                        ref: { kind: "objectNumber", objectNumber: 1 },
+                        label: null,
+                        size: { width: 1.1, height: 1.1 },
+                        rotation: 1.1,
+                        userUnit: 1.1,
+                        boxes: {
+                            media: { x: 1.1, y: 1.1, width: 1.1, height: 1.1 },
+                            crop: { x: 1.1, y: 1.1, width: 1.1, height: 1.1 },
+                            bleed: { x: 1.1, y: 1.1, width: 1.1, height: 1.1 },
+                            trim: { x: 1.1, y: 1.1, width: 1.1, height: 1.1 },
+                            art: { x: 1.1, y: 1.1, width: 1.1, height: 1.1 },
+                        },
+                        pdfCropBox: { left: 1.1, bottom: 1.1, right: 1.1, top: 1.1 },
+                    },
+                ],
+                namedPages: [
+                    { name: "name", target: { kind: "page", page: { kind: "objectNumber", objectNumber: 1 } } },
+                ],
+            },
             meta: {
                 affectedPages: [
                     {
-                        page: { kind: "objectNumber", pageObjectNumber: 1 },
+                        page: { kind: "objectNumber", objectNumber: 1 },
                         revision: {
                             docSessionId: "docSessionId",
-                            page: { kind: "objectNumber", pageObjectNumber: 1 },
+                            page: { kind: "objectNumber", objectNumber: 1 },
                             generation: 1,
                         },
                         weakAnnotationState: { kind: "unknown" },
@@ -406,11 +469,14 @@ describe("PagesClient", () => {
                     previousDocVersion: 1,
                     docVersion: 1,
                     annotationsVersion: 1,
+                    layoutVersion: 1,
+                    metadataVersion: 1,
+                    attachmentsVersion: 1,
                     layerVersion: 1,
                     working: true,
                     pages: [
                         {
-                            page: { kind: "objectNumber", pageObjectNumber: 1 },
+                            page: { kind: "objectNumber", objectNumber: 1 },
                             cache: { contentVersion: 1, annotationVersion: 1 },
                         },
                     ],
@@ -498,13 +564,37 @@ describe("PagesClient", () => {
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
         const rawRequestBody = { key: "value" };
         const rawResponseBody = {
+            layout: {
+                pageCount: 1,
+                pages: [
+                    {
+                        index: 1,
+                        ref: { kind: "objectNumber", objectNumber: 1 },
+                        label: null,
+                        size: { width: 1.1, height: 1.1 },
+                        rotation: 1.1,
+                        userUnit: 1.1,
+                        boxes: {
+                            media: { x: 1.1, y: 1.1, width: 1.1, height: 1.1 },
+                            crop: { x: 1.1, y: 1.1, width: 1.1, height: 1.1 },
+                            bleed: { x: 1.1, y: 1.1, width: 1.1, height: 1.1 },
+                            trim: { x: 1.1, y: 1.1, width: 1.1, height: 1.1 },
+                            art: { x: 1.1, y: 1.1, width: 1.1, height: 1.1 },
+                        },
+                        pdfCropBox: { left: 1.1, bottom: 1.1, right: 1.1, top: 1.1 },
+                    },
+                ],
+                namedPages: [
+                    { name: "name", target: { kind: "page", page: { kind: "objectNumber", objectNumber: 1 } } },
+                ],
+            },
             meta: {
                 affectedPages: [
                     {
-                        page: { kind: "objectNumber", pageObjectNumber: 1 },
+                        page: { kind: "objectNumber", objectNumber: 1 },
                         revision: {
                             docSessionId: "docSessionId",
-                            page: { kind: "objectNumber", pageObjectNumber: 1 },
+                            page: { kind: "objectNumber", objectNumber: 1 },
                             generation: 1,
                         },
                         weakAnnotationState: { kind: "unknown" },
@@ -514,11 +604,14 @@ describe("PagesClient", () => {
                     previousDocVersion: 1,
                     docVersion: 1,
                     annotationsVersion: 1,
+                    layoutVersion: 1,
+                    metadataVersion: 1,
+                    attachmentsVersion: 1,
                     layerVersion: 1,
                     working: true,
                     pages: [
                         {
-                            page: { kind: "objectNumber", pageObjectNumber: 1 },
+                            page: { kind: "objectNumber", objectNumber: 1 },
                             cache: { contentVersion: 1, annotationVersion: 1 },
                         },
                     ],
@@ -606,13 +699,37 @@ describe("PagesClient", () => {
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
         const rawRequestBody = { key: "value" };
         const rawResponseBody = {
+            layout: {
+                pageCount: 1,
+                pages: [
+                    {
+                        index: 1,
+                        ref: { kind: "objectNumber", objectNumber: 1 },
+                        label: null,
+                        size: { width: 1.1, height: 1.1 },
+                        rotation: 1.1,
+                        userUnit: 1.1,
+                        boxes: {
+                            media: { x: 1.1, y: 1.1, width: 1.1, height: 1.1 },
+                            crop: { x: 1.1, y: 1.1, width: 1.1, height: 1.1 },
+                            bleed: { x: 1.1, y: 1.1, width: 1.1, height: 1.1 },
+                            trim: { x: 1.1, y: 1.1, width: 1.1, height: 1.1 },
+                            art: { x: 1.1, y: 1.1, width: 1.1, height: 1.1 },
+                        },
+                        pdfCropBox: { left: 1.1, bottom: 1.1, right: 1.1, top: 1.1 },
+                    },
+                ],
+                namedPages: [
+                    { name: "name", target: { kind: "page", page: { kind: "objectNumber", objectNumber: 1 } } },
+                ],
+            },
             meta: {
                 affectedPages: [
                     {
-                        page: { kind: "objectNumber", pageObjectNumber: 1 },
+                        page: { kind: "objectNumber", objectNumber: 1 },
                         revision: {
                             docSessionId: "docSessionId",
-                            page: { kind: "objectNumber", pageObjectNumber: 1 },
+                            page: { kind: "objectNumber", objectNumber: 1 },
                             generation: 1,
                         },
                         weakAnnotationState: { kind: "unknown" },
@@ -622,11 +739,14 @@ describe("PagesClient", () => {
                     previousDocVersion: 1,
                     docVersion: 1,
                     annotationsVersion: 1,
+                    layoutVersion: 1,
+                    metadataVersion: 1,
+                    attachmentsVersion: 1,
                     layerVersion: 1,
                     working: true,
                     pages: [
                         {
-                            page: { kind: "objectNumber", pageObjectNumber: 1 },
+                            page: { kind: "objectNumber", objectNumber: 1 },
                             cache: { contentVersion: 1, annotationVersion: 1 },
                         },
                     ],
@@ -714,13 +834,37 @@ describe("PagesClient", () => {
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
         const rawRequestBody = { key: "value" };
         const rawResponseBody = {
+            layout: {
+                pageCount: 1,
+                pages: [
+                    {
+                        index: 1,
+                        ref: { kind: "objectNumber", objectNumber: 1 },
+                        label: null,
+                        size: { width: 1.1, height: 1.1 },
+                        rotation: 1.1,
+                        userUnit: 1.1,
+                        boxes: {
+                            media: { x: 1.1, y: 1.1, width: 1.1, height: 1.1 },
+                            crop: { x: 1.1, y: 1.1, width: 1.1, height: 1.1 },
+                            bleed: { x: 1.1, y: 1.1, width: 1.1, height: 1.1 },
+                            trim: { x: 1.1, y: 1.1, width: 1.1, height: 1.1 },
+                            art: { x: 1.1, y: 1.1, width: 1.1, height: 1.1 },
+                        },
+                        pdfCropBox: { left: 1.1, bottom: 1.1, right: 1.1, top: 1.1 },
+                    },
+                ],
+                namedPages: [
+                    { name: "name", target: { kind: "page", page: { kind: "objectNumber", objectNumber: 1 } } },
+                ],
+            },
             meta: {
                 affectedPages: [
                     {
-                        page: { kind: "objectNumber", pageObjectNumber: 1 },
+                        page: { kind: "objectNumber", objectNumber: 1 },
                         revision: {
                             docSessionId: "docSessionId",
-                            page: { kind: "objectNumber", pageObjectNumber: 1 },
+                            page: { kind: "objectNumber", objectNumber: 1 },
                             generation: 1,
                         },
                         weakAnnotationState: { kind: "unknown" },
@@ -730,11 +874,14 @@ describe("PagesClient", () => {
                     previousDocVersion: 1,
                     docVersion: 1,
                     annotationsVersion: 1,
+                    layoutVersion: 1,
+                    metadataVersion: 1,
+                    attachmentsVersion: 1,
                     layerVersion: 1,
                     working: true,
                     pages: [
                         {
-                            page: { kind: "objectNumber", pageObjectNumber: 1 },
+                            page: { kind: "objectNumber", objectNumber: 1 },
                             cache: { contentVersion: 1, annotationVersion: 1 },
                         },
                     ],
@@ -822,13 +969,37 @@ describe("PagesClient", () => {
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
         const rawRequestBody = { key: "value" };
         const rawResponseBody = {
+            layout: {
+                pageCount: 1,
+                pages: [
+                    {
+                        index: 1,
+                        ref: { kind: "objectNumber", objectNumber: 1 },
+                        label: null,
+                        size: { width: 1.1, height: 1.1 },
+                        rotation: 1.1,
+                        userUnit: 1.1,
+                        boxes: {
+                            media: { x: 1.1, y: 1.1, width: 1.1, height: 1.1 },
+                            crop: { x: 1.1, y: 1.1, width: 1.1, height: 1.1 },
+                            bleed: { x: 1.1, y: 1.1, width: 1.1, height: 1.1 },
+                            trim: { x: 1.1, y: 1.1, width: 1.1, height: 1.1 },
+                            art: { x: 1.1, y: 1.1, width: 1.1, height: 1.1 },
+                        },
+                        pdfCropBox: { left: 1.1, bottom: 1.1, right: 1.1, top: 1.1 },
+                    },
+                ],
+                namedPages: [
+                    { name: "name", target: { kind: "page", page: { kind: "objectNumber", objectNumber: 1 } } },
+                ],
+            },
             meta: {
                 affectedPages: [
                     {
-                        page: { kind: "objectNumber", pageObjectNumber: 1 },
+                        page: { kind: "objectNumber", objectNumber: 1 },
                         revision: {
                             docSessionId: "docSessionId",
-                            page: { kind: "objectNumber", pageObjectNumber: 1 },
+                            page: { kind: "objectNumber", objectNumber: 1 },
                             generation: 1,
                         },
                         weakAnnotationState: { kind: "unknown" },
@@ -838,11 +1009,14 @@ describe("PagesClient", () => {
                     previousDocVersion: 1,
                     docVersion: 1,
                     annotationsVersion: 1,
+                    layoutVersion: 1,
+                    metadataVersion: 1,
+                    attachmentsVersion: 1,
                     layerVersion: 1,
                     working: true,
                     pages: [
                         {
-                            page: { kind: "objectNumber", pageObjectNumber: 1 },
+                            page: { kind: "objectNumber", objectNumber: 1 },
                             cache: { contentVersion: 1, annotationVersion: 1 },
                         },
                     ],

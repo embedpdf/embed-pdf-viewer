@@ -11,7 +11,7 @@ import type { DocCapability, PdfBits } from './types';
  *
  * Each leaf is a function returning the literal string (as `const`) so
  * TypeScript catches typos at the call site. Wrappers like `download`
- * and `print` are `Object.assign`'d to be callable AND carry child
+ * and `print` are `Object.assign`'d to be callable and carry child
  * properties for the refinement capabilities.
  */
 export const caps = {
@@ -40,10 +40,12 @@ export const caps = {
       read: () => 'doc.forms.read' as const,
       fill: () => 'doc.forms.fill' as const,
       modify: () => 'doc.forms.modify' as const,
+      submit: () => 'doc.forms.submit' as const,
     },
     annotate: {
       read: () => 'doc.annotate.read' as const,
       modify: () => 'doc.annotate.modify' as const,
+      import: () => 'doc.annotate.import' as const,
     },
     metadata: {
       modify: () => 'doc.metadata.modify' as const,
@@ -52,6 +54,9 @@ export const caps = {
       modify: () => 'doc.attachments.modify' as const,
     },
     redact: () => 'doc.redact' as const,
+    sign: Object.assign(() => 'doc.sign' as const, {
+      certify: () => 'doc.sign.certify' as const,
+    }),
   },
 } as const;
 
@@ -77,7 +82,7 @@ export const collab = {
     update: makeFilterBuilder('annotations', 'update'),
     delete: makeFilterBuilder('annotations', 'delete'),
     setGroup: makeSetGroupBuilder(),
-    /** Action wildcard — matches create, update, delete, AND set-group with the given filter. */
+    /** Action wildcard — matches create, update, delete, and set-group with the given filter. */
     all: makeFilterBuilder('annotations', '*'),
   },
 } as const;
@@ -138,7 +143,7 @@ export const pdfPermissions = (): 'pdf.permissions' => 'pdf.permissions';
  *     'doc.download',
  *   ];
  *
- * IMPORTANT: this MUST stay in sync with `addPdfPermissions` inside
+ * Important: this must stay in sync with `addPdfPermissions` inside
  * resolver.ts. A test pins them together.
  */
 export function materializePdfPermissions(b: PdfBits): DocCapability[] {

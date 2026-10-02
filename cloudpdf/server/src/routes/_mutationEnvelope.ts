@@ -15,7 +15,7 @@ export interface MutationEnvelope {
 }
 
 /**
- * Per-resource binary acceptance, decided AFTER the `body` JSON is known
+ * Per-resource binary acceptance, decided after the `body` JSON is known
  * (multipart parts may arrive in any order, so validation is deferred to
  * the end of the stream):
  *
@@ -34,7 +34,7 @@ const STRICT_POLICY: ResourceBinaryPolicy = () => 'image-or-pdf';
 /**
  * Read a mutation request body in either of its two accepted forms:
  *
- *   - `application/json` — the body IS the JSON payload (unchanged fast
+ *   - `application/json` — the body is the JSON payload (unchanged fast
  *     path; `resources` stays undefined).
  *   - `multipart/form-data` — a `body` field holding that exact same JSON,
  *     plus `resource:{key}` file parts carrying binary payloads. The

@@ -12,7 +12,6 @@
     "./authoring": "./src/authoring.ts",
     "./contract": "./src/contract.ts",
     "./contract/host": "./src/host-contract.ts",
-    "./internal": "./src/internal.ts",
     "./package.json": "./package.json"
   },
   "publishConfig": {
@@ -35,10 +34,6 @@
       "./contract/host": {
         "import": "./dist/contract/host.js",
         "require": "./dist/contract/host.cjs"
-      },
-      "./internal": {
-        "import": "./dist/internal.js",
-        "require": "./dist/internal.cjs"
       },
       "./package.json": "./package.json"
     }

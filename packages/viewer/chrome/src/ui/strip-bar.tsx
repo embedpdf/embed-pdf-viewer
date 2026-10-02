@@ -1,8 +1,8 @@
 /**
- * The floating strip's PIXELS, shared by every contextual strip (annotation
+ * The floating strip's pixels, shared by every contextual strip (annotation
  * selection, text selection, …): a rounded toolbar of command buttons with
- * derived group separators. The WHERE is each strip's menu component
- * (`<AnnotationMenu>`, `<SelectionMenu>`); the WHICH is the commands'
+ * derived group separators. The where is each strip's menu component
+ * (`<AnnotationMenu>`, `<SelectionMenu>`); the which is the commands'
  * `visible`/`enabled` derivations via `useStripView`. This file only draws.
  */
 import { Fragment } from 'react';
@@ -40,10 +40,10 @@ export function StripBar({
       aria-label={label}
       className="border-border-subtle bg-elevated flex items-center gap-1 rounded-lg border p-1 shadow-xl"
     >
-      {view.groups.map((g, i) => (
-        <Fragment key={g.id}>
+      {view.groups.map((group, i) => (
+        <Fragment key={group.id}>
           {i > 0 && <span aria-hidden className="bg-border h-5 w-px" />}
-          {g.commands.map((cmd) => (
+          {group.commands.map((cmd) => (
             <StripButton key={cmd.id} cmd={cmd} run={() => view.execute(cmd.id)} />
           ))}
         </Fragment>

@@ -1,7 +1,7 @@
 /**
  * Shared copy for the license CTA — the single content source for both
  * renderings (the interactive docs component and its Markdown
- * projection), per DOCS-PLATFORM-ARCHITECTURE.md's one-source rule.
+ * projection), per docs/conventions/docs-architecture.md's one-source rule.
  */
 export const LICENSE_CTA_COPY = {
   title: 'Need a license key?',

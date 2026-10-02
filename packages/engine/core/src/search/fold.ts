@@ -1,6 +1,8 @@
+import type { TextRange } from '../text/TextRange';
+
 /**
  * Text folding for literal search: the deterministic normalization applied
- * to BOTH the page text and the needle so that "Café" finds "cafe" and a
+ * to both the page text and the needle so that "Café" finds "cafe" and a
  * line-wrapped "hello\n  world" finds "hello world".
  *
  * Fold version 1:
@@ -19,7 +21,7 @@
  * original-text ranges — the property the whole anchor stage rests on.
  *
  * Pre-folded corpus artifacts store this fold's output; bump
- * `SEARCH_FOLD_VERSION` on ANY semantic change so stored corpora are
+ * `SEARCH_FOLD_VERSION` on any semantic change so stored corpora are
  * rebuilt instead of silently mismatching fresh needles.
  */
 
@@ -40,12 +42,6 @@ export interface FoldedText {
   /** Folded code unit i → code-unit index of the original code point it came from. */
   map: Uint32Array;
   original: string;
-}
-
-/** A half-open match range in ORIGINAL code-unit space. */
-export interface SearchMatchRange {
-  start: number;
-  length: number;
 }
 
 const WHITESPACE = /\s/;
@@ -99,7 +95,8 @@ function codePointLengthAt(text: string, index: number): number {
 }
 
 /**
- * Translate a match found in folded space back to the original text.
+ * Translate a match found in folded space back to a range of the original
+ * text (code units).
  * The range covers whole original code points: a hit on either folded
  * half of "ﬁ" spans the full ligature, and a hit ending on a collapsed
  * space extends only through the first whitespace char of the run (the
@@ -109,9 +106,9 @@ export function toOriginalRange(
   folded: FoldedText,
   foldedStart: number,
   foldedLength: number,
-): SearchMatchRange {
+): TextRange {
   const start = folded.map[foldedStart];
   const lastOriginal = folded.map[foldedStart + foldedLength - 1];
   const end = lastOriginal + codePointLengthAt(folded.original, lastOriginal);
-  return { start, length: end - start };
+  return { start, count: end - start };
 }

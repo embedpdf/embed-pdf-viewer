@@ -1,5 +1,5 @@
 /**
- * Environment-NEUTRAL platform vocabulary. This module must stay importable
+ * Environment-neutral platform vocabulary. This module must stay importable
  * from every graph (browser, worker, node) — so it carries no Node imports.
  * The node-only target detection (detect-libc) lives in `platform.node.ts`;
  * the browser graph pins `wasm32` in `index.browser.ts`.

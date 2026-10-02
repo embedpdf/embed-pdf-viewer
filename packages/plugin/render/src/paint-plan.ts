@@ -2,7 +2,7 @@ import type { PageImageHandle } from '@embedpdf/core';
 import type { Rect } from '@embedpdf/core-geometry';
 
 /**
- * The demand a page HOST supplies through dependency inversion:
+ * The demand a page host supplies through dependency inversion:
  * plugin-render defines the shape, producers fill it. The Stage's page
  * host knows the camera and supplies `visibleRect`/`velocity`; a
  * stage-less `<PageView>` supplies neither — absent `visibleRect` means
@@ -12,16 +12,35 @@ import type { Rect } from '@embedpdf/core-geometry';
 export interface PageViewDemand {
   /** Desired device pixels across the page's unrotated content width. */
   desiredDeviceWidth: number;
-  /** Visible page region — y-down page points. ABSENT = whole page. */
+  /** Visible page region — y-down page points. Absent means the whole page. */
   visibleRect?: Rect;
   /** Scroll velocity in page points/s — prefetch direction bias only. */
   velocity?: { dx: number; dy: number };
 }
 
 /**
+ * Whether two demands ask for the same thing. A host builds a new demand object on every camera
+ * frame; a layer that compares with this sets it again (and plans again) only when it changed.
+ */
+export function samePageViewDemand(left: PageViewDemand, right: PageViewDemand): boolean {
+  return (
+    left.desiredDeviceWidth === right.desiredDeviceWidth &&
+    left.velocity?.dx === right.velocity?.dx &&
+    left.velocity?.dy === right.velocity?.dy &&
+    (left.visibleRect === right.visibleRect ||
+      (left.visibleRect !== undefined &&
+        right.visibleRect !== undefined &&
+        left.visibleRect.x === right.visibleRect.x &&
+        left.visibleRect.y === right.visibleRect.y &&
+        left.visibleRect.width === right.visibleRect.width &&
+        left.visibleRect.height === right.visibleRect.height))
+  );
+}
+
+/**
  * One tile the layer should have in the DOM. `key` is the reconciliation
  * identity (stable across plan recomputes — keyed lists preserve the DOM
- * node, which IS the retention mechanism); `rect` is y-down page points
+ * node, which is the retention mechanism); `rect` is y-down page points
  * inside the unrotated content box; `z` stacks by resolution so arriving
  * sharper tiles occlude retained coarser ones per region.
  */
@@ -34,7 +53,7 @@ export interface TilePaintSource {
 }
 
 /**
- * What a tile plane paints right now. `paint` draws ONLY from resolved
+ * What a tile plane paints right now. `paint` draws only from resolved
  * rasters — retained generations live here until the release rules fire;
  * "loading" never reaches the DOM. `fetching` is diagnostic (badge/tests).
  */
@@ -56,7 +75,7 @@ export const EMPTY_TILE_PLAN: TilePaintPlan = {
 };
 
 /**
- * The base-plane strategy: the pixel BUDGET and the render points below it.
+ * The base-plane strategy: the pixel budget and the render points below it.
  * Device px throughout (CSS px × devicePixelRatio).
  */
 export interface FullPageOptions {
@@ -118,7 +137,7 @@ export interface TilesOptions {
     velocityBias?: boolean;
   };
   /**
-   * Settle gate for LEVEL changes (a zoom in motion): tile fetches for a new
+   * Settle gate for level changes (a zoom in motion): tile fetches for a new
    * level wait this long; pan-driven fetches at the current level fire
    * immediately. Default 150ms; 0 disables.
    */
@@ -128,6 +147,9 @@ export interface TilesOptions {
   fadeMs?: number;
 }
 
+/** The default pixel budget of a whole-page picture, in device pixels. */
+const DEFAULT_BUDGET_PX = 640;
+
 /** The ×2 client pyramid used for lattice deployments without a tiles block. */
 export const DEFAULT_TILE_PYRAMID: readonly number[] = [1, 2, 4, 8, 16, 32];
 
@@ -135,7 +157,7 @@ export interface ResolvedRenderOptions {
   fullPage: {
     maxWidth: number;
     /** True when the embedder set maxWidth themselves — only then does it
-     *  also filter an ADVERTISED deployment ladder (the mobile-memory
+     *  also filter an advertised deployment ladder (the mobile-memory
      *  knob); the default budget governs the client's own strategy only. */
     maxWidthExplicit: boolean;
     quantize: 'exact' | readonly number[];
@@ -160,6 +182,11 @@ export interface ResolvedRenderOptions {
   debug: boolean;
 }
 
+/**
+ * The settings as the strategy reads them, every value filled in. The base
+ * budget filters an advertised deployment ladder only when the app chose a
+ * width other than the default 640.
+ */
 export function resolveRenderOptions(options: {
   fullPage?: FullPageOptions;
   tiles?: TilesOptions | false;
@@ -170,8 +197,9 @@ export function resolveRenderOptions(options: {
   const tiles = options.tiles === false ? undefined : options.tiles;
   return {
     fullPage: {
-      maxWidth: options.fullPage?.maxWidth ?? 640,
-      maxWidthExplicit: options.fullPage?.maxWidth !== undefined,
+      maxWidth: options.fullPage?.maxWidth ?? DEFAULT_BUDGET_PX,
+      maxWidthExplicit:
+        options.fullPage?.maxWidth !== undefined && options.fullPage.maxWidth !== DEFAULT_BUDGET_PX,
       quantize: options.fullPage?.quantize ?? 'exact',
     },
     tiles: {

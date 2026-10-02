@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 
-// SKIPPED: stale since the engine-core -> engine/core restructure broke the
+// Skipped: stale since the engine-core -> engine/core restructure broke the
 // import path and these stopped collecting; the render wire schema has since
 // drifted (9 assertions fail against current shapes). Revive against the
 // current wire contract in a dedicated pass.
@@ -61,12 +61,12 @@ describe.skip('render wire round trip', () => {
         format: 'webp',
         target: {
           kind: 'rect',
-          rect: { left: 10, bottom: 20, right: 40.5, top: 60.25 },
+          rect: { x: 10, y: 20, width: 30.5, height: 40.25 },
         },
         viewport: { kind: 'width', width: 720 },
         rotation: 90,
         background: 'white',
-        quality: 80,
+        quality: 0.8,
         includeAnnotations: true,
       },
       versions: { contentVersion: 11, annotationVersion: 13 },
@@ -150,11 +150,11 @@ describe.skip('render wire round trip', () => {
       viewport: { kind: 'width', width: 720 },
       target: {
         kind: 'rect',
-        rect: { left: 10, bottom: 20, right: 40, top: 60 },
+        rect: { x: 10, y: 20, width: 30, height: 40 },
       },
       background: 'white',
       rotation: 90,
-      quality: 80,
+      quality: 0.8,
     };
     expect(unflatten(flatten(nested))).toEqual(nested);
   });

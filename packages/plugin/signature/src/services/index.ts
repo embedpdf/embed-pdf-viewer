@@ -1,9 +1,8 @@
 /**
- * Plugin-private services every area is built on (NOT the kernel): the
- * event hooks, the slice reads and engine doors, authority, the sibling
- * planes and mark resolution.
+ * Plugin-private services every area is built on (not the kernel): the
+ * events, the busy bracket and engine doors, authority, the sibling plugins
+ * and mark resolution.
  */
-import type { SignatureConfig } from '../contract';
 import { createAuthority, type SignatureAuthority } from './authority';
 import type { SignatureContext } from './context';
 import { createEvents, type SignatureEvents } from './events';
@@ -21,12 +20,12 @@ export interface SignatureServices {
   readonly marks: SignatureMarks;
 }
 
-export function createServices(ctx: SignatureContext, config: SignatureConfig): SignatureServices {
+export function createServices(ctx: SignatureContext): SignatureServices {
   const siblings = resolveSiblings(ctx);
   return {
     events: createEvents(ctx),
     store: createStore(ctx),
-    authority: createAuthority(ctx, config),
+    authority: createAuthority(ctx),
     siblings,
     marks: createMarks(siblings),
   };

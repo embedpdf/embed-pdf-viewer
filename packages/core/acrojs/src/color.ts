@@ -3,7 +3,7 @@ import type { ScriptColorArray } from './types';
 /**
  * Host-side Acrobat color-array conversions — the commit sinks and world
  * builders cross the Acrobat-array ↔ renderer-color boundary through these.
- * The PRELUDE inlines its own identical formulas (it must stay
+ * The prelude inlines its own identical formulas (it must stay
  * self-contained); `prelude.test.ts` pins the two implementations together.
  *
  * Conversion vectors (the documented Acrobat semantics):
@@ -24,11 +24,11 @@ export function scriptColorToRgb(
     case 'RGB':
       return { r: color[1], g: color[2], b: color[3] };
     case 'CMYK': {
-      const [, c, m, y, k] = color;
+      const [, cyan, magenta, yellow, black] = color;
       return {
-        r: 1 - Math.min(1, c + k),
-        g: 1 - Math.min(1, m + k),
-        b: 1 - Math.min(1, y + k),
+        r: 1 - Math.min(1, cyan + black),
+        g: 1 - Math.min(1, magenta + black),
+        b: 1 - Math.min(1, yellow + black),
       };
     }
   }

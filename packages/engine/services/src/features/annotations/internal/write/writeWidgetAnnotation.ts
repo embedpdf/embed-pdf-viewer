@@ -1,25 +1,27 @@
 import type {
-  AnnotationSubtype,
   WidgetDraft,
   WidgetPatch,
   WidgetStyleDraftFields,
+  PdfCoordinates,
 } from '@embedpdf/engine-core/runtime';
+import { rgbOf } from '@embedpdf/engine-core/runtime';
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
 
 import { borderStyleToCode } from '../shapeBorderStyle';
 import { standardFontToCode } from '../standardFont';
 import { textAlignmentToCode } from '../textAlignment';
 import { setAnnotRect } from './annotationWritePrimitives';
+import { applyAnnotationBaseDraft, applyAnnotationBasePatch } from './writeAnnotationBase';
 
 const MK_BORDER_COLOR = 0; // EPDF_MK_COLOR_BC
 const MK_BACKGROUND_COLOR = 1; // EPDF_MK_COLOR_BG
 
-export function isWidgetSubtype(subtype: AnnotationSubtype): subtype is 'widget' {
+export function isWidgetSubtype(subtype: string): subtype is 'widget' {
   return subtype === 'widget';
 }
 
 /**
- * THE widget-plane style writer: /MK colours, /BS, /DA, /Q. Both entry
+ * The widget-plane style writer: /MK colours, /BS, /DA, /Q. Both entry
  * points funnel here — the widget annotation kind (create/patch) and
  * `doc.forms.createField`'s inline placements — so creation-time and
  * edit-time styling can never drift apart.
@@ -33,18 +35,14 @@ export function applyWidgetStyle(
   if (style.color === null) {
     fn.EPDFAnnot_ClearMKColor(annotPtr, MK_BORDER_COLOR);
   } else if (style.color) {
-    fn.EPDFAnnot_SetMKColor(annotPtr, MK_BORDER_COLOR, style.color.r, style.color.g, style.color.b);
+    const { r, g, b } = rgbOf(style.color);
+    fn.EPDFAnnot_SetMKColor(annotPtr, MK_BORDER_COLOR, r, g, b);
   }
   if (style.interiorColor === null) {
     fn.EPDFAnnot_ClearMKColor(annotPtr, MK_BACKGROUND_COLOR);
   } else if (style.interiorColor) {
-    fn.EPDFAnnot_SetMKColor(
-      annotPtr,
-      MK_BACKGROUND_COLOR,
-      style.interiorColor.r,
-      style.interiorColor.g,
-      style.interiorColor.b,
-    );
+    const { r, g, b } = rgbOf(style.interiorColor);
+    fn.EPDFAnnot_SetMKColor(annotPtr, MK_BACKGROUND_COLOR, r, g, b);
   }
 
   if (style.strokeWidth !== undefined || style.borderStyle !== undefined) {
@@ -60,14 +58,14 @@ export function applyWidgetStyle(
     style.fontSize !== undefined ||
     style.fontColor !== undefined
   ) {
-    const color = style.fontColor ?? { r: 0, g: 0, b: 0 };
+    const { r, g, b } = rgbOf(style.fontColor ?? '#000000');
     fn.EPDFAnnot_SetDefaultAppearance(
       annotPtr,
       standardFontToCode(style.fontFamily ?? 'helvetica'),
       style.fontSize ?? 12,
-      color.r,
-      color.g,
-      color.b,
+      r,
+      g,
+      b,
     );
   }
 
@@ -76,13 +74,14 @@ export function applyWidgetStyle(
   }
 }
 
-/** Create an INERT widget: placement + style. Adoption is a forms concern. */
+/** Create an inert widget: the fields every kind has, placement and style. Adoption is a forms concern. */
 export function applyWidgetDraft(
   fn: PdfFunctions,
   mem: PdfRuntimeMemory,
   annotPtr: Ptr,
-  draft: WidgetDraft,
+  draft: WidgetDraft<PdfCoordinates>,
 ): void {
+  applyAnnotationBaseDraft(fn, mem, annotPtr, draft);
   setAnnotRect(fn, mem, annotPtr, draft.rect);
   applyWidgetStyle(fn, mem, annotPtr, draft);
 }
@@ -96,8 +95,9 @@ export function applyWidgetPatch(
   fn: PdfFunctions,
   mem: PdfRuntimeMemory,
   annotPtr: Ptr,
-  patch: WidgetPatch,
+  patch: WidgetPatch<PdfCoordinates>,
 ): void {
+  applyAnnotationBasePatch(fn, mem, annotPtr, patch);
   if (patch.rect) {
     setAnnotRect(fn, mem, annotPtr, patch.rect);
   }

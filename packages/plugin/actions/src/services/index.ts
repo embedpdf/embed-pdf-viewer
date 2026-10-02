@@ -1,9 +1,11 @@
 /**
- * Plugin-private services every area is built on (NOT the kernel): the
- * event hooks, the live policy, the registration ports, the serial queue,
- * the catalog read, session authority and the print latch.
+ * Plugin-private services every area is built on: the settings, the events,
+ * the policy decision, the registration ports, the serial queue, the catalog
+ * read, session authority and the print latch.
  */
-import type { ActionsConfig } from '../contract';
+import type { Settings } from '@embedpdf/core';
+
+import type { ActionsSettings } from '../contract';
 import { createAuthority } from './authority';
 import { createCatalog, type ActionsCatalog } from './catalog';
 import type { ActionsContext } from './context';
@@ -16,6 +18,8 @@ import { createQueue, type ActionsQueue } from './queue';
 export type { ActionsContext } from './context';
 
 export interface ActionsServices {
+  /** The plugin's settings: read `get()` where a setting is used, so a change applies at once. */
+  readonly settings: Settings<ActionsSettings>;
   readonly events: ActionsEvents;
   readonly policy: ActionsPolicy;
   readonly ports: ReturnType<typeof createPorts>;
@@ -25,13 +29,14 @@ export interface ActionsServices {
   readonly printLatch: PrintLatch;
 }
 
-export function createServices(ctx: ActionsContext, config: ActionsConfig): ActionsServices {
+export function createServices(ctx: ActionsContext): ActionsServices {
   const events = createEvents(ctx);
   return {
+    settings: ctx.settings(),
     events,
-    policy: createPolicy(ctx, config),
+    policy: createPolicy(ctx),
     ports: createPorts(events),
-    queue: createQueue(),
+    queue: createQueue(ctx),
     catalog: createCatalog(ctx),
     authority: createAuthority(ctx),
     printLatch: createPrintLatch(),

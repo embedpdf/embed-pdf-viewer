@@ -2,16 +2,20 @@
  *  and layer replay. A label move must never rewrite the measured vertices. */
 import { readFile, writeFile } from 'node:fs/promises';
 import { describe, expect, test, vi } from 'vitest';
-import type { PluginContext } from '@embedpdf/core';
-import { measureFromKnownLength, toPageRef } from '@embedpdf/engine-core/runtime';
+import {
+  measureFromKnownLength,
+  pagePointTurned,
+  pageTurnOfUpright,
+  toPageRef,
+} from '@embedpdf/engine-core/runtime';
 import { annotationSelectionFrame, shapeMeasurementLayout } from '../../../core/annotation/src';
-import { rotatePoint } from '../../../core/annotation/src/geometry';
+import { turnPivotOf } from '../../../core/annotation/src/geometry';
+import { rotatePoint } from '../../../core/annotation/src/rect';
 import { createLocalEngine } from '../src/index';
-import { createAnnotationController } from '../../../plugin/annotation/src/controller';
-import { annotationReducer, initialAnnotationState } from '../../../plugin/annotation/src/model';
-import { fromDTO } from '../../../plugin/annotation/src/repository';
+import { fromDTO, shapeOf, styleOf } from '../../../core/annotation/src/record';
+import { measurementOf } from '../../../core/annotation/src/measurement';
 import { annotationKey } from '@embedpdf/engine-core/runtime';
-import type { AnnotationAction, AnnotationState } from '../../../plugin/annotation/src/model';
+import { annotationShell } from './helpers/annotation-shell';
 
 describe.each(['wasm', 'native'] as const)('shape authoring integration (%s)', (prefer) => {
   test.each(['area', 'perimeter'])(
@@ -34,30 +38,18 @@ describe.each(['wasm', 'native'] as const)('shape authoring integration (%s)', (
       try {
         const pages = (await doc.pages.list()).pages;
         const page = pages[0];
-        const pon = page.ref.pageObjectNumber;
-        const crop = page.boxes.crop;
-        let state = initialAnnotationState();
-        const ctx = {
-          doc,
-          engine,
-          document: () => ({ pages }),
-          getState: () => state,
-          dispatch: (action: AnnotationAction) => {
-            state = annotationReducer(state, action);
-          },
-          cleanup: (cb: () => void) => cleanups.push(cb),
-          tryGet: () => null,
-        } as unknown as PluginContext<AnnotationState, AnnotationAction>;
-        const annotation = createAnnotationController(ctx);
+        const pageObjectNumber = page.ref.objectNumber;
+        const { ctx, annotation } = await annotationShell(doc, pages);
+        cleanups.push(() => ctx.dispose());
         const scale = measureFromKnownLength(100, { value: 5, unit: 'm' });
-        await doc.page(toPageRef(pon)).measure!.setScale(scale);
+        await doc.page(toPageRef(pageObjectNumber)).measure!.setScale(scale);
         annotation.setPageViewports(
           page.ref,
-          await doc.page(toPageRef(pon)).measure!.viewports(),
+          (await doc.page(toPageRef(pageObjectNumber)).measure!.listViewports()).viewports,
           scale,
         );
         for (const preset of annotation.listResolvedTools()) {
-          if (preset.defaults) annotation.setToolDefaults(preset.id, preset.defaults);
+          if (preset.defaults) annotation.updateToolDefaults(preset.id, preset.defaults);
         }
         for (const point of [
           { x: 100, y: 300 },
@@ -68,12 +60,13 @@ describe.each(['wasm', 'native'] as const)('shape authoring integration (%s)', (
           annotation.createPointer(tool, 'down', page.ref, point);
         }
         void annotation.finishCreationDraft();
-        await vi.waitFor(() => expect(annotation.listSelected()).toHaveLength(1));
-        const created = annotation.listSelected()[0].raw!;
+        // Written and confirmed: its ref is the engine's.
+        await vi.waitFor(() => expect(annotation.listSelected()[0]?.ref.kind).toBe('objectNumber'));
+        const created = annotation.listSelected()[0]!;
         if (created.subtype !== 'polygon' && created.subtype !== 'polyline')
           throw new Error('Expected shape');
         const current = () => {
-          const dto = annotation.getRaw(created.ref)!;
+          const dto = annotation.get(created.ref)!;
           if (dto.subtype !== 'polygon' && dto.subtype !== 'polyline')
             throw new Error('Expected shape');
           return dto;
@@ -84,25 +77,28 @@ describe.each(['wasm', 'native'] as const)('shape authoring integration (%s)', (
               .listPageItems(page.ref)
               .find((item) => item.id === annotationKey(created.ref))?.source,
           ).toBe('vector');
-          expect(annotation.getAppearanceEpoch(page.ref)).toBe('');
+          // The fixture's own annotations render baked; the edited shape never does.
+          const bakedEntries = annotation.getAppearanceEpoch(page.ref).split('|');
+          const createdKey = annotationKey(created.ref);
+          expect(bakedEntries.some((entry) => entry.startsWith(`${createdKey}@`))).toBe(false);
         };
-        expect(created.contents).toBe(tool === 'area' ? '50 m²' : '25 m');
-        expect(created.caption).toEqual({ enabled: true });
-        const model = fromDTO(created, crop);
-        if (!model.measure || model.measure.intent === 'LineDimension')
+        expect(created.contents).toBe(tool === 'area' ? '50.00 m²' : '25.00 m');
+        expect(created.captionEnabled).toBe(true);
+        expect(created.captionCenter).toBe(null);
+        const record = fromDTO(created);
+        const measure = measurementOf(record.annotation);
+        if (!measure || measure.intent === 'line-dimension')
           throw new Error('Expected shape measure');
-        const label = shapeMeasurementLayout(model.geom, model.measure, model.style)!.caption!
-          .center;
+        const label = shapeMeasurementLayout(
+          shapeOf(record.annotation),
+          measure,
+          styleOf(record.annotation),
+        )!.caption!.center;
         const target = { x: 390, y: 275 };
         annotation.editPointer('down', page.ref, label, false);
         annotation.editPointer('move', page.ref, target, false);
         annotation.editPointer('up', page.ref, target, false);
-        await vi.waitFor(() =>
-          expect(current().caption?.center).toEqual({
-            x: crop.left + target.x,
-            y: crop.top - target.y,
-          }),
-        );
+        await vi.waitFor(() => expect(current().captionCenter).toEqual(target));
         expect(current().vertices).toEqual(created.vertices);
         expectVector();
 
@@ -110,35 +106,41 @@ describe.each(['wasm', 'native'] as const)('shape authoring integration (%s)', (
         annotation.editPointer('down', page.ref, { x: 100, y: 300 }, false);
         annotation.editPointer('move', page.ref, { x: 80, y: 290 }, false);
         annotation.editPointer('up', page.ref, { x: 80, y: 290 }, false);
-        await vi.waitFor(() => expect(current().vertices[0].x).toBeCloseTo(crop.left + 80, 3));
-        expect(current().caption?.center).toEqual({
-          x: crop.left + target.x,
-          y: crop.top - target.y,
-        });
+        await vi.waitFor(() => expect(current().vertices[0].x).toBeCloseTo(80, 3));
+        expect(current().captionCenter).toEqual(target);
         expectVector();
 
         const before = current();
-        const frame = annotationSelectionFrame(fromDTO(before, crop));
-        const rotatedCaption = rotatePoint(target, frame.center, 90);
+        const pivot = turnPivotOf(shapeOf(fromDTO(before).annotation));
+        const rotatedCaption = rotatePoint(target, pivot, 90);
         await annotation.rotateSelectionBy(90);
         await vi.waitFor(() => {
-          expect(current().rotation).toBe(270);
-          expect(current().caption?.center?.x).toBeCloseTo(crop.left + rotatedCaption.x, 3);
-          expect(current().caption?.center?.y).toBeCloseTo(crop.top - rotatedCaption.y, 3);
-          const after = annotationSelectionFrame(fromDTO(current(), crop));
-          expect(after.center.x).toBeCloseTo(frame.center.x, 3);
-          expect(after.center.y).toBeCloseTo(frame.center.y, 3);
+          expect(current().rotation).toBe(90);
+          // The points and the caption center stay upright; the turn draws them.
+          current().vertices.forEach((vertex, i) => {
+            expect(vertex.x).toBeCloseTo(before.vertices[i]!.x, 3);
+            expect(vertex.y).toBeCloseTo(before.vertices[i]!.y, 3);
+          });
+          expect(current().captionCenter?.x).toBeCloseTo(before.captionCenter!.x, 3);
+          expect(current().captionCenter?.y).toBeCloseTo(before.captionCenter!.y, 3);
+          const drawnCaption = pagePointTurned(
+            current().captionCenter!,
+            pageTurnOfUpright(current().vertices, 90),
+          );
+          expect(drawnCaption.x).toBeCloseTo(rotatedCaption.x, 3);
+          expect(drawnCaption.y).toBeCloseTo(rotatedCaption.y, 3);
+          const after = turnPivotOf(shapeOf(fromDTO(current()).annotation));
+          expect(after.x).toBeCloseTo(pivot.x, 3);
+          expect(after.y).toBeCloseTo(pivot.y, 3);
         });
         expectVector();
         const displacedRect = current().rect;
-        await annotation.updateRaw(created.ref, {
+        await annotation.update(created.ref, {
           subtype: created.subtype,
-          caption: { center: null },
+          captionCenter: null,
         });
-        expect(current().caption?.center).toBeUndefined();
-        expect(current().rect.top - current().rect.bottom).toBeLessThan(
-          displacedRect.top - displacedRect.bottom,
-        );
+        expect(current().captionCenter).toBe(null);
+        expect(current().rect.height).toBeLessThan(displacedRect.height);
         expectVector();
         const final = current();
         const saved = await doc.download();
@@ -148,7 +150,7 @@ describe.each(['wasm', 'native'] as const)('shape authoring integration (%s)', (
             saved,
           );
         }
-        const layer = await doc.downloadLayer!();
+        const layer = await doc.downloadLayer();
         for (const source of [
           { kind: 'bytes' as const, id: `saved-${tool}-${prefer}`, bytes: saved },
           {
@@ -160,26 +162,28 @@ describe.each(['wasm', 'native'] as const)('shape authoring integration (%s)', (
         ]) {
           const reopened = await engine.open(source, { scope: ['*'] });
           try {
-            const reopenedPon = (await reopened.pages.list()).pages[0].ref.pageObjectNumber;
-            const list = (await reopened.page(toPageRef(reopenedPon)).annotations.list())
-              .annotations;
+            const reopenedPageObjectNumber = (await reopened.pages.list()).pages[0].ref
+              .objectNumber;
+            const list = (
+              await reopened.page(toPageRef(reopenedPageObjectNumber)).annotations.list()
+            ).annotations;
             const restored = list.find((dto) => dto.nm === created.nm)!;
             expect(restored).toMatchObject({
               subtype: final.subtype,
               intent: final.intent,
               vertices: final.vertices,
               contents: final.contents,
-              caption: { enabled: true },
-              rotation: 270,
+              captionEnabled: true,
+              rotation: 90,
             });
-            const restoredModel = fromDTO(restored, crop);
+            const restoredModel = fromDTO(restored);
             expect(annotationSelectionFrame(restoredModel)).toEqual(
-              annotationSelectionFrame(fromDTO(final, crop)),
+              annotationSelectionFrame(fromDTO(final)),
             );
             // Rendering requests exercise the generated /AP as well as dictionary persistence.
             const appearance = await reopened
-              .page(toPageRef(reopenedPon))
-              .annotations.renderAppearances({ scale: 1 });
+              .page(toPageRef(reopenedPageObjectNumber))
+              .annotations.renderAppearancesRaw({ viewport: { kind: 'scale', scale: 1 } });
             expect(appearance).toBeTruthy();
           } finally {
             await reopened.close();

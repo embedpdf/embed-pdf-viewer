@@ -1,9 +1,9 @@
 /**
- * The TEXT-SELECTION floating strip:
+ * The text-selection floating strip:
  *
- *   config/chrome.ts `strips.selection`  declares WHAT may appear
- *   each command's visible/enabled       decides WHICH items show
- *   <SelectionMenu>                      solves WHERE (settles on pointer-up,
+ *   config/chrome.ts `strips.selection`  declares what may appear
+ *   each command's visible/enabled       decides which items show
+ *   <SelectionMenu>                      solves where (settles on pointer-up,
  *                                        camera transform, pointer isolation)
  *
  * `useStripView` is the live intersection: with copy denied (no

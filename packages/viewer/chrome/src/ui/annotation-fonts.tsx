@@ -5,10 +5,10 @@
  * mount the same bytes as a `@font-face` named by that key (what the plugin's
  * `cssFontFamily` emits for a registered font, so the live editor renders the
  * face the appearance stream will bake). The style panel lists a font only
- * once BOTH have happened — an offered key always resolves on write.
+ * once both have happened — an offered key always resolves on write.
  */
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
-import { useKernel } from '@embedpdf/react/runtime';
+import { isLocalEngine, useKernel } from '@embedpdf/react/runtime';
 import { mountWebFont } from '@embedpdf/web';
 import { useAnnotationsConfig } from '../config-context';
 
@@ -25,10 +25,10 @@ export function AnnotationFontsProvider({ children }: { children: ReactNode }) {
   const [loaded, setLoaded] = useState<readonly LoadedAnnotationFont[]>([]);
 
   useEffect(() => {
-    const engineFonts = kernel.engine.fonts;
     // The cloud engine registers no fonts (a server policy), so a key could
     // never resolve on write: offer nothing rather than a font that fails.
-    if (!fonts?.length || !engineFonts) return;
+    if (!fonts?.length || !isLocalEngine(kernel.engine)) return;
+    const engineFonts = kernel.engine.fonts;
     let cancelled = false;
     const unmounts: Array<() => void> = [];
     void (async () => {
@@ -54,10 +54,10 @@ export function AnnotationFontsProvider({ children }: { children: ReactNode }) {
             return;
           }
           unmounts.push(unmount);
-          setLoaded((prev) =>
-            prev.some((f) => f.key === font.key)
-              ? prev
-              : [...prev, { key: font.key, label: font.label }],
+          setLoaded((previous) =>
+            previous.some((existing) => existing.key === font.key)
+              ? previous
+              : [...previous, { key: font.key, label: font.label }],
           );
         } catch (error) {
           console.warn(`[embedpdf] annotation font "${font.key}" was not loaded:`, error);
@@ -73,7 +73,7 @@ export function AnnotationFontsProvider({ children }: { children: ReactNode }) {
   return <LoadedFontsContext.Provider value={loaded}>{children}</LoadedFontsContext.Provider>;
 }
 
-/** The configured fonts that are registered AND mounted, in config order. */
+/** The configured fonts that are registered and mounted, in config order. */
 export function useAnnotationFonts(): readonly LoadedAnnotationFont[] {
   return useContext(LoadedFontsContext);
 }

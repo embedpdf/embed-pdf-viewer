@@ -1,45 +1,46 @@
-import type { DistanceAppearance, MeasurementAppearance } from './measurement';
-import type { ShapeMeasurementAppearance } from './measurement-shape';
+import type { PageRotation, Point, Rect as GeometryRect, Quad } from '@embedpdf/core-geometry';
 import type {
-  RichTextDocumentInput,
-  AnnotationDTO,
+  AnnotationBorderStyle,
+  AnnotationDraft,
+  Annotation,
+  AnnotationPatch,
   AnnotationFlags,
   AnnotationRef,
   BlendMode,
-  CaretIntent,
+  Color,
+  FileAttachmentIcon,
   InkIntent,
   LineEnding,
   LineEndings,
+  NoteIcon,
   PageRef,
   PdfLinkTarget,
-  StrikeoutIntent,
+  RichTextDocumentInput,
 } from '@embedpdf/engine-core/runtime';
-import type { PageRotation, Point, Rect as GeometryRect, TextQuad } from '@embedpdf/core-geometry';
 
-export type { TextQuad } from '@embedpdf/core-geometry';
+import type { DistanceAppearance, MeasurementAppearance } from './measurement';
+import type { ShapeMeasurementAppearance } from './measurement-shape';
+import type { BoxShape } from './shapes/box';
+import type { CaretShape } from './shapes/caret';
+import type { PointsShape } from './shapes/points';
+import type { QuadsShape } from './shapes/quads';
+import type { TextBoxShape } from './shapes/text-box';
+
+export type { Quad, QuadRing } from '@embedpdf/core-geometry';
 
 export type { LineEnding, LineEndings };
 
-/**
- * Content-space point/rect (y-down, PDF points, crop-relative) — the viewer space.
- * These are the shared `@embedpdf/core-geometry` primitives: a `Vec` IS a `Point`
- * and `Rect` IS geometry's `Rect`, so the whole stack speaks one vocabulary and
- * the coordinate math lives in ONE package.
- */
-export type Vec = Point;
+export type { Point } from '@embedpdf/core-geometry';
 export type Rect = GeometryRect;
-/** Four POSITIONAL content-space points — selection chrome / OBB corners.
- *  Text-markup geometry uses the corner-NAMED {@link TextQuad} instead. */
-export type Quad = [Vec, Vec, Vec, Vec];
 
 /**
  * Where a text-edit annotation (caret / replace-text) anchors: the boundary
- * glyph's oriented cell plus the READING direction along its baseline
- * (+1 = toward `end`, −1 = toward `start` — sequence-derived, never inferred
- * from geometry).
+ * glyph's oriented cell plus the reading direction along its baseline
+ * (+1 = toward the right end, −1 = toward the left end — sequence-derived,
+ * never inferred from geometry).
  */
 export interface TextEndAnchor {
-  glyphQuad: TextQuad;
+  glyphQuad: Quad;
   advance: 1 | -1;
 }
 
@@ -49,14 +50,14 @@ export type PolySubtype = 'polygon' | 'polyline';
 
 /**
  * The per-page view environment the screen-anchor projection consumes:
- * `zoom` — the page's zoom RELATIVE to its 100% baseline (dimensionless;
+ * `zoom` — the page's zoom relative to its 100% baseline (dimensionless;
  * 1 = Acrobat's 100% = `viewUnitsPerPoint × userUnit` view px per point) —
- * and the TOTAL display rotation (document /Rotate + view rotation).
- * Deliberately NOT a px-per-point scale: `noZoom` means "hold the body at its
- * 100%-zoom size", a statement about zoom, so feeding it a units conversion
- * (the old mistake) shrank bodies at 100%. Per-event / per-call context (the
+ * and the total display rotation (document /Rotate + view rotation).
+ * Deliberately not a px-per-point scale: `noZoom` means "hold the body at its
+ * 100%-zoom size", a statement about zoom; a units conversion here would
+ * shrink bodies at 100%. Per-event / per-call context (the
  * `pageBox` pattern) — never stored on the model; the pointer drafts capture
- * it at DOWN so anchored gestures project and commit with the view they
+ * it at down so anchored gestures project and commit with the view they
  * started under. See anchor.ts.
  */
 export interface ViewEnv {
@@ -64,7 +65,11 @@ export interface ViewEnv {
   rotation: PageRotation;
 }
 
-export type Subtype =
+/**
+ * An annotation kind's name (`kinds/`): its PDF subtype, a widget's field
+ * family (`widget-text`…), or a free text's callout (`free-text-callout`).
+ */
+export type KindName =
   | 'highlight'
   | 'underline'
   | 'squiggly'
@@ -84,88 +89,69 @@ export type Subtype =
   | (string & {});
 
 /**
- * Content-space geometry — the ONE thing hit-testing, editing, and rendering work
- * on. A small closed union covers every kind: shapes (rect/ellipse), line,
- * polygon/polyline (poly), text markup (quads), and caret.
+ * An annotation's shape: what hit-testing, gestures and drawing work on, read
+ * off the annotation by its kind's family (`shapeOf`). One arm per family,
+ * each the engine's own fields
+ * ({@link BoxShape}, {@link TextBoxShape}, {@link PointsShape},
+ * {@link QuadsShape}, {@link CaretShape}).
+ *
+ * Rotation is degrees clockwise in page space, normalized `[0,360)`, and
+ * works the same way for every family that turns: the shape is kept upright
+ * (a box, or points), and `rotation` turns it about its middle. The engine
+ * works out `/Rect` around the turned drawing, so PDFium bakes a portable `/AP`.
  */
+export type Shape =
+  | BoxShape // square, circle, stamp, and the kinds whose shape is their rect
+  | PointsShape // line, polyline, polygon, ink
+  | QuadsShape // text markup, text redaction
+  | CaretShape // an insertion mark on its text
+  | TextBoxShape; // free text; its text is data, rendered by the framework as an editable element
+
 /**
- * A free-text callout's leader: the `/CL` line + `/LE` arrow. `tip` is the
- * called-out point (the arrow is drawn here); `knee` is the optional elbow. The
- * point where the leader meets the text box (the third `/CL` point) is NEVER
- * stored — it is DERIVED from the box + the knee (see `calloutConnection`), so it
- * can't drift when the box or knee moves. Content space (y-down).
+ * How an annotation is drawn, by the engine's field names: its colours, its
+ * stroke and its border, with its kind's fill-ins (a highlight strokes
+ * nothing, a caret draws 1 pt). A view its kind works out from the
+ * annotation (`styleOf`, `kinds/styles.ts`) for drawing, bounding and
+ * hit-testing: nothing is written back through it.
  */
-export interface Callout {
-  tip: Vec;
-  knee?: Vec;
-  ending: LineEnding;
+export interface Style {
+  /** The stroke for a drawn kind, a markup's colour, a free text's border. */
+  color: Color;
+  /** The fill; `null` when the annotation has none. */
+  interiorColor: Color | null;
+  strokeWidth: number;
+  opacity: number;
+  blendMode: BlendMode;
+  borderStyle: AnnotationBorderStyle;
+  /** A dashed border's pattern; `null` draws the engine's default dash. */
+  dashArray: number[] | null;
+  /** A cloudy border's intensity; `null` without a cloud. A cloud wins over a dash. */
+  cloudyIntensity: number | null;
 }
 
 /**
- * Rotation (degrees, clockwise in content space, normalized `[0,360)`) carried by
- * the rotatable `Geom` variants. The semantics differ by family, which is exactly
- * the box-vs-vertex split:
- *
- * - **Box** (`rect`, `text`): `rect` is the UNROTATED local box and `rot` is the
- *   applied tilt — together they reconstruct the visual. The repository emits
- *   `rect` as `unrotatedRect`, `rot` as the rendered `/EMBD_Metadata/Rotation`,
- *   and the rotated visual AABB as `/Rect`, so PDFium bakes a portable `/AP`.
- * - **Vertex** (`line`, `poly`, `ink`): the points are ALREADY rotated (they are
- *   the portable visual), so `rot` is an ADVISORY scalar — the cumulative tilt the
- *   user applied since authoring. It lets EmbedPDF reconstruct an oriented
- *   selection box (`obbFromTheta`) and offer reset-to-0; it is inert for
- *   rendering (PDFium ignores a lone `Rotation` with no `UnrotatedRect`).
+ * What a shape's bounds, hit test and drawing depend on besides the shape:
+ * how wide its stroke is, and a cloud's intensity. A {@link Style} is one.
  */
-export type Geom =
-  | { t: 'rect'; rect: Rect; ellipse: boolean; rot?: number } // square / circle (rect = unrotated box)
-  | { t: 'line'; a: Vec; b: Vec; ends?: LineEndings; rot?: number } // line (points pre-rotated; rot advisory)
-  | { t: 'poly'; points: Vec[]; closed: boolean; ends?: LineEndings; rot?: number } // polygon/polyline (pre-rotated; rot advisory)
-  | { t: 'quads'; quads: TextQuad[] } // highlight / underline / squiggly / strikeout
-  | { t: 'caret'; rect: Rect; rot?: number } // caret insertion marker (rect = unrotated box; rot = its text's baseline tilt, authoring metadata — no gesture)
-  | { t: 'ink'; strokes: Vec[][]; rot?: number } // freehand ink (pre-rotated; rot advisory)
-  | { t: 'text'; rect: Rect; callout?: Callout; rot?: number }; // free-text box (`rect` is the unrotated text box);
-// a `callout` adds a leader line + arrow. The TEXT is data (DTO `contents`),
-// rendered by the framework as an editable element, not by `scene()`.
-
-/**
- * How a shape's outline is stroked. A discriminated union so illegal combinations
- * — a dash array on a cloudy border, an intensity on a dashed one — are simply
- * unrepresentable. Maps onto the engine's `/BS /S` (`borderStyle`), `/BS /D`
- * (`dashArray`), and `/BE /I` (`cloudyIntensity`) wire fields. Cloudy is only
- * honoured for shapes (square/circle); other kinds treat it as solid.
- */
-export type Border =
-  | { kind: 'solid' }
-  | { kind: 'dashed'; dash: number[] }
-  | { kind: 'cloudy'; intensity: number };
-
-export interface Style {
-  /** `/C` colour — stroke for geometric kinds, highlight colour for markup. */
-  color: string;
-  /** `/IC` interior (fill) colour. `null` when the annotation has no fill. */
-  interiorColor: string | null;
+export interface Stroke {
   strokeWidth: number;
-  opacity: number;
-  /** Effective blend mode of the annotation's normal appearance. */
-  blendMode: BlendMode;
-  /** Outline style — defaults to `{ kind: 'solid' }`. */
-  border: Border;
+  cloudyIntensity?: number | null;
 }
 
 export type TextAlign = 'left' | 'center' | 'right';
 
 /**
- * Content-space text styling for a text-editable kind (free text) — the text
- * counterpart of {@link Style}, projected from the DTO's `/DA` fields the same
- * way `style` is projected from `/C`/`/CA`/`/BS`. CSS colour string; the engine
- * `Color` seam is crossed only in the plugin repository.
+ * How an annotation's text is set, by the engine's field names: its font,
+ * size, colour and alignment, and a free text's bold, italic and underline.
+ * A view its kind works out from the annotation (`textOf`,
+ * `kinds/texts.ts`): nothing is written back through it.
  */
 export interface TextStyle {
   /** A PDF standard font name or a registered font key. */
   fontFamily: string;
-  /** Content units (PDF points). */
+  /** Page units (PDF points); 0 fits a form field's or a redaction label's box. */
   fontSize: number;
-  fontColor: string;
+  fontColor: Color;
   textAlign: TextAlign;
   /**
    * The rich body's formatting (free text only): bold = body weight ≥ 600,
@@ -179,86 +165,42 @@ export interface TextStyle {
 }
 
 /**
- * The ONE flat vocabulary for editable appearance properties — what property
- * sidebars/toolbars read and write, regardless of where each property is stored
- * internally (`style`, `geom.ends`, or `text`). Which keys apply to a kind, and
- * in what UI order, is declared per kind in the KIND table (`propsFor`).
+ * Engine fields by name, as a create or an update states them: a tool's
+ * defaults (a draft without its shape), or what a selection edit writes to
+ * each member. The kind table's {@link AnnotationProperty} lists say which a style panel edits.
  */
-export interface AnnotationProps extends Style, TextStyle {
-  /** `/LE` endings (line / polyline). */
-  lineEndings: LineEndings;
-  /**
-   * `/Name` icon of an icon kind (text note, file attachment). Optional in
-   * the bag — each kind falls back to its own spec default ('comment',
-   * 'paperclip') at creation, so one flat vocabulary needs no per-kind base
-   * value. Valid values are the `options` of the kind's `icon` PropSpec.
-   */
-  icon?: string;
-  /**
-   * Where this annotation LINKS to, or `null` for none. Optional in the bag
-   * like `icon`. One key, two storages (the props.ts routing rule): on the
-   * link kind it is the annotation's OWN target (`/A`); on every other
-   * linkable kind it is the target of the ATTACHED link child(ren) —
-   * grouped `/Link` annotations the model folds into their parent (the
-   * serialization the PDF spec forces, since only Link annotations are
-   * clickable). Writing it creates/retargets/deletes those children through
-   * the ONE `syncLink` seam.
-   */
-  link?: PdfLinkTarget | null;
-}
-
-export type PropKey = keyof AnnotationProps;
+export type FieldValues = Readonly<Record<string, unknown>>;
 
 /**
- * What a committed edit CHANGED — carried on the `patch` effect so the shell
- * emits exactly that intent (repository `toScopedPatch`) instead of
- * reconstructing a full projection. `geometry` covers every gesture commit
- * (move/resize/rotate/vertex edit); `props` forwards the user's patch keys
- * verbatim. Text content never rides this effect (the debounced text-edit
- * write owns `contents`).
+ * One annotation as the core works on it: the engine's record, and how it is
+ * drawn right now. The record is the only data: its ref, page, kind and
+ * relationships are read off it (`refOf`, `kindOf`, `irtOf`, `groupOf`), so
+ * is its shape (`shapeOf`), and an edit writes engine fields back
+ * (`withShape`, `withValues`; record/).
  */
-export type PatchScope =
-  | { kind: 'geometry' }
-  | { kind: 'caption' }
-  | { kind: 'leader' }
-  | { kind: 'props'; keys: PropKey[] };
-
-/** A partial property write. `lineEndings` merges per side (set just `end`
- *  without knowing `start`); every other key overwrites. */
-export type AnnotationPropsPatch = {
-  [K in PropKey]?: K extends 'lineEndings' ? Partial<LineEndings> : AnnotationProps[K];
-};
-
-export interface Annot {
-  id: Id;
-  ref: AnnotationRef | null;
-  /** The page this annotation lives on. Internals may key by
-   *  `page.pageObjectNumber`; the address itself is what callers pass around. */
-  page: PageRef;
-  subtype: Subtype;
-  geom: Geom;
-  style: Style;
-  /** Text styling — present only for text-editable kinds (free text). Like
-   *  `style`, a content-space projection of `data`, editable via `setProps`. */
-  text?: TextStyle;
-  /** Redaction label (`/OverlayText` + `/Repeat`) — redact kind only. A
-   *  projection of `data` like `text`; the hover preview scene draws it. */
-  label?: { text: string; repeat: boolean };
-  measure?: MeasurementAppearance;
-  /** `/Name` icon — present only for icon kinds (text note, file attachment).
-   *  Like `style`, a projection of `data`, editable via `setProps`. */
-  icon?: string;
+export interface ModelAnnotation {
   /**
-   * The `/F` annotation flags, verbatim from the DTO (freshly drawn annotations
-   * start at {@link DRAWN_FLAGS} — `print` set). NEVER read individual keys to
-   * gate behavior — the predicates in `flags.ts` (`annotInteractive`,
-   * `annotTransformable`, `annotContentsEditable`, `viewable`) are the one
-   * interpretation of the spec, and `anchorModeOf` owns `noZoom`/`noRotate`.
+   * The record's key: `annotationKey(annotation.ref)`. A record this session
+   * created is keyed by the `nm` ref it is written under until the engine
+   * confirms it, and by the engine's key from then on.
    */
-  flags: AnnotationFlags;
+  id: Id;
+  /**
+   * A record this session created that the engine hasn't confirmed yet: it
+   * has no engine ref (`refOf` is `null`), and writes to it wait for its
+   * create. Its annotation's `ref` is the `nm` ref it is written under.
+   */
+  unconfirmed?: true;
+  /**
+   * How the record renders: `baked` blits the engine's appearance raster,
+   * `vector` draws it live from its geometry and style. The core sets
+   * `vector` when an edit makes the raster stale (a resize, a restyle,
+   * typing); a move keeps the raster. The plugin decides it for confirmed
+   * records: this session's edits stay live, another session's are baked.
+   */
   source: 'baked' | 'vector';
   /**
-   * Content-space box of the engine appearance raster (the AP `/Rect`), set when
+   * Page-space box of the engine appearance raster (the AP `/Rect`), set when
    * the annotation is derived from a DTO. While `source === 'baked'` the renderer
    * blits the engine bitmap into this box; a move translates it (a rigid shift
    * keeps the raster valid), so the bitmap rides along without re-rendering.
@@ -266,70 +208,49 @@ export interface Annot {
    */
   apBox?: Rect;
   /**
-   * Rotation (deg, CW) that was STRIPPED from the baked raster — present only
-   * when the engine rendered this appearance rotation-free (a box-family kind
-   * whose DTO carries BOTH `rotation` and `unrotatedRect`; `apBox` is then the
-   * unrotated box). The blit re-applies it as a view transform about the box
-   * centre. Vertex kinds pre-rotate their geometry, so this stays unset there
-   * and their rasters blit untransformed.
+   * Rotation (deg, CW) that was stripped from the baked raster — present only
+   * when the engine rendered this appearance rotation-free (`appearanceTurnOf`:
+   * a box kind drawn turned, inside its turned box; `apBox` is then its `box`).
+   * The blit re-applies it as a view transform about the box centre. Vertex
+   * kinds pre-rotate their geometry, so this stays unset there and their
+   * rasters blit untransformed.
    */
   apRot?: number;
   /**
-   * Revision of the engine-baked `/AP` CONTENT (absent ≡ 0). The raster a baked
+   * Revision of the engine-baked `/AP` content (absent ≡ 0). The raster a baked
    * annotation shows depends on exactly this and the render scale — never on
    * position (`apBox` translates the blit) or rotation (`apRot` transforms it) —
-   * so the shell re-fetches appearances precisely when it changes. Bumped by the
-   * `upsert` that confirms an engine re-bake with new content: a geometry patch
-   * that changed the authoring frame's SIZE resolving (`Effect.apChanged`), or a
-   * remote edit folding in. A move or rotate leaves it untouched: the old raster
-   * is still pixel-exact, so those cost zero re-renders.
+   * so the shell re-fetches appearances precisely when it changes. Owned by the
+   * plugin's confirmed records, which advance it when the engine reports a
+   * re-baked appearance; the core only reads it.
    */
   apVersion?: number;
   /**
-   * This SESSION's authority over this record, projected from the security
-   * service's collab mirrors at ingest (see permissions.md) — model-owned
-   * derived state like `apVersion`, never DTO-derived. Fused into
+   * This session's authority over this record (see permissions.md), set by the
+   * plugin from the security service; the core only reads it. Fused into
    * `annotTransformable`/`annotDeletable`, so a record the session may not
    * edit renders and behaves exactly like a `locked` one (bare outline, no
-   * handles, no drag). Absent = unstamped (a local draft, a wildcard local
-   * engine, tests) and treated as allowed — the client gate is a COURTESY
-   * that keeps the UI truthful; the engine independently enforces.
+   * handles, no drag). Absent = unstamped (a record created in this session,
+   * a wildcard local engine, tests) and treated as allowed — the client gate
+   * is a courtesy that keeps the UI truthful; the engine independently enforces.
    */
   authority?: { update: boolean; delete: boolean };
   /**
-   * The canonical engine DTO this annotation was derived from (PDF-space, sRGB)
-   * — the single source of truth for its data. `geom` and `style` are
-   * content-space RENDER PROJECTIONS of it, recomputed (never edited directly)
-   * whenever `data` changes, so the two can't drift. Absent only for a vector
-   * draft that hasn't been committed to the engine yet (no DTO exists).
+   * The annotation's data in the engine's shape: what the engine will read
+   * back once this session's writes land. A confirmed record's is the
+   * engine's own read; a record this session created reads as its create
+   * writes it (`newRecord`); an edit merges the fields it changed, and
+   * `update` applies them as the engine will, a drawn kind's `rect`
+   * included (`record/written.ts`). Its attribution waits for the engine's
+   * answer.
    */
-  data?: AnnotationDTO;
-  /** Normalized PDF `/IT` for intent-bearing annotations authored before a DTO exists. */
-  intent?: CaretIntent | StrikeoutIntent | InkIntent;
-  /**
-   * The link KIND's own `/A` target (see {@link AnnotationProps.link}) —
-   * present only on `subtype: 'link'`. Every OTHER kind's link is an
-   * attached child annotation in the substrate, read through the `linkOf`
-   * lens and materialized by the shell's `syncLink` reconciler; parents
-   * store nothing.
-   */
-  link?: PdfLinkTarget | null;
-  /**
-   * Relationship to another annotation. `irt` ("in reply to") links a child to a
-   * parent — a reply in a comment thread, or a caret bound to its strikeout in a
-   * replace-text pair. `group` ties a set into one composite unit (created and,
-   * typically, deleted together). Both are unused until comments / replace-text
-   * land, but the field lives here from the start so select/delete/persistence
-   * never have to be retrofitted around it.
-   */
-  irt?: Id;
-  group?: string;
+  annotation: Annotation;
 }
 
 /** A draggable handle: a resize corner/edge (rect) or a vertex (line/poly). */
 export interface Handle {
   id: string;
-  at: Vec;
+  at: Point;
   cursor: Cursor;
 }
 
@@ -342,93 +263,103 @@ export interface Guide {
   hi: number;
 }
 
-/** Snapping behaviour — seeded from the plugin config, live-adjustable via the
- *  `setSnap` msg (so an app can wire a UI toggle). */
+/**
+ * Snapping: to other annotations and the page while moving, and to angles
+ * while turning. The plugin keeps it in its settings and hands it in with
+ * `setSnap`.
+ */
 export interface SnapSettings {
-  /** Alignment guides while moving (snap to other annotations + the page). */
-  guides: boolean;
-  /** Guide snap tolerance, content units (PDF pt) — the `hitMargin` convention. */
-  guideThreshold: number;
-  /** Snap the rotate gesture onto `rotationAngles`. */
-  rotation: boolean;
-  rotationAngles: number[];
-  /** Rotation snap tolerance, degrees. */
-  rotationThreshold: number;
+  /** Snap to the edges and centres of other annotations and of the page while moving. */
+  readonly alignment: boolean;
+  /**
+   * How close a move comes before it snaps, in screen pixels: each pointer
+   * sample converts it by its `scale`. Without one it is in page units.
+   */
+  readonly alignmentThreshold: number;
+  /** Snap a turn onto `rotationAngles`. */
+  readonly rotation: boolean;
+  /** The angles a turn snaps to, in degrees clockwise. */
+  readonly rotationAngles: readonly number[];
+  /** How close a turn comes before it snaps, in degrees. */
+  readonly rotationThreshold: number;
 }
 
 /**
  * The `defaults` key a creation draft resolves its props from — the authoring
- * TOOL that started it, which may differ from the PDF `subtype`. Two tools can
+ * tool that started it, which may differ from the PDF `subtype`. Two tools can
  * share a subtype but carry distinct defaults (an "arrow" is a `line` with an
  * arrowhead default); the preset keeps them apart. Absent → fall back to
  * `subtype` (a headless / programmatic caller that isn't tool-driven), so the
- * built-in tools where preset === subtype behave exactly as before.
+ * built-in tools where preset === subtype resolve from their subtype.
  */
 export type Draft =
   | {
-      g: 'create-rect';
-      subtype: Subtype;
+      kind: 'create-rect';
+      subtype: KindName;
       preset?: string;
       page: PageRef;
-      from: Vec;
-      to: Vec;
-      ellipse: boolean;
-      /** Display rotation + upright policy captured at DOWN (the gesture's home
-       *  page), so the commit counter-rotates against what the author SAW even
+      from: Point;
+      to: Point;
+      /** Display rotation + upright policy captured at down (the gesture's home
+       *  page), so the commit counter-rotates against what the author saw even
        *  if the up sample resolves elsewhere. See {@link PointerInput}. */
       displayRotation?: PageRotation;
       upright?: boolean;
-      /** The tool's click-create policy, captured at DOWN like `upright`. */
+      /** The tool's click-create policy, captured at down like `upright`. */
       clickCreate?: ClickCreate | false;
-      /** The tool's `/F` seed, captured at DOWN like `upright` — merged over
+      /** The tool's `/F` seed, captured at down like `upright` — merged over
        *  {@link DRAWN_FLAGS} at commit (a note tool sets noZoom/noRotate). */
       flags?: Partial<AnnotationFlags>;
     }
   | {
-      g: 'create-distance';
+      kind: 'create-distance';
       step: 'endpoints' | 'offset';
       subtype: 'line';
       preset: string;
       page: PageRef;
-      from: Vec;
-      to: Vec;
+      from: Point;
+      to: Point;
       measure: DistanceAppearance;
       flags?: Partial<AnnotationFlags>;
     }
   | {
-      g: 'create-line';
+      kind: 'create-line';
       measure?: MeasurementAppearance;
       capture?: string;
-      subtype: Subtype;
+      subtype: KindName;
       preset?: string;
       page: PageRef;
-      from: Vec;
-      to: Vec;
-      /** The tool's click-create policy, captured at DOWN like `upright`. */
+      from: Point;
+      to: Point;
+      /** Display rotation + upright policy captured at down (see the rect
+       *  draft): an upright tool's click lays its line as the author saw the page. */
+      displayRotation?: PageRotation;
+      upright?: boolean;
+      /** The tool's click-create policy, captured at down like `upright`. */
       clickCreate?: ClickCreate | false;
-      /** The tool's `/F` seed, captured at DOWN (see the rect draft). */
+      /** The tool's `/F` seed, captured at down (see the rect draft). */
       flags?: Partial<AnnotationFlags>;
     }
   | {
-      g: 'create-poly';
+      kind: 'create-poly';
       measure?: ShapeMeasurementAppearance;
-      subtype: Subtype;
+      subtype: KindName;
       preset?: string;
       page: PageRef;
-      points: Vec[];
-      cur: Vec;
+      points: Point[];
+      current: Point;
       closed: boolean;
-      /** The tool's `/F` seed, captured at DOWN (see the rect draft). */
+      /** The tool's `/F` seed, captured at down (see the rect draft). */
       flags?: Partial<AnnotationFlags>;
     }
   | {
-      g: 'create-ink';
-      subtype: Subtype;
+      kind: 'create-ink';
+      subtype: KindName;
       preset?: string;
       page: PageRef;
-      strokes: Vec[][];
+      strokes: Point[][];
       intent?: InkIntent;
-      /** The tool's `/F` seed, captured at DOWN (see the rect draft). */
+      /** The tool's `/F` seed, captured at down (see the rect draft). */
       flags?: Partial<AnnotationFlags>;
     }
   | {
@@ -436,77 +367,103 @@ export type Draft =
       // `knee` (advancing to `box`), then a drag/click lays the text box. `cur`
       // is the live pointer for the leader/box preview; `boxFrom`/`boxTo` are the
       // dragged box once the box step starts.
-      g: 'create-callout';
-      subtype: Subtype;
+      kind: 'create-callout';
+      subtype: KindName;
       preset?: string;
       page: PageRef;
       step: 'knee' | 'box';
-      tip: Vec;
-      knee?: Vec;
-      cur: Vec;
-      boxFrom?: Vec;
-      boxTo?: Vec;
-      /** Home-page box captured at the TIP click. The default text box slides
+      tip: Point;
+      knee?: Point;
+      current: Point;
+      boxFrom?: Point;
+      boxTo?: Point;
+      /** Home-page box captured at the tip click. The default text box slides
        *  fully inside it; a drag is already point-clamped and ignores this. */
       pageBox?: Rect;
-      /** Display rotation + upright policy captured at the TIP click (the
-       *  gesture's home page) — the text BOX commits counter-rotated so it
+      /** Display rotation + upright policy captured at the tip click (the
+       *  gesture's home page) — the text box commits counter-rotated so it
        *  reads upright; the leader (tip/knee) is page-space and never turns.
        *  Same capture rule as the rect draft. */
       displayRotation?: PageRotation;
       upright?: boolean;
-      /** The tool's `/F` seed, captured at DOWN (see the rect draft). */
+      /** The tool's `/F` seed, captured at down (see the rect draft). */
       flags?: Partial<AnnotationFlags>;
     }
   // `guides` are the live alignment guides of a snapped move (empty when
   // snapping is off, bypassed, or nothing is in range) — drawn by `chrome`.
-  | { g: 'move'; ids: Id[]; start: Vec; delta: Vec; guides: Guide[] }
+  | { kind: 'move'; ids: Id[]; start: Point; delta: Point; guides: Guide[] }
   // Single-shape resize / vertex drag. For a screen-anchored (`noZoom`/
-  // `noRotate`) target, `base`/`cur` live in VIEW space — the projected
+  // `noRotate`) target, `base`/`cur` live in view space — the projected
   // geometry the user actually grabbed — and the commit maps `cur` back to
   // stored space through `unanchoredGeom` with the captured `view`. For every
-  // other target the projection is the identity and `base` IS the stored geom.
-  | { g: 'handle'; id: Id; handle: string; base: Geom; cur: Geom; view?: ViewEnv }
-  // Rotate gesture (single OR multi-target). `pivot` is the rotation centre
-  // in VIEW space (a single shape's projected centre / the projected union-box
+  // other target the projection is the identity and `base` Is the stored geom.
+  | {
+      kind: 'handle';
+      id: Id;
+      handle: string;
+      base: Shape;
+      current: Shape;
+      view?: ViewEnv;
+    }
+  // Rotate gesture (single or multi-target). `pivot` is the rotation centre
+  // in view space (a single shape's projected centre / the projected union-box
   // centre for a group); `ids` are the members being turned; `start`/`cur` are
   // the pointer at grab and now, so the live angle is
   // `angle(cur - pivot) - angle(start - pivot)`. The base geometry stays in
   // `m.byId` until commit, so `effGeom` rotates from there. `free` (shift
   // held) bypasses rotation snapping for this sample. `view` (captured at
-  // DOWN) projects screen-anchored members for preview + commit.
-  | { g: 'rotate'; ids: Id[]; pivot: Vec; start: Vec; cur: Vec; free?: boolean; view?: ViewEnv }
+  // Down) projects screen-anchored members for preview + commit.
+  | {
+      kind: 'rotate';
+      ids: Id[];
+      pivot: Point;
+      start: Point;
+      current: Point;
+      free?: boolean;
+      view?: ViewEnv;
+    }
   // Multi-target box transform (move/resize) computed as one Mat2D about the
   // union box. `anchor` is the fixed point of a resize (the opposite corner);
   // `sx`/`sy` the live scale; for `move` the scale is 1 and `delta` carries the
   // translation. Single-shape resize keeps using the `handle` draft above.
-  // `anchor`/`base`/`cur` live in VIEW space (the union box is computed from
+  // `anchor`/`base`/`cur` live in view space (the union box is computed from
   // projected quads); `view` as on the rotate draft.
   | {
-      g: 'group';
+      kind: 'group';
       op: 'resize';
       ids: Id[];
       handle: string;
-      anchor: Vec;
+      anchor: Point;
       base: Rect;
-      cur: Rect;
+      current: Rect;
       view?: ViewEnv;
     }
-  | { g: 'caption'; id: Id; start: Vec; delta: Vec }
-  | { g: 'leader'; id: Id; start: Vec; delta: number }
-  | { g: 'marquee'; page: PageRef; from: Vec; to: Vec };
+  | { kind: 'caption'; id: Id; start: Point; delta: Point }
+  | { kind: 'leader'; id: Id; start: Point; delta: number }
+  | { kind: 'marquee'; page: PageRef; from: Point; to: Point };
 
 /** A live text-markup preview (the in-progress selection rendered as the markup it
  *  will become). Per page, since a selection can span pages. */
 export interface MarkupPreview {
-  subtype: Subtype;
+  subtype: KindName;
   /** Defaults key, distinct from subtype for presets such as replace-text. */
   preset: string;
   /** Keyed by `page.pageObjectNumber` (an internal lookup, not an address). */
-  byPage: Record<number, TextQuad[]>;
+  byPage: Record<number, Quad[]>;
 }
 
 /** Anchor + affordance state for UI that controls an in-progress creation draft. */
+/**
+ * A rotation in progress, for the badge that follows the pointer: the page
+ * it runs on, the pointer there (page space) and the selection's angle as the
+ * commit will apply it (degrees clockwise, whole degrees).
+ */
+export interface RotationAnchor {
+  page: PageRef;
+  at: Point;
+  angle: number;
+}
+
 export interface CreationDraftAnchor {
   kind: 'poly';
   subtype: PolySubtype;
@@ -517,28 +474,45 @@ export interface CreationDraftAnchor {
   canFinish: boolean;
 }
 
-export interface Model {
-  byId: Record<Id, Annot>;
-  order: Id[];
+/**
+ * What the core owns: everything about the user's session that is not a
+ * record. `update` returns the next session; the plugin stores it.
+ */
+export interface Session {
   selected: Id[];
   /** The annotation under the pointer (topmost hit), or null. View-model
    *  state like `selected` — drives hover affordances (a redaction mark's
-   *  applied-look preview) purely from the scene. Updated on CHANGE only
+   *  applied-look preview) purely from the scene. Updated on change only
    *  (enter/leave cadence, never per-move). */
   hovered: Id | null;
+  /** The gesture in progress (a move, a resize, a shape being drawn), or null. */
   draft: Draft | null;
   /** Transient ghost of an in-progress markup selection (null when idle). */
   preview: MarkupPreview | null;
+  /**
+   * How many records this session has created; the next one is written under
+   * the name `<namePrefix><seq + 1>`.
+   */
   seq: number;
-  /** The base style new annotations inherit (per-tool `defaults` layer on top). */
-  style: Style;
-  /** Per-tool (keyed by subtype / tool id) property overrides for newly drawn
-   *  annotations — the SAME flat vocabulary `setProps` uses. `lineEndings` is
-   *  stored fully resolved (merged at `setDefaults` time). */
-  defaults: Record<string, AnnotationPropsPatch>;
-  /** Extra clickable margin (content units) around a stroke — bump it for touch. */
+  /**
+   * The start of the `/NM` name each record this session creates is written
+   * with: `<namePrefix><n>` for its `n`-th. A host gives each session its own,
+   * so two sessions never name two annotations alike.
+   */
+  namePrefix: string;
+  /**
+   * Each tool's defaults for the annotations it draws, keyed by the tool's
+   * preset: the engine fields its creates state. The engine's own defaults
+   * fill in what they leave out.
+   */
+  defaults: Record<string, FieldValues>;
+  /**
+   * Extra clickable margin around what an annotation paints, in screen
+   * pixels: converted by the page's view scale, so a click reaches as far at
+   * every zoom. Bump it for touch.
+   */
   hitMargin: number;
-  /** The free-text annotation currently in TEXT-EDIT mode (its `contentEditable`
+  /** The free-text annotation currently in text-edit mode (its `contentEditable`
    *  is focused), or null. Distinct from `selected`: you select to move/resize,
    *  you edit to type. */
   editing: Id | null;
@@ -547,29 +521,69 @@ export interface Model {
 }
 
 /**
- * Selection-chrome geometry in CONTENT units — the grab zones and the knob
+ * The records a gesture works on, read-only: what the engine confirmed with
+ * the user's unconfirmed changes on top. The plugin builds it; the core never
+ * stores a record.
+ */
+export interface AnnotationView {
+  byId: Record<Id, ModelAnnotation>;
+  /** Paint order: the document's order, then records created in this session. */
+  order: Id[];
+}
+
+/** What every transition and read takes: the session composed with the records it works on. */
+export type Model = Session & AnnotationView;
+
+/**
+ * What one message changed in the records. `put` holds new or changed records
+ * as the user produced them; `drop` holds the ids the user deleted. The plugin
+ * shows them until the engine writes that carry them settle.
+ */
+export interface ChangeSet {
+  readonly put: readonly ModelAnnotation[];
+  readonly drop: readonly Id[];
+  /**
+   * What each changed record's change means to the engine, by id: the fields
+   * it changed, as `update` takes them. None for a new record (its create
+   * writes it) or for a change the engine keeps nothing of (a record handed
+   * to live rendering, a value set to what it was).
+   */
+  readonly patches: Readonly<Record<Id, AnnotationPatch>>;
+}
+
+/** The result of one message: the next session, the records it changed, and the engine work to do. */
+export interface UpdateResult {
+  readonly session: Session;
+  readonly change: ChangeSet;
+  readonly effects: readonly Effect[];
+}
+
+/**
+ * Selection-chrome geometry in content units — the grab zones and the knob
  * stalk. The core is unit-agnostic and zoom-free: callers own the px→content
  * conversion (settings are CSS px; divide by the page's view scale), so grab
  * zones stay screen-constant across zoom.
  */
-export interface ChromeGeom {
+export interface ChromeGeometry {
   /** Half-side of a resize/vertex handle's square grab zone. */
   handleTol: number;
   /** Half-side of the rotate knob's square grab zone. */
   knobTol: number;
   /** How far the rotate knob hangs off the selection edge. */
   knobOffset: number;
+  /** `false`: the selection has no rotation handle to grab (it isn't drawn either). */
+  rotationHandle?: boolean;
 }
 
 export interface PointerInput {
-  /** The page the sample resolved against (its own content-space frame). */
+  /** The page the sample resolved against (its own page-space frame). */
   page: PageRef;
-  point: Vec;
+  point: Point;
   shift: boolean;
   finish?: boolean;
   /**
    * The page's content box (`{0, 0, crop.width, crop.height}`) — when present,
-   * gestures are CLAMPED to it: a move keeps the selection's bounds inside the
+   * gestures are clamped to it: a move keeps the selection's bounds inside the
    * page (sliding along the edge when the pointer overshoots), resize/create
    * points pin to the edge. Annotations are page-bound; the pointer isn't.
    */
@@ -579,34 +593,41 @@ export interface PointerInput {
    * exactly like `pageBox` (the caller converts its CSS-px settings by the
    * page's view scale at dispatch). Absent → `DEFAULT_CHROME_GEOM`.
    */
-  chrome?: ChromeGeom;
+  chrome?: ChromeGeometry;
   /**
-   * The page's TOTAL display rotation (document /Rotate + view rotation) at the
-   * gesture — per-event environmental context like `pageBox`. A creation DOWN
+   * The page's total display rotation (document /Rotate + view rotation) at the
+   * gesture — per-event environmental context like `pageBox`. A creation down
    * captures it on the draft (an `upright` commit counter-rotates against how
-   * the page was DISPLAYED); edit gestures read it per sample, paired with
+   * the page was displayed); edit gestures read it per sample, paired with
    * `scale`, so screen-anchored (`noZoom`/`noRotate`) annotations hit-test and
-   * clamp at their EFFECTIVE geometry. Content space itself never rotates.
+   * clamp at their effective geometry. Page space itself never rotates.
    */
   displayRotation?: PageRotation;
   /**
-   * The page's zoom RELATIVE to its 100% baseline at the event — the other
+   * Screen pixels per page unit at the event: the page's view scale. A
+   * setting in screen pixels (`snap.alignmentThreshold`) is converted by it,
+   * so snapping feels the same at every zoom. Absent → 1.
+   */
+  scale?: number;
+  /**
+   * The page's zoom relative to its 100% baseline at the event — the other
    * half of the {@link ViewEnv} pair with `displayRotation` (dimensionless,
-   * `transform.zoom`; NOT the px-per-point scale the caller uses for its
+   * `transform.zoom`; not the px-per-point scale the caller uses for its
    * CSS-px chrome conversion). Absent → 1 (headless callers; screen-anchored
    * bodies then hit-test at rect size).
    */
   zoom?: number;
   /**
-   * Counter-rotate the created annotation so it reads upright at
-   * `displayRotation` — the authoring TOOL's `upright` policy, resolved by the
-   * caller (the core knows subtypes, not tools). Box kinds only (free-text /
-   * stamp are the ones with a natural reading orientation); vertex kinds and
-   * callouts ignore it.
+   * Lay the created annotation out as the author sees the page at
+   * `displayRotation` — the authoring tool's `upright` policy, resolved by the
+   * caller (the core knows subtypes, not tools). A box counter-rotates so it
+   * reads upright (free text, stamps); a clicked line points the way its
+   * `ClickCreate` says on screen. A dragged line and a callout's leader
+   * follow the pointer and ignore it.
    */
   upright?: boolean;
   /**
-   * Ids invisible to hit-testing and marquee for THIS event — per-event
+   * Ids invisible to hit-testing and marquee for this event — per-event
    * environmental context like `pageBox`. The caller (plugin shell) resolves
    * its engaged Behaviors (form widgets under a fill tool render their own
    * DOM and must not select/move), so the core stays behavior-agnostic.
@@ -615,31 +636,45 @@ export interface PointerInput {
 }
 
 /**
- * What a bare CLICK (a press-release under the drag threshold) creates for a
- * tool: a default-size box with an EXPLICIT anchor (`center` unless stated —
- * free text declares `top-left` so the box hangs where you'll type,
- * display-frame-aware under `upright`), or a default-length line from the
- * point (`angleDeg` 0 = rightward, CW-positive in y-down space). Resolved
- * from the TOOL by the caller and passed on the message — the core knows
- * subtypes, not tools (the `upright` pattern). `false` suppresses a kind's
- * own click fallback (free text always click-creates by default).
- * Anchoring is policy DATA, never inferred from the kind — the same policy
- * drives annotation commits, footprint ghosts, and form-field placement
- * (see `resolveClickPlacement`).
+ * What a bare click (a press-release under the drag threshold) creates for a
+ * tool, in PDF points:
+ *   - a box, `width` × `height`, whose `anchor` sits on the click: its middle
+ *     (`center`, the default) or its top-left corner (`top-left`: free text
+ *     hangs where you'll type);
+ *   - a line, `length` long, pointing `rotation` degrees clockwise from
+ *     rightward, whose `anchor` sits on the click: its middle (`center`, the
+ *     default), its start, or its end (an arrow's tip).
+ * Under an `upright` tool the anchor, the box's sides and the line's
+ * direction are as the person sees the turned page. Resolved from the tool
+ * by the caller and passed on the message: the core knows kinds, not tools.
+ * The same policy drives the commit, the tool's ghost and a form field's
+ * placement (see `resolveClickPlacement`).
  */
 export type ClickCreate =
   | { width: number; height: number; anchor?: 'center' | 'top-left' }
-  | { length: number; angleDeg?: number };
+  | { length: number; rotation?: number; anchor?: 'center' | 'start' | 'end' };
 
-export type Msg =
-  | { t: 'editPointer'; phase: 'down' | 'move' | 'up'; in: PointerInput }
-  | { t: 'marqueePointer'; phase: 'down' | 'move' | 'up'; in: PointerInput }
+/**
+ * Where a create gesture puts what it makes, on the page and slid inside it:
+ * a box and the turn an `upright` tool gives it (degrees clockwise, 0 for
+ * none), or a segment from `a` to `b`. A click's comes from the tool's
+ * {@link ClickCreate}, a drag's from the dragged points. It says nothing of
+ * what is drawn there: each shape family turns it into its shape
+ * (`ShapeFamily.placed`), and a form field takes the box as its bounds.
+ */
+export type Placement =
+  | { kind: 'box'; rect: Rect; rot: number }
+  | { kind: 'segment'; a: Point; b: Point };
+
+export type Message =
+  | { type: 'editPointer'; phase: 'down' | 'move' | 'up'; in: PointerInput }
+  | { type: 'marqueePointer'; phase: 'down' | 'move' | 'up'; in: PointerInput }
   | {
-      t: 'createPointer';
+      type: 'createPointer';
       measure?: MeasurementAppearance;
       capture?: string;
       phase: 'down' | 'move' | 'up';
-      subtype: Subtype;
+      subtype: KindName;
       /** The authoring tool's `defaults` key (see {@link Draft}). Defaults to `subtype`. */
       preset?: string;
       /** PDF intent carried by an ink authoring preset. */
@@ -655,35 +690,18 @@ export type Msg =
       straightenInk?: InkStraightenOptions;
       in: PointerInput;
     }
-  | { t: 'finishInkDraft' }
-  | { t: 'finishCreationDraft' }
-  /**
-   * Programmatic creation from page-space geometry — the data API's `create`.
-   * Mints the same optimistic `tmp:` annotation a draw tool commits, from the
-   * preset's defaults with `props` layered on top, and emits the same `create`
-   * effect: ONE commit path for pointer and API. `preset` defaults to `subtype`.
-   */
+  | { type: 'finishInkDraft' }
+  | { type: 'finishCreationDraft' }
   | {
-      t: 'createAnnot';
-      page: PageRef;
-      subtype: Subtype;
-      geom: Geom;
-      preset?: string;
-      props?: AnnotationPropsPatch;
-      flags?: Partial<AnnotationFlags>;
-      /** Select the new annotation (a tool would); default false for API creates. */
-      select?: boolean;
-    }
-  | {
-      t: 'createCaret';
+      type: 'createCaret';
       page: PageRef;
       anchor: TextEndAnchor;
       flags?: Partial<AnnotationFlags>;
     }
   | {
-      t: 'createReplaceText';
+      type: 'createReplaceText';
       page: PageRef;
-      quads: TextQuad[];
+      quads: Quad[];
       anchor: TextEndAnchor;
       preset?: string;
     }
@@ -691,150 +709,135 @@ export type Msg =
   // quads (the `text-selection` create gesture). One message per page the
   // selection covers.
   | {
-      t: 'createMarkup';
-      subtype: Subtype;
+      type: 'createMarkup';
+      subtype: KindName;
       page: PageRef;
-      quads: TextQuad[];
+      quads: Quad[];
       preset?: string;
       /** The tool's `/F` seed — merged over {@link DRAWN_FLAGS} at commit. */
       flags?: Partial<AnnotationFlags>;
     }
   // live markup preview (the selection rendered as the markup it will become)
   | {
-      t: 'setMarkupPreview';
-      subtype: Subtype;
+      type: 'setMarkupPreview';
+      subtype: KindName;
       /** Per-page quads keyed by `page.pageObjectNumber` (a lookup, not an address). */
-      quadsByPage: Record<number, TextQuad[]>;
+      quadsByPage: Record<number, Quad[]>;
       preset?: string;
     }
-  | { t: 'clearMarkupPreview' }
+  | { type: 'clearMarkupPreview' }
   // Without `ids`: clear the selection. With `ids`: drop only those members
-  // (the shell prunes annotations whose Behavior just ENGAGED — inert things
+  // (the shell prunes annotations whose Behavior just engaged — inert things
   // cannot stay selected).
-  | { t: 'deselect'; ids?: Id[] }
+  | { type: 'deselect'; ids?: Id[] }
   /** Pointer entered/left an annotation (topmost hit id, or null). Pure state. */
-  | { t: 'hover'; id: Id | null }
-  /** Force/clear session visibility for specific annotations (the actions
-   *  plane's Hide sink). Hiding also clears transient engagement (selection,
-   *  editing, hover) for the hidden ids. Unknown ids no-op. Zero effects. */
-  /** Drop overrides for truly DELETED annotations (never for reloads). */
+  | { type: 'hover'; id: Id | null }
   // Programmatic selection (the data-API `select(ref)` — e.g. auto-selecting
   // a freshly placed form widget). Unknown/unselectable ids are dropped;
   // selecting a group member takes the whole group, like a click would.
-  | { t: 'select'; ids: Id[]; add?: boolean }
-  // Apply a flat property patch to the current selection. Each member takes the
-  // keys its KIND declares (`propsFor`) and ignores the rest, so one message
-  // restyles a mixed selection. Members flip to `vector`; one patch effect each.
-  | { t: 'setProps'; patch: AnnotationPropsPatch }
-  // Merge a `/F` flags patch into the selection (or explicit ids). Flags are
-  // NOT appearance: members keep their render `source` (no /AP re-bake), and —
-  // deliberately — the write is NOT gated by `locked`: this is how you unlock
-  // (Acrobat keeps its Locked checkbox live on a locked annotation). One
-  // `flags` effect per changed COMMITTED member; an uncommitted draft just
-  // merges (its create draft carries the flags when it commits).
-  | { t: 'setFlags'; patch: Partial<AnnotationFlags>; ids?: Id[] }
-  | { t: 'setDefaults'; subtype: Subtype; patch: AnnotationPropsPatch }
+  | { type: 'select'; ids: Id[]; add?: boolean }
+  // Write engine fields to records, a patch per id: each takes the fields its
+  // kind has and may change now (`mayWrite`), so one message restyles a mixed
+  // selection. How each is drawn after follows appearance.ts.
+  | { type: 'setFields'; patches: Readonly<Record<Id, FieldValues>> }
+  // Bold, italic or underline on the selection's text bodies.
+  | { type: 'setTextFormat'; format: 'bold' | 'italic' | 'underline'; on: boolean }
+  // Link the selection somewhere, or unlink it (`null`): the link kind's own
+  // target, or every other linkable kind's attached link.
+  | { type: 'setLink'; target: PdfLinkTarget | null }
+  // Merge a `/F` flags patch into the selection (or explicit ids). A flag
+  // needs update authority only, never an unlocked record: this is how you
+  // unlock (Acrobat keeps its Locked checkbox live on a locked annotation).
+  // Flags are not appearance: a baked raster stays baked.
+  | { type: 'setFlags'; patch: Partial<AnnotationFlags>; ids?: Id[] }
+  // Merge fields into a tool's defaults (keyed by its preset).
+  | { type: 'setDefaults'; preset: string; patch: FieldValues }
   // Live-adjust snapping (a UI toggle) — merges into `Model.snap`.
-  | { t: 'setSnap'; patch: Partial<SnapSettings> }
-  // Rotate the current selection by a fixed quarter-turn (clockwise) about its
-  // centre — the toolbar "rotate 90°" affordance. Works for a single shape or a
-  // multi-target group (about the union-box centre).
-  | { t: 'rotate90' }
+  | { type: 'setSnap'; patch: Partial<SnapSettings> }
+  // Turn the selection a quarter turn, clockwise (90) or back (-90): the
+  // toolbar's rotate buttons. A single shape turns about its own pivot, a
+  // multi-selection about the middle of the box around it; locked members stay.
+  | { type: 'rotateSelection'; degrees: 90 | -90 }
   // Reset rotation to the as-authored orientation: box `rot → 0`; vertex points
   // spun by `-rot` about their centroid, `rot → 0`. One patch effect per member.
-  | { t: 'resetRotation' }
-  | { t: 'delete' }
-  | { t: 'cancel' }
-  | { t: 'loaded'; annots: Annot[] }
-  /**
-   * Whole-document hydration ingest (and desync re-ingest): the snapshot is
-   * the committed TRUTH. Incoming annots overwrite by id (gesture-locked ids
-   * excepted, as in `upsert`); committed model entries ABSENT from the
-   * snapshot are reaped — they were deleted while we could not watch.
-   * Uncommitted `tmp:` drafts and gesture-locked ids are never reaped, and
-   * an in-progress draft survives (unlike `remove`). `bumpAp` marks a
-   * desync re-ingest: rasters may have changed invisibly during the gap,
-   * so every replaced annotation re-fetches once.
-   */
-  | { t: 'hydrated'; annots: Annot[]; bumpAp?: boolean }
-  | { t: 'created'; tempId: Id; id: Id; ref: AnnotationRef }
-  | { t: 'createFailed'; tempId: Id }
-  // store maintenance for the data API + collaboration: add-or-replace an
-  // annotation by id (own create/update re-synced from the engine DTO, or a
-  // remote edit arriving over the event stream), and remove by id (own delete
-  // by ref, or a remote delete). Pure store ops — they emit no effects.
-  // add-or-replace by id. `bumpAp` marks these upserts as confirming an engine
-  // /AP re-bake with NEW content (a size-changing patch resolving, a remote
-  // edit): each replaced annotation's `apVersion` increments, telling the shell
-  // to re-fetch its raster. Plain re-syncs (a move's round-trip) leave it alone.
-  | { t: 'upsert'; annots: Annot[]; bumpAp?: boolean }
-  // A sibling PLANE re-baked these annotations' /AP without touching the
-  // annotation model (a form value write regenerating widget appearances):
-  // bump `apVersion` so the shell re-fetches the raster. Unknown ids no-op.
-  | { t: 'bumpAp'; ids: Id[] }
-  | { t: 'remove'; ids: Id[] }
+  | { type: 'resetRotation' }
+  | { type: 'delete' }
+  | { type: 'cancel' }
+  /** A record this session created was confirmed under a new id: selection, hover and editing follow it. */
+  | { type: 'rekey'; from: Id; to: Id }
+  /** These records left the view (deleted elsewhere, a refused create): drop every reference to them. */
+  | { type: 'forget'; ids: Id[] }
   // free-text editing: enter/leave the focused `contentEditable`, and apply the
-  // browser's plain-text result optimistically (the plugin debounces the engine
-  // write). `setText` flips the annotation to `vector` so the live text shows.
-  | { t: 'beginTextEdit'; id: Id }
-  | { t: 'setText'; id: Id; text: string }
+  // browser's plain-text result. `setText` flips the annotation to `vector` so
+  // the live text shows; its `text` effect is written after a pause in typing.
+  | { type: 'beginTextEdit'; id: Id }
+  | { type: 'setText'; id: Id; text: string }
   // The editor's rich result (runs of deltas over the body), applied
-  // optimistically like `setText`; `contents` follows as the projection.
-  | { t: 'setRichText'; id: Id; doc: RichTextDocumentInput }
-  | { t: 'endTextEdit' };
+  // like `setText`; `contents` follows as the projection.
+  | { type: 'setRichText'; id: Id; doc: RichTextDocumentInput }
+  | { type: 'endTextEdit' };
 
 export type Effect =
-  | { fx: 'captured'; tool: string; page: PageRef; geom: Geom }
-  | { fx: 'create'; id: Id }
-  | { fx: 'createGroup'; primary: Id; members: Id[] }
-  /** `apChanged` is set (to `true`) ONLY when this patch INVALIDATED a baked
-   *  raster — the annotation stayed `baked` (an opaque-body kind) and the edit
-   *  resized its `/AP` frame, so the engine's re-bake produces new content (in
-   *  practice: a stamp resize). The shell's resolve handler then turns it into
-   *  an `upsert` with `bumpAp`. Absent for everything else — moves/rotations
-   *  (the blit repositions the same pixels) and any kind that flipped to
-   *  `vector` (it renders live; the raster stops mattering) — so those keep the
-   *  bare `{ fx, id }` shape and trigger no appearance re-fetch. */
-  | { fx: 'patch'; id: Id; scope: PatchScope; apChanged?: true }
-  /** A `/F`-only engine write for one committed annotation: the shell emits a
-   *  flags-only patch (the model already holds the merged flags) and re-syncs
-   *  PRESERVING the render source — flags never re-bake an appearance. */
-  | { fx: 'flags'; id: Id }
-  /** The parent's `link` prop changed on a NON-link kind: reconcile its
-   *  attached link children (create / retarget / delete) against the desired
-   *  state derived from `link` + the parent's geometry. Declarative — the
-   *  shell's reconciler is the only code that spells out child operations.
-   *  (Geometry commits don't emit this; the shell re-runs the reconciler on
-   *  any `patch` of an annotation that has `linkRefs`.) */
-  // Reconcile the parent's attached link children toward `target` (null =
-  // remove them). The intent rides the effect — parents store no link value;
-  // the committed children ARE the truth (`linkOf` reads them back).
-  | { fx: 'syncLink'; id: Id; target: PdfLinkTarget | null }
-  | { fx: 'delete'; ref: AnnotationRef };
+  | { type: 'captured'; tool: string; page: PageRef; geometry: Shape }
+  /** Write a new record: the draft its annotation was read from, named as it is keyed. */
+  | { type: 'create'; id: Id; draft: AnnotationDraft }
+  /** Write a composite (a replace-text caret and its strikeout): the primary
+   *  first, then each member answering it. `drafts` holds each one's draft. */
+  | {
+      type: 'createGroup';
+      primary: Id;
+      members: Id[];
+      drafts: Readonly<Record<Id, AnnotationDraft>>;
+    }
+  /** Write one record's change: its entry in the change set's `patches`. `update`
+   *  asks for it for every changed record that has one, except typed text, which
+   *  its `text` effect writes after a pause. Whether the engine's re-baked
+   *  appearance differs is the engine's answer, not the core's guess. */
+  | { type: 'patch'; id: Id; patch: AnnotationPatch }
+  /** Write the edited text of one free-text record. The plugin waits for a
+   *  pause in typing and writes the latest text once. */
+  | { type: 'text'; id: Id }
+  /** The parent's `link` prop changed on a non-link kind: reconcile its
+   *  attached link children (create / retarget / delete) toward `target`
+   *  (null = remove them). Declarative — the plugin's reconciler is the only
+   *  code that spells out child operations; parents store no link value, the
+   *  committed children are the truth (`linkOf` reads them back). Geometry
+   *  commits don't emit this; the plugin re-runs the reconciler after any
+   *  `patch` of an annotation with attached children. */
+  | { type: 'syncLink'; id: Id; target: PdfLinkTarget | null }
+  /** Delete one record from the document. A record the engine has not
+   *  confirmed yet is deleted once its create is. */
+  | { type: 'delete'; id: Id };
 
 /** Per-annotation render data — its content geometry + style + live state. */
 export interface RenderItem {
   id: Id;
   ref: AnnotationRef | null;
-  subtype: Subtype;
-  geom: Geom;
   /**
-   * The VISUAL box (geometry + stroke + line endings) in content space — the SAME
-   * `geomVisualBounds` that feeds the engine `/Rect`. The renderer paints into THIS
-   * box and does no bounds math of its own, so the on-screen box and the baked
-   * appearance can never drift (the v2 "patch computes the rect" rule).
+   * The annotation it draws, as the user sees it (the record's, a gesture
+   * in progress aside: that is in `geometry` and `box`). Absent for what isn't
+   * made yet: a drawing in progress or a tool's ghost.
+   */
+  annotation?: Annotation;
+  subtype: KindName;
+  geometry: Shape;
+  /**
+   * The box the live drawing is painted into (its family's `drawnBounds`:
+   * geometry, stroke, endings, cloud): a box's or caret's own, before its
+   * turn (`rot`), the page's for the rest. The renderer paints into this box
+   * and does no bounds math of its own.
    */
   box: Rect;
   /**
-   * Content-space box the engine appearance raster occupies (the AP `/Rect`),
+   * Page-space box the engine appearance raster occupies (the AP `/Rect`),
    * with the live move gesture applied — so a baked annotation's bitmap follows
    * a drag. Only meaningful when `source === 'baked'`; absent otherwise.
    */
   apBox?: Rect;
   /**
    * Rotation (deg, CW) to apply to the baked raster as a view transform —
-   * exactly the rotation the engine STRIPPED from it (see `Annot.apRot`).
-   * Live for `opaqueBody` kinds (a stamp spins with the rotate gesture);
+   * exactly the rotation the engine stripped from it (see `ModelAnnotation.apRot`).
+   * Live for `rasterOnly` kinds (a stamp spins with the rotate gesture);
    * absent when the raster already contains its rotation (vertex kinds).
    */
   apRot?: number;
@@ -843,19 +846,45 @@ export interface RenderItem {
    *  text, text/choice widgets). Lets a behavior renderer's focused editor
    *  match the baked appearance's font. */
   text?: TextStyle;
-  source: 'baked' | 'vector' | 'ghost';
+  /**
+   * How it paints: the engine's raster (`baked`), live from its description
+   * (`vector`), or an annotation not made yet, drawn as it will be: a drawing
+   * in progress (`draft`, solid) or the tool's ghost, what a click would
+   * place (`ghost`, see-through by `ghostOpacity`).
+   */
+  source: 'baked' | 'vector' | 'draft' | 'ghost';
+  /** How opaque a ghost paints (0–1); a painter lets `--epdf-ghost-opacity` win over it. */
+  ghostOpacity?: number;
   selected: boolean;
   /** The pointer is over this annotation — scene-level hover affordances
    *  (e.g. a redaction mark previews its applied look). */
   hovered?: boolean;
-  /** Redaction label projection (redact kind only) — see {@link Annot.label}. */
+  /** Redaction label projection (redact kind only) — see {@link ModelAnnotation.label}. */
   label?: { text: string; repeat: boolean };
+  /**
+   * The box a painter draws into: `box` before its turn, and that turn,
+   * degrees clockwise about the box's middle. Everything the item draws sits
+   * upright inside it: its scene, a custom look, or its raster (`raster`).
+   * `scale` is how large the page draws the item relative to its own size:
+   * 1, except for a body that keeps its size on screen (`noZoom`), drawn
+   * smaller on the page as people zoom in. Made from `box` and `rot` by the
+   * core; painters read this, not `rot`.
+   */
+  frame: { box: Rect; rotation: number; scale: number };
+  /**
+   * The engine's raster inside the frame, for an item that has one: its box
+   * relative to the frame's top-left before the frame's turn, and its own turn
+   * about its middle. Made from `apBox` and `apRot`; null without a raster box.
+   */
+  raster: { box: Rect; rotation: number } | null;
+  /** A note's or file attachment's icon (`/Name`), which its live drawing draws. */
+  icon?: NoteIcon | FileAttachmentIcon;
   measure?: MeasurementAppearance;
   /**
-   * Applied rotation (deg, CW), or 0/undefined. For BOX kinds (`rect`/`text`)
-   * `box` is the UNROTATED visual box and the renderer applies this rotation
-   * about its centre (CSS/SVG transform). For VERTEX kinds the geometry is
-   * already rotated, so this is advisory only — the renderer must NOT re-apply it.
+   * Applied rotation (deg, CW), or 0/undefined. For box kinds (`box`/`text-box`)
+   * `box` is the unrotated visual box and the renderer applies this rotation
+   * about its centre (CSS/SVG transform). For vertex kinds the geometry is
+   * already rotated, so this is advisory only — the renderer must not re-apply it.
    */
   rot?: number;
   /**
@@ -866,21 +895,21 @@ export interface RenderItem {
   blend?: Exclude<BlendMode, 'normal'>;
 }
 
-/** The dumb draw vocabulary the framework renderer maps to SVG (content space).
- *  A CLOSED node (rect, ellipse, closed poly) takes the annotation's FILL colour;
+/** The dumb draw vocabulary the framework renderer maps to SVG (page space).
+ *  A closed node (rect, ellipse, closed poly) takes the annotation's fill colour;
  *  an open node (line, open poly — open arrows, butt, slash) is stroke-only. The
  *  stroke colour applies to every node. Closed-ness is the only fill signal. */
 export type RenderNode =
   | { kind: 'rect'; rect: Rect }
   | { kind: 'ellipse'; rect: Rect }
-  | { kind: 'line'; a: Vec; b: Vec }
-  | { kind: 'poly'; points: Vec[]; closed: boolean }
-  // a precomputed closed path (cloudy border) — `d` is SVG data in content space
+  | { kind: 'line'; a: Point; b: Point }
+  | { kind: 'poly'; points: Point[]; closed: boolean }
+  // a precomputed closed path (cloudy border) — `d` is SVG data in page space
   | { kind: 'path'; d: string };
 
 /**
  * How to paint one node. The pure core fills this in (per kind/subtype), and a
- * framework renderer applies it verbatim — so ALL appearance logic (markup fill vs
+ * framework renderer applies it verbatim — so all appearance logic (markup fill vs
  * stroke, blend, dash, derived widths) lives once, in the portable core, not in
  * every framework. Omitted `fill`/`stroke` mean none.
  */
@@ -891,28 +920,29 @@ export interface Paint {
   opacity?: number;
   dash?: number[]; // stroke dash (content units)
   blend?: Exclude<BlendMode, 'normal'>;
-  cap?: 'round'; // stroke-linecap; omitted = the default butt. Round for freehand ink.
+  lineCap?: 'round'; // stroke-linecap; omitted = the default butt. Round for freehand ink.
   join?: 'round'; // stroke-linejoin; omitted = the default miter. Round for freehand ink.
+  fillRule?: 'evenodd'; // fill-rule; omitted = the default nonzero. Even-odd punches icon holes.
 }
 
 /**
  * A fully-painted draw node: geometry + paint. `scene(item)` returns these and a
- * per-framework painter maps each to ONE element, applying `paint` — the entire
+ * per-framework painter maps each to one element, applying `paint` — the entire
  * surface a new framework renderer must implement. Supersedes the geometry-only
  * `RenderNode` for rendering; `geomScene` stays the internal geometry helper.
  */
 export type SceneNode =
   | { kind: 'rect'; rect: Rect; paint: Paint }
   | { kind: 'ellipse'; rect: Rect; paint: Paint }
-  | { kind: 'line'; a: Vec; b: Vec; paint: Paint }
-  | { kind: 'poly'; points: Vec[]; closed: boolean; paint: Paint }
+  | { kind: 'line'; a: Point; b: Point; paint: Paint }
+  | { kind: 'poly'; points: Point[]; closed: boolean; paint: Paint }
   | { kind: 'path'; d: string; paint: Paint }
-  /** Painted (non-interactive) text — `at` is the BASELINE start point in
+  /** Painted (non-interactive) text — `at` is the baseline start point in
    *  content units. Editable text (free text) stays a framework element;
    *  this is for pure pixels, e.g. a redaction label preview. */
   | {
       kind: 'text';
-      at: Vec;
+      at: Point;
       text: string;
       fontSize: number;
       fontFamily?: string;
@@ -928,31 +958,41 @@ export interface InkStraightenOptions {
   axisSnapDegrees: number;
 }
 
+/** What a selection handle reshapes: a box's corner or side, or one point of a line or a polygon. */
+export type HandleRole = 'corner' | 'side' | 'point';
+
 export type ChromeNode =
   | { kind: 'outline'; rect: Rect }
   // An oriented selection box: the four corners of the (possibly tilted) OBB in
   // order, for rotatable kinds. The renderer draws the closed quad; `angle` (deg)
   // lets it orient resize cursors. Replaces the axis-aligned `outline` whenever a
   // shape (or group) carries rotation.
-  | { kind: 'obb'; corners: [Vec, Vec, Vec, Vec]; angle: number }
+  | { kind: 'obb'; corners: [Point, Point, Point, Point]; angle: number }
   // `rot` (deg, CW) tilts the handle glyph itself so it rides a rotated box.
-  | { kind: 'handle'; at: Vec; cursor: Cursor; rot?: number }
+  // `role` says what it reshapes: a box's corner or side, or one point of a
+  // line or a polygon; `active` is true while it is being dragged.
+  | {
+      kind: 'handle';
+      at: Point;
+      cursor: Cursor;
+      rot?: number;
+      role: HandleRole;
+      active: boolean;
+    }
   // The rotate knob: `at` is where the grab dot sits (hanging off the top edge),
   // `from` the edge anchor the connector stalk draws to.
-  | { kind: 'rotate-knob'; at: Vec; from: Vec }
+  | { kind: 'rotate-knob'; at: Point; from: Point }
   // A live alignment guide (see `Guide`) — drawn while a snapped move is active.
   | { kind: 'guide'; axis: 'x' | 'y'; at: number; lo: number; hi: number }
-  // The live rotation readout while a rotate gesture is active: `at` is the
-  // pointer (content space), `angle` the selection's absolute angle (deg, CW).
-  | { kind: 'angle-chip'; at: Vec; angle: number }
   // Rotation guides while a rotate gesture is active: finished line segments —
   // chords of the page through the pivot — so painters just draw. Two `axis`
   // lines (the fixed 0°/90° reference cross) + one `indicator` at the live
-  // `angle` (the SAME snapped angle the chip shows and the commit applies).
+  // `angle` (the same snapped angle the rotation badge shows and the commit
+  // applies: `rotationAnchor`).
   | {
       kind: 'rotate-guides';
-      center: Vec;
+      center: Point;
       angle: number;
-      lines: Array<{ a: Vec; b: Vec; role: 'axis' | 'indicator' }>;
+      lines: Array<{ a: Point; b: Point; role: 'axis' | 'indicator' }>;
     }
   | { kind: 'marquee'; rect: Rect };

@@ -21,15 +21,24 @@ import type { EventHook } from '@embedpdf/core';
 import { createDefaultActionsUiAdapter } from '@embedpdf/web';
 
 import { useCapability, useCapabilityEvent, useOptionalCapability } from './runtime';
+import { settingsHook } from './state';
 
-/** The actions capability (execute / executeNamed / policy) for app code. */
+/**
+ * The actions capability (executeNamed, execute, dispatch, the settings) of
+ * the surrounding `<DocumentScope>`'s document, else the active one. Outside
+ * a document, the settings calls work and every other method throws
+ * `not-ready`.
+ */
 export function useActions(): ActionsCapability {
   return useCapability(ActionsToken);
 }
 
-/** Subscribe to one actions event for the mounted lifetime: `useActionsEvent((c) => c.onExecuted, handler)`. */
+/** The actions settings (`policy`, `triggers`, `openSequence`, `javascript`), with or without a document. Takes a selector. */
+export const useActionsSettings = settingsHook(ActionsToken);
+
+/** Subscribe to one actions event for the mounted lifetime: `useActionsEvent((actions) => actions.onExecuted, handler)`. */
 export function useActionsEvent<T>(
-  select: (cap: ActionsCapability) => EventHook<T>,
+  select: (actions: ActionsCapability) => EventHook<T>,
   handler: (event: T) => void,
 ): void {
   useCapabilityEvent(ActionsToken, select, handler);
@@ -40,11 +49,11 @@ export type ActionsUiHandlers = Partial<ActionUiAdapter>;
 
 /**
  * Install the UI adapter for the active document's action dispatcher. The
- * DEFAULT policy — the origin×phase visibility matrix, sanitizeExternalUri
+ * default policy — the origin×phase visibility matrix, sanitizeExternalUri
  * URI opens, browser print/alert fallbacks — is `@embedpdf/web`'s
- * `createDefaultActionsUiAdapter`, written ONCE for every binding; this
+ * `createDefaultActionsUiAdapter`, written once for every binding; this
  * hook is React glue only (late-bound handlers, stage navigation,
- * identity-safe install/uninstall). The doc.print AUTHORITY gate is
+ * identity-safe install/uninstall). The doc.print authority gate is
  * upstream (the actions plugin) and not overridable.
  */
 export function useActionsUiAdapter(handlers?: ActionsUiHandlers): void {
@@ -57,7 +66,7 @@ export function useActionsUiAdapter(handlers?: ActionsUiHandlers): void {
     if (!actions) return;
     const adapter: ActionUiAdapter = createDefaultActionsUiAdapter({
       overrides: () => handlersRef.current,
-      goToPage: (page) => stage?.goToPageIndex(page),
+      goToPage: (page) => stage?.goToPage(page),
     });
     return actions.setUiAdapter(adapter);
   }, [actions, stage]);

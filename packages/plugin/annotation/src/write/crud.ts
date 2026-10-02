@@ -1,469 +1,249 @@
-import { PluginError, pageRefsEqual, toPluginError, type BatchResult } from '@embedpdf/core';
+/**
+ * Create, update, delete and move: the public verbs, in the engine's own
+ * terms, and the transfers (export, import, a resource's bytes). Each change
+ * states itself through `store.apply` (a move through the pending moves), so
+ * it shows at once and is written, settled and refused exactly like a
+ * gesture's, and each resolves with what the engine wrote for it: its own
+ * write's answer, never another change still on its way.
+ */
 import {
-  applyProps,
-  linkChildrenOf,
-  type Annot,
-  type Geom,
-  type Rect,
-  type Subtype,
-} from '@embedpdf/core-annotation';
+  PluginError,
+  toPluginError,
+  toPluginErrorInfo,
+  type OperationOptions,
+} from '@embedpdf/core';
+import { defaultsFor } from '@embedpdf/core-annotation';
 import {
+  ANNOTATION_FIELD_NAMES,
   annotationKey,
-  toPageRef,
-  type AnnotationDTO,
+  type Annotation,
+  type AnnotationBundle,
   type AnnotationDraft,
+  type AnnotationImportOptions,
   type AnnotationPatch,
   type AnnotationRef,
+  type AnnotationResourceRole,
+  type AnnotationResources,
   type PageRef,
 } from '@embedpdf/engine-core/runtime';
 
-import type { AnnotationGeometryPatch, AnnotationPatch as AnnotationPagePatch } from '../contract';
-import { geometryFromInput, type CreateAnnotationInput } from '../create-input';
+import type { AnnotationExportSelection, AnnotationImportResult } from '../contract';
+import { addMove, dropMove } from '../model';
 import type { AnnotationReads } from '../read/annotations';
-import { toCreateDraft, toPatch, toScopedPatch } from '../repository';
 import type { AnnotationContext, AnnotationServices } from '../services';
-import type { LinkWrites } from './links';
-import type { TextEditing } from './text-editing';
-import type { Announcer } from '../services/announce';
-import { ORIGIN_API, ORIGIN_UNKNOWN } from '../services/events';
+import { recordOfRef } from '../services/store';
+import { appliedAnnotationOf, appliedOrThrow } from './outcomes';
 
-/**
- * Create, update and delete: the public page-space verbs, their raw
- * (PDF-space) twins, and the effect runners that commit every gesture's
- * optimistic change to the engine and re-sync from its confirmed record.
- */
 export function createCrud(
-  ctx: Pick<AnnotationContext, 'doc' | 'document'>,
+  ctx: Pick<AnnotationContext, 'doc' | 'state' | 'pageOf' | 'assertAllowed' | 'cancellable'>,
   {
     store,
-    geometry,
-    records,
-    authority,
-    writes,
     tools,
-  }: Pick<AnnotationServices, 'store' | 'geometry' | 'records' | 'authority' | 'writes' | 'tools'>,
-  annotations: Pick<AnnotationReads, 'loadedOrThrow'>,
-  announce: Announcer,
-  text: Pick<TextEditing, 'commitText'>,
-  links: Pick<LinkWrites, 'scheduleSync'>,
+    records,
+    events,
+  }: Pick<AnnotationServices, 'store' | 'tools' | 'records' | 'events'>,
+  annotations: Pick<AnnotationReads, 'get' | 'pageOf'>,
+  /** Write what is held back (typed text) and wait for every write on its way. */
+  settle: () => Promise<void>,
 ) {
-  /** The one engine-update path, shared by `update` and `updateSelection`. A
-   *  programmatic patch changes the appearance → render live (vector). */
-  const updateRaw = async (ref: AnnotationRef, patch: AnnotationPatch): Promise<void> => {
-    const doc = ctx.doc;
-    if (!doc) throw new Error('[annotation] no document bound');
-    const pon = records.pageOf(ref);
-    if (pon == null) throw new Error('[annotation] cannot resolve page for ref');
-    const res = await doc.page(toPageRef(pon)).annotations.update(ref, patch);
-    records.sync(res.updated, 'vector', res.appearance?.changed);
-    announce.updated(res.updated, ORIGIN_API);
+  /** The annotation `ref` names, as the view holds it: for a change that wrote nothing. */
+  const current = (ref: AnnotationRef): { annotation: Annotation } => {
+    const annotation = annotations.get(ref);
+    if (!annotation) {
+      throw new PluginError('not-found', 'annotation', `no annotation ${annotationKey(ref)}`);
+    }
+    return { annotation };
   };
 
-  const wireSubtypeOf = (a: Annot): AnnotationDTO['subtype'] =>
-    a.data?.subtype ?? (a.subtype as AnnotationDTO['subtype']);
+  /**
+   * `draft` over a tool's defaults and flags: what it leaves out, the tool
+   * fills in, and the engine's defaults the rest. The tool's text body is
+   * left out: it formats text drawn with the tool, and a draft brings its own.
+   */
+  const withTool = (draft: AnnotationDraft, toolId: string): AnnotationDraft => {
+    const tool = tools.get(toolId);
+    if (!tool) throw new PluginError('not-found', 'annotation', `no tool '${toolId}'`);
+    const declared = ANNOTATION_FIELD_NAMES[draft.subtype];
+    const defaults = Object.entries(defaultsFor(store.model(), tool.preset)).filter(
+      ([name]) => name !== 'richText' && declared.includes(name),
+    );
+    return { ...tool.flags, ...Object.fromEntries(defaults), ...draft } as AnnotationDraft;
+  };
 
-  // Page-space patches lower through the same projection the gestures use.
-  const geomFromPatch = (geom: Geom, patch: AnnotationGeometryPatch): Geom => {
-    const bad = (): never => {
+  const create = async (
+    page: PageRef | number,
+    fields: AnnotationDraft | Annotation,
+    resources?: AnnotationResources,
+    options: OperationOptions & { tool?: string; select?: boolean } = {},
+  ): Promise<{ annotation: Annotation }> => {
+    ctx.assertAllowed('annotations:create', 'annotation.create');
+    const { ref } = ctx.pageOf(page);
+    // A read is a create too (a copy): the engine writes only its own fields,
+    // and refuses a value a write can't make. A kind it doesn't know has none.
+    if (fields.subtype === 'unsupported') {
       throw new PluginError(
         'invalid-input',
         'annotation',
-        `a '${patch.kind}' geometry cannot replace a '${geom.t}' geometry`,
+        "a kind the engine doesn't know can't be created",
       );
-    };
-    switch (patch.kind) {
-      case 'rect':
-        return geom.t === 'rect'
-          ? {
-              ...geom,
-              rect: patch.bounds,
-              ...(patch.rotation !== undefined ? { rot: patch.rotation } : {}),
-            }
-          : bad();
-      case 'line':
-        return geom.t === 'line' ? { ...geom, a: patch.from, b: patch.to } : bad();
-      case 'polygon':
-      case 'polyline':
-        return geom.t === 'poly'
-          ? {
-              ...geom,
-              points: patch.vertices.map((v) => ({ ...v })),
-              closed: patch.kind === 'polygon',
-            }
-          : bad();
-      case 'ink':
-        return geom.t === 'ink'
-          ? { ...geom, strokes: patch.strokes.map((s) => s.map((v) => ({ ...v }))) }
-          : bad();
-      case 'markup':
-        return geom.t === 'quads' ? { ...geom, quads: patch.quads.map((q) => ({ ...q })) } : bad();
-      case 'text':
-        return geom.t === 'text'
-          ? {
-              ...geom,
-              rect: patch.bounds,
-              ...(patch.rotation !== undefined ? { rot: patch.rotation } : {}),
-              ...(patch.callout !== undefined ? { callout: patch.callout ?? undefined } : {}),
-            }
-          : bad();
     }
+    const draft = fields as AnnotationDraft;
+    const stated = options.tool ? withTool(draft, options.tool) : draft;
+    const applied = store.apply([
+      { type: 'create', page: ref, draft: stated, ...(resources ? { resources } : {}) },
+    ]);
+    if (options.select) store.commit({ type: 'select', ids: [...applied.ids] });
+    const annotation = await ctx.cancellable(options.signal, appliedAnnotationOf(applied));
+    if (!annotation) {
+      throw new PluginError(
+        'operation-failed',
+        'annotation',
+        'the annotation could not be created',
+      );
+    }
+    return { annotation };
   };
-  const withBounds = (geom: Geom, bounds: Rect): Geom => {
-    if (geom.t === 'rect' || geom.t === 'text' || geom.t === 'caret')
-      return { ...geom, rect: bounds };
-    throw new PluginError(
-      'invalid-input',
-      'annotation',
-      `'${geom.t}' geometry has no bounds to set; patch its geometry`,
+
+  const update = async (
+    ref: AnnotationRef,
+    patch: AnnotationPatch,
+    resources?: AnnotationResources,
+    options: OperationOptions = {},
+  ): Promise<{ annotation: Annotation }> => {
+    const annotation = await ctx.cancellable(
+      options.signal,
+      appliedAnnotationOf(
+        store.apply([{ type: 'update', ref, patch, ...(resources ? { resources } : {}) }]),
+      ),
     );
-  };
-  const withRotation = (geom: Geom, rot: number): Geom => {
-    if (geom.t === 'quads' || geom.t === 'caret') {
-      throw new PluginError('unsupported', 'annotation', `'${geom.t}' annotations do not rotate`);
-    }
-    return { ...geom, rot };
+    return annotation ? { annotation } : current(ref);
   };
 
-  const update = async (ref: AnnotationRef, patch: AnnotationPagePatch): Promise<void> => {
-    const a = annotations.loadedOrThrow(ref);
-    const crop = geometry.cropOf(a.page.pageObjectNumber);
-    if (!crop)
-      throw new PluginError('not-found', 'annotation', 'the annotation page is not loaded');
-    let modified: Annot = a;
-    if (patch.bounds) modified = { ...modified, geom: withBounds(modified.geom, patch.bounds) };
-    if (patch.geometry)
-      modified = { ...modified, geom: geomFromPatch(modified.geom, patch.geometry) };
-    if (patch.props) {
-      const applied = applyProps(modified, patch.props);
-      if (!applied) {
-        throw new PluginError(
-          'invalid-input',
-          'annotation',
-          'the props patch does not apply to this annotation',
-        );
+  const remove = async (ref: AnnotationRef, options: OperationOptions = {}): Promise<void> => {
+    await ctx.cancellable(options.signal, appliedOrThrow(store.apply([{ type: 'delete', ref }])));
+  };
+
+  /** The last pending move's token: each move is removed by its own. */
+  let moveToken = 0;
+
+  /**
+   * Move annotations on one page to a new place in its drawing order. The
+   * new order shows at once; once the engine confirmed it, the confirmed
+   * records hold it and the pending move goes. A refused move goes at once.
+   */
+  const move = async (
+    refs: readonly AnnotationRef[],
+    toIndex: number,
+    options: OperationOptions = {},
+  ): Promise<void> => {
+    if (!refs.length) return;
+    const model = store.model();
+    const moving = refs.map((ref) => {
+      const record = recordOfRef(model, ref);
+      if (!record) {
+        throw new PluginError('not-found', 'annotation', `no annotation ${annotationKey(ref)}`);
       }
-      modified = applied;
-    }
-    let engine: Record<string, unknown> = {};
-    if (modified !== a) engine = { ...engine, ...(toPatch(modified, crop) ?? {}) };
-    if (patch.flags) engine = { ...engine, flags: { ...a.flags, ...patch.flags } };
-    if (patch.contents !== undefined) engine = { ...engine, contents: patch.contents };
-    if (Object.keys(engine).length) {
-      await updateRaw(a.ref, { subtype: wireSubtypeOf(a), ...engine } as AnnotationPatch);
-    }
-    if (patch.richText) {
-      store.commit({
-        t: 'setRichText',
-        id: a.id,
-        doc: { paragraphs: patch.richText.paragraphs },
-      });
-      await text.commitText(a.ref);
-    }
-  };
-  const setRotation = async (ref: AnnotationRef, degrees: number): Promise<void> => {
-    const a = annotations.loadedOrThrow(ref);
-    const crop = geometry.cropOf(a.page.pageObjectNumber);
-    if (!crop)
-      throw new PluginError('not-found', 'annotation', 'the annotation page is not loaded');
-    const modified = { ...a, geom: withRotation(a.geom, degrees) };
-    const patch = toScopedPatch(modified, { kind: 'geometry' }, crop);
-    if (patch) await updateRaw(a.ref, patch);
-  };
-  const rotationOf = (a: Annot): number => ('rot' in a.geom ? (a.geom.rot ?? 0) : 0);
-
-  const create = (input: CreateAnnotationInput): Promise<AnnotationRef> => {
-    if (!authority.canCreate()) {
-      return Promise.reject(
-        new PluginError('permission-denied', 'annotation', 'create requires doc.annotate.create'),
+      return record;
+    });
+    const page = moving[0]!.annotation.page;
+    if (moving.some((record) => record.annotation.page.objectNumber !== page.objectNumber)) {
+      throw new PluginError(
+        'invalid-input',
+        'annotation',
+        'the annotations to move must be on one page',
       );
     }
-    if (!ctx.document()?.pages.some((p) => pageRefsEqual(p.ref, input.page))) {
-      return Promise.reject(
-        new PluginError(
-          'not-found',
-          'annotation',
-          `page ${input.page.pageObjectNumber} is not in this document`,
+    if (!Number.isInteger(toIndex) || toIndex < 0) {
+      throw new PluginError('invalid-input', 'annotation', `toIndex ${toIndex} is not an index`);
+    }
+    const token = ++moveToken;
+    ctx.state.update(addMove, {
+      token,
+      page: page.objectNumber,
+      ids: moving.map((record) => record.id),
+      toIndex,
+    });
+    try {
+      await ctx.cancellable(
+        options.signal,
+        ctx.doc.page(page).annotations.move(
+          moving.map((record) => record.annotation.ref),
+          toIndex,
         ),
       );
-    }
-    let staged: { subtype: Subtype; geom: Geom };
-    try {
-      staged = geometryFromInput(input);
+      await records.settled();
     } catch (error) {
-      return Promise.reject(error);
-    }
-    const tool = input.tool ? tools.get(input.tool) : undefined;
-    if (input.tool && !tool) {
-      return Promise.reject(
-        new PluginError('not-found', 'annotation', `unknown tool '${input.tool}'`),
-      );
-    }
-    // One commit path: the same `createAnnot` → `create` effect a draw tool
-    // takes, so defaults, flags, optimistic staging, engine write and
-    // reconciliation are identical for pointer and API.
-    const effects = store.commit({
-      t: 'createAnnot',
-      page: input.page,
-      subtype: staged.subtype,
-      geom: staged.geom,
-      preset: tool?.preset ?? input.tool,
-      props: input.props,
-      flags: { ...tool?.flags, ...input.flags },
-      select: input.select ?? false,
-    });
-    return writes.awaitCreate(writes.createEffectsOf(effects)[0]?.id);
-  };
-
-  const createRaw = async (page: PageRef, draft: AnnotationDraft): Promise<AnnotationRef> => {
-    const doc = ctx.doc;
-    if (!doc) throw new Error('[annotation] no document bound');
-    // Default `/F` to `print` (Acrobat parity — without it the annotation
-    // disappears when printed). An EXPLICIT `flags` is respected verbatim.
-    const withFlags = (
-      draft.flags ? draft : { ...draft, flags: { print: true } }
-    ) as AnnotationDraft;
-    const res = await doc.page(page).annotations.create(withFlags);
-    // Stamps have no vector render — their engine-baked /AP is the visual.
-    records.sync(res.created, res.created.subtype === 'stamp' ? 'baked' : 'vector');
-    announce.created(res.created, ORIGIN_API);
-    return res.created.ref;
-  };
-
-  const remove = async (ref: AnnotationRef): Promise<void> => {
-    const doc = ctx.doc;
-    if (!doc) throw new Error('[annotation] no document bound');
-    const pon = records.pageOf(ref);
-    if (pon == null) throw new Error('[annotation] cannot resolve page for ref');
-    await doc.page(toPageRef(pon)).annotations.delete(ref);
-    store.commit({ t: 'remove', ids: [annotationKey(ref)] });
-    announce.deleted(ref, toPageRef(pon), ORIGIN_API);
-  };
-
-  // ── the effect runners: every gesture's optimistic change reaches the engine here ──
-
-  store.onEffect('create', (fx, m) => {
-    const doc = ctx.doc;
-    if (!doc) return;
-    const a = m.byId[fx.id];
-    const crop = a && geometry.cropOf(a.page.pageObjectNumber);
-    const draft = a && crop ? toCreateDraft(a, crop) : null;
-    if (!a || !draft) return;
-    doc
-      .page(a.page)
-      .annotations.create(draft)
-      .then(
-        (res) => {
-          // Reconcile temp→durable id (keeps selection/order), then attach the
-          // authoritative DTO so the committed annotation is fully data-backed.
-          store.commit({
-            t: 'created',
-            tempId: fx.id,
-            id: annotationKey(res.created.ref),
-            ref: res.created.ref,
-          });
-          records.sync(res.created, 'vector');
-          // Confirmed: the record is in the model, so the event fires now and
-          // a programmatic create() resolves after it (rule 2 of the contract).
-          announce.created(
-            res.created,
-            writes.isCreateAwaited(fx.id) ? ORIGIN_API : ORIGIN_UNKNOWN,
-          );
-          writes.confirmCreate(fx.id, res.created.ref);
-        },
-        (error: unknown) => {
-          store.commit({ t: 'createFailed', tempId: fx.id });
-          writes.failCreate(fx.id, error);
-        },
-      );
-  });
-
-  store.onEffect('createGroup', (fx, m) => {
-    const doc = ctx.doc;
-    if (!doc) return;
-    const ids = [fx.primary, ...fx.members];
-    const annots = ids.map((id) => m.byId[id]);
-    const primary = annots[0];
-    if (
-      !primary ||
-      annots.some((a) => !a || a.page.pageObjectNumber !== primary.page.pageObjectNumber)
-    ) {
-      store.commit({ t: 'remove', ids });
-      return;
-    }
-    const crop = geometry.cropOf(primary.page.pageObjectNumber);
-    const drafts = crop
-      ? annots.map((a) => (a ? toCreateDraft(a, crop) : null))
-      : annots.map(() => null);
-    if (drafts.some((d) => !d)) {
-      store.commit({ t: 'remove', ids });
-      return;
-    }
-
-    void (async () => {
-      const committed: Array<{ tempId: string; ref: AnnotationRef }> = [];
-      try {
-        const page = doc.page(primary.page);
-        const primaryResult = await page.annotations.create(drafts[0]!);
-        committed.push({ tempId: fx.primary, ref: primaryResult.created.ref });
-        store.commit({
-          t: 'created',
-          tempId: fx.primary,
-          id: annotationKey(primaryResult.created.ref),
-          ref: primaryResult.created.ref,
+      const refused = toPluginError('annotation', error);
+      if (refused.code !== 'operation-cancelled') {
+        events.writeFailed.emit({
+          refs: moving.map((record) => record.annotation.ref),
+          error: toPluginErrorInfo(refused),
         });
-        records.sync(primaryResult.created, 'vector');
-
-        for (let i = 0; i < fx.members.length; i++) {
-          const tempId = fx.members[i]!;
-          const draft = {
-            ...drafts[i + 1]!,
-            inReplyTo: primaryResult.created.ref,
-            replyType: 'group' as const,
-          } as AnnotationDraft;
-          const result = await page.annotations.create(draft);
-          committed.push({ tempId, ref: result.created.ref });
-          store.commit({
-            t: 'created',
-            tempId,
-            id: annotationKey(result.created.ref),
-            ref: result.created.ref,
-          });
-          records.sync(result.created, 'vector');
-        }
-        writes.confirmCreate(fx.primary, primaryResult.created.ref);
-      } catch (error) {
-        // A PDF write cannot be transactional, so compensate in reverse: remove
-        // every committed part. Keep any part whose rollback itself fails in the
-        // model; the UI must reflect the authoritative PDF, never hide an orphan.
-        const removeIds = ids.filter((id) => !committed.some((c) => c.tempId === id));
-        for (const part of [...committed].reverse()) {
-          try {
-            await doc.page(primary.page).annotations.delete(part.ref);
-            removeIds.push(annotationKey(part.ref));
-          } catch {
-            // `records.sync` already made this committed annotation visible.
-          }
-        }
-        if (removeIds.length) store.commit({ t: 'remove', ids: removeIds });
-        writes.failCreate(fx.primary, error);
-        console.error('[annotation] grouped annotation creation failed:', error);
       }
-    })();
-  });
+      throw refused;
+    } finally {
+      ctx.state.update(dropMove, token);
+    }
+  };
 
-  store.onEffect('flags', (fx, m) => {
-    const doc = ctx.doc;
-    if (!doc) return;
-    // A `/F`-only write: the model already holds the MERGED flags, so emit
-    // the full set (create/update both land on exactly these bits). The
-    // re-sync PRESERVES the render source — flags never change an
-    // appearance, so a baked raster stays authoritative and nothing
-    // re-fetches.
-    const a = m.byId[fx.id];
-    if (!a || !a.ref || !a.data) return;
-    const write = doc.page(a.page).annotations.update(a.ref, {
-      subtype: a.data.subtype,
-      flags: a.flags,
-    } as AnnotationPatch);
-    writes.note(a.ref, write);
-    write.then(
-      (res) => {
-        records.sync(res.updated, a.source);
-        announce.updated(res.updated, ORIGIN_UNKNOWN);
-      },
-      (err) => console.error('[annotation] flags write failed:', err),
-    );
-  });
+  /** The pages a selection names, as refs: an index becomes its page's ref. */
+  const pageRefsOf = (pages: readonly (PageRef | number)[] | undefined): PageRef[] | undefined =>
+    pages?.map((page) => ctx.pageOf(page).ref);
 
-  store.onEffect('patch', (fx, m) => {
-    const doc = ctx.doc;
-    if (!doc) return;
-    const a = m.byId[fx.id];
-    const crop = a && geometry.cropOf(a.page.pageObjectNumber);
-    const patch = a && a.ref && crop ? toScopedPatch(a, fx.scope, crop) : null;
-    if (!a || !a.ref || !patch) return;
-    const write = doc.page(a.page).annotations.update(a.ref, patch);
-    writes.note(a.ref, write);
-    // Re-sync from the authoritative DTO, PRESERVING the source the gesture
-    // chose: a move kept it baked (raster rides along), a resize flipped it to
-    // vector. So the round-trip can't silently re-bake an edited annotation.
-    //
-    // `apVersion` is driven by the ENGINE'S echo (`res.appearance.changed`),
-    // not by guessing from the patch we sent: the engine value-diffs the
-    // patch, verifies rigid translations, and reports whether the document's
-    // appearance definition actually changed. Preserved moves (including
-    // widget/stamp drags — their /AP survives now) cost zero re-fetches;
-    // regenerated appearances re-fetch exactly once, when the engine is
-    // done — never one-behind. The core's `fx.apChanged` prediction stays
-    // advisory (a future pre-commit "this will replace an imported
-    // appearance" affordance); the echo is the authority.
-    write.then(
-      (res) => {
-        records.sync(res.updated, a.source, res.appearance.changed);
-        announce.updated(res.updated, ORIGIN_UNKNOWN);
-        // Attached link children follow their parent's COMMITTED geometry
-        // — scheduled after the parent's own write resolves, from ONE
-        // place, so no gesture ever has to know the children exist.
-        if (linkChildrenOf(store.model(), fx.id).length) void links.scheduleSync(fx.id, 'keep');
-      },
-      // A refused write (a race, a stale /access) must not leave the
-      // optimistic patch as a lie. The effect runs AFTER the reducer
-      // applied it, so the pre-image is the annot's own canonical DTO —
-      // the last COMMITTED truth — re-ingested with fresh authority.
-      () => {
-        if (a.data && crop)
-          store.commit({ t: 'upsert', annots: [records.ingest(a.data, crop, a.source)] });
-      },
+  const exportBundle = async (
+    selection: AnnotationExportSelection = {},
+    options: OperationOptions = {},
+  ): Promise<AnnotationBundle> => {
+    ctx.assertAllowed('doc.download', 'annotation.export');
+    const pages = pageRefsOf(selection.pages);
+    // What the user sees is what the bundle carries: typed text and pending writes land first.
+    await ctx.cancellable(options.signal, settle());
+    return ctx.cancellable(
+      options.signal,
+      ctx.doc.annotations.export({
+        ...(selection.refs ? { refs: selection.refs } : {}),
+        ...(pages ? { pages } : {}),
+      }),
     );
-  });
+  };
 
-  store.onEffect('delete', (fx) => {
-    const doc = ctx.doc;
-    if (!doc) return;
-    const write = doc.page(fx.ref.page).annotations.delete(fx.ref);
-    writes.note(fx.ref, write);
-    write.then(
-      () => announce.deleted(fx.ref, fx.ref.page, ORIGIN_UNKNOWN),
-      () => {},
+  const importBundle = async (
+    bundle: AnnotationBundle,
+    options: AnnotationImportOptions & OperationOptions = {},
+  ): Promise<AnnotationImportResult> => {
+    ctx.assertAllowed('annotations:create', 'annotation.import');
+    const { signal, ...importOptions } = options;
+    const result = await ctx.cancellable(signal, ctx.doc.annotations.import(bundle, importOptions));
+    // The engine published one `annotations.created` per annotation: once the
+    // records hold them, `list()` shows them.
+    await records.settled();
+    return { annotations: result.annotations, refMap: result.refMap, dropped: result.dropped };
+  };
+
+  const downloadResource = async (
+    ref: AnnotationRef,
+    role: AnnotationResourceRole,
+    options: OperationOptions = {},
+  ): Promise<Uint8Array> => {
+    ctx.assertAllowed('doc.download', 'annotation.downloadResource');
+    current(ref);
+    return ctx.cancellable(
+      options.signal,
+      ctx.doc.page(annotations.pageOf(ref)).annotations.downloadResource(ref, role),
     );
-  });
+  };
 
   const api = {
     create,
-    createMany: (inputs: readonly CreateAnnotationInput[]) =>
-      writes.batchOver(
-        inputs,
-        (input) => create(input),
-        (_input, out) => out ?? null,
-      ),
-    createRaw,
     update,
-    updateMany: (
-      refs: readonly AnnotationRef[],
-      patch: AnnotationPagePatch,
-    ): Promise<BatchResult<AnnotationRef, AnnotationRef>> =>
-      writes.batchOver(
-        refs,
-        (ref) => update(ref, patch),
-        (ref) => ref,
-      ),
-    updateRaw: (ref: AnnotationRef, patch: AnnotationPatch) => updateRaw(ref, patch),
-    setRotation,
-    rotateBy: (ref: AnnotationRef, delta: number) =>
-      setRotation(ref, rotationOf(annotations.loadedOrThrow(ref)) + delta),
     delete: remove,
-    deleteMany: (refs: readonly AnnotationRef[]) =>
-      writes.batchOver(
-        refs,
-        (ref) => remove(ref),
-        (ref) => ref,
-      ),
+    move,
+    export: exportBundle,
+    import: importBundle,
+    downloadResource,
   };
 
-  return { updateRaw, setRotation, rotationOf, api };
+  return { update, api };
 }
 
 export type Crud = ReturnType<typeof createCrud>;
-
-/** Re-exported for the areas that lower errors the same way. */
-export { toPluginError };

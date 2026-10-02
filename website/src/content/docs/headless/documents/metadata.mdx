@@ -1,0 +1,126 @@
+---
+title: Metadata
+description: "Show and change a document's properties: title, author, subject, keywords, dates, and your own fields."
+---
+
+{/* Generated from docs/content — edit there, then `pnpm docs:sync`. */}
+
+# Metadata
+
+A PDF carries information about itself: a title, an author, when it was made. Register
+`metadataPlugin()` to show it in your UI and let people change it:
+
+<Snippet name="documents/title-field" />
+
+What `useMetadataState()` gives you updates by itself: after your own changes, and on a shared
+document, after someone else's.
+
+## Read
+
+<Fw only={['react', 'vue', 'svelte']}>`metadata`</Fw><Fw only="angular">`metadata.fields()`</Fw> has every standard field. A field the file doesn't set is `null`:
+
+| Field        | What it is                                                  |
+| :----------- | :---------------------------------------------------------- |
+| `title`      | The document's title                                        |
+| `author`     | Who wrote it                                                |
+| `subject`    | What it's about                                             |
+| `keywords`   | Keywords, as one string (often separated by commas)         |
+| `creator`    | The app the document was made in                            |
+| `producer`   | The app that turned it into a PDF                           |
+| `createdAt`  | When it was created, as an ISO date                         |
+| `modifiedAt` | When it was last changed, as an ISO date                    |
+| `trapped`    | A print-shop setting: `'true'`, `'false'` or `'unknown'`, never `null` |
+
+`status` says whether the metadata is still loading (`'loading'`), there (`'ready'`), or not
+allowed (`'forbidden'`). Every field `useMetadataState()` gives you, and every status, is listed
+under [State](#state).
+
+<Example name="metadata/properties" />
+
+## Change
+
+`update()` changes the fields you pass, and `null` removes one:
+
+```ts
+await metadata.update({
+  title: 'Q2 Proposal (final)',
+  author: 'Dana Smith',
+  subject: null,
+});
+```
+
+It resolves with `{ metadata }`: the fields after the change. The change is part of the document, kept when it's
+downloaded.
+
+<Example name="metadata/edit" />
+
+## Your own fields
+
+Keep your own values in the document, such as a contract number or who reviewed it. PDF apps show
+them as custom properties:
+
+<Snippet name="documents/custom-fields" />
+
+```ts
+await metadata.custom.update({ reviewedBy: 'lee', draftOwner: null });
+```
+
+A string sets a field, `null` removes it, and fields you leave out stay as they are. A field name is
+1 to 127 plain characters and can't be a standard field's name.
+
+<Example name="metadata/custom-fields" />
+
+## Methods
+
+Everything `useMetadata()` gives you.
+
+| Method                          | What it does                                                                                                                  |
+| :------------------------------ | :---------------------------------------------------------------------------------------------------------------------------- |
+| `update(changes)`               | Changes the standard fields you pass; `null` removes one. Resolves `{ metadata }`, the fields after the change. [Change](#change) |
+| `custom.update(changes)`        | Changes your own fields: a string sets one, `null` removes it, the rest stay. Resolves `{ custom }`. [Your own fields](#your-own-fields) |
+| `refresh()`, `custom.refresh()` | Reads the standard fields, or your own, from the file again. Rarely needed: they stay up to date by themselves.               |
+| `canUpdate()`                   | Whether changing the standard fields and your own ones is allowed. [Permissions](#permissions)                                |
+
+Every method that returns a promise also takes a `signal` in its options, to cancel it.
+
+## State
+
+<StateIntro hook="useMetadataState()" />
+
+| Field      | What it is                                                                  | Read once                                                |
+| :--------- | :-------------------------------------------------------------------------- | :------------------------------------------------------- |
+| `metadata` | Every standard field, as listed under [Read](#read), or `null` until it has loaded | `getSnapshot()`                                   |
+| `custom`   | Your own fields, as `{ name: value }`, or `null` until they have loaded     | `custom.getSnapshot()`                                   |
+| `status`   | `'idle'`, `'loading'`, `'ready'`, `'forbidden'` or `'error'`                | `getStatus()`, or `custom.getStatus()` for your own fields |
+
+## Events
+
+<Snippet name="documents/title-notice" />
+
+| Event               | Fires when                                                                        | Carries                                        |
+| :------------------ | :-------------------------------------------------------------------------------- | :--------------------------------------------- |
+| `onUpdated`         | The standard fields changed, by you or by someone else                            | `metadata`, `previous`, `changedKeys`, `origin` |
+| `onResynced`        | The standard fields were loaded from the file: when it opens, after `refresh()`, or to catch up after a lost connection | `metadata` |
+| `custom.onUpdated`  | Your own fields changed                                                           | `custom`, `previous`, `changedKeys`, `origin`  |
+| `custom.onResynced` | Your own fields were loaded from the file                                         | `custom`                                       |
+
+`changedKeys` names the fields that changed, and `previous` has the values before.
+
+## Permissions
+
+| Permission            | What it allows                                 | Check                  |
+| :-------------------- | :--------------------------------------------- | :--------------------- |
+| `doc.open`            | Reading every field                            | none: it opened        |
+| `doc.metadata.modify` | Changing the standard fields and your own ones | `metadata.canUpdate()` |
+
+## Good to know
+
+### The modified date
+
+Changing a property doesn't change `modifiedAt` for you. Set it yourself when you want it to move:
+`update({ modifiedAt: new Date() })`.
+
+### Dates
+
+Dates are ISO strings, with the time zone the PDF gives, so they survive JSON. Write a date as an
+ISO string or a `Date`. See [Metadata](/docs/engine/documents/metadata) for the details.

@@ -2,7 +2,7 @@
  * The sign dialog (`signature-sign` modal surface): a mark met a field and
  * the mode is `ask` — or a "sign here" flow wants the facts first. Shows
  * the mark as it will sit in the field, takes reason and location, offers
- * a certification when the config allows it, and either SEALS the field
+ * a certification when the config allows it, and either seals the field
  * (`sign`) or only draws the mark into it (`fillField`).
  */
 import { useState } from 'react';
@@ -19,7 +19,7 @@ export function SignDialog() {
   const [location, setLocation] = useState('');
   // What the signature declares about later changes: a plain approval (form
   // filling and further signatures keep it valid; Acrobat's reading), or a
-  // certification with its DocMDP permission. Only the FIRST signature can certify.
+  // certification with its DocMDP permission. Only the first signature can certify.
   const [signKind, setSignKind] = useState<'approval' | 'certify-3' | 'certify-2' | 'certify-1'>(
     'approval',
   );
@@ -32,7 +32,7 @@ export function SignDialog() {
   const preview = useStampAssetPreviewUrl(assetId);
   if (!surface.isOpen || !field || !mark) return null;
 
-  const attribution = {
+  const signer = {
     ...(reason.trim() ? { reason: reason.trim() } : {}),
     ...(location.trim() ? { location: location.trim() } : {}),
   };
@@ -44,7 +44,7 @@ export function SignDialog() {
         await signature.sign({
           field,
           mark,
-          attribution,
+          signer,
           ...(signKind !== 'approval' && signature.canCertify()
             ? { certify: { permission: Number(signKind.slice(-1)) as 1 | 2 | 3 } }
             : {}),
@@ -53,8 +53,8 @@ export function SignDialog() {
         await signature.fillField(field, mark);
       }
       surface.close();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+    } catch (error) {
+      setError(error instanceof Error ? error.message : String(error));
     } finally {
       setBusy(null);
     }
@@ -74,18 +74,26 @@ export function SignDialog() {
         </div>
         <label className="text-fg-muted mt-3 block text-xs">
           {t('demo.signReason')}
-          <input value={reason} onChange={(e) => setReason(e.target.value)} className={input} />
+          <input
+            value={reason}
+            onChange={(event) => setReason(event.target.value)}
+            className={input}
+          />
         </label>
         <label className="text-fg-muted mt-2 block text-xs">
           {t('demo.signLocation')}
-          <input value={location} onChange={(e) => setLocation(e.target.value)} className={input} />
+          <input
+            value={location}
+            onChange={(event) => setLocation(event.target.value)}
+            className={input}
+          />
         </label>
         {signature.canCertify() ? (
           <label className="text-fg-muted mt-3 block text-xs">
             {t('demo.signKind')}
             <select
               value={signKind}
-              onChange={(e) => setSignKind(e.target.value as typeof signKind)}
+              onChange={(event) => setSignKind(event.target.value as typeof signKind)}
               className={input}
             >
               <option value="approval">{t('demo.signKindApproval')}</option>

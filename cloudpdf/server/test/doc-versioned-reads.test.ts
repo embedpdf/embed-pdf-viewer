@@ -348,10 +348,10 @@ describe('Phase 4 versioned reads — GET /pages/:pageKey/annotations@aN', () =>
     );
     expect(res.status).toBe(200);
     const body = (await res.json()) as {
-      pageState: { page: { pageObjectNumber: number } };
       annotations: unknown[];
+      pages: Array<{ page: { objectNumber: number } }>;
     };
-    expect(body.pageState.page.pageObjectNumber).toBe(1);
+    expect(body.pages.map((state) => state.page.objectNumber)).toEqual([1]);
     expect(Array.isArray(body.annotations)).toBe(true);
   });
 
@@ -407,7 +407,7 @@ describe('Phase 4 manifest pages — per-page versions', () => {
       docVersion: number;
       pages: Array<{
         state: {
-          page: { pageObjectNumber: number };
+          page: { objectNumber: number };
           revision: { docSessionId: string; generation: number };
           weakAnnotationState: { kind: string; hasAnyWeakAnnotations: boolean };
         };
@@ -482,14 +482,14 @@ describe('Phase 4 manifest pages — per-page versions', () => {
     const body = (await second.json()) as {
       pages: Array<{
         state: {
-          page: { pageObjectNumber: number };
+          page: { objectNumber: number };
           revision: { docSessionId: string; generation: number };
           weakAnnotationState: { kind: string; hasAnyWeakAnnotations: boolean };
         };
         cache: { annotationVersion: number };
       }>;
     };
-    const page = body.pages.find((p) => p.state.page.pageObjectNumber === 1);
+    const page = body.pages.find((p) => p.state.page.objectNumber === 1);
     expect(page).toMatchObject({
       cache: { annotationVersion: 7 },
       state: {
@@ -564,7 +564,7 @@ describe('Phase 4 manifest pages — per-page versions', () => {
       docVersion: number;
       pages: Array<{
         state: {
-          page: { pageObjectNumber: number };
+          page: { objectNumber: number };
           revision: { docSessionId: string; generation: number };
           weakAnnotationState: { kind: string; hasAnyWeakAnnotations: boolean };
         };
@@ -927,9 +927,9 @@ describe('Phase 4 manifest pages — per-page versions', () => {
     expect(annotations.status).toBe(200);
     expect(annotations.headers.get('cache-control')).toBe(NO_STORE);
     const annotationsBody = (await annotations.json()) as {
-      pageState: { revision: { docSessionId: string; generation: number } };
+      pages: Array<{ revision: { docSessionId: string; generation: number } }>;
     };
-    expect(annotationsBody.pageState.revision).toMatchObject({
+    expect(annotationsBody.pages[0]?.revision).toMatchObject({
       docSessionId: `cloud:layer:${docId}:${layerName}`,
       generation: 4,
     });

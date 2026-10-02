@@ -7,8 +7,8 @@ const base: ChromeSchema = defineChrome({
     main: {
       id: 'main',
       sections: {
-        start: [group('zoom', [custom('zoom-controls', { terminal: 'zoom:menu' })])],
-        center: [group('modes', { role: 'tabs' }, [item('mode:view', { variants: ['label'] })])],
+        start: [group('zoom', [custom('zoom-controls', 'zoom:menu')])],
+        center: [group('modes', [item('mode:view', { variants: ['label'] })], { role: 'tabs' })],
         end: [group('panels', ['panel:search', 'panel:comment'])],
       },
     },
@@ -56,7 +56,7 @@ describe('addItem', () => {
   it('creates an unknown group at the end of the section', () => {
     const next = addItem(base, { bar: 'main', section: 'end', group: 'acme', item: 'acme:send' });
     const groups = next.bars.main.sections.end!;
-    expect(groups.map((g) => g.id)).toEqual(['panels', 'acme']);
+    expect(groups.map((group) => group.id)).toEqual(['panels', 'acme']);
     expect(() => normalizeBar(next.bars.main)).not.toThrow();
   });
 
@@ -104,7 +104,7 @@ describe('replaceItem', () => {
   });
 
   it('keeps menus untouched when the replacement is a custom item', () => {
-    const next = replaceItem(base, 'document:print', custom('x', { terminal: 'y' }));
+    const next = replaceItem(base, 'document:print', custom('x', 'y'));
     expect(next.menus).toBe(base.menus);
   });
 });

@@ -1,0 +1,166 @@
+---
+title: Your own annotation look
+description: Draw annotations with your own components, react to hover, show cards next to them, and make them interactive.
+---
+
+# Your own annotation look
+
+The annotation layer draws each annotation the way the PDF describes it. You can draw some of them
+with your own <Fw only={['react', 'vue', 'svelte']}>component</Fw><Fw only="angular">template</Fw> instead: a note that looks like your app's comment bubble, a stamp
+that shows live data from your server.
+
+This changes the screen only. The PDF keeps the annotation's own look, so other PDF apps,
+printing and downloads show the original:
+
+| Where                               | What people see                 |
+| :---------------------------------- | :------------------------------ |
+| Your viewer                         | Your <Fw only={['react', 'vue', 'svelte']}>component</Fw><Fw only="angular">template</Fw> |
+| The saved PDF, other apps, printing | The annotation's own appearance |
+
+## Its look, or UI on it
+
+Ask whether it should zoom and turn with the PDF:
+
+| You want | Use | It |
+| :-- | :-- | :-- |
+| A different look: a comment bubble instead of the note icon, a stamp with live data | A [renderer](#draw-an-annotation-your-way) | Is part of the page: it zooms and turns with it, and sits under the selection handles |
+| A mark that stays on the annotation: a ✓, a status, a count of replies | [Pinned anchored UI](#pin-ui-to-an-annotation) | Floats over the pages, upright and the same size at every zoom, exactly where you put it |
+| A card or a menu next to it | [Anchored UI](#show-a-card-on-hover) | Floats over the pages, and moves to stay in view |
+
+## Draw an annotation your way
+
+<Fw only={['react', 'vue', 'svelte']}>Give the layer a list of **renderers**. Each one says which
+annotations it draws and with which component:</Fw><Fw only="angular">Put a **renderer** in the layer for
+each look: an `<ng-template epdfAnnotation>` that says which annotations it draws, and draws them:</Fw>
+
+<Snippet name="annotations/custom-rendering/renderers" />
+
+<Fw only={['react', 'vue', 'svelte']}>`for`</Fw><Fw only="angular">The function you give `epdfAnnotation`</Fw>
+gets the annotation, with all its fields, so you can pick by kind, name, author or anything else.<Fw only="angular">
+A subtype picks every annotation of that kind: `epdfAnnotation="stamp"`.</Fw> The first renderer that
+matches wins; an annotation no renderer matches is drawn as usual.
+
+<Fw only="react">
+
+Define the list once, outside your component or in `useMemo`. The layer registers each entry, and
+a new list every render would register them again (the viewer warns about it while you develop).
+
+</Fw>
+
+Your <Fw only={['react', 'vue', 'svelte']}>component</Fw><Fw only="angular">template</Fw> draws into a **frame**: a box the layer places, turns and scales exactly like
+the annotation's own drawing, also while it's dragged, resized or turned. Fill it, with `width` and
+`height` at `100%`, and draw at the annotation's 100% size: the layer scales your drawing with the
+page, text and borders included, as it does the PDF's own:
+
+<Snippet name="annotations/custom-rendering/bubble" />
+
+The selection outline, the click area and the hover all use the frame, so a look that fills it
+matches them. A note keeps its size on screen as people zoom in and stays upright when the page is
+turned, and so does a look that fills its frame. To make the bubble bigger, make the note bigger: a
+size in points is a third more in pixels at 100% zoom, so a 24-point note is 32 pixels.
+
+<Fw only={['react', 'vue', 'svelte']}>Your component gets:</Fw><Fw only="angular">Your template gets these:
+the annotation is `let-annotation`, and the rest are named, such as `let-frame="frame"`.</Fw>
+
+| Prop          | What it is                                                                          |
+| :------------ | :---------------------------------------------------------------------------------- |
+| `annotation`  | The annotation, as `get()` returns it.                                              |
+| `frame`       | The box you draw into: its `width` and `height` in pixels at the annotation's 100% size, its `rotation` on screen in degrees clockwise, and the `scale` the layer draws it at. Turn your content by `-rotation` to keep it upright, such as a label on a turned stamp. |
+| `native`      | The layer's own drawing of it, filling the frame. Render it to keep the original look and add to it. |
+| `appearance`  | The engine's picture of the annotation as an image (`url`), or `null`. `native` already draws it in place. |
+| `hovered`     | True while the pointer is over it.                                                  |
+| `selected`    | True while it's selected, such as to make room for the selection handles.           |
+| `interactive` | True when what you draw takes the pointer (see [below](#take-over-the-pointer)).    |
+
+<Example name="annotation/renderers" />
+
+> **Try it:** the notes are bubbles with their author's initials. Click one: the selection fits it.
+> Press **Turn the view**: they stay upright, like the PDF's own notes. Switch to **The PDF's look**:
+> that's what the saved PDF shows.
+
+People can still select, move, resize and delete the annotation: your <Fw only={['react', 'vue', 'svelte']}>component</Fw><Fw only="angular">template</Fw> draws, and the
+viewer keeps handling the pointer. That's also why it gets no clicks of its own. For that, see
+[Take over the pointer](#take-over-the-pointer).
+
+## Show a card on hover
+
+A hover card sits next to an annotation while the pointer is over it. It needs two things: the
+annotation under the pointer, and an anchor that keeps a card attached to it:
+
+<Snippet name="annotations/custom-rendering/hover-card" />
+
+<Example name="annotation/hover-card" />
+
+<Fw only="react">Mount it in the Stage's `overlay`</Fw><Fw only="vue">Mount it in the Stage's `#overlay`
+slot</Fw><Fw only="svelte">Mount it in the Stage's `overlay` snippet</Fw><Fw only="angular">Put it inside
+`<epdf-stage>`</Fw>, like a menu. The card stays next to the annotation while the user scrolls and
+zooms, and while the annotation is moved.
+
+`useAnnotationAnchor(ref)` works for any annotation, not only the hovered one: see the next section.
+
+## Pin UI to an annotation
+
+A ✓ on an approved stamp, a status under it, a count of replies next to a note: UI that belongs to
+one annotation and stays on it. `pinned` keeps it exactly where you put it. It doesn't flip or move to
+stay in view, and it scrolls away with the annotation:
+
+<Snippet name="annotations/custom-rendering/pinned" />
+
+<Fw only="react">Mount one for each annotation that needs it in the Stage's `overlay`</Fw><Fw only="vue">Mount one for each annotation that needs it in the Stage's `#overlay` slot</Fw><Fw only="svelte">Mount one for each annotation that needs it in the Stage's `overlay` snippet</Fw><Fw only="angular">Put one for each annotation that needs it inside `<epdf-stage>`</Fw>,
+from `useAnnotationList()`. Anchored UI on a page that isn't on screen isn't drawn, so a document
+with hundreds of them costs only the ones in view.
+
+<Example name="annotation/stamp-status" />
+
+> **Try it:** sign the second stamp off, then select a stamp and move it: its status goes with it. The
+> second stamp's status hangs over the next page, and stays on top.
+
+1. The stamps are placed like any stamp, so the PDF holds the real ones; see [Stamps](stamps).
+2. Each one is picked out by its `name`, which the stamp keeps in every PDF app.
+3. The status sits under the stamp with `placement="bottom"`, and the ✓ on its corner with
+   `placement="top-end"` and a negative `gap`. See [Where it goes](../ui/anchored#where-it-goes).
+4. The stamp keeps its own look and stays selectable: the buttons are next to it, not in it.
+
+To find your own data for an annotation, key it by `annotationKey(annotation.ref)`, which stays the
+same after the document is saved and opened again, or by its `name` when you gave it one.
+
+## Take over the pointer
+
+Sometimes your <Fw only={['react', 'vue', 'svelte']}>component</Fw><Fw only="angular">template</Fw> must take clicks itself: buttons, links, a text field. <Fw only={['react', 'vue', 'svelte']}>Mark the
+renderer `interactive`:</Fw><Fw only="angular">Add `epdfAnnotationInteractive` to the renderer:</Fw>
+
+<Snippet name="annotations/custom-rendering/interactive" />
+
+This is for when the annotation itself is the control, such as a stamp you tick like a checkbox. For
+buttons next to an annotation, [pin them](#pin-ui-to-an-annotation) instead: the annotation stays
+selectable.
+
+While a renderer is interactive, the pointer belongs to your <Fw only={['react', 'vue', 'svelte']}>component</Fw><Fw only="angular">template</Fw>, and people can't select,
+move or delete that annotation with it. Most apps want both: interactive while reading, editable
+while editing. Pass a function, and the viewer asks it whenever it matters:
+
+<Snippet name="annotations/custom-rendering/interactive-when" />
+
+## Good to know
+
+### Drawing at the size on screen
+
+A renderer with `scale: false` draws at the frame's size on screen instead, and sizes its text and
+borders itself from `frame.scale`. Use it for something that must lay itself out at full resolution,
+such as a canvas.
+
+### Hover cards people can use
+
+A card closes when the pointer leaves the annotation, so the pointer can't reach a button in it.
+Keep the card open while the pointer is over the card itself, for example with a short delay
+before it closes and a `pointerenter` on the card that cancels it.
+
+### Form fields
+
+Form fields are annotations too. The `<FormLayer>` draws the fields it handles, and always wins over
+your renderers for them; see [Forms and annotations](../forms#forms-and-annotations).
+
+### Other layers
+
+A renderer replaces the drawing inside the annotation layer. Anything that isn't tied to one
+annotation, such as a comments sidebar, belongs in your own UI, fed by `useAnnotationList()`.

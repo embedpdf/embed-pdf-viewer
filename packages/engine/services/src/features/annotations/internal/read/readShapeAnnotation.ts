@@ -1,41 +1,32 @@
 import type {
   AnnotationBase,
-  CircleAnnotationDTO,
+  CircleAnnotation,
   ShapeAnnotationFields,
-  SquareAnnotationDTO,
+  SquareAnnotation,
+  PdfCoordinates,
 } from '@embedpdf/engine-core/runtime';
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
 
-import { readBorderEffect, readRectangleDifferences } from './annotationReadPrimitives';
+import { readBorderEffect } from './annotationReadPrimitives';
+import { readAnnotationBox } from './readAnnotationTurn';
 import { readFilledStyleExtras } from './readStyle';
-import {
-  readAnnotationRotation,
-  readAnnotationUnrotatedRect,
-} from './readAnnotationTransformMetadata';
 
 /**
  * Shared reader for the two shape subtypes. Materialises the common
- * stroke/fill styling plus the shape-only cloudy (`/BE`) and rect-diff
- * (`/RD`) fields; the caller fills in the `subtype` literal. Absent `/BE`
- * and `/RD` read as explicit `null` (never omission), so a read DTO
- * compares structurally against a clearing patch.
+ * stroke/fill styling, the box and its turn, and the cloudy (`/BE`)
+ * intensity; the caller fills in the `subtype` literal. An absent `/BE`
+ * reads as explicit `null` (never omission), so a read DTO compares
+ * structurally against a clearing patch.
  */
 export function readShapeExtras(
   fn: PdfFunctions,
   mem: PdfRuntimeMemory,
   annotPtr: Ptr,
-): ShapeAnnotationFields {
-  const cloudyIntensity = readBorderEffect(fn, mem, annotPtr);
-  const rectDifferences = readRectangleDifferences(fn, mem, annotPtr);
-  const rotation = readAnnotationRotation(fn, mem, annotPtr);
-  const unrotatedRect = readAnnotationUnrotatedRect(fn, mem, annotPtr);
-
+): ShapeAnnotationFields<PdfCoordinates> {
   return {
     ...readFilledStyleExtras(fn, mem, annotPtr),
-    cloudyIntensity,
-    rectDifferences,
-    ...(rotation != null ? { rotation } : {}),
-    ...(unrotatedRect ? { unrotatedRect } : {}),
+    ...readAnnotationBox(fn, mem, annotPtr),
+    cloudyIntensity: readBorderEffect(fn, mem, annotPtr),
   };
 }
 
@@ -43,8 +34,8 @@ export function readCircle(
   fn: PdfFunctions,
   mem: PdfRuntimeMemory,
   annotPtr: Ptr,
-  base: AnnotationBase,
-): CircleAnnotationDTO {
+  base: AnnotationBase<PdfCoordinates>,
+): CircleAnnotation<PdfCoordinates> {
   return { ...base, subtype: 'circle', ...readShapeExtras(fn, mem, annotPtr) };
 }
 
@@ -52,7 +43,7 @@ export function readSquare(
   fn: PdfFunctions,
   mem: PdfRuntimeMemory,
   annotPtr: Ptr,
-  base: AnnotationBase,
-): SquareAnnotationDTO {
+  base: AnnotationBase<PdfCoordinates>,
+): SquareAnnotation<PdfCoordinates> {
   return { ...base, subtype: 'square', ...readShapeExtras(fn, mem, annotPtr) };
 }

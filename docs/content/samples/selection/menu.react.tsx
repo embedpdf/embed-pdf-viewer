@@ -1,4 +1,5 @@
-import { Viewer, DocumentGate } from '@embedpdf/react/runtime';
+import { useEffect, useState } from 'react';
+import { Viewer, DocumentGate, usePageList } from '@embedpdf/react/runtime';
 import type { OpenInput } from '@embedpdf/react/runtime';
 import { Stage, stagePlugin } from '@embedpdf/react/stage';
 import { RenderLayer, renderPlugin } from '@embedpdf/react/render';
@@ -13,15 +14,13 @@ import {
 } from '@embedpdf/react/selection';
 import { localEngine } from '@embedpdf/engine';
 
-import { Button, Demo, StageFrame, stageFill } from '../stage/_shared/chrome';
+import './menu.css';
 
 const engine = localEngine();
-const plugins = [
-  stagePlugin(),
-  renderPlugin(),
-  interactionPlugin(),
-  selectionPlugin(),
-];
+const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), selectionPlugin()];
+
+const PLACEMENTS = ['top', 'bottom', 'left', 'right'] as const;
+type Placement = (typeof PLACEMENTS)[number];
 
 // [!doc-source ebook]
 const ebook = async (): Promise<OpenInput> => {
@@ -30,6 +29,7 @@ const ebook = async (): Promise<OpenInput> => {
 };
 // [!/doc-source]
 
+// What's in the menu is yours: here, copy and clear.
 function SelectionActions() {
   const selection = useSelection();
 
@@ -40,48 +40,68 @@ function SelectionActions() {
   };
 
   return (
-    <div
-      style={{
-        display: 'flex',
-        gap: 6,
-        padding: 6,
-        border: '1px solid #e6eaf2',
-        borderRadius: 12,
-        background: '#fff',
-        boxShadow: '0 8px 24px rgba(7, 32, 76, 0.18)',
-      }}
-    >
-      {selection.canCopy() && <Button onClick={copy}>Copy</Button>}
-      <Button onClick={() => selection.clear()}>Clear</Button>
+    <div className="menu">
+      {selection.canCopy() && (
+        <button type="button" className="button" onClick={copy}>
+          Copy
+        </button>
+      )}
+      <button type="button" className="button" onClick={() => selection.clear()}>
+        Clear
+      </button>
     </div>
   );
 }
 
+// Something selected on load, so the menu shows: the title on the cover.
+function SelectTitle() {
+  const selection = useSelection();
+  const cover = usePageList()[0]?.ref;
+
+  useEffect(() => {
+    if (cover) selection.select({ page: cover, start: 10, count: 52 });
+  }, [selection, cover]);
+
+  return null;
+}
+
 export default function App() {
+  const [placement, setPlacement] = useState<Placement>('top');
+
   return (
     <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: ebook }]}>
-      <Demo>
-        <DocumentGate fallback={<p>Loading…</p>}>
-          <SelectionClipboard />
-          <StageFrame height={460}>
-            <Stage
-              style={stageFill}
-              overlay={
-                <SelectionMenu>
-                  <SelectionActions />
-                </SelectionMenu>
-              }
+      <DocumentGate fallback={<p className="loading">Loading…</p>}>
+        <SelectTitle />
+        <SelectionClipboard />
+        <div className="toolbar" role="group" aria-label="Where the menu goes">
+          {PLACEMENTS.map((name) => (
+            <button
+              key={name}
+              type="button"
+              className="segment"
+              aria-pressed={placement === name}
+              onClick={() => setPlacement(name)}
             >
-              {() => (
-                <>
-                  <RenderLayer />
-                  <SelectionLayer />
-                </>
-              )}
-            </Stage>
-          </StageFrame>
-        </DocumentGate>
-      </Demo>
+              {name}
+            </button>
+          ))}
+        </div>
+        <Stage
+          className="stage"
+          overlay={
+            <SelectionMenu placement={placement} gap={8}>
+              <SelectionActions />
+            </SelectionMenu>
+          }
+        >
+          {() => (
+            <>
+              <RenderLayer />
+              <SelectionLayer />
+            </>
+          )}
+        </Stage>
+      </DocumentGate>
     </Viewer>
   );
 }

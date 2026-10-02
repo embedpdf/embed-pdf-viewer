@@ -1,6 +1,12 @@
-import type { PageImageHandle, PageNetworkRenderFormat, PageRaster } from './PageRender';
-import type { PdfRect, PdfRotation } from '../geometry/primitives';
+import type {
+  PageImageHandle,
+  PageNetworkRenderFormat,
+  PageRaster,
+  PageRenderViewport,
+} from './PageRender';
+import type { PdfRotation } from '../geometry/primitives';
 import type { AnnotationRef } from '../identity/AnnotationRef';
+import type { Coordinates, PageCoordinates } from '../pageSpace/coordinates';
 import type { PageState } from '../revision/PageState';
 
 /**
@@ -11,17 +17,18 @@ import type { PageState } from '../revision/PageState';
 export type AnnotationAppearanceMode = 'normal' | 'rollover' | 'down';
 
 /**
- * Worker-side options for batch-rendering a page's annotation appearance
- * streams. Deliberately narrower than `PageRenderOptions`: appearance
- * bitmaps are sized to each annotation's own `/Rect`, so there is no
- * page target/viewport — only a uniform device scale and page rotation.
+ * Options for batch-rendering a page's annotation appearance streams.
+ * Narrower than `PageRenderOptions`: each bitmap is sized to its
+ * annotation's own `/Rect`, so there is no target.
  */
 export interface AnnotationAppearanceRenderOptions {
   /**
-   * Device pixels per PDF user-space unit. Callers that care about
-   * devicePixelRatio should fold it into this value. Default `1`.
+   * The size, as for a page render: the appearances come out at the scale
+   * the page would have at this viewport, so passing a page image's
+   * viewport makes them match it. `{ kind: 'width' }` is the width of the
+   * whole (turned) page. Default `{ kind: 'scale', scale: 1 }`.
    */
-  scale?: number;
+  viewport?: PageRenderViewport;
   /** Page rotation in degrees clockwise. Default `0`. */
   rotation?: PdfRotation;
   /**
@@ -30,9 +37,9 @@ export interface AnnotationAppearanceRenderOptions {
    */
   modes?: AnnotationAppearanceMode[];
   /**
-   * Output-pixel budget PER APPEARANCE — same semantics as
+   * Output-pixel budget per appearance — same semantics as
    * `PageRenderOptions.maxOutputPixels`: appearances are sized by
-   * `rect × scale`, and a page-sized stamp at a high scale is the same
+   * `rect × scale` (the viewport's scale), and a page-sized stamp at a high scale is the same
    * memory bomb a full-page render is. Server requests carry the
    * deployment policy's budget; local callers omit it unless configured.
    */
@@ -46,17 +53,18 @@ export interface AnnotationAppearanceRenderOptions {
  */
 export interface AnnotationAppearanceImageOptions extends AnnotationAppearanceRenderOptions {
   format?: PageNetworkRenderFormat;
+  /** WebP quality from 0 (smallest) to 1 (best); PNG ignores it. */
   quality?: number;
 }
 
 /**
- * HTTP/token shape: encoded options plus the version field used to make the
+ * HTTP/token shape: encoded options plus the version field that makes the
  * response content-addressed and CDN-cacheable.
  *
  * Only `annotationVersion` matters here: an appearance bitmap is rendered
  * purely from the annotation's own `/AP` stream, so it changes iff the
  * annotation changes. Page base content (`contentVersion`/`docVersion`) does
- * not affect appearances and is deliberately NOT part of the cache key —
+ * not affect appearances and is deliberately not part of the cache key —
  * same as the annotation list endpoint.
  */
 export interface AnnotationAppearancesQuery {
@@ -66,24 +74,31 @@ export interface AnnotationAppearancesQuery {
 
 /**
  * One rendered appearance: the raw RGBA raster plus the metadata needed to
- * position and identify it. `rect` is the placement box in PDF user space
- * (y-up), so the consumer can place the bitmap without a second read.
+ * position and identify it. `rect` is the placement box in page space, so
+ * the consumer can place the bitmap without a second read.
  *
- * Rotation convention: for annotations whose rotation lives in the AP
- * `/Matrix` — box-family kinds (square/circle/free-text/stamp/caret) whose
- * DTO carries BOTH `rotation` and `unrotatedRect` — the raster renders
- * ROTATION-STRIPPED and `rect` is the logical `unrotatedRect`; the consumer
- * re-applies the DTO's `rotation` as a view transform about the box centre
- * (e.g. CSS `rotate`), which makes the raster rotation-invariant (rotating
- * never re-renders). Everything else — vertex kinds, whose rotation is
- * pre-baked into their geometry, and foreign PDFs with arbitrary AP
- * matrices — renders as-is with `rect` = `/Rect` and needs no transform.
+ * Rotation convention (`appearanceTurnOf`): a box kind (square, circle,
+ * free text, stamp, caret) drawn turned, whose drawing stays inside the
+ * turned box, renders turned back upright and `rect` is its `box`; the
+ * consumer re-applies the DTO's `rotation`, degrees clockwise, as a view
+ * transform about the box centre (CSS `rotate()` turns the same way), which
+ * makes the raster rotation-invariant (rotating never re-renders).
+ * Everything else — lines, polygons and ink, drawn with their points turned,
+ * a free-text callout, a turned drawing that reaches past its box,
+ * and appearances with any other matrix — renders as-is with `rect` =
+ * `/Rect` and needs no transform.
+ *
+ * An annotation with no normal appearance in the file (`hasAppearance`
+ * false) renders as the engine draws it in memory, never written: `rect` is
+ * the box that drawing takes, which can reach past `/Rect` (a line's
+ * arrowhead on a `/Rect` with no height). One the engine can't draw without
+ * writing an appearance has no raster.
  */
-export interface AnnotationAppearanceRaster {
+export interface AnnotationAppearanceRaster<C extends Coordinates = PageCoordinates> {
   /** Full wire identity (durable or weak), including index-only annotations. */
   ref: AnnotationRef;
   mode: AnnotationAppearanceMode;
-  rect: PdfRect;
+  rect: C['box'];
   raster: PageRaster;
 }
 
@@ -91,24 +106,24 @@ export interface AnnotationAppearanceRaster {
  * Batch result for one page: the page revision state plus every rendered
  * appearance, keyed implicitly by `ref` on each entry.
  */
-export interface AnnotationAppearancesResult {
+export interface AnnotationAppearancesResult<C extends Coordinates = PageCoordinates> {
   pageState: PageState;
-  appearances: AnnotationAppearanceRaster[];
+  appearances: AnnotationAppearanceRaster<C>[];
 }
 
 /**
  * Encoded counterpart of {@link AnnotationAppearanceRaster}: the same
  * identity/placement metadata, but the RGBA raster has been run through an
  * image encoder into a lazily-fetched `PageImageHandle` (PNG/WebP). This is
- * what both the local engine's `renderAppearanceImages()` and the cloud
+ * what both the local engine's `renderAppearances()` and the cloud
  * client (decoding the multipart parts) produce.
  */
-export interface AnnotationAppearanceImage {
+export interface AnnotationAppearanceImage<C extends Coordinates = PageCoordinates> {
   ref: AnnotationRef;
   mode: AnnotationAppearanceMode;
   /** Placement box (unrotated for rotation-stripped renders) — see
    *  {@link AnnotationAppearanceRaster}. */
-  rect: PdfRect;
+  rect: C['box'];
   image: PageImageHandle;
 }
 
@@ -116,9 +131,9 @@ export interface AnnotationAppearanceImage {
  * Batch encoded result for one page — image-handle analogue of
  * {@link AnnotationAppearancesResult}.
  */
-export interface AnnotationAppearanceImagesResult {
+export interface AnnotationAppearanceImagesResult<C extends Coordinates = PageCoordinates> {
   pageState: PageState;
-  appearances: AnnotationAppearanceImage[];
+  appearances: AnnotationAppearanceImage<C>[];
 }
 
 /**
@@ -130,12 +145,12 @@ export interface AnnotationAppearanceImagesResult {
  * every annotation with an appearance stream is emitted — including index-only
  * ones.
  */
-export interface AnnotationAppearanceManifestEntry {
+export interface AnnotationAppearanceManifestEntry<C extends Coordinates = PageCoordinates> {
   /** `name` of the multipart part carrying this appearance's image bytes. */
   part: string;
   ref: AnnotationRef;
   mode: AnnotationAppearanceMode;
-  rect: PdfRect;
+  rect: C['box'];
   width: number;
   height: number;
   format: PageNetworkRenderFormat;
@@ -146,7 +161,7 @@ export interface AnnotationAppearanceManifestEntry {
  * The JSON part (`name="manifest"`) of the appearance multipart response. The
  * remaining parts are the encoded images, one per `appearances[i].part`.
  */
-export interface AnnotationAppearanceManifest {
+export interface AnnotationAppearanceManifest<C extends Coordinates = PageCoordinates> {
   pageState: PageState;
-  appearances: AnnotationAppearanceManifestEntry[];
+  appearances: AnnotationAppearanceManifestEntry<C>[];
 }

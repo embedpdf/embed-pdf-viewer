@@ -3,6 +3,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      target: base
     working_dir: /workspace
     volumes:
       - ../..:/workspace
@@ -13,6 +14,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      target: linux-test
     platform: linux/amd64
     working_dir: /workspace
     volumes:

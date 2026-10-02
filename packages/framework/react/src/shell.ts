@@ -3,19 +3,18 @@
  * surface's DOM; these hooks bind its open/closed state to the kernel so
  * commands can drive it and applications can restore it.
  *
- * These hooks are TOTAL: shell state is document-scoped, and chrome that uses
- * it (panel buttons, mode bands, menu anchors) stays mounted across the
- * empty-workspace state. With no document, surfaces read as closed, menus as
- * none, and intents no-op — mirroring how command execution `tryGet`s the
- * shell. Use the raw capability (`useShell`) when you need fail-fast access
- * inside a <DocumentGate>.
+ * The state hooks work without a document: shell state is document-scoped,
+ * and chrome that uses it (panel buttons, menu anchors) stays mounted across
+ * the empty workspace. With no document every surface reads as closed, no menu
+ * as open, and `useSurface`'s verbs do nothing. `useShell()` then returns the
+ * stand-in, whose methods throw `not-ready`.
  */
 
 // One-line-per-feature: registration travels with the UI.
 export * from '@embedpdf/plugin-shell';
 import { useMemo } from 'react';
-import { ShellToken } from '@embedpdf/plugin-shell';
-import type { OpenSurfaceOptions, ShellCapability } from '@embedpdf/plugin-shell';
+import { ShellToken, shellState } from '@embedpdf/plugin-shell';
+import type { OpenSurfaceOptions, ShellCapability, SurfaceProps } from '@embedpdf/plugin-shell';
 import type { EventHook } from '@embedpdf/core';
 import {
   useCapability,
@@ -23,75 +22,56 @@ import {
   useOptionalCapability,
   useOptionalSelector,
 } from './runtime';
+import { stateHook } from './state';
 
-/** The raw capability — throws without a document; for gated subtrees. */
+/** The shell capability: open and close panels, dialogs and menus. Without a document its methods throw `not-ready`. */
 export function useShell(): ShellCapability {
   return useCapability(ShellToken);
 }
 
-/** Subscribe to one shell event for the mounted lifetime: `useShellEvent((c) => c.onSurfaceOpened, handler)`. */
+/** Subscribe to one shell event for the mounted lifetime: `useShellEvent((shell) => shell.onSurfaceOpened, handler)`. */
 export function useShellEvent<T>(
-  select: (cap: ShellCapability) => EventHook<T>,
+  select: (shell: ShellCapability) => EventHook<T>,
   handler: (event: T) => void,
 ): void {
   useCapabilityEvent(ShellToken, select, handler);
 }
 
+/**
+ * Which panels, dialogs and menus are open (the page's State table, declared
+ * once in `shellState`). Takes a selector, and re-renders only when what it
+ * returns changes. Without a document nothing is open.
+ */
+export const useShellState = stateHook(shellState);
+
 export interface SurfaceHandle {
   readonly isOpen: boolean;
-  readonly props: Readonly<Record<string, unknown>> | undefined;
-  open(opts?: OpenSurfaceOptions): void;
+  /** The props the surface was opened with, or updated to; empty when it has none. */
+  readonly props: SurfaceProps;
+  open(options?: OpenSurfaceOptions): void;
   close(): void;
-  toggle(opts?: OpenSurfaceOptions): void;
+  toggle(options?: OpenSurfaceOptions): void;
 }
 
-/** One named surface (panel / modal / overlay), bound to this subtree's
- *  document. Reads as closed — and intents no-op — while no document is open. */
+const NO_PROPS: SurfaceProps = Object.freeze({});
+
+/** One named surface (panel, dialog, overlay) of this subtree's document. Reads as closed, and its verbs do nothing, while no document is open. */
 export function useSurface(id: string): SurfaceHandle {
   const shell = useOptionalCapability(ShellToken);
-  const isOpen = useOptionalSelector(ShellToken, (s) => s.isOpen(id), false);
-  const props = useOptionalSelector(ShellToken, (s) => s.getSurface(id)?.props, undefined);
+  const isOpen = useOptionalSelector(ShellToken, (shell) => shell.isOpen(id), false);
+  const props = useOptionalSelector(
+    ShellToken,
+    (shell) => shell.getSurface(id)?.props ?? NO_PROPS,
+    NO_PROPS,
+  );
   return useMemo(
     () => ({
       isOpen,
       props,
-      open: (opts?: OpenSurfaceOptions) => shell?.open(id, opts),
+      open: (options?: OpenSurfaceOptions) => shell?.open(id, options),
       close: () => shell?.close(id),
-      toggle: (opts?: OpenSurfaceOptions) => shell?.toggle(id, opts),
+      toggle: (options?: OpenSurfaceOptions) => shell?.toggle(id, options),
     }),
     [shell, id, isOpen, props],
-  );
-}
-
-export interface MenusHandle {
-  readonly open: readonly string[];
-  isOpen(id: string): boolean;
-  toggle(id: string): void;
-  close(id: string): void;
-  closeAll(): void;
-}
-
-const NO_MENUS: readonly string[] = [];
-const stringArrayEqual = (a: readonly string[], b: readonly string[]) =>
-  a === b || (a.length === b.length && a.every((x, i) => x === b[i]));
-
-/** The dropdown-menu stack for this subtree's document (empty without one). */
-export function useMenus(): MenusHandle {
-  const shell = useOptionalCapability(ShellToken);
-  const open = useOptionalSelector(
-    ShellToken,
-    (s) => s.listOpenMenus(),
-    NO_MENUS,
-    stringArrayEqual,
-  );
-  return useMemo(
-    () => ({
-      open,
-      isOpen: (id: string) => open.includes(id),
-      toggle: (id: string) => shell?.toggleMenu(id),
-      close: (id: string) => shell?.closeMenu(id),
-      closeAll: () => shell?.closeAllMenus(),
-    }),
-    [shell, open],
   );
 }

@@ -3,6 +3,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
+import type { DocumentMeta } from '@embedpdf/core';
 import { createQuickJsSandbox } from '@embedpdf/core-js-sandbox';
 import { createLocalEngine } from '@embedpdf/engine';
 import type { FormSnapshot } from '@embedpdf/engine-core/runtime';
@@ -22,7 +23,7 @@ function scalar(snapshot: FormSnapshot, name: string): string {
 /**
  * The synthetic action form is the AF-library acceptance fixture: calc1/calc2 carry
  * `/AA /K` AFNumber_Keystroke + `/F` AFNumber_Format, and read-only calcsum
- * carries `/C` AFSimple_Calculate("SUM", calc1, calc2) via /CO.
+ * carries `/C` AFSimple_Calculate("sum", calc1, calc2) via /CO.
  */
 describe('synthetic action form AF library acceptance', () => {
   it('runs the AF keystroke, format, and calculate chain end-to-end', async () => {
@@ -36,12 +37,15 @@ describe('synthetic action form AF library acceptance', () => {
       { scope: ['*'] },
     );
     const pages = await doc.pages.list();
-    const document = () => ({
+    const document = (): DocumentMeta => ({
       id: doc.id,
+      instanceId: doc.id,
       name: 'action_form_fixture.pdf',
       pageCount: pages.pageCount,
       pages: pages.pages,
       revision: 0,
+      hasUnsavedChanges: false,
+      renderPolicy: { kind: 'continuous' },
     });
     const realm = standaloneRealm(doc, document, {
       now: () => Date.UTC(2026, 6, 15, 9, 30, 0),
@@ -65,23 +69,22 @@ describe('synthetic action form AF library acceptance', () => {
       if (!calc1 || !calc2 || !email) throw new Error('expected synthetic fields are missing');
 
       // The bug this fixture exposed: typing 12 must survive the K action.
-      const first = await controller.commit(calc1.ref, { type: 'text', value: '12' });
+      const first = await controller.commit(calc1.ref, { value: '12' });
       expect(first.status).toBe('applied');
       expect(first.error).toBeUndefined();
       const afterFirst = await doc.forms.list();
       expect(scalar(afterFirst, 'calc1')).toBe('12');
       expect(scalar(afterFirst, 'calcsum')).toBe('12');
 
-      const second = await controller.commit(calc2.ref, { type: 'text', value: '12' });
+      const second = await controller.commit(calc2.ref, { value: '12' });
       expect(second.status).toBe('applied');
       const afterSecond = await doc.forms.list();
       expect(scalar(afterSecond, 'calc2')).toBe('12');
-      // AFSimple_Calculate("SUM") through the read-only /CO target.
+      // AFSimple_Calculate("sum") through the read-only /CO target.
       expect(scalar(afterSecond, 'calcsum')).toBe('24');
 
       // AFNumber_Keystroke rejects garbage with Acrobat's alert; value survives.
       const rejected = await controller.commit(calc1.ref, {
-        type: 'text',
         value: 'abc',
       });
       expect(rejected.status).toBe('rejected');
@@ -99,7 +102,6 @@ describe('synthetic action form AF library acceptance', () => {
       // The email validator alerts (app.alert works, app.beep degrades to a
       // diagnostic) but never sets rc=false, so the value still commits.
       const emailResult = await controller.commit(email.ref, {
-        type: 'text',
         value: 'not-an-email',
       });
       expect(emailResult.status).toBe('applied');

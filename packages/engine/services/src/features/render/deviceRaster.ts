@@ -1,113 +1,72 @@
 import type {
+  PageBox,
   PageRaster,
   PageRenderBackground,
   PageRenderViewport,
   PdfRect,
   PdfRotation,
 } from '@embedpdf/engine-core/runtime';
-import { EngineError, EngineErrorCode } from '@embedpdf/engine-core/runtime';
+import {
+  EngineError,
+  EngineErrorCode,
+  normalizePdfRect,
+  renderMatrix,
+  renderSize,
+  type PageRenderMatrix,
+} from '@embedpdf/engine-core/runtime';
 import type { PdfRuntimeModule, Ptr } from '@embedpdf/engine-runtime';
 
+import { withScratch } from '../../runtime/memory/scratch';
+import { readRectF } from '../../runtime/memory/structs';
+
 /**
- * The ONE place a PDF user-space region becomes a device raster.
+ * The one place a PDF user-space region becomes a device raster.
  *
  * Every PDFium rasterizer — `PageRenderReader`, `AnnotationAppearanceReader`,
  * and any future one (thumbnails, stamps, flatten) — composes these three
- * pieces and supplies only its own `draw` call. The geometry is a pure affine
- * (the engine twin of the viewer's `Mat2D`/`rotateScaleMatrix`); the bitmap
- * lifecycle (alloc → fill → draw → read back → free) lives in `rasterize`.
+ * pieces and supplies only its own `draw` call. The geometry is engine-core's
+ * `renderMatrix`, the matrix a page transform reports; the bitmap
+ * lifecycle (alloc → fill → draw → read back → free) lives in `rasterize` and,
+ * for a draw that awaits, `rasterizeAsync`.
  */
 
 const FPDF_BITMAP_BGRA = 4;
 /** Emit RGBA byte order (vs PDFium's native BGRA) so callers get `rgba8` directly. */
 export const FPDF_REVERSE_BYTE_ORDER = 0x10;
 
-/** A 2D affine as the same six numbers as the viewer `Mat2D`, CSS `matrix()`, FS_MATRIX. */
-export type Mat2D = readonly [a: number, b: number, c: number, d: number, e: number, f: number];
-
 /**
- * Map a normalized post-`GetDisplayMatrix()` display-space rect onto an
- * `outW × outH` device bitmap, baking in the caller's viewport rotation.
- *
- * PDFium's page and annotation renderers pre-apply `CPDF_Page::GetDisplayMatrix()`
- * before concatenating the caller matrix. That display matrix has already
- * converted PDF page coordinates (y-up) into bitmap/display coordinates
- * (y-down), so the caller matrix must target that post-display rect.
- */
-export function displayRectToDeviceMatrix(
-  rect: PdfRect,
-  rotation: PdfRotation,
-  outW: number,
-  outH: number,
-): Mat2D {
-  const left = rect.left;
-  const bottom = rect.bottom;
-  const width = rect.right - rect.left;
-  const height = rect.top - rect.bottom;
-  const sx0 = outW / width;
-  const sy0 = outH / height;
-  const sx90 = outW / height;
-  const sy90 = outH / width;
-
-  switch (rotation) {
-    case 90:
-      return [0, sy90, -sx90, 0, sx90 * (bottom + height), -sy90 * left];
-    case 180:
-      return [-sx0, 0, 0, -sy0, sx0 * (left + width), sy0 * (bottom + height)];
-    case 270:
-      return [0, -sy90, sx90, 0, -sx90 * bottom, sy90 * (left + width)];
-    case 0:
-      return [sx0, 0, 0, sy0, -sx0 * left, -sy0 * bottom];
-  }
-}
-
-/**
- * Device pixel size for a region under a rotation + viewport. `width` swaps with
- * height on quarter-turns. Validates the viewport (the public-API contract).
+ * Device pixel size for a region under a rotation + viewport (engine-core
+ * {@link renderSize}, which the cloud client reports too).
  */
 export function deviceSize(
   rect: PdfRect,
   rotation: PdfRotation,
   viewport: PageRenderViewport,
 ): { width: number; height: number } {
-  const rectWidth = rect.right - rect.left;
-  const rectHeight = rect.top - rect.bottom;
-  const swap = rotation === 90 || rotation === 270;
-  const baseWidth = swap ? rectHeight : rectWidth;
-  const baseHeight = swap ? rectWidth : rectHeight;
-
-  if (viewport.kind === 'width') {
-    if (!Number.isFinite(viewport.width) || viewport.width <= 0) {
-      throw new EngineError(EngineErrorCode.InvalidArg, 'render viewport width must be positive');
-    }
-    const width = Math.max(1, Math.round(viewport.width));
-    return { width, height: Math.max(1, Math.round((width * baseHeight) / baseWidth)) };
-  }
-
-  const scale = viewport.scale ?? 1;
-  if (!Number.isFinite(scale) || scale <= 0) {
-    throw new EngineError(EngineErrorCode.InvalidArg, 'render viewport scale must be positive');
-  }
-  return {
-    width: Math.max(1, Math.round(baseWidth * scale)),
-    height: Math.max(1, Math.round(baseHeight * scale)),
-  };
+  return renderSize(
+    { width: rect.right - rect.left, height: rect.top - rect.bottom },
+    rotation,
+    viewport,
+  );
 }
 
 export interface RasterizeOptions {
-  /** The region to render, in PDF user space — ALREADY normalized by the caller. */
+  /** The region to render, in PDF user space — already normalized by the caller. */
   rect: PdfRect;
-  /** Page dimensions in PDF user space, used to mirror PDFium's display matrix. */
-  page: { width: number; height: number };
+  /**
+   * The page's display box in PDF user space ({@link readPageBox}), for
+   * mirroring PDFium's display matrix: display space starts at its corner.
+   */
+  page: PdfRect;
   rotation: PdfRotation;
   viewport: PageRenderViewport;
   background: PageRenderBackground;
   /**
-   * Output-pixel budget: reject BEFORE allocating when the computed device
+   * Output-pixel budget: reject before allocating when the computed device
    * size exceeds it (the decode-bomb-guard pattern — the check lives where
    * the allocation happens). PDF page space is effectively unbounded, so a
    * width-bounded request can still explode vertically on degenerate
-   * geometry. Optional: LOCAL renders omit it (exactness is the local
+   * geometry. Optional: Local renders omit it (exactness is the local
    * product promise); server renders carry the deployment policy's budget.
    */
   maxOutputPixels?: number;
@@ -119,6 +78,11 @@ export interface RasterizeOptions {
   draw: (bitmapPtr: Ptr, matrixPtr: Ptr, clipPtr: Ptr) => boolean;
 }
 
+/** {@link RasterizeOptions} with a `draw` that may await, as a sliced page render does. */
+export interface RasterizeAsyncOptions extends Omit<RasterizeOptions, 'draw'> {
+  draw: (bitmapPtr: Ptr, matrixPtr: Ptr, clipPtr: Ptr) => Promise<boolean>;
+}
+
 /**
  * Owns the whole bitmap lifecycle: allocate the pixel buffer + bitmap + matrix
  * (+ clip), fill the background, run the caller's `draw`, read the pixels back
@@ -126,14 +90,53 @@ export interface RasterizeOptions {
  * a failed allocation/draw.
  */
 export function rasterize(runtime: PdfRuntimeModule, opts: RasterizeOptions): PageRaster | null {
+  const target = allocateRaster(runtime, opts);
+  if (!target) return null;
+  try {
+    return opts.draw(target.bitmapPtr, target.matrixPtr, target.clipPtr) ? target.read() : null;
+  } finally {
+    target.free();
+  }
+}
+
+/** {@link rasterize} with a `draw` that may await; everything stays allocated until it settles. */
+export async function rasterizeAsync(
+  runtime: PdfRuntimeModule,
+  opts: RasterizeAsyncOptions,
+): Promise<PageRaster | null> {
+  const target = allocateRaster(runtime, opts);
+  if (!target) return null;
+  try {
+    return (await opts.draw(target.bitmapPtr, target.matrixPtr, target.clipPtr))
+      ? target.read()
+      : null;
+  } finally {
+    target.free();
+  }
+}
+
+/** A filled bitmap and its matrix and clip, ready for a draw. */
+interface RasterTarget {
+  readonly bitmapPtr: Ptr;
+  readonly matrixPtr: Ptr;
+  readonly clipPtr: Ptr;
+  /** Copies the pixels out. */
+  read(): PageRaster;
+  free(): void;
+}
+
+function allocateRaster(
+  runtime: PdfRuntimeModule,
+  opts: Omit<RasterizeOptions, 'draw'>,
+): RasterTarget | null {
   const { fn, mem } = runtime;
-  const { rect, page, rotation, viewport, background, draw } = opts;
+  const { rect, page, rotation, viewport, background } = opts;
 
   // Degenerate (zero/negative area) has no renderable output and would divide by
   // zero in the matrix.
   if (rect.right <= rect.left || rect.top <= rect.bottom) return null;
 
-  const displayRect = pdfRectToDisplayRect(rect, page.height);
+  const displayRect = pdfRectToDisplayRect(rect, page);
   const { width, height } = deviceSize(displayRect, rotation, viewport);
   if (opts.maxOutputPixels !== undefined && width * height > opts.maxOutputPixels) {
     throw new EngineError(
@@ -149,10 +152,19 @@ export function rasterize(runtime: PdfRuntimeModule, opts: RasterizeOptions): Pa
   let bitmapPtr: Ptr | null = null;
   let matrixPtr: Ptr | null = null;
   let clipPtr: Ptr | null = null;
+  const free = () => {
+    if (bitmapPtr) fn.FPDFBitmap_Destroy(bitmapPtr);
+    if (clipPtr) mem.free(clipPtr);
+    if (matrixPtr) mem.free(matrixPtr);
+    if (pixelPtr) mem.free(pixelPtr);
+  };
   try {
     pixelPtr = mem.alloc(bytes);
     bitmapPtr = fn.FPDFBitmap_CreateEx(width, height, FPDF_BITMAP_BGRA, pixelPtr, stride);
-    if (!bitmapPtr) return null;
+    if (!bitmapPtr) {
+      free();
+      return null;
+    }
 
     fn.FPDFBitmap_FillRect(
       bitmapPtr,
@@ -164,43 +176,82 @@ export function rasterize(runtime: PdfRuntimeModule, opts: RasterizeOptions): Pa
     );
 
     matrixPtr = mem.alloc(6 * 4);
-    pokeMat2D(mem, matrixPtr, displayRectToDeviceMatrix(displayRect, rotation, width, height));
+    // The page's display matrix already turned PDF space into page space (the
+    // display rect), so this is the matrix a page transform reports.
+    pokeMatrix(
+      mem,
+      matrixPtr,
+      renderMatrix(pageBoxOfDisplayRect(displayRect), rotation, width, height),
+    );
 
     clipPtr = mem.alloc(4 * 4);
     mem.poke(clipPtr, 'f32', 0, 0);
     mem.poke(clipPtr, 'f32', 0, 4);
     mem.poke(clipPtr, 'f32', width, 8);
     mem.poke(clipPtr, 'f32', height, 12);
+  } catch (error) {
+    free();
+    throw error;
+  }
 
-    if (!draw(bitmapPtr, matrixPtr, clipPtr)) return null;
-
-    const pixels = mem.readBytes(pixelPtr, bytes);
-    return {
+  const pixels = pixelPtr;
+  return {
+    bitmapPtr,
+    matrixPtr,
+    clipPtr,
+    read: () => ({
       width,
       height,
       stride,
       color: 'rgba8',
       premultipliedAlpha: false,
-      data: toExactArrayBuffer(pixels),
-    };
-  } finally {
-    if (bitmapPtr) fn.FPDFBitmap_Destroy(bitmapPtr);
-    if (clipPtr) mem.free(clipPtr);
-    if (matrixPtr) mem.free(matrixPtr);
-    if (pixelPtr) mem.free(pixelPtr);
-  }
-}
-
-function pdfRectToDisplayRect(rect: PdfRect, pageHeight: number): PdfRect {
-  return {
-    left: rect.left,
-    right: rect.right,
-    bottom: pageHeight - rect.top,
-    top: pageHeight - rect.bottom,
+      data: toExactArrayBuffer(mem.readBytes(pixels, bytes)),
+    }),
+    free,
   };
 }
 
-function pokeMat2D(mem: PdfRuntimeModule['mem'], ptr: Ptr, m: Mat2D): void {
+/**
+ * The page's display box in PDF user space: the box PDFium's display matrix
+ * maps to the page's pixels (the crop box of a page loaded normalized). A rect
+ * in PDF user space, as annotation rects and render targets are, is placed
+ * relative to it.
+ */
+export function readPageBox(runtime: PdfRuntimeModule, pagePtr: Ptr): PdfRect {
+  const { fn, mem } = runtime;
+  const box = withScratch(mem, 16, (ptr) =>
+    fn.FPDF_GetPageBoundingBox(pagePtr, ptr) ? readRectF(mem, ptr) : null,
+  );
+  if (box) return normalizePdfRect(box);
+  return {
+    left: 0,
+    bottom: 0,
+    right: fn.FPDF_GetPageWidthF(pagePtr),
+    top: fn.FPDF_GetPageHeightF(pagePtr),
+  };
+}
+
+/** A display rect (edges, y down) as a page-space box. */
+function pageBoxOfDisplayRect(rect: PdfRect): PageBox {
+  return {
+    x: rect.left,
+    y: rect.bottom,
+    width: rect.right - rect.left,
+    height: rect.top - rect.bottom,
+  };
+}
+
+/** A PDF user-space rect in display space: from the page box's top-left, y down. */
+function pdfRectToDisplayRect(rect: PdfRect, page: PdfRect): PdfRect {
+  return {
+    left: rect.left - page.left,
+    right: rect.right - page.left,
+    bottom: page.top - rect.top,
+    top: page.top - rect.bottom,
+  };
+}
+
+function pokeMatrix(mem: PdfRuntimeModule['mem'], ptr: Ptr, m: PageRenderMatrix): void {
   for (let i = 0; i < 6; i++) mem.poke(ptr, 'f32', m[i], i * 4);
 }
 

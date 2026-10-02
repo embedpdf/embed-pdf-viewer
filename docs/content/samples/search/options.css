@@ -1,0 +1,125 @@
+/* Colors, for light and dark */
+:root {
+  --ink: #1a2748;
+  --muted: #5a6b92;
+  --line: #e6eaf2;
+  --line-strong: #dce8fc;
+  --surface: #ffffff;
+  --tint: #f3f7fe;
+  --canvas: #f7f9fc;
+  --accent: #054fb3;
+  --focus: #7db6ff;
+  --shadow: rgb(7 32 76 / 0.04);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --ink: #e6ecfa;
+    --muted: #93a3c7;
+    --line: #27365f;
+    --line-strong: #34467a;
+    --surface: #131d3b;
+    --tint: #1a2750;
+    --canvas: #0b1328;
+    --accent: #7db6ff;
+    --shadow: rgb(0 0 0 / 0.3);
+  }
+}
+
+/* The search box and its options, above the pages */
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.field {
+  appearance: none;
+  flex: 1 1 140px;
+  min-width: 0;
+  box-sizing: border-box;
+  font: inherit;
+  font-size: 13px;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  padding: 8px 12px;
+  box-shadow: 0 1px 2px var(--shadow);
+}
+
+.field::placeholder {
+  color: var(--muted);
+}
+
+.field:focus-visible {
+  outline: none;
+  border-color: var(--focus);
+  box-shadow: 0 0 0 3px rgb(125 182 255 / 0.35);
+}
+
+/* An option is a checkbox in a pill that lights up while it's on */
+.option {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+  font-weight: 550;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  padding: 7px 11px;
+  cursor: pointer;
+  user-select: none;
+  box-shadow: 0 1px 2px var(--shadow);
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.option:hover {
+  background: var(--tint);
+  border-color: var(--line-strong);
+}
+
+.option:has(input:checked) {
+  color: var(--accent);
+  background: var(--tint);
+  border-color: var(--focus);
+}
+
+.option input {
+  margin: 0;
+  accent-color: #0876fd;
+}
+
+.readout {
+  min-width: 84px;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+/* The pages */
+.stage {
+  height: 420px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--canvas);
+  box-shadow:
+    0 1px 2px var(--shadow),
+    0 18px 40px -28px rgb(7 32 76 / 0.28);
+}
+
+.loading {
+  margin: 0;
+  padding: 24px 0;
+  text-align: center;
+  font-size: 13px;
+  color: var(--muted);
+}

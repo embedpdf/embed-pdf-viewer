@@ -1,0 +1,91 @@
+/* Colors */
+:root {
+  --ink: #1a2748;
+  --muted: #5a6b92;
+  --line: #e6eaf2;
+  --surface: #ffffff;
+  --tint: #f3f7fe;
+  --canvas: #f7f9fc;
+  --accent: #054fb3;
+  --focus: #7db6ff;
+  --shadow: rgb(7 32 76 / 0.04);
+}
+
+/* The pages to pick from beside the picked one; above it on a narrow screen */
+.picker {
+  container-type: inline-size;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.choices {
+  flex: 1 1 100%;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 12px;
+  align-content: start;
+}
+
+.choice {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  background: none;
+  border: 0;
+  border-radius: 8px;
+  padding: 6px 0;
+  cursor: pointer;
+}
+
+.choice:hover {
+  background: var(--tint);
+}
+
+.choice[aria-selected='true'] {
+  color: var(--accent);
+  background: var(--tint);
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+
+.choice:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.number {
+  font-variant-numeric: tabular-nums;
+}
+
+.shown {
+  flex: 1 1 100%;
+  display: flex;
+  justify-content: center;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--canvas);
+}
+
+@container (min-width: 600px) {
+  .choices {
+    flex: 1 1 0;
+  }
+
+  .shown {
+    flex: 0 0 auto;
+  }
+}
+
+.loading {
+  margin: 0;
+  padding: 24px 0;
+  text-align: center;
+  font-size: 13px;
+  color: var(--muted);
+}

@@ -1,136 +1,167 @@
-/** Value writes: the validated path (scripts when enabled), the raw
- *  passthrough, and the batch doors — every one through the serial queue. */
-import { PluginError, toPluginError, toPluginErrorInfo, type BatchResult } from '@embedpdf/core';
+/**
+ * Value writes, all on the one write queue: one field through the form's
+ * scripts (when the `validation` setting runs them), and the batch verbs
+ * built on it. The fields mirror applies each confirmed write; these verbs
+ * only mark the field as in flight while the engine works.
+ */
+import {
+  PluginError,
+  toPluginError,
+  toPluginErrorInfo,
+  type BatchResult,
+  type OperationOptions,
+  type PluginErrorInfo,
+} from '@embedpdf/core';
 import type { FormFieldRef, FormFieldValue } from '@embedpdf/engine-core/runtime';
 
-import type { FormCapability, FormCommitResult, SetValueResult } from '../contract';
+import type { FormCapability, FormCommitResult, FormSetValueResult } from '../contract';
+import { beginWrite, endWrite, fieldByRef } from '../model';
+import { writeOfPlainValue } from '../read/fields';
 import type { FormContext, FormServices } from '../services';
-import type { FormHydration } from '../sync/hydration';
+
+const FILL = 'doc.forms.fill';
+
+/** A batch that stops when its caller cancels it. */
+function throwIfCancelled(options?: OperationOptions): void {
+  if (options?.signal?.aborted) {
+    throw new PluginError('operation-cancelled', 'form', 'operation cancelled', {
+      cause: options.signal.reason,
+    });
+  }
+}
+
+/** Why the form refused a value, as a batch reports it. */
+const rejection = (result: FormSetValueResult): PluginErrorInfo => ({
+  code: 'invalid-input',
+  message: `the form refused the value of '${result.field.name}'`,
+  capability: 'form',
+  permission: null,
+});
 
 export function createValueWrites(
   ctx: FormContext,
-  services: Pick<FormServices, 'store' | 'events' | 'authority' | 'scripting' | 'enqueue'>,
-  hydration: FormHydration,
+  services: Pick<FormServices, 'events' | 'scripting' | 'enqueue' | 'keyOf' | 'fields'>,
 ) {
-  const { keyOf, apply } = services.store;
   const { validationRejected } = services.events;
-  const { assertFill } = services.authority;
-  const scripting = services.scripting.controller;
-  const surfaceViaActions = services.scripting.surface;
-  const enqueueMutation = services.enqueue;
-  const { refresh } = hydration;
+  const { enqueue, keyOf, fields, scripting } = services;
+  // A download waits for the values on their way.
+  ctx.onSettle(() => enqueue.idle());
 
-  // ── typed writes: writeStart → engine → writeDone/writeFailed ──────────
   const commitValue = async (
     ref: FormFieldRef,
     value: FormFieldValue,
   ): Promise<FormCommitResult> => {
-    const doc = ctx.doc;
-    if (!doc) throw new Error('no document');
-    if (scripting) {
-      const result = await scripting.commit(ref, value);
-      surfaceViaActions(result, 'user');
-      // A native partial/failed effects result can still have mutated state.
-      if (result.effectsResult !== null) await refresh();
+    const pipeline = scripting.controller();
+    if (pipeline) {
+      const result = await pipeline.commit(ref, value);
+      scripting.surface(result, 'user');
       return result;
     }
-
-    const result = await doc.forms.setValue(ref, value);
-    await refresh();
+    const result = await ctx.doc.forms.setValue(ref, value);
     return {
-      status: result.changedWidgets.length > 0 ? 'applied' : 'unchanged',
+      status: result.meta.changedWidgets.length > 0 ? 'applied' : 'unchanged',
       scripted: false,
       effectsResult: null,
       uiEffects: [],
       diagnostics: [],
     };
   };
-  const write = async (ref: FormFieldRef, value: FormFieldValue): Promise<SetValueResult> => {
-    assertFill('form.setValue');
+
+  /** One value write, already allowed: queued behind every write before it. */
+  const write = (
+    ref: FormFieldRef,
+    value: FormFieldValue,
+    options?: OperationOptions,
+  ): Promise<FormSetValueResult> => {
     const key = keyOf(ref);
-    return enqueueMutation(async () => {
-      const doc = ctx.doc;
-      if (!doc) throw new PluginError('not-ready', 'form', 'no document');
-      apply({ t: 'writeStart', key });
+    return enqueue(async () => {
+      ctx.state.update(beginWrite, key);
       try {
-        const result = await commitValue(ref, value);
-        if (result.status === 'rejected' || result.status === 'failed') {
-          apply({ t: 'writeFailed', key });
-        } else if (result.effectsResult === null && result.scripted) {
-          // A scripted no-op has no engine read-back to clear the spinner.
-          apply({ t: 'writeFailed', key });
+        const result = await ctx.cancellable(options?.signal, commitValue(ref, value));
+        if (result.status === 'failed') {
+          throw new PluginError(
+            'operation-failed',
+            'form',
+            result.error?.message ?? result.diagnostics[0]?.message ?? 'the write failed',
+          );
         }
+        const field = fieldByRef(fields.get(), ref);
+        if (!field) throw new PluginError('not-found', 'form', 'no form field has this ref');
         if (result.status === 'rejected') {
-          validationRejected.emit({ ref, issues: result.diagnostics });
+          validationRejected.emit({ field, issues: result.diagnostics });
         }
-        return result;
-      } catch (err) {
-        apply({ t: 'writeFailed', key });
-        throw toPluginError('form', err);
-      }
-    });
-  };
-  const writeBatch = async <R>(
-    entries: readonly R[],
-    run: (entry: R) => Promise<SetValueResult>,
-    refOf: (entry: R) => FormFieldRef,
-  ): Promise<BatchResult<FormFieldRef, R>> => {
-    const applied: FormFieldRef[] = [];
-    const failed: { ref: R; error: ReturnType<typeof toPluginErrorInfo> }[] = [];
-    for (const entry of entries) {
-      try {
-        const result = await run(entry);
-        if (result.status === 'rejected' || result.status === 'failed') {
-          failed.push({
-            ref: entry,
-            error: {
-              code: result.status === 'rejected' ? 'invalid-input' : 'operation-failed',
-              message: result.error?.message ?? result.diagnostics[0]?.message ?? result.status,
-              capability: 'form',
-            },
-          });
-        } else applied.push(refOf(entry));
+        return { field, status: result.status };
       } catch (error) {
-        failed.push({ ref: entry, error: toPluginErrorInfo(toPluginError('form', error)) });
+        throw toPluginError('form', error);
+      } finally {
+        ctx.state.update(endWrite, key);
+      }
+    }, options);
+  };
+
+  const setValues: FormCapability['setValues'] = async (entries, options) => {
+    ctx.assertAllowed(FILL, 'form.setValues');
+    const applied: FormFieldRef[] = [];
+    const failed: { ref: FormFieldRef; error: PluginErrorInfo }[] = [];
+    for (const entry of entries) {
+      throwIfCancelled(options);
+      try {
+        const result = await write(entry.ref, entry.value, options);
+        if (result.status === 'rejected') failed.push({ ref: entry.ref, error: rejection(result) });
+        else applied.push(entry.ref);
+      } catch (error) {
+        failed.push({ ref: entry.ref, error: toPluginErrorInfo(toPluginError('form', error)) });
       }
     }
     return { applied, skipped: [], failed };
   };
 
+  const importValues: FormCapability['importValues'] = async (values, options) => {
+    ctx.assertAllowed(FILL, 'form.importValues');
+    const result: {
+      applied: FormFieldRef[];
+      skipped: { ref: string; reason: string }[];
+      failed: { ref: string; error: PluginErrorInfo }[];
+    } = { applied: [], skipped: [], failed: [] };
+    for (const [name, plain] of Object.entries(values)) {
+      throwIfCancelled(options);
+      const field = fieldByRef(fields.get(), { kind: 'fqn', name });
+      if (!field) {
+        result.skipped.push({ ref: name, reason: 'the form has no field with this name' });
+        continue;
+      }
+      const value = writeOfPlainValue(field, plain);
+      if (!value) {
+        result.skipped.push({ ref: name, reason: `a ${field.family} field can't take this value` });
+        continue;
+      }
+      try {
+        const written = await write(field.ref, value, options);
+        if (written.status === 'rejected') {
+          result.failed.push({ ref: name, error: rejection(written) });
+        } else {
+          result.applied.push(field.ref);
+        }
+      } catch (error) {
+        result.failed.push({ ref: name, error: toPluginErrorInfo(toPluginError('form', error)) });
+      }
+    }
+    return result satisfies BatchResult<FormFieldRef, string>;
+  };
+
   return {
-    write,
+    /** A text field's write, for the text being typed (write/typing.ts). */
+    setText: async (ref: FormFieldRef, text: string): Promise<FormSetValueResult> => {
+      ctx.assertAllowed(FILL, 'form.setValue');
+      return write(ref, { value: text });
+    },
     api: {
-      setValue: write,
-      setText: (ref, text) => write(ref, { type: 'text', value: text }),
-      setChecked: (ref, onState) => write(ref, { type: 'toggle', state: onState }),
-      setChoice: (ref, values) => write(ref, { type: 'choice', values: [...values] }),
-      setValueRaw: (ref, value) =>
-        enqueueMutation(async () => {
-          const doc = ctx.doc;
-          if (!doc) throw new PluginError('not-ready', 'form', 'no document');
-          const result = await doc.forms.setValue(ref, value);
-          await refresh();
-          return result;
-        }),
-      setValues: async (entries) => {
-        const result = await writeBatch(
-          entries,
-          (entry) => write(entry.ref, entry.value),
-          (entry) => entry.ref,
-        );
-        const out: BatchResult<FormFieldRef, FormFieldRef> = {
-          applied: result.applied,
-          skipped: [],
-          failed: result.failed.map((f) => ({ ref: f.ref.ref, error: f.error })),
-        };
-        return out;
+      setValue: async (ref, value, options) => {
+        ctx.assertAllowed(FILL, 'form.setValue');
+        return write(ref, value, options);
       },
-      importValues: (values) =>
-        writeBatch(
-          Object.keys(values),
-          (name) => write({ kind: 'fqn', name }, values[name]!),
-          (name) => ({ kind: 'fqn', name }),
-        ),
+      setValues,
+      importValues,
     } satisfies Partial<FormCapability>,
   };
 }

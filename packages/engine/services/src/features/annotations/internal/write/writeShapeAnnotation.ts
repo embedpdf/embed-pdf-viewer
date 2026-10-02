@@ -3,31 +3,27 @@ import {
   type CirclePatch,
   type SquareDraft,
   type SquarePatch,
+  type PdfCoordinates,
 } from '@embedpdf/engine-core/runtime';
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
 
-import {
-  clearBorderEffect,
-  clearRectangleDifferences,
-  setAnnotRect,
-  setBorderEffect,
-  setRectangleDifferences,
-} from './annotationWritePrimitives';
+import { clearBorderEffect, setBorderEffect } from './annotationWritePrimitives';
 import { applyAnnotationBaseDraft, applyAnnotationBasePatch } from './writeAnnotationBase';
+import { applyAnnotationBoxPatch, writeAnnotationBox } from './writeAnnotationBox';
 import { applyFilledStyleDraft, applyFilledStylePatch } from './writeStyle';
-import { writeBoxTransformMetadata } from './writeAnnotationTransformMetadata';
 
-export type ShapeDraft = CircleDraft | SquareDraft;
-export type ShapePatch = CirclePatch | SquarePatch;
+export type ShapeDraft = CircleDraft<PdfCoordinates> | SquareDraft<PdfCoordinates>;
+export type ShapePatch = CirclePatch<PdfCoordinates> | SquarePatch<PdfCoordinates>;
 
 /**
  * Apply a shape draft to a freshly-created annotation. Caller is
  * responsible for `EPDFPage_CreateAnnot`; this function only writes
  * fields. Order:
  *   1. base author-metadata (contents/nm)
- *   2. /Rect (required — shapes carry their geometry as /Rect, not quads)
+ *   2. the box and its turn (`/Rect`; the appearance then takes in its
+ *      border and writes `/RD`)
  *   3. shared stroke/fill styling (/IC, /C, /CA, /BS, dash)
- *   4. optional cloudy (/BE), rect-diff (/RD)
+ *   4. optional cloudy (/BE)
  */
 export function applyShapeDraft(
   fn: PdfFunctions,
@@ -37,27 +33,18 @@ export function applyShapeDraft(
 ): void {
   applyAnnotationBaseDraft(fn, mem, annotPtr, draft);
 
-  setAnnotRect(fn, mem, annotPtr, draft.rect);
+  writeAnnotationBox(fn, mem, annotPtr, { box: draft.box, rotation: draft.rotation ?? null });
   applyFilledStyleDraft(fn, mem, annotPtr, draft);
 
   if (draft.cloudyIntensity != null && draft.cloudyIntensity > 0) {
     setBorderEffect(fn, annotPtr, draft.cloudyIntensity);
   }
-  if (draft.rectDifferences != null) {
-    setRectangleDifferences(fn, annotPtr, draft.rectDifferences);
-  }
-  // /Rect above is the rotated visual AABB; the rotation metadata tells the AP
-  // generator to bake a /Matrix from the unrotated box.
-  writeBoxTransformMetadata(fn, mem, annotPtr, {
-    rotation: draft.rotation,
-    unrotatedRect: draft.unrotatedRect,
-  });
 }
 
 /**
  * Apply a shape patch to an existing annotation. Only fields present on
- * the patch are touched; `cloudyIntensity` and `rectDifferences` are
- * tri-state (as `interiorColor`): a value sets the entry, `null` removes it.
+ * the patch are touched; `cloudyIntensity` is tri-state (as
+ * `interiorColor`): a value sets the entry, `null` removes it.
  */
 export function applyShapePatch(
   fn: PdfFunctions,
@@ -67,16 +54,7 @@ export function applyShapePatch(
 ): void {
   applyAnnotationBasePatch(fn, mem, annotPtr, patch);
 
-  if (patch.rect !== undefined) {
-    setAnnotRect(fn, mem, annotPtr, patch.rect);
-  }
-  // Transform metadata is tri-state per field (undefined preserves, null
-  // clears, value sets) — independent of whether /Rect was rewritten. A
-  // rect-only patch on a rotated box keeps its rotation.
-  writeBoxTransformMetadata(fn, mem, annotPtr, {
-    rotation: patch.rotation,
-    unrotatedRect: patch.unrotatedRect,
-  });
+  applyAnnotationBoxPatch(fn, mem, annotPtr, patch);
   applyFilledStylePatch(fn, mem, annotPtr, patch);
 
   if (patch.cloudyIntensity !== undefined) {
@@ -88,11 +66,6 @@ export function applyShapePatch(
       // /BE the read side would normalize away.
       clearBorderEffect(fn, annotPtr);
     }
-  }
-  if (patch.rectDifferences === null) {
-    clearRectangleDifferences(fn, annotPtr);
-  } else if (patch.rectDifferences !== undefined) {
-    setRectangleDifferences(fn, annotPtr, patch.rectDifferences);
   }
 }
 

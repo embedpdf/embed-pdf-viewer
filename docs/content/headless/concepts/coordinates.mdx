@@ -1,104 +1,94 @@
 ---
 title: Coordinates
-description: The two coordinate systems in EmbedPDF — the file's and the viewer's — and the one rule for using them.
+description: "EmbedPDF has one way to say where something is: points from the page's top-left corner, y going down. Pixels only come in when you draw."
 ---
 
 # Coordinates
 
-Every position in EmbedPDF is one of two kinds. You can tell them apart at a
-glance, and the compiler won't let you mix them.
-
-## The file's coordinates — `PdfRect`
-
-What the PDF document itself stores. Y grows **upward** (PDF is a math
-graph), measured in PDF points, corners named explicitly:
+Every position in EmbedPDF is in **page coordinates**: points (1/72 inch) from the top-left corner of
+the page as it's shown, with y going down, like HTML. Annotations, text, search results, selections,
+form fields and the places you scroll to all use them. A box is `{ x, y, width, height }` and a point
+is `{ x, y }`:
 
 ```ts
 annotation.rect;
-// { left: 100, bottom: 700, right: 120, top: 720 }
-```
-
-You'll meet this shape anywhere you read or write the document: annotation
-DTOs, creation drafts, patches. It round-trips byte-for-byte with what
-Acrobat and every other PDF tool sees.
-
-## The viewer's coordinates — `Rect`
-
-What you use to put things on screen. Y grows **downward** (like HTML), same
-points scale, origin at the page's top-left:
-
-```ts
-thread.contentRect;
 // { x: 100, y: 80, width: 20, height: 20 }
 ```
 
-Every viewer API speaks this shape: `stage.reveal(...)`, selection and search
-rects, render boxes, overlay anchors.
+Colors work the same everywhere too: hex strings such as `'#dc143c'`. Angles are degrees, clockwise.
 
-> **The rule:** stored in the file → `PdfRect`. Shown on screen → `Rect`.
-> Wrong one → compile error, because the shapes don't match.
+## Pass values straight through
 
-## You usually don't convert
+Because every part speaks the same coordinates, a value from one goes to another as it is. A comment
+thread knows where its first comment is, and that's where the Stage should go:
 
-APIs hand you the right kind for the job. A comment thread carries both —
-same sticky note, two jobs:
+<Snippet name="concepts/thread-links" />
 
-```tsx
-const threads = useCommentThreads();
-const stage = useStage();
+There's nothing to convert, whether the page is zoomed, rotated or scrolled. A search match says
+where it is the same way, and the Stage goes there:
 
-threads.map((t) => (
-  <button key={refKey(t.root.ref)} onClick={() => stage.reveal(t.pageIndex, { rect: t.contentRect })}>
-    {t.root.contents} — page {t.pageLabel}
-  </button>
-));
-```
+<Example name="coordinates/pass-through" />
 
-No math. `t.root.rect` stays the document's truth (export it, save it, diff
-it); `t.contentRect` is the same box, ready for the viewer.
+## Pages
 
-## When you do convert
-
-Holding a raw annotation and pointing the viewer at it is one call:
+A call that takes a page takes its `ref` or its index. A `ref` stays the same when pages move, so keep
+refs, not indexes, in your own state. Everything that is on a page hands you its page's ref, such as
+`annotation.ref.page` or a search hit's `hit.page`. A ref is an object, so compare two with
+`pageRefsEqual(left, right)` from `/runtime`, not `===`.
 
 ```ts
-const anno = useAnnotation();
-stage.reveal(pageIndex, { rect: anno.toContentBox(dto.ref.page, dto.rect) });
+stage.goToPage(4); // the fifth page, counting from 0
+stage.goToPage(hit.page); // the page of a search hit
 ```
 
-That's the only file ↔ viewer bridge you'll ever need.
+## Pixels, only when you draw
 
-Calls that take a page address it by `PageRef` — `{ kind: 'objectNumber',
-pageObjectNumber }`, the page's indirect object number, which survives reorder
-and every edit. Records hand you one ready-made — `page.ref` on a page-list
-entry, `page` on anything that points at a page (`dto.ref.page`, a search hit's
-`hit.page`); `toPageRef(n)` builds one from a bare number.
+Pixels change with every zoom, rotation and scroll, so nothing in EmbedPDF stores them. When you draw
+something of your own on a page, convert at the last moment with the page's `transform`. Which call
+depends on where you draw:
 
-## Pixels are never stored
+- **On the page**, in the Stage's <Word of="renderFunction" /> or inside `<PageView>`, with the
+  layers: that box turns with the page, so convert for zoom only, with `toPixels`. What you draw turns
+  along.
+- **Over the page**, in its [page chrome](../viewing/stage#labels-and-buttons-on-every-page): that
+  box stays upright, so convert with `pageToView`, which includes the page's turn.
 
-Pixels change with every zoom, rotation, and scroll — so no EmbedPDF API
-stores them. When you draw your own overlay, convert at the last moment:
+An [annotation renderer](../annotations/custom-rendering) converts nothing: it draws into a frame the
+layer places and turns for it.
 
-```tsx
-function Pin({ item, page }: AnnotationRendererProps) {
-  // viewer coordinates → this page's pixels (zoom + rotation handled)
-  const px = page.transform.toPixels({ x: item.box.x, y: item.box.y });
-  return <div style={{ position: 'absolute', left: px.x, top: px.y }}>📌</div>;
-}
-```
+<Snippet name="concepts/pin" />
 
-Going the other way (a pointer event → viewer coordinates) is
-`page.transform.fromPixels(px)`, and for raw client coordinates the page
-context has `page.toContentPoint(clientX, clientY)`.
+| From              | To                | On the page                         | Over the page                         |
+| :---------------- | :---------------- | :---------------------------------- | :------------------------------------ |
+| A point on a page | Pixels            | `page.transform.toPixels(point)`    | `page.transform.pageToView(point)`    |
+| A box on a page   | Pixels            | two corners through `toPixels`      | `page.transform.pageToViewRect(box)`  |
+| Pixels            | A point on a page | `page.transform.fromPixels(point)`  | `page.transform.viewToPage(point)`    |
+| A pointer event   | A point on a page | `page.toPagePoint(event.clientX, event.clientY)` | the same              |
+
+To place many things over a page at once, put them in a container with `transform:
+page.transform.cssMatrix` and `transform-origin: 0 0`, and give them page coordinates: the browser
+does the zoom and the turn.
+
+<Example name="coordinates/pins" />
+
+> **Try it:** click a page to drop a pin, then zoom and turn the view. Each pin keeps its numbers
+> and its spot on the page; only its pixels change.
+
+## Tools that use the PDF file's numbers
+
+The PDF file stores positions in its own numbers, with y going up, and a page can sit anywhere in
+them. You only meet those numbers next to a tool that reads them, such as iText, PDFBox or Acrobat
+JavaScript. `page.pdfCropBox` says where the page sits in them, and `pdfRectOf()`, `pdfPointOf()`,
+`pageBoxOf()` and `pagePointOf()` convert. See [Coordinates](/docs/engine/concepts/coordinates) in the
+engine docs.
 
 ## Cheat sheet
 
-| You're doing…                                  | Use                | Shape                          |
-| ---------------------------------------------- | ------------------ | ------------------------------ |
-| Reading / writing annotations, drafts, patches | file coordinates   | `{ left, bottom, right, top }` |
-| `reveal`, selection & search rects, overlays   | viewer coordinates | `{ x, y, width, height }`      |
-| Drawing DOM/canvas right now                   | `page.transform`   | pixels — convert, never store  |
+| You're…                                               | Use                 | Shape                                    |
+| :---------------------------------------------------- | :------------------ | :--------------------------------------- |
+| Working with annotations, text, search or `reveal`    | page coordinates    | `{ x, y, width, height }` and `{ x, y }` |
+| Drawing on a page right now                           | `page.transform`    | pixels: convert, never store (`toPixels` on it, `pageToView` over it) |
+| Talking to a tool that reads the PDF's own numbers    | `pdfRectOf()`       | `{ left, bottom, right, top }`           |
 
-**Bringing your own coordinate system?** Viewer coordinates are a plain
-y-down frame in points — one affine transform maps them into your world, and
-nothing else in the API will surprise you.
+**Bringing your own coordinate system?** Page coordinates are a plain frame in points with y going
+down, so one transform maps them into yours.

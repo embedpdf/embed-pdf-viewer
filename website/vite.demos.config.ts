@@ -7,7 +7,8 @@ import react from '@vitejs/plugin-react';
 import vue from '@vitejs/plugin-vue';
 import { defineConfig, type Plugin } from 'vite';
 
-import { discoverSampleVariants } from './src/lib/sample-discovery';
+import { discoverSampleVariants, sampleScopeClass } from './src/lib/sample-discovery';
+import { sampleStylesheetsPlugin } from './src/lib/sample-stylesheets';
 
 /**
  * The live-demo half of the samples pipeline (DOCS-ARCHITECTURE.md pillar 3).
@@ -23,35 +24,51 @@ import { discoverSampleVariants } from './src/lib/sample-discovery';
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const SAMPLES = path.join(ROOT, 'src', 'samples');
 
-const MOUNTABLE: Record<string, (abs: string) => string> = {
-  react: (abs) => `
+/** Mounts the app into `el` and returns its unmount; `el` carries the example's style scope meanwhile. */
+const MOUNTABLE: Record<string, (abs: string, scope: string) => string> = {
+  react: (abs, scope) => `
     import { createElement } from 'react';
     import { createRoot } from 'react-dom/client';
     import App from ${JSON.stringify(abs)};
     export function mount(el) {
+      el.classList.add(${JSON.stringify(scope)});
       const root = createRoot(el);
       root.render(createElement(App));
-      return () => root.unmount();
+      return () => {
+        root.unmount();
+        el.classList.remove(${JSON.stringify(scope)});
+      };
     }`,
-  vue: (abs) => `
+  vue: (abs, scope) => `
     import { createApp } from 'vue';
     import App from ${JSON.stringify(abs)};
     export function mount(el) {
+      el.classList.add(${JSON.stringify(scope)});
       const app = createApp(App);
       app.mount(el);
-      return () => app.unmount();
+      return () => {
+        app.unmount();
+        el.classList.remove(${JSON.stringify(scope)});
+      };
     }`,
-  svelte: (abs) => `
+  svelte: (abs, scope) => `
     import { mount as svelteMount, unmount as svelteUnmount } from 'svelte';
     import App from ${JSON.stringify(abs)};
     export function mount(el) {
+      el.classList.add(${JSON.stringify(scope)});
       const app = svelteMount(App, { target: el });
-      return () => svelteUnmount(app);
+      return () => {
+        svelteUnmount(app);
+        el.classList.remove(${JSON.stringify(scope)});
+      };
     }`,
 };
 
 const demos = discoverSampleVariants(SAMPLES, ['react', 'vue', 'svelte']);
 const VIRTUAL_PREFIX = 'virtual:demo/';
+
+/** The framework-neutral `topic/base` of a demo (`topic/base.react`). */
+const demoKey = (demo: { name: string; fw: string }) => demo.name.slice(0, -(demo.fw.length + 1));
 
 function demoEntriesPlugin(): Plugin {
   return {
@@ -67,7 +84,7 @@ function demoEntriesPlugin(): Plugin {
       const name = id.slice(VIRTUAL_PREFIX.length + 1).replace(/\.entry\.js$/, '');
       const demo = demos.find((d) => d.name === name);
       if (!demo) return null;
-      return MOUNTABLE[demo.fw](demo.entry);
+      return MOUNTABLE[demo.fw](demo.entry, sampleScopeClass(demoKey(demo)));
     },
     writeBundle() {
       // The manifest the docs build reads to know which demos exist.
@@ -87,7 +104,17 @@ function demoEntriesPlugin(): Plugin {
 }
 
 export default defineConfig({
-  plugins: [demoEntriesPlugin(), react(), vue(), svelte()],
+  plugins: [
+    demoEntriesPlugin(),
+    // `import './basic.css'`, scoped to its example (src/lib/sample-stylesheets.ts).
+    sampleStylesheetsPlugin({
+      samplesRoot: SAMPLES,
+      isExample: (key) => demos.some((demo) => demoKey(demo) === key),
+    }),
+    react(),
+    vue(),
+    svelte(),
+  ],
   base: '/demos/',
   worker: { format: 'es' },
   publicDir: false,

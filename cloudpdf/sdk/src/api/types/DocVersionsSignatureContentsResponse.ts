@@ -38,6 +38,7 @@ export namespace DocVersionsSignatureContentsResponse {
         SignatureRefused: "SignatureRefused",
         ProtectedDocument: "ProtectedDocument",
         StaleBase: "StaleBase",
+        PayloadTooLarge: "PayloadTooLarge",
     } as const;
     export type Code = (typeof Code)[keyof typeof Code];
 }

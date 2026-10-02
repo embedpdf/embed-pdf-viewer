@@ -36,8 +36,8 @@ describe('matchesQuery', () => {
 describe('resolveResponsive', () => {
   it('applies matching rules in source order, later winning per key', () => {
     const rules: ResponsiveRule[] = [
-      { name: 'a', when: { maxWidth: 900 }, settings: { padding: 12, gap: 4 } },
-      { name: 'b', when: { maxWidth: 600 }, settings: { padding: 4 } },
+      { name: 'medium', when: { maxWidth: 900 }, settings: { padding: 12, gap: 4 } },
+      { name: 'small', when: { maxWidth: 600 }, settings: { padding: 4 } },
     ];
     const wide = resolveResponsive(BASE, rules, boxOf({ width: 1200, height: 700 }));
     expect(wide.effective.padding).toBe(BASE.padding);
@@ -45,11 +45,11 @@ describe('resolveResponsive', () => {
     const mid = resolveResponsive(BASE, rules, boxOf({ width: 800, height: 700 }));
     expect(mid.effective.padding).toBe(12);
     expect(mid.effective.gap).toBe(4);
-    expect(mid.active).toEqual(['a']);
+    expect(mid.active).toEqual(['medium']);
     const narrow = resolveResponsive(BASE, rules, boxOf({ width: 500, height: 700 }));
     expect(narrow.effective.padding).toBe(4); // later rule wins the shared key
     expect(narrow.effective.gap).toBe(4); // earlier rule's other key still applies
-    expect(narrow.active).toEqual(['a', 'b']);
+    expect(narrow.active).toEqual(['medium', 'small']);
   });
 
   it('supports predicate rules and pure named queries (no settings)', () => {
@@ -61,19 +61,19 @@ describe('resolveResponsive', () => {
       },
       { name: 'phone', when: { maxWidth: 600 } }, // pure query — a shared breakpoint
     ];
-    const r = resolveResponsive(BASE, rules, boxOf({ width: 500, height: 200 }));
-    expect(r.effective.layout).toBe('horizontal');
-    expect(r.active).toEqual(['ultrawide', 'phone']);
-    expect(r.effective.padding).toBe(BASE.padding); // the pure query asserts nothing
+    const resolved = resolveResponsive(BASE, rules, boxOf({ width: 500, height: 200 }));
+    expect(resolved.effective.layout).toBe('horizontal');
+    expect(resolved.active).toEqual(['ultrawide', 'phone']);
+    expect(resolved.effective.padding).toBe(BASE.padding); // the pure query asserts nothing
   });
 
   it('skips undefined values in rule patches (Partial semantics)', () => {
     const rules: ResponsiveRule[] = [
       { when: {}, settings: { padding: undefined as unknown as number, gap: 2 } },
     ];
-    const r = resolveResponsive(BASE, rules, boxOf({ width: 100, height: 100 }));
-    expect(r.effective.padding).toBe(BASE.padding);
-    expect(r.effective.gap).toBe(2);
+    const resolved = resolveResponsive(BASE, rules, boxOf({ width: 100, height: 100 }));
+    expect(resolved.effective.padding).toBe(BASE.padding);
+    expect(resolved.effective.gap).toBe(2);
   });
 
   it('does not mutate the base', () => {

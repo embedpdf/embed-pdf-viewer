@@ -57,10 +57,10 @@ export interface LocalFileHandle {
   readonly size: number;
   readonly sha256: string;
   /**
-   * Object-store key the entry was ORIGINALLY materialised from. The
+   * Object-store key the entry was originally materialised from. The
    * cache is content-addressed, so a hit may have been fetched under a
    * different key than the one this `acquire()` passed — same bytes,
-   * different object. Callers that need "the object at MY key was
+   * different object. Callers that need "the object at my key was
    * read and verified" (commit does) must check this and re-verify
    * their own key when it differs.
    */
@@ -145,7 +145,7 @@ export class BaseFileCache {
 
   /**
    * Acquire a handle to a materialised file. Refcount is incremented
-   * on the returned handle; the caller MUST call `handle.release()`
+   * on the returned handle; the caller must call `handle.release()`
    * exactly once. Singleflight: concurrent acquires of the same sha
    * share one materialise.
    *

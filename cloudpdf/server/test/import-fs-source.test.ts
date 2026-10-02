@@ -1,7 +1,7 @@
 /**
  * Filesystem import source: shared conformance over a real tmpdir,
  * plus the containment surface — key-shape rejections, the
- * symlink-escape defense (THE security-critical test of this
+ * symlink-escape defense (the security-critical test of this
  * adapter), and the structural api-token-only invariant.
  */
 import { mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises';

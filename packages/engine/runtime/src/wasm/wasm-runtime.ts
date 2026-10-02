@@ -37,8 +37,13 @@ type EmscriptenModule = Record<string, any> & {
   stringToUTF16?: (str: string, ptr: number, maxBytes: number) => void;
 };
 
+/**
+ * An address from wasm as a `Ptr`. wasm32 addresses are unsigned, but an i32
+ * reaches JS signed, so an address at or above 2 GiB (the heap may grow to
+ * 4 GiB) arrives negative: `>>> 0` gives back the address.
+ */
 function toPtr(value: number | bigint): Ptr {
-  return BigInt(value) as Ptr;
+  return BigInt(typeof value === 'number' ? value >>> 0 : value) as Ptr;
 }
 
 function toNumber(ptr: Ptr | Callback): number {
@@ -104,10 +109,14 @@ function createWasmMemory(module: EmscriptenModule): PdfRuntimeMemory {
       return ptr;
     },
     peek(ptr, kind, byteOffset = 0) {
-      return module.getValue?.(toNumber(ptr) + byteOffset, wasmValueKind(kind)) ?? 0;
+      const value = module.getValue?.(toNumber(ptr) + byteOffset, wasmValueKind(kind)) ?? 0;
+      // A pointer read from memory is a `Ptr`, as on the native runtime.
+      return kind === 'ptr' ? toPtr(value) : value;
     },
     poke(ptr, kind, value, byteOffset = 0) {
-      module.setValue?.(toNumber(ptr) + byteOffset, value, wasmValueKind(kind));
+      // A `Ptr` written as a pointer, as on the native runtime.
+      const stored = kind === 'ptr' && typeof value === 'bigint' ? Number(value) : value;
+      module.setValue?.(toNumber(ptr) + byteOffset, stored, wasmValueKind(kind));
     },
   };
 }
@@ -224,7 +233,7 @@ function toJsResult(meta: PdfFunctionAbiSlot | null, value: unknown): unknown {
 }
 
 /**
- * The wasm artifact is built WITHOUT `WASM_BIGINT`, so Emscripten
+ * The wasm artifact is built without `WASM_BIGINT`, so Emscripten
  * legalizes every `i64` parameter at the JS boundary into an (i32 low,
  * i32 high) pair — the export wrapper takes one extra argument per i64
  * and rejects BigInt values outright. Expand each declared i64 argument
@@ -289,9 +298,9 @@ function buildEmscriptenOptions(opts: CreatePdfRuntimeOptions): Record<string, u
     moduleOptions.locateFile = (path: string, prefix: string) =>
       path.endsWith('.wasm') ? wasmUrl : prefix + path;
   }
-  // Bytes in hand must mean NO location is ever needed: without a locateFile,
+  // Bytes in hand must mean no location is ever needed: without a locateFile,
   // Emscripten still computes the wasm's URL via `new URL('embedpdf.wasm',
-  // import.meta.url)`, which THROWS inside a blob: worker (blob URLs can't be
+  // import.meta.url)`, which throws inside a blob: worker (blob URLs can't be
   // a base). The name is only used as a lookup key against wasmBinary — the
   // glue never fetches it.
   if (moduleOptions.wasmBinary !== undefined && moduleOptions.locateFile === undefined) {

@@ -1,0 +1,21 @@
+import sys,json
+from pathlib import Path
+sys.dont_write_bytecode=True
+sys.path.insert(0,'/Users/bobsingor/GitHub/cloudpdf-platform/oss/embedpdf/packages/engine/main/test/fixtures/signature-compat')
+from generate import reader,raw_body
+from generate_v2 import page_of
+from verify_v3 import changed_keys
+root=Path('/tmp/epdf-weak-nm-probes/pdfs')
+m=json.loads((root/'manifest.json').read_text())
+for case in m['cases']:
+ data=(root/case['file']).read_bytes(); r=reader(data)
+ base=(root/f"{case['profile']}-{case['layout']}-control.pdf").read_bytes(); before=reader(base)
+ squares=[a.get_object() for a in page_of(r)['/Annots'] if a.get_object().get('/Subtype')=='/Square']
+ expected=['weak-0','weak-2','weak-3'] if case['action'].startswith('delete') else ['weak-3','weak-0','weak-1','weak-2'] if case['action'].startswith('reorder') else ['weak-0','weak-1','weak-2','weak-3']
+ assert [str(a['/Contents']) for a in squares]==expected, case['id']
+ previous={str(a.get_object()['/Contents']):a.get_object() for a in page_of(before)['/Annots'] if a.get_object().get('/Subtype')=='/Square'}
+ for square in squares:
+  name=str(square['/Contents']); ap=square['/AP'].raw_get('/N')
+  assert raw_body(data,ap.idnum)==raw_body(base,ap.idnum), case['id']
+  assert changed_keys(previous[name],square)==({'/NM'} if 'names' in case['action'] and not int(square.get('/F',0))&128 else set())
+print('72 independent order, survivor-key, and appearance-byte checks passed.')

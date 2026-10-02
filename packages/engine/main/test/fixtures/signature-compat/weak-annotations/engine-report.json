@@ -1,0 +1,5562 @@
+[
+  {
+    "runtime": "wasm",
+    "id": "approval-inline-control",
+    "profile": "approval",
+    "layout": "inline",
+    "action": "control",
+    "policyVersion": 4,
+    "weakCount": 4,
+    "verdict": {
+      "verdict": "unchanged",
+      "basis": "persisted"
+    },
+    "integrity": "valid",
+    "findings": []
+  },
+  {
+    "runtime": "wasm",
+    "id": "approval-inline-delete",
+    "profile": "approval",
+    "layout": "inline",
+    "action": "delete",
+    "policyVersion": 4,
+    "weakCount": 3,
+    "verdict": {
+      "verdict": "permitted",
+      "basis": "persisted",
+      "laterRevisions": 1
+    },
+    "integrity": "valid",
+    "findings": [
+      {
+        "rule": "trailer",
+        "verdict": "permitted",
+        "objectNumber": 0
+      },
+      {
+        "rule": "annotation",
+        "verdict": "permitted",
+        "objectNumber": 6,
+        "detail": "page /Annots changed"
+      }
+    ]
+  },
+  {
+    "runtime": "wasm",
+    "id": "approval-inline-delete-names",
+    "profile": "approval",
+    "layout": "inline",
+    "action": "delete-names",
+    "policyVersion": 4,
+    "weakCount": 0,
+    "verdict": {
+      "verdict": "permitted",
+      "basis": "persisted",
+      "laterRevisions": 1
+    },
+    "integrity": "valid",
+    "findings": [
+      {
+        "rule": "trailer",
+        "verdict": "permitted",
+        "objectNumber": 0
+      },
+      {
+        "rule": "annotation",
+        "verdict": "permitted",
+        "objectNumber": 6,
+        "detail": "page /Annots changed"
+      }
+    ]
+  },
+  {
+    "runtime": "wasm",
+    "id": "approval-inline-names",
+    "profile": "approval",
+    "layout": "inline",
+    "action": "names",
+    "policyVersion": 4,
+    "weakCount": 0,
+    "verdict": {
+      "verdict": "permitted",
+      "basis": "persisted",
+      "laterRevisions": 1
+    },
+    "integrity": "valid",
+    "findings": [
+      {
+        "rule": "trailer",
+        "verdict": "permitted",
+        "objectNumber": 0
+      },
+      {
+        "rule": "annotation",
+        "verdict": "permitted",
+        "objectNumber": 6,
+        "detail": "page /Annots changed"
+      }
+    ]
+  },
+  {
+    "runtime": "wasm",
+    "id": "approval-inline-reorder",
+    "profile": "approval",
+    "layout": "inline",
+    "action": "reorder",
+    "policyVersion": 4,
+    "weakCount": 4,
+    "verdict": {
+      "verdict": "permitted",
+      "basis": "persisted",
+      "laterRevisions": 1
+    },
+    "integrity": "valid",
+    "findings": [
+      {
+        "rule": "trailer",
+        "verdict": "permitted",
+        "objectNumber": 0
+      },
+      {
+        "rule": "annotation",
+        "verdict": "permitted",
+        "objectNumber": 6,
+        "detail": "page /Annots changed"
+      }
+    ]
+  },
+  {
+    "runtime": "wasm",
+    "id": "approval-inline-reorder-names",
+    "profile": "approval",
+    "layout": "inline",
+    "action": "reorder-names",
+    "policyVersion": 4,
+    "weakCount": 0,
+    "verdict": {
+      "verdict": "permitted",
+      "basis": "persisted",
+      "laterRevisions": 1
+    },
+    "integrity": "valid",
+    "findings": [
+      {
+        "rule": "trailer",
+        "verdict": "permitted",
+        "objectNumber": 0
+      },
+      {
+        "rule": "annotation",
+        "verdict": "permitted",
+        "objectNumber": 6,
+        "detail": "page /Annots changed"
+      }
+    ]
+  },
+  {
+    "runtime": "wasm",
+    "id": "approval-indirect-array-control",
+    "profile": "approval",
+    "layout": "indirect-array",
+    "action": "control",
+    "policyVersion": 4,
+    "weakCount": 4,
+    "verdict": {
+      "verdict": "unchanged",
+      "basis": "persisted"
+    },
+    "integrity": "valid",
+    "findings": []
+  },
+  {
+    "runtime": "wasm",
+    "id": "approval-indirect-array-delete",
+    "profile": "approval",
+    "layout": "indirect-array",
+    "action": "delete",
+    "policyVersion": 4,
+    "weakCount": 3,
+    "verdict": {
+      "verdict": "forbidden",
+      "detail": "object 22, unexplained: was referenced from object 6 at Annots and no rule explains it",
+      "basis": "persisted",
+      "laterRevisions": 1
+    },
+    "integrity": "valid",
+    "findings": [
+      {
+        "rule": "trailer",
+        "verdict": "permitted",
+        "objectNumber": 0
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 22,
+        "edge": "6:Annots",
+        "detail": "was referenced from object 6 at Annots and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 22,
+        "edge": "6:Annots",
+        "detail": "is referenced from object 6 at Annots and no rule explains it"
+      }
+    ]
+  },
+  {
+    "runtime": "wasm",
+    "id": "approval-indirect-array-delete-names",
+    "profile": "approval",
+    "layout": "indirect-array",
+    "action": "delete-names",
+    "policyVersion": 4,
+    "weakCount": 0,
+    "verdict": {
+      "verdict": "forbidden",
+      "detail": "object 22, unexplained: was referenced from object 6 at Annots and no rule explains it",
+      "basis": "persisted",
+      "laterRevisions": 1
+    },
+    "integrity": "valid",
+    "findings": [
+      {
+        "rule": "trailer",
+        "verdict": "permitted",
+        "objectNumber": 0
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 22,
+        "edge": "6:Annots",
+        "detail": "was referenced from object 6 at Annots and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 22,
+        "edge": "6:Annots",
+        "detail": "is referenced from object 6 at Annots and no rule explains it"
+      }
+    ]
+  },
+  {
+    "runtime": "wasm",
+    "id": "approval-indirect-array-names",
+    "profile": "approval",
+    "layout": "indirect-array",
+    "action": "names",
+    "policyVersion": 4,
+    "weakCount": 0,
+    "verdict": {
+      "verdict": "forbidden",
+      "detail": "object 22, unexplained: was referenced from object 6 at Annots and no rule explains it",
+      "basis": "persisted",
+      "laterRevisions": 1
+    },
+    "integrity": "valid",
+    "findings": [
+      {
+        "rule": "trailer",
+        "verdict": "permitted",
+        "objectNumber": 0
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 22,
+        "edge": "6:Annots",
+        "detail": "was referenced from object 6 at Annots and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 22,
+        "edge": "6:Annots",
+        "detail": "is referenced from object 6 at Annots and no rule explains it"
+      }
+    ]
+  },
+  {
+    "runtime": "wasm",
+    "id": "approval-indirect-array-reorder",
+    "profile": "approval",
+    "layout": "indirect-array",
+    "action": "reorder",
+    "policyVersion": 4,
+    "weakCount": 4,
+    "verdict": {
+      "verdict": "forbidden",
+      "detail": "object 22, unexplained: was referenced from object 6 at Annots and no rule explains it",
+      "basis": "persisted",
+      "laterRevisions": 1
+    },
+    "integrity": "valid",
+    "findings": [
+      {
+        "rule": "trailer",
+        "verdict": "permitted",
+        "objectNumber": 0
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 22,
+        "edge": "6:Annots",
+        "detail": "was referenced from object 6 at Annots and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 22,
+        "edge": "6:Annots",
+        "detail": "is referenced from object 6 at Annots and no rule explains it"
+      }
+    ]
+  },
+  {
+    "runtime": "wasm",
+    "id": "approval-indirect-array-reorder-names",
+    "profile": "approval",
+    "layout": "indirect-array",
+    "action": "reorder-names",
+    "policyVersion": 4,
+    "weakCount": 0,
+    "verdict": {
+      "verdict": "forbidden",
+      "detail": "object 22, unexplained: was referenced from object 6 at Annots and no rule explains it",
+      "basis": "persisted",
+      "laterRevisions": 1
+    },
+    "integrity": "valid",
+    "findings": [
+      {
+        "rule": "trailer",
+        "verdict": "permitted",
+        "objectNumber": 0
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 22,
+        "edge": "6:Annots",
+        "detail": "was referenced from object 6 at Annots and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 22,
+        "edge": "6:Annots",
+        "detail": "is referenced from object 6 at Annots and no rule explains it"
+      }
+    ]
+  },
+  {
+    "runtime": "wasm",
+    "id": "p3-inline-control",
+    "profile": "p3",
+    "layout": "inline",
+    "action": "control",
+    "policyVersion": 4,
+    "weakCount": 4,
+    "verdict": {
+      "verdict": "unchanged",
+      "basis": "persisted"
+    },
+    "integrity": "valid",
+    "findings": []
+  },
+  {
+    "runtime": "wasm",
+    "id": "p3-inline-delete",
+    "profile": "p3",
+    "layout": "inline",
+    "action": "delete",
+    "policyVersion": 4,
+    "weakCount": 3,
+    "verdict": {
+      "verdict": "permitted",
+      "basis": "persisted",
+      "laterRevisions": 1
+    },
+    "integrity": "valid",
+    "findings": [
+      {
+        "rule": "trailer",
+        "verdict": "permitted",
+        "objectNumber": 0
+      },
+      {
+        "rule": "annotation",
+        "verdict": "permitted",
+        "objectNumber": 6,
+        "detail": "page /Annots changed"
+      }
+    ]
+  },
+  {
+    "runtime": "wasm",
+    "id": "p3-inline-delete-names",
+    "profile": "p3",
+    "layout": "inline",
+    "action": "delete-names",
+    "policyVersion": 4,
+    "weakCount": 0,
+    "verdict": {
+      "verdict": "permitted",
+      "basis": "persisted",
+      "laterRevisions": 1
+    },
+    "integrity": "valid",
+    "findings": [
+      {
+        "rule": "trailer",
+        "verdict": "permitted",
+        "objectNumber": 0
+      },
+      {
+        "rule": "annotation",
+        "verdict": "permitted",
+        "objectNumber": 6,
+        "detail": "page /Annots changed"
+      }
+    ]
+  },
+  {
+    "runtime": "wasm",
+    "id": "p3-inline-names",
+    "profile": "p3",
+    "layout": "inline",
+    "action": "names",
+    "policyVersion": 4,
+    "weakCount": 0,
+    "verdict": {
+      "verdict": "permitted",
+      "basis": "persisted",
+      "laterRevisions": 1
+    },
+    "integrity": "valid",
+    "findings": [
+      {
+        "rule": "trailer",
+        "verdict": "permitted",
+        "objectNumber": 0
+      },
+      {
+        "rule": "annotation",
+        "verdict": "permitted",
+        "objectNumber": 6,
+        "detail": "page /Annots changed"
+      }
+    ]
+  },
+  {
+    "runtime": "wasm",
+    "id": "p3-inline-reorder",
+    "profile": "p3",
+    "layout": "inline",
+    "action": "reorder",
+    "policyVersion": 4,
+    "weakCount": 4,
+    "verdict": {
+      "verdict": "permitted",
+      "basis": "persisted",
+      "laterRevisions": 1
+    },
+    "integrity": "valid",
+    "findings": [
+      {
+        "rule": "trailer",
+        "verdict": "permitted",
+        "objectNumber": 0
+      },
+      {
+        "rule": "annotation",
+        "verdict": "permitted",
+        "objectNumber": 6,
+        "detail": "page /Annots changed"
+      }
+    ]
+  },
+  {
+    "runtime": "wasm",
+    "id": "p3-inline-reorder-names",
+    "profile": "p3",
+    "layout": "inline",
+    "action": "reorder-names",
+    "policyVersion": 4,
+    "weakCount": 0,
+    "verdict": {
+      "verdict": "permitted",
+      "basis": "persisted",
+      "laterRevisions": 1
+    },
+    "integrity": "valid",
+    "findings": [
+      {
+        "rule": "trailer",
+        "verdict": "permitted",
+        "objectNumber": 0
+      },
+      {
+        "rule": "annotation",
+        "verdict": "permitted",
+        "objectNumber": 6,
+        "detail": "page /Annots changed"
+      }
+    ]
+  },
+  {
+    "runtime": "wasm",
+    "id": "p3-indirect-array-control",
+    "profile": "p3",
+    "layout": "indirect-array",
+    "action": "control",
+    "policyVersion": 4,
+    "weakCount": 4,
+    "verdict": {
+      "verdict": "unchanged",
+      "basis": "persisted"
+    },
+    "integrity": "valid",
+    "findings": []
+  },
+  {
+    "runtime": "wasm",
+    "id": "p3-indirect-array-delete",
+    "profile": "p3",
+    "layout": "indirect-array",
+    "action": "delete",
+    "policyVersion": 4,
+    "weakCount": 3,
+    "verdict": {
+      "verdict": "forbidden",
+      "detail": "object 22, unexplained: was referenced from object 6 at Annots and no rule explains it",
+      "basis": "persisted",
+      "laterRevisions": 1
+    },
+    "integrity": "valid",
+    "findings": [
+      {
+        "rule": "trailer",
+        "verdict": "permitted",
+        "objectNumber": 0
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 22,
+        "edge": "6:Annots",
+        "detail": "was referenced from object 6 at Annots and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 22,
+        "edge": "6:Annots",
+        "detail": "is referenced from object 6 at Annots and no rule explains it"
+      }
+    ]
+  },
+  {
+    "runtime": "wasm",
+    "id": "p3-indirect-array-delete-names",
+    "profile": "p3",
+    "layout": "indirect-array",
+    "action": "delete-names",
+    "policyVersion": 4,
+    "weakCount": 0,
+    "verdict": {
+      "verdict": "forbidden",
+      "detail": "object 22, unexplained: was referenced from object 6 at Annots and no rule explains it",
+      "basis": "persisted",
+      "laterRevisions": 1
+    },
+    "integrity": "valid",
+    "findings": [
+      {
+        "rule": "trailer",
+        "verdict": "permitted",
+        "objectNumber": 0
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 22,
+        "edge": "6:Annots",
+        "detail": "was referenced from object 6 at Annots and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 22,
+        "edge": "6:Annots",
+        "detail": "is referenced from object 6 at Annots and no rule explains it"
+      }
+    ]
+  },
+  {
+    "runtime": "wasm",
+    "id": "p3-indirect-array-names",
+    "profile": "p3",
+    "layout": "indirect-array",
+    "action": "names",
+    "policyVersion": 4,
+    "weakCount": 0,
+    "verdict": {
+      "verdict": "forbidden",
+      "detail": "object 22, unexplained: was referenced from object 6 at Annots and no rule explains it",
+      "basis": "persisted",
+      "laterRevisions": 1
+    },
+    "integrity": "valid",
+    "findings": [
+      {
+        "rule": "trailer",
+        "verdict": "permitted",
+        "objectNumber": 0
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 22,
+        "edge": "6:Annots",
+        "detail": "was referenced from object 6 at Annots and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 22,
+        "edge": "6:Annots",
+        "detail": "is referenced from object 6 at Annots and no rule explains it"
+      }
+    ]
+  },
+  {
+    "runtime": "wasm",
+    "id": "p3-indirect-array-reorder",
+    "profile": "p3",
+    "layout": "indirect-array",
+    "action": "reorder",
+    "policyVersion": 4,
+    "weakCount": 4,
+    "verdict": {
+      "verdict": "forbidden",
+      "detail": "object 22, unexplained: was referenced from object 6 at Annots and no rule explains it",
+      "basis": "persisted",
+      "laterRevisions": 1
+    },
+    "integrity": "valid",
+    "findings": [
+      {
+        "rule": "trailer",
+        "verdict": "permitted",
+        "objectNumber": 0
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 22,
+        "edge": "6:Annots",
+        "detail": "was referenced from object 6 at Annots and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 22,
+        "edge": "6:Annots",
+        "detail": "is referenced from object 6 at Annots and no rule explains it"
+      }
+    ]
+  },
+  {
+    "runtime": "wasm",
+    "id": "p3-indirect-array-reorder-names",
+    "profile": "p3",
+    "layout": "indirect-array",
+    "action": "reorder-names",
+    "policyVersion": 4,
+    "weakCount": 0,
+    "verdict": {
+      "verdict": "forbidden",
+      "detail": "object 22, unexplained: was referenced from object 6 at Annots and no rule explains it",
+      "basis": "persisted",
+      "laterRevisions": 1
+    },
+    "integrity": "valid",
+    "findings": [
+      {
+        "rule": "trailer",
+        "verdict": "permitted",
+        "objectNumber": 0
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 22,
+        "edge": "6:Annots",
+        "detail": "was referenced from object 6 at Annots and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 22,
+        "edge": "6:Annots",
+        "detail": "is referenced from object 6 at Annots and no rule explains it"
+      }
+    ]
+  },
+  {
+    "runtime": "wasm",
+    "id": "p2-inline-control",
+    "profile": "p2",
+    "layout": "inline",
+    "action": "control",
+    "policyVersion": 4,
+    "weakCount": 4,
+    "verdict": {
+      "verdict": "unchanged",
+      "basis": "persisted"
+    },
+    "integrity": "valid",
+    "findings": []
+  },
+  {
+    "runtime": "wasm",
+    "id": "p2-inline-delete",
+    "profile": "p2",
+    "layout": "inline",
+    "action": "delete",
+    "policyVersion": 4,
+    "weakCount": 3,
+    "verdict": {
+      "verdict": "forbidden",
+      "detail": "object 6, unexplained: was referenced from object 3 at Kids/[0] and no rule explains it",
+      "basis": "persisted",
+      "laterRevisions": 1
+    },
+    "integrity": "valid",
+    "findings": [
+      {
+        "rule": "trailer",
+        "verdict": "permitted",
+        "objectNumber": 0
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "3:Kids/[0]",
+        "detail": "was referenced from object 3 at Kids/[0] and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "15:P",
+        "detail": "was referenced from object 15 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "13:P",
+        "detail": "was referenced from object 13 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "10:P",
+        "detail": "was referenced from object 10 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "8:P",
+        "detail": "was referenced from object 8 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "3:Kids/[0]",
+        "detail": "is referenced from object 3 at Kids/[0] and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "15:P",
+        "detail": "is referenced from object 15 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "13:P",
+        "detail": "is referenced from object 13 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "10:P",
+        "detail": "is referenced from object 10 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "8:P",
+        "detail": "is referenced from object 8 at P and no rule explains it"
+      }
+    ]
+  },
+  {
+    "runtime": "wasm",
+    "id": "p2-inline-delete-names",
+    "profile": "p2",
+    "layout": "inline",
+    "action": "delete-names",
+    "policyVersion": 4,
+    "weakCount": 0,
+    "verdict": {
+      "verdict": "forbidden",
+      "detail": "object 6, unexplained: was referenced from object 3 at Kids/[0] and no rule explains it",
+      "basis": "persisted",
+      "laterRevisions": 1
+    },
+    "integrity": "valid",
+    "findings": [
+      {
+        "rule": "trailer",
+        "verdict": "permitted",
+        "objectNumber": 0
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "3:Kids/[0]",
+        "detail": "was referenced from object 3 at Kids/[0] and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "15:P",
+        "detail": "was referenced from object 15 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "13:P",
+        "detail": "was referenced from object 13 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "10:P",
+        "detail": "was referenced from object 10 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "8:P",
+        "detail": "was referenced from object 8 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "3:Kids/[0]",
+        "detail": "is referenced from object 3 at Kids/[0] and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "15:P",
+        "detail": "is referenced from object 15 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "13:P",
+        "detail": "is referenced from object 13 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "10:P",
+        "detail": "is referenced from object 10 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "8:P",
+        "detail": "is referenced from object 8 at P and no rule explains it"
+      }
+    ]
+  },
+  {
+    "runtime": "wasm",
+    "id": "p2-inline-names",
+    "profile": "p2",
+    "layout": "inline",
+    "action": "names",
+    "policyVersion": 4,
+    "weakCount": 0,
+    "verdict": {
+      "verdict": "forbidden",
+      "detail": "object 6, unexplained: was referenced from object 3 at Kids/[0] and no rule explains it",
+      "basis": "persisted",
+      "laterRevisions": 1
+    },
+    "integrity": "valid",
+    "findings": [
+      {
+        "rule": "trailer",
+        "verdict": "permitted",
+        "objectNumber": 0
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "3:Kids/[0]",
+        "detail": "was referenced from object 3 at Kids/[0] and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "15:P",
+        "detail": "was referenced from object 15 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "13:P",
+        "detail": "was referenced from object 13 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "10:P",
+        "detail": "was referenced from object 10 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "8:P",
+        "detail": "was referenced from object 8 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "3:Kids/[0]",
+        "detail": "is referenced from object 3 at Kids/[0] and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "15:P",
+        "detail": "is referenced from object 15 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "13:P",
+        "detail": "is referenced from object 13 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "10:P",
+        "detail": "is referenced from object 10 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "8:P",
+        "detail": "is referenced from object 8 at P and no rule explains it"
+      }
+    ]
+  },
+  {
+    "runtime": "wasm",
+    "id": "p2-inline-reorder",
+    "profile": "p2",
+    "layout": "inline",
+    "action": "reorder",
+    "policyVersion": 4,
+    "weakCount": 4,
+    "verdict": {
+      "verdict": "forbidden",
+      "detail": "object 6, unexplained: was referenced from object 3 at Kids/[0] and no rule explains it",
+      "basis": "persisted",
+      "laterRevisions": 1
+    },
+    "integrity": "valid",
+    "findings": [
+      {
+        "rule": "trailer",
+        "verdict": "permitted",
+        "objectNumber": 0
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "3:Kids/[0]",
+        "detail": "was referenced from object 3 at Kids/[0] and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "15:P",
+        "detail": "was referenced from object 15 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "13:P",
+        "detail": "was referenced from object 13 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "10:P",
+        "detail": "was referenced from object 10 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "8:P",
+        "detail": "was referenced from object 8 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "3:Kids/[0]",
+        "detail": "is referenced from object 3 at Kids/[0] and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "15:P",
+        "detail": "is referenced from object 15 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "13:P",
+        "detail": "is referenced from object 13 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "10:P",
+        "detail": "is referenced from object 10 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "8:P",
+        "detail": "is referenced from object 8 at P and no rule explains it"
+      }
+    ]
+  },
+  {
+    "runtime": "wasm",
+    "id": "p2-inline-reorder-names",
+    "profile": "p2",
+    "layout": "inline",
+    "action": "reorder-names",
+    "policyVersion": 4,
+    "weakCount": 0,
+    "verdict": {
+      "verdict": "forbidden",
+      "detail": "object 6, unexplained: was referenced from object 3 at Kids/[0] and no rule explains it",
+      "basis": "persisted",
+      "laterRevisions": 1
+    },
+    "integrity": "valid",
+    "findings": [
+      {
+        "rule": "trailer",
+        "verdict": "permitted",
+        "objectNumber": 0
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "3:Kids/[0]",
+        "detail": "was referenced from object 3 at Kids/[0] and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "15:P",
+        "detail": "was referenced from object 15 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "13:P",
+        "detail": "was referenced from object 13 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "10:P",
+        "detail": "was referenced from object 10 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "8:P",
+        "detail": "was referenced from object 8 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "3:Kids/[0]",
+        "detail": "is referenced from object 3 at Kids/[0] and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "15:P",
+        "detail": "is referenced from object 15 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "13:P",
+        "detail": "is referenced from object 13 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "10:P",
+        "detail": "is referenced from object 10 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "8:P",
+        "detail": "is referenced from object 8 at P and no rule explains it"
+      }
+    ]
+  },
+  {
+    "runtime": "wasm",
+    "id": "p2-indirect-array-control",
+    "profile": "p2",
+    "layout": "indirect-array",
+    "action": "control",
+    "policyVersion": 4,
+    "weakCount": 4,
+    "verdict": {
+      "verdict": "unchanged",
+      "basis": "persisted"
+    },
+    "integrity": "valid",
+    "findings": []
+  },
+  {
+    "runtime": "wasm",
+    "id": "p2-indirect-array-delete",
+    "profile": "p2",
+    "layout": "indirect-array",
+    "action": "delete",
+    "policyVersion": 4,
+    "weakCount": 3,
+    "verdict": {
+      "verdict": "forbidden",
+      "detail": "object 22, unexplained: was referenced from object 6 at Annots and no rule explains it",
+      "basis": "persisted",
+      "laterRevisions": 1
+    },
+    "integrity": "valid",
+    "findings": [
+      {
+        "rule": "trailer",
+        "verdict": "permitted",
+        "objectNumber": 0
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 22,
+        "edge": "6:Annots",
+        "detail": "was referenced from object 6 at Annots and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 22,
+        "edge": "6:Annots",
+        "detail": "is referenced from object 6 at Annots and no rule explains it"
+      }
+    ]
+  },
+  {
+    "runtime": "wasm",
+    "id": "p2-indirect-array-delete-names",
+    "profile": "p2",
+    "layout": "indirect-array",
+    "action": "delete-names",
+    "policyVersion": 4,
+    "weakCount": 0,
+    "verdict": {
+      "verdict": "forbidden",
+      "detail": "object 22, unexplained: was referenced from object 6 at Annots and no rule explains it",
+      "basis": "persisted",
+      "laterRevisions": 1
+    },
+    "integrity": "valid",
+    "findings": [
+      {
+        "rule": "trailer",
+        "verdict": "permitted",
+        "objectNumber": 0
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 22,
+        "edge": "6:Annots",
+        "detail": "was referenced from object 6 at Annots and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 22,
+        "edge": "6:Annots",
+        "detail": "is referenced from object 6 at Annots and no rule explains it"
+      }
+    ]
+  },
+  {
+    "runtime": "wasm",
+    "id": "p2-indirect-array-names",
+    "profile": "p2",
+    "layout": "indirect-array",
+    "action": "names",
+    "policyVersion": 4,
+    "weakCount": 0,
+    "verdict": {
+      "verdict": "forbidden",
+      "detail": "object 22, unexplained: was referenced from object 6 at Annots and no rule explains it",
+      "basis": "persisted",
+      "laterRevisions": 1
+    },
+    "integrity": "valid",
+    "findings": [
+      {
+        "rule": "trailer",
+        "verdict": "permitted",
+        "objectNumber": 0
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 22,
+        "edge": "6:Annots",
+        "detail": "was referenced from object 6 at Annots and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 22,
+        "edge": "6:Annots",
+        "detail": "is referenced from object 6 at Annots and no rule explains it"
+      }
+    ]
+  },
+  {
+    "runtime": "wasm",
+    "id": "p2-indirect-array-reorder",
+    "profile": "p2",
+    "layout": "indirect-array",
+    "action": "reorder",
+    "policyVersion": 4,
+    "weakCount": 4,
+    "verdict": {
+      "verdict": "forbidden",
+      "detail": "object 22, unexplained: was referenced from object 6 at Annots and no rule explains it",
+      "basis": "persisted",
+      "laterRevisions": 1
+    },
+    "integrity": "valid",
+    "findings": [
+      {
+        "rule": "trailer",
+        "verdict": "permitted",
+        "objectNumber": 0
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 22,
+        "edge": "6:Annots",
+        "detail": "was referenced from object 6 at Annots and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 22,
+        "edge": "6:Annots",
+        "detail": "is referenced from object 6 at Annots and no rule explains it"
+      }
+    ]
+  },
+  {
+    "runtime": "wasm",
+    "id": "p2-indirect-array-reorder-names",
+    "profile": "p2",
+    "layout": "indirect-array",
+    "action": "reorder-names",
+    "policyVersion": 4,
+    "weakCount": 0,
+    "verdict": {
+      "verdict": "forbidden",
+      "detail": "object 22, unexplained: was referenced from object 6 at Annots and no rule explains it",
+      "basis": "persisted",
+      "laterRevisions": 1
+    },
+    "integrity": "valid",
+    "findings": [
+      {
+        "rule": "trailer",
+        "verdict": "permitted",
+        "objectNumber": 0
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 22,
+        "edge": "6:Annots",
+        "detail": "was referenced from object 6 at Annots and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 22,
+        "edge": "6:Annots",
+        "detail": "is referenced from object 6 at Annots and no rule explains it"
+      }
+    ]
+  },
+  {
+    "runtime": "wasm",
+    "id": "fieldmdp-inline-control",
+    "profile": "fieldmdp",
+    "layout": "inline",
+    "action": "control",
+    "policyVersion": 4,
+    "weakCount": 4,
+    "verdict": {
+      "verdict": "unchanged",
+      "basis": "persisted"
+    },
+    "integrity": "valid",
+    "findings": []
+  },
+  {
+    "runtime": "wasm",
+    "id": "fieldmdp-inline-delete",
+    "profile": "fieldmdp",
+    "layout": "inline",
+    "action": "delete",
+    "policyVersion": 4,
+    "weakCount": 3,
+    "verdict": {
+      "verdict": "permitted",
+      "basis": "persisted",
+      "laterRevisions": 1
+    },
+    "integrity": "valid",
+    "findings": [
+      {
+        "rule": "trailer",
+        "verdict": "permitted",
+        "objectNumber": 0
+      },
+      {
+        "rule": "annotation",
+        "verdict": "permitted",
+        "objectNumber": 6,
+        "detail": "page /Annots changed"
+      }
+    ]
+  },
+  {
+    "runtime": "wasm",
+    "id": "fieldmdp-inline-delete-names",
+    "profile": "fieldmdp",
+    "layout": "inline",
+    "action": "delete-names",
+    "policyVersion": 4,
+    "weakCount": 0,
+    "verdict": {
+      "verdict": "permitted",
+      "basis": "persisted",
+      "laterRevisions": 1
+    },
+    "integrity": "valid",
+    "findings": [
+      {
+        "rule": "trailer",
+        "verdict": "permitted",
+        "objectNumber": 0
+      },
+      {
+        "rule": "annotation",
+        "verdict": "permitted",
+        "objectNumber": 6,
+        "detail": "page /Annots changed"
+      }
+    ]
+  },
+  {
+    "runtime": "wasm",
+    "id": "fieldmdp-inline-names",
+    "profile": "fieldmdp",
+    "layout": "inline",
+    "action": "names",
+    "policyVersion": 4,
+    "weakCount": 0,
+    "verdict": {
+      "verdict": "permitted",
+      "basis": "persisted",
+      "laterRevisions": 1
+    },
+    "integrity": "valid",
+    "findings": [
+      {
+        "rule": "trailer",
+        "verdict": "permitted",
+        "objectNumber": 0
+      },
+      {
+        "rule": "annotation",
+        "verdict": "permitted",
+        "objectNumber": 6,
+        "detail": "page /Annots changed"
+      }
+    ]
+  },
+  {
+    "runtime": "wasm",
+    "id": "fieldmdp-inline-reorder",
+    "profile": "fieldmdp",
+    "layout": "inline",
+    "action": "reorder",
+    "policyVersion": 4,
+    "weakCount": 4,
+    "verdict": {
+      "verdict": "permitted",
+      "basis": "persisted",
+      "laterRevisions": 1
+    },
+    "integrity": "valid",
+    "findings": [
+      {
+        "rule": "trailer",
+        "verdict": "permitted",
+        "objectNumber": 0
+      },
+      {
+        "rule": "annotation",
+        "verdict": "permitted",
+        "objectNumber": 6,
+        "detail": "page /Annots changed"
+      }
+    ]
+  },
+  {
+    "runtime": "wasm",
+    "id": "fieldmdp-inline-reorder-names",
+    "profile": "fieldmdp",
+    "layout": "inline",
+    "action": "reorder-names",
+    "policyVersion": 4,
+    "weakCount": 0,
+    "verdict": {
+      "verdict": "permitted",
+      "basis": "persisted",
+      "laterRevisions": 1
+    },
+    "integrity": "valid",
+    "findings": [
+      {
+        "rule": "trailer",
+        "verdict": "permitted",
+        "objectNumber": 0
+      },
+      {
+        "rule": "annotation",
+        "verdict": "permitted",
+        "objectNumber": 6,
+        "detail": "page /Annots changed"
+      }
+    ]
+  },
+  {
+    "runtime": "wasm",
+    "id": "fieldmdp-indirect-array-control",
+    "profile": "fieldmdp",
+    "layout": "indirect-array",
+    "action": "control",
+    "policyVersion": 4,
+    "weakCount": 4,
+    "verdict": {
+      "verdict": "unchanged",
+      "basis": "persisted"
+    },
+    "integrity": "valid",
+    "findings": []
+  },
+  {
+    "runtime": "wasm",
+    "id": "fieldmdp-indirect-array-delete",
+    "profile": "fieldmdp",
+    "layout": "indirect-array",
+    "action": "delete",
+    "policyVersion": 4,
+    "weakCount": 3,
+    "verdict": {
+      "verdict": "forbidden",
+      "detail": "object 22, unexplained: was referenced from object 6 at Annots and no rule explains it",
+      "basis": "persisted",
+      "laterRevisions": 1
+    },
+    "integrity": "valid",
+    "findings": [
+      {
+        "rule": "trailer",
+        "verdict": "permitted",
+        "objectNumber": 0
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 22,
+        "edge": "6:Annots",
+        "detail": "was referenced from object 6 at Annots and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 22,
+        "edge": "6:Annots",
+        "detail": "is referenced from object 6 at Annots and no rule explains it"
+      }
+    ]
+  },
+  {
+    "runtime": "wasm",
+    "id": "fieldmdp-indirect-array-delete-names",
+    "profile": "fieldmdp",
+    "layout": "indirect-array",
+    "action": "delete-names",
+    "policyVersion": 4,
+    "weakCount": 0,
+    "verdict": {
+      "verdict": "forbidden",
+      "detail": "object 22, unexplained: was referenced from object 6 at Annots and no rule explains it",
+      "basis": "persisted",
+      "laterRevisions": 1
+    },
+    "integrity": "valid",
+    "findings": [
+      {
+        "rule": "trailer",
+        "verdict": "permitted",
+        "objectNumber": 0
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 22,
+        "edge": "6:Annots",
+        "detail": "was referenced from object 6 at Annots and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 22,
+        "edge": "6:Annots",
+        "detail": "is referenced from object 6 at Annots and no rule explains it"
+      }
+    ]
+  },
+  {
+    "runtime": "wasm",
+    "id": "fieldmdp-indirect-array-names",
+    "profile": "fieldmdp",
+    "layout": "indirect-array",
+    "action": "names",
+    "policyVersion": 4,
+    "weakCount": 0,
+    "verdict": {
+      "verdict": "forbidden",
+      "detail": "object 22, unexplained: was referenced from object 6 at Annots and no rule explains it",
+      "basis": "persisted",
+      "laterRevisions": 1
+    },
+    "integrity": "valid",
+    "findings": [
+      {
+        "rule": "trailer",
+        "verdict": "permitted",
+        "objectNumber": 0
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 22,
+        "edge": "6:Annots",
+        "detail": "was referenced from object 6 at Annots and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 22,
+        "edge": "6:Annots",
+        "detail": "is referenced from object 6 at Annots and no rule explains it"
+      }
+    ]
+  },
+  {
+    "runtime": "wasm",
+    "id": "fieldmdp-indirect-array-reorder",
+    "profile": "fieldmdp",
+    "layout": "indirect-array",
+    "action": "reorder",
+    "policyVersion": 4,
+    "weakCount": 4,
+    "verdict": {
+      "verdict": "forbidden",
+      "detail": "object 22, unexplained: was referenced from object 6 at Annots and no rule explains it",
+      "basis": "persisted",
+      "laterRevisions": 1
+    },
+    "integrity": "valid",
+    "findings": [
+      {
+        "rule": "trailer",
+        "verdict": "permitted",
+        "objectNumber": 0
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 22,
+        "edge": "6:Annots",
+        "detail": "was referenced from object 6 at Annots and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 22,
+        "edge": "6:Annots",
+        "detail": "is referenced from object 6 at Annots and no rule explains it"
+      }
+    ]
+  },
+  {
+    "runtime": "wasm",
+    "id": "fieldmdp-indirect-array-reorder-names",
+    "profile": "fieldmdp",
+    "layout": "indirect-array",
+    "action": "reorder-names",
+    "policyVersion": 4,
+    "weakCount": 0,
+    "verdict": {
+      "verdict": "forbidden",
+      "detail": "object 22, unexplained: was referenced from object 6 at Annots and no rule explains it",
+      "basis": "persisted",
+      "laterRevisions": 1
+    },
+    "integrity": "valid",
+    "findings": [
+      {
+        "rule": "trailer",
+        "verdict": "permitted",
+        "objectNumber": 0
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 22,
+        "edge": "6:Annots",
+        "detail": "was referenced from object 6 at Annots and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 22,
+        "edge": "6:Annots",
+        "detail": "is referenced from object 6 at Annots and no rule explains it"
+      }
+    ]
+  },
+  {
+    "runtime": "wasm",
+    "id": "lockp2-inline-control",
+    "profile": "lockp2",
+    "layout": "inline",
+    "action": "control",
+    "policyVersion": 4,
+    "weakCount": 4,
+    "verdict": {
+      "verdict": "unchanged",
+      "basis": "persisted"
+    },
+    "integrity": "valid",
+    "findings": []
+  },
+  {
+    "runtime": "wasm",
+    "id": "lockp2-inline-delete",
+    "profile": "lockp2",
+    "layout": "inline",
+    "action": "delete",
+    "policyVersion": 4,
+    "weakCount": 3,
+    "verdict": {
+      "verdict": "forbidden",
+      "detail": "object 6, unexplained: was referenced from object 3 at Kids/[0] and no rule explains it",
+      "basis": "persisted",
+      "laterRevisions": 1
+    },
+    "integrity": "valid",
+    "findings": [
+      {
+        "rule": "trailer",
+        "verdict": "permitted",
+        "objectNumber": 0
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "3:Kids/[0]",
+        "detail": "was referenced from object 3 at Kids/[0] and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "15:P",
+        "detail": "was referenced from object 15 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "13:P",
+        "detail": "was referenced from object 13 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "10:P",
+        "detail": "was referenced from object 10 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "8:P",
+        "detail": "was referenced from object 8 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "3:Kids/[0]",
+        "detail": "is referenced from object 3 at Kids/[0] and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "15:P",
+        "detail": "is referenced from object 15 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "13:P",
+        "detail": "is referenced from object 13 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "10:P",
+        "detail": "is referenced from object 10 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "8:P",
+        "detail": "is referenced from object 8 at P and no rule explains it"
+      }
+    ]
+  },
+  {
+    "runtime": "wasm",
+    "id": "lockp2-inline-delete-names",
+    "profile": "lockp2",
+    "layout": "inline",
+    "action": "delete-names",
+    "policyVersion": 4,
+    "weakCount": 0,
+    "verdict": {
+      "verdict": "forbidden",
+      "detail": "object 6, unexplained: was referenced from object 3 at Kids/[0] and no rule explains it",
+      "basis": "persisted",
+      "laterRevisions": 1
+    },
+    "integrity": "valid",
+    "findings": [
+      {
+        "rule": "trailer",
+        "verdict": "permitted",
+        "objectNumber": 0
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "3:Kids/[0]",
+        "detail": "was referenced from object 3 at Kids/[0] and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "15:P",
+        "detail": "was referenced from object 15 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "13:P",
+        "detail": "was referenced from object 13 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "10:P",
+        "detail": "was referenced from object 10 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "8:P",
+        "detail": "was referenced from object 8 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "3:Kids/[0]",
+        "detail": "is referenced from object 3 at Kids/[0] and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "15:P",
+        "detail": "is referenced from object 15 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "13:P",
+        "detail": "is referenced from object 13 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "10:P",
+        "detail": "is referenced from object 10 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "8:P",
+        "detail": "is referenced from object 8 at P and no rule explains it"
+      }
+    ]
+  },
+  {
+    "runtime": "wasm",
+    "id": "lockp2-inline-names",
+    "profile": "lockp2",
+    "layout": "inline",
+    "action": "names",
+    "policyVersion": 4,
+    "weakCount": 0,
+    "verdict": {
+      "verdict": "forbidden",
+      "detail": "object 6, unexplained: was referenced from object 3 at Kids/[0] and no rule explains it",
+      "basis": "persisted",
+      "laterRevisions": 1
+    },
+    "integrity": "valid",
+    "findings": [
+      {
+        "rule": "trailer",
+        "verdict": "permitted",
+        "objectNumber": 0
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "3:Kids/[0]",
+        "detail": "was referenced from object 3 at Kids/[0] and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "15:P",
+        "detail": "was referenced from object 15 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "13:P",
+        "detail": "was referenced from object 13 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "10:P",
+        "detail": "was referenced from object 10 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "8:P",
+        "detail": "was referenced from object 8 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "3:Kids/[0]",
+        "detail": "is referenced from object 3 at Kids/[0] and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "15:P",
+        "detail": "is referenced from object 15 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "13:P",
+        "detail": "is referenced from object 13 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "10:P",
+        "detail": "is referenced from object 10 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "8:P",
+        "detail": "is referenced from object 8 at P and no rule explains it"
+      }
+    ]
+  },
+  {
+    "runtime": "wasm",
+    "id": "lockp2-inline-reorder",
+    "profile": "lockp2",
+    "layout": "inline",
+    "action": "reorder",
+    "policyVersion": 4,
+    "weakCount": 4,
+    "verdict": {
+      "verdict": "forbidden",
+      "detail": "object 6, unexplained: was referenced from object 3 at Kids/[0] and no rule explains it",
+      "basis": "persisted",
+      "laterRevisions": 1
+    },
+    "integrity": "valid",
+    "findings": [
+      {
+        "rule": "trailer",
+        "verdict": "permitted",
+        "objectNumber": 0
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "3:Kids/[0]",
+        "detail": "was referenced from object 3 at Kids/[0] and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "15:P",
+        "detail": "was referenced from object 15 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "13:P",
+        "detail": "was referenced from object 13 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "10:P",
+        "detail": "was referenced from object 10 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "8:P",
+        "detail": "was referenced from object 8 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "3:Kids/[0]",
+        "detail": "is referenced from object 3 at Kids/[0] and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "15:P",
+        "detail": "is referenced from object 15 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "13:P",
+        "detail": "is referenced from object 13 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "10:P",
+        "detail": "is referenced from object 10 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "8:P",
+        "detail": "is referenced from object 8 at P and no rule explains it"
+      }
+    ]
+  },
+  {
+    "runtime": "wasm",
+    "id": "lockp2-inline-reorder-names",
+    "profile": "lockp2",
+    "layout": "inline",
+    "action": "reorder-names",
+    "policyVersion": 4,
+    "weakCount": 0,
+    "verdict": {
+      "verdict": "forbidden",
+      "detail": "object 6, unexplained: was referenced from object 3 at Kids/[0] and no rule explains it",
+      "basis": "persisted",
+      "laterRevisions": 1
+    },
+    "integrity": "valid",
+    "findings": [
+      {
+        "rule": "trailer",
+        "verdict": "permitted",
+        "objectNumber": 0
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "3:Kids/[0]",
+        "detail": "was referenced from object 3 at Kids/[0] and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "15:P",
+        "detail": "was referenced from object 15 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "13:P",
+        "detail": "was referenced from object 13 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "10:P",
+        "detail": "was referenced from object 10 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "8:P",
+        "detail": "was referenced from object 8 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "3:Kids/[0]",
+        "detail": "is referenced from object 3 at Kids/[0] and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "15:P",
+        "detail": "is referenced from object 15 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "13:P",
+        "detail": "is referenced from object 13 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "10:P",
+        "detail": "is referenced from object 10 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "8:P",
+        "detail": "is referenced from object 8 at P and no rule explains it"
+      }
+    ]
+  },
+  {
+    "runtime": "wasm",
+    "id": "lockp2-indirect-array-control",
+    "profile": "lockp2",
+    "layout": "indirect-array",
+    "action": "control",
+    "policyVersion": 4,
+    "weakCount": 4,
+    "verdict": {
+      "verdict": "unchanged",
+      "basis": "persisted"
+    },
+    "integrity": "valid",
+    "findings": []
+  },
+  {
+    "runtime": "wasm",
+    "id": "lockp2-indirect-array-delete",
+    "profile": "lockp2",
+    "layout": "indirect-array",
+    "action": "delete",
+    "policyVersion": 4,
+    "weakCount": 3,
+    "verdict": {
+      "verdict": "forbidden",
+      "detail": "object 22, unexplained: was referenced from object 6 at Annots and no rule explains it",
+      "basis": "persisted",
+      "laterRevisions": 1
+    },
+    "integrity": "valid",
+    "findings": [
+      {
+        "rule": "trailer",
+        "verdict": "permitted",
+        "objectNumber": 0
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 22,
+        "edge": "6:Annots",
+        "detail": "was referenced from object 6 at Annots and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 22,
+        "edge": "6:Annots",
+        "detail": "is referenced from object 6 at Annots and no rule explains it"
+      }
+    ]
+  },
+  {
+    "runtime": "wasm",
+    "id": "lockp2-indirect-array-delete-names",
+    "profile": "lockp2",
+    "layout": "indirect-array",
+    "action": "delete-names",
+    "policyVersion": 4,
+    "weakCount": 0,
+    "verdict": {
+      "verdict": "forbidden",
+      "detail": "object 22, unexplained: was referenced from object 6 at Annots and no rule explains it",
+      "basis": "persisted",
+      "laterRevisions": 1
+    },
+    "integrity": "valid",
+    "findings": [
+      {
+        "rule": "trailer",
+        "verdict": "permitted",
+        "objectNumber": 0
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 22,
+        "edge": "6:Annots",
+        "detail": "was referenced from object 6 at Annots and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 22,
+        "edge": "6:Annots",
+        "detail": "is referenced from object 6 at Annots and no rule explains it"
+      }
+    ]
+  },
+  {
+    "runtime": "wasm",
+    "id": "lockp2-indirect-array-names",
+    "profile": "lockp2",
+    "layout": "indirect-array",
+    "action": "names",
+    "policyVersion": 4,
+    "weakCount": 0,
+    "verdict": {
+      "verdict": "forbidden",
+      "detail": "object 22, unexplained: was referenced from object 6 at Annots and no rule explains it",
+      "basis": "persisted",
+      "laterRevisions": 1
+    },
+    "integrity": "valid",
+    "findings": [
+      {
+        "rule": "trailer",
+        "verdict": "permitted",
+        "objectNumber": 0
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 22,
+        "edge": "6:Annots",
+        "detail": "was referenced from object 6 at Annots and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 22,
+        "edge": "6:Annots",
+        "detail": "is referenced from object 6 at Annots and no rule explains it"
+      }
+    ]
+  },
+  {
+    "runtime": "wasm",
+    "id": "lockp2-indirect-array-reorder",
+    "profile": "lockp2",
+    "layout": "indirect-array",
+    "action": "reorder",
+    "policyVersion": 4,
+    "weakCount": 4,
+    "verdict": {
+      "verdict": "forbidden",
+      "detail": "object 22, unexplained: was referenced from object 6 at Annots and no rule explains it",
+      "basis": "persisted",
+      "laterRevisions": 1
+    },
+    "integrity": "valid",
+    "findings": [
+      {
+        "rule": "trailer",
+        "verdict": "permitted",
+        "objectNumber": 0
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 22,
+        "edge": "6:Annots",
+        "detail": "was referenced from object 6 at Annots and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 22,
+        "edge": "6:Annots",
+        "detail": "is referenced from object 6 at Annots and no rule explains it"
+      }
+    ]
+  },
+  {
+    "runtime": "wasm",
+    "id": "lockp2-indirect-array-reorder-names",
+    "profile": "lockp2",
+    "layout": "indirect-array",
+    "action": "reorder-names",
+    "policyVersion": 4,
+    "weakCount": 0,
+    "verdict": {
+      "verdict": "forbidden",
+      "detail": "object 22, unexplained: was referenced from object 6 at Annots and no rule explains it",
+      "basis": "persisted",
+      "laterRevisions": 1
+    },
+    "integrity": "valid",
+    "findings": [
+      {
+        "rule": "trailer",
+        "verdict": "permitted",
+        "objectNumber": 0
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 22,
+        "edge": "6:Annots",
+        "detail": "was referenced from object 6 at Annots and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 22,
+        "edge": "6:Annots",
+        "detail": "is referenced from object 6 at Annots and no rule explains it"
+      }
+    ]
+  },
+  {
+    "runtime": "wasm",
+    "id": "locked-markup-inline-control",
+    "profile": "locked-markup",
+    "layout": "inline",
+    "action": "control",
+    "policyVersion": 4,
+    "weakCount": 4,
+    "verdict": {
+      "verdict": "unchanged",
+      "basis": "persisted"
+    },
+    "integrity": "valid",
+    "findings": []
+  },
+  {
+    "runtime": "wasm",
+    "id": "locked-markup-inline-delete",
+    "profile": "locked-markup",
+    "layout": "inline",
+    "action": "delete",
+    "policyVersion": 4,
+    "weakCount": 3,
+    "verdict": {
+      "verdict": "permitted",
+      "basis": "persisted",
+      "laterRevisions": 1
+    },
+    "integrity": "valid",
+    "findings": [
+      {
+        "rule": "trailer",
+        "verdict": "permitted",
+        "objectNumber": 0
+      },
+      {
+        "rule": "annotation",
+        "verdict": "permitted",
+        "objectNumber": 6,
+        "detail": "page /Annots changed"
+      }
+    ]
+  },
+  {
+    "runtime": "wasm",
+    "id": "locked-markup-inline-delete-names",
+    "profile": "locked-markup",
+    "layout": "inline",
+    "action": "delete-names",
+    "policyVersion": 4,
+    "weakCount": 1,
+    "verdict": {
+      "verdict": "permitted",
+      "basis": "persisted",
+      "laterRevisions": 1
+    },
+    "integrity": "valid",
+    "findings": [
+      {
+        "rule": "trailer",
+        "verdict": "permitted",
+        "objectNumber": 0
+      },
+      {
+        "rule": "annotation",
+        "verdict": "permitted",
+        "objectNumber": 6,
+        "detail": "page /Annots changed"
+      }
+    ]
+  },
+  {
+    "runtime": "wasm",
+    "id": "locked-markup-inline-names",
+    "profile": "locked-markup",
+    "layout": "inline",
+    "action": "names",
+    "policyVersion": 4,
+    "weakCount": 1,
+    "verdict": {
+      "verdict": "permitted",
+      "basis": "persisted",
+      "laterRevisions": 1
+    },
+    "integrity": "valid",
+    "findings": [
+      {
+        "rule": "trailer",
+        "verdict": "permitted",
+        "objectNumber": 0
+      },
+      {
+        "rule": "annotation",
+        "verdict": "permitted",
+        "objectNumber": 6,
+        "detail": "page /Annots changed"
+      }
+    ]
+  },
+  {
+    "runtime": "wasm",
+    "id": "locked-markup-inline-reorder",
+    "profile": "locked-markup",
+    "layout": "inline",
+    "action": "reorder",
+    "policyVersion": 4,
+    "weakCount": 4,
+    "verdict": {
+      "verdict": "permitted",
+      "basis": "persisted",
+      "laterRevisions": 1
+    },
+    "integrity": "valid",
+    "findings": [
+      {
+        "rule": "trailer",
+        "verdict": "permitted",
+        "objectNumber": 0
+      },
+      {
+        "rule": "annotation",
+        "verdict": "permitted",
+        "objectNumber": 6,
+        "detail": "page /Annots changed"
+      }
+    ]
+  },
+  {
+    "runtime": "wasm",
+    "id": "locked-markup-inline-reorder-names",
+    "profile": "locked-markup",
+    "layout": "inline",
+    "action": "reorder-names",
+    "policyVersion": 4,
+    "weakCount": 1,
+    "verdict": {
+      "verdict": "permitted",
+      "basis": "persisted",
+      "laterRevisions": 1
+    },
+    "integrity": "valid",
+    "findings": [
+      {
+        "rule": "trailer",
+        "verdict": "permitted",
+        "objectNumber": 0
+      },
+      {
+        "rule": "annotation",
+        "verdict": "permitted",
+        "objectNumber": 6,
+        "detail": "page /Annots changed"
+      }
+    ]
+  },
+  {
+    "runtime": "wasm",
+    "id": "locked-markup-indirect-array-control",
+    "profile": "locked-markup",
+    "layout": "indirect-array",
+    "action": "control",
+    "policyVersion": 4,
+    "weakCount": 4,
+    "verdict": {
+      "verdict": "unchanged",
+      "basis": "persisted"
+    },
+    "integrity": "valid",
+    "findings": []
+  },
+  {
+    "runtime": "wasm",
+    "id": "locked-markup-indirect-array-delete",
+    "profile": "locked-markup",
+    "layout": "indirect-array",
+    "action": "delete",
+    "policyVersion": 4,
+    "weakCount": 3,
+    "verdict": {
+      "verdict": "forbidden",
+      "detail": "object 22, unexplained: was referenced from object 6 at Annots and no rule explains it",
+      "basis": "persisted",
+      "laterRevisions": 1
+    },
+    "integrity": "valid",
+    "findings": [
+      {
+        "rule": "trailer",
+        "verdict": "permitted",
+        "objectNumber": 0
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 22,
+        "edge": "6:Annots",
+        "detail": "was referenced from object 6 at Annots and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 22,
+        "edge": "6:Annots",
+        "detail": "is referenced from object 6 at Annots and no rule explains it"
+      }
+    ]
+  },
+  {
+    "runtime": "wasm",
+    "id": "locked-markup-indirect-array-delete-names",
+    "profile": "locked-markup",
+    "layout": "indirect-array",
+    "action": "delete-names",
+    "policyVersion": 4,
+    "weakCount": 1,
+    "verdict": {
+      "verdict": "forbidden",
+      "detail": "object 22, unexplained: was referenced from object 6 at Annots and no rule explains it",
+      "basis": "persisted",
+      "laterRevisions": 1
+    },
+    "integrity": "valid",
+    "findings": [
+      {
+        "rule": "trailer",
+        "verdict": "permitted",
+        "objectNumber": 0
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 22,
+        "edge": "6:Annots",
+        "detail": "was referenced from object 6 at Annots and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 22,
+        "edge": "6:Annots",
+        "detail": "is referenced from object 6 at Annots and no rule explains it"
+      }
+    ]
+  },
+  {
+    "runtime": "wasm",
+    "id": "locked-markup-indirect-array-names",
+    "profile": "locked-markup",
+    "layout": "indirect-array",
+    "action": "names",
+    "policyVersion": 4,
+    "weakCount": 1,
+    "verdict": {
+      "verdict": "forbidden",
+      "detail": "object 22, unexplained: was referenced from object 6 at Annots and no rule explains it",
+      "basis": "persisted",
+      "laterRevisions": 1
+    },
+    "integrity": "valid",
+    "findings": [
+      {
+        "rule": "trailer",
+        "verdict": "permitted",
+        "objectNumber": 0
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 22,
+        "edge": "6:Annots",
+        "detail": "was referenced from object 6 at Annots and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 22,
+        "edge": "6:Annots",
+        "detail": "is referenced from object 6 at Annots and no rule explains it"
+      }
+    ]
+  },
+  {
+    "runtime": "wasm",
+    "id": "locked-markup-indirect-array-reorder",
+    "profile": "locked-markup",
+    "layout": "indirect-array",
+    "action": "reorder",
+    "policyVersion": 4,
+    "weakCount": 4,
+    "verdict": {
+      "verdict": "forbidden",
+      "detail": "object 22, unexplained: was referenced from object 6 at Annots and no rule explains it",
+      "basis": "persisted",
+      "laterRevisions": 1
+    },
+    "integrity": "valid",
+    "findings": [
+      {
+        "rule": "trailer",
+        "verdict": "permitted",
+        "objectNumber": 0
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 22,
+        "edge": "6:Annots",
+        "detail": "was referenced from object 6 at Annots and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 22,
+        "edge": "6:Annots",
+        "detail": "is referenced from object 6 at Annots and no rule explains it"
+      }
+    ]
+  },
+  {
+    "runtime": "wasm",
+    "id": "locked-markup-indirect-array-reorder-names",
+    "profile": "locked-markup",
+    "layout": "indirect-array",
+    "action": "reorder-names",
+    "policyVersion": 4,
+    "weakCount": 1,
+    "verdict": {
+      "verdict": "forbidden",
+      "detail": "object 22, unexplained: was referenced from object 6 at Annots and no rule explains it",
+      "basis": "persisted",
+      "laterRevisions": 1
+    },
+    "integrity": "valid",
+    "findings": [
+      {
+        "rule": "trailer",
+        "verdict": "permitted",
+        "objectNumber": 0
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 22,
+        "edge": "6:Annots",
+        "detail": "was referenced from object 6 at Annots and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 22,
+        "edge": "6:Annots",
+        "detail": "is referenced from object 6 at Annots and no rule explains it"
+      }
+    ]
+  },
+  {
+    "runtime": "native",
+    "id": "approval-inline-control",
+    "profile": "approval",
+    "layout": "inline",
+    "action": "control",
+    "policyVersion": 4,
+    "weakCount": 4,
+    "verdict": {
+      "verdict": "unchanged",
+      "basis": "persisted"
+    },
+    "integrity": "valid",
+    "findings": []
+  },
+  {
+    "runtime": "native",
+    "id": "approval-inline-delete",
+    "profile": "approval",
+    "layout": "inline",
+    "action": "delete",
+    "policyVersion": 4,
+    "weakCount": 3,
+    "verdict": {
+      "verdict": "permitted",
+      "basis": "persisted",
+      "laterRevisions": 1
+    },
+    "integrity": "valid",
+    "findings": [
+      {
+        "rule": "trailer",
+        "verdict": "permitted",
+        "objectNumber": 0
+      },
+      {
+        "rule": "annotation",
+        "verdict": "permitted",
+        "objectNumber": 6,
+        "detail": "page /Annots changed"
+      }
+    ]
+  },
+  {
+    "runtime": "native",
+    "id": "approval-inline-delete-names",
+    "profile": "approval",
+    "layout": "inline",
+    "action": "delete-names",
+    "policyVersion": 4,
+    "weakCount": 0,
+    "verdict": {
+      "verdict": "permitted",
+      "basis": "persisted",
+      "laterRevisions": 1
+    },
+    "integrity": "valid",
+    "findings": [
+      {
+        "rule": "trailer",
+        "verdict": "permitted",
+        "objectNumber": 0
+      },
+      {
+        "rule": "annotation",
+        "verdict": "permitted",
+        "objectNumber": 6,
+        "detail": "page /Annots changed"
+      }
+    ]
+  },
+  {
+    "runtime": "native",
+    "id": "approval-inline-names",
+    "profile": "approval",
+    "layout": "inline",
+    "action": "names",
+    "policyVersion": 4,
+    "weakCount": 0,
+    "verdict": {
+      "verdict": "permitted",
+      "basis": "persisted",
+      "laterRevisions": 1
+    },
+    "integrity": "valid",
+    "findings": [
+      {
+        "rule": "trailer",
+        "verdict": "permitted",
+        "objectNumber": 0
+      },
+      {
+        "rule": "annotation",
+        "verdict": "permitted",
+        "objectNumber": 6,
+        "detail": "page /Annots changed"
+      }
+    ]
+  },
+  {
+    "runtime": "native",
+    "id": "approval-inline-reorder",
+    "profile": "approval",
+    "layout": "inline",
+    "action": "reorder",
+    "policyVersion": 4,
+    "weakCount": 4,
+    "verdict": {
+      "verdict": "permitted",
+      "basis": "persisted",
+      "laterRevisions": 1
+    },
+    "integrity": "valid",
+    "findings": [
+      {
+        "rule": "trailer",
+        "verdict": "permitted",
+        "objectNumber": 0
+      },
+      {
+        "rule": "annotation",
+        "verdict": "permitted",
+        "objectNumber": 6,
+        "detail": "page /Annots changed"
+      }
+    ]
+  },
+  {
+    "runtime": "native",
+    "id": "approval-inline-reorder-names",
+    "profile": "approval",
+    "layout": "inline",
+    "action": "reorder-names",
+    "policyVersion": 4,
+    "weakCount": 0,
+    "verdict": {
+      "verdict": "permitted",
+      "basis": "persisted",
+      "laterRevisions": 1
+    },
+    "integrity": "valid",
+    "findings": [
+      {
+        "rule": "trailer",
+        "verdict": "permitted",
+        "objectNumber": 0
+      },
+      {
+        "rule": "annotation",
+        "verdict": "permitted",
+        "objectNumber": 6,
+        "detail": "page /Annots changed"
+      }
+    ]
+  },
+  {
+    "runtime": "native",
+    "id": "approval-indirect-array-control",
+    "profile": "approval",
+    "layout": "indirect-array",
+    "action": "control",
+    "policyVersion": 4,
+    "weakCount": 4,
+    "verdict": {
+      "verdict": "unchanged",
+      "basis": "persisted"
+    },
+    "integrity": "valid",
+    "findings": []
+  },
+  {
+    "runtime": "native",
+    "id": "approval-indirect-array-delete",
+    "profile": "approval",
+    "layout": "indirect-array",
+    "action": "delete",
+    "policyVersion": 4,
+    "weakCount": 3,
+    "verdict": {
+      "verdict": "forbidden",
+      "detail": "object 22, unexplained: was referenced from object 6 at Annots and no rule explains it",
+      "basis": "persisted",
+      "laterRevisions": 1
+    },
+    "integrity": "valid",
+    "findings": [
+      {
+        "rule": "trailer",
+        "verdict": "permitted",
+        "objectNumber": 0
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 22,
+        "edge": "6:Annots",
+        "detail": "was referenced from object 6 at Annots and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 22,
+        "edge": "6:Annots",
+        "detail": "is referenced from object 6 at Annots and no rule explains it"
+      }
+    ]
+  },
+  {
+    "runtime": "native",
+    "id": "approval-indirect-array-delete-names",
+    "profile": "approval",
+    "layout": "indirect-array",
+    "action": "delete-names",
+    "policyVersion": 4,
+    "weakCount": 0,
+    "verdict": {
+      "verdict": "forbidden",
+      "detail": "object 22, unexplained: was referenced from object 6 at Annots and no rule explains it",
+      "basis": "persisted",
+      "laterRevisions": 1
+    },
+    "integrity": "valid",
+    "findings": [
+      {
+        "rule": "trailer",
+        "verdict": "permitted",
+        "objectNumber": 0
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 22,
+        "edge": "6:Annots",
+        "detail": "was referenced from object 6 at Annots and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 22,
+        "edge": "6:Annots",
+        "detail": "is referenced from object 6 at Annots and no rule explains it"
+      }
+    ]
+  },
+  {
+    "runtime": "native",
+    "id": "approval-indirect-array-names",
+    "profile": "approval",
+    "layout": "indirect-array",
+    "action": "names",
+    "policyVersion": 4,
+    "weakCount": 0,
+    "verdict": {
+      "verdict": "forbidden",
+      "detail": "object 22, unexplained: was referenced from object 6 at Annots and no rule explains it",
+      "basis": "persisted",
+      "laterRevisions": 1
+    },
+    "integrity": "valid",
+    "findings": [
+      {
+        "rule": "trailer",
+        "verdict": "permitted",
+        "objectNumber": 0
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 22,
+        "edge": "6:Annots",
+        "detail": "was referenced from object 6 at Annots and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 22,
+        "edge": "6:Annots",
+        "detail": "is referenced from object 6 at Annots and no rule explains it"
+      }
+    ]
+  },
+  {
+    "runtime": "native",
+    "id": "approval-indirect-array-reorder",
+    "profile": "approval",
+    "layout": "indirect-array",
+    "action": "reorder",
+    "policyVersion": 4,
+    "weakCount": 4,
+    "verdict": {
+      "verdict": "forbidden",
+      "detail": "object 22, unexplained: was referenced from object 6 at Annots and no rule explains it",
+      "basis": "persisted",
+      "laterRevisions": 1
+    },
+    "integrity": "valid",
+    "findings": [
+      {
+        "rule": "trailer",
+        "verdict": "permitted",
+        "objectNumber": 0
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 22,
+        "edge": "6:Annots",
+        "detail": "was referenced from object 6 at Annots and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 22,
+        "edge": "6:Annots",
+        "detail": "is referenced from object 6 at Annots and no rule explains it"
+      }
+    ]
+  },
+  {
+    "runtime": "native",
+    "id": "approval-indirect-array-reorder-names",
+    "profile": "approval",
+    "layout": "indirect-array",
+    "action": "reorder-names",
+    "policyVersion": 4,
+    "weakCount": 0,
+    "verdict": {
+      "verdict": "forbidden",
+      "detail": "object 22, unexplained: was referenced from object 6 at Annots and no rule explains it",
+      "basis": "persisted",
+      "laterRevisions": 1
+    },
+    "integrity": "valid",
+    "findings": [
+      {
+        "rule": "trailer",
+        "verdict": "permitted",
+        "objectNumber": 0
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 22,
+        "edge": "6:Annots",
+        "detail": "was referenced from object 6 at Annots and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 22,
+        "edge": "6:Annots",
+        "detail": "is referenced from object 6 at Annots and no rule explains it"
+      }
+    ]
+  },
+  {
+    "runtime": "native",
+    "id": "p3-inline-control",
+    "profile": "p3",
+    "layout": "inline",
+    "action": "control",
+    "policyVersion": 4,
+    "weakCount": 4,
+    "verdict": {
+      "verdict": "unchanged",
+      "basis": "persisted"
+    },
+    "integrity": "valid",
+    "findings": []
+  },
+  {
+    "runtime": "native",
+    "id": "p3-inline-delete",
+    "profile": "p3",
+    "layout": "inline",
+    "action": "delete",
+    "policyVersion": 4,
+    "weakCount": 3,
+    "verdict": {
+      "verdict": "permitted",
+      "basis": "persisted",
+      "laterRevisions": 1
+    },
+    "integrity": "valid",
+    "findings": [
+      {
+        "rule": "trailer",
+        "verdict": "permitted",
+        "objectNumber": 0
+      },
+      {
+        "rule": "annotation",
+        "verdict": "permitted",
+        "objectNumber": 6,
+        "detail": "page /Annots changed"
+      }
+    ]
+  },
+  {
+    "runtime": "native",
+    "id": "p3-inline-delete-names",
+    "profile": "p3",
+    "layout": "inline",
+    "action": "delete-names",
+    "policyVersion": 4,
+    "weakCount": 0,
+    "verdict": {
+      "verdict": "permitted",
+      "basis": "persisted",
+      "laterRevisions": 1
+    },
+    "integrity": "valid",
+    "findings": [
+      {
+        "rule": "trailer",
+        "verdict": "permitted",
+        "objectNumber": 0
+      },
+      {
+        "rule": "annotation",
+        "verdict": "permitted",
+        "objectNumber": 6,
+        "detail": "page /Annots changed"
+      }
+    ]
+  },
+  {
+    "runtime": "native",
+    "id": "p3-inline-names",
+    "profile": "p3",
+    "layout": "inline",
+    "action": "names",
+    "policyVersion": 4,
+    "weakCount": 0,
+    "verdict": {
+      "verdict": "permitted",
+      "basis": "persisted",
+      "laterRevisions": 1
+    },
+    "integrity": "valid",
+    "findings": [
+      {
+        "rule": "trailer",
+        "verdict": "permitted",
+        "objectNumber": 0
+      },
+      {
+        "rule": "annotation",
+        "verdict": "permitted",
+        "objectNumber": 6,
+        "detail": "page /Annots changed"
+      }
+    ]
+  },
+  {
+    "runtime": "native",
+    "id": "p3-inline-reorder",
+    "profile": "p3",
+    "layout": "inline",
+    "action": "reorder",
+    "policyVersion": 4,
+    "weakCount": 4,
+    "verdict": {
+      "verdict": "permitted",
+      "basis": "persisted",
+      "laterRevisions": 1
+    },
+    "integrity": "valid",
+    "findings": [
+      {
+        "rule": "trailer",
+        "verdict": "permitted",
+        "objectNumber": 0
+      },
+      {
+        "rule": "annotation",
+        "verdict": "permitted",
+        "objectNumber": 6,
+        "detail": "page /Annots changed"
+      }
+    ]
+  },
+  {
+    "runtime": "native",
+    "id": "p3-inline-reorder-names",
+    "profile": "p3",
+    "layout": "inline",
+    "action": "reorder-names",
+    "policyVersion": 4,
+    "weakCount": 0,
+    "verdict": {
+      "verdict": "permitted",
+      "basis": "persisted",
+      "laterRevisions": 1
+    },
+    "integrity": "valid",
+    "findings": [
+      {
+        "rule": "trailer",
+        "verdict": "permitted",
+        "objectNumber": 0
+      },
+      {
+        "rule": "annotation",
+        "verdict": "permitted",
+        "objectNumber": 6,
+        "detail": "page /Annots changed"
+      }
+    ]
+  },
+  {
+    "runtime": "native",
+    "id": "p3-indirect-array-control",
+    "profile": "p3",
+    "layout": "indirect-array",
+    "action": "control",
+    "policyVersion": 4,
+    "weakCount": 4,
+    "verdict": {
+      "verdict": "unchanged",
+      "basis": "persisted"
+    },
+    "integrity": "valid",
+    "findings": []
+  },
+  {
+    "runtime": "native",
+    "id": "p3-indirect-array-delete",
+    "profile": "p3",
+    "layout": "indirect-array",
+    "action": "delete",
+    "policyVersion": 4,
+    "weakCount": 3,
+    "verdict": {
+      "verdict": "forbidden",
+      "detail": "object 22, unexplained: was referenced from object 6 at Annots and no rule explains it",
+      "basis": "persisted",
+      "laterRevisions": 1
+    },
+    "integrity": "valid",
+    "findings": [
+      {
+        "rule": "trailer",
+        "verdict": "permitted",
+        "objectNumber": 0
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 22,
+        "edge": "6:Annots",
+        "detail": "was referenced from object 6 at Annots and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 22,
+        "edge": "6:Annots",
+        "detail": "is referenced from object 6 at Annots and no rule explains it"
+      }
+    ]
+  },
+  {
+    "runtime": "native",
+    "id": "p3-indirect-array-delete-names",
+    "profile": "p3",
+    "layout": "indirect-array",
+    "action": "delete-names",
+    "policyVersion": 4,
+    "weakCount": 0,
+    "verdict": {
+      "verdict": "forbidden",
+      "detail": "object 22, unexplained: was referenced from object 6 at Annots and no rule explains it",
+      "basis": "persisted",
+      "laterRevisions": 1
+    },
+    "integrity": "valid",
+    "findings": [
+      {
+        "rule": "trailer",
+        "verdict": "permitted",
+        "objectNumber": 0
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 22,
+        "edge": "6:Annots",
+        "detail": "was referenced from object 6 at Annots and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 22,
+        "edge": "6:Annots",
+        "detail": "is referenced from object 6 at Annots and no rule explains it"
+      }
+    ]
+  },
+  {
+    "runtime": "native",
+    "id": "p3-indirect-array-names",
+    "profile": "p3",
+    "layout": "indirect-array",
+    "action": "names",
+    "policyVersion": 4,
+    "weakCount": 0,
+    "verdict": {
+      "verdict": "forbidden",
+      "detail": "object 22, unexplained: was referenced from object 6 at Annots and no rule explains it",
+      "basis": "persisted",
+      "laterRevisions": 1
+    },
+    "integrity": "valid",
+    "findings": [
+      {
+        "rule": "trailer",
+        "verdict": "permitted",
+        "objectNumber": 0
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 22,
+        "edge": "6:Annots",
+        "detail": "was referenced from object 6 at Annots and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 22,
+        "edge": "6:Annots",
+        "detail": "is referenced from object 6 at Annots and no rule explains it"
+      }
+    ]
+  },
+  {
+    "runtime": "native",
+    "id": "p3-indirect-array-reorder",
+    "profile": "p3",
+    "layout": "indirect-array",
+    "action": "reorder",
+    "policyVersion": 4,
+    "weakCount": 4,
+    "verdict": {
+      "verdict": "forbidden",
+      "detail": "object 22, unexplained: was referenced from object 6 at Annots and no rule explains it",
+      "basis": "persisted",
+      "laterRevisions": 1
+    },
+    "integrity": "valid",
+    "findings": [
+      {
+        "rule": "trailer",
+        "verdict": "permitted",
+        "objectNumber": 0
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 22,
+        "edge": "6:Annots",
+        "detail": "was referenced from object 6 at Annots and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 22,
+        "edge": "6:Annots",
+        "detail": "is referenced from object 6 at Annots and no rule explains it"
+      }
+    ]
+  },
+  {
+    "runtime": "native",
+    "id": "p3-indirect-array-reorder-names",
+    "profile": "p3",
+    "layout": "indirect-array",
+    "action": "reorder-names",
+    "policyVersion": 4,
+    "weakCount": 0,
+    "verdict": {
+      "verdict": "forbidden",
+      "detail": "object 22, unexplained: was referenced from object 6 at Annots and no rule explains it",
+      "basis": "persisted",
+      "laterRevisions": 1
+    },
+    "integrity": "valid",
+    "findings": [
+      {
+        "rule": "trailer",
+        "verdict": "permitted",
+        "objectNumber": 0
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 22,
+        "edge": "6:Annots",
+        "detail": "was referenced from object 6 at Annots and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 22,
+        "edge": "6:Annots",
+        "detail": "is referenced from object 6 at Annots and no rule explains it"
+      }
+    ]
+  },
+  {
+    "runtime": "native",
+    "id": "p2-inline-control",
+    "profile": "p2",
+    "layout": "inline",
+    "action": "control",
+    "policyVersion": 4,
+    "weakCount": 4,
+    "verdict": {
+      "verdict": "unchanged",
+      "basis": "persisted"
+    },
+    "integrity": "valid",
+    "findings": []
+  },
+  {
+    "runtime": "native",
+    "id": "p2-inline-delete",
+    "profile": "p2",
+    "layout": "inline",
+    "action": "delete",
+    "policyVersion": 4,
+    "weakCount": 3,
+    "verdict": {
+      "verdict": "forbidden",
+      "detail": "object 6, unexplained: was referenced from object 3 at Kids/[0] and no rule explains it",
+      "basis": "persisted",
+      "laterRevisions": 1
+    },
+    "integrity": "valid",
+    "findings": [
+      {
+        "rule": "trailer",
+        "verdict": "permitted",
+        "objectNumber": 0
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "3:Kids/[0]",
+        "detail": "was referenced from object 3 at Kids/[0] and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "15:P",
+        "detail": "was referenced from object 15 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "13:P",
+        "detail": "was referenced from object 13 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "10:P",
+        "detail": "was referenced from object 10 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "8:P",
+        "detail": "was referenced from object 8 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "3:Kids/[0]",
+        "detail": "is referenced from object 3 at Kids/[0] and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "15:P",
+        "detail": "is referenced from object 15 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "13:P",
+        "detail": "is referenced from object 13 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "10:P",
+        "detail": "is referenced from object 10 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "8:P",
+        "detail": "is referenced from object 8 at P and no rule explains it"
+      }
+    ]
+  },
+  {
+    "runtime": "native",
+    "id": "p2-inline-delete-names",
+    "profile": "p2",
+    "layout": "inline",
+    "action": "delete-names",
+    "policyVersion": 4,
+    "weakCount": 0,
+    "verdict": {
+      "verdict": "forbidden",
+      "detail": "object 6, unexplained: was referenced from object 3 at Kids/[0] and no rule explains it",
+      "basis": "persisted",
+      "laterRevisions": 1
+    },
+    "integrity": "valid",
+    "findings": [
+      {
+        "rule": "trailer",
+        "verdict": "permitted",
+        "objectNumber": 0
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "3:Kids/[0]",
+        "detail": "was referenced from object 3 at Kids/[0] and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "15:P",
+        "detail": "was referenced from object 15 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "13:P",
+        "detail": "was referenced from object 13 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "10:P",
+        "detail": "was referenced from object 10 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "8:P",
+        "detail": "was referenced from object 8 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "3:Kids/[0]",
+        "detail": "is referenced from object 3 at Kids/[0] and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "15:P",
+        "detail": "is referenced from object 15 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "13:P",
+        "detail": "is referenced from object 13 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "10:P",
+        "detail": "is referenced from object 10 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "8:P",
+        "detail": "is referenced from object 8 at P and no rule explains it"
+      }
+    ]
+  },
+  {
+    "runtime": "native",
+    "id": "p2-inline-names",
+    "profile": "p2",
+    "layout": "inline",
+    "action": "names",
+    "policyVersion": 4,
+    "weakCount": 0,
+    "verdict": {
+      "verdict": "forbidden",
+      "detail": "object 6, unexplained: was referenced from object 3 at Kids/[0] and no rule explains it",
+      "basis": "persisted",
+      "laterRevisions": 1
+    },
+    "integrity": "valid",
+    "findings": [
+      {
+        "rule": "trailer",
+        "verdict": "permitted",
+        "objectNumber": 0
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "3:Kids/[0]",
+        "detail": "was referenced from object 3 at Kids/[0] and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "15:P",
+        "detail": "was referenced from object 15 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "13:P",
+        "detail": "was referenced from object 13 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "10:P",
+        "detail": "was referenced from object 10 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "8:P",
+        "detail": "was referenced from object 8 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "3:Kids/[0]",
+        "detail": "is referenced from object 3 at Kids/[0] and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "15:P",
+        "detail": "is referenced from object 15 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "13:P",
+        "detail": "is referenced from object 13 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "10:P",
+        "detail": "is referenced from object 10 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "8:P",
+        "detail": "is referenced from object 8 at P and no rule explains it"
+      }
+    ]
+  },
+  {
+    "runtime": "native",
+    "id": "p2-inline-reorder",
+    "profile": "p2",
+    "layout": "inline",
+    "action": "reorder",
+    "policyVersion": 4,
+    "weakCount": 4,
+    "verdict": {
+      "verdict": "forbidden",
+      "detail": "object 6, unexplained: was referenced from object 3 at Kids/[0] and no rule explains it",
+      "basis": "persisted",
+      "laterRevisions": 1
+    },
+    "integrity": "valid",
+    "findings": [
+      {
+        "rule": "trailer",
+        "verdict": "permitted",
+        "objectNumber": 0
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "3:Kids/[0]",
+        "detail": "was referenced from object 3 at Kids/[0] and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "15:P",
+        "detail": "was referenced from object 15 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "13:P",
+        "detail": "was referenced from object 13 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "10:P",
+        "detail": "was referenced from object 10 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "8:P",
+        "detail": "was referenced from object 8 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "3:Kids/[0]",
+        "detail": "is referenced from object 3 at Kids/[0] and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "15:P",
+        "detail": "is referenced from object 15 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "13:P",
+        "detail": "is referenced from object 13 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "10:P",
+        "detail": "is referenced from object 10 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "8:P",
+        "detail": "is referenced from object 8 at P and no rule explains it"
+      }
+    ]
+  },
+  {
+    "runtime": "native",
+    "id": "p2-inline-reorder-names",
+    "profile": "p2",
+    "layout": "inline",
+    "action": "reorder-names",
+    "policyVersion": 4,
+    "weakCount": 0,
+    "verdict": {
+      "verdict": "forbidden",
+      "detail": "object 6, unexplained: was referenced from object 3 at Kids/[0] and no rule explains it",
+      "basis": "persisted",
+      "laterRevisions": 1
+    },
+    "integrity": "valid",
+    "findings": [
+      {
+        "rule": "trailer",
+        "verdict": "permitted",
+        "objectNumber": 0
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "3:Kids/[0]",
+        "detail": "was referenced from object 3 at Kids/[0] and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "15:P",
+        "detail": "was referenced from object 15 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "13:P",
+        "detail": "was referenced from object 13 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "10:P",
+        "detail": "was referenced from object 10 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "8:P",
+        "detail": "was referenced from object 8 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "3:Kids/[0]",
+        "detail": "is referenced from object 3 at Kids/[0] and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "15:P",
+        "detail": "is referenced from object 15 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "13:P",
+        "detail": "is referenced from object 13 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "10:P",
+        "detail": "is referenced from object 10 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "8:P",
+        "detail": "is referenced from object 8 at P and no rule explains it"
+      }
+    ]
+  },
+  {
+    "runtime": "native",
+    "id": "p2-indirect-array-control",
+    "profile": "p2",
+    "layout": "indirect-array",
+    "action": "control",
+    "policyVersion": 4,
+    "weakCount": 4,
+    "verdict": {
+      "verdict": "unchanged",
+      "basis": "persisted"
+    },
+    "integrity": "valid",
+    "findings": []
+  },
+  {
+    "runtime": "native",
+    "id": "p2-indirect-array-delete",
+    "profile": "p2",
+    "layout": "indirect-array",
+    "action": "delete",
+    "policyVersion": 4,
+    "weakCount": 3,
+    "verdict": {
+      "verdict": "forbidden",
+      "detail": "object 22, unexplained: was referenced from object 6 at Annots and no rule explains it",
+      "basis": "persisted",
+      "laterRevisions": 1
+    },
+    "integrity": "valid",
+    "findings": [
+      {
+        "rule": "trailer",
+        "verdict": "permitted",
+        "objectNumber": 0
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 22,
+        "edge": "6:Annots",
+        "detail": "was referenced from object 6 at Annots and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 22,
+        "edge": "6:Annots",
+        "detail": "is referenced from object 6 at Annots and no rule explains it"
+      }
+    ]
+  },
+  {
+    "runtime": "native",
+    "id": "p2-indirect-array-delete-names",
+    "profile": "p2",
+    "layout": "indirect-array",
+    "action": "delete-names",
+    "policyVersion": 4,
+    "weakCount": 0,
+    "verdict": {
+      "verdict": "forbidden",
+      "detail": "object 22, unexplained: was referenced from object 6 at Annots and no rule explains it",
+      "basis": "persisted",
+      "laterRevisions": 1
+    },
+    "integrity": "valid",
+    "findings": [
+      {
+        "rule": "trailer",
+        "verdict": "permitted",
+        "objectNumber": 0
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 22,
+        "edge": "6:Annots",
+        "detail": "was referenced from object 6 at Annots and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 22,
+        "edge": "6:Annots",
+        "detail": "is referenced from object 6 at Annots and no rule explains it"
+      }
+    ]
+  },
+  {
+    "runtime": "native",
+    "id": "p2-indirect-array-names",
+    "profile": "p2",
+    "layout": "indirect-array",
+    "action": "names",
+    "policyVersion": 4,
+    "weakCount": 0,
+    "verdict": {
+      "verdict": "forbidden",
+      "detail": "object 22, unexplained: was referenced from object 6 at Annots and no rule explains it",
+      "basis": "persisted",
+      "laterRevisions": 1
+    },
+    "integrity": "valid",
+    "findings": [
+      {
+        "rule": "trailer",
+        "verdict": "permitted",
+        "objectNumber": 0
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 22,
+        "edge": "6:Annots",
+        "detail": "was referenced from object 6 at Annots and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 22,
+        "edge": "6:Annots",
+        "detail": "is referenced from object 6 at Annots and no rule explains it"
+      }
+    ]
+  },
+  {
+    "runtime": "native",
+    "id": "p2-indirect-array-reorder",
+    "profile": "p2",
+    "layout": "indirect-array",
+    "action": "reorder",
+    "policyVersion": 4,
+    "weakCount": 4,
+    "verdict": {
+      "verdict": "forbidden",
+      "detail": "object 22, unexplained: was referenced from object 6 at Annots and no rule explains it",
+      "basis": "persisted",
+      "laterRevisions": 1
+    },
+    "integrity": "valid",
+    "findings": [
+      {
+        "rule": "trailer",
+        "verdict": "permitted",
+        "objectNumber": 0
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 22,
+        "edge": "6:Annots",
+        "detail": "was referenced from object 6 at Annots and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 22,
+        "edge": "6:Annots",
+        "detail": "is referenced from object 6 at Annots and no rule explains it"
+      }
+    ]
+  },
+  {
+    "runtime": "native",
+    "id": "p2-indirect-array-reorder-names",
+    "profile": "p2",
+    "layout": "indirect-array",
+    "action": "reorder-names",
+    "policyVersion": 4,
+    "weakCount": 0,
+    "verdict": {
+      "verdict": "forbidden",
+      "detail": "object 22, unexplained: was referenced from object 6 at Annots and no rule explains it",
+      "basis": "persisted",
+      "laterRevisions": 1
+    },
+    "integrity": "valid",
+    "findings": [
+      {
+        "rule": "trailer",
+        "verdict": "permitted",
+        "objectNumber": 0
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 22,
+        "edge": "6:Annots",
+        "detail": "was referenced from object 6 at Annots and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 22,
+        "edge": "6:Annots",
+        "detail": "is referenced from object 6 at Annots and no rule explains it"
+      }
+    ]
+  },
+  {
+    "runtime": "native",
+    "id": "fieldmdp-inline-control",
+    "profile": "fieldmdp",
+    "layout": "inline",
+    "action": "control",
+    "policyVersion": 4,
+    "weakCount": 4,
+    "verdict": {
+      "verdict": "unchanged",
+      "basis": "persisted"
+    },
+    "integrity": "valid",
+    "findings": []
+  },
+  {
+    "runtime": "native",
+    "id": "fieldmdp-inline-delete",
+    "profile": "fieldmdp",
+    "layout": "inline",
+    "action": "delete",
+    "policyVersion": 4,
+    "weakCount": 3,
+    "verdict": {
+      "verdict": "permitted",
+      "basis": "persisted",
+      "laterRevisions": 1
+    },
+    "integrity": "valid",
+    "findings": [
+      {
+        "rule": "trailer",
+        "verdict": "permitted",
+        "objectNumber": 0
+      },
+      {
+        "rule": "annotation",
+        "verdict": "permitted",
+        "objectNumber": 6,
+        "detail": "page /Annots changed"
+      }
+    ]
+  },
+  {
+    "runtime": "native",
+    "id": "fieldmdp-inline-delete-names",
+    "profile": "fieldmdp",
+    "layout": "inline",
+    "action": "delete-names",
+    "policyVersion": 4,
+    "weakCount": 0,
+    "verdict": {
+      "verdict": "permitted",
+      "basis": "persisted",
+      "laterRevisions": 1
+    },
+    "integrity": "valid",
+    "findings": [
+      {
+        "rule": "trailer",
+        "verdict": "permitted",
+        "objectNumber": 0
+      },
+      {
+        "rule": "annotation",
+        "verdict": "permitted",
+        "objectNumber": 6,
+        "detail": "page /Annots changed"
+      }
+    ]
+  },
+  {
+    "runtime": "native",
+    "id": "fieldmdp-inline-names",
+    "profile": "fieldmdp",
+    "layout": "inline",
+    "action": "names",
+    "policyVersion": 4,
+    "weakCount": 0,
+    "verdict": {
+      "verdict": "permitted",
+      "basis": "persisted",
+      "laterRevisions": 1
+    },
+    "integrity": "valid",
+    "findings": [
+      {
+        "rule": "trailer",
+        "verdict": "permitted",
+        "objectNumber": 0
+      },
+      {
+        "rule": "annotation",
+        "verdict": "permitted",
+        "objectNumber": 6,
+        "detail": "page /Annots changed"
+      }
+    ]
+  },
+  {
+    "runtime": "native",
+    "id": "fieldmdp-inline-reorder",
+    "profile": "fieldmdp",
+    "layout": "inline",
+    "action": "reorder",
+    "policyVersion": 4,
+    "weakCount": 4,
+    "verdict": {
+      "verdict": "permitted",
+      "basis": "persisted",
+      "laterRevisions": 1
+    },
+    "integrity": "valid",
+    "findings": [
+      {
+        "rule": "trailer",
+        "verdict": "permitted",
+        "objectNumber": 0
+      },
+      {
+        "rule": "annotation",
+        "verdict": "permitted",
+        "objectNumber": 6,
+        "detail": "page /Annots changed"
+      }
+    ]
+  },
+  {
+    "runtime": "native",
+    "id": "fieldmdp-inline-reorder-names",
+    "profile": "fieldmdp",
+    "layout": "inline",
+    "action": "reorder-names",
+    "policyVersion": 4,
+    "weakCount": 0,
+    "verdict": {
+      "verdict": "permitted",
+      "basis": "persisted",
+      "laterRevisions": 1
+    },
+    "integrity": "valid",
+    "findings": [
+      {
+        "rule": "trailer",
+        "verdict": "permitted",
+        "objectNumber": 0
+      },
+      {
+        "rule": "annotation",
+        "verdict": "permitted",
+        "objectNumber": 6,
+        "detail": "page /Annots changed"
+      }
+    ]
+  },
+  {
+    "runtime": "native",
+    "id": "fieldmdp-indirect-array-control",
+    "profile": "fieldmdp",
+    "layout": "indirect-array",
+    "action": "control",
+    "policyVersion": 4,
+    "weakCount": 4,
+    "verdict": {
+      "verdict": "unchanged",
+      "basis": "persisted"
+    },
+    "integrity": "valid",
+    "findings": []
+  },
+  {
+    "runtime": "native",
+    "id": "fieldmdp-indirect-array-delete",
+    "profile": "fieldmdp",
+    "layout": "indirect-array",
+    "action": "delete",
+    "policyVersion": 4,
+    "weakCount": 3,
+    "verdict": {
+      "verdict": "forbidden",
+      "detail": "object 22, unexplained: was referenced from object 6 at Annots and no rule explains it",
+      "basis": "persisted",
+      "laterRevisions": 1
+    },
+    "integrity": "valid",
+    "findings": [
+      {
+        "rule": "trailer",
+        "verdict": "permitted",
+        "objectNumber": 0
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 22,
+        "edge": "6:Annots",
+        "detail": "was referenced from object 6 at Annots and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 22,
+        "edge": "6:Annots",
+        "detail": "is referenced from object 6 at Annots and no rule explains it"
+      }
+    ]
+  },
+  {
+    "runtime": "native",
+    "id": "fieldmdp-indirect-array-delete-names",
+    "profile": "fieldmdp",
+    "layout": "indirect-array",
+    "action": "delete-names",
+    "policyVersion": 4,
+    "weakCount": 0,
+    "verdict": {
+      "verdict": "forbidden",
+      "detail": "object 22, unexplained: was referenced from object 6 at Annots and no rule explains it",
+      "basis": "persisted",
+      "laterRevisions": 1
+    },
+    "integrity": "valid",
+    "findings": [
+      {
+        "rule": "trailer",
+        "verdict": "permitted",
+        "objectNumber": 0
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 22,
+        "edge": "6:Annots",
+        "detail": "was referenced from object 6 at Annots and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 22,
+        "edge": "6:Annots",
+        "detail": "is referenced from object 6 at Annots and no rule explains it"
+      }
+    ]
+  },
+  {
+    "runtime": "native",
+    "id": "fieldmdp-indirect-array-names",
+    "profile": "fieldmdp",
+    "layout": "indirect-array",
+    "action": "names",
+    "policyVersion": 4,
+    "weakCount": 0,
+    "verdict": {
+      "verdict": "forbidden",
+      "detail": "object 22, unexplained: was referenced from object 6 at Annots and no rule explains it",
+      "basis": "persisted",
+      "laterRevisions": 1
+    },
+    "integrity": "valid",
+    "findings": [
+      {
+        "rule": "trailer",
+        "verdict": "permitted",
+        "objectNumber": 0
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 22,
+        "edge": "6:Annots",
+        "detail": "was referenced from object 6 at Annots and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 22,
+        "edge": "6:Annots",
+        "detail": "is referenced from object 6 at Annots and no rule explains it"
+      }
+    ]
+  },
+  {
+    "runtime": "native",
+    "id": "fieldmdp-indirect-array-reorder",
+    "profile": "fieldmdp",
+    "layout": "indirect-array",
+    "action": "reorder",
+    "policyVersion": 4,
+    "weakCount": 4,
+    "verdict": {
+      "verdict": "forbidden",
+      "detail": "object 22, unexplained: was referenced from object 6 at Annots and no rule explains it",
+      "basis": "persisted",
+      "laterRevisions": 1
+    },
+    "integrity": "valid",
+    "findings": [
+      {
+        "rule": "trailer",
+        "verdict": "permitted",
+        "objectNumber": 0
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 22,
+        "edge": "6:Annots",
+        "detail": "was referenced from object 6 at Annots and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 22,
+        "edge": "6:Annots",
+        "detail": "is referenced from object 6 at Annots and no rule explains it"
+      }
+    ]
+  },
+  {
+    "runtime": "native",
+    "id": "fieldmdp-indirect-array-reorder-names",
+    "profile": "fieldmdp",
+    "layout": "indirect-array",
+    "action": "reorder-names",
+    "policyVersion": 4,
+    "weakCount": 0,
+    "verdict": {
+      "verdict": "forbidden",
+      "detail": "object 22, unexplained: was referenced from object 6 at Annots and no rule explains it",
+      "basis": "persisted",
+      "laterRevisions": 1
+    },
+    "integrity": "valid",
+    "findings": [
+      {
+        "rule": "trailer",
+        "verdict": "permitted",
+        "objectNumber": 0
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 22,
+        "edge": "6:Annots",
+        "detail": "was referenced from object 6 at Annots and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 22,
+        "edge": "6:Annots",
+        "detail": "is referenced from object 6 at Annots and no rule explains it"
+      }
+    ]
+  },
+  {
+    "runtime": "native",
+    "id": "lockp2-inline-control",
+    "profile": "lockp2",
+    "layout": "inline",
+    "action": "control",
+    "policyVersion": 4,
+    "weakCount": 4,
+    "verdict": {
+      "verdict": "unchanged",
+      "basis": "persisted"
+    },
+    "integrity": "valid",
+    "findings": []
+  },
+  {
+    "runtime": "native",
+    "id": "lockp2-inline-delete",
+    "profile": "lockp2",
+    "layout": "inline",
+    "action": "delete",
+    "policyVersion": 4,
+    "weakCount": 3,
+    "verdict": {
+      "verdict": "forbidden",
+      "detail": "object 6, unexplained: was referenced from object 3 at Kids/[0] and no rule explains it",
+      "basis": "persisted",
+      "laterRevisions": 1
+    },
+    "integrity": "valid",
+    "findings": [
+      {
+        "rule": "trailer",
+        "verdict": "permitted",
+        "objectNumber": 0
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "3:Kids/[0]",
+        "detail": "was referenced from object 3 at Kids/[0] and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "15:P",
+        "detail": "was referenced from object 15 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "13:P",
+        "detail": "was referenced from object 13 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "10:P",
+        "detail": "was referenced from object 10 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "8:P",
+        "detail": "was referenced from object 8 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "3:Kids/[0]",
+        "detail": "is referenced from object 3 at Kids/[0] and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "15:P",
+        "detail": "is referenced from object 15 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "13:P",
+        "detail": "is referenced from object 13 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "10:P",
+        "detail": "is referenced from object 10 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "8:P",
+        "detail": "is referenced from object 8 at P and no rule explains it"
+      }
+    ]
+  },
+  {
+    "runtime": "native",
+    "id": "lockp2-inline-delete-names",
+    "profile": "lockp2",
+    "layout": "inline",
+    "action": "delete-names",
+    "policyVersion": 4,
+    "weakCount": 0,
+    "verdict": {
+      "verdict": "forbidden",
+      "detail": "object 6, unexplained: was referenced from object 3 at Kids/[0] and no rule explains it",
+      "basis": "persisted",
+      "laterRevisions": 1
+    },
+    "integrity": "valid",
+    "findings": [
+      {
+        "rule": "trailer",
+        "verdict": "permitted",
+        "objectNumber": 0
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "3:Kids/[0]",
+        "detail": "was referenced from object 3 at Kids/[0] and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "15:P",
+        "detail": "was referenced from object 15 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "13:P",
+        "detail": "was referenced from object 13 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "10:P",
+        "detail": "was referenced from object 10 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "8:P",
+        "detail": "was referenced from object 8 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "3:Kids/[0]",
+        "detail": "is referenced from object 3 at Kids/[0] and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "15:P",
+        "detail": "is referenced from object 15 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "13:P",
+        "detail": "is referenced from object 13 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "10:P",
+        "detail": "is referenced from object 10 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "8:P",
+        "detail": "is referenced from object 8 at P and no rule explains it"
+      }
+    ]
+  },
+  {
+    "runtime": "native",
+    "id": "lockp2-inline-names",
+    "profile": "lockp2",
+    "layout": "inline",
+    "action": "names",
+    "policyVersion": 4,
+    "weakCount": 0,
+    "verdict": {
+      "verdict": "forbidden",
+      "detail": "object 6, unexplained: was referenced from object 3 at Kids/[0] and no rule explains it",
+      "basis": "persisted",
+      "laterRevisions": 1
+    },
+    "integrity": "valid",
+    "findings": [
+      {
+        "rule": "trailer",
+        "verdict": "permitted",
+        "objectNumber": 0
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "3:Kids/[0]",
+        "detail": "was referenced from object 3 at Kids/[0] and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "15:P",
+        "detail": "was referenced from object 15 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "13:P",
+        "detail": "was referenced from object 13 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "10:P",
+        "detail": "was referenced from object 10 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "8:P",
+        "detail": "was referenced from object 8 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "3:Kids/[0]",
+        "detail": "is referenced from object 3 at Kids/[0] and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "15:P",
+        "detail": "is referenced from object 15 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "13:P",
+        "detail": "is referenced from object 13 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "10:P",
+        "detail": "is referenced from object 10 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "8:P",
+        "detail": "is referenced from object 8 at P and no rule explains it"
+      }
+    ]
+  },
+  {
+    "runtime": "native",
+    "id": "lockp2-inline-reorder",
+    "profile": "lockp2",
+    "layout": "inline",
+    "action": "reorder",
+    "policyVersion": 4,
+    "weakCount": 4,
+    "verdict": {
+      "verdict": "forbidden",
+      "detail": "object 6, unexplained: was referenced from object 3 at Kids/[0] and no rule explains it",
+      "basis": "persisted",
+      "laterRevisions": 1
+    },
+    "integrity": "valid",
+    "findings": [
+      {
+        "rule": "trailer",
+        "verdict": "permitted",
+        "objectNumber": 0
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "3:Kids/[0]",
+        "detail": "was referenced from object 3 at Kids/[0] and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "15:P",
+        "detail": "was referenced from object 15 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "13:P",
+        "detail": "was referenced from object 13 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "10:P",
+        "detail": "was referenced from object 10 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "8:P",
+        "detail": "was referenced from object 8 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "3:Kids/[0]",
+        "detail": "is referenced from object 3 at Kids/[0] and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "15:P",
+        "detail": "is referenced from object 15 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "13:P",
+        "detail": "is referenced from object 13 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "10:P",
+        "detail": "is referenced from object 10 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "8:P",
+        "detail": "is referenced from object 8 at P and no rule explains it"
+      }
+    ]
+  },
+  {
+    "runtime": "native",
+    "id": "lockp2-inline-reorder-names",
+    "profile": "lockp2",
+    "layout": "inline",
+    "action": "reorder-names",
+    "policyVersion": 4,
+    "weakCount": 0,
+    "verdict": {
+      "verdict": "forbidden",
+      "detail": "object 6, unexplained: was referenced from object 3 at Kids/[0] and no rule explains it",
+      "basis": "persisted",
+      "laterRevisions": 1
+    },
+    "integrity": "valid",
+    "findings": [
+      {
+        "rule": "trailer",
+        "verdict": "permitted",
+        "objectNumber": 0
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "3:Kids/[0]",
+        "detail": "was referenced from object 3 at Kids/[0] and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "15:P",
+        "detail": "was referenced from object 15 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "13:P",
+        "detail": "was referenced from object 13 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "10:P",
+        "detail": "was referenced from object 10 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "8:P",
+        "detail": "was referenced from object 8 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "3:Kids/[0]",
+        "detail": "is referenced from object 3 at Kids/[0] and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "15:P",
+        "detail": "is referenced from object 15 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "13:P",
+        "detail": "is referenced from object 13 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "10:P",
+        "detail": "is referenced from object 10 at P and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 6,
+        "edge": "8:P",
+        "detail": "is referenced from object 8 at P and no rule explains it"
+      }
+    ]
+  },
+  {
+    "runtime": "native",
+    "id": "lockp2-indirect-array-control",
+    "profile": "lockp2",
+    "layout": "indirect-array",
+    "action": "control",
+    "policyVersion": 4,
+    "weakCount": 4,
+    "verdict": {
+      "verdict": "unchanged",
+      "basis": "persisted"
+    },
+    "integrity": "valid",
+    "findings": []
+  },
+  {
+    "runtime": "native",
+    "id": "lockp2-indirect-array-delete",
+    "profile": "lockp2",
+    "layout": "indirect-array",
+    "action": "delete",
+    "policyVersion": 4,
+    "weakCount": 3,
+    "verdict": {
+      "verdict": "forbidden",
+      "detail": "object 22, unexplained: was referenced from object 6 at Annots and no rule explains it",
+      "basis": "persisted",
+      "laterRevisions": 1
+    },
+    "integrity": "valid",
+    "findings": [
+      {
+        "rule": "trailer",
+        "verdict": "permitted",
+        "objectNumber": 0
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 22,
+        "edge": "6:Annots",
+        "detail": "was referenced from object 6 at Annots and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 22,
+        "edge": "6:Annots",
+        "detail": "is referenced from object 6 at Annots and no rule explains it"
+      }
+    ]
+  },
+  {
+    "runtime": "native",
+    "id": "lockp2-indirect-array-delete-names",
+    "profile": "lockp2",
+    "layout": "indirect-array",
+    "action": "delete-names",
+    "policyVersion": 4,
+    "weakCount": 0,
+    "verdict": {
+      "verdict": "forbidden",
+      "detail": "object 22, unexplained: was referenced from object 6 at Annots and no rule explains it",
+      "basis": "persisted",
+      "laterRevisions": 1
+    },
+    "integrity": "valid",
+    "findings": [
+      {
+        "rule": "trailer",
+        "verdict": "permitted",
+        "objectNumber": 0
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 22,
+        "edge": "6:Annots",
+        "detail": "was referenced from object 6 at Annots and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 22,
+        "edge": "6:Annots",
+        "detail": "is referenced from object 6 at Annots and no rule explains it"
+      }
+    ]
+  },
+  {
+    "runtime": "native",
+    "id": "lockp2-indirect-array-names",
+    "profile": "lockp2",
+    "layout": "indirect-array",
+    "action": "names",
+    "policyVersion": 4,
+    "weakCount": 0,
+    "verdict": {
+      "verdict": "forbidden",
+      "detail": "object 22, unexplained: was referenced from object 6 at Annots and no rule explains it",
+      "basis": "persisted",
+      "laterRevisions": 1
+    },
+    "integrity": "valid",
+    "findings": [
+      {
+        "rule": "trailer",
+        "verdict": "permitted",
+        "objectNumber": 0
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 22,
+        "edge": "6:Annots",
+        "detail": "was referenced from object 6 at Annots and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 22,
+        "edge": "6:Annots",
+        "detail": "is referenced from object 6 at Annots and no rule explains it"
+      }
+    ]
+  },
+  {
+    "runtime": "native",
+    "id": "lockp2-indirect-array-reorder",
+    "profile": "lockp2",
+    "layout": "indirect-array",
+    "action": "reorder",
+    "policyVersion": 4,
+    "weakCount": 4,
+    "verdict": {
+      "verdict": "forbidden",
+      "detail": "object 22, unexplained: was referenced from object 6 at Annots and no rule explains it",
+      "basis": "persisted",
+      "laterRevisions": 1
+    },
+    "integrity": "valid",
+    "findings": [
+      {
+        "rule": "trailer",
+        "verdict": "permitted",
+        "objectNumber": 0
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 22,
+        "edge": "6:Annots",
+        "detail": "was referenced from object 6 at Annots and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 22,
+        "edge": "6:Annots",
+        "detail": "is referenced from object 6 at Annots and no rule explains it"
+      }
+    ]
+  },
+  {
+    "runtime": "native",
+    "id": "lockp2-indirect-array-reorder-names",
+    "profile": "lockp2",
+    "layout": "indirect-array",
+    "action": "reorder-names",
+    "policyVersion": 4,
+    "weakCount": 0,
+    "verdict": {
+      "verdict": "forbidden",
+      "detail": "object 22, unexplained: was referenced from object 6 at Annots and no rule explains it",
+      "basis": "persisted",
+      "laterRevisions": 1
+    },
+    "integrity": "valid",
+    "findings": [
+      {
+        "rule": "trailer",
+        "verdict": "permitted",
+        "objectNumber": 0
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 22,
+        "edge": "6:Annots",
+        "detail": "was referenced from object 6 at Annots and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 22,
+        "edge": "6:Annots",
+        "detail": "is referenced from object 6 at Annots and no rule explains it"
+      }
+    ]
+  },
+  {
+    "runtime": "native",
+    "id": "locked-markup-inline-control",
+    "profile": "locked-markup",
+    "layout": "inline",
+    "action": "control",
+    "policyVersion": 4,
+    "weakCount": 4,
+    "verdict": {
+      "verdict": "unchanged",
+      "basis": "persisted"
+    },
+    "integrity": "valid",
+    "findings": []
+  },
+  {
+    "runtime": "native",
+    "id": "locked-markup-inline-delete",
+    "profile": "locked-markup",
+    "layout": "inline",
+    "action": "delete",
+    "policyVersion": 4,
+    "weakCount": 3,
+    "verdict": {
+      "verdict": "permitted",
+      "basis": "persisted",
+      "laterRevisions": 1
+    },
+    "integrity": "valid",
+    "findings": [
+      {
+        "rule": "trailer",
+        "verdict": "permitted",
+        "objectNumber": 0
+      },
+      {
+        "rule": "annotation",
+        "verdict": "permitted",
+        "objectNumber": 6,
+        "detail": "page /Annots changed"
+      }
+    ]
+  },
+  {
+    "runtime": "native",
+    "id": "locked-markup-inline-delete-names",
+    "profile": "locked-markup",
+    "layout": "inline",
+    "action": "delete-names",
+    "policyVersion": 4,
+    "weakCount": 1,
+    "verdict": {
+      "verdict": "permitted",
+      "basis": "persisted",
+      "laterRevisions": 1
+    },
+    "integrity": "valid",
+    "findings": [
+      {
+        "rule": "trailer",
+        "verdict": "permitted",
+        "objectNumber": 0
+      },
+      {
+        "rule": "annotation",
+        "verdict": "permitted",
+        "objectNumber": 6,
+        "detail": "page /Annots changed"
+      }
+    ]
+  },
+  {
+    "runtime": "native",
+    "id": "locked-markup-inline-names",
+    "profile": "locked-markup",
+    "layout": "inline",
+    "action": "names",
+    "policyVersion": 4,
+    "weakCount": 1,
+    "verdict": {
+      "verdict": "permitted",
+      "basis": "persisted",
+      "laterRevisions": 1
+    },
+    "integrity": "valid",
+    "findings": [
+      {
+        "rule": "trailer",
+        "verdict": "permitted",
+        "objectNumber": 0
+      },
+      {
+        "rule": "annotation",
+        "verdict": "permitted",
+        "objectNumber": 6,
+        "detail": "page /Annots changed"
+      }
+    ]
+  },
+  {
+    "runtime": "native",
+    "id": "locked-markup-inline-reorder",
+    "profile": "locked-markup",
+    "layout": "inline",
+    "action": "reorder",
+    "policyVersion": 4,
+    "weakCount": 4,
+    "verdict": {
+      "verdict": "permitted",
+      "basis": "persisted",
+      "laterRevisions": 1
+    },
+    "integrity": "valid",
+    "findings": [
+      {
+        "rule": "trailer",
+        "verdict": "permitted",
+        "objectNumber": 0
+      },
+      {
+        "rule": "annotation",
+        "verdict": "permitted",
+        "objectNumber": 6,
+        "detail": "page /Annots changed"
+      }
+    ]
+  },
+  {
+    "runtime": "native",
+    "id": "locked-markup-inline-reorder-names",
+    "profile": "locked-markup",
+    "layout": "inline",
+    "action": "reorder-names",
+    "policyVersion": 4,
+    "weakCount": 1,
+    "verdict": {
+      "verdict": "permitted",
+      "basis": "persisted",
+      "laterRevisions": 1
+    },
+    "integrity": "valid",
+    "findings": [
+      {
+        "rule": "trailer",
+        "verdict": "permitted",
+        "objectNumber": 0
+      },
+      {
+        "rule": "annotation",
+        "verdict": "permitted",
+        "objectNumber": 6,
+        "detail": "page /Annots changed"
+      }
+    ]
+  },
+  {
+    "runtime": "native",
+    "id": "locked-markup-indirect-array-control",
+    "profile": "locked-markup",
+    "layout": "indirect-array",
+    "action": "control",
+    "policyVersion": 4,
+    "weakCount": 4,
+    "verdict": {
+      "verdict": "unchanged",
+      "basis": "persisted"
+    },
+    "integrity": "valid",
+    "findings": []
+  },
+  {
+    "runtime": "native",
+    "id": "locked-markup-indirect-array-delete",
+    "profile": "locked-markup",
+    "layout": "indirect-array",
+    "action": "delete",
+    "policyVersion": 4,
+    "weakCount": 3,
+    "verdict": {
+      "verdict": "forbidden",
+      "detail": "object 22, unexplained: was referenced from object 6 at Annots and no rule explains it",
+      "basis": "persisted",
+      "laterRevisions": 1
+    },
+    "integrity": "valid",
+    "findings": [
+      {
+        "rule": "trailer",
+        "verdict": "permitted",
+        "objectNumber": 0
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 22,
+        "edge": "6:Annots",
+        "detail": "was referenced from object 6 at Annots and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 22,
+        "edge": "6:Annots",
+        "detail": "is referenced from object 6 at Annots and no rule explains it"
+      }
+    ]
+  },
+  {
+    "runtime": "native",
+    "id": "locked-markup-indirect-array-delete-names",
+    "profile": "locked-markup",
+    "layout": "indirect-array",
+    "action": "delete-names",
+    "policyVersion": 4,
+    "weakCount": 1,
+    "verdict": {
+      "verdict": "forbidden",
+      "detail": "object 22, unexplained: was referenced from object 6 at Annots and no rule explains it",
+      "basis": "persisted",
+      "laterRevisions": 1
+    },
+    "integrity": "valid",
+    "findings": [
+      {
+        "rule": "trailer",
+        "verdict": "permitted",
+        "objectNumber": 0
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 22,
+        "edge": "6:Annots",
+        "detail": "was referenced from object 6 at Annots and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 22,
+        "edge": "6:Annots",
+        "detail": "is referenced from object 6 at Annots and no rule explains it"
+      }
+    ]
+  },
+  {
+    "runtime": "native",
+    "id": "locked-markup-indirect-array-names",
+    "profile": "locked-markup",
+    "layout": "indirect-array",
+    "action": "names",
+    "policyVersion": 4,
+    "weakCount": 1,
+    "verdict": {
+      "verdict": "forbidden",
+      "detail": "object 22, unexplained: was referenced from object 6 at Annots and no rule explains it",
+      "basis": "persisted",
+      "laterRevisions": 1
+    },
+    "integrity": "valid",
+    "findings": [
+      {
+        "rule": "trailer",
+        "verdict": "permitted",
+        "objectNumber": 0
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 22,
+        "edge": "6:Annots",
+        "detail": "was referenced from object 6 at Annots and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 22,
+        "edge": "6:Annots",
+        "detail": "is referenced from object 6 at Annots and no rule explains it"
+      }
+    ]
+  },
+  {
+    "runtime": "native",
+    "id": "locked-markup-indirect-array-reorder",
+    "profile": "locked-markup",
+    "layout": "indirect-array",
+    "action": "reorder",
+    "policyVersion": 4,
+    "weakCount": 4,
+    "verdict": {
+      "verdict": "forbidden",
+      "detail": "object 22, unexplained: was referenced from object 6 at Annots and no rule explains it",
+      "basis": "persisted",
+      "laterRevisions": 1
+    },
+    "integrity": "valid",
+    "findings": [
+      {
+        "rule": "trailer",
+        "verdict": "permitted",
+        "objectNumber": 0
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 22,
+        "edge": "6:Annots",
+        "detail": "was referenced from object 6 at Annots and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 22,
+        "edge": "6:Annots",
+        "detail": "is referenced from object 6 at Annots and no rule explains it"
+      }
+    ]
+  },
+  {
+    "runtime": "native",
+    "id": "locked-markup-indirect-array-reorder-names",
+    "profile": "locked-markup",
+    "layout": "indirect-array",
+    "action": "reorder-names",
+    "policyVersion": 4,
+    "weakCount": 1,
+    "verdict": {
+      "verdict": "forbidden",
+      "detail": "object 22, unexplained: was referenced from object 6 at Annots and no rule explains it",
+      "basis": "persisted",
+      "laterRevisions": 1
+    },
+    "integrity": "valid",
+    "findings": [
+      {
+        "rule": "trailer",
+        "verdict": "permitted",
+        "objectNumber": 0
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 22,
+        "edge": "6:Annots",
+        "detail": "was referenced from object 6 at Annots and no rule explains it"
+      },
+      {
+        "rule": "unexplained",
+        "verdict": "forbidden",
+        "objectNumber": 22,
+        "edge": "6:Annots",
+        "detail": "is referenced from object 6 at Annots and no rule explains it"
+      }
+    ]
+  }
+]

@@ -2,14 +2,14 @@
  * Pluggable read-only source family for `documents.importFrom` — the
  * server-side pull counterpart to the client-push upload pathway.
  *
- * A source is NOT an ObjectStore: it is deliberately incapable of
+ * A source is not an ObjectStore: it is deliberately incapable of
  * writing or deleting. The deployment's ObjectStore is "our bucket,
  * our credentials, read-write"; a source is "their bytes, someone
- * else's authority, read-only". v1 ships one universal kind — `url`
- * (a caller-minted presigned GET) — which covers every object store
- * that can presign. Native kinds (`s3`/`gcs`/`azure-blob` against
- * registered connections) can join later under the same factory,
- * following ADAPTERS.md conventions.
+ * else's authority, read-only". The universal kind is `url` (a
+ * caller-minted presigned GET), which covers every object store that
+ * can presign; the native kinds (`s3`/`gcs`/`azure-blob`/`fs`) read
+ * through registered connections. All kinds share one factory and
+ * follow `docs/conventions/server-adapters.md`.
  *
  * `stat()` is intentionally absent: presigned GET URLs frequently
  * cannot be HEADed (S3 and GCS sign the HTTP method into the URL), so
@@ -25,8 +25,8 @@ export type ImportSourceKind = 'url' | 's3' | 'gcs' | 'azure-blob' | 'fs';
 /**
  * Diagnostic identity, mirroring the other adapter families:
  * `kind` is the discriminator; `location` is a public identifier
- * only — for URL sources that means origin + path, NEVER the query
- * string (a presigned query string IS the credential).
+ * only — for URL sources that means origin + path, never the query
+ * string (a presigned query string is the credential).
  */
 export interface ImportSourceInfo {
   readonly kind: ImportSourceKind;
@@ -45,7 +45,7 @@ export interface ImportSourceOpen {
    * The revision the backend actually served (S3 VersionId, GCS
    * generation, Azure version id), when the backend reports one —
    * even if the request didn't pin a revision. Recorded as
-   * provenance; phase 3b pins async retries to it.
+   * provenance; async import retries pin to it.
    */
   resolvedRevision?: string;
 }

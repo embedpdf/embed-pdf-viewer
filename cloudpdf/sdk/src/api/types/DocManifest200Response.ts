@@ -15,6 +15,7 @@ export interface DocManifest200Response {
     working?: boolean | undefined;
     baseByteLength?: number | undefined;
     scopes?: DocManifest200Response.Scopes | undefined;
+    protection: DocManifest200Response.Protection | null;
     pages: DocManifest200Response.Pages.Item[];
 }
 
@@ -61,55 +62,78 @@ export namespace DocManifest200Response {
         export type Actions = (typeof Actions)[keyof typeof Actions];
     }
 
+    export interface Protection {
+        enforced: Protection.Enforced | null;
+        judged: Protection.Judged | null;
+        certification: Protection.Certification | null;
+        fieldLocks: Protection.FieldLocks.Item[];
+        policyVersion: number;
+    }
+
+    export namespace Protection {
+        export const Enforced = {
+            None: "none",
+            Lta: "lta",
+            Fill: "fill",
+            Annotate: "annotate",
+        } as const;
+        export type Enforced = (typeof Enforced)[keyof typeof Enforced];
+        export const Judged = {
+            None: "none",
+            Lta: "lta",
+            Fill: "fill",
+            Annotate: "annotate",
+        } as const;
+        export type Judged = (typeof Judged)[keyof typeof Judged];
+
+        export interface Certification {
+            signatureIndex: number;
+            permission: number;
+        }
+
+        export type FieldLocks = FieldLocks.Item[];
+
+        export namespace FieldLocks {
+            export interface Item {
+                signatureIndex: number;
+                source: Item.Source;
+                spec: Item.Spec;
+            }
+
+            export namespace Item {
+                export const Source = {
+                    Fieldmdp: "fieldmdp",
+                    Lock: "lock",
+                } as const;
+                export type Source = (typeof Source)[keyof typeof Source];
+
+                export interface Spec {
+                    action: Spec.Action;
+                    fields: string[];
+                    permission?: number | undefined;
+                }
+
+                export namespace Spec {
+                    export const Action = {
+                        All: "all",
+                        Include: "include",
+                        Exclude: "exclude",
+                    } as const;
+                    export type Action = (typeof Action)[keyof typeof Action];
+                }
+            }
+        }
+    }
+
     export type Pages = Pages.Item[];
 
     export namespace Pages {
         export interface Item {
-            state: Item.State;
+            state: CloudPDF.PageState;
             cache: Item.Cache;
         }
 
         export namespace Item {
-            export interface State {
-                page: State.Page;
-                revision: State.Revision;
-                weakAnnotationState: CloudPDF.DocManifest200ResponsePagesItemStateWeakAnnotationState;
-            }
-
-            export namespace State {
-                export interface Page {
-                    kind: Page.Kind;
-                    pageObjectNumber: number;
-                }
-
-                export namespace Page {
-                    export const Kind = {
-                        ObjectNumber: "objectNumber",
-                    } as const;
-                    export type Kind = (typeof Kind)[keyof typeof Kind];
-                }
-
-                export interface Revision {
-                    docSessionId: string;
-                    page: Revision.Page;
-                    generation: number;
-                }
-
-                export namespace Revision {
-                    export interface Page {
-                        kind: Page.Kind;
-                        pageObjectNumber: number;
-                    }
-
-                    export namespace Page {
-                        export const Kind = {
-                            ObjectNumber: "objectNumber",
-                        } as const;
-                        export type Kind = (typeof Kind)[keyof typeof Kind];
-                    }
-                }
-            }
-
             export interface Cache {
                 contentVersion: number;
                 annotationVersion: number;

@@ -20,16 +20,16 @@ describe('docsProductFromPath', () => {
 describe('docsProductHref', () => {
   it('carries a supported integration between Viewer and Headless', () => {
     expect(docsProductHref('viewer', 'vue')).toBe('/docs/viewer/vue/getting-started');
-    expect(docsProductHref('headless', 'vue')).toBe('/docs/headless/vue/getting-started');
+    expect(docsProductHref('headless', 'vue')).toBe('/docs/headless/vue');
   });
 
   it('falls Vanilla JS back to React when entering Headless', () => {
-    expect(docsProductHref('headless', 'vanilla')).toBe('/docs/headless/react/getting-started');
+    expect(docsProductHref('headless', 'vanilla')).toBe('/docs/headless/react');
   });
 
   it('uses the courtesy route when the current page has no integration', () => {
     expect(docsProductHref('viewer', null)).toBe('/docs/viewer/getting-started');
-    expect(docsProductHref('headless', null)).toBe('/docs/headless/getting-started');
+    expect(docsProductHref('headless', null)).toBe('/docs/headless');
   });
 
   it('always links Engine to its product root', () => {

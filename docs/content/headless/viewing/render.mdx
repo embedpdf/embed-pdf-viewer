@@ -1,0 +1,219 @@
+---
+title: Rendering
+description: Draw every page sharp at every zoom, within a memory budget you choose, and render pages yourself for previews and exports.
+---
+
+# Rendering
+
+The render plugin draws the pages. Put `<RenderLayer>` in each page, and the plugin decides what
+to render, how big and when, keeps the results cached, and redraws only the pages whose content
+changed:
+
+<Example name="render/basic" mode="open" />
+
+- **Sharp text.** Pages render at exactly the pixels your screen needs, so small text stays crisp,
+  even on a low-resolution display.
+- **A memory ceiling.** A whole-page picture is never wider than 640 device pixels. Zooming in
+  further uses small tiles for the part you can see, so deep zoom never asks for a giant image.
+- **Caching.** Scrolling away and back is instant, and two views of the same page share one render.
+
+## Sharp at every zoom
+
+A page shows a whole-page picture first, which appears fast. When you zoom in past what that
+picture can show sharply, tiles take over for the part you can see:
+
+<Example name="render/deep-zoom" />
+
+> **Try it:** it opens at 250%, past what a whole-page picture shows sharply. Zoom in further: only
+> the tiles you can see load, the area under the pointer sharpens first, and when you stop, the
+> tiles redraw at exactly your zoom.
+
+While you pinch, the pixels you have scale along, so nothing reloads mid-gesture. About 150
+milliseconds after the zoom comes to rest, the page redraws at the new size. You configure none of
+this.
+
+## Set the memory budget
+
+One setting decides how big a whole-page picture may get, in device pixels:
+
+```ts
+renderPlugin({ fullPage: { maxWidth: 1280 } });
+```
+
+The default, `640`, makes the first picture of each page small and fast, and lets tiles carry the
+sharpness at normal reading zooms. A bigger budget means fewer tiles but a slower first paint and
+more memory. For a view that should never tile, such as a thumbnail strip, set `tiles` to `false` on
+its layer.
+
+<Example name="render/budget" />
+
+> **Try it:** turn the tiles off, then pick a smaller budget. At 200% the page goes soft: the
+> whole-page picture is all there is.
+
+## Annotations in the picture
+
+By default the page picture includes the annotations, so a plain `<RenderLayer>` shows the document
+as it is: right for thumbnails and read-only views. When an [annotation layer](../annotations) draws
+the annotations so people can edit them, leave them out of the picture:
+
+<Snippet name="viewing/render-without-annotations" />
+
+<Example name="render/annotations" />
+
+## Render a page yourself
+
+For your own preview, an export or a page picker, render any page on demand:
+
+```ts
+const image = await render.renderPage(page.ref, { width: 800 });
+const { url, revoke } = await image.objectUrl();
+// …show it, and call revoke() when you're done
+```
+
+`renderPage` renders exactly the size you ask for, at `width` pixels or at a `scale`, and shares the
+layers' cache. For many pages at once, use `renderPages`, which renders a few at a time:
+
+```ts
+const thumbnail = await render.renderThumbnail(page.ref, { maxWidth: 200 });
+
+const { applied } = await render.renderPages(
+  pages.map((page) => page.ref),
+  { width: 300 },
+);
+```
+
+| Option               | What it is                                                     | Default   |
+| :------------------- | :------------------------------------------------------------- | :-------- |
+| `width`              | The width of the image, in pixels                              | —         |
+| `scale`              | Or a scale: `1` is the page's size in points                   | `1`       |
+| `includeAnnotations` | Draw the annotations into the image                            | `true`    |
+| `format`             | `'png'`, `'webp'` or `'bmp'`                                   | per engine |
+| `quality`            | For WebP, from `0` to `1`                                      | per engine |
+| `concurrency`        | For `renderPages`, how many pages render at once               | `4`       |
+
+<Example name="render/render-page" />
+
+## When a page changes
+
+A rendered page is a snapshot, so the plugin watches the document and redraws exactly the pages an
+edit touched, whether you, your code or someone else on a shared document made it. Nothing redraws
+while someone is still dragging: it redraws once, when the change is saved.
+
+For a change the plugin can't see, tell it:
+
+```ts
+render.invalidate({ pages: [page.ref] }); // redraw these pages
+render.invalidate({ pages: [page.ref], scope: 'annotations' }); // only their annotations changed
+```
+
+Your own long-lived renders can keep up the same way: `render.getRenderEpoch(page.ref)` changes
+whenever the page's pixels do.
+
+<Example name="render/redraws" />
+
+## Methods
+
+Everything `useRender()` gives you.
+
+| Method                                     | What it does                                                                                                                                     |
+| :----------------------------------------- | :----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `renderPage(page, options?)`               | Renders one page at exactly the size you ask for, sharing the layers' cache. Resolves an image; `image.objectUrl()` gives a URL for an `<img>`. [Render a page yourself](#render-a-page-yourself) |
+| `renderThumbnail(page, { maxWidth })`      | Renders a small picture of a page, `maxWidth` pixels wide                                                                                        |
+| `renderPages(pages, options?)`             | Renders several pages, a few at a time. Resolves `{ applied, failed }`: each page with its image, in the order you gave, and the pages that failed with why. |
+| `invalidate({ pages?, scope? })`           | Redraws pages after a change the plugin can't see; without `pages`, every page. [When a page changes](#when-a-page-changes)                      |
+| `getRenderEpoch(page, includeAnnotations?)` | A number that changes whenever the page's pixels do, with the annotations unless you pass `false`. Key your own long-lived renders on it.        |
+| `getRenderPolicy()`                        | The sizes the engine renders best at: any size on the local engine, a short list of widths on a CloudPDF server. See [Render policy](/docs/engine/documents/rendering#render-policy). |
+| `canRender()`                              | Whether page images are allowed. [Permissions](#permissions)                                                                                     |
+| `getSettings()`, `updateSettings(changes)`, `resetSettings()` | Reads the settings, changes them while the app runs, or goes back to what you registered. In a component, use `useRenderSettings()`. [Settings](#settings) |
+
+Every method that returns a promise also takes a `signal` in its options, to cancel it.
+
+## Settings
+
+Set them when you register the plugin, and change them while the app runs with
+`render.updateSettings({ … })`; `render.resetSettings()` goes back to what you registered, and
+`useRenderSettings()` gives you the current settings.
+
+| Setting                       | What it does                                                          | Default          |
+| :---------------------------- | :-------------------------------------------------------------------- | :--------------- |
+| `fullPage.maxWidth`           | The widest a whole-page picture may be, in device pixels              | `640`            |
+| `fullPage.quantize`           | Render exact sizes, or snap to a few reusable sizes                   | `'exact'`        |
+| `tiles`                       | `false` turns tiles off everywhere                                    | on               |
+| `tiles.size`                  | A tile's edge, in device pixels                                       | `512`            |
+| `tiles.maxScale`              | The sharpest tiles get; zoom beyond it stretches them                 | `128`            |
+| `tiles.prefetch.margin`       | How far around the view to load tiles, as a share of the view         | `0.5`            |
+| `tiles.prefetch.velocityBias` | Load further ahead in the direction you're scrolling                  | `true`           |
+| `tiles.settleMs`              | How long a zoom rests before tiles redraw                             | `150`            |
+| `tiles.fadeMs`                | Fade new tiles in over this many milliseconds                         | `0`              |
+| `format`                      | `'png'`, `'webp'`, or `'bmp'` (fastest, local engine only)            | per engine       |
+| `quality`                     | WebP quality, from `0` to `1`                                         | per engine       |
+| `debug`                       | Log what the plugin renders, and why, to the console                  | `false`          |
+
+`<RenderLayer>` takes two <Word of="props" />: `annotations` (default `true`) and `tiles` (default `true`).
+
+## Events
+
+<Snippet name="viewing/refresh-previews" />
+
+| Event           | Fires when                                  | Carries                      |
+| :-------------- | :------------------------------------------ | :--------------------------- |
+| `onInvalidated` | Pages' pixels changed and they will redraw  | `pages`, `scope`, `origin`   |
+| `onSettingsChanged` | The settings changed | `settings`, `changed` |
+
+## Permissions
+
+| Permission   | What it allows                            | Check                |
+| :----------- | :---------------------------------------- | :------------------- |
+| `doc.render` | Page images, thumbnails and page sections | `render.canRender()` |
+
+Without it, pages keep their size and place, so the Stage still scrolls and the other plugins still
+work, but nothing is painted.
+
+## Good to know
+
+### Two layers of pixels
+
+Each page paints from a whole-page picture, capped at the budget, and tiles over the visible part
+when the view needs more pixels than the budget allows. The whole-page picture is also what you see
+while tiles load, so a page never goes blank mid-zoom. Each tile is a square of the same size, so a
+screen of tiles costs about the same at any zoom.
+
+### Local and cloud render sizes
+
+<Engine local>
+
+The local engine renders exact sizes: every render is private to this browser, so it asks for
+precisely the pixels on screen.
+
+<CloudPdfCallout
+  title="Render heavy pages on your server"
+  href="https://www.cloudpdf.com/docs/headless/viewing/render"
+  cta="Render with CloudPDF"
+>
+
+With CloudPDF, pages are rendered on your server, so a phone never downloads the file or runs
+PDFium, however heavy the drawing. The server renders a few fixed sizes that a cache can keep, and
+the render plugin asks for those sizes by itself: your code doesn't change.
+
+</CloudPdfCallout>
+
+</Engine>
+
+<Engine cloud>
+
+The cloud engine renders at the sizes your server advertises, so each render is shared and cached
+on the CDN; the plugin picks the nearest size for you. Setting `fullPage.maxWidth` yourself also
+limits which of those sizes it uses, which helps on memory-constrained devices.
+
+</Engine>
+
+### Faster rendering
+
+Each image is compressed before it reaches the page: PNG on the local engine by default. If
+profiling shows compression matters, `format: 'bmp'` skips it on the local engine, at the cost of
+memory (a 512-pixel tile is about 1 MB, against tens of KB as WebP).
+
+### The engine underneath
+
+The plugin renders through the engine's page rendering; see
+[Rendering](/docs/engine/documents/rendering) for page sizes and what a render costs.

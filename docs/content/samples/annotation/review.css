@@ -1,0 +1,198 @@
+/* Colors */
+:root {
+  --ink: #1a2748;
+  --text: #3b4b7a;
+  --muted: #5a6b92;
+  --line: #e6eaf2;
+  --line-strong: #dce8fc;
+  --surface: #ffffff;
+  --tint: #f3f7fe;
+  --canvas: #f7f9fc;
+  --accent: #054fb3;
+  --focus: #7db6ff;
+  --shadow: rgb(7 32 76 / 0.04);
+  --accepted: #1d7a4d;
+  --accepted-tint: #d9f5e6;
+  --rejected: #b42318;
+  --rejected-tint: #fde2e1;
+}
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 550;
+  line-height: 1.1;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  padding: 8px 12px;
+  cursor: pointer;
+  white-space: nowrap;
+  box-shadow: 0 1px 2px var(--shadow);
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.button:hover {
+  background: var(--tint);
+  border-color: var(--line-strong);
+}
+
+.button:active {
+  transform: translateY(1px);
+}
+
+.button:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.button[aria-pressed='true'] {
+  color: var(--accent);
+  background: var(--tint);
+  border-color: var(--line-strong);
+}
+
+.button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* The threads: one card each */
+.threads {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.thread {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px;
+  background: var(--tint);
+  border-radius: 10px;
+}
+
+.comment {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--text);
+}
+
+.comment strong {
+  color: var(--ink);
+}
+
+.empty {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+/* A thread's verdict and its buttons */
+.verdict {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+}
+
+.state {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+  background: var(--surface);
+  border-radius: 6px;
+  padding: 2px 6px;
+}
+
+.state--accepted {
+  color: var(--accepted);
+  background: var(--accepted-tint);
+}
+
+.state--rejected {
+  color: var(--rejected);
+  background: var(--rejected-tint);
+}
+
+.mark {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accepted);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.actions .button {
+  padding: 5px 9px;
+  font-size: 12px;
+}
+
+/* The pages and the panel: stacked, and side by side where there's room */
+.viewer {
+  container-type: inline-size;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.stage,
+.panel {
+  flex: 1 1 100%;
+  box-sizing: border-box;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  box-shadow:
+    0 1px 2px var(--shadow),
+    0 18px 40px -28px rgb(7 32 76 / 0.28);
+}
+
+.stage {
+  height: 340px;
+  background: var(--canvas);
+}
+
+.panel {
+  max-height: 260px;
+  overflow-y: auto;
+  margin: 0;
+  padding: 12px;
+  background: var(--surface);
+}
+
+@container (min-width: 620px) {
+  .stage {
+    flex: 1 1 0;
+    min-width: 0;
+    height: 420px;
+  }
+
+  .panel {
+    flex: 0 0 280px;
+    max-height: 420px;
+  }
+}
+
+.loading {
+  margin: 0;
+  padding: 24px 0;
+  text-align: center;
+  font-size: 13px;
+  color: var(--muted);
+}

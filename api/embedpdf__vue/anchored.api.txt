@@ -1,0 +1,16 @@
+# @embedpdf/vue — ./anchored
+
+AnchorTarget [InterfaceDeclaration] (from packages/framework/web/src/anchored-position.ts): export interface AnchorTarget{ page: PageRef; bounds: AnchoredRect; boundsIn?: (view: PageViewEnv) => AnchoredRect | null; avoid?: AnchoredPoint[]; }
+Anchored [VueComponent] (from packages/framework/vue/src/anchored/Anchored.vue): props { anchor: (Omit<AnchorTarget, 'bounds'> &{ bounds?: AnchoredRect} ) | null; placement?: AnchoredPlacement; gap?: number; pinned?: boolean; }; defaults { placement: 'top', gap: 8, pinned: false}; slots { default?(): unknown}
+AnchoredPlacement [TypeAliasDeclaration] (from packages/framework/web/src/anchored-position.ts): export type AnchoredPlacement = AnchoredSide | `${ AnchoredSide} -${ 'start' | 'end'} `;
+AnchoredScope [VueComponent] (from packages/framework/vue/src/anchored/AnchoredScope.vue): props { binding: ProjectorBinding; shown: ShownPages; }; slots { default?(): unknown}
+AnchoredSide [TypeAliasDeclaration] (from packages/framework/web/src/anchored-position.ts): export type AnchoredSide = 'top' | 'right' | 'bottom' | 'left';
+PageViewEnv [InterfaceDeclaration] (from packages/framework/web/src/anchored-position.ts): export interface PageViewEnv{ scale: number; rotation: 0 | 90 | 180 | 270; zoom: number; }
+ProjectorBinding [InterfaceDeclaration] (from packages/framework/vue/src/anchored/projector.ts): export interface ProjectorBinding{ projector: ViewProjector; revision: unknown; subscribe?: (callback: () => void) => () => void; }
+ShownPages [TypeAliasDeclaration] (from packages/framework/vue/src/anchored/projector.ts): export type ShownPages = ReadonlySet<number>;
+ViewProjector [InterfaceDeclaration] (from packages/framework/web/src/anchored-position.ts): export interface ViewProjector{ space: 'overlay' | 'client'; toScreen(page: PageRef, rect: AnchoredRect): AnchoredRect | null; toScreenPoint(page: PageRef, at: AnchoredPoint): AnchoredPoint | null; viewEnv(page: PageRef): PageViewEnv | null; view(): AnchoredRect | null; }
+provideProjector [FunctionDeclaration] (from packages/framework/vue/src/anchored/projector.ts): export function provideProjector(binding: Readonly<Ref<ProjectorBinding>>): void{ provide(ProjectorKey, binding); }
+provideShownPages [FunctionDeclaration] (from packages/framework/vue/src/anchored/projector.ts): export function provideShownPages(shown: Readonly<Ref<ShownPages>>): void{ provide(ShownPagesKey, shown); }
+useOptionalProjectorBinding [FunctionDeclaration] (from packages/framework/vue/src/anchored/projector.ts): export function useOptionalProjectorBinding(): Readonly<Ref<ProjectorBinding>> | null{ return inject(ProjectorKey, null); }
+useProjectorBinding [FunctionDeclaration] (from packages/framework/vue/src/anchored/projector.ts): export function useProjectorBinding(): Readonly<Ref<ProjectorBinding>>{ const binding = useOptionalProjectorBinding(); if (!binding){ throw new Error( "No ViewProjector in scope: mount anchored UI in a <Stage>'s #overlay slot.", ); } return binding; }
+useShownPages [FunctionDeclaration] (from packages/framework/vue/src/anchored/projector.ts): export function useShownPages(): Readonly<Ref<ShownPages>> | null{ return inject(ShownPagesKey, null); }

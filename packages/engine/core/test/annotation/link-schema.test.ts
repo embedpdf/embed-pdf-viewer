@@ -1,5 +1,12 @@
 import { describe, expect, test } from 'vitest';
-import type { LinkDraft, LinkPatch, PdfLinkTarget } from '../../src/shared';
+import type {
+  Annotation,
+  LinkDraft,
+  LinkPatch,
+  PdfCoordinates,
+  PdfLinkTarget,
+} from '../../src/shared';
+import { pdfResolveAnnotationPatch } from '../../src/shared';
 import {
   AnnotationDraftSchema,
   AnnotationPatchSchema,
@@ -10,14 +17,14 @@ import {
   PdfLinkTargetWritableSchema,
 } from '../../src/wire';
 
-const RECT = { left: 10, top: 100, right: 110, bottom: 80 };
+const RECT = { x: 10, y: 20, width: 100, height: 20 };
 
 describe('link kind schemas', () => {
   test('destination arms validate, including spec-null axes', () => {
     expect(
       PdfDestinationSchema.safeParse({
         kind: 'xyz',
-        page: { kind: 'objectNumber', pageObjectNumber: 12 },
+        page: { kind: 'objectNumber', objectNumber: 12 },
         left: null,
         top: 640,
         zoom: null,
@@ -26,13 +33,13 @@ describe('link kind schemas', () => {
     expect(
       PdfDestinationSchema.safeParse({
         kind: 'fit',
-        page: { kind: 'objectNumber', pageObjectNumber: 3 },
+        page: { kind: 'objectNumber', objectNumber: 3 },
       }).success,
     ).toBe(true);
     expect(
       PdfDestinationSchema.safeParse({
         kind: 'fitR',
-        page: { kind: 'objectNumber', pageObjectNumber: 3 },
+        page: { kind: 'objectNumber', objectNumber: 3 },
         left: 0,
         bottom: 0,
         right: 200,
@@ -43,7 +50,7 @@ describe('link kind schemas', () => {
     expect(
       PdfDestinationSchema.safeParse({
         kind: 'fitR',
-        page: { kind: 'objectNumber', pageObjectNumber: 3 },
+        page: { kind: 'objectNumber', objectNumber: 3 },
       }).success,
     ).toBe(false);
   });
@@ -52,7 +59,7 @@ describe('link kind schemas', () => {
     const arms: PdfLinkTarget[] = [
       {
         kind: 'goto',
-        destination: { kind: 'fit', page: { kind: 'objectNumber', pageObjectNumber: 5 } },
+        destination: { kind: 'fit', page: { kind: 'objectNumber', objectNumber: 5 } },
       },
       { kind: 'uri', uri: 'https://embedpdf.com' },
       { kind: 'goto-remote', file: 'other.pdf' },
@@ -84,14 +91,16 @@ describe('link kind schemas', () => {
       subtype: 'link',
       rect: RECT,
       target: null,
-      // v2 parity: a link grouped to another annotation rides the base
-      // relationship fields — nothing link-specific.
-      inReplyTo: {
-        kind: 'objectNumber',
-        page: { kind: 'objectNumber', pageObjectNumber: 4 },
-        annotObjectNumber: 77,
+      // A link grouped to another annotation rides the base
+      // relationship field — nothing link-specific.
+      reply: {
+        to: {
+          kind: 'objectNumber',
+          page: { kind: 'objectNumber', objectNumber: 4 },
+          objectNumber: 77,
+        },
+        type: 'group',
       },
-      replyType: 'group',
     };
     const parsed = LinkDraftSchema.safeParse(draft);
     expect(parsed.success).toBe(true);
@@ -114,7 +123,7 @@ describe('link kind schemas', () => {
       subtype: 'link',
       target: {
         kind: 'goto',
-        destination: { kind: 'xyz', page: { kind: 'objectNumber', pageObjectNumber: 9 }, top: 700 },
+        destination: { kind: 'xyz', page: { kind: 'objectNumber', objectNumber: 9 }, y: 92 },
       },
     };
     const clear: LinkPatch = { subtype: 'link', target: null };
@@ -123,5 +132,46 @@ describe('link kind schemas', () => {
       expect(LinkPatchSchema.safeParse(patch).success).toBe(true);
       expect(AnnotationPatchSchema.safeParse(patch).success).toBe(true);
     }
+  });
+
+  test('a read-only target sent back unchanged is kept; a changed one is refused', () => {
+    // The engine checks a patch in the file's coordinates, after converting it.
+    // `GoBack` is another app's own verb: read, and kept as it is.
+    const current = {
+      subtype: 'link',
+      rect: { left: 10, bottom: 80, right: 110, top: 100 },
+      target: { kind: 'named', name: 'GoBack' },
+    } as unknown as Annotation<PdfCoordinates>;
+    // The patch schema takes what a read returns, so a read DTO passes.
+    expect(LinkPatchSchema.safeParse({ target: { kind: 'named', name: 'GoBack' } }).success).toBe(
+      true,
+    );
+    const kept = pdfResolveAnnotationPatch(current, {
+      subtype: 'link',
+      contents: 'Back',
+      target: { name: 'GoBack', kind: 'named' },
+    });
+    expect(kept).toEqual({ subtype: 'link', contents: 'Back' });
+    expect(() =>
+      pdfResolveAnnotationPatch(current, {
+        subtype: 'link',
+        target: { kind: 'named', name: 'Print' },
+      }),
+    ).toThrow(expect.objectContaining({ code: 'InvalidArg', details: { field: 'target' } }));
+    expect(() =>
+      pdfResolveAnnotationPatch(current, { subtype: 'link', target: { kind: 'javascript' } }),
+    ).toThrow(expect.objectContaining({ code: 'InvalidArg' }));
+    // The four standard page-turning verbs are written like any target.
+    const next = pdfResolveAnnotationPatch(current, {
+      subtype: 'link',
+      target: { kind: 'named', name: 'NextPage' },
+    });
+    expect(next).toEqual({ subtype: 'link', target: { kind: 'named', name: 'NextPage' } });
+    // A writable target replaces it.
+    const uri = pdfResolveAnnotationPatch(current, {
+      subtype: 'link',
+      target: { kind: 'uri', uri: 'https://embedpdf.com' },
+    });
+    expect(uri).toEqual({ subtype: 'link', target: { kind: 'uri', uri: 'https://embedpdf.com' } });
   });
 });

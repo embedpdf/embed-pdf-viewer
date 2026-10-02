@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
-import type { DocumentHandle, Engine, PageRaster } from '@embedpdf/engine-core/runtime';
+import type { LocalDocumentHandle, LocalEngine, PageRaster } from '@embedpdf/engine-core/runtime';
 import { toPageRef } from '@embedpdf/engine-core/runtime';
 import { createLocalEngine } from '../src/index';
 
@@ -58,12 +58,13 @@ function pixel(raster: PageRaster, x: number, y: number): number[] {
   return [...new Uint8Array(raster.data).slice(index, index + 4)];
 }
 
-async function appearance(doc: DocumentHandle, index = 0): Promise<PageRaster> {
-  return (await doc.page(toPageRef(3)).annotations.renderAppearances()).appearances[index]!.raster;
+async function appearance(doc: LocalDocumentHandle, index = 0): Promise<PageRaster> {
+  return (await doc.page(toPageRef(3)).annotations.renderAppearancesRaw()).appearances[index]!
+    .raster;
 }
 
 describe('vector stamp resizing (wasm)', () => {
-  let engine: Engine;
+  let engine: LocalEngine;
   beforeAll(async () => {
     engine = await createLocalEngine({ runtime: { prefer: 'wasm' } });
   });
@@ -71,7 +72,7 @@ describe('vector stamp resizing (wasm)', () => {
     await engine.destroy();
   });
 
-  async function open(bytes: Uint8Array): Promise<DocumentHandle> {
+  async function open(bytes: Uint8Array): Promise<LocalDocumentHandle> {
     return engine.open({ kind: 'bytes', id: 'stamp-resize', bytes }, { scope: ['*'] });
   }
 
@@ -86,15 +87,15 @@ describe('vector stamp resizing (wasm)', () => {
       await page.annotations.update(ref, {
         subtype: 'stamp',
         rotation: 270,
-        unrotatedRect: { left: 80, bottom: 45, right: 140, top: 75 },
-        rect: { left: 95, bottom: 30, right: 125, top: 90 },
+        box: { x: 95, y: 30, width: 30, height: 60 },
       });
       // Render the full annotation through the page renderer: appearance
       // thumbnails deliberately remove rotation for the viewer to apply it.
-      const render = (document: DocumentHandle) =>
+      const area = { x: 0, y: 0, width: 520, height: 270 };
+      const render = async (document: LocalDocumentHandle) =>
         document.page(toPageRef(3)).render.raw({
           includeAnnotations: true,
-          target: { kind: 'rect', rect: { left: 0, bottom: -50, right: 520, top: 220 } },
+          target: { kind: 'rect', rect: area },
         });
       const live = await render(doc);
       for (const mode of [undefined, 'rewrite'] as const) {
@@ -133,7 +134,7 @@ describe('vector stamp resizing (wasm)', () => {
         await page.annotations.update(ref, {
           subtype: 'stamp',
           fit: 'cover',
-          rect: { left: 10, bottom: 10, right: 110, top: 110 },
+          box: { x: 10, y: 10, width: 100, height: 100 },
         });
         const verify = async () => {
           const raster = await appearance(doc);
@@ -169,7 +170,7 @@ describe('vector stamp resizing (wasm)', () => {
         await page.annotations.update(ref, {
           subtype: 'stamp',
           fit: 'contain',
-          rect: { left: 10, bottom: 10, right: 110, top: 110 },
+          box: { x: 10, y: 10, width: 100, height: 100 },
         });
         const verify = async () => {
           const sibling = await appearance(doc, 1);
@@ -201,7 +202,7 @@ describe('vector stamp resizing (wasm)', () => {
         await page.annotations.update(ref, {
           subtype: 'stamp',
           fit: 'fill',
-          rect: { left: 10, bottom: 10, right: 110, top: 60 },
+          box: { x: 10, y: 10, width: 100, height: 50 },
         });
         const raster = await appearance(doc);
         expect(pixel(raster, 0.1, 0.5)).toEqual(extraContent ? [0, 0, 255, 255] : [255, 0, 0, 255]);
@@ -224,13 +225,13 @@ describe('vector stamp resizing (wasm)', () => {
           await page.annotations.update(ref, {
             subtype: 'stamp',
             fit,
-            rect: { left: 10, bottom: 10, right: 110, top: 110 },
+            box: { x: 10, y: 10, width: 100, height: 100 },
           });
         }
         await page.annotations.update(ref, {
           subtype: 'stamp',
           fit: 'fill',
-          rect: { left: 10, bottom: 10, right: 210, top: 110 },
+          box: { x: 10, y: 10, width: 200, height: 100 },
         });
         const saved = await doc.download();
         await doc.close();

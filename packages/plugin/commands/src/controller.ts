@@ -1,10 +1,19 @@
 /**
- * The commands controller: the registry, resolution against a target
- * document (pure derivations over the store, throw-safe), the one execution
- * path, category gating, and the host-only keystroke matcher.
+ * The commands controller: the commands (from the settings, added while the
+ * app runs, and from families), resolution for a document (derivations over
+ * live state, safe to throw), the one way to run a command, the categories,
+ * and the host-only keystroke matcher.
+ *
+ * Definitions hold functions, so the commands added while the app runs are a
+ * map outside state; every change to it calls `ctx.notify()` so readers read
+ * again.
  */
 import {
-  createEventHook,
+  DocumentsToken,
+  isPluginError,
+  memo,
+  memoByKey,
+  PluginError,
   toPluginError,
   toPluginErrorInfo,
   type CapabilityToken,
@@ -15,50 +24,96 @@ import { matchShortcut, type KeyStroke } from '@embedpdf/core-ui';
 import { I18nToken } from '@embedpdf/plugin-i18n/contract';
 import { ShellToken } from '@embedpdf/plugin-shell/contract';
 
-import { resolvedCommandsEqual } from './contract';
 import type {
   CommandContext,
   CommandDef,
   CommandExecutedEvent,
   CommandExecutionFailedEvent,
-  CommandsConfig,
+  CommandFamily,
+  CommandsSettings,
+  ExecuteOptions,
   ExecuteResult,
   IconAccent,
+  RegisterCommandOptions,
   ResolvedCommand,
 } from './contract';
 import type { CommandsHostCapability } from './host-contract';
-import type { CommandsAction, CommandsState } from './model';
-import { registerCommand, type CommandRegistry, type RegisteredCommand } from './registry';
+import {
+  configuredCommands,
+  registeredCommand,
+  type ConfiguredCommands,
+  type RegisteredCommand,
+} from './registry';
 
-const panelTarget = (def: CommandDef): { id: string; exclusive?: string } | null =>
-  def.panel === undefined ? null : typeof def.panel === 'string' ? { id: def.panel } : def.panel;
+const panelTarget = (definition: CommandDef): { id: string; exclusive?: string } | null =>
+  definition.panel === undefined
+    ? null
+    : typeof definition.panel === 'string'
+      ? { id: definition.panel }
+      : definition.panel;
 
-export function createCommandsController(
-  ctx: PluginContext<CommandsState, CommandsAction>,
-  config: CommandsConfig = {},
-): CommandsHostCapability {
-  const registry: CommandRegistry = new Map();
-  for (const def of config.commands ?? []) registerCommand(registry, def);
-  const report = (error: unknown) =>
-    globalThis.console?.error('[commands] listener failed:', error);
-  const executed = createEventHook<CommandExecutedEvent>(report);
-  const executionFailed = createEventHook<CommandExecutionFailedEvent>(report);
-  ctx.cleanup(() => {
-    executed.dispose();
-    executionFailed.dispose();
-  });
+/**
+ * One command's live derivations for a document, as values a memo can
+ * compare: the entry, label, accent colors, and the enabled/active/visible flags.
+ */
+type Derivations = readonly [
+  entry: RegisteredCommand | null,
+  label: string,
+  accentPrimary: string | undefined,
+  accentSecondary: string | undefined,
+  enabled: boolean,
+  active: boolean,
+  visible: boolean,
+];
 
-  /** Bind capability resolution to the command's target document. The kernel
-   *  resolves workspace tokens regardless of the document argument, so one
-   *  code path serves both scopes. */
-  const commandContext = (documentId?: string, args?: unknown): CommandContext => {
-    const target = documentId ?? ctx.core().activeId;
+const NOT_REGISTERED: Derivations = [null, '', undefined, undefined, false, false, false];
+const NO_NAMES: readonly string[] = [];
+
+const accentOf = (primary?: string, secondary?: string): IconAccent | undefined =>
+  primary === undefined && secondary === undefined
+    ? undefined
+    : {
+        ...(primary !== undefined ? { primary } : {}),
+        ...(secondary !== undefined ? { secondary } : {}),
+      };
+
+/** The memo key of a resolution: the command id and the document named, if any. */
+const resolutionKey = (id: string, documentId: string | undefined): string =>
+  JSON.stringify([id, documentId ?? null]);
+
+export function createCommandsController(ctx: PluginContext<void, CommandsSettings>) {
+  const settings = ctx.settings();
+
+  /** Commands added while the app runs, in the order they were added. */
+  const registered = new Map<string, RegisteredCommand>();
+  /** Bumped on every change to `registered`: the input of the reads built from it. */
+  let registeredVersion = 0;
+  const registeredChanged = (): void => {
+    registeredVersion += 1;
+    ctx.notify();
+  };
+
+  /** The commands the settings define, rebuilt when the setting changes. */
+  const configured = memo(
+    () => [settings.get().commands],
+    (items): ConfiguredCommands => configuredCommands(items),
+  );
+
+  const executed = ctx.events.source<CommandExecutedEvent>();
+  const executionFailed = ctx.events.source<CommandExecutionFailedEvent>();
+
+  /** Capabilities for the command's document: the one named, else the active one. */
+  const commandContext = (
+    documentId?: string,
+    call: { args?: unknown; signal?: AbortSignal } = {},
+  ): CommandContext => {
+    const target = documentId ?? ctx.get(DocumentsToken).getActiveId();
     const get = <T>(token: CapabilityToken<T>): T =>
       target ? ctx.forDocument(token, target) : ctx.get(token);
     return {
       documentId: target,
-      ...(args === undefined ? {} : { args }),
-      core: ctx.core,
+      ...(call.args === undefined ? {} : { args: call.args }),
+      ...(call.signal ? { signal: call.signal } : {}),
       get,
       tryGet: <T>(token: CapabilityToken<T>): T | null => {
         try {
@@ -70,186 +125,327 @@ export function createCommandsController(
     };
   };
 
-  /** Derivations run against live state; a derivation that throws (e.g. it
-   *  needs a document and none is open) falls back to the safe default —
-   *  the button renders, disabled, exactly like v2's empty state. */
+  /** A family's command for one name, made once so it keeps its identity. */
+  const familyCommands = new WeakMap<CommandFamily, Map<string, RegisteredCommand>>();
+  const familyCommand = (family: CommandFamily, name: string): RegisteredCommand => {
+    let byName = familyCommands.get(family);
+    if (!byName) {
+      byName = new Map();
+      familyCommands.set(family, byName);
+    }
+    let entry = byName.get(name);
+    if (!entry) {
+      entry = registeredCommand({ ...family.command(name), id: `${family.prefix}${name}` });
+      byName.set(name, entry);
+    }
+    return entry;
+  };
+
+  /** The command with this id: one added while the app runs, else the settings', else a family's. */
+  const entryOf = (id: string): RegisteredCommand | null => {
+    const { commands, families } = configured();
+    const entry = registered.get(id) ?? commands.get(id);
+    if (entry) return entry;
+    const family = families.find(
+      (candidate) => id.startsWith(candidate.prefix) && id.length > candidate.prefix.length,
+    );
+    return family ? familyCommand(family, id.slice(family.prefix.length)) : null;
+  };
+
+  /** Every command with its own definition (not a family's), each id once. */
+  const definedCommands = memo(
+    () => [registeredVersion, configured()],
+    (_version, { commands }) => {
+      const entries = new Map(commands);
+      for (const [id, entry] of registered) entries.set(id, entry);
+      return [...entries.values()];
+    },
+  );
+
+  // Derivations run against live state; one that throws (it needs a document
+  // and none is open, say) falls back to a safe default, so the button renders
+  // disabled instead of breaking.
   const derive = (
-    fn: ((c: CommandContext) => boolean) | undefined,
-    c: CommandContext,
+    derivation: ((context: CommandContext) => boolean) | undefined,
+    context: CommandContext,
     fallback: boolean,
   ): boolean => {
-    if (!fn) return fallback;
+    if (!derivation) return fallback;
     try {
-      return fn(c);
+      return derivation(context);
     } catch {
       return fallback;
     }
   };
   const deriveAccent = (
-    fn: ((c: CommandContext) => IconAccent | null) | undefined,
-    c: CommandContext,
+    derivation: ((context: CommandContext) => IconAccent | null) | undefined,
+    context: CommandContext,
   ): IconAccent | undefined => {
-    if (!fn) return undefined;
+    if (!derivation) return undefined;
     try {
-      return fn(c) ?? undefined;
+      return derivation(context) ?? undefined;
     } catch {
       return undefined;
     }
   };
+  const namesOf = (family: CommandFamily, context: CommandContext): readonly string[] => {
+    try {
+      return family.names(context);
+    } catch {
+      return NO_NAMES;
+    }
+  };
 
-  const resolveFresh = (entry: RegisteredCommand, documentId?: string): ResolvedCommand => {
-    const { def } = entry;
-    const c = commandContext(documentId);
-    const disabled = ctx.getState().disabledCategories;
-    const categoryHidden = (def.categories ?? []).some((cat) => disabled.includes(cat));
-    const i18n = c.tryGet(I18nToken);
-    const label = i18n ? i18n.t(def.labelKey) : def.labelKey;
-    // Surface-target commands derive `active` from the surface's open state
-    // unless the definition overrides it.
+  /** The label: the key's string when a language has it, else `label`, else the key or the id. */
+  const labelOf = (definition: CommandDef, context: CommandContext): string => {
+    const i18n = definition.labelKey ? context.tryGet(I18nToken) : null;
+    if (i18n && definition.labelKey) {
+      return definition.label === undefined
+        ? i18n.t(definition.labelKey)
+        : i18n.t(definition.labelKey, { fallback: definition.label });
+    }
+    return definition.label ?? definition.labelKey ?? definition.id;
+  };
+
+  const derivationsOf = (entry: RegisteredCommand, documentId?: string): Derivations => {
+    const { definition } = entry;
+    const context = commandContext(documentId);
+    const disabled = settings.get().disabledCategories;
+    const categoryOff = (definition.categories ?? []).some((category) =>
+      disabled.includes(category),
+    );
+    // A command that opens something is active while it's open, unless it says otherwise.
     let active: boolean;
-    if (def.active) {
-      active = derive(def.active, c, false);
+    if (definition.active) {
+      active = derive(definition.active, context, false);
     } else {
-      const shell = c.tryGet(ShellToken);
-      const panel = panelTarget(def);
+      const shell = context.tryGet(ShellToken);
+      const panel = panelTarget(definition);
       active = shell
-        ? def.menu
-          ? shell.isMenuOpen(def.menu)
+        ? definition.menu
+          ? shell.isMenuOpen(definition.menu)
           : panel
             ? shell.isOpen(panel.id)
-            : def.modal
-              ? shell.isOpen(def.modal)
+            : definition.modal
+              ? shell.isOpen(definition.modal)
               : false
         : false;
     }
-    return {
-      id: def.id,
-      label,
-      icon: def.icon,
-      iconAccent: deriveAccent(def.iconAccent, c),
-      shortcuts: entry.shortcuts,
-      menu: def.menu,
-      enabled: derive(def.enabled, c, true) && !categoryHidden,
+    const accent = deriveAccent(definition.iconAccent, context);
+    return [
+      entry,
+      labelOf(definition, context),
+      accent?.primary,
+      accent?.secondary,
+      derive(definition.enabled, context, true) && !categoryOff,
       active,
-      visible: derive(def.visible, c, true) && !categoryHidden,
-      categories: def.categories ?? [],
-    };
+      derive(definition.visible, context, true) && !categoryOff,
+    ];
   };
 
-  /** Reference-stable resolution: the previous object comes back while nothing changed. */
-  const resolved = new Map<string, ResolvedCommand>();
-  const resolveCommand = (id: string, documentId?: string): ResolvedCommand | null => {
-    const entry = registry.get(id);
-    if (!entry) return null;
-    const key = `${documentId ?? ''}|${id}`;
-    const fresh = resolveFresh(entry, documentId);
-    const previous = resolved.get(key);
-    if (previous && resolvedCommandsEqual(previous, fresh)) return previous;
-    resolved.set(key, fresh);
-    return fresh;
-  };
-  const listed = new Map<string, readonly ResolvedCommand[]>();
-  const listCommands = (documentId?: string): readonly ResolvedCommand[] => {
-    const key = documentId ?? '';
-    const next = [...registry.keys()].flatMap((id) => {
-      const r = resolveCommand(id, documentId);
-      return r ? [r] : [];
-    });
-    const previous = listed.get(key);
-    if (previous && previous.length === next.length && previous.every((r, i) => r === next[i])) {
-      return previous;
-    }
-    listed.set(key, next);
-    return next;
-  };
+  /** A resolved command, the same object until one of its derivations or its entry changes. */
+  const resolvedByKey = memoByKey(
+    (key: string): Derivations => {
+      const [id, documentId] = JSON.parse(key) as [string, string | null];
+      const entry = entryOf(id);
+      return entry ? derivationsOf(entry, documentId ?? undefined) : NOT_REGISTERED;
+    },
+    (
+      _key,
+      entry,
+      label,
+      accentPrimary,
+      accentSecondary,
+      enabled,
+      active,
+      visible,
+    ): ResolvedCommand | null =>
+      entry && {
+        id: entry.definition.id,
+        label,
+        icon: entry.definition.icon,
+        iconAccent: accentOf(accentPrimary, accentSecondary),
+        shortcuts: entry.shortcuts,
+        menu: entry.definition.menu,
+        enabled,
+        active,
+        visible,
+        categories: entry.definition.categories ?? [],
+      },
+  );
+  const resolveCommand = (id: string, documentId?: string): ResolvedCommand | null =>
+    entryOf(id) ? resolvedByKey(resolutionKey(id, documentId)) : null;
 
-  const execute = async (
-    id: string,
-    options: { documentId?: string; args?: unknown } = {},
-  ): Promise<ExecuteResult> => {
-    const entry = registry.get(id);
-    if (!entry) return { status: 'rejected', reason: 'not-found' };
-    const r = resolveCommand(id, options.documentId);
-    if (!r || !r.visible) return { status: 'rejected', reason: 'hidden' };
-    if (!r.enabled) return { status: 'rejected', reason: 'disabled' };
-    const c = commandContext(options.documentId, options.args);
-    try {
-      if (entry.def.run) {
-        await entry.def.run(c);
-      } else {
-        // Default routing for declarative surface targets.
-        const shell = c.tryGet(ShellToken);
-        const panel = panelTarget(entry.def);
-        if (shell) {
-          if (entry.def.menu) shell.toggleMenu(entry.def.menu);
-          else if (panel) shell.toggle(panel.id, { exclusive: panel.exclusive });
-          else if (entry.def.modal) shell.toggle(entry.def.modal, { exclusive: 'modal' });
+  /**
+   * Every command's id for a document (`''` is the active one): the defined ones in the order
+   * they were added, then each family's names that no defined command took.
+   */
+  const idsByDocument = memoByKey(
+    (documentKey: string): readonly unknown[] => {
+      const config = configured();
+      const context = commandContext(documentKey || undefined);
+      return [
+        definedCommands(),
+        config,
+        ...config.families.map((family) => namesOf(family, context)),
+      ];
+    },
+    (_documentKey, ...inputs): readonly string[] => {
+      const [defined, { families }, ...names] = inputs as [
+        readonly RegisteredCommand[],
+        ConfiguredCommands,
+        ...(readonly string[])[],
+      ];
+      const ids = defined.map((entry) => entry.definition.id);
+      const taken = new Set(ids);
+      families.forEach((family, index) => {
+        for (const name of names[index] ?? NO_NAMES) {
+          const id = `${family.prefix}${name}`;
+          if (taken.has(id)) continue;
+          taken.add(id);
+          ids.push(id);
         }
-      }
+      });
+      return ids;
+    },
+  );
+  const commandsByDocument = memoByKey(
+    (documentKey: string) =>
+      idsByDocument(documentKey).map((id) => resolveCommand(id, documentKey || undefined)),
+    (_documentKey, ...resolved) =>
+      resolved.filter((command): command is ResolvedCommand => command !== null),
+  );
+  const listCommands = (documentId?: string): readonly ResolvedCommand[] =>
+    commandsByDocument(documentId ?? '');
+
+  const listShortcuts = memo(
+    () => [definedCommands()],
+    (entries) =>
+      entries.flatMap((entry) =>
+        entry.shortcuts.map((shortcut) => ({ commandId: entry.definition.id, shortcut })),
+      ),
+  );
+
+  /** What running a command does: its `run`, or opening what it opens. */
+  const runCommand = async (definition: CommandDef, context: CommandContext): Promise<void> => {
+    if (definition.run) {
+      await definition.run(context);
+      return;
+    }
+    const shell = context.tryGet(ShellToken);
+    const panel = panelTarget(definition);
+    if (!shell) return;
+    if (definition.menu) shell.toggleMenu(definition.menu);
+    else if (panel) shell.toggle(panel.id, { exclusive: panel.exclusive });
+    else if (definition.modal) shell.toggle(definition.modal, { exclusive: 'modal' });
+  };
+
+  const execute = async (id: string, options: ExecuteOptions = {}): Promise<ExecuteResult> => {
+    const { signal, documentId, args } = options;
+    if (signal?.aborted) {
+      throw new PluginError('operation-cancelled', 'commands', 'operation cancelled');
+    }
+    const entry = entryOf(id);
+    if (!entry) return { status: 'rejected', reason: 'not-found' };
+    const resolved = resolveCommand(id, documentId);
+    if (!resolved?.visible) return { status: 'rejected', reason: 'hidden' };
+    if (!resolved.enabled) return { status: 'rejected', reason: 'disabled' };
+    const context = commandContext(documentId, { args, signal });
+    try {
+      await ctx.cancellable(signal, runCommand(entry.definition, context));
     } catch (error) {
+      // The caller cancelling isn't the command failing.
+      if (signal?.aborted && isPluginError(error, 'operation-cancelled')) throw error;
       const failure = toPluginError('commands', error);
       executionFailed.emit({
         commandId: id,
-        documentId: c.documentId,
+        documentId: context.documentId,
         error: toPluginErrorInfo(failure),
       });
       throw failure;
     }
-    executed.emit({ commandId: id, documentId: c.documentId, args: options.args });
+    executed.emit({ commandId: id, documentId: context.documentId, args });
     return { status: 'executed' };
   };
 
-  const registerOne = (def: CommandDef, options?: { replace?: boolean }): Unsubscribe => {
-    const entry = registerCommand(registry, def, options);
+  const registerOne = (definition: CommandDef, options?: RegisterCommandOptions): Unsubscribe => {
+    const taken = registered.has(definition.id) || configured().commands.has(definition.id);
+    if (taken && !options?.replace) {
+      throw new PluginError('conflict', 'commands', `duplicate command '${definition.id}'`);
+    }
+    const entry = registeredCommand(definition);
+    registered.set(definition.id, entry);
+    registeredChanged();
     return () => {
-      if (registry.get(def.id) === entry) registry.delete(def.id);
+      // Own this registration only: a later replacement is not ours to remove.
+      if (registered.get(definition.id) !== entry) return;
+      registered.delete(definition.id);
+      registeredChanged();
     };
   };
 
-  return {
+  const disabledCategories = () => settings.get().disabledCategories;
+
+  const api: CommandsHostCapability = {
+    ...settings.api,
     registerCommand: registerOne,
-    registerCommands: (defs, options) => {
-      const removers = defs.map((def) => registerOne(def, options));
+    registerCommands: (definitions, options) => {
+      const removers = definitions.map((definition) => registerOne(definition, options));
       return () => removers.forEach((remove) => remove());
     },
-    hasCommand: (id) => registry.has(id),
-    getCommand: (id) => registry.get(id)?.def ?? null,
-    listCommandIds: () => [...registry.keys()],
+    hasCommand: (id) => entryOf(id) !== null,
+    getCommand: (id) => entryOf(id)?.definition ?? null,
+    listCommandIds: () => idsByDocument(''),
     resolveCommand,
     listCommands,
     searchCommands: (query, documentId) => {
-      const q = query.trim().toLowerCase();
+      const needle = query.trim().toLowerCase();
       return listCommands(documentId).filter(
-        (r) => r.visible && (q === '' || r.label.toLowerCase().includes(q) || r.id.includes(q)),
+        (command) =>
+          command.visible &&
+          (needle === '' ||
+            command.label.toLowerCase().includes(needle) ||
+            command.id.includes(needle)),
       );
     },
-    listShortcuts: () =>
-      [...registry.values()].flatMap((entry) =>
-        entry.shortcuts.map((shortcut) => ({ commandId: entry.def.id, shortcut })),
-      ),
+    listShortcuts,
     execute,
     canExecute: (id, documentId) => {
-      const r = resolveCommand(id, documentId);
-      return !!r && r.enabled && r.visible;
+      const resolved = resolveCommand(id, documentId);
+      return !!resolved && resolved.enabled && resolved.visible;
     },
-    getDisabledCategories: () => ctx.getState().disabledCategories,
-    isCategoryDisabled: (category) => ctx.getState().disabledCategories.includes(category),
-    disableCategory: (category) => ctx.dispatch({ type: 'COMMANDS/DISABLE_CATEGORY', category }),
-    enableCategory: (category) => ctx.dispatch({ type: 'COMMANDS/ENABLE_CATEGORY', category }),
+    getDisabledCategories: disabledCategories,
+    isCategoryDisabled: (category) => disabledCategories().includes(category),
+    disableCategory: (category) => {
+      const current = disabledCategories();
+      if (current.includes(category)) return;
+      settings.api.updateSettings({ disabledCategories: [...current, category] });
+    },
+    enableCategory: (category) => {
+      const current = disabledCategories();
+      if (!current.includes(category)) return;
+      settings.api.updateSettings({
+        disabledCategories: current.filter((other) => other !== category),
+      });
+    },
     setDisabledCategories: (categories) =>
-      ctx.dispatch({ type: 'COMMANDS/SET_DISABLED_CATEGORIES', categories }),
+      settings.api.updateSettings({ disabledCategories: [...categories] }),
     onExecuted: executed.on,
     onExecutionFailed: executionFailed.on,
     // ── host lens ──
     matchStroke: (stroke: KeyStroke, options) => {
-      for (const [id, entry] of registry) {
-        if (entry.parsed.some((p) => matchShortcut(p, stroke, options))) return id;
+      for (const entry of definedCommands()) {
+        if (entry.parsed.some((shortcut) => matchShortcut(shortcut, stroke, options))) {
+          return entry.definition.id;
+        }
       }
       return null;
     },
     getMenuTarget: (id) => {
-      const entry = registry.get(id);
-      return entry ? { menu: entry.def.menu } : null;
+      const entry = entryOf(id);
+      return entry ? { menu: entry.definition.menu } : null;
     },
-  } satisfies CommandsHostCapability;
+  };
+
+  return { api };
 }

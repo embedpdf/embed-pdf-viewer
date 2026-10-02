@@ -1,4 +1,4 @@
-import type { AstNode } from '@embedpdf/docs-kit';
+import { mdast, type AstNode } from '@embedpdf/docs-kit';
 
 import { projectDocsOverview } from './docs-overview-markdown';
 
@@ -9,8 +9,31 @@ import { projectDocsOverview } from './docs-overview-markdown';
  */
 export function projectEmbedPdfComponent(
   node: AstNode,
-  helpers: { absoluteContentUrl: (url: string) => string },
+  helpers: {
+    absoluteContentUrl: (url: string) => string;
+    resolveNodes: (nodes: AstNode[]) => AstNode[];
+    stringAttribute: (node: AstNode, name: string) => string;
+  },
 ): AstNode[] | null {
   if (node.name === 'DocsOverview') return projectDocsOverview(helpers.absoluteContentUrl);
+  if (node.name === 'CloudPdfCallout') {
+    // A blockquote, like any callout: the author's title, body and link.
+    const { link, paragraph, strong } = mdast;
+    return [
+      {
+        type: 'blockquote',
+        children: [
+          paragraph([strong(helpers.stringAttribute(node, 'title'))]),
+          ...helpers.resolveNodes(node.children ?? []),
+          paragraph([
+            link(
+              helpers.absoluteContentUrl(helpers.stringAttribute(node, 'href')),
+              helpers.stringAttribute(node, 'cta'),
+            ),
+          ]),
+        ],
+      },
+    ];
+  }
   return null;
 }

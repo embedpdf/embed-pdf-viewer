@@ -15,7 +15,7 @@ export const RT_REPLY = 1;
 export const RT_GROUP = 2;
 
 /**
- * Map a PDFium reply-type code to the wire string, GATED on the presence
+ * Map a PDFium reply-type code to the wire string, gated on the presence
  * of `/IRT`. PDFium's `EPDFAnnot_GetReplyType` returns `RT_REPLY` even
  * when there is no `/IRT` (it reports the `/RT` default in isolation), so
  * callers must only invoke this for annotations that actually carry an

@@ -1,15 +1,15 @@
 /**
- * The KERNEL's config: the chrome's customization contract + document sourcing.
+ * The kernel's config: the chrome's customization contract + document sourcing.
  *
  * Deliberately door-blind. `ViewerCustomization` is shared verbatim (README of
  * @embedpdf/viewer-chrome is the law for it); this file adds only what any
- * delivery needs — where the PDFs come from. The engine seam is NOT declared
+ * delivery needs — where the PDFs come from. The engine seam is not declared
  * here: each door declares its own (see ../doors and ../local), because a
  * config type may only promise what its door's imports actually deliver.
  */
 import type { InitialDocument, ViewerCustomization } from '@embedpdf/viewer-chrome';
 
-/** Everything a delivery needs EXCEPT the engine seam — the part every door
+/** Everything a delivery needs except the engine seam — the part every door
  *  agrees on. Doors extend this and add their own `engine` field. */
 export interface ViewerConfigBase extends ViewerCustomization {
   /** URL of a PDF to open at startup — the one-liner path. */
@@ -19,9 +19,9 @@ export interface ViewerConfigBase extends ViewerCustomization {
 }
 
 /**
- * The config as the ELEMENT sees it — a courier's view.
+ * The config as the element sees it — a courier's view.
  *
- * `engine` is `unknown` because the element is ONE compiled class serving every
+ * `engine` is `unknown` because the element is one compiled class serving every
  * door, and it must carry a value only the sending door understands: a live
  * `Engine`, a factory, or that door's plain-data options bag. It opens the
  * envelope just far enough to spot an engine, and otherwise hands it to
@@ -54,11 +54,11 @@ export function initialDocumentsOf(config: ViewerConfigBase): InitialDocument[] 
 }
 
 /** Declarative use: `<embedpdf-viewer src="…" locale="…" theme="…">`. */
-export function configFromAttributes(el: HTMLElement): ViewerConfigBase {
+export function configFromAttributes(element: HTMLElement): ViewerConfigBase {
   const config: ViewerConfigBase = {};
-  const src = el.getAttribute('src');
-  const locale = el.getAttribute('locale');
-  const theme = el.getAttribute('theme');
+  const src = element.getAttribute('src');
+  const locale = element.getAttribute('locale');
+  const theme = element.getAttribute('theme');
   if (src) config.src = src;
   if (locale) config.locale = locale;
   if (theme === 'light' || theme === 'dark' || theme === 'system') config.theme = theme;

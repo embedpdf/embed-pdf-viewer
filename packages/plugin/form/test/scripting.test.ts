@@ -11,19 +11,24 @@ import {
 } from '@embedpdf/core-acrojs';
 import type { ScriptSandbox } from '@embedpdf/core-js-sandbox';
 import {
+  formWidget,
   toPageRef,
   type DocumentHandle,
   type FormEffect,
   type FormFieldDTO,
   type FormSnapshot,
+  type PageLayout,
   type PdfActionTree,
 } from '@embedpdf/engine-core/runtime';
 
-import { createSerialMutationQueue } from '../src/mutationQueue';
+import { createSerialQueue } from '@embedpdf/core';
 import { createFormScriptingController } from '../src/scripting/controller';
 import { standaloneRealm } from './helpers/standalone-realm';
 
-const ref = (fieldObjectNumber: number) => ({ kind: 'objectNumber' as const, fieldObjectNumber });
+const ref = (fieldObjectNumber: number) => ({
+  kind: 'objectNumber' as const,
+  objectNumber: fieldObjectNumber,
+});
 
 const action = (script: string): PdfActionTree => ({
   root: { type: 'javascript', subtype: 'JavaScript', script, next: [] },
@@ -39,11 +44,12 @@ const text = (
   actions?: FormFieldDTO['actions'],
 ): FormFieldDTO => ({
   ref: ref(fieldObjectNumber),
-  fieldObjectNumber,
   name,
   family: 'text',
   origin: 'acroform',
-  flags: { readOnly: false, required: false, noExport: false, raw: 0 },
+  readOnly: false,
+  required: false,
+  noExport: false,
   alternateName: null,
   mappingName: null,
   valueEntry: { kind: 'scalar', value },
@@ -54,22 +60,23 @@ const text = (
   multiline: false,
   password: false,
   comb: false,
-  widgets: [{ annotObjectNumber: fieldObjectNumber, page: toPageRef(10) }],
+  widgets: [{ ...formWidget(fieldObjectNumber, toPageRef(10)), rect: null }],
   ...(actions ? { actions } : {}),
 });
 
 const pushbutton = (fieldObjectNumber: number, name: string): FormFieldDTO => ({
   ref: ref(fieldObjectNumber),
-  fieldObjectNumber,
   name,
   family: 'pushbutton',
   origin: 'acroform',
-  flags: { readOnly: false, required: false, noExport: false, raw: 0 },
+  readOnly: false,
+  required: false,
+  noExport: false,
   alternateName: null,
   mappingName: null,
   valueEntry: { kind: 'none' },
   defaultValueEntry: { kind: 'none' },
-  widgets: [{ annotObjectNumber: fieldObjectNumber, page: toPageRef(10) }],
+  widgets: [{ ...formWidget(fieldObjectNumber, toPageRef(10)), rect: null }],
 });
 
 class NodeSandbox implements ScriptSandbox {
@@ -99,14 +106,17 @@ class NodeSandbox implements ScriptSandbox {
   }
 }
 
-const documentMeta = (): DocumentMeta =>
-  ({
-    id: 'form-doc',
-    name: 'proposal.pdf',
-    pageCount: 1,
-    pages: [{ ref: toPageRef(10) }],
-    revision: 0,
-  }) as DocumentMeta;
+const documentMeta = (): DocumentMeta => ({
+  id: 'form-doc',
+  instanceId: 'form-doc',
+  name: 'proposal.pdf',
+  pageCount: 1,
+  // Only the page's identity matters to the scripting controller.
+  pages: [{ ref: toPageRef(10) } as PageLayout],
+  revision: 0,
+  hasUnsavedChanges: false,
+  renderPolicy: { kind: 'continuous' },
+});
 
 function harness(snapshot: FormSnapshot, nameTreeScript?: string) {
   const batches: FormEffect[][] = [];
@@ -119,7 +129,6 @@ function harness(snapshot: FormSnapshot, nameTreeScript?: string) {
         fields: [],
         changedWidgets: [],
       })),
-      changedWidgets: [],
       meta: {} as never,
     };
   });
@@ -130,9 +139,9 @@ function harness(snapshot: FormSnapshot, nameTreeScript?: string) {
   const doc = {
     id: 'form-doc',
     forms: { list: async () => snapshot, applyEffects },
-    actions: { read: readActions },
+    actions: { get: readActions },
     security: {
-      identity: { user_id: 'alex', display_name: 'Alex Morgan', group_id: 'EmbedPDF' },
+      identity: { userId: 'alex', displayName: 'Alex Morgan', organization: 'EmbedPDF' },
     },
   } as unknown as DocumentHandle;
   const sandbox = new NodeSandbox();
@@ -171,16 +180,16 @@ describe('form scripting transaction', () => {
     };
     const fx = harness(snapshot, `getField('status').value = 'initialized';`);
 
-    const result = await fx.controller.commit(ref(2), { type: 'text', value: '3' });
+    const result = await fx.controller.commit(ref(2), { value: '3' });
 
     expect(result.status).toBe('applied');
     expect(fx.readActions).toHaveBeenCalledTimes(1);
     expect(fx.factory).toHaveBeenCalledTimes(1);
     expect(fx.batches).toEqual([
       [
-        { kind: 'setValue', ref: ref(1), value: { type: 'text', value: 'initialized' } },
-        { kind: 'setValue', ref: ref(2), value: { type: 'text', value: '3' } },
-        { kind: 'setValue', ref: ref(3), value: { type: 'text', value: '6' } },
+        { kind: 'setValue', ref: ref(1), value: { value: 'initialized' } },
+        { kind: 'setValue', ref: ref(2), value: { value: '3' } },
+        { kind: 'setValue', ref: ref(3), value: { value: '6' } },
         { kind: 'setAppearanceText', ref: ref(3), text: '$6' },
       ],
     ]);
@@ -202,7 +211,6 @@ describe('form scripting transaction', () => {
     const fx = harness(snapshot);
 
     const result = await fx.controller.commit(ref(2), {
-      type: 'text',
       value: 'invalid',
     });
 
@@ -226,11 +234,9 @@ describe('form scripting transaction', () => {
     };
     const fx = harness(snapshot);
 
-    await fx.controller.commit(ref(2), { type: 'text', value: 'abc' });
+    await fx.controller.commit(ref(2), { value: 'abc' });
 
-    expect(fx.batches[0]).toEqual([
-      { kind: 'setValue', ref: ref(2), value: { type: 'text', value: 'ABC' } },
-    ]);
+    expect(fx.batches[0]).toEqual([{ kind: 'setValue', ref: ref(2), value: { value: 'ABC' } }]);
   });
 
   it('executes widget activation in the same isolated transaction and surfaces UI effects', async () => {
@@ -261,17 +267,17 @@ describe('form scripting transaction', () => {
         {
           kind: 'setValue',
           ref: ref(1),
-          value: { type: 'text', value: 'Mouse Up:Field' },
+          value: { value: 'Mouse Up:Field' },
         },
       ],
     ]);
   });
 
   it('DEGRADES a name-tree boot exception — the user still fills (never bricks)', async () => {
-    // The i-140 class of bug: Adobe's `!ADBE::…VersChk…` boilerplate throwing
-    // (an API we don't emulate) used to poison every commit. The invariant
-    // now: a boot failure is a `script-error` DIAGNOSTIC; the user's own
-    // value still commits, on this transaction and every later one.
+    // Adobe's `!ADBE::…VersChk…` boilerplate throws (it calls an API the
+    // sandbox does not emulate). A boot failure is a `script-error`
+    // diagnostic; the user's own value still commits, on this transaction
+    // and every later one.
     const snapshot: FormSnapshot = {
       formKind: 'acroform',
       needsAppearances: false,
@@ -280,16 +286,19 @@ describe('form scripting transaction', () => {
     };
     const fx = harness(snapshot, `throw new Error('boot failed');`);
 
-    const first = await fx.controller.commit(ref(2), { type: 'text', value: 'a' });
-    const second = await fx.controller.commit(ref(2), { type: 'text', value: 'b' });
+    const first = await fx.controller.commit(ref(2), { value: 'a' });
+    const second = await fx.controller.commit(ref(2), { value: 'b' });
 
     expect(first.status).toBe('applied');
     expect(first.error).toBeUndefined();
     expect(
-      first.diagnostics.some((d) => d.code === 'script-error' && d.message.includes('boot failed')),
+      first.diagnostics.some(
+        (diagnostic) =>
+          diagnostic.code === 'script-error' && diagnostic.message.includes('boot failed'),
+      ),
     ).toBe(true);
     expect(second.status).toBe('applied');
-    expect(second.diagnostics.some((d) => d.code === 'script-error')).toBe(false);
+    expect(second.diagnostics.some((diagnostic) => diagnostic.code === 'script-error')).toBe(false);
     expect(fx.readActions).toHaveBeenCalledTimes(1); // boot never retried
     expect(fx.applyEffects).toHaveBeenCalledTimes(2); // both user values landed
   });
@@ -297,7 +306,7 @@ describe('form scripting transaction', () => {
 
 describe('form mutation queue', () => {
   it('serializes overlapping operations and continues after a rejection', async () => {
-    const enqueue = createSerialMutationQueue();
+    const enqueue = createSerialQueue('form');
     const order: string[] = [];
     let release!: () => void;
     const held = new Promise<void>((resolve) => {

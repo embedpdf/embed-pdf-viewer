@@ -3,6 +3,7 @@ import type {
   FormFieldDTO,
   FormFieldRef,
   FormSnapshot,
+  PdfCoordinates,
 } from '@embedpdf/engine-core/runtime';
 import { EngineError, EngineErrorCode } from '@embedpdf/engine-core/runtime';
 import { NULL_PTR, type PdfRuntimeModule } from '@embedpdf/engine-runtime';
@@ -25,13 +26,13 @@ export class FormReader {
     private readonly session: DocumentSession,
   ) {}
 
-  snapshot(signal: AbortSignal): FormSnapshot {
+  snapshot(signal: AbortSignal): FormSnapshot<PdfCoordinates> {
     throwIfAborted(signal);
     const model = acquireFormModel(this.runtime, this.session);
     return readFormSnapshot(this.runtime, model, this.session.requireDocPtr());
   }
 
-  field(ref: FormFieldRef, signal: AbortSignal): FormFieldDTO {
+  field(ref: FormFieldRef, signal: AbortSignal): FormFieldDTO<PdfCoordinates> {
     throwIfAborted(signal);
     const model = acquireFormModel(this.runtime, this.session);
     const { fieldIndex } = resolveFieldRef(this.runtime, model, ref);

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
-import { createCloudEngine } from '../src/index';
+import { cloudEngine } from '../src/index';
 import { HttpClient } from '../src/transport/HttpClient';
 import { CloudDocumentHandle } from '../src/document/CloudDocumentHandle';
 import {
@@ -9,7 +9,7 @@ import {
   toPageRef,
 } from '@embedpdf/engine-core/runtime';
 import {
-  AnnotationListPageSnapshotSchema,
+  AnnotationListSchema,
   DocumentHeadSchema,
   DocumentManifestSchema,
   PageTextSnapshotSchema,
@@ -91,33 +91,38 @@ function annotation(index: number) {
     ref: {
       kind: 'objectNumber',
       page: toPageRef(PAGE_OBJECT_NUMBER),
-      annotObjectNumber: 10_000 + index,
+      objectNumber: 10_000 + index,
     },
     page: toPageRef(PAGE_OBJECT_NUMBER),
     index,
     identityQuality: 'durable',
+    hasAppearance: true,
     nm: `stub-${index}`,
-    flags: {
-      invisible: false,
-      hidden: false,
-      print: true,
-      noZoom: false,
-      noRotate: false,
-      noView: false,
-      readOnly: false,
-      locked: false,
-      toggleNoView: false,
-      lockedContents: false,
-    },
-    rect: { left: 0, top: 0, right: 10, bottom: 10 },
+    invisible: false,
+    hidden: false,
+    print: true,
+    noZoom: false,
+    noRotate: false,
+    noView: false,
+    readOnly: false,
+    locked: false,
+    toggleNoView: false,
+    lockedContents: false,
+    rect: { x: 0, y: 0, width: 10, height: 10 },
     contents: null,
     subject: null,
     author: null,
-    created: null,
-    modified: null,
+    createdAt: null,
+    modifiedAt: null,
     blendMode: 'normal',
-    inReplyTo: null,
-    replyType: null,
+    reply: null,
+    popup: null,
+    groupId: null,
+    userId: null,
+    createdBy: null,
+    modifiedBy: null,
+    importedBy: null,
+    actions: null,
     rawSubtypeCode: 0,
     rawSubtypeName: null,
   };
@@ -139,6 +144,7 @@ function pageState(generation = 0) {
 // for the single stub page (the harness only asserts page identity/order).
 function layoutSnapshot() {
   const box = { left: 0, bottom: 0, right: 612, top: 792 };
+  const pageBox = { x: 0, y: 0, width: 612, height: 792 };
   return {
     pageCount: 1,
     pages: [
@@ -149,9 +155,17 @@ function layoutSnapshot() {
         size: { width: 612, height: 792 },
         rotation: 0 as const,
         userUnit: 1,
-        boxes: { media: { ...box }, crop: { ...box } },
+        boxes: {
+          media: { ...pageBox },
+          crop: { ...pageBox },
+          bleed: { ...pageBox },
+          trim: { ...pageBox },
+          art: { ...pageBox },
+        },
+        pdfCropBox: { ...box },
       },
     ],
+    namedPages: [],
   };
 }
 
@@ -164,10 +178,9 @@ function metadataSnapshot(title: string | null) {
     keywords: null,
     producer: null,
     creator: null,
-    created: null,
-    modified: null,
+    createdAt: null,
+    modifiedAt: null,
     trapped: 'unknown' as const,
-    custom: {},
   };
 }
 
@@ -228,6 +241,7 @@ function buildStub(initial: ServerState): StubbedFixture {
           metadataVersion: state.metadataVersion,
           auditHead: 0,
           baseSha: 'stub-sha',
+          protection: null,
           pages: [
             {
               state: pageState(),
@@ -288,10 +302,14 @@ function buildStub(initial: ServerState): StubbedFixture {
       return new Response(
         JSON.stringify({
           metadata: metadataSnapshot(state.title),
-          cache: {
-            previousDocVersion,
-            docVersion: state.docVersion,
-            metadataVersion: state.metadataVersion,
+          meta: {
+            affectedPages: [],
+            cacheDelta: {
+              previousDocVersion,
+              docVersion: state.docVersion,
+              metadataVersion: state.metadataVersion,
+              pages: [],
+            },
           },
         }),
         { status: 200, headers: { 'content-type': 'application/json' } },
@@ -302,9 +320,9 @@ function buildStub(initial: ServerState): StubbedFixture {
       /^\/v1\/docs\/([^/]+)\/layers\/([^/]+)\/text\/pages\/obj%3A(\d+)\/data@contentVersion=(\d+)$/,
     );
     if (textMatch && method === 'GET') {
-      const requestedPon = Number(textMatch[3]);
+      const requestedPageObjectNumber = Number(textMatch[3]);
       const requestedVersion = Number(textMatch[4]);
-      if (requestedPon !== PAGE_OBJECT_NUMBER) {
+      if (requestedPageObjectNumber !== PAGE_OBJECT_NUMBER) {
         return new Response(
           JSON.stringify({ error: { code: 'NotFound', message: 'unknown page' } }),
           { status: 404, headers: { 'content-type': 'application/json' } },
@@ -330,9 +348,9 @@ function buildStub(initial: ServerState): StubbedFixture {
       /^\/v1\/docs\/([^/]+)\/layers\/([^/]+)\/annotations\/pages\/obj%3A(\d+)\/items@annotationVersion=(\d+)$/,
     );
     if (annotationsMatch && method === 'GET') {
-      const requestedPon = Number(annotationsMatch[3]);
+      const requestedPageObjectNumber = Number(annotationsMatch[3]);
       const requestedVersion = Number(annotationsMatch[4]);
-      if (requestedPon !== PAGE_OBJECT_NUMBER) {
+      if (requestedPageObjectNumber !== PAGE_OBJECT_NUMBER) {
         return new Response(
           JSON.stringify({ error: { code: 'NotFound', message: 'unknown page' } }),
           { status: 404, headers: { 'content-type': 'application/json' } },
@@ -346,10 +364,10 @@ function buildStub(initial: ServerState): StubbedFixture {
       }
       return new Response(
         JSON.stringify({
-          pageState: pageState(),
           annotations: Array.from({ length: state.annotationCount }, (_, index) =>
             annotation(index),
           ),
+          pages: [pageState()],
         }),
         { status: 200, headers: { 'content-type': 'application/json' } },
       );
@@ -359,8 +377,8 @@ function buildStub(initial: ServerState): StubbedFixture {
       /^\/v1\/docs\/([^/]+)\/layers\/([^/]+)\/annotations\/pages\/obj%3A(\d+)\/items$/,
     );
     if (annotationCreateMatch && method === 'POST') {
-      const requestedPon = Number(annotationCreateMatch[3]);
-      if (requestedPon !== PAGE_OBJECT_NUMBER) {
+      const requestedPageObjectNumber = Number(annotationCreateMatch[3]);
+      if (requestedPageObjectNumber !== PAGE_OBJECT_NUMBER) {
         return new Response(
           JSON.stringify({ error: { code: 'NotFound', message: 'unknown page' } }),
           { status: 404, headers: { 'content-type': 'application/json' } },
@@ -373,7 +391,7 @@ function buildStub(initial: ServerState): StubbedFixture {
       state.annotationCount += 1;
       return new Response(
         JSON.stringify({
-          created,
+          annotation: created,
           meta: {
             cacheDelta: {
               previousDocVersion,
@@ -389,7 +407,7 @@ function buildStub(initial: ServerState): StubbedFixture {
               ],
             },
             affectedPages: [pageState()],
-            changed: [{ kind: 'objectNumber', value: created.ref.annotObjectNumber }],
+            changed: [{ kind: 'objectNumber', objectNumber: created.ref.objectNumber }],
             weakRefsInvalidated: false,
             shouldRefetch: null,
           },
@@ -514,7 +532,7 @@ describe('CloudPageTextService — end-to-end transparent retry', () => {
     const doc = new CloudDocumentHandle(fx.http, DOC_ID);
     try {
       const page = doc.page(toPageRef(PAGE_OBJECT_NUMBER));
-      const snap = await page.text.read();
+      const snap = await page.text.get();
       expect(snap.text).toBe('initial');
       expect(PageTextSnapshotSchema.safeParse(snap).success).toBe(true);
       const paths = fx.calls.map((c) => c.path);
@@ -529,14 +547,14 @@ describe('CloudPageTextService — end-to-end transparent retry', () => {
   });
 
   test('open token seeds the first manifest fetch so pages.list does not repeat /head', async () => {
-    const engine = createCloudEngine({
+    const engine = cloudEngine({
       baseUrl: 'http://stub',
       fetch: fx.fetch,
     });
     const doc = await engine.open({ kind: 'token', token: docToken() });
     try {
       const list = await doc.pages.list();
-      expect(list.pages.map((page) => page.ref.pageObjectNumber)).toEqual([PAGE_OBJECT_NUMBER]);
+      expect(list.pages.map((page) => page.ref.objectNumber)).toEqual([PAGE_OBJECT_NUMBER]);
       const paths = fx.calls.map((call) => call.path);
       // pages.list reads layoutVersion off the (seeded) manifest, then fetches
       // the content-addressed /layout leaf — no extra /head.
@@ -553,17 +571,27 @@ describe('CloudPageTextService — end-to-end transparent retry', () => {
   });
 
   test('stale open seed falls back to /head before surfacing pages.list', async () => {
-    const engine = createCloudEngine({
+    // A change lands between open()'s /head and its first manifest read (the
+    // manifest it fetches up front for the document's protection).
+    let raced = false;
+    const racingFetch: typeof globalThis.fetch = async (input, init) => {
+      const response = await fx.fetch(input, init);
+      if (!raced && String(input).endsWith('/head')) {
+        raced = true;
+        fx.bump({ docVersion: 2, pageContentVersion: 2, pageAnnotationVersion: 2 });
+      }
+      return response;
+    };
+    const engine = cloudEngine({
       baseUrl: 'http://stub',
-      fetch: fx.fetch,
+      fetch: racingFetch,
     });
     const doc = await engine.open({ kind: 'token', token: docToken() });
     try {
-      fx.bump({ docVersion: 2, pageContentVersion: 2, pageAnnotationVersion: 2 });
       const list = await doc.pages.list();
-      expect(list.pages.map((page) => page.ref.pageObjectNumber)).toEqual([PAGE_OBJECT_NUMBER]);
+      expect(list.pages.map((page) => page.ref.objectNumber)).toEqual([PAGE_OBJECT_NUMBER]);
       const paths = fx.calls.map((call) => call.path);
-      // Stale seed → manifest ladder refreshes to v2 first, then the /layout
+      // Stale seed → manifest ladder refreshes to docVersion=2 first, then the /layout
       // leaf is fetched at the refreshed layoutVersion.
       expect(paths).toEqual([
         `/v1/docs/${DOC_ID}/layers/${LAYER_NAME}/head`,
@@ -579,7 +607,7 @@ describe('CloudPageTextService — end-to-end transparent retry', () => {
   });
 
   test('refreshManifest still re-fetches /head after the open seed is consumed', async () => {
-    const engine = createCloudEngine({
+    const engine = cloudEngine({
       baseUrl: 'http://stub',
       fetch: fx.fetch,
     });
@@ -589,7 +617,7 @@ describe('CloudPageTextService — end-to-end transparent retry', () => {
       fx.bump({ docVersion: 2, pageContentVersion: 2, pageAnnotationVersion: 2 });
       const callsBeforeRefresh = fx.calls.length;
       const page = doc.page(toPageRef(PAGE_OBJECT_NUMBER));
-      const snap = await page.text.read();
+      const snap = await page.text.get();
       expect(snap.text).toBe('initial');
       const paths = fx.calls.slice(callsBeforeRefresh).map((call) => call.path);
       expect(paths).toEqual([
@@ -608,9 +636,9 @@ describe('CloudPageTextService — end-to-end transparent retry', () => {
     const doc = new CloudDocumentHandle(fx.http, DOC_ID);
     try {
       const page = doc.page(toPageRef(PAGE_OBJECT_NUMBER));
-      await page.text.read();
+      await page.text.get();
       const callsAfterFirst = fx.calls.length;
-      await page.text.read();
+      await page.text.get();
       const newPaths = fx.calls.slice(callsAfterFirst).map((c) => c.path);
       expect(newPaths).toEqual([
         `/v1/docs/${DOC_ID}/layers/${LAYER_NAME}/text/pages/${PAGE_KEY}/data@contentVersion=1`,
@@ -626,21 +654,21 @@ describe('CloudPageTextService — end-to-end transparent retry', () => {
       const page = doc.page(toPageRef(PAGE_OBJECT_NUMBER));
       // Warm the cache so the SDK has docVersion=1 / pageContentVersion=1
       // squirrelled away.
-      const first = await page.text.read();
+      const first = await page.text.get();
       expect(first.text).toBe('initial');
 
       // Server bumps both versions, as a mutation would.
       fx.bump({ docVersion: 2, pageContentVersion: 2, text: 'after-mutation' });
 
       const callsBeforeRetry = fx.calls.length;
-      const second = await page.text.read();
+      const second = await page.text.get();
       expect(second.text).toBe('after-mutation');
 
       // The retry ladder must be exactly:
-      //   [stale-leaf v1]   → 404
-      //   [/head]           → 200 (docVersion=2)
-      //   [/manifest@docVersion=2]    → 200 (pageContentVersion=2)
-      //   [fresh-leaf v2]   → 200
+      //   [stale leaf, contentVersion=1]  → 404
+      //   [/head]                         → 200 (docVersion=2)
+      //   [/manifest@docVersion=2]        → 200 (pageContentVersion=2)
+      //   [fresh leaf, contentVersion=2]  → 200
       const retryPaths = fx.calls.slice(callsBeforeRetry).map((c) => c.path);
       expect(retryPaths).toEqual([
         `/v1/docs/${DOC_ID}/layers/${LAYER_NAME}/text/pages/${PAGE_KEY}/data@contentVersion=1`,
@@ -649,10 +677,10 @@ describe('CloudPageTextService — end-to-end transparent retry', () => {
         `/v1/docs/${DOC_ID}/layers/${LAYER_NAME}/text/pages/${PAGE_KEY}/data@contentVersion=2`,
       ]);
 
-      // Cache is now warm with v2; a third read uses the new version
+      // Cache is now warm with docVersion=2; a third read uses it
       // and goes straight to the leaf URL — no second refresh.
       const callsBeforeThird = fx.calls.length;
-      const third = await page.text.read();
+      const third = await page.text.get();
       expect(third.text).toBe('after-mutation');
       const thirdPaths = fx.calls.slice(callsBeforeThird).map((c) => c.path);
       expect(thirdPaths).toEqual([
@@ -669,7 +697,7 @@ describe('CloudPageTextService — end-to-end transparent retry', () => {
       const page = doc.page(toPageRef(PAGE_OBJECT_NUMBER));
       const first = await page.annotations.list();
       expect(first.annotations).toEqual([]);
-      expect(AnnotationListPageSnapshotSchema.safeParse(first).success).toBe(true);
+      expect(AnnotationListSchema.safeParse(first).success).toBe(true);
 
       fx.bump({ docVersion: 2, pageAnnotationVersion: 2 });
 
@@ -692,14 +720,14 @@ describe('CloudPageTextService — end-to-end transparent retry', () => {
   test('metadata read uses the same layer refresh-on-404 ladder as text/annotations', async () => {
     const doc = new CloudDocumentHandle(fx.http, DOC_ID);
     try {
-      const first = await doc.metadata.read();
+      const first = await doc.metadata.get();
       expect(first.title).toBe('initial-title');
 
       // A metadata write bumps docVersion + metadataVersion under the SDK.
       fx.bump({ docVersion: 2, metadataVersion: 2, title: 'after-write' });
 
       const callsBeforeRetry = fx.calls.length;
-      const second = await doc.metadata.read();
+      const second = await doc.metadata.get();
       expect(second.title).toBe('after-write');
 
       const retryPaths = fx.calls.slice(callsBeforeRetry).map((c) => c.path);
@@ -714,24 +742,25 @@ describe('CloudPageTextService — end-to-end transparent retry', () => {
     }
   });
 
-  test('metadata update absorbs cache in place so the next read skips the 404 refresh', async () => {
+  test('metadata update absorbs its cache delta in place so the next read skips the 404 refresh', async () => {
     const doc = new CloudDocumentHandle(fx.http, DOC_ID);
     try {
-      const first = await doc.metadata.read();
+      const first = await doc.metadata.get();
       expect(first.title).toBe('initial-title');
 
       const result = await doc.metadata.update({ title: 'patched-title' });
       expect(result.metadata.title).toBe('patched-title');
-      expect(result.cache).toEqual({
+      expect(result.meta.cacheDelta).toEqual({
         previousDocVersion: 1,
         docVersion: 2,
         metadataVersion: 2,
+        pages: [],
       });
 
-      // applyMetadata advanced the cached manifest in place: the next read
+      // The absorb advanced the cached manifest in place: the next read
       // goes straight to the fresh /metadata leaf — no /head, no /manifest.
       const callsBeforeRead = fx.calls.length;
-      const after = await doc.metadata.read();
+      const after = await doc.metadata.get();
       expect(after.title).toBe('patched-title');
       const paths = fx.calls.slice(callsBeforeRead).map((c) => c.path);
       expect(paths).toEqual([`/v1/docs/${DOC_ID}/layers/${LAYER_NAME}/metadata@metadataVersion=2`]);
@@ -752,10 +781,10 @@ describe('CloudPageTextService — end-to-end transparent retry', () => {
         contents: 'delta-driven-create',
         quadPoints: [
           {
-            p1: { x: 0, y: 0 },
-            p2: { x: 10, y: 0 },
-            p3: { x: 0, y: 10 },
-            p4: { x: 10, y: 10 },
+            upperLeft: { x: 0, y: 0 },
+            upperRight: { x: 10, y: 0 },
+            lowerLeft: { x: 0, y: 10 },
+            lowerRight: { x: 10, y: 10 },
           },
         ],
       });
@@ -815,14 +844,14 @@ describe('CloudPageTextService — end-to-end transparent retry', () => {
     const doc = new CloudDocumentHandle(fx.http, DOC_ID);
     try {
       const page = doc.page(toPageRef(PAGE_OBJECT_NUMBER));
-      const [a, b] = await Promise.all([page.text.read(), page.text.read()]);
+      const [a, b] = await Promise.all([page.text.get(), page.text.get()]);
       expect(a.text).toBe('initial');
       expect(b.text).toBe('initial');
       const headCount = fx.calls.filter((c) => c.path.endsWith('/head')).length;
       const manifestCount = fx.calls.filter((c) => c.path.includes('/manifest@')).length;
-      // Phase 4 contract: cold-cache fetches are singleflighted, so
-      // even two parallel page reads trigger exactly one /head + one
-      // /manifest. Without the inflight dedupe, this would be 2/2.
+      // Cold-cache fetches are singleflighted, so even two parallel page
+      // reads trigger exactly one /head + one /manifest. Without the
+      // inflight dedupe, this would be 2/2.
       expect(headCount).toBe(1);
       expect(manifestCount).toBe(1);
     } finally {
@@ -836,7 +865,7 @@ describe('CloudPageTextService — end-to-end transparent retry', () => {
       const ghost = doc.page(toPageRef(999_999));
       let caught: unknown;
       try {
-        await ghost.text.read();
+        await ghost.text.get();
       } catch (err) {
         caught = err;
       }
@@ -844,7 +873,7 @@ describe('CloudPageTextService — end-to-end transparent retry', () => {
       const headCalls = fx.calls.filter((c) => c.path.endsWith('/head')).length;
       const manifestCalls = fx.calls.filter((c) => c.path.includes('/manifest@')).length;
       // The SDK fetches the manifest once to resolve the page; the
-      // "page not in manifest" branch throws locally and does NOT
+      // "page not in manifest" branch throws locally and does not
       // trigger the 404→refresh ladder (no leaf call, no refresh).
       expect(headCalls).toBe(1);
       expect(manifestCalls).toBe(1);
@@ -874,6 +903,7 @@ describe('CloudEngine schema parity — DocumentHeadSchema / DocumentManifestSch
       metadataVersion: 1,
       auditHead: 0,
       baseSha: 'sha',
+      protection: null,
       pages: [
         {
           state: {
@@ -914,35 +944,32 @@ describe('CloudPageAnnotationsService — binary payload wire shape', () => {
     return Uint8Array.from(atob(b64), (ch) => ch.charCodeAt(0));
   })();
 
-  test('a stamp create ships as multipart: `body` JSON part + `resource:{key}` file part', async () => {
+  test('a stamp create ships as multipart: the data as `body`, its drawing as `resource:appearance`', async () => {
     const fx = freshStub();
     const doc = new CloudDocumentHandle(fx.http, DOC_ID);
     try {
-      await doc.page(toPageRef(PAGE_OBJECT_NUMBER)).annotations.create({
-        subtype: 'stamp',
-        rect: { left: 10, bottom: 10, right: 110, top: 60 },
-        source: TINY_PNG,
-        fit: 'contain',
-      });
+      await doc
+        .page(toPageRef(PAGE_OBJECT_NUMBER))
+        .annotations.create(
+          { subtype: 'stamp', box: { x: 10, y: 10, width: 100, height: 50 }, fit: 'cover' },
+          { appearance: TINY_PNG },
+        );
 
       const post = fx.calls.find((c) => c.method === 'POST' && c.path.endsWith('/items'));
       expect(post).toBeDefined();
       expect(post!.body).toBeInstanceOf(FormData);
       const form = post!.body as FormData;
 
-      const wire = JSON.parse(String(form.get('body')));
-      expect(wire).toMatchObject({
+      // The body is the data exactly: no bytes and no resource keys inside it.
+      expect(JSON.parse(String(form.get('body')))).toEqual({
         subtype: 'stamp',
-        fit: 'contain',
-        source: { resource: 'r0' },
+        box: { x: 10, y: 10, width: 100, height: 50 },
+        fit: 'cover',
       });
-      expect(wire.source.resource).toBe('r0'); // never inline bytes on the wire
-
-      const part = form.get('resource:r0');
+      const part = form.get('resource:appearance');
       expect(part).toBeInstanceOf(Blob);
-      expect((part as Blob).type).toBe('image/png'); // sniffed, not declared
-      const bytes = new Uint8Array(await (part as Blob).arrayBuffer());
-      expect(bytes).toEqual(TINY_PNG);
+      expect(new Uint8Array(await (part as Blob).arrayBuffer())).toEqual(TINY_PNG);
+      expect([...form.keys()].sort()).toEqual(['body', 'resource:appearance']);
     } finally {
       await doc.close();
     }
@@ -956,10 +983,10 @@ describe('CloudPageAnnotationsService — binary payload wire shape', () => {
         subtype: 'highlight',
         quadPoints: [
           {
-            p1: { x: 0, y: 0 },
-            p2: { x: 10, y: 0 },
-            p3: { x: 0, y: 10 },
-            p4: { x: 10, y: 10 },
+            upperLeft: { x: 0, y: 0 },
+            upperRight: { x: 10, y: 0 },
+            lowerLeft: { x: 0, y: 10 },
+            lowerRight: { x: 10, y: 10 },
           },
         ],
       });
@@ -973,4 +1000,4 @@ describe('CloudPageAnnotationsService — binary payload wire shape', () => {
   });
 });
 
-void createCloudEngine;
+void cloudEngine;

@@ -1,0 +1,51 @@
+import { readFile, writeFile } from 'node:fs/promises';
+import { beforeAll, afterAll, describe, test, expect } from '/Users/bobsingor/GitHub/cloudpdf-platform/oss/embedpdf/packages/core/signature/node_modules/vitest/dist/index.js';
+import { createLocalEngine } from '/Users/bobsingor/GitHub/cloudpdf-platform/oss/embedpdf/packages/engine/main/dist/index.js';
+import { validateSignatures } from '/Users/bobsingor/GitHub/cloudpdf-platform/oss/embedpdf/packages/core/signature/src/index.ts';
+const directory = '/tmp/epdf-weak-nm-probes/pdfs';
+const manifest = JSON.parse(await readFile(`${directory}/manifest.json`, 'utf8'));
+const certificate = new Uint8Array(await readFile(manifest.certificate));
+const reports: any[] = [];
+afterAll(async () => { await writeFile('/tmp/epdf-weak-nm-probes/engine-report.json', JSON.stringify(reports, null, 2)); });
+for (const runtime of ['wasm', 'native'] as const) {
+ describe(runtime, () => {
+  let engine: ReturnType<typeof createLocalEngine>;
+  beforeAll(() => { engine = createLocalEngine({ runtime: { prefer: runtime } }); });
+  afterAll(async () => { await engine.destroy(); });
+  test.each(manifest.cases)('$id', async (fixture: any) => {
+    const bytes = new Uint8Array(await readFile(`${directory}/${fixture.file}`));
+    const doc = await engine.open(runtime === 'native' ? { kind: 'layerFile', id: fixture.id, basePath: `${directory}/${fixture.file}` } : {kind:'bytes',id: fixture.id, bytes}, {scope:['*']});
+    try {
+      const verdicts = await validateSignatures(doc, {trust: {anchors: async () => [certificate]}});
+      const analysis = await doc.signatures!.analyze({since: {signatureIndex: 0}});
+      const page = (await doc.pages.list()).pages[0].ref;
+      const annotations = (await doc.page(page).annotations.list()).annotations;
+      const squares = annotations.filter(a => a.subtype === 'square');
+      reports.push({runtime, id:fixture.id, profile:fixture.profile, layout:fixture.layout, action:fixture.action, policyVersion:analysis.policyVersion, weakCount:squares.filter(a=>a.ref.kind==='index').length, verdict:verdicts[0].modifications, integrity:verdicts[0].integrity, findings:analysis.steps.flatMap(step=>step.findings)});
+      expect(verdicts[0].integrity).toBe('valid');
+      expect(verdicts[0].cryptography).toBe('valid');
+      expect(verdicts[0].trust).toBe('trusted');
+      expect(squares).toHaveLength(fixture.action.startsWith('delete') ? 3 : 4);
+      expect(squares.filter(a=>a.ref.kind==='index')).toHaveLength(fixture.action.includes('names') ? fixture.profile==='locked-markup' ? 1 : 0 : squares.length);
+      const expected = fixture.action === 'control' ? 'unchanged' : ['p2','lockp2'].includes(fixture.profile) ? 'forbidden' : 'permitted';
+      expect(verdicts[0].modifications.verdict).toBe(expected);
+    } finally { await doc.close(); }
+  });
+  test.each(['p2','lockp2'])('engine refuses protected weak deletion: %s', async profile => {
+    const file = `${directory}/${profile}-inline-control.pdf`;
+    const bytes = new Uint8Array(await readFile(file));
+    const doc=await engine.open({kind:'bytes',id:`guard-${runtime}-${profile}`,bytes},{scope:['*']});
+    try {
+      const page=(await doc.pages.list()).pages[0].ref;
+      const before=await doc.page(page).annotations.list();
+      const target=before.annotations.find(a=>a.contents==='weak-1')!;
+      expect(doc.security.allows('doc.annotate.modify')).toBe(false);
+      await expect(doc.page(page).annotations.delete(target.ref)).rejects.toThrow();
+      const after=await doc.page(page).annotations.list();
+      expect(after).toEqual(before);
+      const downloaded=await doc.download({mode:'incremental'});
+      expect(Buffer.from(downloaded).equals(Buffer.from(bytes))).toBe(true);
+    } finally {await doc.close();}
+  });
+ });
+}

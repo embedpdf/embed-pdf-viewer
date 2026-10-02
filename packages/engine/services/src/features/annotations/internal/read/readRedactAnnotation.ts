@@ -1,9 +1,16 @@
-import type { AnnotationBase, Color, RedactAnnotationDTO } from '@embedpdf/engine-core/runtime';
+import type {
+  AnnotationBase,
+  Color,
+  RedactAnnotation,
+  PdfCoordinates,
+} from '@embedpdf/engine-core/runtime';
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
 
 import { FPDFANNOT_COLORTYPE } from '../colorType';
+import { freeTextFontForFace, readEngineRichText } from '../richTextWire';
 import { DEFAULT_STANDARD_FONT, standardFontFromCode } from '../standardFont';
 import { textAlignmentFromCode } from '../textAlignment';
+import type { AnnotationReadContext } from './annotationReadContext';
 import {
   readAnnotColor,
   readAnnotOpacity,
@@ -16,12 +23,12 @@ import {
 
 /** Default `/C` marking outline (red) — the redaction marking convention and
  *  the AP generator's default. */
-const DEFAULT_REDACT_COLOR: Color = { r: 255, g: 0, b: 0 };
+const DEFAULT_REDACT_COLOR: Color = '#ff0000';
 
 /** Default label colour (black) when a redaction carries no `/DA`. */
-const DEFAULT_LABEL_COLOR: Color = { r: 0, g: 0, b: 0 };
+const DEFAULT_LABEL_COLOR: Color = '#000000';
 
-/** Default label size when there is no `/DA`. When a `/DA` IS present its
+/** Default label size when there is no `/DA`. When a `/DA` is present its
  *  size is kept verbatim — including `0`, which means auto-fit for a
  *  redaction label (unlike free text, which normalizes 0 away). */
 const DEFAULT_FONT_SIZE = 12;
@@ -30,20 +37,33 @@ export function readRedact(
   fn: PdfFunctions,
   mem: PdfRuntimeMemory,
   annotPtr: Ptr,
-  base: AnnotationBase,
-): RedactAnnotationDTO {
-  const color = readAnnotColor(fn, mem, annotPtr, FPDFANNOT_COLORTYPE.Color) ?? {
-    ...DEFAULT_REDACT_COLOR,
-  };
+  base: AnnotationBase<PdfCoordinates>,
+  _subtypeCode?: number,
+  ctx?: AnnotationReadContext,
+): RedactAnnotation<PdfCoordinates> {
+  const color =
+    readAnnotColor(fn, mem, annotPtr, FPDFANNOT_COLORTYPE.Color) ?? DEFAULT_REDACT_COLOR;
   const ca = readAnnotOpacity(fn, mem, annotPtr);
   const opacity = ca == null ? 1 : Math.max(0, Math.min(1, ca));
   const interiorColor =
     readAnnotColor(fn, mem, annotPtr, FPDFANNOT_COLORTYPE.InteriorColor) ?? null;
 
   const da = readDefaultAppearance(fn, mem, annotPtr);
-  const fontFamily = da ? standardFontFromCode(da.fontCode) : DEFAULT_STANDARD_FONT;
+  // The face the /DA names, resolved by identity as free text does, so a
+  // registered font reads back as its key (`standardFontFromCode` only
+  // knows the 14).
+  const face = da ? readEngineRichText(fn, mem, annotPtr)?.body : undefined;
+  const fonts = ctx?.fonts;
+  const fontFamily = face?.family
+    ? freeTextFontForFace(
+        face,
+        fonts ? (family, weight, italic) => fonts.keyForFace(family, weight, italic) : undefined,
+      )
+    : da
+      ? standardFontFromCode(da.fontCode)
+      : DEFAULT_STANDARD_FONT;
   const fontSize = da ? da.fontSize : DEFAULT_FONT_SIZE;
-  const fontColor = da?.color ?? { ...DEFAULT_LABEL_COLOR };
+  const fontColor = da?.color ?? DEFAULT_LABEL_COLOR;
 
   return {
     ...base,

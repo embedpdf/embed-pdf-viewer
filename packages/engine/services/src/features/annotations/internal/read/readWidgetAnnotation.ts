@@ -1,4 +1,10 @@
-import type { AnnotationBase, Color, WidgetAnnotationDTO } from '@embedpdf/engine-core/runtime';
+import type {
+  AnnotationBase,
+  Color,
+  WidgetAnnotation,
+  PdfCoordinates,
+} from '@embedpdf/engine-core/runtime';
+import { colorOf } from '@embedpdf/engine-core/runtime';
 import { type PdfFunctions, type PdfRuntimeMemory, type Ptr } from '@embedpdf/engine-runtime';
 
 import { withScratchN } from '../../../../runtime/memory/scratch';
@@ -20,25 +26,21 @@ function readMKColor(
 ): Color | null {
   return withScratchN(mem, [I32_BYTES, I32_BYTES, I32_BYTES], ([r, g, b]) => {
     if (!fn.EPDFAnnot_GetMKColor(annotPtr, which, r, g, b)) return null;
-    return {
-      r: readI32(mem, r) & 0xff,
-      g: readI32(mem, g) & 0xff,
-      b: readI32(mem, b) & 0xff,
-    };
+    return colorOf(readI32(mem, r) & 0xff, readI32(mem, g) & 0xff, readI32(mem, b) & 0xff);
   });
 }
 
 /**
  * Widget-plane read: /MK colours, /BS border, /DA text defaults, /Q, and
  * the field join. Field-plane data (value, options, flags) lives on
- * `doc.forms` — join via `fieldObjectNumber`.
+ * `doc.forms` — join via `field`, the field's ref.
  */
 export function readWidget(
   fn: PdfFunctions,
   mem: PdfRuntimeMemory,
   annotPtr: Ptr,
-  base: AnnotationBase,
-): WidgetAnnotationDTO {
+  base: AnnotationBase<PdfCoordinates>,
+): WidgetAnnotation<PdfCoordinates> {
   const border = readBorderFields(fn, mem, annotPtr);
   const da = readDefaultAppearance(fn, mem, annotPtr);
   return {
@@ -48,17 +50,13 @@ export function readWidget(
     interiorColor: readMKColor(fn, mem, annotPtr, MK_BACKGROUND_COLOR),
     strokeWidth: border.strokeWidth,
     borderStyle: border.borderStyle,
-    ...(da
-      ? {
-          fontFamily: standardFontFromCode(da.fontCode),
-          fontSize: da.fontSize,
-          fontColor: da.color,
-        }
-      : {}),
+    fontFamily: da ? standardFontFromCode(da.fontCode) : null,
+    fontSize: da ? da.fontSize : null,
+    fontColor: da ? da.color : null,
     textAlign: textAlignmentFromCode(readTextAlignment(fn, annotPtr)),
     // Joined by the caller (joinWidgetFieldNumbers): the /Parent target is
-    // a FIELD dictionary, which annotation-plane primitives cannot follow.
-    fieldObjectNumber: 0,
+    // a field dictionary, which annotation-plane primitives cannot follow.
+    field: null,
     fieldFamily: 'unknown',
   };
 }

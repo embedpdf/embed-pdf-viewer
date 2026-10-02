@@ -5,8 +5,8 @@ import type { PdfRuntimeModule, Ptr } from '@embedpdf/engine-runtime';
 import type { DocumentSession } from '../../../../document-session/DocumentSession';
 
 /**
- * Resolve an `AnnotationRef` to a live `annotPtr` on an ALREADY-acquired
- * `pagePtr`. This does NOT acquire/release the page and does NOT close the
+ * Resolve an `AnnotationRef` to a live `annotPtr` on an already-acquired
+ * `pagePtr`. This does not acquire/release the page and does not close the
  * returned annot — the caller owns both lifetimes.
  *
  * Resolution order matches the wire spec:
@@ -14,8 +14,9 @@ import type { DocumentSession } from '../../../../document-session/DocumentSessi
  *   2. `nm`           -> `EPDFPage_GetAnnotByName`
  *   3. `index`        -> revision validation, then `FPDFPage_GetAnnot`
  *
- * Surfaces `InvalidReference` deterministically when the ref doesn't
- * resolve, so mutation paths can fail fast before doing any work.
+ * Fails fast, before any work: `NotFound` when no annotation on the page
+ * has the number or name, `InvalidReference` for an index ref whose page
+ * changed (stale revision, or out of range).
  */
 export function resolveAnnotPtr(
   runtime: PdfRuntimeModule,
@@ -26,11 +27,11 @@ export function resolveAnnotPtr(
   const { fn, mem } = runtime;
   switch (ref.kind) {
     case 'objectNumber': {
-      const annotPtr = fn.EPDFPage_GetAnnotByObjectNumber(pagePtr, ref.annotObjectNumber);
+      const annotPtr = fn.EPDFPage_GetAnnotByObjectNumber(pagePtr, ref.objectNumber);
       if (!annotPtr) {
         throw new EngineError(
-          EngineErrorCode.InvalidReference,
-          `no annotation with object number ${ref.annotObjectNumber} on page ${ref.page.pageObjectNumber}`,
+          EngineErrorCode.NotFound,
+          `no annotation with object number ${ref.objectNumber} on page ${ref.page.objectNumber}`,
         );
       }
       return annotPtr;
@@ -41,8 +42,8 @@ export function resolveAnnotPtr(
         const annotPtr = fn.EPDFPage_GetAnnotByName(pagePtr, namePtr);
         if (!annotPtr) {
           throw new EngineError(
-            EngineErrorCode.InvalidReference,
-            `no annotation with /NM '${ref.nm}' on page ${ref.page.pageObjectNumber}`,
+            EngineErrorCode.NotFound,
+            `no annotation with /NM '${ref.nm}' on page ${ref.page.objectNumber}`,
           );
         }
         return annotPtr;
@@ -56,7 +57,7 @@ export function resolveAnnotPtr(
       if (!annotPtr) {
         throw new EngineError(
           EngineErrorCode.InvalidReference,
-          `index ${ref.index} out of range on page ${ref.page.pageObjectNumber}`,
+          `index ${ref.index} out of range on page ${ref.page.objectNumber}`,
         );
       }
       return annotPtr;

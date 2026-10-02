@@ -3,7 +3,7 @@ import type { PdfFunctions, Ptr } from '@embedpdf/engine-runtime';
 
 // PDFium /Trapped values:
 //   0 = NotSet, 1 = True, 2 = False, 3 = Unknown.
-// The v3 wire DTO has only true/false/unknown, so NotSet folds into 'unknown'.
+// The wire DTO has only true/false/unknown, so NotSet folds into 'unknown'.
 const TRAPPED_TRUE = 1;
 const TRAPPED_FALSE = 2;
 

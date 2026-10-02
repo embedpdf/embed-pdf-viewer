@@ -1,32 +1,33 @@
 /**
  * The shipped default libraries (`packages/default-stamps/<locale>/stamps.pdf`)
- * re-imported through the plugin with NO overrides — the gate that the
- * conversion wrote exactly what the plugin reads: title, registry order,
- * identifiers, labels, kind, and one library identity across locales.
+ * re-imported through the plugin with no overrides: proof that the
+ * conversion wrote exactly what the plugin reads (title, registry order,
+ * identifiers, labels, kind, and one library identity across locales).
  */
 import { readFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import type { DocumentHandle, Engine, PageRef } from '@embedpdf/engine-core/runtime';
-import type { PluginContext } from '@embedpdf/core';
+import { LOCAL_ENGINE_BRAND } from '@embedpdf/engine-core/runtime';
+import type { DocumentHandle, Engine, LocalEngine, PageRef } from '@embedpdf/engine-core/runtime';
+import { createTestContext } from '@embedpdf/core/testing';
 import { createLocalEngine } from '@embedpdf/engine';
 import { LOCALES as SHIPPED, loadDefaultLibrary } from '@embedpdf/default-stamps/library';
 
+import { STAMP_DEFAULTS } from '../src/contract';
 import { createStampController } from '../src/controller';
-import { initialStampState, stampReducer } from '../src/model';
-import type { StampAction, StampState } from '../src/host-contract';
+import { initialStampState } from '../src/model';
 
 const here = dirname(fileURLToPath(import.meta.url));
-// The release consume gate supplies the extracted npm tarball, so missing
+// The release consume gate (`tooling/consume-fixtures`) supplies the extracted npm tarball, so missing
 // packaged manifests/PDFs fail the same compatibility checks as source changes.
 const packageDir =
   process.env.EMBEDPDF_DEFAULT_STAMPS_DIR ?? resolve(here, '..', '..', '..', 'default-stamps');
 const LOCALES = ['en', 'de', 'nl', 'fr', 'es', 'zh-CN', 'sv', 'ja'] as const;
 /** The library id every locale carries (PieceInfo `Id`). */
 const LIBRARY_ID = 'embedpdf-standard';
-/** Stable ids shipped by v2; consumers may select a stamp by this id. */
-const LEGACY_STAMP_IDS = [
+/** The stable ids `manifest.json` ships; consumers may select a stamp by this id. */
+const MANIFEST_STAMP_IDS = [
   'approved',
   'not-approved',
   'draft',
@@ -225,26 +226,27 @@ const EXPECTED: Record<string, { name: string; keys: readonly string[] }> = {
   },
 };
 
-/** Minimal PNG header: signature + IHDR with width=100, height=50. */
+/** Minimal PNG header: the signature and an `IHDR` chunk with width=100, height=50. */
 const pngBytes = () => {
-  const b = new Uint8Array(32);
-  b.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a], 0);
-  const dv = new DataView(b.buffer);
-  dv.setUint32(8, 13);
-  b.set([0x49, 0x48, 0x44, 0x52], 12);
-  dv.setUint32(16, 100);
-  dv.setUint32(20, 50);
-  return b;
+  const bytes = new Uint8Array(32);
+  bytes.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a], 0);
+  const view = new DataView(bytes.buffer);
+  view.setUint32(8, 13);
+  bytes.set([0x49, 0x48, 0x44, 0x52], 12);
+  view.setUint32(16, 100);
+  view.setUint32(20, 50);
+  return bytes;
 };
 
 /** Node has no PNG encoder: keep every PDF operation real and stub only the
  *  thumbnail encode at the asset-engine boundary. */
-function nodeAssetEngine(engine: Engine): Engine {
+function nodeAssetEngine(engine: Engine): LocalEngine {
   const bindAll = <T extends object>(target: T, key: PropertyKey) => {
     const value = Reflect.get(target, key, target);
     return typeof value === 'function' ? value.bind(target) : value;
   };
   return {
+    [LOCAL_ENGINE_BRAND]: true,
     open: async (input: Parameters<Engine['open']>[0], options?: Parameters<Engine['open']>[1]) => {
       const doc = await engine.open(input, options);
       return new Proxy(doc, {
@@ -273,36 +275,30 @@ function nodeAssetEngine(engine: Engine): Engine {
       }) as DocumentHandle;
     },
     destroy: () => engine.destroy(),
-  } as unknown as Engine;
+  } as unknown as LocalEngine;
 }
 
-function makeCtx(engine: Engine) {
-  let state: StampState = initialStampState();
-  return {
+/** The stamp capability with `engine` as its asset engine and no document open. */
+function makeStamp(engine: LocalEngine) {
+  const ctx = createTestContext({
     id: 'stamp',
+    state: initialStampState(),
+    settings: {
+      defaults: STAMP_DEFAULTS,
+      registered: { assetEngine: engine },
+      whole: ['assetEngine'],
+    },
     engine,
     doc: null,
-    getState: () => state,
-    dispatch: (action: StampAction) => {
-      state = stampReducer(state, action);
-    },
-    subscribe: () => () => {},
-    core: () => ({ documents: {}, order: [], activeId: null }),
-    document: () => null,
-    documentHandle: () => null,
-    cleanup: () => {},
-    forDocument: () => {
-      throw new Error('no document');
-    },
-    tryForDocument: () => null,
-  } as unknown as PluginContext<StampState, StampAction>;
+  });
+  return ctx.connect(createStampController(ctx));
 }
 
 const libraryPdf = async (locale: string) =>
   new Uint8Array(await readFile(resolve(packageDir, locale, 'stamps.pdf')));
 
 describe('@embedpdf/default-stamps', () => {
-  let engine: Engine;
+  let engine: LocalEngine;
   beforeAll(async () => {
     engine = nodeAssetEngine(await createLocalEngine({ runtime: { prefer: 'wasm' } }));
   });
@@ -311,7 +307,7 @@ describe('@embedpdf/default-stamps', () => {
   });
 
   for (const locale of LOCALES) {
-    it(`${locale}: preserves the v2 manifest and its PDF page-index mapping`, async () => {
+    it(`${locale}: preserves the manifest and its PDF page-index mapping`, async () => {
       const manifest = JSON.parse(
         await readFile(resolve(packageDir, locale, 'manifest.json'), 'utf8'),
       );
@@ -322,14 +318,15 @@ describe('@embedpdf/default-stamps', () => {
         pdf: 'stamps.pdf',
         stamps: EXPECTED[locale].keys.map((key, pageIndex) => {
           const [name, subject] = key.split('=');
-          return { id: LEGACY_STAMP_IDS[pageIndex], pageIndex, name, subject };
+          return { id: MANIFEST_STAMP_IDS[pageIndex], pageIndex, name, subject };
         }),
       });
 
-      // V2 ignores the registry and renders by pageIndex. Prove each legacy
-      // entry still addresses the page that v3 identifies by name and label.
+      // A manifest reader ignores the registry and renders by `pageIndex`.
+      // Prove each manifest entry addresses the page the registry names by
+      // identifier and label.
       const doc = await engine.open(
-        { kind: 'bytes', id: `v2-stamps-${locale}`, bytes: await libraryPdf(locale) },
+        { kind: 'bytes', id: `manifest-stamps-${locale}`, bytes: await libraryPdf(locale) },
         { scope: ['*'] },
       );
       try {
@@ -349,9 +346,8 @@ describe('@embedpdf/default-stamps', () => {
     });
 
     it(`${locale}: re-imports with no overrides as the manifest described it`, async () => {
-      const ctx = makeCtx(engine);
-      const stamp = createStampController(ctx, { assetEngine: engine });
-      const libraryId = await stamp.importLibrary(await libraryPdf(locale));
+      const stamp = makeStamp(engine);
+      const libraryId = (await stamp.importLibrary(await libraryPdf(locale))).library.id;
       expect(libraryId).toBe(LIBRARY_ID);
       const library = stamp.getLibrary(libraryId)!;
       expect(library.name).toBe(EXPECTED[locale].name);
@@ -362,8 +358,8 @@ describe('@embedpdf/default-stamps', () => {
         true,
       );
       // Page order == registry order: the n-th asset is the n-th page.
-      const pons = assets.map((asset) => asset.page.pageObjectNumber);
-      expect([...new Set(pons)]).toHaveLength(pons.length);
+      const pageObjectNumbers = assets.map((asset) => asset.page.objectNumber);
+      expect([...new Set(pageObjectNumbers)]).toHaveLength(pageObjectNumbers.length);
       for (const asset of assets) {
         expect(asset.size.width).toBeGreaterThan(0);
         expect(asset.size.height).toBeGreaterThan(0);
@@ -382,32 +378,30 @@ describe('@embedpdf/default-stamps', () => {
   });
 
   it('exports what it imported: a second import of the export is identical', async () => {
-    const ctx = makeCtx(engine);
-    const stamp = createStampController(ctx, { assetEngine: engine });
-    const id = await stamp.importLibrary(await libraryPdf('nl'));
-    const exported = await await stamp.exportLibrary(id);
-    const again = createStampController(makeCtx(engine), { assetEngine: engine });
-    const id2 = await again.importLibrary(exported);
-    expect(id2).toBe(id);
-    expect(again.getLibrary(id2)!.name).toBe(EXPECTED.nl.name);
-    expect(again.listAssets({ libraryId: id2 }).map((a) => `${a.name}=${a.label}`)).toEqual(
-      EXPECTED.nl.keys,
-    );
+    const stamp = makeStamp(engine);
+    const id = (await stamp.importLibrary(await libraryPdf('nl'))).library.id;
+    const exported = await stamp.exportLibrary(id);
+    const again = makeStamp(engine);
+    const reimportedId = (await again.importLibrary(exported)).library.id;
+    expect(reimportedId).toBe(id);
+    expect(again.getLibrary(reimportedId)!.name).toBe(EXPECTED.nl.name);
+    expect(
+      again.listAssets({ libraryId: reimportedId }).map((asset) => `${asset.name}=${asset.label}`),
+    ).toEqual(EXPECTED.nl.keys);
   });
 
   it('two locales import side by side: one identity, two libraries', async () => {
-    const ctx = makeCtx(engine);
-    const stamp = createStampController(ctx, { assetEngine: engine });
-    const en = await stamp.importLibrary(await libraryPdf('en'));
-    const nl = await stamp.importLibrary(await libraryPdf('nl'));
+    const stamp = makeStamp(engine);
+    const en = (await stamp.importLibrary(await libraryPdf('en'))).library.id;
+    const nl = (await stamp.importLibrary(await libraryPdf('nl'))).library.id;
     expect(en).toBe(LIBRARY_ID);
     expect(nl).not.toBe(en);
     expect(stamp.getLibrary(nl)!.name).toBe(EXPECTED.nl.name);
     expect(stamp.listAssets({ libraryId: en })).toHaveLength(17);
     expect(stamp.listAssets({ libraryId: nl })).toHaveLength(17);
-    // Same identifiers, different labels — the locale is the only difference.
-    expect(stamp.listAssets({ libraryId: nl }).map((a) => a.name)).toEqual(
-      stamp.listAssets({ libraryId: en }).map((a) => a.name),
+    // Same identifiers, different labels: the locale is the only difference.
+    expect(stamp.listAssets({ libraryId: nl }).map((asset) => asset.name)).toEqual(
+      stamp.listAssets({ libraryId: en }).map((asset) => asset.name),
     );
   });
 });

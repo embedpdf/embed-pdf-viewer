@@ -1,0 +1,2 @@
+import { defineConfig } from '/Users/bobsingor/GitHub/cloudpdf-platform/oss/embedpdf/packages/core/signature/node_modules/vitest/dist/config.js';
+export default defineConfig({ test: { root: '/tmp/epdf-weak-nm-probes', include: ['probe.test.ts'], testTimeout: 30000, hookTimeout: 30000 } });

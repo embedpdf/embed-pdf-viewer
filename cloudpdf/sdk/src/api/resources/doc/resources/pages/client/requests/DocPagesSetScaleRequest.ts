@@ -34,7 +34,7 @@ export namespace DocPagesSetScaleRequest {
 
     export namespace Measure {
         export const Subtype = {
-            Rl: "RL",
+            Rectilinear: "rectilinear",
         } as const;
         export type Subtype = (typeof Subtype)[keyof typeof Subtype];
         export type X = X.Item[];

@@ -1,11 +1,11 @@
 import type {
   AnnotationRef,
   AttachmentFileWorkerPayload,
-  EmbeddedFileItem,
-  EmbeddedFileRef,
+  Attachment,
+  AttachmentRef,
   PageObjectNumber,
 } from '@embedpdf/engine-core/runtime';
-import { EngineError, EngineErrorCode } from '@embedpdf/engine-core/runtime';
+import { EngineError, EngineErrorCode, toAttachmentRef } from '@embedpdf/engine-core/runtime';
 import type { PdfRuntimeModule, Ptr } from '@embedpdf/engine-runtime';
 
 import {
@@ -23,7 +23,7 @@ import { resolveAnnotPtr } from '../annotations/internal/identity/resolveAnnotat
  * Read-only access to embedded files, at both of their homes: the
  * document catalog's `/EmbeddedFiles` name tree (list / readFile by
  * index) and a FileAttachment annotation's `/FS` (readAnnotationFile by
- * ref). Pure READS over the session — no revision bumps, no layer
+ * ref). Pure reads over the session — no revision bumps, no layer
  * artifacts (the `PagesExtractor` shape).
  *
  * Byte delivery mirrors the request's `path?`: absent → a standalone
@@ -38,24 +38,28 @@ export class AttachmentReader {
   ) {}
 
   /** Snapshot of the `/EmbeddedFiles` name tree, in tree (key-sorted) order. */
-  list(signal: AbortSignal): EmbeddedFileItem[] {
+  list(signal: AbortSignal): Attachment[] {
     throwIfAborted(signal);
     const { fn, mem } = this.runtime;
     const docPtr = this.session.requireDocPtr();
     const count = fn.FPDFDoc_GetAttachmentCount(docPtr);
-    const items: EmbeddedFileItem[] = [];
+    const items: Attachment[] = [];
     for (let index = 0; index < count; index++) {
       const attachmentPtr = fn.FPDFDoc_GetAttachment(docPtr, index);
       if (!attachmentPtr) continue;
       const key = readAttachmentKey(fn, mem, docPtr, index) ?? '';
-      items.push({ ...readAttachmentFileInfo(fn, mem, attachmentPtr), key, index });
+      items.push({
+        ...readAttachmentFileInfo(fn, mem, attachmentPtr),
+        ref: toAttachmentRef(key),
+        index,
+      });
     }
     return items;
   }
 
   /** Decode one document-level embedded file, addressed by key. */
   readFile(
-    ref: EmbeddedFileRef,
+    ref: AttachmentRef,
     path: string | undefined,
     maxDecodedBytes: number | undefined,
     signal: AbortSignal,
@@ -78,7 +82,13 @@ export class AttachmentReader {
       );
     }
     const info = readAttachmentFileInfo(fn, mem, attachmentPtr);
-    return this.extract(attachmentPtr, info.name, info.mimeType, path, maxDecodedBytes);
+    return this.extract(
+      attachmentPtr,
+      info.name,
+      info.mimeType ?? undefined,
+      path,
+      maxDecodedBytes,
+    );
   }
 
   /** Decode the file embedded in a FileAttachment annotation's `/FS`. */
@@ -104,7 +114,13 @@ export class AttachmentReader {
         );
       }
       const info = readAttachmentFileInfo(fn, mem, attachmentPtr);
-      return this.extract(attachmentPtr, info.name, info.mimeType, path, maxDecodedBytes);
+      return this.extract(
+        attachmentPtr,
+        info.name,
+        info.mimeType ?? undefined,
+        path,
+        maxDecodedBytes,
+      );
     } finally {
       if (annotPtr !== null) fn.FPDFPage_CloseAnnot(annotPtr);
       pool.release(pageObjectNumber);

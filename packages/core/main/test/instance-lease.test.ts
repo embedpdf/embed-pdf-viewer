@@ -5,24 +5,24 @@ import type { AnyPlugin, PluginContext } from '../src/types';
 import { bytesInput, immediateEngine } from './helpers';
 
 /**
- * G2: a context retained across close and reopen of the same document id
+ * A context retained across close and reopen of the same document id
  * cannot read or write the new instance. The lease is revoked synchronously
- * at the start of close; a late dispatch is dropped and reported once.
+ * at the start of close; a late update is dropped and reported once.
  */
 
 const token = { name: 'counter' };
-type State = { n: number };
+type State = { count: number };
+const bump = (state: State): State => ({ count: state.count + 1 });
 
 function counterPlugin(seen: PluginContext<State>[]): AnyPlugin {
   return {
     id: 'counter',
     scope: 'document',
     token,
-    initialState: (): State => ({ n: 0 }),
-    reduce: (s: State, a: { type: string }) => (a.type === 'BUMP' ? { n: s.n + 1 } : s),
-    capability: (ctx: PluginContext<State>) => {
+    state: (): State => ({ count: 0 }),
+    create: (ctx: PluginContext<State>) => {
       seen.push(ctx);
-      return { bump: () => ctx.dispatch({ type: 'BUMP' }), read: () => ctx.getState().n };
+      return { api: { bump: () => ctx.state.update(bump), read: () => ctx.state.get().count } };
     },
   };
 }
@@ -55,7 +55,7 @@ describe('instance leases', () => {
     first.bump();
     expect(second.read()).toBe(0);
     expect(first.read()).toBe(1);
-    expect(report).toHaveBeenCalledTimes(1); // reported once, not per dispatch
+    expect(report).toHaveBeenCalledTimes(1); // reported once, not per update
     expect(isPluginError(report.mock.calls[0][0], 'instance-closed')).toBe(true);
 
     // and the new instance carries a new identity
@@ -70,7 +70,7 @@ describe('instance leases', () => {
     await kernel.start();
     await kernel.documents.open(bytesInput('doc-1'));
     const cap = kernel.capability<{ bump(): void; read(): number }>(token, 'doc-1');
-    const closing = kernel.documents.close('doc-1'); // not awaited: close has only STARTED
+    const closing = kernel.documents.close('doc-1'); // not awaited: close has only started
     cap.bump();
     expect(cap.read()).toBe(0); // the write never landed
     await closing;

@@ -1,14 +1,14 @@
 /**
- * The document tab bar — a 1:1 port of v2's tab-bar.tsx
- * (viewers/snippet/src/components/tab-bar.tsx): rounded-top tabs on the
- * surface-alt strip, the active tab merging into the toolbar surface below,
- * close-× on the active tab, and a + button opening a real file dialog.
+ * The document tab bar: rounded-top tabs on the surface-alt strip, the active
+ * tab merging into the toolbar surface below, close-× on the active tab, and a
+ * + button opening a real file dialog.
  *
- * v2 needed a DocumentManager capability; here the kernel's document registry
- * (useDocuments) already is the tab model — open/close/setActive, reactive.
+ * The kernel's document registry is the tab model: `useDocumentsState()` for
+ * the tabs, `useDocuments()` for open/close/setActive; there is no separate
+ * document manager.
  */
 import { useRef } from 'react';
-import { useDocuments } from '@embedpdf/react/runtime';
+import { useDocuments, useDocumentsState } from '@embedpdf/react/runtime';
 import type { OpenInput } from '@embedpdf/react/runtime';
 import { Icon } from './icons';
 
@@ -21,7 +21,8 @@ export function TabBar({
   visibility?: TabBarVisibility;
   allowOpenFile?: boolean;
 }) {
-  const { docs, activeId, setActive, close, open } = useDocuments();
+  const { setActive, close, open } = useDocuments();
+  const { documents: docs, activeId } = useDocumentsState();
   const fileInput = useRef<HTMLInputElement>(null);
 
   const shouldShow = visibility === 'always' || (visibility === 'multiple' && docs.length > 1);
@@ -46,9 +47,9 @@ export function TabBar({
               part={isActive ? 'tab tab-active' : 'tab'}
               tabIndex={0}
               aria-selected={isActive}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault();
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault();
                   setActive(doc.id);
                 }
               }}
@@ -81,8 +82,8 @@ export function TabBar({
               {isActive && docs.length > 1 && (
                 <button
                   type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
+                  onClick={(event) => {
+                    event.stopPropagation();
                     void close(doc.id);
                   }}
                   aria-label={`Close ${doc.name ?? 'document'}`}
@@ -111,10 +112,10 @@ export function TabBar({
               type="file"
               accept=".pdf,application/pdf"
               className="hidden"
-              onChange={(e) => {
-                const file = e.target.files?.[0];
+              onChange={(event) => {
+                const file = event.target.files?.[0];
                 if (file) void openFile(file);
-                e.target.value = '';
+                event.target.value = '';
               }}
             />
           </>

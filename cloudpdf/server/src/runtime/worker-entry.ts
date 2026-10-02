@@ -60,13 +60,13 @@ function bootstrapFontSpecs(): StartupFontSpec[] {
   // the boundary rather than cross-typing the whole engine-core surface
   // to a Node-specific list.
   // Injected encoding capability behind the
-  // `*.renderEncoded` wire kinds: rasters are compressed HERE, in the
+  // `*.renderEncoded` wire kinds: rasters are compressed here, in the
   // worker that produced them, so only compressed kilobytes cross the
   // engine boundary. `encodeToBuffer` copies sharp's output into a
-  // fresh Uint8Array — the buffer OWNERSHIP the transfer manifest
+  // fresh Uint8Array — the buffer ownership the transfer manifest
   // requires (a pooled Buffer slab view must never be transferred).
   //
-  // sharp/libvips loads LAZILY on the first encoded request: with the
+  // sharp/libvips loads lazily on the first encoded request: with the
   // `CLOUDPDF_ENCODE_IN_ENGINE=0` escape hatch on, no encoded request
   // ever arrives, so the worker never initializes libvips at all — the
   // hatch restores the previous API-side encoding worker, not just its routing.
@@ -92,7 +92,7 @@ function bootstrapFontSpecs(): StartupFontSpec[] {
     },
     {
       imageEncoder,
-      // File-backed sessions sign through a candidate FILE under the
+      // File-backed sessions sign through a candidate file under the
       // signing root the API process shares, keyed by signing id, so the
       // tail can be streamed to object storage right after prepare without
       // the path crossing the engine boundary.

@@ -1,9 +1,15 @@
 /**
- * @embedpdf/plugin-signature/contract — the PUBLIC signature vocabulary: the
+ * @embedpdf/plugin-signature/contract: the public signature vocabulary: the
  * act of signing (one-shot and two-phase), visual fills, validation, the
  * sign-here flow, and the facts about a document's signatures.
  */
-import type { ChangeOrigin, EventHook, OperationOptions, ResourceStatus } from '@embedpdf/core';
+import type {
+  EventHook,
+  EventOrigin,
+  OperationOptions,
+  ResourceStatus,
+  SettingsApi,
+} from '@embedpdf/core';
 import type {
   SignatureVerdict,
   SignerPort,
@@ -23,11 +29,12 @@ import type {
   SignatureCompleteResult,
   SignatureDTO,
   SignaturePrepared,
+  SignatureSignerInput,
   SignatureSnapshot,
   SignatureSubFilter,
 } from '@embedpdf/engine-core/runtime';
 import type { StampPlacement } from '@embedpdf/plugin-annotation/contract';
-import type { StampAsset } from '@embedpdf/plugin-stamp/contract';
+import type { StampAsset, StampLibrary } from '@embedpdf/plugin-stamp/contract';
 
 export { SignatureToken } from './token';
 export type {
@@ -51,36 +58,56 @@ export type {
 
 /**
  * What placing a mark on a signature field does:
- *   - `sign`    seal the field with the configured signer (the mark is the appearance);
+ *   - `sign`    seal the field with the configured key (the mark is the appearance);
  *   - `visual`  draw the mark into the field without sealing (Preview's "signature");
- *   - `ask`     neither — `onSignRequested` fires so the chrome can open its dialog and decide.
- * Default `sign` when a signer is configured, else `visual`.
+ *   - `ask`     neither: `onSignRequested` fires so the chrome can open its dialog and decide.
  */
 export type SignatureMode = 'sign' | 'visual' | 'ask';
 
-export interface SignatureConfig {
-  mode?: SignatureMode;
-  /** The key holder: a raw signer (the CMS is built here) or a CMS signer (a service builds it). A thunk resolves per signing. */
-  signer?: SignerPort | (() => Promise<SignerPort>);
-  /** Trust anchors for validation. None → every verdict tops out at `valid-untrusted`. */
-  trust?: TrustPort;
-  /** Let the UI offer a certification (still needs `doc.sign.certify`). Default false. */
-  allowCertify?: boolean;
+/** The key that signs: a signer port, or a function that returns one when someone signs. */
+export type SignatureKey = SignerPort | (() => SignerPort | Promise<SignerPort>);
+
+/**
+ * The signature plugin's settings. `signaturePlugin(config)` registers them
+ * over {@link SIGNATURE_DEFAULTS}, and `updateSettings()` changes them for
+ * every document while the app runs. Each is one value: a change replaces a
+ * key or a trust port whole.
+ */
+export interface SignatureSettings {
+  /** The key: a raw signer (the CMS is built here) or a CMS signer (a service builds it); `null` for none. */
+  readonly key: SignatureKey | null;
+  /** What a mark does in a field; `null` is `'sign'` with a key, else `'visual'`. */
+  readonly mode: SignatureMode | null;
+  /** The certificates you trust, for checking signatures. Without them a verdict is at best `valid-untrusted`. */
+  readonly trust: TrustPort | null;
+  /** Let a first signature be a certification (still needs `doc.sign.certify`). */
+  readonly allowCertify: boolean;
 }
+
+/** What the signature settings are when the app registers none. */
+export const SIGNATURE_DEFAULTS: SignatureSettings = {
+  key: null,
+  mode: null,
+  trust: null,
+  allowCertify: false,
+};
+
+/** What `signaturePlugin(config)` takes: any of the settings. */
+export type SignatureConfig = Partial<SignatureSettings>;
 
 /** The mark: a stamp-plugin asset, or bytes the embedder brings (PNG, JPEG, or a one-page PDF). */
 export type Mark = { assetId: string } | { source: BinarySource };
 
 /** How a signature field is addressed: its field ref, its widget's annotation ref, or the widget's object number. */
-export type SignatureFieldAddress = FormFieldRef | AnnotationRef | { annotObjectNumber: number };
+export type SignatureFieldAddress = FormFieldRef | AnnotationRef | { objectNumber: number };
 
 export interface SignFieldInput {
   field: FormFieldRef;
   mark: Mark;
-  /** A per-call key holder; the configured `signer` otherwise. */
-  signer?: SignerPort | (() => Promise<SignerPort>);
-  /** What the signature dictionary says (`/Name` `/Reason` `/Location` `/ContactInfo`); the name defaults to the certificate's subject. */
-  attribution?: { name?: string; reason?: string; location?: string; contactInfo?: string };
+  /** A per-call key; the `key` setting otherwise. */
+  key?: SignatureKey;
+  /** What the signature dictionary says about the signer; the name defaults to the certificate's subject. */
+  signer?: SignatureSignerInput;
   /** Instead of the mark: a ready one-page appearance PDF the embedder composed itself. */
   appearance?: BinarySource;
   certify?: { permission: DocMdpPermission };
@@ -92,7 +119,7 @@ export interface PrepareSignatureInput {
   field: FormFieldRef;
   mark?: Mark;
   appearance?: BinarySource;
-  attribution?: { name?: string; reason?: string; location?: string; contactInfo?: string };
+  signer?: SignatureSignerInput;
   certify?: { permission: DocMdpPermission };
   lock?: FieldLockSpec;
   subFilter?: SignatureSubFilter;
@@ -112,9 +139,51 @@ export type MarkRole = 'signature' | 'initials';
 export const markRoleOf = (asset: Pick<StampAsset, 'name'>): MarkRole =>
   asset.name === INITIALS_MARK_NAME ? 'initials' : 'signature';
 
+/** One person in a signatures picker: a library of kind `signatures`, with its marks split by role. */
+export interface SignerRow {
+  readonly libraryId: string;
+  readonly name: string;
+  readonly library: StampLibrary;
+  /** Every full signature of the person, in the library's order. */
+  readonly signatures: StampAsset[];
+  /** The person's initials, or `null` when the library has none. */
+  readonly initials: StampAsset | null;
+}
+
+/**
+ * The people whose marks the stamp plugin holds, one row per library of kind
+ * `signatures`, in the order of `libraries`: give it the stamp plugin's
+ * `listLibraries({ kind: SIGNATURES_LIBRARY_KIND })` and `listAssets()`. A
+ * pure derivation: rename, delete and export are the stamp plugin's library
+ * verbs, and nothing is stored beyond the library's file.
+ */
+export function signerRowsOf(
+  libraries: readonly StampLibrary[],
+  assets: readonly StampAsset[],
+): SignerRow[] {
+  return libraries
+    .filter((library) => library.kind === SIGNATURES_LIBRARY_KIND)
+    .map((library) => {
+      const own = assets.filter((asset) => asset.libraryId === library.id);
+      return {
+        libraryId: library.id,
+        name: library.name,
+        library,
+        signatures: own.filter((asset) => markRoleOf(asset) === 'signature'),
+        initials: own.find((asset) => markRoleOf(asset) === 'initials') ?? null,
+      };
+    });
+}
+
+/** A signature prepared in two steps and not completed yet. */
 export interface SignaturePending {
-  signingId: string;
-  field: FormFieldRef;
+  readonly signingId: string;
+  readonly field: FormFieldRef;
+}
+
+/** A signed field's facts, with its verdict from the last check (`null` until one ran). */
+export interface SignatureInfo extends SignatureDTO {
+  readonly verdict: SignatureVerdict | null;
 }
 
 /** What `placeMark` did: sealed, drawn, handed to the chrome (mode `ask`), or placed as a stamp. */
@@ -125,14 +194,20 @@ export type PlaceMarkResult =
   | { kind: 'placed'; annotation: AnnotationRef };
 
 // ── events ──
+/** A signing completed, in this session or another: the confirmed `signatures.completed` fact. */
 export interface SignatureSignedEvent {
+  /** The sealed field, by its durable object-number ref. */
   readonly field: FormFieldRef;
   readonly result: SignatureCompleteResult;
-  readonly origin: ChangeOrigin;
+  readonly origin: EventOrigin;
 }
-export interface SignatureFieldEvent {
+/** This session's `fillField()` drew a mark into a field. */
+export interface SignatureFilledEvent {
   readonly field: FormFieldRef;
-  readonly origin: ChangeOrigin;
+}
+/** This session's `clearField()` took a drawn mark out of a field. */
+export interface SignatureClearedEvent {
+  readonly field: FormFieldRef;
 }
 export interface SignatureValidatedEvent {
   readonly verdicts: readonly SignatureVerdict[];
@@ -141,7 +216,7 @@ export interface SignatureProtectionChangedEvent {
   readonly protection: DocumentProtection;
 }
 /** An unsaved edit just turned a signature that held into one a save would invalidate. Once per edge. */
-export interface SignatureInvalidatingEvent {
+export interface SignatureInvalidationPredictedEvent {
   readonly field: FormFieldRef;
   readonly detail: string;
 }
@@ -158,102 +233,147 @@ export interface SignatureInspectionRequestedEvent {
   readonly field: FormFieldRef;
 }
 
-export interface SignatureCapability {
+/** Options for `validate()` and `validateField()`. */
+export interface SignatureValidateOptions extends OperationOptions {
+  /** The moment the certificates are judged at; now by default. */
+  readonly at?: ValidationTime;
+  /** `'persisted'` checks the file as it was opened; `'working-copy'` (the default) counts unsaved changes. */
+  readonly until?: 'persisted' | 'working-copy';
+}
+
+/**
+ * Signing, visual fills and checking signatures for one document. Every verb
+ * rejects with a `PluginError`, and every async verb takes a `signal`. Its
+ * settings belong to the plugin, not to a document.
+ */
+export interface SignatureCapability extends SettingsApi<SignatureSettings> {
   // ── reading ──
-  /** Every signature field and its facts. Reference-stable until it changes. */
+  /** Every signature field and its facts, the file's versions and `protection`. The same object until it changes. */
   getSnapshot(): SignatureSnapshot | null;
+  /** Whether the signatures are read. */
   getStatus(): ResourceStatus;
-  /** Signed fields, in document order. Reference-stable per snapshot. */
-  listSignatures(): readonly SignatureDTO[];
-  /** Signature fields still to sign, in document order. Reference-stable per snapshot. */
+  /** The signed fields, in document order, each with its verdict once checked. The same array until one changes. */
+  listSignatures(): readonly SignatureInfo[];
+  /** Signature fields still to sign, in document order. The same array until one changes. */
   listUnsignedFields(): readonly FormFieldRef[];
-  /** The signature facts of one field, by ref or by widget, from the last snapshot. */
+  /** One signature field's facts, signed or not, by its ref or its widget's, or `null`. */
   getSignature(field: SignatureFieldAddress): SignatureDTO | null;
-  /** The last validation (null until one ran). */
+  /** Every verdict from the last check; `null` before the first. */
   listVerdicts(): readonly SignatureVerdict[] | null;
-  /** The verdict of one signed field from the last validation. */
+  /** One signed field's verdict from the last check, or `null`. */
   getVerdict(field: SignatureFieldAddress): SignatureVerdict | null;
-  /** What the document's signatures forbid (null when nothing is read yet). */
+  /** What the document's signatures allow, or `null` before they're read. */
   getProtection(): DocumentProtection | null;
-  /** A parked two-phase signing (here or, on the cloud, elsewhere): the document is read-only. */
+  /** A signature prepared in two steps and not completed: the document can't be changed until it is, or is cancelled. */
   getPending(): SignaturePending | null;
-  /** A sign or fill is in flight. */
+  /** Whether a signing or a fill is running. */
   isBusy(): boolean;
-  /** The effective mode. */
+  /** The mode in effect: the `mode` setting, or its default. */
   getMode(): SignatureMode;
-  /** The field the next picked mark goes to. */
+  /** The field the next picked mark goes to, or `null`. */
   getTarget(): FormFieldRef | null;
 
-  // ── the act ──
-  /** Seal the field: the mark's page becomes the widget's appearance, the signer signs. */
+  // ── signing ──
+  /**
+   * Sign a field: the mark becomes what it shows, the key seals the document,
+   * and the signed document is a new version. A signal that fires before the
+   * seal leaves nothing signed. Fires `onSigned`. Rejects `permission-denied`
+   * without `doc.sign` (or `doc.sign.certify` to certify), `invalid-input`
+   * without a key, `not-found`, `operation-cancelled`.
+   */
   sign(input: SignFieldInput, options?: OperationOptions): Promise<SignatureCompleteResult>;
-  /** Two-phase signing, step one: the digest to sign comes back and the signing is parked. */
+  /**
+   * Signing in two steps, the first: resolves the digest for your key to sign,
+   * and keeps the document from changing until `completeSignature()` or
+   * `cancelPending()`. Rejects `permission-denied` without `doc.sign`.
+   */
   prepareSignature(
     input: PrepareSignatureInput,
     options?: OperationOptions,
   ): Promise<PreparedSignature>;
-  /** Two-phase signing, step two: the detached CMS seals the parked signing. */
+  /** Signing in two steps, the second: the key's CMS seals the document. Fires `onSigned`. Rejects `not-found` for a signing this session didn't prepare. */
   completeSignature(
     signingId: string,
     cms: Uint8Array,
     options?: OperationOptions,
   ): Promise<SignatureCompleteResult>;
-  /** Cancel the parked signing, if any. */
-  abortPending(options?: OperationOptions): Promise<void>;
-  /** Visual only: the mark becomes the widget's appearance; nothing is sealed. Rejects `conflict` on a signed field. */
+  /** Give up a signature prepared in two steps, so the document can be changed again. */
+  cancelPending(options?: OperationOptions): Promise<void>;
+  /**
+   * Draw a mark into a field without signing. Fires `onFilled`. Rejects
+   * `permission-denied` without `doc.forms.fill`, `conflict` on a signed field.
+   */
   fillField(field: FormFieldRef, mark: Mark, options?: OperationOptions): Promise<void>;
-  /** Undo a visual fill (a blank appearance). Rejects `conflict` on a signed field. */
+  /** Take a drawn mark out of a field. Fires `onCleared`. Rejects like `fillField()`. */
   clearField(field: FormFieldRef, options?: OperationOptions): Promise<void>;
-  /** The destination rule in one call: a field (sign, fill, or ask by mode) or a free placement (a stamp). */
+  /**
+   * Do what a click with an armed mark does: in a field, sign, fill or ask
+   * (`onSignRequested`), by `mode`; anywhere else, place it as a stamp.
+   * Rejects like the verb it runs.
+   */
   placeMark(
     mark: Mark,
     target: { field: FormFieldRef } | StampPlacement,
     options?: OperationOptions,
   ): Promise<PlaceMarkResult>;
-  /** Name the field the next picked mark goes to (the chrome's "Sign here"); null clears. */
+  /** Make a field the target, where the next mark the person picks goes; `null` clears. Fires `onTargetChanged`. */
   setTarget(field: FormFieldRef | null): void;
-  /** Ask the host UI to show a signed field's facts. */
+  /** Ask your UI to show a signed field's details, as clicking it does. Fires `onInspectionRequested`. */
   requestInspection(field: FormFieldRef): void;
 
-  // ── judging ──
+  // ── checking ──
+  /** Read the signatures again; resolves the snapshot. */
   refresh(options?: OperationOptions): Promise<SignatureSnapshot | null>;
   /**
-   * Judge every signature. The viewer's default is the WORKING COPY: unsaved
-   * edits count, so the verdict is the one the file a save produces will get.
-   * `until: 'persisted'` judges the loaded bytes only.
+   * Check every signature again and resolve the verdicts. Unsaved changes
+   * count, so the verdict is the one the downloaded file will get;
+   * `until: 'persisted'` checks the file as it was opened. Fires `onValidated`.
    */
-  validate(
-    options?: { at?: ValidationTime; until?: 'persisted' | 'working-copy' } & OperationOptions,
-  ): Promise<readonly SignatureVerdict[]>;
-  /** Judge one signed field. Rejects `not-found` for an unsigned or unknown field. */
+  validate(options?: SignatureValidateOptions): Promise<readonly SignatureVerdict[]>;
+  /** Check one signed field. Rejects `not-found` for an unsigned or unknown field. */
   validateField(
     field: SignatureFieldAddress,
-    options?: { at?: ValidationTime; until?: 'persisted' | 'working-copy' } & OperationOptions,
+    options?: SignatureValidateOptions,
   ): Promise<SignatureVerdict>;
-  /** What changed after a signature. */
+  /** What changed after a signature or a version of the file, rule by rule. */
   analyzeChanges(input: AnalyzeInput, options?: OperationOptions): Promise<ChangeAnalysis>;
-  /** The exact bytes a signature's revision covers — rides `doc.download`. */
+  /**
+   * The exact bytes of the file version a signature covers. Rejects
+   * `permission-denied` without `doc.download`, `not-found` for an unsigned
+   * field.
+   */
   readRevision(
     target: SignatureFieldAddress | { revisionIndex: number },
     options?: OperationOptions,
   ): Promise<Uint8Array>;
 
-  // ── twins ──
-  /** `doc.sign` is granted and a signer is configured (or resolvable). */
+  // ── permissions ──
+  /** Whether signing is allowed: `doc.sign`. A per-call key or two-step signing needs no `key` setting. */
   canSign(): boolean;
-  /** Visual fills ride `doc.forms.fill`. */
+  /** Whether drawing a mark into a field without signing is allowed: `doc.forms.fill`. */
   canFill(): boolean;
-  /** `allowCertify` and `doc.sign.certify`. */
+  /** Whether a certification may be offered: the `allowCertify` setting and `doc.sign.certify`. */
   canCertify(): boolean;
+  /** Whether the signed bytes may be read: `doc.download`. */
+  canReadRevision(): boolean;
 
   // ── events ──
+  /** A field was signed, whoever signed it; fires once the facts show the sealed field. */
   readonly onSigned: EventHook<SignatureSignedEvent>;
-  readonly onFilled: EventHook<SignatureFieldEvent>;
-  readonly onCleared: EventHook<SignatureFieldEvent>;
+  /** A mark was drawn into a field. */
+  readonly onFilled: EventHook<SignatureFilledEvent>;
+  /** A drawn mark was taken out of a field. */
+  readonly onCleared: EventHook<SignatureClearedEvent>;
+  /** The signatures were checked. */
   readonly onValidated: EventHook<SignatureValidatedEvent>;
+  /** What the signatures allow changed. */
   readonly onProtectionChanged: EventHook<SignatureProtectionChangedEvent>;
-  readonly onInvalidating: EventHook<SignatureInvalidatingEvent>;
+  /** A change would break a signature once saved. */
+  readonly onInvalidationPredicted: EventHook<SignatureInvalidationPredictedEvent>;
+  /** A field became the target, or the target was cleared. */
   readonly onTargetChanged: EventHook<SignatureTargetChangedEvent>;
+  /** In `'ask'` mode, a mark was dropped on a field. */
   readonly onSignRequested: EventHook<SignatureSignRequestedEvent>;
+  /** A signed field was clicked. */
   readonly onInspectionRequested: EventHook<SignatureInspectionRequestedEvent>;
 }

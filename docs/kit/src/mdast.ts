@@ -5,7 +5,7 @@ import type { AstNode } from './docs-markdown';
  *
  * Projection files compose these over their site's DATA modules — the same
  * modules the page components render — and contain no reader-facing string
- * literals of their own (DOCS-PLATFORM-ARCHITECTURE.md: a page and its .md
+ * literals of their own (docs/conventions/docs-architecture.md: a page and its .md
  * are two renderings of one content source).
  */
 

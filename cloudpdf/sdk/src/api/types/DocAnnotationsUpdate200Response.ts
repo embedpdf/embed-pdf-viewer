@@ -3,99 +3,23 @@
 import type * as CloudPDF from "../index.js";
 
 export interface DocAnnotationsUpdate200Response {
-    meta: DocAnnotationsUpdate200Response.Meta;
-    /** Accepts any additional properties */
-    [key: string]: any;
+    annotation: CloudPDF.Annotation;
+    appearance: DocAnnotationsUpdate200Response.Appearance;
+    meta: CloudPDF.AnnotationMutationMeta;
 }
 
 export namespace DocAnnotationsUpdate200Response {
-    export interface Meta {
-        affectedPages: Meta.AffectedPages.Item[];
-        cacheDelta: Meta.CacheDelta | null;
+    export interface Appearance {
+        action: Appearance.Action;
+        changed: boolean;
     }
 
-    export namespace Meta {
-        export type AffectedPages = AffectedPages.Item[];
-
-        export namespace AffectedPages {
-            export interface Item {
-                page: Item.Page;
-                revision: Item.Revision;
-                weakAnnotationState: CloudPDF.DocAnnotationsUpdate200ResponseMetaAffectedPagesItemWeakAnnotationState;
-            }
-
-            export namespace Item {
-                export interface Page {
-                    kind: Page.Kind;
-                    pageObjectNumber: number;
-                }
-
-                export namespace Page {
-                    export const Kind = {
-                        ObjectNumber: "objectNumber",
-                    } as const;
-                    export type Kind = (typeof Kind)[keyof typeof Kind];
-                }
-
-                export interface Revision {
-                    docSessionId: string;
-                    page: Revision.Page;
-                    generation: number;
-                }
-
-                export namespace Revision {
-                    export interface Page {
-                        kind: Page.Kind;
-                        pageObjectNumber: number;
-                    }
-
-                    export namespace Page {
-                        export const Kind = {
-                            ObjectNumber: "objectNumber",
-                        } as const;
-                        export type Kind = (typeof Kind)[keyof typeof Kind];
-                    }
-                }
-            }
-        }
-
-        export interface CacheDelta {
-            previousDocVersion: number;
-            docVersion: number;
-            annotationsVersion?: number | undefined;
-            layerVersion?: number | undefined;
-            working?: boolean | undefined;
-            pages: CacheDelta.Pages.Item[];
-        }
-
-        export namespace CacheDelta {
-            export type Pages = Pages.Item[];
-
-            export namespace Pages {
-                export interface Item {
-                    page: Item.Page;
-                    cache: Item.Cache;
-                }
-
-                export namespace Item {
-                    export interface Page {
-                        kind: Page.Kind;
-                        pageObjectNumber: number;
-                    }
-
-                    export namespace Page {
-                        export const Kind = {
-                            ObjectNumber: "objectNumber",
-                        } as const;
-                        export type Kind = (typeof Kind)[keyof typeof Kind];
-                    }
-
-                    export interface Cache {
-                        contentVersion: number;
-                        annotationVersion: number;
-                    }
-                }
-            }
-        }
+    export namespace Appearance {
+        export const Action = {
+            Preserved: "preserved",
+            Regenerated: "regenerated",
+            GenerationUnavailable: "generation-unavailable",
+        } as const;
+        export type Action = (typeof Action)[keyof typeof Action];
     }
 }

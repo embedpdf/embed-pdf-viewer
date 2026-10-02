@@ -1,7 +1,12 @@
 import { TextDecoder } from 'node:util';
 
 import { adminOperations, adminWirePaths } from '@cloudpdf/contract';
-import { EngineError, EngineErrorCode } from '@embedpdf/engine-core/runtime';
+import {
+  DEFAULT_ANNOTATION_BUNDLE_LIMITS,
+  EngineError,
+  EngineErrorCode,
+  type AnnotationBundleLimits,
+} from '@embedpdf/engine-core/runtime';
 import compress from '@fastify/compress';
 import cors from '@fastify/cors';
 import multipart from '@fastify/multipart';
@@ -106,7 +111,7 @@ export interface BuildAppOptions {
   /**
    * Cross-replica mutation doorbell. Defaults to in-process delivery —
    * complete for single-replica deployments (the SQLite profile) and tests.
-   * Multi-replica Postgres deployments MUST pass a `PostgresRealtimeBus`
+   * Multi-replica Postgres deployments must pass a `PostgresRealtimeBus`
    * (the production entrypoint does this by default when the driver is
    * postgres) or replicas will not see each other's mutations.
    */
@@ -159,6 +164,11 @@ export interface BuildAppOptions {
   workerEntry: URL | string | null;
   /** Override Fastify body limit. Defaults to 50 MiB. */
   bodyLimit?: number;
+  /**
+   * How large an annotation bundle may be, exported or imported. Defaults to
+   * `DEFAULT_ANNOTATION_BUNDLE_LIMITS`.
+   */
+  annotationBundleLimits?: AnnotationBundleLimits;
   /** Origin-mediated upload policy. Defaults to `fallback-only`. */
   uploadProxyPolicy?: UploadProxyPolicy;
   /**
@@ -176,7 +186,7 @@ export interface BuildAppOptions {
   /** Async import worker idle-poll interval; tests shrink it. Default 1s. */
   importWorkerPollMs?: number;
   /**
-   * Fastify `trustProxy` passthrough. REQUIRED for `request.ip` (and thus
+   * Fastify `trustProxy` passthrough. Required for `request.ip` (and thus
    * the auth-failure limiter) to see real client addresses when the server
    * runs behind a load balancer / reverse proxy: `true` trusts
    * `X-Forwarded-For` from the direct peer, a number trusts that many hops,
@@ -185,7 +195,7 @@ export interface BuildAppOptions {
    */
   trustProxy?: boolean | number | string | string[];
   /**
-   * Per-IP throttle on authentication FAILURES (never successful traffic).
+   * Per-IP throttle on authentication failures (never successful traffic).
    * Defaults to 30 failures / 60s per IP; pass `false` to disable when an
    * edge layer (WAF / ingress) already rate-limits. See `JwtPluginOptions`.
    */
@@ -256,8 +266,8 @@ export interface BuildAppOptions {
   /** Max age of a `pending` doc before it's considered abandoned. */
   pendingTtlMs?: number;
   /**
-   * Phase 3 — when supplied (with `db`, `objectStore`, and a worker
-   * pool), enables the cloud `/v1/docs/...` routes via the
+   * When supplied (with `db`, `objectStore`, and a worker pool),
+   * enables the cloud `/v1/docs/...` routes via the
    * `DocumentService` orchestrator. The required pieces are:
    *
    *   - `cacheRoot`        absolute path the BaseFileCache uses
@@ -291,11 +301,11 @@ export interface BuildAppOptions {
   /** Treat pending migrations as drift at boot. Defaults to false. */
   failOnPending?: boolean;
   /**
-   * The render lattice: canonical FULL-PAGE
-   * `viewport.width` points whose renders are DURABLE derived artifacts —
+   * The render lattice: canonical full-page
+   * `viewport.width` points whose renders are durable derived artifacts —
    * the bounded quantity is output pixels, never zoom. `maxRenderPixels`
    * is the worker-side allocation budget every server render carries.
-   * `enforce: true` rejects off-lattice versioned FULL-PAGE tokens with
+   * `enforce: true` rejects off-lattice versioned full-page tokens with
    * 400 (flip on once clients ship `snapFullPageViewport`); rect targets
    * are exempt (the future tile policy's jurisdiction). Default false =
    * off-lattice renders are computed but never persisted.
@@ -311,7 +321,7 @@ export interface BuildAppOptions {
   };
   /**
    * Budget for `app.close()` inside `shutdown()` before teardown
-   * proceeds anyway (default 30s). Keep it BELOW the supervisor's kill
+   * proceeds anyway (default 30s). Keep it below the supervisor's kill
    * deadline (Kubernetes `terminationGracePeriodSeconds`, `docker stop`
    * timeout) so pool + cache teardown always runs before SIGKILL.
    */
@@ -331,7 +341,7 @@ export interface BuildAppOptions {
   metrics?: boolean;
   /**
    * Engine plane placement. `inline` (default): PDFium worker threads in
-   * THIS process — a native crash costs the process. `host`: a
+   * this process — a native crash costs the process. `host`: a
    * supervised child process — a native crash costs one engine respawn
    * (in-flight engine calls reject `RuntimeUnavailable`), never the API.
    */
@@ -352,7 +362,7 @@ export interface BuildAppOptions {
    *  computed from the pool's slot count; `false` disables the decorator
    *  entirely (raw-pool tests). */
   scheduling?: EngineSchedulingConfig | false;
-  /** Engine recycling policy — OPT-IN (absent = telemetry only, no
+  /** Engine recycling policy — opt-in (absent = telemetry only, no
    *  recycler). Host isolation required; validated at boot by
    *  `resolveRecycleConfig` in the bin. */
   recycle?: EngineRecyclePolicy;
@@ -365,14 +375,14 @@ export interface BuildAppOptions {
   /**
    * How long the engine host may be down before `/readyz` fails
    * (default 10s). A sub-second respawn must never flap the pod out of
-   * its load balancer — readiness reacts to PERSISTENT engine
+   * its load balancer — readiness reacts to persistent engine
    * unavailability only; the health detail is always in the body.
    */
   engineUnreadyAfterMs?: number;
   /**
-   * Crash-journal posture (host mode + db only). OBSERVE-ONLY by
+   * Crash-journal posture (host mode + db only). Observe-only by
    * default: every engine-host death and its suspects are journaled and
-   * quarantine decisions are computed AND persisted — but nothing is
+   * quarantine decisions are computed and persisted — but nothing is
    * refused until `enforce` is set.
    */
   quarantine?: { enforce?: boolean; ttlHours?: number };
@@ -390,18 +400,18 @@ export interface AppBundle {
   revokedJtisGuard?: RevokedJtisGuard;
   /** Present whenever a `db` is configured; tests use it to clear the TTL cache. */
   suspendedTenantsGuard?: SuspendedTenantsGuard;
-  /** Phase 3 — present only when `cacheRoot` is set (+ pool + db). */
+  /** Present only when `cacheRoot` is set (+ pool + db). */
   documentService?: DocumentService;
-  /** Phase 5 — write-side lazy layer materialization service. */
+  /** Write-side lazy layer materialization service. */
   layerService?: LayerService;
-  /** Phase 3 — the base-file cache backing `documentService`. */
+  /** The base-file cache backing `documentService`. */
   baseFileCache?: BaseFileCache;
   /** Security substrate keyring, when configured by the caller. */
   kms?: KmsKeyring;
   /** Present in host mode with a db: the engine crash journal. */
   crashJournal?: CrashJournal;
   /**
-   * Host mode only: the RAW EngineHostClient (bundle.pool may be the
+   * Host mode only: the raw EngineHostClient (bundle.pool may be the
    * quarantine decorator). Drills and boundary tests need its
    * `hostPid()`/`engineBuildId()`.
    */
@@ -424,7 +434,7 @@ export interface AppBundle {
 /**
  * @license FCL-1.0-ALv2
  *
- * WARNING: The server-construction and request-gating code below is part of
+ * Warning: The server-construction and request-gating code below is part of
  * CloudPDF's license-key functionality. Removing or modifying it to disable or
  * circumvent license enforcement, enable protected functionality without a
  * valid license key, or remove protected functionality is a breach of
@@ -481,14 +491,14 @@ export async function buildAppForTesting(opts: BuildAppOptions): Promise<AppBund
   const engineShards =
     opts.engineShards ?? (testShards !== undefined ? Number(testShards) : undefined);
   // Matrix-leg pragmatics: most fixtures pin poolSize 1, which cannot
-  // divide across K > 1 — round the worker total UP to a multiple of K
+  // divide across K > 1 — round the worker total up to a multiple of K
   // so the alternate-topology leg boots (an intentional distortion:
   // the leg tests K-topology behavior, not exact worker counts).
   const poolSize =
     engineShards !== undefined && engineShards > 1 && opts.engineIsolation !== 'inline'
       ? Math.ceil((opts.poolSize ?? engineShards) / engineShards) * engineShards
       : opts.poolSize;
-  // Teardown must fit INSIDE the runner's hook budget, with margin. The
+  // Teardown must fit inside the runner's hook budget, with margin. The
   // production default (30s) exists so real in-flight traffic can finish
   // before a supervisor's kill deadline — but it happens to equal
   // vitest's `hookTimeout`, so a single stuck connection at teardown
@@ -531,11 +541,11 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
     },
     ...(opts.trustProxy !== undefined ? { trustProxy: opts.trustProxy } : {}),
     bodyLimit: opts.bodyLimit ?? 50 * 1024 * 1024,
-    // Use Fastify's default (`fast-querystring`) which yields a FLAT
+    // Use Fastify's default (`fast-querystring`) which yields a flat
     // Record<string, string> — `?viewport.kind=width` parses as
     // `{ "viewport.kind": "width" }`, not `{ viewport: { kind: "width" } }`.
     // The render wire format depends on this: dotted keys are reassembled
-    // into nested objects by `unflatten()` in the route handler. DO NOT
+    // into nested objects by `unflatten()` in the route handler. Do not
     // switch to `qs` or another nesting parser — it would silently pre-nest
     // these keys and break the wire-roundtrip property.
     //
@@ -591,11 +601,13 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
         'content-type',
         'x-engine-session-id',
         'last-event-id',
+        // Names a change a retry must not repeat (annotation import).
+        'idempotency-key',
         // Document affinity: SDKs may send the document routing key; the server
         // never parses it, but the preflight must allow it.
         'x-cloudpdf-doc',
       ],
-      // Response headers cross-origin JS may READ (nothing is safelisted
+      // Response headers cross-origin JS may read (nothing is safelisted
       // beyond the basics): the backpressure hint + the advisory
       // dimension/file headers clients already consume.
       exposedHeaders: [
@@ -604,6 +616,7 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
         'x-embedpdf-image-height',
         'x-embedpdf-appearance-count',
         'x-embedpdf-file-name',
+        'x-embedpdf-file-type',
       ],
       credentials: false,
       maxAge: 86_400,
@@ -680,7 +693,7 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
   const suspendedTenantsGuard = opts.db ? new SuspendedTenantsGuard({ db: opts.db }) : undefined;
 
   // The deployment can sign iff it verifies with the shared secret —
-  // the ONE condition gating every minting surface: tokens.issue, the
+  // the one condition gating every minting surface: tokens.issue, the
   // share-grant routes, and the public exchange. Asymmetric/JWKS
   // deployments verify only; their backends mint with their own keys.
   const verifierForSigning = opts.verifier;
@@ -773,7 +786,7 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
         : undefined;
       const shardCount = opts.engineShards ?? 1;
       if (shardCount === 1) {
-        // K = 1 is TODAY'S exact object graph — no composite exists.
+        // K = 1 is today'S exact object graph — no composite exists.
         pool = await EngineHostClient.create({
           hostEntry: opts.engineHostEntry,
           boot: {
@@ -898,7 +911,7 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
   // database answers. License-restricted mode stays ready on purpose —
   // a lapsed license degrades to read-only; it must never restart-loop
   // or pull the deployment out of every balancer. The object store is
-  // deliberately NOT probed: a transient bucket blip must not amputate
+  // deliberately not probed: a transient bucket blip must not amputate
   // the whole fleet's endpoints. The DB result is cached briefly so
   // probe storms (N replicas × N balancers) cost ~one ping per window —
   // including while the DB is down.
@@ -1147,7 +1160,7 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
     }
 
     // API-token requests reach the doc plane as a synthesized
-    // tenant-mode principal for the DOC'S OWN tenant — recovered from
+    // tenant-mode principal for the doc'S own tenant — recovered from
     // the document row, which is an addressing lookup (storage keys and
     // services are tenant-keyed), not an authorization decision: the
     // API token is already root. Every existing guard then takes its
@@ -1218,10 +1231,10 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
       }
     });
 
-    // Phase 3: wire the doc-scoped routes when the operator has
-    // chosen a cache root. Requires the worker pool — admin-only
-    // deploys (no `workerEntry`) keep the legacy admin surface and
-    // skip the cloud open surface entirely.
+    // Wire the doc-scoped routes when the operator has chosen a cache
+    // root. Requires the worker pool — admin-only deploys (no
+    // `workerEntry`) serve only the admin surface and skip the cloud
+    // open surface entirely.
     if (baseFileCache && pool) {
       const layerStateService = new LayerStateService({
         documentPages: new DocumentPagesRepo(opts.db),
@@ -1329,6 +1342,7 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
         ...(derivedRenders ? { derivedRenders } : {}),
         ...(usageMeters ? { usageMeters } : {}),
         tenantUsage: new TenantUsageRepo(opts.db),
+        annotationBundleLimits: opts.annotationBundleLimits ?? DEFAULT_ANNOTATION_BUNDLE_LIMITS,
       });
       await registerDocsRoutes(app, { service: documentService });
       await registerMetadataRoutes(app, { service: documentService, layerService });
@@ -1356,6 +1370,7 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
         ...(opts.encodeInEngine !== undefined ? { encodeInEngine: opts.encodeInEngine } : {}),
         weakAnnotationSessions,
         ...(derivedRenders ? { derivedRenders } : {}),
+        ...(opts.annotationBundleLimits ? { bundleLimits: opts.annotationBundleLimits } : {}),
       });
       await registerFormRoutes(app, {
         documentService,
@@ -1614,21 +1629,25 @@ function mapToHttp(code: string): number {
       return 401;
     case EngineErrorCode.Forbidden:
       return 403;
-    case EngineErrorCode.WeakAnnotationSessionConflict:
-    case EngineErrorCode.LayerVersionConflict:
     // Signing: a pending candidate, a moved fence, or a layer behind the
     // head are all conflicts the client resolves by re-preparing; a dead
     // signing (expired/aborted) is gone for good; a refused CMS is the
-    // caller's input.
+    // caller's input. A change the document's own signatures refuse is a
+    // conflict with its state, not a matter of the caller's authority.
+    case EngineErrorCode.WeakAnnotationSessionConflict:
+    case EngineErrorCode.LayerVersionConflict:
     case EngineErrorCode.SigningPending:
     case EngineErrorCode.SigningVersionMismatch:
     case EngineErrorCode.StaleBase:
+    case EngineErrorCode.ProtectedDocument:
       return 409;
     case EngineErrorCode.NotFound:
     case EngineErrorCode.DocNotOpen:
       return 404;
     case EngineErrorCode.SigningExpired:
       return 410;
+    case EngineErrorCode.PayloadTooLarge:
+      return 413;
     case EngineErrorCode.DocOpenFailed:
     case EngineErrorCode.DocPasswordRequired:
     case EngineErrorCode.DocPasswordIncorrect:

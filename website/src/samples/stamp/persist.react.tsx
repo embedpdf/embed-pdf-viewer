@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Viewer, DocumentGate } from '@embedpdf/react/runtime';
+import { Viewer, DocumentGate, saveFile } from '@embedpdf/react/runtime';
 import type { OpenInput } from '@embedpdf/react/runtime';
 import { Stage, stagePlugin } from '@embedpdf/react/stage';
 import { RenderLayer, renderPlugin } from '@embedpdf/react/render';
@@ -10,22 +10,16 @@ import {
   persistStampLibraries,
   restoreStampLibraries,
   stampPlugin,
-  useArmStampAsset,
   useStamp,
+  useStampAssetPreviewUrl,
   useStampAssets,
   useStampLibraries,
+  useStampState,
 } from '@embedpdf/react/stamp';
+import type { StampAsset } from '@embedpdf/react/stamp';
 import { localEngine } from '@embedpdf/engine';
 
-import {
-  Button,
-  Demo,
-  Readout,
-  Spacer,
-  StageFrame,
-  Toolbar,
-  stageFill,
-} from '../stage/_shared/chrome';
+import './persist.css';
 
 const engine = localEngine();
 const assetEngine = engine; // stamp libraries are PDFs; they open here too
@@ -42,100 +36,110 @@ const ebook = async (): Promise<OpenInput> => {
   return { kind: 'bytes', id: 'ebook', bytes: new Uint8Array(await response.arrayBuffer()) };
 };
 
-/** Where the library PDFs live between sessions: one IndexedDB store. Any
- *  object with `list` / `put` / `delete` works — a backend of your own too. */
-const store = indexedDbByteStore('stamp-docs-demo');
+// Where the libraries live between visits: this browser's IndexedDB.
+const store = indexedDbByteStore('embedpdf-stamp-example');
+
+function StampButton({ asset, armed }: { asset: StampAsset; armed: boolean }) {
+  const stamp = useStamp();
+  const url = useStampAssetPreviewUrl(asset.id);
+
+  return (
+    <button
+      type="button"
+      className="button"
+      title={`Place “${asset.label}”`}
+      aria-pressed={armed}
+      onClick={() => (armed ? stamp.disarm() : void stamp.armAsset(asset.id))}
+    >
+      {url ? <img src={url} alt={asset.label} className="preview" /> : asset.label}
+    </button>
+  );
+}
 
 function Libraries() {
   const stamp = useStamp();
   const libraries = useStampLibraries();
   const assets = useStampAssets();
-  const { armAsset } = useArmStampAsset();
-  const fileRef = useRef<HTMLInputElement>(null);
+  const { armedAsset } = useStampState();
   const [restored, setRestored] = useState<number | null>(null);
+  const started = useRef(false);
 
-  // Restore on mount; from then on every change writes the library back.
+  // Every change is written to the store from now on.
+  useEffect(() => persistStampLibraries(stamp, store), [stamp]);
+
+  // On load: what the store kept. The first visit starts a library of its own.
   useEffect(() => {
-    void restoreStampLibraries(stamp, store).then((ids) => setRestored(ids.length));
-    return persistStampLibraries(stamp, store);
+    if (started.current) return;
+    started.current = true;
+    void restoreStampLibraries(stamp, store).then(async (ids) => {
+      setRestored(ids.length);
+      if (ids.length > 0) return;
+      const { library } = await stamp.createLibrary('My stamps');
+      await stamp.createAsset({
+        libraryId: library.id,
+        label: 'Checked',
+        mark: { kind: 'text', text: 'Checked', fontFamily: 'times-bold-italic', color: '#1f7a3f' },
+      });
+    });
   }, [stamp]);
 
-  const importPdf = (file: File) =>
-    // The file name is a fallback: a library names itself through its /Title.
-    void stamp.importLibrary(file, { name: file.name.replace(/\.pdf$/i, '') });
-
-  const exportPdf = async (libraryId: string, name: string) => {
-    const bytes = await stamp.exportLibrary(libraryId);
-    const url = URL.createObjectURL(new Blob([bytes as BlobPart], { type: 'application/pdf' }));
-    Object.assign(document.createElement('a'), { href: url, download: `${name}.pdf` }).click();
-    URL.revokeObjectURL(url);
+  const addStamp = async (libraryId: string) => {
+    const label = `Stamp ${assets.length + 1}`;
+    await stamp.createAsset({
+      libraryId,
+      label,
+      mark: { kind: 'text', text: label, fontFamily: 'helvetica-bold', color: '#054fb3' },
+    });
   };
 
   return (
-    <Toolbar>
-      <Readout>
-        {restored === null
-          ? 'restoring…'
-          : `${restored} restored · reload the page to see them come back`}
-      </Readout>
-      <Spacer />
+    <div className="toolbar">
+      {assets.map((asset) => (
+        <StampButton key={asset.id} asset={asset} armed={armedAsset?.id === asset.id} />
+      ))}
       {libraries.map((library) => (
-        <Button
-          key={library.id}
-          title={`Download "${library.name}" as a PDF — open it in Acrobat, or import it here again`}
-          onClick={() => exportPdf(library.id, library.name)}
-        >
-          ⬇ {library.name}
-        </Button>
+        <span className="group" key={library.id}>
+          <button type="button" className="button" onClick={() => void addStamp(library.id)}>
+            Add a stamp
+          </button>
+          <button
+            type="button"
+            className="button"
+            title="The library as the PDF it is: open it in Acrobat, or import it again"
+            onClick={() =>
+              void stamp
+                .exportLibrary(library.id)
+                .then((bytes) => saveFile(bytes, `${library.name}.pdf`, 'application/pdf'))
+            }
+          >
+            Download “{library.name}”
+          </button>
+        </span>
       ))}
-      {assets.slice(0, 3).map((asset) => (
-        <Button
-          key={asset.id}
-          title={`Place "${asset.label}"`}
-          onClick={() => void armAsset(asset.id)}
-        >
-          {asset.label}
-        </Button>
-      ))}
-      <Button
-        title="Import any PDF as a library: one stamp per page"
-        onClick={() => fileRef.current?.click()}
-      >
-        + Import PDF
-      </Button>
-      <input
-        ref={fileRef}
-        type="file"
-        accept="application/pdf"
-        hidden
-        onChange={(event) => {
-          const file = event.currentTarget.files?.[0];
-          event.currentTarget.value = '';
-          if (file) importPdf(file);
-        }}
-      />
-    </Toolbar>
+      <span className="spacer" />
+      <output className="readout">
+        {restored === null
+          ? 'Restoring…'
+          : `${restored} restored: add a stamp, then reload the page`}
+      </output>
+    </div>
   );
 }
 
 export default function App() {
   return (
     <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: ebook }]}>
-      <Demo>
-        <DocumentGate fallback={<p>Loading…</p>}>
-          <Libraries />
-          <StageFrame height={420}>
-            <Stage style={stageFill}>
-              {() => (
-                <>
-                  <RenderLayer annotations={false} />
-                  <AnnotationLayer />
-                </>
-              )}
-            </Stage>
-          </StageFrame>
-        </DocumentGate>
-      </Demo>
+      <DocumentGate fallback={<p className="loading">Loading…</p>}>
+        <Libraries />
+        <Stage className="stage">
+          {() => (
+            <>
+              <RenderLayer annotations={false} />
+              <AnnotationLayer />
+            </>
+          )}
+        </Stage>
+      </DocumentGate>
     </Viewer>
   );
 }

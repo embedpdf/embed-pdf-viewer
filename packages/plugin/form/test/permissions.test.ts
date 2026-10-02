@@ -1,21 +1,32 @@
 import { describe, expect, it, vi } from 'vitest';
-import { toPageRef, type FormFieldDTO, type FormSnapshot } from '@embedpdf/engine-core/runtime';
-import type { PluginContext } from '@embedpdf/core';
+import {
+  formWidget,
+  toPageRef,
+  type FormFieldDTO,
+  type FormSnapshot,
+} from '@embedpdf/engine-core/runtime';
+import { createTestContext } from '@embedpdf/core/testing';
+import { InteractionToken } from '@embedpdf/plugin-interaction/contract/host';
 
-import { createFormCapability } from '../src/controller';
-import { formReducer, initialFormState } from '../src/model';
-import { fieldRef, type FormAction, type FormState } from '../src/host-contract';
+import { FORM_DEFAULTS } from '../src/contract';
+import { createFormController } from '../src/controller';
+import { initialFormState } from '../src/model';
+
+const byObjectNumber = (objectNumber: number) => ({ kind: 'objectNumber' as const, objectNumber });
 
 const field = (): FormFieldDTO => ({
-  ref: { kind: 'objectNumber', fieldObjectNumber: 5 },
-  fieldObjectNumber: 5,
+  ref: { kind: 'objectNumber', objectNumber: 5 },
   name: 'name',
   family: 'text',
   origin: 'acroform',
-  flags: { readOnly: false, required: false, noExport: false, raw: 0 },
+  readOnly: false,
+  required: false,
+  noExport: false,
   alternateName: null,
   mappingName: null,
-  widgets: [{ annotObjectNumber: 9, page: toPageRef(1) }],
+  valueEntry: { kind: 'scalar', value: '' },
+  defaultValueEntry: { kind: 'scalar', value: '' },
+  widgets: [{ ...formWidget(9, toPageRef(1)), rect: null }],
   value: '',
   defaultValue: '',
   maxLength: null,
@@ -28,69 +39,107 @@ const SNAPSHOT: FormSnapshot = {
   formKind: 'acroform',
   needsAppearances: false,
   fields: [field()],
+  calculationOrder: [],
 };
 
 function harness(granted: readonly string[]) {
-  let state = initialFormState();
   const list = vi.fn(async () => SNAPSHOT);
-  const setValue = vi.fn(async () => ({ changedWidgets: [] }));
-  const ctx = {
-    getState: () => state,
-    dispatch: (action: FormAction) => {
-      state = formReducer(state, action);
-    },
-    document: () => ({ pages: [] }),
+  const setValue = vi.fn(async () => ({ meta: { changedWidgets: [] } }));
+  const interaction = {
+    registerTool: () => () => {},
+    registerHandler: () => () => {},
+    getActiveTool: () => ({ id: 'pointer', enables: new Set(['form-fill']) }),
+  };
+  const create = vi.fn();
+  const ctx = createTestContext({
+    id: 'form',
+    state: initialFormState(),
+    settings: { defaults: FORM_DEFAULTS },
+    pages: [{ ref: toPageRef(1) }],
+    capabilities: [[InteractionToken, interaction]],
     doc: {
-      forms: { list, setValue },
-      security: { allows: (cap: string) => granted.includes(cap) },
-    },
-    cleanup: () => {},
-    tryGet: () => null,
-  } as unknown as PluginContext<FormState, FormAction>;
-  return { capability: createFormCapability(ctx), list, setValue };
+      forms: { list, setValue, create },
+      page: () => ({
+        annotations: {
+          list: async () => ({
+            annotations: [
+              {
+                subtype: 'widget',
+                ref: { kind: 'objectNumber', page: toPageRef(1), objectNumber: 9 },
+                rect: { x: 0, y: 0, width: 100, height: 20 },
+              },
+            ],
+          }),
+        },
+      }),
+      security: { allows: (capability: string) => granted.includes(capability) },
+    } as never,
+  });
+  return { capability: ctx.connect(createFormController(ctx)), list, setValue, create };
 }
 
 const ALL = ['doc.forms.read', 'doc.forms.fill', 'doc.forms.modify'];
 
-describe('the twin law (permissions.md) — form', () => {
+describe('form authority twins', () => {
   it('the three twins mirror their capabilities independently', () => {
-    const h = harness(['doc.forms.read', 'doc.forms.fill']);
-    expect(h.capability.canRead()).toBe(true);
-    expect(h.capability.canFill()).toBe(true);
-    expect(h.capability.canDesign()).toBe(false);
+    const fixture = harness(['doc.forms.read', 'doc.forms.fill']);
+    expect(fixture.capability.canRead()).toBe(true);
+    expect(fixture.capability.canFill()).toBe(true);
+    expect(fixture.capability.canDesign()).toBe(false);
   });
 
-  it('no read authority → hydration never fires the doomed list', async () => {
-    const h = harness(['doc.forms.fill']);
-    await h.capability.refresh();
-    expect(h.list).not.toHaveBeenCalled();
-    expect(h.capability.getSnapshot()).toBeNull();
+  it('without read authority the field tree is never requested', async () => {
+    const fixture = harness(['doc.forms.fill']);
+    await fixture.capability.refresh();
+    expect(fixture.list).not.toHaveBeenCalled();
+    expect(fixture.capability.getSnapshot()).toBeNull();
+    expect(fixture.capability.getStatus()).toBe('forbidden');
   });
 
-  it('fill authority fuses into FillItem.disabled — inert pixels, not a late 403', async () => {
-    const h = harness(['doc.forms.read']);
-    await h.capability.refresh();
-    await vi.waitFor(() => expect(h.capability.getSnapshot()).not.toBeNull());
-    expect(h.capability.getFillItem(9)?.disabled).toBe(true);
+  it('without fill authority every widget renders disabled', async () => {
+    const fixture = harness(['doc.forms.read']);
+    await fixture.capability.refresh();
+    await vi.waitFor(() => expect(fixture.capability.getSnapshot()).not.toBeNull());
+    await fixture.capability.ensureLoaded(toPageRef(1));
+    expect(fixture.capability.listWidgets(0)[0]?.disabled).toBe(true);
   });
 
-  it('a fillable session leaves the flag gate in charge', async () => {
-    const h = harness(ALL);
-    await h.capability.refresh();
-    await vi.waitFor(() => expect(h.capability.getSnapshot()).not.toBeNull());
-    expect(h.capability.getFillItem(9)?.disabled).toBe(false);
+  it('with fill authority the field flags alone decide', async () => {
+    const fixture = harness(ALL);
+    await fixture.capability.refresh();
+    await vi.waitFor(() => expect(fixture.capability.getSnapshot()).not.toBeNull());
+    await fixture.capability.ensureLoaded(toPageRef(1));
+    expect(fixture.capability.listWidgets(toPageRef(1))[0]?.disabled).toBe(false);
   });
 
-  it('the write gate refuses with the engine refusal shape, before any call', async () => {
-    const h = harness(['doc.forms.read']);
-    await h.capability.refresh();
-    await vi.waitFor(() => expect(h.capability.getSnapshot()).not.toBeNull());
-    await expect(h.capability.setText(fieldRef.byObjectNumber(5), 'x')).rejects.toMatchObject({
+  it('refuses writes with the engine refusal shape before any engine call', async () => {
+    const fixture = harness(['doc.forms.read']);
+    await fixture.capability.refresh();
+    await vi.waitFor(() => expect(fixture.capability.getSnapshot()).not.toBeNull());
+    await expect(
+      fixture.capability.setValue(byObjectNumber(5), { value: 'x' }),
+    ).rejects.toMatchObject({ code: 'permission-denied', permission: 'doc.forms.fill' });
+    await expect(fixture.capability.reset([byObjectNumber(5)])).rejects.toMatchObject({
       code: 'permission-denied',
+      permission: 'doc.forms.fill',
     });
-    await expect(h.capability.reset(fieldRef.byObjectNumber(5))).rejects.toMatchObject({
-      code: 'permission-denied',
-    });
-    expect(h.setValue).not.toHaveBeenCalled();
+    expect(fixture.setValue).not.toHaveBeenCalled();
+  });
+
+  it('refuses building the form without doc.forms.modify, before any engine call', async () => {
+    const fixture = harness(['doc.forms.read', 'doc.forms.fill']);
+    const draft = { family: 'text' as const, name: 'x' };
+    for (const call of [
+      () => fixture.capability.create(draft),
+      () => fixture.capability.update(byObjectNumber(5), { required: true }),
+      () => fixture.capability.delete(byObjectNumber(5)),
+      () => fixture.capability.repair(),
+    ]) {
+      await expect(call()).rejects.toMatchObject({
+        code: 'permission-denied',
+        permission: 'doc.forms.modify',
+      });
+    }
+    expect(fixture.create).not.toHaveBeenCalled();
   });
 });

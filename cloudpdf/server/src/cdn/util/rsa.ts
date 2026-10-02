@@ -4,7 +4,7 @@
  * key pair group at the edge only verifies SHA1 signatures, so we use
  * what the provider accepts.
  *
- * Private key MUST be a PEM-encoded RSA key (the kind you upload to
+ * Private key must be a PEM-encoded RSA key (the kind you upload to
  * a CloudFront key group). Other key types (ECDSA, Ed25519) won't be
  * accepted by CloudFront's edge verifier.
  */

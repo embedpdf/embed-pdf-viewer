@@ -38,7 +38,10 @@ describe('devWarn', () => {
     devWarn('k', 'first');
     devWarn('k', 'second');
     devWarn('other', 'third');
-    expect(warn.mock.calls.map((c) => c[0])).toEqual(['[embedpdf] first', '[embedpdf] third']);
+    expect(warn.mock.calls.map((call) => call[0])).toEqual([
+      '[embedpdf] first',
+      '[embedpdf] third',
+    ]);
   });
 });
 
@@ -64,21 +67,5 @@ describe('page layer facts', () => {
       </>,
     );
     expect(warn).not.toHaveBeenCalled();
-  });
-
-  it('warns when a FormLayer sits beside the form widget renderer', () => {
-    const page = {};
-    render(
-      <>
-        <Layer page={page} fact="formLayer" value={true} />
-        <Layer
-          page={page}
-          fact="annotationRenderers"
-          value={[{ behavior: 'form-widgets' }, { behavior: 'other' }]}
-        />
-      </>,
-    );
-    expect(warn).toHaveBeenCalledTimes(1);
-    expect(String(warn.mock.calls[0]![0])).toContain('<FormLayer>');
   });
 });

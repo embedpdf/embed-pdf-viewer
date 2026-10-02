@@ -4,17 +4,17 @@ import type { PdfFunctions, PdfRuntimeMemory } from '@embedpdf/engine-runtime';
 import { ActionReadBudgetTracker, readActionModel } from '@embedpdf/engine-services';
 
 /**
- * The Phase-4 skew law, pinned at the reader: a runtime payload that
+ * The version-skew rule, pinned at the reader: a runtime payload that
  * predates the SubmitForm getters (engine-runtime pin lag) must yield the
- * PRE-payload node — bare `{ type: 'submit-form' }`, recognized-inert —
+ * pre-payload node — bare `{ type: 'submit-form' }`, recognized-inert —
  * never a crash and never a degraded `unknown`. (The other half of the
- * atomic rule — a NEW runtime withholding an unresolvable payload degrades
+ * atomic rule — a new runtime withholding an unresolvable payload degrades
  * the node — runs on the real runtime in both conformance flavors via the
  * `submit-not-url` / `submit-no-f` fixtures.)
  */
 describe('action reader ↔ runtime skew', () => {
   it('an old runtime without submit getters yields the bare recognized-inert node', () => {
-    // The minimal native surface the walker touches for ONE payload-less
+    // The minimal native surface the walker touches for one payload-less
     // node: no submit getters anywhere on the table — `typeof` probes miss.
     const SUBMIT_TYPE_CODE = 11;
     const fn = {

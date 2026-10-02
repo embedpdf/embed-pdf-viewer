@@ -74,25 +74,35 @@ export function runSearchConformance(
       const doc = await openFixture(engine, opts);
       try {
         const { matches } = await collectAll(doc, {
-          query: { text: fixture.presentLiteral },
+          text: fixture.presentLiteral,
         });
         expect(matches.length > 0).toBe(true);
-        expect(
-          matches.some((m) => m.page.pageObjectNumber === fixture.presentPageObjectNumber),
-        ).toBe(true);
+        expect(matches.some((m) => m.page.objectNumber === fixture.presentPageObjectNumber)).toBe(
+          true,
+        );
         for (const m of matches) {
-          expect(m.charCount > 0).toBe(true);
+          expect(m.count > 0).toBe(true);
           expect(m.segments.length > 0).toBe(true);
           for (const s of m.segments) {
-            expect(s.rect.right > s.rect.left).toBe(true);
-            expect(s.rect.top > s.rect.bottom).toBe(true);
+            expect(s.rect.width > 0).toBe(true);
+            expect(s.rect.height > 0).toBe(true);
             // The pair is one constructor's output — enforce it stayed that way.
-            const xs = [s.quad.p1.x, s.quad.p2.x, s.quad.p3.x, s.quad.p4.x];
-            const ys = [s.quad.p1.y, s.quad.p2.y, s.quad.p3.y, s.quad.p4.y];
-            expect(Math.abs(s.rect.left - Math.min(...xs)) < 1e-3).toBe(true);
-            expect(Math.abs(s.rect.right - Math.max(...xs)) < 1e-3).toBe(true);
-            expect(Math.abs(s.rect.bottom - Math.min(...ys)) < 1e-3).toBe(true);
-            expect(Math.abs(s.rect.top - Math.max(...ys)) < 1e-3).toBe(true);
+            const xs = [
+              s.quad.upperLeft.x,
+              s.quad.upperRight.x,
+              s.quad.lowerLeft.x,
+              s.quad.lowerRight.x,
+            ];
+            const ys = [
+              s.quad.upperLeft.y,
+              s.quad.upperRight.y,
+              s.quad.lowerLeft.y,
+              s.quad.lowerRight.y,
+            ];
+            expect(Math.abs(s.rect.x - Math.min(...xs)) < 1e-3).toBe(true);
+            expect(Math.abs(s.rect.x + s.rect.width - Math.max(...xs)) < 1e-3).toBe(true);
+            expect(Math.abs(s.rect.y - Math.min(...ys)) < 1e-3).toBe(true);
+            expect(Math.abs(s.rect.y + s.rect.height - Math.max(...ys)) < 1e-3).toBe(true);
             expect(s.advance === 1 || s.advance === -1).toBe(true);
           }
         }
@@ -105,10 +115,10 @@ export function runSearchConformance(
       const doc = await openFixture(engine, opts);
       try {
         const lower = await collectAll(doc, {
-          query: { text: fixture.presentLiteral.toLowerCase() },
+          text: fixture.presentLiteral.toLowerCase(),
         });
         const upper = await collectAll(doc, {
-          query: { text: fixture.presentLiteral.toUpperCase() },
+          text: fixture.presentLiteral.toUpperCase(),
         });
         expect(lower.matches.length).toBe(upper.matches.length);
         expect(lower.matches.length > 0).toBe(true);
@@ -117,27 +127,26 @@ export function runSearchConformance(
       }
     });
 
-    test("'full' snippets reproduce the matched text; 'rects' carries none", async () => {
+    test('snippets carry the matched text; without them a match has none', async () => {
       const doc = await openFixture(engine, opts);
       try {
-        const full = await collectAll(doc, {
-          query: { text: fixture.presentLiteral },
-          mode: 'full',
+        const withSnippets = await collectAll(doc, {
+          text: fixture.presentLiteral,
+          snippets: true,
         });
-        for (const m of full.matches) {
+        for (const m of withSnippets.matches) {
           expect(!!m.snippet).toBe(true);
           const s = m.snippet!;
-          const hit = s.text.slice(s.matchStart, s.matchStart + s.matchLength);
+          const hit = s.match;
           // Fold both sides: the snippet keeps the page's original case
-          // and (1:1-flattened) whitespace.
+          // and (flattened) whitespace.
           expect(foldText(hit).folded).toBe(foldText(fixture.presentLiteral).folded);
         }
-        const rects = await collectAll(doc, {
-          query: { text: fixture.presentLiteral },
-          mode: 'rects',
+        const plain = await collectAll(doc, {
+          text: fixture.presentLiteral,
         });
-        expect(rects.matches.length).toBe(full.matches.length);
-        for (const m of rects.matches) expect(m.snippet === undefined).toBe(true);
+        expect(plain.matches.length).toBe(withSnippets.matches.length);
+        for (const m of plain.matches) expect(m.snippet === undefined).toBe(true);
       } finally {
         await doc.close();
       }
@@ -147,46 +156,46 @@ export function runSearchConformance(
       const doc = await openFixture(engine, opts);
       try {
         const { matches, slices } = await collectAll(doc, {
-          query: { text: fixture.absentLiteral },
+          text: fixture.absentLiteral,
         });
         expect(matches.length).toBe(0);
         const last = slices[slices.length - 1];
         expect(last.nextCursor).toBe(null);
-        expect(last.totalPages > 0).toBe(true);
+        expect(last.pageCount > 0).toBe(true);
       } finally {
         await doc.close();
       }
     });
 
-    test('a one-page budget walks the whole document via the cursor', async () => {
+    test('a one-page limit walks the whole document via the cursor', async () => {
       const doc = await openFixture(engine, opts);
       try {
         const whole = await collectAll(doc, {
-          query: { text: fixture.presentLiteral },
+          text: fixture.presentLiteral,
         });
         const sliced = await collectAll(doc, {
-          query: { text: fixture.presentLiteral },
-          budget: { maxPages: 1 },
+          text: fixture.presentLiteral,
+          limit: { pages: 1 },
         });
         expect(sliced.matches.length).toBe(whole.matches.length);
         const last = sliced.slices[sliced.slices.length - 1];
-        expect(last.scannedPages).toBe(last.totalPages);
-        expect(sliced.slices.length).toBe(last.totalPages);
+        expect(last.pagesSearched).toBe(last.pageCount);
+        expect(sliced.slices.length).toBe(last.pageCount);
       } finally {
         await doc.close();
       }
     });
 
-    test('startPage rotates the scan order (viewport-first)', async () => {
+    test('from rotates the scan order (viewport-first)', async () => {
       const doc = await openFixture(engine, opts);
       try {
         const slice = await doc.search.query({
-          query: { text: fixture.presentLiteral },
-          startPage: toPageRef(fixture.presentPageObjectNumber),
-          budget: { maxPages: 1 },
+          text: fixture.presentLiteral,
+          from: toPageRef(fixture.presentPageObjectNumber),
+          limit: { pages: 1 },
         });
         expect(slice.matches.length > 0).toBe(true);
-        expect(slice.matches[0].page.pageObjectNumber).toBe(fixture.presentPageObjectNumber);
+        expect(slice.matches[0].page.objectNumber).toBe(fixture.presentPageObjectNumber);
       } finally {
         await doc.close();
       }
@@ -196,14 +205,14 @@ export function runSearchConformance(
       const doc = await openFixture(engine, opts);
       try {
         const first = await doc.search.query({
-          query: { text: fixture.presentLiteral },
-          budget: { maxPages: 1 },
+          text: fixture.presentLiteral,
+          limit: { pages: 1 },
         });
         expect(first.nextCursor !== null).toBe(true);
         let caught: unknown;
         try {
           await doc.search.query({
-            query: { text: fixture.absentLiteral },
+            text: fixture.absentLiteral,
             cursor: first.nextCursor!,
           });
         } catch (err) {
@@ -221,7 +230,7 @@ export function runSearchConformance(
         let caught: unknown;
         try {
           await doc.search.query({
-            query: { text: fixture.presentLiteral },
+            text: fixture.presentLiteral,
             cursor: 'not a cursor',
           });
         } catch (err) {
@@ -237,11 +246,12 @@ export function runSearchConformance(
       const doc = await openFixture(engine, opts);
       try {
         const { matches } = await collectAll(doc, {
-          query: { text: fixture.presentRegex, regex: true },
+          text: fixture.presentRegex,
+          regex: true,
         });
         expect(matches.length > 0).toBe(true);
         for (const m of matches) {
-          expect(m.charCount > 0).toBe(true);
+          expect(m.count > 0).toBe(true);
           expect(m.segments.length > 0).toBe(true);
         }
       } finally {
@@ -253,15 +263,18 @@ export function runSearchConformance(
       const doc = await openFixture(engine, opts);
       try {
         const all = await collectAll(doc, {
-          query: { text: fixture.presentRegex, regex: true },
+          text: fixture.presentRegex,
+          regex: true,
         });
-        const key = (m: SearchMatch) => `${m.page.pageObjectNumber}:${m.charStart}:${m.charCount}`;
+        const key = (m: SearchMatch) => `${m.page.objectNumber}:${m.start}:${m.count}`;
         const allKeys = new Set(all.matches.map(key));
-        // Each flag can only REMOVE matches, never invent them — true for
+        // Each flag can only remove matches, never invent them — true for
         // any fixture pattern, so the suite needs no per-fixture counts.
         for (const flags of [{ matchCase: true }, { wholeWord: true }]) {
           const restricted = await collectAll(doc, {
-            query: { text: fixture.presentRegex, regex: true, ...flags },
+            text: fixture.presentRegex,
+            regex: true,
+            ...flags,
           });
           expect(restricted.matches.length <= all.matches.length).toBe(true);
           for (const m of restricted.matches) expect(allKeys.has(key(m))).toBe(true);
@@ -274,18 +287,20 @@ export function runSearchConformance(
     test('ignoreWhitespace keeps every default hit and finds the space-free needle', async () => {
       const doc = await openFixture(engine, opts);
       try {
-        const key = (m: SearchMatch) => `${m.page.pageObjectNumber}:${m.charStart}:${m.charCount}`;
-        const plain = await collectAll(doc, { query: { text: fixture.presentLiteral } });
-        // Dropping whitespace can only ADD matches over the collapsing default
+        const key = (m: SearchMatch) => `${m.page.objectNumber}:${m.start}:${m.count}`;
+        const plain = await collectAll(doc, { text: fixture.presentLiteral });
+        // Dropping whitespace can only add matches over the collapsing default
         // fold — every default hit survives, at the same place.
         const relaxed = await collectAll(doc, {
-          query: { text: fixture.presentLiteral, ignoreWhitespace: true },
+          text: fixture.presentLiteral,
+          ignoreWhitespace: true,
         });
         const relaxedKeys = new Set(relaxed.matches.map(key));
         for (const m of plain.matches) expect(relaxedKeys.has(key(m))).toBe(true);
         // ...and the needle no longer needs the page's spaces.
         const squashed = await collectAll(doc, {
-          query: { text: fixture.presentLiteral.replace(/\s+/g, ''), ignoreWhitespace: true },
+          text: fixture.presentLiteral.replace(/\s+/g, ''),
+          ignoreWhitespace: true,
         });
         expect(squashed.matches.map(key)).toEqual(relaxed.matches.map(key));
       } finally {
@@ -300,7 +315,9 @@ export function runSearchConformance(
           let caught: unknown;
           try {
             await doc.search.query({
-              query: { text: fixture.presentRegex, regex: true, ...flags },
+              text: fixture.presentRegex,
+              regex: true,
+              ...flags,
             });
           } catch (err) {
             caught = err;
@@ -318,7 +335,7 @@ export function runSearchConformance(
         for (const pattern of ['(a)\\1', '(?=x)y', '(']) {
           let caught: unknown;
           try {
-            await doc.search.query({ query: { text: pattern, regex: true } });
+            await doc.search.query({ text: pattern, regex: true });
           } catch (err) {
             caught = err;
           }
@@ -332,7 +349,7 @@ export function runSearchConformance(
     test('an empty needle returns an exhausted, empty slice', async () => {
       const doc = await openFixture(engine, opts);
       try {
-        const slice = await doc.search.query({ query: { text: '   ' } });
+        const slice = await doc.search.query({ text: '   ' });
         expect(slice.matches.length).toBe(0);
         expect(slice.nextCursor).toBe(null);
       } finally {
@@ -343,7 +360,7 @@ export function runSearchConformance(
     test('abort() on query rejects with AbortError', async () => {
       const doc = await openFixture(engine, opts);
       try {
-        const p = doc.search.query({ query: { text: fixture.presentLiteral } });
+        const p = doc.search.query({ text: fixture.presentLiteral });
         p.abort('test');
         await expect(p).rejects.toBeInstanceOf(AbortError);
       } finally {
@@ -356,7 +373,7 @@ export function runSearchConformance(
       await doc.close();
       let caught: unknown;
       try {
-        await doc.search.query({ query: { text: fixture.presentLiteral } });
+        await doc.search.query({ text: fixture.presentLiteral });
       } catch (err) {
         caught = err;
       }

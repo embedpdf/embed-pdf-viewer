@@ -1,6 +1,6 @@
 /**
  * Shared internals for the remote ObjectStore adapters (S3 / GCS /
- * Azure Blob). NOT an adapter — the leading underscore marks it as
+ * Azure Blob). Not an adapter — the leading underscore marks it as
  * package-private scaffolding.
  *
  * Why this exists: `put`/`getSha256`/`materializeLocal` are byte-for-
@@ -8,7 +8,7 @@
  * "fetch these bytes" / "write these bytes" SDK calls differ. Pulling
  * the orchestration (range fan-out, partial-file + atomic-rename,
  * SHA-256 verification, content-length checks) into one place means:
- *   - the atomicity + verify contract has exactly ONE implementation,
+ *   - the atomicity + verify contract has exactly one implementation,
  *     so adapters can't drift from each other; and
  *   - each adapter shrinks to "construct client + map our ops to SDK
  *     calls", with no business logic to get subtly wrong.
@@ -69,20 +69,20 @@ export async function streamingSha256(stream: Readable): Promise<string> {
 }
 
 /**
- * The body wrapper for a STREAMED `put`. Hashes and counts the bytes
+ * The body wrapper for a streamed `put`. Hashes and counts the bytes
  * as they flow toward the backend, enforcing the declared
  * content-length exactly:
  *
  *   - one byte over `declared` errors the body mid-stream, so the
  *     backend aborts its upload and no visible object materializes;
- *   - a source that ends short errors in `flush` — BEFORE downstream
+ *   - a source that ends short errors in `flush` — before downstream
  *     ever sees EOF — so single-shot backends can never finalize an
  *     undersized object;
  *   - `sha256()` is defined only after a full, exact-length flush. A
  *     backend upload call that resolved implies EOF was consumed,
  *     which implies the flush ran (adapters rely on this order);
  *   - `error()` hands back the body/source failure so adapters can
- *     rethrow OUR precise content-length error instead of whatever
+ *     rethrow our precise content-length error instead of whatever
  *     wrapper the SDK put around the aborted request.
  */
 export interface CountedSha256Body {
@@ -130,7 +130,7 @@ export function countedSha256Body(
   body.on('error', (err) => {
     failure ??= err instanceof Error ? err : new Error(String(err));
   });
-  // pipeline (vs .pipe) propagates errors BOTH ways: a source failure
+  // pipeline (vs .pipe) propagates errors both ways: a source failure
   // destroys the body (the backend sees the error), and a backend
   // abort destroys the source.
   pipeline(source, body, () => {
@@ -188,7 +188,7 @@ export interface RangeMaterializeSource {
  *   - bytes land in `${destPath}.partial.<random>` first; an atomic
  *     `rename` produces `destPath` only after the full payload wrote
  *     without error;
- *   - on ANY failure (range error, abort, sha mismatch) the partial
+ *   - on any failure (range error, abort, sha mismatch) the partial
  *     is removed and the error rethrown — callers never see a
  *     half-written or unverified file;
  *   - the final bytes are verified against `opts.expectedSha`;

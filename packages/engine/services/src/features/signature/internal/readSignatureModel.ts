@@ -1,6 +1,8 @@
 import type {
+  PdfCoordinates,
   DocMdpPermission,
   FieldLockSpec,
+  IsoDateTime,
   PdfRevision,
   RevisionField,
   RevisionStructure,
@@ -14,8 +16,11 @@ import { NULL_PTR, type PdfRuntimeModule, type Ptr } from '@embedpdf/engine-runt
 
 import { withScratch, withScratchN } from '../../../runtime/memory/scratch';
 import { readUtf16String } from '../../../runtime/memory/strings';
+import { pdfDateToIso } from '../../../shared/pdf-date';
 import { U64_BYTES, peekU64, pokeU64 } from '../../../runtime/memory/u64';
 import { readFormSnapshot, widgetPageRef } from '../../forms/internal/readFormSnapshot';
+import { fieldObjectNumberOf } from '../../forms/internal/resolveFieldRef';
+import type { WidgetRectOf } from '../../forms/internal/widgetRects';
 
 // Mirrors public/epdf_signature.h.
 const KIND_DOC_TIMESTAMP = 1;
@@ -149,11 +154,19 @@ function readSeedValue(
   };
 }
 
-/** Every signature field of a native signature model, in model order. */
-export function readSignaturesFromModel(runtime: PdfRuntimeModule, model: Ptr): SignatureDTO[] {
+/**
+ * Every signature field of a native signature model, in model order. A
+ * widget's rect comes from `rectOf` (the signature model has none); without
+ * it, rects are `null`, for reads that never show where a signature is.
+ */
+export function readSignaturesFromModel(
+  runtime: PdfRuntimeModule,
+  model: Ptr,
+  rectOf: WidgetRectOf = () => null,
+): SignatureDTO<PdfCoordinates>[] {
   const { fn } = runtime;
   const count = fn.EPDFSig_Count(model);
-  const out: SignatureDTO[] = [];
+  const out: SignatureDTO<PdfCoordinates>[] = [];
   const str = (i: number, key: number) =>
     readWide(runtime, (buf, cap) => fn.EPDFSig_GetString(model, i, key, buf, cap));
   for (let i = 0; i < count; i++) {
@@ -163,11 +176,14 @@ export function readSignaturesFromModel(runtime: PdfRuntimeModule, model: Ptr): 
     const docMdp = fn.EPDFSig_GetDocMDPPermission(model, i);
     out.push({
       index: i,
-      field: { kind: 'objectNumber', fieldObjectNumber: fn.EPDFSig_GetFieldObjNum(model, i) },
+      field: { kind: 'objectNumber', objectNumber: fn.EPDFSig_GetFieldObjNum(model, i) },
       fieldName: readWide(runtime, (buf, cap) => fn.EPDFSig_GetFieldName(model, i, buf, cap)) ?? '',
       widget:
         widgetObjNum > 0
-          ? formWidget(widgetObjNum, widgetPageRef(fn.EPDFSig_GetWidgetPageObjNum(model, i)))
+          ? {
+              ...formWidget(widgetObjNum, widgetPageRef(fn.EPDFSig_GetWidgetPageObjNum(model, i))),
+              rect: rectOf(widgetObjNum),
+            }
           : null,
       signed,
       kind: fn.EPDFSig_GetKind(model, i) === KIND_DOC_TIMESTAMP ? 'timestamp' : 'signature',
@@ -182,7 +198,7 @@ export function readSignaturesFromModel(runtime: PdfRuntimeModule, model: Ptr): 
         reason: str(i, STRING_REASON),
         location: str(i, STRING_LOCATION),
         contactInfo: str(i, STRING_CONTACT_INFO),
-        claimedTime: str(i, STRING_M),
+        signedAt: signedAtOf(str(i, STRING_M)),
       },
       docMdp: isPermission(docMdp) ? docMdp : null,
       catalogCertification: fn.EPDFSig_IsCatalogCertification(model, i),
@@ -219,7 +235,7 @@ export function readContentsAt(runtime: PdfRuntimeModule, model: Ptr, index: num
 export function readRevisions(
   runtime: PdfRuntimeModule,
   docPtr: Ptr,
-  signatures: ReadonlyArray<SignatureDTO>,
+  signatures: ReadonlyArray<SignatureDTO<PdfCoordinates>>,
 ): PdfRevision[] {
   const { fn, mem } = runtime;
   const count = fn.EPDFDoc_GetRevisionCount(docPtr);
@@ -299,15 +315,16 @@ export function readStructure(runtime: PdfRuntimeModule, docPtr: Ptr): RevisionS
   if (formModel !== NULL_PTR) {
     try {
       const snapshot = readFormSnapshot(runtime, formModel, docPtr);
-      for (const f of snapshot.fields) {
+      // The snapshot lists the model's fields in model order.
+      snapshot.fields.forEach((f, index) => {
         fields.push({
-          objectNumber: f.fieldObjectNumber,
+          objectNumber: fieldObjectNumberOf(f),
           name: f.name,
           family: f.family,
-          widgets: f.widgets.map((w) => w.annotObjectNumber),
-          flags: f.flags.raw,
+          widgets: f.widgets.map((w) => w.objectNumber),
+          flags: fn.EPDFForm_GetFieldFlags(formModel, index),
         });
-      }
+      });
     } finally {
       fn.EPDFForm_CloseModel(formModel);
     }
@@ -316,4 +333,9 @@ export function readStructure(runtime: PdfRuntimeModule, docPtr: Ptr): RevisionS
     readSignaturesFromModel(runtime, model),
   );
   return { root, acroForm, pagesRoot, pages, fields, signatures };
+}
+
+/** `/M` as `IsoDateTime`; `null` when absent or not a date. */
+function signedAtOf(raw: string | null): IsoDateTime | null {
+  return raw ? pdfDateToIso(raw) : null;
 }

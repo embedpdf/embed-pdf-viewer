@@ -29,14 +29,14 @@ const PRODUCTS: DocsProductItem[] = [
   {
     key: 'headless',
     label: 'Headless',
-    href: '/docs/headless/getting-started',
+    href: '/docs/headless',
     icon: <PuzzleBadgeIcon />,
     tintClass: 'bg-[#EEE5FF] text-[#7C3AED]',
   },
   {
     key: 'engine',
     label: 'Engine',
-    href: '/docs/engine/getting-started',
+    href: '/docs/engine',
     icon: <EngineIcon />,
     tintClass: 'bg-[#DFF5F1] text-[#087F73]',
   },

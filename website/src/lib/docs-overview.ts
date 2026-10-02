@@ -36,7 +36,7 @@ export const DOCS_OVERVIEW_PATHS: readonly DocsOverviewPath[] = [
     title: 'Headless Components',
     eyebrow: 'Recommended for customization',
     description: 'Compose your own viewer UI from plugins, components, and reactive bindings.',
-    href: '/docs/headless/react/getting-started',
+    href: '/docs/headless/react',
     cta: 'Start with Headless',
     illustration: '/illustration-headless.svg',
     features: ['Own every pixel', 'Composable feature plugins', 'One API across frameworks'],
@@ -49,7 +49,7 @@ export const DOCS_ENGINE_FOUNDATION = {
   eyebrow: 'The foundation underneath both paths',
   description:
     'Open, inspect, render, edit, and save PDF documents without adopting a UI layer. The local engine runs PDFium through WebAssembly in a Web Worker.',
-  href: '/docs/engine/getting-started',
+  href: '/docs/engine/quick-start',
   cta: 'Use the Engine directly',
   apiHref: '/docs/engine',
   apiCta: 'Engine API reference',

@@ -10,28 +10,28 @@ describe('RasterStore', () => {
   it('singleflight: concurrent acquires of one key run the fetch once', async () => {
     const store = new RasterStore();
     let fetches = 0;
-    let resolveFn!: (h: PageImageHandle) => void;
+    let resolveFetch!: (image: PageImageHandle) => void;
     const fetch = () => {
       fetches += 1;
-      return new Promise<PageImageHandle>((res) => {
-        resolveFn = res;
+      return new Promise<PageImageHandle>((resolve) => {
+        resolveFetch = resolve;
       });
     };
-    const a = store.acquire('k', fetch);
-    const b = store.acquire('k', fetch);
+    const first = store.acquire('k', fetch);
+    const second = store.acquire('k', fetch);
     expect(fetches).toBe(1);
-    resolveFn(handle('one'));
-    expect(await a).toBe(await b);
+    resolveFetch(handle('one'));
+    expect(await first).toBe(await second);
   });
 
   it('resolved entries serve synchronously via peek and survive aborts', async () => {
     const store = new RasterStore();
     await store.acquire('k', ready('one'));
     expect(store.peek('k')).toEqual(handle('one'));
-    // An abort AFTER resolution is a no-op — the cache keeps the raster.
-    const ac = new AbortController();
-    const again = store.acquire('k', ready('two'), ac.signal);
-    ac.abort();
+    // An abort after resolution is a no-op — the cache keeps the raster.
+    const controller = new AbortController();
+    const again = store.acquire('k', ready('two'), controller.signal);
+    controller.abort();
     expect(store.peek('k')).toEqual(handle('one'));
     await again.catch(() => {}); // wrapper may reject; entry must survive
     expect(store.peek('k')).toEqual(handle('one'));
@@ -60,16 +60,16 @@ describe('RasterStore', () => {
 
   it('in-flight entries are never evicted, even over capacity', async () => {
     const store = new RasterStore(1);
-    let resolveFn!: (h: PageImageHandle) => void;
+    let resolveFetch!: (image: PageImageHandle) => void;
     const pending = store.acquire(
       'slow',
       () =>
-        new Promise<PageImageHandle>((res) => {
-          resolveFn = res;
+        new Promise<PageImageHandle>((resolve) => {
+          resolveFetch = resolve;
         }),
     );
     await store.acquire('fast', ready('fast'));
-    resolveFn(handle('slow'));
+    resolveFetch(handle('slow'));
     expect(await pending).toEqual(handle('slow'));
   });
 });

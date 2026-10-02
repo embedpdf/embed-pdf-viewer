@@ -24,6 +24,14 @@ export type SearchExtractSite = {
    * the section set, ordering, and the shared prose.
    */
   integrationsForProduct(product: string | null): readonly (string | undefined)[];
+  /**
+   * Which of `integrations` a page is published for (the publish gate,
+   * `../publish.ts`); none leaves the page out of the index. Absent: all.
+   */
+  publishedIntegrations?(
+    contentPath: string,
+    integrations: readonly (string | undefined)[],
+  ): readonly (string | undefined)[];
 };
 
 /**
@@ -236,7 +244,13 @@ export function extractPageSections(
 ): DocsSection[] {
   const canonicalPath = `/${contentPath}`;
   const product = site.productFromPath(canonicalPath);
-  const integrations = site.integrationsForProduct(product);
+  const supported = site.integrationsForProduct(product);
+  const integrations = site.publishedIntegrations?.(contentPath, supported) ?? supported;
+  if (integrations.length === 0) return [];
+  // The integrations the page waits on, so their readers don't find it.
+  const withheldFrom = supported.filter(
+    (integration): integration is string => !!integration && !integrations.includes(integration),
+  );
   const pageTitle =
     typeof title === 'string' && title ? title : titleCase(contentPath.split('/').at(-1) ?? '');
   const pageDescription = typeof description === 'string' && description ? description : null;
@@ -270,6 +284,7 @@ export function extractPageSections(
           prose: section.prose,
           variantProse: {},
           symbols: {},
+          ...(withheldFrom.length > 0 ? { withheldFrom } : {}),
         });
       } else if (integration && section.prose && section.prose !== existing.prose) {
         // Same heading, different words: an <Fw> branch. Keep it searchable,

@@ -1,0 +1,280 @@
+---
+title: How it works
+description: "How the headless packages fit together: the viewer, plugins, what a plugin gives your components, layers, and which document a component talks to."
+---
+
+# How it works
+
+A headless viewer is a few parts that always work the same way. Learn them once here, and every
+plugin page reads the same: the same <Fw only={['react', 'vue', 'svelte']}>four <Word of="hooks" /></Fw><Fw only="angular">kind of service</Fw>, the same kinds of settings and events, the same
+checks.
+
+## The viewer and its documents
+
+<Fw only={['react', 'vue', 'svelte']}>
+
+`<Viewer>` holds the engine, the plugins and the open documents. Everything inside it can use them:
+
+</Fw>
+
+<Fw only="angular">
+
+`provideEmbedPdf()` sets up the engine, the plugins and the open documents. Put it in a component's
+`providers`, and that component and everything in its template can use them:
+
+</Fw>
+
+<Snippet name="concepts/viewer" />
+
+<Fw only="angular">
+
+It works the same in your app config or in a route's `providers`. `engine` is a function that
+creates the engine: it runs only in the browser, and it may return a promise, so a dynamic
+`import()` keeps the engine out of the page's first download. A document that comes from an input
+or a route parameter goes on the Stage instead, `<epdf-stage [document]="source()">`: when the
+source changes, the new document opens and the old one closes.
+
+</Fw>
+
+A viewer can have several documents open, like tabs, and one of them is active. <Fw only={['react', 'vue', 'svelte']}>A component talks
+to the active document unless you put it inside `<DocumentScope>`, which is how a tab strip or a
+side-by-side view gives each part its own document:</Fw><Fw only="angular">A component talks to the
+active document unless it's inside an element with `[epdfDocumentScope]`: then every service it
+injects acts on that document. That's how a tab strip or a side-by-side view gives each part its own
+document:</Fw>
+
+<Snippet name="concepts/document-scope" />
+
+`<DocumentGate>` renders <Fw only={['react', 'svelte']}>its children</Fw><Fw only="vue">its default slot</Fw><Fw only="angular">the element it's on</Fw> only once the document is open, so the components inside can
+count on it. See [Opening documents](../documents/opening).
+
+## Plugins
+
+A plugin adds one feature. You register it <Fw only={['react', 'vue', 'svelte']}>when you create the viewer</Fw><Fw only="angular">in `provideEmbedPdf()`</Fw>, with its settings:
+
+<Snippet name="concepts/plugins" />
+
+Most plugins keep their state per document: each open document has its own search, its own
+selection, its own zoom. A few belong to the whole viewer, such as translations, commands and stamp
+libraries.
+
+## What a plugin gives you
+
+<Fw only={['react', 'vue', 'svelte']}>
+
+Every plugin gives your components four <Word of="hooks" />, each with one job:
+
+| <Fw only="react">Hook</Fw><Fw only="vue">Composable</Fw><Fw only="svelte">Function</Fw> | Gives you | Your component <Word of="rerenders" /> |
+| :-------------------- | :--------------------------------------------- | :------------------------------------- |
+| `useSearch()`         | the plugin's API: everything it can do         | never                                  |
+| `useSearchState()`    | the data to show, such as the number of hits   | when that data changes                 |
+| `useSearchEvent()`    | a call to your function when something happens | never                                  |
+| `useSearchSettings()` | the plugin's current settings                  | when a setting changes                 |
+
+Search is the example; every plugin follows the pattern: `useStage()` and `useStageState()`,
+`useAnnotation()` and `useAnnotationEvent()`, and so on. A plugin without settings has no settings
+<Word of="hook" />, and one without events has no event <Word of="hook" />.
+
+</Fw>
+
+<Fw only="angular">
+
+Every plugin gives your components one service, `inject(EpdfSearch)` for search, with four parts:
+
+| Part     | Gives you                                      | For search                                    |
+| :------- | :--------------------------------------------- | :-------------------------------------------- |
+| Methods  | the plugin's API: everything it can do         | `search.search({ text })`, `search.nextHit()` |
+| Signals  | the data to show, such as the number of hits   | `search.hitCount()`                           |
+| Streams  | a call to your function when something happens | `search.completed$`                           |
+| Settings | the plugin's current settings, as a signal     | `search.settings()`                           |
+
+Search is the example; every plugin follows the pattern: `inject(EpdfAnnotation)`,
+`inject(EpdfSelection)`, and so on. A plugin without settings has no `settings()`, and one without
+events has no streams. The Stage is the one exception: it's a component, so you reach its API
+through a template reference, `<epdf-stage #stage="epdfStage">`, or `viewChild(EpdfStage)`.
+
+</Fw>
+
+<Snippet name="concepts/search-box" />
+
+<Fw only="react">
+
+- **Do things with the API hook.** Its object never changes, so it's safe in effects and callbacks.
+- **Show things with the state hook.** To re-render only when one value changes, pass a function
+  that picks it: `useSearchState((state) => state.hitCount)`.
+- **React to things with the event hook.** It listens while the component is mounted:
+
+</Fw>
+
+<Fw only="vue">
+
+- **Do things with the API composable.** Its object never changes, so it's safe in watchers and
+  event handlers.
+- **Show things with the state composable.** It gives you refs: your template updates when a value
+  it reads changes.
+- **React to things with the event composable.** It listens while the component is mounted, and
+  stops when it unmounts:
+
+</Fw>
+
+<Fw only="svelte">
+
+- **Do things with the API function.** Its object never changes, so it's safe in `$effect` and
+  event handlers.
+- **Show things with the state function.** It gives you one reactive object: read its fields, and
+  your markup updates when they change.
+- **React to things with the event function.** It listens while the component is mounted:
+
+</Fw>
+
+<Fw only="angular">
+
+- **Do things with its methods.** The service is the same object for as long as your component
+  lives, so call it from event bindings, `effect()` or your own methods.
+- **Show things with its signals.** Read them in your template or in a `computed()`. A signal
+  updates only what reads it, so a count doesn't redraw a list.
+- **React to things with its streams.** They're RxJS observables, and `takeUntilDestroyed()` stops
+  listening when your component goes away:
+
+</Fw>
+
+<Snippet name="concepts/match-announcer" />
+
+All four together: the API searches, the state shows the count, the event announces each finished
+search, and the settings change the highlight color.
+
+<Example name="how-it-works/hooks" />
+
+<Fw only={['react', 'vue', 'svelte']}>
+
+A few <Word of="hooks" /> read one specific thing and are named after it, such as
+`useAnnotationList(filter)`, `usePageList()` or `useSurface(id)`.<Fw only="vue"> Each gives you a ref.</Fw><Fw only="svelte"> Each gives you
+an object whose `current` is the value.</Fw>
+
+</Fw>
+
+<Fw only="angular">
+
+A few signals read one specific thing, and the ones that need an argument are methods that return a
+signal: `annotation.watch(filter)`, `document.pages()` or `shell.surface(id)`.
+
+</Fw>
+
+## Layers and overlays
+
+What you draw goes in one of two places.
+
+**Layers** draw inside each page. <Fw only="react">The Stage calls its children once per visible page</Fw><Fw only="vue">The Stage renders its `#page` slot once per visible page</Fw><Fw only="svelte">The Stage renders what you put between its tags once per visible page</Fw><Fw only="angular">The Stage stamps out its `<ng-template epdfPage>` once per visible page</Fw>, and each layer
+draws for that page. Later layers sit on top:
+
+<Snippet name="concepts/layers" />
+
+A layer zooms, scrolls and rotates with its page, and you never convert a position: everything a
+plugin gives you is in page coordinates, and the layer places it.
+
+**Overlays** float above the pages, attached to something on them: a menu next to the selected
+text, a card next to an annotation. They go <Fw only="react">in the Stage's `overlay`</Fw><Fw only="vue">in the Stage's `#overlay` slot</Fw><Fw only="svelte">in the Stage's `overlay` snippet</Fw><Fw only="angular">inside `<epdf-stage>`, next to the page template</Fw>, which keeps them attached
+while the user scrolls and zooms. See [Menus over the page](../ui/anchored).
+
+<Example name="how-it-works/layers" />
+
+## Settings
+
+A plugin's settings are the options you pass when you register it, and each plugin page lists them
+under **Settings**. Every plugin lets you change them while the app runs, for example when the user
+picks another layout:
+
+```ts
+stage.updateSettings({ layout: 'grid' });
+stage.resetSettings(); // back to what you registered
+```
+
+<Fw only={['react', 'vue', 'svelte']}>
+
+Every plugin with settings has the same three calls, a `useStageSettings()`-style
+<Word of="hook" />, and an `onSettingsChanged` event.
+
+</Fw>
+
+<Fw only="angular">
+
+Every plugin with settings has the same three calls, a `settings()` signal, and a
+`settingsChanged$` stream.
+
+</Fw>
+
+Colors are settings too, such as the highlight of a search match or the handles of an annotation.
+Each color setting can also come from a CSS variable, which wins over the setting, for dark mode or a
+different look per viewer: see [Colors & theming](../ui/theming).
+
+## Checks before you act
+
+Anything the user may not be allowed to do has a check with the same name:
+`annotation.canCreate()`, `search.canSearch()`, `pageEdit.canEdit()`. Use them to hide or disable
+buttons. The engine checks every call again, so they keep your UI honest; they're not the guard.
+See [Permissions](permissions).
+
+## Good to know
+
+### Code outside components
+
+<Fw only="react">
+
+`onReady` gives you the viewer once it has started, for code that isn't a component: a keyboard
+handler, an analytics hook, a test.
+
+</Fw>
+
+<Fw only="vue">
+
+`@ready` gives you the viewer once it has started, for code that isn't a component: a keyboard
+handler, analytics, a test.
+
+</Fw>
+
+<Fw only="svelte">
+
+`onReady` gives you the viewer once it has started, for code that isn't a component: a keyboard
+handler, analytics, a test.
+
+</Fw>
+
+<Fw only="angular">
+
+Code that isn't a component, such as a keyboard handler, analytics or a test, uses the same
+services: inject them in a service of your own, provided next to `provideEmbedPdf()`.
+
+</Fw>
+
+<Snippet name="concepts/outside-components" />
+
+<Fw only="react">
+
+Each plugin exports its token (`SearchToken`, `StageToken`, …). A `ref` on `<Viewer>` gives you the
+same object.
+
+</Fw>
+
+<Fw only={['vue', 'svelte']}>
+
+Each plugin exports its token (`SearchToken`, `StageToken`, …).
+
+</Fw>
+
+<Fw only="angular">
+
+With `provideEmbedPdf()` in your app config, every service in the app can inject them. In a test,
+replace one the Angular way: `{ provide: EpdfSearch, useValue: fakeSearch }`.
+
+</Fw>
+
+### Plugins don't touch the page
+
+Plugins hold state and logic, never HTML. The framework packages draw. That's why every plugin
+works the same in React, Vue, Svelte and Angular, and why you can use a plugin's API in a test
+without a browser.
+
+### Coordinates
+
+Every position is in points from the top-left corner of the page, with y going down. Layers and
+overlays convert to pixels for you. See [Coordinates](coordinates).

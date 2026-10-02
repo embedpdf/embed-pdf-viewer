@@ -1,47 +1,26 @@
-/** The eight change hooks; disposed with the plugin. */
-import { createEventHook } from '@embedpdf/core';
-
+/** The capability's events, minted on the instance so they are disposed with it. */
 import type {
   StampArmChangedEvent,
-  StampAssetEvent,
-  StampLibraryChange,
-  StampLibraryEvent,
+  StampAssetCreatedEvent,
+  StampAssetDeletedEvent,
+  StampAssetUpdatedEvent,
+  StampLibraryChangedEvent,
+  StampLibraryCreatedEvent,
+  StampLibraryDeletedEvent,
+  StampLibraryUpdatedEvent,
 } from '../contract';
 import type { StampContext } from './context';
 
 export function createEvents(ctx: StampContext) {
-  const reportListener = (error: unknown) =>
-    globalThis.console?.error('[stamp] event listener failed:', error);
-  const libraryChanged = createEventHook<StampLibraryChange>(reportListener);
-  const libraryCreated = createEventHook<StampLibraryEvent>(reportListener);
-  const libraryUpdated = createEventHook<StampLibraryEvent>(reportListener);
-  const libraryDeleted = createEventHook<StampLibraryEvent>(reportListener);
-  const assetCreated = createEventHook<StampAssetEvent>(reportListener);
-  const assetUpdated = createEventHook<StampAssetEvent>(reportListener);
-  const assetDeleted = createEventHook<StampAssetEvent>(reportListener);
-  const armChanged = createEventHook<StampArmChangedEvent>(reportListener);
-  ctx.cleanup(() => {
-    for (const hook of [
-      libraryChanged,
-      libraryCreated,
-      libraryUpdated,
-      libraryDeleted,
-      assetCreated,
-      assetUpdated,
-      assetDeleted,
-      armChanged,
-    ])
-      hook.dispose();
-  });
   return {
-    libraryChanged,
-    libraryCreated,
-    libraryUpdated,
-    libraryDeleted,
-    assetCreated,
-    assetUpdated,
-    assetDeleted,
-    armChanged,
+    libraryChanged: ctx.events.source<StampLibraryChangedEvent>(),
+    libraryCreated: ctx.events.source<StampLibraryCreatedEvent>(),
+    libraryUpdated: ctx.events.source<StampLibraryUpdatedEvent>(),
+    libraryDeleted: ctx.events.source<StampLibraryDeletedEvent>(),
+    assetCreated: ctx.events.source<StampAssetCreatedEvent>(),
+    assetUpdated: ctx.events.source<StampAssetUpdatedEvent>(),
+    assetDeleted: ctx.events.source<StampAssetDeletedEvent>(),
+    armChanged: ctx.events.source<StampArmChangedEvent>(),
   };
 }
 export type StampEvents = ReturnType<typeof createEvents>;

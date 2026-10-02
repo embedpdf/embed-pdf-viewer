@@ -1,4 +1,4 @@
-import type { IdentityClaims } from '../auth/scope';
+import type { Identity } from '../auth/scope';
 
 /**
  * Per-call token source. Either a literal JWT or a factory that
@@ -16,10 +16,12 @@ export type TokenSource = string | (() => string | Promise<string>);
  */
 export interface OpenInputBytes {
   kind: 'bytes';
-  /** Caller-supplied stable id; doubles as docId at the engine boundary. */
-  id: string;
+  /**
+   * A stable id of your own for the document; doubles as docId at the
+   * engine boundary. Generated when omitted.
+   */
+  id?: string;
   bytes: Uint8Array | ArrayBuffer;
-  password?: string | null;
 }
 
 export type OpenInputLayerSource =
@@ -39,13 +41,12 @@ export type OpenInputLayerSource =
  */
 export interface OpenInputLayerBytes {
   kind: 'layerBytes';
-  /** Caller-supplied stable id for this layer document handle. */
-  id: string;
-  /** Optional sharing key for the loaded base. Defaults to `id`. */
+  /** A stable id of your own for this layer document handle. Generated when omitted. */
+  id?: string;
+  /** Optional sharing key for the loaded base. Defaults to the handle's id (no sharing). */
   baseKey?: string;
   baseBytes: Uint8Array | ArrayBuffer;
   layer?: OpenInputLayerSource;
-  password?: string | null;
 }
 
 /**
@@ -75,7 +76,6 @@ export interface OpenInputById {
    * this empty.
    */
   token?: TokenSource;
-  password?: string | null;
 }
 
 /**
@@ -100,12 +100,11 @@ export interface OpenInputToken {
    * its own per-doc token.
    */
   token: TokenSource;
-  password?: string | null;
 }
 
 /**
  * Cloud-engine: open via a public share token (`shr_…`) from the
- * dashboard's embed snippet. A share token is a REFERENCE to a
+ * dashboard's embed snippet. A share token is a reference to a
  * stored grant on the server, not a credential — the engine
  * exchanges it for a short-lived doc-scoped session JWT and
  * silently re-exchanges near expiry, so revoking or editing the
@@ -120,12 +119,11 @@ export interface OpenInputShare {
   /** Public share token (`shr_…`) identifying the grant. */
   shareToken: string;
   /**
-   * Passphrase for a protected grant. This is the SHARE passphrase,
+   * Passphrase for a protected grant. This is the share passphrase,
    * checked by the exchange endpoint — not the PDF's encryption
-   * password, which stays in `password` like every other kind.
+   * password, which goes in `OpenOptions.password` like every other kind.
    */
   sharePassword?: string;
-  password?: string | null;
 }
 
 export type OpenInputLayerFileSource =
@@ -134,7 +132,7 @@ export type OpenInputLayerFileSource =
   | { kind: 'artifact-file'; path: string };
 
 /**
- * Local-engine layer open over a base FILE (Node runtimes only): the base
+ * Local-engine layer open over a base file (Node runtimes only): the base
  * is range-read from disk by PDFium and never loaded into JS, and a
  * signing candidate for such a session is written beside it rather than
  * held in memory. What a server does for every document; useful locally
@@ -144,15 +142,14 @@ export type OpenInputLayerFileSource =
  */
 export interface OpenInputLayerFile {
   kind: 'layerFile';
-  /** Caller-supplied stable id for this layer document handle. */
-  id: string;
+  /** A stable id of your own for this layer document handle. Generated when omitted. */
+  id?: string;
   /** Optional sharing key for the loaded base. Defaults to the path. */
   baseKey?: string;
   basePath: string;
   /** A verified SHA-256 (hex) of the base file, when the caller has one. */
   baseSha256?: string;
   layer?: OpenInputLayerFileSource;
-  password?: string | null;
 }
 
 export type OpenInput =
@@ -164,6 +161,12 @@ export type OpenInput =
   | OpenInputShare;
 
 export interface OpenOptions {
+  /**
+   * The PDF's own password (user or owner), for every input kind. Without
+   * one a password-protected file opens locked (see
+   * `security.passwordPrompt`); with a wrong one it opens locked too, and
+   * the prompt's `incorrect` is `true`.
+   */
   password?: string | null;
 
   /**
@@ -171,29 +174,29 @@ export interface OpenOptions {
    * operations, mirroring what a doc-scoped JWT would carry in the
    * cloud. Same vocabulary as the cloud (`pdf.permissions`, `doc.*`,
    * `annotations:update:self`, `annotations:delete:group=X`,
-   * `annotations:set-group:all`, etc.) — same enforcement, same
-   * `PermissionDenied` errors.
+   * `annotations:set-group:all`, etc.) — same enforcement, the same
+   * `Forbidden` errors.
    *
    * Defaults to `['*']` (admin wildcard) when omitted, with a one-time
    * console warning. Set explicitly to test realistic permissions
    * locally before pointing the same SDK code at the cloud.
    *
-   * Cloud engines read scope from the JWT and IGNORE this option.
+   * Cloud engines read scope from the JWT and ignore this option.
    */
   scope?: ReadonlyArray<string>;
 
   /**
-   * Engine-local only. The identity claims to evaluate collab filters
-   * against (`:self`, `:group=X`) and to stamp onto annotation
-   * `/EMBD_Metadata` on create. Mirrors the JWT identity claims used
-   * cloud-side.
+   * Engine-local only. Who the session acts for: collab filters
+   * (`:self`, `:group=X`) are evaluated against it, and annotations it
+   * writes are attributed to it. The cloud engine takes the same object
+   * from the document token's `identity` claim.
    *
    * Required when `scope` contains collab scopes (`annotations:*:self`
-   * etc.) — opening without it throws `MissingIdentity` so the config
+   * etc.) — opening without it fails with `InvalidArg` so the config
    * mistake surfaces immediately instead of producing silent denies
    * at every mutation.
    *
-   * Cloud engines read identity from the JWT and IGNORE this option.
+   * Cloud engines read identity from the JWT and ignore this option.
    */
-  identity?: IdentityClaims;
+  identity?: Identity;
 }

@@ -38,12 +38,22 @@ By participating in this project, you agree to abide by our Code of Conduct. Ple
 
 #### Pull Request Guidelines
 
+- Follow the conventions in [`docs/conventions/`](docs/conventions/README.md)
 - Follow the existing code style
 - Include comments in your code where necessary
 - Update documentation if needed
 - Add tests for new features
 - Ensure all tests pass
 - Keep pull requests focused on a single feature/fix
+
+## Conventions
+
+How the codebase is built, and the rules every change follows, are written
+down in [`docs/conventions/`](docs/conventions/README.md). Start with its
+README: the four kinds of state, the three kinds of events, the core rules,
+and a map of the detailed documents (architecture, state and sync, events,
+plugins, testing, naming, comments, packages, permissions, and the engine and
+server laws).
 
 ## Development Setup
 

@@ -1,5 +1,6 @@
 import type { FormFieldDTO } from './field';
 import type { FormFieldRef } from '../identity/FormFieldRef';
+import type { Coordinates, PageCoordinates } from '../pageSpace/coordinates';
 
 /**
  * What kind of interactive form the document declares.
@@ -21,7 +22,7 @@ export type FormKind = 'none' | 'acroform' | 'xfa';
  * stale. Re-read after mutating; the engine caches the underlying model
  * per document version, so repeated reads between mutations are cheap.
  */
-export interface FormSnapshot {
+export interface FormSnapshot<C extends Coordinates = PageCoordinates> {
   formKind: FormKind;
   /**
    * Whether the /AcroForm sets /NeedAppearances (viewer-generated widget
@@ -29,7 +30,7 @@ export interface FormSnapshot {
    * `repair({ bakeAppearances: true })` can clear the flag document-wide.
    */
   needsAppearances: boolean;
-  fields: FormFieldDTO[];
+  fields: FormFieldDTO<C>[];
   /** `/AcroForm /CO` order; null preserves each malformed/unresolved slot. */
   calculationOrder: Array<FormFieldRef | null>;
 }

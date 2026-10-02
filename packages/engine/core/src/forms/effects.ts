@@ -1,6 +1,7 @@
 import type { SerializedEngineError } from '../errors/EngineError';
 import type { FormFieldRef, FormWidget } from '../identity/FormFieldRef';
-import type { MutationMeta } from '../mutation/MutationMeta';
+import type { FormMutationMeta } from '../mutation/FormMutationResults';
+import type { Coordinates, PageCoordinates } from '../pageSpace/coordinates';
 import type { FormFieldDTO } from './field';
 import type { FormFieldValue } from './value';
 
@@ -15,24 +16,23 @@ export type FormEffect =
 
 export type FormEffectStatus = 'applied' | 'unchanged' | 'rejected' | 'failed' | 'skipped';
 
-export interface FormEffectResult {
+export interface FormEffectResult<C extends Coordinates = PageCoordinates> {
   index: number;
   status: FormEffectStatus;
   /** Re-read terminal fields affected by this effect, when available. */
-  fields: FormFieldDTO[];
+  fields: FormFieldDTO<C>[];
   changedWidgets: FormWidget[];
   error?: SerializedEngineError;
 }
 
 /**
- * Result of an ordered, non-rollback-atomic effects batch.
- *
- * `meta` is null only when nothing was applied and no native call had an
- * outcome-indeterminate failure. Such all-no-op/all-preflight-rejected
- * batches produce no artifact, event, or version bump.
+ * Result of an ordered, non-rollback-atomic effects batch: one result per
+ * effect, and `meta` naming every field written and widget changed across
+ * the batch. A batch where nothing was applied (and no native call had an
+ * outcome-indeterminate failure) changes nothing: no artifact, event, or
+ * version bump, and `meta` lists nothing.
  */
-export interface FormEffectsResult {
-  results: FormEffectResult[];
-  changedWidgets: FormWidget[];
-  meta: MutationMeta | null;
+export interface FormEffectsResult<C extends Coordinates = PageCoordinates> {
+  results: FormEffectResult<C>[];
+  meta: FormMutationMeta;
 }

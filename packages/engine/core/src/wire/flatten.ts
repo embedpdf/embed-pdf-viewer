@@ -8,7 +8,7 @@
  *
  * Rules:
  *   - Nested object keys are joined with `.` (e.g. `viewport.kind`,
- *     `target.rect.left`).
+ *     `target.rect.x`).
  *   - `undefined` and `null` are dropped.
  *   - Arrays are not supported (the wire format has no list grammar yet).
  *   - Scalar leaves must be `string | number | boolean`.

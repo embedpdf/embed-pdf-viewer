@@ -1,12 +1,17 @@
 /**
- * The REAL `javascript` executor: one node = one host transaction with
- * prefetch → boot? → run → commit → surface INSIDE the boundary. Print and
- * submit effects are external — replayed after the transaction releases,
- * still inside the queued dispatch operation.
+ * The `javascript` executor: one node is one host transaction with prefetch →
+ * boot (once) → run → commit → surface inside the boundary. Print and submit
+ * effects are external: replayed after the transaction releases, still inside
+ * the queued dispatch operation.
  */
 import type { ScriptOutput, ScriptUiEffect } from '@embedpdf/core-acrojs';
 
-import type { ActionDiagnostic, ActionsConfig } from '../contract';
+import type {
+  ActionDiagnostic,
+  ActionNodeStatus,
+  ActionOrigin,
+  ActionsScriptEnvironment,
+} from '../contract';
 import type { AnnotCommitEntry } from '../host-contract';
 import type { ActionsContext, ActionsServices } from '../services';
 import { intentOfSubmitEffect } from '../submit/intent';
@@ -15,25 +20,32 @@ import type { ActionsRealm } from './realm';
 import type { ActionsScriptSurface } from './surface';
 import { createScriptWorld } from './world';
 
+type FirePrint = (
+  uiContext: { origin: ActionOrigin; phase: 'boot' | 'user' } | undefined,
+  diagnose: (diagnostic: ActionDiagnostic) => void,
+) => Promise<{ status: ActionNodeStatus; detail?: string }>;
+
+/** The default cap on JavaScript nodes one dispatch may run. */
+const DEFAULT_SCRIPT_NODES_PER_DISPATCH = 16;
+
 export function registerScriptExecutor(
   ctx: ActionsContext,
   services: Pick<ActionsServices, 'events' | 'ports' | 'queue'>,
-  config: ActionsConfig,
+  environment: ActionsScriptEnvironment,
   { scriptHost }: Pick<ActionsRealm, 'scriptHost'>,
   { performSubmit }: ActionsSubmit,
   { surfaceScriptResult }: Pick<ActionsScriptSurface, 'surfaceScriptResult'>,
   documentEvents: { firePrintThroughAdapter: FirePrint },
 ): void {
-  const { diagnosticHook } = services.events;
+  const { reportDiagnostic } = services.events;
   const ports = services.ports.slots;
   const { budget } = services.queue;
   const { firePrintThroughAdapter } = documentEvents;
   const { scriptWorldFor, scriptEventFor } = createScriptWorld(ctx);
-  const js = config.javascript;
 
   /** Commit one run's document effects through the owner sinks in the
-   *  DECLARED order (form first, then annot); the first failure skips the
-   *  rest across BOTH streams. Returns the failure summary, if any. */
+   *  declared order (form first, then annotations); the first failure skips
+   *  the rest across both streams. Returns the failure summary, if any. */
   const commitScriptOutput = async (
     output: ScriptOutput,
     diagnose: (diagnostic: ActionDiagnostic) => void,
@@ -47,10 +59,11 @@ export function registerScriptExecutor(
         });
       } else {
         const result = await ports.formCommitSink(output.formEffects);
-        const bad = result.results.find(
+        const firstFailure = result.results.find(
           (entry) => entry.status === 'failed' || entry.status === 'rejected',
         );
-        if (bad) failure = `form effect ${bad.index}: ${bad.error?.message ?? bad.status}`;
+        if (firstFailure)
+          failure = `form effect ${firstFailure.index}: ${firstFailure.error?.message ?? firstFailure.status}`;
       }
     }
     if (output.annotEffects.length > 0) {
@@ -66,115 +79,113 @@ export function registerScriptExecutor(
         });
       } else {
         const entries: AnnotCommitEntry[] = output.annotEffects.map((effect) => ({
-          annotObjectNumber: effect.ref.kind === 'objectNumber' ? effect.ref.annotObjectNumber : -1,
+          annotObjectNumber: effect.ref.kind === 'objectNumber' ? effect.ref.objectNumber : -1,
           ...(effect.ref.kind === 'objectNumber' ? { page: effect.ref.page } : {}),
           patch: effect.patch,
         }));
         const result = await ports.annotCommitSink(entries);
-        const bad = result.results.find((entry) => entry.status === 'failed');
-        if (bad) failure = `annotation ${bad.annotObjectNumber}: ${bad.error ?? 'failed'}`;
+        const firstFailure = result.results.find((entry) => entry.status === 'failed');
+        if (firstFailure)
+          failure = `annotation ${firstFailure.annotObjectNumber}: ${firstFailure.error ?? 'failed'}`;
       }
     }
     if (failure) diagnose({ code: 'executor-failed', message: `script commit: ${failure}` });
     return failure;
   };
 
-  // ── the REAL `javascript` executor: one node = one host transaction with
-  //    prefetch → boot? → run → commit → surface INSIDE the boundary ───────
-  if (scriptHost) {
-    const nodeCap = js?.maxScriptNodesPerDispatch ?? 16;
-    ports.executors.set('javascript', async (node, actionCtx) => {
-      if (node.type !== 'javascript') return { status: 'inert', reason: 'not a JS node' };
-      const doc = ctx.doc;
-      if (!doc) return { status: 'inert', reason: 'no document' };
-      if (budget.scriptNodes >= nodeCap) {
-        return {
-          status: 'inert',
-          reason: `dispatch script budget exhausted (${nodeCap} JS nodes)`,
-        };
-      }
-      budget.scriptNodes += 1;
-      const source = actionCtx.source;
-      const pon =
-        source.kind === 'widget'
-          ? source.page.pageObjectNumber
-          : source.kind === 'link' || source.kind === 'annotation'
-            ? (source.page?.pageObjectNumber ?? ctx.document()?.pages[0]?.ref.pageObjectNumber)
-            : source.kind === 'page'
-              ? source.page.pageObjectNumber
-              : ctx.document()?.pages[0]?.ref.pageObjectNumber;
-      if (pon === undefined) return { status: 'inert', reason: 'no page to anchor the world on' };
-      const diagnose = (diagnostic: ActionDiagnostic): void => diagnosticHook.emit(diagnostic);
-      // Print/submit effects are EXTERNAL: the WP/DP wrap runs action trees
-      // (which may need their own host transactions) and the submit dataset
-      // must be resolved from POST-COMMIT truth — both must run after the
-      // transaction releases, still inside this queued dispatch op.
-      const pendingExternal: Array<{
-        effect: Extract<ScriptUiEffect, { kind: 'print' | 'submitForm' }>;
-        phase: 'boot' | 'user';
-      }> = [];
-      const splitExternal = (output: ScriptOutput, phase: 'boot' | 'user'): ScriptUiEffect[] =>
-        output.uiEffects.filter((effect) => {
-          if (effect.kind === 'print' || effect.kind === 'submitForm') {
-            pendingExternal.push({ effect, phase });
-            return false;
-          }
-          return true;
-        });
-      const outcome = await scriptHost.transaction<
-        { status: 'executed' } | { status: 'failed'; error: string }
-      >(async (txn) => {
-        let built = await scriptWorldFor(pon);
-        const boot = await txn.boot({
-          ...built.world,
-          event: { kind: 'name-tree-boot', type: 'Doc', name: 'Open' },
-        });
-        if (boot) {
-          // Boot effects belong to this first transaction; a boot fault only
-          // degrades (never bricks). Refetch the world afterwards so the run
-          // sees post-boot truth.
-          await commitScriptOutput(boot, diagnose);
-          surfaceScriptResult({
-            uiEffects: splitExternal(boot, 'boot'),
-            diagnostics: boot.diagnostics,
-            ...(boot.error ? { error: boot.error } : {}),
-            origin: actionCtx.origin,
-            phase: 'boot',
-            realm: 'document',
-          });
-          if (boot.formEffects.length || boot.annotEffects.length) {
-            built = await scriptWorldFor(pon);
-          }
+  if (!scriptHost) return;
+  const nodeLimit = environment.maxScriptNodesPerDispatch ?? DEFAULT_SCRIPT_NODES_PER_DISPATCH;
+  ports.executors.set('javascript', async (node, actionContext) => {
+    if (node.type !== 'javascript') return { status: 'inert', reason: 'not a JS node' };
+    if (budget.scriptNodes >= nodeLimit) {
+      return {
+        status: 'inert',
+        reason: `dispatch script budget exhausted (${nodeLimit} JS nodes)`,
+      };
+    }
+    budget.scriptNodes += 1;
+    const source = actionContext.source;
+    const firstPage = ctx.document()?.pages[0]?.ref.objectNumber;
+    const pageObjectNumber =
+      source.kind === 'widget' || source.kind === 'page'
+        ? source.page.objectNumber
+        : source.kind === 'link' || source.kind === 'annotation'
+          ? (source.page?.objectNumber ?? firstPage)
+          : firstPage;
+    if (pageObjectNumber === undefined) {
+      return { status: 'inert', reason: 'no page to anchor the world on' };
+    }
+    const diagnose = (diagnostic: ActionDiagnostic): void =>
+      reportDiagnostic(diagnostic, { action: 'javascript', source });
+    // Print and submit effects are external: the /WP and /DP wrap runs
+    // action trees (which may need their own host transactions) and the
+    // submit dataset must be resolved from post-commit truth, so both run
+    // after the transaction releases, still inside this queued operation.
+    const pendingExternal: Array<{
+      effect: Extract<ScriptUiEffect, { kind: 'print' | 'submitForm' }>;
+      phase: 'boot' | 'user';
+    }> = [];
+    const splitExternal = (output: ScriptOutput, phase: 'boot' | 'user'): ScriptUiEffect[] =>
+      output.uiEffects.filter((effect) => {
+        if (effect.kind === 'print' || effect.kind === 'submitForm') {
+          pendingExternal.push({ effect, phase });
+          return false;
         }
-        const output = await txn.run(node.script, {
-          ...built.world,
-          event: scriptEventFor(actionCtx, built.snapshot),
-        });
-        surfaceScriptResult({
-          uiEffects: splitExternal(output, 'user'),
-          diagnostics: output.diagnostics,
-          ...(output.error ? { error: output.error } : {}),
-          origin: actionCtx.origin,
-          phase: 'user',
-          realm: 'document',
-        });
-        if (output.error) return { status: 'failed', error: output.error.message };
-        const failure = await commitScriptOutput(output, diagnose);
-        return failure ? { status: 'failed', error: failure } : { status: 'executed' };
+        return true;
       });
-      for (const entry of pendingExternal) {
-        if (entry.effect.kind === 'print') {
-          await firePrintThroughAdapter({ origin: actionCtx.origin, phase: entry.phase }, diagnose);
-        } else {
-          await performSubmit(intentOfSubmitEffect(entry.effect), actionCtx, diagnose);
+    const outcome = await scriptHost.transaction<
+      { status: 'executed' } | { status: 'failed'; error: string }
+    >(async (transaction) => {
+      let built = await scriptWorldFor(pageObjectNumber);
+      const boot = await transaction.boot({
+        ...built.world,
+        event: { kind: 'name-tree-boot', type: 'Doc', name: 'Open' },
+      });
+      if (boot) {
+        // Boot effects belong to this first transaction; a boot fault only
+        // degrades, never blocks. Refetch the world afterwards so the run
+        // sees post-boot truth.
+        await commitScriptOutput(boot, diagnose);
+        surfaceScriptResult({
+          uiEffects: splitExternal(boot, 'boot'),
+          diagnostics: boot.diagnostics,
+          ...(boot.error ? { error: boot.error } : {}),
+          origin: actionContext.origin,
+          phase: 'boot',
+          realm: 'document',
+          source,
+        });
+        if (boot.formEffects.length || boot.annotEffects.length) {
+          built = await scriptWorldFor(pageObjectNumber);
         }
       }
-      return outcome;
+      const output = await transaction.run(node.script, {
+        ...built.world,
+        event: scriptEventFor(actionContext, built.snapshot),
+      });
+      surfaceScriptResult({
+        uiEffects: splitExternal(output, 'user'),
+        diagnostics: output.diagnostics,
+        ...(output.error ? { error: output.error } : {}),
+        origin: actionContext.origin,
+        phase: 'user',
+        realm: 'document',
+        source,
+      });
+      if (output.error) return { status: 'failed', error: output.error.message };
+      const failure = await commitScriptOutput(output, diagnose);
+      return failure ? { status: 'failed', error: failure } : { status: 'executed' };
     });
-  }
+    for (const entry of pendingExternal) {
+      if (entry.effect.kind === 'print') {
+        await firePrintThroughAdapter(
+          { origin: actionContext.origin, phase: entry.phase },
+          diagnose,
+        );
+      } else {
+        await performSubmit(intentOfSubmitEffect(entry.effect), actionContext, diagnose);
+      }
+    }
+    return outcome;
+  });
 }
-
-type FirePrint = (
-  uiContext: { origin: import('../contract').ActionOrigin; phase: 'boot' | 'user' } | undefined,
-  diagnose: (diagnostic: ActionDiagnostic) => void,
-) => Promise<{ status: import('../contract').ActionNodeStatus; detail?: string }>;

@@ -86,13 +86,20 @@ describe("DocClient", () => {
                 metadata: "base",
                 actions: "base",
             },
+            protection: {
+                enforced: "none",
+                judged: "none",
+                certification: { signatureIndex: 1, permission: 1.1 },
+                fieldLocks: [{ signatureIndex: 1, source: "fieldmdp", spec: { action: "all", fields: ["fields"] } }],
+                policyVersion: 1,
+            },
             pages: [
                 {
                     state: {
-                        page: { kind: "objectNumber", pageObjectNumber: 1 },
+                        page: { kind: "objectNumber", objectNumber: 1 },
                         revision: {
                             docSessionId: "docSessionId",
-                            page: { kind: "objectNumber", pageObjectNumber: 1 },
+                            page: { kind: "objectNumber", objectNumber: 1 },
                             generation: 1,
                         },
                         weakAnnotationState: { kind: "unknown" },

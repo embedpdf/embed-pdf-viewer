@@ -1,5 +1,5 @@
 import {
-  type Color,
+  ANNOTATION_DEFAULTS,
   type FilledStyleDraftFields,
   type GeometryStyleDraftFields,
 } from '@embedpdf/engine-core/runtime';
@@ -10,6 +10,7 @@ import { readBorderStyle } from '../read/annotationReadPrimitives';
 import { borderStyleFromCode, borderStyleToCode } from '../shapeBorderStyle';
 import {
   clearAnnotColor,
+  clearBorderDashPattern,
   setAnnotColor,
   setAnnotOpacity,
   setBorderDashPattern,
@@ -22,14 +23,11 @@ export type BorderDraftFields = Pick<
   'strokeWidth' | 'borderStyle' | 'dashArray'
 >;
 
-/**
- * Defaults applied when a draft omits a styling field. Shared by every
- * geometric family (shape/vertex/line/ink) so circle, square, polygon,
- * polyline, line, and ink all default to a 1pt solid red stroke.
- */
-export const DEFAULT_OPACITY = 1;
-export const DEFAULT_STROKE_WIDTH = 1;
-export const DEFAULT_COLOR: Color = { r: 255, g: 0, b: 0 };
+/** The kinds with a stroke of their own: shapes, lines and ink. */
+type StrokedSubtype = 'square' | 'circle' | 'line' | 'polygon' | 'polyline' | 'ink';
+
+/** The kinds with a `/BS` border: the stroked kinds and a free text's box. */
+type BorderedSubtype = StrokedSubtype | 'free-text';
 
 /**
  * Apply the geometry styling (`/C`, `/CA`, `/BS`, dash) from a draft to a
@@ -43,10 +41,12 @@ export function applyGeometryStyleDraft(
   fn: PdfFunctions,
   mem: PdfRuntimeMemory,
   annotPtr: Ptr,
-  draft: GeometryStyleDraftFields,
+  draft: GeometryStyleDraftFields & { subtype: StrokedSubtype },
 ): void {
-  setAnnotColor(fn, annotPtr, draft.color ?? DEFAULT_COLOR);
-  setAnnotOpacity(fn, annotPtr, draft.opacity ?? DEFAULT_OPACITY);
+  // A field left out takes the kind's default (`annotation/defaults.ts`).
+  const defaults = ANNOTATION_DEFAULTS[draft.subtype];
+  setAnnotColor(fn, annotPtr, draft.color ?? defaults.color);
+  setAnnotOpacity(fn, annotPtr, draft.opacity ?? defaults.opacity);
   applyBorderDraft(fn, mem, annotPtr, draft);
 }
 
@@ -60,15 +60,16 @@ export function applyBorderDraft(
   fn: PdfFunctions,
   mem: PdfRuntimeMemory,
   annotPtr: Ptr,
-  draft: BorderDraftFields,
+  draft: BorderDraftFields & { subtype: BorderedSubtype },
 ): void {
+  const defaults = ANNOTATION_DEFAULTS[draft.subtype];
   setBorderStyle(
     fn,
     annotPtr,
-    borderStyleToCode(draft.borderStyle ?? 'solid'),
-    draft.strokeWidth ?? DEFAULT_STROKE_WIDTH,
+    borderStyleToCode(draft.borderStyle ?? defaults.borderStyle),
+    draft.strokeWidth ?? defaults.strokeWidth,
   );
-  if (draft.dashArray !== undefined && draft.dashArray.length > 0) {
+  if (draft.dashArray != null && draft.dashArray.length > 0) {
     setBorderDashPattern(fn, mem, annotPtr, draft.dashArray);
   }
 }
@@ -113,7 +114,9 @@ export function applyBorderPatch(
     const width = patch.strokeWidth ?? current.width;
     setBorderStyle(fn, annotPtr, borderStyleToCode(style), width);
   }
-  if (patch.dashArray !== undefined && patch.dashArray.length > 0) {
+  if (patch.dashArray === null || patch.dashArray?.length === 0) {
+    clearBorderDashPattern(fn, annotPtr);
+  } else if (patch.dashArray !== undefined) {
     setBorderDashPattern(fn, mem, annotPtr, patch.dashArray);
   }
 }
@@ -127,7 +130,7 @@ export function applyFilledStyleDraft(
   fn: PdfFunctions,
   mem: PdfRuntimeMemory,
   annotPtr: Ptr,
-  draft: FilledStyleDraftFields,
+  draft: FilledStyleDraftFields & { subtype: Exclude<StrokedSubtype, 'ink'> },
 ): void {
   const interior = draft.interiorColor ?? null;
   if (interior === null) {

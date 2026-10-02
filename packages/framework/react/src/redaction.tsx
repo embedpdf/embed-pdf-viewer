@@ -1,58 +1,63 @@
-import { annotationKey } from '@embedpdf/core';
-import type { EventHook } from '@embedpdf/core';
-import { useMemo } from 'react';
-import { RedactionToken } from '@embedpdf/plugin-redaction';
-import type {
-  RedactionApplyResult,
-  RedactionCapability,
-  RedactionMark,
-  RedactionMarkFilter,
-} from '@embedpdf/plugin-redaction';
-import { useCapability, useCapabilityEvent, useSelector } from './runtime';
-
 /**
- * Redaction for the surrounding `DocumentScope`: the pending-marks view plus
- * the destructive apply. Marking rides the annotation plane (the composed
- * `redact` tool); `useRedaction` surfaces the workflow around it.
+ * The React view of @embedpdf/plugin-redaction: the four hooks every plugin
+ * has, plus the pending marks. Marking rides the annotation plane (the
+ * composed `redact` tool); these hooks surface the workflow around it.
  *
  *   const redaction = useRedaction();
- *   await redaction.markSelection();
- *   await redaction.applyAll();          // irreversible — confirm first
+ *   const { pendingCount, applying } = useRedactionState();
+ *   await redaction.applyAll(); // irreversible: confirm first
  */
 
 // One-line-per-feature: registration travels with the UI.
 export * from '@embedpdf/plugin-redaction';
+import type { EventHook } from '@embedpdf/core';
+import { RedactionToken, redactionState } from '@embedpdf/plugin-redaction';
+import type {
+  RedactionCapability,
+  RedactionMark,
+  RedactionMarkFilter,
+} from '@embedpdf/plugin-redaction';
+import { useCapability, useCapabilityEvent, useDocumentScope, useKernelValue } from './runtime';
+import { settingsHook, stateHook } from './state';
 
-/** The capability plus the two reactive facts chrome shows (`applying`, `lastResult`). */
-export function useRedaction(): RedactionCapability & {
-  applying: boolean;
-  lastResult: RedactionApplyResult | null;
-} {
-  const cap = useCapability(RedactionToken);
-  const applying = useSelector(RedactionToken, (c) => c.isApplying());
-  const lastResult = useSelector(RedactionToken, (c) => c.getLastResult());
-  return useMemo(() => ({ ...cap, applying, lastResult }), [cap, applying, lastResult]);
+/** The redaction capability: marking, the pending marks, and applying them. */
+export function useRedaction(): RedactionCapability {
+  return useCapability(RedactionToken);
 }
 
-/** Subscribe to one redaction event for the mounted lifetime: `useRedactionEvent((c) => c.onApplied, handler)`. */
+/** Subscribe to one redaction event for the mounted lifetime: `useRedactionEvent((redaction) => redaction.onApplied, handler)`. */
 export function useRedactionEvent<T>(
-  select: (cap: RedactionCapability) => EventHook<T>,
+  select: (redaction: RedactionCapability) => EventHook<T>,
   handler: (event: T) => void,
 ): void {
   useCapabilityEvent(RedactionToken, select, handler);
 }
 
-/** The pending marks (optionally of one page), reactive against the annotation plane. */
-export function usePendingRedactions(filter?: RedactionMarkFilter): readonly RedactionMark[] {
-  const pon = filter?.page?.pageObjectNumber;
-  const stable = useMemo(() => filter, [pon]);
-  return useSelector(RedactionToken, (c) => c.listPending(stable), pendingEqual);
-}
+/**
+ * The redaction state: how many marks wait, whether marks are being applied,
+ * and the last apply's result (the page's State table, declared once in
+ * `redactionState`). Takes a selector, and re-renders only when what it
+ * returns changes.
+ */
+export const useRedactionState = stateHook(redactionState);
 
-const pendingEqual = (a: readonly RedactionMark[], b: readonly RedactionMark[]): boolean =>
-  a.length === b.length &&
-  a.every(
-    (item, i) =>
-      annotationKey(item.ref) === annotationKey(b[i]!.ref) &&
-      item.overlayText === b[i]!.overlayText,
+/** The redaction settings (`overlay`), with or without a document. Takes a selector. */
+export const useRedactionSettings = settingsHook(RedactionToken);
+
+const NO_MARKS: readonly RedactionMark[] = Object.freeze([]);
+
+/**
+ * The marks waiting to be applied, in page order, or one page's (its ref or
+ * its index). The lists are reference-stable, so a component re-renders only
+ * when its marks change. Empty without a document.
+ */
+export function usePendingRedactions(filter?: RedactionMarkFilter): readonly RedactionMark[] {
+  const scoped = useDocumentScope();
+  const page = filter?.page;
+  return useKernelValue(
+    (kernel) =>
+      kernel
+        .tryCapability(RedactionToken, scoped ?? undefined)
+        ?.listPending(page === undefined ? undefined : { page }) ?? NO_MARKS,
   );
+}

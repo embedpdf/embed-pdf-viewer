@@ -19,8 +19,7 @@ const metrics: FitMetrics = {
 
 describe('projectOverflow', () => {
   /**
-   * The v2 regression: at tiny widths the snippet's hand-written
-   * 'left-action-menu' showed
+   * At tiny widths the main bar's overflow reads as the left action menu:
    *
    *   View controls  ▸
    *   Zoom controls  ▸
@@ -28,8 +27,7 @@ describe('projectOverflow', () => {
    *   Toggle pan mode
    *   Toggle pointer mode
    *
-   * ([viewers/snippet] ui-schema.ts 'left-action-menu'). Here the same menu
-   * DERIVES from the main-bar structure + the commands' menu targets.
+   * The menu derives from the main-bar structure + the commands' menu targets.
    */
   it('reproduces the v2 left-action-menu from the main bar schema', () => {
     const bar = normalizeBar({
@@ -42,7 +40,7 @@ describe('projectOverflow', () => {
           ]),
         ],
         center: [
-          group('zoom', [custom('zoom-controls', { variants: ['inline'], terminal: 'zoom:menu' })]),
+          group('zoom', [custom('zoom-controls', 'zoom:menu', { variants: ['inline'] })]),
           group('tools', ['pan:toggle', 'pointer:toggle']),
         ],
       },
@@ -106,10 +104,14 @@ describe('projectOverflow', () => {
       id: 'b',
       sections: {
         center: [
-          group('modes', { role: 'tabs', collapse: 'select', labelKey: 'toolbar.modes' }, [
-            item('mode:view', { variants: ['label'] }),
-            item('mode:annotate', { variants: ['label'] }),
-          ]),
+          group(
+            'modes',
+            [
+              item('mode:view', { variants: ['label'] }),
+              item('mode:annotate', { variants: ['label'] }),
+            ],
+            { role: 'tabs', collapse: 'select', labelKey: 'toolbar.modes' },
+          ),
         ],
       },
     });
@@ -132,7 +134,7 @@ describe('projectOverflow', () => {
     const bar = normalizeBar({
       id: 'b',
       sections: {
-        start: [group('zoom', [custom('zoom-controls', { terminal: 'zoom:menu', importance: 1 })])],
+        start: [group('zoom', [custom('zoom-controls', 'zoom:menu', { importance: 1 })])],
         end: [group('other', [item('keep', { importance: 5 })])],
       },
     });
@@ -150,7 +152,7 @@ describe('projectOverflow', () => {
   it('keeps shed units OUT of the global overflow — they project via projectShed', () => {
     const bar = normalizeBar({
       id: 'b',
-      sections: { start: [group('tabs', { role: 'tabs', shed: true }, ['t1', 't2', 't3'])] },
+      sections: { start: [group('tabs', ['t1', 't2', 't3'], { role: 'tabs', shed: true })] },
     });
     // 3×40+2×10 = 140. Budget 120: shed t3 → 116+20 = 136 > 120 → shed t2 →
     // t1 + trigger = 76+10 = 86 ≤ 120.
@@ -165,7 +167,7 @@ describe('projectOverflow', () => {
   it('projects a fully-overflowed shed group globally (radio section), with an empty disclosure', () => {
     const bar = normalizeBar({
       id: 'b',
-      sections: { start: [group('tabs', { role: 'tabs', shed: true }, ['t1', 't2', 't3'])] },
+      sections: { start: [group('tabs', ['t1', 't2', 't3'], { role: 'tabs', shed: true })] },
     });
     // Floor (t1 + trigger = 86) doesn't fit in 50 → the whole group overflows.
     const fit = solve(bar, metrics, 50);
@@ -231,7 +233,7 @@ describe('projectStrip', () => {
     const bar = normalizeBar({
       id: 'b',
       sections: {
-        start: [group('g', [custom('zoom-controls', { terminal: 'zoom:menu' }), 'zoom:in'])],
+        start: [group('g', [custom('zoom-controls', 'zoom:menu'), 'zoom:in'])],
       },
     });
     expect(projectStrip(bar, () => true)).toEqual([

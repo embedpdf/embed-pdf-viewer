@@ -1,0 +1,37 @@
+import sys,json,subprocess,tempfile
+from pathlib import Path
+sys.dont_write_bytecode=True
+sys.path.insert(0,'/Users/bobsingor/GitHub/cloudpdf-platform/oss/embedpdf/packages/engine/main/test/fixtures/signature-compat')
+from generate import reader,raw_body,describe_bytes
+from generate_v3 import edit
+from generate_v2 import page_of
+from verify_v3 import normalized
+from asn1crypto import cms
+root=Path('/tmp/epdf-weak-nm-probes')
+base=(root/'pdfs/approval-inline-control.pdf').read_bytes()
+old=reader(base)
+page_ref=old.root['/Pages']['/Kids'].raw_get(0)
+data=edit(base,lambda writer:writer.mark_update(writer.root['/Pages']['/Kids'].raw_get(0)))
+new=reader(data)
+assert data.startswith(base)
+assert normalized(page_of(old))==normalized(page_of(new))
+byte_equal=raw_body(base,page_ref.idnum)==raw_body(data,page_ref.idnum)
+assert byte_equal, 'Expected identical page serialization for this control'
+for ref in old.root['/AcroForm']['/Fields']:
+ assert raw_body(base,ref.idnum)==raw_body(data,ref.idnum)
+facts=describe_bytes(data)
+assert all(s['digestMatches'] for s in facts['signatures'])
+sig=new.embedded_signatures[0].sig_object
+ranges=sig['/ByteRange']
+signed=b''.join(data[int(ranges[i]):int(ranges[i])+int(ranges[i+1])] for i in range(0,len(ranges),2))
+with tempfile.TemporaryDirectory(prefix='epdf-rewrite-cms-') as temporary:
+ temp=Path(temporary);(temp/'sig.der').write_bytes(cms.ContentInfo.load(sig['/Contents'].original_bytes).dump());(temp/'signed.bin').write_bytes(signed)
+ result=subprocess.run(['openssl','cms','-verify','-inform','DER','-in',str(temp/'sig.der'),'-content',str(temp/'signed.bin'),'-binary','-noverify','-out','/dev/null'],capture_output=True)
+ assert result.returncode==0,result.stderr
+out=root/'supplemental';out.mkdir(exist_ok=True)
+file=out/'approval-inline-rewrite-unchanged.pdf'
+assert not file.exists(), 'Do not replace probe bytes'
+file.write_bytes(data)
+case={'id':'approval-inline-rewrite-unchanged','file':file.name,'profile':'approval','layout':'inline','action':'rewrite-unchanged','facts':facts,'pageObjectNumber':page_ref.idnum,'pageBodyByteIdentical':byte_equal,'cmsVerified':True,'acrobat':'unobserved'}
+(out/'manifest.json').write_text(json.dumps({'cases':[case]},indent=2)+'\n')
+print('Generated unchanged-page rewrite: identical page-body bytes, original signed prefix preserved, CMS verification passed.')

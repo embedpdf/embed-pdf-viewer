@@ -13,16 +13,25 @@ export type { AbortableExecutor } from './promise/AbortablePromise';
 export { AbortError, isAbortError } from './promise/AbortError';
 
 export type { Engine, EngineFactory } from './engine/Engine';
+export { isLocalEngine } from './engine/LocalEngine';
+export type { LocalEngine } from './engine/LocalEngine';
+export { isLocalDocument } from './engine/LocalDocumentHandle';
+export type { LocalDocumentHandle } from './engine/LocalDocumentHandle';
+export { isLocalPage } from './engine/LocalPageHandle';
+export type { LocalPageHandle } from './engine/LocalPageHandle';
+export { LOCAL_ENGINE_BRAND } from './engine/localEngineBrand';
 export type { FontService } from './engine/FontService';
 export type { DocumentFontSettings, FontEmbeddingPolicy } from './engine/DocumentFontSettings';
 export type { DocumentHandle } from './engine/DocumentHandle';
 export type {
   DocumentEvent,
   DocumentEventInit,
+  DocumentEventOf,
   DocumentEventType,
   EventOrigin,
 } from './events/DocumentEvent';
 export type { DocumentEventStream } from './events/DocumentEventStream';
+export { subscribeToType } from './events/DocumentEventStream';
 export {
   advisoryFromPdfBits,
   permissionInfoFromProbe,
@@ -31,12 +40,12 @@ export {
   securityStateFromProbe,
 } from './engine/document-security-state';
 export type {
+  AnnotationOwner,
   CdnAccessInfo,
   CdnAdapter,
   DocumentAccessInfo,
   DocumentAccessReason,
   DocumentEncryptionState,
-  DocumentIdentity,
   DocumentOpenMode,
   DocumentSecurityService,
   DocumentSecurityState,
@@ -47,6 +56,7 @@ export type {
 } from './engine/DocumentSecurityService';
 export {
   CONTINUOUS_RENDER_POLICY,
+  appearanceLatticeScale,
   snapAppearanceScale,
   snapFullPageViewport,
   snapTileScale,
@@ -56,6 +66,7 @@ export { passwordPromptFromState } from './engine/passwordPrompt';
 export type { PasswordPrompt } from './engine/passwordPrompt';
 export type { DocumentCapabilities } from './engine/DocumentHandle';
 export type { MetadataService } from './engine/MetadataService';
+export type { CustomMetadataService } from './engine/CustomMetadataService';
 export type { PageHandle } from './engine/PageHandle';
 export type { PageMeasureService } from './engine/PageMeasureService';
 export type {
@@ -70,9 +81,16 @@ export type { WeakAnnotationEditSession } from './engine/DocumentAnnotationsServ
 export type { DocumentPagesService } from './engine/DocumentPagesService';
 export type { DocumentRedactionService } from './engine/DocumentRedactionService';
 export type { DocumentSignaturesService } from './engine/DocumentSignaturesService';
-export type { PageAnnotationsService } from './engine/PageAnnotationsService';
+export type {
+  LocalPageAnnotationsService,
+  PageAnnotationsService,
+} from './engine/PageAnnotationsService';
 export type { DocumentAttachmentsService } from './engine/DocumentAttachmentsService';
-export type { PieceInfoService } from './engine/PieceInfoService';
+export type {
+  PieceInfoDeleteResult,
+  PieceInfoService,
+  PieceInfoUpdateResult,
+} from './engine/PieceInfoService';
 export type {
   PieceInfoEntry,
   PieceInfoPatch,
@@ -80,8 +98,7 @@ export type {
   PieceInfoSnapshot,
 } from './dto/PieceInfo';
 export type { PageTextService } from './engine/PageTextService';
-export type { PageGeometryService } from './engine/PageGeometryService';
-export type { PageRenderService } from './engine/PageRenderService';
+export type { LocalPageRenderService, PageRenderService } from './engine/PageRenderService';
 
 export { wirePack, EMPTY_TRANSFER } from './wire/WirePack';
 export type { WirePack } from './wire/WirePack';
@@ -99,10 +116,10 @@ export type {
   LayerOpenSource,
   MetadataReadWorkerRequest,
   MetadataUpdateWorkerRequest,
+  MetadataReadCustomWorkerRequest,
+  MetadataUpdateCustomWorkerRequest,
   ActionsReadWorkerRequest,
-  AnnotationsListRawAllWorkerRequest,
-  AnnotationsListRawPageWorkerRequest,
-  AnnotationsListFullPageWorkerRequest,
+  AnnotationsListWorkerRequest,
   AnnotationsRenderAppearancesWorkerRequest,
   AnnotationsRenderAppearancesEncodedWorkerRequest,
   AnnotationAppearancesEncodedResultWire,
@@ -129,7 +146,7 @@ export type {
   DocumentVersionWorkerRequest,
   SignaturesPrepareWorkerRequest,
   SignaturesCompleteWorkerRequest,
-  SignaturesAbortWorkerRequest,
+  SignaturesCancelWorkerRequest,
   SignaturesAnalyzeWorkerRequest,
   SignaturesFinalizeCandidateWorkerRequest,
   PagesMoveWorkerRequest,
@@ -147,12 +164,13 @@ export type {
   PieceInfoReadWorkerRequest,
   PieceInfoUpdateWorkerRequest,
   PieceInfoApplicationsWorkerRequest,
-  PieceInfoClearWorkerRequest,
+  PieceInfoDeleteWorkerRequest,
   PagesTextWorkerRequest,
   PagesGeometryWorkerRequest,
   PagesRenderWorkerRequest,
   PagesRenderEncodedWorkerRequest,
   SearchQueryWorkerRequest,
+  SearchScanRequest,
   FormsListWorkerRequest,
   FormsSetValueWorkerRequest,
   FormsResetWorkerRequest,
@@ -164,7 +182,7 @@ export type {
   FormsUpdateFieldWorkerRequest,
   FormsSetSignatureAppearanceWorkerRequest,
   FormsDeleteFieldWorkerRequest,
-  FormsAttachWidgetWorkerRequest,
+  FormsAddWidgetWorkerRequest,
   FormsDetachWidgetWorkerRequest,
   FontsRegisterWorkerRequest,
   FontsAddFallbackWorkerRequest,
@@ -181,6 +199,9 @@ export type {
   AttachmentsCreateWorkerRequest,
   AttachmentsDeleteWorkerRequest,
   AnnotationsReadFileWorkerRequest,
+  AnnotationsReadAppearanceWorkerRequest,
+  AnnotationsExportWorkerRequest,
+  AnnotationsImportWorkerRequest,
   AttachmentFileWorkerPayload,
   LayerArtifactWorkerPayload,
   LayerArtifactFileWorkerPayload,

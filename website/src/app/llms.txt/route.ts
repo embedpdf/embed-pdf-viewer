@@ -3,6 +3,7 @@ import path from 'node:path';
 import { listDocsPages, renderLlmsTxt, type LlmsSection } from '@embedpdf/docs-kit/llms';
 
 import { DEFAULT_PRODUCT_INTEGRATION } from '@/lib/docs-integrations';
+import { docsRelease } from '@/lib/docs-release';
 import { urlForSection } from '@/lib/search/url';
 import { SITE_ORIGIN } from '@/lib/site';
 
@@ -21,15 +22,24 @@ const SECTIONS: Array<{ label: string; product: string }> = [
   { label: 'EmbedPDF Engine', product: 'engine' },
 ];
 
-function markdownUrl(contentPath: string): string {
+function defaultIntegration(contentPath: string) {
   const product = contentPath.split('/')[1];
-  const integration =
-    product === 'viewer' || product === 'headless' ? DEFAULT_PRODUCT_INTEGRATION[product] : null;
-  return `${SITE_ORIGIN}${urlForSection(contentPath, null, integration)}.md`;
+  return product === 'viewer' || product === 'headless'
+    ? DEFAULT_PRODUCT_INTEGRATION[product]
+    : null;
+}
+
+function markdownUrl(contentPath: string): string {
+  return `${SITE_ORIGIN}${urlForSection(contentPath, null, defaultIntegration(contentPath))}.md`;
 }
 
 export function GET() {
-  const pages = listDocsPages(path.join(process.cwd(), 'src', 'content'));
+  // Each page is listed in its default framework; one the publish gate holds back isn't listed.
+  const pages = listDocsPages(path.join(process.cwd(), 'src', 'content')).filter(
+    (page) =>
+      docsRelease(page.contentPath.split('/'), defaultIntegration(page.contentPath) ?? undefined)
+        .live,
+  );
   const grouped = new Map(SECTIONS.map((section) => [section.product, [] as typeof pages]));
   const rest: typeof pages = [];
   let landing: (typeof pages)[number] | undefined;

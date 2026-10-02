@@ -1,0 +1,117 @@
+---
+title: Refs & identity
+description: What a page or annotation ref contains, how long it stays valid, and how to store one.
+---
+
+{/* Generated from docs/content — edit there, then `pnpm docs:sync`. */}
+
+import { Callout } from '@/components/docs/callout';
+
+# Refs & identity
+
+Pages and annotations are addressed by a **ref**: `page.ref`, `annotation.ref`. The engine hands
+you refs in everything it returns, and takes them in every call that works on a page or an
+annotation. You never build one; pass back the one you were given.
+
+```ts
+const { annotations } = await page.annotations.list();
+await page.annotations.update(annotations[0].ref, { contents: 'Seen' });
+```
+
+This page is about what's inside a ref, for when you store one or compare two.
+
+## Page refs
+
+A page ref is the page's number inside the PDF file (its object number), not its position:
+
+```ts
+page.ref; // { kind: 'objectNumber', objectNumber: 12 }
+```
+
+That's why a page ref stays valid when pages move: after you move page 3 to the front, its ref
+is the same, only its `index` in `doc.pages.list()` changes. A deleted page's number is never
+given to another page.
+
+When you already have a page's number (from your own database, say), `toPageRef(12)` makes the
+ref. To compare two, use `pageRefsEqual(a, b)`.
+
+## Annotation refs
+
+An annotation ref also says which page the annotation is on. It comes in three kinds, depending
+on how the annotation is stored in the file:
+
+| Kind           | Looks like                                         | Stays valid                     |
+| :------------- | :------------------------------------------------- | :------------------------------ |
+| `objectNumber` | `{ kind: 'objectNumber', page, objectNumber: 48 }` | Always.                         |
+| `nm`           | `{ kind: 'nm', page, nm: 'a3f…' }`                 | Always.                         |
+| `index`        | `{ kind: 'index', page, index: 2, revision: '…' }` | Until the page's order changes. |
+
+Annotations the engine creates always get an object number. The other two kinds exist because
+PDF files from other tools don't always give their annotations one:
+
+- An annotation with a **name** (its `nm`) but no number is addressed by its name.
+- An annotation with **neither** can only be addressed by its position on the page. That's a
+  **weak** annotation (`identityQuality: 'weak'`), and its ref breaks when an annotation before
+  it is added, moved or deleted.
+
+The first time you change a weak annotation (or reply to it), the engine gives it a name, and it
+isn't weak anymore. The result of that call lists the new ref, so you can replace the old one.
+
+To use a ref as a key in a `Map` or an object, turn it into a string with `annotationKey(ref)`.
+
+## Other refs
+
+Form fields and attachments have refs too, handed out the same way:
+
+| Thing      | Its ref          | From a name you hold              |
+| :--------- | :--------------- | :-------------------------------- |
+| Form field | `field.ref`      | `toFieldRef('billing.name')`      |
+| Attachment | `attachment.ref` | `toAttachmentRef('figures.xlsx')` |
+
+Use the name helpers only for a name you stored yourself; see
+[Forms](/docs/engine/forms#find-a-field) and
+[Attachments](/docs/engine/documents/attachments#names-and-refs).
+
+## Storing refs
+
+A ref is plain data: store it as JSON and pass it back later, even after the document was saved
+and opened again. Object numbers and names are part of the file, so they survive a save.
+
+Index refs don't survive: they carry the page's `revision`, and a call with a stale revision
+fails with `InvalidReference`. Read the annotations again to get a fresh ref.
+
+<Engine cloud>
+
+## Edit sessions
+
+On the cloud, deleting or moving a weak annotation shifts the positions of the annotations after
+it, which could break another person's refs to them. So those edits need an edit session: it
+makes you the only one editing those pages by position until you close it.
+
+```ts
+const session = await doc.annotations.beginEdit([page.ref]);
+
+try {
+  await page.annotations.delete(weakRef);
+} finally {
+  await session.close();
+}
+```
+
+A session expires unless you keep it alive: call `session.heartbeat()` every
+`session.heartbeatIntervalMs`. Without a session, or while someone else holds the page, the edit
+fails with `WeakAnnotationSessionConflict`.
+
+You don't need a session for annotations with a number or a name (every annotation you create),
+or for changes that don't move anything, like a new color.
+
+</Engine>
+
+## Good to know
+
+- **Why not the position?** Positions change whenever something is added, moved or deleted. A
+  number or a name belongs to the annotation itself, so it can't end up pointing at a different
+  one.
+- **Why not the name for everything?** Names are optional in PDF, and other tools don't always
+  keep them unique. The engine refuses to create an annotation whose `nm` is already used on its
+  page, so names it writes stay unique.

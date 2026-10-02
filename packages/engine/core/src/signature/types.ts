@@ -1,5 +1,8 @@
-import type { FormFieldRef, FormWidget } from '../identity/FormFieldRef';
+import type { DateInput, IsoDateTime } from '../dto/IsoDateTime';
+import type { FormFieldWidget } from '../forms/field';
+import type { FormFieldRef } from '../identity/FormFieldRef';
 import type { MutationMeta } from '../mutation/MutationMeta';
+import type { Coordinates, PageCoordinates } from '../pageSpace/coordinates';
 
 /**
  * Digital signatures, read side.
@@ -47,9 +50,9 @@ export type DocMdpPermission = 1 | 2 | 3;
  * The modification level a signed document allows, as a product policy:
  *   - `none`: no byte change at all (not a DocMDP value)
  *   - `lta`: DSS and document timestamps only (P = 1)
- *   - `fill`: + form fill, signatures, new signature fields (P = 2, and how a
- *     validator reads an approval signature)
- *   - `annotate`: + annotations (P = 3)
+ *   - `fill`: + form fill, signatures, new signature fields (P = 2)
+ *   - `annotate`: + annotations (P = 3, and how a validator reads an approval
+ *     signature)
  */
 export type ModificationLevel = 'none' | 'lta' | 'fill' | 'annotate';
 
@@ -84,8 +87,17 @@ export interface SignatureSigner {
   reason: string | null;
   location: string | null;
   contactInfo: string | null;
-  /** `/M` as written (PDF date string). */
-  claimedTime: string | null;
+  /** `/M`: when the signer says they signed. */
+  signedAt: IsoDateTime | null;
+}
+
+/** What a signature says about its signer, as `prepare()` and `sign()` take it. */
+export interface SignatureSignerInput {
+  name?: string;
+  reason?: string;
+  location?: string;
+  contactInfo?: string;
+  signedAt?: DateInput;
 }
 
 /** The field's `/SV` seed value: what a signature on this field must satisfy. */
@@ -106,13 +118,14 @@ export interface SignatureSeedValue {
   unsupportedRequired: boolean;
 }
 
-export interface SignatureDTO {
+export interface SignatureDTO<C extends Coordinates = PageCoordinates> {
   /** Position in `SignatureSnapshot.signatures` (field order). */
   index: number;
   /** Always an `objectNumber` ref: the durable identity. */
   field: FormFieldRef;
   fieldName: string;
-  widget: FormWidget | null;
+  /** The field's widget, where the signature shows, or `null` when it has none. */
+  widget: FormFieldWidget<C> | null;
   signed: boolean;
   kind: SignatureKind;
   /** Raw `/Filter` and `/SubFilter` names. */
@@ -128,7 +141,7 @@ export interface SignatureDTO {
   signer: SignatureSigner;
   /** The DocMDP permission the signature carries (its `/Reference`), whether or not the catalog points at it. */
   docMdp: DocMdpPermission | null;
-  /** `/Root /Perms /DocMDP` names this signature: it is THE certification. */
+  /** `/Root /Perms /DocMDP` names this signature: it is the certification. */
   catalogCertification: boolean;
   /** The FieldMDP transform this signature carries. */
   fieldMdp: FieldLockSpec | null;
@@ -148,16 +161,15 @@ export interface DocumentFieldLock {
  * What the signatures already in a document mean for what comes after, in
  * two separate answers:
  *
- *   - `enforced`: what a signer DECLARED — a certification's /P, a signed
+ *   - `enforced`: what a signer declared — a certification's /P, a signed
  *     field's /Lock /P. The engine refuses what it forbids (mapped onto
  *     capabilities like encryption permission bits). A plain approval
  *     signature declares nothing: `null`.
  *   - `judged`: what a validator holds later changes to — the declared level,
- *     or the approval baseline (`fill`: form fill-in and signing keep the
- *     signature valid, anything else does not; Acrobat's reading, ISO 32000
- *     is silent) when only approval signatures exist. Never refused, only
- *     judged: an annotation after an approval signature is allowed and then
- *     reads as invalidating, exactly as in Acrobat.
+ *     or the approval baseline (`annotate`: form fill-in, signing and
+ *     annotations keep the signature valid, anything else does not;
+ *     Acrobat's reading, ISO 32000 is silent) when only approval signatures
+ *     exist. Never refused, only judged.
  */
 export interface DocumentProtection {
   /** Declared and enforced; `null` when nothing declared (unsigned, or approval signatures only). */
@@ -170,12 +182,12 @@ export interface DocumentProtection {
   policyVersion: number;
 }
 
-export interface SignatureSnapshot {
+export interface SignatureSnapshot<C extends Coordinates = PageCoordinates> {
   /** `false` when the cross-reference chain is broken or was rebuilt: every byte fact is then indeterminate. */
   chainValid: boolean;
   /** Oldest first. Empty when `chainValid` is false. */
   revisions: PdfRevision[];
-  signatures: SignatureDTO[];
+  signatures: SignatureDTO<C>[];
   protection: DocumentProtection;
 }
 
@@ -205,14 +217,13 @@ export interface DocumentVersionRef {
 // ---------------------------------------------------------------------------
 
 /**
- * Widget artwork for the signature, as a page of a PDF (the same path
- * stamps take: the page is drawn into the widget's appearance stream).
+ * Widget artwork for the signature, as a one-page PDF (the same path stamps
+ * take: the page is drawn into the widget's appearance stream). A PDF with
+ * more pages is refused with `InvalidArg`.
  */
 export interface SignatureAppearanceInput {
-  /** A PDF whose page carries the artwork. */
+  /** A one-page PDF that carries the artwork. */
   pdf: Uint8Array;
-  /** Which page; default 0. */
-  pageIndex?: number;
 }
 
 export interface SignaturePrepareInput {
@@ -222,10 +233,12 @@ export interface SignaturePrepareInput {
   digest?: Exclude<DigestAlgorithm, 'sha1'>;
   /** Room reserved for the CMS, in bytes (256 .. 4 MiB). Default 8192. */
   contentsSize?: number;
-  /** What the signature dictionary says about the signer: `/Name`, `/Reason`, `/Location`, `/ContactInfo`. */
-  attribution?: { name?: string; reason?: string; location?: string; contactInfo?: string };
-  /** PDF date string for `/M`; default: now. */
-  signingTime?: string;
+  /**
+   * What the signature dictionary says about the signer — `/Name`, `/Reason`,
+   * `/Location`, `/ContactInfo` and `/M` (`signedAt`, default: now): the
+   * fields a read returns as `signer`.
+   */
+  signer?: SignatureSignerInput;
   /** Make this the certification signature (`/Root /Perms /DocMDP`). Only ever the first signature. */
   certify?: { permission: DocMdpPermission };
   /** FieldMDP for this signature plus a mirroring `/Lock` on the field. */
@@ -252,10 +265,10 @@ export interface SignatureCompleteInput {
   expectedVersion: DocumentVersionRef;
 }
 
-export interface SignatureCompleteResult {
+export interface SignatureCompleteResult<C extends Coordinates = PageCoordinates> {
   /** `already-completed` on an idempotent replay with the same CMS. */
   status: 'completed' | 'already-completed';
-  signature: SignatureDTO;
+  signature: SignatureDTO<C>;
   /** The version the sealed bytes became. */
   version: BaseVersionInfo;
   /** What it was built on. */
@@ -266,6 +279,6 @@ export interface SignatureCompleteResult {
   meta: MutationMeta;
 }
 
-export interface SignatureAbortResult {
-  status: 'aborted' | 'already-completed' | 'unknown';
+export interface SignatureCancelResult {
+  status: 'cancelled' | 'already-completed' | 'unknown';
 }

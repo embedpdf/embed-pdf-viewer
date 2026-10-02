@@ -2,13 +2,15 @@
  * The React surface for @embedpdf/plugin-selection.
  *
  * <SelectionLayer> is a dumb renderer: it warms the page's geometry on mount,
- * reads the content-space highlight rects from the capability, and paints them —
- * mapping each rect through PageContext.toPixels (the same path markers use).
- * Zero pointer handling here; that's the PagePointerSource + the hub.
+ * reads the page-space highlight rects from the capability, and paints them —
+ * mapping each rect through PageContext.toPixels (the same path markers use),
+ * in the plugin's `color` setting, which the `--epdf-text-selection` CSS
+ * variable overrides. Zero pointer handling here; that's the
+ * PagePointerSource + the hub.
  *
- * The layer resolves the HOST lens (`/contract/host`: geometry warming, the
+ * The layer resolves the host lens (`/contract/host`: geometry warming, the
  * highlight handshake) — the adapter is exactly what that entry exists for.
- * `useSelection()` hands app code the PUBLIC lens only.
+ * `useSelection()` hands app code the public lens only.
  */
 
 // One-line-per-feature: registration travels with the UI.
@@ -18,25 +20,30 @@ export * from '@embedpdf/plugin-selection';
 export { copySelection } from '@embedpdf/web';
 import * as React from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { textQuadEquals } from '@embedpdf/core-geometry';
-import type { CapabilityToken, EventHook, PageRef } from '@embedpdf/core';
+import type { CapabilityToken, EventHook } from '@embedpdf/core';
 import {
   HANDLE_BAR,
   HANDLE_HEAD,
   HANDLE_PAD,
   SelectionToken,
-  createSelectionHandleDrag,
+  armSelectionHandle,
+  selectionHandleEndpointsOf,
   selectionHandleGeom,
-  type SelectionHandleEndpoint,
-  type SelectionHandleView,
-  type SelectionAnchor,
+  selectionHandleViewOf,
+  selectionState,
+  type SelectionHandleEndpoints,
   type SelectionCapability,
-  type TextRange,
 } from '@embedpdf/plugin-selection';
 import { SelectionToken as SelectionHostToken } from '@embedpdf/plugin-selection/contract/host';
 import type { StageCapability } from '@embedpdf/plugin-stage/contract';
 import {
   attachSelectionHandle,
+  mixAccent,
+  paint,
+  quadInPixels,
+  samePageBounds,
+  sameSelectionEndpoints,
+  svgPoints,
   wireSelectionClipboard,
   type SelectionClipboardOptions,
 } from '@embedpdf/web';
@@ -51,20 +58,28 @@ import {
   useOptionalCapability,
   usePage,
   useSelector,
+  useViewerSettings,
 } from './runtime';
+import { settingsHook, stateHook } from './state';
 
-export interface SelectionLayerProps {
-  /** Highlight colour (default: translucent blue). */
-  color?: string;
-}
-
-export function SelectionLayer({ color = 'rgba(33, 150, 243, 0.35)' }: SelectionLayerProps) {
+/**
+ * The highlight of the selected text on one page, in the selection plugin's
+ * `color` setting; the `--epdf-text-selection` CSS variable wins over it.
+ */
+export function SelectionLayer() {
   const page = usePage();
   const selection = useCapability(SelectionHostToken);
-  const segments = useSelector(SelectionHostToken, (c) => c.listSegments(page.ref), shallowArray);
+  const segments = useSelector(
+    SelectionHostToken,
+    (selection) => selection.listSegments(page.ref),
+    shallowArray,
+  );
   // A consumer (e.g. a markup tool drawing its own preview) can take over the
   // selection visual; when it does, we render nothing so the two never overlap.
-  const visible = useSelector(SelectionHostToken, (c) => c.isHighlightVisible());
+  const visible = useSelector(SelectionHostToken, (selection) => selection.isHighlightVisible());
+  const color = useSelectionSettings((settings) => settings.color);
+  // An unset color follows the viewer's accent, behind the `--epdf-accent` variable.
+  const accent = useViewerSettings((settings) => settings.accent);
 
   // Warm this page's text geometry as soon as it's on screen, so the first
   // pointer-down can hit-test without waiting on the engine round-trip.
@@ -74,6 +89,9 @@ export function SelectionLayer({ color = 'rgba(33, 150, 243, 0.35)' }: Selection
   }, [selection, page.ref]);
 
   if (!visible) return null;
+
+  // Unset, the color is the accent at 35%, the accent variables included.
+  const fill = paint('text-selection', color ?? mixAccent('text-selection', accent));
 
   return (
     <svg
@@ -86,72 +104,44 @@ export function SelectionLayer({ color = 'rgba(33, 150, 243, 0.35)' }: Selection
         pointerEvents: 'none',
       }}
     >
-      {segments.map((s, i) => {
-        // content space → un-rotated content view px (rides the page's CSS
-        // rotation). An affine map, so mapping the four corners is exact —
-        // upright segments render pixel-identical to the old div-per-rect.
-        const ring = [s.quad.upperStart, s.quad.upperEnd, s.quad.lowerEnd, s.quad.lowerStart].map(
-          (p) => page.transform.toPixels(p),
-        );
-        return <polygon key={i} points={ring.map((p) => `${p.x},${p.y}`).join(' ')} fill={color} />;
-      })}
+      {segments.map((segment, i) => (
+        // Page space → the page layer's pixels, which ride the page's CSS
+        // rotation: mapping the four corners is exact, for turned text too.
+        <polygon
+          key={i}
+          points={svgPoints(quadInPixels(segment.quad, page.transform))}
+          // In `style`: an SVG attribute doesn't read var().
+          style={{ fill }}
+        />
+      ))}
     </svg>
   );
 }
 
-/** The PUBLIC selection capability (select(), readText(), canCopy(), …) for
+/** The public selection capability (select(), readText(), canCopy(), …) for
  *  app chrome — toolbars, context menus, automation. */
 export function useSelection() {
   return useCapability(SelectionToken);
 }
 
-/** Subscribe to one selection event for the mounted lifetime: `useSelectionEvent((c) => c.onCommitted, handler)`. */
+/** Subscribe to one selection event for the mounted lifetime: `useSelectionEvent((selection) => selection.onCommitted, handler)`. */
 export function useSelectionEvent<T>(
-  select: (cap: SelectionCapability) => EventHook<T>,
+  select: (selection: SelectionCapability) => EventHook<T>,
   handler: (event: T) => void,
 ): void {
   useCapabilityEvent(SelectionToken, select, handler);
 }
 
-const sameRange = (a: TextRange | null, b: TextRange | null): boolean =>
-  a === b ||
-  (!!a &&
-    !!b &&
-    a.start.page.pageObjectNumber === b.start.page.pageObjectNumber &&
-    a.start.index === b.start.index &&
-    a.end.page.pageObjectNumber === b.end.page.pageObjectNumber &&
-    a.end.index === b.end.index);
-const samePages = (a: readonly PageRef[], b: readonly PageRef[]): boolean =>
-  a === b ||
-  (a.length === b.length && a.every((p, i) => p.pageObjectNumber === b[i]!.pageObjectNumber));
+/**
+ * The selection's state: whether anything is selected, whether the user is
+ * still selecting, the character range and the pages it's on (the page's State
+ * table, declared once in `selectionState`). Takes a selector, re-renders only
+ * when what it returns changes, and returns the empty state without a document.
+ */
+export const useSelectionState = stateHook(selectionState);
 
-/** The selection's reactive read-model for chrome: whether anything is
- *  selected, the character range (persist/restore), and the pages it spans. */
-export function useSelectionState(): {
-  hasSelection: boolean;
-  range: TextRange | null;
-  pageRefs: readonly PageRef[];
-} {
-  const hasSelection = useSelector(SelectionToken, (c) => c.hasSelection());
-  const range = useSelector(SelectionToken, (c) => c.getRange(), sameRange);
-  const pageRefs = useSelector(SelectionToken, (c) => c.listSelectedPages(), samePages);
-  return { hasSelection, range, pageRefs };
-}
-
-/** Structural equality for the selection's menu anchor — keeps the menu from
- *  re-rendering on unrelated dispatches (the capability returns a fresh
- *  object each call). */
-const sameAnchor = (a: SelectionAnchor | null, b: SelectionAnchor | null): boolean => {
-  if (a === b) return true;
-  if (!a || !b) return false;
-  return (
-    a.page.pageObjectNumber === b.page.pageObjectNumber &&
-    a.bounds.x === b.bounds.x &&
-    a.bounds.y === b.bounds.y &&
-    a.bounds.width === b.bounds.width &&
-    a.bounds.height === b.bounds.height
-  );
-};
+/** The selection settings (`dragThreshold`, `color`, `handles`), with or without a document. Takes a selector. */
+export const useSelectionSettings = settingsHook(SelectionToken);
 
 export interface SelectionMenuProps {
   children: React.ReactNode;
@@ -162,9 +152,9 @@ export interface SelectionMenuProps {
 }
 
 /**
- * Floats over the current TEXT selection (one anchor regardless of
+ * Floats over the current text selection (one anchor regardless of
  * cross-page selection; it rides the gesture's end page) — and only once the
- * selection SETTLES: hidden while a gesture is active (mid-drag), it appears at
+ * selection settles: hidden while a gesture is active (mid-drag), it appears at
  * pointer-up; programmatic selections show immediately (born settled). Works
  * under `<Stage>` (mount in the overlay slot) and `<PageView>` alike — the
  * surface provides the projection. Compose the contents from hooks:
@@ -174,8 +164,10 @@ export interface SelectionMenuProps {
  * `getAnchor()` yourself — the primitive carries no policy.
  */
 export function SelectionMenu({ children, gap = 8, placement = 'top' }: SelectionMenuProps) {
-  const selecting = useSelector(SelectionHostToken, (c) => c.isGestureActive());
-  const anchor = useSelector(SelectionToken, (c) => c.getAnchor(), sameAnchor);
+  const selecting = useSelectionState((state) => state.isSelecting);
+  // The capability returns a fresh anchor on every read: compare by value, so
+  // the menu re-renders only when the selection moved.
+  const anchor = useSelector(SelectionToken, (selection) => selection.getAnchor(), samePageBounds);
   if (selecting || !anchor) return null;
   return (
     <Anchored anchor={anchor} placement={placement} gap={gap}>
@@ -186,70 +178,39 @@ export function SelectionMenu({ children, gap = 8, placement = 'top' }: Selectio
 
 // ── selection handles (the touch affordance) ────────────────────────────────
 //
-// Policy lives out of this file, per the layering razor: the geometry and the
-// drag session are `@embedpdf/plugin-selection`'s pure `handles` module (one
-// source for every adapter), the native listener mechanics are
+// Policy lives out of this file, per the layering razor: the view over the
+// Stage, the endpoints, the geometry and the armed drag are
+// `@embedpdf/plugin-selection`'s pure `handles` module (one source for every
+// adapter), the native listener mechanics are
 // `@embedpdf/web`'s `attachSelectionHandle` (the down-shield timing subtlety
-// lives ONCE), and this component keeps what only React can do —
+// lives once), and this component keeps what only React can do —
 // subscriptions, markup, theming.
 
-interface Endpoints {
-  start: SelectionHandleEndpoint;
-  end: SelectionHandleEndpoint;
-}
-const sameEndpoints = (a: Endpoints | null, b: Endpoints | null): boolean => {
-  if (a === b) return true;
-  if (!a || !b) return false;
-  return (
-    a.start.page.pageObjectNumber === b.start.page.pageObjectNumber &&
-    a.end.page.pageObjectNumber === b.end.page.pageObjectNumber &&
-    a.start.advance === b.start.advance &&
-    a.end.advance === b.end.advance &&
-    // corner-wise, so a boundary that ROTATES without moving its bounding box
-    // still re-renders (an AABB comparison would call that "unchanged")
-    textQuadEquals(a.start.glyphQuad, b.start.glyphQuad) &&
-    textQuadEquals(a.end.glyphQuad, b.end.glyphQuad)
-  );
-};
-
-/** The plugin's structural view over this Stage: point-exact projection in,
- *  page resolution out. (`pageRectToViewport` is the AABB projector — upright
- *  overlays only — and would collapse exactly the orientation handles need.) */
-const handleView = (stage: StageCapability): SelectionHandleView => ({
-  toOverlay: (page, pt) => {
-    return stage.pageToViewport(page, pt);
-  },
-  pageAt: (overlay) => stage.getPageAt(overlay),
-  pointOnPage: (page, overlay) => stage.viewportToPage(page, overlay),
-});
-
 export interface SelectionHandlesProps {
-  /** Handle colour (default: the selection blue). */
-  color?: string;
   /** The stage lens hosting this overlay (default: the enclosing `<Stage>`'s lens). */
   token?: CapabilityToken<StageCapability>;
 }
 
 /**
  * iOS-style draggable selection handles. Each is drawn the way the platform
- * draws them: a thin caret BAR that forms the selection's own start/end edge
+ * draws them: a thin caret bar that forms the selection's own start/end edge
  * — the boundary glyph's oriented edge, so rotated text and rotated pages
  * carry the handle with them — capped by a screen-constant circle, above the
  * first line at the start, below the last line at the end.
  *
- * On touch, where a caret drag isn't available, the handles ARE the way to
+ * On touch, where a caret drag isn't available, the handles are the way to
  * grow or shrink a selection: a long-press selects a word, then each handle
- * extends from the OPPOSITE endpoint, snapping to glyphs and crossing pages
+ * extends from the opposite endpoint, snapping to glyphs and crossing pages
  * exactly like a pointer drag — it rides the same `beginGestureAt`/`extendTo`
  * gesture path, so highlights, menus, and commit signals all behave
  * identically. Mount in the `<Stage>` overlay slot next to `<SelectionMenu>`;
  * outside a Stage it renders nothing (a `PageView` has no camera to project
  * through). Pointer-isolated, so grabbing a handle never pans the stage.
+ * Painted in the plugin's `handles` setting, which the
+ * `--epdf-text-selection-handle` and `--epdf-text-selection-handle-shadow` CSS
+ * variables override.
  */
-export function SelectionHandles({
-  color = '#2196f3',
-  token: explicitToken,
-}: SelectionHandlesProps) {
+export function SelectionHandles({ token: explicitToken }: SelectionHandlesProps = {}) {
   const token = useStageToken(explicitToken);
   const host = useCapability(SelectionHostToken);
   const stage = useOptionalCapability(token);
@@ -263,57 +224,53 @@ export function SelectionHandles({
         '(a <PageView> has no camera to project the handles through).',
     );
   }
-  const selecting = useSelector(SelectionHostToken, (c) => c.isGestureActive());
-  const visible = useSelector(SelectionHostToken, (c) => c.isHighlightVisible());
+  const selecting = useSelectionState((state) => state.isSelecting);
+  const visible = useSelector(SelectionHostToken, (selection) => selection.isHighlightVisible());
+  const handles = useSelectionSettings((settings) => settings.handles);
+  const accent = useViewerSettings((settings) => settings.accent);
   const endpoints = useSelector(
     SelectionHostToken,
-    (c): Endpoints | null => {
-      const s = c.getSnapshot();
-      if (!s.start || !s.end) return null;
-      return {
-        start: { page: s.start.page, glyphQuad: s.start.glyphQuad, advance: s.start.advance },
-        end: { page: s.end.page, glyphQuad: s.end.glyphQuad, advance: s.end.advance },
-      };
-    },
-    sameEndpoints,
+    (selection) => selectionHandleEndpointsOf(selection.getSnapshot()),
+    sameSelectionEndpoints,
   );
-  // The handles are positioned by PROJECTING the endpoint corners through the
+  // The handles are positioned by projecting the endpoint corners through the
   // camera, so they must re-render whenever the camera moves — visiblePages is
   // the stage's reference-stable revision for exactly that (the same value the
   // page surfaces re-render on, so handle and highlight move in one commit).
   useKernelValue(() => stage?.listVisiblePages() ?? null);
   const [dragging, setDragging] = useState<'start' | 'end' | null>(null);
-  // The web binder's `arm` must read the CURRENT endpoints/stage at pointer
+  // The web binder's `arm` must read the current endpoints/stage at pointer
   // down, not the ones captured when the listener attached — a stable ref
   // callback with a live arm-source is the standard escape from that.
-  const armSource = useRef<{ stage: StageCapability; endpoints: Endpoints } | null>(null);
+  const armSource = useRef<{ stage: StageCapability; endpoints: SelectionHandleEndpoints } | null>(
+    null,
+  );
   armSource.current = stage && endpoints ? { stage, endpoints } : null;
   const bindHandle = useMemo(() => {
     const detach: Partial<Record<'start' | 'end', () => void>> = {};
-    const make = (role: 'start' | 'end') => (el: HTMLDivElement | null) => {
+    const make = (role: 'start' | 'end') => (element: HTMLDivElement | null) => {
       detach[role]?.();
       delete detach[role];
-      if (!el) return;
-      detach[role] = attachSelectionHandle(el, {
+      if (!element) return;
+      detach[role] = attachSelectionHandle(element, {
         arm: () => {
           const src = armSource.current;
           if (!src) return null;
-          const view = handleView(src.stage);
-          const geom = selectionHandleGeom(view, src.endpoints[role], role);
-          if (!geom) return null;
-          const opposite = src.endpoints[role === 'start' ? 'end' : 'start'];
-          const drag = createSelectionHandleDrag(host, view, opposite, src.endpoints[role].page);
+          const armed = armSelectionHandle(
+            host,
+            selectionHandleViewOf(src.stage),
+            src.endpoints,
+            role,
+          );
+          if (!armed) return null;
           setDragging(role);
           return {
             // the point the user grabbed: the bar's midpoint
-            base: {
-              x: (geom.bar.from.x + geom.bar.to.x) / 2,
-              y: (geom.bar.from.y + geom.bar.to.y) / 2,
-            },
+            base: armed.base,
             session: {
-              move: drag.move,
+              move: armed.drag.move,
               end: () => {
-                drag.end(); // settle → menu reappears, onCommitted fires
+                armed.drag.end(); // settle → menu reappears, onCommitted fires
                 setDragging(null);
               },
             },
@@ -326,14 +283,17 @@ export function SelectionHandles({
 
   if (!stage || !endpoints || !visible) return null;
   // Hidden while a pointer drag-select is in flight (like the menu) — but a
-  // HANDLE drag is itself a selection gesture, so it keeps its handles.
+  // handle drag is itself a selection gesture, so it keeps its handles.
   if (selecting && !dragging) return null;
-  const view = handleView(stage);
+  const view = selectionHandleViewOf(stage);
+  // Each is its CSS variable first, then the setting; an unset color is the accent.
+  const color = paint('text-selection-handle', handles.color ?? accent);
+  const shadow = paint('text-selection-handle-shadow', handles.shadow);
 
   const renderHandle = (role: 'start' | 'end') => {
-    const geom = selectionHandleGeom(view, endpoints[role], role);
-    if (!geom) return null; // endpoint page not laid out right now
-    // The shell is laid out UPRIGHT in its own frame — bar of the edge's
+    const geometry = selectionHandleGeom(view, endpoints[role], role);
+    if (!geometry) return null; // endpoint page not laid out right now
+    // The shell is laid out upright in its own frame — bar of the edge's
     // length, head stacked above (start) or below (end) — then rotated onto
     // the projected edge. The pivot is the bar's ascent-side tip, the one
     // point that must land exactly on the glyph corner.
@@ -345,16 +305,16 @@ export function SelectionHandles({
         ref={bindHandle[role]}
         style={{
           position: 'absolute',
-          left: geom.bar.from.x - pivotX,
-          top: geom.bar.from.y - barTop,
+          left: geometry.bar.from.x - pivotX,
+          top: geometry.bar.from.y - barTop,
           width: HANDLE_BAR + 2 * HANDLE_PAD,
-          height: geom.length + HANDLE_HEAD + 2 * HANDLE_PAD,
-          // Upright text carries NO transform — pixel-identical to an
+          height: geometry.length + HANDLE_HEAD + 2 * HANDLE_PAD,
+          // Upright text carries no transform — pixel-identical to an
           // axis-aligned box (the geometry's float-noise guard decides).
-          ...(geom.upright
+          ...(geometry.upright
             ? null
             : {
-                transform: `rotate(${geom.rotation}deg)`,
+                transform: `rotate(${geometry.rotation}deg)`,
                 transformOrigin: `${pivotX}px ${barTop}px`,
               }),
           touchAction: 'none',
@@ -370,7 +330,7 @@ export function SelectionHandles({
             left: HANDLE_PAD,
             top: barTop,
             width: HANDLE_BAR,
-            height: geom.length,
+            height: geometry.length,
             background: color,
             borderRadius: HANDLE_BAR / 2,
           }}
@@ -381,12 +341,12 @@ export function SelectionHandles({
           style={{
             position: 'absolute',
             left: pivotX - HANDLE_HEAD / 2,
-            top: role === 'start' ? HANDLE_PAD : HANDLE_PAD + geom.length,
+            top: role === 'start' ? HANDLE_PAD : HANDLE_PAD + geometry.length,
             width: HANDLE_HEAD,
             height: HANDLE_HEAD,
             borderRadius: '50%',
             background: color,
-            boxShadow: '0 1px 4px rgba(0, 0, 0, 0.35)',
+            boxShadow: shadow,
           }}
         />
       </div>
@@ -404,17 +364,18 @@ export function SelectionHandles({
 export type SelectionClipboardProps = Pick<SelectionClipboardOptions, 'prefetch'>;
 
 /**
- * Mount ONCE per viewer to wire clipboard copy: prefetches the selected text
+ * Mount once per viewer to wire clipboard copy: prefetches the selected text
  * when the selection settles, answers the native `copy` event synchronously,
  * and falls back to the async Clipboard API for ctrl/cmd+C when the page has
- * no DOM selection. Renders nothing. For a toolbar Copy button, call
- * `copySelection(useSelection())` from its click handler instead.
+ * no DOM selection. Renders nothing, and wires nothing until a document is
+ * ready. For a toolbar Copy button, call `copySelection(useSelection())` from
+ * its click handler instead.
  */
 export function SelectionClipboard({ prefetch }: SelectionClipboardProps = {}) {
-  const selection = useCapability(SelectionToken);
-  useEffect(
-    () => wireSelectionClipboard(selection, prefetch === undefined ? {} : { prefetch }),
-    [selection, prefetch],
-  );
+  const selection = useOptionalCapability(SelectionToken);
+  useEffect(() => {
+    if (!selection) return;
+    return wireSelectionClipboard(selection, prefetch === undefined ? {} : { prefetch });
+  }, [selection, prefetch]);
   return null;
 }

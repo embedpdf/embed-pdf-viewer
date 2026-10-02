@@ -1,0 +1,180 @@
+---
+title: Commands & shortcuts
+description: Give every action in your viewer one name, with its label, icon, state and keyboard shortcut, and run it from buttons, menus and keys.
+---
+
+# Commands & shortcuts
+
+A **command** is one action of your viewer, like "zoom in" or "download", defined once: its label, its
+icon, when it's enabled or active, what it does, and its keyboard shortcut. Toolbars, menus, a command
+palette and the keyboard all run the same command, so they always agree. Register the plugin with the
+commands you need:
+
+<Snippet name="ui/commands-plugin" />
+
+## Show a command
+
+<Fw only={['react', 'vue', 'svelte']}>`useCommand(id)` gives you everything a button needs, and <Word of="rerenders" /> when any of it changes:</Fw><Fw only="angular">The `epdfCommand` directive runs the command on click and keeps your button's `disabled`, `aria-pressed`, `title` and `hidden` in step with it. Its template reference gives you the rest, as signals:</Fw>
+
+<Snippet name="ui/command-button" />
+
+<Example name="commands/buttons" />
+
+<Fw only={['vue', 'svelte']}>
+
+Pass the id as a function, and the button follows `id` when it changes.
+
+</Fw>
+
+<Fw only="angular">
+
+For UI that isn't a button, such as a row in a shortcuts list, `commands.commandOf(id)` gives the
+same command as a signal.
+
+</Fw>
+
+`shortcut` is formatted for the user's platform: `⌘K` on a Mac, `Ctrl+K` elsewhere. The
+[toolbar](toolbar) draws commands the same way.
+
+## The standard commands
+
+`standardCommands` covers what every viewer has, with labels in [every language you load](translations):
+
+| Command                                              | Does                                         | Shortcut         |
+| :--------------------------------------------------- | :------------------------------------------- | :--------------- |
+| `zoom:in`, `zoom:out`                                | Zoom in or out                               | `Mod+=`, `Mod+-` |
+| `zoom:fit-width`, `zoom:fit-page`                    | Fit the page's width, or the whole page      |                  |
+| `page:next`, `page:previous`, `page:first`, `page:last` | Move through pages                        | `→`, `←`, `Home`, `End` |
+| `view:rotate-clockwise`, `view:rotate-counterclockwise` | Turn the view                             |                  |
+| `tool:pointer`, `tool:pan`                           | Switch tools                                 | `V`, `H`         |
+| `tool:<id>`                                          | Any registered tool, such as `tool:highlight` |                 |
+| `selection:copy`                                     | Copy the selected text                       | `Mod+C`          |
+| `annotation:delete`                                  | Delete the selected annotations              | `Delete`         |
+| `document:download`, `document:print`                | Download or print the document               | `Mod+S`, `Mod+P` |
+
+Each one is enabled only when it can run: `selection:copy` needs a selection and permission to copy,
+`annotation:delete` a selection the user may delete.
+
+## Keyboard shortcuts
+
+`useCommandShortcuts()` turns every command's shortcut into a working key. <Fw only={['react', 'vue', 'svelte']}>Call it once, near the top
+of your viewer:</Fw><Fw only="angular">Add it to `provideEmbedPdf()`, next to `withCommands()`:</Fw>
+
+<Snippet name="ui/command-shortcuts" />
+
+It ignores keys typed into text fields, runs commands for the active document, and does nothing for a
+command that's disabled. <Fw only={['react', 'vue', 'svelte']}>With more than one viewer on a page, pass `target`, a ref to the element
+around one: its keys then work only while focus is inside it.</Fw><Fw only="angular">With more than one viewer on a page, leave
+`withCommandShortcuts()` out and put the `epdfCommandShortcuts` directive on the element around one
+(`<div tabindex="0" epdfCommandShortcuts>`): its keys then work only while focus is inside it.</Fw> `Mod` means Cmd on a Mac and Ctrl elsewhere. A help sheet lists
+`listShortcuts()`:
+
+<Example name="commands/shortcuts" />
+
+## Run a command from code
+
+```ts
+await commands.execute('zoom:in');
+await commands.execute('review:approve', { args: { note: 'Looks good' } });
+```
+
+`execute()` resolves with `{ status: 'executed' }`, or `{ status: 'rejected', reason }` when the command
+is disabled, hidden or unknown.
+
+## A command palette
+
+`searchCommands()` finds commands by their label, for a palette like the one in code editors:
+
+```ts
+const results = commands.searchCommands(query); // visible commands whose label or id matches
+```
+
+A disabled command is still in the results, so show it greyed out.
+
+<Example name="commands/palette" />
+
+## Define a command
+
+| Field         | What it is                                                                       |
+| :------------ | :------------------------------------------------------------------------------- |
+| `id`          | A unique name, by convention `area:action`                                       |
+| `label`       | What the user sees, or `labelKey` for a [translated](translations) label         |
+| `icon`        | Your icon's name; your buttons turn it into an icon                              |
+| `shortcut`    | A key such as `'Mod+K'`, or a list of them                                       |
+| `enabled`     | When it can run, as a function of the viewer's state                             |
+| `active`      | When it shows as pressed, such as the current tool                               |
+| `visible`     | When it shows at all                                                             |
+| `run`         | What it does                                                                     |
+| `categories`  | Groups you can turn off together                                                 |
+| `panel`, `menu`, `modal` | A command that opens a [panel, menu or dialog](panels) needs no `run`  |
+
+`enabled`, `active` and `visible` get the viewer's state through `get(Token)`, and are asked again
+whenever anything changes, so a button is always right without events or effects of your own.
+
+## Turn features off
+
+Put commands in categories, and turn a whole category off: its commands are hidden and disabled,
+wherever they appear. The `disabledCategories` [setting](#settings) turns categories off from the start,
+and while the app runs:
+
+```ts
+commands.disableCategory('annotate');
+commands.enableCategory('annotate');
+```
+
+A command of your own, a category switch, and a command run from code when the document opens:
+
+<Example name="commands/custom" />
+
+## Methods
+
+Everything `useCommands()` gives you.
+
+| Method                                                                   | What it does                                                                                                                                         |
+| :----------------------------------------------------------------------- | :--------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `execute(id, { args?, documentId? })`                                    | Runs a command. Resolves `{ status, reason? }`: `'executed'`, or `'rejected'` with why. A `run` that throws rejects. [Run a command from code](#run-a-command-from-code) |
+| `canExecute(id, documentId?)`                                            | Whether a command can run now: it's registered, enabled and visible                                                                                 |
+| `resolveCommand(id, documentId?)`                                        | A command as a button shows it: label, icon, shortcuts, and whether it's enabled, active and visible. `null` for an unknown id. <Fw only={['react', 'vue', 'svelte']}>In a component, use `useCommand(id)`.</Fw><Fw only="angular">In a template, use the `epdfCommand` directive.</Fw> [Show a command](#show-a-command) |
+| `listCommands(documentId?)`                                              | Every command, resolved the same way, in the order they were added                                                                                  |
+| `searchCommands(query, documentId?)`                                     | The visible commands whose label or id contains the query. [A command palette](#a-command-palette)                                                  |
+| `listShortcuts()`                                                        | Every shortcut with its command, as `{ commandId, shortcut }`, for a keyboard help sheet. [Keyboard shortcuts](#keyboard-shortcuts)                 |
+| `registerCommand(command, { replace? })`, `registerCommands(commands, { replace? })` | Adds one command, or several, while the app runs, and returns a function that removes them. An id that's taken is refused unless you pass `replace: true`. [Define a command](#define-a-command) |
+| `getCommand(id)`, `hasCommand(id)`                                       | A command as you defined it, or `null`; whether it's registered                                                                                      |
+| `listCommandIds()`                                                       | Every command's id, in the order they were added                                                                                                     |
+| `disableCategory(category)`, `enableCategory(category)`                  | Turns a category off, or on again. [Turn features off](#turn-features-off)                                                                          |
+| `setDisabledCategories(categories)`                                      | Replaces the list of categories that are off                                                                                                         |
+| `getDisabledCategories()`, `isCategoryDisabled(category)`                | The categories that are off; whether one is                                                                                                          |
+| `getSettings()`, `updateSettings(changes)`, `resetSettings()` | Reads the settings, changes them while the app runs, or goes back to what you registered. In a component, use `useCommandsSettings()`. [Settings](#settings) |
+
+Leave out `documentId`, and a command runs and resolves for the document in scope: the one a
+[`<DocumentScope>`](../documents/tabs#talk-to-a-specific-document) around your component names, or
+else the active one. Every method that returns a promise also takes a `signal` in its options, to
+cancel it.
+
+## Settings
+
+Set them when you register the plugin, and change them while the app runs with
+`commands.updateSettings({ … })`; `commands.resetSettings()` goes back to what you registered, and
+`useCommandsSettings()` gives you the current settings.
+
+| Setting              | What it does                                          | Default |
+| :------------------- | :---------------------------------------------------- | :------ |
+| `commands`           | The commands your viewer has                          | none    |
+| `disabledCategories` | Categories that start turned off                      | none    |
+
+## Events
+
+<Snippet name="ui/command-events" />
+
+| Event               | Fires when                      | Carries                           |
+| :------------------ | :------------------------------ | :-------------------------------- |
+| `onExecuted`        | A command ran                   | `commandId`, `documentId`, `args` |
+| `onExecutionFailed` | A command's `run` threw         | `commandId`, `documentId`, `error` |
+| `onSettingsChanged` | The settings changed | `settings`, `changed` |
+
+## Good to know
+
+### Commands and permissions
+
+A command's `enabled` is where permission checks go: `({ get }) => get(AnnotationToken).canCreate()`.
+The standard commands already check theirs.

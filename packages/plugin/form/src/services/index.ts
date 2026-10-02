@@ -1,38 +1,48 @@
 /**
- * Plugin-private services every area is built on (NOT the kernel): the
- * store, the event hooks, authority, the sibling planes, the scripting seam
- * and the one serial mutation queue.
+ * Plugin-private services every area is built on: the two mirrors (the field
+ * tree and per-page widget geometry), the events, the sibling plugins, the
+ * scripting seam, and the one write queue. Session authority is the
+ * context's (`ctx.allows`, `ctx.assertAllowed`).
  */
-import type { FormConfig } from '../contract';
-import { createSerialMutationQueue } from '../mutationQueue';
-import { createAuthority, type FormAuthority } from './authority';
+import type { Mirror, PageMirror, SerialQueue } from '@embedpdf/core';
+import type { FormFieldRef } from '@embedpdf/engine-core/runtime';
+
+import { canonicalKey, type FieldIndex, type FieldKey, type PageWidgets } from '../model';
+import { createFieldsMirror } from '../sync/fields';
+import { createWidgetBoxesMirror } from '../sync/widget-boxes';
 import type { FormContext } from './context';
 import { createEvents, type FormEvents } from './events';
 import { createScriptingSeam, type FormScripting } from './scripting';
 import { resolveSiblings, type FormSiblings } from './siblings';
-import { createStore, type FormStore } from './store';
 
 export type { FormContext } from './context';
 
 export interface FormServices {
-  readonly store: FormStore;
+  readonly fields: Mirror<FieldIndex>;
+  readonly widgetBoxes: PageMirror<PageWidgets>;
   readonly events: FormEvents;
-  readonly authority: FormAuthority;
   readonly siblings: FormSiblings;
   readonly scripting: FormScripting;
-  /** Every durable write rides ONE serial queue — an actions-driven form
-   *  mutation never interleaves with a user's in-flight commit. */
-  readonly enqueue: ReturnType<typeof createSerialMutationQueue>;
+  /**
+   * Every durable write rides one serial queue, so a write driven by the
+   * actions plugin never interleaves with a user's in-flight commit.
+   */
+  readonly enqueue: SerialQueue;
+  /** The key a field is known by, whichever ref names it (`toFieldRef(name)` too). */
+  readonly keyOf: (ref: FormFieldRef) => FieldKey;
 }
 
-export function createServices(ctx: FormContext, config: FormConfig): FormServices {
+export function createServices(ctx: FormContext): FormServices {
   const siblings = resolveSiblings(ctx);
+  const events = createEvents(ctx);
+  const fields = createFieldsMirror(ctx, events);
   return {
-    store: createStore(ctx),
-    events: createEvents(ctx),
-    authority: createAuthority(ctx),
+    fields,
+    widgetBoxes: createWidgetBoxesMirror(ctx),
+    events,
     siblings,
-    scripting: createScriptingSeam(ctx, config, siblings),
-    enqueue: createSerialMutationQueue(),
+    scripting: createScriptingSeam(ctx, siblings),
+    enqueue: ctx.serialQueue('writes'),
+    keyOf: (ref) => canonicalKey(fields.get(), ref),
   };
 }

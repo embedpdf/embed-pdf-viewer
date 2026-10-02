@@ -3,7 +3,7 @@
  * in the function's docstring has a test here so future edits can't
  * silently change the contract local + cloud both rely on.
  *
- * If you change a mapping rule, this test MUST be updated explicitly
+ * If you change a mapping rule, this test must be updated explicitly
  * — and that's the point.
  */
 import { describe, expect, it } from 'vitest';
@@ -36,7 +36,7 @@ describe('passwordPromptFromState', () => {
       encryption: { state: 'encrypted', requiresPassword: true },
       permissions: { known: false } as DocumentSecurityState['permissions'],
     });
-    expect(passwordPromptFromState(s)).toEqual({ state: 'required', hint: null });
+    expect(passwordPromptFromState(s)).toEqual({ state: 'required', hint: null, incorrect: false });
   });
 
   it('encrypted + anonymous open failed (openedAs=none) + requiresPassword → required with user hint', () => {
@@ -47,7 +47,24 @@ describe('passwordPromptFromState', () => {
         openedAs: 'none',
       } as DocumentSecurityState['permissions'],
     });
-    expect(passwordPromptFromState(s)).toEqual({ state: 'required', hint: 'user' });
+    expect(passwordPromptFromState(s)).toEqual({
+      state: 'required',
+      hint: 'user',
+      incorrect: false,
+    });
+  });
+
+  it('a rejected password marks a required prompt incorrect, and only a required one', () => {
+    const locked = state({
+      encryption: { state: 'encrypted', requiresPassword: true },
+      permissions: { known: true, openedAs: 'none' } as DocumentSecurityState['permissions'],
+    });
+    expect(passwordPromptFromState(locked, true)).toEqual({
+      state: 'required',
+      hint: 'user',
+      incorrect: true,
+    });
+    expect(passwordPromptFromState(state(), true)).toEqual({ state: 'none' });
   });
 
   it('encrypted + opened as owner → none (already at the top)', () => {
@@ -103,8 +120,8 @@ describe('passwordPromptFromState', () => {
     // for completeness.
     const cases: ReturnType<typeof passwordPromptFromState>[] = [
       { state: 'none' },
-      { state: 'required', hint: null },
-      { state: 'required', hint: 'user' },
+      { state: 'required', hint: null, incorrect: false },
+      { state: 'required', hint: 'user', incorrect: true },
       { state: 'optional', hint: 'owner' },
     ];
     for (const c of cases) {

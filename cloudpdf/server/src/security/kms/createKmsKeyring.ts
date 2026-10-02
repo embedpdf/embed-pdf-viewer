@@ -1,7 +1,8 @@
 /**
  * Factory for KmsKeyring instances. Matches the unified adapter
- * pattern (see ADAPTERS.md) — switch on `config.kind`, accept a
- * SecretResolver via `opts.resolver` for SecretRef-bearing variants.
+ * pattern (see `docs/conventions/server-adapters.md`) — switch on
+ * `config.kind`, accept a SecretResolver via `opts.resolver` for
+ * SecretRef-bearing variants.
  *
  * The `static` kind needs its KEK bytes at construction time (held
  * in process). When called with a `static` config, this function
@@ -20,7 +21,7 @@ import { AzureKeyVaultKeyring } from './adapters/AzureKeyVaultKeyring';
 
 export interface CreateKmsKeyringOptions {
   /**
-   * Required for `static` KMS (used to resolve the KEK SecretRef).
+   * Required for `static` KMS, which resolves its KEK SecretRef through it.
    * Ignored by cloud kinds, which authenticate via the cloud's SDK.
    */
   resolver?: SecretResolver;

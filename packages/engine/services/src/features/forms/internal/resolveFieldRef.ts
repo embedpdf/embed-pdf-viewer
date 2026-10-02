@@ -23,14 +23,14 @@ export function resolveFieldRef(
 ): ResolvedField {
   const { fn } = runtime;
   if (ref.kind === 'objectNumber') {
-    const fieldIndex = fn.EPDFForm_GetFieldIndexByObjNum(model, ref.fieldObjectNumber);
+    const fieldIndex = fn.EPDFForm_GetFieldIndexByObjNum(model, ref.objectNumber);
     if (fieldIndex < 0) {
       throw new EngineError(
         EngineErrorCode.NotFound,
-        `form field not found: object ${ref.fieldObjectNumber}`,
+        `form field not found: object ${ref.objectNumber}`,
       );
     }
-    return { fieldIndex, fieldObjectNumber: ref.fieldObjectNumber };
+    return { fieldIndex, fieldObjectNumber: ref.objectNumber };
   }
 
   const count = fn.EPDFForm_CountFields(model);
@@ -43,4 +43,9 @@ export function resolveFieldRef(
     }
   }
   throw new EngineError(EngineErrorCode.NotFound, `form field not found: "${ref.name}"`);
+}
+
+/** A field's object number, or `0` for a direct field dictionary (its ref is its name). */
+export function fieldObjectNumberOf(field: { ref: FormFieldRef }): number {
+  return field.ref.kind === 'objectNumber' ? field.ref.objectNumber : 0;
 }

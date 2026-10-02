@@ -1,7 +1,7 @@
 /**
  * @embedpdf/plugin-shell/contract — the workbench's surface state, and
  * nothing else. A "surface" is anything the app shows or hides by name: a
- * sidebar panel, a modal, an overlay. The plugin stores WHICH surfaces are
+ * sidebar panel, a modal, an overlay. The plugin stores which surfaces are
  * open; the app owns their DOM entirely. Document-scoped: each document keeps
  * its own panels, so switching tabs restores them — and the state is plain
  * serializable data, so applications can snapshot and restore it.
@@ -38,23 +38,42 @@ export interface ShellSnapshot {
 }
 
 // ── events ──
-export interface SurfaceEvent {
+export interface SurfaceOpenedEvent {
   readonly id: string;
+  /** The props it was opened with. */
   readonly props?: SurfaceProps;
 }
-export interface MenuEvent {
+export interface SurfaceClosedEvent {
+  readonly id: string;
+}
+export interface MenuOpenedEvent {
+  readonly id: string;
+}
+export interface MenuClosedEvent {
   readonly id: string;
 }
 
+/**
+ * Which surfaces (panels, dialogs) and menus of one document are open. The app
+ * draws them; the plugin only holds their state.
+ */
 export interface ShellCapability {
   // ── surfaces ──
+  /** Whether a surface is open. */
   isOpen(id: string): boolean;
   /** Open flag, exclusivity tag and props; null for a surface never opened. */
   getSurface(id: string): SurfaceState | null;
-  /** Open surfaces. Reference-stable while unchanged. */
+  /** The open surfaces. The same array while none opens or closes. */
   listOpenSurfaces(): readonly SurfaceState[];
+  /**
+   * Open a surface. `exclusive` closes the other open surfaces of that group,
+   * and `props` travel with it. Fires `onSurfaceOpened`, and `onSurfaceClosed`
+   * for each surface it closes.
+   */
   open(id: string, options?: OpenSurfaceOptions): void;
+  /** Close a surface. Fires `onSurfaceClosed` when it was open. */
   close(id: string): void;
+  /** Open a closed surface, or close an open one. */
   toggle(id: string, options?: OpenSurfaceOptions): void;
   /** Change a surface's props without reopening it. */
   updateSurfaceProps(id: string, props: SurfaceProps): void;
@@ -62,21 +81,32 @@ export interface ShellCapability {
   closeAll(): void;
 
   // ── menus ──
+  /** Whether a menu is open. */
   isMenuOpen(id: string): boolean;
-  /** Open menus in opening order. Reference-stable while unchanged. */
+  /** The open menus, in the order they opened (the last one on top). The same array while none opens or closes. */
   listOpenMenus(): readonly string[];
+  /** Open a menu, leaving the others open. Fires `onMenuOpened`. */
   openMenu(id: string): void;
+  /** Close a menu. Fires `onMenuClosed` when it was open. */
   closeMenu(id: string): void;
+  /** Open a closed menu, or close an open one. */
   toggleMenu(id: string): void;
+  /** Close every menu, for a click outside or Escape. */
   closeAllMenus(): void;
 
   // ── persistence ──
+  /** Everything the plugin holds, as plain data you can store. */
   getSnapshot(): ShellSnapshot;
+  /** Put back what `getSnapshot()` returned. Fires the events of what opens and closes. */
   applySnapshot(snapshot: ShellSnapshot): void;
 
   // ── events ──
-  readonly onSurfaceOpened: EventHook<SurfaceEvent>;
-  readonly onSurfaceClosed: EventHook<SurfaceEvent>;
-  readonly onMenuOpened: EventHook<MenuEvent>;
-  readonly onMenuClosed: EventHook<MenuEvent>;
+  /** A surface opened, by `open`, `toggle` or `applySnapshot`. */
+  readonly onSurfaceOpened: EventHook<SurfaceOpenedEvent>;
+  /** A surface closed, by `close`, `toggle`, `closeAll`, an `exclusive` open or `applySnapshot`. */
+  readonly onSurfaceClosed: EventHook<SurfaceClosedEvent>;
+  /** A menu opened. */
+  readonly onMenuOpened: EventHook<MenuOpenedEvent>;
+  /** A menu closed. */
+  readonly onMenuClosed: EventHook<MenuClosedEvent>;
 }

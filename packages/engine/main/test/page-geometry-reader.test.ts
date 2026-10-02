@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import type { PdfQuad, PdfRect } from '@embedpdf/engine-core/runtime';
-import { isRotatedGeometryRun } from '@embedpdf/engine-core/runtime';
+import { createPdfTextLayout, isRotatedGeometryRun } from '@embedpdf/engine-core/runtime';
 import {
   buildRunsFromRawGlyphs,
   EPDF_CHAR_GEOMETRY_LAYOUT,
@@ -14,20 +14,20 @@ const box = (left: number, bottom: number, right: number, top: number): PdfRect 
   top,
 });
 
-/** Axis-aligned quad in the frame-geometric slot order (US, UE, LS, LE). */
+/** Axis-aligned quad over a box. */
 const quadOf = (left: number, bottom: number, right: number, top: number): PdfQuad => ({
-  p1: { x: left, y: top },
-  p2: { x: right, y: top },
-  p3: { x: left, y: bottom },
-  p4: { x: right, y: bottom },
+  upperLeft: { x: left, y: top },
+  upperRight: { x: right, y: top },
+  lowerLeft: { x: left, y: bottom },
+  lowerRight: { x: right, y: bottom },
 });
 
 /** Quad of the b×h cell at `origin`, rotated 90° CCW (baseline along +y). */
 const rotatedQuad = (x: number, y: number, w: number, h: number): PdfQuad => ({
-  p1: { x: x + h, y: y }, // upper-start
-  p2: { x: x + h, y: y + w }, // upper-end
-  p3: { x: x, y: y }, // lower-start
-  p4: { x: x, y: y + w }, // lower-end
+  upperLeft: { x: x + h, y: y },
+  upperRight: { x: x + h, y: y + w },
+  lowerLeft: { x: x, y: y },
+  lowerRight: { x: x, y: y + w },
 });
 
 const upright = (
@@ -39,7 +39,7 @@ const upright = (
   flags: 0,
   looseBox,
   upright: true,
-  rotation: 0,
+  baselineAngle: 0,
   ascentFlip: false,
   ...over,
 });
@@ -47,7 +47,7 @@ const upright = (
 const rotated = (
   objectKey: number,
   looseQuad: PdfQuad,
-  rotation: number,
+  baselineAngle: number,
   over: Partial<RawGeometryGlyphRecord> = {},
 ): RawGeometryGlyphRecord => ({
   objectKey,
@@ -55,7 +55,7 @@ const rotated = (
   looseBox: box(0, 0, 0, 0),
   looseQuad,
   upright: false,
-  rotation,
+  baselineAngle,
   ascentFlip: false,
   ...over,
 });
@@ -65,7 +65,7 @@ const empty = (objectKey: number): RawGeometryGlyphRecord => ({
   flags: 2,
   looseBox: box(0, 0, 0, 0),
   upright: true,
-  rotation: 0,
+  baselineAngle: 0,
   ascentFlip: false,
 });
 
@@ -87,28 +87,52 @@ describe('buildRunsFromRawGlyphs', () => {
     expect(runs).toHaveLength(2);
     const [first, second] = runs;
     expect(isRotatedGeometryRun(first)).toBe(false);
-    expect(first.charStart).toBe(0);
+    expect(first.start).toBe(0);
     expect(first.fontSize).toBe(12);
     expect(first.rect).toEqual(box(10, 10, 30, 22));
+    // Boxes, not quads, and the space state only where it is true.
     expect(first.glyphs).toEqual([
-      { looseBox: box(10, 10, 20, 22), flags: 0, tightBox: box(11, 12, 19, 20) },
-      { looseBox: box(20, 10, 30, 22), flags: 1 },
+      { loose: box(10, 10, 20, 22), tight: box(11, 12, 19, 20) },
+      { loose: box(20, 10, 30, 22), space: true },
     ]);
-    expect(first.glyphs.some((g) => 'looseQuad' in g || 'tightQuad' in g)).toBe(false);
-    expect(second.charStart).toBe(2);
+    expect(second.start).toBe(2);
     expect(second.fontSize).toBe(9);
   });
 
-  test('legacy run rect seeds from the first glyph, zero-seed quirk included', () => {
+  test("a run's rect covers its real glyphs; a glyph with no box takes no part", () => {
     const runs = buildRunsFromRawGlyphs([
-      empty(1), // a generated space opening the object: zeroed seed
+      empty(1), // a generated space opening the object
       upright(1, box(100, 200, 110, 212)),
+      empty(1),
+      upright(1, box(110, 200, 120, 212)),
     ]);
     expect(runs).toHaveLength(1);
-    // The seed participates in the union — exactly the legacy reader's
-    // behavior for runs opening with a degenerate glyph.
-    expect(runs[0].rect).toEqual(box(0, 0, 110, 212));
-    expect(runs[0].glyphs[0]).toEqual({ looseBox: box(0, 0, 0, 0), flags: 2 });
+    expect(runs[0].rect).toEqual(box(100, 200, 120, 212));
+    expect(runs[0].glyphs[0]).toEqual({ loose: box(0, 0, 0, 0), empty: true });
+  });
+
+  test('a triple-click on a line opening with a glyph with no box stays on that line', () => {
+    const runs = buildRunsFromRawGlyphs([
+      empty(1),
+      upright(1, box(100, 600, 110, 612)),
+      upright(1, box(110, 600, 120, 612)),
+      upright(2, box(100, 500, 110, 512)), // the line below
+    ]);
+    expect(createPdfTextLayout({ runs }).lineAt(1)).toEqual({ start: 0, count: 3 });
+  });
+
+  test('a run of nothing but glyphs with no box keeps the zeroed rect', () => {
+    const runs = buildRunsFromRawGlyphs([empty(1), empty(1)]);
+    expect(runs).toHaveLength(1);
+    expect(runs[0].rect).toEqual(box(0, 0, 0, 0));
+  });
+
+  test('a rotated run opening with a glyph with no box covers only its real cells', () => {
+    const q1 = rotatedQuad(50, 100, 10, 14);
+    const runs = buildRunsFromRawGlyphs([empty(1), rotated(1, q1, Math.PI / 2)]);
+    expect(runs).toHaveLength(1);
+    expect(isRotatedGeometryRun(runs[0])).toBe(true);
+    expect(runs[0].rect).toEqual(box(50, 100, 64, 110));
   });
 
   test('rotated object emits the rotated variant; empty glyphs get zeroed quads', () => {
@@ -123,14 +147,19 @@ describe('buildRunsFromRawGlyphs', () => {
     expect(runs).toHaveLength(1);
     const run = runs[0];
     if (!isRotatedGeometryRun(run)) throw new Error('expected a rotated run');
-    expect(run.rotation).toBeCloseTo(Math.PI / 2, 6);
+    expect(run.rotation).toBeCloseTo(270, 6);
     expect(run.ascentFlip).toBe(false);
     expect(run.fontSize).toBe(10);
-    expect(run.glyphs[0].looseQuad).toEqual(q1);
-    expect(run.glyphs[0].tightQuad).toEqual(rotatedQuad(51, 101, 8, 12));
+    expect(run.glyphs[0].loose).toEqual(q1);
+    expect(run.glyphs[0].tight).toEqual(rotatedQuad(51, 101, 8, 12));
     expect(run.glyphs[1]).toEqual({
-      looseQuad: { p1: { x: 0, y: 0 }, p2: { x: 0, y: 0 }, p3: { x: 0, y: 0 }, p4: { x: 0, y: 0 } },
-      flags: 2,
+      loose: {
+        upperLeft: { x: 0, y: 0 },
+        upperRight: { x: 0, y: 0 },
+        lowerLeft: { x: 0, y: 0 },
+        lowerRight: { x: 0, y: 0 },
+      },
+      empty: true,
     });
     // Page-space AABB over the real glyphs' cells (the first glyph is real,
     // so the seed is its bounds — no zero-seed here).
@@ -144,8 +173,8 @@ describe('buildRunsFromRawGlyphs', () => {
       rotated(1, rotatedQuad(40, 10, 10, 12), Math.PI / 2),
     ]);
     expect(runs).toHaveLength(2);
-    expect(runs[0].charStart).toBe(0);
-    expect(runs[1].charStart).toBe(2);
+    expect(runs[0].start).toBe(0);
+    expect(runs[1].start).toBe(2);
     expect(isRotatedGeometryRun(runs[0])).toBe(false);
     expect(isRotatedGeometryRun(runs[1])).toBe(true);
     expect(runs[1].fontSize).toBe(12); // same text object → inherited
@@ -178,11 +207,13 @@ describe('buildRunsFromRawGlyphs', () => {
     // Synthesized /ActualText pieces and singular-matrix glyphs have boxes
     // but no oriented cells — they classify upright (legacy behavior).
     const runs = buildRunsFromRawGlyphs([
-      upright(1, box(10, 10, 30, 22), { upright: false, rotation: Math.PI / 2 }),
+      upright(1, box(10, 10, 30, 22), { upright: false, baselineAngle: Math.PI / 2 }),
     ]);
     expect(runs).toHaveLength(1);
-    expect(isRotatedGeometryRun(runs[0])).toBe(false);
-    expect(runs[0].glyphs[0].looseBox).toEqual(box(10, 10, 30, 22));
+    const run = runs[0];
+    expect(isRotatedGeometryRun(run)).toBe(false);
+    if (isRotatedGeometryRun(run)) return; // narrows: only upright glyphs carry a box
+    expect(run.glyphs[0].loose).toEqual(box(10, 10, 30, 22));
   });
 });
 

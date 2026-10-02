@@ -1,9 +1,10 @@
 /**
- * @embedpdf/plugin-form/contract/host — the HOST lens: the fill render feed,
- * geometry warming, the widget event feed and the actions-plane seams. Same
- * runtime token as the public one, typed wider.
+ * @embedpdf/plugin-form/contract/host: the host lens, for the framework
+ * layers and the actions plugin: loading a page's widgets, the widget event
+ * feed, the text being typed, and the actions plugin's executors and sinks.
+ * Same runtime token as the public one, typed wider.
  */
-import type { CapabilityToken } from '@embedpdf/core';
+import { createHostToken } from '@embedpdf/core';
 import type {
   AnnotationRef,
   FormEffect,
@@ -21,44 +22,51 @@ import type {
   SubmitIntent,
 } from '@embedpdf/plugin-actions/contract';
 
-import type { FormCapability, FormCommitResult } from './contract';
-import type { FillItem } from './core/fill-items';
-import type { Box } from './core/model';
+import type { FormCapability, FormCommitResult, FormSetValueResult } from './contract';
+import type { Box } from './model';
 import { FormToken as PublicFormToken } from './token';
 
 export * from './contract';
-export type { FormAction, FormState } from './model';
 
 /**
- * HOST lens — plugin-to-plugin only (the actions plugin's interim
- * `javascript` / `reset-form` executors). Import the token from
- * `@embedpdf/plugin-form/contract/host`, never from application code.
+ * The host lens: members for the framework layers and sibling plugins (the
+ * widget event feed, the text being typed, and the actions plugin's
+ * executors and sinks). Application code uses the public capability.
  */
 export interface FormHostCapability extends FormCapability {
-  /** The render feed: widgets on a page with their page-space boxes. Reference-stable. */
-  listFillItems(page: PageRef): FillItem[];
-  getFillItem(annotObjectNumber: number): FillItem | null;
-  /** Warm a page's widget geometry (one annotations read per page). */
-  ensureLoaded(page: PageRef): void;
-  /** The page box in page space (for placement clamping). */
+  /** Load a page's widgets (one annotation read per page), so `listWidgets(page)` has them. */
+  ensureLoaded(page: PageRef): Promise<void>;
+  /** The page box in page space, for keeping a placement on the page; `null` for a page that isn't there. */
   getPageBox(page: PageRef): Box | null;
-  /** The widget DOM-event feed into the actions plane. */
+  /** Send a widget's pointer or focus event to the actions plugin, which runs its `/AA` actions. */
   notifyWidgetEvent(
     field: FormFieldRef,
     widget: AnnotationRef,
     event: PdfAnnotationEventKind,
   ): void;
+  /** Run a ResetForm action: reset the fields it names (or all but them), then recalculate. */
   resetFormAction(
     fields: PdfActionTargetRef[] | null,
     exclude: boolean,
     origin?: ActionOrigin,
   ): Promise<FormCommitResult>;
+  /** The fields a SubmitForm action sends, read from the engine when it runs. */
   resolveSubmitDataset(
     intent: SubmitIntent,
-    ctx: ActionContext,
+    actionContext: ActionContext,
     diagnose: (diagnostic: ActionDiagnostic) => void,
   ): Promise<ActionSubmitRequest>;
+  /** Write what a document script changed in the fields; never rejects, a refusal is reported per effect. */
   commitScriptFormEffects(effects: FormEffect[]): Promise<FormEffectsResult>;
+  /**
+   * The text someone is typing in a field, before it's written (write/typing.ts): a keystroke
+   * calls `draftText`, blur or Enter `commitDraftText` (the field's scripts run then), Escape
+   * `discardDraftText`. A download writes a draft first, like Acrobat commits the field being
+   * edited before it saves. `commitDraftText` resolves `null` when there's nothing to write.
+   */
+  draftText(field: FormFieldRef, text: string): void;
+  commitDraftText(field: FormFieldRef): Promise<FormSetValueResult | null>;
+  discardDraftText(field: FormFieldRef): void;
 }
 
-export const FormToken = PublicFormToken as unknown as CapabilityToken<FormHostCapability>;
+export const FormToken = createHostToken<FormHostCapability>(PublicFormToken);

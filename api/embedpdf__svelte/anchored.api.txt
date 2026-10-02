@@ -1,0 +1,16 @@
+# @embedpdf/svelte — ./anchored
+
+AnchorTarget [InterfaceDeclaration] (from packages/framework/web/src/anchored-position.ts): export interface AnchorTarget{ page: PageRef; bounds: AnchoredRect; boundsIn?: (view: PageViewEnv) => AnchoredRect | null; avoid?: AnchoredPoint[]; }
+Anchored [SvelteComponent] (from packages/framework/svelte/src/anchored/Anchored.svelte): props AnchoredProps
+AnchoredPlacement [TypeAliasDeclaration] (from packages/framework/web/src/anchored-position.ts): export type AnchoredPlacement = AnchoredSide | `${ AnchoredSide} -${ 'start' | 'end'} `;
+AnchoredProps [InterfaceDeclaration] (from packages/framework/svelte/src/anchored/props.ts): export interface AnchoredProps{ anchor: (Omit<AnchorTarget, 'bounds'> &{ bounds?: AnchoredRect} ) | null; placement?: AnchoredPlacement; gap?: number; pinned?: boolean; children?: Snippet; }
+AnchoredSide [TypeAliasDeclaration] (from packages/framework/web/src/anchored-position.ts): export type AnchoredSide = 'top' | 'right' | 'bottom' | 'left';
+PageViewEnv [InterfaceDeclaration] (from packages/framework/web/src/anchored-position.ts): export interface PageViewEnv{ scale: number; rotation: 0 | 90 | 180 | 270; zoom: number; }
+ProjectorBinding [InterfaceDeclaration] (from packages/framework/svelte/src/anchored/context.ts): export interface ProjectorBinding{ projector: ViewProjector; revision: unknown; subscribe?: (callback: () => void) => () => void; }
+ShownPages [TypeAliasDeclaration] (from packages/framework/svelte/src/anchored/context.ts): export type ShownPages = ReadonlySet<number>;
+ViewProjector [InterfaceDeclaration] (from packages/framework/web/src/anchored-position.ts): export interface ViewProjector{ space: 'overlay' | 'client'; toScreen(page: PageRef, rect: AnchoredRect): AnchoredRect | null; toScreenPoint(page: PageRef, at: AnchoredPoint): AnchoredPoint | null; viewEnv(page: PageRef): PageViewEnv | null; view(): AnchoredRect | null; }
+setProjectorBinding [FunctionDeclaration] (from packages/framework/svelte/src/anchored/context.ts): export function setProjectorBinding(binding: () => ProjectorBinding): void{ setContext(PROJECTOR, binding); }
+setShownPages [FunctionDeclaration] (from packages/framework/svelte/src/anchored/context.ts): export function setShownPages(shown: () => ShownPages): void{ setContext(SHOWN_PAGES, shown); }
+useOptionalProjectorBinding [FunctionDeclaration] (from packages/framework/svelte/src/anchored/context.ts): export function useOptionalProjectorBinding(): (() => ProjectorBinding) | null{ return hasContext(PROJECTOR) ? getContext<() => ProjectorBinding>(PROJECTOR) : null; }
+useProjectorBinding [FunctionDeclaration] (from packages/framework/svelte/src/anchored/context.ts): export function useProjectorBinding(): () => ProjectorBinding{ const binding = useOptionalProjectorBinding(); if (!binding){ throw new Error( '[embedpdf] No ViewProjector in scope: put anchored UI in a <Stage> (its overlay snippet) or a <PageView>.', ); } return binding; }
+useShownPages [FunctionDeclaration] (from packages/framework/svelte/src/anchored/context.ts): export function useShownPages(): (() => ShownPages) | null{ return hasContext(SHOWN_PAGES) ? getContext<() => ShownPages>(SHOWN_PAGES) : null; }

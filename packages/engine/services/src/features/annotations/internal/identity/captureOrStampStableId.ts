@@ -9,7 +9,7 @@ import { writeAnnotationNm } from '../write/writeAnnotationBase';
  * Read an annotation's stable id, opportunistically stamping a fresh
  * engine-generated UUID v4 as `/NM` if it is currently weak (no object
  * number, no `/NM`). Monotonic `/NM` rule: an already-durable annotation
- * is NEVER touched. Caller owns the lifecycle of `annotPtr`.
+ * is never touched. Caller owns the lifecycle of `annotPtr`.
  *
  * Shared by the create/update/move mutator paths and the `/IRT`
  * relationship writer (which strengthens a weak parent before linking to
@@ -21,10 +21,10 @@ export function captureOrStampStableId(
 ): AnnotationStableId {
   const { fn, mem } = runtime;
   const objNum = fn.EPDFAnnot_GetObjectNumber(annotPtr);
-  if (objNum > 0) return { kind: 'objectNumber', value: objNum };
+  if (objNum > 0) return { kind: 'objectNumber', objectNumber: objNum };
   const nm = readAnnotString(fn, mem, annotPtr, 'NM');
-  if (nm !== null && nm.length > 0) return { kind: 'nm', value: nm };
+  if (nm !== null && nm.length > 0) return { kind: 'nm', nm };
   const minted = generateUuid();
   writeAnnotationNm(fn, mem, annotPtr, minted);
-  return { kind: 'nm', value: minted };
+  return { kind: 'nm', nm: minted };
 }

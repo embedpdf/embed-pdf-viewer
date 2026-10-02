@@ -1,51 +1,51 @@
-import type { Action, CoreState, GlobalState, Unsubscribe } from './types';
+import { createEventHook, type EventHook } from './event-hook';
+import type { CoreState, GlobalState, Unsubscribe } from './types';
+
+/** One committed change of a slice: the value before and after. */
+export interface SliceChange<S> {
+  readonly next: S;
+  readonly previous: S;
+}
 
 /**
  * A plugin instance's authority over its state slice. Unique per instance:
- * closing and reopening the same document id yields a NEW lease, and the old
- * one is revoked synchronously at the start of close — so a callback retained
+ * closing and reopening the same document id yields a new lease, and the old
+ * one is revoked synchronously at the start of close, so a callback retained
  * by the old instance can never read or write the new instance's state.
- * `commit` returns false (and drops the action) once revoked.
+ * Writes return false (and are dropped) once the lease is revoked.
  */
-export interface SliceLease<S = unknown, A extends Action = Action> {
+export interface SliceLease<S = unknown> {
   readonly key: string;
   readonly instanceId: string;
   readonly live: boolean;
   read(): S;
-  commit(action: A): boolean;
+  /** Replace the slice's value. Writing the current value is a no-op that returns true. */
+  write(next: S): boolean;
+  /** Fires after every committed change of this slice, once the store's subscribers ran. */
+  readonly onChange: EventHook<SliceChange<S>>;
   revoke(): void;
 }
 
 /**
  * The store: one state tree ({ core, plugins }), keyed plugin slices held by
- * leases, and two channels — `subscribe` (state changed, for reactivity/`watch`)
- * and `subscribeAction` (an action was dispatched, for `onAction`). Slice keys
- * are opaque strings; the kernel uses `pluginId` for workspace plugins and
- * `pluginId::docId` for document-scoped ones.
+ * leases, and one change stream (`subscribe`) that adapters and `watch` read
+ * through. Slice keys are opaque strings; the kernel uses `pluginId` for
+ * workspace plugins and `pluginId::docId` for document-scoped ones.
  *
- * Change notification is non-re-entrant: if a listener dispatches, we finish the
- * current pass and run another — keeping listener order deterministic.
+ * Change notification is non-re-entrant: a change made by a listener finishes
+ * the current pass and runs another, keeping listener order deterministic.
  */
 export interface Store {
   /** Acquire the lease for a slice. Replaces any earlier lease under the same key (revoking it). */
-  lease<S, A extends Action>(
-    key: string,
-    reducer: (s: S, a: A) => S,
-    initial: S,
-    instanceId?: string,
-  ): SliceLease<S, A>;
-  /** @deprecated use `lease()`; kept for the transition. */
-  registerSlice(key: string, reducer: (s: unknown, a: Action) => unknown, initial: unknown): void;
-  /** @deprecated revoke the lease instead; kept for the transition. */
-  removeSlice(key: string): void;
-  getSlice(key: string): unknown;
+  lease<S>(key: string, initial: S, instanceId?: string): SliceLease<S>;
   getCore(): CoreState;
   getState(): GlobalState;
-  dispatchTo(key: string, action: Action): void;
-  setCore(patch: Partial<CoreState>, action: Action): void;
+  /** The kernel's own registry writes. */
+  setCore(patch: Partial<CoreState>): void;
+  /** Wake every subscriber without a state change: a resource read through a capability changed. */
+  notify(): void;
   subscribe(listener: () => void): Unsubscribe;
-  subscribeAction(listener: (action: Action) => void): Unsubscribe;
-  /** Kernel-destroy teardown: reset core, drop every slice/reducer/listener.
+  /** Kernel-destroy teardown: reset core, drop every slice and listener.
    *  Reads stay legal afterwards (empty state); writes become no-ops. */
   destroy(): void;
 }
@@ -54,14 +54,13 @@ export function createStore(report: (error: unknown) => void = console.error): S
   let core: CoreState = { documents: {}, pending: {}, order: [], activeId: null };
   /** Live slice states, as adapters read them (`getState().plugins`). */
   const states: Record<string, unknown> = {};
-  const leases = new Map<string, SliceLease<unknown, Action>>();
+  const leases = new Map<string, SliceLease<unknown>>();
   const changeListeners = new Set<() => void>();
-  const actionListeners = new Set<(a: Action) => void>();
   let leaseCounter = 0;
 
-  // Per-listener isolation: one throwing subscriber (a plugin effect, a React
-  // read) must never halt the pass for its siblings, and must never unwind a
-  // kernel lifecycle transition out of setCore/dispatchTo mid-update.
+  // Per-listener isolation: one throwing subscriber (a plugin reaction, a
+  // React read) must never halt the pass for its siblings, and must never
+  // unwind a kernel lifecycle transition out of setCore mid-update.
   const guarded = (fn: () => void) => {
     try {
       fn();
@@ -87,83 +86,67 @@ export function createStore(report: (error: unknown) => void = console.error): S
       emitting = false;
     }
   };
-  const emitAction = (action: Action) =>
-    actionListeners.forEach((listener) => guarded(() => listener(action)));
 
-  function lease<S, A extends Action>(
+  function lease<S>(
     key: string,
-    reducer: (s: S, a: A) => S,
     initial: S,
     instanceId = `${key}#${++leaseCounter}`,
-  ): SliceLease<S, A> {
+  ): SliceLease<S> {
     leases.get(key)?.revoke();
     const cell = { live: true, state: initial };
+    const changed = createEventHook<SliceChange<S>>(report);
     states[key] = initial;
-    const handle: SliceLease<S, A> = {
+    const handle: SliceLease<S> = {
       key,
       instanceId,
       get live() {
         return cell.live;
       },
       read: () => cell.state,
-      commit(action) {
+      write(next) {
         if (!cell.live) return false;
-        const next = reducer(cell.state, action);
-        if (next !== cell.state) {
-          cell.state = next;
-          states[key] = next;
-          emitChange();
-        }
-        emitAction(action);
+        if (next === cell.state) return true;
+        const previous = cell.state;
+        cell.state = next;
+        states[key] = next;
+        emitChange();
+        changed.emit({ next, previous });
         return true;
       },
+      onChange: changed.on,
       revoke() {
         if (!cell.live) return;
         cell.live = false;
-        if (leases.get(key) === (handle as SliceLease<unknown, Action>)) {
+        changed.dispose();
+        if (leases.get(key) === (handle as SliceLease<unknown>)) {
           leases.delete(key);
           delete states[key];
           emitChange();
         }
       },
     };
-    leases.set(key, handle as SliceLease<unknown, Action>);
+    leases.set(key, handle as SliceLease<unknown>);
     return handle;
   }
 
   return {
     lease,
-    registerSlice(key, reducer, initial) {
-      lease(key, reducer, initial);
-    },
-    removeSlice(key) {
-      leases.get(key)?.revoke();
-    },
-    getSlice: (key) => leases.get(key)?.read(),
     getCore: () => core,
     getState: () => ({ core, plugins: states }),
-    dispatchTo(key, action) {
-      leases.get(key)?.commit(action);
-    },
-    setCore(patch, action) {
+    setCore(patch) {
       core = { ...core, ...patch };
       emitChange();
-      emitAction(action);
     },
+    notify: () => emitChange(),
     subscribe(listener) {
       changeListeners.add(listener);
       return () => void changeListeners.delete(listener);
-    },
-    subscribeAction(listener) {
-      actionListeners.add(listener);
-      return () => void actionListeners.delete(listener);
     },
     destroy() {
       core = { documents: {}, pending: {}, order: [], activeId: null };
       for (const held of [...leases.values()]) held.revoke();
       for (const key of Object.keys(states)) delete states[key];
       changeListeners.clear();
-      actionListeners.clear();
     },
   };
 }

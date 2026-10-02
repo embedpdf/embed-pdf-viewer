@@ -1,18 +1,31 @@
-import type { HighlightDraft } from './draft';
-import type { HighlightAnnotationDTO } from './dto';
-import type { HighlightPatch } from './patch';
-import { HighlightDTOSchema, HighlightDraftSchema, HighlightPatchSchema } from './schema';
+import type { CreateOf, ReadOf, UpdateOf } from '../../declaration';
+import type { Coordinates, PageCoordinates } from '../../../pageSpace/coordinates';
 import type { AnnotationKindModule } from '../../registry';
 import { PdfAnnotationSubtypeCode } from '../../subtype';
+import { HighlightDeclaration } from './declaration';
 
-export type { HighlightAnnotationDTO } from './dto';
-export type { HighlightDraft } from './draft';
-export type { HighlightPatch } from './patch';
-export { HighlightDTOSchema, HighlightDraftSchema, HighlightPatchSchema } from './schema';
+export { HighlightDeclaration } from './declaration';
+
+export type HighlightAnnotation<C extends Coordinates = PageCoordinates> = ReadOf<
+  typeof HighlightDeclaration,
+  C
+>;
+export type HighlightDraft<C extends Coordinates = PageCoordinates> = CreateOf<
+  typeof HighlightDeclaration,
+  C
+>;
+export type HighlightPatch<C extends Coordinates = PageCoordinates> = UpdateOf<
+  typeof HighlightDeclaration,
+  C
+>;
+
+export const HighlightDTOSchema = HighlightDeclaration.readSchema;
+export const HighlightDraftSchema = HighlightDeclaration.createSchema;
+export const HighlightPatchSchema = HighlightDeclaration.updateSchema;
 
 export const HighlightKind: AnnotationKindModule<
   'highlight',
-  HighlightAnnotationDTO,
+  HighlightAnnotation,
   HighlightDraft,
   HighlightPatch
 > = {
@@ -21,4 +34,5 @@ export const HighlightKind: AnnotationKindModule<
   dtoSchema: HighlightDTOSchema,
   draftSchema: HighlightDraftSchema,
   patchSchema: HighlightPatchSchema,
+  readBackWrites: HighlightDeclaration.readBackWrites,
 };

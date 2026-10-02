@@ -1,6 +1,6 @@
-/** The package token — created once here; `contract.ts` re-exports it and
+/** The package token, created once here; `contract.ts` re-exports it and
  *  `host-contract.ts` widens it to the host capability. Additional lenses
- *  mint their own token (see `stagePlugin`'s options). */
+ *  create their own token (see `StagePluginOptions`). */
 import { createCapabilityToken } from '@embedpdf/core';
 
 import type { StageCapability } from './contract';

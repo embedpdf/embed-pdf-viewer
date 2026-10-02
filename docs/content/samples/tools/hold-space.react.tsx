@@ -1,0 +1,96 @@
+import { useEffect, useRef } from 'react';
+import type { ReactNode } from 'react';
+import { Viewer, DocumentGate } from '@embedpdf/react/runtime';
+import type { OpenInput } from '@embedpdf/react/runtime';
+import { Stage, stagePlugin } from '@embedpdf/react/stage';
+import { RenderLayer, renderPlugin } from '@embedpdf/react/render';
+import {
+  interactionPlugin,
+  useInteraction,
+  useInteractionState,
+} from '@embedpdf/react/interaction';
+import { SelectionLayer, selectionPlugin } from '@embedpdf/react/selection';
+import { localEngine } from '@embedpdf/engine';
+
+import './hold-space.css';
+
+const engine = localEngine();
+const plugins = [stagePlugin(), renderPlugin(), interactionPlugin(), selectionPlugin()];
+
+// [!doc-source ebook]
+const ebook = async (): Promise<OpenInput> => {
+  const response = await fetch('https://snippet.embedpdf.com/ebook.pdf');
+  return { kind: 'bytes', id: 'ebook', bytes: new Uint8Array(await response.arrayBuffer()) };
+};
+// [!/doc-source]
+
+// While Space is held over the pages, the hand tool is active; on release, the tool from before.
+function HoldSpaceToPan({ children }: { children: ReactNode }) {
+  const interaction = useInteraction();
+  // Only over the pages, so Space still scrolls the rest of your page.
+  const viewer = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    let held = false;
+    const down = (event: KeyboardEvent) => {
+      if (event.code !== 'Space' || !viewer.current?.matches(':hover')) return;
+      event.preventDefault();
+      if (event.repeat || held) return;
+      held = true;
+      interaction.pushTool('pan');
+    };
+    const up = (event: KeyboardEvent) => {
+      if (event.code !== 'Space' || !held) return;
+      held = false;
+      interaction.popTool();
+    };
+    window.addEventListener('keydown', down);
+    window.addEventListener('keyup', up);
+    return () => {
+      window.removeEventListener('keydown', down);
+      window.removeEventListener('keyup', up);
+    };
+  }, [interaction]);
+
+  return (
+    <div ref={viewer} className="viewer">
+      {children}
+    </div>
+  );
+}
+
+function ActiveTool() {
+  const { activeToolId } = useInteractionState();
+  const panning = activeToolId === 'pan';
+
+  return (
+    <div className="toolbar">
+      <span className="badge" data-active={panning}>
+        {panning ? 'Hand' : 'Select'}
+      </span>
+      <span className="readout">
+        {panning ? 'Drag to scroll, then let go of Space' : 'Hold Space over the pages to scroll'}
+      </span>
+    </div>
+  );
+}
+
+export default function App() {
+  return (
+    <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: ebook }]}>
+      <DocumentGate fallback={<p className="loading">Loading…</p>}>
+        <ActiveTool />
+        <HoldSpaceToPan>
+          <Stage className="stage">
+            {() => (
+              <>
+                <RenderLayer />
+                <SelectionLayer />
+              </>
+            )}
+          </Stage>
+        </HoldSpaceToPan>
+      </DocumentGate>
+    </Viewer>
+  );
+}

@@ -7,8 +7,8 @@ import type {
   PdfPoint,
   PdfQuad,
   PdfRect,
-  PdfRectDifferences,
 } from '@embedpdf/engine-core/runtime';
+import { colorOf, normalizePdfQuad } from '@embedpdf/engine-core/runtime';
 import {
   NULL_PTR,
   type PdfFunctions,
@@ -16,6 +16,7 @@ import {
   type Ptr,
 } from '@embedpdf/engine-runtime';
 
+import { float32Decimal } from '../../../../runtime/memory/float32';
 import { withScratch, withScratchN } from '../../../../runtime/memory/scratch';
 import { readUtf8String, readUtf16String } from '../../../../runtime/memory/strings';
 import {
@@ -84,29 +85,36 @@ export function readAnnotColor(
 ): Color | null {
   return withScratchN(mem, [I32_BYTES, I32_BYTES, I32_BYTES], ([r, g, b]) => {
     if (!fn.EPDFAnnot_GetColor(annotPtr, type, r, g, b)) return null;
-    return {
-      r: readI32(mem, r) & 0xff,
-      g: readI32(mem, g) & 0xff,
-      b: readI32(mem, b) & 0xff,
-    };
+    return colorOf(readI32(mem, r) & 0xff, readI32(mem, g) & 0xff, readI32(mem, b) & 0xff);
+  });
+}
+
+/** A boolean entry of the annotation's dictionary; `null` when absent or not a boolean. */
+export function readAnnotBoolean(
+  fn: PdfFunctions,
+  mem: PdfRuntimeMemory,
+  annotPtr: Ptr,
+  key: string,
+): boolean | null {
+  return withScratch(mem, I32_BYTES, (buf) => {
+    if (!fn.EPDFAnnot_GetBooleanValue(annotPtr, key, buf)) return null;
+    return readI32(mem, buf) !== 0;
   });
 }
 
 /**
- * Read annotation opacity via the EmbedPDF `EPDFAnnot_GetOpacity`
- * extension. Returns a 0..1 value (the native alpha is 0..255). Returns
- * `null` when the annotation has no opacity entry. This is the path that
- * stays consistent across native `EPDFAnnot_GenerateAppearance`, unlike a
- * raw `/CA` number read.
+ * Read annotation opacity (`/CA` as stored, 0..1; 1 when absent) via the
+ * EmbedPDF `EPDFAnnot_GetOpacity` extension, as the decimal it was written
+ * as. `null` only when the annotation can't be read.
  */
 export function readAnnotOpacity(
   fn: PdfFunctions,
   mem: PdfRuntimeMemory,
   annotPtr: Ptr,
 ): number | null {
-  return withScratch(mem, I32_BYTES, (buf) => {
+  return withScratch(mem, F32_BYTES, (buf) => {
     if (!fn.EPDFAnnot_GetOpacity(annotPtr, buf)) return null;
-    return (readI32(mem, buf) & 0xff) / 255;
+    return float32Decimal(readF32(mem, buf));
   });
 }
 
@@ -168,17 +176,24 @@ export function readBorderEffect(
   });
 }
 
+/** `/RD`: how far `/Rect` reaches past the shape on each side. */
+export interface RectangleDifferences {
+  left: number;
+  bottom: number;
+  right: number;
+  top: number;
+}
+
 /**
- * Read the `/RD` rectangle differences. Returns `null` when the
- * annotation has no `/RD` entry. PDFium reports `/RD` in
- * `[left, bottom, right, top]` order; we surface the wire-stable
- * `{ left, top, right, bottom }` shape.
+ * Read the `/RD` rectangle differences, in the order PDFium reads them
+ * (`[left, bottom, right, top]`, as Acrobat writes them). Returns `null` when
+ * the annotation has no `/RD` entry.
  */
 export function readRectangleDifferences(
   fn: PdfFunctions,
   mem: PdfRuntimeMemory,
   annotPtr: Ptr,
-): PdfRectDifferences | null {
+): RectangleDifferences | null {
   return withScratchN(
     mem,
     [F32_BYTES, F32_BYTES, F32_BYTES, F32_BYTES],
@@ -197,7 +212,7 @@ export function readRectangleDifferences(
 /**
  * Read the `/Vertices` point list of a polygon/polyline annotation via
  * the two-call `FPDFAnnot_GetVertices` pattern (probe for the count with
- * a NULL buffer, then read into a `count * FS_POINTF` buffer). Returns an
+ * a null buffer, then read into a `count * FS_POINTF` buffer). Returns an
  * empty array when the annotation has no vertices.
  */
 export function readVertices(fn: PdfFunctions, mem: PdfRuntimeMemory, annotPtr: Ptr): PdfPoint[] {
@@ -218,7 +233,7 @@ export function readVertices(fn: PdfFunctions, mem: PdfRuntimeMemory, annotPtr: 
 /**
  * Read the `/InkList` of an ink annotation. `FPDFAnnot_GetInkListCount`
  * gives the number of strokes; each stroke is sized with a probe call to
- * `FPDFAnnot_GetInkListPath` (NULL buffer) and then read into a
+ * `FPDFAnnot_GetInkListPath` (null buffer) and then read into a
  * `count * FS_POINTF` buffer. Empty strokes are skipped; the result is an
  * array of non-empty point paths.
  */
@@ -304,11 +319,7 @@ export function readDefaultAppearance(
       return {
         fontCode: readI32(mem, font),
         fontSize: readF32(mem, size),
-        color: {
-          r: readI32(mem, r) & 0xff,
-          g: readI32(mem, g) & 0xff,
-          b: readI32(mem, b) & 0xff,
-        },
+        color: colorOf(readI32(mem, r) & 0xff, readI32(mem, g) & 0xff, readI32(mem, b) & 0xff),
       };
     },
   );
@@ -391,8 +402,8 @@ export function readCalloutLine(
 }
 
 /**
- * Read attachment points for a text-markup annotation.
- * Each `FS_QUADPOINTSF` is 8 floats = 32 bytes.
+ * Read an annotation's `/QuadPoints`, each entry's corners named by
+ * `normalizePdfQuad`. Each `FS_QUADPOINTSF` is 8 floats = 32 bytes.
  */
 export function readQuadPoints(fn: PdfFunctions, mem: PdfRuntimeMemory, annotPtr: Ptr): PdfQuad[] {
   const count = fn.FPDFAnnot_CountAttachmentPoints(annotPtr);
@@ -403,15 +414,15 @@ export function readQuadPoints(fn: PdfFunctions, mem: PdfRuntimeMemory, annotPtr
     for (let i = 0; i < count; i++) {
       if (!fn.FPDFAnnot_GetAttachmentPoints(annotPtr, i, buf)) continue;
       const f = (off: number) => readF32(mem, buf, off);
-      // Positional, in PDFium FS_QUADPOINTSF slot order (PDF 32000 12.5.6.10):
-      // { x1,y1, x2,y2, x3,y3, x4,y4 } -> p1 p2 p3 p4. We do NOT relabel these
-      // as named corners: PdfQuad asserts no corner semantics (see its docs).
-      out.push({
-        p1: { x: f(0), y: f(4) },
-        p2: { x: f(8), y: f(12) },
-        p3: { x: f(16), y: f(20) },
-        p4: { x: f(24), y: f(28) },
-      });
+      // FS_QUADPOINTSF holds { x1,y1, x2,y2, x3,y3, x4,y4 }, in the file's order.
+      out.push(
+        normalizePdfQuad([
+          { x: f(0), y: f(4) },
+          { x: f(8), y: f(12) },
+          { x: f(16), y: f(20) },
+          { x: f(24), y: f(28) },
+        ]),
+      );
     }
     return out;
   });

@@ -1,4 +1,5 @@
 import type {
+  PdfCoordinates,
   AnalyzeInput,
   ChangeAnalysis,
   DocumentFieldLock,
@@ -31,6 +32,7 @@ import { deriveProtection } from '@embedpdf/engine-core/runtime';
 import { NULL_PTR, type PdfRuntimeModule, type Ptr } from '@embedpdf/engine-runtime';
 
 import { SignatureReader } from './SignatureReader';
+import { withWidgetRects } from '../forms/internal/widgetRects';
 import type { DocumentSession } from '../../document-session/DocumentSession';
 import {
   CloseStack,
@@ -61,7 +63,7 @@ const KIND_BY_CODE: Record<number, ObjectChangeKind> = {
 };
 const DIFF_OLD = 0;
 const DIFF_NEW = 1;
-/** EPDF_DIFF_READ_OK / FAILED / ABSENT. */
+/** EPDF_DIFF_READ_OK / failed / absent. */
 const READ_BY_CODE: Record<number, ObjectReadStatus> = { 0: 'ok', 1: 'failed', 2: 'absent' };
 
 /** The objects an edge may be anchored at: the trailer, the structure of the revision, and every changed object. */
@@ -94,7 +96,7 @@ export class SignatureAnalyzer {
    * over the loaded bytes. Identical to the loaded-bytes snapshot when
    * nothing is unsaved.
    */
-  readWorkingCopySnapshot(): SignatureSnapshot {
+  readWorkingCopySnapshot(): SignatureSnapshot<PdfCoordinates> {
     const stack = new CloseStack();
     try {
       const copy = this.openWorkingCopy(stack);
@@ -104,7 +106,9 @@ export class SignatureAnalyzer {
       const target = copy.target;
       return withSignatureModel(this.runtime, target, (model) => {
         const chainValid = this.runtime.fn.EPDFSig_IsRevisionChainValid(model);
-        const signatures = readSignaturesFromModel(this.runtime, model);
+        const signatures = withWidgetRects(this.runtime, target, (rectOf) =>
+          readSignaturesFromModel(this.runtime, model, rectOf),
+        );
         const revisions = chainValid ? readRevisions(this.runtime, target, signatures) : [];
         return { chainValid, revisions, signatures, protection: deriveProtection(signatures) };
       });
@@ -156,7 +160,8 @@ export class SignatureAnalyzer {
             rule: 'revision-chain',
             verdict: 'incomplete' as const,
             objectNumber: 0,
-            detail: 'the cross-reference chain is broken or was rebuilt: no revision can be told from another',
+            detail:
+              'the cross-reference chain is broken or was rebuilt: no revision can be told from another',
           },
         ],
         method: 'net-state' as const,
@@ -219,7 +224,7 @@ export class SignatureAnalyzer {
 
       // The two revisions that decide the verdict: the sealed one and the
       // judged one, opened as their own prefix documents from the target's
-      // bytes (the judged one IS the target when it is the last revision).
+      // bytes (the judged one is the target when it is the last revision).
       // Nothing in between is opened for the net state.
       const pair = new CloseStack();
       let before: RevisionStructure;
@@ -301,7 +306,10 @@ export class SignatureAnalyzer {
   private openPrefix(target: Ptr, revisions: PdfRevision[], index: number, stack: CloseStack): Ptr {
     const prefix = this.runtime.fn.EPDFDoc_OpenRevision(target, BigInt(revisions[index].end));
     if (prefix === NULL_PTR) {
-      throw new EngineError(EngineErrorCode.MalformedPdf, `revision ${index} does not open as a document`);
+      throw new EngineError(
+        EngineErrorCode.MalformedPdf,
+        `revision ${index} does not open as a document`,
+      );
     }
     stack.push(() => this.runtime.fn.FPDF_CloseDocument(prefix));
     return prefix;
@@ -319,7 +327,11 @@ export class SignatureAnalyzer {
     since: number,
     until: number,
     sealedStructure: RevisionStructure,
-    restrictions: { level: ModificationLevel; locks: DocumentFieldLock[]; levelOverride?: ModificationLevel },
+    restrictions: {
+      level: ModificationLevel;
+      locks: DocumentFieldLock[];
+      levelOverride?: ModificationLevel;
+    },
   ): RevisionAnalysis[] {
     const { fn } = this.runtime;
     const steps: RevisionAnalysis[] = [];
@@ -327,7 +339,10 @@ export class SignatureAnalyzer {
     let olderStructure = sealedStructure;
     try {
       for (let r = since + 1; r <= until; r++) {
-        const newer = r === revisions.length - 1 ? target : this.openPrefix(target, revisions, r, new CloseStack());
+        const newer =
+          r === revisions.length - 1
+            ? target
+            : this.openPrefix(target, revisions, r, new CloseStack());
         try {
           const newerStructure = readStructure(this.runtime, newer);
           const { changes, health } = this.compare(older, newer, olderStructure, newerStructure);
@@ -362,7 +377,7 @@ export class SignatureAnalyzer {
    * the session's own document is the working copy. `working-copy`: a
    * layer session composes its immutable base with the cumulative delta
    * the pass emits (`EPDFDoc_OpenBaseOverlay`: no copy of the base, one
-   * cross-reference parse, the loaded delta's revision REPLACED, as an
+   * cross-reference parse, the loaded delta's revision replaced, as an
    * artifact is), or — when every edit brought the layer back to its base
    * — a fresh layer over that base; a plain session (unsigned by law 9, so
    * this is exploratory) materialises a standalone incremental save and
@@ -427,7 +442,7 @@ export class SignatureAnalyzer {
     return { target: opened.docPtr, source: 'working-copy' };
   }
 
-  /** Changed since load, nothing to write: the layer equals its base, and a fresh layer over it IS that document. */
+  /** Changed since load, nothing to write: the layer equals its base, and a fresh layer over it is that document. */
   private freshLayerOverBase(stack: CloseStack): { target: Ptr; source: 'working-copy' } {
     const { fn, mem } = this.runtime;
     const base = fn.EPDFLayer_GetBaseDocument(this.session.requireDocPtr());
@@ -604,7 +619,7 @@ export class SignatureAnalyzer {
     return withScratch(mem, 4, (truncPtr) => {
       mem.poke(truncPtr, 'i32', 0);
       const length = fn.EPDFObjectDiff_GetValue(diff, index, which, NULL_PTR, 0, truncPtr);
-      // A value past the fork's inspection cap reports length 0 WITH the flag set: read it first.
+      // A value past the fork's inspection cap reports length 0 with the flag set: read it first.
       const truncatedProbe = Number(mem.peek(truncPtr, 'i32')) !== 0;
       if (length <= 0) return { text: null, truncated: truncatedProbe };
       return withScratch(mem, length, (buf) => {

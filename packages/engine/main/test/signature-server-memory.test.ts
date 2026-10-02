@@ -87,7 +87,8 @@ afterAll(async () => {
   await rm(dir, { recursive: true, force: true });
 });
 
-const scratchFiles = async (tag: string) => (await readdir(dir)).filter((f) => f.includes(`.${tag}-`));
+const scratchFiles = async (tag: string) =>
+  (await readdir(dir)).filter((f) => f.includes(`.${tag}-`));
 const mib = (n: number) => `${(n / 1024 / 1024).toFixed(1)} MiB`;
 
 describe('server memory contract', () => {
@@ -96,13 +97,22 @@ describe('server memory contract', () => {
     // Four revisions, two signatures (corpus v3/85): the first signature's
     // window spans three later revisions. The net state needs the sealed and
     // the judged revision; a full replay walks two at a time.
-    const corpusPath = resolve(here, 'fixtures', 'signature-compat', 'v3', '85-locked-signed-change-restored.pdf');
-    const doc = await engine.open({ kind: 'layerFile', id: 'handles', basePath: corpusPath }, { scope: ['*'] });
+    const corpusPath = resolve(
+      here,
+      'fixtures',
+      'signature-compat',
+      'v3',
+      '85-locked-signed-change-restored.pdf',
+    );
+    const doc = await engine.open(
+      { kind: 'layerFile', id: 'handles', basePath: corpusPath },
+      { scope: ['*'] },
+    );
     try {
       for (const detail of ['summary', 'full'] as const) {
         prefixes.clear();
         maxLivePrefixes = 0;
-        const analysis = await doc.signatures!.analyze({ since: { signatureIndex: 0 }, detail });
+        const analysis = await doc.signatures.analyze({ since: { signatureIndex: 0 }, detail });
         expect(analysis.later.revisionCount).toBe(3);
         expect(analysis.steps).toHaveLength(detail === 'full' ? 3 : 0);
         expect(maxLivePrefixes).toBeLessThanOrEqual(2);
@@ -117,31 +127,36 @@ describe('server memory contract', () => {
     if (!engine) return;
     const doc = await engine.open({ kind: 'layerFile', id: 'memory', basePath }, { scope: ['*'] });
     try {
-      // A 16 MiB embedded file: the edit IS the payload. Random bytes, so no
+      // A 16 MiB embedded file: the edit is the payload. Random bytes, so no
       // filter shrinks it.
       const payload = new Uint8Array(PAYLOAD);
       for (let i = 0; i < payload.length; i += 4096) payload[i] = (i * 7919) & 0xff;
-      for (let i = 1; i < payload.length; i++) payload[i] = (payload[i - 1]! * 1103515245 + 12345 + i) & 0xff;
-      await doc.attachments.create!({ data: payload, name: 'blob.bin', mimeType: 'application/octet-stream' });
+      for (let i = 1; i < payload.length; i++)
+        payload[i] = (payload[i - 1]! * 1103515245 + 12345 + i) & 0xff;
+      await doc.attachments!.create!({
+        data: payload,
+        name: 'blob.bin',
+        mimeType: 'application/octet-stream',
+      });
 
       // Preparing a signature: the candidate's layer is a scratch file beside
       // the base while the candidate is open, and gone when prepare returns.
       ownedBufferSaves = 0;
       const rssBefore = process.memoryUsage().rss;
-      const prepared = await doc.signatures!.prepare({ field: { kind: 'fqn', name: 'sig' } });
+      const prepared = await doc.signatures.prepare({ field: { kind: 'fqn', name: 'sig' } });
       const rssAfterPrepare = process.memoryUsage().rss;
       expect(ownedBufferSaves).toBe(0);
       expect(await scratchFiles('signing')).toEqual(
         expect.arrayContaining([expect.stringContaining(`.signing-${prepared.signingId}.pdf`)]),
       );
       expect((await scratchFiles('signing')).filter((f) => f.endsWith('.layer'))).toEqual([]);
-      await doc.signatures!.abort(prepared.signingId);
+      await doc.signatures.cancel(prepared.signingId);
       expect(await scratchFiles('signing')).toEqual([]);
 
       // Judging the working copy: the delta goes to a scratch file and is
       // composed over the base in place; nothing is left behind.
       ownedBufferSaves = 0;
-      const analysis = await doc.signatures!.analyze({
+      const analysis = await doc.signatures.analyze({
         since: { revisionIndex: 0 },
         until: 'working-copy',
       });

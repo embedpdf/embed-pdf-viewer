@@ -214,10 +214,10 @@ async function unwrapStandardKeyVaultRsa(
 /**
  * Build the key identifier URL from validated config parts.
  *
- * COMPAT: the returned string is stored inside every wrapped-key envelope
+ * Compat: the returned string is stored inside every wrapped-key envelope
  * (`wrapped.keyId`) and strictly compared on decrypt — changing how it is
  * computed for an already-valid config would make existing envelopes
- * undecryptable. So the URL API is used for VALIDATION ONLY (https,
+ * undecryptable. So the URL API is used for validation only (https,
  * origin-only, sane key name/version); the root itself stays the operator's
  * exact string minus trailing slashes, byte-identical to what this function
  * always produced. Malformed configs now fail at construction with a clear

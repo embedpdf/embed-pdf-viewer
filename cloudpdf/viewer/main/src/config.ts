@@ -1,9 +1,9 @@
 /**
- * `@cloudpdf/viewer/config` — the CLOUD vocabulary, in one place.
+ * `@cloudpdf/viewer/config` — the cloud vocabulary, in one place.
  *
  * Every cloud door (the CDN snippet here, and each `@cloudpdf/viewer-<framework>`
  * wrapper) faces the same job: turn CloudPDF connection options plus a document
- * reference into what the open-source viewer's ENGINE-AGNOSTIC door already
+ * reference into what the open-source viewer's engine-agnostic door already
  * takes — an engine factory and a `documents` list — while passing every other
  * option through untouched. That mapping lives here, so the brand vocabulary
  * has exactly one definition and each door stays a genuine shim.
@@ -69,7 +69,7 @@ export interface CloudSource extends CloudEngineOptions {
  * <PDFViewer {...resolveCloudConfig(props)} />        // react
  * ```
  *
- * The engine comes back as a THUNK, which is what gives the viewer ownership of
+ * The engine comes back as a thunk, which is what gives the viewer ownership of
  * its lifetime: created on mount, destroyed on unmount.
  *
  * Document sources need no lowering here: `{ kind: 'share' }` is part of the
@@ -77,7 +77,7 @@ export interface CloudSource extends CloudEngineOptions {
  * (exchange, renewal, revocation-at-renewal). This module only expands the
  * one-document shorthands.
  *
- * The return type is deliberately INFERRED. The destructuring below is the only
+ * The return type is deliberately inferred. The destructuring below is the only
  * statement of what this module consumes, so what passes through in `rest` and
  * what the type says passes through are the same fact and cannot drift. Writing
  * the type by hand needs a second list of the same keys, and a second list is
@@ -87,7 +87,6 @@ export function resolveCloudConfig<T extends CloudSource>(options: T) {
   const {
     baseUrl,
     token,
-    sessionId,
     fetch: fetchFn,
     docToken,
     docId,
@@ -97,7 +96,7 @@ export function resolveCloudConfig<T extends CloudSource>(options: T) {
     ...rest
   } = options;
 
-  const engine: EngineFactory = () => cloudEngine({ baseUrl, token, sessionId, fetch: fetchFn });
+  const engine: EngineFactory = () => cloudEngine({ baseUrl, token, fetch: fetchFn });
 
   const initialDocuments: InitialDocument[] = documents ?? [
     ...(docToken !== undefined ? [{ source: { kind: 'token' as const, token: docToken } }] : []),

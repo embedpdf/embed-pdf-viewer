@@ -7,7 +7,7 @@ import { hostEnvWhitelist } from '../src/runtime/host-protocol';
 /**
  * The real thing: the actual engine-host-entry forked (via tsx) hosting
  * the actual WorkerThreadPool with the crashing stub worker. The
- * `{kind:'die'}` job kills a worker thread INSIDE the host → the pool's
+ * `{kind:'die'}` job kills a worker thread inside the host → the pool's
  * fail-fast exits the host (70) → the client rejects in-flight, journals
  * the suspects, respawns, and the next call works. One test file, the
  * whole supervision story.
@@ -62,7 +62,7 @@ describe('engine host integration (real fork)', () => {
     expect(pidBefore).toBeGreaterThan(0);
     expect(client.generation()).toBe(1);
 
-    // A working dispatch through the REAL host + pool + worker thread.
+    // A working dispatch through the real host + pool + worker thread.
     await expect(client.runAdHoc('sha-ok', rawBuild({ kind: 'anything' }))).resolves.toBeNull();
 
     // Kill a worker thread inside the host. The pool's fail-fast exits
@@ -106,8 +106,8 @@ describe('engine host integration (real fork)', () => {
     const closed = await client.close('doc-int-1');
     expect(closed).toBeTruthy();
 
-    // Graceful destroy: the REAL host answers the shutdown control.
-    // protocol v3: the real fork emits memory heartbeats.
+    // Graceful destroy: the real host answers the shutdown control.
+    // The real fork emits memory heartbeats.
     await until(() => client.memory() !== null, 5_000);
     expect(client.memory()!.rssBytes).toBeGreaterThan(1_000_000);
     await client.destroy();

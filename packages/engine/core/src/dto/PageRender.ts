@@ -1,6 +1,9 @@
 import { EngineError } from '../errors/EngineError';
 import { EngineErrorCode } from '../errors/EngineErrorCode';
-import type { PdfRect, PdfRotation } from '../geometry/primitives';
+import type { PageRenderTransform } from '../geometry/pageTransform';
+import type { PdfRotation } from '../geometry/primitives';
+import type { Coordinates, PageCoordinates } from '../pageSpace/coordinates';
+import { AbortablePromise } from '../promise/AbortablePromise';
 
 export type PageRenderEncodedFormat = 'png' | 'webp' | 'bmp';
 
@@ -17,7 +20,7 @@ export type PageRenderBackground = 'white' | 'transparent';
 export type PageRenderViewport =
   | {
       /**
-       * Render one PDF user-space unit as `scale` device pixels. Callers
+       * Render one point as `scale` device pixels. Callers
        * that care about devicePixelRatio should fold it into this value.
        */
       kind: 'scale';
@@ -32,30 +35,27 @@ export type PageRenderViewport =
       width: number;
     };
 
-export type PageRenderTarget =
+export type PageRenderTarget<C extends Coordinates = PageCoordinates> =
   | { kind: 'page' }
   | {
       kind: 'rect';
-      /**
-       * PDF user-space rectangle. Same convention as annotation rects:
-       * top > bottom, origin at the PDF page's bottom-left.
-       */
-      rect: PdfRect;
+      /** The area to render, in page space: from the page's top-left, y down. */
+      rect: C['box'];
     };
 
-export interface PageRenderOptions {
-  target?: PageRenderTarget;
+export interface PageRenderOptions<C extends Coordinates = PageCoordinates> {
+  target?: PageRenderTarget<C>;
   viewport?: PageRenderViewport;
   rotation?: PdfRotation;
   background?: PageRenderBackground;
   includeAnnotations?: boolean;
   /**
    * Output-pixel budget: the renderer rejects (InvalidArg) instead of
-   * allocating when `outputWidth × outputHeight` exceeds it. A WIDTH
+   * allocating when `outputWidth × outputHeight` exceeds it. A width
    * lattice bounds width but not height — a 1×14,400pt page still
    * explodes vertically — so the guard lives where the allocation
-   * happens (the decode-bomb-guard pattern). SERVER requests carry it
-   * from the deployment's render policy; LOCAL engines inject it only
+   * happens (the decode-bomb-guard pattern). Server requests carry it
+   * from the deployment's render policy; local engines inject it only
    * when `localEngine({ renderPolicy })` configured a budget — the
    * default local policy stays continuous and unbudgeted (exactness is
    * the local product promise).
@@ -63,9 +63,23 @@ export interface PageRenderOptions {
   maxOutputPixels?: number;
 }
 
-export interface PageImageOptions extends PageRenderOptions {
+export interface PageImageOptions<
+  C extends Coordinates = PageCoordinates,
+> extends PageRenderOptions<C> {
   format?: PageRenderEncodedFormat;
+  /**
+   * WebP quality from 0 (smallest) to 1 (best), the same scale as
+   * `canvas.toBlob`. PNG and BMP are lossless and ignore it.
+   */
   quality?: number;
+}
+
+/** `InvalidArg` unless `quality` is absent or between 0 and 1. */
+export function checkImageQuality(quality: number | undefined): void {
+  if (quality === undefined || (quality >= 0 && quality <= 1)) return;
+  throw new EngineError(EngineErrorCode.InvalidArg, 'quality must be between 0 and 1', {
+    details: { field: 'quality' },
+  });
 }
 
 export interface PageRenderQuery {
@@ -89,8 +103,10 @@ export interface PageRaster {
 }
 
 export interface PageImageResult {
-  width?: number;
-  height?: number;
+  /** Image width in pixels. */
+  width: number;
+  /** Image height in pixels. */
+  height: number;
   format: PageRenderEncodedFormat;
   contentType: string;
   source: PageImageSource;
@@ -104,7 +120,27 @@ export interface PageImageObjectUrl {
 }
 
 export interface PageImageHandle extends PageImageResult {
-  objectUrl(signal?: AbortSignal): Promise<PageImageObjectUrl>;
+  /**
+   * A `blob:` URL for the image, and `revoke()` to free it. Cancel with
+   * `.abort()`: a URL made after the cancel is revoked, never leaked.
+   */
+  objectUrl(): AbortablePromise<PageImageObjectUrl>;
+  /**
+   * The encoded image, typed `contentType`. The same call on both engines:
+   * the cloud engine fetches it with the document's token. Cancel with
+   * `.abort()`.
+   */
+  blob(): AbortablePromise<Blob>;
+}
+
+/** What `render.image()` gives: the image, and how its pixels map to page space. */
+export interface PageRenderImage extends PageImageHandle {
+  transform: PageRenderTransform;
+}
+
+/** What `render.raw()` gives: the pixels, and how they map to page space. */
+export interface PageRenderRaster extends PageRaster {
+  transform: PageRenderTransform;
 }
 
 export interface PageImageBlobSource {
@@ -117,17 +153,37 @@ export function createPageImageHandle(
 ): PageImageHandle {
   return {
     ...result,
-    async objectUrl(signal?: AbortSignal) {
-      if (typeof Blob === 'undefined' || typeof URL === 'undefined' || !URL.createObjectURL) {
-        throw new EngineError(
-          EngineErrorCode.RuntimeUnavailable,
-          'Object URLs are not available in this environment',
-        );
-      }
+    blob() {
+      return AbortablePromise.run(async (signal) => {
+        if (typeof Blob === 'undefined') {
+          throw new EngineError(
+            EngineErrorCode.RuntimeUnavailable,
+            'Blob is not available in this environment',
+          );
+        }
+        const blob = await blobSource.blob(signal);
+        if (signal.aborted) throw signal.reason;
+        return blob;
+      });
+    },
+    objectUrl() {
+      return AbortablePromise.run(async (signal) => {
+        if (typeof Blob === 'undefined' || typeof URL === 'undefined' || !URL.createObjectURL) {
+          throw new EngineError(
+            EngineErrorCode.RuntimeUnavailable,
+            'Object URLs are not available in this environment',
+          );
+        }
 
-      const blob = await blobSource.blob(signal);
-      const url = URL.createObjectURL(blob);
-      return { url, revoke: () => URL.revokeObjectURL(url) };
+        const blob = await blobSource.blob(signal);
+        const url = URL.createObjectURL(blob);
+        // Cancelled while the blob arrived: nobody will revoke it but us.
+        if (signal.aborted) {
+          URL.revokeObjectURL(url);
+          throw signal.reason;
+        }
+        return { url, revoke: () => URL.revokeObjectURL(url) };
+      });
     },
   };
 }

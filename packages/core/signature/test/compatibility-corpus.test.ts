@@ -2,7 +2,7 @@
  * Immutable synthetic PDFs, authored independently of EmbedPDF's writer.
  * Cryptographic/structural assertions run immediately. Modification-policy
  * expectations are promoted separately after an Acrobat observation is reviewed.
- * A current engine answer is never used to invent an Acrobat expectation.
+ * An Acrobat expectation is never invented from a current engine answer.
  */
 import { createHash } from 'node:crypto';
 import { readFile, writeFile } from 'node:fs/promises';
@@ -41,7 +41,7 @@ interface PolicyExpectation {
   id: string;
   sha256: string;
   observationRunId: string;
-  /** The engine policy the review was made against; a later policy must still honour it. */
+  /** The engine policy the Acrobat observation was reviewed against; a later policy must still honour it. */
   policyVersion?: number;
   /**
    * How the expected verdict relates to what Acrobat displayed. A stricter
@@ -49,7 +49,10 @@ interface PolicyExpectation {
    * accept the case, so a later Acrobat build cannot silently turn a
    * difference into an agreement.
    */
-  relationship?: 'matches-observed-behavior' | 'intentional-stricter-policy' | 'engine-specific-definition';
+  relationship?:
+    | 'matches-observed-behavior'
+    | 'intentional-stricter-policy'
+    | 'engine-specific-definition';
   rationale: string;
   modifications: ModificationsVerdict[];
 }
@@ -88,10 +91,10 @@ for (const file of [
   'engine-baseline-role-probes-v3.json',
 ]) {
   const baseline: EngineBaseline = JSON.parse(await readFile(resolve(corpus, file), 'utf8'));
-  for (const c of baseline.cases) {
+  for (const baselineCase of baseline.cases) {
     baselines.set(
-      c.id,
-      c.signatures.map((s) => s.modifications.verdict),
+      baselineCase.id,
+      baselineCase.signatures.map((signature) => signature.modifications.verdict),
     );
   }
 }
@@ -129,7 +132,11 @@ afterAll(async () => {
     await writeFile(
       process.env.EPDF_SIGNATURE_CORPUS_REPORT,
       JSON.stringify(
-        { corpusVersions: manifests.map((m) => m.corpusVersion), runtime, cases: report },
+        {
+          corpusVersions: manifests.map((manifest) => manifest.corpusVersion),
+          runtime,
+          cases: report,
+        },
         null,
         2,
       ) + '\n',
@@ -139,15 +146,19 @@ afterAll(async () => {
 
 describe('synthetic signature compatibility corpus', () => {
   test('every promoted policy expectation has recorded evidence for the exact PDF', () => {
-    expect(new Set(fixtures.map((c) => c.id)).size).toBe(fixtures.length);
-    expect(new Set(policy.entries.map((e) => e.id)).size).toBe(policy.entries.length);
+    expect(new Set(fixtures.map((fixture) => fixture.id)).size).toBe(fixtures.length);
+    expect(new Set(policy.entries.map((entry) => entry.id)).size).toBe(policy.entries.length);
     for (const entry of policy.entries) {
-      const fixture = fixtures.find((c) => c.id === entry.id);
+      const fixture = fixtures.find((candidate) => candidate.id === entry.id);
       expect(fixture, entry.id).toBeDefined();
       expect(entry.sha256).toBe(fixture!.facts.sha256);
       expect(entry.rationale.trim().length).toBeGreaterThan(0);
-      const run = observations.runs.find((r) => r.id === entry.observationRunId);
-      const observed = run?.cases.find((c) => c.id === entry.id && c.sha256 === entry.sha256);
+      const run = observations.runs.find(
+        (observationRun) => observationRun.id === entry.observationRunId,
+      );
+      const observed = run?.cases.find(
+        (observedCase) => observedCase.id === entry.id && observedCase.sha256 === entry.sha256,
+      );
       expect(observed?.status).toBe('observed');
       expect(observed?.signatures).toHaveLength(fixture!.facts.signatures.length);
       expect(entry.modifications).toHaveLength(fixture!.facts.signatures.length);
@@ -191,7 +202,7 @@ describe('synthetic signature compatibility corpus', () => {
       { scope: ['*'] },
     );
     try {
-      const snapshot = await doc.signatures!.list();
+      const snapshot = await doc.signatures.list();
       expect(snapshot.chainValid).toBe(true);
       expect(snapshot.revisions).toHaveLength(fixture.facts.revisionCount);
       const verdicts = await validateSignatures(doc, {
@@ -208,29 +219,29 @@ describe('synthetic signature compatibility corpus', () => {
         expect(verdict.cryptography).toBe('valid');
         expect(verdict.trust).toBe('trusted');
       }
-      const analysis = await doc.signatures!.analyze({ since: { signatureIndex: 0 } });
+      const analysis = await doc.signatures.analyze({ since: { signatureIndex: 0 } });
       report.push({
         id: fixture.id,
         sha256: fixture.facts.sha256,
-        signatures: verdicts.map((v) => ({
-          field: v.signature.fieldName,
-          integrity: v.integrity,
-          cryptography: v.cryptography,
-          trust: v.trust,
-          modifications: v.modifications,
-          summary: v.summary,
+        signatures: verdicts.map((verdict) => ({
+          field: verdict.signature.fieldName,
+          integrity: verdict.integrity,
+          cryptography: verdict.cryptography,
+          trust: verdict.trust,
+          modifications: verdict.modifications,
+          summary: verdict.summary,
         })),
         policyVersion: analysis.policyVersion,
-        steps: analysis.steps.map((s) => ({
-          older: s.older,
-          newer: s.newer,
-          level: s.levelInForce,
-          verdict: s.verdict,
-          findings: s.findings,
+        steps: analysis.steps.map((step) => ({
+          older: step.older,
+          newer: step.newer,
+          level: step.levelInForce,
+          verdict: step.verdict,
+          findings: step.findings,
         })),
       });
-      const expectedPolicy = policy.entries.find((e) => e.id === fixture.id);
-      const answered = verdicts.map((v) => v.modifications.verdict);
+      const expectedPolicy = policy.entries.find((entry) => entry.id === fixture.id);
+      const answered = verdicts.map((verdict) => verdict.modifications.verdict);
       if (expectedPolicy) {
         expect(answered).toEqual(expectedPolicy.modifications);
         if (expectedPolicy.policyVersion !== undefined) {

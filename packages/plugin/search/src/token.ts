@@ -6,4 +6,11 @@ import type { SearchCapability } from './contract';
 
 export const SearchToken = createCapabilityToken<SearchCapability>('search', {
   hint: "add searchPlugin() from '@embedpdf/plugin-search' to your plugins list",
+  // Without a document, an adapter's stand-in rejects these with `not-ready`, as the
+  // capability would; the type asks for every member that returns a promise.
+  promises: {
+    search: true,
+    refresh: true,
+    findAll: true,
+  },
 });

@@ -10,7 +10,7 @@ export interface DocPagesSetScale200Response {
 export namespace DocPagesSetScale200Response {
     export interface Page {
         kind: Page.Kind;
-        pageObjectNumber: number;
+        objectNumber: number;
     }
 
     export namespace Page {
@@ -21,59 +21,18 @@ export namespace DocPagesSetScale200Response {
     }
 
     export interface Meta {
-        affectedPages: Meta.AffectedPages.Item[];
+        affectedPages: CloudPDF.PageState[];
         cacheDelta: Meta.CacheDelta | null;
     }
 
     export namespace Meta {
-        export type AffectedPages = AffectedPages.Item[];
-
-        export namespace AffectedPages {
-            export interface Item {
-                page: Item.Page;
-                revision: Item.Revision;
-                weakAnnotationState: CloudPDF.DocPagesSetScale200ResponseMetaAffectedPagesItemWeakAnnotationState;
-            }
-
-            export namespace Item {
-                export interface Page {
-                    kind: Page.Kind;
-                    pageObjectNumber: number;
-                }
-
-                export namespace Page {
-                    export const Kind = {
-                        ObjectNumber: "objectNumber",
-                    } as const;
-                    export type Kind = (typeof Kind)[keyof typeof Kind];
-                }
-
-                export interface Revision {
-                    docSessionId: string;
-                    page: Revision.Page;
-                    generation: number;
-                }
-
-                export namespace Revision {
-                    export interface Page {
-                        kind: Page.Kind;
-                        pageObjectNumber: number;
-                    }
-
-                    export namespace Page {
-                        export const Kind = {
-                            ObjectNumber: "objectNumber",
-                        } as const;
-                        export type Kind = (typeof Kind)[keyof typeof Kind];
-                    }
-                }
-            }
-        }
-
         export interface CacheDelta {
             previousDocVersion: number;
             docVersion: number;
             annotationsVersion?: number | undefined;
+            layoutVersion?: number | undefined;
+            metadataVersion?: number | undefined;
+            attachmentsVersion?: number | undefined;
             layerVersion?: number | undefined;
             working?: boolean | undefined;
             pages: CacheDelta.Pages.Item[];
@@ -91,7 +50,7 @@ export namespace DocPagesSetScale200Response {
                 export namespace Item {
                     export interface Page {
                         kind: Page.Kind;
-                        pageObjectNumber: number;
+                        objectNumber: number;
                     }
 
                     export namespace Page {

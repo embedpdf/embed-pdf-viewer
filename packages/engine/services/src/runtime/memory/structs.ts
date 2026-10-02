@@ -12,6 +12,8 @@ export const I32_BYTES = 4;
 export const QUADPOINTSF_BYTES = 32;
 /** `FS_POINTF { float x, y }` → 8 bytes. */
 export const POINTF_BYTES = 8;
+/** `FS_MATRIX { float a, b, c, d, e, f }` → 24 bytes. */
+export const MATRIXF_BYTES = 24;
 
 /** Generated from `EPDF_CHAR_GEOMETRY`; pinned by native static_asserts. */
 export const EPDF_CHAR_GEOMETRY_LAYOUT = {
@@ -54,6 +56,36 @@ export function readRectF(mem: PdfRuntimeMemory, ptr: Ptr, byteOffset = 0): Rect
     top: readF32(mem, ptr, byteOffset + 4),
     right: readF32(mem, ptr, byteOffset + 8),
     bottom: readF32(mem, ptr, byteOffset + 12),
+  };
+}
+
+/** Encode `rect` as the `FS_RECTF` struct a native call reads from `ptr`. */
+export function writeRectF(mem: PdfRuntimeMemory, ptr: Ptr, rect: RectF): void {
+  mem.poke(ptr, 'f32', rect.left, 0);
+  mem.poke(ptr, 'f32', rect.top, 4);
+  mem.poke(ptr, 'f32', rect.right, 8);
+  mem.poke(ptr, 'f32', rect.bottom, 12);
+}
+
+/** An `FS_MATRIX`: `x' = a·x + c·y + e`, `y' = b·x + d·y + f`. */
+export interface MatrixF {
+  a: number;
+  b: number;
+  c: number;
+  d: number;
+  e: number;
+  f: number;
+}
+
+/** Decode an `FS_MATRIX` struct that a native call wrote into `ptr`. */
+export function readMatrixF(mem: PdfRuntimeMemory, ptr: Ptr): MatrixF {
+  return {
+    a: readF32(mem, ptr, 0),
+    b: readF32(mem, ptr, 4),
+    c: readF32(mem, ptr, 8),
+    d: readF32(mem, ptr, 12),
+    e: readF32(mem, ptr, 16),
+    f: readF32(mem, ptr, 20),
   };
 }
 

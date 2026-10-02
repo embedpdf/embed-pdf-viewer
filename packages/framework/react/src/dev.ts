@@ -1,5 +1,5 @@
 /**
- * Development-time guardrails. Every warning fires ONCE per process (keyed),
+ * Development-time guardrails. Every warning fires once per process (keyed),
  * says what is wrong and what to do instead, and compiles out of production
  * builds (`process.env.NODE_ENV`, the same gate `<Viewer>` uses).
  */

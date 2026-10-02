@@ -1,73 +1,83 @@
 import { Viewer, DocumentGate } from '@embedpdf/react/runtime';
 import type { OpenInput } from '@embedpdf/react/runtime';
-import { Stage, stagePlugin, useLayout, usePages } from '@embedpdf/react/stage';
+import { Stage, stagePlugin, useStage, useStageSettings } from '@embedpdf/react/stage';
 import type { FlowMode, LayoutKind, SpreadMode } from '@embedpdf/react/stage';
 import { RenderLayer, renderPlugin } from '@embedpdf/react/render';
 import { cloudEngine } from '@cloudpdf/engine';
 
-import { Demo, Toolbar, Button, Select, Spacer, StageFrame, stageFill } from './_shared/chrome';
+import './layouts.css';
 
 const engine = cloudEngine({ baseUrl: 'https://engine.cloudpdf.com' });
-const plugins = [stagePlugin(), renderPlugin()];
+// Facing pages from the start, like a book.
+const plugins = [stagePlugin({ spread: 'odd' }), renderPlugin()];
 
 const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
 function LayoutControls() {
-  const { flow, layout, spread, setFlow, setLayout, setSpread } = useLayout();
-  const { next, prev } = usePages();
+  const stage = useStage();
+  const { flow, layout, spread } = useStageSettings();
+
   return (
-    <Toolbar>
-      <Select<FlowMode>
-        label="Flow"
-        value={flow}
-        onChange={setFlow}
-        options={[
-          { value: 'continuous', label: 'continuous' },
-          { value: 'paged', label: 'paged' },
-        ]}
-      />
-      <Select<LayoutKind>
-        label="Layout"
-        value={layout}
-        onChange={setLayout}
-        options={[
-          { value: 'vertical', label: 'vertical' },
-          { value: 'horizontal', label: 'horizontal' },
-          { value: 'grid', label: 'grid' },
-        ]}
-      />
-      <Select<SpreadMode>
-        label="Spread"
-        value={spread}
-        onChange={setSpread}
-        options={[
-          { value: 'none', label: 'none' },
-          { value: 'odd', label: 'odd' },
-          { value: 'even', label: 'even' },
-        ]}
-      />
-      <Spacer />
-      <Button icon onClick={() => prev()} title="Previous">
-        ‹
-      </Button>
-      <Button icon onClick={() => next()} title="Next">
-        ›
-      </Button>
-    </Toolbar>
+    <div className="toolbar">
+      <label className="label">
+        Flow
+        <select
+          className="select"
+          value={flow}
+          onChange={(event) => stage.updateSettings({ flow: event.target.value as FlowMode })}
+        >
+          <option value="continuous">continuous</option>
+          <option value="paged">paged</option>
+        </select>
+      </label>
+      <label className="label">
+        Layout
+        <select
+          className="select"
+          value={layout}
+          onChange={(event) => stage.updateSettings({ layout: event.target.value as LayoutKind })}
+        >
+          <option value="vertical">vertical</option>
+          <option value="horizontal">horizontal</option>
+          <option value="grid">grid</option>
+        </select>
+      </label>
+      <label className="label">
+        Spread
+        <select
+          className="select"
+          value={spread}
+          onChange={(event) => stage.updateSettings({ spread: event.target.value as SpreadMode })}
+        >
+          <option value="none">none</option>
+          <option value="odd">odd</option>
+          <option value="even">even</option>
+        </select>
+      </label>
+      <div className="pager">
+        <button
+          type="button"
+          className="button"
+          aria-label="Previous"
+          onClick={() => stage.previousPage()}
+        >
+          ‹
+        </button>
+        <button type="button" className="button" aria-label="Next" onClick={() => stage.nextPage()}>
+          ›
+        </button>
+      </div>
+    </div>
   );
 }
 
 export default function App() {
   return (
     <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: ebook }]}>
-      <Demo>
-        <DocumentGate fallback={<p>Loading…</p>}>
-          <LayoutControls />
-          <StageFrame height={420}>
-            <Stage style={stageFill}>{() => <RenderLayer />}</Stage>
-          </StageFrame>
-        </DocumentGate>
-      </Demo>
+      <DocumentGate fallback={<p className="loading">Loading…</p>}>
+        <LayoutControls />
+        <Stage className="stage">{() => <RenderLayer />}</Stage>
+      </DocumentGate>
     </Viewer>
   );
 }

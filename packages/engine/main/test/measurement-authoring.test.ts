@@ -2,15 +2,12 @@
  * caption offsets through editing and a saved/reopened PDF. */
 import { readFile, writeFile } from 'node:fs/promises';
 import { describe, expect, test, vi } from 'vitest';
-import type { PluginContext } from '@embedpdf/core';
-import { measureFromKnownLength, toPageRef } from '@embedpdf/engine-core/runtime';
-import { annotationSelectionFrame } from '../../../core/annotation/src';
+import { drawnPointsOf, measureFromKnownLength, toPageRef } from '@embedpdf/engine-core/runtime';
+import { turnPivotOf } from '../../../core/annotation/src';
 import { createLocalEngine } from '../src/index';
-import { createAnnotationController } from '../../../plugin/annotation/src/controller';
-import { annotationReducer, initialAnnotationState } from '../../../plugin/annotation/src/model';
-import { fromDTO } from '../../../plugin/annotation/src/repository';
+import { fromDTO, shapeOf } from '../../../core/annotation/src/record';
 import { annotationKey } from '@embedpdf/engine-core/runtime';
-import type { AnnotationAction, AnnotationState } from '../../../plugin/annotation/src/model';
+import { annotationShell } from './helpers/annotation-shell';
 
 describe.each(['wasm', 'native'] as const)('distance authoring integration (%s)', (prefer) => {
   test('draw, edit, recalculate, save and reopen', async () => {
@@ -26,30 +23,19 @@ describe.each(['wasm', 'native'] as const)('distance authoring integration (%s)'
     try {
       const pages = (await doc.pages.list()).pages;
       const page = pages[0];
-      const pon = page.ref.pageObjectNumber;
-      let state = initialAnnotationState();
-      const ctx = {
-        doc,
-        engine,
-        document: () => ({ pages }),
-        getState: () => state,
-        dispatch: (a: AnnotationAction) => {
-          state = annotationReducer(state, a);
-        },
-        cleanup: (cb: () => void) => cleanups.push(cb),
-        tryGet: () => null,
-      } as unknown as PluginContext<AnnotationState, AnnotationAction>;
-      const annotation = createAnnotationController(ctx);
+      const pageObjectNumber = page.ref.objectNumber;
+      const { ctx, annotation } = await annotationShell(doc, pages);
+      cleanups.push(() => ctx.dispose());
       const scale = measureFromKnownLength(100, { value: 5, unit: 'm' });
-      await doc.page(toPageRef(pon)).measure!.setScale(scale);
+      await doc.page(toPageRef(pageObjectNumber)).measure!.setScale(scale);
       annotation.setPageViewports(
         page.ref,
-        await doc.page(toPageRef(pon)).measure!.viewports(),
+        (await doc.page(toPageRef(pageObjectNumber)).measure!.listViewports()).viewports,
         scale,
       );
       for (const tool of annotation.listResolvedTools()) {
         if (tool.defaults) {
-          annotation.setToolDefaults(tool.id, tool.defaults);
+          annotation.updateToolDefaults(tool.id, tool.defaults);
         }
       }
       annotation.createPointer('distance', 'down', page.ref, { x: 50, y: 100 });
@@ -58,8 +44,9 @@ describe.each(['wasm', 'native'] as const)('distance authoring integration (%s)'
       expect(annotation.listSelected()).toHaveLength(0);
       annotation.createPointer('distance', 'move', page.ref, { x: 250, y: 88 });
       annotation.createPointer('distance', 'down', page.ref, { x: 250, y: 88 });
-      await vi.waitFor(() => expect(annotation.listSelected()).toHaveLength(1));
-      const created = annotation.listSelected()[0].raw!;
+      // Written and confirmed: its ref is the engine's.
+      await vi.waitFor(() => expect(annotation.listSelected()[0]?.ref.kind).toBe('objectNumber'));
+      const created = annotation.listSelected()[0]!;
       const createdId = annotationKey(created.ref);
       const expectVector = () => {
         expect(
@@ -74,11 +61,11 @@ describe.each(['wasm', 'native'] as const)('distance authoring integration (%s)'
       expectVector();
       expect(created).toMatchObject({
         subtype: 'line',
-        intent: 'LineDimension',
-        contents: '10 m',
+        intent: 'line-dimension',
+        contents: '10.00 m',
         linePoints: {
-          start: { x: page.boxes.crop.left + 50, y: page.boxes.crop.top - 100 },
-          end: { x: page.boxes.crop.left + 250, y: page.boxes.crop.top - 100 },
+          start: { x: 50, y: 100 },
+          end: { x: 250, y: 100 },
         },
         leader: { length: 12 },
       });
@@ -87,61 +74,63 @@ describe.each(['wasm', 'native'] as const)('distance authoring integration (%s)'
       annotation.editPointer('move', page.ref, { x: 250, y: 64 }, false);
       annotation.editPointer('up', page.ref, { x: 250, y: 64 }, false);
       await vi.waitFor(() =>
-        expect(annotation.getRaw(created.ref)).toMatchObject({
-          contents: '10 m',
+        expect(annotation.get(created.ref)).toMatchObject({
+          contents: '10.00 m',
           linePoints: created.subtype === 'line' ? created.linePoints : undefined,
           leader: { length: 36 },
         }),
       );
       expectVector();
-      // Caption-only drag: +15 along, +25 perpendicular in PDF y-up axes.
+      // Caption-only drag: +15 along, +25 perpendicular, in the line's own axes (/CO).
       annotation.editPointer('down', page.ref, { x: 150, y: 64 }, false);
       annotation.editPointer('move', page.ref, { x: 165, y: 39 }, false);
       annotation.editPointer('up', page.ref, { x: 165, y: 39 }, false);
       await vi.waitFor(() =>
-        expect(annotation.getRaw(created.ref)).toMatchObject({
-          caption: { offset: { along: 15, perpendicular: 25 } },
+        expect(annotation.get(created.ref)).toMatchObject({
+          captionOffset: { along: 15, perpendicular: 25 },
         }),
       );
       expectVector();
       const newScale = measureFromKnownLength(100, { value: 8, unit: 'ft' });
-      await doc.page(toPageRef(pon)).measure!.setScale(newScale);
+      await doc.page(toPageRef(pageObjectNumber)).measure!.setScale(newScale);
       const report = await annotation.remeasurePage(page.ref, newScale);
       expect(report.failed).toEqual([]);
       expect(report.error).toBeUndefined();
-      expect(annotation.getRaw(created.ref)).toMatchObject({
-        contents: '16 ft',
-        caption: { offset: { along: 15, perpendicular: 25 } },
+      expect(annotation.get(created.ref)).toMatchObject({
+        contents: '16.00 ft',
+        captionOffset: { along: 15, perpendicular: 25 },
       });
       expectVector();
 
-      // Rotation uses the complete annotation frame and survives the native
-      // appearance echo without replacing that frame with the PDF /Rect.
-      const beforeRotation = annotation.getRaw(created.ref)!;
+      // A turn pivots about the middle of the line, as the engine turns it,
+      // and survives the native appearance echo.
+      const beforeRotation = annotation.get(created.ref)!;
       if (beforeRotation.subtype !== 'line') throw new Error('Expected distance annotation');
-      const frame = annotationSelectionFrame(fromDTO(beforeRotation, page.boxes.crop));
-      const start = {
-        x: beforeRotation.linePoints.start.x - page.boxes.crop.left,
-        y: page.boxes.crop.top - beforeRotation.linePoints.start.y,
-      };
+      const pivot = turnPivotOf(shapeOf(fromDTO(beforeRotation).annotation));
+      const start = beforeRotation.linePoints.start;
       const rotatedStart = {
-        x: page.boxes.crop.left + frame.center.x - (start.y - frame.center.y),
-        y: page.boxes.crop.top - (frame.center.y + start.x - frame.center.x),
+        x: pivot.x - (start.y - pivot.y),
+        y: pivot.y + (start.x - pivot.x),
       };
       await annotation.rotateSelectionBy(90);
       await vi.waitFor(() => {
-        const rotated = annotation.getRaw(created.ref)!;
+        const rotated = annotation.get(created.ref)!;
         if (rotated.subtype !== 'line') throw new Error('Expected distance annotation');
-        expect(rotated.linePoints.start.x).toBeCloseTo(rotatedStart.x, 3);
-        expect(rotated.linePoints.start.y).toBeCloseTo(rotatedStart.y, 3);
-        const actual = annotationSelectionFrame(fromDTO(rotated, page.boxes.crop));
-        expect(actual.center.x).toBeCloseTo(frame.center.x, 3);
-        expect(actual.center.y).toBeCloseTo(frame.center.y, 3);
+        // The points stay upright; the turn draws them.
+        expect(rotated.rotation).toBe(90);
+        expect(rotated.linePoints.start.x).toBeCloseTo(beforeRotation.linePoints.start.x, 3);
+        expect(rotated.linePoints.start.y).toBeCloseTo(beforeRotation.linePoints.start.y, 3);
+        const drawnStart = drawnPointsOf(rotated)![0]![0]!;
+        expect(drawnStart.x).toBeCloseTo(rotatedStart.x, 3);
+        expect(drawnStart.y).toBeCloseTo(rotatedStart.y, 3);
+        const actual = turnPivotOf(shapeOf(fromDTO(rotated).annotation));
+        expect(actual.x).toBeCloseTo(pivot.x, 3);
+        expect(actual.y).toBeCloseTo(pivot.y, 3);
       });
       expectVector();
       await annotation.resetSelectionRotation();
       await vi.waitFor(() => {
-        const reset = annotation.getRaw(created.ref)!;
+        const reset = annotation.get(created.ref)!;
         if (reset.subtype !== 'line') throw new Error('Expected distance annotation');
         expect(reset.linePoints.start.x).toBeCloseTo(beforeRotation.linePoints.start.x, 3);
         expect(reset.linePoints.start.y).toBeCloseTo(beforeRotation.linePoints.start.y, 3);
@@ -149,16 +138,16 @@ describe.each(['wasm', 'native'] as const)('distance authoring integration (%s)'
       expectVector();
       await annotation.rotateSelectionBy(90);
       await vi.waitFor(() => {
-        const rotated = annotation.getRaw(created.ref)!;
+        const rotated = annotation.get(created.ref)!;
         if (rotated.subtype !== 'line') throw new Error('Expected distance annotation');
-        expect(rotated.linePoints.start.x).toBeCloseTo(rotatedStart.x, 3);
+        expect(drawnPointsOf(rotated)![0]![0]!.x).toBeCloseTo(rotatedStart.x, 3);
       });
 
       const saved = await doc.download();
       if (process.env.EMBEDPDF_MEASUREMENT_OUTPUT) {
         await writeFile(`${process.env.EMBEDPDF_MEASUREMENT_OUTPUT}/${prefer}.pdf`, saved);
       }
-      const layerBytes = await doc.downloadLayer!();
+      const layerBytes = await doc.downloadLayer();
       const layered = await engine.open(
         {
           kind: 'layerBytes',
@@ -169,16 +158,19 @@ describe.each(['wasm', 'native'] as const)('distance authoring integration (%s)'
         { scope: ['*'] },
       );
       try {
-        const layeredAnnotations = (await layered.page(toPageRef(pon)).annotations.list())
-          .annotations;
+        const layeredAnnotations = (
+          await layered.page(toPageRef(pageObjectNumber)).annotations.list()
+        ).annotations;
         expect(layeredAnnotations.find((a) => a.nm === created.nm)).toMatchObject({
-          contents: '16 ft',
+          contents: '16.00 ft',
           leader: { length: 36 },
-          caption: { offset: { along: 15, perpendicular: 25 } },
+          captionOffset: { along: 15, perpendicular: 25 },
         });
-        expect((await layered.page(toPageRef(pon)).measure!.viewports()).some((v) => v.owned)).toBe(
-          true,
-        );
+        expect(
+          (await layered.page(toPageRef(pageObjectNumber)).measure!.listViewports()).viewports.some(
+            (v) => v.owned,
+          ),
+        ).toBe(true);
       } finally {
         await layered.close();
       }
@@ -187,23 +179,23 @@ describe.each(['wasm', 'native'] as const)('distance authoring integration (%s)'
         { scope: ['*'] },
       );
       try {
-        const reopenedPon = (await reopened.pages.list()).pages[0].ref.pageObjectNumber;
-        const list = await reopened.page(toPageRef(reopenedPon)).annotations.list();
+        const reopenedPageObjectNumber = (await reopened.pages.list()).pages[0].ref.objectNumber;
+        const list = await reopened.page(toPageRef(reopenedPageObjectNumber)).annotations.list();
         const restored = list.annotations.find((a) => a.nm === created.nm)!;
         expect(restored).toMatchObject({
-          intent: 'LineDimension',
-          contents: '16 ft',
+          intent: 'line-dimension',
+          contents: '16.00 ft',
           leader: { length: 36 },
-          caption: { offset: { along: 15, perpendicular: 25 } },
+          captionOffset: { along: 15, perpendicular: 25 },
         });
-        const restoredFrame = annotationSelectionFrame(fromDTO(restored, page.boxes.crop));
-        expect(restoredFrame.center.x).toBeCloseTo(frame.center.x, 3);
-        expect(restoredFrame.center.y).toBeCloseTo(frame.center.y, 3);
-        expect(restoredFrame.angle).toBe(90);
+        const restoredPivot = turnPivotOf(shapeOf(fromDTO(restored).annotation));
+        expect(restoredPivot.x).toBeCloseTo(pivot.x, 3);
+        expect(restoredPivot.y).toBeCloseTo(pivot.y, 3);
+        expect(restored.subtype === 'line' && restored.rotation).toBe(90);
         expect(
-          (await reopened.page(toPageRef(reopenedPon)).measure!.viewports()).some(
-            (v) => v.owned && v.measure?.subtype === 'RL',
-          ),
+          (
+            await reopened.page(toPageRef(reopenedPageObjectNumber)).measure!.listViewports()
+          ).viewports.some((v) => v.owned && v.measure?.subtype === 'rectilinear'),
         ).toBe(true);
       } finally {
         await reopened.close();

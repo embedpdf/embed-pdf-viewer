@@ -8,6 +8,8 @@ export type AuditMutationKind =
   | 'annot.update'
   | 'annot.delete'
   | 'annot.move'
+  /** A bundle's annotations, created as one change (`doc.annotations.import`). */
+  | 'annot.import'
   | 'pages.move'
   | 'pages.rotate'
   | 'pages.delete'
@@ -16,6 +18,7 @@ export type AuditMutationKind =
   | 'pages.flatten'
   | 'redaction.apply'
   | 'metadata.update'
+  | 'metadata.updateCustom'
   | 'attachment.create'
   | 'attachment.delete'
   | 'form.setValue'
@@ -25,12 +28,16 @@ export type AuditMutationKind =
   | 'form.createField'
   | 'form.updateField'
   | 'form.deleteField'
-  | 'form.attachWidget'
+  | 'form.addWidget'
   | 'form.detachWidget'
   | 'form.applyEffects'
   | 'form.setSignatureAppearance'
+  /** A signing was prepared on this layer: the layer is locked until it ends. */
+  | 'signature.prepare'
+  /** A prepared signing was cancelled. */
+  | 'signature.cancel'
   /** A signature published a new base version through this layer. */
-  | 'signature.completed';
+  | 'signature.complete';
 
 export interface AppendAuditLogInput {
   tenantId: string;
@@ -95,6 +102,20 @@ export class AuditLogRepo {
       .returning('id')
       .executeTakeFirstOrThrow();
     return Number(row.id);
+  }
+
+  /**
+   * The row a layer committed under `idempotencyKey`, if any: a retried
+   * request finds the change it already made (unique per layer).
+   */
+  async findByIdempotencyKey(layerId: string, idempotencyKey: string): Promise<AuditLogRow | null> {
+    const row = await this.db
+      .selectFrom('audit_log')
+      .selectAll()
+      .where('layer_id', '=', layerId)
+      .where('idempotency_key', '=', idempotencyKey)
+      .executeTakeFirst();
+    return row ? mapAuditRow(row) : null;
   }
 
   async findForDocTimeRange(input: {

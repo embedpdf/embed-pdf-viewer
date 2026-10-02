@@ -4,7 +4,9 @@ import {
   decodePdfBits,
   expandRawScope,
   permissionInfoWithAdvisory,
+  type AnnotationBundleLimits,
   type DocumentAccessInfo,
+  type DocumentProtection,
   type PdfBits,
 } from '@embedpdf/engine-core/runtime';
 import {
@@ -29,6 +31,8 @@ export interface AccessRouteDeps {
   cdnSigner: CdnSigner;
   /** When present, /access advertises the deployment's render lattice. */
   derivedRenders?: DerivedRenderService;
+  /** The deployment's annotation import limits, advertised so a client checks them first. */
+  annotationBundleLimits: AnnotationBundleLimits;
   usageMeters?: UsageMeters;
   tenantUsage?: TenantUsageRepo;
 }
@@ -37,7 +41,8 @@ export async function registerAccessRoutes(
   app: FastifyInstance,
   deps: AccessRouteDeps,
 ): Promise<void> {
-  const { service, cdnSigner, derivedRenders, usageMeters, tenantUsage } = deps;
+  const { service, cdnSigner, derivedRenders, usageMeters, tenantUsage, annotationBundleLimits } =
+    deps;
 
   const handleAccess = async (
     req: FastifyRequest,
@@ -53,7 +58,7 @@ export async function registerAccessRoutes(
       );
     }
     const body = parsed.data;
-    // Identity rides the PATH — doc AND layer, like every layer route
+    // Identity rides the path — doc and layer, like every layer route
     // (the affinity tier routes on the doc segment); the legacy alias
     // still takes both from the body. When path and body are both
     // present they must agree — a mismatch is malformed, never a
@@ -85,7 +90,7 @@ export async function registerAccessRoutes(
       passwordGrant: body.passwordGrant ?? null,
       mode: body.mode ?? 'any',
     });
-    // Effective bits for this response come from the unlock probe — NOT
+    // Effective bits for this response come from the unlock probe — not
     // from the DB row. The row was populated by an anonymous probe at
     // ingest and is stale for encrypted documents; the just-completed
     // unlock is the authoritative source for "what bits does this
@@ -95,19 +100,24 @@ export async function registerAccessRoutes(
     const pdfBits = decodePdfBits(unlocked.probe.pdfPermissionsBits);
     // Plane-scoped edge grant: each doc-level shared prefix rides this caller's CDN
     // credential only while every plane it depends on is inherited by the
-    // pinned layer — the SAME scopes the manifest advertises and the origin
+    // pinned layer — the same scopes the manifest advertises and the origin
     // guards enforce (the origin is the truth; this grant is the
     // optimization, TTL-bounded by `expiresAt` after a divergence flip).
     const layerScopes = await service.getLayerScopes(docId, layerName);
+    // What the document's signatures forbid: subtracted from the scope for
+    // every caller, as every route guard subtracts it.
+    const protection = await service.getProtection(ctx, docId, layerName);
     const access = buildAccessResponse(
       unlocked,
       ctx.jwt,
       pdfBits,
+      protection,
       cdnSigner,
       ctx.tenantId,
       docId,
       layerName,
       `${req.protocol}://${req.hostname}`,
+      annotationBundleLimits,
       derivedRenders?.policy(),
       layerScopes,
     );
@@ -154,11 +164,13 @@ function buildAccessResponse(
   unlocked: Awaited<ReturnType<DocumentService['unlockLayerAccess']>>,
   jwt: RequestJwtContext,
   pdfBits: PdfBits,
+  protection: DocumentProtection | null,
   cdnSigner: CdnSigner,
   tenantId: string,
   docId: string,
   layerName: string,
   originUrl: string,
+  annotationBundleLimits: AnnotationBundleLimits,
   renderPolicy?: RenderPolicy,
   layerScopes?: LayerScopes,
 ): DocumentAccessInfo {
@@ -171,8 +183,9 @@ function buildAccessResponse(
   // what the client should drive UI off — `pdf.permissions` is opaque
   // until expanded against the document's PDF bits, and the resolver
   // also applies implication rules (e.g. annotations collab scopes
-  // imply doc.annotate.read).
-  const effectiveScope = [...expandRawScope(jwt.scope, pdfBits)].sort();
+  // imply doc.annotate.read) and takes away what the document's
+  // signatures forbid.
+  const effectiveScope = [...expandRawScope(jwt.scope, pdfBits, protection)].sort();
 
   const coverage = cdnCoverageForScope(jwt.scope, pdfBits, {
     docId,
@@ -197,6 +210,7 @@ function buildAccessResponse(
     pdfPermissions: permissionInfoWithAdvisory(unlocked.probe, pdfBits),
     scope: [...jwt.scope],
     effectiveScope,
+    protection,
     // Explicit identity construction (rather than spreading
     // jwt.identity) so the readonly `groups` array doesn't leak into a
     // mutable-typed slot. Each field is copied only when present.
@@ -205,19 +219,15 @@ function buildAccessResponse(
       mode: unlocked.probe.encryptionState === 'encrypted' ? 'server-session' : 'not-needed',
     },
     expiresAt,
-    // The render lattice rides /access, NEVER the manifest: manifests are
+    // The render lattice rides /access, never the manifest: manifests are
     // version-pinned immutable objects; the lattice is mutable deployment
     // policy.
     ...(renderPolicy ? { renderPolicy } : {}),
+    annotationBundleLimits,
   };
 }
 
 function identityForResponse(jwt: RequestJwtContext): DocumentAccessInfo['identity'] {
   const id = jwt.identity;
-  return {
-    ...(id.user_id !== undefined ? { user_id: id.user_id } : {}),
-    ...(id.group_id !== undefined ? { group_id: id.group_id } : {}),
-    ...(id.display_name !== undefined ? { display_name: id.display_name } : {}),
-    ...(id.groups !== undefined ? { groups: [...id.groups] } : {}),
-  };
+  return { ...id, ...(id.groups !== undefined ? { groups: [...id.groups] } : {}) };
 }

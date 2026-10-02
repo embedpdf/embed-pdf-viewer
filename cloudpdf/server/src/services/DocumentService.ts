@@ -12,6 +12,7 @@ import {
   toPageRef,
   wirePack,
   type DocumentSecurityState,
+  type CustomMetadata,
   type DocumentMetadata,
   type DocumentActionsSnapshot,
   type DocumentSecurityProbeInfo,
@@ -21,14 +22,15 @@ import {
   type PdfSaveMode,
   type WorkerJobId,
   type WorkerResultPayload,
-  type EmbeddedFileItem,
-  type EmbeddedFileRef,
+  type AttachmentList,
+  type AttachmentRef,
   type AnnotationRef,
   type WirePack,
   type WorkerRequest,
   type AnalyzeInput,
   type ChangeAnalysis,
   type SignatureSnapshot,
+  type DocumentProtection,
 } from '@embedpdf/engine-core/runtime';
 import { DEFAULT_LAYER_NAME, wirePaths } from '@embedpdf/engine-core/wire';
 import type { DocumentManifest, LayerScopes } from '@embedpdf/engine-core/wire';
@@ -57,17 +59,16 @@ import type { ObjectStore } from '../storage/ObjectStore';
  * Public head shape returned by `GET /v1/docs/:docId/head`.
  *
  * `docVersion` is the single monotonic integer per document — bumps
- * on ANY mutation that could change the manifest's content (page
+ * on any mutation that could change the manifest's content (page
  * list, per-page content, per-page annotations, per-page weak-flag).
  * That makes `/manifest@docVersion=N` content-addressed and CDN-cacheable for
- * a year. Phase 4 hard-codes it to `1`; Phase 5's mutation handler
- * is what actually bumps it.
+ * a year. `LayerService`'s mutation handlers are what bump it.
  */
 export interface DocumentHead {
   id: string;
   baseSha: string;
   storageSizeBytes: number;
-  /** Cache-busting integer; bumps on EVERY content-changing mutation. */
+  /** Cache-busting integer; bumps on every content-changing mutation. */
   docVersion: number;
   /** Lifecycle state, exposed so the SDK can render "deleting" / "failed" UI. */
   state: DocumentRow['state'];
@@ -202,10 +203,16 @@ export class DocumentService {
   private readonly cdnAccessRequired: boolean;
   private readonly heads = new Map<string, DocumentHead>();
   private readonly opens = new Map<string, Promise<DocumentHead>>();
+  /**
+   * What each base version's signatures forbid, by the version's sha. The
+   * worker reports it whenever it opens a version's bytes; it belongs to the
+   * bytes, so an entry never goes stale.
+   */
+  private readonly protections = new Map<string, DocumentProtection | null>();
   private readonly baseHandles = new Map<string, LocalFileHandle>();
   private readonly layerArtifactHandles = new Map<string, LocalFileHandle>();
   /**
-   * The layer-session FENCE: sessionKey → the `layers.current_version` the
+   * The layer-session fence: sessionKey → the `layers.current_version` the
    * worker materialization embodies (0 = opened fresh, before any row).
    *
    * A worker layer session is a write-through cache of the durable layer
@@ -220,21 +227,21 @@ export class DocumentService {
   /**
    * One marker per layer while a write op is in flight (worker mutation
    * dispatched, durable commit pending). During that window the worker
-   * session holds UNCOMMITTED state — reads must not treat it as a clean
+   * session holds uncommitted state — reads must not treat it as a clean
    * materialization of the current version. Never rejects; settles when
    * the write finishes either way.
    */
   private readonly layerWritesInFlight = new Map<string, Promise<void>>();
   /**
-   * Engine generation captured at WRITE-alignment time (the
+   * Engine generation captured at write-alignment time (the
    * `forWrite` door of {@link ensureLayerFreshOnPool}), consumed by
    * {@link advanceLayerSession}. Correct without per-write threading
    * because the layer write queue (`enqueueLayerWrite`) serializes
-   * writes per sessionKey IN-PROCESS — at most one write sits between
+   * writes per sessionKey in-process — at most one write sits between
    * alignment and commit at any time, so the stored generation always
-   * belongs to THE write that is committing. Survives host restarts on
+   * belongs to the write that is committing. Survives host restarts on
    * purpose: the stale generation is exactly the datum that detects a
-   * session recreated by a reader on a NEW engine after the aligned
+   * session recreated by a reader on a new engine after the aligned
    * engine died.
    */
   private readonly writeAlignGens = new Map<string, number>();
@@ -265,10 +272,10 @@ export class DocumentService {
    * Concurrent first-callers share one open via singleflight.
    */
   /**
-   * THE read-dispatch door: ensure (layer or base) → dispatch → ONE
+   * The read-dispatch door: ensure (layer or base) → dispatch → one
    * reopen-retry when the session vanished between ensure and dispatch
    * (a read parked across an engine respawn). Every engine read —
-   * service-internal AND route-level — goes through this verb, so the
+   * service-internal and route-level — goes through this verb, so the
    * recovery cannot be skipped by a future call site, and routes need no
    * `EnginePool` of their own. One reopen per request is the law: a
    * second DocNotOpen means the engine respawned twice inside one
@@ -280,7 +287,7 @@ export class DocumentService {
   readOnPool(
     ctx: OpenContext,
     docId: string,
-    /** undefined = the BASE view (shared reads use no layer session). */
+    /** undefined = the base view (shared reads use no layer session). */
     layerName: string | undefined,
     build: BuildPack,
     signal?: AbortSignal,
@@ -314,7 +321,7 @@ export class DocumentService {
     }
 
     const row = await this.requireReadyRow(ctx, docId);
-    // Resolve and authorize THIS caller before consulting either the warm
+    // Resolve and authorize this caller before consulting either the warm
     // session cache (`heads`) or the open singleflight (`opens`). Neither
     // shared map says anything about the caller's password.
     const openPassword = password ?? (await this.passwordForOpen(ctx, row, pinnedLayerName(ctx)));
@@ -368,23 +375,23 @@ export class DocumentService {
    * For unencrypted documents this is the right value — the bits are
    * a property of the static PDF and don't change per caller.
    *
-   * For ENCRYPTED documents this is stale: the row was populated by an
+   * For encrypted documents this is stale: the row was populated by an
    * anonymous probe at ingest, so it reflects either "no permissions"
-   * (probe rejected by password) or restrictive user-mode bits, NEVER
+   * (probe rejected by password) or restrictive user-mode bits, never
    * the actual bits the caller sees with their unlocked session. Route
    * guards should prefer {@link getEffectivePdfBits} which consults the
    * active password session first.
    *
    * Kept exposed as a focused primitive for cases that genuinely want
    * the document-row state regardless of session (e.g. /head's advisory
-   * display BEFORE any unlock happens).
+   * display before any unlock happens).
    */
   async getPdfBits(tenantId: string, docId: string) {
     return this.documents.getPdfBits(docId, tenantId);
   }
 
   /**
-   * Authorization-aware accessor for the bits the caller's CURRENT
+   * Authorization-aware accessor for the bits the caller's current
    * session sees. This is what route guards should use to expand
    * `pdf.permissions` and run capability/collab checks — the
    * difference matters for encrypted documents, where the DB row and
@@ -403,7 +410,7 @@ export class DocumentService {
    * the cached session — readers fall back to the new DB row bits and
    * the caller has to /access again to refresh.
    *
-   * `/access` itself does NOT call this — it has `unlocked.probe` in
+   * `/access` itself does not call this — it has `unlocked.probe` in
    * hand from `unlockLayerAccess`, which is the authoritative source
    * for the moment it just unlocked. Use that probe directly.
    */
@@ -411,7 +418,7 @@ export class DocumentService {
     ctx: OpenContext,
     docId: string,
     // Default to the token's pinned layer: doc-level shared routes
-    // must evaluate the CLAIMED layer's post-unlock bits, not 'default''s.
+    // must evaluate the claimed layer's post-unlock bits, not 'default''s.
     layerName: string = pinnedLayerName(ctx),
   ): Promise<PdfBits> {
     const row = await this.requireReadyRow(ctx, docId);
@@ -476,6 +483,7 @@ export class DocumentService {
       if (result.tag !== 'open') {
         throw new EngineError(EngineErrorCode.WireFormat, `unexpected open payload: ${result.tag}`);
       }
+      this.recordProtection(baseSha, result);
       const head = buildHead(row, this.cdnAccessRequired);
       this.replaceBaseHandle(docId, baseSha, handle);
       handle = null;
@@ -501,14 +509,19 @@ export class DocumentService {
       head.baseSha,
       head.storageSizeBytes,
     );
-    return this.layerState.buildBaseManifest(head, pages, version);
+    const protection = await this.protectionOf(
+      ctx,
+      await this.requireReadyRow(ctx, docId),
+      head.baseSha,
+    );
+    return this.layerState.buildBaseManifest(head, pages, version, protection);
   }
 
   async getLayerHead(ctx: OpenContext, docId: string, layerName: string): Promise<DocumentHead> {
     const head = await this.getHead(ctx, docId);
     const layer = await this.layerState.repos.layers.findByDocAndName(docId, layerName);
-    // Plane-scoped warming policy: the BASE is always warmed (getHead above fires
-    // the doc warm); the LAYER session is warmed iff the layer OWNS at
+    // Plane-scoped warming policy: the base is always warmed (getHead above fires
+    // the doc warm); the layer session is warmed iff the layer owns at
     // least one plane — a pristine layer's reads all execute on the base
     // session, so eagerly warming it would resurrect the
     // session-per-visitor explosion this policy avoids.
@@ -553,13 +566,14 @@ export class DocumentService {
         this.loadDurableBasePageStates(ctx, docId),
       );
       // No layer row yet -> immutable base view: docVersion from head, the
-      // plane pointers the HEAD VERSION publishes (the initial epochs for a
-      // never-published document) — and every plane trivially INHERITED,
+      // plane pointers the HEAD version publishes (the initial epochs for a
+      // never-published document) — and every plane trivially inherited,
       // so every visitor's never-written layer resolves all reads at the
       // shared base URLs.
       return this.layerState.buildLayerManifest(
         docId,
         headVersion,
+        await this.protectionOf(ctx, row, head.baseSha),
         layerName,
         {
           docVersion: head.docVersion,
@@ -580,7 +594,7 @@ export class DocumentService {
       this.loadDurableBasePageStates(ctx, docId),
     );
     const pages = await this.layerState.ensureLayerPagesFromBase({ layerId: layer.id, docId });
-    // The layer's OWN base version (law 2): behind the head once a sibling
+    // The layer's own base version (law 2): behind the head once a sibling
     // published, until the layer is rebased.
     const layerBaseSha = layer.baseSha ?? head.baseSha;
     const layerVersion =
@@ -594,6 +608,7 @@ export class DocumentService {
     return this.layerState.buildLayerManifest(
       docId,
       layerVersion,
+      await this.protectionOf(ctx, row, layerBaseSha),
       layerName,
       layer,
       pages,
@@ -622,7 +637,7 @@ export class DocumentService {
   async getLayerLayout(
     ctx: OpenContext,
     docId: string,
-    /** Omit for the BASE view (shared reads use no layer session). */
+    /** Omit for the base view (shared reads use no layer session). */
     layerName?: string,
     signal?: AbortSignal,
   ): Promise<PageListSnapshot> {
@@ -648,7 +663,7 @@ export class DocumentService {
   async getLayerActions(
     ctx: OpenContext,
     docId: string,
-    /** Omit for the BASE view (shared reads use no layer session). */
+    /** Omit for the base view (shared reads use no layer session). */
     layerName?: string,
     signal?: AbortSignal,
   ): Promise<DocumentActionsSnapshot> {
@@ -677,7 +692,7 @@ export class DocumentService {
   }
 
   /**
-   * Ensure a FRESH layer session before dispatching worker ops — the READ
+   * Ensure a fresh layer session before dispatching worker ops — the read
    * path door. Freshness is judged per request against the layer row (one
    * PK SELECT — noise next to any PDF op): a session left behind at an
    * older version is a stale materialization from this replica's past and
@@ -688,7 +703,7 @@ export class DocumentService {
    * CDN-cacheable version pin.
    *
    * (The write path calls {@link ensureLayerFreshOnPool} directly with the
-   * row it ALREADY read — alignment must target the exact row the commit
+   * row it already read — alignment must target the exact row the commit
    * CAS will compare against, never a second read.)
    */
   async ensureLayerOnPool(
@@ -697,9 +712,9 @@ export class DocumentService {
     layerName: string,
     password: string | null = null,
   ): Promise<void> {
-    // Park behind any in-flight write FIRST: its uncommitted worker state
+    // Park behind any in-flight write first: its uncommitted worker state
     // must never be served as a clean materialization, and the layer row
-    // must be read AFTER the write settles or the freshness compare would
+    // must be read after the write settles or the freshness compare would
     // force a pointless reload on every awaited commit.
     await this.awaitLayerWriteSettled(layerSessionKey(docId, layerName));
     const layer = await this.layerState.repos.layers.findByDocAndName(docId, layerName);
@@ -707,12 +722,12 @@ export class DocumentService {
   }
 
   /**
-   * Version-fenced sibling of {@link ensureLayerOnPool} — the WRITE-path
+   * Version-fenced sibling of {@link ensureLayerOnPool} — the write-path
    * door. `currentVersion` is the `layers.current_version` the caller just
    * read from durable truth. If the live session's materialized version
    * differs, the session is a stale replica-local cache (another replica
    * advanced the layer) and is reloaded — close + reopen from the current
-   * artifact — BEFORE the caller may dispatch worker mutations. This
+   * artifact — before the caller may dispatch worker mutations. This
    * alignment is what makes the commit-time version CAS a real fence: after
    * it, the only way the CAS can fail is a remote commit inside the
    * prepare→commit window.
@@ -729,7 +744,7 @@ export class DocumentService {
     // Write alignment records the engine generation the aligned session
     // lives under — the datum advanceLayerSession later compares against
     // the then-current generation to refuse blessing a session that was
-    // recreated on a NEW engine after this one died mid-commit.
+    // recreated on a new engine after this one died mid-commit.
     const recordAlignment = () => {
       if (opts.forWrite) this.writeAlignGens.set(key, this.pool.generationFor(docId));
     };
@@ -756,7 +771,7 @@ export class DocumentService {
 
   /**
    * Mark a layer write in flight. The write pipeline calls this around the
-   * WHOLE mutation op (worker apply → upload → commit); reads use the
+   * whole mutation op (worker apply → upload → commit); reads use the
    * marker to park until the dirty window closes. Returns the settle
    * function; idempotent and never throws.
    */
@@ -792,7 +807,7 @@ export class DocumentService {
   /**
    * Record that the live session now embodies `version` — called by the
    * layer write pipeline after its commit transaction wins the CAS (the
-   * worker applied the mutation, so its state IS the new version). Guarded
+   * worker applied the mutation, so its state is the new version). Guarded
    * on the entry still existing: if the pool evicted the doc mid-commit,
    * the worker session is gone and must not be resurrected as "fresh".
    */
@@ -803,9 +818,9 @@ export class DocumentService {
     // Existing law: if the pool evicted the doc mid-commit, the worker
     // session is gone and must not be resurrected as "fresh".
     if (!this.layerSessionVersions.has(key)) return;
-    // Completed law (host mode): the session that APPLIED this write
+    // Completed law (host mode): the session that applied this write
     // lived under `alignedGen`. If the engine has respawned since, any
-    // session that exists now was opened from the PRE-commit artifact —
+    // session that exists now was opened from the pre-commit artifact —
     // a reader recreating the entry must not get it blessed with the
     // committed version. Invalidate; the next touch reloads at the new
     // durable head. (Inline pool: generation is constant 0, this branch
@@ -891,7 +906,7 @@ export class DocumentService {
   async readLayerMetadata(
     ctx: OpenContext,
     docId: string,
-    /** Omit for the BASE view (shared reads use no layer session). */
+    /** Omit for the base view (shared reads use no layer session). */
     layerName?: string,
     signal?: AbortSignal,
   ): Promise<DocumentMetadata> {
@@ -914,10 +929,37 @@ export class DocumentService {
     return result.metadata;
   }
 
+  /** The Info dict's custom keys, read the same way as `readLayerMetadata`. */
+  async readLayerCustomMetadata(
+    ctx: OpenContext,
+    docId: string,
+    /** Omit for the base view (shared reads use no layer session). */
+    layerName?: string,
+    signal?: AbortSignal,
+  ): Promise<CustomMetadata> {
+    if (layerName !== undefined) await this.ensureLayerOnPool(ctx, docId, layerName);
+    else await this.openOnPool(ctx, docId);
+    const build = (jobId: WorkerJobId) =>
+      wirePack({
+        kind: 'metadata.readCustom' as const,
+        jobId,
+        docId,
+        ...(layerName !== undefined ? { layerName } : {}),
+      });
+    const result = await this.readOnPool(ctx, docId, layerName, build, signal);
+    if (result.tag !== 'metadata.readCustom') {
+      throw new EngineError(
+        EngineErrorCode.WireFormat,
+        `unexpected custom metadata payload: ${result.tag}`,
+      );
+    }
+    return result.custom;
+  }
+
   /**
    * The layer's signature snapshot, read through the session's working copy
    * (decision 18: the server session keeps every committed edit in memory,
-   * so its working copy IS the layer's durable state). Ensures the session
+   * so its working copy is the layer's durable state). Ensures the session
    * embodies the durable layer version first — a read never validates
    * freshness by itself, and a session left over from before a publish
    * on another replica would otherwise describe the old base.
@@ -1120,12 +1162,12 @@ export class DocumentService {
    * Reject a supplied password without consulting the worker when it is
    * provably wrong. A standard PDF security handler has at most one user
    * and one owner password, and `pdf_password_verifications` only stores
-   * verified-good facts. So once BOTH passwords are known, a password that
+   * verified-good facts. So once both passwords are known, a password that
    * missed the per-password cache cannot be valid.
    *
    *   - owner known: a cached verification with `openedAs === 'owner'`.
    *   - user known: empty user password (`encryptionRequiresPassword === false`)
-   *     OR a cached verification with `openedAs === 'user'`.
+   *     or a cached verification with `openedAs === 'user'`.
    *
    * No-ops (falls through to the worker) when verification storage is
    * absent or knowledge is incomplete.
@@ -1192,7 +1234,7 @@ export class DocumentService {
     layerName?: string,
   ): Promise<{ probe: DocumentSecurityProbeInfo; facts: PasswordSessionFacts }> {
     const result = await runReadWithReopen(
-      // Re-establish the canonical session WITH the supplied password —
+      // Re-establish the canonical session with the supplied password —
       // the explicit-password bootstrap path — then re-check.
       () => this.openOnPool(ctx, row.id, password),
       () =>
@@ -1381,6 +1423,7 @@ export class DocumentService {
       throw new EngineError(
         EngineErrorCode.Forbidden,
         'encrypted PDF access requires a doc token with jti',
+        { details: { required: 'jti' } },
       );
     }
     return jti;
@@ -1392,6 +1435,7 @@ export class DocumentService {
       throw new EngineError(
         EngineErrorCode.Forbidden,
         'encrypted PDF access requires a token embedpdf.unlock_key claim',
+        { details: { required: 'embedpdf.unlock_key' } },
       );
     }
     return unlockKey;
@@ -1427,7 +1471,7 @@ export class DocumentService {
   }
 
   /**
-   * Export the listed pages, in caller order, as a standalone PDF. A READ
+   * Export the listed pages, in caller order, as a standalone PDF. A read
    * over the current layer state (the worker's `pages.extract` is a scratch
    * copy — the source document is untouched), so there is no write queue,
    * no artifact, and no audit row. Extracted subsets are bounded by the
@@ -1461,8 +1505,8 @@ export class DocumentService {
   }
 
   /**
-   * The chosen annotations' normal appearances as ONE single-page PDF —
-   * `pages.extract`'s sibling for the annotation plane: a READ over the
+   * The chosen annotations' normal appearances as one single-page PDF —
+   * `pages.extract`'s sibling for the annotation plane: a read over the
    * current layer state (the worker flattens into a scratch document; the
    * source is untouched), so no write queue, no artifact, no audit row.
    */
@@ -1489,6 +1533,39 @@ export class DocumentService {
       throw new EngineError(
         EngineErrorCode.WireFormat,
         `unexpected annotations.exportAppearance payload: ${result.tag}`,
+      );
+    }
+    return new Uint8Array(result.bytes);
+  }
+
+  /**
+   * An annotation's `appearance` resource: its drawing as a one-page PDF,
+   * before the fit, rotation and opacity its data describes. A read like
+   * {@link exportAnnotationAppearance}.
+   */
+  async readAnnotationAppearance(
+    ctx: OpenContext,
+    docId: string,
+    layerName: string,
+    pageObjectNumber: number,
+    ref: AnnotationRef,
+    signal?: AbortSignal,
+  ): Promise<Uint8Array> {
+    await this.ensureLayerOnPool(ctx, docId, layerName);
+    const build = (jobId: WorkerJobId) =>
+      wirePack({
+        kind: 'annotations.readAppearance' as const,
+        jobId,
+        docId,
+        layerName,
+        page: toPageRef(pageObjectNumber),
+        ref,
+      });
+    const result = await this.pool.run(docId, build, signal);
+    if (result.tag !== 'annotations.readAppearance') {
+      throw new EngineError(
+        EngineErrorCode.WireFormat,
+        `unexpected annotations.readAppearance payload: ${result.tag}`,
       );
     }
     return new Uint8Array(result.bytes);
@@ -1552,16 +1629,16 @@ export class DocumentService {
 
   /**
    * The engine host died: every worker session, materialization, and
-   * pinned handle it embodied is gone. Drop the engine-plane CACHES; the
+   * pinned handle it embodied is gone. Drop the engine-plane caches; the
    * next request lazily rebuilds from durable truth (DB + object store),
    * which the write-generation fence makes correct by construction.
    *
    * Deliberately untouched:
    *  - `opens` / `layerOpens`: their in-flight promises are rejecting
    *    right now and their own settle paths remove their own entries —
-   *    clearing here would ABA-delete a NEXT flight that reused the key.
+   *    clearing here would aba-delete a next flight that reused the key.
    *  - `layerWritesInFlight`: the durable-commit window is API-side work
-   *    that SURVIVES host death; readers must keep parking behind it
+   *    that survives host death; readers must keep parking behind it
    *    until the owning pipeline settles it (it always settles).
    *  - `writeAlignGens`: the stale generation is the datum that lets
    *    `advanceLayerSession` refuse to bless a recreated session.
@@ -1577,9 +1654,9 @@ export class DocumentService {
     // Scoped by shard: one shard died — forget exactly its residents, and
     // touch exactly what the full clear touches, nothing more. `opens`/
     // `layerOpens` settle via compare-and-delete (clearing them re-opens
-    // the ABA window); `layerWritesInFlight` is API-side write state;
-    // `writeAlignGens` stays — the fence fails CLOSED on a missing entry,
-    // so leaving it is discipline, not necessity. Deliberately NOT
+    // the aba window); `layerWritesInFlight` is API-side write state;
+    // `writeAlignGens` stays — the fence fails closed on a missing entry,
+    // so leaving it is discipline, not necessity. Deliberately not
     // `forgetLayerSessions()`: that is evict-path behavior and deletes
     // `layerOpens`.
     for (const docId of scope.docIds) {
@@ -1607,13 +1684,6 @@ export class DocumentService {
   }
 
   /**
-   * Explicit close: tear down the worker-side handle and drop the
-   * head cache. Currently unused on the route side — Phase 3 leaves
-   * close to the pool's eviction policy — but exposed for tests and
-   * for future graceful-shutdown flows.
-   */
-
-  /**
    * Decompression-bomb guard for attachment extraction: the worker's
    * flate sink stops decoding past this many decoded bytes (on the
    * thread-confined runtime an unbounded decode would take every doc
@@ -1625,10 +1695,10 @@ export class DocumentService {
   async listAttachments(
     ctx: OpenContext,
     docId: string,
-    /** Omit for the BASE view (shared reads use no layer session). */
+    /** Omit for the base view (shared reads use no layer session). */
     layerName?: string,
     signal?: AbortSignal,
-  ): Promise<EmbeddedFileItem[]> {
+  ): Promise<AttachmentList> {
     if (layerName !== undefined) await this.ensureLayerOnPool(ctx, docId, layerName);
     else await this.openOnPool(ctx, docId);
     const build = (jobId: WorkerJobId) =>
@@ -1645,16 +1715,16 @@ export class DocumentService {
         `unexpected attachments.list payload: ${payload.tag}`,
       );
     }
-    return payload.items;
+    return { attachments: payload.attachments };
   }
 
   /** Decode one document-level embedded file (by key) to a temp path.
-   *  Omit `layerName` for the BASE view's shared reads. */
+   *  Omit `layerName` for the base view's shared reads. */
   async readAttachmentFileToTemp(
     ctx: OpenContext,
     docId: string,
     layerName: string | undefined,
-    ref: EmbeddedFileRef,
+    ref: AttachmentRef,
     signal?: AbortSignal,
   ): Promise<SavedAttachmentFile> {
     return this.readFileToTemp(ctx, docId, layerName, signal, (jobId, path) =>
@@ -1671,7 +1741,7 @@ export class DocumentService {
   }
 
   /** Decode a FileAttachment annotation's embedded file to a temp path.
-   *  Omit `layerName` for the BASE view's shared reads. */
+   *  Omit `layerName` for the base view's shared reads. */
   async readAnnotationFileToTemp(
     ctx: OpenContext,
     docId: string,
@@ -1748,6 +1818,11 @@ export class DocumentService {
     }
   }
 
+  /**
+   * Explicit close: tear down the worker-side handle and drop the
+   * head cache. Routes do not call this; they leave close to the
+   * pool's eviction policy.
+   */
   async close(docId: string): Promise<void> {
     this.heads.delete(docId);
     try {
@@ -1790,15 +1865,15 @@ export class DocumentService {
 
   private async loadDurableBasePageStates(ctx: OpenContext, docId: string): Promise<PageState[]> {
     const annotationsBuild = (jobId: WorkerJobId) =>
-      wirePack({ kind: 'annotations.listRawAll' as const, jobId, docId });
+      wirePack({ kind: 'annotations.list' as const, jobId, docId });
     const annotationsResult = await this.readOnPool(ctx, docId, undefined, annotationsBuild);
-    if (annotationsResult.tag !== 'annotations.listRawAll') {
+    if (annotationsResult.tag !== 'annotations.list') {
       throw new EngineError(
         EngineErrorCode.WireFormat,
         `unexpected manifest annotation payload: ${annotationsResult.tag}`,
       );
     }
-    return annotationsResult.snapshot.pages.map((page) => page.pageState);
+    return annotationsResult.list.pages;
   }
 
   private async openLayerOnPool(
@@ -1813,7 +1888,7 @@ export class DocumentService {
 
     const sessionKey = layerSessionKey(docId, layerName);
     const layer = await this.layerState.repos.layers.findByDocAndName(docId, layerName);
-    // Law 2: a layer session materializes over the LAYER's base version,
+    // Law 2: a layer session materializes over the layer's base version,
     // which sits behind the head once a sibling published. Its file is
     // held beside the head's, keyed by sha, until the document closes or
     // a publish forgets every session over the old base.
@@ -1867,7 +1942,7 @@ export class DocumentService {
     source: { kind: 'fresh' } | { kind: 'artifact-file'; path: string };
     handle: LocalFileHandle | null;
   }> {
-    // No artifact key means a fresh layer over its base at ANY version: a
+    // No artifact key means a fresh layer over its base at any version: a
     // publish consumes the signing layer's edits into the new base version
     // and clears the artifact while `current_version` keeps counting (law 3).
     if (!layer.currentArtifactKey) {
@@ -1977,7 +2052,7 @@ export class DocumentService {
   }
 
   /**
-   * One engine read over a base VERSION: the version's file opened into a
+   * One engine read over a base version: the version's file opened into a
    * private transient session (a version is not a layer, and never the
    * live document), the read dispatched to it, the session closed. The
    * session id is unique per call so concurrent reads of one version
@@ -1990,6 +2065,19 @@ export class DocumentService {
     build: (sessionId: string, jobId: WorkerJobId) => WirePack<WorkerRequest>,
     signal?: AbortSignal,
   ): Promise<WorkerResultPayload> {
+    return this.withVersionSession(ctx, docId, sha, signal, (sessionId) =>
+      this.pool.run(sessionId, (jobId: WorkerJobId) => build(sessionId, jobId), signal),
+    );
+  }
+
+  /** `sha`'s bytes opened into a private transient session for `run`, then closed. */
+  private async withVersionSession<T>(
+    ctx: OpenContext,
+    docId: string,
+    sha: string,
+    signal: AbortSignal | undefined,
+    run: (sessionId: string) => Promise<T>,
+  ): Promise<T> {
     const row = await this.requireReadyRow(ctx, docId);
     const version = await this.requireVersion(ctx, docId, sha);
     const password = await this.passwordForOpen(ctx, row, pinnedLayerName(ctx));
@@ -2015,15 +2103,58 @@ export class DocumentService {
       if (opened.tag !== 'open') {
         throw new EngineError(EngineErrorCode.WireFormat, `unexpected open payload: ${opened.tag}`);
       }
-      return await this.pool.run(
-        sessionId,
-        (jobId: WorkerJobId) => build(sessionId, jobId),
-        signal,
-      );
+      this.recordProtection(version.sha256, opened);
+      return await run(sessionId);
     } finally {
       await this.pool.close(sessionId).catch(() => undefined);
       handle.release();
     }
+  }
+
+  /**
+   * What the signatures in a layer's base version forbid (`null` when it has
+   * none): the protection the route guards and `/access` subtract from every
+   * caller, as the local engine's scope guard does.
+   */
+  async getProtection(
+    ctx: OpenContext,
+    docId: string,
+    layerName: string = pinnedLayerName(ctx),
+  ): Promise<DocumentProtection | null> {
+    const row = await this.requireReadyRow(ctx, docId);
+    const layer = await this.layerState.repos.layers.findByDocAndName(docId, layerName);
+    return this.protectionOf(ctx, row, layer?.baseSha ?? requireBaseSha(row));
+  }
+
+  /** What a version a signing just published forbids, as the signing reported it. */
+  rememberProtection(sha: string, protection: DocumentProtection | null): void {
+    this.protections.set(sha, protection);
+  }
+
+  /**
+   * `sha`'s protection: known once the worker has opened its bytes. The head
+   * is opened as every read opens it; a version behind the head (a layer a
+   * sibling's signature left behind) is opened on its own.
+   */
+  private async protectionOf(
+    ctx: OpenContext,
+    row: DocumentRow,
+    sha: string,
+  ): Promise<DocumentProtection | null> {
+    const known = this.protections.get(sha);
+    if (known !== undefined) return known;
+    if (sha === row.baseSha) {
+      await this.openOnPool(ctx, row.id);
+    } else {
+      await this.withVersionSession(ctx, row.id, sha, undefined, async () => undefined);
+    }
+    // An open that couldn't read the signatures (a locked one) reports none.
+    return this.protections.get(sha) ?? null;
+  }
+
+  /** Keep what an open of `sha`'s bytes reported its signatures forbid. */
+  private recordProtection(sha: string, opened: { protection?: DocumentProtection | null }): void {
+    if (opened.protection !== undefined) this.protections.set(sha, opened.protection);
   }
 
   /** The local file of one base version of a document the caller may read (signing rebuilds a candidate from it). */
@@ -2251,7 +2382,7 @@ function requiresPasswordSession(row: DocumentRow): boolean {
 /**
  * Whether the document is encrypted at all. Distinct from
  * {@link requiresPasswordSession}: a permission-only encrypted PDF (owner
- * password set, empty user password) is `isEncrypted` but does NOT require
+ * password set, empty user password) is `isEncrypted` but does not require
  * a password to open. Such docs are still "session-capable" — their
  * effective bits can change after an owner-password unlock — so the unlock
  * and effective-bits paths gate on this rather than on the open-time

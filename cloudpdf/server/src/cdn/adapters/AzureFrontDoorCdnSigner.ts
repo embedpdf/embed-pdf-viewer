@@ -13,7 +13,7 @@
  * query, recomputes the HMAC using the rule's stored secret, and
  * rejects on mismatch or expiry.
  *
- * **Per-resource scope enforcement at the edge** (paths v2)
+ * **Per-resource scope enforcement at the edge**
  *
  * We sign each granted cacheable resource's distinct prefix separately
  * — `/v1/docs/{id}/render/pages/`, `/v1/docs/{id}/text/pages/`, etc. —
@@ -30,7 +30,8 @@
  * Output channels: `baseUrlOverrides` per granted cacheable resource +
  * one `signedPathPolicies` entry per granted prefix.
  *
- * Purge: stub here; real Azure REST `purgeContent` lands in commit H.
+ * Purge is not implemented: it returns a `no-op` receipt without calling
+ * Azure's `purgeContent`.
  */
 
 import type { CdnAccessInfo } from '@embedpdf/engine-core/runtime';

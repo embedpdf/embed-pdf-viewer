@@ -1,28 +1,30 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { memoryStampStore, persistStampLibraries, restoreStampLibraries } from '../src/persistence';
-import type { StampCapability, StampLibraryChange } from '../src/host-contract';
+import type { StampCapability, StampLibraryChangedEvent } from '../src/contract';
 
 function fakeStamp() {
-  const listeners = new Set<(change: StampLibraryChange) => void>();
+  const listeners = new Set<(change: StampLibraryChangedEvent) => void>();
   const bytes = new Map<string, Uint8Array>();
+  // Only the members the helpers use: a framework's own service of the plugin is enough.
   const stamp = {
-    onLibraryChanged: (listener: (change: StampLibraryChange) => void) => {
+    onLibraryChanged: (listener: (change: StampLibraryChangedEvent) => void) => {
       listeners.add(listener);
       return () => listeners.delete(listener);
     },
     exportLibrary: async (id: string) => {
-      const b = bytes.get(id);
-      if (!b) throw new Error(`unknown library '${id}'`);
-      return b;
+      const stored = bytes.get(id);
+      if (!stored) throw new Error(`unknown library '${id}'`);
+      return stored;
     },
     importLibrary: vi.fn(async (source: Uint8Array) => {
       const id = new TextDecoder().decode(source).replace('%PDF-', '');
       bytes.set(id, source);
-      return id;
+      return { library: { id } };
     }),
-  } as unknown as StampCapability;
-  const emit = (change: StampLibraryChange) => listeners.forEach((l) => l(change));
+  } as unknown as Pick<StampCapability, 'exportLibrary' | 'importLibrary' | 'onLibraryChanged'>;
+  const emit = (change: StampLibraryChangedEvent) =>
+    listeners.forEach((listener) => listener(change));
   return { stamp, bytes, emit };
 }
 

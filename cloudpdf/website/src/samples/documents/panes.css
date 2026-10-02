@@ -1,0 +1,116 @@
+/* Colors */
+:root {
+  --ink: #1a2748;
+  --muted: #5a6b92;
+  --line: #e6eaf2;
+  --line-strong: #dce8fc;
+  --surface: #ffffff;
+  --tint: #f3f7fe;
+  --canvas: #f7f9fc;
+  --focus: #7db6ff;
+  --shadow: rgb(7 32 76 / 0.04);
+}
+
+/* The panes: stacked, and side by side where there's room */
+.panes {
+  container-type: inline-size;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.pane {
+  flex: 1 1 100%;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+}
+
+/* The focused pane is where documents you open land */
+.pane[data-focused='true'] {
+  border-color: var(--focus);
+}
+
+@container (min-width: 620px) {
+  .pane {
+    flex: 1 1 0;
+  }
+}
+
+/* A pane's tabs, then what you do to the pane */
+.bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.tab {
+  font: inherit;
+  font-size: 13px;
+  color: var(--muted);
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  padding: 6px 10px;
+  cursor: pointer;
+}
+
+.tab[aria-selected='true'] {
+  color: var(--ink);
+  font-weight: 600;
+  background: var(--tint);
+  border-color: var(--line-strong);
+}
+
+.button {
+  font: inherit;
+  font-size: 12px;
+  font-weight: 550;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 6px 10px;
+  cursor: pointer;
+}
+
+.button:first-of-type {
+  margin-left: auto;
+}
+
+.button:hover {
+  background: var(--tint);
+  border-color: var(--line-strong);
+}
+
+.button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.tab:focus-visible,
+.button:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+/* The pages */
+.stage {
+  height: 320px;
+  border-radius: 10px;
+  background: var(--canvas);
+}
+
+.empty {
+  margin: 0;
+  padding: 24px 0;
+  text-align: center;
+  font-size: 13px;
+  color: var(--muted);
+}

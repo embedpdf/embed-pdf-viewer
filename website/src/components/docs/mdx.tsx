@@ -1,13 +1,14 @@
 import type { MDXComponents } from 'mdx/types';
-import Link from 'next/link';
-import type { AnchorHTMLAttributes, ReactNode } from 'react';
+import { FrameworkLink, FwCode, FwVariant, Framework, StateIntroText, Word } from '@embedpdf/docs-kit';
+import type { AnchorHTMLAttributes, HTMLAttributes, ReactNode } from 'react';
 
+import { CloudPdfCallout } from './cloudpdf-callout';
 import { DocsOverview } from './docs-overview';
 import { DocsPage } from './docs-page';
-import { Example } from './example';
 import { Fw } from './framework';
 import { createHeading } from './heading';
 import { Pre } from './pre';
+import { RouteExample, type CompiledExampleProps } from './route-example';
 import type { TocItem } from './toc';
 
 import { CodeExample } from '@/components/site/code-example';
@@ -27,15 +28,20 @@ function Wrapper({ children, toc }: WrapperProps) {
   );
 }
 
+/** A page's title: its `# heading`, or the title a held-back page still shows. */
+export function PageTitle(props: HTMLAttributes<HTMLHeadingElement>) {
+  return (
+    <h1
+      className="font-display text-ep-navy scroll-mt-[100px] text-[clamp(34px,4vw,46px)] font-extrabold leading-[1.08] tracking-[-0.025em]"
+      {...props}
+    />
+  );
+}
+
 export function useMDXComponents(components?: MDXComponents): MDXComponents {
   return {
     wrapper: Wrapper,
-    h1: (props) => (
-      <h1
-        className="font-display text-ep-navy scroll-mt-[100px] text-[clamp(34px,4vw,46px)] font-extrabold leading-[1.08] tracking-[-0.025em]"
-        {...props}
-      />
-    ),
+    h1: PageTitle,
     h2: createHeading('h2'),
     h3: createHeading('h3'),
     h4: createHeading('h4'),
@@ -46,7 +52,7 @@ export function useMDXComponents(components?: MDXComponents): MDXComponents {
       />
     ),
     a: ({ href = '', ...props }: AnchorHTMLAttributes<HTMLAnchorElement>) => (
-      <Link
+      <FrameworkLink
         href={href}
         className="text-ep-blue font-semibold underline-offset-[3px] hover:underline"
         {...props}
@@ -88,9 +94,25 @@ export function useMDXComponents(components?: MDXComponents): MDXComponents {
       <td className="border-ep-borderSoft text-ep-ink border-b px-3 py-2" {...props} />
     ),
     pre: Pre,
+    CloudPdfCallout,
     CodeExample,
     DocsOverview,
-    Example,
+    // A docs page passes its route's framework (app/…/[...mdxPath]/page.tsx); without one, the
+    // code of every framework goes to the browser, which picks by pathname.
+    Example: (props: CompiledExampleProps) => <RouteExample {...props} framework={null} />,
+    // The headless docs, written for each framework (docs/conventions/docs-architecture.md).
+    Framework,
+    FwCode,
+    FwVariant,
+    Snippet: (props: CompiledExampleProps) => (
+      <RouteExample {...props} mode="code" kind="snippet" framework={null} />
+    ),
+    StateIntro: (props: { hook: string }) => (
+      <p className="text-ep-ink mt-4 max-w-[70ch] font-sans text-[16.5px] leading-[1.7]">
+        <StateIntroText {...props} />
+      </p>
+    ),
+    Word,
     Fw,
     ...components,
   };

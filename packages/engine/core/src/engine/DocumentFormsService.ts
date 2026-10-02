@@ -1,12 +1,12 @@
 import type { AnnotationRef } from '../identity/AnnotationRef';
-import type { FormFieldDraft } from '../forms/draft';
+import type { FormFieldDraft, WidgetPlacement } from '../forms/draft';
 import type { FormFieldDTO } from '../forms/field';
 import type { FormFieldPatch } from '../forms/patch';
 import type { FormSnapshot } from '../forms/snapshot';
 import type { FormDataFormat, FormFieldValue } from '../forms/value';
 import type { FormEffect, FormEffectsResult } from '../forms/effects';
 import type { FormSubmissionReceipt, FormSubmissionRequest } from '../forms/submission';
-import type { FormFieldRef, FormWidget } from '../identity/FormFieldRef';
+import type { FormFieldRef } from '../identity/FormFieldRef';
 import type { SignatureAppearanceInput } from '../signature/types';
 import type {
   FormDataExport,
@@ -15,6 +15,7 @@ import type {
   FormFieldUpdateResult,
   FormImportResult,
   FormRepairResult,
+  FormResetResult,
   FormSetValueResult,
   FormWidgetLinkResult,
 } from '../mutation/FormMutationResults';
@@ -36,7 +37,7 @@ export interface FormRepairOptions {
  * fields hold the values and widget annotations are their page-scoped
  * views. Filling mutates the field plane; rendering only ever reads the
  * widget plane (through the annotation subsystem — join widgets to
- * annotations via `FormFieldWidget.annotObjectNumber`).
+ * annotations via `FormWidget.ref`).
  *
  * Reads are gated by `doc.forms.read`, value writes and imports by
  * `doc.forms.fill`, and repair by `doc.forms.modify`. On layer documents
@@ -59,19 +60,24 @@ export interface DocumentFormsService {
   get(ref: FormFieldRef): AbortablePromise<FormFieldDTO>;
 
   /**
-   * Write one field's value. The value's `type` must match the field
-   * family (see {@link FormFieldValue}). Validation happens before any
-   * write — a failed call leaves the document untouched. Appearance
-   * streams regenerate for text/choice widgets; toggles flip their
-   * appearance state. Emits `form.valueChanged`.
+   * Write one field's value, in the fields a read of it returns (see
+   * {@link FormFieldValue}). Validation happens before any write — a failed
+   * call leaves the document untouched. Appearance streams regenerate for
+   * text/choice widgets; toggles flip their appearance state. Emits
+   * `forms.valueSet`.
    */
   setValue(ref: FormFieldRef, value: FormFieldValue): AbortablePromise<FormSetValueResult>;
 
   /**
-   * Restore a field to its default value (/DV), or clear it when no
-   * default exists. Emits `form.valueChanged`.
+   * Put fields back to their default value (/DV), or empty them when they
+   * have none: the whole form without an argument, else the fields named.
+   * Fields that hold no value (push buttons, signature fields) are skipped,
+   * and so, in a whole-form reset, are fields a signature locked; naming a
+   * locked field fails with `ProtectedDocument`. The result lists the
+   * fields that changed. Emits one `forms.valueSet` per changed field,
+   * sharing `origin.tx`.
    */
-  reset(ref: FormFieldRef): AbortablePromise<FormSetValueResult>;
+  reset(fields?: FormFieldRef | FormFieldRef[]): AbortablePromise<FormResetResult>;
 
   /**
    * Apply one script run's ordered effects as one worker/cloud job. The batch
@@ -79,17 +85,17 @@ export interface DocumentFormsService {
    * after a post-preflight internal failure the remaining effects are marked
    * skipped and any landed state is finalized as one artifact/event/version.
    */
-  applyEffects?(effects: FormEffect[]): AbortablePromise<FormEffectsResult>;
+  applyEffects(effects: FormEffect[]): AbortablePromise<FormEffectsResult>;
 
   /**
-   * Deliver a resolved form submission to the document's HOME. Present only
-   * where the document HAS a home that accepts submissions — the cloud
+   * Deliver a resolved form submission to the document's home. Present only
+   * where the document has a home that accepts submissions — the cloud
    * engine when the deployment advertises the capability; the local engine
    * truthfully lacks it (an in-process document has no home, and this
    * contract is never a callback trampoline). Gated by `doc.forms.submit`
    * (grant-minted; no PDF permission bit exists for submission), asserted
    * at the home's boundary where enforcement is real. The home stores the
-   * dataset with the declared intent as metadata and derives WHO submitted
+   * dataset with the declared intent as metadata and derives who submitted
    * from its own verified session — it never fetches the PDF's URL.
    */
   submit?(request: FormSubmissionRequest): AbortablePromise<FormSubmissionReceipt>;
@@ -101,15 +107,15 @@ export interface DocumentFormsService {
    * `list()`, so recovered fields are included and, on layer documents,
    * filled values win over the base.
    */
-  exportData(format?: FormDataFormat): AbortablePromise<FormDataExport>;
+  export(format?: FormDataFormat): AbortablePromise<FormDataExport>;
 
   /**
    * Apply an FDF or XFDF payload. The format is sniffed from the bytes
    * when `format` is omitted. Each entry replays through the same typed,
    * validated write path as `setValue` — one bad entry is skipped and
-   * counted, never fatal. Emits `form.imported`.
+   * counted, never fatal. Emits `forms.imported`.
    */
-  importData(
+  import(
     data: Uint8Array | ArrayBuffer,
     format?: FormDataFormat,
   ): AbortablePromise<FormImportResult>;
@@ -117,28 +123,27 @@ export interface DocumentFormsService {
   /**
    * Create a logical form field, optionally with styled widgets, in one
    * atomic job. Widgets are born through the annotation plane and adopted
-   * (see {@link attachWidget}); the inline `widget(s)` config is sugar for
+   * (see {@link addWidget}); the inline `widget(s)` config is sugar for
    * exactly that composition. Gated by `doc.forms.modify`. Emits
-   * `form.fieldCreated`.
+   * `forms.created`.
    */
-  createField(draft: FormFieldDraft): AbortablePromise<FormFieldCreateResult>;
+  create(draft: FormFieldDraft): AbortablePromise<FormFieldCreateResult>;
 
   /**
    * Update field-plane properties (name, universal and family flags,
    * options, default value, names). The patch's `family` must match the
    * target field. Validate-then-apply per property. Emits
-   * `form.fieldUpdated`.
+   * `forms.updated`.
    */
-  updateField(ref: FormFieldRef, patch: FormFieldPatch): AbortablePromise<FormFieldUpdateResult>;
+  update(ref: FormFieldRef, patch: FormFieldPatch): AbortablePromise<FormFieldUpdateResult>;
 
   /**
-   * Draw a PDF page into every widget of an UNSIGNED signature field — the
+   * Draw a PDF page into every widget of an unsigned signature field — the
    * visual "sign" of a viewer that has no signer. The field's value stays
    * empty and nothing is sealed; a signed field is refused. Gated by
-   * `doc.forms.fill`. Emits `form.fieldUpdated`. Absent on engines that
-   * cannot draw appearances.
+   * `doc.forms.fill`. Emits `forms.updated`.
    */
-  setSignatureAppearance?(
+  setSignatureAppearance(
     ref: FormFieldRef,
     appearance: SignatureAppearanceInput,
   ): AbortablePromise<FormFieldUpdateResult>;
@@ -146,38 +151,33 @@ export interface DocumentFormsService {
   /**
    * Delete a terminal field and cascade: every widget is removed from its
    * page, the field leaves the tree, and empty ancestors are pruned.
-   * Emits `form.fieldDeleted`.
+   * Emits `forms.deleted`.
    */
-  deleteField(ref: FormFieldRef): AbortablePromise<FormFieldDeleteResult>;
+  delete(ref: FormFieldRef): AbortablePromise<FormFieldDeleteResult>;
 
   /**
-   * Adopt an existing, unattached widget annotation as a view of the
-   * field. `onState` names the checked appearance state and is required
-   * for radio groups (checkboxes default to "Yes"). Attaching into a
-   * legacy merged field splits it — the FIELD object number never
-   * changes; widget identity may. Emits `form.widgetAttached`.
+   * Show the field in one more place: a new widget, placed and styled like
+   * an entry of a draft's `widgets`, in one change. A radio button needs
+   * its `exportValue`. Adding a widget to a legacy merged field splits it —
+   * the field object number never changes. Emits `forms.widgetAdded`.
    */
-  attachWidget(
-    ref: FormFieldRef,
-    widget: AnnotationRef,
-    options?: { onState?: string },
-  ): AbortablePromise<FormWidgetLinkResult>;
+  addWidget(ref: FormFieldRef, placement: WidgetPlacement): AbortablePromise<FormWidgetLinkResult>;
 
   /**
-   * The inverse of {@link attachWidget}: the widget keeps its page
-   * placement and last appearance but becomes an ordinary, inert
-   * annotation (deletable through the annotation APIs). The field
+   * Take a widget out of its field: it keeps its page placement and last
+   * appearance but becomes an ordinary, inert widget annotation (its
+   * `field` is `null`, deletable through the annotation APIs). The field
    * survives, "unplaced" when this was its last widget. Emits
-   * `form.widgetDetached`.
+   * `forms.widgetRemoved`.
    */
-  detachWidget(ref: FormFieldRef, widget: AnnotationRef): AbortablePromise<FormWidgetLinkResult>;
+  removeWidget(ref: FormFieldRef, widget: AnnotationRef): AbortablePromise<FormWidgetLinkResult>;
 
   /**
    * Make the engine's read-time reconciliation durable in the document
    * ("form doctor"): bootstrap a missing /AcroForm, link recovered field
    * roots into /Fields, re-attach stray widgets to their parent's /Kids,
    * and optionally bake appearances. Validate-then-apply and idempotent —
-   * a second call reports zero fixes. Emits `form.repaired`.
+   * a second call reports zero fixes. Emits `forms.repaired`.
    */
   repair(options?: FormRepairOptions): AbortablePromise<FormRepairResult>;
 }

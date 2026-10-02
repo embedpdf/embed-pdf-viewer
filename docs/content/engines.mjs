@@ -1,5 +1,5 @@
 /**
- * The engine-flavor manifest (DOCS-PLATFORM-ARCHITECTURE.md): everything the
+ * The engine-flavor manifest (docs/conventions/docs-architecture.md): everything the
  * sync generator substitutes when it emits a site's copy of a sample.
  * "Fork what teaches, template what provisions" — these lines ARE the
  * provisioning, so they are defined once, here, never per sample.

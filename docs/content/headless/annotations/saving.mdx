@@ -1,0 +1,232 @@
+---
+title: Events, saving & sharing
+description: Listen for annotation changes, save them into the PDF, and move them in and out of your own database.
+---
+
+# Events, saving & sharing
+
+Every annotation change fires an event, whoever made it: the user, your code, or someone else on
+a shared document. Listen for them to keep your own UI or server in step:
+
+<Snippet name="annotations/saving/events" />
+
+<Example name="annotation/events" />
+
+> **Try it:** draw, move and delete. Each change is logged once the engine has saved it, as
+> `local`: this viewer made it.
+
+<Fw only={['react', 'vue', 'svelte']}>
+
+The <Word of="hook" /> listens while the component is mounted. Outside a component, call the event on the
+plugin's API; it returns a function that stops listening:
+
+```ts
+const stop = annotation.onCreated(({ annotation }) => {
+  /* … */
+});
+```
+
+</Fw>
+
+<Fw only="angular">
+
+`takeUntilDestroyed()` stops listening when the component or directive is destroyed. Anywhere
+else, such as in a service, keep the subscription and end it yourself:
+
+```ts
+const subscription = annotation.created$.subscribe(({ annotation }) => {
+  /* … */
+});
+
+subscription.unsubscribe();
+```
+
+</Fw>
+
+## Events
+
+| Event               | Fires when                                                          | Carries                             |
+| :------------------ | :------------------------------------------------------------------ | :---------------------------------- |
+| `onCreated`         | An annotation was added.                                            | `annotation`, `origin`              |
+| `onUpdated`         | An annotation was changed.                                          | `annotation`, `origin`              |
+| `onDeleted`         | Annotations were deleted: one, plus its popup and replies.          | `refs`, `page`, `origin`            |
+| `onMoved`           | The drawing order on a page changed.                                | `refs`, `page`, `toIndex`, `origin` |
+| `onResynced`        | Annotations were read again, as after loading a document.           | `pages`                             |
+| `onWriteFailed`     | The engine refused a change the user made.                          | `refs`, `error`                     |
+| `onSettingsChanged` | A setting changed, through `updateSettings()` or `resetSettings()`. | `settings`, `changed`               |
+
+- **Once, and after it's saved.** <Fw only={['react', 'vue', 'svelte']}>`onCreated`, `onUpdated`, `onDeleted` and
+  `onMoved`</Fw><Fw only="angular">`created$`, `updated$`, `deleted$` and `moved$`</Fw> fire when the engine has saved
+  the change, never while it's still pending. A change fires once, however
+  many screens show it.
+- **Loading isn't a list of creates.** When a document opens, its annotations arrive as one
+  <Fw only={['react', 'vue', 'svelte']}>`onResynced`, not as an `onCreated`</Fw><Fw only="angular">`resynced$`, not as a `created$`</Fw> per
+  annotation. The same happens after a change that touches whole pages, such as flattening or
+  redaction. Then read the `pages` it names again with `list()`.
+- **`annotation` is the record after the change.** It's what `get()` returns now.
+
+The selection, a shape being drawn, text editing and hover have events of their own
+(<Fw only={['react', 'vue', 'svelte']}>`onSelectionChanged`, `onDraftChanged`, `onEditingChanged`, `onHoverChanged`</Fw><Fw only="angular">`selectionChanged$`,
+`draftChanged$`, `editingChanged$`, `hoverChanged$`</Fw>); see [Selecting & editing](selecting#events).
+A tool's defaults have <Fw only={['react', 'vue', 'svelte']}>`tools.onDefaultsChanged`</Fw><Fw only="angular">`tools.defaultsChanged$`</Fw>; see
+[Tools & defaults](tools#events).
+
+## Where a change came from
+
+`origin` says who made the change:
+
+| Field         | What it is                                                                    |
+| :------------ | :---------------------------------------------------------------------------- |
+| `origin.kind` | `'local'` when this viewer made the change, `'remote'` when someone else did. |
+| `origin.sub`  | The user who made it (on a shared document).                                  |
+| `origin.ts`   | When it happened, in milliseconds.                                            |
+| `origin.tx`   | Shared by every change one call made, such as an import.                      |
+
+<Snippet name="annotations/saving/remote-toast" />
+
+These are the engine's own events, so the fields mean the same as on
+[Events](/docs/engine/concepts/events).
+
+## Save the PDF
+
+Annotations are part of the document. Save the document and they're in the file:
+
+```ts
+const bytes = await documents.download(); // the whole PDF, with every annotation
+```
+
+<Example name="annotation/download" />
+
+A save waits for pending changes, so what you save is what the user sees. For the difference
+between a quick save that appends the changes and a full rewrite, see
+[Saving](/docs/engine/documents/saving).
+
+## Export and import
+
+To take annotations out of a document, as data rather than inside a PDF, export them. One call
+gives you a **bundle**: every annotation with the bytes it carries (a stamp's drawing, an
+attached file). One call puts a bundle into a document. `AnnotationTransfer` comes from
+`@embedpdf/react/annotation`:
+
+```ts
+const bundle = await annotation.export(); // everything
+const text = AnnotationTransfer.stringify(bundle); // one JSON text, ready to store
+
+// later, in the same document or another one
+const { annotations, dropped } = await annotation.import(await AnnotationTransfer.parse(text), {
+  pages: 'by-position',
+});
+```
+
+Use it to:
+
+- keep annotations in your own database, apart from the PDF;
+- carry a review over to a new version of a document;
+- let a user paste annotations from one document into another.
+
+<Example name="annotation/export-import" />
+
+> **Try it:** **Delete all**, then **Import**: they come back from the text. Import again: the
+> annotations with a name are left out, since they're there already.
+
+Export waits for pending changes, and imported annotations show at once, like any other change.
+
+What to export:
+
+```ts
+await annotation.export({ refs: annotation.selection.list().map((a) => a.ref) }); // the selection
+await annotation.export({ pages: [page.ref] }); // one page
+```
+
+A selection brings what it needs: a reply brings the comment it answers, and a comment brings its
+replies.
+
+How to import:
+
+| Option        | What it does                                                                                     | Default     |
+| :------------ | :----------------------------------------------------------------------------------------------- | :---------- |
+| `pages`       | Where each page's annotations go: `'same'` (the same page), `'by-position'`, or a list of pairs. | `'same'`    |
+| `attribution` | `'restore'` keeps who wrote each annotation, `'stamp'` makes the importing user the author.      | `'restore'` |
+
+Use `'stamp'` when a user pastes annotations: they become theirs. `'restore'` writes annotations
+in other people's names, so it needs a special permission; keep it for trusted jobs, such as
+loading from your own database.
+
+The result tells you what happened:
+
+- **`annotations`**: the new annotations, in bundle order.
+- **`refMap`**: each annotation's ref in the bundle, and its new ref here.
+- **`dropped`**: what was left out, and why. For example, an annotation whose name is already
+  taken on its page. Importing the same bundle twice doesn't duplicate annotations with a name.
+
+The engine's [Import & export](/docs/engine/annotations/import-export) page has every option,
+reason and limit.
+
+## Keep annotations in your own database
+
+There are two ways to store annotations outside the PDF.
+
+**Store a bundle per document.** Export when the user saves, store the text, and import it when
+the document opens again. It's one row per document and one call each way:
+
+```ts
+// on save
+await api.put(`/reviews/${docId}`, AnnotationTransfer.stringify(await annotation.export()));
+
+// on open, once the annotations are loaded (status 'ready')
+const text = await api.get(`/reviews/${docId}`);
+if (text) await annotation.import(await AnnotationTransfer.parse(text));
+```
+
+**Store each annotation as it changes.** Listen for the events and write each change to your
+server. Key your rows by the annotation's ref:
+
+<Snippet name="annotations/saving/sync" />
+
+<Fw only={['react', 'vue', 'svelte']}>Handle `onUpdated` the same way, and `onDeleted` by deleting each of its `refs`. On
+`onResynced`, compare the pages it names with `list()`.</Fw><Fw only="angular">Handle `updated$` the same way, and
+`deleted$` by deleting each of its `refs`. On `resynced$`, compare the pages it names with
+`list()`.</Fw> Only send `local` changes: a `remote` one was already saved by whoever made it.
+
+### Which id to store
+
+Store the annotation's `ref`. It's plain data, and it stays valid after the document is saved
+and opened again. To use it as a key in a map or a URL, turn it into a string with
+`annotationKey(ref)`. See [Refs & identity](/docs/engine/concepts/identity).
+
+## Good to know
+
+### Unsaved changes
+
+To warn before someone leaves with annotations that aren't downloaded yet, use
+<Fw only={['react', 'vue', 'svelte']}>`hasUnsavedChanges` from `useDocument()`</Fw><Fw only="angular">the `hasUnsavedChanges()` signal on
+`inject(EpdfDocument)`</Fw>; see [Warn before changes are lost](../documents/saving#warn-before-changes-are-lost).
+
+### Events on a shared document
+
+<Engine local>
+
+The local engine's events come from this tab: the changes made here, by the user or your code.
+
+<CloudPdfCallout
+  title="Review one document together, live"
+  href="https://www.cloudpdf.com/docs/headless/annotations/saving"
+  cta="Collaborate with CloudPDF"
+>
+
+With CloudPDF, annotations are stored on your server as people make them, and everyone with the
+document open gets each other's changes as events, with `origin.kind: 'remote'`. The server checks
+that people only change what they may, such as their own annotations. Your code stays the same: the
+same events, the same `list()`.
+
+</CloudPdfCallout>
+
+</Engine>
+
+<Engine cloud>
+
+Every viewer with the document open gets every change as an event, with `origin.kind` set to
+`'remote'` for the ones it didn't make. The annotations appear in `list()` by themselves; the events
+are there so you can react, such as with a notification.
+
+</Engine>

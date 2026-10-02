@@ -1,8 +1,6 @@
 import type { PageAnnotationsService } from './PageAnnotationsService';
-import type { PageGeometryService } from './PageGeometryService';
 import type { PageRenderService } from './PageRenderService';
 import type { PageTextService } from './PageTextService';
-import type { PieceInfoService } from './PieceInfoService';
 import type { PageMeasureService } from './PageMeasureService';
 import type { PageRef } from '../identity/PageRef';
 
@@ -13,21 +11,8 @@ import type { PageRef } from '../identity/PageRef';
  */
 export interface PageHandle {
   readonly ref: PageRef;
-  /**
-   * Display index at the time this handle was minted. The engine refreshes
-   * this on every annotation/list call against the live `PageRecord`, but
-   * callers should treat it as advisory metadata only.
-   */
-  readonly pageIndex: number;
   readonly annotations: PageAnnotationsService;
   readonly text: PageTextService;
-  readonly geometry: PageGeometryService;
   readonly render: PageRenderService;
-  /**
-   * PAGE-level `/PieceInfo` private application data (ISO 32000 §14.5) —
-   * e.g. a stamp page's name/subject. Optional: local implements it; cloud
-   * omits it until a cloud consumer ships (the `downloadLayer?` pattern).
-   */
-  readonly pieceInfo?: PieceInfoService;
-  readonly measure?: PageMeasureService;
+  readonly measure: PageMeasureService;
 }

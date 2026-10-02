@@ -9,7 +9,7 @@ import ts from 'typescript';
 const PLUGIN_ROOT = /^@embedpdf\/plugin-[^/]+$/;
 const PLUGIN_PACKAGE = /^(@embedpdf\/plugin-[^/]+)(?:\/(.+))?$/;
 const SOURCE_EXTENSIONS = ['.ts', '.tsx', '.mts', '.cts', '.js', '.jsx', '.mjs', '.cjs'];
-const IMPLEMENTATION_MODULE = /(?:^|\/)(?:[^/]+\.plugin|capability|effects|reducer)$/;
+const IMPLEMENTATION_MODULE = /(?:^|\/)(?:[^/]+\.plugin|controller|connect)$/;
 
 function normalize(file) {
   return file.split(path.sep).join('/');
@@ -20,7 +20,13 @@ function sourceFilesUnder(root) {
   const files = [];
   const visit = (dir) => {
     for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-      if (entry.name === 'dist' || entry.name === 'node_modules' || entry.name === '__tests__') {
+      if (
+        entry.name === 'dist' ||
+        entry.name === 'node_modules' ||
+        entry.name === '__tests__' ||
+        // svelte-package's own working copy of the build.
+        entry.name === '.svelte-kit'
+      ) {
         continue;
       }
       const full = path.join(dir, entry.name);
@@ -163,6 +169,26 @@ function angularOwnedRoots(frameworkRoot) {
     const publicApi = path.join(entryRoot, 'src', 'public_api.ts');
     if (!fs.existsSync(publicApi)) continue;
     rootsByDirectory.set(entryRoot, runtimeRootReexports(parse(publicApi)));
+  }
+  return rootsByDirectory;
+}
+
+/**
+ * Vue's and Svelte's entries: `src/<feature>.ts` re-exports its plugin and the folder
+ * `src/<feature>/` holds the rest of the entry (its components and readers), so that folder owns
+ * the same plugin roots, as an Angular entry's directory does.
+ */
+function folderEntryOwnedRoots(frameworkRoot) {
+  const rootsByDirectory = new Map();
+  for (const framework of ['vue', 'svelte']) {
+    const sourceRoot = path.join(frameworkRoot, framework, 'src');
+    if (!fs.existsSync(sourceRoot)) continue;
+    for (const entry of fs.readdirSync(sourceRoot, { withFileTypes: true })) {
+      if (!entry.isFile() || !entry.name.endsWith('.ts')) continue;
+      const folder = path.join(sourceRoot, entry.name.replace(/\.ts$/, ''));
+      if (!fs.existsSync(folder)) continue;
+      rootsByDirectory.set(folder, runtimeRootReexports(parse(path.join(sourceRoot, entry.name))));
+    }
   }
   return rootsByDirectory;
 }
@@ -312,11 +338,14 @@ function importBoundaryChecks(repoRoot, violations) {
   }
 
   const frameworkRoot = path.join(repoRoot, 'packages', 'framework');
-  const angularRoots = angularOwnedRoots(frameworkRoot);
+  const entryRoots = new Map([
+    ...angularOwnedRoots(frameworkRoot),
+    ...folderEntryOwnedRoots(frameworkRoot),
+  ]);
   for (const file of sourceFilesUnder(frameworkRoot)) {
     const source = parse(file);
     const owned = runtimeRootReexports(source);
-    for (const [entryRoot, roots] of angularRoots) {
+    for (const [entryRoot, roots] of entryRoots) {
       if (file === entryRoot || file.startsWith(`${entryRoot}${path.sep}`)) {
         for (const root of roots) owned.add(root);
       }

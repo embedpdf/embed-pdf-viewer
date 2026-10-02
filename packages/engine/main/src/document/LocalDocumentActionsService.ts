@@ -24,7 +24,7 @@ export class LocalDocumentActionsService implements DocumentActionsService {
     private readonly guard: ScopeGuard,
   ) {}
 
-  read(): AbortablePromise<DocumentActionsSnapshot> {
+  get(): AbortablePromise<DocumentActionsSnapshot> {
     if (this.view.isClosed()) {
       return AbortablePromise.rejectReason(
         new EngineError(EngineErrorCode.DocNotOpen, `document not open: ${this.docId}`),

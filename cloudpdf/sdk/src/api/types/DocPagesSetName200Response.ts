@@ -3,66 +3,128 @@
 import type * as CloudPDF from "../index.js";
 
 export interface DocPagesSetName200Response {
+    layout: DocPagesSetName200Response.Layout;
     meta: DocPagesSetName200Response.Meta;
-    /** Accepts any additional properties */
-    [key: string]: any;
 }
 
 export namespace DocPagesSetName200Response {
-    export interface Meta {
-        affectedPages: Meta.AffectedPages.Item[];
-        cacheDelta: Meta.CacheDelta | null;
+    export interface Layout {
+        pageCount: number;
+        pages: Layout.Pages.Item[];
+        namedPages: Layout.NamedPages.Item[];
     }
 
-    export namespace Meta {
-        export type AffectedPages = AffectedPages.Item[];
+    export namespace Layout {
+        export type Pages = Pages.Item[];
 
-        export namespace AffectedPages {
+        export namespace Pages {
             export interface Item {
-                page: Item.Page;
-                revision: Item.Revision;
-                weakAnnotationState: CloudPDF.DocPagesSetName200ResponseMetaAffectedPagesItemWeakAnnotationState;
+                index: number;
+                ref: Item.Ref;
+                label: string | null;
+                size: Item.Size;
+                rotation: number;
+                userUnit: number;
+                boxes: Item.Boxes;
+                pdfCropBox: Item.PdfCropBox;
+                actions?: CloudPDF.PdfPageActions | undefined;
             }
 
             export namespace Item {
-                export interface Page {
-                    kind: Page.Kind;
-                    pageObjectNumber: number;
+                export interface Ref {
+                    kind: Ref.Kind;
+                    objectNumber: number;
                 }
 
-                export namespace Page {
+                export namespace Ref {
                     export const Kind = {
                         ObjectNumber: "objectNumber",
                     } as const;
                     export type Kind = (typeof Kind)[keyof typeof Kind];
                 }
 
-                export interface Revision {
-                    docSessionId: string;
-                    page: Revision.Page;
-                    generation: number;
+                export interface Size {
+                    width: number;
+                    height: number;
                 }
 
-                export namespace Revision {
-                    export interface Page {
-                        kind: Page.Kind;
-                        pageObjectNumber: number;
+                export interface Boxes {
+                    media: Boxes.Media;
+                    crop: Boxes.Crop;
+                    bleed: Boxes.Bleed;
+                    trim: Boxes.Trim;
+                    art: Boxes.Art;
+                }
+
+                export namespace Boxes {
+                    export interface Media {
+                        x: number;
+                        y: number;
+                        width: number;
+                        height: number;
                     }
 
-                    export namespace Page {
-                        export const Kind = {
-                            ObjectNumber: "objectNumber",
-                        } as const;
-                        export type Kind = (typeof Kind)[keyof typeof Kind];
+                    export interface Crop {
+                        x: number;
+                        y: number;
+                        width: number;
+                        height: number;
                     }
+
+                    export interface Bleed {
+                        x: number;
+                        y: number;
+                        width: number;
+                        height: number;
+                    }
+
+                    export interface Trim {
+                        x: number;
+                        y: number;
+                        width: number;
+                        height: number;
+                    }
+
+                    export interface Art {
+                        x: number;
+                        y: number;
+                        width: number;
+                        height: number;
+                    }
+                }
+
+                export interface PdfCropBox {
+                    left: number;
+                    bottom: number;
+                    right: number;
+                    top: number;
                 }
             }
         }
 
+        export type NamedPages = NamedPages.Item[];
+
+        export namespace NamedPages {
+            export interface Item {
+                name: string;
+                target: CloudPDF.DocPagesSetName200ResponseLayoutNamedPagesItemTarget;
+            }
+        }
+    }
+
+    export interface Meta {
+        affectedPages: CloudPDF.PageState[];
+        cacheDelta: Meta.CacheDelta | null;
+    }
+
+    export namespace Meta {
         export interface CacheDelta {
             previousDocVersion: number;
             docVersion: number;
             annotationsVersion?: number | undefined;
+            layoutVersion?: number | undefined;
+            metadataVersion?: number | undefined;
+            attachmentsVersion?: number | undefined;
             layerVersion?: number | undefined;
             working?: boolean | undefined;
             pages: CacheDelta.Pages.Item[];
@@ -80,7 +142,7 @@ export namespace DocPagesSetName200Response {
                 export namespace Item {
                     export interface Page {
                         kind: Page.Kind;
-                        pageObjectNumber: number;
+                        objectNumber: number;
                     }
 
                     export namespace Page {

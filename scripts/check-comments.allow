@@ -1,0 +1,8 @@
+# Exceptions to scripts/check-comments.mjs, one per line:
+#   <path prefix> :: <regular expression matched against the comment line> :: <reason>
+packages/viewer/main/src/doors/snippet.ts :: @VERSION/ :: a URL placeholder the reader replaces with a version
+cloudpdf/viewer/main/src/index.ts :: @VERSION/ :: a URL placeholder the reader replaces with a version
+packages/core/signature/src :: signing-certificate-v2 :: the ESS attribute name (RFC 5035), not a version reference
+packages/engine/ :: UUID v4|v4 UUID :: the RFC 4122 UUID version (random UUIDs), not a version reference
+cloudpdf/sdk/src/core/ :: \bused to (set|upload)\b :: Fern-generated SDK runtime, rewritten by every api:sync; "is used to" means "serves to", not history
+cloudpdf/website/src/ :: `/docs\.md` :: the public Markdown URL of the docs landing page, not a repository file

@@ -1,8 +1,8 @@
 /**
- * Dev harness — the vanilla one-liner PLUS one rung of each door, so
+ * Dev harness — the vanilla one-liner plus one rung of each door, so
  * `pnpm dev` in this package always exercises the whole boundary:
  * init → element → preact chrome → engine worker, the config pass-through,
- * and the DRIVE door (el.viewer from plain page script).
+ * and the drive door (el.viewer from plain page script).
  */
 import EmbedPDF, { AnnotationToken, indexedDbKeyStore, personalSigner } from './doors/local';
 
@@ -13,11 +13,11 @@ const signer = personalSigner({
   store: indexedDbKeyStore('embedpdf-dev-keys'),
 });
 
-const el = EmbedPDF.init({
+const element = EmbedPDF.init({
   target: '#viewer',
   src: '/ebook.pdf',
   signatures: {
-    signer: () => signer,
+    key: () => signer,
     trust: { anchors: async () => [(await signer).certificate] },
     allowCertify: true,
   },
@@ -25,7 +25,7 @@ const el = EmbedPDF.init({
   // this harness, registered on the engine and mounted for the live editor.
   annotations: {
     fonts: [
-      { key: 'roboto', url: '/fonts/Roboto-Regular.ttf', label: 'Roboto', familyName: 'Roboto' }
+      { key: 'roboto', url: '/fonts/Roboto-Regular.ttf', label: 'Roboto', familyName: 'Roboto' },
     ],
   },
 });

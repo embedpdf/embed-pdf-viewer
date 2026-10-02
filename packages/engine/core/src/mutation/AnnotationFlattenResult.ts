@@ -11,18 +11,18 @@ export interface AnnotationFlattenInput {
 
 /**
  * Per-ref outcome. `applied`: painted into the page content and removed.
- * `skipped`: left in place — hidden for the usage, a Popup, or without a
+ * `unchanged`: left in place — hidden for the usage, a Popup, or without a
  * usable normal appearance. A ref that is not on the page rejects the whole
  * call with `InvalidArg` before anything is mutated, so it never appears here.
  */
 export interface AnnotationFlattenItemResult {
   ref: AnnotationRef;
-  status: 'applied' | 'skipped';
+  status: 'applied' | 'unchanged';
 }
 
 /**
  * Result of `page(pon).annotations.flatten()` — `pages.flatten` for a chosen
- * set. A content + annotation mutation of ONE page: `meta` carries that
+ * set. A content + annotation mutation of one page: `meta` carries that
  * page's new pins (null when nothing was applied), exactly like
  * `PageFlattenResult`.
  */
@@ -30,7 +30,7 @@ export interface AnnotationFlattenResult {
   page: PageRef;
   usage: PageFlattenUsage;
   results: AnnotationFlattenItemResult[];
-  meta: MutationMeta | null;
+  meta: MutationMeta;
 }
 
 /** Input for `page(pon).annotations.exportAppearance()`. */

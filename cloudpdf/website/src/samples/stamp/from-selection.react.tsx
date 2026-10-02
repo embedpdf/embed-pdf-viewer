@@ -1,35 +1,27 @@
-import { useState } from 'react';
-import { Viewer, DocumentGate, toPageRef, useDocumentId } from '@embedpdf/react/runtime';
+import { useEffect, useRef } from 'react';
+import { Viewer, DocumentGate } from '@embedpdf/react/runtime';
 import type { OpenInput } from '@embedpdf/react/runtime';
-import { Stage, stagePlugin } from '@embedpdf/react/stage';
+import { Stage, stagePlugin, useStage } from '@embedpdf/react/stage';
 import { RenderLayer, renderPlugin } from '@embedpdf/react/render';
-import { interactionPlugin, useTool } from '@embedpdf/react/interaction';
+import { interactionPlugin } from '@embedpdf/react/interaction';
 import {
   AnnotationLayer,
   annotationPlugin,
   useAnnotation,
-  useAnnotationSelection,
+  useAnnotationState,
 } from '@embedpdf/react/annotation';
 import {
   stampPlugin,
-  useArmStampAsset,
   useStamp,
   useStampAssetPreviewUrl,
   useStampAssets,
+  useStampState,
 } from '@embedpdf/react/stamp';
 import type { StampAsset } from '@embedpdf/react/stamp';
 import { cloudEngine } from '@cloudpdf/engine';
 import { localEngine } from '@embedpdf/engine';
 
-import {
-  Button,
-  Demo,
-  Readout,
-  Spacer,
-  StageFrame,
-  Toolbar,
-  stageFill,
-} from '../stage/_shared/chrome';
+import './from-selection.css';
 
 const engine = cloudEngine({ baseUrl: 'https://engine.cloudpdf.com' });
 const assetEngine = localEngine();
@@ -44,96 +36,115 @@ const plugins = [
 const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrbJQM' };
 
 const MY_STAMPS = 'my-stamps';
+// An empty corner of the cover, in page coordinates.
+const CORNER = { x: 70, y: 600, width: 190, height: 64 };
 
-function MyStamp({ asset, onArm }: { asset: StampAsset; onArm: () => void }) {
+// On load: a framed text stamp in the cover's empty corner, both parts selected, scrolled into view.
+function DrawSeal() {
+  const annotation = useAnnotation();
+  const stage = useStage();
+  const ready = useAnnotationState((state) => state.status === 'ready');
+  const drawn = useRef(false);
+
+  useEffect(() => {
+    if (!ready || drawn.current) return;
+    drawn.current = true;
+    void Promise.all([
+      annotation.create(0, { subtype: 'square', box: CORNER, color: '#c4262e', strokeWidth: 4 }),
+      annotation.create(0, {
+        subtype: 'free-text',
+        intent: 'free-text',
+        box: CORNER,
+        contents: 'CHECKED',
+        fontFamily: 'helvetica-bold',
+        fontSize: 30,
+        textAlign: 'center',
+        verticalAlign: 'middle',
+        fontColor: '#c4262e',
+        strokeWidth: 0,
+      }),
+    ]).then((created) => {
+      annotation.selection.set(created.map((made) => made.annotation.ref));
+      stage.reveal(0, { rect: CORNER });
+    });
+  }, [annotation, stage, ready]);
+
+  return null;
+}
+
+function MyStamp({ asset, armed }: { asset: StampAsset; armed: boolean }) {
+  const stamp = useStamp();
   const url = useStampAssetPreviewUrl(asset.id);
+
   return (
-    <Button title={`Place "${asset.label}"`} onClick={onArm}>
-      {url ? <img src={url} alt={asset.label} style={{ height: 22 }} /> : asset.label}
-    </Button>
+    <button
+      type="button"
+      className="button"
+      title={`Place “${asset.label}”`}
+      aria-pressed={armed}
+      onClick={() => (armed ? stamp.disarm() : void stamp.armAsset(asset.id))}
+    >
+      {url ? <img src={url} alt={asset.label} className="preview" /> : asset.label}
+    </button>
   );
 }
 
 function MakeStamp() {
   const stamp = useStamp();
-  const documentId = useDocumentId();
-  const annotation = useAnnotation();
-  // Subscribed to the selection (refs) so this re-renders as it changes; the
-  // page-space records carry each annotation's page.
-  const selectedRefs = useAnnotationSelection();
-  const selected = selectedRefs.length > 0 ? annotation.listSelected() : [];
-  const selection = selected.map((a) => a.ref);
-  const mine = useStampAssets(MY_STAMPS);
-  const { armAsset } = useArmStampAsset();
-  const { activeToolId, activate } = useTool();
-  const [status, setStatus] = useState('draw a shape, select it, make a stamp');
+  const selected = useAnnotationState((state) => state.selected);
+  const mine = useStampAssets({ libraryId: MY_STAMPS });
+  const { armedAsset } = useStampState();
 
-  // One page at a time: a stamp is one page of artwork.
-  const pages = new Set(selected.map((a) => a.page.pageObjectNumber));
-  const canMake = selection.length > 0 && pages.size === 1 && documentId !== null;
+  // A stamp is one page of artwork: the selection must be on one page.
+  const page = selected[0]?.page;
+  const onePage = selected.every(
+    (annotation) => annotation.page.objectNumber === page?.objectNumber,
+  );
+  const canMake = !!page && onePage && stamp.canCreateFromAnnotations();
 
   const make = async () => {
-    if (!canMake || !documentId) return;
-    const [pageObjectNumber] = pages;
-    // The library is created on first use; the identifier is minted in
-    // Acrobat's `#…` form so the stamp keeps its identity there too.
-    const libraryId = stamp.getLibrary(MY_STAMPS)
-      ? MY_STAMPS
-      : await stamp.createLibrary('My stamps', { id: MY_STAMPS });
-    const assetId = await stamp.createAssetFromAnnotations(
-      documentId,
-      toPageRef(pageObjectNumber),
-      [...selection],
-      {
-        libraryId,
-        label: `Custom stamp ${mine.length + 1}`,
-      },
+    if (!page) return;
+    // The library is made on first use.
+    if (!stamp.getLibrary(MY_STAMPS)) await stamp.createLibrary('My stamps', { id: MY_STAMPS });
+    const { asset } = await stamp.createAssetFromAnnotations(
+      page,
+      selected.map((annotation) => annotation.ref),
+      { libraryId: MY_STAMPS, label: `My stamp ${mine.length + 1}` },
     );
-    setStatus(`added ${stamp.getAsset(assetId)?.label ?? assetId}`);
+    await stamp.armAsset(asset.id);
   };
 
   return (
-    <Toolbar>
-      <Button
-        title="Draw a rectangle on the page"
-        onClick={() => activate(activeToolId === 'square' ? 'pointer' : 'square')}
-      >
-        {activeToolId === 'square' ? '▸ ' : ''}▭ Draw
-      </Button>
-      <Button
-        title="Turn the selected annotation(s) into a reusable stamp"
-        disabled={!canMake}
-        onClick={() => void make().catch((err) => setStatus(String(err)))}
-      >
-        Make stamp
-      </Button>
+    <div className="toolbar">
+      <button type="button" className="button" disabled={!canMake} onClick={() => void make()}>
+        Make a stamp of the selection
+      </button>
       {mine.map((asset) => (
-        <MyStamp key={asset.id} asset={asset} onArm={() => void armAsset(asset.id)} />
+        <MyStamp key={asset.id} asset={asset} armed={armedAsset?.id === asset.id} />
       ))}
-      <Spacer />
-      <Readout>{status}</Readout>
-    </Toolbar>
+      <span className="spacer" />
+      <output className="readout">
+        {armedAsset ? 'Click a page to place it' : `${selected.length} selected`}
+      </output>
+    </div>
   );
 }
 
 export default function App() {
   return (
     <Viewer engine={engine} plugins={plugins} initialDocuments={[{ source: ebook }]}>
-      <Demo>
-        <DocumentGate fallback={<p>Loading…</p>}>
-          <MakeStamp />
-          <StageFrame height={420}>
-            <Stage style={stageFill}>
-              {() => (
-                <>
-                  <RenderLayer annotations={false} />
-                  <AnnotationLayer />
-                </>
-              )}
-            </Stage>
-          </StageFrame>
-        </DocumentGate>
-      </Demo>
+      <DocumentGate fallback={<p className="loading">Loading…</p>}>
+        <DrawSeal />
+        <MakeStamp />
+        <Stage className="stage">
+          {() => (
+            <>
+              <RenderLayer annotations={false} />
+              <AnnotationLayer />
+            </>
+          )}
+        </Stage>
+      </DocumentGate>
     </Viewer>
   );
 }

@@ -12,14 +12,9 @@ import type { ManifestPage } from '@embedpdf/engine-core/wire';
  * `_` so it's clearly internal to this directory and not meant to be
  * exported from the package).
  *
- * History note: these helpers used to be copy-pasted across
- * `annotations.ts`, `pages.ts`, and `metadata.ts`. The
- * `abortSignalFromRequest` variant in `metadata.ts` was the original,
- * naive version that aborts on every `close` event — which silently
- * fires for body-bearing requests (POST/PATCH) the moment Fastify
- * finishes consuming the JSON body. Consolidating to one
- * implementation here ensures every route file gets the fixed
- * "abort only on actual client disconnect" behaviour.
+ * Route files must use these instead of local copies, so every route
+ * gets the same "abort only on actual client disconnect" behaviour of
+ * {@link abortSignalOf}.
  */
 
 /**
@@ -30,7 +25,10 @@ import type { ManifestPage } from '@embedpdf/engine-core/wire';
  */
 export type SafeParseLike<T> =
   | { success: true; data: T }
-  | { success: false; error: { issues: Array<{ message: string }> } };
+  | {
+      success: false;
+      error: { issues: Array<{ message: string; path?: ReadonlyArray<string | number> }> };
+    };
 
 export interface SchemaLike<T> {
   safeParse(raw: unknown): SafeParseLike<T>;
@@ -80,7 +78,7 @@ export function resolvePageRefToNumber(ref: PageRef): number {
       `unsupported page address kind '${String((ref as { kind: unknown }).kind)}'`,
     );
   }
-  return ref.pageObjectNumber;
+  return ref.objectNumber;
 }
 
 /** `parsePageKey` + `resolvePageRefToNumber` in one call, for route handlers. */
@@ -93,40 +91,32 @@ export function toPageState(page: ManifestPage): PageState {
 }
 
 /**
- * Convert a Fastify request's lifecycle into an `AbortSignal` the
- * worker pool can react to.
+ * An `AbortSignal` that aborts when the client goes away before its reply is
+ * sent, so the worker pool stops work nobody waits for any more.
  *
- * Locked behaviour (do not loosen without re-reading the abort-on-body
- * debug session in the v3 mutations slice):
+ * The response tells, not the request: by the time a client disconnects, its
+ * request has been read in full (`req.raw.complete` is true, for GET and POST
+ * alike, so a request-side check never fires); only the response sees its
+ * connection close before it finished.
  *
- *   - For body-bearing requests (POST/PATCH), Fastify finishes
- *     consuming the request stream BEFORE our handler runs. Node
- *     emits `close` on the IncomingMessage immediately after that.
- *     If we abort unconditionally on `close`, every request appears
- *     "aborted" to the worker, even when the client is happily
- *     awaiting the response.
- *
- *   - The fix: only abort when the request stream did NOT finish
- *     reading (`req.raw.complete === false`). That distinguishes a
- *     real client disconnect from a normal end-of-body signal.
- *
- *   - `req.raw.aborted` is checked up front for the rare case where
- *     the client tore down the connection before the handler started.
+ * Locked behaviour (do not loosen): a request whose reply is sent never
+ * aborts, whether its connection then closes or is kept alive.
  */
-export function abortSignalFromRequest(req: {
+export function abortSignalOf(reply: {
   raw: {
-    on(event: 'close', cb: () => void): void;
-    readonly complete: boolean;
-    readonly aborted?: boolean;
+    on(event: 'close', cb: () => void): unknown;
+    readonly writableFinished: boolean;
+    readonly destroyed: boolean;
   };
 }): AbortSignal {
   const ctrl = new AbortController();
-  if (req.raw.aborted) {
+  // The client left before the handler ran.
+  if (reply.raw.destroyed) {
     ctrl.abort();
     return ctrl.signal;
   }
-  req.raw.on('close', () => {
-    if (!req.raw.complete) ctrl.abort();
+  reply.raw.on('close', () => {
+    if (!reply.raw.writableFinished) ctrl.abort();
   });
   return ctrl.signal;
 }
@@ -137,13 +127,18 @@ export function abortSignalFromRequest(req: {
  * argument is interpolated into the message so the caller doesn't
  * have to compose a path manually.
  */
+/**
+ * `raw` checked against `schema`. A value it refuses is `InvalidArg` naming
+ * the field (the first issue's path, as the engines' own checks name it).
+ */
 export function parseOrInvalidArg<T>(schema: SchemaLike<T>, raw: unknown, where: string): T {
   const result = schema.safeParse(raw);
   if (!result.success) {
+    const field = result.error.issues[0]?.path?.join('.') ?? '';
     throw new EngineError(
       EngineErrorCode.InvalidArg,
       `${where}: ${result.error.issues.map((i) => i.message).join('; ')}`,
-      { details: { issues: result.error.issues } },
+      { details: { ...(field ? { field } : {}), issues: result.error.issues } },
     );
   }
   return result.data;

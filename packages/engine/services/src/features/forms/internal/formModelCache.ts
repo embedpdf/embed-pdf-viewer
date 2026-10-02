@@ -18,7 +18,7 @@ interface FormModelEntry {
  * field tree and sweep every page's /Annots on each read (widget lists on
  * multi-page documents read it constantly); keeping one forever would
  * serve stale values. Version-keying gives exact coherence for free:
- * `DocumentSession.noteMutation()` bumps the sequence on EVERY successful
+ * `DocumentSession.noteMutation()` bumps the sequence on every successful
  * mutation (annotations, pages, metadata, forms — widgets are annotations,
  * so all of them can affect the form model), and the next read rebuilds.
  *

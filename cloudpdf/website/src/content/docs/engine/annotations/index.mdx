@@ -1,0 +1,343 @@
+---
+title: Annotations
+description: List, add, change, reorder and delete annotations, with the fields and styles every kind shares.
+---
+
+{/* Generated from docs/content — edit there, then `pnpm docs:sync`. */}
+
+import { Callout } from '@/components/docs/callout';
+import { CardGrid, GridCard } from '@/components/docs/cards';
+
+# Annotations
+
+Annotations are what people add on top of a page: highlights, sticky notes, shapes, stamps,
+free text, links. They're stored in the PDF, so every PDF app shows them, and they stay separate
+from the page's own content, so you can change or remove them later.
+
+```ts
+const page = doc.page(pageRef);
+
+const { annotation } = await page.annotations.create({
+  subtype: 'square',
+  box: { x: 72, y: 92, width: 200, height: 100 },
+  color: '#0078ff',
+});
+
+await page.annotations.update(annotation.ref, { contents: 'Check this table' });
+await page.annotations.delete(annotation.ref);
+```
+
+## Kinds
+
+Each kind has its own page with an example and its fields:
+
+<CardGrid columns={2}>
+  <GridCard
+    icon="annotation"
+    title="Highlights & text markup"
+    description="Highlight, underline, squiggly and strikeout over text."
+    href="/docs/engine/annotations/text-markup"
+  />
+  <GridCard
+    icon="note"
+    title="Notes & replies"
+    description="Sticky notes, their popups, and threads of replies."
+    href="/docs/engine/annotations/notes-and-replies"
+  />
+  <GridCard
+    icon="free-text"
+    title="Free text"
+    description="Text boxes and callouts, with fonts and rich text."
+    href="/docs/engine/annotations/free-text"
+  />
+  <GridCard
+    icon="shape"
+    title="Shapes & drawing"
+    description="Rectangles, ellipses, lines, polygons and freehand ink."
+    href="/docs/engine/annotations/shapes"
+  />
+  <GridCard
+    icon="stamp"
+    title="Stamps"
+    description="Images and drawings placed on a page."
+    href="/docs/engine/annotations/stamps"
+  />
+  <GridCard
+    icon="link"
+    title="Links"
+    description="Areas that go to another page or open a website."
+    href="/docs/engine/annotations/links"
+  />
+  <GridCard
+    icon="attachment"
+    title="File attachments"
+    description="A file pinned to a spot on the page."
+    href="/docs/engine/annotations/file-attachments"
+  />
+  <GridCard
+    icon="measurement"
+    title="Measurements"
+    description="Distances, perimeters and areas at a real-world scale."
+    href="/docs/engine/annotations/measurements"
+  />
+</CardGrid>
+
+## List annotations
+
+Every annotation in the document, or the ones on one page:
+
+```ts
+const { annotations } = await doc.annotations.list(); // every page
+const { annotations } = await doc.annotations.list({ pages: [pageA, pageB] }); // some pages
+const { annotations } = await doc.page(pageRef).annotations.list(); // one page
+```
+
+A list is cheap even for a whole document: the engine reads the annotations without loading the
+pages. Each annotation names its `page`, and the list's `pages` has one entry per page it read.
+
+Each annotation has a `subtype` (its kind), a `rect` (where it is on its page) and a `ref` (its
+address). Keep the `ref`: it's how you change or delete the annotation later.
+
+Positions are in points from the top-left corner of the page, with y going down, like every
+position in the engine: a box is `{ x, y, width, height }` and a point `{ x, y }`. See
+[Coordinates](/docs/engine/concepts/coordinates).
+
+```ts
+for (const annotation of annotations) {
+  console.log(annotation.subtype, annotation.rect, annotation.contents);
+}
+```
+
+A list includes kinds the engine can't create yet: they come back as `subtype: 'unsupported'`,
+with their position and common fields. They stay in the PDF untouched.
+
+Form widgets are annotations too, of kind `'widget'`. You manage them through the form; see
+[Creating form fields](/docs/engine/forms/authoring).
+
+## Fields every annotation has
+
+Besides `subtype`, `rect` and `ref`, every kind has these fields:
+
+| Field      | What it is                                                                                               |
+| :--------- | :------------------------------------------------------------------------------------------------------- |
+| `contents` | A comment, the text PDF apps show for the annotation.                                                    |
+| `subject`  | A short title PDF apps show with the comment, such as `'Question'`.                                      |
+| `nm`       | A unique name on its page. See [Refs & identity](/docs/engine/concepts/identity).                        |
+| `reply`    | The annotation it answers, or `null`. See [Notes & replies](/docs/engine/annotations/notes-and-replies). |
+| `popup`    | The ref of its popup window, or `null`. See [Popups](/docs/engine/annotations/notes-and-replies#popups). |
+| `groupId`  | The group it belongs to, when you work with groups.                                                      |
+
+Each annotation also has the [flags](#flags) and the fields that say [who wrote it](#who-wrote-it).
+
+## Add an annotation
+
+`create()` takes the kind and its fields, and returns the new annotation:
+
+```ts
+const { annotation } = await page.annotations.create({
+  subtype: 'circle',
+  box: { x: 60, y: 392, width: 120, height: 100 },
+  interiorColor: '#1e90ff',
+});
+```
+
+Fields you leave out get the kind's default. The engine draws the annotation's appearance for
+you, so it shows the same in every PDF app.
+
+Stamps and file attachments also carry bytes (an image, a file). Pass those in a second
+argument; see [Stamps](/docs/engine/annotations/stamps) and
+[File attachments](/docs/engine/annotations/file-attachments).
+
+## Change an annotation
+
+`update()` takes the `ref` and only the fields you want to change:
+
+```ts
+await page.annotations.update(annotation.ref, {
+  color: '#dc143c',
+  contents: 'Reviewed',
+});
+```
+
+A field you leave out keeps its value. A field set to `null` is removed, for example
+`{ interiorColor: null }` for no fill. A field's value is replaced whole (a `file`, a list of
+points), except rich text's `body` style, which merges.
+
+You can also pass an annotation you read straight back: every field it has is one `update()`
+accepts. That makes "change a copy, then save it" code simple:
+
+```ts
+await page.annotations.update(annotation.ref, { ...annotation, opacity: 0.5 });
+```
+
+Fields the engine writes (`author`, the dates, `userId`, `ref`…) are accepted and ignored. For
+free text, send `contents` or `richText`, not both with different text.
+
+### Move or resize by `rect`
+
+An update takes a new `rect` for every annotation, as a script's `annot.rect` does in Acrobat. A
+note, a file, a link, a popup, a form field's widget and a redaction take it as it is.
+
+Every other annotation is drawn from its shape: rectangles, ellipses, text boxes, stamps and
+carets from their `box`, lines, polylines, polygons and ink from their points, and text markup
+from its quads. For these, a new `rect` puts the shape there: each point is mapped from the old
+`rect` onto the new one, each axis on its own. A `rect` of the same size moves the drawing, and a
+bigger one stretches it:
+
+```ts
+const { rect } = line;
+
+// 40 points right, 20 down
+await page.annotations.update(line.ref, {
+  rect: { ...rect, x: rect.x + 40, y: rect.y + 20 },
+});
+```
+
+The engine then works out `rect` again from the shape. After a resize it can differ a little from
+the one you sent: a line keeps its width, and its endings keep their size. The `rect` you read,
+sent back, changes nothing, so a read passed straight back works.
+
+- A new `rect` with a new shape (`box`, points or quads) fails with `InvalidArg`: send one or the
+  other.
+- A turned drawing can only move. A `rect` of another size fails with `InvalidArg`; resize its
+  `box` or its points instead.
+- A `rect` that would squash a drawing to no width or no height fails with `InvalidArg`.
+
+`shapeForRect(annotation, rect)` gives the fields that put an annotation at a `rect`, by the same
+rule. Use it to place a copy somewhere else:
+
+```ts
+import { shapeForRect } from '@cloudpdf/engine';
+
+await page.annotations.create({ ...copy, ...shapeForRect(copy, target) });
+```
+
+A create works out a drawn annotation's `rect` from its shape, whatever `rect` you send, so a
+copy of another app's drawing keeps its shape exactly.
+
+## Delete and reorder
+
+```ts
+await page.annotations.delete(annotation.ref);
+
+await page.annotations.move([annotation.ref], 0); // to the back
+```
+
+Deleting an annotation also deletes its popup, if it has one, and its replies; see
+[Delete a note](/docs/engine/annotations/notes-and-replies#delete-a-note).
+
+Annotations on a page are drawn in order, so the last one is on top. `move(refs, toIndex)`
+moves one annotation (or several next to each other) to a new position in that order.
+
+## Style
+
+Most kinds share the same style fields:
+
+| Field           | What it is                                              | Default   |
+| :-------------- | :------------------------------------------------------ | :-------- |
+| `color`         | Line color, such as `'#1e90ff'`                         | per kind  |
+| `interiorColor` | Fill color of closed shapes, or `null` for no fill      | no fill   |
+| `opacity`       | From `0` (invisible) to `1` (solid)                     | `1`       |
+| `strokeWidth`   | Line width in points                                    | `1`       |
+| `borderStyle`   | `'solid'` or `'dashed'`                                 | `'solid'` |
+| `dashArray`     | The pattern a `'dashed'` border draws, such as `[3, 2]` | `[3]`     |
+
+A pattern alone doesn't make a border dashed: a `'solid'` border keeps its `dashArray` and draws
+solid. `dashArray: null` on a dashed border draws the default `[3]`, 3 points on and 3 off. A
+border from another app can read `'beveled'` or `'inset'`; only form widgets draw those, so a
+write takes them only sent back unchanged.
+
+Colors are `'#rrggbb'`, as in CSS: the engine gives them in lowercase and takes either case. They
+never include transparency: that's what `opacity` is for. The default color depends on the kind
+(yellow for a highlight, red for a shape, black for free text); each kind's page lists its
+defaults.
+
+A PDF can store a color as gray or CMYK. It reads as the same color in `'#rrggbb'`, and sent back
+unchanged it stays as the file has it, so passing a read straight back rewrites nothing.
+
+## Who wrote it
+
+The engine records who created and last changed each annotation, from the user the document was
+opened for. You read these fields; you don't set them:
+
+| Field        | What it is                                          |
+| :----------- | :-------------------------------------------------- |
+| `author`     | The display name shown in PDF apps.                 |
+| `createdAt`  | When it was created, as an ISO date.                |
+| `modifiedAt` | When it was last changed.                           |
+| `userId`     | The id of the user who owns it.                     |
+| `createdBy`  | The id of the user who created it.                  |
+| `modifiedBy` | The id of the user who last changed it.             |
+| `groupId`    | The group it belongs to, when you work with groups. |
+
+<Engine local>
+
+The user comes from the `identity` you pass when you open the document; see
+[Opening documents](/docs/engine/documents/opening#who-is-working-on-it).
+
+</Engine>
+
+<Engine cloud>
+
+The user comes from the identity in their token; see
+[Authentication](/docs/engine/authentication#what-a-token-carries).
+
+</Engine>
+
+## Flags
+
+Every annotation has the standard PDF flags as `true`/`false` fields. Set the ones you need; the
+rest stay off (on create) or keep their value (on update). The exception is `print`: a new
+annotation prints unless you set `print: false`, as in Acrobat. A popup doesn't print.
+
+```ts
+await page.annotations.update(annotation.ref, { print: true, locked: true });
+```
+
+| Flag             | What it does                                            |
+| :--------------- | :------------------------------------------------------ |
+| `print`          | Printed with the page. Off: shown on screen only.       |
+| `hidden`         | Not shown and not printed.                              |
+| `noView`         | Not shown on screen (can still print).                  |
+| `locked`         | Can't be moved, resized or deleted in PDF apps.         |
+| `lockedContents` | Its text can't be changed in PDF apps.                  |
+| `readOnly`       | Can't be changed at all in PDF apps.                    |
+| `noZoom`         | Keeps its size when the page is zoomed (notes, icons).  |
+| `noRotate`       | Stays upright when the page is rotated.                 |
+| `invisible`      | Hidden when the app doesn't know the annotation's kind. |
+| `toggleNoView`   | Flips `noView` when the pointer is over it.             |
+
+Flags are instructions for PDF apps. The engine itself still lets you change a locked
+annotation; the viewer's annotation tools respect the flags in their interface.
+
+## Permissions
+
+Reading annotations needs `doc.annotate.read`. Creating, changing and deleting them needs a
+permission for that action, which can be limited to the user's own annotations:
+`annotations:update:self` lets a user edit what they created and nothing else. See
+[Permissions](/docs/engine/concepts/permissions#annotations).
+
+<Engine local>
+
+<CloudPdfCallout
+  title="Let many people annotate one document"
+  href="https://www.cloudpdf.com/docs/engine"
+  cta="Collaborate with CloudPDF"
+>
+
+With CloudPDF, annotations are stored on your server as people make them. Everyone with the
+document open gets each other's changes as [events](/docs/engine/concepts/events), and the server
+makes sure people only change the annotations they may change.
+
+</CloudPdfCallout>
+
+</Engine>
+
+## More
+
+- [Import & export](/docs/engine/annotations/import-export): copy annotations to another
+  document, or store them apart from the PDF.
+- [Drawing annotations yourself](/docs/engine/annotations/appearances): render annotations as
+  separate images, bake them into the page, or export them as a PDF.
+- [Refs & identity](/docs/engine/concepts/identity): what a `ref` contains, and why you never
+  build one.

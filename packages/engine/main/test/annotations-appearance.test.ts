@@ -32,7 +32,6 @@ const runner: ConformanceTestRunner = {
 runAnnotationAppearanceConformance(runner, {
   label: 'engine-local (inline transport, wasm runtime)',
   openKind: 'bytes',
-  supportsRawRasters: true,
   fixture: {
     id: 'ebook-annotated-pdf',
     bytes: async () => new Uint8Array(await readFile(fixturePath)),

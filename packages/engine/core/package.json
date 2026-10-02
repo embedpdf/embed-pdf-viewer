@@ -18,6 +18,11 @@
       "import": "./dist/conformance.js",
       "require": "./dist/conformance.cjs"
     },
+    "./public": {
+      "development": "./src/public.ts",
+      "import": "./dist/public.js",
+      "require": "./dist/public.cjs"
+    },
     "./runtime": {
       "development": "./src/runtime.ts",
       "import": "./dist/runtime.js",
@@ -78,6 +83,10 @@
       "./conformance": {
         "import": "./dist/conformance.js",
         "require": "./dist/conformance.cjs"
+      },
+      "./public": {
+        "import": "./dist/public.js",
+        "require": "./dist/public.cjs"
       },
       "./runtime": {
         "import": "./dist/runtime.js",

@@ -1,10 +1,10 @@
-import type { PdfDestination } from './PdfDestination';
+import type { PageDestination } from './PdfDestination';
 
 /** Normalized values of an action dictionary's `/S` name. */
 export type PdfActionType = PdfActionNode['type'];
 
 /**
- * One Hide `/T` or ResetForm `/Fields` entry. Deliberately UNSCOPED: a
+ * One Hide `/T` or ResetForm `/Fields` entry. Deliberately unscoped: a
  * dictionary reference carries no page, so resolution (a name to widgets, an
  * object number to an annotation or field) is the interpreter's job — never
  * the extractor's.
@@ -15,14 +15,14 @@ export type PdfActionTargetRef =
 
 /**
  * Decoded SubmitForm `/Flags` word (ISO 32000-2:2020 Table 240) plus the raw
- * value. `exclude` is DERIVED from bit 1 — never stored separately, so the
+ * value. `exclude` is derived from bit 1 — never stored separately, so the
  * two cannot disagree. Note the two easily-missed positions verified against
  * the spec: bit 12 is `ExclFKey` (not "ExclFDFTemplate") and bit 13 is
  * reserved/undefined, so `EmbedForm` is bit 14.
  */
 export interface SubmitFormFlags {
   raw: number;
-  /** Bit 1: set → `fields` lists EXCLUDED fields. */
+  /** Bit 1: set → `fields` lists excluded fields. */
   exclude: boolean;
   /** Bit 2: submit designated valueless fields too, as name-only entries. */
   includeNoValueFields: boolean;
@@ -76,10 +76,10 @@ export const decodeSubmitFormFlags = (raw: number): SubmitFormFlags => {
 };
 
 /**
- * SubmitForm's extracted intent. ATOMIC on purpose: either every required
+ * SubmitForm's extracted intent. Atomic on purpose: either every required
  * component resolved (a complete, executable payload) or the node carries no
  * payload at all — partial states are unrepresentable. An unreadable
- * REQUIRED component (`/F`) degrades the whole node to `unknown` +
+ * required component (`/F`) degrades the whole node to `unknown` +
  * `payload-dropped` at read time instead.
  */
 export interface SubmitFormPayload {
@@ -88,9 +88,9 @@ export interface SubmitFormPayload {
    *  as a producer-compat extension. */
   url: string;
   /**
-   * `null` = `/Fields` ABSENT → Include/Exclude is ignored and every field
+   * `null` = `/Fields` absent → Include/Exclude is ignored and every field
    * except NoExport-flagged ones is submitted (Table 239). `[]` =
-   * present-but-empty: include mode submits NOTHING, exclude mode submits
+   * present-but-empty: include mode submits nothing, exclude mode submits
    * everything eligible — presence and emptiness are different states.
    */
   fields: PdfActionTargetRef[] | null;
@@ -99,11 +99,11 @@ export interface SubmitFormPayload {
   charSet?: string;
 }
 
-interface PdfActionNodeCommon {
+interface PdfActionNodeCommon<Destination> {
   /** Raw `/S` name, retained for unknown and future action types. */
   subtype: string;
   /** Normalized `/Next` children in PDF order. */
-  next: PdfActionNode[];
+  next: PdfActionNode<Destination>[];
 }
 
 /**
@@ -112,21 +112,23 @@ interface PdfActionNodeCommon {
  * payload — a `goto` without a destination or a `uri` without a URI is
  * unrepresentable. A payload the reader cannot materialize degrades the node
  * to `unknown` (original `/S` kept on `subtype`) and appends the tree-level
- * `'payload-dropped'` warning.
+ * `'payload-dropped'` warning. A `goto` goes to a {@link PageDestination};
+ * the engine's own readers, which work in the file's coordinates, use
+ * `PdfActionNode<PdfDestination>`.
  */
-export type PdfActionNode = PdfActionNodeCommon &
+export type PdfActionNode<Destination = PageDestination> = PdfActionNodeCommon<Destination> &
   (
     | { type: 'javascript'; script: string }
-    | { type: 'goto'; destination: PdfDestination }
+    | { type: 'goto'; destination: Destination }
     | { type: 'uri'; uri: string; isMap: boolean }
     | { type: 'named'; name: string }
     | { type: 'hide'; targets: PdfActionTargetRef[]; hide: boolean }
     | {
         type: 'reset-form';
         /**
-         * `null` = `/Fields` ABSENT → reset every field (`exclude` is
+         * `null` = `/Fields` absent → reset every field (`exclude` is
          * meaningless). `[]` = present-but-empty: with `exclude` false reset
-         * NOTHING, with `exclude` true reset EVERYTHING — PDFium's executor
+         * nothing, with `exclude` true reset everything — PDFium's executor
          * branches on presence first.
          */
         fields: PdfActionTargetRef[] | null;
@@ -139,8 +141,8 @@ export type PdfActionNode = PdfActionNodeCommon &
     /** ISO allows `/Rendition` to carry `/JS`; preserved, not collected. */
     | { type: 'rendition'; script?: string }
     /** Recognized; executable only when `payload` is present. Absent payload
-     *  = extracted by an older runtime (skew) — the node stays
-     *  recognized-inert exactly as before this payload existed. */
+     *  = extracted by a runtime without the SubmitForm getters (version
+     *  skew) — the node stays recognized-inert. */
     | { type: 'submit-form'; payload?: SubmitFormPayload }
     | { type: 'thread' }
     | { type: 'sound' }
@@ -163,9 +165,9 @@ export type PdfActionWarning =
  * One extracted action root plus the native reader's safety verdict.
  * Consumers must never execute a tree whose `incomplete` flag is true.
  */
-export interface PdfActionTree {
+export interface PdfActionTree<Destination = PageDestination> {
   /** Null when the model was valid but its root exceeded a safety bound. */
-  root: PdfActionNode | null;
+  root: PdfActionNode<Destination> | null;
   incomplete: boolean;
   /** Raw native bits, retained so newer warnings survive older SDKs.
    *  TS-detected warnings (`payload-dropped`) appear only in `warnings`. */
@@ -173,53 +175,53 @@ export interface PdfActionTree {
   warnings: PdfActionWarning[];
 }
 
-export interface PdfFieldActions {
-  keystroke?: PdfActionTree;
-  format?: PdfActionTree;
-  validate?: PdfActionTree;
-  calculate?: PdfActionTree;
+export interface PdfFieldActions<Destination = PageDestination> {
+  keystroke?: PdfActionTree<Destination>;
+  format?: PdfActionTree<Destination>;
+  validate?: PdfActionTree<Destination>;
+  calculate?: PdfActionTree<Destination>;
 }
 
-export interface PdfPageActions {
-  open?: PdfActionTree;
-  close?: PdfActionTree;
+export interface PdfPageActions<Destination = PageDestination> {
+  open?: PdfActionTree<Destination>;
+  close?: PdfActionTree<Destination>;
 }
 
-export interface PdfAnnotationActions {
-  activate?: PdfActionTree;
-  cursorEnter?: PdfActionTree;
-  cursorExit?: PdfActionTree;
-  mouseDown?: PdfActionTree;
-  mouseUp?: PdfActionTree;
-  focus?: PdfActionTree;
-  blur?: PdfActionTree;
-  pageOpen?: PdfActionTree;
-  pageClose?: PdfActionTree;
-  pageVisible?: PdfActionTree;
-  pageInvisible?: PdfActionTree;
+export interface PdfAnnotationActions<Destination = PageDestination> {
+  activate?: PdfActionTree<Destination>;
+  cursorEnter?: PdfActionTree<Destination>;
+  cursorExit?: PdfActionTree<Destination>;
+  mouseDown?: PdfActionTree<Destination>;
+  mouseUp?: PdfActionTree<Destination>;
+  focus?: PdfActionTree<Destination>;
+  blur?: PdfActionTree<Destination>;
+  pageOpen?: PdfActionTree<Destination>;
+  pageClose?: PdfActionTree<Destination>;
+  pageVisible?: PdfActionTree<Destination>;
+  pageInvisible?: PdfActionTree<Destination>;
 }
 
-export interface NamedJavaScriptAction {
+export interface NamedJavaScriptAction<Destination = PageDestination> {
   /** Name-tree key. Array order is the PDF boot order. */
   name: string;
-  action: PdfActionTree;
+  action: PdfActionTree<Destination>;
 }
 
 /** Catalog-owned actions. Page actions stay on their owning PageLayout. */
-export interface DocumentActionsSnapshot {
-  nameTreeScripts: NamedJavaScriptAction[];
+export interface DocumentActionsSnapshot<Destination = PageDestination> {
+  nameTreeScripts: NamedJavaScriptAction<Destination>[];
   /** Action-form `/OpenAction`. Mutually exclusive with `openDestination` —
    *  `/OpenAction` is one entry, a dictionary or an array. */
-  openAction: PdfActionTree | null;
+  openAction: PdfActionTree<Destination> | null;
   /** Destination-form `/OpenAction` — the initial view, not an action.
    *  Optional on the wire for skew tolerance (absent ≡ null); the schema
    *  defaults it, so parsed snapshots always carry the key. */
-  openDestination?: PdfDestination | null;
-  willClose?: PdfActionTree;
-  willSave?: PdfActionTree;
-  didSave?: PdfActionTree;
-  willPrint?: PdfActionTree;
-  didPrint?: PdfActionTree;
+  openDestination?: Destination | null;
+  willClose?: PdfActionTree<Destination>;
+  willSave?: PdfActionTree<Destination>;
+  didSave?: PdfActionTree<Destination>;
+  willPrint?: PdfActionTree<Destination>;
+  didPrint?: PdfActionTree<Destination>;
 }
 
 /**
@@ -236,6 +238,6 @@ export interface ActionReadBudget {
   maxTargetEntries: number;
   /** Payload string code units (URIs, submit URLs/CharSets, names, file
    *  paths, name-tree script names), aggregate across the job. Reserved
-   *  BEFORE allocation. */
+   *  before allocation. */
   maxPayloadCodeUnits: number;
 }

@@ -1,6 +1,6 @@
 /**
  * `@embedpdf/engine/portable` — the local engine with its wasm delivered
- * through the MODULE GRAPH.
+ * through the module graph.
  *
  * The default entry expects the consumer's bundler to emit `embedpdf.wasm`
  * as an asset (`new URL(..., import.meta.url)`), which webpack, Vite, Rspack,
@@ -13,10 +13,10 @@
  *
  * Costs, compared with the emitted asset: the same bytes over the wire, a
  * short inflate before boot, and no streaming compile. A separate entry, not
- * a runtime fallback, so a build carries ONE copy of the binary — this one or
+ * a runtime fallback, so a build carries one copy of the binary — this one or
  * the asset, never both.
  *
- * Angular gets this entry WITHOUT asking: its application builder resolves
+ * Angular gets this entry without asking: its application builder resolves
  * packages with the `es2020` export condition (the Angular Package Format's
  * own), which no other bundler declares, and `@embedpdf/engine`'s export map
  * routes that condition here. So `import { localEngine } from '@embedpdf/engine'`

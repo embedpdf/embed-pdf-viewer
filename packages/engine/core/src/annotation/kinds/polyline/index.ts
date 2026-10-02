@@ -1,18 +1,31 @@
-import type { PolylineDraft } from './draft';
-import type { PolylineAnnotationDTO } from './dto';
-import type { PolylinePatch } from './patch';
-import { PolylineDTOSchema, PolylineDraftSchema, PolylinePatchSchema } from './schema';
+import type { CreateOf, ReadOf, UpdateOf } from '../../declaration';
+import type { Coordinates, PageCoordinates } from '../../../pageSpace/coordinates';
 import type { AnnotationKindModule } from '../../registry';
 import { PdfAnnotationSubtypeCode } from '../../subtype';
+import { PolylineDeclaration } from './declaration';
 
-export type { PolylineAnnotationDTO } from './dto';
-export type { PolylineDraft } from './draft';
-export type { PolylinePatch } from './patch';
-export { PolylineDTOSchema, PolylineDraftSchema, PolylinePatchSchema } from './schema';
+export { PolylineDeclaration } from './declaration';
+
+export type PolylineAnnotation<C extends Coordinates = PageCoordinates> = ReadOf<
+  typeof PolylineDeclaration,
+  C
+>;
+export type PolylineDraft<C extends Coordinates = PageCoordinates> = CreateOf<
+  typeof PolylineDeclaration,
+  C
+>;
+export type PolylinePatch<C extends Coordinates = PageCoordinates> = UpdateOf<
+  typeof PolylineDeclaration,
+  C
+>;
+
+export const PolylineDTOSchema = PolylineDeclaration.readSchema;
+export const PolylineDraftSchema = PolylineDeclaration.createSchema;
+export const PolylinePatchSchema = PolylineDeclaration.updateSchema;
 
 export const PolylineKind: AnnotationKindModule<
   'polyline',
-  PolylineAnnotationDTO,
+  PolylineAnnotation,
   PolylineDraft,
   PolylinePatch
 > = {
@@ -21,4 +34,5 @@ export const PolylineKind: AnnotationKindModule<
   dtoSchema: PolylineDTOSchema,
   draftSchema: PolylineDraftSchema,
   patchSchema: PolylinePatchSchema,
+  readBackWrites: PolylineDeclaration.readBackWrites,
 };

@@ -1,0 +1,3 @@
+# Written by `docs:check` on every build (scripts/snippets.mjs, scripts/publish-gate.mjs), never committed.
+*
+!.gitignore

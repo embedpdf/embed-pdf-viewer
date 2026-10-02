@@ -10,6 +10,7 @@ import {
   type FormFieldRef,
   type FormFieldValue,
   type AnnotationRef,
+  type WidgetPlacement,
 } from '@embedpdf/engine-core/runtime';
 import {
   FormDataFormatSchema,
@@ -17,13 +18,15 @@ import {
   FormFieldDraftSchema,
   FormFieldPatchSchema,
   FormFieldValueSchema,
+  FormResetBodySchema,
   AnnotationRefSchema,
   SignatureAppearanceBodySchema,
+  WidgetPlacementSchema,
 } from '@embedpdf/engine-core/wire';
 import { requireLayerCapability, requireLayerDocAccessOnly } from '../app/jwt-plugin';
 import type { DocumentService } from '../services/DocumentService';
 import type { LayerService } from '../services/LayerService';
-import { abortSignalFromRequest, parseOrInvalidArg, setNoStore, type SchemaLike } from './_helpers';
+import { abortSignalOf, parseOrInvalidArg, setNoStore, type SchemaLike } from './_helpers';
 import { readMutationEnvelope } from './_mutationEnvelope';
 
 interface FormRouteDeps {
@@ -40,7 +43,7 @@ const EXPORT_CONTENT_TYPE: Record<FormDataFormat, string> = {
 /**
  * Layer-scoped form routes.
  *
- * Forms are DOCUMENT-scoped (one AcroForm per layer document), so unlike
+ * Forms are document-scoped (one AcroForm per layer document), so unlike
  * annotations there is no per-page collection and no content-addressed
  * `@version` read URL — every response here is `no-store`. Coherence with
  * the page-scoped caches is preserved the other way around: mutation
@@ -62,7 +65,7 @@ export async function registerFormRoutes(app: FastifyInstance, deps: FormRouteDe
     const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
     const ctx = requireLayerCapability(req, docId, layerName, 'doc.forms.read', pdfBits);
     setNoStore(reply);
-    return layerService.getFormSnapshot(ctx, { docId, layerName }, abortSignalFromRequest(req));
+    return layerService.getFormSnapshot(ctx, { docId, layerName }, abortSignalOf(reply));
   });
 
   app.get('/v1/docs/:docId/layers/:layerName/form/fields/:fieldKey', async (req, reply) => {
@@ -74,18 +77,18 @@ export async function registerFormRoutes(app: FastifyInstance, deps: FormRouteDe
     const snapshot = await layerService.getFormSnapshot(
       ctx,
       { docId, layerName },
-      abortSignalFromRequest(req),
+      abortSignalOf(reply),
     );
     const field = snapshot.fields.find((f) =>
       ref.kind === 'objectNumber'
-        ? f.fieldObjectNumber === ref.fieldObjectNumber
+        ? f.ref.kind === 'objectNumber' && f.ref.objectNumber === ref.objectNumber
         : f.name === ref.name,
     );
     if (!field) {
       throw new EngineError(
         EngineErrorCode.NotFound,
         ref.kind === 'objectNumber'
-          ? `form field not found: object ${ref.fieldObjectNumber}`
+          ? `form field not found: object ${ref.objectNumber}`
           : `form field not found: "${ref.name}"`,
       );
     }
@@ -102,7 +105,7 @@ export async function registerFormRoutes(app: FastifyInstance, deps: FormRouteDe
     const exported = await layerService.exportFormData(
       ctx,
       { docId, layerName, format },
-      abortSignalFromRequest(req),
+      abortSignalOf(reply),
     );
     setNoStore(reply);
     reply.type(EXPORT_CONTENT_TYPE[exported.format]);
@@ -113,14 +116,22 @@ export async function registerFormRoutes(app: FastifyInstance, deps: FormRouteDe
     const { docId, layerName } = layerParams(req);
     const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
     const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
-    const ctx = requireLayerCapability(req, docId, layerName, 'doc.forms.fill', pdfBits);
+    const protection = await documentService.getProtection(accessCtx, docId, layerName);
+    const ctx = requireLayerCapability(
+      req,
+      docId,
+      layerName,
+      'doc.forms.fill',
+      pdfBits,
+      protection,
+    );
     const format = formatFromQuery(req);
     const data = importBodyBytes(req);
     setNoStore(reply);
     return layerService.importFormData(
       ctx,
       { docId, layerName, data, ...(format ? { format } : {}) },
-      abortSignalFromRequest(req),
+      abortSignalOf(reply),
     );
   });
 
@@ -128,7 +139,15 @@ export async function registerFormRoutes(app: FastifyInstance, deps: FormRouteDe
     const { docId, layerName } = layerParams(req);
     const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
     const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
-    const ctx = requireLayerCapability(req, docId, layerName, 'doc.forms.modify', pdfBits);
+    const protection = await documentService.getProtection(accessCtx, docId, layerName);
+    const ctx = requireLayerCapability(
+      req,
+      docId,
+      layerName,
+      'doc.forms.modify',
+      pdfBits,
+      protection,
+    );
     const body = (req.body ?? {}) as { bakeAppearances?: unknown };
     if (body.bakeAppearances !== undefined && typeof body.bakeAppearances !== 'boolean') {
       throw new EngineError(EngineErrorCode.InvalidArg, 'body.bakeAppearances: expected boolean');
@@ -137,7 +156,7 @@ export async function registerFormRoutes(app: FastifyInstance, deps: FormRouteDe
     return layerService.repairForm(
       ctx,
       { docId, layerName, bakeAppearances: body.bakeAppearances ?? false },
-      abortSignalFromRequest(req),
+      abortSignalOf(reply),
     );
   });
 
@@ -145,18 +164,22 @@ export async function registerFormRoutes(app: FastifyInstance, deps: FormRouteDe
     const { docId, layerName } = layerParams(req);
     const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
     const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
-    const ctx = requireLayerCapability(req, docId, layerName, 'doc.forms.modify', pdfBits);
+    const protection = await documentService.getProtection(accessCtx, docId, layerName);
+    const ctx = requireLayerCapability(
+      req,
+      docId,
+      layerName,
+      'doc.forms.modify',
+      pdfBits,
+      protection,
+    );
     const draft = parseOrInvalidArg<FormFieldDraft>(
       FormFieldDraftSchema as unknown as SchemaLike<FormFieldDraft>,
       req.body,
       'request body',
     );
     setNoStore(reply);
-    return layerService.createFormField(
-      ctx,
-      { docId, layerName, draft },
-      abortSignalFromRequest(req),
-    );
+    return layerService.createFormField(ctx, { docId, layerName, draft }, abortSignalOf(reply));
   });
 
   app.patch('/v1/docs/:docId/layers/:layerName/form/fields/:fieldKey', async (req, reply) => {
@@ -164,7 +187,15 @@ export async function registerFormRoutes(app: FastifyInstance, deps: FormRouteDe
     const ref = fieldRefFromParams(req);
     const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
     const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
-    const ctx = requireLayerCapability(req, docId, layerName, 'doc.forms.modify', pdfBits);
+    const protection = await documentService.getProtection(accessCtx, docId, layerName);
+    const ctx = requireLayerCapability(
+      req,
+      docId,
+      layerName,
+      'doc.forms.modify',
+      pdfBits,
+      protection,
+    );
     const patch = parseOrInvalidArg<FormFieldPatch>(
       FormFieldPatchSchema as unknown as SchemaLike<FormFieldPatch>,
       req.body,
@@ -174,7 +205,7 @@ export async function registerFormRoutes(app: FastifyInstance, deps: FormRouteDe
     return layerService.updateFormField(
       ctx,
       { docId, layerName, ref, patch },
-      abortSignalFromRequest(req),
+      abortSignalOf(reply),
     );
   });
 
@@ -183,13 +214,17 @@ export async function registerFormRoutes(app: FastifyInstance, deps: FormRouteDe
     const ref = fieldRefFromParams(req);
     const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
     const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
-    const ctx = requireLayerCapability(req, docId, layerName, 'doc.forms.modify', pdfBits);
-    setNoStore(reply);
-    return layerService.deleteFormField(
-      ctx,
-      { docId, layerName, ref },
-      abortSignalFromRequest(req),
+    const protection = await documentService.getProtection(accessCtx, docId, layerName);
+    const ctx = requireLayerCapability(
+      req,
+      docId,
+      layerName,
+      'doc.forms.modify',
+      pdfBits,
+      protection,
     );
+    setNoStore(reply);
+    return layerService.deleteFormField(ctx, { docId, layerName, ref }, abortSignalOf(reply));
   });
 
   app.post('/v1/docs/:docId/layers/:layerName/form/fields/:fieldKey/value', async (req, reply) => {
@@ -197,7 +232,15 @@ export async function registerFormRoutes(app: FastifyInstance, deps: FormRouteDe
     const ref = fieldRefFromParams(req);
     const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
     const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
-    const ctx = requireLayerCapability(req, docId, layerName, 'doc.forms.fill', pdfBits);
+    const protection = await documentService.getProtection(accessCtx, docId, layerName);
+    const ctx = requireLayerCapability(
+      req,
+      docId,
+      layerName,
+      'doc.forms.fill',
+      pdfBits,
+      protection,
+    );
     const body = (req.body ?? {}) as { value?: unknown };
     const value = parseOrInvalidArg<FormFieldValue>(
       FormFieldValueSchema as unknown as SchemaLike<FormFieldValue>,
@@ -205,21 +248,33 @@ export async function registerFormRoutes(app: FastifyInstance, deps: FormRouteDe
       'body.value',
     );
     setNoStore(reply);
-    return layerService.setFormValue(
-      ctx,
-      { docId, layerName, ref, value },
-      abortSignalFromRequest(req),
-    );
+    return layerService.setFormValue(ctx, { docId, layerName, ref, value }, abortSignalOf(reply));
   });
 
-  app.post('/v1/docs/:docId/layers/:layerName/form/fields/:fieldKey/reset', async (req, reply) => {
+  app.post('/v1/docs/:docId/layers/:layerName/form/reset', async (req, reply) => {
     const { docId, layerName } = layerParams(req);
-    const ref = fieldRefFromParams(req);
     const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
     const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
-    const ctx = requireLayerCapability(req, docId, layerName, 'doc.forms.fill', pdfBits);
+    const protection = await documentService.getProtection(accessCtx, docId, layerName);
+    const ctx = requireLayerCapability(
+      req,
+      docId,
+      layerName,
+      'doc.forms.fill',
+      pdfBits,
+      protection,
+    );
+    const body = parseOrInvalidArg<{ refs?: FormFieldRef[] }>(
+      FormResetBodySchema as unknown as SchemaLike<{ refs?: FormFieldRef[] }>,
+      req.body ?? {},
+      'body',
+    );
     setNoStore(reply);
-    return layerService.resetFormField(ctx, { docId, layerName, ref }, abortSignalFromRequest(req));
+    return layerService.resetForm(
+      ctx,
+      { docId, layerName, ...(body.refs ? { refs: body.refs } : {}) },
+      abortSignalOf(reply),
+    );
   });
 
   app.post(
@@ -228,7 +283,15 @@ export async function registerFormRoutes(app: FastifyInstance, deps: FormRouteDe
       const { docId, layerName } = layerParams(req);
       const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
       const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
-      const ctx = requireLayerCapability(req, docId, layerName, 'doc.forms.fill', pdfBits);
+      const protection = await documentService.getProtection(accessCtx, docId, layerName);
+      const ctx = requireLayerCapability(
+        req,
+        docId,
+        layerName,
+        'doc.forms.fill',
+        pdfBits,
+        protection,
+      );
       const ref = fieldRefFromParams(req);
       // The mark is a page of a PDF (sniffed, never declared), riding the multipart envelope.
       const { body, resources } = await readMutationEnvelope(req, () => 'image-or-pdf');
@@ -257,9 +320,8 @@ export async function registerFormRoutes(app: FastifyInstance, deps: FormRouteDe
           layerName,
           ref,
           pdf: new Uint8Array(resource.bytes),
-          pageIndex: parsed.pageIndex ?? 0,
         },
-        abortSignalFromRequest(req),
+        abortSignalOf(reply),
       );
     },
   );
@@ -268,7 +330,15 @@ export async function registerFormRoutes(app: FastifyInstance, deps: FormRouteDe
     const { docId, layerName } = layerParams(req);
     const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
     const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
-    const ctx = requireLayerCapability(req, docId, layerName, 'doc.forms.fill', pdfBits);
+    const protection = await documentService.getProtection(accessCtx, docId, layerName);
+    const ctx = requireLayerCapability(
+      req,
+      docId,
+      layerName,
+      'doc.forms.fill',
+      pdfBits,
+      protection,
+    );
     const body = (req.body ?? {}) as { effects?: unknown };
     const effects = parseOrInvalidArg<FormEffect[]>(
       FormEffectSchema.array() as unknown as SchemaLike<FormEffect[]>,
@@ -276,11 +346,7 @@ export async function registerFormRoutes(app: FastifyInstance, deps: FormRouteDe
       'body.effects',
     );
     setNoStore(reply);
-    return layerService.applyFormEffects(
-      ctx,
-      { docId, layerName, effects },
-      abortSignalFromRequest(req),
-    );
+    return layerService.applyFormEffects(ctx, { docId, layerName, effects }, abortSignalOf(reply));
   });
 
   app.post(
@@ -290,21 +356,25 @@ export async function registerFormRoutes(app: FastifyInstance, deps: FormRouteDe
       const ref = fieldRefFromParams(req);
       const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
       const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
-      const ctx = requireLayerCapability(req, docId, layerName, 'doc.forms.modify', pdfBits);
-      const body = (req.body ?? {}) as { widget?: unknown; onState?: unknown };
-      const widget = parseOrInvalidArg<AnnotationRef>(
-        AnnotationRefSchema as unknown as SchemaLike<AnnotationRef>,
-        body.widget,
-        'body.widget',
+      const protection = await documentService.getProtection(accessCtx, docId, layerName);
+      const ctx = requireLayerCapability(
+        req,
+        docId,
+        layerName,
+        'doc.forms.modify',
+        pdfBits,
+        protection,
       );
-      if (body.onState !== undefined && typeof body.onState !== 'string') {
-        throw new EngineError(EngineErrorCode.InvalidArg, 'body.onState: expected string');
-      }
+      const placement = parseOrInvalidArg<WidgetPlacement>(
+        WidgetPlacementSchema as unknown as SchemaLike<WidgetPlacement>,
+        req.body,
+        'body',
+      );
       setNoStore(reply);
-      return layerService.attachFormWidget(
+      return layerService.addFormWidget(
         ctx,
-        { docId, layerName, ref, widget, ...(body.onState ? { onState: body.onState } : {}) },
-        abortSignalFromRequest(req),
+        { docId, layerName, ref, placement },
+        abortSignalOf(reply),
       );
     },
   );
@@ -316,7 +386,15 @@ export async function registerFormRoutes(app: FastifyInstance, deps: FormRouteDe
       const ref = fieldRefFromParams(req);
       const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
       const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
-      const ctx = requireLayerCapability(req, docId, layerName, 'doc.forms.modify', pdfBits);
+      const protection = await documentService.getProtection(accessCtx, docId, layerName);
+      const ctx = requireLayerCapability(
+        req,
+        docId,
+        layerName,
+        'doc.forms.modify',
+        pdfBits,
+        protection,
+      );
       const body = (req.body ?? {}) as { widget?: unknown };
       const widget = parseOrInvalidArg<AnnotationRef>(
         AnnotationRefSchema as unknown as SchemaLike<AnnotationRef>,
@@ -327,7 +405,7 @@ export async function registerFormRoutes(app: FastifyInstance, deps: FormRouteDe
       return layerService.detachFormWidget(
         ctx,
         { docId, layerName, ref, widget },
-        abortSignalFromRequest(req),
+        abortSignalOf(reply),
       );
     },
   );

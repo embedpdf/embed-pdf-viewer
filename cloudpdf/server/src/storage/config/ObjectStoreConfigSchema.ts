@@ -41,7 +41,7 @@ export const ObjectStoreConfigSchema = z.discriminatedUnion('kind', [
     accountName: z.string().min(1),
     endpoint: z.string().url().optional(),
     /**
-     * Optional storage account key for the KEYED presigning fallback.
+     * Optional storage account key for the keyed presigning fallback.
      * When absent (the recommended default), the adapter signs SAS
      * tokens keylessly via a user-delegation key obtained through
      * `DefaultAzureCredential` (managed identity / Workload Identity).

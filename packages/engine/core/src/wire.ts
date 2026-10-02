@@ -14,7 +14,7 @@ export {
   SignatureSnapshotSchema,
   BaseVersionInfoSchema,
   SignatureCompleteResultSchema,
-  SignatureAbortResultSchema,
+  SignatureCancelResultSchema,
   ChangeAnalysisSchema,
   SignaturePrepareBodySchema,
   SignatureAppearanceBodySchema,
@@ -36,8 +36,12 @@ export {
   DocumentMetadataSchema,
   MetadataPatchSchema,
   MetadataUpdateResultSchema,
+  CustomMetadataSchema,
+  CustomMetadataPatchSchema,
+  CustomMetadataUpdateResultSchema,
   AccessRequestSchema,
   AccessResponseSchema,
+  AnnotationBundleLimitsSchema,
   OpenDocumentResponseSchema,
   DocumentHeadSchema,
   DocumentSecurityStateSchema,
@@ -50,8 +54,7 @@ export {
   MutationMetaSchema,
   EngineErrorPayloadSchema,
   PageStateSchema,
-  AnnotationListPageSnapshotSchema,
-  AnnotationListSnapshotAllPagesSchema,
+  AnnotationListSchema,
   PageTextSnapshotSchema,
   PageGeometrySnapshotSchema,
   PageNetworkRenderFormatSchema,
@@ -65,8 +68,12 @@ export {
   AppearanceOutcomeSchema,
   AnnotationUpdateResultSchema,
   AnnotationDeleteResultSchema,
+  AnnotationWireComponents,
   AnnotationMoveResultSchema,
+  FormMutationMetaSchema,
   FormSetValueResultSchema,
+  FormResetResultSchema,
+  FormResetBodySchema,
   FormImportResultSchema,
   FormRepairResultSchema,
   FormFieldCreateResultSchema,
@@ -81,11 +88,15 @@ export {
   AnnotationFlattenInputSchema,
   AnnotationFlattenResultSchema,
   AnnotationAppearanceExportInputSchema,
+  AnnotationExportSelectionSchema,
+  AnnotationsExportRequestSchema,
+  AnnotationImportManifestSchema,
+  AnnotationImportResultSchema,
+  AnnotationImportOptionsSchema,
   NamedPageEntrySchema,
   PageNameInputSchema,
   PageNameResultSchema,
   PageRemoveNameInputSchema,
-  PageStructureCacheSchema,
   PageRotateInputSchema,
   PageRotateResultSchema,
   PageDeleteInputSchema,
@@ -103,11 +114,11 @@ export {
   WeakAnnotationSessionResponseSchema,
   WeakAnnotationSessionPagesRequestSchema,
   SearchQuerySchema,
-  SearchModeSchema,
   SearchRequestSchema,
   SearchSnippetSchema,
   SearchMatchSchema,
   SearchSliceSchema,
+  IdentitySchema,
 } from './wire/schemas';
 export {
   PdfActionTypeSchema,
@@ -138,7 +149,6 @@ export type {
 export {
   FormFieldRefSchema,
   FormWidgetSchema,
-  FormFieldFlagsSchema,
   ToggleFieldWidgetSchema,
   FormFieldOptionSchema,
   FormFieldDTOSchema,
@@ -199,6 +209,7 @@ export {
   decodeAnnotationAppearancesRenderToken,
   decodeAnnotationToken,
   decodeAnnotationsAllToken,
+  decodeAnnotationsExportToken,
   decodeActionsToken,
   decodeAttachmentsToken,
   decodeContentToken,
@@ -210,6 +221,7 @@ export {
   encodeAnnotationAppearancesRenderToken,
   encodeAnnotationToken,
   encodeAnnotationsAllToken,
+  encodeAnnotationsExportToken,
   encodeActionsToken,
   encodeAttachmentsToken,
   encodeContentToken,
@@ -237,7 +249,7 @@ export {
 } from './wire/renderOptionsCodec';
 export type { AnnotationRenderVersion, RenderVersions } from './wire/renderOptionsCodec';
 
-// Canonical PDF-document geometry schemas (zod). Exported from `wire` ONLY.
+// Canonical PDF-document geometry schemas (zod). Exported from `wire` only.
 export {
   PdfPointSchema,
   PdfRectSchema,
@@ -247,39 +259,43 @@ export {
   LinePointsSchema,
   InkListSchema,
   CalloutLineSchema,
+  PagePointSchema,
+  PageBoxSchema,
+  PageQuadSchema,
 } from './geometry/schemas';
 
 export {
   AnnotationStableIdSchema,
   AnnotationRefSchema,
   RevisionTokenSchema,
-  AnnotationFlagsSchema,
-  AnnotationFlagsPartialSchema,
   ColorSchema,
   PointSchema,
   RectSchema,
   LineEndingSchema,
   LineEndingsSchema,
   AnnotationBorderStyleSchema,
-  PdfRectDifferencesSchema,
+  DrawnBorderStyleSchema,
   StandardFontSchema,
   TextAlignmentSchema,
   FreeTextIntentSchema,
+  FreeTextIntentWriteSchema,
+  VerticalAlignmentSchema,
   CaretIntentSchema,
   StrikeoutIntentSchema,
   InkIntentSchema,
   BlendModeSchema,
-  AnnotationBaseShape,
-  AnnotationDraftBaseShape,
-  AnnotationPatchBaseShape,
 } from './annotation/base.schema';
 
 export {
   ANNOTATION_KINDS,
   KIND_BY_SUBTYPE,
-  AnnotationDTOSchema,
+  AnnotationSchema,
   AnnotationDraftSchema,
   AnnotationPatchSchema,
+  annotationPatchSchemaOf,
+  PopupDTOSchema,
+  PopupDraftSchema,
+  PopupPatchSchema,
   HighlightDTOSchema,
   HighlightDraftSchema,
   HighlightPatchSchema,
@@ -327,25 +343,27 @@ export {
   TextPatchSchema,
   NoteIconSchema,
   StampDTOSchema,
-  StampWireDraftSchema,
-  StampWirePatchSchema,
-  ResourceRefSchema,
+  StampDraftSchema,
+  StampPatchSchema,
+  StampFitSchema,
   FileAttachmentDTOSchema,
-  FileAttachmentWireDraftSchema,
+  FileAttachmentDraftSchema,
   FileAttachmentPatchSchema,
   FileAttachmentIconSchema,
-  WireAttachmentFileSchema,
   UnsupportedDTOSchema,
   UnsupportedDraftSchema,
   UnsupportedPatchSchema,
 } from './annotation/kinds';
+export { DateInputSchema, IsoDateTimeSchema } from './dto/IsoDateTime.schema';
 export {
   AttachmentFileInfoSchema,
-  EmbeddedFileItemSchema,
-  EmbeddedFileRefSchema,
+  WireAttachmentFileSchema,
+  AttachmentSchema,
+  AttachmentRefSchema,
 } from './dto/Attachment.schema';
 export {
-  AttachmentsCacheSchema,
+  AttachmentListSchema,
+  AttachmentMutationMetaSchema,
   AttachmentCreateResultSchema,
   AttachmentDeleteResultSchema,
 } from './wire/schemas';
@@ -359,6 +377,7 @@ export type {
   DocumentVersions,
 } from './wire/schemas';
 export { encodeAnalysisToken, decodeAnalysisToken, type AnalysisToken } from './wire/tokens';
+export type { AnnotationsExportToken } from './wire/tokens';
 export { analysisQueryString, type AnalysisQueryInput } from './wire/paths';
 
 export * from './dto/Measure.schema';

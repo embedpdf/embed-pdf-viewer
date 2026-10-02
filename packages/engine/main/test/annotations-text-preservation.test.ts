@@ -1,16 +1,16 @@
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import type {
   CalloutLine,
-  DocumentHandle,
-  Engine,
-  FreeTextAnnotationDTO,
+  LocalDocumentHandle,
+  LocalEngine,
+  FreeTextAnnotation,
   FreeTextPatch,
 } from '@embedpdf/engine-core/runtime';
 import { toPageRef } from '@embedpdf/engine-core/runtime';
 import { createLocalEngine } from '../src/index';
 
 const TEXT = 'Keep this text';
-const RECT = { left: 80, bottom: 180, right: 380, top: 280 };
+const RECT = { x: 80, y: 180, width: 300, height: 100 };
 
 /** A legacy FreeText has /Contents and /DA, with no rich-text /RC. */
 function fixture(legacy: boolean, callout: boolean): Uint8Array {
@@ -37,17 +37,17 @@ function fixture(legacy: boolean, callout: boolean): Uint8Array {
   return new TextEncoder().encode(text);
 }
 
-async function annotation(doc: DocumentHandle): Promise<FreeTextAnnotationDTO> {
-  return (await doc.page(toPageRef(3)).annotations.list()).annotations[0] as FreeTextAnnotationDTO;
+async function annotation(doc: LocalDocumentHandle): Promise<FreeTextAnnotation> {
+  return (await doc.page(toPageRef(3)).annotations.list()).annotations[0] as FreeTextAnnotation;
 }
 
-function expectText(dto: FreeTextAnnotationDTO): void {
+function expectText(dto: FreeTextAnnotation): void {
   expect(dto.contents).toBe(TEXT);
   expect(dto.richText.paragraphs.flatMap((p) => p.runs.map((r) => r.text)).join('')).toBe(TEXT);
 }
 
 describe('FreeText and Callout partial updates preserve text (wasm)', () => {
-  let engine: Engine;
+  let engine: LocalEngine;
   beforeAll(async () => {
     engine = await createLocalEngine({ runtime: { prefer: 'wasm' } });
   });
@@ -67,7 +67,7 @@ describe('FreeText and Callout partial updates preserve text (wasm)', () => {
             await doc.page(toPageRef(3)).annotations.create({
               subtype: 'free-text',
               intent: callout ? 'free-text-callout' : 'free-text',
-              rect: RECT,
+              box: RECT,
               fontFamily: 'helvetica',
               fontSize: 18,
               textAlign: 'left',
@@ -77,7 +77,6 @@ describe('FreeText and Callout partial updates preserve text (wasm)', () => {
                       { x: 90, y: 190 },
                       { x: 120, y: 240 },
                     ],
-                    rectDifferences: { left: 40, bottom: 20, right: 0, top: 0 },
                   }
                 : {}),
               ...(source === 'rich'
@@ -102,15 +101,15 @@ describe('FreeText and Callout partial updates preserve text (wasm)', () => {
           for (let cycle = 0; cycle < 2; cycle++) {
             const ref = (await annotation(doc)).ref;
             const patches: FreeTextPatch[] = [
-              { subtype: 'free-text', color: { r: 20 + cycle, g: 40, b: 60 } },
-              { subtype: 'free-text', fontSize: 20 + cycle, fontColor: { r: 0, g: 40, b: 120 } },
+              { subtype: 'free-text', color: cycle ? '#15283c' : '#14283c' },
+              { subtype: 'free-text', fontSize: 20 + cycle, fontColor: '#002878' },
               {
                 subtype: 'free-text',
                 fontFamily: cycle ? 'helvetica' : 'times-roman',
                 textAlign: cycle ? 'left' : 'center',
               },
-              { subtype: 'free-text', interiorColor: { r: 240, g: 245, b: 250 }, opacity: 0.9 },
-              { subtype: 'free-text', rect: { ...RECT, right: 410 + cycle * 10 } },
+              { subtype: 'free-text', interiorColor: '#f0f5fa', opacity: 0.9 },
+              { subtype: 'free-text', box: { ...RECT, width: 330 + cycle * 10 } },
               { subtype: 'free-text', subject: `metadata-only-${cycle}` },
               ...(callout
                 ? [
@@ -127,17 +126,17 @@ describe('FreeText and Callout partial updates preserve text (wasm)', () => {
             for (const patch of patches) {
               // Deliberately never re-attach contents or richText to these patches.
               const result = await doc.page(toPageRef(3)).annotations.update(ref, patch);
-              expectText(result.updated as FreeTextAnnotationDTO);
+              expectText(result.annotation as FreeTextAnnotation);
               expectText(await annotation(doc));
             }
 
-            const before = (await doc.page(toPageRef(3)).annotations.renderAppearances())
+            const before = (await doc.page(toPageRef(3)).annotations.renderAppearancesRaw())
               .appearances[0]!.raster;
             const saved = await doc.download();
             await doc.close();
             doc = await open(saved);
             expectText(await annotation(doc));
-            const after = (await doc.page(toPageRef(3)).annotations.renderAppearances())
+            const after = (await doc.page(toPageRef(3)).annotations.renderAppearancesRaw())
               .appearances[0]!.raster;
             expect([after.width, after.height]).toEqual([before.width, before.height]);
             expect(new Uint8Array(after.data)).toEqual(new Uint8Array(before.data));
@@ -150,7 +149,7 @@ describe('FreeText and Callout partial updates preserve text (wasm)', () => {
             const appearance = await engine.open({ kind: 'bytes', id: 'text-appearance', bytes });
             try {
               const page = (await appearance.pages.list()).pages[0]!;
-              const text = await appearance.page(page.ref).text.read();
+              const text = await appearance.page(page.ref).text.get();
               expect(text.text).toContain(TEXT);
             } finally {
               await appearance.close();
@@ -175,7 +174,7 @@ describe('FreeText and Callout partial updates preserve text (wasm)', () => {
             subtype: 'free-text',
             contents: '',
           });
-        expect(result.updated.contents).toBe('');
+        expect(result.annotation.contents).toBe('');
         const bytes = await doc.download();
         await doc.close();
         doc = await engine.open({ kind: 'bytes', id: 'cleared-text', bytes });

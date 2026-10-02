@@ -1,5 +1,5 @@
 /**
- * Acrobat's stamp-library convention, interpreted in ONE place. A library is
+ * Acrobat's stamp-library convention, interpreted in one place. A library is
  * a PDF whose `/Names /Pages` registry names each stamp page with a key of
  * the form `identifier=label`:
  *
@@ -10,7 +10,7 @@
  *     annotation's default `/Subj`.
  *
  * The engine never interprets key text; this module does. A key without
- * `=` is its own label. `#` is never stripped — it is part of the identity.
+ * `=` is its own label. `#` is never stripped: it is part of the identity.
  */
 import type { PieceInfoPatch } from '@embedpdf/engine-core/runtime';
 import type { StampAssetKind } from './contract';
@@ -38,9 +38,9 @@ const BASE62 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
  * identity when the library is opened and placed in Acrobat.
  */
 export function customStampName(random: () => number = Math.random): string {
-  let out = '#';
-  for (let i = 0; i < 22; i++) out += BASE62[Math.floor(random() * BASE62.length)];
-  return out;
+  let name = '#';
+  for (let i = 0; i < 22; i++) name += BASE62[Math.floor(random() * BASE62.length)];
+  return name;
 }
 
 /** Asset ids are derived, not allocated: library id + identifier. */
@@ -50,18 +50,16 @@ export function assetIdFor(libraryId: string, name: string): string {
 
 // ── PieceInfo: only what has no standard home ────────────────────────────────
 //
-// The title, the registry, and the artwork are standard PDF. What remains —
-// a durable library id, categories, a locale, a stamp's kind and an explicit
-// `/Subj` override — rides `/PieceInfo` under these application names, in
-// the shape below. Exported so a library authored outside the plugin (a
-// conversion script, a build step) writes the same dictionary the plugin
-// reads.
+// The title, the registry, and the artwork are standard PDF. What remains
+// (a durable library id, categories, a locale, a stamp's kind and an explicit
+// `/Subj` override) rides `/PieceInfo` under these application names, in the
+// shape below, so every write produces the dictionary the import reads.
 
 /** Catalog `/PieceInfo` application name for library-level data. */
 export const STAMP_LIBRARY_PIECEINFO_APP = 'EMBD_StampLibrary';
 /** Page `/PieceInfo` application name for per-stamp data. */
 export const STAMP_PIECEINFO_APP = 'EMBD_Stamp';
-/** The `Version` both dictionaries carry. */
+/** The PieceInfo format version both dictionaries carry in `Version`. */
 export const STAMP_PIECEINFO_VERSION = 2;
 
 /** The library kind every file has unless it says otherwise. */
@@ -84,33 +82,34 @@ export function stampKindToPdfName(kind: StampAssetKind): string {
 /** The catalog patch: library id, categories, locale. The name is `/Title`. */
 export function stampLibraryPieceInfo(
   id: string,
-  opts: { kind?: string; categories?: readonly string[]; locale?: string } = {},
+  options: { kind?: string; categories?: readonly string[]; locale?: string } = {},
 ): PieceInfoPatch {
   return {
     Version: STAMP_PIECEINFO_VERSION,
     Id: id,
-    Kind: { name: libraryKindToPdfName(opts.kind ?? DEFAULT_LIBRARY_KIND) },
-    // v2: the name is the PDF's /Title.
+    Kind: { name: libraryKindToPdfName(options.kind ?? DEFAULT_LIBRARY_KIND) },
+    // Format version 2 keeps the name in the PDF's /Title.
     Name: null,
-    Categories: opts.categories ?? null,
-    Locale: opts.locale ?? null,
+    Categories: options.categories ?? null,
+    Locale: options.locale ?? null,
   };
 }
 
 /** The page patch: kind, an explicit `/Subj` override, categories. */
 export function stampPieceInfo(
   kind: StampAssetKind,
-  opts: { subject?: string | null; categories?: readonly string[] } = {},
+  options: { subject?: string | null; categories?: readonly string[] } = {},
 ): PieceInfoPatch {
   return {
     Version: STAMP_PIECEINFO_VERSION,
     Kind: { name: stampKindToPdfName(kind) },
-    // v2: the identifier and label live in the /Names /Pages key; only an
-    // explicit /Subj override has no standard home. v1 `Name`/`Subject` keys
-    // are cleared so a re-imported v1 library cannot disagree with its registry.
+    // Format version 2 keeps the identifier and label in the /Names /Pages
+    // key; only an explicit /Subj override has no standard home. The format
+    // version 1 `Name`/`Subject` keys are cleared, so a re-imported format
+    // version 1 library cannot disagree with its registry.
     Name: null,
     Subject: null,
-    SubjectOverride: opts.subject ?? null,
-    Categories: opts.categories ?? null,
+    SubjectOverride: options.subject ?? null,
+    Categories: options.categories ?? null,
   };
 }

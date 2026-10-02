@@ -110,7 +110,7 @@ describe('EngineRecycler fleet safety', () => {
     let aState: 'ready' | 'starting' = 'ready';
     let aRecycled = false;
     const a = {
-      // A fresh successor comes back SMALL — after recovery, B is the
+      // A fresh successor comes back small — after recovery, B is the
       // largest and the roll moves on.
       memory: () =>
         aState === 'ready'
@@ -130,7 +130,7 @@ describe('EngineRecycler fleet safety', () => {
     expect(await r.tick(1_000_000)).toEqual({ reason: 'hard-rss', graceful: false });
     expect(a.recycle).toHaveBeenCalledTimes(1);
     // Past the hard cooldown, pressure still hard, B has the only (and
-    // largest) reading — but A's successor is NOT ready: no decision.
+    // largest) reading — but A's successor is not ready: no decision.
     expect(await r.tick(1_020_000)).toBeNull();
     expect(await r.tick(1_040_000)).toBeNull();
     expect(b.recycle).not.toHaveBeenCalled();
@@ -272,7 +272,7 @@ describe('recycle through the full app (host fixture)', () => {
       const target = clientFor(fx, 'docrec001');
       await until(() => target.stats().inFlight >= 1);
 
-      // Reads issued DURING the graceful recycle park and complete on
+      // Reads issued during the graceful recycle park and complete on
       // the successor — the zero-5xx property for settled-or-parked work.
       const recycled = target.recycle('manual', { settleWindowMs: 250 });
       const during = listAnnotations(fx, 'tenant-r', 'docrec002', 'alice');
@@ -282,7 +282,7 @@ describe('recycle through the full app (host fixture)', () => {
       expect(stalledRes.status).toBeGreaterThanOrEqual(500); // truncated, honestly
       expect((await during).status).toBe(200);
 
-      // A rehearsed crash leaves NO journal evidence.
+      // A rehearsed crash leaves no journal evidence.
       const crashes = await fx.db
         .selectFrom('engine_crashes')
         .select(fx.db.fn.countAll().as('n'))

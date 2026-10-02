@@ -44,8 +44,8 @@ export class TenantsRepo {
   }
 
   /**
-   * Insert if absent. Returns the row. Race-safe via ON CONFLICT DO
-   * NOTHING (both dialects).
+   * Insert if absent. Returns the row. Race-safe via on CONFLICT do
+   * nothing (both dialects).
    */
   async ensure(input: {
     id: string;
@@ -95,7 +95,7 @@ export class TenantsRepo {
       .orderBy('id', 'desc');
     if (opts.before) {
       const { createdAt, id } = opts.before;
-      // OR-spelled keyset comparison, planned against idx_tenants_created_id.
+      // Or-spelled keyset comparison, planned against idx_tenants_created_id.
       q = q.where((eb) =>
         eb.or([
           eb('created_at', '<', createdAt),
