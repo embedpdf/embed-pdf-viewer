@@ -13,6 +13,7 @@ import { distanceScene, measurementCaptionScene } from './measurement';
 import { shapeMeasurementLayout } from './measurement-shape';
 import { quadBounds, quadRing } from '@embedpdf/core-geometry';
 import { geomScene } from './geometry';
+import { HELVETICA_ASCENT, HELVETICA_LINE_HEIGHT, helveticaAdvance } from './helvetica';
 import { fileAttachmentIconScene, noteIconScene } from './icons';
 import { blendFor, dashOf } from './kinds/styles';
 import { CARET_STROKE_WIDTH } from './shapes/caret';
@@ -174,11 +175,37 @@ function redactRegions(geometry: Shape): RedactRegion[] {
 }
 
 /**
+ * The size a label draws at when its `fontSize` is 0 (fit) and `/Repeat` is
+ * on: fitting would only shrink the label as it repeats, so the engine tiles
+ * at this size instead.
+ */
+const REPEAT_FIT_FONT_SIZE = 12;
+
+/** The sizes the engine tries when it fits a label to its region, smallest first. */
+const FIT_FONT_SIZES = [
+  4, 6, 8, 9, 10, 12, 14, 18, 20, 25, 30, 35, 40, 45, 50, 55, 60, 70, 80, 90, 100, 110, 120, 130,
+  144,
+];
+
+/** The largest size at which one line of text `advance` em wide fits the region. */
+function fitFontSize(region: Rect, advance: number): number {
+  let fitted = FIT_FONT_SIZES[0]!;
+  for (const size of FIT_FONT_SIZES) {
+    if (size * HELVETICA_LINE_HEIGHT > region.height || size * advance > region.width) break;
+    fitted = size;
+  }
+  return fitted;
+}
+
+/**
  * Redaction label layout — the same reading of ISO 32000-2 the engine's
  * apply-time painter uses, as pure math: top-aligned, `/Q` horizontal
  * alignment, `/Repeat` tiling a full grid that fits the region (no partial
- * glyph bleed — the scene has no clipping). Character advance is estimated
- * (0.55em Helvetica-ish); this is a live preview, the engine bakes the truth.
+ * glyph bleed — the scene has no clipping). A `fontSize` of 0 fits one label
+ * to the region on one line, and tiles a repeated one at 12pt, like the
+ * engine. Text is measured in Helvetica, the engine's default label font, so
+ * a label in another font is estimated; this is a live preview, the engine
+ * bakes the truth.
  */
 export function layoutRedactLabel(
   region: Rect,
@@ -186,33 +213,45 @@ export function layoutRedactLabel(
   text: TextStyle | undefined,
 ): SceneNode[] {
   if (!label.text) return [];
-  const fontSize = Math.max(4, text && text.fontSize > 0 ? text.fontSize : region.height * 0.6);
-  const charW = fontSize * 0.55;
-  const textW = label.text.length * charW;
-  const lineH = fontSize * 1.2;
+  const advance = helveticaAdvance(label.text);
+  const fit = label.repeat ? REPEAT_FIT_FONT_SIZE : fitFontSize(region, advance);
+  const fontSize = Math.max(4, text && text.fontSize > 0 ? text.fontSize : fit);
+  const textW = advance * fontSize;
+  // Repeated labels are joined with a space.
+  const gap = helveticaAdvance(' ') * fontSize;
+  const lineH = fontSize * HELVETICA_LINE_HEIGHT;
   const paint: Paint = { fill: text?.fontColor ?? '#ffffff', opacity: 1 };
   const base = { fontSize, ...(text?.fontFamily ? { fontFamily: text.fontFamily } : {}), paint };
-  const baseline = (rowTop: number) => rowTop + fontSize * 0.95;
+  const baseline = (rowTop: number) => rowTop + fontSize * HELVETICA_ASCENT;
+  /** Where a line `width` wide starts, by the label's alignment. */
+  const lineStart = (width: number) =>
+    text?.textAlign === 'center'
+      ? region.x + Math.max(0, (region.width - width) / 2)
+      : text?.textAlign === 'right'
+        ? region.x + Math.max(0, region.width - width)
+        : region.x;
 
   if (!label.repeat) {
     if (fontSize > region.height) return [];
-    const x =
-      text?.textAlign === 'center'
-        ? region.x + Math.max(0, (region.width - textW) / 2)
-        : text?.textAlign === 'right'
-          ? region.x + Math.max(0, region.width - textW)
-          : region.x;
-    return [{ kind: 'text', at: { x, y: baseline(region.y) }, text: label.text, ...base }];
+    return [
+      {
+        kind: 'text',
+        at: { x: lineStart(textW), y: baseline(region.y) },
+        text: label.text,
+        ...base,
+      },
+    ];
   }
 
-  const cols = Math.max(1, Math.floor((region.width + charW) / (textW + charW)));
+  const cols = Math.max(1, Math.floor((region.width + gap) / (textW + gap)));
   const rows = Math.max(1, Math.floor(region.height / lineH));
+  const left = lineStart(cols * textW + (cols - 1) * gap);
   const nodes: SceneNode[] = [];
   for (let row = 0; row < rows && nodes.length < 400; row++) {
     for (let column = 0; column < cols && nodes.length < 400; column++) {
       nodes.push({
         kind: 'text',
-        at: { x: region.x + column * (textW + charW), y: baseline(region.y + row * lineH) },
+        at: { x: left + column * (textW + gap), y: baseline(region.y + row * lineH) },
         text: label.text,
         ...base,
       });

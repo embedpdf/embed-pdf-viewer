@@ -97,6 +97,34 @@ export function runRedactionApplyConformance(
         expect(after.annotations.length).toBe(before.annotations.length - 3);
         expect(after.pages[0].revision.generation > before.pages[0].revision.generation).toBe(true);
         expect(await doc.pages.list()).toEqual(layoutBefore);
+        // The label is part of the page now.
+        expect((await page.text.get()).text).toContain('REDACTED');
+      } finally {
+        await doc.close();
+      }
+    });
+
+    test('a label fitted to its region (fontSize 0) is burned in', async () => {
+      const doc = await openFixture(engine, opts);
+      try {
+        if (!doc.redaction) return;
+        const layout = await doc.pages.list();
+        const page = doc.page(toPageRef(layout.pages[0].ref.objectNumber));
+        // Marked first and labelled after, as a redaction UI does.
+        const marked = await page.annotations.create({
+          subtype: 'redact',
+          rect: REDACT_RECT,
+          interiorColor: '#000000',
+        } satisfies RedactDraft);
+        await page.annotations.update(marked.annotation.ref, {
+          subtype: 'redact',
+          overlayText: 'CLASSIFIED',
+          fontSize: 0,
+          fontColor: '#ffffff',
+        });
+
+        await doc.redaction.apply({ annotations: [marked.annotation.ref] });
+        expect((await page.text.get()).text).toContain('CLASSIFIED');
       } finally {
         await doc.close();
       }

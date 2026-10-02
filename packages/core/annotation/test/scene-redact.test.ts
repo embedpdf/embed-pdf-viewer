@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 
 import { step } from './support';
 import { DRAWN_FLAGS } from '../src/flags';
+import { HELVETICA_ASCENT, helveticaAdvance } from '../src/helvetica';
 import { layoutRedactLabel, scene } from '../src/scene';
 import type { ModelAnnotation, Model, RenderItem, TextStyle } from '../src/types';
 import { initialModel } from '../src/update';
@@ -128,7 +129,7 @@ describe('layoutRedactLabel', () => {
     expect(node).toMatchObject({ kind: 'text', text: 'TOP', fontSize: 12 });
     if (node!.kind !== 'text') throw new Error('expected text node');
     expect(node.at.x).toBe(REGION.x);
-    expect(node.at.y).toBeCloseTo(REGION.y + 12 * 0.95);
+    expect(node.at.y).toBeCloseTo(REGION.y + 12 * HELVETICA_ASCENT);
   });
 
   it('alignment: right pushes the line to the region edge', () => {
@@ -138,27 +139,49 @@ describe('layoutRedactLabel', () => {
       { ...LABEL_STYLE, textAlign: 'right' },
     );
     if (node!.kind !== 'text') throw new Error('expected text node');
-    const textW = 1 * 12 * 0.55;
-    expect(node.at.x).toBeCloseTo(REGION.x + REGION.width - textW);
+    expect(node.at.x).toBeCloseTo(REGION.x + REGION.width - helveticaAdvance('X') * 12);
   });
 
-  it('fontSize 0 auto-fits to the region height', () => {
+  it('fontSize 0 fits one label to the region, at the size the engine picks', () => {
+    // As the engine fits it: "Classified" in 352 × 114 draws at 80pt (90
+    // would overflow the width).
     const [node] = layoutRedactLabel(
-      REGION,
+      { x: 0, y: 0, width: 352, height: 114 },
+      { text: 'Classified', repeat: false },
+      { ...LABEL_STYLE, fontSize: 0 },
+    );
+    expect(node).toMatchObject({ kind: 'text', fontSize: 80 });
+  });
+
+  it('fontSize 0 fits a one-line region by its height', () => {
+    const [node] = layoutRedactLabel(
+      { x: 0, y: 0, width: 400, height: 14 },
       { text: 'A', repeat: false },
       { ...LABEL_STYLE, fontSize: 0 },
     );
-    if (node!.kind !== 'text') throw new Error('expected text node');
-    expect(node.fontSize).toBeCloseTo(REGION.height * 0.6);
+    expect(node).toMatchObject({ kind: 'text', fontSize: 10 });
+  });
+
+  it('fontSize 0 with repeat tiles at 12pt, like the engine', () => {
+    // Measured from the engine: 3 labels a line in 180 × 120, 14.028pt apart.
+    const nodes = layoutRedactLabel(
+      { x: 0, y: 0, width: 180, height: 120 },
+      { text: 'Classified', repeat: true },
+      { ...LABEL_STYLE, fontSize: 0 },
+    );
+    expect(nodes[0]).toMatchObject({ kind: 'text', fontSize: 12 });
+    const rows = new Set(nodes.map((node) => (node.kind === 'text' ? node.at.y : 0)));
+    expect(nodes.length / rows.size).toBe(3);
+    expect(rows.size).toBe(8);
   });
 
   it('repeat tiles a full grid that FITS the region (no bleed)', () => {
     const nodes = layoutRedactLabel(REGION, { text: 'AB', repeat: true }, LABEL_STYLE);
     expect(nodes.length).toBeGreaterThan(1);
-    const charW = 12 * 0.55;
+    const width = helveticaAdvance('AB') * 12;
     for (const node of nodes) {
       if (node.kind !== 'text') throw new Error('expected text node');
-      expect(node.at.x + 2 * charW).toBeLessThanOrEqual(REGION.x + REGION.width + 1e-6);
+      expect(node.at.x + width).toBeLessThanOrEqual(REGION.x + REGION.width + 1e-6);
       expect(node.at.y).toBeLessThanOrEqual(REGION.y + REGION.height);
     }
   });
