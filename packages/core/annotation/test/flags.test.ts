@@ -391,6 +391,50 @@ describe('screen-anchored bodies (noZoom / noRotate)', () => {
     }
   });
 
+  it('deep zoom: the projection stays exact below the 4pt resize limit', () => {
+    // A 24pt note at 20×: 1.2pt on the page, so 24pt on screen. Clamped to a
+    // resize's 4pt limit it would grow on screen past 6×, and a gesture's
+    // commit would store it larger than it was.
+    const note: Shape = {
+      kind: 'box',
+      box: { x: 100, y: 100, width: 24, height: 24 },
+      rotation: 0,
+      ellipse: false,
+    };
+    const mode = { zoom: true, upright: false };
+    const view: ViewEnv = { zoom: 20, rotation: 0 };
+    const shown = geomBounds(anchoredGeom(note, mode, view));
+    expect(shown.x).toBe(100);
+    expect(shown.width).toBeCloseTo(1.2, 9);
+    expect(shown.height).toBeCloseTo(1.2, 9);
+    const stored = geomBounds(unanchoredGeom(anchoredGeom(note, mode, view), mode, view));
+    expect(stored.width).toBeCloseTo(24, 9);
+    expect(stored.height).toBeCloseTo(24, 9);
+  });
+
+  it('deep zoom: a noZoom body and its frame agree, so a look keeps its size', () => {
+    const record = square('nz', flagsWith({ print: true, noZoom: true }));
+    const [item] = pageItems(loaded([record]), PAGE, { zoom: 40, rotation: 0 });
+    // 80pt wide at 100%: 2pt on the page at 40×, drawn at 1/40 of its size.
+    expect(item.frame.box.width * 40).toBeCloseTo(80, 6);
+    expect(item.frame.scale).toBeCloseTo(1 / 40, 12);
+  });
+
+  it('a click reaches as far on screen at every zoom (the hit margin is in screen pixels)', () => {
+    const down = (point: Point, scale: number): Message => ({
+      type: 'editPointer',
+      phase: 'down',
+      in: { page: PAGE, point, shift: false, scale, zoom: scale },
+    });
+    const model = loaded([square('nz', flagsWith({ print: true, noZoom: true }))]);
+    // At 100%: 3pt right of the 80pt body is within the 6px margin.
+    expect(run(model, [down({ x: 183, y: 130 }, 1)]).selected).toEqual(['nz']);
+    // At 40×: the body is 2pt wide on the page, 80px on screen; 1pt right of
+    // it is 40px away, far outside a 6px margin.
+    expect(run(model, [down({ x: 103, y: 100.75 }, 40)]).selected).toEqual([]);
+    expect(run(model, [down({ x: 102.1, y: 100.75 }, 40)]).selected).toEqual(['nz']);
+  });
+
   it('pageItems projects the anchored footprint + scaled stroke; hit matches paint', () => {
     const record = square('nz', flagsWith({ print: true, noZoom: true }));
     const model = loaded([record]);

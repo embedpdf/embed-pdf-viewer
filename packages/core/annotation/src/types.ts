@@ -506,7 +506,11 @@ export interface Session {
    * fill in what they leave out.
    */
   defaults: Record<string, FieldValues>;
-  /** Extra clickable margin (content units) around a stroke — bump it for touch. */
+  /**
+   * Extra clickable margin around what an annotation paints, in screen
+   * pixels: converted by the page's view scale, so a click reaches as far at
+   * every zoom. Bump it for touch.
+   */
   hitMargin: number;
   /** The free-text annotation currently in text-edit mode (its `contentEditable`
    *  is focused), or null. Distinct from `selected`: you select to move/resize,

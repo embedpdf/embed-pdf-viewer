@@ -7,6 +7,7 @@ import { anchorModeOf, unanchoredGeom } from '../anchor';
 import { geomRotateAbout, geomScaleAbout, geomTranslate, groupResizeFactors } from '../geometry';
 import { measurementOf } from '../measurement';
 import { moveMeasurementCaption, shapeMeasurementReadout } from '../measurement-shape';
+import { MIN_SIZE } from '../rect';
 import { shapeOf, styleOf, withShape, withValues } from '../record';
 import type { Effect, Model } from '../types';
 import { commitViewGesture, geomEqual } from './changes';
@@ -89,7 +90,7 @@ export function editUp(model: Model): [Model, Effect[]] {
       const record = byId[id];
       if (!record) continue;
       const scaled = commitViewGesture(record, draft.view, (geometry) =>
-        geomScaleAbout(geometry, draft.anchor, sx, sy),
+        geomScaleAbout(geometry, draft.anchor, sx, sy, MIN_SIZE),
       );
       byId[id] = withShape(record, scaled);
     }

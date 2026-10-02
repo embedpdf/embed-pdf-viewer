@@ -100,7 +100,7 @@ export function editDown(model: Model, input: PointerInput): [Model, Effect[]] {
     input.page,
     input.point,
     input.chrome ?? DEFAULT_CHROME_GEOMETRY,
-    model.hitMargin,
+    model.hitMargin / (input.scale || 1),
     input.pageBox,
     input.inert,
     viewOf(input),

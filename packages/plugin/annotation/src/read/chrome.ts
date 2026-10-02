@@ -68,6 +68,8 @@ export function createChromeReads(
     };
   };
   const grabBoost = (touch?: boolean): number => (touch ? TOUCH_GRAB_BOOST : 1);
+  /** The hit margin, a screen-pixel setting, in content units at the view scale. */
+  const hitMarginAt = (scale?: number): number => store.model().hitMargin / (scale || 1);
 
   /** The core hit-test with this plugin's inputs filled in: chrome geometry
    *  at the view scale, the page box, and the engaged (inert) ids. Pass
@@ -86,7 +88,7 @@ export function createChromeReads(
       page,
       point,
       chromeGeomAt(view.scale, boost),
-      model.hitMargin,
+      hitMarginAt(view.scale),
       geometry.pageBoxOf(pageObjectNumber),
       inert === undefined ? behaviors.engagedIdsOn(pageObjectNumber) : (inert ?? undefined),
       viewEnv(view.zoom, view.rotation),
@@ -342,7 +344,7 @@ export function createChromeReads(
         page,
         point,
         chromeGeomAt(scale),
-        model.hitMargin,
+        hitMarginAt(scale),
         geometry.pageBoxOf(pageObjectNumber),
         behaviors.engagedIdsOn(pageObjectNumber),
         viewEnv(zoom, rotation),

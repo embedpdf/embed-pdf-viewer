@@ -63,8 +63,11 @@ export interface ShapeFamily<S extends Shape = Shape> {
   translate(shape: S, delta: Point): S;
   /** The shape turned `degrees` clockwise about `pivot`; unchanged when it doesn't turn. */
   rotateAbout(shape: S, pivot: Point, degrees: number): S;
-  /** The shape scaled about `anchor` by `(sx, sy)` (a multi-selection's resize). */
-  scaleAbout(shape: S, anchor: Point, sx: number, sy: number): S;
+  /**
+   * The shape scaled about `anchor` by `(sx, sy)`, exactly. A resize passes
+   * its limit, `minSize`: a box then ends up no smaller than that.
+   */
+  scaleAbout(shape: S, anchor: Point, sx: number, sy: number, minSize?: number): S;
   /** The shape with its turn cleared, turned back about `pivot` where that matters. */
   upright(shape: S, pivot?: Point): S;
   /** Its handles: resize corners and sides, or vertices. */

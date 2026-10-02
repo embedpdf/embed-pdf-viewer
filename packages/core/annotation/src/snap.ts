@@ -3,7 +3,7 @@
  * edges + centers against every other annotation on the page (and the page
  * box); if a pair lands within the threshold, nudges the delta to align them
  * and reports a guide line to draw. One snap per axis — the closest wins.
- * Threshold is in content units (the `hitMargin` convention).
+ * Threshold is in content units: the caller converts the screen-pixel setting.
  */
 import type { PageRef } from '@embedpdf/engine-core/runtime';
 import { anchorModeOf } from './anchor';

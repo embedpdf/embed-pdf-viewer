@@ -159,8 +159,14 @@ function textBoxRotateAbout(shape: TextBoxShape, pivot: Point, degrees: number) 
 }
 
 /** A plain text box scaled about `anchor`; a callout stays as it is. */
-function textBoxScaleAbout(shape: TextBoxShape, anchor: Point, sx: number, sy: number) {
-  return shape.calloutLine ? shape : boxScaleAbout(shape, anchor, sx, sy);
+function textBoxScaleAbout(
+  shape: TextBoxShape,
+  anchor: Point,
+  sx: number,
+  sy: number,
+  minSize?: number,
+) {
+  return shape.calloutLine ? shape : boxScaleAbout(shape, anchor, sx, sy, minSize);
 }
 
 /** The shape upright: its turn cleared, and a callout's end back on the upright box. */

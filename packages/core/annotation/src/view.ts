@@ -30,7 +30,7 @@ import {
   rectHandlesFor,
   ROTATE_KNOB_OFFSET,
 } from './geometry';
-import { cursorOnScreen, rectFromPoints, rotatePoint, unionRect } from './rect';
+import { MIN_SIZE, cursorOnScreen, rectFromPoints, rotatePoint, unionRect } from './rect';
 import { placed } from './frame';
 import { calloutShape } from './shapes/text-box';
 import { groupCaps } from './group';
@@ -147,7 +147,7 @@ function effGeom(model: Model, id: Id, view: ViewEnv | undefined): Shape {
     }
     if (draft.kind === 'group' && draft.ids.includes(id)) {
       const { sx, sy } = groupResizeFactors(draft.base, draft.current);
-      return geomScaleAbout(geometry, draft.anchor, sx, sy);
+      return geomScaleAbout(geometry, draft.anchor, sx, sy, MIN_SIZE);
     }
   }
   return geometry;

@@ -65,3 +65,19 @@ describe('the box family on a turned box', () => {
     close(boxCorners(resized)[0], nw);
   });
 });
+
+describe('the box family scales', () => {
+  const shape: BoxShape = { kind: 'box', box: BOX, rotation: 0, ellipse: false };
+
+  it('exactly, however small the box gets', () => {
+    const scaled = boxFamily.scaleAbout(shape, { x: 100, y: 200 }, 0.01, 0.01);
+    expect(scaled.box).toEqual({ x: 100, y: 200, width: 0.8, height: 0.4 });
+  });
+
+  it("no smaller than a resize's limit, about the scaled middle", () => {
+    const scaled = boxFamily.scaleAbout(shape, { x: 100, y: 200 }, 0.01, 0.01, 4);
+    expect(scaled.box.width).toBe(4);
+    expect(scaled.box.height).toBe(4);
+    close({ x: scaled.box.x + 2, y: scaled.box.y + 2 }, { x: 100.4, y: 200.2 });
+  });
+});

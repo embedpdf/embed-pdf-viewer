@@ -51,7 +51,8 @@ export function familyChosenBy(pick: (annotation: Annotation) => ShapeFamily): S
     pivot: (shape) => familyOf(shape).pivot(shape),
     translate: (shape, delta) => familyOf(shape).translate(shape, delta),
     rotateAbout: (shape, pivot, degrees) => familyOf(shape).rotateAbout(shape, pivot, degrees),
-    scaleAbout: (shape, anchor, sx, sy) => familyOf(shape).scaleAbout(shape, anchor, sx, sy),
+    scaleAbout: (shape, anchor, sx, sy, minSize) =>
+      familyOf(shape).scaleAbout(shape, anchor, sx, sy, minSize),
     upright: (shape, pivot) => familyOf(shape).upright(shape, pivot),
     handles: (shape) => familyOf(shape).handles(shape),
     drag: (shape, handle, to) => familyOf(shape).drag(shape, handle, to),

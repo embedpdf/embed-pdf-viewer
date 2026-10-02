@@ -226,13 +226,20 @@ export function groupResizeFactors(base: Rect, current: Rect): { sx: number; sy:
 }
 
 /**
- * Scale a geom about `anchor` by `(sx, sy)`. For a rotated box (iso scale, so
- * `sx === sy`) the unrotated box is scaled about the anchor and its turn is
- * preserved (a uniform scale commutes with rotation). For unrotated members
- * (the anisotropic case) every point/extent scales directly.
+ * Scale a geom about `anchor` by `(sx, sy)`, exactly. For a rotated box (iso
+ * scale, so `sx === sy`) the unrotated box is scaled about the anchor and its
+ * turn is preserved (a uniform scale commutes with rotation). For unrotated
+ * members (the anisotropic case) every point/extent scales directly. A resize
+ * passes `minSize`, the smallest a box may end up.
  */
-export function geomScaleAbout(geometry: Shape, anchor: Point, sx: number, sy: number): Shape {
-  return familyOf(geometry).scaleAbout(geometry, anchor, sx, sy);
+export function geomScaleAbout(
+  geometry: Shape,
+  anchor: Point,
+  sx: number,
+  sy: number,
+  minSize?: number,
+): Shape {
+  return familyOf(geometry).scaleAbout(geometry, anchor, sx, sy, minSize);
 }
 
 /** Where the rotate knob sits, given the OBB corners (nw, ne, se, sw) and the

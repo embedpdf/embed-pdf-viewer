@@ -17,7 +17,6 @@ import type { Annotation } from '@embedpdf/engine-core/runtime';
 import { cloudyBounds, cloudyOutline, cloudyPath } from '../cloudy';
 import type { PaintedPiece } from '../painted';
 import {
-  MIN_SIZE,
   RECT_HANDLES,
   expandRect,
   insetRect,
@@ -157,13 +156,15 @@ export function boxRotateAbout<S extends TurnedBox>(shape: S, pivot: Point, degr
 /**
  * The shape scaled about `anchor` by `(sx, sy)`: its middle moves with the
  * scale and its size scales, and its turn stays (a turned member of a
- * selection scales the same in both directions).
+ * selection scales the same in both directions). Its size is kept at least
+ * `minSize`, a resize's limit; 0 scales exactly.
  */
 export function boxScaleAbout<S extends TurnedBox>(
   shape: S,
   anchor: Point,
   sx: number,
   sy: number,
+  minSize = 0,
 ): S {
   const middle = rectCenter(shape.box);
   return {
@@ -171,8 +172,8 @@ export function boxScaleAbout<S extends TurnedBox>(
     box: boxAround(
       { x: anchor.x + (middle.x - anchor.x) * sx, y: anchor.y + (middle.y - anchor.y) * sy },
       {
-        width: Math.max(MIN_SIZE, shape.box.width * Math.abs(sx)),
-        height: Math.max(MIN_SIZE, shape.box.height * Math.abs(sy)),
+        width: Math.max(minSize, shape.box.width * Math.abs(sx)),
+        height: Math.max(minSize, shape.box.height * Math.abs(sy)),
       },
     ),
   };
