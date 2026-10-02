@@ -663,6 +663,59 @@ describe('smooth scroll via the injected scheduler', () => {
   });
 });
 
+describe('the instance owns its frames and its viewport', () => {
+  it('cancels the frames still scheduled when it closes, and schedules none after', async () => {
+    // Frames by id, so a cancelled one never runs.
+    const frames = new Map<number, (timestamp: number) => void>();
+    let nextId = 0;
+    const scheduler = {
+      raf: (callback: (timestamp: number) => void) => {
+        frames.set(++nextId, callback);
+        return nextId;
+      },
+      caf: (id: number) => void frames.delete(id),
+    };
+    const { stage, ctx } = harness(PORTRAIT, { scheduler });
+    stage.zoomTo(2); // the camera-rest countdown
+    stage.goToPage(3); // a tween
+    expect(frames.size).toBeGreaterThan(1);
+
+    // The document closes mid-flight (a page left in the docs tears its demos down this way).
+    await ctx.dispose();
+    expect(frames.size).toBe(0);
+    stage.goToPage(1);
+    expect(frames.size).toBe(0);
+  });
+
+  it('keeps its viewport and view through a report with no area, and carries on after', () => {
+    const { stage } = harness(PORTRAIT);
+    stage.zoomTo(2);
+    stage.goToPage(2, { behavior: 'instant' });
+    const camera = stage.getCamera();
+    const events: string[] = [];
+    stage.onViewportChanged(() => events.push('viewport'));
+    stage.onZoomChanged(() => events.push('zoom'));
+    stage.onCameraChanged(() => events.push('camera'));
+
+    // Hidden, or taken out of the page before its stage is torn down.
+    stage.setViewportSize({ width: 0, height: 0 });
+    stage.setViewportSize({ width: 1000, height: 0 });
+    expect(stage.getCamera()).toEqual(camera);
+    expect(events).toEqual([]);
+
+    // Shown again at its size: the same view, nothing to do.
+    stage.setViewportSize({ width: 1000, height: 700 });
+    expect(stage.getCamera()).toEqual(camera);
+    expect(events).toEqual([]);
+    expect(stage.getCurrentPageIndex()).toBe(2);
+
+    // A real new size is a resize: the view fits it around the same page.
+    stage.setViewportSize({ width: 800, height: 700 });
+    expect(events).toContain('viewport');
+    expect(stage.getCurrentPageIndex()).toBe(2);
+  });
+});
+
 describe('the scroller contract — the camera in native DOM vocabulary', () => {
   // 5 × 600×800 portrait pages, default gap 16 → world 600 × 4064; viewport 1000×700,
   // padding 24; automatic zoom caps at 1 → the y axis overflows, x fits.

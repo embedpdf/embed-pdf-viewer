@@ -76,7 +76,12 @@ export function createViewLifecycle(
           }
           return;
         }
-        // Afterwards a report of the size the stage already has says nothing new. Hosts send
+        // Afterwards a report with no area means the view isn't shown: a hidden tab, or an
+        // element taken out of the page before its stage is torn down. There is nothing to fit
+        // to, so the stage keeps its last real viewport and its view, and carries on from them
+        // when it's shown again (as a browser keeps a hidden element's scroll position).
+        if (size.width <= 0 || size.height <= 0) return;
+        // A report of the size the stage already has says nothing new either. Hosts send
         // them (a ResizeObserver's first callback repeats the size reported at attach), and
         // treating one as a resize would cancel a navigation still animating, like a reveal
         // the app asked for as the view opened.

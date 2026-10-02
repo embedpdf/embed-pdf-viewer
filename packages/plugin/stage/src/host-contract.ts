@@ -13,7 +13,10 @@ export type { StageState } from './model';
  * plugins need. The same runtime token as the public contract, typed wider.
  */
 export interface StageHostCapability extends StageCapability {
-  /** Report the container box (ResizeObserver); the first real size triggers placement. */
+  /**
+   * Report the container box (ResizeObserver); the first real size triggers placement. After
+   * that, a box with no area (hidden, or taken out of the page) keeps the last real viewport.
+   */
   setViewportSize(size: Size): void;
   /** Report the device pixel ratio so page transforms render crisp. */
   setDevicePixelRatio(ratio: number): void;

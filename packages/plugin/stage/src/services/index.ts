@@ -24,7 +24,7 @@ export function createServices(
 ): StageServices {
   return {
     events: createEvents(ctx),
-    scheduler: createScheduler(config),
+    scheduler: createScheduler(ctx, config),
     placement: createPlacementLatch(),
     scene: createScene(ctx),
   };
