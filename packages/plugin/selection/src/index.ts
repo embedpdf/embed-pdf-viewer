@@ -21,13 +21,19 @@ export {
   HANDLE_BAR,
   HANDLE_HEAD,
   HANDLE_PAD,
+  armSelectionHandle,
   createSelectionHandleDrag,
+  selectionHandleEndpointsOf,
   selectionHandleGeom,
+  selectionHandleViewOf,
 } from './handles';
 export type {
+  ArmedSelectionHandle,
   SelectionHandleDragSession,
   SelectionHandleEndpoint,
+  SelectionHandleEndpoints,
   SelectionHandleGeom,
+  SelectionHandleStage,
   SelectionHandleTarget,
   SelectionHandleView,
 } from './handles';

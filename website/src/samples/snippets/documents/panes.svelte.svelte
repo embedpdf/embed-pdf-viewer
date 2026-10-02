@@ -16,9 +16,7 @@
       {#if pane.activeDocumentId}
         <DocumentScope id={pane.activeDocumentId}>
           <Stage>
-            {#snippet page()}
-              <RenderLayer />
-            {/snippet}
+            <RenderLayer />
           </Stage>
         </DocumentScope>
       {/if}

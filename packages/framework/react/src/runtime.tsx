@@ -13,6 +13,8 @@ export * from '@embedpdf/core';
 // What a page with a viewer needs from the browser: handing bytes to the user as a download,
 // and a font the engine draws with, for text you draw yourself.
 export { mountWebFont, saveFile } from '@embedpdf/web';
+// The page context every layer draws through; its conversions are shared with every framework.
+export { makePageContext } from '@embedpdf/web';
 // A theme written with setting names, as the style for the element around a viewer.
 export { epdfTheme } from './theme';
 export type { EpdfTheme } from './theme';
@@ -29,13 +31,13 @@ import {
 } from 'react';
 import {
   DocumentsToken,
-  PluginError,
-  VIEWER_DEFAULTS,
   createKernel,
   documentState,
   documentsState,
   isLocalEngine,
   shallowEqual,
+  standInFor,
+  viewerSettingsOf,
 } from '@embedpdf/core';
 import type {
   AnyPlugin,
@@ -52,14 +54,14 @@ import type {
   Kernel,
   LockedDocumentInfo,
   PageInfo,
-  PageRef,
   ViewerPageSettings,
   ViewerSettings,
 } from '@embedpdf/core';
 // Pure coordinate math from the geometry base — not from stage-core. The
 // PageContext seam stays stage-agnostic (it must also serve standalone PageView).
-import type { PageFrame, PageTransform, Point, Rect } from '@embedpdf/core-geometry';
+import type { PageTransform } from '@embedpdf/core-geometry';
 import type { PageViewDemand } from '@embedpdf/plugin-render/contract';
+import type { PageContext } from '@embedpdf/web';
 
 const KernelCtx = createContext<Kernel | null>(null);
 /** The document a subtree is bound to. null => use the active document. */
@@ -158,9 +160,10 @@ export function DocumentGate({ fallback = null, locked, error, children }: Docum
  * structurally impossible.
  *
  * Outside a document (none open, not ready yet, or none in scope), a document
- * plugin resolves to its stand-in ({@link standInFor}): rendering never fails,
- * and a method called too early throws `not-ready`. A token no plugin provides
- * still throws the kernel's reason, because that is a setup mistake.
+ * plugin resolves to its stand-in (`standInFor` from `@embedpdf/core`):
+ * rendering never fails, and a method called too early refuses with
+ * `not-ready` (a method that returns a promise rejects). A token no plugin
+ * provides still throws the kernel's reason, because that is a setup mistake.
  */
 export function useCapability<T>(token: CapabilityToken<T>): T {
   const kernel = useKernel();
@@ -175,80 +178,6 @@ export function useCapability<T>(token: CapabilityToken<T>): T {
 export function useOptionalCapability<T>(token: CapabilityToken<T>): T | null {
   const scoped = useDocumentScope();
   return useKernelValue((kernel) => kernel.tryCapability(token, scoped ?? undefined));
-}
-
-const standIns = new WeakMap<Kernel, WeakMap<CapabilityToken<unknown>, object>>();
-
-/**
- * What `useCapability` returns for a document plugin while its subtree has no
- * ready document. Reading a member never throws, so chrome renders before the
- * first document opens; calling one throws `PluginError('not-ready')`, so a
- * verb called too early says why. The settings calls are the exception: they
- * need no document, so they reach the plugin's settings. One per kernel and
- * token, so it holds across renders.
- */
-function standInFor<T>(kernel: Kernel, token: CapabilityToken<T>): T {
-  let byToken = standIns.get(kernel);
-  if (!byToken) {
-    byToken = new WeakMap();
-    standIns.set(kernel, byToken);
-  }
-  let standIn = byToken.get(token);
-  if (!standIn) {
-    standIn = createStandIn(token.name, () => kernel.settingsOf(token));
-    byToken.set(token, standIn);
-  }
-  return standIn as T;
-}
-
-/** The capability members that work without a document: a plugin's settings are the plugin's own. */
-const SETTINGS_CALLS: ReadonlySet<string> = new Set([
-  'getSettings',
-  'updateSettings',
-  'resetSettings',
-  'onSettingsChanged',
-]);
-
-/**
- * A Proxy whose every member is a function that throws `not-ready`. A member
- * is itself such a Proxy, so namespaces work too (`annotation.comments.addReply`).
- * Members are cached by path, so `stage.zoomIn` is the same function on every
- * render. `then` and symbol keys read as undefined: the stand-in is no
- * thenable, and inspecting it doesn't throw. The four settings calls forward
- * to `settings()` when called; for a plugin without settings, they throw `not-ready` too.
- */
-function createStandIn(capability: string, settings: () => object): object {
-  const refuse = (): never => {
-    throw new PluginError('not-ready', capability, 'no document is open');
-  };
-  const forward =
-    (name: string) =>
-    (...args: unknown[]): unknown => {
-      // A plugin whose definition declares no settings (the Stage keeps its own, per view) has
-      // none to reach without a document either.
-      let api: Record<string, (...args: unknown[]) => unknown>;
-      try {
-        api = settings() as typeof api;
-      } catch {
-        return refuse();
-      }
-      return api[name](...args);
-    };
-  const members = new Map<string, unknown>();
-  const memberOf = (parentPath: string, key: string | symbol): unknown => {
-    if (typeof key === 'symbol' || key === 'then') return undefined;
-    const path = parentPath ? `${parentPath}.${key}` : key;
-    let member = members.get(path);
-    if (!member) {
-      member =
-        !parentPath && SETTINGS_CALLS.has(key)
-          ? forward(key)
-          : new Proxy(refuse, { get: (_refuse, next) => memberOf(path, next) });
-      members.set(path, member);
-    }
-    return member;
-  };
-  return new Proxy({}, { get: (_capability, key) => memberOf('', key) });
 }
 
 /**
@@ -477,19 +406,6 @@ export interface ViewerProps {
   children?: React.ReactNode;
 }
 
-/** The viewer's settings as the props give them: a prop left out is its default. */
-const viewerSettingsOf = ({
-  identity,
-  scope,
-  accent,
-  page,
-}: Pick<ViewerProps, 'identity' | 'scope' | 'accent' | 'page'>): ViewerSettings => ({
-  identity: identity ?? null,
-  scope: scope ?? null,
-  accent: accent ?? VIEWER_DEFAULTS.accent,
-  page: { ...VIEWER_DEFAULTS.page, ...page },
-});
-
 type BootState =
   | { phase: 'booting'; kernel: Kernel | null }
   | { phase: 'ready'; kernel: Kernel }
@@ -642,62 +558,9 @@ export const EmbedPDF = Viewer;
 /**
  * PageContext — the seam. A layer depends only on this, never on the Stage. So the
  * same layer works inside a virtualized Stage and in a standalone <PageView>.
+ * Its members are documented on `PageContext` in `@embedpdf/web`.
  */
-export interface PageContextValue {
-  documentId: string;
-  /**
-   * The page's durable address — use for keys / render / annotations (read
-   * `ref.objectNumber` where a map key is needed). Identity-stable for
-   * the surface's lifetime, so layers may key effects on it.
-   */
-  ref: PageRef;
-  /** Display index (page N) — use for ordering / human-facing page numbers. */
-  pageIndex: number;
-  /**
-   * Reserved chrome bands around the page (screen px per side). The page-chrome
-   * slot renders into the outer box (content + frame); these thicknesses size
-   * the bands — a label in the bottom band is `bottom:0; height: frame.bottom`.
-   */
-  frame: PageFrame;
-  /**
-   * The single bridge between PDF points, view px, and device px for this page.
-   * Layers do all coordinate work through it — `toPixels` to place content-
-   * space overlays, `renderScale`/`deviceWidth` to render, `contentWidth` for
-   * page-relative sizing. Never re-derive `x * scale` or `* dpr`.
-   */
-  transform: PageTransform;
-  /** Client (screen) point → the viewer's coordinates (page point) — the
-   *  one platform-bound hit-test. */
-  toPagePoint(clientX: number, clientY: number): Point;
-  /** Content point → client (screen) px — the exact inverse of `toPagePoint`
-   *  (rotation applied). Lets viewport-space UI (e.g. a selection menu) anchor to a
-   *  page point without a Stage camera, so it works the same in `<PageView>`. */
-  toClientPoint(point: Point): Point;
-  /** Content rect → client (screen) px AABB. Rect analog of `toClientPoint`
-   *  for upright viewport-space UI that frames a selected page region. */
-  toClientRect(rect: Rect): Rect;
-  /**
-   * The page-view demand for raster planning uses dependency inversion:
-   * plugin-render defines the shape; the host that created this
-   * context fills it — as a pull. The Stage host's getter closes over the
-   * stage capability and reads `VisiblePage.visibleRect` live at call time
-   * (visibility is the stage's data; adapters never re-derive camera math or
-   * cache a copy). Three states, three meanings: a real sub-rect (visible),
-   * a zero rect (stage host, page currently off-screen — want nothing), and
-   * an undefined getter (stage-less `<PageView>` — whole page visible, which
-   * a thumbnail-sized demand turns into "never engages" by arithmetic).
-   */
-  getViewDemand?: () => PageViewDemand;
-  /**
-   * The hosting view's identity — the stage lens id (`stage.getLensId()`) or a
-   * per-instance PageView id. Identity, not an option: per-view raster
-   * planning (tiles) keys its state by this, so two views showing the same
-   * page never fight over one plan (a thumbnail rail's never-engaging demand
-   * must not disturb the main view's tiles). Every page context host must
-   * say which view it is.
-   */
-  view: string;
-}
+export type PageContextValue = PageContext<PageTransform, PageViewDemand>;
 
 const PageCtx = createContext<PageContextValue | null>(null);
 export const PageProvider = PageCtx.Provider;
@@ -706,51 +569,4 @@ export function usePage(): PageContextValue {
   const context = useContext(PageCtx);
   if (!context) throw new Error('usePage must be used inside <PageView> or a <Stage> page');
   return context;
-}
-
-export function makePageContext(
-  documentId: string,
-  view: string,
-  ref: PageRef,
-  pageIndex: number,
-  frame: PageFrame,
-  transform: PageTransform,
-  getRect: () => DOMRect,
-  getViewDemand?: () => PageViewDemand,
-): PageContextValue {
-  return {
-    documentId,
-    view,
-    ref,
-    pageIndex,
-    frame,
-    transform,
-    ...(getViewDemand ? { getViewDemand } : {}),
-    toPagePoint: (cx, cy) => {
-      // `getRect()` is the rotated content wrapper's axis-aligned bounding box =
-      // the page's display box on screen. Convert client → box-local view px,
-      // then invert rotation + scale via the transform (verified once in geometry,
-      // not re-derived per framework adapter).
-      const rect = getRect();
-      return transform.viewToPage({ x: cx - rect.left, y: cy - rect.top });
-    },
-    toClientPoint: (point) => {
-      // Exact inverse of `toPagePoint`: page/page point → display-box view px
-      // (rotation applied by the transform), offset by the same live display-box
-      // origin. So the two can never drift, in either <Stage> or <PageView>.
-      const rect = getRect();
-      const viewPoint = transform.pageToView(point);
-      return { x: rect.left + viewPoint.x, y: rect.top + viewPoint.y };
-    },
-    toClientRect: (rect) => {
-      const elementRect = getRect();
-      const viewRect = transform.pageToViewRect(rect);
-      return {
-        x: elementRect.left + viewRect.x,
-        y: elementRect.top + viewRect.y,
-        width: viewRect.width,
-        height: viewRect.height,
-      };
-    },
-  };
 }

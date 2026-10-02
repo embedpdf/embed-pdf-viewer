@@ -1,7 +1,7 @@
 <script lang="ts">
   import { useMetadata, useMetadataState } from '@embedpdf/svelte/metadata';
 
-  const { update, canUpdate } = useMetadata();
+  const metadata = useMetadata();
   const state = useMetadataState();
 </script>
 
@@ -9,7 +9,7 @@
   Title
   <input
     value={state.metadata?.title ?? ''}
-    disabled={!canUpdate()}
-    onblur={(event) => update({ title: event.currentTarget.value })}
+    disabled={!metadata.canUpdate()}
+    onblur={(event) => metadata.update({ title: event.currentTarget.value })}
   />
 </label>

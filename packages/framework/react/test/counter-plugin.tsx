@@ -29,10 +29,14 @@ export interface CounterCapability extends SettingsApi<CounterSettings> {
   setLabel(label: string): void;
   /** Wakes every reader without changing a field. */
   touch(): void;
-  readonly notes: { add(text: string): void };
+  /** A verb that returns a promise, as most document verbs do. */
+  save(name: string): Promise<string>;
+  readonly notes: { add(text: string): void; publish(text: string): Promise<void> };
 }
 
-export const CounterToken = createCapabilityToken<CounterCapability>('counter');
+export const CounterToken = createCapabilityToken<CounterCapability>('counter', {
+  promises: { save: true, 'notes.publish': true },
+});
 
 interface CounterState {
   readonly count: number;
@@ -56,7 +60,8 @@ export const counterPlugin = definePlugin({
       // A new object even when the label is the same, so the store still changes.
       setLabel: (label) => ctx.state.update((state) => ({ ...state, label })),
       touch: () => ctx.notify(),
-      notes: { add: () => {} },
+      save: async (name) => name,
+      notes: { add: () => {}, publish: async () => {} },
     },
   }),
 });

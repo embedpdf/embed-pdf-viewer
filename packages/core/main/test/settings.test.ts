@@ -2,7 +2,13 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { createCapabilityToken, definePlugin } from '../src/index';
 import { createKernel } from '../src/kernel';
-import { createSettingsStore, type DeepPartial, type SettingsApi } from '../src/settings';
+import {
+  createSettingsStore,
+  mergeSettings,
+  type DeepPartial,
+  type SettingsApi,
+} from '../src/settings';
+import { VIEWER_DEFAULTS, viewerSettingsOf } from '../src/viewer-settings';
 import type { AnyPlugin } from '../src/types';
 import { bytesInput, immediateEngine } from './helpers';
 
@@ -100,6 +106,48 @@ describe('whole settings', () => {
     const before = settings.getSettings();
     settings.updateSettings({ highlight: { activeColor: 'blue' } });
     expect(settings.getSettings()).toBe(before);
+  });
+});
+
+describe('mergeSettings', () => {
+  it('merges the way a store does, for changes kept before a store exists', () => {
+    const merged = mergeSettings(DEFAULTS, { highlight: { color: 'red' }, tags: ['x'] });
+    expect(merged).toEqual({
+      ...DEFAULTS,
+      highlight: { ...DEFAULTS.highlight, color: 'red' },
+      tags: ['x'],
+    });
+    // What the change leaves alone keeps its object.
+    expect(mergeSettings(DEFAULTS, { reveal: undefined })).toBe(DEFAULTS);
+    expect(mergeSettings(DEFAULTS, undefined)).toBe(DEFAULTS);
+  });
+
+  it('replaces the whole settings instead of merging into them', () => {
+    const merged = mergeSettings(DEFAULTS, { highlight: { activeColor: 'blue' } }, ['highlight']);
+    expect(merged.highlight).toEqual({ activeColor: 'blue' });
+  });
+});
+
+describe('viewerSettingsOf', () => {
+  it('gives every setting left out its default', () => {
+    expect(viewerSettingsOf({})).toEqual(VIEWER_DEFAULTS);
+  });
+
+  it('takes what is given, and fills in the page side left out', () => {
+    const identity = { userId: 'ada', displayName: 'Ada' };
+    expect(
+      viewerSettingsOf({
+        identity,
+        scope: ['annotations:read'],
+        accent: '#ff0000',
+        page: { shadow: 'none' },
+      }),
+    ).toEqual({
+      identity,
+      scope: ['annotations:read'],
+      accent: '#ff0000',
+      page: { background: VIEWER_DEFAULTS.page.background, shadow: 'none' },
+    });
   });
 });
 

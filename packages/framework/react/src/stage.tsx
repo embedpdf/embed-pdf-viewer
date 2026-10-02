@@ -20,7 +20,14 @@ import type { CapabilityToken, EventHook } from '@embedpdf/core';
 import type { PageFrame } from '@embedpdf/core-geometry';
 import { InteractionToken as InteractionPublicToken } from '@embedpdf/plugin-interaction/contract';
 import { InteractionToken } from '@embedpdf/plugin-interaction/contract/host';
-import { createStageSurface, paint } from '@embedpdf/web';
+import {
+  createStageSurface,
+  makePageContext,
+  pageSurfaceLayout,
+  paint,
+  stagePageDemand,
+  stageViewProjector,
+} from '@embedpdf/web';
 import {
   ProjectorProvider,
   ShownPagesProvider,
@@ -29,7 +36,6 @@ import {
   type ViewProjector,
 } from './anchored';
 import {
-  makePageContext,
   PageProvider,
   useCapability,
   useCapabilityEvent,
@@ -69,34 +75,20 @@ function PageSurface({
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const transform = page.transform;
-  const rotation = page.rotation;
   // The viewer's `page` settings; `--epdf-page-*` CSS variables win over them.
   const look = useViewerSettings((settings) => settings.page);
-  // All geometry comes from the transform: the display footprint (viewWidth/Height,
-  // already w↔h-swapped + device-snapped) and the un-rotated content box
-  // (contentWidth/Height). The shell never re-derives `* zoom` / `* dpr` / snapping.
-  const outerW = transform.viewWidth + frame.left + frame.right;
-  const outerH = transform.viewHeight + frame.top + frame.bottom;
-  // page.screenX/screenY are the device-snapped footprint top-left; the outer box
-  // sits one frame further out so the content keeps its scene position.
-  const left = page.screenX - frame.left;
-  const top = page.screenY - frame.top;
-  // Center the (possibly rotated) content box on the display box and rotate about
-  // its center — no translate(), so rotation 0 carries no transform and pixel-snaps
-  // like the axis-aligned shadow behind it (no hairline seam).
-  const contentLeft = frame.left + (transform.viewWidth - transform.contentWidth) / 2;
-  const contentTop = frame.top + (transform.viewHeight - transform.contentHeight) / 2;
+  // The outer, shadow and content boxes, all from the transform; `screenX`/`screenY` are the
+  // device-snapped footprint's top-left.
+  const layout = pageSurfaceLayout(transform, frame, { x: page.screenX, y: page.screenY });
   // The page address this surface hands its layers. The stage rebuilds
   // `VisiblePage.ref` every camera frame, so it is memoized by the number:
   // identity-stable per page, safe for layers to key effects on.
   const pageObjectNumber = page.ref.objectNumber;
   const pageRef = useMemo(() => toPageRef(pageObjectNumber), [pageObjectNumber]);
-  // The page-view demand is a pull: the getter closes over
-  // stable references (capability + page address) and reads the stage's live state at
-  // call time — visibility is the stage's data (`VisiblePage.visibleRect`),
-  // not something an adapter re-derives or caches. Absent from the visible
-  // set = zero rect ("want nothing"), distinct from PageView's undefined
-  // getter ("whole page").
+  // The page-view demand is a pull: the getter closes over stable references
+  // (capability + page address) and reads the stage's live state at call time.
+  // Absent from the visible set = zero rect ("want nothing"), distinct from
+  // PageView's undefined getter ("whole page").
   const ctx = useMemo(
     () =>
       makePageContext(
@@ -109,22 +101,12 @@ function PageSurface({
         frame,
         transform,
         () => ref.current!.getBoundingClientRect(),
-        () => {
-          const live = stage
-            .listVisiblePages()
-            .find((visiblePage) => visiblePage.ref.objectNumber === pageObjectNumber);
-          return live
-            ? { desiredDeviceWidth: live.transform.deviceWidth, visibleRect: live.visibleRect }
-            : {
-                desiredDeviceWidth: transform.deviceWidth,
-                visibleRect: { x: 0, y: 0, width: 0, height: 0 },
-              };
-        },
+        () => stagePageDemand(stage, pageObjectNumber, transform.deviceWidth),
       ),
     [documentId, pageRef, pageObjectNumber, page.pageIndex, frame, transform, stage],
   );
   return (
-    <div style={{ position: 'absolute', left, top, width: outerW, height: outerH }}>
+    <div style={{ position: 'absolute', ...layout.outer }}>
       <PageProvider value={ctx}>
         {/* drop shadow ONLY — axis-aligned at the content box (inset by the frame),
             transparent fill so it can never peek out behind the bitmap, and it
@@ -132,10 +114,7 @@ function PageSurface({
         <div
           style={{
             position: 'absolute',
-            left: frame.left,
-            top: frame.top,
-            width: transform.viewWidth,
-            height: transform.viewHeight,
+            ...layout.shadow,
             boxShadow: paint('page-shadow', look.shadow),
           }}
         />
@@ -147,12 +126,9 @@ function PageSurface({
           ref={ref}
           style={{
             position: 'absolute',
-            left: contentLeft,
-            top: contentTop,
-            width: transform.contentWidth,
-            height: transform.contentHeight,
+            ...layout.content,
             background: paint('page-background', look.background),
-            transform: rotation ? `rotate(${rotation}deg)` : undefined,
+            transform: layout.turn ?? undefined,
             // We render our own selection highlights — suppress native text/image
             // selection (and the double-click image grab) on the whole page subtree.
             userSelect: 'none',
@@ -263,27 +239,7 @@ export function Stage({
   // `pages` (visiblePages) is the binding's revision, so a camera change
   // re-renders the pages and every anchored consumer in the same React
   // commit — surface and overlay can never paint a frame apart.
-  const projector = useMemo<ViewProjector>(
-    () => ({
-      space: 'overlay',
-      toScreen: (page, rect) => stage.pageRectToViewport(page, rect),
-      toScreenPoint: (page, at) => {
-        const rect = stage.pageRectToViewport(page, { x: at.x, y: at.y, width: 0, height: 0 });
-        return rect ? { x: rect.x, y: rect.y } : null;
-      },
-      viewEnv: (page) => {
-        const transform = stage.getPageFrame(page)?.transform;
-        return transform
-          ? { scale: transform.viewScale, rotation: transform.rotation, zoom: transform.zoom }
-          : null;
-      },
-      view: () => {
-        const size = stage.getViewportSize();
-        return size.width > 0 && size.height > 0 ? { x: 0, y: 0, ...size } : null;
-      },
-    }),
-    [stage],
-  );
+  const projector = useMemo<ViewProjector>(() => stageViewProjector(() => stage), [stage]);
   const projectorBinding = useMemo<ProjectorBinding>(
     () => ({ projector, revision: pages }),
     [projector, pages],

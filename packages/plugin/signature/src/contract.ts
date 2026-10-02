@@ -34,7 +34,7 @@ import type {
   SignatureSubFilter,
 } from '@embedpdf/engine-core/runtime';
 import type { StampPlacement } from '@embedpdf/plugin-annotation/contract';
-import type { StampAsset } from '@embedpdf/plugin-stamp/contract';
+import type { StampAsset, StampLibrary } from '@embedpdf/plugin-stamp/contract';
 
 export { SignatureToken } from './token';
 export type {
@@ -138,6 +138,42 @@ export type MarkRole = 'signature' | 'initials';
 /** Which mark an asset of a signatures library is (anything not named `initials` is a signature). */
 export const markRoleOf = (asset: Pick<StampAsset, 'name'>): MarkRole =>
   asset.name === INITIALS_MARK_NAME ? 'initials' : 'signature';
+
+/** One person in a signatures picker: a library of kind `signatures`, with its marks split by role. */
+export interface SignerRow {
+  readonly libraryId: string;
+  readonly name: string;
+  readonly library: StampLibrary;
+  /** Every full signature of the person, in the library's order. */
+  readonly signatures: StampAsset[];
+  /** The person's initials, or `null` when the library has none. */
+  readonly initials: StampAsset | null;
+}
+
+/**
+ * The people whose marks the stamp plugin holds, one row per library of kind
+ * `signatures`, in the order of `libraries`: give it the stamp plugin's
+ * `listLibraries({ kind: SIGNATURES_LIBRARY_KIND })` and `listAssets()`. A
+ * pure derivation: rename, delete and export are the stamp plugin's library
+ * verbs, and nothing is stored beyond the library's file.
+ */
+export function signerRowsOf(
+  libraries: readonly StampLibrary[],
+  assets: readonly StampAsset[],
+): SignerRow[] {
+  return libraries
+    .filter((library) => library.kind === SIGNATURES_LIBRARY_KIND)
+    .map((library) => {
+      const own = assets.filter((asset) => asset.libraryId === library.id);
+      return {
+        libraryId: library.id,
+        name: library.name,
+        library,
+        signatures: own.filter((asset) => markRoleOf(asset) === 'signature'),
+        initials: own.find((asset) => markRoleOf(asset) === 'initials') ?? null,
+      };
+    });
+}
 
 /** A signature prepared in two steps and not completed yet. */
 export interface SignaturePending {

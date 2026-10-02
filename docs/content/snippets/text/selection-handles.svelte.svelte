@@ -7,10 +7,8 @@
 </script>
 
 <Stage>
-  {#snippet page()}
-    <RenderLayer />
-    <SelectionLayer />
-  {/snippet}
+  <RenderLayer />
+  <SelectionLayer />
 
   {#snippet overlay()}
     <SelectionMenu>

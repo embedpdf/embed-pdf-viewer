@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import {
   attachRichTextEditor,
@@ -7,79 +7,11 @@ import {
   renderRichText,
   serializeRichText,
   styleDeltaOf,
-  type EditorDocumentFactory,
-  type EditorElement,
   type EditorNode,
-  type EditorRoot,
-  type EditorStyle,
   type RichTextEditorDocument,
   type RichTextEditorHost,
 } from '../src/rich-text-editor';
-
-// ---- A fake DOM: enough shape for the binding, no jsdom ------------------------
-
-type FakeNode = EditorNode & { parentNode: FakeNode | null; childNodes: FakeNode[] };
-
-function emptyStyle(): EditorStyle {
-  return {
-    marginTop: '',
-    lineHeight: '',
-    fontWeight: '',
-    fontStyle: '',
-    textDecoration: '',
-    color: '',
-    fontSize: '',
-    fontFamily: '',
-    verticalAlign: '',
-    letterSpacing: '',
-    textAlign: '',
-    direction: '',
-  };
-}
-
-function element(tag: string, style: Partial<EditorStyle> = {}): EditorElement & FakeNode {
-  const node: EditorElement & FakeNode = {
-    nodeType: 1,
-    nodeName: tag.toUpperCase(),
-    nodeValue: null,
-    parentNode: null,
-    childNodes: [],
-    style: { ...emptyStyle(), ...style },
-    appendChild(child: EditorNode) {
-      const fakeChild = child as FakeNode;
-      fakeChild.parentNode = node;
-      node.childNodes.push(fakeChild);
-      return fakeChild;
-    },
-  };
-  return node;
-}
-
-function text(value: string): FakeNode {
-  return { nodeType: 3, nodeName: '#text', nodeValue: value, parentNode: null, childNodes: [] };
-}
-
-function elementTree(tag: string, style: Partial<EditorStyle>, ...children: (FakeNode | string)[]) {
-  const el = element(tag, style);
-  for (const child of children) el.appendChild(typeof child === 'string' ? text(child) : child);
-  return el;
-}
-
-const factory: EditorDocumentFactory = {
-  createElement: (tag) => element(tag),
-  createTextNode: (value) => text(value),
-};
-
-function root(...children: FakeNode[]): EditorRoot & FakeNode {
-  const el = element('div') as EditorElement & FakeNode & EditorRoot;
-  el.ownerDocument = factory;
-  el.replaceChildren = (...nodes: EditorNode[]) => {
-    el.childNodes.length = 0;
-    for (const node of nodes) el.appendChild(node);
-  };
-  for (const child of children) el.appendChild(child);
-  return el;
-}
+import { element, elementTree, emptyStyle, fakeEditor, root, text } from './helpers/fake-editor';
 
 const cssFontFamily = (family: string) =>
   family === 'Helvetica' ? 'Helvetica, Arial, sans-serif' : `"${family}"`;
@@ -352,110 +284,6 @@ describe('offsets', () => {
 });
 
 // ---- The binding --------------------------------------------------------------
-
-type Listener = (event: unknown) => void;
-
-function fakeEventTarget() {
-  const listeners = new Map<string, Set<Listener>>();
-  return {
-    listeners,
-    addEventListener(type: string, fn: Listener) {
-      if (!listeners.has(type)) listeners.set(type, new Set());
-      listeners.get(type)!.add(fn);
-    },
-    removeEventListener(type: string, fn: Listener) {
-      listeners.get(type)?.delete(fn);
-    },
-    dispatch(type: string, event: unknown = {}) {
-      for (const fn of listeners.get(type) ?? []) fn(event);
-    },
-  };
-}
-
-function fakeEditor(metrics?: (font: string) => { ascent: number; descent: number }) {
-  const el = root() as EditorRoot & FakeNode & ReturnType<typeof fakeEventTarget>;
-  Object.assign(el, fakeEventTarget());
-  Object.assign(el, {
-    querySelectorAll(selector: string) {
-      const tags = selector
-        .toUpperCase()
-        .split(',')
-        .map((tag) => tag.trim());
-      const nodes: FakeNode[] = [];
-      const visit = (node: FakeNode) => {
-        for (const child of node.childNodes) {
-          if (tags.includes(child.nodeName)) nodes.push(child);
-          visit(child);
-        }
-      };
-      visit(el);
-      return nodes;
-    },
-  });
-  const context = {
-    font: '',
-    measureText: vi.fn(() => {
-      const measured = metrics!(context.font);
-      return {
-        fontBoundingBoxAscent: measured.ascent * 100,
-        fontBoundingBoxDescent: measured.descent * 100,
-      };
-    }),
-  };
-  let range: {
-    startContainer: EditorNode;
-    startOffset: number;
-    endContainer: EditorNode;
-    endOffset: number;
-  } | null = null;
-  const selection = {
-    get rangeCount() {
-      return range ? 1 : 0;
-    },
-    getRangeAt: () => range,
-    removeAllRanges: () => {
-      range = null;
-    },
-    addRange: (added: typeof range) => {
-      range = added;
-    },
-  };
-  const document = {
-    ...fakeEventTarget(),
-    fonts: fakeEventTarget(),
-    activeElement: null as unknown,
-    getSelection: () => selection,
-    createRange: () => {
-      const created: NonNullable<typeof range> & {
-        setStart(node: EditorNode, offset: number): void;
-        setEnd(node: EditorNode, offset: number): void;
-      } = {
-        startContainer: el,
-        startOffset: 0,
-        endContainer: el,
-        endOffset: 0,
-        setStart(node, offset) {
-          created.startContainer = node;
-          created.startOffset = offset;
-        },
-        setEnd(node, offset) {
-          created.endContainer = node;
-          created.endOffset = offset;
-        },
-      };
-      return created;
-    },
-    execCommand: vi.fn(),
-  };
-  (el as { ownerDocument: unknown }).ownerDocument = Object.assign(document, factory, {
-    createElement: (tag: string) =>
-      tag === 'canvas'
-        ? Object.assign(element(tag), { getContext: () => (metrics ? context : null) })
-        : element(tag),
-  });
-  (el as { getRootNode?: unknown }).getRootNode = () => document;
-  return { el, document, selection, context, currentRange: () => range };
-}
 
 function host(): RichTextEditorHost & {
   inputs: RichTextEditorDocument[];

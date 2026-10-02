@@ -1,4 +1,5 @@
 import * as React from 'react';
+import { formFocusRingStyleOf } from '@embedpdf/web';
 
 export interface FormFocusRingProps {
   visible: boolean;
@@ -15,18 +16,6 @@ export interface FormFocusRingProps {
 export function FormFocusRing({ visible, color }: FormFocusRingProps) {
   if (!visible) return null;
   return (
-    <span
-      aria-hidden="true"
-      data-embedpdf-form-focus-ring=""
-      style={{
-        position: 'absolute',
-        inset: 0,
-        zIndex: 1,
-        boxSizing: 'border-box',
-        outline: `2px solid ${color}`,
-        outlineOffset: -2,
-        pointerEvents: 'none',
-      }}
-    />
+    <span aria-hidden="true" data-embedpdf-form-focus-ring="" style={formFocusRingStyleOf(color)} />
   );
 }

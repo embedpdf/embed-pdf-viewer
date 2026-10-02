@@ -7,14 +7,24 @@
  * exact `PageContext` seam, so every layer (RenderLayer, AnnotationLayer, …)
  * works here identically — and it provides the measured `ViewProjector`, so
  * anchored UI (`<AnnotationMenu>`, `<SelectionMenu>`) works here too, portalled
- * and clipping-immune.
+ * and clipping-immune. With the interaction plugin registered it is also the
+ * page's pointer surface, so tools (text selection, annotation editing) work in
+ * it as they do on a Stage page.
  */
 import * as React from 'react';
 import { useId, useMemo, useRef } from 'react';
-import { pageRefsEqual, toPageRef } from '@embedpdf/core';
+import { toPageRef } from '@embedpdf/core';
 import type { PageRef } from '@embedpdf/core';
 import { NO_FRAME, pageTransform, type PageFrame } from '@embedpdf/core-geometry';
-import { observeClientGeometry, paint } from '@embedpdf/web';
+import {
+  clientPageProjector,
+  makePageContext,
+  observeClientGeometry,
+  pageSurfaceLayout,
+  pageViewTransformInput,
+  paint,
+} from '@embedpdf/web';
+import { InteractionToken as InteractionHostToken } from '@embedpdf/plugin-interaction/contract/host';
 import {
   ProjectorProvider,
   ShownPagesProvider,
@@ -22,19 +32,31 @@ import {
   type ShownPages,
   type ViewProjector,
 } from './anchored';
+import { PagePointerSource } from './interaction';
 import {
   DocumentScope,
-  makePageContext,
   PageProvider,
-  useActiveDocumentId,
+  useDocumentId,
   useKernelValue,
+  useOptionalCapability,
   useViewerSettings,
 } from './runtime';
+
+/**
+ * The page's pointer surface, when the interaction plugin is registered. It sits
+ * below the layers, like the Stage's own listener: a press on a layer that lets
+ * the pointer through (the picture, the selection highlight) reaches the tools,
+ * and a control that takes its own presses (a link, a form field) keeps them.
+ */
+function PointerSurface() {
+  const interaction = useOptionalCapability(InteractionHostToken);
+  return interaction ? <PagePointerSource /> : null;
+}
 
 export interface PageViewProps {
   /** The page: its `ref`, which follows it when pages move, or its index, from 0. */
   page: PageRef | number;
-  /** Which document to show. Defaults to the active document. */
+  /** Which document to show. Defaults to the one a `<DocumentScope>` names, else the active one. */
   documentId?: string;
   /** Shown while the document or the page is not available yet (default: nothing). */
   fallback?: React.ReactNode;
@@ -73,9 +95,9 @@ export function PageView({
     () => ({ top, right, bottom, left }),
     [top, right, bottom, left],
   );
-  const active = useActiveDocumentId();
+  const inScope = useDocumentId();
   const ref = useRef<HTMLDivElement>(null);
-  const docId = documentId ?? active;
+  const docId = documentId ?? inScope;
   // The page-registry entry, subscribed: a rotate or a reorder re-renders
   // this surface like it re-renders a Stage page. Entries are reference-
   // stable per page in the registry, so identity is the right equality.
@@ -97,25 +119,14 @@ export function PageView({
   // effects on it).
   const pageObjectNumber = base?.ref.objectNumber ?? wantedPageObjectNumber ?? page + 1;
   const pageRef = useMemo(() => toPageRef(pageObjectNumber), [pageObjectNumber]);
-  const rotation = base?.rotation ?? 0;
   const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
   // Standalone (no Stage/camera): build the page's transform from the target
-  // content `width` directly. `scale` is view px per point = width / pageWidthPts.
+  // content `width` directly. Memoized by value: a new registry entry for an
+  // unchanged page keeps the transform.
   const transform = useMemo(
-    () =>
-      pageTransform({
-        pageSize: base
-          ? { width: base.size.width, height: base.size.height }
-          : { width: 1, height: 1 },
-        rotation,
-        scale: base ? width / base.size.width : 1,
-        // Physical 100% on the web: 1pt = 96/72 CSS px, times the page's
-        // /UserUnit — so `transform.zoom` is meaningful even without a Stage
-        // (a thumbnail-sized PageView reads as zoomed out, as it should).
-        baseScale: (96 / 72) * (base?.userUnit ?? 1),
-        dpr,
-      }),
-    [base?.size.width, base?.size.height, base?.userUnit, rotation, width, dpr],
+    () => pageTransform(pageViewTransformInput(base, width, dpr)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `base` by the values it gives
+    [base?.size.width, base?.size.height, base?.userUnit, base?.rotation, width, dpr],
   );
   // This instance's view identity: two PageViews of the same page (a compare
   // strip) must plan rasters independently, like two stage lenses do.
@@ -136,30 +147,7 @@ export function PageView({
   // browser-driven ones (document scroll, window resize) that no state
   // change announces.
   const projector = useMemo<ViewProjector>(
-    () => ({
-      space: 'client',
-      toScreen: (page, rect) =>
-        pageRefsEqual(page, ctx.ref) && ref.current ? ctx.toClientRect(rect) : null,
-      toScreenPoint: (page, at) =>
-        pageRefsEqual(page, ctx.ref) && ref.current ? ctx.toClientPoint(at) : null,
-      viewEnv: (page) =>
-        pageRefsEqual(page, ctx.ref)
-          ? {
-              scale: ctx.transform.viewScale,
-              rotation: ctx.transform.rotation,
-              zoom: ctx.transform.zoom,
-            }
-          : null,
-      view: () =>
-        typeof document === 'undefined'
-          ? null
-          : {
-              x: 0,
-              y: 0,
-              width: document.documentElement.clientWidth,
-              height: document.documentElement.clientHeight,
-            },
-    }),
+    () => clientPageProjector(ctx, () => ref.current !== null),
     [ctx],
   );
   const projectorBinding = useMemo<ProjectorBinding>(
@@ -174,27 +162,27 @@ export function PageView({
   // The viewer's `page` settings; `--epdf-page-*` CSS variables win over them.
   const look = useViewerSettings((settings) => settings.page);
   if (!docId || !base) return <>{fallback}</>;
-  const outerW = transform.viewWidth + pageFrame.left + pageFrame.right;
-  const outerH = transform.viewHeight + pageFrame.top + pageFrame.bottom;
-  const contentLeft = pageFrame.left + (transform.viewWidth - transform.contentWidth) / 2;
-  const contentTop = pageFrame.top + (transform.viewHeight - transform.contentHeight) / 2;
+  // The outer box (page and frame), the shadow at the footprint, and the turned content box.
+  const layout = pageSurfaceLayout(transform, pageFrame);
   return (
     <DocumentScope id={docId}>
       <ShownPagesProvider value={shownPages}>
         <ProjectorProvider value={projectorBinding}>
           <div
             className={className}
-            style={{ position: 'relative', width: outerW, height: outerH, ...style }}
+            style={{
+              position: 'relative',
+              width: layout.outer.width,
+              height: layout.outer.height,
+              ...style,
+            }}
           >
             <PageProvider value={ctx}>
               {/* drop shadow ONLY — transparent, axis-aligned, can't leak behind the bitmap */}
               <div
                 style={{
                   position: 'absolute',
-                  left: pageFrame.left,
-                  top: pageFrame.top,
-                  width: transform.viewWidth,
-                  height: transform.viewHeight,
+                  ...layout.shadow,
                   boxShadow: paint('page-shadow', look.shadow),
                 }}
               />
@@ -203,16 +191,14 @@ export function PageView({
                 ref={ref}
                 style={{
                   position: 'absolute',
-                  left: contentLeft,
-                  top: contentTop,
-                  width: transform.contentWidth,
-                  height: transform.contentHeight,
+                  ...layout.content,
                   background: paint('page-background', look.background),
-                  transform: rotation ? `rotate(${rotation}deg)` : undefined,
+                  transform: layout.turn ?? undefined,
                   userSelect: 'none',
                   WebkitUserSelect: 'none',
                 }}
               >
+                <PointerSurface />
                 {children}
               </div>
               {pageChrome}

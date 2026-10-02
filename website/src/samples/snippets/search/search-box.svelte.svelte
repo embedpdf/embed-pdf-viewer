@@ -20,8 +20,6 @@
 </form>
 
 <Stage>
-  {#snippet page()}
-    <RenderLayer />
-    <SearchLayer />
-  {/snippet}
+  <RenderLayer />
+  <SearchLayer />
 </Stage>

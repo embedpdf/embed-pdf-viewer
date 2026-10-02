@@ -84,6 +84,24 @@ export interface PageScale {
   error?: SerializedEngineError;
 }
 
+/**
+ * A page's scale where there is none to read: before a document opens, or for
+ * a page that isn't there. Not ready, with no measure; the same object every
+ * time, so a framework read compares it by identity.
+ */
+export const NO_PAGE_SCALE: PageScale = Object.freeze({
+  measure: null,
+  source: 'default',
+  ready: false,
+  persistent: false,
+});
+
+/**
+ * The readout where there is no measurement to read: before a document
+ * opens, or for an annotation that isn't there. `getReadout` answers it too.
+ */
+export const NO_READOUT: MeasurementUnavailable = Object.freeze({ unavailable: 'not-dimension' });
+
 /** Two points captured by the calibrate tool, awaiting the real length. Page space. */
 export interface CalibrationRequest {
   page: PageRef;
@@ -168,7 +186,11 @@ export interface MeasurementCapability extends SettingsApi<MeasurementSettings> 
   listPresets(): readonly ScalePreset[];
   listUnits(): readonly LengthUnit[];
   listAreaUnits(): readonly AreaUnit[];
-  /** The formatted measurement of a measurement annotation. */
+  /**
+   * The formatted measurement of a measurement annotation, or why there is
+   * none ({@link NO_READOUT} for an annotation that isn't there). The same
+   * object until the annotation changes.
+   */
   getReadout(ref: AnnotationRef): MeasurementReadout | MeasurementUnavailable;
   /** A distance between two page-space points in the page's scale: a pure conversion, no annotation. */
   measureDistance(

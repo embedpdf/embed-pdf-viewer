@@ -44,3 +44,30 @@ export const VIEWER_DEFAULTS: ViewerSettings = Object.freeze({
 
 /** An identity is one person: a new one replaces the last instead of merging into it. */
 export const VIEWER_WHOLE_SETTINGS = ['identity'] as const;
+
+/** The viewer settings a framework's viewer takes as its props or config; each one is optional. */
+export interface ViewerSettingsInput {
+  readonly identity?: Identity | null;
+  readonly scope?: readonly string[] | null;
+  readonly accent?: string;
+  readonly page?: Partial<ViewerPageSettings>;
+}
+
+/**
+ * The viewer's settings as a framework's viewer component gives them: a setting left out is its
+ * default, and `page` fills in the side it leaves out. Every adapter's viewer starts the kernel
+ * with this and passes it again when its props change.
+ */
+export function viewerSettingsOf({
+  identity,
+  scope,
+  accent,
+  page,
+}: ViewerSettingsInput): ViewerSettings {
+  return {
+    identity: identity ?? null,
+    scope: scope ?? null,
+    accent: accent ?? VIEWER_DEFAULTS.accent,
+    page: { ...VIEWER_DEFAULTS.page, ...page },
+  };
+}

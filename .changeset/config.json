@@ -55,9 +55,11 @@
       "@embedpdf/plugin-stamp",
       "@embedpdf/plugin-view-manager",
       "@embedpdf/react",
+      "@embedpdf/svelte",
       "@embedpdf/viewer",
       "@embedpdf/viewer-chrome",
       "@embedpdf/viewer-react",
+      "@embedpdf/vue",
       "@embedpdf/web",
       "@embedpdf/plugin-measurement"
     ]

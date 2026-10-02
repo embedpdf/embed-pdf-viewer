@@ -7,7 +7,7 @@ import { type Annotation, EpdfAnnotation, EpdfComments } from '@embedpdf/angular
   imports: [EpdfAnchored],
   template: `
     <epdf-anchored [anchor]="anchor()" placement="right" [gap]="4" pinned>
-      <span class="badge">{{ thread()?.replies.length ?? 0 }}</span>
+      <span class="badge">{{ thread()?.replies?.length ?? 0 }}</span>
     </epdf-anchored>
   `,
 })

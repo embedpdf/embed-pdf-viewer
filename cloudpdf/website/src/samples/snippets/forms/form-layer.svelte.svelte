@@ -11,9 +11,7 @@
 
 <Viewer {engine} {plugins}>
   <Stage>
-    {#snippet page()}
-      <RenderLayer />
-      <FormLayer />
-    {/snippet}
+    <RenderLayer />
+    <FormLayer />
   </Stage>
 </Viewer>

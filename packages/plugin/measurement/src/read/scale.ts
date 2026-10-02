@@ -2,6 +2,7 @@
 import type { Point } from '@embedpdf/core-geometry';
 import { measurementReadout, METRES, squareOf } from '@embedpdf/engine-core/runtime';
 import type {
+  Annotation,
   AnnotationRef,
   AreaUnit,
   MeasurementReadout,
@@ -9,7 +10,7 @@ import type {
   PageRef,
 } from '@embedpdf/engine-core/runtime';
 
-import type { MeasurementCapability } from '../contract';
+import { NO_READOUT, type MeasurementCapability } from '../contract';
 import type { MeasurementContext, MeasurementServices } from '../services';
 import type { MeasurementViewportSync } from '../sync/viewports';
 
@@ -25,9 +26,18 @@ export function createScaleReads(
   const settings = ctx.settings();
   const state = () => ctx.state.get();
 
+  // One readout per annotation object: the annotation plugin hands out the same
+  // object until the annotation changes, so the readout stays the same with it.
+  const readouts = new WeakMap<Annotation, MeasurementReadout | MeasurementUnavailable>();
   const getReadout = (ref: AnnotationRef): MeasurementReadout | MeasurementUnavailable => {
     const raw = annotation.get(ref);
-    return raw ? measurementReadout(raw) : { unavailable: 'not-dimension' };
+    if (!raw) return NO_READOUT;
+    let readout = readouts.get(raw);
+    if (!readout) {
+      readout = measurementReadout(raw);
+      readouts.set(raw, readout);
+    }
+    return readout;
   };
   const measureDistance = (
     page: PageRef | number,

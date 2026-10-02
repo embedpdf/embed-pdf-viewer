@@ -54,6 +54,40 @@ it:
 The second argument, `'page:go-to'` (a command of your own that opens a "Go to page" dialog), is what
 the item becomes in the "More" menu when there's no room for it. `variants` lets it get smaller first, like a command's variants.
 
+<Fw only="react">
+
+`renderCustom` has one renderer per item name. A renderer that returns `undefined` draws the item's
+command as a button instead. An item with no renderer is a native `<slot name>` element with that
+button inside: in a web component, the host's children for that slot show there.
+
+</Fw>
+
+<Fw only="vue">
+
+The `#custom` slot draws every custom item, by `name`. Where it draws nothing for one (a `v-if` that
+doesn't match), the item's command shows as a button instead. Without the slot, each item is a native
+`<slot name>` element with that button inside: in a web component, the host's children for that slot
+show there.
+
+</Fw>
+
+<Fw only="svelte">
+
+The `custom` snippet draws every custom item, by `name`, so draw something for each one: a snippet
+can't fall back, and an item it skips shows nothing. Without the snippet, each item is a native
+`<slot name>` element with the item's command as a button inside: in a web component, the host's
+children for that slot show there.
+
+</Fw>
+
+<Fw only="angular">
+
+Each `epdfToolbarCustom="name"` template draws the item of that name. An item with no template is a
+native `<slot name>` element with its command as a button inside: in a web component, the host's
+children for that slot show there.
+
+</Fw>
+
 ## Draw every part
 
 | Prop                    | Draws                                                                  |
@@ -68,7 +102,8 @@ the item becomes in the "More" menu when there's no room for it. `variants` lets
 <Fw only="react">
 
 Every prop you leave out has a plain default, so you can start with `renderCommand` and add the rest as
-you style them. `gap` and `separatorWidth` set the spacing, and `className` and `style` go on the
+you style them. `renderCollapsed` and `renderGroupTrigger` can return `undefined` for a group to leave
+it to the default. `gap` and `separatorWidth` set the spacing, and `className` and `style` go on the
 toolbar itself.
 
 </Fw>
@@ -76,24 +111,25 @@ toolbar itself.
 <Fw only="vue">
 
 Every slot you leave out has a plain default, so you can start with `#command` and add the rest as
-you style them. `gap` and `separator-width` set the spacing, and `class` and `style` go on the
-toolbar itself.
+you style them. A slot that draws nothing for a part leaves that part to the default. `gap` and
+`separator-width` set the spacing, and `class` and `style` go on the toolbar itself.
 
 </Fw>
 
 <Fw only="svelte">
 
 Every snippet you leave out has a plain default, so you can start with `command` and add the rest as
-you style them. `gap` and `separatorWidth` set the spacing, and `class` and `style` go on the
-toolbar itself.
+you style them. A snippet you pass draws every part of its kind. `gap` and `separatorWidth` set the
+spacing, and `class` and `style` go on the toolbar itself.
 
 </Fw>
 
 <Fw only="angular">
 
 Every template you leave out has a plain default, so you can start with `epdfToolbarCommand` and add
-the rest as you style them. `gap` and `separatorWidth` set the spacing, and a `class` or `style` on
-`<epdf-toolbar>` styles the toolbar itself.
+the rest as you style them. A template you give draws every part of its kind. `gap` and
+`separatorWidth` set the spacing, and a `class` or `style` on `<epdf-toolbar>` styles the toolbar
+itself.
 
 </Fw>
 

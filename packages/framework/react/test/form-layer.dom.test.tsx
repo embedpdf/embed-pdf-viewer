@@ -4,13 +4,14 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import * as React from 'react';
 import { useEffect, useState } from 'react';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 
 import { pageTransform } from '@embedpdf/core-geometry';
 import type { Kernel } from '@embedpdf/core';
 import { createLocalEngine } from '@embedpdf/engine';
 import { formPlugin, FormToken, toFieldRef } from '@embedpdf/plugin-form';
+import { FormToken as FormHostToken } from '@embedpdf/plugin-form/contract/host';
 import { interactionPlugin } from '@embedpdf/plugin-interaction';
 
 import { FormLayer } from '../src/form';
@@ -112,6 +113,22 @@ describe('<FormLayer> over fields made from code', () => {
       expect(checkbox.style.boxShadow).toContain('#ea580c');
       // The text box has its own border: no edge.
       expect((input.parentElement as HTMLElement).style.boxShadow).toBe('');
+
+      // A press on a field stops at its box, before the page below sees it, and still reaches the
+      // field's PDF actions as "mouse down" (the box's native listener sends it).
+      const host = kernel!.capability(FormHostToken);
+      const events: string[] = [];
+      vi.spyOn(host, 'notifyWidgetEvent').mockImplementation((_field, _widget, event) => {
+        events.push(event);
+      });
+      const pagePresses: Event[] = [];
+      const pageBelow = view.container;
+      const onPagePress = (event: Event) => pagePresses.push(event);
+      pageBelow.addEventListener('pointerdown', onPagePress);
+      fireEvent.pointerDown(input.parentElement as HTMLElement);
+      pageBelow.removeEventListener('pointerdown', onPagePress);
+      expect(events).toContain('mouseDown');
+      expect(pagePresses).toHaveLength(0);
     } finally {
       view.unmount();
       await engine.destroy();

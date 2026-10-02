@@ -38,7 +38,7 @@ function ShortcutRow({ id, shortcut }: { id: string; shortcut: string }) {
   if (!command?.visible) return null;
 
   return (
-    <li className="row" aria-disabled={!command.enabled}>
+    <li className="row" data-disabled={!command.enabled || undefined}>
       <kbd className="key">{formatShortcut(shortcut)}</kbd>
       <span>{command.label}</span>
     </li>
@@ -69,12 +69,14 @@ function KeyboardHelp() {
   );
 }
 
-// The keys work while focus is inside this viewer, so they leave the rest of the page alone.
+// The keys work while focus is inside this viewer, so they leave the rest of the page alone. A
+// click anywhere in it gives it focus: `tabIndex={-1}` makes it a place for keys, not a stop in the
+// Tab order.
 function ShortcutArea() {
   const area = useRef<HTMLDivElement>(null);
   useCommandShortcuts({ target: area });
   return (
-    <div ref={area} className="layout" tabIndex={0}>
+    <div ref={area} className="layout" tabIndex={-1}>
       <KeyboardHelp />
       <Stage className="stage">{() => <RenderLayer />}</Stage>
     </div>

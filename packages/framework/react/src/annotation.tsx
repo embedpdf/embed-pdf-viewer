@@ -9,6 +9,11 @@
  * renderer may wrap or replace it. Every chrome color is a setting painted
  * through `paint()`, so its `--epdf-annotation-*` CSS variable wins.
  *
+ * What isn't React lives in `@embedpdf/web`, the same for every framework:
+ * the scene as SVG elements, the chrome's paint and pixels, the text box
+ * editor, which drawing each annotation gets and the behaviors renderers
+ * register, and the object URLs of baked appearances and the stamp ghost.
+ *
  * The hooks follow every plugin's four: `useAnnotation()` (the API),
  * `useAnnotationState()` (status, selected, hovered, editing),
  * `useAnnotationEvent()` and `useAnnotationSettings()`; the reads a component
@@ -22,11 +27,8 @@ import type { EventHook, PageRef } from '@embedpdf/core';
 import {
   scene,
   MITER_LIMIT,
-  type ChromeNode,
   type FieldValues,
-  type Paint,
   type Point,
-  type Rect,
   type RenderItem,
 } from '@embedpdf/core-annotation';
 import {
@@ -38,7 +40,6 @@ import {
   type AnnotationFilter,
   type AnnotationProperties,
   type AnnotationRef,
-  type Behavior,
   type ChromeSettings,
   type CommentsApi,
   type CommentThread,
@@ -56,15 +57,33 @@ import {
 } from '@embedpdf/plugin-annotation/contract/host';
 import { InteractionToken } from '@embedpdf/plugin-interaction/contract';
 import {
-  attachRichTextEditor,
+  annotationChromePaint,
+  annotationDrawingOf,
+  bakedAppearanceOf,
+  chromeInPixels,
+  createTextBoxEditorFollower,
+  editingTextKeyOf,
+  enrichCommentThreads,
   frameInPixels,
-  mixAccent,
-  paint,
-  pickFile,
+  ghostOpacity,
+  installFilePickerProvider,
+  layerTextBoxesOf,
+  loadAppearanceUrls,
+  loadObjectUrl,
+  lookFrameOf,
+  pickRequestedFile,
   rasterInFrame,
+  rectInPixels,
+  registerRendererBehaviors,
+  sameAnnotationAnchor,
+  sceneViewBox,
+  svgShapesOf,
+  textBoxEditorScaleOf,
+  textBoxStyleOf,
+  textPlateInPixels,
+  type AnnotationChromePaint,
+  type AppearanceUrl,
   type FrameFraction,
-  type RichTextEditorBinding,
-  type RichTextEditorHost,
 } from '@embedpdf/web';
 import { useEffect, useRef, useState } from 'react';
 import * as React from 'react';
@@ -97,7 +116,6 @@ import {
 } from './runtime';
 import type { PageContextValue, PageLayout } from './runtime';
 
-export { sameAnchor, sameCreationDraftAnchor } from './annotation-anchors';
 export { useAnnotationSettings, useAnnotationState } from './annotation-hooks';
 export {
   AnnotationDraftMenu,
@@ -243,13 +261,6 @@ export interface AnnotationLayerProps {
   components?: AnnotationLayerComponents;
 }
 
-/** Content rect → a view-px box (the page wrapper's own coordinate space). */
-function boxOf(rect: Rect, page: PageContextValue) {
-  const tl = page.transform.toPixels({ x: rect.x, y: rect.y });
-  const br = page.transform.toPixels({ x: rect.x + rect.width, y: rect.y + rect.height });
-  return { left: tl.x, top: tl.y, width: br.x - tl.x, height: br.y - tl.y };
-}
-
 /** How much the layer scales the look around it: 1 outside a look, or in one drawn at its size on screen. */
 const LookScaleContext = React.createContext(1);
 
@@ -295,45 +306,29 @@ function AnnotationFrame({
   );
 }
 
-/** Map a core `Paint` to SVG presentation attributes — the whole framework-facing
- *  surface. Everything else about appearance is decided in the core's `scene`. */
-function paintAttrs(paint: Paint) {
-  return {
-    fill: paint.fill ?? 'none',
-    fillRule: paint.fillRule, // undefined → SVG default (nonzero); even-odd punches icon holes
-    stroke: paint.stroke ?? 'none',
-    strokeWidth: paint.width,
-    opacity: paint.opacity,
-    strokeLinejoin: paint.join ?? ('miter' as const), // undefined → sharp miter; 'round' only for ink
-    strokeMiterlimit: MITER_LIMIT, // must match the bounds math so spike vs bevel agree
-    strokeLinecap: paint.lineCap, // undefined → SVG default (butt); 'round' only for ink
-    strokeDasharray: paint.dash ? paint.dash.join(' ') : undefined,
-    ...(paint.blend ? { style: { mixBlendMode: paint.blend } } : {}),
-  };
+/** SVG attribute names as React props: `stroke-width` is `strokeWidth`. */
+function reactProps(attributes: Readonly<Record<string, string | number>>) {
+  return Object.fromEntries(
+    Object.entries(attributes).map(([name, value]) => [
+      name.replace(/-([a-z])/g, (_dash, letter: string) => letter.toUpperCase()),
+      value,
+    ]),
+  );
 }
 
 /**
- * The dumb painter. The pure core computed `item.box` and the painted `scene`; we
- * size the <svg> to the box with a page-space `viewBox` and map each SceneNode
- * to one element, applying its `paint`. No per-kind logic, no bounds math — so
- * shapes, cloudy borders and every text-markup type all render here, and a Vue /
- * Svelte painter is the same ~10-line loop.
+ * The scene, filling the item's frame: drawn upright in it, the frame turns
+ * it. The core computed the box and the painted scene; `@embedpdf/web`
+ * describes each scene node as one SVG element, so there is no per-kind
+ * logic and no bounds math here.
  */
-/** How opaque a ghost paints: `--epdf-ghost-opacity` from CSS wins over the tool's own. */
-const ghostOpacity = (opacity: number): string => paint('ghost-opacity', opacity);
-
-/** The scene, filling the item's frame: drawn upright in it, the frame turns it. */
 function Shape({ item }: { item: RenderItem }) {
   // Nothing to draw until the annotation has area (the 0×0 draft at mouse-down).
-  if (item.box.width <= 0 || item.box.height <= 0) return null;
-  // The viewBox (content units) and the <svg> on-screen size must stay proportional
-  // (scale == zoom). Clamping either — e.g. a `max(1px)` floor on the element while
-  // the viewBox keeps shrinking — decouples them, so a sub-pixel box scales content
-  // up by ~1/size and a cloudy border's scallops flood the stage. No clamps here.
-  const vb = `${item.box.x} ${item.box.y} ${item.box.width} ${item.box.height}`;
+  const viewBox = sceneViewBox(item.box);
+  if (!viewBox) return null;
   return (
     <svg
-      viewBox={vb}
+      viewBox={viewBox}
       style={{
         position: 'absolute',
         left: 0,
@@ -346,65 +341,21 @@ function Shape({ item }: { item: RenderItem }) {
         ...(item.source === 'ghost' ? { opacity: ghostOpacity(item.ghostOpacity ?? 0.5) } : {}),
       }}
     >
-      {sceneNodes(item)}
+      {svgShapesOf(scene(item), { miterLimit: MITER_LIMIT }).map((shape, i) =>
+        React.createElement(
+          shape.tag,
+          {
+            key: i,
+            ...reactProps(shape.attributes),
+            ...(shape.blend
+              ? { style: { mixBlendMode: shape.blend as React.CSSProperties['mixBlendMode'] } }
+              : {}),
+          },
+          shape.text,
+        ),
+      )}
     </svg>
   );
-}
-
-/** Map a core scene to SVG children. */
-function sceneNodes(item: RenderItem): React.ReactNode[] {
-  return scene(item).map((node, i) => {
-    const attributes = paintAttrs(node.paint);
-    if (node.kind === 'rect')
-      return (
-        <rect
-          key={i}
-          x={node.rect.x}
-          y={node.rect.y}
-          width={node.rect.width}
-          height={node.rect.height}
-          {...attributes}
-        />
-      );
-    if (node.kind === 'ellipse')
-      return (
-        <ellipse
-          key={i}
-          cx={node.rect.x + node.rect.width / 2}
-          cy={node.rect.y + node.rect.height / 2}
-          rx={node.rect.width / 2}
-          ry={node.rect.height / 2}
-          {...attributes}
-        />
-      );
-    if (node.kind === 'line')
-      return (
-        <line key={i} x1={node.a.x} y1={node.a.y} x2={node.b.x} y2={node.b.y} {...attributes} />
-      );
-    if (node.kind === 'path') return <path key={i} d={node.d} {...attributes} />;
-    if (node.kind === 'text')
-      return (
-        <text
-          key={i}
-          x={node.at.x}
-          y={node.at.y}
-          transform={
-            node.rotation ? `rotate(${node.rotation} ${node.at.x} ${node.at.y})` : undefined
-          }
-          fontSize={node.fontSize}
-          {...(node.fontFamily ? { fontFamily: node.fontFamily } : {})}
-          {...attributes}
-        >
-          {node.text}
-        </text>
-      );
-    const svgPoints = node.points.map((point) => `${point.x},${point.y}`).join(' ');
-    return node.closed ? (
-      <polygon key={i} points={svgPoints} {...attributes} />
-    ) : (
-      <polyline key={i} points={svgPoints} {...attributes} />
-    );
-  });
 }
 
 /** The engine's raster inside the item's frame, where `item.raster` puts it, at any frame size. */
@@ -461,28 +412,13 @@ function ToolGhostImage({ page }: { page: PageContextValue }) {
       setUrl(null);
       return;
     }
-    let cancelled = false;
-    let obj: string | null = null;
-    void anno.renderArmedStampPreview(bucket).then((preview) => {
-      if (cancelled || !preview) return;
-      // Copy into an exact ArrayBuffer (the engine idiom): a Uint8Array view
-      // may sit on a larger or shared buffer, which Blob won't accept.
-      const body = new ArrayBuffer(preview.bytes.byteLength);
-      new Uint8Array(body).set(preview.bytes);
-      const blob = new Blob([body], preview.mimeType ? { type: preview.mimeType } : {});
-      obj = URL.createObjectURL(blob);
-      // The previous bucket's image stays up until this one resolves — no
-      // flicker while a zoom crosses a bucket boundary.
-      setUrl(obj);
-    });
-    return () => {
-      cancelled = true;
-      if (obj) URL.revokeObjectURL(obj);
-    };
+    // The previous bucket's image stays up until this one resolves: no
+    // flicker while a zoom crosses a bucket boundary.
+    return loadObjectUrl(() => anno.renderArmedStampPreview(bucket), setUrl);
   }, [anno, armed, bucket]);
 
   if (!ghost || !url) return null;
-  const frame = boxOf(ghost.box, page);
+  const frame = rectInPixels(ghost.box, page.transform);
   return (
     <img
       src={url}
@@ -508,66 +444,11 @@ function ToolGhostImage({ page }: { page: PageContextValue }) {
 
 // ── the selection's chrome ───────────────────────────────────────────────────
 
-/** Every chrome color, width and dash as CSS: its variable first, then the setting. */
-interface ChromePaint {
-  readonly outline: React.CSSProperties;
-  readonly handle: React.CSSProperties;
-  readonly rotationHandle: React.CSSProperties;
-  readonly guide: React.CSSProperties;
-  readonly rotationGuide: React.CSSProperties;
-  readonly marquee: React.CSSProperties;
-}
-
-/**
- * The chrome settings as paint. A color left `null` follows the part it
- * names, and in the end the accent: the setting's own, else the viewer's.
- */
-function chromePaint(chrome: ChromeSettings, viewerAccent: string): ChromePaint {
-  const accent = chrome.accent ?? viewerAccent;
-  const guideLine = {
-    strokeWidth: paint('annotation-guide-width', chrome.guides.width),
-    strokeDasharray: paint('annotation-guide-dash', chrome.guides.style),
-  };
-  return {
-    outline: {
-      stroke: paint('annotation-outline', chrome.outline.color ?? accent),
-      strokeWidth: paint('annotation-outline-width', chrome.outline.width),
-      strokeDasharray: paint('annotation-outline-dash', chrome.outline.style),
-    },
-    handle: {
-      fill: paint('annotation-handle-fill', chrome.handles.fill),
-      stroke: paint('annotation-handle-stroke', chrome.handles.stroke ?? accent),
-    },
-    rotationHandle: {
-      fill: paint(
-        'annotation-rotation-handle-fill',
-        chrome.rotationHandle.fill ?? chrome.handles.fill,
-      ),
-      stroke: paint(
-        'annotation-rotation-handle-stroke',
-        chrome.rotationHandle.stroke ?? chrome.handles.stroke ?? accent,
-      ),
-    },
-    guide: { stroke: paint('annotation-guide', chrome.guides.color), ...guideLine },
-    rotationGuide: {
-      stroke: paint('annotation-rotation-guide', chrome.guides.rotationColor ?? accent),
-      ...guideLine,
-    },
-    marquee: {
-      fill: paint(
-        'annotation-marquee-fill',
-        chrome.marquee.fill ?? mixAccent('annotation-marquee-fill', accent),
-      ),
-      stroke: paint('annotation-marquee-stroke', chrome.marquee.stroke ?? accent),
-    },
-  };
-}
-
 /** The chrome settings, painted: follows the settings and the viewer's accent live. */
-function useChromePaint(): { chrome: ChromeSettings; painted: ChromePaint } {
+function useChromePaint(): { chrome: ChromeSettings; painted: AnnotationChromePaint } {
   const chrome = useAnnotationSettings((settings) => settings.chrome);
   const accent = useViewerSettings((settings) => settings.accent);
-  const painted = React.useMemo(() => chromePaint(chrome, accent), [chrome, accent]);
+  const painted = React.useMemo(() => annotationChromePaint(chrome, accent), [chrome, accent]);
   return { chrome, painted };
 }
 
@@ -625,155 +506,125 @@ function Chrome({
   const RotationHandle = components?.RotationHandle;
   // Your own handles draw as HTML over the page; the layer's as SVG.
   const custom: React.ReactNode[] = [];
-  const svg = nodes.map((node: ChromeNode, i) => {
-    if (node.kind === 'handle') {
-      const at = page.transform.toPixels(node.at);
-      if (Handle) {
-        custom.push(
-          <Handle
+  const svg = chromeInPixels(nodes, page.transform).map((node, i) => {
+    switch (node.kind) {
+      case 'handle':
+        if (Handle) {
+          custom.push(
+            <Handle
+              key={i}
+              at={node.at}
+              size={chrome.handles.size}
+              rotation={node.rotation}
+              kind={node.role}
+              active={node.active}
+            />,
+          );
+          return null;
+        }
+        return (
+          <DefaultHandle
             key={i}
-            at={at}
+            at={node.at}
             size={chrome.handles.size}
-            rotation={node.rot ?? 0}
-            kind={node.role}
-            active={node.active}
-          />,
+            rotation={node.rotation}
+            shape={chrome.handles.shape}
+            style={painted.handle}
+          />
         );
-        return null;
-      }
-      return (
-        <DefaultHandle
-          key={i}
-          at={at}
-          size={chrome.handles.size}
-          rotation={node.rot ?? 0}
-          shape={chrome.handles.shape}
-          style={painted.handle}
-        />
-      );
-    }
-    // A live alignment guide of a snapped move: a through-line at the snapped
-    // edge or center, spanning both shapes.
-    if (node.kind === 'guide') {
-      const start = page.transform.toPixels(
-        node.axis === 'x' ? { x: node.at, y: node.lo } : { x: node.lo, y: node.at },
-      );
-      const end = page.transform.toPixels(
-        node.axis === 'x' ? { x: node.at, y: node.hi } : { x: node.hi, y: node.at },
-      );
-      return (
-        <line
-          key={i}
-          x1={start.x}
-          y1={start.y}
-          x2={end.x}
-          y2={end.y}
-          shapeRendering="crispEdges"
-          style={painted.guide}
-        />
-      );
-    }
-    // An oriented selection box (a tilted shape or group): a closed quad
-    // through the four page-space corners, in place of the axis-aligned outline.
-    if (node.kind === 'obb') {
-      const svgPoints = node.corners
-        .map((point) => {
-          const pixel = page.transform.toPixels(point);
-          return `${pixel.x},${pixel.y}`;
-        })
-        .join(' ');
-      return <polygon key={i} points={svgPoints} fill="none" style={painted.outline} />;
-    }
-    // Rotation guides (a live turn only): a faint 0°/90° reference cross and
-    // the line riding the angle, already cut to the page.
-    if (node.kind === 'rotate-guides') {
-      return (
-        <g key={i}>
-          {node.lines.map((chord, j) => {
-            const start = page.transform.toPixels(chord.a);
-            const end = page.transform.toPixels(chord.b);
-            return (
+      case 'guide':
+        return (
+          <line
+            key={i}
+            x1={node.from.x}
+            y1={node.from.y}
+            x2={node.to.x}
+            y2={node.to.y}
+            shapeRendering="crispEdges"
+            style={painted.guide}
+          />
+        );
+      case 'turned-outline':
+        return <polygon key={i} points={node.points} fill="none" style={painted.outline} />;
+      case 'rotation-guides':
+        return (
+          <g key={i}>
+            {node.lines.map((line, j) => (
               <line
                 key={j}
-                x1={start.x}
-                y1={start.y}
-                x2={end.x}
-                y2={end.y}
-                opacity={chord.role === 'axis' ? 0.35 : 0.8}
+                x1={line.from.x}
+                y1={line.from.y}
+                x2={line.to.x}
+                y2={line.to.y}
+                opacity={line.opacity}
                 style={painted.rotationGuide}
               />
-            );
-          })}
-        </g>
-      );
-    }
-    // The rotation handle: a stalk from the box's edge out to a round handle.
-    if (node.kind === 'rotate-knob') {
-      const at = page.transform.toPixels(node.at);
-      const from = page.transform.toPixels(node.from);
-      if (RotationHandle) {
-        custom.push(
-          <RotationHandle
-            key={i}
-            at={at}
-            from={from}
-            size={chrome.rotationHandle.size}
-            rotation={0}
-            active={false}
-          />,
+            ))}
+          </g>
         );
-        return null;
-      }
-      return (
-        <g key={i}>
-          {chrome.rotationHandle.stalk && (
-            <line
-              x1={from.x}
-              y1={from.y}
-              x2={at.x}
-              y2={at.y}
-              strokeWidth={1}
-              style={{ stroke: painted.rotationHandle.stroke }}
+      case 'rotation-handle':
+        if (RotationHandle) {
+          custom.push(
+            <RotationHandle
+              key={i}
+              at={node.at}
+              from={node.from}
+              size={chrome.rotationHandle.size}
+              rotation={0}
+              active={false}
+            />,
+          );
+          return null;
+        }
+        return (
+          <g key={i}>
+            {chrome.rotationHandle.stalk && (
+              <line
+                x1={node.from.x}
+                y1={node.from.y}
+                x2={node.at.x}
+                y2={node.at.y}
+                strokeWidth={1}
+                style={{ stroke: painted.rotationHandle.stroke }}
+              />
+            )}
+            <circle
+              cx={node.at.x}
+              cy={node.at.y}
+              r={chrome.rotationHandle.size / 2}
+              strokeWidth={1.5}
+              style={painted.rotationHandle}
             />
-          )}
-          <circle
-            cx={at.x}
-            cy={at.y}
-            r={chrome.rotationHandle.size / 2}
-            strokeWidth={1.5}
-            style={painted.rotationHandle}
+          </g>
+        );
+      // The box dragged to select keeps its own look (a see-through accent
+      // fill, always dashed); the selection outline follows the settings.
+      case 'marquee':
+        return (
+          <rect
+            key={i}
+            x={node.box.left}
+            y={node.box.top}
+            width={node.box.width}
+            height={node.box.height}
+            strokeWidth={1}
+            strokeDasharray="4 3"
+            style={painted.marquee}
           />
-        </g>
-      );
+        );
+      case 'outline':
+        return (
+          <rect
+            key={i}
+            x={node.box.left}
+            y={node.box.top}
+            width={node.box.width}
+            height={node.box.height}
+            fill="none"
+            style={painted.outline}
+          />
+        );
     }
-    const frame = boxOf(node.rect, page);
-    // The box dragged to select keeps its own look (a see-through accent
-    // fill, always dashed); the selection outline follows the settings.
-    if (node.kind === 'marquee') {
-      return (
-        <rect
-          key={i}
-          x={frame.left}
-          y={frame.top}
-          width={frame.width}
-          height={frame.height}
-          strokeWidth={1}
-          strokeDasharray="4 3"
-          style={painted.marquee}
-        />
-      );
-    }
-    return (
-      <rect
-        key={i}
-        x={frame.left}
-        y={frame.top}
-        width={frame.width}
-        height={frame.height}
-        fill="none"
-        style={painted.outline}
-      />
-    );
   });
   return (
     <>
@@ -790,13 +641,11 @@ function Chrome({
 // ── text boxes ───────────────────────────────────────────────────────────────
 
 /**
- * Make an element the editor of a text box: the shared
- * `attachRichTextEditor` binding renders the runs as inline-styled spans,
- * turns typing back into runs, maps the selection to flat offsets and keeps
- * the caret through a restyle; the browser owns layout, caret, input methods
- * and the clipboard; the plugin owns the text, the range routing and the
- * write after a pause. `contentEditable` follows `item.editing`, so the text
- * never jumps between reading and typing.
+ * Make an element the editor of a text box: `@embedpdf/web`'s text box
+ * editor binds it (rich text, focus and `contentEditable` following
+ * `item.editing`, presses kept inside), and its follower attaches again for
+ * another element or document and hands it the item and the scale. Returns
+ * the ref callback for the element.
  */
 function useTextBoxEditor(
   item: TextItem | null,
@@ -804,125 +653,35 @@ function useTextBoxEditor(
 ): (element: HTMLElement | null) => void {
   const anno = useCapability(AnnotationHostToken);
   const [element, setElement] = useState<HTMLElement | null>(null);
-  // The binding outlives renders; the host closes over the latest item.
-  const binding = useRef<RichTextEditorBinding | null>(null);
-  const latest = useRef({ item, scale });
-  latest.current = { item, scale };
-  useEffect(() => {
-    if (!element || !latest.current.item) return;
-    const host: RichTextEditorHost = {
-      // Typing shows at once and reaches the engine in one write after a
-      // pause (or when the edit ends), not one write per keystroke.
-      onInput: (doc) => {
-        const it = latest.current.item;
-        if (it?.ref) anno.draftRichText(it.ref, doc);
-      },
-      onSelectionChange: (range) => {
-        const it = latest.current.item;
-        if (it?.ref) anno.setTextSelection(it.ref, range);
-      },
-      onCommand: (command) => anno.text.toggleFormat(command),
-      cssFontFamily: (family) => anno.getCssFontFamily(family),
-    };
-    const editorBinding = attachRichTextEditor(element, host, {
-      document: latest.current.item.richText,
-      scale: latest.current.scale,
-    });
-    binding.current = editorBinding;
-    return () => {
-      editorBinding.detach();
-      binding.current = null;
-    };
-    // The binding is made once per element; it follows the item below.
-  }, [anno, element, !!item]);
-  // Model → DOM: the binding skips its own echo (so the caret never jumps
-  // while typing) and re-renders, caret kept, for a restyle, a remote edit or
-  // a zoom. It runs on every item change; the binding redraws only when the
-  // text differs, and otherwise states the line model for the (maybe
-  // restyled) font again.
-  useEffect(() => {
-    if (item) binding.current?.update({ document: item.richText, scale });
-  }, [item, scale]);
-
-  const editing = item?.editing ?? false;
-  // Focus follows the model's `editing`, never the other way: leaving is
-  // driven by the hub, so a passing focus steal can't end the edit.
-  useEffect(() => {
-    if (!element) return;
-    element.contentEditable = editing ? 'true' : 'false';
-    if (editing) {
-      element.focus();
-      // Enter at the top, where the baked appearance anchors the text, so
-      // baked → edit → baked never jumps.
-      element.scrollTop = 0;
-    }
-  }, [element, editing]);
-
-  // A press inside the editor stays there: it must not reach the Stage's
-  // listener, which reads it as a click outside (and ends the edit). The
-  // browser then owns the caret and the drag inside the box.
-  useEffect(() => {
-    if (!element) return;
-    const stop = (event: Event) => event.stopPropagation();
-    // The gesture that opens the editor blurs it to <body> right after it
-    // takes focus; while the model still edits this box, take focus back. A
-    // real click away ends the edit through the hub first.
-    const refocus = (event: FocusEvent) => {
-      const it = latest.current.item;
-      if (event.relatedTarget == null && element.isConnected && it && anno.getEditingId() === it.id)
-        element.focus();
-    };
-    element.addEventListener('pointerdown', stop);
-    element.addEventListener('blur', refocus);
-    return () => {
-      element.removeEventListener('pointerdown', stop);
-      element.removeEventListener('blur', refocus);
-    };
-  }, [anno, element]);
-
+  const [follower] = useState(() => createTextBoxEditorFollower<AnnotationRef>());
+  // On every item or scale change too: the editor redraws only when the text differs.
+  useEffect(
+    () => follower.follow(element, anno, item, scale),
+    [follower, anno, element, item, scale],
+  );
+  useEffect(() => () => follower.detach(), [follower]);
   return setElement;
-}
-
-/** A text box's body style as CSS at a scale: font, size, color and alignment. */
-function textStyleOf(item: TextItem, scale: number): React.CSSProperties {
-  return {
-    fontFamily: item.css.fontFamily,
-    fontSize: item.css.fontSize * scale,
-    // No line height: the binding states the engine's line model per face.
-    color: item.css.color,
-    fontWeight: item.css.fontWeight,
-    fontStyle: item.css.fontStyle,
-    textDecoration: item.css.textDecoration,
-    textAlign: item.css.align,
-  };
 }
 
 /** A free text annotation: the same styled element for reading and typing. */
 function FreeText({ item, page }: { item: TextItem; page: PageContextValue }) {
-  const box = boxOf(item.box, page);
-  const scale = item.box.width > 0 ? box.width / item.box.width : 1; // content units → screen px
-  const ref = useTextBoxEditor(item, scale);
-  const textOutline = useAnnotationSettings((settings) => settings.chrome.textOutline);
-  const accent = useViewerSettings((settings) => settings.accent);
-  const outlineAccent = useAnnotationSettings((settings) => settings.chrome.accent);
-  // The element is the engine's text plate (`SetPlateRect` and its `re W n`
-  // clip): positioned at the padding inset with no CSS padding, so its edge
-  // is the plate's. CSS padding doesn't clip overflow: scrolled lines would
-  // paint over the border band.
-  const pad = item.css.padding * scale;
+  // The element is the engine's text plate: the box inset by its padding.
+  const plate = textPlateInPixels(item, page.transform);
+  const ref = useTextBoxEditor(item, plate.scale);
+  const { painted } = useChromePaint();
   return (
     <div
       ref={ref}
       suppressContentEditableWarning
       style={{
         position: 'absolute',
-        left: box.left + pad,
-        top: box.top + pad,
-        width: Math.max(0, box.width - 2 * pad),
+        left: plate.left,
+        top: plate.top,
+        width: plate.width,
         // Fixed to the plate: the box never grows with its text; it scrolls
         // while typing and clips otherwise, where the baked /AP clips.
-        height: Math.max(0, box.height - 2 * pad),
-        ...textStyleOf(item, scale),
+        height: plate.height,
+        ...textBoxStyleOf(item.css, plate.scale),
         boxSizing: 'border-box',
         // The box's fill and border are the vector scene's, under this layer.
         background: 'transparent',
@@ -930,9 +689,7 @@ function FreeText({ item, page }: { item: TextItem; page: PageContextValue }) {
         overflowWrap: 'break-word',
         overflowY: item.editing ? 'auto' : 'hidden',
         overflowX: 'hidden',
-        outline: item.editing
-          ? `1px solid ${paint('annotation-text-outline', textOutline ?? outlineAccent ?? accent)}`
-          : 'none',
+        outline: item.editing ? `1px solid ${painted.textOutline}` : 'none',
         cursor: item.editing ? 'text' : 'default',
         // A plain text box turns about its centre, as the baked /AP does.
         ...(item.rot ? { transform: `rotate(${item.rot}deg)`, transformOrigin: 'center' } : {}),
@@ -977,17 +734,13 @@ export function useRichTextEditor(annotation: Annotation): RichTextEditor {
   );
   // Pixels per point where the element is: inside a scaled look, at the
   // annotation's 100% size; the look's scale does the rest.
-  const lookScale = React.useContext(LookScaleContext);
-  const scale =
-    (item && item.box.width > 0
-      ? boxOf(item.box, page).width / item.box.width
-      : page.transform.viewScale) / lookScale;
+  const scale = textBoxEditorScaleOf(item, page.transform, React.useContext(LookScaleContext));
   const ref = useTextBoxEditor(item, scale);
   // While typing, the element takes the pointer (the caret, a drag over words).
   const style = React.useMemo<React.CSSProperties>(
     () =>
       item
-        ? { ...textStyleOf(item, scale), ...(item.editing ? { pointerEvents: 'auto' } : {}) }
+        ? { ...textBoxStyleOf(item.css, scale), ...(item.editing ? { pointerEvents: 'auto' } : {}) }
         : NO_STYLE,
     [item, scale],
   );
@@ -997,19 +750,13 @@ export function useRichTextEditor(annotation: Annotation): RichTextEditor {
 // ── renderers that take the pointer ──────────────────────────────────────────
 
 /**
- * The behaviors `interactive` renderers register, counted per (capability,
- * entry) because the layer mounts once per page: the first page registers,
- * the last unregisters. Entry identity is the key, hence the "define entries
- * outside render" rule on {@link AnnotationRenderer}.
+ * Register the behaviors this layer's `interactive` renderers need, through
+ * `@embedpdf/web`'s `registerRendererBehaviors`: counted per capability and
+ * entry, since the layer mounts once per page. Entry identity is the key,
+ * hence the "define entries outside render" rule on {@link AnnotationRenderer}.
  */
-const autoBehaviors = new WeakMap<
-  object,
-  Map<object, { id: string; count: number; unregister: () => void }>
->();
-let autoBehaviorSeq = 0;
-
-function useAutoBehaviors(
-  anno: { registerBehavior(behavior: Behavior): () => void },
+function useRendererBehaviors(
+  anno: Parameters<typeof registerRendererBehaviors<Annotation>>[0],
   activeToolId: () => string,
   renderers?: AnnotationRenderer[],
 ): void {
@@ -1017,44 +764,8 @@ function useAutoBehaviors(
   toolRef.current = activeToolId;
   useEffect(() => {
     if (!renderers) return;
-    const released: Array<() => void> = [];
-    for (const renderer of renderers) {
-      if (!('for' in renderer) || !renderer.interactive) continue;
-      let perCap = autoBehaviors.get(anno);
-      if (!perCap) autoBehaviors.set(anno, (perCap = new Map()));
-      let rec = perCap.get(renderer);
-      if (!rec) {
-        const id = renderer.id ?? `renderer:${++autoBehaviorSeq}`;
-        const interactive = renderer.interactive;
-        const engaged =
-          typeof interactive === 'function'
-            ? (annotation: Annotation) => interactive({ annotation, toolId: toolRef.current() })
-            : () => true;
-        rec = {
-          id,
-          count: 0,
-          unregister: anno.registerBehavior({ id, matches: renderer.for, engaged }),
-        };
-        perCap.set(renderer, rec);
-      }
-      rec.count++;
-      const owned = rec;
-      released.push(() => {
-        owned.count--;
-        if (owned.count === 0) {
-          owned.unregister();
-          autoBehaviors.get(anno)?.delete(renderer);
-        }
-      });
-    }
-    return () => released.forEach((release) => release());
+    return registerRendererBehaviors(anno, renderers, () => toolRef.current());
   }, [anno, renderers]);
-}
-
-/** The behavior id a renderer entry answers for (plugin-owned or auto-registered). */
-function rendererBehaviorId(anno: object, renderer: AnnotationRenderer): string | null {
-  if ('behavior' in renderer) return renderer.behavior;
-  return autoBehaviors.get(anno)?.get(renderer)?.id ?? null;
 }
 
 /** React 18 spells the `inert` attribute as a string spread; it disables
@@ -1090,8 +801,8 @@ export function AnnotationLayer({ renderers, components }: AnnotationLayerProps 
     (annotation) => annotation.listTextItems(page.ref, { zoom: viewZoom, rotation: viewRotation }),
     shallowArray,
   );
-  const [urls, setUrls] = useState<Record<string, { url: string; box: Rect }>>({});
-  useAutoBehaviors(anno, () => (interaction?.getActiveToolId() as string) ?? '', renderers);
+  const [urls, setUrls] = useState<Record<string, AppearanceUrl>>({});
+  useRendererBehaviors(anno, () => (interaction?.getActiveToolId() as string) ?? '', renderers);
   usePageLayerFact(page, 'annotationRenderers', renderers ?? null);
   // Entry identity keys the behavior registration, so an inline `renderers`
   // array registers again on every render. Detect it once: a fresh array
@@ -1125,51 +836,18 @@ export function AnnotationLayer({ renderers, components }: AnnotationLayerProps 
     annotation.getBakeScale(page.transform.renderScale),
   );
 
-  useEffect(() => {
-    const controller = new AbortController();
-    const revokers: Array<() => void> = [];
-    (async () => {
-      try {
-        const imgs = await anno.renderAppearances(page.ref, bakeScale, controller.signal);
-        const map: Record<string, { url: string; box: Rect }> = {};
-        for (const ap of imgs) {
-          // Place the baked bitmap by its own rect (the box it was rendered
-          // into, in page space), never a recomputed bound.
-          const box = ap.rect;
-          const obj = await ap.image.objectUrl().abortWith(controller.signal);
-          if (controller.signal.aborted) {
-            obj.revoke();
-            return;
-          }
-          revokers.push(obj.revoke);
-          map[annotationKey(ap.ref)] = { url: obj.url, box };
-        }
-        if (!controller.signal.aborted) setUrls(map);
-      } catch {
-        /* aborted / no appearances */
-      }
-    })();
-    return () => {
-      controller.abort();
-      revokers.forEach((revoke) => revoke());
-    };
-  }, [anno, page.ref, bakeScale, bakedKey]);
+  useEffect(
+    () =>
+      loadAppearanceUrls(
+        (signal) => anno.renderAppearances(page.ref, bakeScale, signal),
+        annotationKey,
+        setUrls,
+      ),
+    [anno, page.ref, bakeScale, bakedKey],
+  );
 
   /** The text box being typed in, by key. */
-  const editingText = texts.find((text) => text.editing && text.ref !== null);
-  const editingKey = editingText?.ref ? annotationKey(editingText.ref) : null;
-
-  /** Whether one of your renderers draws this text box: the item it is on the page has a renderer. */
-  const drawnByRenderer = (text: TextItem): boolean => {
-    if (!renderers || !text.ref) return false;
-    const key = annotationKey(text.ref);
-    const annotation = items.find(
-      (item) => item.ref !== null && annotationKey(item.ref) === key,
-    )?.annotation;
-    return (
-      !!annotation && renderers.some((renderer) => 'for' in renderer && renderer.for(annotation))
-    );
-  };
+  const editingKey = editingTextKeyOf(texts, annotationKey);
 
   return (
     <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
@@ -1207,14 +885,9 @@ export function AnnotationLayer({ renderers, components }: AnnotationLayerProps 
           const drawn = (
             <Look
               annotation={annotation}
-              frame={{
-                width: scaled ? pixels.design.width : pixels.width,
-                height: scaled ? pixels.design.height : pixels.height,
-                rotation: pixels.rotationOnScreen,
-                scale: pixels.scale,
-              }}
+              frame={lookFrameOf(pixels, scaled)}
               native={native}
-              appearance={baked ? { url: baked.url } : null}
+              appearance={bakedAppearanceOf(urls, item.id)}
               hovered={item.hovered ?? false}
               selected={item.selected}
               interactive={interactive}
@@ -1240,15 +913,15 @@ export function AnnotationLayer({ renderers, components }: AnnotationLayerProps 
 
         // Ownership beats looks: an engaged behavior's renderer is
         // authoritative (form fill controls own their DOM); `for` rules apply
-        // only to what the layer owns, and draw without the pointer.
-        const behavior = anno.getBehaviorFor(annotation);
-        if (behavior) {
-          const entry = renderers?.find(
-            (renderer) => rendererBehaviorId(anno, renderer) === behavior.id,
-          );
-          if (entry && 'behavior' in entry) {
+        // only to what the layer owns, and draw without the pointer. While its
+        // text box is typed in, a look's editor (`useRichTextEditor`) takes
+        // the keys: an inert subtree can't.
+        const typing = editingKey !== null && annotationKey(annotation.ref) === editingKey;
+        const drawing = annotationDrawingOf(annotation, anno, renderers, typing);
+        switch (drawing.kind) {
+          case 'owned': {
             // Its controls place themselves in the layer; the native drawing keeps its frame.
-            const Owner = entry.component;
+            const Owner = drawing.entry.component;
             return (
               <Owner
                 key={item.id}
@@ -1262,26 +935,22 @@ export function AnnotationLayer({ renderers, components }: AnnotationLayerProps 
               />
             );
           }
-          if (entry) return framed(look(entry, true), { interactive: true });
-          // Engaged with no renderer wired: the behavior's plugin owns the
-          // input (a link's anchor takes the click), and the annotation keeps
-          // its own look.
-          return framed(native, { inert: true });
+          case 'look':
+            return framed(look(drawing.entry, drawing.interactive), {
+              interactive: drawing.interactive,
+              inert: drawing.inert,
+            });
+          case 'native':
+            // Inert when an engaged behavior has no renderer of yours: its
+            // plugin owns the input (a link's anchor takes the click), and the
+            // annotation keeps its own look.
+            return framed(native, { inert: drawing.inert });
         }
-        const entry = renderers?.find(
-          (renderer): renderer is Extract<AnnotationRenderer, { for: unknown }> =>
-            'for' in renderer && renderer.for(annotation),
-        );
-        if (!entry) return framed(native);
-        // While its text box is typed in, the renderer's editor
-        // (`useRichTextEditor`) takes the keys: an inert subtree can't.
-        const typing = editingKey !== null && annotationKey(annotation.ref) === editingKey;
-        return framed(look(entry, false), { inert: !typing });
       })}
-      {texts.map((text) =>
-        // A text box your renderer draws is edited there (`useRichTextEditor`).
-        drawnByRenderer(text) ? null : <FreeText key={text.id} item={text} page={page} />,
-      )}
+      {/* A text box your renderer draws is edited there (`useRichTextEditor`). */}
+      {layerTextBoxesOf(texts, items, renderers, annotationKey).map((text) => (
+        <FreeText key={text.id} item={text} page={page} />
+      ))}
       <ToolGhostImage page={page} />
       <Chrome page={page} components={components} />
     </div>
@@ -1291,14 +960,10 @@ export function AnnotationLayer({ renderers, components }: AnnotationLayerProps 
 /**
  * The default file-picker provider: the built-in file dialog (from
  * `@embedpdf/web`), honouring the tool's `accept` filter. This is the adapter
- * fulfilling the plugin's DOM-free port — the dialog lives here, in the
- * framework layer, never in the plugin. A picked `File` carries its own name
- * and mime, so it goes straight through as the engine's file source.
+ * fulfilling the plugin's DOM-free port — the dialog lives in the framework
+ * layer, never in the plugin.
  */
-export const filePickerProvider: FilePickerProvider = async (request) => {
-  const file = await pickFile({ accept: request.accept ?? '*/*' });
-  return file ? { data: file } : null;
-};
+export const filePickerProvider: FilePickerProvider = pickRequestedFile;
 
 /**
  * Install the file-picker provider for the active document — the one port
@@ -1317,23 +982,15 @@ export function useFilePickerProvider(
   useEffect(() => {
     if (!anno) return;
     // One port per document: a second caller silently replaces the first.
-    const installed = (filePickerInstalls.get(anno) ?? 0) + 1;
-    filePickerInstalls.set(anno, installed);
-    if (installed > 1) {
+    return installFilePickerProvider(anno, provider, () =>
       devWarn(
         'file-picker-provider-twice',
         'useFilePickerProvider() is called from two mounted components for the same document — ' +
           'the later one wins. Call it once, at a document-scoped spot.',
-      );
-    }
-    const remove = anno.setFilePickerProvider(provider);
-    return () => {
-      filePickerInstalls.set(anno, (filePickerInstalls.get(anno) ?? 1) - 1);
-      remove();
-    };
+      ),
+    );
   }, [anno, provider]);
 }
-const filePickerInstalls = new WeakMap<object, number>();
 
 export function useAnnotation(): AnnotationCapability {
   return useCapability(AnnotationToken);
@@ -1425,28 +1082,13 @@ export function useAnnotationAnchor(ref: AnnotationRef | null): AnnotationAnchor
   );
 }
 
-/** The same anchor: page, box, and how it follows the view. */
-const sameAnnotationAnchor = (
-  left: AnnotationAnchor | null,
-  right: AnnotationAnchor | null,
-): boolean =>
-  left === right ||
-  (!!left &&
-    !!right &&
-    left.page.objectNumber === right.page.objectNumber &&
-    left.bounds.x === right.bounds.x &&
-    left.bounds.y === right.bounds.y &&
-    left.bounds.width === right.bounds.width &&
-    left.bounds.height === right.bounds.height &&
-    left.boundsIn === right.boundsIn);
-
 // ── Comments (the conversation plane) ────────────────────────────────────────
 
 /**
  * A {@link CommentThread} enriched with its page's live display position —
- * the framework-layer join. Identity stays `page` (like every
- * annotation surface); these two fields are presentation, tracking page
- * moves and deletes.
+ * the framework-layer join (`enrichCommentThreads` in `@embedpdf/web`).
+ * Identity stays `page` (like every annotation surface); these two fields
+ * are presentation, tracking page moves and deletes.
  */
 export interface CommentThreadView extends CommentThread {
   /** Current 0-based display index of the thread's page; `-1` when the page
@@ -1455,24 +1097,6 @@ export interface CommentThreadView extends CommentThread {
   /** The page's `/PageLabels` label when the PDF declares one ("iv", "A-2"),
    *  else the 1-based position as a string — print it verbatim. */
   pageLabel: string;
-}
-
-/** Pure join behind {@link useCommentThreads} — exported for tests. */
-export function enrichCommentThreads(
-  threads: readonly CommentThread[],
-  pages: readonly PageLayout[],
-): CommentThreadView[] {
-  const byPageObjectNumber = new Map(
-    pages.map((pageInfo) => [pageInfo.ref.objectNumber, pageInfo] as const),
-  );
-  return threads.map((thread) => {
-    const page = byPageObjectNumber.get(thread.page.objectNumber);
-    return {
-      ...thread,
-      pageIndex: page ? page.index : -1,
-      pageLabel: page ? (page.label ?? String(page.index + 1)) : '?',
-    };
-  });
 }
 
 /** The comments API: the `comments` part of `useAnnotation()`. Pair it with

@@ -14,13 +14,15 @@
  * keep only subscriptions and markup; the DOM listener mechanics live in
  * `@embedpdf/web`'s `attachSelectionHandle`.
  *
- * The view dependency is structural (satisfied by five lines over
- * `StageCapability`) so this plugin stays stage-free — selection also runs
- * in stage-less hosts (`PageView`) — and the math tests run against a fake.
+ * The view dependency is structural (`selectionHandleViewOf` builds it from
+ * anything shaped like `StageCapability`) so this plugin stays stage-free —
+ * selection also runs in stage-less hosts (`PageView`) — and the math tests
+ * run against a fake.
  */
 import { quadEdge } from '@embedpdf/core-geometry';
 import type { Point, Quad } from '@embedpdf/core-geometry';
 import type { PageRef } from '@embedpdf/engine-core/runtime';
+import type { SelectionSnapshot } from './contract';
 
 /** What handle geometry & drags need from the hosting view. */
 export interface SelectionHandleView {
@@ -33,6 +35,26 @@ export interface SelectionHandleView {
   pointOnPage(page: PageRef, overlay: Point): Point | null;
 }
 
+/** The Stage's projection, as the handles use it: `StageCapability` satisfies it. */
+export interface SelectionHandleStage {
+  pageToViewport(page: PageRef, point: Point): Point | null;
+  getPageAt(point: Point): { ref: PageRef; point: Point } | null;
+  viewportToPage(page: PageRef, point: Point): Point | null;
+}
+
+/**
+ * The handles' view over a Stage: point-exact projection in, page lookup out.
+ * (The Stage's box projector, `pageRectToViewport`, is for upright overlays
+ * and would lose the orientation a handle needs.)
+ */
+export function selectionHandleViewOf(stage: SelectionHandleStage): SelectionHandleView {
+  return {
+    toOverlay: (page, point) => stage.pageToViewport(page, point),
+    pageAt: (overlay) => stage.getPageAt(overlay),
+    pointOnPage: (page, overlay) => stage.viewportToPage(page, overlay),
+  };
+}
+
 /** One selection boundary, as the handle needs it (a `SelectionEndpoint` slice). */
 export interface SelectionHandleEndpoint {
   page: PageRef;
@@ -41,6 +63,28 @@ export interface SelectionHandleEndpoint {
   /** Reading direction of its segment (+1 = the frame's +x) — decides which
    *  side of the cell is the selection's leading edge. */
   advance: 1 | -1;
+}
+
+/** Both ends of a selection, as the handles need them. */
+export interface SelectionHandleEndpoints {
+  start: SelectionHandleEndpoint;
+  end: SelectionHandleEndpoint;
+}
+
+/**
+ * The two ends of the selection in `snapshot` (`getSnapshot()`), or null
+ * while nothing is selected. A new object on every call: compare with
+ * `sameSelectionEndpoints` from `@embedpdf/web`.
+ */
+export function selectionHandleEndpointsOf(
+  snapshot: Pick<SelectionSnapshot, 'start' | 'end'>,
+): SelectionHandleEndpoints | null {
+  const { start, end } = snapshot;
+  if (!start || !end) return null;
+  return {
+    start: { page: start.page, glyphQuad: start.glyphQuad, advance: start.advance },
+    end: { page: end.page, glyphQuad: end.glyphQuad, advance: end.advance },
+  };
 }
 
 /** The gesture verbs a handle drag drives — `SelectionHostCapability` satisfies it. */
@@ -162,5 +206,32 @@ export function createSelectionHandleDrag(
     end: () => {
       if (begun) selection.endGesture(); // settle → menu reappears, onCommitted fires
     },
+  };
+}
+
+/** A press on a handle, armed: the point it grabbed and the drag it starts. */
+export interface ArmedSelectionHandle {
+  /** The point the user grabbed: the bar's midpoint, overlay px. */
+  base: Point;
+  drag: SelectionHandleDragSession;
+}
+
+/**
+ * Arm a drag of the `role` handle at a press, with the view and the endpoints
+ * as they are at that moment: it extends the selection from the opposite end.
+ * Null when the handle's page isn't laid out.
+ */
+export function armSelectionHandle(
+  selection: SelectionHandleTarget,
+  view: SelectionHandleView,
+  endpoints: SelectionHandleEndpoints,
+  role: 'start' | 'end',
+): ArmedSelectionHandle | null {
+  const geometry = selectionHandleGeom(view, endpoints[role], role);
+  if (!geometry) return null;
+  const opposite = endpoints[role === 'start' ? 'end' : 'start'];
+  return {
+    base: midpoint(geometry.bar.from, geometry.bar.to),
+    drag: createSelectionHandleDrag(selection, view, opposite, endpoints[role].page),
   };
 }

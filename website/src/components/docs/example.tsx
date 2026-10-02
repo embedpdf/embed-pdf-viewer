@@ -93,12 +93,18 @@ export function Example({
   demosByFramework,
   mode = 'default',
   kind = 'example',
+  available,
 }: {
   filesByFramework?: string;
   demosByFramework?: string;
   mode?: ExampleMode;
   /** A `<Snippet>` is code only; its gap note says so. */
   kind?: 'example' | 'snippet';
+  /**
+   * The frameworks that have a version, when the server only sent the route's framework's files
+   * (`RouteExample`); the "not available yet" note picks its link from it.
+   */
+  available?: readonly string[];
 }) {
   const pathname = usePathname();
   const product = docsProductFromPath(pathname);
@@ -119,9 +125,8 @@ export function Example({
   const demoUrl = demos[variant];
 
   if (!files || files.length === 0) {
-    const fallback = byFramework[defaultIntegration]?.length
-      ? defaultIntegration
-      : Object.keys(byFramework)[0];
+    const versions = available ?? Object.keys(byFramework).filter((fw) => byFramework[fw]?.length);
+    const fallback = versions.includes(defaultIntegration) ? defaultIntegration : versions[0];
     const fallbackIntegration = isDocsIntegration(fallback) ? fallback : null;
     const fallbackLabel = fallbackIntegration ? DOCS_INTEGRATION_LABELS[fallbackIntegration] : null;
     const fallbackHref = fallbackIntegration

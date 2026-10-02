@@ -20,19 +20,18 @@ export * from '@embedpdf/plugin-selection';
 export { copySelection } from '@embedpdf/web';
 import * as React from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { quadEquals } from '@embedpdf/core-geometry';
 import type { CapabilityToken, EventHook } from '@embedpdf/core';
 import {
   HANDLE_BAR,
   HANDLE_HEAD,
   HANDLE_PAD,
   SelectionToken,
-  createSelectionHandleDrag,
+  armSelectionHandle,
+  selectionHandleEndpointsOf,
   selectionHandleGeom,
+  selectionHandleViewOf,
   selectionState,
-  type SelectionHandleEndpoint,
-  type SelectionHandleView,
-  type SelectionAnchor,
+  type SelectionHandleEndpoints,
   type SelectionCapability,
 } from '@embedpdf/plugin-selection';
 import { SelectionToken as SelectionHostToken } from '@embedpdf/plugin-selection/contract/host';
@@ -41,6 +40,10 @@ import {
   attachSelectionHandle,
   mixAccent,
   paint,
+  quadInPixels,
+  samePageBounds,
+  sameSelectionEndpoints,
+  svgPoints,
   wireSelectionClipboard,
   type SelectionClipboardOptions,
 } from '@embedpdf/web';
@@ -101,25 +104,16 @@ export function SelectionLayer() {
         pointerEvents: 'none',
       }}
     >
-      {segments.map((segment, i) => {
-        // page space → un-rotated content view px (rides the page's CSS
-        // rotation). An affine map, so mapping the four corners is exact —
-        // upright segments render pixel-identical to the old div-per-rect.
-        const ring = [
-          segment.quad.upperLeft,
-          segment.quad.upperRight,
-          segment.quad.lowerRight,
-          segment.quad.lowerLeft,
-        ].map((point) => page.transform.toPixels(point));
-        return (
-          <polygon
-            key={i}
-            points={ring.map((point) => `${point.x},${point.y}`).join(' ')}
-            // In `style`: an SVG attribute doesn't read var().
-            style={{ fill }}
-          />
-        );
-      })}
+      {segments.map((segment, i) => (
+        // Page space → the page layer's pixels, which ride the page's CSS
+        // rotation: mapping the four corners is exact, for turned text too.
+        <polygon
+          key={i}
+          points={svgPoints(quadInPixels(segment.quad, page.transform))}
+          // In `style`: an SVG attribute doesn't read var().
+          style={{ fill }}
+        />
+      ))}
     </svg>
   );
 }
@@ -149,21 +143,6 @@ export const useSelectionState = stateHook(selectionState);
 /** The selection settings (`dragThreshold`, `color`, `handles`), with or without a document. Takes a selector. */
 export const useSelectionSettings = settingsHook(SelectionToken);
 
-/** Structural equality for the selection's menu anchor — keeps the menu from
- *  re-rendering on unrelated dispatches (the capability returns a fresh
- *  object each call). */
-const sameAnchor = (left: SelectionAnchor | null, right: SelectionAnchor | null): boolean => {
-  if (left === right) return true;
-  if (!left || !right) return false;
-  return (
-    left.page.objectNumber === right.page.objectNumber &&
-    left.bounds.x === right.bounds.x &&
-    left.bounds.y === right.bounds.y &&
-    left.bounds.width === right.bounds.width &&
-    left.bounds.height === right.bounds.height
-  );
-};
-
 export interface SelectionMenuProps {
   children: React.ReactNode;
   /** Gap in screen px between the selection and the menu (default 8). */
@@ -186,7 +165,9 @@ export interface SelectionMenuProps {
  */
 export function SelectionMenu({ children, gap = 8, placement = 'top' }: SelectionMenuProps) {
   const selecting = useSelectionState((state) => state.isSelecting);
-  const anchor = useSelector(SelectionToken, (selection) => selection.getAnchor(), sameAnchor);
+  // The capability returns a fresh anchor on every read: compare by value, so
+  // the menu re-renders only when the selection moved.
+  const anchor = useSelector(SelectionToken, (selection) => selection.getAnchor(), samePageBounds);
   if (selecting || !anchor) return null;
   return (
     <Anchored anchor={anchor} placement={placement} gap={gap}>
@@ -197,42 +178,13 @@ export function SelectionMenu({ children, gap = 8, placement = 'top' }: Selectio
 
 // ── selection handles (the touch affordance) ────────────────────────────────
 //
-// Policy lives out of this file, per the layering razor: the geometry and the
-// drag session are `@embedpdf/plugin-selection`'s pure `handles` module (one
-// source for every adapter), the native listener mechanics are
+// Policy lives out of this file, per the layering razor: the view over the
+// Stage, the endpoints, the geometry and the armed drag are
+// `@embedpdf/plugin-selection`'s pure `handles` module (one source for every
+// adapter), the native listener mechanics are
 // `@embedpdf/web`'s `attachSelectionHandle` (the down-shield timing subtlety
 // lives once), and this component keeps what only React can do —
 // subscriptions, markup, theming.
-
-interface Endpoints {
-  start: SelectionHandleEndpoint;
-  end: SelectionHandleEndpoint;
-}
-const sameEndpoints = (left: Endpoints | null, right: Endpoints | null): boolean => {
-  if (left === right) return true;
-  if (!left || !right) return false;
-  return (
-    left.start.page.objectNumber === right.start.page.objectNumber &&
-    left.end.page.objectNumber === right.end.page.objectNumber &&
-    left.start.advance === right.start.advance &&
-    left.end.advance === right.end.advance &&
-    // corner-wise, so a boundary that rotates without moving its bounding box
-    // still re-renders (an AABB comparison would call that "unchanged")
-    quadEquals(left.start.glyphQuad, right.start.glyphQuad) &&
-    quadEquals(left.end.glyphQuad, right.end.glyphQuad)
-  );
-};
-
-/** The plugin's structural view over this Stage: point-exact projection in,
- *  page resolution out. (`pageRectToViewport` is the AABB projector — upright
- *  overlays only — and would collapse exactly the orientation handles need.) */
-const handleView = (stage: StageCapability): SelectionHandleView => ({
-  toOverlay: (page, pt) => {
-    return stage.pageToViewport(page, pt);
-  },
-  pageAt: (overlay) => stage.getPageAt(overlay),
-  pointOnPage: (page, overlay) => stage.viewportToPage(page, overlay),
-});
 
 export interface SelectionHandlesProps {
   /** The stage lens hosting this overlay (default: the enclosing `<Stage>`'s lens). */
@@ -278,23 +230,8 @@ export function SelectionHandles({ token: explicitToken }: SelectionHandlesProps
   const accent = useViewerSettings((settings) => settings.accent);
   const endpoints = useSelector(
     SelectionHostToken,
-    (selection): Endpoints | null => {
-      const snapshot = selection.getSnapshot();
-      if (!snapshot.start || !snapshot.end) return null;
-      return {
-        start: {
-          page: snapshot.start.page,
-          glyphQuad: snapshot.start.glyphQuad,
-          advance: snapshot.start.advance,
-        },
-        end: {
-          page: snapshot.end.page,
-          glyphQuad: snapshot.end.glyphQuad,
-          advance: snapshot.end.advance,
-        },
-      };
-    },
-    sameEndpoints,
+    (selection) => selectionHandleEndpointsOf(selection.getSnapshot()),
+    sameSelectionEndpoints,
   );
   // The handles are positioned by projecting the endpoint corners through the
   // camera, so they must re-render whenever the camera moves — visiblePages is
@@ -305,7 +242,9 @@ export function SelectionHandles({ token: explicitToken }: SelectionHandlesProps
   // The web binder's `arm` must read the current endpoints/stage at pointer
   // down, not the ones captured when the listener attached — a stable ref
   // callback with a live arm-source is the standard escape from that.
-  const armSource = useRef<{ stage: StageCapability; endpoints: Endpoints } | null>(null);
+  const armSource = useRef<{ stage: StageCapability; endpoints: SelectionHandleEndpoints } | null>(
+    null,
+  );
   armSource.current = stage && endpoints ? { stage, endpoints } : null;
   const bindHandle = useMemo(() => {
     const detach: Partial<Record<'start' | 'end', () => void>> = {};
@@ -317,22 +256,21 @@ export function SelectionHandles({ token: explicitToken }: SelectionHandlesProps
         arm: () => {
           const src = armSource.current;
           if (!src) return null;
-          const view = handleView(src.stage);
-          const geometry = selectionHandleGeom(view, src.endpoints[role], role);
-          if (!geometry) return null;
-          const opposite = src.endpoints[role === 'start' ? 'end' : 'start'];
-          const drag = createSelectionHandleDrag(host, view, opposite, src.endpoints[role].page);
+          const armed = armSelectionHandle(
+            host,
+            selectionHandleViewOf(src.stage),
+            src.endpoints,
+            role,
+          );
+          if (!armed) return null;
           setDragging(role);
           return {
             // the point the user grabbed: the bar's midpoint
-            base: {
-              x: (geometry.bar.from.x + geometry.bar.to.x) / 2,
-              y: (geometry.bar.from.y + geometry.bar.to.y) / 2,
-            },
+            base: armed.base,
             session: {
-              move: drag.move,
+              move: armed.drag.move,
               end: () => {
-                drag.end(); // settle → menu reappears, onCommitted fires
+                armed.drag.end(); // settle → menu reappears, onCommitted fires
                 setDragging(null);
               },
             },
@@ -347,7 +285,7 @@ export function SelectionHandles({ token: explicitToken }: SelectionHandlesProps
   // Hidden while a pointer drag-select is in flight (like the menu) — but a
   // handle drag is itself a selection gesture, so it keeps its handles.
   if (selecting && !dragging) return null;
-  const view = handleView(stage);
+  const view = selectionHandleViewOf(stage);
   // Each is its CSS variable first, then the setting; an unset color is the accent.
   const color = paint('text-selection-handle', handles.color ?? accent);
   const shadow = paint('text-selection-handle-shadow', handles.shadow);

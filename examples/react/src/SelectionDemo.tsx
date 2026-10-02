@@ -12,7 +12,6 @@ import * as React from 'react';
 import { useEffect, useState } from 'react';
 import {
   PageView,
-  PagePointerSource,
   RenderLayer,
   SelectionLayer,
   Viewer,
@@ -91,7 +90,6 @@ function Shell() {
             <PageView page={i} width={WIDTH}>
               <RenderLayer />
               <SelectionLayer />
-              <PagePointerSource />
             </PageView>
           </div>
         ))}

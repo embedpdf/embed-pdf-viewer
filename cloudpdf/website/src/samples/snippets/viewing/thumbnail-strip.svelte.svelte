@@ -14,7 +14,7 @@
 </script>
 
 <Stage token={ThumbsToken}>
-  {#snippet page(page)}
+  {#snippet children(page)}
     <button
       onclick={() => main.goToPage(page.ref)}
       aria-current={page.pageIndex === state.currentPageIndex}

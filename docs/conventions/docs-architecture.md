@@ -92,8 +92,15 @@ website/src/samples/
 - `pnpm --filter @embedpdf/website-samples typecheck` runs in CI: an API
   change fails the build until the docs move with it. This is the docs
   equivalent of the consume gate.
-- The MDX pipeline (extend cloudpdf/website's remark/rehype code-example plugins)
-  inlines the file at build time with shiki highlighting.
+- The MDX pipeline (each site's remark/rehype code-example plugins) reads the
+  files at compile time and highlights them with shiki. An `<Example>` or
+  `<Snippet>` keeps its code out of the compiled page: each framework's files go
+  to a JSON file in `.next/cache/docs-code/`, keyed by the sample's name and a
+  hash of the files, and the page only names the key and the frameworks that
+  have a version. The page's server component (`RouteExample`) reads the
+  route's framework's files at render (docs-kit `mdx/code-panels`). Inlined, four
+  frameworks made page modules megabytes each, and the docs route, which
+  compiles every page, ran the dev server out of memory.
 - A missing sample for a framework renders an honest "not yet ported for
   {framework}" callout — driven by file presence, not hand-maintained flags.
 
@@ -137,16 +144,53 @@ framework, and run in `docs:check`:
 
 Live examples (`docs/content/samples/`) are complete apps, so every one must compile.
 `docs/content/scripts/samples.mjs` checks them straight from `docs/content`, without syncing them
-into a site or starting one, and fails on an error:
+into a site or starting one, reports per framework (React with `tsc`, Angular with `ngc`, Vue
+with `vue-tsc`, Svelte with `svelte-check`; Angular and Vue with `strictTemplates`) and fails on
+an error:
 
 ```sh
 pnpm --filter @embedpdf/docs-content samples          # every example
 pnpm --filter @embedpdf/docs-content samples search   # one area's examples
 ```
 
-Both checks compile in a run directory of their own (`scripts/compile.mjs`), so several can run
-at the same time. The sites' `check:samples` still compiles what each site ships, the cloud form
-included.
+Both checks share `scripts/compile.mjs`: each framework's compiler and options, and a run
+directory of their own in the system's temporary directory, whose `node_modules` links to the
+embedpdf.com site's, so several can run at the same time. (Never under a `node_modules` path:
+`svelte-check` reports nothing for a file there.) Every run also compiles a canary per framework,
+with a missing export, a missing module and a template naming nothing: a compiler that doesn't
+report all three isn't checking, and the framework fails. An Angular file that declares a component,
+directive or pipe without exporting it fails too: ngc can't type-check a template that uses it the
+usual way, and then stops reporting template errors in every file. Vue snippets allow components they
+don't import (a snippet may use a global or a Nuxt auto-import); examples don't. Each site's
+`check:samples` runs the same example check on what it ships (`samples.mjs --root src/samples`):
+the synced copy, in every framework, the cloud form included on cloudpdf.com.
+
+### An example in each framework
+
+```
+samples/<area>/<name>.react.tsx       one file per framework…
+samples/<area>/<name>.vue.vue
+samples/<area>/<name>.svelte.svelte
+samples/<area>/<name>.angular.ts      (root component `export class App`, selector `demo-root`)
+samples/<area>/<name>.vue/App.vue     …or a directory, entry first (`App.svelte`,
+samples/<area>/<name>.vue/Toolbar.vue   `App.tsx`; Angular's is `app.ts`)
+samples/<area>/<name>.css             the one stylesheet every framework's version uses
+```
+
+React, Vue and Svelte import the stylesheet (`import './<name>.css'`, `'../<name>.css'` from a
+directory). Angular names it in `styleUrl: './<name>.css'` with
+`encapsulation: ViewEncapsulation.None`, and writes its template inline. The code view shows each
+framework's files with the stylesheet after the entry. In the demo builds both forms become the
+same stylesheet, scoped to the example's class (`src/lib/sample-stylesheets.ts` in each site);
+the Angular pass compiles in the browser (JIT), so it first applies Angular's JIT transform,
+without which `input()`, `output()`, `model()` and `viewChild()` do nothing
+(`src/lib/angular-demo-samples.ts`).
+
+The checks and the demos read the adapters' source through their workspace `exports`: Vue's
+point at `./src/<entry>.ts` as plain strings, like React's; Svelte's name the same file under
+`types`, `svelte` and `default`. Never only under `development`, which the demo builds don't use.
+The checks map `@embedpdf/angular/*` to its source (`compile.mjs`); the Angular demos use its
+build.
 
 A page that isn't live shows its title and a notice that it describes 3.0 for
 that framework, linking to the React version when that one is live; it stays out

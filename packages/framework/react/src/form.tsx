@@ -24,14 +24,16 @@
  * `--epdf-form-*` CSS variables override.
  *
  * Every control keeps its pointerdown from the interaction hub with a native
- * listener: the Stage listens natively on an ancestor, so React's synthetic
- * events would run too late.
+ * listener (`isolatePointerDown`): the Stage listens natively on an ancestor,
+ * so React's synthetic events would run too late. The colors, the field
+ * looks, the boxes' and controls' styles, and the toggle, text-field and
+ * list-box policies are `@embedpdf/web`'s, the same for every framework.
  */
 
 // One-line-per-feature: registration travels with the UI.
 export * from '@embedpdf/plugin-form';
 import * as React from 'react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import type { EventHook } from '@embedpdf/core';
 import type { PdfAnnotationEventKind } from '@embedpdf/plugin-actions/contract';
 import type { AnnotationRef } from '@embedpdf/plugin-annotation/contract';
@@ -42,12 +44,22 @@ import {
   type FormFieldRef,
   type FormFieldValue,
   type FormWidgetItem,
-  type FormWidgetLook,
 } from '@embedpdf/plugin-form';
 import { FormToken as FormHostToken } from '@embedpdf/plugin-form/contract/host';
 import { InteractionToken } from '@embedpdf/plugin-interaction/contract/host';
 import { SignatureToken } from '@embedpdf/plugin-signature/contract';
-import { mixAccent, paint } from '@embedpdf/web';
+import {
+  createTextFieldEditor,
+  FORM_CONTROL_FILL,
+  formColorsOf,
+  isolatePointerDown,
+  listBoxControlStyleOf,
+  pressToggle,
+  rectInPixels,
+  textFieldEditorStyleOf,
+  widgetBoxStyleOf,
+  type FormColors,
+} from '@embedpdf/web';
 
 import { NativeListBox } from './form-listbox';
 import { FormFocusRing } from './form-focus-ring';
@@ -68,84 +80,29 @@ import { settingsHook, stateHook } from './state';
 
 // ── what every control shares ──────────────────────────────────────────────
 
-/** The colors the viewer draws with, each its CSS variable first, then the setting. */
-interface FormColors {
-  focus: string;
-  border: string;
-  background: string;
-  text: string;
-}
-
+/** The colors the viewer draws fields with: the form settings over the viewer's accent. */
 function useFormColors(): FormColors {
   const accent = useViewerSettings((settings) => settings.accent);
   const focus = useFormSettings((settings) => settings.focus);
   const fields = useFormSettings((settings) => settings.fields);
-  return useMemo(
-    () => ({
-      focus: paint('form-focus', focus.color ?? accent),
-      border: paint('form-field-border', fields.border ?? mixAccent('form-field-border', accent)),
-      background: paint('form-field-background', fields.background),
-      text: paint('form-field-color', fields.color),
-    }),
-    [accent, focus, fields],
-  );
-}
-
-/** A widget's page-space box as view pixels, in the page wrapper's own coordinates. */
-function viewBox(item: FormWidgetItem, page: PageContextValue) {
-  const { box } = item;
-  const topLeft = page.transform.toPixels({ x: box.x, y: box.y });
-  const bottomRight = page.transform.toPixels({ x: box.x + box.width, y: box.y + box.height });
-  return {
-    left: topLeft.x,
-    top: topLeft.y,
-    width: bottomRight.x - topLeft.x,
-    height: bottomRight.y - topLeft.y,
-  };
-}
-
-/** One of the 14 standard PDF fonts as CSS: a family that looks like it, its weight and style. */
-function cssFont(look: FormWidgetLook): Pick<
-  React.CSSProperties,
-  'fontFamily' | 'fontWeight' | 'fontStyle'
-> {
-  const name = look.fontFamily ?? 'helvetica';
-  const fontFamily = name.startsWith('courier')
-    ? '"Courier New", Courier, monospace'
-    : name.startsWith('times')
-      ? '"Times New Roman", Times, serif'
-      : 'Helvetica, Arial, sans-serif';
-  return {
-    fontFamily,
-    fontWeight: name.includes('bold') ? 700 : 400,
-    fontStyle: name.includes('italic') || name.includes('oblique') ? 'italic' : 'normal',
-  };
-}
-
-/**
- * The field's text size in view pixels. A size of 0 means "fit the box" in
- * PDF: the box height for one line, Acrobat's 12 pt for several.
- */
-function fontSizeOf(item: FormWidgetItem, scale: number, height: number, multiline: boolean) {
-  const size = item.look.fontSize;
-  if (size) return size * scale;
-  return multiline ? 12 * scale : Math.max(6, height * 0.72);
+  return useMemo(() => formColorsOf({ focus, fields }, accent), [accent, focus, fields]);
 }
 
 /**
  * Keep the interaction hub out of gestures that begin inside a control. A
  * native listener, not React's, so it runs during real DOM bubbling, before
- * the Stage's own native listener on an ancestor.
+ * the Stage's own native listener on an ancestor. The press stops there, so
+ * React's own `onPointerDown` never sees it: whoever needs the press passes
+ * `onPress`, which the native listener calls.
  */
-function useIsolated<T extends HTMLElement>() {
+function useIsolated<T extends HTMLElement>(onPress?: () => void) {
   const ref = useRef<T>(null);
-  useEffect(() => {
-    const element = ref.current;
-    if (!element) return;
-    const stop = (event: Event) => event.stopPropagation();
-    element.addEventListener('pointerdown', stop);
-    return () => element.removeEventListener('pointerdown', stop);
-  }, []);
+  const press = useRef(onPress);
+  press.current = onPress;
+  useEffect(
+    () => (ref.current ? isolatePointerDown(ref.current, () => press.current?.()) : undefined),
+    [],
+  );
   return ref;
 }
 
@@ -161,8 +118,8 @@ function useWidgetEvents(
   annotationRef: AnnotationRef | null,
 ): Pick<
   React.DOMAttributes<HTMLElement>,
-  'onPointerEnter' | 'onPointerLeave' | 'onPointerDown' | 'onPointerUp' | 'onFocus' | 'onBlur'
-> {
+  'onPointerEnter' | 'onPointerLeave' | 'onPointerUp' | 'onFocus' | 'onBlur'
+> & { onPress: () => void } {
   const form = useCapability(FormHostToken);
   const refBox = useRef(annotationRef);
   refBox.current = annotationRef;
@@ -174,7 +131,8 @@ function useWidgetEvents(
     return {
       onPointerEnter: () => notify('cursorEnter'),
       onPointerLeave: () => notify('cursorExit'),
-      onPointerDown: () => notify('mouseDown'),
+      // The press, from the box's native listener (`useIsolated`).
+      onPress: () => notify('mouseDown'),
       onPointerUp: () => notify('mouseUp'),
       // React focus and blur bubble, so the inner control's focus reaches the
       // box; blur fires after the control's own commit, so a blur script
@@ -228,9 +186,9 @@ function WidgetBox({
   onClick?: () => void;
   children?: React.ReactNode;
 } & Omit<React.HTMLAttributes<HTMLDivElement>, 'onClick' | 'children'>) {
-  const wrap = useIsolated<HTMLDivElement>();
-  const events = useWidgetEvents(item.fieldRef, item.annotationRef);
-  const frame = viewBox(item, page);
+  const { onPress, ...events } = useWidgetEvents(item.fieldRef, item.annotationRef);
+  const wrap = useIsolated<HTMLDivElement>(onPress);
+  const frame = rectInPixels(item.box, page.transform);
   return (
     <div
       ref={wrap}
@@ -245,32 +203,12 @@ function WidgetBox({
         rest.onBlur?.(event);
       }}
       onClick={onClick}
-      style={{
-        position: 'absolute',
-        left: frame.left,
-        top: frame.top,
-        width: frame.width,
-        height: frame.height,
-        // Always the event surface; the control inside gates the edits.
-        pointerEvents: 'auto',
-        boxShadow: edge && item.look.border === null ? `inset 0 0 0 1px ${colors.border}` : undefined,
-        ...rest.style,
-      }}
+      style={{ ...widgetBoxStyleOf(item, frame, colors, { edge }), ...rest.style }}
     >
       {children}
     </div>
   );
 }
-
-/** Fills the box it sits in. */
-const fill: React.CSSProperties = {
-  position: 'absolute',
-  inset: 0,
-  width: '100%',
-  height: '100%',
-  boxSizing: 'border-box',
-  margin: 0,
-};
 
 // ── the controls ───────────────────────────────────────────────────────────
 
@@ -279,66 +217,36 @@ function TextControl({ item, page, colors }: ControlProps<'text'>) {
   const form = useCapability(FormHostToken);
   const activate = useWidgetActivation(item.annotationRef);
   // The editor is always mounted, see-through at rest and shown while
-  // focused: the DOM is the focus manager, so Tab reaches every field.
-  const [focused, setFocused] = useState(false);
-  const [draft, setDraft] = useState(item.value);
-  const cancelled = useRef(false);
+  // focused: the DOM is the focus manager, so Tab reaches every field. Typing
+  // drafts, blur or Enter commits, Escape puts the value back. One editing
+  // policy per field (by its key) and form.
+  const editor = useMemo(
+    () => createTextFieldEditor(form, item.fieldRef, item.value),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [form, item.key],
+  );
+  const { focused, draft } = useSyncExternalStore(
+    editor.subscribe,
+    editor.getState,
+    editor.getState,
+  );
   // Take the field's value whenever it changes under us, but never mid-edit.
-  useEffect(() => {
-    if (!focused) setDraft(item.value);
-  }, [item.value, focused]);
+  useEffect(() => editor.setValue(item.value), [editor, item.value]);
 
-  const frame = viewBox(item, page);
-  const scale = item.box.width > 0 ? frame.width / item.box.width : 1;
-  const editorStyle: React.CSSProperties = {
-    ...fill,
-    border: 'none',
-    outline: focused ? `2px solid ${colors.focus}` : 'none',
-    outlineOffset: -2,
-    padding: '0 2px',
-    background: item.look.background ?? colors.background,
-    color: item.look.color ?? colors.text,
-    ...cssFont(item.look),
-    fontSize: fontSizeOf(item, scale, frame.height, item.multiline),
-    textAlign: item.look.textAlign,
-    letterSpacing: item.comb && item.maxLength ? frame.width / item.maxLength / 2 : undefined,
-    resize: 'none',
-    cursor: 'text',
-    opacity: focused ? 1 : 0,
-    // A disabled control swallows clicks: the box below runs the widget's
-    // action, the read-only "button" pattern, so let them through.
-    ...(item.disabled ? { pointerEvents: 'none' as const } : {}),
-  };
+  const frame = rectInPixels(item.box, page.transform);
   const editorProps = {
     value: draft,
     maxLength: item.maxLength ?? undefined,
     'aria-label': item.label,
     disabled: item.disabled,
-    onFocus: () => setFocused(true),
-    onChange: (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-      setDraft(event.target.value);
-      form.draftText(item.fieldRef, event.target.value);
-    },
-    onBlur: () => {
-      setFocused(false);
-      if (cancelled.current) {
-        cancelled.current = false;
-        form.discardDraftText(item.fieldRef);
-        setDraft(item.value);
-        return;
-      }
-      if (draft === item.value) form.discardDraftText(item.fieldRef);
-      else void form.commitDraftText(item.fieldRef).catch(() => setDraft(item.value));
-    },
+    onFocus: editor.focus,
+    onChange: (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
+      editor.input(event.target.value),
+    onBlur: editor.blur,
     onKeyDown: (event: React.KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-      if (event.key === 'Escape') {
-        cancelled.current = true;
-        event.currentTarget.blur();
-      }
-      // Blur commits; a text box with several lines takes Enter as a new line.
-      if (event.key === 'Enter' && !item.multiline) event.currentTarget.blur();
+      if (editor.keyDown(event.key, item.multiline)) event.currentTarget.blur();
     },
-    style: editorStyle,
+    style: textFieldEditorStyleOf(item, frame, colors, focused),
   };
   return (
     // A click runs the widget's action too, as in Acrobat: the editor's
@@ -358,17 +266,8 @@ function ToggleControl({ item, page, colors }: ControlProps<'toggle'>) {
   const form = useCapability(FormHostToken);
   const activate = useWidgetActivation(item.annotationRef);
   const [focused, setFocused] = useState(false);
-  const press = () => {
-    // A checkbox clicked again clears; a radio button always selects its own
-    // value. The value first, then the widget's action (Acrobat's order), so
-    // an action script reads the new state. A read-only toggle still runs it.
-    const written = item.disabled
-      ? undefined
-      : form.setValue(item.fieldRef, {
-          value: item.kind === 'checkbox' && item.checked ? null : item.exportValue,
-        });
-    void Promise.resolve(written).then(activate, activate);
-  };
+  // The value first, then the widget's action (Acrobat's order).
+  const press = () => pressToggle(form, item, activate);
   return (
     <WidgetBox
       item={item}
@@ -412,7 +311,7 @@ function ComboControl({ item, page, colors }: ControlProps<'choice'>) {
           void form.setValue(item.fieldRef, { value: event.currentTarget.value || null })
         }
         style={{
-          ...fill,
+          ...FORM_CONTROL_FILL,
           opacity: 0,
           cursor: item.disabled ? 'default' : 'pointer',
           ...(item.disabled ? { pointerEvents: 'none' as const } : {}),
@@ -435,8 +334,7 @@ function ListControl({ item, page, colors }: ControlProps<'choice'>) {
   const form = useCapability(FormHostToken);
   const activate = useWidgetActivation(item.annotationRef);
   const [focused, setFocused] = useState(false);
-  const frame = viewBox(item, page);
-  const scale = item.box.width > 0 ? frame.width / item.box.width : 1;
+  const frame = rectInPixels(item.box, page.transform);
   return (
     <WidgetBox item={item} page={page} colors={colors} edge={false} onClick={activate}>
       <NativeListBox
@@ -450,22 +348,7 @@ function ListControl({ item, page, colors }: ControlProps<'choice'>) {
         onSelect={async (values) => {
           await form.setValue(item.fieldRef, { selectedValues: values });
         }}
-        style={{
-          ...fill,
-          padding: 0,
-          borderWidth: Math.max(1, item.look.borderWidth * scale),
-          borderStyle: item.look.borderStyle === 'dashed' ? 'dashed' : 'solid',
-          borderColor: item.look.border ?? colors.border,
-          borderRadius: 0,
-          outline: 'none',
-          background: item.look.background ?? colors.background,
-          color: item.look.color ?? colors.text,
-          ...cssFont(item.look),
-          fontSize: (item.look.fontSize || 12) * scale,
-          textAlign: item.look.textAlign,
-          cursor: item.disabled ? 'default' : 'pointer',
-          ...(item.disabled ? { pointerEvents: 'none' as const } : {}),
-        }}
+        style={listBoxControlStyleOf(item, frame, colors)}
       />
       <FormFocusRing visible={focused} color={colors.focus} />
     </WidgetBox>
@@ -489,7 +372,7 @@ function ButtonControl({ item, page, colors }: ControlProps<'button'>) {
         disabled={item.disabled}
         onClick={activate}
         style={{
-          ...fill,
+          ...FORM_CONTROL_FILL,
           padding: 0,
           border: 0,
           background: 'transparent',
@@ -531,7 +414,13 @@ function SignatureControl({ item, page, colors }: ControlProps<'signature'>) {
           aria-label={item.label}
           data-signed={signed ? '' : undefined}
           onClick={() => (signed ? signature.requestInspection(ref) : signature.setTarget(ref))}
-          style={{ ...fill, padding: 0, border: 0, background: 'transparent', cursor: 'inherit' }}
+          style={{
+            ...FORM_CONTROL_FILL,
+            padding: 0,
+            border: 0,
+            background: 'transparent',
+            cursor: 'inherit',
+          }}
         />
       ) : null}
     </WidgetBox>
@@ -557,7 +446,11 @@ export function FormLayer() {
     if (active) void form.ensureLoaded(page.ref);
   }, [active, form, page.ref]);
 
-  const items = useSelector(FormHostToken, (capability) => capability.listWidgets(page.ref), shallowArray);
+  const items = useSelector(
+    FormHostToken,
+    (capability) => capability.listWidgets(page.ref),
+    shallowArray,
+  );
   if (!active) return null;
 
   return (

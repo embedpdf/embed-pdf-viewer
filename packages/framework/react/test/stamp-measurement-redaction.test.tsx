@@ -140,6 +140,6 @@ describe('without a document', () => {
     expect(stamp.getArmedAsset()).toBeNull();
     expect(stamp.canPlace()).toBe(false);
     await expect(stamp.armAsset('any')).rejects.toMatchObject({ code: 'not-ready' });
-    expect(() => redaction.markPage(0)).toThrow(expect.objectContaining({ code: 'not-ready' }));
+    await expect(redaction.markPage(0)).rejects.toMatchObject({ code: 'not-ready' });
   });
 });

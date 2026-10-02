@@ -15,6 +15,7 @@ export * from '@embedpdf/plugin-stamp';
 // (structurally the plugin's `StampLibraryStore`), written once in `@embedpdf/web`.
 export { indexedDbByteStore } from '@embedpdf/web';
 export type { ByteStore } from '@embedpdf/web';
+import { objectUrlOf } from '@embedpdf/web';
 import { useEffect, useState } from 'react';
 import {
   StampToken,
@@ -95,13 +96,10 @@ export function useStampAssetPreviewUrl(assetId: string | null): string | null {
       setUrl(null);
       return;
     }
-    // Copy into an exact ArrayBuffer (the engine idiom) before Blob-wrapping.
-    const body = new ArrayBuffer(preview.bytes.byteLength);
-    new Uint8Array(body).set(preview.bytes);
-    const objectUrl = URL.createObjectURL(new Blob([body], { type: preview.mimeType }));
-    setUrl(objectUrl);
+    const objectUrl = objectUrlOf(preview);
+    setUrl(objectUrl.url);
     return () => {
-      URL.revokeObjectURL(objectUrl);
+      objectUrl.revoke();
       setUrl(null);
     };
   }, [stamp, assetId]);

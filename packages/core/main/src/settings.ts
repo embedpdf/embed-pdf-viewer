@@ -102,9 +102,7 @@ export function createSettingsStore<T extends object>(
   wake: () => void,
   report: (error: unknown) => void,
 ): SettingsStore<T> {
-  const mergeSettings = (settings: T, changes: DeepPartial<T> | undefined): T =>
-    mergeTopLevel(settings, changes, whole);
-  const initial = mergeSettings(defaults, registered);
+  const initial = mergeSettings(defaults, registered, whole);
   let current = initial;
   const changedHook = createEventHook<SettingsChangedEvent<T>>(report);
 
@@ -119,7 +117,7 @@ export function createSettingsStore<T extends object>(
 
   const api: SettingsApi<T> = {
     getSettings: () => current,
-    updateSettings: (changes) => commit(mergeSettings(current, changes)),
+    updateSettings: (changes) => commit(mergeSettings(current, changes, whole)),
     resetSettings: () => commit(initial),
     onSettingsChanged: changedHook.on,
   };
@@ -140,13 +138,15 @@ export function createSettingsStore<T extends object>(
 }
 
 /**
- * `changes` merged into `settings`, the `whole` ones replaced instead. What a change leaves as it
- * was keeps its object, so a reader that compares by reference sees only what really changed.
+ * `changes` merged into `settings`, the `whole` ones replaced instead: the merge every settings
+ * store applies, for code that keeps changes before a store exists (an adapter whose engine is
+ * still loading). What a change leaves as it was keeps its object, so a reader that compares by
+ * reference sees only what really changed.
  */
-function mergeTopLevel<T>(
+export function mergeSettings<T>(
   settings: T,
   changes: DeepPartial<T> | undefined,
-  whole: readonly string[],
+  whole: readonly string[] = [],
 ): T {
   if (whole.length === 0 || !isPlainObject(changes)) return mergeValue(settings, changes) as T;
   const merged = mergeValue(settings, omit(changes, whole)) as Record<string, unknown>;

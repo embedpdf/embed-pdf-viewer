@@ -3,8 +3,9 @@ import * as React from 'react';
 import { afterEach, describe, expect, it } from 'vitest';
 import { act, cleanup } from '@testing-library/react';
 import type { Engine } from '@embedpdf/core';
+import { interactionPlugin } from '../src/interaction';
 import { PageView } from '../src/page-view';
-import { toPageRef, usePage } from '../src/runtime';
+import { DocumentScope, toPageRef, usePage } from '../src/runtime';
 import { bytesInput, counterPlugin, viewerWith } from './counter-plugin';
 
 /** `<PageView>` takes its page as a ref or an index, puts `className` on its outer box, and
@@ -38,6 +39,51 @@ describe('PageView', () => {
     expect(byIndex.at(-1)).toEqual({ ref: 1, index: 0 });
     expect(byRef.at(-1)).toEqual({ ref: 1, index: 0 });
     expect(document.querySelector('.by-index')).not.toBeNull();
+  });
+
+  it('shows the document a <DocumentScope> names, not the active one', async () => {
+    const seen: string[] = [];
+    function DocumentProbe() {
+      seen.push(usePage().documentId);
+      return null;
+    }
+    const { kernel } = await viewerWith(
+      [counterPlugin],
+      <DocumentScope id="a">
+        <PageView page={0}>
+          <DocumentProbe />
+        </PageView>
+      </DocumentScope>,
+    );
+    await act(() => kernel.documents.open(bytesInput('a')));
+    await act(() => kernel.documents.open(bytesInput('b'))); // the active document now
+    expect(kernel.documents.getActiveId?.() ?? 'b').toBe('b');
+    expect(seen.at(-1)).toBe('a');
+  });
+
+  it('is the page’s pointer surface when the interaction plugin is registered, below the layers', async () => {
+    const withTools = await viewerWith(
+      [counterPlugin, interactionPlugin()],
+      <PageView page={0} className="with-tools">
+        <span className="layer" />
+      </PageView>,
+    );
+    await act(() => withTools.kernel.documents.open(bytesInput('a')));
+    const box = document.querySelector('.with-tools .layer')!.parentElement!;
+    // The surface comes first, so the layers drawn after it sit on top of it.
+    expect((box.firstElementChild as HTMLElement).style.touchAction).toBe('none');
+    expect(box.lastElementChild!.className).toBe('layer');
+    cleanup();
+
+    const withoutTools = await viewerWith(
+      [counterPlugin],
+      <PageView page={0} className="without-tools">
+        <span className="layer" />
+      </PageView>,
+    );
+    await act(() => withoutTools.kernel.documents.open(bytesInput('a')));
+    const plain = document.querySelector('.without-tools .layer')!.parentElement!;
+    expect(plain.children).toHaveLength(1);
   });
 
   it('a page turned a quarter is `width` pixels tall and shows its height across', async () => {

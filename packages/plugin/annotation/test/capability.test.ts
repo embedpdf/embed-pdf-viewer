@@ -164,6 +164,12 @@ describe('the selection', () => {
     expect(selection.list()).toHaveLength(2);
     selection.selectAll(7); // no such page: nothing to select
     expect(selection.list()).toEqual([]);
+    selection.set([ref(20)]);
+    selection.set([]); // selects nothing
+    expect(selection.list()).toEqual([]);
+    selection.set([ref(21)]);
+    selection.add([]); // adds nothing
+    expect(keys(selection.list())).toEqual([annotationKey(ref(21))]);
   });
 
   it('selectInRect refuses a page that isn’t in the document', async () => {

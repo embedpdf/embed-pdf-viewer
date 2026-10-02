@@ -11,9 +11,7 @@
 
 <Viewer {engine} {plugins}>
   <Stage>
-    {#snippet page()}
-      <RenderLayer />
-      <LinkLayer />
-    {/snippet}
+    <RenderLayer />
+    <LinkLayer />
   </Stage>
 </Viewer>

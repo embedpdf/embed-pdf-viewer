@@ -17,9 +17,7 @@
       <Spinner />
     {/snippet}
     <Stage>
-      {#snippet page()}
-        <RenderLayer />
-      {/snippet}
+      <RenderLayer />
     </Stage>
   </DocumentGate>
 </Viewer>

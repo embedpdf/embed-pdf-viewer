@@ -164,7 +164,7 @@ signal: `annotation.watch(filter)`, `document.pages()` or `shell.surface(id)`.
 
 What you draw goes in one of two places.
 
-**Layers** draw inside each page. <Fw only="react">The Stage calls its children once per visible page</Fw><Fw only="vue">The Stage renders its `#page` slot once per visible page</Fw><Fw only="svelte">The Stage renders its `page` snippet once per visible page</Fw><Fw only="angular">The Stage stamps out its `<ng-template epdfPage>` once per visible page</Fw>, and each layer
+**Layers** draw inside each page. <Fw only="react">The Stage calls its children once per visible page</Fw><Fw only="vue">The Stage renders its `#page` slot once per visible page</Fw><Fw only="svelte">The Stage renders what you put between its tags once per visible page</Fw><Fw only="angular">The Stage stamps out its `<ng-template epdfPage>` once per visible page</Fw>, and each layer
 draws for that page. Later layers sit on top:
 
 <Snippet name="concepts/layers" />

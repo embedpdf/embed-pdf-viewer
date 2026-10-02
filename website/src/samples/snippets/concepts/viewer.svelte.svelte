@@ -13,9 +13,7 @@
       <p>Opening…</p>
     {/snippet}
     <Stage>
-      {#snippet page()}
-        <RenderLayer />
-      {/snippet}
+      <RenderLayer />
     </Stage>
   </DocumentGate>
 </Viewer>

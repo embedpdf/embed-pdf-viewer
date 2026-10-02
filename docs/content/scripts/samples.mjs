@@ -5,55 +5,60 @@
  *
  *   node scripts/samples.mjs                every example; exit 1 on an error
  *   node scripts/samples.mjs search stage   only the examples of these areas
+ *   node scripts/samples.mjs --root <dir>   a site's synced copy instead (`src/samples`)
  *
  * Unlike a snippet, an example is a complete app that runs on its page, so every one must compile:
  * nothing stands in for a missing helper, and an error fails the check. React examples compile
- * with `tsc`, Angular ones with `ngc` (`strictTemplates`). Each run gets its own directory
+ * with `tsc`, Angular ones with `ngc` (`strictTemplates`), Vue ones with `vue-tsc`
+ * (`strictTemplates`) and Svelte ones with `svelte-check`. Each run gets its own directory
  * (`compile.mjs`), so several checks of different areas can run at the same time.
  *
- * It checks examples as they are written, for the local engine. The sites still check what they
- * ship: `check:samples` compiles each site's synced copy, the cloud form included. The ready-made
- * viewer's samples (`samples/viewer/`) belong to the viewer docs, and Vue and Svelte examples wait
- * for `vue-tsc` and `svelte-check` in the site.
+ * By default it checks examples as they are written, for the local engine. A site checks what it
+ * ships with `--root src/samples` (its `check:samples`): the synced copy, the cloud form included,
+ * in every framework. The ready-made viewer's samples (`samples/viewer/`) belong to the viewer
+ * docs, and a synced copy's `snippets/` to the snippet check.
  */
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import {
-  COMPILER_OPTIONS,
-  compileWithNgc,
-  compileWithTsc,
+  compile,
   contentRoot,
-  resolvePaths,
+  FRAMEWORK_LABELS,
+  FRAMEWORKS,
+  removeRunDirectory,
   runDirectory,
   toPosix,
   walk,
+  writeTsconfig,
 } from './compile.mjs';
 
-const samplesRoot = path.join(contentRoot, 'samples');
+/** Where the examples are: here, or a site's synced copy (`--root`). */
+let samplesRoot = path.join(contentRoot, 'samples');
 
-/** The viewer docs' samples, which this check leaves to the viewer. */
-const NOT_EXAMPLES = new Set(['viewer']);
+/** The viewer docs' samples, and a synced copy's snippets: not examples. */
+const NOT_EXAMPLES = new Set(['viewer', 'snippets']);
 
-/** How each framework's examples are named, and compiled. */
-const FRAMEWORKS = {
-  react: {
-    label: 'React',
-    isExample: (file) => /\.react\.tsx$|\.react\/.+\.tsx?$/.test(file),
-    include: ['**/*.react.tsx', '**/*.react/**/*', 'samples-env.d.ts'],
-    compilerOptions: { jsx: 'react-jsx' },
-    compile: compileWithTsc,
-  },
-  angular: {
-    label: 'Angular',
-    isExample: (file) => /\.angular\.ts$|\.angular\/.+\.ts$/.test(file),
-    include: ['**/*.angular.ts', '**/*.angular/**/*.ts', 'samples-env.d.ts'],
-    compilerOptions: { experimentalDecorators: true, useDefineForClassFields: false },
-    angularCompilerOptions: { strictTemplates: true },
-    compile: compileWithNgc,
-  },
-};
+/**
+ * How each framework's examples are named: one file, `<name>.<framework>.<ext>`, or a directory
+ * of them, `<name>.<framework>/` with `App.<ext>` first. The tsconfig compiles exactly those.
+ */
+const EXTENSIONS = { react: 'tsx', vue: 'vue', svelte: 'svelte', angular: 'ts' };
+
+const include = (framework) => [
+  `**/*.${framework}.${EXTENSIONS[framework]}`,
+  `**/*.${framework}/**/*`,
+  'samples-env.d.ts',
+];
+
+/** The example a file belongs to (`search/basic.vue`), or null if it isn't a `framework` one. */
+function exampleOf(file, framework) {
+  const match = toPosix(path.relative(samplesRoot, file)).match(
+    new RegExp(`^(.+\\.${framework})(?:\\.${EXTENSIONS[framework]}$|/.+\\.[a-z]+$)`),
+  );
+  return match ? match[1] : null;
+}
 
 /** The areas to check: the ones named on the command line, or every one. */
 function areasToCheck(argv) {
@@ -78,13 +83,7 @@ function stage(framework, root) {
     recursive: true,
     filter: (source) => !NOT_EXAMPLES.has(path.relative(samplesRoot, source).split(path.sep)[0]),
   });
-  const { include, compilerOptions, angularCompilerOptions } = FRAMEWORKS[framework];
-  const tsconfig = {
-    compilerOptions: { ...COMPILER_OPTIONS, ...compilerOptions, paths: resolvePaths() },
-    include,
-    ...(angularCompilerOptions ? { angularCompilerOptions } : {}),
-  };
-  fs.writeFileSync(path.join(root, 'tsconfig.json'), `${JSON.stringify(tsconfig, null, 2)}\n`);
+  writeTsconfig(framework, root, include(framework));
 }
 
 /** Where a staged file came from, as the docs name it: `samples/search/search-box.react.tsx`. */
@@ -92,48 +91,46 @@ const sourceName = (root, file) => toPosix(path.join('samples', path.relative(ro
 
 export async function checkSamples(argv = []) {
   const started = performance.now();
+  const rootFlag = argv.indexOf('--root');
+  if (rootFlag !== -1) {
+    samplesRoot = path.resolve(argv[rootFlag + 1]);
+    argv = argv.filter((_, index) => index !== rootFlag && index !== rootFlag + 1);
+  }
   const areas = areasToCheck(argv);
   const inArea = (root, file) => areas.includes(path.relative(root, file).split(path.sep)[0]);
   const runRoot = runDirectory('embedpdf-samples');
   let failed = false;
   try {
-    for (const [framework, { label, isExample, compile }] of Object.entries(FRAMEWORKS)) {
-      const examples = areas.flatMap((area) =>
-        walk(path.join(samplesRoot, area)).filter((file) => isExample(toPosix(file))),
+    for (const framework of FRAMEWORKS) {
+      const label = FRAMEWORK_LABELS[framework];
+      const examples = new Set(
+        areas
+          .flatMap((area) => walk(path.join(samplesRoot, area)))
+          .map((file) => exampleOf(file, framework))
+          .filter(Boolean),
       );
-      if (examples.length === 0) continue;
+      if (examples.size === 0) continue;
       const root = path.join(runRoot, framework);
       stage(framework, root);
-      const result = await compile(root, (file) => inArea(root, file));
+      const result = await compile(framework, root, (file) => inArea(root, file));
       if (!result.tool) {
         failed = true;
         console.error(`  ${label.padEnd(8)} not checked: ${result.reason}`);
         continue;
       }
-      const errors = result.diagnostics.filter(
-        ({ file }) => !file || inArea(root, path.resolve(root, file)),
-      );
+      // A compiler that can't narrow to the areas reports on every example: keep theirs.
+      const errors = result.diagnostics.filter(({ file }) => !file || inArea(root, file));
       console.log(
-        `  ${label.padEnd(8)} ${examples.length} examples, ${errors.length ? `${errors.length} errors` : 'all compile'} (${result.tool})`,
+        `  ${label.padEnd(8)} ${examples.size} examples, ${errors.length ? `${errors.length} errors` : 'all compile'} (${result.tool})`,
       );
       for (const { file, line, column, message } of errors) {
-        const where = file
-          ? `${sourceName(root, path.resolve(root, file))}:${line}:${column}`
-          : '(compiler options)';
+        const where = file ? `${sourceName(root, file)}:${line}:${column}` : '(compiler options)';
         console.error(`    ${where}  ${message}`);
       }
       failed ||= errors.length > 0;
     }
   } finally {
-    fs.rmSync(runRoot, { recursive: true, force: true });
-  }
-  const unchecked = areas.flatMap((area) =>
-    walk(path.join(samplesRoot, area)).filter((file) => /\.(vue|svelte)$/.test(file)),
-  );
-  if (unchecked.length) {
-    console.log(
-      `  ${unchecked.length} Vue and Svelte examples aren't checked yet (no vue-tsc or svelte-check in website/)`,
-    );
+    removeRunDirectory(runRoot);
   }
   console.log(
     `Examples in ${areas.join(', ')}: ${((performance.now() - started) / 1000).toFixed(1)}s`,

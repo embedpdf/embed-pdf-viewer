@@ -22,6 +22,7 @@ import {
 import type { FullPageOptions, PageViewDemand, TilesOptions } from './paint-plan';
 
 export type { FullPageOptions, PageViewDemand, TilesOptions } from './paint-plan';
+export { samePageViewDemand } from './paint-plan';
 
 // ── settings ────────────────────────────────────────────────────────────────
 

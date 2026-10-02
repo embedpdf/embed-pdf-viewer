@@ -19,6 +19,25 @@ export interface PageViewDemand {
 }
 
 /**
+ * Whether two demands ask for the same thing. A host builds a new demand object on every camera
+ * frame; a layer that compares with this sets it again (and plans again) only when it changed.
+ */
+export function samePageViewDemand(left: PageViewDemand, right: PageViewDemand): boolean {
+  return (
+    left.desiredDeviceWidth === right.desiredDeviceWidth &&
+    left.velocity?.dx === right.velocity?.dx &&
+    left.velocity?.dy === right.velocity?.dy &&
+    (left.visibleRect === right.visibleRect ||
+      (left.visibleRect !== undefined &&
+        right.visibleRect !== undefined &&
+        left.visibleRect.x === right.visibleRect.x &&
+        left.visibleRect.y === right.visibleRect.y &&
+        left.visibleRect.width === right.visibleRect.width &&
+        left.visibleRect.height === right.visibleRect.height))
+  );
+}
+
+/**
  * One tile the layer should have in the DOM. `key` is the reconciliation
  * identity (stable across plan recomputes — keyed lists preserve the DOM
  * node, which is the retention mechanism); `rect` is y-down page points

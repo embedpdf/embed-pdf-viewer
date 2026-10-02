@@ -6,6 +6,7 @@ import { Fragment, type HTMLAttributes } from 'react';
 import { useMDXComponents as getMDXComponents } from '../../../../mdx-components';
 
 import { PageTitle } from '@/components/docs/mdx';
+import { RouteExample, type CompiledExampleProps } from '@/components/docs/route-example';
 import { isHeadlessIntegration, type HeadlessIntegration } from '@/lib/docs-integrations';
 import { buildDocsPageMetadata, getDocsPagePresentation } from '@/lib/docs-page';
 import { docsRelease, reactVersionHref } from '@/lib/docs-release';
@@ -61,11 +62,18 @@ export default async function Page(props: PageProps) {
     );
   }
 
-  // The preview site shows a page production holds back with a banner under its title.
-  const components =
-    release.preview && isHeadlessIntegration(resolved.integration)
+  // The preview site shows a page production holds back with a banner under its title. Examples
+  // and snippets read and send only this route's framework's code (RouteExample).
+  const framework = resolved.integration ?? null;
+  const components = {
+    ...(release.preview && isHeadlessIntegration(resolved.integration)
       ? { h1: withPreviewBanner(resolved.integration) }
-      : undefined;
+      : {}),
+    Example: (props: CompiledExampleProps) => <RouteExample {...props} framework={framework} />,
+    Snippet: (props: CompiledExampleProps) => (
+      <RouteExample {...props} mode="code" kind="snippet" framework={framework} />
+    ),
+  };
   return (
     <Wrapper {...rest}>
       <MDXContent {...props} params={params} components={components} />

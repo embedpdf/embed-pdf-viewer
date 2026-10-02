@@ -16,11 +16,16 @@ import * as React from 'react';
 import { AnnotationToken } from '@embedpdf/plugin-annotation/contract';
 import { AnnotationToken as AnnotationHostToken } from '@embedpdf/plugin-annotation/contract/host';
 import type { CreationDraftAnchor, RotationAnchor } from '@embedpdf/core-annotation';
-import { paint, paintDefault } from '@embedpdf/web';
+import {
+  paint,
+  paintDefault,
+  sameCreationDraftAnchor,
+  sameRotationAnchor,
+  sameSelectionAnchor,
+} from '@embedpdf/web';
 import { Anchored, useProjectorBinding, type AnchoredPlacement } from './anchored';
 import { useAnnotationSettings } from './annotation-hooks';
 import { useOptionalSelector } from './runtime';
-import { sameAnchor, sameCreationDraftAnchor, sameRotationAnchor } from './annotation-anchors';
 
 export interface AnnotationMenuProps {
   children: React.ReactNode;
@@ -52,7 +57,7 @@ export function AnnotationMenu({ children, gap = 15, placement = 'top' }: Annota
       return env ? annotation.getSelectionAnchorIn(env) : selectionAnchor;
     },
     null,
-    sameAnchor,
+    sameSelectionAnchor,
   );
   if (!anchor) return null;
   return (

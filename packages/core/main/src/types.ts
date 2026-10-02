@@ -136,9 +136,45 @@ export interface CapabilityToken<T> {
    * your plugins list").
    */
   readonly hint?: string;
+  /**
+   * The members of the capability that return a promise, by path (`setValue`,
+   * `comments.reply`). Without a document, a framework adapter's stand-in
+   * rejects these with `not-ready`, as the capability would, instead of
+   * throwing (see `standInFor`).
+   */
+  readonly promises?: Readonly<Record<string, true>>;
   /** phantom — never present at runtime */
   readonly __type?: T;
 }
+
+/** The members of an object that return a promise, by name. */
+type PromiseMethodOf<Owner> = {
+  [Key in keyof Owner & string]-?: Owner[Key] extends (...args: never[]) => infer Result
+    ? [Result] extends [PromiseLike<unknown>]
+      ? Key
+      : never
+    : never;
+}[keyof Owner & string];
+
+/**
+ * The path of every member of `Capability` that returns a promise: its own methods
+ * (`'setValue'`) and those of its namespaces (`'comments.reply'`).
+ */
+export type PromiseMemberOf<Capability> =
+  | PromiseMethodOf<Capability>
+  | {
+      [Key in keyof Capability & string]-?: Capability[Key] extends (...args: never[]) => unknown
+        ? never
+        : Capability[Key] extends object
+          ? `${Key}.${PromiseMethodOf<Capability[Key]>}`
+          : never;
+    }[keyof Capability & string];
+
+/**
+ * A token's `promises`: one entry for each member of `Capability` that returns a promise. The
+ * type asks for every one of them, and only them, so the list can't fall behind the contract.
+ */
+export type PromiseMembers<Capability> = { readonly [Path in PromiseMemberOf<Capability>]: true };
 
 /**
  * What the kernel knows about an open document — the page registry captured at open.

@@ -12,6 +12,6 @@ SelectionRangeInput [TypeAliasDeclaration]: export type SelectionRangeInput = Te
 SelectionSegment [TypeAliasDeclaration] (from packages/plugin/selection/src/geometry.ts): export type SelectionSegment = PdfTextSegment;
 SelectionSettings [InterfaceDeclaration]: export interface SelectionSettings{ readonly dragThreshold: number; readonly color: string | null; readonly handles:{ readonly color: string | null; readonly shadow: string; } ; }
 SelectionSnapshot [InterfaceDeclaration]: export interface SelectionSnapshot{ readonly pages: readonly{ page: PageRef; segments: readonly SelectionSegment[]} []; readonly start: SelectionEndpoint | null; readonly end: SelectionEndpoint | null; readonly direction: 'forward' | 'backward'; readonly range: TextRange | null; }
-SelectionToken [VariableDeclaration] (from packages/plugin/selection/src/token.ts): SelectionToken = createCapabilityToken<SelectionCapability>('selection', { hint: `add selectionPlugin() from '@embedpdf/plugin-selection' to your plugins list`, } )
+SelectionToken [VariableDeclaration] (from packages/plugin/selection/src/token.ts): SelectionToken = createCapabilityToken<SelectionCapability>('selection', { hint: `add selectionPlugin() from '@embedpdf/plugin-selection' to your plugins list`, promises:{ readText: true, readTextInRange: true, } , } )
 TextPosition [InterfaceDeclaration]: export interface TextPosition{ page: PageRef; index: number; }
 TextRange [InterfaceDeclaration]: export interface TextRange{ start: TextPosition; end: TextPosition; }

@@ -8,7 +8,8 @@
  * `indexedDbByteStore` in `@embedpdf/web` (structurally this port), wired by
  * the framework layer; an embedder with its own backend implements the three
  * calls once. These helpers are the proof that the two capability calls are
- * all a store needs.
+ * all a store needs: each takes only the members it uses, so a framework's
+ * own service of the plugin works as well as the capability.
  */
 import type { StampCapability } from './contract';
 
@@ -40,7 +41,7 @@ export function memoryStampStore(): StampLibraryStore {
  * libraries" means the user's own.
  */
 export async function restoreStampLibraries(
-  stamp: StampCapability,
+  stamp: Pick<StampCapability, 'importLibrary'>,
   store: StampLibraryStore,
 ): Promise<string[]> {
   const restored: string[] = [];
@@ -61,7 +62,7 @@ export async function restoreStampLibraries(
  * bundled default set, typically). Returns the unsubscribe.
  */
 export function persistStampLibraries(
-  stamp: StampCapability,
+  stamp: Pick<StampCapability, 'exportLibrary' | 'onLibraryChanged'>,
   store: StampLibraryStore,
   options: { except?: readonly string[]; debounceMs?: number } = {},
 ): () => void {

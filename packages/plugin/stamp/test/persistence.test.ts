@@ -6,6 +6,7 @@ import type { StampCapability, StampLibraryChangedEvent } from '../src/contract'
 function fakeStamp() {
   const listeners = new Set<(change: StampLibraryChangedEvent) => void>();
   const bytes = new Map<string, Uint8Array>();
+  // Only the members the helpers use: a framework's own service of the plugin is enough.
   const stamp = {
     onLibraryChanged: (listener: (change: StampLibraryChangedEvent) => void) => {
       listeners.add(listener);
@@ -21,7 +22,7 @@ function fakeStamp() {
       bytes.set(id, source);
       return { library: { id } };
     }),
-  } as unknown as StampCapability;
+  } as unknown as Pick<StampCapability, 'exportLibrary' | 'importLibrary' | 'onLibraryChanged'>;
   const emit = (change: StampLibraryChangedEvent) =>
     listeners.forEach((listener) => listener(change));
   return { stamp, bytes, emit };

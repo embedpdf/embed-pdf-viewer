@@ -10,9 +10,10 @@ import type { CounterCapability } from './counter-plugin';
 
 /**
  * `useCapability` outside a document: a document plugin resolves to a stand-in
- * that renders and whose methods throw `not-ready`; a workspace plugin always
- * resolves; a token no plugin provides, and the strict `useSelector`, still
- * throw the kernel's reason.
+ * that renders and whose methods refuse with `not-ready` (a method that returns
+ * a promise rejects, the others throw); a workspace plugin always resolves; a
+ * token no plugin provides, and the strict `useSelector`, still throw the
+ * kernel's reason.
  */
 
 const WorkspaceToken = createCapabilityToken<{ ping(): string }>('workspace-probe');
@@ -75,9 +76,20 @@ describe('useCapability without a document', () => {
 
     await act(() => kernel.documents.open(bytesInput('a')));
     expect(seen[seen.length - 1]).toBe(kernel.capability(CounterToken));
+    await expect(seen[seen.length - 1].save('kept')).resolves.toBe('kept');
 
     await act(() => kernel.documents.close('a'));
     expect(seen[seen.length - 1]).toBe(standIn);
+  });
+
+  it('rejects, rather than throws, from a method that returns a promise', async () => {
+    const seen: CounterCapability[] = [];
+    await viewerWith(plugins, <CounterProbe seen={seen} />);
+    const standIn = seen[seen.length - 1];
+    let saving: Promise<string> | null = null;
+    expect(() => (saving = standIn.save('draft'))).not.toThrow();
+    await expect(saving).rejects.toMatchObject({ code: 'not-ready', capability: 'counter' });
+    await expect(standIn.notes.publish('note')).rejects.toMatchObject({ code: 'not-ready' });
   });
 
   it('is one stand-in per token, with stable members, and no thenable', async () => {
@@ -121,7 +133,12 @@ describe('useCapability without a document', () => {
       return null;
     }
     await viewerWith([...plugins, plainPlugin], <PlainProbe />);
-    expect(isPluginError(refusal(() => seen[seen.length - 1].getSettings()), 'not-ready')).toBe(true);
+    expect(
+      isPluginError(
+        refusal(() => seen[seen.length - 1].getSettings()),
+        'not-ready',
+      ),
+    ).toBe(true);
   });
 
   it('resolves a workspace plugin with no document', async () => {

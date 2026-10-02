@@ -29,11 +29,9 @@
   <DocumentGate>
     <HighlightButton />
     <Stage style="height: 500px">
-      {#snippet page()}
-        <RenderLayer annotations={false} />
-        <SelectionLayer />
-        <AnnotationLayer />
-      {/snippet}
+      <RenderLayer annotations={false} />
+      <SelectionLayer />
+      <AnnotationLayer />
     </Stage>
   </DocumentGate>
 </Viewer>

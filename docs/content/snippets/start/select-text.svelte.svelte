@@ -20,10 +20,8 @@
 <Viewer {engine} {plugins} initialDocuments={[{ source: ebook }]}>
   <DocumentGate>
     <Stage style="height: 500px">
-      {#snippet page()}
-        <RenderLayer />
-        <SelectionLayer />
-      {/snippet}
+      <RenderLayer />
+      <SelectionLayer />
     </Stage>
   </DocumentGate>
 </Viewer>

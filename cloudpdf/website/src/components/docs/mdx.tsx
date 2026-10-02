@@ -13,10 +13,10 @@ import {
 } from './api-overview';
 import { ApiClientSetup, ApiOperation, ApiSnippet } from './api-reference';
 import { DeploymentTab, DeploymentTabs } from './deployment-tabs';
-import { Example } from './example';
 import { Fw } from './framework';
 import { createHeading } from './heading';
 import { Pre } from './pre';
+import { RouteExample, type CompiledExampleProps } from './route-example';
 import { Toc, type TocItem } from './toc';
 
 type WrapperProps = {
@@ -112,12 +112,16 @@ export function useMDXComponents(components?: MDXComponents): MDXComponents {
     DeploymentTabs,
     DeploymentTab,
     CodeExample,
-    Example,
+    // A docs page passes its route's framework (app/…/[...mdxPath]/page.tsx); without one, the
+    // code of every framework goes to the browser, which picks by pathname.
+    Example: (props: CompiledExampleProps) => <RouteExample {...props} framework={null} />,
     // The headless docs, written for each framework (docs/conventions/docs-architecture.md).
     Framework,
     FwCode,
     FwVariant,
-    Snippet: (props: { name: string }) => <Example {...props} mode="code" kind="snippet" />,
+    Snippet: (props: CompiledExampleProps) => (
+      <RouteExample {...props} mode="code" kind="snippet" framework={null} />
+    ),
     StateIntro: (props: { hook: string }) => (
       <p className="text-cp-ink mt-4 max-w-[70ch] font-sans text-[16.5px] leading-[1.7]">
         <StateIntroText {...props} />

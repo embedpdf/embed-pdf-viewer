@@ -12,33 +12,7 @@ import { fileURLToPath } from 'node:url';
 // Verticals React ships that the Angular adapter has NOT ported yet. Shrink
 // this set as entries land; never grow it silently — a new React vertical
 // should either be ported or added here in the same change, consciously.
-const PENDING = new Set([
-  'page-view',
-  'interaction',
-  'selection',
-  'annotation',
-  'search',
-  'stamp',
-  'view-manager',
-  'page-edit',
-  'metadata',
-  'i18n',
-  'commands',
-  'shell',
-  'form',
-  'toolbar',
-  'link',
-  'redaction',
-  // The anchored-overlay vertical (React, Aug 2026) — deferred consciously
-  // with Phase 4's actions port; lands with the annotation vertical it
-  // serves.
-  'anchored',
-  // The measurement and signature verticals (React, Sep 2026) — deferred
-  // consciously with the 3.0 contract work; they ride the annotation and form
-  // verticals, which are pending too.
-  'measurement',
-  'signature',
-]);
+const PENDING = new Set([]);
 
 const reactPkg = JSON.parse(
   readFileSync(fileURLToPath(new URL('../../react/package.json', import.meta.url)), 'utf8'),

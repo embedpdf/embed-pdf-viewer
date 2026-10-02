@@ -94,3 +94,28 @@ export function rasterInFrame(raster: TurnedBox, frame: TurnedBox): FrameFractio
     transform: turnCss(raster.rotation),
   };
 }
+
+/** The frame a renderer's look draws into: the size to draw at, its turn on screen, and its scale. */
+export interface AnnotationLookFrame {
+  width: number;
+  height: number;
+  /** Its turn on screen, the page's and its own, degrees clockwise. */
+  rotation: number;
+  /** How much the layer scales what the look draws. */
+  scale: number;
+}
+
+/**
+ * The frame a look draws into. A `scaled` look (the default) draws at the
+ * annotation's 100% size (`design`) inside an element of that size, which
+ * the layer scales by `scale` from its top-left corner; an unscaled look
+ * draws at the frame's size on screen.
+ */
+export function lookFrameOf(frame: FramePixels, scaled: boolean): AnnotationLookFrame {
+  return {
+    width: scaled ? frame.design.width : frame.width,
+    height: scaled ? frame.design.height : frame.height,
+    rotation: frame.rotationOnScreen,
+    scale: frame.scale,
+  };
+}

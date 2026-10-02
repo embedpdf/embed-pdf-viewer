@@ -7,7 +7,7 @@
 </script>
 
 <Stage>
-  {#snippet page(page)}
+  {#snippet children(page)}
     <RenderLayer />
     {#each pins.get(page.ref.objectNumber) ?? [] as point}
       <!-- page coordinates → pixels on this page, at its zoom; the page turns them with it -->

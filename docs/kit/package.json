@@ -9,6 +9,7 @@
     "./mdx": "./mdx/remark-engine-axis.mjs",
     "./styles.css": "./styles.css",
     "./mdx/highlight": "./mdx/highlight-code.mjs",
+    "./mdx/code-panels": "./mdx/code-panels.mjs",
     "./search": "./src/search/index.ts",
     "./mdx/install-channel": "./mdx/install-channel.mjs",
     "./mdx/frameworks": "./mdx/frameworks.mjs",

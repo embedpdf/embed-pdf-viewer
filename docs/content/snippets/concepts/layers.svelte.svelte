@@ -7,10 +7,8 @@
 </script>
 
 <Stage>
-  {#snippet page()}
-    <RenderLayer annotations={false} />
-    <SearchLayer />
-    <SelectionLayer />
-    <AnnotationLayer />
-  {/snippet}
+  <RenderLayer annotations={false} />
+  <SearchLayer />
+  <SelectionLayer />
+  <AnnotationLayer />
 </Stage>

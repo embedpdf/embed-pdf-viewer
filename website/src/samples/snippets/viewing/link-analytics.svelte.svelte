@@ -11,8 +11,6 @@
 </script>
 
 <Stage>
-  {#snippet page()}
-    <RenderLayer />
-    <LinkLayer />
-  {/snippet}
+  <RenderLayer />
+  <LinkLayer />
 </Stage>

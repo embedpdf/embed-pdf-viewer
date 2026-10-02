@@ -94,7 +94,7 @@ Everything `useRedaction()` gives you.
 | `unmark(refs)`                               | Removes marks without applying them. [Review the marks](#review-the-marks)                                                                                |
 | `clearPending()`                             | Removes every mark                                                                                                                                        |
 | `updateLabel(ref, { overlayText, repeat? })` | Sets the label a mark shows once it's applied; `overlayText: null` clears it. Resolves `{ mark }`. [What shows in place of the content](#what-shows-in-place-of-the-content) |
-| `listPending({ page? })`                     | The marks not applied yet, in page order, or one page's. In a component, use `usePendingRedactions({ page? })`.                                          |
+| `listPending({ page? })`                     | The marks not applied yet, in page order, or one page's. In a component, use `usePendingRedactions()`.                                          |
 | `getPending(ref)`                            | One mark, or `null` when it isn't a mark waiting to be applied                                                                                            |
 | `estimateCollateral(refs?)`                  | The other annotations applying would remove too, as `{ count, refs }`, for every mark or for the ones you pass. [Apply](#apply)                          |
 | `applyAll()`                                 | Applies every mark in the document, on pages that haven't loaded too. Can't be undone. [Apply](#apply)                                                   |
@@ -130,7 +130,7 @@ Set them when you register the plugin, and change them while the app runs with
 | `overlay.fill`         | The color of a redacted area                     | `'#000000'` |
 | `overlay.text.color`   | The color of a label                             | `'#ffffff'` |
 | `overlay.text.fontFamily` | The label's font                              | Helvetica   |
-| `overlay.text.fontSize`   | The label's size, or `0` to fit the area      | `0`         |
+| `overlay.text.fontSize`   | The label's size, or `0` to fit the area (a repeated label then draws at 12pt) | `0`         |
 
 ## Events
 

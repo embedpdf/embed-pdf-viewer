@@ -17,8 +17,6 @@
     <p>Couldn't open {document.name}: {document.error.message}</p>
   {/snippet}
   <Stage>
-    {#snippet page()}
-      <RenderLayer />
-    {/snippet}
+    <RenderLayer />
   </Stage>
 </DocumentGate>

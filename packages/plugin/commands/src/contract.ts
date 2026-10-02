@@ -16,6 +16,7 @@ import type {
   SettingsApi,
   Unsubscribe,
 } from '@embedpdf/core';
+import { formatShortcut } from '@embedpdf/core-ui';
 
 export { CommandsToken } from './token';
 
@@ -144,6 +145,43 @@ export const resolvedCommandsEqual = (
     left.shortcuts.every((shortcut, index) => shortcut === right.shortcuts[index])
   );
 };
+
+/** What a toolbar draws for a command id no plugin registered: disabled, with its id as the label. */
+export const unregisteredCommand = (id: CommandId): ResolvedCommand => ({
+  id,
+  label: id,
+  shortcuts: [],
+  enabled: false,
+  active: false,
+  visible: true,
+  categories: [],
+});
+
+/** A command with everything a button needs: what it shows, `run`, and its shortcut for a tooltip. */
+export interface BoundCommand extends ResolvedCommand {
+  /** Run the command for the document it was read for. */
+  readonly run: () => Promise<ExecuteResult>;
+  /** Its first shortcut, formatted for the platform (`'⌘K'` on a Mac, `'Ctrl+K'` elsewhere), or `null`. */
+  readonly shortcut: string | null;
+}
+
+/**
+ * A resolved command, bound for a button: `run` executes it through `execute`, and `shortcut` is
+ * its first shortcut formatted for the platform. Which platform is the caller's to know
+ * (`isMacPlatform()` in `@embedpdf/web`).
+ */
+export function boundCommandOf(
+  command: ResolvedCommand,
+  execute: (id: CommandId) => Promise<ExecuteResult>,
+  options: { readonly isMac: boolean },
+): BoundCommand {
+  const [first] = command.shortcuts;
+  return {
+    ...command,
+    run: () => execute(command.id),
+    shortcut: first === undefined ? null : formatShortcut(first, { isMac: options.isMac }),
+  };
+}
 
 /**
  * The commands plugin's settings. `commandsPlugin(config)` registers them over

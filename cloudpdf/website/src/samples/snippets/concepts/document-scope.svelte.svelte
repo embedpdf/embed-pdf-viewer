@@ -8,8 +8,6 @@
 
 <DocumentScope id={documentId}>
   <Stage>
-    {#snippet page()}
-      <RenderLayer />
-    {/snippet}
+    <RenderLayer />
   </Stage>
 </DocumentScope>

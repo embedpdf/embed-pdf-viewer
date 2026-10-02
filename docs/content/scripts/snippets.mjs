@@ -6,12 +6,13 @@
  *
  * The pages describe the API the code is moving to, so most snippets don't compile yet. The check
  * says which do, per page and framework, and never fails; `publish-gate.mjs` reads it. React
- * compiles with `tsc`, Angular with `ngc` (`strictTemplates`), Vue with `vue-tsc`, Svelte with
- * `svelte-check`; a tool that isn't installed leaves its framework "not compiling".
+ * compiles with `tsc`, Angular with `ngc` (`strictTemplates`), Vue with `vue-tsc`
+ * (`strictTemplates`), Svelte with `svelte-check`; a tool that isn't installed, or misses an error
+ * in the run's canary (`compile.mjs`), leaves its framework "not compiling".
  *
- * The snippets compile inside the embedpdf.com site (`website/node_modules/.cache/`), which has
- * every framework they use, each under the name its page shows (`search/search-box.tsx`) so they
- * import each other as written. Workspace packages resolve to their source. A helper a snippet
+ * The snippets compile in a run directory that resolves every framework the embedpdf.com site has
+ * (`compile.mjs`), each under the name its page shows (`search/search-box.tsx`) so they import
+ * each other as written. Workspace packages resolve to their source. A helper a snippet
  * imports but doesn't show (`./pdf`, `./toast`) is the reader's own code: a typed stub from
  * `snippet-stubs/` when it feeds the viewer, an `any` stand-in otherwise, so a snippet's errors
  * are about our API.
@@ -19,32 +20,28 @@
  * A page's snippets are its `<Snippet name>` tags, for the frameworks its `<Fw only>` blocks
  * allow, on either site: `<Engine>` versions differ only in the engine they create.
  */
-import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import {
-  COMPILER_OPTIONS,
-  compileWithNgc,
-  compileWithTsc,
+  compile,
   contentRoot,
-  findTool,
+  FRAMEWORK_LABELS,
+  FRAMEWORKS,
+  removeRunDirectory,
   repoRoot,
-  resolvePaths,
   runDirectory,
   toPosix,
   walk,
   writeJson,
+  writeTsconfig,
 } from './compile.mjs';
 
 const snippetsRoot = path.join(contentRoot, 'snippets');
 const headlessRoot = path.join(contentRoot, 'headless');
 const stubsRoot = path.join(contentRoot, 'scripts/snippet-stubs');
 const statusFile = path.join(contentRoot, 'generated/snippet-status.json');
-
-const FRAMEWORKS = ['react', 'vue', 'svelte', 'angular'];
-const FRAMEWORK_LABELS = { react: 'React', vue: 'Vue', svelte: 'Svelte', angular: 'Angular' };
 
 /** Errors kept per page and framework; the count says how many there were. */
 const MAX_ERRORS = 20;
@@ -247,6 +244,10 @@ function angularStandIn(uses, importers) {
 }
 
 const VUE_STAND_IN = `<!-- A stand-in for the reader's own component (scripts/snippets.mjs). -->
+<script setup lang="ts">
+defineProps<Record<string, any>>();
+</script>
+
 <template><slot /></template>
 `;
 
@@ -258,34 +259,26 @@ const SVELTE_STAND_IN = `<!-- A stand-in for the reader's own component (scripts
 {@render children?.()}
 `;
 
-const TSCONFIGS = {
-  react: () => ({
-    compilerOptions: { ...COMPILER_OPTIONS, jsx: 'react-jsx' },
-    include: ['**/*.ts', '**/*.tsx'],
-  }),
-  angular: () => ({
-    compilerOptions: {
-      ...COMPILER_OPTIONS,
-      experimentalDecorators: true,
-      useDefineForClassFields: false,
-    },
-    include: ['**/*.ts'],
-    angularCompilerOptions: { strictTemplates: true },
-  }),
-  vue: () => ({
-    compilerOptions: { ...COMPILER_OPTIONS, jsx: 'preserve' },
-    include: ['**/*.ts', '**/*.vue'],
-  }),
-  svelte: () => ({
-    compilerOptions: { ...COMPILER_OPTIONS, verbatimModuleSyntax: true },
-    include: ['**/*.ts', '**/*.svelte'],
-  }),
+/** The files each framework's tsconfig compiles: the snippets, their helpers and stand-ins. */
+const INCLUDE = {
+  react: ['**/*.ts', '**/*.tsx'],
+  angular: ['**/*.ts'],
+  vue: ['**/*.ts', '**/*.vue'],
+  svelte: ['**/*.ts', '**/*.svelte'],
 };
 
 /**
- * Copy one framework's snippets to `root` (in the site) under the names the pages show, write a
- * stub or a stand-in for every helper they import but don't show, and a tsconfig. Returns where
- * each staged snippet came from.
+ * A snippet is part of the reader's app, which may use a component without importing it (a
+ * global one, or Nuxt's `<ClientOnly>` and auto-imports), so an unknown Vue component isn't an
+ * error here. The components it does import are still checked, props and events included; a
+ * complete example (`samples.mjs`) gets no such leeway.
+ */
+const OVERRIDES = { vue: { vueCompilerOptions: { checkUnknownComponents: false } } };
+
+/**
+ * Copy one framework's snippets to `root` (in a run directory) under the names the pages show,
+ * write a stub or a stand-in for every helper they import but don't show, and a tsconfig. Returns
+ * where each staged snippet came from.
  */
 function stage(framework, snippets, root) {
   const origins = new Map();
@@ -329,9 +322,7 @@ function stage(framework, snippets, root) {
     fs.writeFileSync(file, contents);
   }
 
-  const tsconfig = TSCONFIGS[framework]();
-  tsconfig.compilerOptions.paths = resolvePaths();
-  fs.writeFileSync(path.join(root, 'tsconfig.json'), `${JSON.stringify(tsconfig, null, 2)}\n`);
+  writeTsconfig(framework, root, INCLUDE[framework], OVERRIDES[framework]);
   return { root, origins };
 }
 
@@ -345,8 +336,7 @@ function stage(framework, snippets, root) {
 function sortDiagnostics(diagnostics, { root, origins }) {
   const bySnippet = new Map();
   const ownFiles = [];
-  for (const { file, line, column, message } of diagnostics) {
-    const absolute = file ? path.resolve(root, file) : null;
+  for (const { file: absolute, line, column, message } of diagnostics) {
     const snippet = absolute && origins.get(absolute);
     if (snippet) {
       const errors = bySnippet.get(snippet) ?? [];
@@ -359,73 +349,6 @@ function sortDiagnostics(diagnostics, { root, origins }) {
   }
   return { bySnippet, ownFiles };
 }
-
-const COMPILERS = {
-  react: (staged) => compileWithTsc(staged.root),
-  angular: (staged) => compileWithNgc(staged.root),
-
-  async vue(staged) {
-    const tool = findTool('vue-tsc', 'bin/vue-tsc.js');
-    if (!tool) return { tool: null, reason: "vue-tsc isn't installed in website/" };
-    const run = spawnSync(
-      process.execPath,
-      [tool.entry, '--noEmit', '--pretty', 'false', '-p', 'tsconfig.json'],
-      {
-        cwd: staged.root,
-        encoding: 'utf8',
-        maxBuffer: 64 * 1024 * 1024,
-      },
-    );
-    // `file(line,column): error TS1234: message`, a message's later lines indented under it.
-    const diagnostics = [];
-    for (const line of `${run.stdout}${run.stderr}`.split('\n')) {
-      const match = line.match(/^(.+?)\((\d+),(\d+)\): error TS\d+: (.*)$/);
-      if (match)
-        diagnostics.push({
-          file: match[1],
-          line: Number(match[2]),
-          column: Number(match[3]),
-          message: match[4],
-        });
-      else if (/^\s/.test(line) && diagnostics.length)
-        diagnostics.at(-1).message += ` ${line.trim()}`;
-    }
-    return { tool: `vue-tsc ${tool.version}`, diagnostics };
-  },
-
-  async svelte(staged) {
-    const tool = findTool('svelte-check', 'bin/svelte-check');
-    if (!tool) return { tool: null, reason: "svelte-check isn't installed in website/" };
-    const run = spawnSync(
-      process.execPath,
-      [
-        tool.entry,
-        '--workspace',
-        staged.root,
-        '--tsconfig',
-        './tsconfig.json',
-        '--output',
-        'machine',
-        '--threshold',
-        'error',
-      ],
-      { cwd: staged.root, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 },
-    );
-    // `<time> ERROR "file" line:column "message"`, the path relative to the workspace.
-    const diagnostics = [];
-    for (const line of run.stdout.split('\n')) {
-      const match = line.match(/^\d+ ERROR "(.+?)" (\d+):(\d+) (".*")$/);
-      if (match)
-        diagnostics.push({
-          file: match[1],
-          line: Number(match[2]),
-          column: Number(match[3]),
-          message: JSON.parse(match[4]),
-        });
-    }
-    return { tool: `svelte-check ${tool.version}`, diagnostics };
-  },
-};
 
 // ── the status ──────────────────────────────────────────────────────────────
 
@@ -500,15 +423,7 @@ export async function checkSnippets() {
     for (const framework of FRAMEWORKS) {
       const frameworkStarted = performance.now();
       const staged = stage(framework, snippets, path.join(runRoot, framework));
-      let result;
-      try {
-        result = await COMPILERS[framework](staged);
-      } catch (error) {
-        result = {
-          tool: null,
-          reason: `its compiler failed: ${error instanceof Error ? error.message : error}`,
-        };
-      }
+      let result = await compile(framework, staged.root);
       if (result.tool) {
         result = { ...result, ...sortDiagnostics(result.diagnostics, staged) };
         // An error in a stub or a stand-in means the check can't vouch for any snippet.
@@ -523,7 +438,7 @@ export async function checkSnippets() {
       results[framework] = { ...result, seconds: (performance.now() - frameworkStarted) / 1000 };
     }
   } finally {
-    fs.rmSync(runRoot, { recursive: true, force: true });
+    removeRunDirectory(runRoot);
   }
 
   const status = {

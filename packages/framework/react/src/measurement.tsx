@@ -8,7 +8,12 @@
 // One-line-per-feature: registration travels with the UI.
 export * from '@embedpdf/plugin-measurement';
 import type { EventHook, PageRef } from '@embedpdf/core';
-import { MeasurementToken, measurementState } from '@embedpdf/plugin-measurement';
+import {
+  MeasurementToken,
+  measurementState,
+  NO_PAGE_SCALE,
+  NO_READOUT,
+} from '@embedpdf/plugin-measurement';
 import type {
   AnnotationRef,
   MeasurementCapability,
@@ -43,14 +48,6 @@ export const useMeasurementState = stateHook(measurementState);
 /** The measurement settings (`defaultScale`, `presets`), with or without a document. Takes a selector. */
 export const useMeasurementSettings = settingsHook(MeasurementToken);
 
-/** A page's scale while there's none to read: no document, or a page that isn't there. */
-const NO_SCALE: PageScale = Object.freeze({
-  measure: null,
-  source: 'default',
-  ready: false,
-  persistent: false,
-});
-
 /**
  * A page's measurement scale (its ref or its index), for a scale bar or a
  * "1:100" badge. Accepts `null` (no current page) and answers `null` then,
@@ -64,21 +61,17 @@ export function usePageScale(page: PageRef | number | null): PageScale | null {
   return useKernelValue((kernel) => {
     if (page === null) return null;
     return (
-      kernel.tryCapability(MeasurementToken, scoped ?? undefined)?.getPageScale(page) ?? NO_SCALE
+      kernel.tryCapability(MeasurementToken, scoped ?? undefined)?.getPageScale(page) ??
+      NO_PAGE_SCALE
     );
   });
 }
 
-/** What a measurement's readout is with no document: nothing to read. */
-const NO_READOUT: MeasurementUnavailable = Object.freeze({ unavailable: 'not-dimension' });
-
-/** Two readouts that say the same thing. */
-const sameReadout = (
-  left: MeasurementReadout | MeasurementUnavailable,
-  right: MeasurementReadout | MeasurementUnavailable,
-): boolean => JSON.stringify(left) === JSON.stringify(right);
-
-/** A measurement's `{ kind, value, label }`, or `{ unavailable }` with why there's none. */
+/**
+ * A measurement's `{ kind, value, label }`, or `{ unavailable }` with why there's none.
+ * Readouts are reference-stable in the plugin, so this re-renders only when the measurement's
+ * changes.
+ */
 export function useMeasurementReadout(
   ref: AnnotationRef,
 ): MeasurementReadout | MeasurementUnavailable {
@@ -86,6 +79,5 @@ export function useMeasurementReadout(
   return useKernelValue(
     (kernel) =>
       kernel.tryCapability(MeasurementToken, scoped ?? undefined)?.getReadout(ref) ?? NO_READOUT,
-    sameReadout,
   );
 }

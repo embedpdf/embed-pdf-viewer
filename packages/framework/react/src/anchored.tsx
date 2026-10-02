@@ -29,7 +29,9 @@ import * as React from 'react';
 import { createContext, useContext, useEffect, useLayoutEffect, useReducer, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
+  observeAnchoredFit,
   projectAnchoredTarget,
+  sameAnchoredFit,
   type AnchoredFit,
   type AnchoredPlacement,
   type AnchoredRect,
@@ -127,25 +129,6 @@ export interface AnchoredProps {
   children: React.ReactNode;
 }
 
-/** The area anchored UI stays inside: the surface's own box (overlay space) or the window (client space). */
-function viewOf(element: HTMLElement, space: ViewProjector['space']): AnchoredRect | null {
-  if (space === 'client') {
-    const { clientWidth, clientHeight } = element.ownerDocument.documentElement;
-    return { x: 0, y: 0, width: clientWidth, height: clientHeight };
-  }
-  const container = element.offsetParent;
-  return container
-    ? { x: 0, y: 0, width: container.clientWidth, height: container.clientHeight }
-    : null;
-}
-
-const sameFit = (left: AnchoredFit | null, right: AnchoredFit): boolean =>
-  left !== null &&
-  left.size.width === right.size.width &&
-  left.size.height === right.size.height &&
-  left.view.width === right.view.width &&
-  left.view.height === right.view.height;
-
 /**
  * Position `children` around a page-space anchor, on whichever page surface
  * is in scope. Projection runs during render from the shared pure helper.
@@ -193,22 +176,9 @@ function PlacedAnchored({
 
   useLayoutEffect(() => {
     if (!element) return;
-    const measure = () => {
-      const view = viewOf(element, projector.space);
-      if (!view) return;
-      const next = { size: { width: element.offsetWidth, height: element.offsetHeight }, view };
-      setFit((current) => (sameFit(current, next) ? current : next));
-    };
-    measure();
-    const observer = new ResizeObserver(measure);
-    observer.observe(element);
-    if (projector.space === 'overlay' && element.offsetParent)
-      observer.observe(element.offsetParent);
-    else window.addEventListener('resize', measure);
-    return () => {
-      observer.disconnect();
-      window.removeEventListener('resize', measure);
-    };
+    return observeAnchoredFit(element, projector.space, (next) =>
+      setFit((current) => (sameAnchoredFit(current, next) ? current : next)),
+    );
   }, [element, projector.space]);
 
   useEffect(() => {

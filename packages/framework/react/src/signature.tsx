@@ -11,13 +11,13 @@
 import { useMemo } from 'react';
 import type { EventHook } from '@embedpdf/core';
 import {
-  markRoleOf,
   signatureState,
+  signerRowsOf,
   SIGNATURES_LIBRARY_KIND,
   SignatureToken,
   type SignatureCapability,
+  type SignerRow,
 } from '@embedpdf/plugin-signature';
-import type { StampAsset, StampLibrary } from '@embedpdf/plugin-stamp/contract';
 
 import { useCapability, useCapabilityEvent } from './runtime';
 import { useStampAssets, useStampLibraries } from './stamp';
@@ -51,15 +51,6 @@ export function useSignatureEvent<T>(
   useCapabilityEvent(SignatureToken, select, handler);
 }
 
-/** One person: a library of kind `signatures` with its marks split by role. */
-export interface SignerRow {
-  libraryId: string;
-  name: string;
-  library: StampLibrary;
-  signatures: StampAsset[];
-  initials: StampAsset | null;
-}
-
 /**
  * The people whose marks this browser holds, one row per library of kind
  * `signatures`, for a picker. Derived from the stamp plugin: rename, delete
@@ -68,18 +59,5 @@ export interface SignerRow {
 export function useSignerRows(): SignerRow[] {
   const libraries = useStampLibraries({ kind: SIGNATURES_LIBRARY_KIND });
   const assets = useStampAssets();
-  return useMemo(
-    () =>
-      libraries.map((library) => {
-        const own = assets.filter((asset) => asset.libraryId === library.id);
-        return {
-          libraryId: library.id,
-          name: library.name,
-          library,
-          signatures: own.filter((asset) => markRoleOf(asset) === 'signature'),
-          initials: own.find((asset) => markRoleOf(asset) === 'initials') ?? null,
-        };
-      }),
-    [libraries, assets],
-  );
+  return useMemo(() => signerRowsOf(libraries, assets), [libraries, assets]);
 }

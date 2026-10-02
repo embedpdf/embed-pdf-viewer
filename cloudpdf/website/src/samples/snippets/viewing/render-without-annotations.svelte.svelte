@@ -5,8 +5,6 @@
 </script>
 
 <Stage>
-  {#snippet page()}
-    <RenderLayer annotations={false} />
-    <AnnotationLayer />
-  {/snippet}
+  <RenderLayer annotations={false} />
+  <AnnotationLayer />
 </Stage>

@@ -1,13 +1,14 @@
-import crypto from 'node:crypto';
-import fs from 'node:fs';
-import path from 'node:path';
-
 import type { NextConfig } from 'next';
 import nextra from 'nextra';
 import { remarkNpm2Yarn } from '@theguild/remark-npm2yarn';
 import { visit } from 'unist-util-visit';
 
 import { remarkEngineAxis } from '@embedpdf/docs-kit/mdx';
+import {
+  CODE_PANELS_DIR,
+  openCodePanels,
+  withCodePanelsCache,
+} from '@embedpdf/docs-kit/mdx/code-panels';
 import { remarkFrameworkNames } from '@embedpdf/docs-kit/mdx/frameworks';
 import { remarkInstallChannel } from '@embedpdf/docs-kit/mdx/install-channel';
 
@@ -48,46 +49,20 @@ const githubRef = process.env.VERCEL_GIT_COMMIT_REF ?? process.env.GIT_COMMIT_RE
 // The website lives at <repo>/website/; sample paths resolve relative to it.
 const githubBaseUrl = `https://github.com/${githubOwner}/${githubRepo}/blob/${githubRef}/website/`;
 
-// The docs code panels are inlined at MDX-compile time by remarkCodeExample
-// via fs.readFileSync — a read webpack can't see, so a change to a sample
-// alone never invalidates the cached compiled MDX (Vercel restores
-// .next/cache across deploys, so stale code panels ship while the separately
-// built live demos stay fresh). Fix: make the samples a first-class cache
-// input by folding a content hash of everything those panels read into
-// webpack's persistent cache version. Samples changed → whole cache discarded
-// → MDX recompiles and re-reads. Samples untouched → full cache reuse.
-function hashDocsCodeInputs(): string {
-  const hash = crypto.createHash('sha256');
-  const walk = (dir: string) => {
-    let entries: fs.Dirent[];
-    try {
-      entries = fs.readdirSync(dir, { withFileTypes: true });
-    } catch {
-      return;
-    }
-    for (const entry of entries.sort((a, b) => a.name.localeCompare(b.name))) {
-      const abs = path.join(dir, entry.name);
-      if (entry.isDirectory()) {
-        walk(abs);
-      } else if (entry.isFile()) {
-        hash.update(abs);
-        hash.update(fs.readFileSync(abs));
-      }
-    }
-  };
-  // Everything <Example>/<CodeExample> panels read from disk at compile time.
-  walk(path.resolve(__dirname, 'src', 'samples'));
-  // The demo manifest decides which examples get a live preview; built by
-  // build:demos before next build.
-  try {
-    hash.update(fs.readFileSync(path.resolve(__dirname, 'public', 'demos', 'demos-manifest.json')));
-  } catch {
-    // No demos built (e.g. bare `next build` in CI checks) — still valid.
-  }
-  return hash.digest('hex').slice(0, 16);
-}
-
-const docsCodeHash = hashDocsCodeInputs();
+// The code of every <Example>/<Snippet> is read from src/samples at MDX-compile time
+// (remarkCodeExample, via fs.readFileSync — a read webpack can't see) and stored outside the
+// compiled page (rehypeCodeExample → docs-kit `mdx/code-panels`, in .next/cache/docs-code). So a
+// change to a sample alone would never invalidate the cached compiled MDX (Vercel restores
+// .next/cache across deploys, so stale code panels would ship while the separately built live
+// demos stay fresh). `openCodePanels` hashes everything the panels are made from — the samples,
+// and the demo manifest (built by build:demos before next build) that decides which examples get
+// a live preview — and its `cacheVersion` versions webpack's persistent cache: samples changed →
+// whole cache discarded → MDX recompiles and re-reads. Samples untouched → full cache reuse, and
+// the store still holds every file the cached pages point at.
+const codePanels = openCodePanels({
+  siteRoot: __dirname,
+  inputs: ['src/samples', 'public/demos/demos-manifest.json'],
+});
 
 const withNextra = nextra({
   mdxOptions: {
@@ -115,7 +90,7 @@ const withNextra = nextra({
       overrideNpm2YarnImports,
       [remarkCodeExample, { githubBaseUrl }],
     ],
-    rehypePlugins: [rehypeCodeExample],
+    rehypePlugins: [[rehypeCodeExample, { panelsDir: codePanels.dir }]],
   },
 });
 
@@ -128,17 +103,18 @@ const nextConfig: NextConfig = {
   // The docs kit ships raw TypeScript source (workspace package).
   transpilePackages: ['@embedpdf/docs-kit'],
   // The search route reads the per-deploy artifact from the filesystem;
-  // tracing must bundle it into the serverless function.
+  // tracing must bundle it into the serverless function. The docs pages read
+  // their code panels from the store at render (RouteExample): the build
+  // prerenders them, and a page rendered on request needs the store too. (The
+  // key is a glob, so the brackets of `[...mdxPath]` are escaped.)
   outputFileTracingIncludes: {
     '/api/search': ['./public/search-index.bin'],
+    '/\\[...mdxPath\\]': [`./${CODE_PANELS_DIR}/**/*.json`],
   },
   webpack(config) {
-    // See hashDocsCodeInputs above: docs code panels depend on files webpack
+    // See openCodePanels above: docs code panels depend on files webpack
     // doesn't track, so their hash versions the persistent cache.
-    if (config.cache && typeof config.cache === 'object' && config.cache.type === 'filesystem') {
-      config.cache.version = `${config.cache.version ?? ''}|docs-code:${docsCodeHash}`;
-    }
-    return config;
+    return withCodePanelsCache(config, codePanels);
   },
 };
 

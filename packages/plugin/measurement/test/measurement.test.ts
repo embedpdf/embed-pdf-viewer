@@ -10,7 +10,7 @@ import {
 import { InteractionToken } from '@embedpdf/plugin-interaction/contract';
 
 import { createMeasurementController } from '../src/controller';
-import { MEASUREMENT_DEFAULTS, type MeasurementConfig } from '../src/contract';
+import { MEASUREMENT_DEFAULTS, NO_READOUT, type MeasurementConfig } from '../src/contract';
 import { initialMeasurementState } from '../src/model';
 import { measurementState } from '../src/state';
 
@@ -53,7 +53,7 @@ function harness(
       failed: [],
     })),
     onDraftCaptured: draftCaptured.on,
-    get: () => null,
+    get: vi.fn((_ref: unknown): unknown => null),
     tools: {
       getDefaults: () => ({
         color: '#ef4444',
@@ -135,6 +135,31 @@ describe('measurement', () => {
     const readout = measurement.measureDistance(PAGE, { x: 0, y: 0 }, { x: 72, y: 0 });
     expect('unavailable' in readout).toBe(false);
     if (!('unavailable' in readout)) expect(readout.kind).toBe('distance');
+  });
+
+  it('reads a measurement the same object until its annotation changes', () => {
+    const { measurement, annotation } = harness();
+    const line = (end: number) => ({
+      subtype: 'line',
+      intent: 'line-dimension',
+      measure: ONE_TO_HUNDRED,
+      linePoints: { start: { x: 0, y: 0 }, end: { x: end, y: 0 } },
+    });
+    let current: unknown = line(72);
+    annotation.get.mockImplementation(() => current);
+    const ref = { kind: 'objectNumber', objectNumber: 9, page: PAGE } as never;
+
+    const first = measurement.getReadout(ref);
+    expect(first).toMatchObject({ kind: 'distance' });
+    expect(measurement.getReadout(ref)).toBe(first);
+
+    current = line(144);
+    const moved = measurement.getReadout(ref);
+    expect(moved).not.toBe(first);
+    expect((moved as { value: number }).value).toBeCloseTo(2 * (first as { value: number }).value);
+
+    current = null;
+    expect(measurement.getReadout(ref)).toBe(NO_READOUT);
   });
 
   it('calibrates from two page points, reports, and announces the change', async () => {

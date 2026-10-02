@@ -133,6 +133,37 @@ describe('LinkLayer', () => {
     expect(outcomes).toEqual(['uri', 'reported']);
   });
 
+  it('keeps a press on a link from the page below it', async () => {
+    const { kernel, rerender } = await viewerWith(
+      [interactionPlugin(), linkPlugin()],
+      null,
+      engine,
+    );
+    await act(() => kernel.documents.open(bytesInput('doc')));
+    // The Stage listens natively on an element between the link and React's root.
+    const stagePresses: Event[] = [];
+    function StageBelow({ children }: { children: React.ReactNode }) {
+      const ref = React.useRef<HTMLDivElement>(null);
+      React.useEffect(() => {
+        const element = ref.current!;
+        const onPress = (event: Event) => stagePresses.push(event);
+        element.addEventListener('pointerdown', onPress);
+        return () => element.removeEventListener('pointerdown', onPress);
+      }, []);
+      return <div ref={ref}>{children}</div>;
+    }
+    rerender(
+      <PageProvider value={context}>
+        <StageBelow>
+          <LinkLayer />
+        </StageBelow>
+      </PageProvider>,
+    );
+    await waitFor(() => expect(document.querySelectorAll('a')).toHaveLength(2));
+    fireEvent.pointerDown(document.querySelector('a')!);
+    expect(stagePresses).toHaveLength(0);
+  });
+
   it('opens a website from code while a component uses useLink()', async () => {
     const open = vi.spyOn(window, 'open').mockReturnValue(null);
     let link: ReturnType<typeof useLink> | null = null;

@@ -56,11 +56,12 @@ export const remarkCodeExample = (options: RemarkCodeExampleOptions = {}) => {
         const sampleName =
           node.name === 'Snippet' ? `snippets/${nameAttr.value}` : nameAttr.value;
         const byFramework = collectSampleFiles(sampleName, githubBaseUrl);
-        node.attributes.push({
-          type: 'mdxJsxAttribute',
-          name: '__fwFiles',
-          value: JSON.stringify(byFramework),
-        });
+        // For rehype-code-example, which highlights the files, stores them under the sample's
+        // name and leaves the page only a reference to them (docs-kit `mdx/code-panels`).
+        node.attributes.push(
+          { type: 'mdxJsxAttribute', name: '__sample', value: sampleName },
+          { type: 'mdxJsxAttribute', name: '__fwFiles', value: JSON.stringify(byFramework) },
+        );
         // Live demos: built by the demo Vite pass before the docs build;
         // presence in the manifest = a mounted preview exists. A snippet is code only, even
         // when an example has the same name.

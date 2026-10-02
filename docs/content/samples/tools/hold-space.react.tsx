@@ -28,12 +28,12 @@ const ebook = async (): Promise<OpenInput> => {
 function HoldSpaceToPan({ children }: { children: ReactNode }) {
   const interaction = useInteraction();
   // Only over the pages, so Space still scrolls the rest of your page.
-  const over = useRef(false);
+  const viewer = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     let held = false;
     const down = (event: KeyboardEvent) => {
-      if (event.code !== 'Space' || !over.current) return;
+      if (event.code !== 'Space' || !viewer.current?.matches(':hover')) return;
       event.preventDefault();
       if (event.repeat || held) return;
       held = true;
@@ -53,11 +53,7 @@ function HoldSpaceToPan({ children }: { children: ReactNode }) {
   }, [interaction]);
 
   return (
-    <div
-      className="viewer"
-      onPointerEnter={() => (over.current = true)}
-      onPointerLeave={() => (over.current = false)}
-    >
+    <div ref={viewer} className="viewer">
       {children}
     </div>
   );

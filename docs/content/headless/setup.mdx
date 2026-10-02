@@ -198,6 +198,9 @@ the plugins' services itself. In `app.config.ts` or a route's `providers`, the s
 whole app or route one viewer, so a toolbar in your header and the pages in your outlet work
 together. The viewer reads the engine and the features once, when it starts.
 
+A setup that can't work, such as a service with no viewer above it, throws an error with a
+number and its fix, like Angular's own. [Errors](errors) lists them.
+
 </Fw>
 
 Order doesn't matter, and a plugin that needs another says so when the app starts: the annotation

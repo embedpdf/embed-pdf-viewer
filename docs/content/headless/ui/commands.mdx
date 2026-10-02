@@ -26,6 +26,13 @@ Pass the id as a function, and the button follows `id` when it changes.
 
 </Fw>
 
+<Fw only="angular">
+
+For UI that isn't a button, such as a row in a shortcuts list, `commands.commandOf(id)` gives the
+same command as a signal.
+
+</Fw>
+
 `shortcut` is formatted for the user's platform: `⌘K` on a Mac, `Ctrl+K` elsewhere. The
 [toolbar](toolbar) draws commands the same way.
 
@@ -56,8 +63,10 @@ of your viewer:</Fw><Fw only="angular">Add it to `provideEmbedPdf()`, next to `w
 <Snippet name="ui/command-shortcuts" />
 
 It ignores keys typed into text fields, runs commands for the active document, and does nothing for a
-command that's disabled. With more than one viewer on a page, pass `target`, a ref to the element
-around one: its keys then work only while focus is inside it. `Mod` means Cmd on a Mac and Ctrl elsewhere. A help sheet lists
+command that's disabled. <Fw only={['react', 'vue', 'svelte']}>With more than one viewer on a page, pass `target`, a ref to the element
+around one: its keys then work only while focus is inside it.</Fw><Fw only="angular">With more than one viewer on a page, leave
+`withCommandShortcuts()` out and put the `epdfCommandShortcuts` directive on the element around one
+(`<div tabindex="0" epdfCommandShortcuts>`): its keys then work only while focus is inside it.</Fw> `Mod` means Cmd on a Mac and Ctrl elsewhere. A help sheet lists
 `listShortcuts()`:
 
 <Example name="commands/shortcuts" />

@@ -1,11 +1,16 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
+  anchoredViewOf,
   fitAnchoredRect,
+  observeAnchoredFit,
   positionAnchoredRect,
   projectAnchoredTarget,
+  sameAnchoredFit,
+  type AnchoredFit,
   type ViewProjector,
 } from '../src/anchored-position';
+import { asElement, fakeElement } from './helpers/fake-element';
 
 /** A 400 × 300 view, and a 100 × 40 menu. */
 const view = { x: 0, y: 0, width: 400, height: 300 };
@@ -153,5 +158,98 @@ describe('projectAnchoredTarget', () => {
     expect(projectAnchoredTarget(projector, note, { placement: 'right', gap: 0 })).toMatchObject({
       left: 160, // 150 + 20 / 2
     });
+  });
+});
+
+describe('measuring anchored UI', () => {
+  const surface = { clientWidth: 640, clientHeight: 480 };
+  const element = (offsetParent: object | null) =>
+    fakeElement({
+      offsetWidth: 120,
+      offsetHeight: 30,
+      offsetParent,
+      ownerDocument: { documentElement: { clientWidth: 1280, clientHeight: 720 } },
+    });
+
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("stays inside the surface's box in overlay space, and the window in client space", () => {
+    expect(anchoredViewOf(asElement(element(surface)), 'overlay')).toEqual({
+      x: 0,
+      y: 0,
+      width: 640,
+      height: 480,
+    });
+    expect(anchoredViewOf(asElement(element(null)), 'overlay')).toBeNull();
+    expect(anchoredViewOf(asElement(element(null)), 'client')).toEqual({
+      x: 0,
+      y: 0,
+      width: 1280,
+      height: 720,
+    });
+  });
+
+  it('compares measurements by their sizes', () => {
+    const measured = {
+      size: { width: 120, height: 30 },
+      view: { x: 0, y: 0, width: 640, height: 480 },
+    };
+    expect(sameAnchoredFit(null, measured)).toBe(false);
+    expect(sameAnchoredFit(measured, { ...measured, size: { width: 120, height: 30 } })).toBe(true);
+    expect(sameAnchoredFit(measured, { ...measured, size: { width: 121, height: 30 } })).toBe(
+      false,
+    );
+  });
+
+  it('measures now and on every resize of the content or its surface, until stopped', () => {
+    const observed: unknown[] = [];
+    let resized = () => {};
+    let disconnected = false;
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        constructor(callback: () => void) {
+          resized = callback;
+        }
+        observe(target: unknown) {
+          observed.push(target);
+        }
+        disconnect() {
+          disconnected = true;
+        }
+      },
+    );
+    const windowListeners = fakeElement();
+    vi.stubGlobal('window', windowListeners);
+    const content = element(surface);
+    const fits: AnchoredFit[] = [];
+    const stop = observeAnchoredFit(asElement(content), 'overlay', (fit) => fits.push(fit));
+    expect(fits).toEqual([
+      { size: { width: 120, height: 30 }, view: { x: 0, y: 0, width: 640, height: 480 } },
+    ]);
+    expect(observed).toEqual([content, surface]);
+    expect(windowListeners.listenerCount('resize')).toBe(0);
+    resized();
+    expect(fits).toHaveLength(2);
+    stop();
+    expect(disconnected).toBe(true);
+  });
+
+  it('follows the window in client space', () => {
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        observe() {}
+        disconnect() {}
+      },
+    );
+    const windowListeners = fakeElement();
+    vi.stubGlobal('window', windowListeners);
+    const fits: AnchoredFit[] = [];
+    const stop = observeAnchoredFit(asElement(element(null)), 'client', (fit) => fits.push(fit));
+    windowListeners.dispatch('resize');
+    expect(fits).toHaveLength(2);
+    stop();
+    expect(windowListeners.listenerCount('resize')).toBe(0);
   });
 });

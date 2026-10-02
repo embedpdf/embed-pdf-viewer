@@ -1,14 +1,12 @@
 /**
- * Document toolbar — the facade inject functions in action. Strict facades
- * (they resolve the document-scoped stage capability), so this component lives
- * behind the workspace's document gate.
+ * The document toolbar: zoom and page controls, through the Stage it's given. Document UI, so
+ * it sits behind the workspace's document gate, next to the Stage.
  */
-import { ChangeDetectionStrategy, Component, computed } from '@angular/core';
-import { injectPages, injectZoom } from '@embedpdf/angular/stage';
+import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
+import type { EpdfStage } from '@embedpdf/angular/stage';
 
 @Component({
   selector: 'app-toolbar',
-  standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   styles: `
     :host {
@@ -39,19 +37,18 @@ import { injectPages, injectZoom } from '@embedpdf/angular/stage';
     }
   `,
   template: `
-    <button (click)="zoom.zoomOut()">−</button>
+    <button (click)="stage().zoomOut()">−</button>
     <span class="readout">{{ percent() }}%</span>
-    <button (click)="zoom.zoomIn()">+</button>
-    <button (click)="zoom.fitWidth()">Fit width</button>
-    <button (click)="zoom.fitPage()">Fit page</button>
+    <button (click)="stage().zoomIn()">+</button>
+    <button (click)="stage().fitWidth()">Fit width</button>
+    <button (click)="stage().fitPage()">Fit page</button>
     <span class="spacer"></span>
-    <button (click)="pages.previous()">‹</button>
-    <span class="readout">{{ pages.currentPage() + 1 }} / {{ pages.pageCount() }}</span>
-    <button (click)="pages.next()">›</button>
+    <button (click)="stage().previousPage()">‹</button>
+    <span class="readout">{{ stage().currentPageIndex() + 1 }} / {{ stage().pageCount() }}</span>
+    <button (click)="stage().nextPage()">›</button>
   `,
 })
 export class Toolbar {
-  protected readonly zoom = injectZoom();
-  protected readonly pages = injectPages();
-  protected readonly percent = computed(() => Math.round(this.zoom.zoom() * 100));
+  readonly stage = input.required<EpdfStage>();
+  protected readonly percent = computed(() => Math.round(this.stage().zoomLevel() * 100));
 }

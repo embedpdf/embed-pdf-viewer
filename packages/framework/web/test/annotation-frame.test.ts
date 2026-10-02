@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { frameInPixels, rasterInFrame } from '../src/annotation-frame';
+import { frameInPixels, lookFrameOf, rasterInFrame } from '../src/annotation-frame';
 
 /** A page layer at 2 pixels per point and 150% zoom, its top-left 10 pixels in, turned a quarter. */
 const page = {
@@ -54,5 +54,23 @@ describe('an annotation frame in pixels', () => {
     expect(percent(placed.width)).toBeCloseTo(110);
     expect(percent(placed.height)).toBeCloseTo(110);
     expect(placed.transform).toBeUndefined();
+  });
+});
+
+describe('lookFrameOf', () => {
+  const pixels = {
+    left: 0,
+    top: 0,
+    width: 40,
+    height: 20,
+    transform: undefined,
+    rotationOnScreen: 90,
+    scale: 2,
+    design: { width: 20, height: 10 },
+  };
+
+  it('draws a scaled look at the annotation’s 100% size, an unscaled one at its size on screen', () => {
+    expect(lookFrameOf(pixels, true)).toEqual({ width: 20, height: 10, rotation: 90, scale: 2 });
+    expect(lookFrameOf(pixels, false)).toEqual({ width: 40, height: 20, rotation: 90, scale: 2 });
   });
 });

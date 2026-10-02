@@ -631,6 +631,36 @@ describe('smooth scroll via the injected scheduler', () => {
     run(240); // final: k = 1 → at target
     expect(stage.getCurrentPageIndex()).toBe(4);
   });
+
+  it('a report of the same viewport size never cancels a tween', () => {
+    // Frames by id, so a cancelled one never runs.
+    const frames = new Map<number, (timestamp: number) => void>();
+    let nextId = 0;
+    const scheduler = {
+      raf: (callback: (timestamp: number) => void) => {
+        frames.set(++nextId, callback);
+        return nextId;
+      },
+      caf: (id: number) => void frames.delete(id),
+    };
+    const { stage } = harness(PORTRAIT, { scheduler });
+    // A reveal as the view opens, then the ResizeObserver's first callback, repeating the size.
+    stage.reveal(3, { rect: { x: 72, y: 72, width: 468, height: 96 }, zoom: 'fit-width' });
+    stage.setViewportSize({ width: 1000, height: 700 });
+    const run = (timestamp: number) => {
+      const due = [...frames.values()];
+      frames.clear();
+      due.forEach((callback) => callback(timestamp));
+    };
+    run(0);
+    run(120);
+    run(240);
+    // The box is on screen, not the zoom alone at the top of page 1.
+    const page = stage.getPageFrame(toPageRef(4))!;
+    const top = stage.worldToViewport({ x: page.x, y: page.y + 72 }).y;
+    expect(top).toBeGreaterThan(0);
+    expect(top).toBeLessThan(700);
+  });
 });
 
 describe('the scroller contract — the camera in native DOM vocabulary', () => {

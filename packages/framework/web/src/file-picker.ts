@@ -5,7 +5,9 @@
  *
  * A `File` is a `Blob`, which is a `BinarySource` everywhere in the stack, so the
  * caller can hand the result straight to the engine — this module stays a pure
- * DOM utility with no EmbedPDF types.
+ * DOM utility with no EmbedPDF types. It also holds the default provider for
+ * the annotation plugin's file prompt ({@link pickRequestedFile}), and its
+ * one install per document ({@link installFilePickerProvider}).
  */
 const IMAGE_ACCEPT = 'image/png,image/jpeg,application/pdf';
 
@@ -74,4 +76,47 @@ export function saveFile(bytes: Uint8Array | Blob, name: string, mimeType?: stri
   anchor.click();
   anchor.remove();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+/**
+ * The browser's default for a plugin's file prompt (the annotation plugin's
+ * `FilePickerProvider`): the file dialog, honouring the request's `accept`
+ * filter. A picked `File` carries its own name and type, so it goes straight
+ * through as the engine's file source; a dismissed dialog answers `null`.
+ */
+export async function pickRequestedFile(request: {
+  accept?: string | null;
+}): Promise<{ data: File } | null> {
+  const file = await pickFile({ accept: request.accept ?? '*/*' });
+  return file ? { data: file } : null;
+}
+
+/** Where a provider goes: the annotation plugin's port (its capability satisfies it). */
+export interface FilePickerPort<Provider> {
+  /** Install the provider, `null` to make click-then-pick tools do nothing. Returns its removal. */
+  setFilePickerProvider(provider: Provider | null): () => void;
+}
+
+/** How many mounted installs each document's port has: one is the rule. */
+const filePickerInstalls = new WeakMap<object, number>();
+
+/**
+ * Install `provider` as a document's file picker, until the call it returns
+ * removes it. A document has one port, so a second install while the first
+ * is there silently replaces it: `onRepeat` hears of it (an adapter warns in
+ * development, saying where to install it once).
+ */
+export function installFilePickerProvider<Provider>(
+  annotation: FilePickerPort<Provider>,
+  provider: Provider | null,
+  onRepeat: () => void,
+): () => void {
+  const installed = (filePickerInstalls.get(annotation) ?? 0) + 1;
+  filePickerInstalls.set(annotation, installed);
+  if (installed > 1) onRepeat();
+  const remove = annotation.setFilePickerProvider(provider);
+  return () => {
+    filePickerInstalls.set(annotation, (filePickerInstalls.get(annotation) ?? 1) - 1);
+    remove();
+  };
 }

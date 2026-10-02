@@ -7,11 +7,12 @@ import { EpdfAnnotation } from '@embedpdf/angular/annotation';
   selector: 'app-stamp-card',
   imports: [EpdfAnchored],
   template: `
-    @let stamp = hovered();
-    @if (stamp?.subtype === 'stamp') {
-      <epdf-anchored [anchor]="anchor()" placement="top">
-        <div class="card">Approved by {{ stamp.author }}</div>
-      </epdf-anchored>
+    @if (hovered(); as stamp) {
+      @if (stamp.subtype === 'stamp') {
+        <epdf-anchored [anchor]="anchor()" placement="top">
+          <div class="card">Approved by {{ stamp.author }}</div>
+        </epdf-anchored>
+      }
     }
   `,
 })

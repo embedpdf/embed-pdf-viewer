@@ -112,9 +112,8 @@ describe('use<Plugin>() outside a document', () => {
     const pageEdit = captured.pageEdit as ReturnType<typeof usePageEdit>;
     const actions = captured.actions as ReturnType<typeof useActions>;
     expect(() => metadata.canUpdate()).toThrow(expect.objectContaining({ code: 'not-ready' }));
-    expect(() => metadata.custom.update({})).toThrow(
-      expect.objectContaining({ code: 'not-ready' }),
-    );
+    // A verb that returns a promise rejects, so `.catch()` sees the refusal.
+    await expect(metadata.custom.update({})).rejects.toMatchObject({ code: 'not-ready' });
     expect(() => pageEdit.canEdit()).toThrow(expect.objectContaining({ code: 'not-ready' }));
     // The settings belong to the plugin, so they work without a document.
     expect(actions.getSettings()).toEqual({ ...ACTIONS_DEFAULTS, openSequence: 'off' });

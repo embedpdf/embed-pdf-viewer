@@ -9,9 +9,7 @@
 </script>
 
 <Stage>
-  {#snippet page()}
-    <RenderLayer />
-  {/snippet}
+  <RenderLayer />
   {#snippet overlay()}
     <Anchored anchor={{ page: hit.page, bounds: hit.bounds }} placement="bottom">
       <button onclick={() => highlight(hit)}>Highlight</button>

@@ -183,6 +183,63 @@ export function observeClientGeometry(callback: () => void): () => void {
   };
 }
 
+/**
+ * The area anchored UI stays inside: the surface's own box (`'overlay'` space, the element's
+ * positioned parent) or the window (`'client'` space). Null while the element has no
+ * positioned parent to measure.
+ */
+export function anchoredViewOf(
+  element: HTMLElement,
+  space: ViewProjector['space'],
+): AnchoredRect | null {
+  if (space === 'client') {
+    const { clientWidth, clientHeight } = element.ownerDocument.documentElement;
+    return { x: 0, y: 0, width: clientWidth, height: clientHeight };
+  }
+  const container = element.offsetParent;
+  return container
+    ? { x: 0, y: 0, width: container.clientWidth, height: container.clientHeight }
+    : null;
+}
+
+/** Whether two measurements give the same sizes, so a placement made from the first still holds. */
+export function sameAnchoredFit(left: AnchoredFit | null, right: AnchoredFit): boolean {
+  return (
+    left !== null &&
+    left.size.width === right.size.width &&
+    left.size.height === right.size.height &&
+    left.view.width === right.view.width &&
+    left.view.height === right.view.height
+  );
+}
+
+/**
+ * Measure anchored UI's `element` and the area it stays inside ({@link anchoredViewOf}) now, and
+ * again whenever either resizes: `report` hears every measurement (keep it when
+ * {@link sameAnchoredFit} says it changed). A camera move changes neither, so it measures nothing.
+ * Returns the function that stops measuring.
+ */
+export function observeAnchoredFit(
+  element: HTMLElement,
+  space: ViewProjector['space'],
+  report: (fit: AnchoredFit) => void,
+): () => void {
+  const measure = () => {
+    const view = anchoredViewOf(element, space);
+    if (!view) return;
+    report({ size: { width: element.offsetWidth, height: element.offsetHeight }, view });
+  };
+  measure();
+  const observer = new ResizeObserver(measure);
+  observer.observe(element);
+  if (space === 'overlay' && element.offsetParent) observer.observe(element.offsetParent);
+  else window.addEventListener('resize', measure);
+  return () => {
+    observer.disconnect();
+    window.removeEventListener('resize', measure);
+  };
+}
+
 /** A placement's side and how it lines up along that side. */
 function splitPlacement(placement: AnchoredPlacement): {
   side: AnchoredSide;

@@ -6,7 +6,14 @@ import { describe, expect, it, vi } from 'vitest';
 import { quadFromRect } from '@embedpdf/core-geometry';
 import type { Point, Quad } from '@embedpdf/core-geometry';
 import { toPageRef, type PageRef } from '@embedpdf/engine-core/runtime';
-import { HANDLE_HEAD, createSelectionHandleDrag, selectionHandleGeom } from '../src/handles';
+import {
+  HANDLE_HEAD,
+  armSelectionHandle,
+  createSelectionHandleDrag,
+  selectionHandleEndpointsOf,
+  selectionHandleGeom,
+  selectionHandleViewOf,
+} from '../src/handles';
 import type { SelectionHandleEndpoint, SelectionHandleView } from '../src/handles';
 
 const rotateQuad = (quad: Quad, angleDeg: number, pivotX: number, pivotY: number): Quad => {
@@ -184,5 +191,72 @@ describe('createSelectionHandleDrag', () => {
     expect(selection.extendTo).not.toHaveBeenCalled();
     session.end();
     expect(selection.endGesture).not.toHaveBeenCalled(); // an untouched press commits nothing
+  });
+});
+
+describe('selectionHandleViewOf', () => {
+  it('projects page points and finds pages through the Stage', () => {
+    const stage = {
+      pageToViewport: vi.fn((_page: PageRef, point: Point) => ({ x: point.x + 1, y: point.y })),
+      getPageAt: vi.fn((point: Point) => ({ ref: toPageRef(3), point, scale: 1 })),
+      viewportToPage: vi.fn((_page: PageRef, point: Point) => ({ x: point.x - 1, y: point.y })),
+    };
+    const handleView = selectionHandleViewOf(stage);
+    expect(handleView.toOverlay(toPageRef(3), { x: 1, y: 2 })).toEqual({ x: 2, y: 2 });
+    expect(handleView.pageAt({ x: 5, y: 6 })?.ref).toEqual(toPageRef(3));
+    expect(handleView.pointOnPage(toPageRef(3), { x: 5, y: 6 })).toEqual({ x: 4, y: 6 });
+    expect(stage.pageToViewport).toHaveBeenCalledWith(toPageRef(3), { x: 1, y: 2 });
+  });
+});
+
+describe('selectionHandleEndpointsOf', () => {
+  it('is both ends of a selection, as the handles need them, or null without one', () => {
+    const boundary = (page: number, advance: 1 | -1) => ({
+      page: toPageRef(page),
+      glyphQuad: CELL,
+      advance,
+      rect: { x: 100, y: 200, width: 60, height: 16 },
+    });
+    expect(selectionHandleEndpointsOf({ start: boundary(1, 1), end: boundary(2, -1) })).toEqual({
+      start: { page: toPageRef(1), glyphQuad: CELL, advance: 1 },
+      end: { page: toPageRef(2), glyphQuad: CELL, advance: -1 },
+    });
+    expect(selectionHandleEndpointsOf({ start: boundary(1, 1), end: null })).toBeNull();
+  });
+});
+
+describe('armSelectionHandle', () => {
+  const target = () => ({
+    beginGestureAt: vi.fn((_page: PageRef, _point: Point) => true),
+    extendTo: vi.fn(),
+    endGesture: vi.fn(),
+  });
+  const ends = {
+    start: endpoint(CELL),
+    end: {
+      ...endpoint(quadFromRect({ x: 300, y: 200, width: 60, height: 16 })),
+      page: toPageRef(8),
+    },
+  };
+
+  it('grabs the bar’s midpoint and drags from the opposite end', () => {
+    const selection = target();
+    const handleView: SelectionHandleView = {
+      ...view(),
+      pageAt: (overlay) => ({ ref: toPageRef(8), point: overlay }),
+    };
+    const armed = armSelectionHandle(selection, handleView, ends, 'start')!;
+    // The start's bar runs down the cell's left side, from (100, 200) to (100, 216).
+    expect(armed.base).toEqual({ x: 100, y: 208 });
+    armed.drag.move({ x: 50, y: 60 });
+    // Re-rooted at the end's cell centre.
+    expect(selection.beginGestureAt).toHaveBeenCalledWith(toPageRef(8), { x: 330, y: 208 });
+    armed.drag.end();
+    expect(selection.endGesture).toHaveBeenCalledTimes(1);
+  });
+
+  it('arms nothing while the handle’s page isn’t laid out', () => {
+    const notLaidOut: SelectionHandleView = { ...view(), toOverlay: () => null };
+    expect(armSelectionHandle(target(), notLaidOut, ends, 'end')).toBeNull();
   });
 });

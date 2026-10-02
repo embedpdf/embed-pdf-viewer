@@ -5,7 +5,7 @@
   "scripts": {
     "build": "next build",
     "build:demos": "vite build --config vite.demos.config.ts && vite build --config vite.demos-ng.config.ts",
-    "check:samples": "tsc -p tsconfig.samples-engine.json && tsc -p tsconfig.samples-react.json && ngc -p tsconfig.samples-angular.json",
+    "check:samples": "tsc -p tsconfig.samples-engine.json && node ../docs/content/scripts/samples.mjs --root src/samples",
     "dev": "turbo run build:demos && pnpm run search:index:build && next dev --port 3100",
     "docs:check": "node ../docs/content/scripts/sync.mjs --target . --engine local --check",
     "docs:sync": "node ../docs/content/scripts/sync.mjs --target . --engine local",
@@ -66,6 +66,15 @@
     "vite": "^6.3.5",
     "vitest": "^4.1.10",
     "vue": "^3.5.13",
-    "yaml": "^2.9.0"
+    "yaml": "^2.9.0",
+    "vue-tsc": "^3.2.4",
+    "svelte-check": "^4.3.0",
+    "@embedpdf/vue": "workspace:*",
+    "@embedpdf/svelte": "workspace:*",
+    "@angular/forms": "~20.2.0",
+    "@angular/router": "~20.2.0",
+    "@angular/cdk": "~20.2.0",
+    "vue-router": "^4.5.0",
+    "@sveltejs/kit": "^2.20.0"
   }
 }

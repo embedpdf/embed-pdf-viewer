@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { deviceHeightForWidth, pageTransform, type PageRotation } from '../src/index';
+import {
+  deviceHeightForWidth,
+  pageTransform,
+  samePagePlacement,
+  type PageRotation,
+} from '../src/index';
 
 /**
  * `pageTransform` is the single per-page bridge: page points ↔ view px ↔ device px.
@@ -231,5 +236,19 @@ describe('pageTransform baseScale/zoom: percent-of-100% semantics', () => {
     const transform = pageTransform({ pageSize, rotation: 0, scale: 0.42, dpr: 2 });
     expect(transform.baseScale).toBeCloseTo(0.42, 6);
     expect(transform.zoom).toBeCloseTo(1, 2);
+  });
+});
+
+describe('samePagePlacement', () => {
+  const at = (scale: number, rotation: PageRotation = 0) =>
+    pageTransform({ pageSize: { width: 100, height: 200 }, rotation, scale, baseScale: 1, dpr: 1 });
+
+  it('is the same placement for a new transform of the same page view', () => {
+    expect(samePagePlacement(at(2), at(2))).toBe(true);
+  });
+
+  it('differs when the scale or the turn does', () => {
+    expect(samePagePlacement(at(2), at(3))).toBe(false);
+    expect(samePagePlacement(at(2), at(2, 90))).toBe(false);
   });
 });

@@ -132,7 +132,10 @@ export function createSelectionWrites(
 
   /** The `selection` noun (its reads come from the property and chrome reads). */
   const selection = {
-    set: (refs: readonly AnnotationRef[]) => select(refs, false),
+    // `set([])` selects nothing, as its name says: the reducer leaves an empty `select` alone,
+    // so an `add` of nothing stays a no-op.
+    set: (refs: readonly AnnotationRef[]) =>
+      refs.length ? select(refs, false) : void store.commit({ type: 'deselect' }),
     add: (refs: readonly AnnotationRef[]) => select(refs, true),
     selectAll: (page?: PageRef | number) => {
       // A page that isn't in the document has nothing to select.

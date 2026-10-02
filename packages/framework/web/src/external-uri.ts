@@ -36,3 +36,16 @@ export function sanitizeExternalUri(
     return null;
   }
 }
+
+/**
+ * Open a link target in a new tab when its address is allowed (`http`,
+ * `https`, `mailto`, `tel`); anything else is refused. True when it opened.
+ * Call it inside the user's click (the link plugin's `activate()` does), so
+ * the click is still the gesture that opens the tab.
+ */
+export function openExternalUri(uri: string): boolean {
+  const href = sanitizeExternalUri(uri);
+  if (!href || typeof window === 'undefined') return false;
+  window.open(href, '_blank', 'noopener,noreferrer');
+  return true;
+}

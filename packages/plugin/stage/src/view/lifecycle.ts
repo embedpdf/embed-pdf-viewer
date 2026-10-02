@@ -76,7 +76,13 @@ export function createViewLifecycle(
           }
           return;
         }
-        // Afterwards every resize keeps the same page and re-resolves fit modes.
+        // Afterwards a report of the size the stage already has says nothing new. Hosts send
+        // them (a ResizeObserver's first callback repeats the size reported at attach), and
+        // treating one as a resize would cancel a navigation still animating, like a reveal
+        // the app asked for as the view opened.
+        const current = state().viewport;
+        if (size.width === current.width && size.height === current.height) return;
+        // Every real resize keeps the same page and re-resolves fit modes.
         cancelAnimation();
         const anchor = currentAnchor(); // measured against the old viewport
         ctx.state.update(setViewport, size);

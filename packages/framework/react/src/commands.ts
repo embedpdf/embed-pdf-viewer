@@ -9,12 +9,12 @@
 export * from '@embedpdf/plugin-commands';
 import { useEffect, useMemo, type RefObject } from 'react';
 import { formatShortcut as formatKeys } from '@embedpdf/core-ui';
-import { CommandsToken, resolvedCommandsEqual } from '@embedpdf/plugin-commands';
-import type { CommandsCapability, ExecuteResult, ResolvedCommand } from '@embedpdf/plugin-commands';
+import { CommandsToken, boundCommandOf, resolvedCommandsEqual } from '@embedpdf/plugin-commands';
+import type { BoundCommand, CommandsCapability } from '@embedpdf/plugin-commands';
 import { CommandsToken as CommandsHostToken } from '@embedpdf/plugin-commands/contract/host';
 import { createStandardCommands } from '@embedpdf/plugin-commands/standard';
 import type { EventHook } from '@embedpdf/core';
-import { bindCommandShortcuts, copySelection, isMacPlatform, saveFile } from '@embedpdf/web';
+import { bindCommandShortcuts, isMacPlatform, standardCommandsBrowser } from '@embedpdf/web';
 import { useCapability, useCapabilityEvent, useDocumentId, useKernelValue } from './runtime';
 import { settingsHook } from './state';
 
@@ -23,11 +23,7 @@ import { settingsHook } from './state';
  * delete, download and print, with shortcuts and labels in EmbedPDF's eight languages. Spread
  * them into `commandsPlugin({ commands })`.
  */
-export const standardCommands = /* @__PURE__ */ createStandardCommands({
-  copySelection,
-  saveFile: (bytes, fileName) => saveFile(bytes, fileName, 'application/pdf'),
-  print: () => window.print(),
-});
+export const standardCommands = /* @__PURE__ */ createStandardCommands(standardCommandsBrowser);
 
 /** The commands capability: `execute`, `searchCommands`, `registerCommand`, the categories, the settings calls. */
 export function useCommands(): CommandsCapability {
@@ -50,14 +46,6 @@ export function formatShortcut(shortcut: string, options: { isMac?: boolean } = 
   return formatKeys(shortcut, { isMac: options.isMac ?? isMacPlatform() });
 }
 
-/** A command with everything a button needs. */
-export interface BoundCommand extends ResolvedCommand {
-  /** Run the command for this component's document. */
-  readonly run: () => Promise<ExecuteResult>;
-  /** Its first shortcut, formatted for the platform, or `null`. */
-  readonly shortcut: string | null;
-}
-
 /**
  * A command for this component's document (the nearest <DocumentScope>, else the active one):
  * its label, icon, state, `run` and `shortcut`. Re-renders when any of them changes; `null` for
@@ -70,15 +58,14 @@ export function useCommand(id: string): BoundCommand | null {
     () => commands.resolveCommand(id, documentId),
     resolvedCommandsEqual,
   );
-  return useMemo(() => {
-    if (!resolved) return null;
-    const [first] = resolved.shortcuts;
-    return {
-      ...resolved,
-      run: () => commands.execute(id, { documentId }),
-      shortcut: first === undefined ? null : formatShortcut(first),
-    };
-  }, [resolved, commands, id, documentId]);
+  return useMemo(
+    () =>
+      resolved &&
+      boundCommandOf(resolved, (commandId) => commands.execute(commandId, { documentId }), {
+        isMac: isMacPlatform(),
+      }),
+    [resolved, commands, documentId],
+  );
 }
 
 /**
@@ -97,6 +84,8 @@ export function useCommandShortcuts(options?: {
   useEffect(() => {
     if (!target) return bindCommandShortcuts(commands, { isMac });
     // The element mounts before this effect runs, so its ref is set by now.
-    return target.current ? bindCommandShortcuts(commands, { isMac, target: target.current }) : undefined;
+    return target.current
+      ? bindCommandShortcuts(commands, { isMac, target: target.current })
+      : undefined;
   }, [commands, isMac, target]);
 }

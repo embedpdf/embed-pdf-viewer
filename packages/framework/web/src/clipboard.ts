@@ -124,7 +124,9 @@ export function wireSelectionClipboard(
  * with what was copied ('' when nothing was — nothing is written then, so an
  * empty selection never clobbers the user's clipboard).
  */
-export async function copySelection(selection: ClipboardSelectionSource): Promise<string> {
+export async function copySelection(
+  selection: Pick<ClipboardSelectionSource, 'readText'>,
+): Promise<string> {
   const text = await selection.readText();
   if (text !== '') await navigator.clipboard.writeText(text);
   return text;

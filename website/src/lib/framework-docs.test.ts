@@ -30,10 +30,28 @@ const PAGES = process.env.FRAMEWORK_DOCS_PAGES
       .sort();
 
 /** What gives another framework away, on each framework's page. */
+// A React code block (```tsx / ```jsx) belongs on React's page only; React's JSX props
+// (`onHitClick={…}`) on Vue's and Angular's (Svelte writes its own props the same way).
+const REACT_BLOCK = /^\s*```(tsx|jsx)\b/gm;
+const JSX_PROP = /\bon[A-Z]\w*=\{/g;
+
 const OTHER_FRAMEWORKS: Record<Framework, RegExp[]> = {
   react: [/@embedpdf\/(vue|svelte|angular)\b/g, /\binject\(Epdf/g, /\bv-(if|for|model)\b/g, /\{#(if|each|snippet)\b/g],
-  vue: [/@embedpdf\/(react|svelte|angular)\b/g, /\binject\(Epdf/g, /\b(className|onClick)=/g, /\{#(if|each|snippet)\b/g],
-  svelte: [/@embedpdf\/(react|vue|angular)\b/g, /\binject\(Epdf/g, /\b(className|onClick)=/g, /\bv-(if|for|model)\b/g],
+  vue: [
+    /@embedpdf\/(react|svelte|angular)\b/g,
+    /\binject\(Epdf/g,
+    /\b(className|onClick)=/g,
+    /\{#(if|each|snippet)\b/g,
+    REACT_BLOCK,
+    JSX_PROP,
+  ],
+  svelte: [
+    /@embedpdf\/(react|vue|angular)\b/g,
+    /\binject\(Epdf/g,
+    /\b(className|onClick)=/g,
+    /\bv-(if|for|model)\b/g,
+    REACT_BLOCK,
+  ],
   angular: [
     /@embedpdf\/(react|vue|svelte)\b/g,
     /\buse[A-Z]\w*\(/g,
@@ -41,6 +59,8 @@ const OTHER_FRAMEWORKS: Record<Framework, RegExp[]> = {
     /\b(className|onClick)=/g,
     /\bv-(if|for|model)\b/g,
     /\{#(if|each|snippet)\b/g,
+    REACT_BLOCK,
+    JSX_PROP,
   ],
 };
 

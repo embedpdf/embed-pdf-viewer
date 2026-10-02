@@ -327,6 +327,25 @@ export function pageTransform(input: {
   };
 }
 
+/**
+ * Whether two transforms place things on the page the same: the same scale, zoom and turn, and
+ * the same content box. A Stage builds a new transform on every frame, also for a plain scroll,
+ * which moves the page but changes nothing inside it; a layer that compares with this redraws
+ * only when what it draws in the page's pixels moved.
+ */
+export function samePagePlacement(
+  left: Pick<PageTransform, 'viewScale' | 'zoom' | 'rotation' | 'contentWidth' | 'contentHeight'>,
+  right: Pick<PageTransform, 'viewScale' | 'zoom' | 'rotation' | 'contentWidth' | 'contentHeight'>,
+): boolean {
+  return (
+    left.viewScale === right.viewScale &&
+    left.zoom === right.zoom &&
+    left.rotation === right.rotation &&
+    left.contentWidth === right.contentWidth &&
+    left.contentHeight === right.contentHeight
+  );
+}
+
 /* ────────────────────────────────────────────────────────────────────────────
  * Matrix-native geometry — the composable primitive under every space hop.
  *
