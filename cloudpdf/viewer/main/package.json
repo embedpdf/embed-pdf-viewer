@@ -2,7 +2,7 @@
   "name": "@cloudpdf/viewer",
   "version": "3.0.0-next.14",
   "private": false,
-  "description": "The full viewer wired to the CloudPDF engine: one CDN artifact (cloudpdf.js) exposing CloudPDF.init(). A thin EE wrapper over the Apache-2.0 @embedpdf/viewer — no wasm, no workers: rendering happens on a @cloudpdf/server deployment (or CloudPDF SaaS) over HTTPS.",
+  "description": "The full viewer wired to the CloudPDF engine: one CDN artifact (cloudpdf.js) exposing CloudPDF.init(). A thin EE wrapper over the Apache-2.0 @embedpdf/viewer: pages render on a @cloudpdf/server deployment (or CloudPDF SaaS) over HTTPS, and the local engine loads only when stamps need it.",
   "type": "module",
   "main": "./dist/cloudpdf.js",
   "module": "./dist/cloudpdf.js",
@@ -24,7 +24,7 @@
     "README.md"
   ],
   "scripts": {
-    "build": "vite build && tsc -p tsconfig.decl.json",
+    "build": "rimraf dist && vite build && vite build --mode snippet && tsc -p tsconfig.decl.json",
     "clean": "rimraf dist",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
@@ -46,9 +46,11 @@
   "license": "Apache-2.0",
   "dependencies": {
     "@cloudpdf/engine": "workspace:*",
+    "@embedpdf/engine": "workspace:*",
     "@embedpdf/viewer": "workspace:*"
   },
   "devDependencies": {
+    "@embedpdf/engine-runtime-wasm32": "workspace:*",
     "@types/node": "^22.0.0",
     "@types/react": "^18.3.0",
     "@types/react-dom": "^18.3.0",

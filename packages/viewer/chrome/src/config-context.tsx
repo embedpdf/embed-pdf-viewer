@@ -12,6 +12,7 @@ import type { BarSchema, ChromeSchema, MenuSchema } from '@embedpdf/react/toolba
 import { defaultChrome, getMenu, getModeBar, getStrip } from './config/chrome';
 import type { IconDef } from './ui/icons';
 import type { SignatureMode, SignerPort, TrustPort } from '@embedpdf/react/signature';
+import type { StampAssetEngine } from '@embedpdf/react/stamp';
 
 export interface StampsCustomization {
   /** `false`: no built-in library. A string: URL template with `{locale}`. */
@@ -21,6 +22,10 @@ export interface StampsCustomization {
   /** Quick marks in the Insert toolbar: asset ids (`library:name`) from any
    *  library, or one library's whole set. Default none. */
   readonly toolbar?: ReadonlyArray<string> | { readonly library: string };
+  /** The local engine stamp libraries and signature marks open in, or a
+   *  function that makes one on first use. Default: the viewer's own engine,
+   *  which is right when it is local. A cloud viewer needs one of its own. */
+  readonly assetEngine?: StampAssetEngine;
 }
 
 export interface SignaturesCustomization {

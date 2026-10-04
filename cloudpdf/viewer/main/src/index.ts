@@ -16,10 +16,9 @@
  * A cloud door over the open-source viewer's engine-agnostic door
  * (`@embedpdf/viewer/core`): it maps the cloud vocabulary to an injected engine
  * factory (see ./config) and hands everything else straight to `EmbedPDF.init()`.
- * Because the core door registers no default engine, the local PDFium engine —
- * wasm, worker source, main-thread recipe — is structurally absent from this
- * artifact: rendering happens server-side, so the only thing that crosses the
- * network is HTTPS API traffic.
+ * Because the core door registers no default engine, rendering happens
+ * server-side and the local PDFium engine is not part of startup. It is a lazy
+ * chunk the stamp libraries load on first use (see ./config).
  */
 import { cloudEngine } from '@cloudpdf/engine';
 import EmbedPDF from '@embedpdf/viewer/core';

@@ -17,8 +17,8 @@
  * required — and supplies that engine from the cloud vocabulary via
  * `resolveCloudConfig`. Because the core door registers no default engine, the
  * local PDFium engine (6 MB of wasm, the worker source, the main-thread recipe)
- * is structurally absent from your bundle: not stubbed, not aliased away,
- * simply never imported.
+ * is not part of startup. The only import of it is the lazy one the stamp
+ * libraries make the first time someone opens Stamps or Signatures.
  *
  * Everything the open viewer accepts — `chrome`, `commands`, `icons`,
  * `strings`, `theme`, children-as-slots, `onReady` — works here unchanged (see

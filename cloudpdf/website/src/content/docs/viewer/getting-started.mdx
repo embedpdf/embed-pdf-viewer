@@ -43,6 +43,16 @@ stamps: {
 } // self-host
 ```
 
+<Engine cloud>
+
+A stamp library is a PDF, and it is cut into stamps in the browser, which takes
+the local engine. The CloudPDF viewer loads it the first time someone opens
+Stamps or Signatures, never at startup, so a viewer that never uses them never
+downloads the WebAssembly. To supply your own local engine, pass
+`stamps: { assetEngine }`.
+
+</Engine>
+
 A self-hosted URL is used exactly as given. Libraries a user creates —
 stamps made from selected annotations, PDFs imported into the panel — are
 kept in the browser across reloads. For the whole picture — the engine's

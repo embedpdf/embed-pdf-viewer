@@ -299,10 +299,16 @@ importers:
       '@cloudpdf/engine':
         specifier: workspace:*
         version: link:../../engine
+      '@embedpdf/engine':
+        specifier: workspace:*
+        version: link:../../../packages/engine/main
       '@embedpdf/viewer':
         specifier: workspace:*
         version: link:../../../packages/viewer/main
     devDependencies:
+      '@embedpdf/engine-runtime-wasm32':
+        specifier: workspace:*
+        version: link:../../../packages/engine/runtime/npm/wasm32
       '@types/node':
         specifier: ^22.0.0
         version: 22.19.11

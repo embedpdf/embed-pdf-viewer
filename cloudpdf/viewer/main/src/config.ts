@@ -8,8 +8,10 @@
  * option through untouched. That mapping lives here, so the brand vocabulary
  * has exactly one definition and each door stays a genuine shim.
  *
- * Deliberately tiny and framework-free: `cloudEngine` is the only runtime
- * import, so a wrapper that uses this does not drag the CDN artifact along.
+ * Deliberately tiny and framework-free: `cloudEngine` is the only static
+ * runtime import, so a wrapper that uses this does not drag the CDN artifact
+ * along. The local engine stamps need is imported on first use (see
+ * `localAssetEngine`).
  */
 import {
   cloudEngine,
@@ -17,7 +19,7 @@ import {
   type OpenInputShare,
   type TokenSource,
 } from '@cloudpdf/engine';
-import type { EngineFactory, InitialDocument } from '@embedpdf/viewer/core';
+import type { EngineFactory, InitialDocument, StampsCustomization } from '@embedpdf/viewer/core';
 
 /**
  * @deprecated `{ kind: 'share' }` is a standard `OpenInput` kind now
@@ -58,7 +60,19 @@ export interface CloudSource extends CloudEngineOptions {
    *  (a standard OpenInput kind the cloud engine resolves itself). Wins over
    *  the `docToken`/`docId`/`shareToken` shorthands. */
   documents?: InitialDocument[];
+  /** Stamps, exactly as the open-source viewer takes them, except that
+   *  `assetEngine` defaults to a local engine loaded on first use. */
+  stamps?: StampsCustomization;
 }
+
+/**
+ * The engine stamp libraries and signature marks open in. The cloud engine
+ * renders the pages, but a stamp library is a PDF that is cut into stamps and
+ * previewed in the browser, which takes a local engine. It is imported the
+ * first time someone opens Stamps or Signatures, so a viewer that never does
+ * never downloads the wasm.
+ */
+const localAssetEngine = () => import('@embedpdf/engine').then((engine) => engine.localEngine());
 
 /**
  * Split cloud options into the engine seam, the initial documents, and
@@ -70,7 +84,8 @@ export interface CloudSource extends CloudEngineOptions {
  * ```
  *
  * The engine comes back as a thunk, which is what gives the viewer ownership of
- * its lifetime: created on mount, destroyed on unmount.
+ * its lifetime: created on mount, destroyed on unmount. `stamps` comes back
+ * with a local `assetEngine` unless you named one.
  *
  * Document sources need no lowering here: `{ kind: 'share' }` is part of the
  * standard `OpenInput` union and the cloud engine resolves it itself
@@ -93,6 +108,7 @@ export function resolveCloudConfig<T extends CloudSource>(options: T) {
     shareToken,
     sharePassword,
     documents,
+    stamps,
     ...rest
   } = options;
 
@@ -114,5 +130,10 @@ export function resolveCloudConfig<T extends CloudSource>(options: T) {
     ...(docId !== undefined ? [{ source: { kind: 'id' as const, id: docId } }] : []),
   ];
 
-  return { ...rest, engine, documents: initialDocuments };
+  return {
+    ...rest,
+    engine,
+    documents: initialDocuments,
+    stamps: { assetEngine: localAssetEngine, ...stamps },
+  };
 }

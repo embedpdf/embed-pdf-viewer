@@ -117,10 +117,12 @@ export interface ViewerCustomization {
   /** The structure — a value you own: the default (pass nothing), a transform
    *  of it, or your own schema. Never merged. */
   chrome?: ChromeSchema | ((base: ChromeSchema, helpers: ChromeHelpers) => ChromeSchema);
-  /** The stamps sidebar's built-in library. `false`: none (air-gapped, no
-   *  request). A string: a URL template with a `{locale}` slot for a
-   *  self-hosted copy of `@embedpdf/default-stamps`. Default: the copy that
-   *  ships with the viewer, as a lazy chunk of your own build — no CDN. */
+  /** Stamps. `defaultLibrary` is the sidebar's built-in library: `false` for
+   *  none (air-gapped, no request), or a URL template with a `{locale}` slot
+   *  for a self-hosted copy of `@embedpdf/default-stamps`. Default: the copy
+   *  that ships with the viewer, as a lazy chunk of your own build — no CDN.
+   *  `assetEngine` is the local engine libraries open in (see
+   *  {@link StampsCustomization}). */
   stamps?: StampsCustomization;
   /** Digital signatures: the key, trust anchors, the mode (sign / visual /
    *  ask), which marks a person keeps, and script faces for typed marks. With
@@ -337,7 +339,11 @@ export function FullViewer({
     // Stamp libraries (workspace-scoped): named reusable assets — the built-in
     // set plus any PDF the user imports, each page one vector stamp. The
     // stamps sidebar is the picker; placement rides annotation's armed stamp.
-    stampPlugin(),
+    // Libraries open on a local engine: the viewer's own unless the host
+    // names one (a cloud viewer has to).
+    stampPlugin(
+      resolved.stamps.assetEngine ? { assetEngine: resolved.stamps.assetEngine } : undefined,
+    ),
     // The action engine: /A and /AA trees dispatch through one policy-gated
     // executor spine, and the JavaScript switch lives here (the per-document
     // ScriptHost realm; form's K/V/C/F pipeline rides its transaction port,

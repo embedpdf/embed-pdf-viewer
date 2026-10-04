@@ -30,8 +30,11 @@ strict-CSP deployment is a checklist, not an investigation.
 With the cloud engine the document lives on your CloudPDF deployment or on
 CloudPDF SaaS, so `baseUrl` is the one network destination the engine itself
 has — and rendering, text, and search happen there, not in the browser. The
-rows above still apply to the parts that run locally (the built-in stamp
-library opens in the browser).
+rows above still apply to the parts that run locally: the built-in stamp
+library opens in the browser, so the first time someone opens Stamps or
+Signatures the viewer loads `embedpdf.wasm` and the engine worker. The CDN
+snippet ships the WebAssembly in its folder; npm installs go through your
+bundler as above. `stamps.assetEngine` supplies your own local engine instead.
 
 </Engine>
 

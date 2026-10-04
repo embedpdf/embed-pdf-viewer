@@ -1,10 +1,13 @@
 # @cloudpdf/viewer
 
 The full EmbedPDF viewer wired to the CloudPDF engine, delivered as one CDN
-artifact: `cloudpdf.js`. There is no WebAssembly and no Web Worker in this
-bundle — rendering happens on a CloudPDF deployment (the SaaS at
-`api.cloudpdf.com`, or your own [`@cloudpdf/server`](https://www.npmjs.com/package/@cloudpdf/server)),
-so the only thing that crosses the network is HTTPS API traffic.
+artifact: `cloudpdf.js`. Rendering happens on a CloudPDF deployment (the SaaS
+at `api.cloudpdf.com`, or your own [`@cloudpdf/server`](https://www.npmjs.com/package/@cloudpdf/server)),
+so opening and reading a document is HTTPS API traffic only. The one exception
+is stamps: a stamp library is a PDF that is cut into stamps in the browser, so
+the first time someone opens Stamps or Signatures the viewer loads the local
+engine (`embedpdf.wasm`, shipped in the same folder). Pass
+`stamps: { assetEngine }` to supply your own.
 
 ## Usage
 
