@@ -275,6 +275,7 @@ describe('DocumentSession open ownership', () => {
 
     host.receive({
       kind: 'pages.renderEncoded',
+      effect: 'read',
       jobId: 9,
       docId: 'doc-never-opened',
       page: toPageRef(1),
@@ -298,6 +299,7 @@ describe('DocumentSession open ownership', () => {
 
     host.receive({
       kind: 'open.fatMem',
+      effect: 'open',
       jobId: 1,
       docId: 'doc-a',
       bytes: new ArrayBuffer(1),
@@ -308,6 +310,7 @@ describe('DocumentSession open ownership', () => {
     });
     host.receive({
       kind: 'open.layerMemBase',
+      effect: 'open',
       jobId: 2,
       docId: 'doc-a',
       layerName: 'alice',
@@ -316,10 +319,10 @@ describe('DocumentSession open ownership', () => {
       layer: { kind: 'fresh' },
       password: null,
     });
-    host.receive({ kind: 'pages.list', jobId: 3, docId: 'doc-a' });
-    host.receive({ kind: 'pages.list', jobId: 4, docId: 'doc-a', layerName: 'alice' });
-    host.receive({ kind: 'close', jobId: 5, docId: 'doc-a' });
-    host.receive({ kind: 'pages.list', jobId: 6, docId: 'doc-a', layerName: 'alice' });
+    host.receive({ kind: 'pages.list', effect: 'read', jobId: 3, docId: 'doc-a' });
+    host.receive({ kind: 'pages.list', effect: 'read', jobId: 4, docId: 'doc-a', layerName: 'alice' });
+    host.receive({ kind: 'close', effect: 'close', jobId: 5, docId: 'doc-a' });
+    host.receive({ kind: 'pages.list', effect: 'read', jobId: 6, docId: 'doc-a', layerName: 'alice' });
 
     expect(responses.map((r) => r.kind)).toEqual([
       'resolve',
@@ -355,6 +358,7 @@ describe('DocumentSession open ownership', () => {
 
     host.receive({
       kind: 'open.layerFileBase',
+      effect: 'open',
       jobId: 1,
       docId: 'doc-file',
       baseKey: 'base-file',
@@ -362,8 +366,8 @@ describe('DocumentSession open ownership', () => {
       layer: { kind: 'fresh' },
       password: null,
     });
-    host.receive({ kind: 'pages.list', jobId: 2, docId: 'doc-file' });
-    host.receive({ kind: 'close', jobId: 3, docId: 'doc-file' });
+    host.receive({ kind: 'pages.list', effect: 'read', jobId: 2, docId: 'doc-file' });
+    host.receive({ kind: 'close', effect: 'close', jobId: 3, docId: 'doc-file' });
 
     expect(responses.map((r) => r.kind)).toEqual(['resolve', 'resolve', 'resolve']);
     const list = responses[1];
@@ -386,6 +390,7 @@ describe('DocumentSession open ownership', () => {
 
     host.receive({
       kind: 'open.layerMemBase',
+      effect: 'open',
       jobId: 1,
       docId: 'layer-a',
       baseKey: 'shared-base',
@@ -395,6 +400,7 @@ describe('DocumentSession open ownership', () => {
     });
     host.receive({
       kind: 'open.layerMemBase',
+      effect: 'open',
       jobId: 2,
       docId: 'layer-b',
       baseKey: 'shared-base',
@@ -402,8 +408,8 @@ describe('DocumentSession open ownership', () => {
       layer: { kind: 'fresh' },
       password: null,
     });
-    host.receive({ kind: 'close', jobId: 3, docId: 'layer-a' });
-    host.receive({ kind: 'close', jobId: 4, docId: 'layer-b' });
+    host.receive({ kind: 'close', effect: 'close', jobId: 3, docId: 'layer-a' });
+    host.receive({ kind: 'close', effect: 'close', jobId: 4, docId: 'layer-b' });
 
     expect(responses.map((r) => r.kind)).toEqual(['resolve', 'resolve', 'resolve', 'resolve']);
     expect(runtime.calls.loadMemBases).toHaveLength(1);

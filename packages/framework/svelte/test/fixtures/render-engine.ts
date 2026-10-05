@@ -5,14 +5,10 @@
 import type { DocumentHandle, Engine, PageRef } from '@embedpdf/core';
 import { pageAt } from './counter-plugin';
 
-/** A promise with the `abort` / `abortWith` / `setPriority` the engine's tasks have. */
+/** A promise with the `abort` / `abortWith` the engine's tasks have. */
 function task<T>(value: T) {
   const promise = Promise.resolve(value);
-  return Object.assign(promise, {
-    abort: () => {},
-    abortWith: () => promise,
-    setPriority: () => {},
-  });
+  return Object.assign(promise, { abort: () => {}, abortWith: () => promise });
 }
 
 export function renderEngine(pageCount = 2) {
@@ -36,6 +32,11 @@ export function renderEngine(pageCount = 2) {
         },
       },
     }),
+    // Calls' facts and working sets change nothing here: the same document.
+    with() {
+      return this;
+    },
+    setWorkingSet: () => {},
     close: () => Promise.resolve(),
   } as unknown as DocumentHandle;
   const engine = {

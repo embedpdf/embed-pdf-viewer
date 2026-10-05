@@ -1,15 +1,21 @@
-import type { CharMapAnchor, PageObjectNumber, PageTextSnapshot } from '@embedpdf/engine-core/runtime';
+import type {
+  CharMapAnchor,
+  PageObjectNumber,
+  PageTextSnapshot,
+} from '@embedpdf/engine-core/runtime';
 import { charMapViolation, EngineError, EngineErrorCode } from '@embedpdf/engine-core/runtime';
 import { NULL_PTR, type PdfRuntimeModule, type Ptr } from '@embedpdf/engine-runtime';
 
 import type { DocumentSession } from '../../document-session/DocumentSession';
 import { withScratch } from '../../runtime/memory/scratch';
 import { throwIfAborted } from '../../shared/abort';
+import type { Slices } from '../../shared/slices';
 
 /**
  * Per-page slow-path text reader. Acquires a `pagePtr` from the
- * `PagePtrPool`, opens a PDFium text page (`FPDFText_LoadPage`), extracts
- * the page text, and releases everything in reverse order.
+ * `PagePtrPool` (a page not parsed yet loads in slices, so an abort stops the
+ * load), opens a PDFium text page (`FPDFText_LoadPage`), extracts the page
+ * text, and releases everything in reverse order.
  *
  * Index spaces (see engine-core `text/charmap.ts`): `charCount` is the
  * character space (`FPDFText_CountChars` — the space geometry runs tile);
@@ -35,11 +41,15 @@ export class PageTextReader {
     private readonly session: DocumentSession,
   ) {}
 
-  read(pageObjectNumber: PageObjectNumber, signal: AbortSignal): PageTextSnapshot {
+  async read(
+    pageObjectNumber: PageObjectNumber,
+    signal: AbortSignal,
+    slices: Slices,
+  ): Promise<PageTextSnapshot> {
     throwIfAborted(signal);
     const { fn } = this.runtime;
     const pool = this.session.pagePool();
-    const pagePtr = pool.acquire(pageObjectNumber);
+    const pagePtr = await pool.acquireInSlices(pageObjectNumber, signal, slices);
 
     try {
       throwIfAborted(signal);
@@ -81,11 +91,7 @@ export class PageTextReader {
  * the returned requirement always fits and the measure round-trip is
  * skipped. The return value counts UTF-16 units including the terminator.
  */
-function readTextFull(
-  runtime: PdfRuntimeModule,
-  textPagePtr: Ptr,
-  charCount: number,
-): string {
+function readTextFull(runtime: PdfRuntimeModule, textPagePtr: Ptr, charCount: number): string {
   if (charCount <= 0) return '';
   const { fn, mem } = runtime;
   const bufUnits = charCount * 2 + 1;

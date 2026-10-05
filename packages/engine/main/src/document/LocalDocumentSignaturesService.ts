@@ -18,9 +18,8 @@ import {
 
 import type { SessionEventPublisher } from '@embedpdf/engine-services';
 import type { ScopeGuard } from '../scope';
-import { Priority } from '../worker/Priority';
 import type { JobId, WorkerResultPayload } from '../worker/protocol';
-import type { WorkerQueue } from '../worker/WorkerQueue';
+import type { JobQueue } from '../worker/WorkerQueue';
 
 interface DocClosedView {
   isClosed(): boolean;
@@ -35,7 +34,7 @@ interface DocClosedView {
 export class LocalDocumentSignaturesService implements DocumentSignaturesService {
   constructor(
     private readonly docId: string,
-    private readonly queue: WorkerQueue,
+    private readonly queue: JobQueue,
     private readonly view: DocClosedView,
     private readonly guard: ScopeGuard,
     private readonly publisher: SessionEventPublisher,
@@ -45,10 +44,10 @@ export class LocalDocumentSignaturesService implements DocumentSignaturesService
     const rejected = this.gate('doc.forms.read');
     if (rejected) return rejected;
     const docId = this.docId;
-    const submission = this.queue.enqueue<WorkerResultPayload>(
-      { buildPack: (jobId: JobId) => wirePack({ kind: 'signatures.list', jobId, docId }) },
-      { priority: Priority.MEDIUM },
-    );
+    const submission = this.queue.enqueue<WorkerResultPayload>({
+      buildPack: (jobId: JobId) =>
+        wirePack({ kind: 'signatures.list', effect: 'read', jobId, docId }),
+    });
     return this.await(submission, 'signatures.list', (payload) => payload.snapshot);
   }
 
@@ -56,13 +55,10 @@ export class LocalDocumentSignaturesService implements DocumentSignaturesService
     const rejected = this.gate('doc.forms.read');
     if (rejected) return rejected;
     const docId = this.docId;
-    const submission = this.queue.enqueue<WorkerResultPayload>(
-      {
-        buildPack: (jobId: JobId) =>
-          wirePack({ kind: 'signatures.contents', jobId, docId, ref: field }),
-      },
-      { priority: Priority.MEDIUM },
-    );
+    const submission = this.queue.enqueue<WorkerResultPayload>({
+      buildPack: (jobId: JobId) =>
+        wirePack({ kind: 'signatures.contents', effect: 'read', jobId, docId, ref: field }),
+    });
     return this.await(
       submission,
       'signatures.contents',
@@ -74,13 +70,17 @@ export class LocalDocumentSignaturesService implements DocumentSignaturesService
     const rejected = this.gate('doc.forms.read');
     if (rejected) return rejected;
     const docId = this.docId;
-    const submission = this.queue.enqueue<WorkerResultPayload>(
-      {
-        buildPack: (jobId: JobId) =>
-          wirePack({ kind: 'signatures.digest', jobId, docId, ref: field, algorithm }),
-      },
-      { priority: Priority.MEDIUM },
-    );
+    const submission = this.queue.enqueue<WorkerResultPayload>({
+      buildPack: (jobId: JobId) =>
+        wirePack({
+          kind: 'signatures.digest',
+          effect: 'read',
+          jobId,
+          docId,
+          ref: field,
+          algorithm,
+        }),
+    });
     return this.await(submission, 'signatures.digest', (payload) => new Uint8Array(payload.digest));
   }
 
@@ -93,13 +93,10 @@ export class LocalDocumentSignaturesService implements DocumentSignaturesService
       );
     }
     const docId = this.docId;
-    const submission = this.queue.enqueue<WorkerResultPayload>(
-      {
-        buildPack: (jobId: JobId) =>
-          wirePack({ kind: 'signatures.revisionBytes', jobId, docId, revisionIndex }),
-      },
-      { priority: Priority.MEDIUM },
-    );
+    const submission = this.queue.enqueue<WorkerResultPayload>({
+      buildPack: (jobId: JobId) =>
+        wirePack({ kind: 'signatures.revisionBytes', effect: 'read', jobId, docId, revisionIndex }),
+    });
     return this.await(
       submission,
       'signatures.revisionBytes',
@@ -111,12 +108,10 @@ export class LocalDocumentSignaturesService implements DocumentSignaturesService
     const rejected = this.gate('doc.forms.read');
     if (rejected) return rejected;
     const docId = this.docId;
-    const submission = this.queue.enqueue<WorkerResultPayload>(
-      {
-        buildPack: (jobId: JobId) => wirePack({ kind: 'signatures.analyze', jobId, docId, input }),
-      },
-      { priority: Priority.MEDIUM },
-    );
+    const submission = this.queue.enqueue<WorkerResultPayload>({
+      buildPack: (jobId: JobId) =>
+        wirePack({ kind: 'signatures.analyze', effect: 'read', jobId, docId, input }),
+    });
     return this.await(submission, 'signatures.analyze', (payload) => payload.analysis);
   }
 
@@ -125,12 +120,10 @@ export class LocalDocumentSignaturesService implements DocumentSignaturesService
       this.gate('doc.sign') ?? (input.certify ? this.gate('doc.sign.certify') : null);
     if (rejected) return rejected;
     const docId = this.docId;
-    const submission = this.queue.enqueue<WorkerResultPayload>(
-      {
-        buildPack: (jobId: JobId) => wirePack({ kind: 'signatures.prepare', jobId, docId, input }),
-      },
-      { priority: Priority.HIGH },
-    );
+    const submission = this.queue.enqueue<WorkerResultPayload>({
+      buildPack: (jobId: JobId) =>
+        wirePack({ kind: 'signatures.prepare', effect: 'snapshot', jobId, docId, input }),
+    });
     return this.await(submission, 'signatures.prepare', (payload) => {
       this.publisher.publishLocal({
         type: 'signatures.prepared',
@@ -145,12 +138,10 @@ export class LocalDocumentSignaturesService implements DocumentSignaturesService
     const rejected = this.gate('doc.sign');
     if (rejected) return rejected;
     const docId = this.docId;
-    const submission = this.queue.enqueue<WorkerResultPayload>(
-      {
-        buildPack: (jobId: JobId) => wirePack({ kind: 'signatures.complete', jobId, docId, input }),
-      },
-      { priority: Priority.HIGH },
-    );
+    const submission = this.queue.enqueue<WorkerResultPayload>({
+      buildPack: (jobId: JobId) =>
+        wirePack({ kind: 'signatures.complete', effect: 'contentWrite', jobId, docId, input }),
+    });
     return this.await(submission, 'signatures.complete', (payload) => {
       const result = payload.result;
       if (result.status === 'completed') {
@@ -172,13 +163,10 @@ export class LocalDocumentSignaturesService implements DocumentSignaturesService
     const rejected = this.gate('doc.sign');
     if (rejected) return rejected;
     const docId = this.docId;
-    const submission = this.queue.enqueue<WorkerResultPayload>(
-      {
-        buildPack: (jobId: JobId) =>
-          wirePack({ kind: 'signatures.cancel', jobId, docId, signingId }),
-      },
-      { priority: Priority.HIGH },
-    );
+    const submission = this.queue.enqueue<WorkerResultPayload>({
+      buildPack: (jobId: JobId) =>
+        wirePack({ kind: 'signatures.cancel', effect: 'session', jobId, docId, signingId }),
+    });
     return this.await(submission, 'signatures.cancel', (payload) => {
       if (payload.result.status === 'cancelled') {
         this.publisher.publishLocal({ type: 'signatures.cancelled', signingId });

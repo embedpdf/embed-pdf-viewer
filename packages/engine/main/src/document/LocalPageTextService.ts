@@ -13,9 +13,8 @@ import {
 } from '@embedpdf/engine-core/runtime';
 
 import type { ScopeGuard } from '../scope';
-import { Priority } from '../worker/Priority';
 import type { JobId, WorkerResultPayload } from '../worker/protocol';
-import type { WorkerQueue } from '../worker/WorkerQueue';
+import type { JobQueue } from '../worker/WorkerQueue';
 
 interface DocClosedView {
   isClosed(): boolean;
@@ -31,7 +30,7 @@ export class LocalPageTextService implements PageTextService {
   constructor(
     private readonly docId: string,
     private readonly ref: PageRef,
-    private readonly queue: WorkerQueue,
+    private readonly queue: JobQueue,
     private readonly view: DocClosedView,
     private readonly guard: ScopeGuard,
   ) {}
@@ -52,18 +51,16 @@ export class LocalPageTextService implements PageTextService {
     }
     const docId = this.docId;
     const ref = this.ref;
-    const submission = this.queue.enqueue<WorkerResultPayload>(
-      {
-        buildPack: (jobId: JobId) =>
-          wirePack({
-            kind: 'pages.text',
-            jobId,
-            docId,
-            page: ref,
-          }),
-      },
-      { priority: Priority.MEDIUM },
-    );
+    const submission = this.queue.enqueue<WorkerResultPayload>({
+      buildPack: (jobId: JobId) =>
+        wirePack({
+          kind: 'pages.text',
+          effect: 'read',
+          jobId,
+          docId,
+          page: ref,
+        }),
+    });
     return AbortablePromise.run<PageTextSnapshot>(async (signal) => {
       const onAbort = () => submission.abort(signal.reason);
       if (signal.aborted) onAbort();
@@ -97,12 +94,10 @@ export class LocalPageTextService implements PageTextService {
     }
     const docId = this.docId;
     const ref = this.ref;
-    const submission = this.queue.enqueue<WorkerResultPayload>(
-      {
-        buildPack: (jobId: JobId) => wirePack({ kind: 'pages.geometry', jobId, docId, page: ref }),
-      },
-      { priority: Priority.MEDIUM },
-    );
+    const submission = this.queue.enqueue<WorkerResultPayload>({
+      buildPack: (jobId: JobId) =>
+        wirePack({ kind: 'pages.geometry', effect: 'read', jobId, docId, page: ref }),
+    });
     return AbortablePromise.run<TextLayout>(async (signal) => {
       const onAbort = () => submission.abort(signal.reason);
       if (signal.aborted) onAbort();

@@ -98,6 +98,7 @@ export function RenderLayer({ annotations = true, tiles = true }: RenderLayerPro
         const image = await render.renderSource(page.ref, {
           scale: page.transform.renderScale,
           includeAnnotations: annotations,
+          view: page.view,
           signal: controller.signal,
         });
         const obj = await image.objectUrl().abortWith(controller.signal);

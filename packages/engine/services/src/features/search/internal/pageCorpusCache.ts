@@ -3,6 +3,7 @@ import { foldText } from '@embedpdf/engine-core/runtime';
 import type { PdfRuntimeModule } from '@embedpdf/engine-runtime';
 
 import type { DocumentSession } from '../../../document-session/DocumentSession';
+import type { Slices } from '../../../shared/slices';
 import { PageTextReader } from '../../text/PageTextReader';
 
 export interface PageCorpus {
@@ -41,12 +42,13 @@ const MAX_CACHED_PAGES = 512;
 
 const cache = new WeakMap<DocumentSession, Map<PageObjectNumber, PageCorpusEntry>>();
 
-export function acquirePageCorpus(
+export async function acquirePageCorpus(
   runtime: PdfRuntimeModule,
   session: DocumentSession,
   pageObjectNumber: PageObjectNumber,
   signal: AbortSignal,
-): PageCorpus {
+  slices: Slices,
+): Promise<PageCorpus> {
   const seq = session.mutationSeq();
   let pages = cache.get(session);
   if (!pages) {
@@ -57,7 +59,11 @@ export function acquirePageCorpus(
   const hit = pages.get(pageObjectNumber);
   if (hit && hit.seq === seq) return hit;
 
-  const snapshot = new PageTextReader(runtime, session).read(pageObjectNumber, signal);
+  const snapshot = await new PageTextReader(runtime, session).read(
+    pageObjectNumber,
+    signal,
+    slices,
+  );
   const entry: PageCorpusEntry = { seq, folded: foldText(snapshot.text), snapshot };
 
   pages.delete(pageObjectNumber); // re-insert = most recently used

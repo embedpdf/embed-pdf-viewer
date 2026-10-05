@@ -62,6 +62,9 @@ export {
   snapTileScale,
 } from './engine/DocumentRenderService';
 export type { DocumentRenderService, EngineRenderPolicy } from './engine/DocumentRenderService';
+export type { CallFacts, CallPriority, WorkingSetPage } from './scheduling/facts';
+export { clearlyOutranks, placeFor, placeIn, placedBefore, rank } from './scheduling/place';
+export type { JobTarget, Place, Placed, RankedJob, ViewSets } from './scheduling/place';
 export { passwordPromptFromState } from './engine/passwordPrompt';
 export type { PasswordPrompt } from './engine/passwordPrompt';
 export type { DocumentCapabilities } from './engine/DocumentHandle';
@@ -98,19 +101,17 @@ export type {
   PieceInfoSnapshot,
 } from './dto/PieceInfo';
 export type { PageTextService } from './engine/PageTextService';
-export type {
-  LocalPageRenderService,
-  PageRenderService,
-  PageRenderTask,
-} from './engine/PageRenderService';
-export { pageRenderTask } from './engine/PageRenderService';
+export type { LocalPageRenderService, PageRenderService } from './engine/PageRenderService';
 
 export { wirePack, EMPTY_TRANSFER } from './wire/WirePack';
 export type { WirePack } from './wire/WirePack';
 
 export type {
   WorkerJobId,
+  RequestEffect,
   WorkerRequest,
+  WorkerJobRequest,
+  WorkerControlMessage,
   WorkerResponse,
   WorkerResultPayload,
   WorkerLifecycleMessage,
@@ -198,6 +199,7 @@ export type {
   CloseWorkerRequest,
   LayerCloseWorkerRequest,
   AbortWorkerRequest,
+  PagesWorkingSetWorkerRequest,
   ShutdownWorkerRequest,
   AttachmentsListWorkerRequest,
   AttachmentsReadFileWorkerRequest,

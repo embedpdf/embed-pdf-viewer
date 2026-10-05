@@ -12,7 +12,6 @@ import {
   type WorkerResultPayload,
 } from '@embedpdf/engine-core/runtime';
 
-import { Priority } from '../worker/Priority';
 import type { JobId } from '../worker/protocol';
 import type { WorkerQueue } from '../worker/WorkerQueue';
 
@@ -80,24 +79,22 @@ export class LocalFontService implements FontService {
       const replayCopy = bytes.slice(0);
       const submission = this.queue.enqueue<
         Extract<WorkerResultPayload, { tag: 'fonts.register' }>
-      >(
-        {
-          buildPack: (jobId: JobId) =>
-            wirePack(
-              {
-                kind: 'fonts.register',
-                jobId,
-                fontKey: key,
-                familyName,
-                weight,
-                italic,
-                data: bytes,
-              },
-              [bytes],
-            ),
-        },
-        { priority: Priority.HIGH },
-      );
+      >({
+        buildPack: (jobId: JobId) =>
+          wirePack(
+            {
+              kind: 'fonts.register',
+              effect: 'runtimeWrite',
+              jobId,
+              fontKey: key,
+              familyName,
+              weight,
+              italic,
+              data: bytes,
+            },
+            [bytes],
+          ),
+      });
       forwardAbort(signal, submission);
       const payload = await submission;
       // The runtime resolved the identity (inferred family, weight, italic)
@@ -180,7 +177,8 @@ export class LocalFontService implements FontService {
     }
     return AbortablePromise.run<void>(async (signal) => {
       const submission = this.queue.enqueue({
-        buildPack: (jobId: JobId) => wirePack({ kind: 'fonts.addFallback', jobId, fontKey: key }),
+        buildPack: (jobId: JobId) =>
+          wirePack({ kind: 'fonts.addFallback', effect: 'runtimeWrite', jobId, fontKey: key }),
       });
       forwardAbort(signal, submission);
       await submission;
@@ -201,7 +199,7 @@ export class LocalFontService implements FontService {
         Extract<WorkerResultPayload, { tag: 'fonts.authorizeEditing' }>
       >({
         buildPack: (jobId: JobId) =>
-          wirePack({ kind: 'fonts.authorizeEditing', jobId, fontKey: key }),
+          wirePack({ kind: 'fonts.authorizeEditing', effect: 'runtimeWrite', jobId, fontKey: key }),
       });
       forwardAbort(signal, submission);
       const payload = await submission;
@@ -213,7 +211,8 @@ export class LocalFontService implements FontService {
   clearFallbacks(): AbortablePromise<void> {
     return AbortablePromise.run<void>(async (signal) => {
       const submission = this.queue.enqueue({
-        buildPack: (jobId: JobId) => wirePack({ kind: 'fonts.clearFallbacks', jobId }),
+        buildPack: (jobId: JobId) =>
+          wirePack({ kind: 'fonts.clearFallbacks', effect: 'runtimeWrite', jobId }),
       });
       forwardAbort(signal, submission);
       await submission;
@@ -224,7 +223,8 @@ export class LocalFontService implements FontService {
   clear(): AbortablePromise<void> {
     return AbortablePromise.run<void>(async (signal) => {
       const submission = this.queue.enqueue({
-        buildPack: (jobId: JobId) => wirePack({ kind: 'fonts.clear', jobId }),
+        buildPack: (jobId: JobId) =>
+          wirePack({ kind: 'fonts.clear', effect: 'runtimeWrite', jobId }),
       });
       forwardAbort(signal, submission);
       await submission;
@@ -251,6 +251,7 @@ export class LocalFontService implements FontService {
           wirePack(
             {
               kind: 'fonts.register',
+              effect: 'runtimeWrite',
               jobId,
               fontKey: key,
               familyName: font.familyName,
@@ -264,7 +265,8 @@ export class LocalFontService implements FontService {
     }
     for (const key of this.fallbacks) {
       await this.queue.enqueue({
-        buildPack: (jobId: JobId) => wirePack({ kind: 'fonts.addFallback', jobId, fontKey: key }),
+        buildPack: (jobId: JobId) =>
+          wirePack({ kind: 'fonts.addFallback', effect: 'runtimeWrite', jobId, fontKey: key }),
       });
     }
     for (const [key, font] of this.fonts) {
@@ -274,7 +276,12 @@ export class LocalFontService implements FontService {
       ) {
         await this.queue.enqueue({
           buildPack: (jobId: JobId) =>
-            wirePack({ kind: 'fonts.authorizeEditing', jobId, fontKey: key }),
+            wirePack({
+              kind: 'fonts.authorizeEditing',
+              effect: 'runtimeWrite',
+              jobId,
+              fontKey: key,
+            }),
         });
       }
     }

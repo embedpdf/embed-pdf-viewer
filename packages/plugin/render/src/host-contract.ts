@@ -37,6 +37,11 @@ export interface RenderSourceOptions {
   scale: number;
   /** Bake annotations (default true). Pass false when an annotation layer paints them. */
   includeAnnotations?: boolean;
+  /**
+   * The view the picture is for (the page context's `view`): the engine ranks
+   * the render by where the page is in that view (`doc.with({ view })`).
+   */
+  view?: string;
 }
 
 /**

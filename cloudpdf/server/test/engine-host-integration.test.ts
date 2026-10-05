@@ -22,7 +22,14 @@ const CRASHING_WORKER = fileURLToPath(
 const openBuild = (docId: string) => (jobId: number) => {
   const empty = new ArrayBuffer(0);
   return wirePack(
-    { kind: 'open.fatMem', jobId, docId, bytes: empty, password: null } as unknown as WorkerRequest,
+    {
+      kind: 'open.fatMem',
+      effect: 'open',
+      jobId,
+      docId,
+      bytes: empty,
+      password: null,
+    } as unknown as WorkerRequest,
     [empty],
   );
 };

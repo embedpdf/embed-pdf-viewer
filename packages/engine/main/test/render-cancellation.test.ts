@@ -18,28 +18,7 @@ import {
 } from '@embedpdf/engine-core/runtime';
 import { createPdfRuntime, type PdfRuntimeModule } from '@embedpdf/engine-runtime';
 import { WorkerHost } from '../../services/src/worker-host/WorkerHost';
-import { pdf, type Objects } from './helpers/miniPdf';
-
-/** Pages of small coloured squares, enough for a render of many slices. */
-function heavyPdf(pageCount: number, squares: number): Uint8Array {
-  const objects: Objects = { 1: '<< /Type /Catalog /Pages 2 0 R >>' };
-  const kids: string[] = [];
-  for (let p = 0; p < pageCount; p++) {
-    const pageNumber = 3 + 2 * p;
-    kids.push(`${pageNumber} 0 R`);
-    let body = '';
-    for (let i = 0; i < squares; i++) {
-      const x = (i * 7 + p * 3) % 590;
-      const y = (i * 13) % 830;
-      body += `${(i % 7) / 7} ${(i % 5) / 5} ${(i % 3) / 3} rg ${x} ${y} 4 4 re f\n`;
-    }
-    objects[pageNumber] =
-      `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 600 840] /Contents ${pageNumber + 1} 0 R >>`;
-    objects[pageNumber + 1] = `<< /Length ${body.length} >>\nstream\n${body}endstream`;
-  }
-  objects[2] = `<< /Type /Pages /Kids [${kids.join(' ')}] /Count ${pageCount} >>`;
-  return pdf(objects);
-}
+import { heavyPdf } from './helpers/heavyPdf';
 
 const bytes = heavyPdf(2, 30_000);
 const FIRST = toPageRef(3);
@@ -72,13 +51,13 @@ function counting(runtime: PdfRuntimeModule) {
 const turn = () => new Promise<void>((resolve) => setImmediate(resolve));
 
 /** A worker host with the heavy document open, and the replies it posted. */
-async function openHost(renderSliceMs: number) {
+async function openHost(sliceMs: number) {
   const { runtime, counts } = counting(await createPdfRuntime({ prefer: 'wasm' }));
   const replies: WorkerResponse[] = [];
   const host = new WorkerHost(
     runtime,
     (pack: WirePack<WorkerResponse>) => replies.push(pack.payload),
-    { renderSliceMs },
+    { sliceMs },
   );
   let jobId = 0;
   // An abort names the job it stops; every other request gets a new id.
@@ -93,7 +72,7 @@ async function openHost(renderSliceMs: number) {
   };
   const order = () => replies.map((response) => response.jobId);
   const open = await settled(
-    send({ kind: 'open.fatMem', bytes: bytes.slice().buffer, password: null }),
+    send({ kind: 'open.fatMem', effect: 'open', bytes: bytes.slice().buffer, password: null }),
   );
   expect(open.kind).toBe('resolve');
   return { host, counts, send, reply, settled, order };
@@ -104,6 +83,7 @@ type Host = Awaited<ReturnType<typeof openHost>>;
 const render = (host: Host, page: PageRef, options: Record<string, unknown> = {}) =>
   host.send({
     kind: 'pages.render',
+    effect: 'read',
     page,
     options: { viewport: { kind: 'scale', scale: 1 }, ...options },
   });
@@ -155,8 +135,12 @@ describe('sliced page renders (wasm engine)', () => {
     const host = await openHost(0);
     const first = render(host, FIRST);
     while (host.counts.continues < 3) await turn();
-    const list = host.send({ kind: 'pages.list' });
-    const update = host.send({ kind: 'metadata.update', patch: { title: 'held' } });
+    const list = host.send({ kind: 'pages.list', effect: 'read' });
+    const update = host.send({
+      kind: 'metadata.update',
+      effect: 'write',
+      patch: { title: 'held' },
+    });
     const second = render(host, SECOND);
 
     for (let i = 0; i < 20; i++) await turn();
@@ -191,7 +175,7 @@ describe('sliced page renders (wasm engine)', () => {
     const host = await openHost(0);
     const job = render(host, FIRST);
     while (host.counts.continues < 3) await turn();
-    const close = host.send({ kind: 'close' });
+    const close = host.send({ kind: 'close', effect: 'close' });
 
     expect((await host.settled(close)).kind).toBe('resolve');
     expect(host.order().slice(-2)).toEqual([job, close]);

@@ -59,6 +59,7 @@
     const options = untrack(() => ({
       scale: page.transform.renderScale,
       includeAnnotations: annotations,
+      view: page.view,
     }));
     void (async () => {
       try {

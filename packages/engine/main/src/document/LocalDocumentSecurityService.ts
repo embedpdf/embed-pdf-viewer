@@ -18,9 +18,8 @@ import {
 } from '@embedpdf/engine-core/runtime';
 
 import type { ScopeGuard } from '../scope';
-import { Priority } from '../worker/Priority';
 import type { JobId, WorkerResultPayload } from '../worker/protocol';
-import type { WorkerQueue } from '../worker/WorkerQueue';
+import type { JobQueue } from '../worker/WorkerQueue';
 
 export class LocalDocumentSecurityService implements DocumentSecurityService {
   private securityState: DocumentSecurityState;
@@ -28,7 +27,7 @@ export class LocalDocumentSecurityService implements DocumentSecurityService {
   constructor(
     initial: DocumentSecurityProbeInfo,
     private readonly docId: string,
-    private readonly queue: WorkerQueue,
+    private readonly queue: JobQueue,
     private readonly view: { isClosed(): boolean },
     /**
      * Optional ScopeGuard so the service can expose the same
@@ -123,19 +122,17 @@ export class LocalDocumentSecurityService implements DocumentSecurityService {
         new EngineError(EngineErrorCode.DocNotOpen, `document not open: ${this.docId}`),
       );
     }
-    const submission = this.queue.enqueue<WorkerResultPayload>(
-      {
-        buildPack: (jobId: JobId) =>
-          wirePack({
-            kind: 'document.checkPasswordPermissions',
-            jobId,
-            docId: this.docId,
-            password: input.password,
-            mode: input.mode ?? 'any',
-          }),
-      },
-      { priority: Priority.HIGH },
-    );
+    const submission = this.queue.enqueue<WorkerResultPayload>({
+      buildPack: (jobId: JobId) =>
+        wirePack({
+          kind: 'document.checkPasswordPermissions',
+          effect: 'open',
+          jobId,
+          docId: this.docId,
+          password: input.password,
+          mode: input.mode ?? 'any',
+        }),
+    });
     return AbortablePromise.run<DocumentUnlockResult>(async (signal) => {
       const onAbort = () => submission.abort(signal.reason);
       if (signal.aborted) onAbort();

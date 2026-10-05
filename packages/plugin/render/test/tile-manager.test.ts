@@ -22,15 +22,11 @@ const LATTICE = {
   enforced: false,
 } as const;
 
-function createHarness(options?: {
-  policy?: unknown;
-  tiling?: TilesOptions;
-  priorityOf?: (pageObjectNumber: number, prefetch: boolean) => number;
-}) {
+function createHarness(options?: { policy?: unknown; tiling?: TilesOptions }) {
   const store = new RasterStore(256);
   const pending: Array<{
+    view: string;
     page: number;
-    prefetch: () => boolean;
     key: string;
     rect: Rect;
     scale: number;
@@ -50,12 +46,11 @@ function createHarness(options?: {
     getPageSize: () => PAGE,
     getEpoch: () => epoch,
     after: timerClock.after,
-    priorityOf: options?.priorityOf ?? (() => 0),
-    fetchTile: (pageObjectNumber, rect, scale, _includeAnnotations, signal, prefetch) =>
+    fetchTile: (view, pageObjectNumber, rect, scale, _includeAnnotations, signal) =>
       new Promise<PageImageHandle>((resolve, reject) => {
         const record = {
+          view,
           page: pageObjectNumber,
-          prefetch,
           key: `${rect.x},${rect.y}@${scale}`,
           rect,
           scale,
@@ -269,7 +264,11 @@ describe('TileManager', () => {
     harness.manager.plan(1, DEEP, true);
     expect(harness.pending).toHaveLength(4);
     // Pan far away before anything resolves.
-    harness.manager.plan(1, { ...DEEP, visibleRect: { x: 448, y: 448, width: 128, height: 128 } }, true);
+    harness.manager.plan(
+      1,
+      { ...DEEP, visibleRect: { x: 448, y: 448, width: 128, height: 128 } },
+      true,
+    );
     await drain();
     expect(harness.pending.slice(0, 4).every((request) => request.aborted())).toBe(true);
   });
@@ -378,40 +377,39 @@ describe('TileManager', () => {
   });
 });
 
-describe('one line across pages (render priority)', () => {
+describe('one line across pages and views', () => {
   // A wide strip at scale 8: 10 × 4 visible tiles, more than the 8 transit slots.
   const STRIP = { desiredDeviceWidth: 4896, visibleRect: { x: 0, y: 0, width: 612, height: 256 } };
 
-  it('a freed slot goes to the most urgent page, not to the page that planned first', async () => {
-    const harness = createHarness({
-      tiling: { prefetch: { margin: 0 } },
-      priorityOf: (page) => (page === 2 ? 10 : 1),
-    });
+  it('a freed slot goes to an on-screen tile of any page before a tile of a ring', async () => {
+    const harness = createHarness();
     harness.manager.plan(1, STRIP, true);
+    // Every visible tile of page 1 ready, eight at a time.
+    for (let started = -1; started !== harness.pending.length; ) {
+      started = harness.pending.length;
+      await harness.resolveAll();
+    }
+    harness.manager.plan(1, STRIP, true); // page 1's ring queues, and takes every slot
+    const before = harness.pending.length;
     harness.manager.plan(2, STRIP, true);
-    // Page 1 planned first and took every slot; page 2 waits.
-    expect(harness.pending.map((request) => request.page)).toEqual(Array(8).fill(1));
+    expect(harness.pending).toHaveLength(before); // page 2 waits for a slot
 
-    harness.pending[0]!.resolve();
+    // The slot a ring tile frees goes to page 2's tiles on screen, though
+    // page 1's ring has more tiles queued and queued first.
+    harness.pending[before - 1]!.resolve();
     await drain();
-    expect(harness.pending).toHaveLength(9);
-    expect(harness.pending[8]!.page).toBe(2);
+    expect(harness.pending).toHaveLength(before + 1);
+    expect(harness.pending.at(-1)!.page).toBe(2);
   });
 
-  it("a ring tile that a pan brings on screen stops counting as prefetch while it's in flight", async () => {
-    const harness = createHarness();
-    harness.manager.plan(1, DEEP, true);
-    await harness.resolveAll();
-    harness.manager.plan(1, DEEP, true); // every visible tile ready: the ring starts
-    const ring = harness.pending.slice(4);
-    expect(ring.length).toBeGreaterThan(0);
-    expect(ring.every((request) => request.prefetch())).toBe(true);
-
-    // One tile-span right: the column right of the old view is on screen now.
-    const panned = { ...DEEP, visibleRect: { x: 64, y: 0, width: 128, height: 128 } };
-    harness.manager.plan(1, panned, true);
-    const onScreen = ring.filter((request) => !request.aborted() && !request.prefetch());
-    expect(onScreen.map((request) => request.rect.x)).toEqual([128, 128]);
+  it('a tile names the view it is for, so the engine ranks it by where it is there', () => {
+    const harness = createHarness({ tiling: { prefetch: { margin: 0 } } });
+    harness.manager.plan(1, DEEP, true, 'stage');
+    // Twice as sharp: other tiles, which the store can't share with the stage's.
+    harness.manager.plan(1, { ...DEEP, desiredDeviceWidth: 9792 }, true, 'magnifier');
+    expect(new Set(harness.pending.map((request) => request.view))).toEqual(
+      new Set(['stage', 'magnifier']),
+    );
   });
 });
 
@@ -446,7 +444,9 @@ describe('settle convergence (regression: a zoom must always land on its final l
       expect(harness.pending.length).toBeGreaterThan(before);
       await harness.resolveAll();
       let plan = harness.manager.plan(1, demand(6400), true);
-      expect(plan.paint.some((source) => Math.abs(source.scale - 6400 / PAGE.width) < 1e-9)).toBe(true);
+      expect(plan.paint.some((source) => Math.abs(source.scale - 6400 / PAGE.width) < 1e-9)).toBe(
+        true,
+      );
 
       // One small step (the anchor-jitter cadence) converges the same way.
       harness.manager.plan(1, demand(6560), true);
@@ -455,7 +455,9 @@ describe('settle convergence (regression: a zoom must always land on its final l
       expect(harness.pending.length).toBeGreaterThan(beforeSmall);
       await harness.resolveAll();
       plan = harness.manager.plan(1, demand(6560), true);
-      expect(plan.paint.some((source) => Math.abs(source.scale - 6560 / PAGE.width) < 1e-9)).toBe(true);
+      expect(plan.paint.some((source) => Math.abs(source.scale - 6560 / PAGE.width) < 1e-9)).toBe(
+        true,
+      );
     } finally {
       vi.useRealTimers();
     }

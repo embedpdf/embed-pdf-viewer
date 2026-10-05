@@ -280,6 +280,7 @@ export class EpdfRenderLayer {
           const image = await render.renderSource(this.page.ref, {
             scale,
             includeAnnotations,
+            view: this.page.view,
             signal: controller.signal,
           });
           const objectUrl = await image.objectUrl().abortWith(controller.signal);

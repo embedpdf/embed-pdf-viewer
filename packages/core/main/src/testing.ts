@@ -224,7 +224,7 @@ export function createTestContext<S = void, T extends object = NoSettings>(
       ? null
       : isRealHandle
         ? (options.doc as DocumentHandle)
-        : ({
+        : fakeDocument({
             id: documentId,
             events: {
               subscribe: documentEvents.on,
@@ -234,7 +234,7 @@ export function createTestContext<S = void, T extends object = NoSettings>(
             },
             security: { allows: () => true, allowsAnnotation: () => true },
             ...options.doc,
-          } as unknown as DocumentHandle);
+          });
   const requireDoc = (): DocumentHandle => {
     if (!doc) throw new PluginError('not-ready', id, 'the test context has no document');
     return doc;
@@ -509,4 +509,15 @@ export function manualClock(options: { frames?: boolean } = {}): ManualClock {
       for (const run of due) run(now);
     },
   };
+}
+
+/**
+ * A faked document's members over the defaults every document has: calls'
+ * facts and working sets change no result, so `with` gives the same fake and
+ * a working set goes nowhere, unless the test fakes them.
+ */
+function fakeDocument(members: Record<string, unknown>): DocumentHandle {
+  const fake: Record<string, unknown> = { setWorkingSet: () => {}, ...members };
+  fake.with ??= () => fake;
+  return fake as unknown as DocumentHandle;
 }

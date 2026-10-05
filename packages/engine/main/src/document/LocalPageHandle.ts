@@ -15,7 +15,7 @@ import { LocalPieceInfoService } from './LocalPieceInfoService';
 import { LocalPageMeasureService } from './LocalPageMeasureService';
 import type { LocalImageEncoder } from '../render/BrowserImageEncoder';
 import type { ScopeGuard } from '../scope';
-import type { WorkerQueue } from '../worker/WorkerQueue';
+import type { JobQueue } from '../worker/WorkerQueue';
 
 interface DocClosedView {
   isClosed(): boolean;
@@ -37,7 +37,7 @@ export class LocalPageHandle implements LocalPageHandleContract {
   constructor(
     readonly ref: PageRef,
     docId: string,
-    queue: WorkerQueue,
+    queue: JobQueue,
     view: DocClosedView,
     imageEncoder: LocalImageEncoder,
     guard: ScopeGuard,

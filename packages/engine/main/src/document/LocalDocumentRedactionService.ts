@@ -10,9 +10,8 @@ import {
 import type { SessionEventPublisher } from '@embedpdf/engine-services';
 
 import type { ScopeGuard } from '../scope';
-import { Priority } from '../worker/Priority';
 import type { JobId, WorkerResultPayload } from '../worker/protocol';
-import type { WorkerQueue } from '../worker/WorkerQueue';
+import type { JobQueue } from '../worker/WorkerQueue';
 
 interface DocClosedView {
   isClosed(): boolean;
@@ -27,7 +26,7 @@ interface DocClosedView {
 export class LocalDocumentRedactionService implements DocumentRedactionService {
   constructor(
     private readonly docId: string,
-    private readonly queue: WorkerQueue,
+    private readonly queue: JobQueue,
     private readonly view: DocClosedView,
     private readonly guard: ScopeGuard,
     private readonly publisher: SessionEventPublisher,
@@ -50,12 +49,10 @@ export class LocalDocumentRedactionService implements DocumentRedactionService {
       return AbortablePromise.rejectReason(error);
     }
     const docId = this.docId;
-    const submission = this.queue.enqueue<WorkerResultPayload>(
-      {
-        buildPack: (jobId: JobId) => wirePack({ kind: 'redaction.apply', jobId, docId, scope }),
-      },
-      { priority: Priority.HIGH },
-    );
+    const submission = this.queue.enqueue<WorkerResultPayload>({
+      buildPack: (jobId: JobId) =>
+        wirePack({ kind: 'redaction.apply', effect: 'contentWrite', jobId, docId, scope }),
+    });
     return AbortablePromise.run<RedactionApplyResult>(async (signal) => {
       const onAbort = () => submission.abort(signal.reason);
       if (signal.aborted) onAbort();

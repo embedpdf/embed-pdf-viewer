@@ -9,9 +9,8 @@ import {
 } from '@embedpdf/engine-core/runtime';
 
 import type { ScopeGuard } from '../scope';
-import { Priority } from '../worker/Priority';
 import type { JobId, WorkerResultPayload } from '../worker/protocol';
-import type { WorkerQueue } from '../worker/WorkerQueue';
+import type { JobQueue } from '../worker/WorkerQueue';
 
 interface DocClosedView {
   isClosed(): boolean;
@@ -28,7 +27,7 @@ interface DocClosedView {
 export class LocalDocumentSearchService implements DocumentSearchService {
   constructor(
     private readonly docId: string,
-    private readonly queue: WorkerQueue,
+    private readonly queue: JobQueue,
     private readonly view: DocClosedView,
     private readonly guard: ScopeGuard,
   ) {}
@@ -51,11 +50,11 @@ export class LocalDocumentSearchService implements DocumentSearchService {
     const docId = this.docId;
     const submission = this.queue.enqueue<WorkerResultPayload>(
       {
-        buildPack: (jobId: JobId) => wirePack({ kind: 'search.query', jobId, docId, request }),
+        buildPack: (jobId: JobId) =>
+          wirePack({ kind: 'search.query', effect: 'read', jobId, docId, request }),
       },
       // Search runs behind interactive work (renders, edits): a slice is
       // bounded but not small, and the next one can always wait a beat.
-      { priority: Priority.LOW },
     );
     return AbortablePromise.run<SearchSlice>(async (signal) => {
       const onAbort = () => submission.abort(signal.reason);

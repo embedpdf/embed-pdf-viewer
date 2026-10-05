@@ -428,6 +428,7 @@ export class DerivedRenderService {
             (jobId) =>
               wirePack({
                 kind: 'document.renderPageFileEncoded' as const,
+                effect: 'read' as const,
                 jobId,
                 path: handle.path,
                 password: null,
@@ -452,6 +453,7 @@ export class DerivedRenderService {
             (jobId) =>
               wirePack({
                 kind: 'document.renderPageFile' as const,
+                effect: 'read' as const,
                 jobId,
                 path: handle.path,
                 password: null,

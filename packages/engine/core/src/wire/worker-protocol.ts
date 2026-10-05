@@ -67,6 +67,7 @@ import type { RedactionApplyResult, RedactionApplyScope } from '../mutation/Reda
 import type { Coordinates, PageCoordinates } from '../pageSpace/coordinates';
 import type { WireResourceMap } from '../resource/BinarySource';
 import type { PageState } from '../revision/PageState';
+import type { WorkingSetPage } from '../scheduling/facts';
 import type { SearchRequest, SearchSlice } from '../search/types';
 import type { AnalyzeInput, ChangeAnalysis } from '../signature/analysis/types';
 import type {
@@ -98,8 +99,39 @@ import type { AnnotationExportSelection } from '../transfer/exportSelection';
  */
 export type WorkerJobId = number;
 
+/**
+ * What a job does to its document: part of every job request's definition,
+ * so the one fact has one home. The worker queue keeps each document's jobs
+ * in the order this asks for (the page residency plan, §10.5), and the worker
+ * closes parsed pages a write may have changed.
+ *
+ * - `read`: changes nothing. It sees every write asked before it, and may see
+ *   one asked after it.
+ * - `snapshot`: reads the document as of its call, so writes asked after it
+ *   wait for it (saving, exporting, preparing a signing).
+ * - `session`: changes the session, not the document, so writes asked after it
+ *   wait for it (font settings, cancelling a signing). Reads don't.
+ * - `write`: changes the document, but no page's content (annotations, forms,
+ *   metadata, attachments, names).
+ * - `contentWrite`: may change what pages show (page edits, flattening,
+ *   redaction, a completed signing).
+ * - `runtimeWrite`: changes the runtime, for every document (fonts).
+ * - `open`: opens the document, or unlocks it; everything after it waits.
+ * - `close`: closes the document, or one layer of it, after everything before it.
+ */
+export type RequestEffect =
+  | 'read'
+  | 'snapshot'
+  | 'session'
+  | 'write'
+  | 'contentWrite'
+  | 'runtimeWrite'
+  | 'open'
+  | 'close';
+
 export interface OpenFatMemoryWorkerRequest {
   kind: 'open.fatMem';
+  effect: 'open';
   jobId: WorkerJobId;
   docId: string;
   bytes: ArrayBuffer;
@@ -118,6 +150,7 @@ export type LayerOpenSource =
 
 export interface OpenLayerMemoryBaseWorkerRequest {
   kind: 'open.layerMemBase';
+  effect: 'open';
   jobId: WorkerJobId;
   docId: string;
   /**
@@ -141,6 +174,7 @@ export interface OpenLayerMemoryBaseWorkerRequest {
 
 export interface OpenLayerFileBaseWorkerRequest {
   kind: 'open.layerFileBase';
+  effect: 'open';
   jobId: WorkerJobId;
   docId: string;
   /**
@@ -168,6 +202,7 @@ export type OpenWorkerRequest =
 
 export interface SignaturesListWorkerRequest {
   kind: 'signatures.list';
+  effect: 'read';
   jobId: WorkerJobId;
   docId: string;
   layerName?: string;
@@ -182,6 +217,7 @@ export interface SignaturesListWorkerRequest {
 
 export interface SignaturesContentsWorkerRequest {
   kind: 'signatures.contents';
+  effect: 'read';
   jobId: WorkerJobId;
   docId: string;
   layerName?: string;
@@ -190,6 +226,7 @@ export interface SignaturesContentsWorkerRequest {
 
 export interface SignaturesDigestWorkerRequest {
   kind: 'signatures.digest';
+  effect: 'read';
   jobId: WorkerJobId;
   docId: string;
   layerName?: string;
@@ -199,6 +236,7 @@ export interface SignaturesDigestWorkerRequest {
 
 export interface SignaturesRevisionBytesWorkerRequest {
   kind: 'signatures.revisionBytes';
+  effect: 'read';
   jobId: WorkerJobId;
   docId: string;
   layerName?: string;
@@ -207,6 +245,7 @@ export interface SignaturesRevisionBytesWorkerRequest {
 
 export interface DocumentVersionWorkerRequest {
   kind: 'document.version';
+  effect: 'read';
   jobId: WorkerJobId;
   docId: string;
   layerName?: string;
@@ -214,6 +253,7 @@ export interface DocumentVersionWorkerRequest {
 
 export interface SignaturesPrepareWorkerRequest {
   kind: 'signatures.prepare';
+  effect: 'snapshot';
   jobId: WorkerJobId;
   docId: string;
   layerName?: string;
@@ -222,6 +262,7 @@ export interface SignaturesPrepareWorkerRequest {
 
 export interface SignaturesCompleteWorkerRequest {
   kind: 'signatures.complete';
+  effect: 'contentWrite';
   jobId: WorkerJobId;
   docId: string;
   layerName?: string;
@@ -231,6 +272,7 @@ export interface SignaturesCompleteWorkerRequest {
 
 export interface SignaturesCancelWorkerRequest {
   kind: 'signatures.cancel';
+  effect: 'session';
   jobId: WorkerJobId;
   docId: string;
   layerName?: string;
@@ -239,6 +281,7 @@ export interface SignaturesCancelWorkerRequest {
 
 export interface SignaturesAnalyzeWorkerRequest {
   kind: 'signatures.analyze';
+  effect: 'read';
   jobId: WorkerJobId;
   docId: string;
   layerName?: string;
@@ -254,6 +297,7 @@ export interface SignaturesAnalyzeWorkerRequest {
  */
 export interface SignaturesFinalizeCandidateWorkerRequest {
   kind: 'signatures.finalizeCandidate';
+  effect: 'read';
   jobId: WorkerJobId;
   /** The candidate on the worker's filesystem; its /Contents hole is patched in place. */
   path: string;
@@ -269,6 +313,7 @@ export interface SignaturesFinalizeCandidateWorkerRequest {
 
 export interface MetadataReadWorkerRequest {
   kind: 'metadata.read';
+  effect: 'read';
   jobId: WorkerJobId;
   docId: string;
   layerName?: string;
@@ -276,6 +321,7 @@ export interface MetadataReadWorkerRequest {
 
 export interface MetadataUpdateWorkerRequest {
   kind: 'metadata.update';
+  effect: 'write';
   jobId: WorkerJobId;
   docId: string;
   layerName?: string;
@@ -285,6 +331,7 @@ export interface MetadataUpdateWorkerRequest {
 
 export interface MetadataReadCustomWorkerRequest {
   kind: 'metadata.readCustom';
+  effect: 'read';
   jobId: WorkerJobId;
   docId: string;
   layerName?: string;
@@ -292,6 +339,7 @@ export interface MetadataReadCustomWorkerRequest {
 
 export interface MetadataUpdateCustomWorkerRequest {
   kind: 'metadata.updateCustom';
+  effect: 'write';
   jobId: WorkerJobId;
   docId: string;
   layerName?: string;
@@ -301,6 +349,7 @@ export interface MetadataUpdateCustomWorkerRequest {
 
 export interface ActionsReadWorkerRequest {
   kind: 'actions.read';
+  effect: 'read';
   jobId: WorkerJobId;
   docId: string;
   layerName?: string;
@@ -312,6 +361,7 @@ export interface ActionsReadWorkerRequest {
  */
 export interface AnnotationsListWorkerRequest {
   kind: 'annotations.list';
+  effect: 'read';
   jobId: WorkerJobId;
   docId: string;
   layerName?: string;
@@ -327,6 +377,7 @@ export interface AnnotationsListWorkerRequest {
  */
 export interface AnnotationsRenderAppearancesWorkerRequest {
   kind: 'annotations.renderAppearances';
+  effect: 'read';
   jobId: WorkerJobId;
   docId: string;
   layerName?: string;
@@ -336,6 +387,7 @@ export interface AnnotationsRenderAppearancesWorkerRequest {
 
 export interface AnnotationsCreateWorkerRequest<C extends Coordinates = PageCoordinates> {
   kind: 'annotations.create';
+  effect: 'write';
   jobId: WorkerJobId;
   docId: string;
   layerName?: string;
@@ -360,6 +412,7 @@ export interface AnnotationsCreateWorkerRequest<C extends Coordinates = PageCoor
 
 export interface AnnotationsUpdateWorkerRequest<C extends Coordinates = PageCoordinates> {
   kind: 'annotations.update';
+  effect: 'write';
   jobId: WorkerJobId;
   docId: string;
   layerName?: string;
@@ -378,6 +431,7 @@ export interface AnnotationsUpdateWorkerRequest<C extends Coordinates = PageCoor
 
 export interface AnnotationsDeleteWorkerRequest {
   kind: 'annotations.delete';
+  effect: 'write';
   jobId: WorkerJobId;
   docId: string;
   layerName?: string;
@@ -395,6 +449,7 @@ export interface AnnotationsDeleteWorkerRequest {
  *  `AnnotationFlattenInput`. A content + annotation mutation of that page. */
 export interface AnnotationsFlattenWorkerRequest {
   kind: 'annotations.flatten';
+  effect: 'contentWrite';
   jobId: WorkerJobId;
   docId: string;
   layerName?: string;
@@ -408,6 +463,7 @@ export interface AnnotationsFlattenWorkerRequest {
  *  single-page PDF (bytes). A read: no artifact, no revision. */
 export interface AnnotationsExportAppearanceWorkerRequest {
   kind: 'annotations.exportAppearance';
+  effect: 'snapshot';
   jobId: WorkerJobId;
   docId: string;
   layerName?: string;
@@ -418,6 +474,7 @@ export interface AnnotationsExportAppearanceWorkerRequest {
 /** Annotations and their resources as one bundle (`doc.annotations.export`). A read. */
 export interface AnnotationsExportWorkerRequest {
   kind: 'annotations.export';
+  effect: 'snapshot';
   jobId: WorkerJobId;
   docId: string;
   layerName?: string;
@@ -434,6 +491,7 @@ export interface AnnotationsExportWorkerRequest {
  */
 export interface AnnotationsImportWorkerRequest {
   kind: 'annotations.import';
+  effect: 'write';
   jobId: WorkerJobId;
   docId: string;
   layerName?: string;
@@ -453,6 +511,7 @@ export interface AnnotationsImportWorkerRequest {
 /** An annotation's `appearance` resource: its drawing, as a one-page PDF (bytes). A read. */
 export interface AnnotationsReadAppearanceWorkerRequest {
   kind: 'annotations.readAppearance';
+  effect: 'read';
   jobId: WorkerJobId;
   docId: string;
   layerName?: string;
@@ -467,6 +526,7 @@ export interface AnnotationsReadAppearanceWorkerRequest {
  */
 export interface AnnotationsMoveWorkerRequest {
   kind: 'annotations.move';
+  effect: 'write';
   jobId: WorkerJobId;
   docId: string;
   layerName?: string;
@@ -483,6 +543,7 @@ export interface AnnotationsMoveWorkerRequest {
  */
 export interface FormsListWorkerRequest {
   kind: 'forms.list';
+  effect: 'read';
   jobId: WorkerJobId;
   docId: string;
   layerName?: string;
@@ -490,6 +551,7 @@ export interface FormsListWorkerRequest {
 
 export interface FormsSetValueWorkerRequest {
   kind: 'forms.setValue';
+  effect: 'write';
   jobId: WorkerJobId;
   docId: string;
   layerName?: string;
@@ -500,6 +562,7 @@ export interface FormsSetValueWorkerRequest {
 
 export interface FormsResetWorkerRequest {
   kind: 'forms.reset';
+  effect: 'write';
   jobId: WorkerJobId;
   docId: string;
   layerName?: string;
@@ -510,6 +573,7 @@ export interface FormsResetWorkerRequest {
 
 export interface FormsApplyEffectsWorkerRequest {
   kind: 'forms.applyEffects';
+  effect: 'write';
   jobId: WorkerJobId;
   docId: string;
   layerName?: string;
@@ -519,6 +583,7 @@ export interface FormsApplyEffectsWorkerRequest {
 
 export interface FormsExportWorkerRequest {
   kind: 'forms.export';
+  effect: 'snapshot';
   jobId: WorkerJobId;
   docId: string;
   layerName?: string;
@@ -527,6 +592,7 @@ export interface FormsExportWorkerRequest {
 
 export interface FormsImportWorkerRequest {
   kind: 'forms.import';
+  effect: 'write';
   jobId: WorkerJobId;
   docId: string;
   layerName?: string;
@@ -539,6 +605,7 @@ export interface FormsImportWorkerRequest {
 
 export interface FormsRepairWorkerRequest {
   kind: 'forms.repair';
+  effect: 'write';
   jobId: WorkerJobId;
   docId: string;
   layerName?: string;
@@ -548,6 +615,7 @@ export interface FormsRepairWorkerRequest {
 
 export interface FormsCreateFieldWorkerRequest<C extends Coordinates = PageCoordinates> {
   kind: 'forms.createField';
+  effect: 'write';
   jobId: WorkerJobId;
   docId: string;
   layerName?: string;
@@ -557,6 +625,7 @@ export interface FormsCreateFieldWorkerRequest<C extends Coordinates = PageCoord
 
 export interface FormsUpdateFieldWorkerRequest {
   kind: 'forms.updateField';
+  effect: 'write';
   jobId: WorkerJobId;
   docId: string;
   layerName?: string;
@@ -568,6 +637,7 @@ export interface FormsUpdateFieldWorkerRequest {
 /** Draw a PDF page into every widget of an unsigned signature field (the visual fill). */
 export interface FormsSetSignatureAppearanceWorkerRequest {
   kind: 'forms.setSignatureAppearance';
+  effect: 'write';
   jobId: WorkerJobId;
   docId: string;
   layerName?: string;
@@ -578,6 +648,7 @@ export interface FormsSetSignatureAppearanceWorkerRequest {
 
 export interface FormsDeleteFieldWorkerRequest {
   kind: 'forms.deleteField';
+  effect: 'write';
   jobId: WorkerJobId;
   docId: string;
   layerName?: string;
@@ -587,6 +658,7 @@ export interface FormsDeleteFieldWorkerRequest {
 
 export interface FormsAddWidgetWorkerRequest<C extends Coordinates = PageCoordinates> {
   kind: 'forms.addWidget';
+  effect: 'write';
   jobId: WorkerJobId;
   docId: string;
   layerName?: string;
@@ -597,6 +669,7 @@ export interface FormsAddWidgetWorkerRequest<C extends Coordinates = PageCoordin
 
 export interface FormsDetachWidgetWorkerRequest {
   kind: 'forms.detachWidget';
+  effect: 'write';
   jobId: WorkerJobId;
   docId: string;
   layerName?: string;
@@ -607,6 +680,7 @@ export interface FormsDetachWidgetWorkerRequest {
 
 export interface PagesListWorkerRequest {
   kind: 'pages.list';
+  effect: 'read';
   jobId: WorkerJobId;
   docId: string;
   layerName?: string;
@@ -619,6 +693,7 @@ export interface PagesListWorkerRequest {
  */
 export interface PagesTextWorkerRequest {
   kind: 'pages.text';
+  effect: 'read';
   jobId: WorkerJobId;
   docId: string;
   layerName?: string;
@@ -627,6 +702,7 @@ export interface PagesTextWorkerRequest {
 
 export interface PagesGeometryWorkerRequest {
   kind: 'pages.geometry';
+  effect: 'read';
   jobId: WorkerJobId;
   docId: string;
   layerName?: string;
@@ -652,6 +728,7 @@ export interface SearchScanRequest extends SearchRequest {
  */
 export interface SearchQueryWorkerRequest {
   kind: 'search.query';
+  effect: 'read';
   jobId: WorkerJobId;
   docId: string;
   layerName?: string;
@@ -660,6 +737,7 @@ export interface SearchQueryWorkerRequest {
 
 export interface PagesRenderWorkerRequest<C extends Coordinates = PageCoordinates> {
   kind: 'pages.render';
+  effect: 'read';
   jobId: WorkerJobId;
   docId: string;
   layerName?: string;
@@ -677,6 +755,7 @@ export interface PagesRenderWorkerRequest<C extends Coordinates = PageCoordinate
  */
 export interface DocumentRenderPageFileWorkerRequest {
   kind: 'document.renderPageFile';
+  effect: 'read';
   jobId: WorkerJobId;
   path: string;
   password: string | null;
@@ -714,6 +793,7 @@ export interface EncodedImageWire {
 
 export interface PagesRenderEncodedWorkerRequest<C extends Coordinates = PageCoordinates> {
   kind: 'pages.renderEncoded';
+  effect: 'read';
   jobId: WorkerJobId;
   docId: string;
   layerName?: string;
@@ -726,6 +806,7 @@ export interface PagesRenderEncodedWorkerRequest<C extends Coordinates = PageCoo
  *  session semantics; see that request's docs. */
 export interface DocumentRenderPageFileEncodedWorkerRequest {
   kind: 'document.renderPageFileEncoded';
+  effect: 'read';
   jobId: WorkerJobId;
   path: string;
   password: string | null;
@@ -737,6 +818,7 @@ export interface DocumentRenderPageFileEncodedWorkerRequest {
 
 export interface AnnotationsRenderAppearancesEncodedWorkerRequest {
   kind: 'annotations.renderAppearancesEncoded';
+  effect: 'read';
   jobId: WorkerJobId;
   docId: string;
   layerName?: string;
@@ -761,6 +843,7 @@ export interface AnnotationAppearancesEncodedResultWire<C extends Coordinates = 
 
 export interface PagesMoveWorkerRequest {
   kind: 'pages.move';
+  effect: 'contentWrite';
   jobId: WorkerJobId;
   docId: string;
   layerName?: string;
@@ -771,6 +854,7 @@ export interface PagesMoveWorkerRequest {
 
 export interface PagesRotateWorkerRequest {
   kind: 'pages.rotate';
+  effect: 'contentWrite';
   jobId: WorkerJobId;
   docId: string;
   layerName?: string;
@@ -782,6 +866,7 @@ export interface PagesRotateWorkerRequest {
 
 export interface PagesDeleteWorkerRequest {
   kind: 'pages.delete';
+  effect: 'contentWrite';
   jobId: WorkerJobId;
   docId: string;
   layerName?: string;
@@ -792,6 +877,7 @@ export interface PagesDeleteWorkerRequest {
 /** Register/rename a `/Names /Pages` entry — see `PageNameInput`. */
 export interface PagesSetNameWorkerRequest {
   kind: 'pages.setName';
+  effect: 'write';
   jobId: WorkerJobId;
   docId: string;
   layerName?: string;
@@ -804,6 +890,7 @@ export interface PagesSetNameWorkerRequest {
 /** Remove a `/Names /Pages` entry — see `PageRemoveNameInput`. */
 export interface PagesRemoveNameWorkerRequest {
   kind: 'pages.removeName';
+  effect: 'write';
   jobId: WorkerJobId;
   docId: string;
   layerName?: string;
@@ -813,6 +900,7 @@ export interface PagesRemoveNameWorkerRequest {
 
 export interface PagesFlattenWorkerRequest {
   kind: 'pages.flatten';
+  effect: 'contentWrite';
   jobId: WorkerJobId;
   docId: string;
   layerName?: string;
@@ -823,6 +911,7 @@ export interface PagesFlattenWorkerRequest {
 
 export interface RedactionApplyWorkerRequest {
   kind: 'redaction.apply';
+  effect: 'contentWrite';
   jobId: WorkerJobId;
   docId: string;
   layerName?: string;
@@ -834,6 +923,7 @@ export interface RedactionApplyWorkerRequest {
  *  session is untouched, so no layer artifact rides the result). */
 export interface PagesExtractWorkerRequest {
   kind: 'pages.extract';
+  effect: 'snapshot';
   jobId: WorkerJobId;
   docId: string;
   layerName?: string;
@@ -843,6 +933,7 @@ export interface PagesExtractWorkerRequest {
 /** List the document catalog's `/EmbeddedFiles` name tree (a read). */
 export interface AttachmentsListWorkerRequest {
   kind: 'attachments.list';
+  effect: 'read';
   jobId: WorkerJobId;
   docId: string;
   layerName?: string;
@@ -859,6 +950,7 @@ export interface AttachmentsListWorkerRequest {
  */
 export interface AttachmentsReadFileWorkerRequest {
   kind: 'attachments.readFile';
+  effect: 'read';
   jobId: WorkerJobId;
   docId: string;
   layerName?: string;
@@ -877,6 +969,7 @@ export interface AttachmentsReadFileWorkerRequest {
  */
 export interface AttachmentsCreateWorkerRequest {
   kind: 'attachments.create';
+  effect: 'write';
   jobId: WorkerJobId;
   docId: string;
   layerName?: string;
@@ -889,6 +982,7 @@ export interface AttachmentsCreateWorkerRequest {
 /** Delete a document-level embedded file by key (a mutation). */
 export interface AttachmentsDeleteWorkerRequest {
   kind: 'attachments.delete';
+  effect: 'write';
   jobId: WorkerJobId;
   docId: string;
   layerName?: string;
@@ -900,6 +994,7 @@ export interface AttachmentsDeleteWorkerRequest {
  *  Same read semantics and delivery modes as `attachments.readFile`. */
 export interface AnnotationsReadFileWorkerRequest {
   kind: 'annotations.readFile';
+  effect: 'read';
   jobId: WorkerJobId;
   docId: string;
   layerName?: string;
@@ -915,6 +1010,7 @@ export interface AnnotationsReadFileWorkerRequest {
  *  persist an artifact like move/rotate/delete. */
 export interface PagesInsertWorkerRequest {
   kind: 'pages.insert';
+  effect: 'contentWrite';
   jobId: WorkerJobId;
   docId: string;
   layerName?: string;
@@ -929,6 +1025,7 @@ export interface PagesInsertWorkerRequest {
  *  layer sessions persist an artifact identically. */
 export interface PagesInsertBlankWorkerRequest {
   kind: 'pages.insertBlank';
+  effect: 'contentWrite';
   jobId: WorkerJobId;
   docId: string;
   layerName?: string;
@@ -947,6 +1044,7 @@ export interface PagesInsertBlankWorkerRequest {
  */
 export interface MeasureViewportsWorkerRequest {
   kind: 'measure.viewports';
+  effect: 'read';
   jobId: WorkerJobId;
   docId: string;
   layerName?: string;
@@ -954,6 +1052,7 @@ export interface MeasureViewportsWorkerRequest {
 }
 export interface MeasureSetScaleWorkerRequest {
   kind: 'measure.setScale';
+  effect: 'write';
   jobId: WorkerJobId;
   docId: string;
   layerName?: string;
@@ -964,6 +1063,7 @@ export interface MeasureSetScaleWorkerRequest {
 
 export interface PieceInfoReadWorkerRequest {
   kind: 'pieceInfo.read';
+  effect: 'read';
   jobId: WorkerJobId;
   docId: string;
   layerName?: string;
@@ -973,6 +1073,7 @@ export interface PieceInfoReadWorkerRequest {
 
 export interface PieceInfoUpdateWorkerRequest {
   kind: 'pieceInfo.update';
+  effect: 'write';
   jobId: WorkerJobId;
   docId: string;
   layerName?: string;
@@ -984,6 +1085,7 @@ export interface PieceInfoUpdateWorkerRequest {
 
 export interface PieceInfoApplicationsWorkerRequest {
   kind: 'pieceInfo.applications';
+  effect: 'read';
   jobId: WorkerJobId;
   docId: string;
   layerName?: string;
@@ -992,6 +1094,7 @@ export interface PieceInfoApplicationsWorkerRequest {
 
 export interface PieceInfoDeleteWorkerRequest {
   kind: 'pieceInfo.delete';
+  effect: 'write';
   jobId: WorkerJobId;
   docId: string;
   layerName?: string;
@@ -1002,6 +1105,7 @@ export interface PieceInfoDeleteWorkerRequest {
 
 export interface DocumentSaveBufferWorkerRequest {
   kind: 'document.saveBuffer';
+  effect: 'snapshot';
   jobId: WorkerJobId;
   docId: string;
   layerName?: string;
@@ -1010,6 +1114,7 @@ export interface DocumentSaveBufferWorkerRequest {
 
 export interface DocumentSaveFileWorkerRequest {
   kind: 'document.saveFile';
+  effect: 'snapshot';
   jobId: WorkerJobId;
   docId: string;
   layerName?: string;
@@ -1021,6 +1126,7 @@ export interface DocumentSaveFileWorkerRequest {
  *  Layer sessions only; the host rejects a base-only session. */
 export interface DocumentSaveLayerBufferWorkerRequest {
   kind: 'document.saveLayerBuffer';
+  effect: 'snapshot';
   jobId: WorkerJobId;
   docId: string;
   layerName?: string;
@@ -1038,6 +1144,7 @@ export interface DocumentSecurityProbeInfo {
 
 export interface DocumentProbeSecurityFileWorkerRequest {
   kind: 'document.probeSecurityFile';
+  effect: 'read';
   jobId: WorkerJobId;
   path: string;
   password: string | null;
@@ -1045,6 +1152,7 @@ export interface DocumentProbeSecurityFileWorkerRequest {
 
 export interface DocumentCheckPasswordPermissionsWorkerRequest {
   kind: 'document.checkPasswordPermissions';
+  effect: 'open';
   jobId: WorkerJobId;
   docId: string;
   layerName?: string;
@@ -1061,6 +1169,7 @@ export interface DocumentCheckPasswordPermissionsWorkerRequest {
  */
 export interface FontsRegisterWorkerRequest {
   kind: 'fonts.register';
+  effect: 'runtimeWrite';
   jobId: WorkerJobId;
   fontKey: string;
   /** `""` → infer the base font name from the file. */
@@ -1074,23 +1183,27 @@ export interface FontsRegisterWorkerRequest {
 
 export interface FontsAddFallbackWorkerRequest {
   kind: 'fonts.addFallback';
+  effect: 'runtimeWrite';
   jobId: WorkerJobId;
   fontKey: string;
 }
 
 export interface FontsClearFallbacksWorkerRequest {
   kind: 'fonts.clearFallbacks';
+  effect: 'runtimeWrite';
   jobId: WorkerJobId;
 }
 
 export interface FontsClearWorkerRequest {
   kind: 'fonts.clear';
+  effect: 'runtimeWrite';
   jobId: WorkerJobId;
 }
 
 /** The application asserts a licence permitting editing with a font. */
 export interface FontsAuthorizeEditingWorkerRequest {
   kind: 'fonts.authorizeEditing';
+  effect: 'runtimeWrite';
   jobId: WorkerJobId;
   fontKey: string;
 }
@@ -1102,6 +1215,7 @@ export interface FontsAuthorizeEditingWorkerRequest {
  */
 export interface DocumentSetFontSettingsWorkerRequest {
   kind: 'document.setFontSettings';
+  effect: 'session';
   jobId: WorkerJobId;
   docId: string;
   layerName?: string;
@@ -1111,6 +1225,7 @@ export interface DocumentSetFontSettingsWorkerRequest {
 
 export interface CloseWorkerRequest {
   kind: 'close';
+  effect: 'close';
   jobId: WorkerJobId;
   docId: string;
 }
@@ -1127,6 +1242,7 @@ export interface CloseWorkerRequest {
  */
 export interface LayerCloseWorkerRequest {
   kind: 'layer.close';
+  effect: 'close';
   jobId: WorkerJobId;
   docId: string;
   layerName: string;
@@ -1135,6 +1251,20 @@ export interface LayerCloseWorkerRequest {
 export interface AbortWorkerRequest {
   kind: 'abort';
   jobId: WorkerJobId;
+}
+
+/**
+ * What a view shows of a document (`DocumentHandle.setWorkingSet`): the order
+ * its parsed pages close in. The worker takes it on arrival, even while a
+ * render runs, and never answers: `jobId` only names the message.
+ */
+export interface PagesWorkingSetWorkerRequest {
+  kind: 'pages.workingSet';
+  jobId: WorkerJobId;
+  docId: string;
+  layerName?: string;
+  view: string;
+  pages: WorkingSetPage[];
 }
 
 export interface ShutdownWorkerRequest {
@@ -1254,8 +1384,24 @@ export type WorkerRequest<C extends Coordinates = PageCoordinates> =
   | DocumentSetFontSettingsWorkerRequest
   | CloseWorkerRequest
   | LayerCloseWorkerRequest
+  | WorkerControlMessage;
+
+/** The messages that aren't jobs: the worker takes them on arrival and runs nothing for them. */
+export type WorkerControlMessage =
   | AbortWorkerRequest
+  | PagesWorkingSetWorkerRequest
   | ShutdownWorkerRequest;
+
+/**
+ * A request the worker runs as a job. Every one states its
+ * {@link RequestEffect}: a request type without one fails `StatesItsEffect`,
+ * so it doesn't compile.
+ */
+export type WorkerJobRequest<C extends Coordinates = PageCoordinates> = StatesItsEffect<
+  Exclude<WorkerRequest<C>, WorkerControlMessage>
+>;
+
+type StatesItsEffect<T extends { effect: RequestEffect }> = T;
 
 /**
  * What a job returns. `C` is the space its positions are in: the handlers

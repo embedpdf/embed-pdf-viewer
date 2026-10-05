@@ -25,7 +25,8 @@ import {
   type PdfDestination,
   type PdfRect,
   type VisibleBoxOf,
-  type WorkerRequest,
+  type ShutdownWorkerRequest,
+  type WorkerJobRequest,
   type WorkerResultPayload,
 } from '@embedpdf/engine-core/runtime';
 
@@ -149,10 +150,13 @@ export function resultInPageSpace(
   }
 }
 
-/** A job as callers send it, in page space. */
-export type PageSpaceJob = Exclude<WorkerRequest, { kind: 'abort' }>;
+/**
+ * A job as callers send it, in page space. A shutdown runs in line with the
+ * jobs too; the other control messages are taken on arrival.
+ */
+export type PageSpaceJob = WorkerJobRequest | ShutdownWorkerRequest;
 /** A job as the handlers take it, in the file's coordinates. */
-export type FileSpaceJob = Exclude<WorkerRequest<PdfCoordinates>, { kind: 'abort' }>;
+export type FileSpaceJob = WorkerJobRequest<PdfCoordinates> | ShutdownWorkerRequest;
 
 /**
  * The other way across the boundary: a request as the handlers take it, each

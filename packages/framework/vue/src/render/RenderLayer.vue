@@ -73,6 +73,7 @@ watch(
         const picture = await lens.renderSource(pageRef, {
           scale: page.value.transform.renderScale,
           includeAnnotations: props.annotations,
+          view: page.value.view,
           signal: controller.signal,
         });
         const object = await picture.objectUrl().abortWith(controller.signal);

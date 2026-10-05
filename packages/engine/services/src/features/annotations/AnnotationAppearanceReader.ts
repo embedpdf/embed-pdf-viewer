@@ -33,6 +33,7 @@ import { readAnnotRect, readIntent } from './internal/read/annotationReadPrimiti
 import { readAnnotationIdentity } from './internal/read/readAnnotationIdentity';
 import { pdfFromClockwise } from './internal/read/readAnnotationTransformMetadata';
 import { throwIfAborted } from '../../shared/abort';
+import { SliceTimer, type Slices } from '../../shared/slices';
 import { readAnnotationTurn, type AnnotationTurn } from './internal/read/readAnnotationTurn';
 
 /** `FPDF_ANNOT_FREETEXT` — free-text annotation subtype code. */
@@ -82,15 +83,20 @@ export class AnnotationAppearanceReader {
     private readonly session: DocumentSession,
   ) {}
 
-  render(
+  /**
+   * The page loads in slices when it isn't parsed, and the loop pauses between
+   * annotations once a slice's budget is spent, so an abort stops it at either.
+   */
+  async render(
     pageObjectNumber: PageObjectNumber,
     options: AnnotationAppearanceRenderOptions,
     signal: AbortSignal,
-  ): AnnotationAppearancesResult<PdfCoordinates> {
+    slices: Slices,
+  ): Promise<AnnotationAppearancesResult<PdfCoordinates>> {
     throwIfAborted(signal);
     const { fn, mem } = this.runtime;
     const pool = this.session.pagePool();
-    const pagePtr = pool.acquire(pageObjectNumber);
+    const pagePtr = await pool.acquireInSlices(pageObjectNumber, signal, slices);
 
     const rotation = (options.rotation ?? 0) as PdfRotation;
     const modes = resolveModes(options.modes);
@@ -106,7 +112,9 @@ export class AnnotationAppearanceReader {
         rotation,
       );
       const count = fn.FPDFPage_GetAnnotCount(pagePtr);
+      const timer = new SliceTimer(slices, signal);
       for (let i = 0; i < count; i++) {
+        if (timer.due) await timer.pause();
         throwIfAborted(signal);
         const annotPtr = fn.FPDFPage_GetAnnot(pagePtr, i);
         if (!annotPtr) continue;

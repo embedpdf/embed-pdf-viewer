@@ -18,9 +18,8 @@ import {
 import type { SessionEventPublisher } from '@embedpdf/engine-services';
 
 import type { ScopeGuard } from '../scope';
-import { Priority } from '../worker/Priority';
 import type { JobId, WorkerResultPayload } from '../worker/protocol';
-import type { WorkerQueue } from '../worker/WorkerQueue';
+import type { JobQueue } from '../worker/WorkerQueue';
 
 interface DocClosedView {
   isClosed(): boolean;
@@ -28,13 +27,13 @@ interface DocClosedView {
 
 /**
  * Document-scoped annotation reads, dispatched through the same
- * WorkerQueue every other local read uses. The worker host reads them with
+ * JobQueue every other local read uses. The worker host reads them with
  * `RawAnnotationReader.list`.
  */
 export class LocalDocumentAnnotationsService implements DocumentAnnotationsService {
   constructor(
     private readonly docId: string,
-    private readonly queue: WorkerQueue,
+    private readonly queue: JobQueue,
     private readonly view: DocClosedView,
     private readonly guard: ScopeGuard,
     private readonly publisher: SessionEventPublisher,
@@ -54,13 +53,16 @@ export class LocalDocumentAnnotationsService implements DocumentAnnotationsServi
       return AbortablePromise.rejectReason(err);
     }
     const docId = this.docId;
-    const submission = this.queue.enqueue<WorkerResultPayload>(
-      {
-        buildPack: (jobId: JobId) =>
-          wirePack({ kind: 'annotations.export', jobId, docId, selection: { ...selection } }),
-      },
-      { priority: Priority.MEDIUM },
-    );
+    const submission = this.queue.enqueue<WorkerResultPayload>({
+      buildPack: (jobId: JobId) =>
+        wirePack({
+          kind: 'annotations.export',
+          effect: 'snapshot',
+          jobId,
+          docId,
+          selection: { ...selection },
+        }),
+    });
     return AbortablePromise.run<AnnotationBundle>(async (signal) => {
       const onAbort = () => submission.abort(signal.reason);
       if (signal.aborted) onAbort();
@@ -113,24 +115,22 @@ export class LocalDocumentAnnotationsService implements DocumentAnnotationsServi
           new Uint8Array(bytes).buffer as ArrayBuffer,
         ]),
       );
-      const submission = this.queue.enqueue<WorkerResultPayload>(
-        {
-          buildPack: (jobId: JobId) =>
-            wirePack(
-              {
-                kind: 'annotations.import',
-                jobId,
-                docId,
-                bundle: { ...bundle, resources },
-                ...(options.pages !== undefined ? { pages: options.pages } : {}),
-                attribution,
-                ...(actor ? { actor } : {}),
-              },
-              Object.values(resources),
-            ),
-        },
-        { priority: Priority.HIGH },
-      );
+      const submission = this.queue.enqueue<WorkerResultPayload>({
+        buildPack: (jobId: JobId) =>
+          wirePack(
+            {
+              kind: 'annotations.import',
+              effect: 'write',
+              jobId,
+              docId,
+              bundle: { ...bundle, resources },
+              ...(options.pages !== undefined ? { pages: options.pages } : {}),
+              attribution,
+              ...(actor ? { actor } : {}),
+            },
+            Object.values(resources),
+          ),
+      });
       const onAbort = () => submission.abort(signal.reason);
       if (signal.aborted) onAbort();
       else signal.addEventListener('abort', onAbort, { once: true });
@@ -183,13 +183,16 @@ export class LocalDocumentAnnotationsService implements DocumentAnnotationsServi
     }
     const docId = this.docId;
     const pages = options.pages === undefined ? undefined : [...options.pages];
-    const submission = this.queue.enqueue<WorkerResultPayload>(
-      {
-        buildPack: (jobId: JobId) =>
-          wirePack({ kind: 'annotations.list', jobId, docId, ...(pages ? { pages } : {}) }),
-      },
-      { priority: Priority.MEDIUM },
-    );
+    const submission = this.queue.enqueue<WorkerResultPayload>({
+      buildPack: (jobId: JobId) =>
+        wirePack({
+          kind: 'annotations.list',
+          effect: 'read',
+          jobId,
+          docId,
+          ...(pages ? { pages } : {}),
+        }),
+    });
     return AbortablePromise.run<AnnotationList>(async (signal) => {
       const onAbort = () => submission.abort(signal.reason);
       if (signal.aborted) onAbort();

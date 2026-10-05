@@ -749,7 +749,7 @@ describe('Phase 5 layer mutation pipeline', () => {
       body: JSON.stringify({ pages: [3].map(toPageRef), toIndex: 0 }),
     });
     expect(moved.status).toBe(200);
-    mutations.push({ kind: 'pages.move', response: await moved.json() });
+    mutations.push({ kind: 'pages.move', effect: 'contentWrite', response: await moved.json() });
 
     const rotated = await fetch(`${fx.baseUrl}/v1/docs/${docId}/layers/${layerName}/pages/rotate`, {
       method: 'POST',
@@ -757,7 +757,11 @@ describe('Phase 5 layer mutation pipeline', () => {
       body: JSON.stringify({ pages: [2].map(toPageRef), rotation: 90 }),
     });
     expect(rotated.status).toBe(200);
-    mutations.push({ kind: 'pages.rotate', response: await rotated.json() });
+    mutations.push({
+      kind: 'pages.rotate',
+      effect: 'contentWrite',
+      response: await rotated.json(),
+    });
 
     const deleted = await fetch(`${fx.baseUrl}/v1/docs/${docId}/layers/${layerName}/pages/delete`, {
       method: 'POST',
@@ -765,7 +769,11 @@ describe('Phase 5 layer mutation pipeline', () => {
       body: JSON.stringify({ pages: [2].map(toPageRef) }),
     });
     expect(deleted.status).toBe(200);
-    mutations.push({ kind: 'pages.delete', response: await deleted.json() });
+    mutations.push({
+      kind: 'pages.delete',
+      effect: 'contentWrite',
+      response: await deleted.json(),
+    });
 
     const auditRows = await fx.db
       .selectFrom('audit_log')

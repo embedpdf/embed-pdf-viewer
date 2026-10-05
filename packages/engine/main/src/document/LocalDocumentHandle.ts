@@ -20,6 +20,8 @@ import {
   type DownloadOptions,
   type PdfSaveMode,
   type PageRef,
+  type CallFacts,
+  type WorkingSetPage,
 } from '@embedpdf/engine-core/runtime';
 import { EventHub, SessionEventPublisher } from '@embedpdf/engine-services';
 
@@ -38,9 +40,28 @@ import { LocalDocumentSignaturesService } from './LocalDocumentSignaturesService
 import { LocalMetadataService } from './LocalMetadataService';
 import { LocalPageHandle } from './LocalPageHandle';
 import { LocalPieceInfoService } from './LocalPieceInfoService';
-import { Priority } from '../worker/Priority';
 import type { JobId, WorkerResultPayload } from '../worker/protocol';
-import type { WorkerQueue } from '../worker/WorkerQueue';
+import type { JobQueue, WorkerQueue } from '../worker/WorkerQueue';
+
+/**
+ * What every handle of one open document shares. `with()` makes handles that
+ * differ only in the facts their calls carry, over this one state.
+ */
+interface OpenDocument {
+  readonly id: string;
+  readonly queue: WorkerQueue;
+  readonly imageEncoder: LocalImageEncoder;
+  readonly guard: ScopeGuard;
+  readonly renderPolicy: EngineRenderPolicy;
+  readonly publisher: SessionEventPublisher;
+  readonly events: DocumentEventStream;
+  readonly security: LocalDocumentSecurityService;
+  readonly render: DocumentRenderService;
+  readonly isClosed: () => boolean;
+  close(): void;
+  /** The handles `with()` made, by their facts, so asking twice gives the same one. */
+  readonly withFacts: Map<string, LocalDocumentHandle>;
+}
 
 export class LocalDocumentHandle implements LocalDocumentHandleContract {
   readonly [LOCAL_ENGINE_BRAND] = true;
@@ -70,40 +91,97 @@ export class LocalDocumentHandle implements LocalDocumentHandleContract {
    */
   readonly render: DocumentRenderService;
   readonly events: DocumentEventStream;
-  private readonly publisher: SessionEventPublisher;
-  private readonly renderPolicy: EngineRenderPolicy;
-  private closed = false;
+  readonly id: string;
+  /** The queue with this handle's facts: every call made through it carries them. */
+  private readonly queue: JobQueue;
 
-  constructor(
-    readonly id: string,
-    private readonly queue: WorkerQueue,
-    private readonly imageEncoder: LocalImageEncoder,
+  /** A newly opened document's handle, its calls carrying no facts. */
+  static open(
+    id: string,
+    queue: WorkerQueue,
+    imageEncoder: LocalImageEncoder,
     initialSecurity: DocumentSecurityProbeInfo,
-    private readonly guard: ScopeGuard,
+    guard: ScopeGuard,
     sessionId: string,
     renderPolicy: EngineRenderPolicy = CONTINUOUS_RENDER_POLICY,
-  ) {
-    const view = { isClosed: () => this.closed };
-    this.renderPolicy = renderPolicy;
-    this.render = { getPolicy: () => AbortablePromise.resolveValue(this.renderPolicy) };
+  ): LocalDocumentHandle {
+    let closed = false;
+    const isClosed = () => closed;
     const hub = new EventHub();
-    this.events = hub;
-    // A single instance, so every event is `kind: 'local'` — the same
-    // interface as cloud with the collaborative fields at rest.
-    this.publisher = new SessionEventPublisher(hub, sessionId);
-    this.security = new LocalDocumentSecurityService(initialSecurity, id, queue, view, guard);
-    this.metadata = new LocalMetadataService(id, queue, view, guard, this.publisher);
+    const doc: OpenDocument = {
+      id,
+      queue,
+      imageEncoder,
+      guard,
+      renderPolicy,
+      // A single instance, so every event is `kind: 'local'` — the same
+      // interface as cloud with the collaborative fields at rest.
+      publisher: new SessionEventPublisher(hub, sessionId),
+      events: hub,
+      security: new LocalDocumentSecurityService(initialSecurity, id, queue, { isClosed }, guard),
+      render: { getPolicy: () => AbortablePromise.resolveValue(renderPolicy) },
+      isClosed,
+      close: () => {
+        closed = true;
+      },
+      withFacts: new Map(),
+    };
+    return new LocalDocumentHandle(doc, {});
+  }
+
+  private constructor(
+    private readonly doc: OpenDocument,
+    private readonly facts: CallFacts,
+  ) {
+    const { id, guard, publisher } = doc;
+    const queue = doc.queue.withFacts(facts);
+    const view = { isClosed: doc.isClosed };
+    this.id = id;
+    this.queue = queue;
+    this.render = doc.render;
+    this.events = doc.events;
+    this.security = doc.security;
+    this.metadata = new LocalMetadataService(id, queue, view, guard, publisher);
     // Catalog-level /PieceInfo (no pon); page-level lives on each page handle.
     this.pieceInfo = new LocalPieceInfoService(id, queue, view, guard);
-    this.annotations = new LocalDocumentAnnotationsService(id, queue, view, guard, this.publisher);
-    this.attachments = new LocalDocumentAttachmentsService(id, queue, view, guard, this.publisher);
+    this.annotations = new LocalDocumentAnnotationsService(id, queue, view, guard, publisher);
+    this.attachments = new LocalDocumentAttachmentsService(id, queue, view, guard, publisher);
     this.actions = new LocalDocumentActionsService(id, queue, view, guard);
-    this.forms = new LocalDocumentFormsService(id, queue, view, guard, this.publisher);
+    this.forms = new LocalDocumentFormsService(id, queue, view, guard, publisher);
     this.fonts = new LocalDocumentFontSettings(id, queue, view, guard);
     this.search = new LocalDocumentSearchService(id, queue, view, guard);
-    this.pages = new LocalDocumentPagesService(id, queue, view, guard, this.publisher);
-    this.redaction = new LocalDocumentRedactionService(id, queue, view, guard, this.publisher);
-    this.signatures = new LocalDocumentSignaturesService(id, queue, view, guard, this.publisher);
+    this.pages = new LocalDocumentPagesService(id, queue, view, guard, publisher);
+    this.redaction = new LocalDocumentRedactionService(id, queue, view, guard, publisher);
+    this.signatures = new LocalDocumentSignaturesService(id, queue, view, guard, publisher);
+  }
+
+  private get closed(): boolean {
+    return this.doc.isClosed();
+  }
+
+  private get guard(): ScopeGuard {
+    return this.doc.guard;
+  }
+
+  /**
+   * The same document, every call made through it carrying `facts` on top of
+   * this handle's own (see `DocumentHandle.with`).
+   */
+  with(facts: CallFacts): LocalDocumentHandle {
+    const merged: CallFacts = { ...this.facts, ...facts };
+    const key = `${merged.priority ?? 'auto'}\u0000${merged.view ?? ''}`;
+    let handle = this.doc.withFacts.get(key);
+    if (!handle) {
+      handle = new LocalDocumentHandle(this.doc, merged);
+      this.doc.withFacts.set(key, handle);
+    }
+    return handle;
+  }
+
+  /** What `view` shows of the document (see `DocumentHandle.setWorkingSet`). */
+  setWorkingSet(view: string, pages: readonly WorkingSetPage[]): void {
+    if (this.closed) return;
+    this.doc.queue.setWorkingSet(this.id, view, pages);
   }
 
   /**
@@ -122,10 +200,10 @@ export class LocalDocumentHandle implements LocalDocumentHandleContract {
       return AbortablePromise.rejectReason(err);
     }
     const docId = this.id;
-    const submission = this.queue.enqueue<WorkerResultPayload>(
-      { buildPack: (jobId: JobId) => wirePack({ kind: 'document.version', jobId, docId }) },
-      { priority: Priority.MEDIUM },
-    );
+    const submission = this.queue.enqueue<WorkerResultPayload>({
+      buildPack: (jobId: JobId) =>
+        wirePack({ kind: 'document.version', effect: 'read', jobId, docId }),
+    });
     return AbortablePromise.run<BaseVersionInfo>(async (signal) => {
       const onAbort = () => submission.abort(signal.reason);
       if (signal.aborted) onAbort();
@@ -150,13 +228,11 @@ export class LocalDocumentHandle implements LocalDocumentHandleContract {
       ref,
       this.id,
       this.queue,
-      {
-        isClosed: () => this.closed,
-      },
-      this.imageEncoder,
+      { isClosed: this.doc.isClosed },
+      this.doc.imageEncoder,
       this.guard,
-      this.publisher,
-      this.renderPolicy,
+      this.doc.publisher,
+      this.doc.renderPolicy,
     );
   }
 
@@ -175,18 +251,16 @@ export class LocalDocumentHandle implements LocalDocumentHandleContract {
     const mode = options.mode ?? DEFAULT_PDF_SAVE_MODE;
     // A rewrite of a signed document is refused by the worker (one rule for
     // both engines).
-    const submission = this.queue.enqueue<WorkerResultPayload>(
-      {
-        buildPack: (jobId: JobId) =>
-          wirePack({
-            kind: 'document.saveBuffer',
-            jobId,
-            docId,
-            mode,
-          }),
-      },
-      { priority: Priority.HIGH },
-    );
+    const submission = this.queue.enqueue<WorkerResultPayload>({
+      buildPack: (jobId: JobId) =>
+        wirePack({
+          kind: 'document.saveBuffer',
+          effect: 'snapshot',
+          jobId,
+          docId,
+          mode,
+        }),
+    });
     return AbortablePromise.run<Uint8Array>(async (signal) => {
       const onAbort = () => submission.abort(signal.reason);
       if (signal.aborted) onAbort();
@@ -214,12 +288,10 @@ export class LocalDocumentHandle implements LocalDocumentHandleContract {
       return AbortablePromise.rejectReason(err);
     }
     const docId = this.id;
-    const submission = this.queue.enqueue<WorkerResultPayload>(
-      {
-        buildPack: (jobId: JobId) => wirePack({ kind: 'document.saveLayerBuffer', jobId, docId }),
-      },
-      { priority: Priority.HIGH },
-    );
+    const submission = this.queue.enqueue<WorkerResultPayload>({
+      buildPack: (jobId: JobId) =>
+        wirePack({ kind: 'document.saveLayerBuffer', effect: 'snapshot', jobId, docId }),
+    });
     return AbortablePromise.run<Uint8Array>(async (signal) => {
       const onAbort = () => submission.abort(signal.reason);
       if (signal.aborted) onAbort();
@@ -246,13 +318,10 @@ export class LocalDocumentHandle implements LocalDocumentHandleContract {
       return AbortablePromise.rejectReason(err);
     }
     const docId = this.id;
-    const submission = this.queue.enqueue<WorkerResultPayload>(
-      {
-        buildPack: (jobId: JobId) =>
-          wirePack({ kind: 'document.saveFile', jobId, docId, mode, path }),
-      },
-      { priority: Priority.HIGH },
-    );
+    const submission = this.queue.enqueue<WorkerResultPayload>({
+      buildPack: (jobId: JobId) =>
+        wirePack({ kind: 'document.saveFile', effect: 'snapshot', jobId, docId, mode, path }),
+    });
     return AbortablePromise.run<void>(async (signal) => {
       const onAbort = () => submission.abort(signal.reason);
       if (signal.aborted) onAbort();
@@ -268,14 +337,12 @@ export class LocalDocumentHandle implements LocalDocumentHandleContract {
     if (this.closed) {
       return AbortablePromise.resolveValue<void>(undefined);
     }
-    this.closed = true;
+    this.doc.close();
+    this.doc.queue.forgetWorkingSets(this.id);
     const docId = this.id;
-    const submission = this.queue.enqueue<WorkerResultPayload>(
-      {
-        buildPack: (jobId: JobId) => wirePack({ kind: 'close', jobId, docId }),
-      },
-      { priority: Priority.HIGH },
-    );
+    const submission = this.queue.enqueue<WorkerResultPayload>({
+      buildPack: (jobId: JobId) => wirePack({ kind: 'close', effect: 'close', jobId, docId }),
+    });
     return AbortablePromise.run<void>(async (signal) => {
       const onAbort = () => submission.abort(signal.reason);
       if (signal.aborted) onAbort();

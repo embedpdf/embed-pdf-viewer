@@ -101,6 +101,11 @@ async function boot() {
       log.push('download');
       return new Uint8Array([1]);
     }),
+    // Calls' facts and working sets change nothing here: the same document.
+    with() {
+      return this;
+    },
+    setWorkingSet: () => {},
     close: () => Promise.resolve(),
   } as unknown as DocumentHandle;
   const engine = {

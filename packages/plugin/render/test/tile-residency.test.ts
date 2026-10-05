@@ -16,9 +16,11 @@ import { TileManager } from '../src/tile-manager';
 
 const PAGE = { width: 612, height: 792 };
 
-function createHarness(
-  options?: { tiling?: TilesOptions; storeBudget?: number; handleBytes?: number },
-) {
+function createHarness(options?: {
+  tiling?: TilesOptions;
+  storeBudget?: number;
+  handleBytes?: number;
+}) {
   const store = new RasterStore(options?.storeBudget ?? 1024 * 1024 * 1024);
   const pending: Array<{
     key: string;
@@ -37,8 +39,7 @@ function createHarness(
     getPageSize: () => PAGE,
     getEpoch: () => 0,
     after: timerClock.after,
-    priorityOf: () => 0,
-    fetchTile: (_pageObjectNumber, rect, scale: number, _includeAnnotations, signal) =>
+    fetchTile: (_view, _pageObjectNumber, rect, scale: number, _includeAnnotations, signal) =>
       new Promise<PageImageHandle>((resolve, reject) => {
         liveFetches += 1;
         maxLiveFetches = Math.max(maxLiveFetches, liveFetches);

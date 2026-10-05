@@ -61,15 +61,6 @@ export interface PageRenderOptions<C extends Coordinates = PageCoordinates> {
    * the local product promise).
    */
   maxOutputPixels?: number;
-  /**
-   * How soon this render should run among the renders waiting: higher runs
-   * first, equal ones in call order. Any finite number; default 0. It orders
-   * renders only: a write or an open the caller already asked for still runs
-   * before them, a read after them. Change it while the render waits with
-   * the task's `setPriority`. Scheduling, never identity: the pixels are the
-   * same at any priority. The cloud engine ignores it for now.
-   */
-  priority?: number;
 }
 
 export interface PageImageOptions<

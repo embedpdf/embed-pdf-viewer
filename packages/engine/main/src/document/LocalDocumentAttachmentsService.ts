@@ -16,9 +16,8 @@ import {
 import type { SessionEventPublisher } from '@embedpdf/engine-services';
 
 import type { ScopeGuard } from '../scope';
-import { Priority } from '../worker/Priority';
 import type { JobId, WorkerResultPayload } from '../worker/protocol';
-import type { WorkerQueue } from '../worker/WorkerQueue';
+import type { JobQueue } from '../worker/WorkerQueue';
 
 interface DocClosedView {
   isClosed(): boolean;
@@ -40,7 +39,7 @@ interface DocClosedView {
 export class LocalDocumentAttachmentsService implements DocumentAttachmentsService {
   constructor(
     private readonly docId: string,
-    private readonly queue: WorkerQueue,
+    private readonly queue: JobQueue,
     private readonly view: DocClosedView,
     private readonly guard: ScopeGuard,
     private readonly publisher: SessionEventPublisher,
@@ -58,12 +57,10 @@ export class LocalDocumentAttachmentsService implements DocumentAttachmentsServi
       return AbortablePromise.rejectReason(err);
     }
     const docId = this.docId;
-    const submission = this.queue.enqueue<WorkerResultPayload>(
-      {
-        buildPack: (jobId: JobId) => wirePack({ kind: 'attachments.list', jobId, docId }),
-      },
-      { priority: Priority.MEDIUM },
-    );
+    const submission = this.queue.enqueue<WorkerResultPayload>({
+      buildPack: (jobId: JobId) =>
+        wirePack({ kind: 'attachments.list', effect: 'read', jobId, docId }),
+    });
     return AbortablePromise.run<AttachmentList>(async (signal) => {
       const onAbort = () => submission.abort(signal.reason);
       if (signal.aborted) onAbort();
@@ -88,12 +85,10 @@ export class LocalDocumentAttachmentsService implements DocumentAttachmentsServi
       return AbortablePromise.rejectReason(err);
     }
     const docId = this.docId;
-    const submission = this.queue.enqueue<WorkerResultPayload>(
-      {
-        buildPack: (jobId: JobId) => wirePack({ kind: 'attachments.readFile', jobId, docId, ref }),
-      },
-      { priority: Priority.MEDIUM },
-    );
+    const submission = this.queue.enqueue<WorkerResultPayload>({
+      buildPack: (jobId: JobId) =>
+        wirePack({ kind: 'attachments.readFile', effect: 'read', jobId, docId, ref }),
+    });
     return AbortablePromise.run<AttachmentContent>(async (signal) => {
       const onAbort = () => submission.abort(signal.reason);
       if (signal.aborted) onAbort();
@@ -133,22 +128,20 @@ export class LocalDocumentAttachmentsService implements DocumentAttachmentsServi
       // Same splitter the file-attachment annotation draft uses: metadata
       // into the JSON body, bytes onto the transfer list.
       const { wireFile, resource } = await normalizeAttachmentFileSource(file, 'r0');
-      const submission = this.queue.enqueue<WorkerResultPayload>(
-        {
-          buildPack: (jobId: JobId) =>
-            wirePack(
-              {
-                kind: 'attachments.create',
-                jobId,
-                docId,
-                file: wireFile,
-                resources: { r0: resource },
-              },
-              [resource.bytes],
-            ),
-        },
-        { priority: Priority.MEDIUM },
-      );
+      const submission = this.queue.enqueue<WorkerResultPayload>({
+        buildPack: (jobId: JobId) =>
+          wirePack(
+            {
+              kind: 'attachments.create',
+              effect: 'write',
+              jobId,
+              docId,
+              file: wireFile,
+              resources: { r0: resource },
+            },
+            [resource.bytes],
+          ),
+      });
       const onAbort = () => submission.abort(signal.reason);
       if (signal.aborted) onAbort();
       else signal.addEventListener('abort', onAbort, { once: true });
@@ -173,12 +166,10 @@ export class LocalDocumentAttachmentsService implements DocumentAttachmentsServi
       return AbortablePromise.rejectReason(err);
     }
     const docId = this.docId;
-    const submission = this.queue.enqueue<WorkerResultPayload>(
-      {
-        buildPack: (jobId: JobId) => wirePack({ kind: 'attachments.delete', jobId, docId, ref }),
-      },
-      { priority: Priority.MEDIUM },
-    );
+    const submission = this.queue.enqueue<WorkerResultPayload>({
+      buildPack: (jobId: JobId) =>
+        wirePack({ kind: 'attachments.delete', effect: 'write', jobId, docId, ref }),
+    });
     return AbortablePromise.run<AttachmentDeleteResult>(async (signal) => {
       const onAbort = () => submission.abort(signal.reason);
       if (signal.aborted) onAbort();

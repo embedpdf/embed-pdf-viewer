@@ -53,8 +53,7 @@ describe('tile grid math (aligned ×2 pyramid)', () => {
   it('regionCovered is index arithmetic over the want grid', () => {
     const grid = tileGrid(PAGE, 8, 512);
     const painted = new Set(['0,0', '1,0', '0,1']);
-    const isPainted = (coord: { ix: number; iy: number }) =>
-      painted.has(`${coord.ix},${coord.iy}`);
+    const isPainted = (coord: { ix: number; iy: number }) => painted.has(`${coord.ix},${coord.iy}`);
     // A region inside the painted L-shape: covered.
     expect(regionCovered(grid, PAGE, { x: 0, y: 0, width: 60, height: 60 }, isPainted)).toBe(true);
     // Extending into the unpainted (1,1): not covered.

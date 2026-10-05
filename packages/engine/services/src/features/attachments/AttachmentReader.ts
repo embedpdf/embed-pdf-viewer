@@ -17,6 +17,7 @@ import {
 } from './internal/attachmentPrimitives';
 import type { DocumentSession } from '../../document-session/DocumentSession';
 import { throwIfAborted } from '../../shared/abort';
+import type { Slices } from '../../shared/slices';
 import { resolveAnnotPtr } from '../annotations/internal/identity/resolveAnnotationPointer';
 
 /**
@@ -92,17 +93,19 @@ export class AttachmentReader {
   }
 
   /** Decode the file embedded in a FileAttachment annotation's `/FS`. */
-  readAnnotationFile(
+  /** A file attachment annotation's file; a page not parsed yet loads in slices. */
+  async readAnnotationFile(
     pageObjectNumber: PageObjectNumber,
     ref: AnnotationRef,
     path: string | undefined,
     maxDecodedBytes: number | undefined,
     signal: AbortSignal,
-  ): AttachmentFileWorkerPayload {
+    slices: Slices,
+  ): Promise<AttachmentFileWorkerPayload> {
     throwIfAborted(signal);
     const { fn, mem } = this.runtime;
     const pool = this.session.pagePool();
-    const pagePtr = pool.acquire(pageObjectNumber);
+    const pagePtr = await pool.acquireInSlices(pageObjectNumber, signal, slices);
     let annotPtr: Ptr | null = null;
     try {
       annotPtr = resolveAnnotPtr(this.runtime, this.session, pagePtr, ref);

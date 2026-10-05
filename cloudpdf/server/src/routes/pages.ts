@@ -930,6 +930,7 @@ async function renderPageImage(input: {
     const build = (jobId: WorkerJobId) =>
       wirePack({
         kind: 'pages.render' as const,
+        effect: 'read' as const,
         jobId,
         docId: input.scope.docId,
         ...(input.scope.kind === 'layer' ? { layerName: input.scope.layerName } : {}),
@@ -960,6 +961,7 @@ async function renderPageImage(input: {
     const build = (jobId: WorkerJobId) =>
       wirePack({
         kind: 'pages.renderEncoded' as const,
+        effect: 'read' as const,
         jobId,
         docId: input.scope.docId,
         ...(input.scope.kind === 'layer' ? { layerName: input.scope.layerName } : {}),
@@ -1085,6 +1087,7 @@ async function readPageText(input: {
   const build = (jobId: WorkerJobId) =>
     wirePack({
       kind: 'pages.text' as const,
+      effect: 'read' as const,
       jobId,
       docId: input.scope.docId,
       ...(input.scope.kind === 'layer' ? { layerName: input.scope.layerName } : {}),
@@ -1146,6 +1149,7 @@ async function readPageGeometry(input: {
   const build = (jobId: WorkerJobId) =>
     wirePack({
       kind: 'pages.geometry' as const,
+      effect: 'read' as const,
       jobId,
       docId: input.scope.docId,
       ...(input.scope.kind === 'layer' ? { layerName: input.scope.layerName } : {}),

@@ -137,6 +137,11 @@ export const handleFor = (id: string, pageCount = 1) =>
     },
     security: { allows: () => true, allowsAnnotation: () => true },
     download: () => Promise.resolve(new TextEncoder().encode(id)),
+    // Calls' facts and working sets change nothing here: the same document.
+    with() {
+      return this;
+    },
+    setWorkingSet: () => {},
     close: () => Promise.resolve(),
   }) as unknown as DocumentHandle;
 

@@ -256,6 +256,11 @@ describe('*epdfDocumentGate', () => {
                 allows: () => true,
                 passwordPrompt: { state: 'required', incorrect: true },
               },
+              // Calls' facts and working sets change nothing here: the same document.
+              with() {
+                return this;
+              },
+              setWorkingSet: () => {},
               close: () => Promise.resolve(),
             } as unknown as DocumentHandle)
           : fakeEngine().engine.open(input as never),

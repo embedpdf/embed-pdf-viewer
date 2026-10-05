@@ -320,7 +320,13 @@ export async function registerSignatureRoutes(
       ctx,
       docId,
       sha,
-      (sessionId, jobId) => wirePack({ kind: 'signatures.list' as const, jobId, docId: sessionId }),
+      (sessionId, jobId) =>
+        wirePack({
+          kind: 'signatures.list' as const,
+          effect: 'read' as const,
+          jobId,
+          docId: sessionId,
+        }),
       signal,
     );
     if (payload.tag !== 'signatures.list') {
@@ -354,7 +360,13 @@ export async function registerSignatureRoutes(
       docId,
       requireSha(sha),
       (sessionId, jobId) =>
-        wirePack({ kind: 'signatures.contents' as const, jobId, docId: sessionId, ref }),
+        wirePack({
+          kind: 'signatures.contents' as const,
+          effect: 'read' as const,
+          jobId,
+          docId: sessionId,
+          ref,
+        }),
       abortSignalOf(reply),
     );
     if (payload.tag !== 'signatures.contents') {
@@ -391,6 +403,7 @@ export async function registerSignatureRoutes(
         (sessionId, jobId) =>
           wirePack({
             kind: 'signatures.digest' as const,
+            effect: 'read' as const,
             jobId,
             docId: sessionId,
             ref,
@@ -429,7 +442,13 @@ export async function registerSignatureRoutes(
       docId,
       requireSha(sha),
       (sessionId, jobId) =>
-        wirePack({ kind: 'signatures.analyze' as const, jobId, docId: sessionId, input }),
+        wirePack({
+          kind: 'signatures.analyze' as const,
+          effect: 'read' as const,
+          jobId,
+          docId: sessionId,
+          input,
+        }),
       abortSignalOf(reply),
     );
     if (payload.tag !== 'signatures.analyze') {

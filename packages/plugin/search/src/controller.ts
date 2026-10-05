@@ -149,8 +149,12 @@ export function createSearchController(ctx: PluginContext<SearchState, SearchSet
             : {}),
       };
       try {
+        // A scan nobody waits on, so it runs once the views' work is done.
         // Cancelling stops the engine working on the slice, not only the wait for it.
-        slice = await ctx.cancellable(signal, ctx.doc.search.query(request));
+        slice = await ctx.cancellable(
+          signal,
+          ctx.doc.with({ priority: 'low' }).search.query(request),
+        );
       } catch (error) {
         if (signal?.aborted) return false;
         // Snippets denied (no doc.text.copy)? Degrade to matches without them.

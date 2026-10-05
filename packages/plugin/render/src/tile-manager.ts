@@ -45,9 +45,10 @@ const STAGELESS_TILE_CAP = 64;
  *     center-out, then the prefetch ring once every visible tile resolved)
  *     and returns a paint list drawn only from resolved entries: the
  *     current level and retained older generations.
- *   - one line for every view and page: the transit slots go to the most
- *     urgent queued tile anywhere (`priorityOf`, see `priority.ts`), so the
- *     focus page's tiles never wait behind a page that planned first.
+ *   - one line for every view and page: a transit slot goes to an on-screen
+ *     tile of any page before a tile of any prefetch ring, so a ring never
+ *     takes the slots an on-screen tile needs. The engine ranks the tiles it
+ *     is given by where each one is on screen.
  *   - release-on-occlusion: when a want-level tile reports painted (after the
  *     layer's first presentation opportunity), retained sources whose
  *     visible footprint is covered by painted want tiles leave the paint
@@ -99,20 +100,17 @@ export class TileManager {
       getEpoch(pageObjectNumber: number, includeAnnotations: boolean): number;
       /** Run `run` once, `ms` from now; returns its cancel (the plugin's `ctx.clock.after`). */
       after(ms: number, run: () => void): () => void;
-      /** How urgent a tile of the page is now: higher starts first. */
-      priorityOf(pageObjectNumber: number, prefetch: boolean): number;
       /**
-       * Render a page-space (y-down page points) region; the owner converts to
-       * PDF space. `prefetch` says, whenever asked, whether the tile is in the
-       * ring rather than on screen: a pan can bring it on screen in flight.
+       * Render a page-space (y-down page points) region for `view`, whose
+       * pixels it is: the engine ranks it by where the region is in that view.
        */
       fetchTile(
+        view: string,
         pageObjectNumber: number,
         rect: Rect,
         scale: number,
         includeAnnotations: boolean,
         signal: AbortSignal,
-        prefetch: () => boolean,
       ): Promise<PageImageHandle>;
       /** A page's plans changed outside `plan()`: re-plan it and wake subscribed layers. */
       onAdvance(pageObjectNumber: number): void;
@@ -345,8 +343,9 @@ export class TileManager {
     if (entry) entry.painted = false;
   }
 
-  /** A lens unmounted its tile plane: stop fetching, drop bookkeeping.
-   *  Resolved bytes stay in the RasterStore for a re-mount. */
+  /** A lens stopped painting tiles for the page (it left the view, or its
+   *  layer paints none): stop fetching, drop bookkeeping. Resolved bytes stay
+   *  in the RasterStore for a re-mount. */
   releasePage(view: string, pageObjectNumber: number): void {
     const state = this.pages.get(stateKey(view, pageObjectNumber));
     if (!state) return;
@@ -359,6 +358,7 @@ export class TileManager {
     let state = this.pages.get(stateKey(view, pageObjectNumber));
     if (!state) {
       state = {
+        view,
         pageObjectNumber,
         queue: null,
         epoch: -1,
@@ -405,14 +405,9 @@ export class TileManager {
     // zoom accumulates every tile ever visited.
     const keyOf = (coord: TileCoord) =>
       this.tileKey(pageObjectNumber, wantWidth, coord, includeAnnotations, epoch);
-    const onScreen = new Set(visibleCoords.map(keyOf));
-    const wanted = new Set([...onScreen, ...prefetchCoords.map(keyOf)]);
+    const wanted = new Set([...visibleCoords, ...prefetchCoords].map(keyOf));
     for (const [key, entry] of state.entries) {
-      if (wanted.has(key)) {
-        // A ring tile a pan brought on screen ranks as on screen from now.
-        entry.prefetch = !onScreen.has(key);
-        continue;
-      }
+      if (wanted.has(key)) continue;
       if (!entry.resolved) {
         entry.abort?.abort();
         // The transit slot frees now, synchronously — the rejection handler
@@ -490,29 +485,25 @@ export class TileManager {
   }
 
   /**
-   * Starts queued tiles while transit slots are free, the most urgent first
-   * across every view and page (`priorityOf`; ties go to the view of a page
-   * that queued first). Within one view of a page, its queue's order holds.
-   * Backpressure bounds raw rasters in transit (render + encode); each
+   * Starts queued tiles while transit slots are free: the first on-screen
+   * tile of any view and page, in the order their queues were set, before
+   * any tile of a prefetch ring. Within one view of a page, its queue's order
+   * holds. Backpressure bounds raw rasters in transit (render + encode); each
    * resolution hands its slot on through here, so no other pump is needed.
    */
   private pump(): void {
     const started = new Map<PageTileState, number>();
     while (this.inFlight < MAX_IN_FLIGHT) {
-      let best: { state: PageTileState; coord: TileCoord; prefetch: boolean } | null = null;
-      let bestPriority = -Infinity;
+      let next: { state: PageTileState; coord: TileCoord } | null = null;
       for (const state of this.pages.values()) {
-        const next = this.nextToStart(state);
-        if (!next) continue;
-        const priority = this.deps.priorityOf(state.pageObjectNumber, next.prefetch);
-        if (priority > bestPriority) {
-          best = { state, ...next };
-          bestPriority = priority;
-        }
+        const queued = this.nextToStart(state);
+        if (!queued || (next && queued.prefetch)) continue;
+        next = { state, coord: queued.coord };
+        if (!queued.prefetch) break;
       }
-      if (!best) break;
-      this.start(best.state, best.coord, best.prefetch);
-      started.set(best.state, (started.get(best.state) ?? 0) + 1);
+      if (!next) break;
+      this.start(next.state, next.coord);
+      started.set(next.state, (started.get(next.state) ?? 0) + 1);
     }
     for (const [state, count] of started) {
       this.deps.debug?.(
@@ -544,7 +535,7 @@ export class TileManager {
   }
 
   /** Starts one queued tile's fetch, in a transit slot. */
-  private start(state: PageTileState, coord: TileCoord, prefetch: boolean): void {
+  private start(state: PageTileState, coord: TileCoord): void {
     const { page, grid, wantWidth, includeAnnotations, epoch } = state.queue!;
     const pageObjectNumber = state.pageObjectNumber;
     const key = this.tileKey(pageObjectNumber, wantWidth, coord, includeAnnotations, epoch);
@@ -561,7 +552,6 @@ export class TileManager {
       painted: false,
       charged: true,
       abort,
-      prefetch,
     };
     state.entries.set(key, entry);
     // The cached plan's `fetching` misses this tile now.
@@ -571,6 +561,7 @@ export class TileManager {
         key,
         (signal) =>
           this.deps.fetchTile(
+            state.view,
             pageObjectNumber,
             // The rendered region is the bled rect — it matches the bled
             // placement rect the paint list emits for this entry.
@@ -578,7 +569,6 @@ export class TileManager {
             grid.scale,
             includeAnnotations,
             signal,
-            () => entry.prefetch,
           ),
         abort.signal,
       )
@@ -737,8 +727,6 @@ interface TileEntry {
   /** Holds an in-flight transit slot (see releaseSlot — idempotent). */
   charged?: boolean;
   abort?: AbortController;
-  /** In the prefetch ring, not on screen; kept current while the tile is wanted. */
-  prefetch: boolean;
 }
 
 /** The tiles one view of a page wants started, in order, with what starting one needs. */
@@ -757,6 +745,7 @@ interface TileQueue {
 }
 
 interface PageTileState {
+  view: string;
   pageObjectNumber: number;
   /** What the pump starts for this view of the page; null while nothing should start. */
   queue: TileQueue | null;

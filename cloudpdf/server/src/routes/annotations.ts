@@ -1326,6 +1326,7 @@ async function renderAnnotationAppearances(input: {
       const build = (jobId: WorkerJobId) =>
         wirePack({
           kind: 'annotations.renderAppearancesEncoded' as const,
+          effect: 'read' as const,
           jobId,
           docId: input.scope.docId,
           ...(input.scope.kind === 'layer' ? { layerName: input.scope.layerName } : {}),
@@ -1377,6 +1378,7 @@ async function renderAnnotationAppearances(input: {
     const build = (jobId: WorkerJobId) =>
       wirePack({
         kind: 'annotations.renderAppearances' as const,
+        effect: 'read' as const,
         jobId,
         docId: input.scope.docId,
         ...(input.scope.kind === 'layer' ? { layerName: input.scope.layerName } : {}),
@@ -1497,6 +1499,7 @@ async function readAnnotations(input: {
   const build = (jobId: WorkerJobId) =>
     wirePack({
       kind: 'annotations.list' as const,
+      effect: 'read' as const,
       jobId,
       docId: input.scope.docId,
       ...(input.scope.kind === 'layer' ? { layerName: input.scope.layerName } : {}),
@@ -1593,6 +1596,7 @@ async function exportAnnotations(input: {
   const build = (jobId: WorkerJobId) =>
     wirePack({
       kind: 'annotations.export' as const,
+      effect: 'snapshot' as const,
       jobId,
       docId: scope.docId,
       ...(layerName !== undefined ? { layerName } : {}),
@@ -1663,6 +1667,7 @@ async function readAnnotationsAll(input: {
     const build = (jobId: WorkerJobId) =>
       wirePack({
         kind: 'annotations.list' as const,
+        effect: 'read' as const,
         jobId,
         docId: scope.docId,
         ...(scope.kind === 'layer' ? { layerName: scope.layerName } : {}),

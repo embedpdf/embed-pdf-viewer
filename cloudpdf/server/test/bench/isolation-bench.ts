@@ -125,6 +125,7 @@ function openBuild(docId: string, baseKey: string = PDF_SHA): BuildPack {
   return (jobId: WorkerJobId) =>
     wirePack({
       kind: 'open.layerFileBase' as const,
+      effect: 'open' as const,
       jobId,
       docId,
       baseKey,
@@ -138,6 +139,7 @@ function renderBuild(docId: string, pageObjectNumber: number, width: number): Bu
   return (jobId: WorkerJobId) =>
     wirePack({
       kind: 'pages.render' as const,
+      effect: 'read' as const,
       jobId,
       docId,
       page: toPageRef(pageObjectNumber),
@@ -149,6 +151,7 @@ function renderEncodedBuild(docId: string, pageObjectNumber: number, width: numb
   return (jobId: WorkerJobId) =>
     wirePack({
       kind: 'pages.renderEncoded' as const,
+      effect: 'read' as const,
       jobId,
       docId,
       page: toPageRef(pageObjectNumber),
@@ -158,7 +161,8 @@ function renderEncodedBuild(docId: string, pageObjectNumber: number, width: numb
 }
 
 function metadataBuild(docId: string): BuildPack {
-  return (jobId: WorkerJobId) => wirePack({ kind: 'metadata.read' as const, jobId, docId });
+  return (jobId: WorkerJobId) =>
+    wirePack({ kind: 'metadata.read' as const, effect: 'read' as const, jobId, docId });
 }
 
 // off-lattice, deterministic, identical sequence in both modes
@@ -474,7 +478,7 @@ async function main(): Promise<void> {
     const docIds = Array.from({ length: N_DOCS }, (_, i) => `bench-doc-${i}`);
     for (const docId of docIds) await pool.runOpen(docId, PDF_SHA, openBuild(docId));
     const list = await pool.run(docIds[0]!, (jobId: WorkerJobId) =>
-      wirePack({ kind: 'pages.list' as const, jobId, docId: docIds[0]! }),
+      wirePack({ kind: 'pages.list' as const, effect: 'read' as const, jobId, docId: docIds[0]! }),
     );
     if (list.tag !== 'pages.list') throw new Error(`unexpected ${list.tag}`);
     const pageObjectNumbers = list.snapshot.pages.slice(0, 8).map((p) => p.ref.objectNumber);

@@ -32,6 +32,7 @@ import type {
   RenderCompletedEvent,
   RenderFailedEvent,
   RenderHostCapability,
+  RenderSourceOptions,
   ViewDemand,
 } from './host-contract';
 import { pixelChangeOf } from './invalidation';
@@ -43,7 +44,6 @@ import {
   type ResolvedRenderOptions,
   type TilePaintPlan,
 } from './paint-plan';
-import { renderPriority, screenFacts, type RenderPurpose, type ScreenFacts } from './priority';
 import { RasterStore } from './raster-store';
 import { baseAskWidth, resolveStrategy, type ResolvedStrategy } from './strategy';
 import { TileManager } from './tile-manager';
@@ -61,14 +61,6 @@ interface PageDemand {
   plan: TilePaintPlan;
 }
 
-/** An engine render still on its way, and what decides its priority. */
-interface RankedRender {
-  readonly task: { setPriority(priority: number): void };
-  readonly page: PageObjectNumber;
-  readonly purpose: () => RenderPurpose;
-  priority: number;
-}
-
 /**
  * The render controller: the one place strategy (config: what the viewer
  * spends) composes with policy (the engine fact: what the deployment
@@ -81,13 +73,14 @@ interface RankedRender {
  * `renderSource` (host, conformed). Both share the raster store, so a
  * developer's thumbnail and the rail's base plane never render twice.
  *
+ * Every render it asks for is the picture of a page itself, so it asks the
+ * engine with `priority: 'high'`, naming the view it's for when it knows it:
+ * the engine runs it before anything else about the same place (annotation
+ * appearances, form fields, text geometry, links).
+ *
  * Two doors for staleness: confirmed document events (see `connect`) and
  * the `invalidate` verb. Both go through `publishInvalidation`, the one
  * place the ledger bumps and `onInvalidated` fires.
- *
- * One order for every engine render it asks for: a priority from what the
- * views show (`priority.ts`), changed while the render waits when the views
- * move on.
  *
  * The tile manager and the per-view plans live outside state (they hold
  * live handles and abort controllers); a re-plan wakes readers with
@@ -176,53 +169,6 @@ export function createRenderController(ctx: PluginContext<RenderState, RenderSet
     `${pageObjectNumber}|w${width}|a${annotations ? 1 : 0}|e${epochOf(pageObjectNumber, annotations)}` +
     `${format ? `|f${format}` : ''}${quality !== undefined ? `|q${quality}` : ''}`;
 
-  // ── priority: what the views show orders the renders ──
-  /** Handles per view id, reference-counted; demands and plans per page. */
-  const views = new Map<
-    string,
-    { handle: ViewDemand; refs: number; pages: Map<PageObjectNumber, PageDemand> }
-  >();
-  // The facts of every view's demands, recomputed after one changed.
-  let facts: ScreenFacts | null = null;
-  const currentFacts = (): ScreenFacts =>
-    (facts ??= screenFacts(
-      [...views.values()].flatMap((view) =>
-        [...view.pages].map(([page, entry]) => ({ page, demand: entry.demand })),
-      ),
-      (pageObjectNumber) => ctx.getPage(toPageRef(pageObjectNumber))?.size,
-    ));
-  const ranked = new Set<RankedRender>();
-
-  /** Starts an engine render at its priority now, re-ranked while it waits. */
-  function startRanked<T extends PromiseLike<unknown> & { setPriority(priority: number): void }>(
-    page: PageObjectNumber,
-    purpose: () => RenderPurpose,
-    render: (priority: number) => T,
-  ): T {
-    const priority = renderPriority(purpose(), page, currentFacts());
-    const task = render(priority);
-    const entry: RankedRender = { task, page, purpose, priority };
-    ranked.add(entry);
-    const settled = () => void ranked.delete(entry);
-    task.then(settled, settled);
-    return task;
-  }
-
-  // A view's demand changed: the renders on their way take their priority now.
-  // Nothing waits for the other views to report first: the engine reads
-  // priorities only when it picks its next render, after this burst of reports.
-  function demandsChanged(): void {
-    facts = null;
-    if (ranked.size === 0) return;
-    const now = currentFacts();
-    for (const render of ranked) {
-      const priority = renderPriority(render.purpose(), render.page, now);
-      if (priority === render.priority) continue;
-      render.priority = priority;
-      render.task.setPriority(priority);
-    }
-  }
-
   // ── the raster store door (shared by both render doors and the tiles) ──
   function acquireRaster(
     page: PageRef,
@@ -232,24 +178,24 @@ export function createRenderController(ctx: PluginContext<RenderState, RenderSet
       includeAnnotations: boolean;
       format: RenderFormat | undefined;
       quality: number | undefined;
+      /** The view whose picture it is, so the engine ranks it by where the page is there. */
+      view: string | undefined;
     },
     signal: AbortSignal | undefined,
   ): Promise<PageImageHandle> {
     const result = store.acquire(
       key,
       (storeSignal) => {
-        const task = startRanked(
-          page.objectNumber,
-          () => 'base',
-          (priority) =>
-            ctx.doc.page(page).render.image({
-              viewport: request.viewport,
-              includeAnnotations: request.includeAnnotations,
-              ...(request.format !== undefined ? { format: request.format } : {}),
-              ...(request.quality !== undefined ? { quality: request.quality } : {}),
-              priority,
-            }),
-        );
+        const doc = ctx.doc.with({
+          priority: 'high',
+          ...(request.view !== undefined ? { view: request.view } : {}),
+        });
+        const task = doc.page(page).render.image({
+          viewport: request.viewport,
+          includeAnnotations: request.includeAnnotations,
+          ...(request.format !== undefined ? { format: request.format } : {}),
+          ...(request.quality !== undefined ? { quality: request.quality } : {}),
+        });
         if (storeSignal.aborted) task.abort(reasonOf(storeSignal));
         else
           storeSignal.addEventListener('abort', () => task.abort(reasonOf(storeSignal)), {
@@ -280,11 +226,7 @@ export function createRenderController(ctx: PluginContext<RenderState, RenderSet
   /** The host door: conformed to the render points. Async so refusals reject. */
   async function renderSource(
     page: PageRef,
-    {
-      scale,
-      includeAnnotations,
-      signal,
-    }: { scale: number; includeAnnotations?: boolean; signal?: AbortSignal },
+    { scale, includeAnnotations, view, signal }: RenderSourceOptions & { signal?: AbortSignal },
   ): Promise<PageImageHandle> {
     ctx.assertAllowed(RENDER_SCOPE, 'render.renderSource');
     const annotations = includeAnnotations ?? true;
@@ -305,6 +247,7 @@ export function createRenderController(ctx: PluginContext<RenderState, RenderSet
         includeAnnotations: annotations,
         format: strategy.format,
         quality: strategy.quality,
+        view,
       },
       signal,
     );
@@ -331,7 +274,13 @@ export function createRenderController(ctx: PluginContext<RenderState, RenderSet
       acquireRaster(
         page,
         key,
-        { viewport: { kind: 'width', width }, includeAnnotations: annotations, format, quality },
+        {
+          viewport: { kind: 'width', width },
+          includeAnnotations: annotations,
+          format,
+          quality,
+          view: undefined,
+        },
         options.signal,
       ),
     );
@@ -420,34 +369,22 @@ export function createRenderController(ctx: PluginContext<RenderState, RenderSet
     getPageSize: (pageObjectNumber) => ctx.getPage(toPageRef(pageObjectNumber))?.size,
     getEpoch: epochOf,
     after: ctx.clock.after,
-    priorityOf: (pageObjectNumber, prefetch) =>
-      renderPriority(prefetch ? 'prefetch' : 'tile', pageObjectNumber, currentFacts()),
-    fetchTile: async (
-      pageObjectNumber,
-      rect: Rect,
-      scale,
-      includeAnnotations,
-      signal,
-      prefetch,
-    ) => {
+    fetchTile: async (view, pageObjectNumber, rect: Rect, scale, includeAnnotations, signal) => {
       // The same refusal the engine would send, without the round trip: a
       // denied session's viewport would otherwise be refused once per tile.
       ctx.assertAllowed(RENDER_SCOPE, 'render.tile');
       const page = toPageRef(pageObjectNumber);
       const strategy = currentStrategy();
-      const task = startRanked(
-        pageObjectNumber,
-        () => (prefetch() ? 'prefetch' : 'tile'),
-        (priority) =>
-          ctx.doc.page(page).render.image({
-            target: { kind: 'rect', rect },
-            viewport: { kind: 'scale', scale },
-            includeAnnotations,
-            ...(strategy.format !== undefined ? { format: strategy.format } : {}),
-            ...(strategy.quality !== undefined ? { quality: strategy.quality } : {}),
-            priority,
-          }),
-      );
+      const task = ctx.doc
+        .with({ priority: 'high', view })
+        .page(page)
+        .render.image({
+          target: { kind: 'rect', rect },
+          viewport: { kind: 'scale', scale },
+          includeAnnotations,
+          ...(strategy.format !== undefined ? { format: strategy.format } : {}),
+          ...(strategy.quality !== undefined ? { quality: strategy.quality } : {}),
+        });
       if (signal.aborted) task.abort(reasonOf(signal));
       else signal.addEventListener('abort', () => task.abort(reasonOf(signal)), { once: true });
       return task;
@@ -457,6 +394,12 @@ export function createRenderController(ctx: PluginContext<RenderState, RenderSet
       if (resolvedOptions().debug) console.debug(`[render] ${message}`);
     },
   });
+
+  /** One handle per view id, reference-counted; demands and plans per page. */
+  const views = new Map<
+    string,
+    { handle: ViewDemand; refs: number; pages: Map<PageObjectNumber, PageDemand> }
+  >();
 
   /** Re-plan a page for every view that wants it (schedules the next want
    *  set), and wake readers once when any plan changed. */
@@ -485,20 +428,16 @@ export function createRenderController(ctx: PluginContext<RenderState, RenderSet
       setDemand: (page, demand, options) => {
         const pageObjectNumber = page.objectNumber;
         const includeAnnotations = options?.includeAnnotations ?? true;
-        const previous = pages.get(pageObjectNumber)?.plan;
-        // The demand first: the plan starts tiles in the order it sets.
-        const entry: PageDemand = { demand, includeAnnotations, plan: previous ?? EMPTY_TILE_PLAN };
-        pages.set(pageObjectNumber, entry);
-        demandsChanged();
-        entry.plan = tiles.plan(viewId, pageObjectNumber, demand, includeAnnotations);
-        if (entry.plan !== previous) ctx.notify();
+        const previous = pages.get(pageObjectNumber);
+        const plan = tiles.plan(viewId, pageObjectNumber, demand, includeAnnotations);
+        pages.set(pageObjectNumber, { demand, includeAnnotations, plan });
+        if (plan !== previous?.plan) ctx.notify();
       },
       getPlan: (page) => pages.get(page.objectNumber)?.plan ?? EMPTY_TILE_PLAN,
       markPainted: (page, key) => tiles.sourcePainted(viewId, page.objectNumber, key),
       markUnpainted: (page, key) => tiles.sourceUnpainted(viewId, page.objectNumber, key),
       release: (page) => {
         pages.delete(page.objectNumber);
-        demandsChanged();
         tiles.releasePage(viewId, page.objectNumber);
       },
       dispose: () => {
@@ -509,10 +448,10 @@ export function createRenderController(ctx: PluginContext<RenderState, RenderSet
         // The last reference releases the view's pages. The entry itself stays
         // (a few ids per document) so a handle that is re-acquired or reused
         // after a dispose (React's development double-mount) keeps working.
-        const shown = [...view.pages.keys()];
+        for (const pageObjectNumber of [...view.pages.keys()]) {
+          tiles.releasePage(viewId, pageObjectNumber);
+        }
         view.pages.clear();
-        demandsChanged();
-        for (const pageObjectNumber of shown) tiles.releasePage(viewId, pageObjectNumber);
       },
     };
     views.set(viewId, { handle, refs: 1, pages });

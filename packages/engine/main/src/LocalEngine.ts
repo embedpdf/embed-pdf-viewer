@@ -23,7 +23,6 @@ import { BrowserImageEncoder, type LocalImageEncoder } from './render/BrowserIma
 import { PortableImageEncoder } from './render/PortableImageEncoder';
 import { buildHandleScopeContext, ScopeGuard } from './scope';
 import type { Transport } from './transport/Transport';
-import { Priority } from './worker/Priority';
 import type { JobId, WorkerResultPayload } from './worker/protocol';
 import { WorkerQueue } from './worker/WorkerQueue';
 
@@ -185,26 +184,24 @@ export class LocalEngine implements LocalEngineContract {
     const signedDocumentPolicy = this.signedDocumentPolicy;
     const baseSha256 = input.baseSha256;
 
-    const submission = queue.enqueue<WorkerResultPayload>(
-      {
-        buildPack: (jobId: JobId) =>
-          wirePack(
-            {
-              kind: 'open.layerFileBase',
-              jobId,
-              docId,
-              baseKey,
-              basePath: input.basePath,
-              layer,
-              password,
-              signedDocumentPolicy,
-              ...(baseSha256 ? { baseSha256 } : {}),
-            },
-            transfer,
-          ),
-      },
-      { priority: Priority.HIGH },
-    );
+    const submission = queue.enqueue<WorkerResultPayload>({
+      buildPack: (jobId: JobId) =>
+        wirePack(
+          {
+            kind: 'open.layerFileBase',
+            effect: 'open',
+            jobId,
+            docId,
+            baseKey,
+            basePath: input.basePath,
+            layer,
+            password,
+            signedDocumentPolicy,
+            ...(baseSha256 ? { baseSha256 } : {}),
+          },
+          transfer,
+        ),
+    });
 
     return this.openResult(submission, options);
   }
@@ -220,29 +217,27 @@ export class LocalEngine implements LocalEngineContract {
     const signedDocumentPolicy = this.signedDocumentPolicy;
     const sessionKind = this.sessionKind;
 
-    const submission = queue.enqueue<WorkerResultPayload>(
-      {
-        // open() is the one current producer that actually carries a buffer.
-        // The buffer reference appears once in the payload and once in the
-        // transfer manifest — same object, marked for zero-copy move so the
-        // sender's `buffer.byteLength` becomes 0 after the transport hands
-        // it off to the worker.
-        buildPack: (jobId: JobId) =>
-          wirePack(
-            {
-              kind: 'open.fatMem',
-              jobId,
-              docId,
-              bytes: buffer,
-              password,
-              signedDocumentPolicy,
-              sessionKind,
-            },
-            [buffer],
-          ),
-      },
-      { priority: Priority.HIGH },
-    );
+    const submission = queue.enqueue<WorkerResultPayload>({
+      // open() is the one current producer that actually carries a buffer.
+      // The buffer reference appears once in the payload and once in the
+      // transfer manifest — same object, marked for zero-copy move so the
+      // sender's `buffer.byteLength` becomes 0 after the transport hands
+      // it off to the worker.
+      buildPack: (jobId: JobId) =>
+        wirePack(
+          {
+            kind: 'open.fatMem',
+            effect: 'open',
+            jobId,
+            docId,
+            bytes: buffer,
+            password,
+            signedDocumentPolicy,
+            sessionKind,
+          },
+          [buffer],
+        ),
+    });
 
     return this.openResult(submission, options);
   }
@@ -265,25 +260,23 @@ export class LocalEngine implements LocalEngineContract {
     const transfer = artifactBytes ? [baseBytes, artifactBytes] : [baseBytes];
     const signedDocumentPolicy = this.signedDocumentPolicy;
 
-    const submission = queue.enqueue<WorkerResultPayload>(
-      {
-        buildPack: (jobId: JobId) =>
-          wirePack(
-            {
-              kind: 'open.layerMemBase',
-              jobId,
-              docId,
-              baseKey,
-              baseBytes,
-              layer,
-              password,
-              signedDocumentPolicy,
-            },
-            transfer,
-          ),
-      },
-      { priority: Priority.HIGH },
-    );
+    const submission = queue.enqueue<WorkerResultPayload>({
+      buildPack: (jobId: JobId) =>
+        wirePack(
+          {
+            kind: 'open.layerMemBase',
+            effect: 'open',
+            jobId,
+            docId,
+            baseKey,
+            baseBytes,
+            layer,
+            password,
+            signedDocumentPolicy,
+          },
+          transfer,
+        ),
+    });
 
     return this.openResult(submission, options);
   }
@@ -316,7 +309,7 @@ export class LocalEngine implements LocalEngineContract {
           signedDocumentPolicy: this.signedDocumentPolicy,
         }),
       );
-      const handle = new LocalDocumentHandle(
+      const handle = LocalDocumentHandle.open(
         payload.docId,
         queue,
         imageEncoder,

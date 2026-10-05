@@ -34,9 +34,17 @@ const openBuild = (docId: string) => (jobId: WorkerJobId) => {
   // Stub workers don't read bytes; pass an empty payload + empty
   // transfer list so the test stays focused on the routing logic.
   const empty = new ArrayBuffer(0);
-  return wirePack({ kind: 'open.fatMem' as const, jobId, docId, bytes: empty, password: null }, [
-    empty,
-  ]);
+  return wirePack(
+    {
+      kind: 'open.fatMem' as const,
+      effect: 'open' as const,
+      jobId,
+      docId,
+      bytes: empty,
+      password: null,
+    },
+    [empty],
+  );
 };
 
 describe('WorkerThreadPool sticky-by-base_sha', () => {
@@ -122,7 +130,7 @@ describe('WorkerThreadPool sticky-by-base_sha', () => {
     // rejection while still going through runOpen's binding path.
     await expect(
       p.runOpen('fails', 'f'.repeat(64), (jobId) =>
-        wirePack({ kind: 'metadata.read', jobId, docId: 'fails' }),
+        wirePack({ kind: 'metadata.read', effect: 'read', jobId, docId: 'fails' }),
       ),
     ).rejects.toThrow();
     expect(p.inspect()[0]!.docIds).toEqual([]);

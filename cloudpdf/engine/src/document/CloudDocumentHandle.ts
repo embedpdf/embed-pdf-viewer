@@ -21,6 +21,8 @@ import {
   type PageHandle,
   type PageRef,
   type DownloadOptions,
+  type CallFacts,
+  type WorkingSetPage,
 } from '@embedpdf/engine-core/runtime';
 import {
   DEFAULT_LAYER_NAME,
@@ -299,6 +301,18 @@ export class CloudDocumentHandle implements DocumentHandle {
       (signal) => this.pages.pageLayout(ref, signal),
     );
   }
+
+  /**
+   * This handle: the cloud engine sends every call as it's made, in
+   * parallel, and the server runs them in arrival order, so a call's facts
+   * change nothing here (the page residency plan, §10.10).
+   */
+  with(_facts: CallFacts): DocumentHandle {
+    return this;
+  }
+
+  /** Ignored: the server learns what's needed from what is asked of it (§10.10). */
+  setWorkingSet(_view: string, _pages: readonly WorkingSetPage[]): void {}
 
   download(options: DownloadOptions = {}): AbortablePromise<Uint8Array> {
     if (this.closed) {

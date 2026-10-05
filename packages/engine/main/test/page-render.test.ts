@@ -4,17 +4,8 @@ import {
   runPageRenderConformance,
   type ConformanceTestRunner,
 } from '@embedpdf/engine-core/conformance';
-import {
-  pageTransform,
-  toPageRef,
-  type WirePack,
-  type WorkerRequest,
-  type WorkerResponse,
-} from '@embedpdf/engine-core/runtime';
-import { LocalPageRenderService } from '../src/document/LocalPageRenderService';
+import { pageTransform } from '@embedpdf/engine-core/runtime';
 import { createLocalEngine } from '../src/index';
-import type { Transport } from '../src/transport/Transport';
-import { WorkerQueue } from '../src/worker/WorkerQueue';
 
 const runner: ConformanceTestRunner = {
   describe,
@@ -67,70 +58,66 @@ describe('render.raw() (local)', () => {
   });
 });
 
-describe('render priority (local)', () => {
-  test('renders run by priority after the writes asked meanwhile; setPriority re-ranks a waiting one', async () => {
+describe('render order (local)', () => {
+  test('renders follow the view: on screen before a tile off screen, a high call first', async () => {
     const engine = await createLocalEngine({ runtime: { prefer: 'wasm' } });
     try {
       const doc = await engine.open({
         kind: 'bytes',
-        id: 'render-priority',
+        id: 'render-order',
         bytes: CROP_OFFSET_PDF.slice(),
       });
       const { pages } = await doc.pages.list();
-      const page = doc.page(pages[0]!.ref);
+      const ref = pages[0]!.ref;
+      const stage = doc.with({ view: 'stage' });
       const order: string[] = [];
       const track = (name: string, task: Promise<unknown>) =>
         task.then(() => void order.push(name));
-      const render = (priority?: number) =>
-        page.render.raw({ viewport: { kind: 'scale', scale: 0.5 }, priority });
+      const viewport = { kind: 'scale', scale: 0.5 } as const;
 
-      // The first render takes the worker; the rest wait in the queue.
-      const running = track('running', render());
-      const low = track('low', render(1));
-      const high = track('high', render(5));
-      const unranked = track('unranked', render());
-      const moved = render(1);
-      const write = track('write', doc.metadata.update({ title: 'ranked' }));
-      moved.setPriority(9);
-      await Promise.all([running, low, high, unranked, track('moved', moved), write]);
+      // A write takes the worker (a write never gives way, as a running read
+      // would to the high call); the renders wait in the queue.
+      const running = track('write', doc.metadata.update({ title: 'order' }));
+      const below = track(
+        'tile below the screen',
+        stage.page(ref).render.raw({
+          viewport,
+          target: { kind: 'rect', rect: { x: 0, y: 150, width: 50, height: 50 } },
+        }),
+      );
+      const base = track('base', stage.page(ref).render.raw({ viewport }));
+      const text = track('high text', doc.with({ priority: 'high' }).page(ref).text.layout());
+      // The view says what it shows after the renders were asked: they take their places now.
+      doc.setWorkingSet('stage', [
+        {
+          page: ref,
+          role: 'visible',
+          visible: { x: 0, y: 0, width: 200, height: 100 },
+          pixels: 20_000,
+        },
+      ]);
+      await Promise.all([running, below, base, text]);
 
-      expect(order).toEqual(['running', 'write', 'moved', 'high', 'low', 'unranked']);
+      expect(order).toEqual(['write', 'high text', 'base', 'tile below the screen']);
       await doc.close();
     } finally {
       await engine.destroy();
     }
   });
 
-  test('the worker hears the priority a render has when it is sent, for its own line', async () => {
-    const sent: WorkerRequest[] = [];
-    let answer: (response: WorkerResponse) => void = () => undefined;
-    const transport: Transport = {
-      send: (pack: WirePack<WorkerRequest>) => void sent.push(pack.payload),
-      onMessage: (handler) => {
-        answer = handler;
-        return () => undefined;
-      },
-      terminate: async () => undefined,
-    };
-    const render = new LocalPageRenderService(
-      'doc',
-      toPageRef(3),
-      new WorkerQueue(transport),
-      { isClosed: () => false },
-      {} as never,
-      { assertCapability: () => undefined } as never,
-    );
-    const options = { viewport: { kind: 'scale', scale: 1 } } as const;
-    const running = render.raw(options); // sent at once: the queue's one slot
-    const waiting = render.raw({ ...options, priority: 2 });
-    waiting.setPriority(7);
-    expect(sent).toEqual([expect.objectContaining({ options: { ...options, priority: 0 } })]);
-
-    // The slot frees; the waiting render goes out with its priority now.
-    answer({ kind: 'reject', jobId: sent[0]!.jobId, error: { code: 'Aborted', message: '' } });
-    await running.catch(() => undefined);
-    expect(sent[1]).toMatchObject({ kind: 'pages.render', options: { priority: 7 } });
-    answer({ kind: 'reject', jobId: sent[1]!.jobId, error: { code: 'Aborted', message: '' } });
-    await waiting.catch(() => undefined);
+  test('with() keeps the facts it was given, adds to them, and gives the same handle for the same facts', async () => {
+    const engine = await createLocalEngine({ runtime: { prefer: 'wasm' } });
+    try {
+      const doc = await engine.open({ kind: 'bytes', id: 'with', bytes: CROP_OFFSET_PDF.slice() });
+      const stage = doc.with({ view: 'stage' });
+      expect(doc.with({ view: 'stage' })).toBe(stage);
+      expect(stage.with({ priority: 'high' })).toBe(doc.with({ priority: 'high', view: 'stage' }));
+      expect(stage.id).toBe(doc.id);
+      expect(stage.events).toBe(doc.events);
+      await doc.close();
+      await expect(stage.pages.list()).rejects.toMatchObject({ code: 'DocNotOpen' });
+    } finally {
+      await engine.destroy();
+    }
   });
 });

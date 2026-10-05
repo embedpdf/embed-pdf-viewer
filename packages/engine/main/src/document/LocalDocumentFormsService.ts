@@ -33,9 +33,8 @@ import {
 
 import type { SessionEventPublisher } from '@embedpdf/engine-services';
 import type { ScopeGuard } from '../scope';
-import { Priority } from '../worker/Priority';
 import type { JobId, WorkerResultPayload } from '../worker/protocol';
-import type { WorkerQueue } from '../worker/WorkerQueue';
+import type { JobQueue } from '../worker/WorkerQueue';
 
 interface DocClosedView {
   isClosed(): boolean;
@@ -51,7 +50,7 @@ interface DocClosedView {
 export class LocalDocumentFormsService implements DocumentFormsService {
   constructor(
     private readonly docId: string,
-    private readonly queue: WorkerQueue,
+    private readonly queue: JobQueue,
     private readonly view: DocClosedView,
     private readonly guard: ScopeGuard,
     private readonly publisher: SessionEventPublisher,
@@ -61,12 +60,9 @@ export class LocalDocumentFormsService implements DocumentFormsService {
     const rejected = this.gate('doc.forms.read');
     if (rejected) return rejected;
     const docId = this.docId;
-    const submission = this.queue.enqueue<WorkerResultPayload>(
-      {
-        buildPack: (jobId: JobId) => wirePack({ kind: 'forms.list', jobId, docId }),
-      },
-      { priority: Priority.MEDIUM },
-    );
+    const submission = this.queue.enqueue<WorkerResultPayload>({
+      buildPack: (jobId: JobId) => wirePack({ kind: 'forms.list', effect: 'read', jobId, docId }),
+    });
     return this.await(submission, 'forms.list', (payload) => payload.snapshot);
   }
 
@@ -96,12 +92,10 @@ export class LocalDocumentFormsService implements DocumentFormsService {
     const rejected = this.gate('doc.forms.fill');
     if (rejected) return rejected;
     const docId = this.docId;
-    const submission = this.queue.enqueue<WorkerResultPayload>(
-      {
-        buildPack: (jobId: JobId) => wirePack({ kind: 'forms.setValue', jobId, docId, ref, value }),
-      },
-      { priority: Priority.HIGH },
-    );
+    const submission = this.queue.enqueue<WorkerResultPayload>({
+      buildPack: (jobId: JobId) =>
+        wirePack({ kind: 'forms.setValue', effect: 'write', jobId, docId, ref, value }),
+    });
     return this.await(submission, 'forms.setValue', (payload) => {
       this.publisher.publishLocal({ type: 'forms.valueSet', ...payload.result });
       return payload.result;
@@ -113,13 +107,10 @@ export class LocalDocumentFormsService implements DocumentFormsService {
     if (rejected) return rejected;
     const docId = this.docId;
     const refs = fields === undefined ? undefined : Array.isArray(fields) ? fields : [fields];
-    const submission = this.queue.enqueue<WorkerResultPayload>(
-      {
-        buildPack: (jobId: JobId) =>
-          wirePack({ kind: 'forms.reset', jobId, docId, ...(refs ? { refs } : {}) }),
-      },
-      { priority: Priority.HIGH },
-    );
+    const submission = this.queue.enqueue<WorkerResultPayload>({
+      buildPack: (jobId: JobId) =>
+        wirePack({ kind: 'forms.reset', effect: 'write', jobId, docId, ...(refs ? { refs } : {}) }),
+    });
     return this.await(submission, 'forms.reset', (payload) => {
       // One event per field that changed, sharing one transaction.
       const facts = formResetFacts(payload.result);
@@ -138,13 +129,10 @@ export class LocalDocumentFormsService implements DocumentFormsService {
     const rejected = this.gate('doc.forms.fill');
     if (rejected) return rejected;
     const docId = this.docId;
-    const submission = this.queue.enqueue<WorkerResultPayload>(
-      {
-        buildPack: (jobId: JobId) =>
-          wirePack({ kind: 'forms.applyEffects', jobId, docId, effects }),
-      },
-      { priority: Priority.HIGH },
-    );
+    const submission = this.queue.enqueue<WorkerResultPayload>({
+      buildPack: (jobId: JobId) =>
+        wirePack({ kind: 'forms.applyEffects', effect: 'write', jobId, docId, effects }),
+    });
     return this.await(submission, 'forms.applyEffects', (payload) => {
       if (payload.wrote) {
         this.publisher.publishLocal({ type: 'forms.effectsApplied', ...payload.result });
@@ -157,12 +145,10 @@ export class LocalDocumentFormsService implements DocumentFormsService {
     const rejected = this.gate('doc.forms.read');
     if (rejected) return rejected;
     const docId = this.docId;
-    const submission = this.queue.enqueue<WorkerResultPayload>(
-      {
-        buildPack: (jobId: JobId) => wirePack({ kind: 'forms.export', jobId, docId, format }),
-      },
-      { priority: Priority.MEDIUM },
-    );
+    const submission = this.queue.enqueue<WorkerResultPayload>({
+      buildPack: (jobId: JobId) =>
+        wirePack({ kind: 'forms.export', effect: 'snapshot', jobId, docId, format }),
+    });
     return this.await(submission, 'forms.export', (payload) => ({
       format: payload.format,
       bytes: new Uint8Array(payload.bytes),
@@ -177,16 +163,20 @@ export class LocalDocumentFormsService implements DocumentFormsService {
     if (rejected) return rejected;
     const docId = this.docId;
     const buffer = toOwnedArrayBuffer(data);
-    const submission = this.queue.enqueue<WorkerResultPayload>(
-      {
-        buildPack: (jobId: JobId) =>
-          wirePack(
-            { kind: 'forms.import', jobId, docId, data: buffer, ...(format ? { format } : {}) },
-            [buffer],
-          ),
-      },
-      { priority: Priority.HIGH },
-    );
+    const submission = this.queue.enqueue<WorkerResultPayload>({
+      buildPack: (jobId: JobId) =>
+        wirePack(
+          {
+            kind: 'forms.import',
+            effect: 'write',
+            jobId,
+            docId,
+            data: buffer,
+            ...(format ? { format } : {}),
+          },
+          [buffer],
+        ),
+    });
     return this.await(submission, 'forms.import', (payload) => {
       this.publisher.publishLocal({ type: 'forms.imported', ...payload.result });
       return payload.result;
@@ -197,12 +187,10 @@ export class LocalDocumentFormsService implements DocumentFormsService {
     const rejected = this.gate('doc.forms.modify');
     if (rejected) return rejected;
     const docId = this.docId;
-    const submission = this.queue.enqueue<WorkerResultPayload>(
-      {
-        buildPack: (jobId: JobId) => wirePack({ kind: 'forms.createField', jobId, docId, draft }),
-      },
-      { priority: Priority.HIGH },
-    );
+    const submission = this.queue.enqueue<WorkerResultPayload>({
+      buildPack: (jobId: JobId) =>
+        wirePack({ kind: 'forms.createField', effect: 'write', jobId, docId, draft }),
+    });
     return this.await(submission, 'forms.createField', (payload) => {
       this.publisher.publishLocal({ type: 'forms.created', ...payload.result });
       return payload.result;
@@ -217,13 +205,13 @@ export class LocalDocumentFormsService implements DocumentFormsService {
     if (rejected) return rejected;
     const docId = this.docId;
     const pdf = appearance.pdf.slice().buffer as ArrayBuffer;
-    const submission = this.queue.enqueue<WorkerResultPayload>(
-      {
-        buildPack: (jobId: JobId) =>
-          wirePack({ kind: 'forms.setSignatureAppearance', jobId, docId, ref, pdf }, [pdf]),
-      },
-      { priority: Priority.HIGH },
-    );
+    const submission = this.queue.enqueue<WorkerResultPayload>({
+      buildPack: (jobId: JobId) =>
+        wirePack(
+          { kind: 'forms.setSignatureAppearance', effect: 'write', jobId, docId, ref, pdf },
+          [pdf],
+        ),
+    });
     return this.await(submission, 'forms.setSignatureAppearance', (payload) => {
       this.publisher.publishLocal({ type: 'forms.updated', ...payload.result });
       return payload.result;
@@ -234,13 +222,10 @@ export class LocalDocumentFormsService implements DocumentFormsService {
     const rejected = this.gate('doc.forms.modify');
     if (rejected) return rejected;
     const docId = this.docId;
-    const submission = this.queue.enqueue<WorkerResultPayload>(
-      {
-        buildPack: (jobId: JobId) =>
-          wirePack({ kind: 'forms.updateField', jobId, docId, ref, patch }),
-      },
-      { priority: Priority.HIGH },
-    );
+    const submission = this.queue.enqueue<WorkerResultPayload>({
+      buildPack: (jobId: JobId) =>
+        wirePack({ kind: 'forms.updateField', effect: 'write', jobId, docId, ref, patch }),
+    });
     return this.await(submission, 'forms.updateField', (payload) => {
       this.publisher.publishLocal({ type: 'forms.updated', ...payload.result });
       return payload.result;
@@ -251,12 +236,10 @@ export class LocalDocumentFormsService implements DocumentFormsService {
     const rejected = this.gate('doc.forms.modify');
     if (rejected) return rejected;
     const docId = this.docId;
-    const submission = this.queue.enqueue<WorkerResultPayload>(
-      {
-        buildPack: (jobId: JobId) => wirePack({ kind: 'forms.deleteField', jobId, docId, ref }),
-      },
-      { priority: Priority.HIGH },
-    );
+    const submission = this.queue.enqueue<WorkerResultPayload>({
+      buildPack: (jobId: JobId) =>
+        wirePack({ kind: 'forms.deleteField', effect: 'write', jobId, docId, ref }),
+    });
     return this.await(submission, 'forms.deleteField', (payload) => {
       this.publisher.publishLocal({
         type: 'forms.deleted',
@@ -271,13 +254,10 @@ export class LocalDocumentFormsService implements DocumentFormsService {
     const rejected = this.gate('doc.forms.modify');
     if (rejected) return rejected;
     const docId = this.docId;
-    const submission = this.queue.enqueue<WorkerResultPayload>(
-      {
-        buildPack: (jobId: JobId) =>
-          wirePack({ kind: 'forms.addWidget', jobId, docId, ref, placement }),
-      },
-      { priority: Priority.HIGH },
-    );
+    const submission = this.queue.enqueue<WorkerResultPayload>({
+      buildPack: (jobId: JobId) =>
+        wirePack({ kind: 'forms.addWidget', effect: 'write', jobId, docId, ref, placement }),
+    });
     return this.await(submission, 'forms.addWidget', (payload) => {
       this.publisher.publishLocal({ type: 'forms.widgetAdded', ...payload.result });
       return payload.result;
@@ -288,13 +268,10 @@ export class LocalDocumentFormsService implements DocumentFormsService {
     const rejected = this.gate('doc.forms.modify');
     if (rejected) return rejected;
     const docId = this.docId;
-    const submission = this.queue.enqueue<WorkerResultPayload>(
-      {
-        buildPack: (jobId: JobId) =>
-          wirePack({ kind: 'forms.detachWidget', jobId, docId, ref, widget }),
-      },
-      { priority: Priority.HIGH },
-    );
+    const submission = this.queue.enqueue<WorkerResultPayload>({
+      buildPack: (jobId: JobId) =>
+        wirePack({ kind: 'forms.detachWidget', effect: 'write', jobId, docId, ref, widget }),
+    });
     return this.await(submission, 'forms.detachWidget', (payload) => {
       this.publisher.publishLocal({ type: 'forms.widgetRemoved', ...payload.result });
       return payload.result;
@@ -306,13 +283,10 @@ export class LocalDocumentFormsService implements DocumentFormsService {
     if (rejected) return rejected;
     const docId = this.docId;
     const bakeAppearances = options?.bakeAppearances ?? false;
-    const submission = this.queue.enqueue<WorkerResultPayload>(
-      {
-        buildPack: (jobId: JobId) =>
-          wirePack({ kind: 'forms.repair', jobId, docId, bakeAppearances }),
-      },
-      { priority: Priority.HIGH },
-    );
+    const submission = this.queue.enqueue<WorkerResultPayload>({
+      buildPack: (jobId: JobId) =>
+        wirePack({ kind: 'forms.repair', effect: 'write', jobId, docId, bakeAppearances }),
+    });
     return this.await(submission, 'forms.repair', (payload) => {
       this.publisher.publishLocal({ type: 'forms.repaired', ...payload.result });
       return payload.result;

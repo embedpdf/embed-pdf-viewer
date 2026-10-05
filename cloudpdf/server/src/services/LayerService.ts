@@ -386,6 +386,7 @@ export class LayerService {
         const build = (jobId: WorkerJobId) =>
           wirePack({
             kind: 'annotations.create' as const,
+            effect: 'write' as const,
             jobId,
             docId: input.docId,
             layerName: input.layerName,
@@ -440,6 +441,7 @@ export class LayerService {
           wirePack(
             {
               kind: 'annotations.import' as const,
+              effect: 'write' as const,
               jobId,
               docId: input.docId,
               layerName: input.layerName,
@@ -532,6 +534,7 @@ export class LayerService {
         const build = (jobId: WorkerJobId) =>
           wirePack({
             kind: 'annotations.update' as const,
+            effect: 'write' as const,
             jobId,
             docId: input.docId,
             layerName: input.layerName,
@@ -645,6 +648,7 @@ export class LayerService {
     const build = (jobId: WorkerJobId) =>
       wirePack({
         kind: 'annotations.list' as const,
+        effect: 'read' as const,
         jobId,
         docId,
         layerName,
@@ -690,6 +694,7 @@ export class LayerService {
         const build = (jobId: WorkerJobId) =>
           wirePack({
             kind: 'annotations.delete' as const,
+            effect: 'write' as const,
             jobId,
             docId: input.docId,
             layerName: input.layerName,
@@ -740,6 +745,7 @@ export class LayerService {
         const build = (jobId: WorkerJobId) =>
           wirePack({
             kind: 'annotations.move' as const,
+            effect: 'write' as const,
             jobId,
             docId: input.docId,
             layerName: input.layerName,
@@ -779,6 +785,7 @@ export class LayerService {
         const build = (jobId: WorkerJobId) =>
           wirePack({
             kind: 'pages.move' as const,
+            effect: 'contentWrite' as const,
             jobId,
             docId: input.docId,
             layerName: input.layerName,
@@ -824,6 +831,7 @@ export class LayerService {
           (jobId: WorkerJobId) =>
             wirePack({
               kind: 'measure.setScale' as const,
+              effect: 'write' as const,
               jobId,
               docId: input.docId,
               layerName: input.layerName,
@@ -864,6 +872,7 @@ export class LayerService {
       (jobId, artifactPath) =>
         wirePack({
           kind: 'pages.setName' as const,
+          effect: 'write' as const,
           jobId,
           docId: input.docId,
           layerName: input.layerName,
@@ -890,6 +899,7 @@ export class LayerService {
       (jobId, artifactPath) =>
         wirePack({
           kind: 'pages.removeName' as const,
+          effect: 'write' as const,
           jobId,
           docId: input.docId,
           layerName: input.layerName,
@@ -962,6 +972,7 @@ export class LayerService {
           (jobId) =>
             wirePack({
               kind: 'annotations.flatten' as const,
+              effect: 'contentWrite' as const,
               jobId,
               docId: input.docId,
               layerName: input.layerName,
@@ -1006,6 +1017,7 @@ export class LayerService {
         const build = (jobId: WorkerJobId) =>
           wirePack({
             kind: 'pages.rotate' as const,
+            effect: 'contentWrite' as const,
             jobId,
             docId: input.docId,
             layerName: input.layerName,
@@ -1056,6 +1068,7 @@ export class LayerService {
         const build = (jobId: WorkerJobId) =>
           wirePack({
             kind: 'pages.delete' as const,
+            effect: 'contentWrite' as const,
             jobId,
             docId: input.docId,
             layerName: input.layerName,
@@ -1100,6 +1113,7 @@ export class LayerService {
         const build = (jobId: WorkerJobId) =>
           wirePack({
             kind: 'pages.insert' as const,
+            effect: 'contentWrite' as const,
             jobId,
             docId: input.docId,
             layerName: input.layerName,
@@ -1140,6 +1154,7 @@ export class LayerService {
         const build = (jobId: WorkerJobId) =>
           wirePack({
             kind: 'pages.insertBlank' as const,
+            effect: 'contentWrite' as const,
             jobId,
             docId: input.docId,
             layerName: input.layerName,
@@ -1193,6 +1208,7 @@ export class LayerService {
           (jobId) =>
             wirePack({
               kind: 'pages.flatten' as const,
+              effect: 'contentWrite' as const,
               jobId,
               docId: input.docId,
               layerName: input.layerName,
@@ -1249,6 +1265,7 @@ export class LayerService {
           (jobId) =>
             wirePack({
               kind: 'redaction.apply' as const,
+              effect: 'contentWrite' as const,
               jobId,
               docId: input.docId,
               layerName: input.layerName,
@@ -1287,6 +1304,7 @@ export class LayerService {
         const build = (jobId: WorkerJobId) =>
           wirePack({
             kind: 'metadata.update' as const,
+            effect: 'write' as const,
             jobId,
             docId: input.docId,
             layerName: input.layerName,
@@ -1325,6 +1343,7 @@ export class LayerService {
         const build = (jobId: WorkerJobId) =>
           wirePack({
             kind: 'metadata.updateCustom' as const,
+            effect: 'write' as const,
             jobId,
             docId: input.docId,
             layerName: input.layerName,
@@ -1373,6 +1392,7 @@ export class LayerService {
         const build = (jobId: WorkerJobId) =>
           wirePack({
             kind: 'attachments.create' as const,
+            effect: 'write' as const,
             jobId,
             docId: input.docId,
             layerName: input.layerName,
@@ -1412,6 +1432,7 @@ export class LayerService {
         const build = (jobId: WorkerJobId) =>
           wirePack({
             kind: 'attachments.delete' as const,
+            effect: 'write' as const,
             jobId,
             docId: input.docId,
             layerName: input.layerName,
@@ -1456,6 +1477,7 @@ export class LayerService {
     const build = (jobId: WorkerJobId) =>
       wirePack({
         kind: 'forms.list' as const,
+        effect: 'read' as const,
         jobId,
         docId: input.docId,
         layerName: input.layerName,
@@ -1482,6 +1504,7 @@ export class LayerService {
     const build = (jobId: WorkerJobId) =>
       wirePack({
         kind: 'forms.export' as const,
+        effect: 'snapshot' as const,
         jobId,
         docId: input.docId,
         layerName: input.layerName,
@@ -1512,6 +1535,7 @@ export class LayerService {
         build: (jobId, artifactPath) =>
           wirePack({
             kind: 'forms.setValue' as const,
+            effect: 'write' as const,
             jobId,
             docId: input.docId,
             layerName: input.layerName,
@@ -1542,6 +1566,7 @@ export class LayerService {
         build: (jobId, artifactPath) =>
           wirePack({
             kind: 'forms.reset' as const,
+            effect: 'write' as const,
             jobId,
             docId: input.docId,
             layerName: input.layerName,
@@ -1568,6 +1593,7 @@ export class LayerService {
           (jobId) =>
             wirePack({
               kind: 'forms.applyEffects' as const,
+              effect: 'write' as const,
               jobId,
               docId: input.docId,
               layerName: input.layerName,
@@ -1628,6 +1654,7 @@ export class LayerService {
           wirePack(
             {
               kind: 'forms.import' as const,
+              effect: 'write' as const,
               jobId,
               docId: input.docId,
               layerName: input.layerName,
@@ -1661,6 +1688,7 @@ export class LayerService {
         build: (jobId, artifactPath) =>
           wirePack({
             kind: 'forms.repair' as const,
+            effect: 'write' as const,
             jobId,
             docId: input.docId,
             layerName: input.layerName,
@@ -1689,6 +1717,7 @@ export class LayerService {
         build: (jobId, artifactPath) =>
           wirePack({
             kind: 'forms.createField' as const,
+            effect: 'write' as const,
             jobId,
             docId: input.docId,
             layerName: input.layerName,
@@ -1717,6 +1746,7 @@ export class LayerService {
         build: (jobId, artifactPath) =>
           wirePack({
             kind: 'forms.updateField' as const,
+            effect: 'write' as const,
             jobId,
             docId: input.docId,
             layerName: input.layerName,
@@ -1756,6 +1786,7 @@ export class LayerService {
           wirePack(
             {
               kind: 'forms.setSignatureAppearance' as const,
+              effect: 'write' as const,
               jobId,
               docId: input.docId,
               layerName: input.layerName,
@@ -1786,6 +1817,7 @@ export class LayerService {
         build: (jobId, artifactPath) =>
           wirePack({
             kind: 'forms.deleteField' as const,
+            effect: 'write' as const,
             jobId,
             docId: input.docId,
             layerName: input.layerName,
@@ -1817,6 +1849,7 @@ export class LayerService {
         build: (jobId, artifactPath) =>
           wirePack({
             kind: 'forms.addWidget' as const,
+            effect: 'write' as const,
             jobId,
             docId: input.docId,
             layerName: input.layerName,
@@ -1847,6 +1880,7 @@ export class LayerService {
         build: (jobId, artifactPath) =>
           wirePack({
             kind: 'forms.detachWidget' as const,
+            effect: 'write' as const,
             jobId,
             docId: input.docId,
             layerName: input.layerName,
@@ -2593,6 +2627,7 @@ export class LayerService {
     const build = (jobId: WorkerJobId) =>
       wirePack({
         kind: 'annotations.list' as const,
+        effect: 'read' as const,
         jobId,
         docId,
         layerName,
@@ -3613,6 +3648,7 @@ export class LayerService {
         (jobId: WorkerJobId) =>
           wirePack({
             kind: 'signatures.prepare' as const,
+            effect: 'snapshot' as const,
             jobId,
             docId: input.docId,
             layerName: input.layerName,
@@ -3708,6 +3744,7 @@ export class LayerService {
           .run(input.docId, (jobId: WorkerJobId) =>
             wirePack({
               kind: 'signatures.cancel' as const,
+              effect: 'session' as const,
               jobId,
               docId: input.docId,
               layerName: input.layerName,
@@ -3817,6 +3854,7 @@ export class LayerService {
                 wirePack(
                   {
                     kind: 'signatures.finalizeCandidate' as const,
+                    effect: 'read' as const,
                     jobId,
                     path: candidatePath,
                     byteRange: prepared.byteRange,
@@ -4050,7 +4088,13 @@ export class LayerService {
     const payload = await this.requirePool().run(
       docId,
       (jobId: WorkerJobId) =>
-        wirePack({ kind: 'signatures.list' as const, jobId, docId, layerName }),
+        wirePack({
+          kind: 'signatures.list' as const,
+          effect: 'read' as const,
+          jobId,
+          docId,
+          layerName,
+        }),
       signal,
     );
     if (payload.tag !== 'signatures.list') {

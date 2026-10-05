@@ -39,9 +39,8 @@ export function renderImageOptionsToWire(
   options: PageImageOptions,
   versions: RenderVersions,
 ): WireFlat {
-  // Path-expressed, never token-expressed (see above). The priority orders
-  // renders and changes no pixel, so it is no part of the artifact's name.
-  const { includeAnnotations: _pathExpressed, priority: _scheduling, ...wireOptions } = options;
+  // Path-expressed, never token-expressed (see above).
+  const { includeAnnotations: _pathExpressed, ...wireOptions } = options;
   return flatten({
     ...wireOptions,
     contentVersion: versions.contentVersion,

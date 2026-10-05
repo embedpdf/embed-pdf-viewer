@@ -121,6 +121,7 @@ describe('annotation export on the local engine', () => {
     const bytes = await documentWithStamps();
     const opened = await send({
       kind: 'open.fatMem',
+      effect: 'open',
       docId: 'limits',
       bytes: bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength),
       password: null,
@@ -130,6 +131,7 @@ describe('annotation export on the local engine', () => {
     const exported = (limits: Partial<AnnotationBundleLimits>) =>
       send({
         kind: 'annotations.export',
+        effect: 'snapshot',
         docId: 'limits',
         selection: {},
         limits: { ...DEFAULT_ANNOTATION_BUNDLE_LIMITS, ...limits },

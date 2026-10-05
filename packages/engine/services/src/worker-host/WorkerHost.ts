@@ -89,15 +89,15 @@ import {
   type PageNetworkRenderFormat,
   type PageRaster,
   type PagesRenderWorkerRequest,
-  type PagesRenderEncodedWorkerRequest,
-  type DocumentRenderPageFileEncodedWorkerRequest,
-  type AnnotationsRenderAppearancesEncodedWorkerRequest,
   type EncodedAppearanceWire,
   type EncodedImageWire,
   type RenderEncode,
   type PagesTextWorkerRequest,
   type SearchQueryWorkerRequest,
   type FormsApplyEffectsWorkerRequest,
+  type PageRef,
+  type PagesWorkingSetWorkerRequest,
+  type RequestEffect,
   type SerializedEngineError,
   type ShutdownWorkerRequest,
   type WirePack,
@@ -215,22 +215,27 @@ export interface WorkerHostOptions {
    */
   parsedPageBudgetBytes?: number;
   /**
-   * Milliseconds a page render runs before it lets this thread receive
-   * messages, so an abort stops it about this soon. Defaults to
-   * {@link DEFAULT_RENDER_SLICE_MS}.
+   * Milliseconds a job's PDFium work runs (a page render, a page load, a loop
+   * over glyphs or annotations) before it lets this thread receive messages,
+   * so an abort stops it about this soon. Defaults to {@link DEFAULT_SLICE_MS}.
    */
-  renderSliceMs?: number;
+  sliceMs?: number;
 }
 
-/** See {@link WorkerHostOptions.renderSliceMs}. */
-export const DEFAULT_RENDER_SLICE_MS = 8;
+/** See {@link WorkerHostOptions.sliceMs}. */
+export const DEFAULT_SLICE_MS = 8;
 
-/** The kinds that render a page, in slices (see {@link Slices}). */
-type PageRenderRequest =
-  | PagesRenderWorkerRequest<PdfCoordinates>
-  | PagesRenderEncodedWorkerRequest<PdfCoordinates>
-  | DocumentRenderPageFileWorkerRequest
-  | DocumentRenderPageFileEncodedWorkerRequest;
+/**
+ * The work of a job that pauses between slices (see {@link WorkerHost.runSliced}):
+ * its PDFium part, and for an encoded kind the image encode that follows it.
+ */
+interface SlicedWork {
+  pdfium(signal: AbortSignal): Promise<WirePack<WorkerResultPayload<PdfCoordinates>>>;
+  encode?(
+    pdfium: WirePack<WorkerResultPayload<PdfCoordinates>>,
+    signal: AbortSignal,
+  ): Promise<WirePack<WorkerResultPayload<PdfCoordinates>>>;
+}
 
 /** A page render as it arrives, in page space: what the held list reorders. */
 type HeldPageRender = Extract<
@@ -279,15 +284,16 @@ export class WorkerHost {
   private readonly residency: PageResidency;
   /** Image decodes kept between jobs that write nothing, for every session on this runtime. */
   private readonly decodedImages: DecodedImageStore;
-  private readonly renderSlices: Slices;
+  private readonly slices: Slices;
   /**
-   * True while a page render is in progress. The render pauses between slices
-   * so this thread can receive an abort, but PDFium holds the page's render
-   * until it ends, so nothing else may use PDFium meanwhile: requests that
-   * arrive are held (see {@link receive}).
+   * True while a job's PDFium work is in progress across slices (a render, a
+   * page load, a glyph loop). It pauses between slices so this thread can
+   * receive an abort, but nothing else may use PDFium meanwhile (a render
+   * holds its page until it ends): requests that arrive are held (see
+   * {@link receive}).
    */
-  private rendering = false;
-  /** Requests that arrived while a render was in progress, in arrival order (see {@link takeHeld}). */
+  private busy = false;
+  /** Requests that arrived while a job was busy, in arrival order (see {@link takeHeld}). */
   private readonly held: PageSpaceJob[] = [];
   private destroyed = false;
 
@@ -315,11 +321,11 @@ export class WorkerHost {
         budgetBytes:
           this.options.parsedPageBudgetBytes ?? DEFAULT_PAGE_RESIDENCY_POLICY.budgetBytes,
       },
-      () => this.rendering,
+      () => this.busy,
     );
     this.decodedImages = new DecodedImageStore(this.runtime, this.options.decodedImageBudgetBytes);
-    this.renderSlices = {
-      budgetMs: this.options.renderSliceMs ?? DEFAULT_RENDER_SLICE_MS,
+    this.slices = {
+      budgetMs: this.options.sliceMs ?? DEFAULT_SLICE_MS,
       between: createEventLoopYield(),
     };
   }
@@ -340,13 +346,32 @@ export class WorkerHost {
       this.abort(msg.jobId);
       return;
     }
-    // While a page render is in progress, and until every request held
-    // meanwhile has run, requests wait their turn in arrival order.
-    if (this.rendering || this.held.length > 0) {
+    // Bookkeeping only, so it is taken at once, even while a render runs.
+    if (msg.kind === 'pages.workingSet') {
+      this.setWorkingSet(msg);
+      return;
+    }
+    // While a job is busy, and until every request held meanwhile has run,
+    // requests wait their turn in arrival order.
+    if (this.busy || this.held.length > 0) {
       this.held.push(msg);
       return;
     }
     this.run(msg);
+  }
+
+  /** What a view shows of a document: the order its kept pages close in. Never answered. */
+  private setWorkingSet(msg: PagesWorkingSetWorkerRequest): void {
+    const session = this.sessions.get(sessionKey(msg.docId, msg.layerName));
+    if (!session?.isOpen()) return;
+    session.pagePool().setWorkingSet(
+      msg.view,
+      msg.pages.map(({ page, role, pixels }) => ({
+        pageObjectNumber: page.objectNumber,
+        role,
+        pixels,
+      })),
+    );
   }
 
   /** Stops a running job, or answers a held one as aborted without running it. */
@@ -361,9 +386,9 @@ export class WorkerHost {
     this.post(wirePack({ kind: 'reject', jobId, error }, EMPTY_TRANSFER));
   }
 
-  /** Runs held requests until one starts a page render. */
+  /** Runs held requests until one is busy across slices. */
   private drain(): void {
-    while (!this.rendering) {
+    while (!this.busy) {
       const next = this.takeHeld();
       if (!next) return;
       this.run(next);
@@ -371,11 +396,10 @@ export class WorkerHost {
   }
 
   /**
-   * The next held request. Requests run in arrival order, except that page
-   * renders held one after another run by their priority, higher first; then
-   * a render whose page is parsed before one that must parse it; then in
-   * arrival order. A render never passes another kind of request, nor the
-   * other way round.
+   * The next held request. Requests run in arrival order, except that of page
+   * renders held one after another, a render whose page is parsed runs before
+   * one that must parse it. A render never passes another kind of request, nor
+   * the other way round.
    */
   private takeHeld(): PageSpaceJob | undefined {
     const first = this.held[0];
@@ -385,21 +409,13 @@ export class WorkerHost {
     for (let i = 1; i < this.held.length; i++) {
       const candidate = this.held[i]!;
       if (!isPageRender(candidate)) break;
-      if (this.runsBefore(candidate, best)) {
+      if (this.pageIsKept(candidate) && !this.pageIsKept(best)) {
         next = i;
         best = candidate;
       }
     }
     this.held.splice(next, 1);
     return best;
-  }
-
-  /** Whether held render `a` runs before held render `b`, which arrived first. */
-  private runsBefore(a: HeldPageRender, b: HeldPageRender): boolean {
-    const priorityA = a.options?.priority ?? 0;
-    const priorityB = b.options?.priority ?? 0;
-    if (priorityA !== priorityB) return priorityA > priorityB;
-    return this.pageIsKept(a) && !this.pageIsKept(b);
   }
 
   /** Whether the render's page is kept, so the render parses nothing. */
@@ -419,7 +435,7 @@ export class WorkerHost {
     // Before any route below: a write drops every kept image decode, and a
     // write that changes content closes the pages it may change, so no change
     // can meet a page or an image decoded before it (see pageEffectOf).
-    const effect = pageEffectOf(job.kind);
+    const effect = pageEffectOf(job);
     this.closePagesChangedBy(job, effect);
     this.decodedImages.beginJob(effect === 'none');
 
@@ -435,22 +451,11 @@ export class WorkerHost {
       return;
     }
 
-    // Page renders run in slices, awaiting between them; see receiveRender.
-    if (
-      msg.kind === 'pages.render' ||
-      msg.kind === 'pages.renderEncoded' ||
-      msg.kind === 'document.renderPageFile' ||
-      msg.kind === 'document.renderPageFileEncoded'
-    ) {
-      void this.receiveRender(msg);
-      return;
-    }
-    // The encoded appearance render's rasters come from the same sync handler
-    // as the raw kind; only the injected image encode awaits, and PDFium is
-    // done by then, so other requests may run meanwhile. Everything else stays
-    // on the synchronous switch below.
-    if (msg.kind === 'annotations.renderAppearancesEncoded') {
-      void this.receiveEncoded(msg);
+    // Renders and the reads that load pages pause between slices (see
+    // runSliced); everything else runs in one go, on the switch below.
+    const sliced = this.slicedWork(msg);
+    if (sliced) {
+      void this.runSliced(job, msg, effect, sliced);
       return;
     }
 
@@ -492,9 +497,6 @@ export class WorkerHost {
           break;
         case 'annotations.list':
           resultPack = this.handleAnnotationsList(msg, ctrl.signal);
-          break;
-        case 'annotations.renderAppearances':
-          resultPack = this.handleAnnotationsRenderAppearances(msg, ctrl.signal);
           break;
         case 'annotations.create':
           resultPack = this.handleAnnotationsCreate(msg, ctrl.signal);
@@ -637,12 +639,6 @@ export class WorkerHost {
         case 'attachments.delete':
           resultPack = this.handleAttachmentsDelete(msg, ctrl.signal);
           break;
-        case 'annotations.readFile':
-          resultPack = this.handleAnnotationsReadFile(msg, ctrl.signal);
-          break;
-        case 'measure.viewports':
-          resultPack = this.handleMeasureViewports(msg, ctrl.signal);
-          break;
         case 'measure.setScale':
           resultPack = this.handleMeasureSetScale(msg, ctrl.signal);
           break;
@@ -657,15 +653,6 @@ export class WorkerHost {
           break;
         case 'pieceInfo.delete':
           resultPack = this.handlePieceInfoDelete(msg, ctrl.signal);
-          break;
-        case 'pages.text':
-          resultPack = this.handlePagesText(msg, ctrl.signal);
-          break;
-        case 'pages.geometry':
-          resultPack = this.handlePagesGeometry(msg, ctrl.signal);
-          break;
-        case 'search.query':
-          resultPack = this.handleSearchQuery(msg, ctrl.signal);
           break;
         case 'document.saveBuffer':
           resultPack = this.handleDocumentSaveBuffer(msg);
@@ -1010,12 +997,14 @@ export class WorkerHost {
   }
 
   /**
-   * The dispatch fence for a parked signing candidate. Only mutating kinds
-   * are refused; a request for a session that is not open falls through
-   * to its handler's own `DocNotOpen`.
+   * The dispatch fence for a parked signing candidate. Only writes are
+   * refused, except the signing's own completion; a request for a session
+   * that is not open falls through to its handler's own `DocNotOpen`.
    */
   private assertNoPendingSigning(msg: FileSpaceJob): void {
-    if (!MUTATING_KINDS.has(msg.kind) || !('docId' in msg)) return;
+    if (msg.kind === 'shutdown' || msg.kind === 'signatures.complete') return;
+    if (msg.effect !== 'write' && msg.effect !== 'contentWrite') return;
+    if (!('docId' in msg)) return;
     const layerName = 'layerName' in msg ? msg.layerName : undefined;
     const session = this.sessions.get(sessionKey(msg.docId, layerName));
     if (session?.pendingSigning) {
@@ -1083,14 +1072,14 @@ export class WorkerHost {
     return wirePack({ tag: 'annotations.list', list: reader.list(pages, signal) });
   }
 
-  private handleAnnotationsRenderAppearances(
+  private async handleAnnotationsRenderAppearances(
     req: AnnotationsRenderAppearancesWorkerRequest,
     signal: AbortSignal,
-  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
+  ): Promise<WirePack<WorkerResultPayload<PdfCoordinates>>> {
     const session = this.requireSession(req);
     const pageObjectNumber = session.resolvePageRef(req.page).pageObjectNumber;
     const reader = new AnnotationAppearanceReader(this.runtime, session);
-    const result = reader.render(pageObjectNumber, req.options ?? {}, signal);
+    const result = await reader.render(pageObjectNumber, req.options ?? {}, signal, this.slices);
     // Transfer every appearance raster buffer back zero-copy, like pages.render.
     const transfer = result.appearances.map((a) => a.raster.data);
     return wirePack({ tag: 'annotations.renderAppearances', page: req.page, result }, transfer);
@@ -1397,17 +1386,18 @@ export class WorkerHost {
     return this.finishMutation(session, { tag: 'attachments.delete', result }, req.artifactPath);
   }
 
-  private handleAnnotationsReadFile(
+  private async handleAnnotationsReadFile(
     req: AnnotationsReadFileWorkerRequest,
     signal: AbortSignal,
-  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
+  ): Promise<WirePack<WorkerResultPayload<PdfCoordinates>>> {
     const session = this.requireSession(req);
-    const content = new AttachmentReader(this.runtime, session).readAnnotationFile(
+    const content = await new AttachmentReader(this.runtime, session).readAnnotationFile(
       session.resolvePageRef(req.page).pageObjectNumber,
       req.ref,
       req.path,
       req.maxDecodedBytes,
       signal,
+      this.slices,
     );
     return wirePack(
       { tag: 'annotations.readFile', content },
@@ -1415,19 +1405,17 @@ export class WorkerHost {
     );
   }
 
-  private handleMeasureViewports(
+  private async handleMeasureViewports(
     req: MeasureViewportsWorkerRequest,
     signal: AbortSignal,
-  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
+  ): Promise<WirePack<WorkerResultPayload<PdfCoordinates>>> {
     const session = this.requireSession(req);
-    return wirePack({
-      tag: 'measure.viewports',
-      page: req.page,
-      viewports: new MeasureReader(this.runtime, session).viewports(
-        session.resolvePageRef(req.page).pageObjectNumber,
-        signal,
-      ),
-    });
+    const viewports = await new MeasureReader(this.runtime, session).viewports(
+      session.resolvePageRef(req.page).pageObjectNumber,
+      signal,
+      this.slices,
+    );
+    return wirePack({ tag: 'measure.viewports', page: req.page, viewports });
   }
   private handleMeasureSetScale(
     req: MeasureSetScaleWorkerRequest,
@@ -1514,33 +1502,35 @@ export class WorkerHost {
     return this.finishMutation(session, { tag: 'pieceInfo.delete', result }, req.artifactPath);
   }
 
-  private handlePagesText(
+  private async handlePagesText(
     req: PagesTextWorkerRequest,
     signal: AbortSignal,
-  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
+  ): Promise<WirePack<WorkerResultPayload<PdfCoordinates>>> {
     const session = this.requireSession(req);
     const reader = new PageTextReader(this.runtime, session);
-    const snapshot = reader.read(session.resolvePageRef(req.page).pageObjectNumber, signal);
+    const pageObjectNumber = session.resolvePageRef(req.page).pageObjectNumber;
+    const snapshot = await reader.read(pageObjectNumber, signal, this.slices);
     return wirePack({ tag: 'pages.text', snapshot });
   }
 
-  private handlePagesGeometry(
+  private async handlePagesGeometry(
     req: PagesGeometryWorkerRequest,
     signal: AbortSignal,
-  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
+  ): Promise<WirePack<WorkerResultPayload<PdfCoordinates>>> {
     const session = this.requireSession(req);
     const reader = new PageGeometryReader(this.runtime, session);
-    const snapshot = reader.read(session.resolvePageRef(req.page).pageObjectNumber, signal);
+    const pageObjectNumber = session.resolvePageRef(req.page).pageObjectNumber;
+    const snapshot = await reader.read(pageObjectNumber, signal, this.slices);
     return wirePack({ tag: 'pages.geometry', page: req.page, snapshot });
   }
 
-  private handleSearchQuery(
+  private async handleSearchQuery(
     req: SearchQueryWorkerRequest,
     signal: AbortSignal,
-  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
+  ): Promise<WirePack<WorkerResultPayload<PdfCoordinates>>> {
     const session = this.requireSession(req);
     const reader = new SearchReader(this.runtime, session);
-    const slice = reader.query(req.request, signal);
+    const slice = await reader.query(req.request, signal, this.slices);
     return wirePack({ tag: 'search.query', slice });
   }
 
@@ -1554,69 +1544,76 @@ export class WorkerHost {
       session.resolvePageRef(req.page).pageObjectNumber,
       req.options ?? {},
       signal,
-      this.renderSlices,
+      this.slices,
     );
     return wirePack({ tag: 'pages.render', page: req.page, area, raster }, [raster.data]);
   }
 
   /**
-   * A page render: it runs in slices, and until its PDFium work ends
-   * (`rendering`), requests are held. An encoded kind then encodes the raster
-   * while other requests run.
+   * The work of a job that pauses between slices, or null for one that runs in
+   * one go: renders, and the reads that load a page (its text, geometry,
+   * annotation appearances, measurement viewports, an annotation's file) or
+   * many (a search). Writes never pause: a read must never see half of one.
    */
-  private async receiveRender(msg: PageRenderRequest): Promise<void> {
-    // Fail-fast before any native work: a host without an injected encoder
-    // (browser/local workers) rejects the job without paying for a raster it
-    // could never encode.
-    const encoded =
-      msg.kind === 'pages.renderEncoded' || msg.kind === 'document.renderPageFileEncoded';
-    if (encoded && !this.options.imageEncoder) {
-      this.post(
-        wirePack({ kind: 'reject', jobId: msg.jobId, error: noEncoderError() }, EMPTY_TRANSFER),
-      );
-      return;
-    }
-    const ctrl = new AbortController();
-    this.aborts.set(msg.jobId, ctrl);
-    // Set before the handler's first await, so a request that arrives while
-    // the render pauses is held.
-    this.rendering = true;
-    try {
-      let rendered: WirePack<WorkerResultPayload<PdfCoordinates>>;
-      try {
-        rendered =
-          msg.kind === 'pages.render' || msg.kind === 'pages.renderEncoded'
-            ? await this.handlePagesRender({ ...msg, kind: 'pages.render' }, ctrl.signal)
-            : await this.handleDocumentRenderPageFile(
-                { ...msg, kind: 'document.renderPageFile' },
-                ctrl.signal,
-              );
-      } finally {
-        this.rendering = false;
-        // After this job's own reply below, which follows synchronously.
-        queueMicrotask(() => this.drain());
-      }
-      const resultPack =
-        msg.kind === 'pages.renderEncoded' || msg.kind === 'document.renderPageFileEncoded'
-          ? await this.encodeRendered(rendered, msg.encode, ctrl.signal)
-          : rendered;
-      this.resolve(msg, resultPack);
-    } catch (err) {
-      this.post(
-        wirePack({ kind: 'reject', jobId: msg.jobId, error: serializeError(err) }, EMPTY_TRANSFER),
-      );
-    } finally {
-      this.aborts.delete(msg.jobId);
+  private slicedWork(msg: FileSpaceJob): SlicedWork | null {
+    switch (msg.kind) {
+      case 'pages.render':
+        return { pdfium: (signal) => this.handlePagesRender(msg, signal) };
+      case 'pages.renderEncoded':
+        return {
+          pdfium: (signal) => this.handlePagesRender({ ...msg, kind: 'pages.render' }, signal),
+          encode: (rendered, signal) => this.encodeRendered(rendered, msg.encode, signal),
+        };
+      case 'document.renderPageFile':
+        return { pdfium: (signal) => this.handleDocumentRenderPageFile(msg, signal) };
+      case 'document.renderPageFileEncoded':
+        return {
+          pdfium: (signal) =>
+            this.handleDocumentRenderPageFile({ ...msg, kind: 'document.renderPageFile' }, signal),
+          encode: (rendered, signal) => this.encodeRendered(rendered, msg.encode, signal),
+        };
+      case 'annotations.renderAppearances':
+        return { pdfium: (signal) => this.handleAnnotationsRenderAppearances(msg, signal) };
+      case 'annotations.renderAppearancesEncoded':
+        return {
+          pdfium: (signal) =>
+            this.handleAnnotationsRenderAppearances(
+              { ...msg, kind: 'annotations.renderAppearances' },
+              signal,
+            ),
+          encode: (rendered, signal) =>
+            this.encodeAppearances(rendered, msg.page, msg.encode, signal),
+        };
+      case 'pages.text':
+        return { pdfium: (signal) => this.handlePagesText(msg, signal) };
+      case 'pages.geometry':
+        return { pdfium: (signal) => this.handlePagesGeometry(msg, signal) };
+      case 'measure.viewports':
+        return { pdfium: (signal) => this.handleMeasureViewports(msg, signal) };
+      case 'annotations.readFile':
+        return { pdfium: (signal) => this.handleAnnotationsReadFile(msg, signal) };
+      case 'search.query':
+        return { pdfium: (signal) => this.handleSearchQuery(msg, signal) };
+      default:
+        return null;
     }
   }
 
-  private async receiveEncoded(
-    msg: AnnotationsRenderAppearancesEncodedWorkerRequest,
+  /**
+   * A job that pauses between slices of its PDFium work, so this thread can
+   * receive an abort meanwhile. Until that work ends (`busy`), requests are
+   * held. An encoded kind then encodes while other requests run.
+   */
+  private async runSliced(
+    job: PageSpaceJob,
+    msg: FileSpaceJob,
+    effect: PageEffect,
+    work: SlicedWork,
   ): Promise<void> {
-    // Fail-fast before any native work: a host without an injected
-    // encoder (browser/local workers) rejects the job without paying for
-    // a raster it could never encode.
-    if (!this.options.imageEncoder) {
+    // Fail-fast before any native work: a host without an injected encoder
+    // (browser/local workers) rejects the job without paying for a raster it
+    // could never encode.
+    if (work.encode && !this.options.imageEncoder) {
       this.post(
         wirePack({ kind: 'reject', jobId: msg.jobId, error: noEncoderError() }, EMPTY_TRANSFER),
       );
@@ -1624,15 +1621,26 @@ export class WorkerHost {
     }
     const ctrl = new AbortController();
     this.aborts.set(msg.jobId, ctrl);
+    // Set before the work's first await, so a request that arrives while it
+    // pauses is held.
+    this.busy = true;
     try {
-      const resultPack = await this.handleAnnotationsRenderAppearancesEncoded(msg, ctrl.signal);
-      this.resolve(msg, resultPack);
+      let pdfium: WirePack<WorkerResultPayload<PdfCoordinates>>;
+      try {
+        pdfium = await work.pdfium(ctrl.signal);
+      } finally {
+        this.busy = false;
+        // After this job's own reply below, which follows synchronously.
+        queueMicrotask(() => this.drain());
+      }
+      this.resolve(msg, work.encode ? await work.encode(pdfium, ctrl.signal) : pdfium);
     } catch (err) {
       this.post(
         wirePack({ kind: 'reject', jobId: msg.jobId, error: serializeError(err) }, EMPTY_TRANSFER),
       );
     } finally {
       this.aborts.delete(msg.jobId);
+      this.closePagesChangedBy(job, effect);
     }
   }
 
@@ -1682,20 +1690,19 @@ export class WorkerHost {
     throw new EngineError(EngineErrorCode.WireFormat, `unexpected ${payload.tag}`);
   }
 
-  private async handleAnnotationsRenderAppearancesEncoded(
-    req: AnnotationsRenderAppearancesEncodedWorkerRequest,
+  /** The encoded reply of an appearance render's raw one, its rasters encoded one by one. */
+  private async encodeAppearances(
+    rendered: WirePack<WorkerResultPayload<PdfCoordinates>>,
+    page: PageRef,
+    encode: RenderEncode,
     signal: AbortSignal,
   ): Promise<WirePack<WorkerResultPayload<PdfCoordinates>>> {
-    const inner = this.handleAnnotationsRenderAppearances(
-      { ...req, kind: 'annotations.renderAppearances' },
-      signal,
-    );
-    if (inner.payload.tag !== 'annotations.renderAppearances') {
-      throw new EngineError(EngineErrorCode.WireFormat, `unexpected ${inner.payload.tag}`);
+    if (rendered.payload.tag !== 'annotations.renderAppearances') {
+      throw new EngineError(EngineErrorCode.WireFormat, `unexpected ${rendered.payload.tag}`);
     }
-    const { pageState, appearances } = inner.payload.result;
+    const { pageState, appearances } = rendered.payload.result;
     // Sequential encode, deliberately: the whole raster batch already
-    // exists in `inner` (peak memory is set by the render, not by encode
+    // exists in `rendered` (peak memory is set by the render, not by encode
     // order), so fanning every appearance into the process-wide encoder
     // pool at once would only let one big batch monopolize it and starve
     // the encodes of interleaved jobs. One at a time matches the
@@ -1706,13 +1713,13 @@ export class WorkerHost {
         ref: a.ref,
         mode: a.mode,
         rect: a.rect,
-        image: await this.encodeRaster(a.raster, req.encode, signal),
+        image: await this.encodeRaster(a.raster, encode, signal),
       });
     }
     return wirePack(
       {
         tag: 'annotations.renderAppearancesEncoded',
-        page: req.page,
+        page,
         result: { pageState, appearances: encoded },
       },
       encoded.map((e) => e.image.bytes.buffer),
@@ -1845,7 +1852,7 @@ export class WorkerHost {
         page.ref.objectNumber,
         renderOptionsInFileSpace(req.options ?? {}, () => page.pdfCropBox),
         signal,
-        this.renderSlices,
+        this.slices,
       );
       return wirePack(
         {
@@ -2249,102 +2256,40 @@ interface LayerArtifactSave {
 }
 
 /**
- * What a job does to the parsed pages the runtime keeps ({@link PageResidency}):
- * - `none`: it writes nothing.
- * - `keepsPages`: it writes annotations, form fields, metadata, attachments or
- *   names - what a page reads afresh at every render, never its parsed
- *   content - so pages stay.
- * - `document`: it changes content or the page tree in place (redaction,
- *   flattening, page edits), so the document's pages close before and after
- *   it. A write kind not listed as keeping pages does this, so a new write
- *   kind is safe until someone shows it keeps pages.
- * - `runtime`: it changes the fonts text is set in, for every document on the
- *   runtime, so every page closes.
- * A page also closes when it is next taken after a write in a layer
- * transaction changed it (`EPDFPage_IsContentCurrent`).
+ * What a job does to the parsed pages the runtime keeps ({@link PageResidency})
+ * and to the image decodes kept between jobs, from its effect (see
+ * `RequestEffect`, stated on each request's definition):
+ * - `none`: it writes nothing, so both stay.
+ * - `keepsPages`: a `write` changes annotations, form fields, metadata,
+ *   attachments or names - what a page reads afresh at every render, never its
+ *   parsed content - so pages stay.
+ * - `document`: a `contentWrite` changes content or the page tree in place
+ *   (redaction, flattening, page edits), so the document's pages close before
+ *   and after it.
+ * - `runtime`: a `runtimeWrite` changes the fonts text is set in, for every
+ *   document on the runtime, so every page closes.
+ * Every write drops the kept image decodes. A page also closes when it is next
+ * taken after a write in a layer transaction changed it
+ * (`EPDFPage_IsContentCurrent`).
  */
 type PageEffect = 'none' | 'keepsPages' | 'document' | 'runtime';
 
-const WRITES_THAT_KEEP_PAGES: ReadonlySet<WorkerRequest['kind']> = new Set<WorkerRequest['kind']>([
-  'metadata.update',
-  'metadata.updateCustom',
-  'annotations.create',
-  'annotations.update',
-  'annotations.delete',
-  'annotations.move',
-  'annotations.import',
-  'forms.setValue',
-  'forms.reset',
-  'forms.applyEffects',
-  'forms.import',
-  'forms.repair',
-  'forms.createField',
-  'forms.updateField',
-  'forms.setSignatureAppearance',
-  'forms.deleteField',
-  'forms.addWidget',
-  'forms.detachWidget',
-  'pages.setName',
-  'pages.removeName',
-  'attachments.create',
-  'attachments.delete',
-  'measure.setScale',
-  'pieceInfo.update',
-  'pieceInfo.delete',
-]);
+const PAGE_EFFECT: Record<RequestEffect, PageEffect> = {
+  read: 'none',
+  snapshot: 'none',
+  session: 'none',
+  open: 'none',
+  close: 'none',
+  write: 'keepsPages',
+  contentWrite: 'document',
+  runtimeWrite: 'runtime',
+};
 
-const FONT_KINDS: ReadonlySet<WorkerRequest['kind']> = new Set<WorkerRequest['kind']>([
-  'fonts.register',
-  'fonts.addFallback',
-  'fonts.clearFallbacks',
-  'fonts.clear',
-]);
-
-function pageEffectOf(kind: WorkerRequest['kind']): PageEffect {
-  if (FONT_KINDS.has(kind)) return 'runtime';
-  if (WRITES_THAT_KEEP_PAGES.has(kind)) return 'keepsPages';
-  if (MUTATING_KINDS.has(kind) || kind === 'signatures.complete') return 'document';
-  return 'none';
+function pageEffectOf(job: PageSpaceJob): PageEffect {
+  return job.kind === 'shutdown' ? 'none' : PAGE_EFFECT[job.effect];
 }
 
 const BASE_SESSION_SUFFIX = '__base__';
-
-/** Every request kind that writes to a session's document. */
-const MUTATING_KINDS: ReadonlySet<WorkerRequest['kind']> = new Set<WorkerRequest['kind']>([
-  'metadata.update',
-  'metadata.updateCustom',
-  'annotations.create',
-  'annotations.update',
-  'annotations.delete',
-  'annotations.move',
-  'annotations.flatten',
-  'annotations.import',
-  'forms.setValue',
-  'forms.reset',
-  'forms.applyEffects',
-  'forms.import',
-  'forms.repair',
-  'forms.createField',
-  'forms.updateField',
-  'forms.setSignatureAppearance',
-  'forms.deleteField',
-  'forms.addWidget',
-  'forms.detachWidget',
-  'pages.move',
-  'pages.rotate',
-  'pages.delete',
-  'pages.setName',
-  'pages.removeName',
-  'pages.flatten',
-  'pages.insert',
-  'pages.insertBlank',
-  'redaction.apply',
-  'attachments.create',
-  'attachments.delete',
-  'measure.setScale',
-  'pieceInfo.update',
-  'pieceInfo.delete',
-]);
 
 function sessionKey(docId: string, layerName?: string): string {
   return `${docId}::${layerName ? `layer:${layerName}` : BASE_SESSION_SUFFIX}`;

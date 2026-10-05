@@ -65,6 +65,9 @@ export type {
   PageImageOptions,
   PageImageObjectUrl,
   PdfRect,
+  CallFacts,
+  CallPriority,
+  WorkingSetPage,
 } from '@embedpdf/engine-core/runtime';
 
 import type { NoSettings } from './settings';

@@ -55,6 +55,7 @@ export class DocumentSecurityProbe {
         (jobId) =>
           wirePack({
             kind: 'document.probeSecurityFile' as const,
+            effect: 'read' as const,
             jobId,
             path: handle!.path,
             password: input.password ?? null,

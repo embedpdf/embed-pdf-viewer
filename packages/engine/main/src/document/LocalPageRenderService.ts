@@ -14,16 +14,13 @@ import {
   type LocalPageRenderService as LocalPageRenderServiceContract,
   type PageRef,
   checkImageQuality,
-  pageRenderTask,
-  type PageRenderTask,
 } from '@embedpdf/engine-core/runtime';
 
 import type { LocalImageEncoder } from '../render/BrowserImageEncoder';
 import { assertFullPageOnLattice, withRenderBudget } from '../render/renderPolicyGuard';
 import type { ScopeGuard } from '../scope';
-import { Priority } from '../worker/Priority';
 import type { JobId, WorkerResultPayload } from '../worker/protocol';
-import type { WorkerQueue } from '../worker/WorkerQueue';
+import type { JobQueue } from '../worker/WorkerQueue';
 
 interface DocClosedView {
   isClosed(): boolean;
@@ -33,20 +30,17 @@ export class LocalPageRenderService implements LocalPageRenderServiceContract {
   constructor(
     private readonly docId: string,
     private readonly ref: PageRef,
-    private readonly queue: WorkerQueue,
+    private readonly queue: JobQueue,
     private readonly view: DocClosedView,
     private readonly encoder: LocalImageEncoder,
     private readonly guard: ScopeGuard,
     private readonly policy: EngineRenderPolicy = CONTINUOUS_RENDER_POLICY,
   ) {}
 
-  raw(options?: PageRenderOptions): PageRenderTask<PageRenderRaster> {
+  raw(options?: PageRenderOptions): AbortablePromise<PageRenderRaster> {
     if (this.view.isClosed()) {
-      return pageRenderTask(
-        AbortablePromise.rejectReason(
-          new EngineError(EngineErrorCode.DocNotOpen, `document not open: ${this.docId}`),
-        ),
-        () => {},
+      return AbortablePromise.rejectReason(
+        new EngineError(EngineErrorCode.DocNotOpen, `document not open: ${this.docId}`),
       );
     }
     // Cloud parity: /render gates on `doc.render` (the session-level
@@ -61,27 +55,26 @@ export class LocalPageRenderService implements LocalPageRenderServiceContract {
       this.guard.assertCapability('doc.render');
       assertFullPageOnLattice(this.policy, options);
     } catch (err) {
-      return pageRenderTask(AbortablePromise.rejectReason(err), () => {});
+      return AbortablePromise.rejectReason(err);
     }
     const effectiveOptions = withRenderBudget(this.policy, options);
     const docId = this.docId;
     const ref = this.ref;
-    // The priority as it is when the request is sent, for the worker's own line.
-    let priority = options?.priority ?? 0;
-    const submission = this.queue.enqueue<WorkerResultPayload>(
-      {
-        buildPack: (jobId: JobId) =>
-          wirePack({
-            kind: 'pages.render',
-            jobId,
-            docId,
-            page: ref,
-            options: { ...effectiveOptions, priority },
-          }),
-      },
-      { priority: Priority.RENDER, rank: priority },
-    );
-    const task = AbortablePromise.run<PageRenderRaster>(async (signal) => {
+    const target = options?.target;
+    const submission = this.queue.enqueue<WorkerResultPayload>({
+      buildPack: (jobId: JobId) =>
+        wirePack({
+          kind: 'pages.render',
+          effect: 'read',
+          jobId,
+          docId,
+          page: ref,
+          options: effectiveOptions,
+        }),
+      // A tile is about its part of the page: off screen, it ranks as near.
+      ...(target?.kind === 'rect' ? { region: target.rect } : {}),
+    });
+    return AbortablePromise.run<PageRenderRaster>(async (signal) => {
       const onAbort = () => submission.abort(signal.reason);
       if (signal.aborted) onAbort();
       else signal.addEventListener('abort', onAbort, { once: true });
@@ -95,19 +88,12 @@ export class LocalPageRenderService implements LocalPageRenderServiceContract {
         transform: renderTransform(area, options?.rotation ?? 0, raster.width, raster.height),
       };
     });
-    return pageRenderTask(task, (next) => {
-      priority = next;
-      submission.setRank(next);
-    });
   }
 
-  image(options: PageImageOptions = {}): PageRenderTask<PageRenderImage> {
-    // Set before `image` returns: the body runs up to its first await at once.
-    let rawTask: PageRenderTask<PageRenderRaster> | undefined;
-    const task = AbortablePromise.run<PageRenderImage>(async (signal) => {
+  image(options: PageImageOptions = {}): AbortablePromise<PageRenderImage> {
+    return AbortablePromise.run<PageRenderImage>(async (signal) => {
       checkImageQuality(options.quality);
       const raw = this.raw(options);
-      rawTask = raw;
       const onAbort = () => raw.abort(signal.reason);
       if (signal.aborted) onAbort();
       else signal.addEventListener('abort', onAbort, { once: true });
@@ -131,7 +117,6 @@ export class LocalPageRenderService implements LocalPageRenderServiceContract {
       });
       return { ...handle, transform: raster.transform };
     });
-    return pageRenderTask(task, (priority) => rawTask?.setPriority(priority));
   }
 }
 

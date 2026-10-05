@@ -1,7 +1,7 @@
 /**
  * The stage's wiring to its surroundings, run once every dependency exists:
- * the refit on page-registry changes (every lens) and, for the default lens
- * only, the page-state feed and the navigation executors of the actions
+ * the refit on page-registry changes and the working set told to the engine
+ * (every lens) and, for the default lens only, the page-state feed and the navigation executors of the actions
  * plugin. A thumbnail lens must never report page state or win the
  * last-wins executor registry and start navigating the sidebar.
  */
@@ -10,6 +10,7 @@ import { ActionsToken, type ActionsHostCapability } from '@embedpdf/plugin-actio
 
 import type { StageHostCapability } from './host-contract';
 import type { StageState } from './model';
+import { connectWorkingSet } from './working-set';
 
 /** The id of the main lens; additional lenses register under their own id. */
 export const DEFAULT_LENS_ID = 'stage';
@@ -23,6 +24,7 @@ export function connectStage(ctx: PluginContext<StageState>, stage: StageHostCap
     () => ctx.document()?.revision ?? 0,
     () => stage.refit(),
   );
+  connectWorkingSet(ctx, stage);
 
   if (ctx.id !== DEFAULT_LENS_ID) return;
   const actions = ctx.tryGet(ActionsToken);

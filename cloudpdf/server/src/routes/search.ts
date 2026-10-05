@@ -113,6 +113,7 @@ async function runSearchSlice(
   const build = (jobId: WorkerJobId) =>
     wirePack({
       kind: 'search.query' as const,
+      effect: 'read' as const,
       jobId,
       docId,
       layerName,

@@ -14,6 +14,7 @@ import type { DownloadOptions } from '../dto/PdfSaveMode';
 import type { DocumentEventStream } from '../events/DocumentEventStream';
 import type { PageRef } from '../identity/PageRef';
 import { AbortablePromise } from '../promise/AbortablePromise';
+import type { CallFacts, WorkingSetPage } from '../scheduling/facts';
 
 export interface DocumentCapabilities {
   readonly weakAnnotationEditSessions: 'not-needed' | 'required';
@@ -80,6 +81,21 @@ export interface DocumentHandle {
    * call with `NotFound`. It carries no page data: `pages.list()` does.
    */
   page(ref: PageRef): PageHandle;
+  /**
+   * The same document, every call made through it carrying `facts`: whether
+   * a person waits on it, and the view it serves (see {@link CallFacts}). Most
+   * calls need none. The local engine ranks the jobs it runs by them; the
+   * cloud engine sends every call as it's made, so it ignores them.
+   */
+  with(facts: CallFacts): DocumentHandle;
+  /**
+   * What `view` shows of the document. The local engine ranks the jobs for
+   * those pages by it, ranking again whatever waits each time a set arrives,
+   * and keeps the pages it shows parsed longest. Each call replaces the view's
+   * last set; an empty set withdraws it. A hint: it changes no result. The
+   * cloud engine ignores it.
+   */
+  setWorkingSet(view: string, pages: readonly WorkingSetPage[]): void;
   download(options?: DownloadOptions): AbortablePromise<Uint8Array>;
   close(): AbortablePromise<void>;
 }

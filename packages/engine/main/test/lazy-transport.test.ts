@@ -32,7 +32,7 @@ class RecordingTransport implements Transport {
 }
 
 const pack = (jobId: number): WirePack<WorkerRequest> =>
-  wirePack({ kind: 'fonts.clearFallbacks', jobId });
+  wirePack({ kind: 'fonts.clearFallbacks', effect: 'runtimeWrite', jobId });
 
 const microtasks = () => new Promise<void>((r) => setTimeout(r, 0));
 

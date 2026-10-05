@@ -158,6 +158,7 @@ async function openWorker(runtime: PdfRuntimeModule, bytes: Uint8Array, docId: s
     });
   const opened = await send({
     kind: 'open.fatMem',
+    effect: 'open',
     bytes: bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength),
     password: null,
   });
@@ -174,9 +175,9 @@ async function openWorker(runtime: PdfRuntimeModule, bytes: Uint8Array, docId: s
     result,
     /** A save, with the trailer's /ID blanked. */
     save: async (mode: 'rewrite' | 'incremental') =>
-      withoutId((await result({ kind: 'document.saveBuffer', mode }, 'document.saveBuffer')).bytes),
+      withoutId((await result({ kind: 'document.saveBuffer', effect: 'snapshot', mode }, 'document.saveBuffer')).bytes),
     draw: async (page: PageRef) =>
-      Buffer.from((await result({ kind: 'pages.render', page }, 'pages.render')).raster.data),
+      Buffer.from((await result({ kind: 'pages.render', effect: 'read', page }, 'pages.render')).raster.data),
   };
 }
 
@@ -218,7 +219,7 @@ describe.each(['wasm', 'native'] as const)(
       // Each attribution mode writes its own last pass: both run, each
       // against the document as the one before left it.
       for (const attribution of ['stamp', 'restore'] as const) {
-        const importing = () => send({ kind: 'annotations.import', bundle: wire, attribution });
+        const importing = () => send({ kind: 'annotations.import', effect: 'write', bundle: wire, attribution });
         const drawn = await draw();
         const baseline = { rewrite: await save('rewrite'), incremental: await save('incremental') };
         expect(await save('rewrite')).toBe(baseline.rewrite);
@@ -311,11 +312,11 @@ describe.each(['wasm', 'native'] as const)('one create (%s runtime)', (prefer) =
       new Uint8Array(await readFile(fixtures.authoring)),
       'one-create',
     );
-    const { snapshot } = await worker.result({ kind: 'pages.list' }, 'pages.list');
+    const { snapshot } = await worker.result({ kind: 'pages.list', effect: 'read' }, 'pages.list');
     const page = toPageRef(snapshot.pages[0]!.ref.objectNumber);
     const rect = { x: 300, y: 300, width: 20, height: 20 };
     const create = (draft: Record<string, unknown>) =>
-      worker.send({ kind: 'annotations.create', page, draft });
+      worker.send({ kind: 'annotations.create', effect: 'write', page, draft });
     const created = await create({ subtype: 'text', rect: iconRect(rect.x, rect.y) });
     if (created.kind !== 'resolve' || created.result.tag !== 'annotations.create') {
       throw new Error(`the note: ${JSON.stringify(created)}`);
@@ -382,7 +383,7 @@ describe.each(['wasm', 'native'] as const)('one create (%s runtime)', (prefer) =
       new Uint8Array(await readFile(fixtures.weak)),
       'weak-reply',
     );
-    const { list } = await worker.result({ kind: 'annotations.list' }, 'annotations.list');
+    const { list } = await worker.result({ kind: 'annotations.list', effect: 'read' }, 'annotations.list');
     const weak = list.annotations.find(
       (dto) => dto.ref.kind === 'index' && dto.subtype !== 'popup',
     )!.ref;
@@ -394,6 +395,7 @@ describe.each(['wasm', 'native'] as const)('one create (%s runtime)', (prefer) =
     const reply = () =>
       worker.send({
         kind: 'annotations.create',
+        effect: 'write',
         page: weak.page,
         draft: {
           subtype: 'text',
@@ -409,7 +411,7 @@ describe.each(['wasm', 'native'] as const)('one create (%s runtime)', (prefer) =
     expect(response.kind).toBe('reject');
     expect(await worker.save('rewrite')).toBe(baseline.rewrite);
     expect(await worker.save('incremental')).toBe(baseline.incremental);
-    const after = await worker.result({ kind: 'annotations.list' }, 'annotations.list');
+    const after = await worker.result({ kind: 'annotations.list', effect: 'read' }, 'annotations.list');
     expect(after.list).toEqual(list);
 
     // And a reply that holds names it.

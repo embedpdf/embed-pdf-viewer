@@ -151,6 +151,11 @@ describe('DocumentGate', () => {
               allows: () => true,
               passwordPrompt: { state: 'required', incorrect: true },
             },
+            // Calls' facts and working sets change nothing here: the same document.
+            with() {
+              return this;
+            },
+            setWorkingSet: () => {},
             close: () => Promise.resolve(),
           } as unknown as DocumentHandle),
     destroy: () => Promise.resolve(),
@@ -191,6 +196,11 @@ describe('the Viewer’s own settings', () => {
           events: { subscribe: () => () => {}, lastServerId: () => null },
           pages: { list: () => Promise.resolve({ pageCount: 0, pages: [] }) },
           security: { allows: () => true },
+          // Calls' facts and working sets change nothing here: the same document.
+          with() {
+            return this;
+          },
+          setWorkingSet: () => {},
           close: () => Promise.resolve(),
         } as unknown as DocumentHandle),
       ),

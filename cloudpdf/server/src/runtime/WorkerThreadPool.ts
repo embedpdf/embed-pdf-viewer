@@ -397,7 +397,7 @@ export class WorkerThreadPool implements EnginePool {
       const r = await this.dispatchToSlot(
         slot,
         // close carries no buffers — pack with the shared empty transfer.
-        (jobId) => wirePack({ kind: 'close', jobId, docId }),
+        (jobId) => wirePack({ kind: 'close', effect: 'close', jobId, docId }),
         signal,
       );
       return r;
@@ -478,7 +478,7 @@ export class WorkerThreadPool implements EnginePool {
     const baseSha = slot.docToBaseSha.get(evicted) ?? '';
     try {
       await this.dispatchToSlot(slot, (jobId) =>
-        wirePack({ kind: 'close', jobId, docId: evicted }),
+        wirePack({ kind: 'close', effect: 'close', jobId, docId: evicted }),
       );
     } catch {
       // Worker-side close errors are best-effort during eviction; we

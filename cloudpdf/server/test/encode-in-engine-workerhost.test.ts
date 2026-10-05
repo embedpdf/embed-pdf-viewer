@@ -118,6 +118,7 @@ describe('encoded kinds through the real WorkerHost (native runtime + sharp)', (
     const docId = 'real-doc';
     await resolved({
       kind: 'open.layerFileBase',
+      effect: 'open',
       jobId: nextJob++,
       docId,
       baseKey: 'sha-min',
@@ -125,7 +126,8 @@ describe('encoded kinds through the real WorkerHost (native runtime + sharp)', (
       layer: { kind: 'fresh' },
       password: null,
     });
-    const list = (await resolved({ kind: 'pages.list', jobId: nextJob++, docId })).result as {
+    const list = (await resolved({ kind: 'pages.list', effect: 'read', jobId: nextJob++, docId }))
+      .result as {
       tag: string;
       snapshot: { pages: Array<{ ref: { objectNumber: number } }> };
     };
@@ -134,6 +136,7 @@ describe('encoded kinds through the real WorkerHost (native runtime + sharp)', (
 
     const { result, transfer } = await resolved({
       kind: 'pages.renderEncoded',
+      effect: 'read',
       jobId: nextJob++,
       docId,
       page: toPageRef(pageObjectNumber),
@@ -159,6 +162,7 @@ describe('encoded kinds through the real WorkerHost (native runtime + sharp)', (
     const png = (
       await resolved({
         kind: 'pages.renderEncoded',
+        effect: 'read',
         jobId: nextJob++,
         docId,
         page: toPageRef(pageObjectNumber),
@@ -173,6 +177,7 @@ describe('encoded kinds through the real WorkerHost (native runtime + sharp)', (
   test('document.renderPageFileEncoded: ad-hoc file render encodes in-worker', async () => {
     const { result, transfer } = await resolved({
       kind: 'document.renderPageFileEncoded',
+      effect: 'read',
       jobId: nextJob++,
       path: pdfPath,
       password: null,
@@ -196,6 +201,7 @@ describe('encoded kinds through the real WorkerHost (native runtime + sharp)', (
   test('annotations.renderAppearancesEncoded: async path resolves an empty batch on a blank page', async () => {
     const { result, transfer } = await resolved({
       kind: 'annotations.renderAppearancesEncoded',
+      effect: 'read',
       jobId: nextJob++,
       docId: 'real-doc',
       page: toPageRef(3), // the page object of the minimal PDF

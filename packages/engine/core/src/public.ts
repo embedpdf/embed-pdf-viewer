@@ -89,6 +89,10 @@ export type {
   TokenSource,
   Identity,
   DocCapability,
+  // Scheduling: what a call says (`doc.with`) and what a view shows (`doc.setWorkingSet`).
+  CallFacts,
+  CallPriority,
+  WorkingSetPage,
   // Services.
   MetadataService,
   CustomMetadataService,
@@ -98,7 +102,6 @@ export type {
   LocalPageAnnotationsService,
   PageTextService,
   PageRenderService,
-  PageRenderTask,
   LocalPageRenderService,
   DocumentSecurityService,
   DocumentSecurityState,

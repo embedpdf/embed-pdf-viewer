@@ -16,9 +16,8 @@ import {
 import type { SessionEventPublisher } from '@embedpdf/engine-services';
 
 import type { ScopeGuard } from '../scope';
-import { Priority } from '../worker/Priority';
 import type { WorkerResultPayload } from '../worker/protocol';
-import type { JobSpec, WorkerQueue } from '../worker/WorkerQueue';
+import type { JobQueue, JobSpec } from '../worker/WorkerQueue';
 
 interface DocClosedView {
   isClosed(): boolean;
@@ -26,7 +25,7 @@ interface DocClosedView {
 
 interface MetadataDeps {
   docId: string;
-  queue: WorkerQueue;
+  queue: JobQueue;
   view: DocClosedView;
   guard: ScopeGuard;
 }
@@ -38,7 +37,7 @@ interface MetadataDeps {
 function runMetadataJob<Tag extends WorkerResultPayload['tag'], T>(
   deps: MetadataDeps,
   capability: DocCapability,
-  job: { tag: Tag; priority: Priority; buildPack: JobSpec['buildPack'] },
+  job: { tag: Tag; buildPack: JobSpec['buildPack'] },
   pick: (payload: Extract<WorkerResultPayload, { tag: Tag }>) => T,
 ): AbortablePromise<T> {
   if (deps.view.isClosed()) {
@@ -51,10 +50,7 @@ function runMetadataJob<Tag extends WorkerResultPayload['tag'], T>(
   } catch (err) {
     return AbortablePromise.rejectReason(err);
   }
-  const submission = deps.queue.enqueue<WorkerResultPayload>(
-    { buildPack: job.buildPack },
-    { priority: job.priority },
-  );
+  const submission = deps.queue.enqueue<WorkerResultPayload>({ buildPack: job.buildPack });
   return AbortablePromise.run<T>(async (signal) => {
     const onAbort = () => submission.abort(signal.reason);
     if (signal.aborted) onAbort();
@@ -84,8 +80,8 @@ class LocalCustomMetadataService implements CustomMetadataService {
       'doc.open',
       {
         tag: 'metadata.readCustom',
-        priority: Priority.MEDIUM,
-        buildPack: (jobId) => wirePack({ kind: 'metadata.readCustom', jobId, docId }),
+        buildPack: (jobId) =>
+          wirePack({ kind: 'metadata.readCustom', effect: 'read', jobId, docId }),
       },
       (payload) => payload.custom,
     );
@@ -98,8 +94,8 @@ class LocalCustomMetadataService implements CustomMetadataService {
       'doc.metadata.modify',
       {
         tag: 'metadata.updateCustom',
-        priority: Priority.HIGH,
-        buildPack: (jobId) => wirePack({ kind: 'metadata.updateCustom', jobId, docId, patch }),
+        buildPack: (jobId) =>
+          wirePack({ kind: 'metadata.updateCustom', effect: 'write', jobId, docId, patch }),
       },
       (payload) => {
         this.publisher.publishLocal({ type: 'metadata.customUpdated', ...payload.result });
@@ -115,7 +111,7 @@ export class LocalMetadataService implements MetadataService {
 
   constructor(
     docId: string,
-    queue: WorkerQueue,
+    queue: JobQueue,
     view: DocClosedView,
     guard: ScopeGuard,
     private readonly publisher: SessionEventPublisher,
@@ -131,8 +127,7 @@ export class LocalMetadataService implements MetadataService {
       'doc.open',
       {
         tag: 'metadata.read',
-        priority: Priority.MEDIUM,
-        buildPack: (jobId) => wirePack({ kind: 'metadata.read', jobId, docId }),
+        buildPack: (jobId) => wirePack({ kind: 'metadata.read', effect: 'read', jobId, docId }),
       },
       (payload) => payload.metadata,
     );
@@ -145,8 +140,8 @@ export class LocalMetadataService implements MetadataService {
       'doc.metadata.modify',
       {
         tag: 'metadata.update',
-        priority: Priority.HIGH,
-        buildPack: (jobId) => wirePack({ kind: 'metadata.update', jobId, docId, patch }),
+        buildPack: (jobId) =>
+          wirePack({ kind: 'metadata.update', effect: 'write', jobId, docId, patch }),
       },
       (payload) => {
         this.publisher.publishLocal({ type: 'metadata.updated', ...payload.result });

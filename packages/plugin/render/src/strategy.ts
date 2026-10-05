@@ -124,7 +124,6 @@ export function baseAskWidth(strategy: ResolvedStrategy, demandWidth: number): n
   const wanted = Math.max(1, Math.round(demandWidth));
   if (strategy.widths === null) return Math.min(wanted, strategy.maxWidth);
   return (
-    strategy.widths.find((width) => width >= wanted) ??
-    strategy.widths[strategy.widths.length - 1]!
+    strategy.widths.find((width) => width >= wanted) ?? strategy.widths[strategy.widths.length - 1]!
   );
 }

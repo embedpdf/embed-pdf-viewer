@@ -56,7 +56,6 @@ export type { Transport } from './transport/Transport';
 export { InlineTransport } from './transport/InlineTransport';
 export { BrowserWorkerTransport } from './transport/BrowserWorkerTransport';
 export { LazyTransport } from './transport/LazyTransport';
-export { Priority } from './worker/Priority';
 export type { WorkerRequest, WorkerResponse } from './worker/protocol';
 export type { EngineWorkerInit } from './worker/bootstrap';
 export { LocalDocumentAnnotationsService } from './document/LocalDocumentAnnotationsService';
@@ -466,6 +465,7 @@ async function registerBootFonts(
       wirePack(
         {
           kind: 'fonts.register',
+          effect: 'runtimeWrite',
           jobId,
           fontKey: spec.key,
           familyName: spec.familyName ?? '',
@@ -481,7 +481,7 @@ async function registerBootFonts(
     }
     if (fallback) {
       await requestOverTransport(transport, (jobId) =>
-        wirePack({ kind: 'fonts.addFallback', jobId, fontKey: spec.key }),
+        wirePack({ kind: 'fonts.addFallback', effect: 'runtimeWrite', jobId, fontKey: spec.key }),
       );
     }
   }

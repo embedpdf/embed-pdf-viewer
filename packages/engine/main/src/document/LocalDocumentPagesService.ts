@@ -21,9 +21,8 @@ import {
 import type { SessionEventPublisher } from '@embedpdf/engine-services';
 
 import type { ScopeGuard } from '../scope';
-import { Priority } from '../worker/Priority';
 import type { JobId, WorkerResultPayload } from '../worker/protocol';
-import type { WorkerQueue } from '../worker/WorkerQueue';
+import type { JobQueue } from '../worker/WorkerQueue';
 
 interface DocClosedView {
   isClosed(): boolean;
@@ -47,7 +46,7 @@ function copyToExactBuffer(view: Uint8Array): ArrayBuffer {
 export class LocalDocumentPagesService implements DocumentPagesService {
   constructor(
     private readonly docId: string,
-    private readonly queue: WorkerQueue,
+    private readonly queue: JobQueue,
     private readonly view: DocClosedView,
     private readonly guard: ScopeGuard,
     private readonly publisher: SessionEventPublisher,
@@ -68,12 +67,9 @@ export class LocalDocumentPagesService implements DocumentPagesService {
       return AbortablePromise.rejectReason(err);
     }
     const docId = this.docId;
-    const submission = this.queue.enqueue<WorkerResultPayload>(
-      {
-        buildPack: (jobId: JobId) => wirePack({ kind: 'pages.list', jobId, docId }),
-      },
-      { priority: Priority.MEDIUM },
-    );
+    const submission = this.queue.enqueue<WorkerResultPayload>({
+      buildPack: (jobId: JobId) => wirePack({ kind: 'pages.list', effect: 'read', jobId, docId }),
+    });
     return AbortablePromise.run<PageListSnapshot>(async (signal) => {
       const onAbort = () => submission.abort(signal.reason);
       if (signal.aborted) onAbort();
@@ -100,19 +96,17 @@ export class LocalDocumentPagesService implements DocumentPagesService {
       return AbortablePromise.rejectReason(err);
     }
     const docId = this.docId;
-    const submission = this.queue.enqueue<WorkerResultPayload>(
-      {
-        buildPack: (jobId: JobId) =>
-          wirePack({
-            kind: 'pages.move',
-            jobId,
-            docId,
-            pages,
-            toIndex,
-          }),
-      },
-      { priority: Priority.HIGH },
-    );
+    const submission = this.queue.enqueue<WorkerResultPayload>({
+      buildPack: (jobId: JobId) =>
+        wirePack({
+          kind: 'pages.move',
+          effect: 'contentWrite',
+          jobId,
+          docId,
+          pages,
+          toIndex,
+        }),
+    });
     return AbortablePromise.run<PageMoveResult>(async (signal) => {
       const onAbort = () => submission.abort(signal.reason);
       if (signal.aborted) onAbort();
@@ -132,12 +126,16 @@ export class LocalDocumentPagesService implements DocumentPagesService {
   }
 
   setName(input: PageNameInput): AbortablePromise<PageNameResult> {
-    return this.runNameJob({ kind: 'pages.setName', ...input }, 'pages.setName', input.name);
+    return this.runNameJob(
+      { kind: 'pages.setName', effect: 'write', ...input },
+      'pages.setName',
+      input.name,
+    );
   }
 
   removeName(input: PageRemoveNameInput): AbortablePromise<PageNameResult> {
     return this.runNameJob(
-      { kind: 'pages.removeName', name: input.name },
+      { kind: 'pages.removeName', effect: 'write', name: input.name },
       'pages.removeName',
       input.name,
     );
@@ -153,11 +151,12 @@ export class LocalDocumentPagesService implements DocumentPagesService {
     request:
       | {
           kind: 'pages.setName';
+          effect: 'write';
           name: string;
           page: PageRef;
           replace?: string;
         }
-      | { kind: 'pages.removeName'; name: string },
+      | { kind: 'pages.removeName'; effect: 'write'; name: string },
     tag: 'pages.setName' | 'pages.removeName',
     name: string,
   ): AbortablePromise<PageNameResult> {
@@ -172,12 +171,9 @@ export class LocalDocumentPagesService implements DocumentPagesService {
       return AbortablePromise.rejectReason(err);
     }
     const docId = this.docId;
-    const submission = this.queue.enqueue<WorkerResultPayload>(
-      {
-        buildPack: (jobId: JobId) => wirePack({ ...request, jobId, docId }),
-      },
-      { priority: Priority.HIGH },
-    );
+    const submission = this.queue.enqueue<WorkerResultPayload>({
+      buildPack: (jobId: JobId) => wirePack({ ...request, jobId, docId }),
+    });
     return AbortablePromise.run<PageNameResult>(async (signal) => {
       const onAbort = () => submission.abort(signal.reason);
       if (signal.aborted) onAbort();
@@ -210,19 +206,17 @@ export class LocalDocumentPagesService implements DocumentPagesService {
       return AbortablePromise.rejectReason(err);
     }
     const docId = this.docId;
-    const submission = this.queue.enqueue<WorkerResultPayload>(
-      {
-        buildPack: (jobId: JobId) =>
-          wirePack({
-            kind: 'pages.rotate',
-            jobId,
-            docId,
-            pages,
-            rotation,
-          }),
-      },
-      { priority: Priority.HIGH },
-    );
+    const submission = this.queue.enqueue<WorkerResultPayload>({
+      buildPack: (jobId: JobId) =>
+        wirePack({
+          kind: 'pages.rotate',
+          effect: 'contentWrite',
+          jobId,
+          docId,
+          pages,
+          rotation,
+        }),
+    });
     return AbortablePromise.run<PageRotateResult>(async (signal) => {
       const onAbort = () => submission.abort(signal.reason);
       if (signal.aborted) onAbort();
@@ -255,18 +249,16 @@ export class LocalDocumentPagesService implements DocumentPagesService {
       return AbortablePromise.rejectReason(err);
     }
     const docId = this.docId;
-    const submission = this.queue.enqueue<WorkerResultPayload>(
-      {
-        buildPack: (jobId: JobId) =>
-          wirePack({
-            kind: 'pages.delete',
-            jobId,
-            docId,
-            pages,
-          }),
-      },
-      { priority: Priority.HIGH },
-    );
+    const submission = this.queue.enqueue<WorkerResultPayload>({
+      buildPack: (jobId: JobId) =>
+        wirePack({
+          kind: 'pages.delete',
+          effect: 'contentWrite',
+          jobId,
+          docId,
+          pages,
+        }),
+    });
     return AbortablePromise.run<PageDeleteResult>(async (signal) => {
       const onAbort = () => submission.abort(signal.reason);
       if (signal.aborted) onAbort();
@@ -301,13 +293,10 @@ export class LocalDocumentPagesService implements DocumentPagesService {
       return AbortablePromise.rejectReason(error);
     }
     const docId = this.docId;
-    const submission = this.queue.enqueue<WorkerResultPayload>(
-      {
-        buildPack: (jobId: JobId) =>
-          wirePack({ kind: 'pages.flatten', jobId, docId, pages, usage }),
-      },
-      { priority: Priority.HIGH },
-    );
+    const submission = this.queue.enqueue<WorkerResultPayload>({
+      buildPack: (jobId: JobId) =>
+        wirePack({ kind: 'pages.flatten', effect: 'contentWrite', jobId, docId, pages, usage }),
+    });
     return AbortablePromise.run<PageFlattenResult>(async (signal) => {
       const onAbort = () => submission.abort(signal.reason);
       if (signal.aborted) onAbort();
@@ -341,13 +330,13 @@ export class LocalDocumentPagesService implements DocumentPagesService {
     // can't disturb a larger buffer the caller still owns (the open() rule);
     // a bare ArrayBuffer transfers as-is — the call takes ownership.
     const buffer = bytes instanceof ArrayBuffer ? bytes : copyToExactBuffer(bytes);
-    const submission = this.queue.enqueue<WorkerResultPayload>(
-      {
-        buildPack: (jobId: JobId) =>
-          wirePack({ kind: 'pages.insert', jobId, docId, bytes: buffer, toIndex }, [buffer]),
-      },
-      { priority: Priority.HIGH },
-    );
+    const submission = this.queue.enqueue<WorkerResultPayload>({
+      buildPack: (jobId: JobId) =>
+        wirePack(
+          { kind: 'pages.insert', effect: 'contentWrite', jobId, docId, bytes: buffer, toIndex },
+          [buffer],
+        ),
+    });
     return AbortablePromise.run<PageInsertResult>(async (signal) => {
       const onAbort = () => submission.abort(signal.reason);
       if (signal.aborted) onAbort();
@@ -380,20 +369,18 @@ export class LocalDocumentPagesService implements DocumentPagesService {
       return AbortablePromise.rejectReason(err);
     }
     const docId = this.docId;
-    const submission = this.queue.enqueue<WorkerResultPayload>(
-      {
-        buildPack: (jobId: JobId) =>
-          wirePack({
-            kind: 'pages.insertBlank',
-            jobId,
-            docId,
-            size: spec.size,
-            count: spec.count,
-            toIndex,
-          }),
-      },
-      { priority: Priority.HIGH },
-    );
+    const submission = this.queue.enqueue<WorkerResultPayload>({
+      buildPack: (jobId: JobId) =>
+        wirePack({
+          kind: 'pages.insertBlank',
+          effect: 'contentWrite',
+          jobId,
+          docId,
+          size: spec.size,
+          count: spec.count,
+          toIndex,
+        }),
+    });
     return AbortablePromise.run<PageInsertResult>(async (signal) => {
       const onAbort = () => submission.abort(signal.reason);
       if (signal.aborted) onAbort();
@@ -426,18 +413,16 @@ export class LocalDocumentPagesService implements DocumentPagesService {
       return AbortablePromise.rejectReason(err);
     }
     const docId = this.docId;
-    const submission = this.queue.enqueue<WorkerResultPayload>(
-      {
-        buildPack: (jobId: JobId) =>
-          wirePack({
-            kind: 'pages.extract',
-            jobId,
-            docId,
-            pages,
-          }),
-      },
-      { priority: Priority.MEDIUM },
-    );
+    const submission = this.queue.enqueue<WorkerResultPayload>({
+      buildPack: (jobId: JobId) =>
+        wirePack({
+          kind: 'pages.extract',
+          effect: 'snapshot',
+          jobId,
+          docId,
+          pages,
+        }),
+    });
     return AbortablePromise.run<Uint8Array>(async (signal) => {
       const onAbort = () => submission.abort(signal.reason);
       if (signal.aborted) onAbort();

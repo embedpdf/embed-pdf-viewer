@@ -12,14 +12,13 @@ import {
 } from '@embedpdf/engine-core/runtime';
 import type { SessionEventPublisher } from '@embedpdf/engine-services';
 import type { ScopeGuard } from '../scope';
-import { Priority } from '../worker/Priority';
-import type { WorkerQueue } from '../worker/WorkerQueue';
+import type { JobQueue } from '../worker/WorkerQueue';
 
 export class LocalPageMeasureService implements PageMeasureService {
   constructor(
     private readonly docId: string,
     private readonly ref: PageRef,
-    private readonly queue: WorkerQueue,
+    private readonly queue: JobQueue,
     private readonly view: { isClosed(): boolean },
     private readonly guard: ScopeGuard,
     private readonly publisher: SessionEventPublisher,
@@ -27,18 +26,16 @@ export class LocalPageMeasureService implements PageMeasureService {
   listViewports(): AbortablePromise<PageMeasurementViewportList> {
     return AbortablePromise.run(async (signal) => {
       this.check('doc.open');
-      const submission = this.queue.enqueue<WorkerResultPayload>(
-        {
-          buildPack: (jobId) =>
-            wirePack({
-              kind: 'measure.viewports',
-              jobId,
-              docId: this.docId,
-              page: this.ref,
-            }),
-        },
-        { priority: Priority.MEDIUM },
-      );
+      const submission = this.queue.enqueue<WorkerResultPayload>({
+        buildPack: (jobId) =>
+          wirePack({
+            kind: 'measure.viewports',
+            effect: 'read',
+            jobId,
+            docId: this.docId,
+            page: this.ref,
+          }),
+      });
       const payload = await this.wait(submission, signal);
       if (payload.tag !== 'measure.viewports')
         throw new EngineError(EngineErrorCode.WireFormat, 'Unexpected viewport response');
@@ -51,19 +48,17 @@ export class LocalPageMeasureService implements PageMeasureService {
       await Promise.resolve();
       signal.throwIfAborted();
       this.check('doc.annotate.modify');
-      const submission = this.queue.enqueue<WorkerResultPayload>(
-        {
-          buildPack: (jobId) =>
-            wirePack({
-              kind: 'measure.setScale',
-              jobId,
-              docId: this.docId,
-              page: this.ref,
-              measure,
-            }),
-        },
-        { priority: Priority.HIGH },
-      );
+      const submission = this.queue.enqueue<WorkerResultPayload>({
+        buildPack: (jobId) =>
+          wirePack({
+            kind: 'measure.setScale',
+            effect: 'write',
+            jobId,
+            docId: this.docId,
+            page: this.ref,
+            measure,
+          }),
+      });
       const payload = await this.wait(submission, signal);
       if (payload.tag !== 'measure.setScale')
         throw new EngineError(EngineErrorCode.WireFormat, 'Unexpected scale response');
@@ -77,7 +72,7 @@ export class LocalPageMeasureService implements PageMeasureService {
     this.guard.assertCapability(cap);
   }
   private async wait(
-    submission: ReturnType<WorkerQueue['enqueue']>,
+    submission: ReturnType<JobQueue['enqueue']>,
     signal: AbortSignal,
   ): Promise<WorkerResultPayload> {
     const abort = () => submission.abort(signal.reason);

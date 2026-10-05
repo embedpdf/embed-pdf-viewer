@@ -41,9 +41,8 @@ import type { SessionEventPublisher } from '@embedpdf/engine-services';
 import type { LocalImageEncoder } from '../render/BrowserImageEncoder';
 import { assertAppearanceOnLattice, withAppearanceBudget } from '../render/renderPolicyGuard';
 import type { ScopeGuard } from '../scope';
-import { Priority } from '../worker/Priority';
 import type { JobId, WorkerResultPayload } from '../worker/protocol';
-import type { WorkerQueue } from '../worker/WorkerQueue';
+import type { JobQueue } from '../worker/WorkerQueue';
 
 interface DocClosedView {
   isClosed(): boolean;
@@ -63,7 +62,7 @@ export class LocalPageAnnotationsService implements LocalPageAnnotationsServiceC
   constructor(
     private readonly docId: string,
     private readonly ref: PageRef,
-    private readonly queue: WorkerQueue,
+    private readonly queue: JobQueue,
     private readonly view: DocClosedView,
     private readonly encoder: LocalImageEncoder,
     private readonly guard: ScopeGuard,
@@ -86,13 +85,10 @@ export class LocalPageAnnotationsService implements LocalPageAnnotationsServiceC
     }
     const docId = this.docId;
     const ref = this.ref;
-    const submission = this.queue.enqueue<WorkerResultPayload>(
-      {
-        buildPack: (jobId: JobId) =>
-          wirePack({ kind: 'annotations.list', jobId, docId, pages: [ref] }),
-      },
-      { priority: Priority.MEDIUM },
-    );
+    const submission = this.queue.enqueue<WorkerResultPayload>({
+      buildPack: (jobId: JobId) =>
+        wirePack({ kind: 'annotations.list', effect: 'read', jobId, docId, pages: [ref] }),
+    });
     return AbortablePromise.run<AnnotationList>(async (signal) => {
       const onAbort = () => submission.abort(signal.reason);
       if (signal.aborted) onAbort();
@@ -122,10 +118,9 @@ export class LocalPageAnnotationsService implements LocalPageAnnotationsServiceC
     const docId = this.docId;
     const page = this.ref;
     const kind = role === 'file' ? 'annotations.readFile' : 'annotations.readAppearance';
-    const submission = this.queue.enqueue<WorkerResultPayload>(
-      { buildPack: (jobId: JobId) => wirePack({ kind, jobId, docId, page, ref }) },
-      { priority: Priority.MEDIUM },
-    );
+    const submission = this.queue.enqueue<WorkerResultPayload>({
+      buildPack: (jobId: JobId) => wirePack({ kind, effect: 'read', jobId, docId, page, ref }),
+    });
     return AbortablePromise.run<Uint8Array>(async (signal) => {
       const onAbort = () => submission.abort(signal.reason);
       if (signal.aborted) onAbort();
@@ -168,19 +163,17 @@ export class LocalPageAnnotationsService implements LocalPageAnnotationsServiceC
     const effectiveOptions = withAppearanceBudget(this.policy, options);
     const docId = this.docId;
     const ref = this.ref;
-    const submission = this.queue.enqueue<WorkerResultPayload>(
-      {
-        buildPack: (jobId: JobId) =>
-          wirePack({
-            kind: 'annotations.renderAppearances',
-            jobId,
-            docId,
-            page: ref,
-            ...(effectiveOptions ? { options: effectiveOptions } : {}),
-          }),
-      },
-      { priority: Priority.MEDIUM },
-    );
+    const submission = this.queue.enqueue<WorkerResultPayload>({
+      buildPack: (jobId: JobId) =>
+        wirePack({
+          kind: 'annotations.renderAppearances',
+          effect: 'read',
+          jobId,
+          docId,
+          page: ref,
+          ...(effectiveOptions ? { options: effectiveOptions } : {}),
+        }),
+    });
     return AbortablePromise.run<AnnotationAppearancesResult>(async (signal) => {
       const onAbort = () => submission.abort(signal.reason);
       if (signal.aborted) onAbort();
@@ -272,24 +265,22 @@ export class LocalPageAnnotationsService implements LocalPageAnnotationsServiceC
       // async). The copy rides the wirePack transfer list and is detached by
       // the worker transport, while the caller's bytes stay intact.
       const wireResources = await resolveAnnotationResources(resources);
-      const submission = this.queue.enqueue<WorkerResultPayload>(
-        {
-          buildPack: (jobId: JobId) =>
-            wirePack(
-              {
-                kind: 'annotations.create',
-                jobId,
-                docId,
-                page: ref,
-                draft: data,
-                ...(hasAnnotationResources(wireResources) ? { resources: wireResources } : {}),
-                ...(actor ? { actor } : {}),
-              },
-              transferOf(wireResources),
-            ),
-        },
-        { priority: Priority.HIGH },
-      );
+      const submission = this.queue.enqueue<WorkerResultPayload>({
+        buildPack: (jobId: JobId) =>
+          wirePack(
+            {
+              kind: 'annotations.create',
+              effect: 'write',
+              jobId,
+              docId,
+              page: ref,
+              draft: data,
+              ...(hasAnnotationResources(wireResources) ? { resources: wireResources } : {}),
+              ...(actor ? { actor } : {}),
+            },
+            transferOf(wireResources),
+          ),
+      });
       const onAbort = () => submission.abort(signal.reason);
       if (signal.aborted) onAbort();
       else signal.addEventListener('abort', onAbort, { once: true });
@@ -342,24 +333,22 @@ export class LocalPageAnnotationsService implements LocalPageAnnotationsServiceC
       const docId = this.docId;
       // Owned copies, as in create().
       const wireResources = await resolveAnnotationResources(resources);
-      const submission = this.queue.enqueue<WorkerResultPayload>(
-        {
-          buildPack: (jobId: JobId) =>
-            wirePack(
-              {
-                kind: 'annotations.update',
-                jobId,
-                docId,
-                ref,
-                patch,
-                ...(hasAnnotationResources(wireResources) ? { resources: wireResources } : {}),
-                ...(actor ? { actor } : {}),
-              },
-              transferOf(wireResources),
-            ),
-        },
-        { priority: Priority.HIGH },
-      );
+      const submission = this.queue.enqueue<WorkerResultPayload>({
+        buildPack: (jobId: JobId) =>
+          wirePack(
+            {
+              kind: 'annotations.update',
+              effect: 'write',
+              jobId,
+              docId,
+              ref,
+              patch,
+              ...(hasAnnotationResources(wireResources) ? { resources: wireResources } : {}),
+              ...(actor ? { actor } : {}),
+            },
+            transferOf(wireResources),
+          ),
+      });
       const onAbort = () => submission.abort(signal.reason);
       if (signal.aborted) onAbort();
       else signal.addEventListener('abort', onAbort, { once: true });
@@ -391,19 +380,17 @@ export class LocalPageAnnotationsService implements LocalPageAnnotationsServiceC
       const checked = members.map((member) => member.ref);
 
       const docId = this.docId;
-      const submission = this.queue.enqueue<WorkerResultPayload>(
-        {
-          buildPack: (jobId: JobId) =>
-            wirePack({
-              kind: 'annotations.delete',
-              jobId,
-              docId,
-              ref,
-              checked,
-            }),
-        },
-        { priority: Priority.HIGH },
-      );
+      const submission = this.queue.enqueue<WorkerResultPayload>({
+        buildPack: (jobId: JobId) =>
+          wirePack({
+            kind: 'annotations.delete',
+            effect: 'write',
+            jobId,
+            docId,
+            ref,
+            checked,
+          }),
+      });
       const onAbort = () => submission.abort(signal.reason);
       if (signal.aborted) onAbort();
       else signal.addEventListener('abort', onAbort, { once: true });
@@ -437,20 +424,18 @@ export class LocalPageAnnotationsService implements LocalPageAnnotationsServiceC
     }
     const docId = this.docId;
     const ref = this.ref;
-    const submission = this.queue.enqueue<WorkerResultPayload>(
-      {
-        buildPack: (jobId: JobId) =>
-          wirePack({
-            kind: 'annotations.move',
-            jobId,
-            docId,
-            page: ref,
-            refs,
-            toIndex,
-          }),
-      },
-      { priority: Priority.HIGH },
-    );
+    const submission = this.queue.enqueue<WorkerResultPayload>({
+      buildPack: (jobId: JobId) =>
+        wirePack({
+          kind: 'annotations.move',
+          effect: 'write',
+          jobId,
+          docId,
+          page: ref,
+          refs,
+          toIndex,
+        }),
+    });
     return AbortablePromise.run<AnnotationMoveResult>(async (signal) => {
       const onAbort = () => submission.abort(signal.reason);
       if (signal.aborted) onAbort();
@@ -488,20 +473,18 @@ export class LocalPageAnnotationsService implements LocalPageAnnotationsServiceC
     }
     const docId = this.docId;
     const ref = this.ref;
-    const submission = this.queue.enqueue<WorkerResultPayload>(
-      {
-        buildPack: (jobId: JobId) =>
-          wirePack({
-            kind: 'annotations.flatten',
-            jobId,
-            docId,
-            page: ref,
-            refs,
-            usage,
-          }),
-      },
-      { priority: Priority.HIGH },
-    );
+    const submission = this.queue.enqueue<WorkerResultPayload>({
+      buildPack: (jobId: JobId) =>
+        wirePack({
+          kind: 'annotations.flatten',
+          effect: 'contentWrite',
+          jobId,
+          docId,
+          page: ref,
+          refs,
+          usage,
+        }),
+    });
     return AbortablePromise.run<AnnotationFlattenResult>(async (signal) => {
       const onAbort = () => submission.abort(signal.reason);
       if (signal.aborted) onAbort();
@@ -532,19 +515,17 @@ export class LocalPageAnnotationsService implements LocalPageAnnotationsServiceC
     }
     const docId = this.docId;
     const ref = this.ref;
-    const submission = this.queue.enqueue<WorkerResultPayload>(
-      {
-        buildPack: (jobId: JobId) =>
-          wirePack({
-            kind: 'annotations.exportAppearance',
-            jobId,
-            docId,
-            page: ref,
-            refs,
-          }),
-      },
-      { priority: Priority.MEDIUM },
-    );
+    const submission = this.queue.enqueue<WorkerResultPayload>({
+      buildPack: (jobId: JobId) =>
+        wirePack({
+          kind: 'annotations.exportAppearance',
+          effect: 'snapshot',
+          jobId,
+          docId,
+          page: ref,
+          refs,
+        }),
+    });
     return AbortablePromise.run<Uint8Array>(async (signal) => {
       const onAbort = () => submission.abort(signal.reason);
       if (signal.aborted) onAbort();
@@ -582,13 +563,16 @@ export class LocalPageAnnotationsService implements LocalPageAnnotationsServiceC
 
   /** The page's annotations as the worker reads them, for a check before a write. */
   private async pageAnnotations(page: PageRef, signal: AbortSignal): Promise<Annotation[]> {
-    const submission = this.queue.enqueue<WorkerResultPayload>(
-      {
-        buildPack: (jobId: JobId) =>
-          wirePack({ kind: 'annotations.list', jobId, docId: this.docId, pages: [page] }),
-      },
-      { priority: Priority.MEDIUM },
-    );
+    const submission = this.queue.enqueue<WorkerResultPayload>({
+      buildPack: (jobId: JobId) =>
+        wirePack({
+          kind: 'annotations.list',
+          effect: 'read',
+          jobId,
+          docId: this.docId,
+          pages: [page],
+        }),
+    });
     const onAbort = () => submission.abort(signal.reason);
     if (signal.aborted) onAbort();
     else signal.addEventListener('abort', onAbort, { once: true });

@@ -90,10 +90,7 @@ export function buildHandleScopeContext(input: BuildHandleScopeContextInput): Ha
  *     the caller needn't belong to (see `checkSetGroup`), so it requires
  *     nothing either.
  */
-function assertIdentityForCollabScopes(
-  scope: ReadonlyArray<string>,
-  identity: Identity,
-): void {
+function assertIdentityForCollabScopes(scope: ReadonlyArray<string>, identity: Identity): void {
   for (const s of scope) {
     const parsed = parseScope(s);
     if (parsed.kind !== 'collab' || parsed.action === 'set-group') continue;

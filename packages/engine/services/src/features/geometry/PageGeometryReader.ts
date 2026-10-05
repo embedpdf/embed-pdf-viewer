@@ -24,6 +24,7 @@ import {
   readRectF,
 } from '../../runtime/memory/structs';
 import { throwIfAborted } from '../../shared/abort';
+import { SliceTimer, type Slices } from '../../shared/slices';
 
 /**
  * Mid-object orientation drift that forces a run split (~0.5°). Real content
@@ -88,14 +89,20 @@ export class PageGeometryReader {
     private readonly session: DocumentSession,
   ) {}
 
-  read(
+  /**
+   * A page's text geometry. The page loads in slices when it isn't parsed, and
+   * the glyph loop pauses once a slice's budget is spent, so an abort stops the
+   * read at either.
+   */
+  async read(
     pageObjectNumber: PageObjectNumber,
     signal: AbortSignal,
-  ): PageGeometrySnapshot<PdfCoordinates> {
+    slices: Slices,
+  ): Promise<PageGeometrySnapshot<PdfCoordinates>> {
     throwIfAborted(signal);
     const { fn, mem } = this.runtime;
     const pool = this.session.pagePool();
-    const pagePtr = pool.acquire(pageObjectNumber);
+    const pagePtr = await pool.acquireInSlices(pageObjectNumber, signal, slices);
 
     try {
       throwIfAborted(signal);
@@ -113,9 +120,10 @@ export class PageGeometryReader {
         const geometryPtr = mem.alloc(EPDF_CHAR_GEOMETRY_LAYOUT.bytes);
 
         try {
+          const timer = new SliceTimer(slices, signal);
           let prevObjectKey: number | bigint | null = null;
           for (let i = 0; i < glyphCount; i++) {
-            throwIfAborted(signal);
+            if (timer.due) await timer.pause();
             const objectKey = fn.FPDFText_GetTextObject(textPagePtr, i);
             const record: RawGeometryGlyphRecord = {
               objectKey,

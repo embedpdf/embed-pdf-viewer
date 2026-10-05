@@ -1,4 +1,4 @@
-import type { PageObjectNumber } from '@embedpdf/engine-core/runtime';
+import type { PageObjectNumber, WorkingSetPage } from '@embedpdf/engine-core/runtime';
 import type { PdfRuntimeModule, Ptr } from '@embedpdf/engine-runtime';
 
 import { PageResidency } from './PageResidency';
@@ -62,6 +62,16 @@ export class PagePtrPool {
 
   release(pageObjectNumber: PageObjectNumber): void {
     this.residency.release(this, pageObjectNumber);
+  }
+
+  /** What `view` shows of the document, replacing its last set (see {@link PageResidency}). */
+  setWorkingSet(
+    view: string,
+    pages: Iterable<
+      { pageObjectNumber: PageObjectNumber } & Pick<WorkingSetPage, 'role' | 'pixels'>
+    >,
+  ): void {
+    this.residency.setWorkingSet(this, view, pages);
   }
 
   /** Closes the pages no job holds: a write changed the document's content in place. */

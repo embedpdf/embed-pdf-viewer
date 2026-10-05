@@ -468,6 +468,7 @@ export class DocumentService {
       const build = (jobId: WorkerJobId) =>
         wirePack({
           kind: 'open.layerFileBase' as const,
+          effect: 'open' as const,
           jobId,
           docId,
           baseKey: baseSha,
@@ -646,6 +647,7 @@ export class DocumentService {
     const build = (jobId: WorkerJobId) =>
       wirePack({
         kind: 'pages.list' as const,
+        effect: 'read' as const,
         jobId,
         docId,
         ...(layerName !== undefined ? { layerName } : {}),
@@ -676,6 +678,7 @@ export class DocumentService {
       (jobId) =>
         wirePack({
           kind: 'actions.read' as const,
+          effect: 'read' as const,
           jobId,
           docId,
           ...(layerName !== undefined ? { layerName } : {}),
@@ -863,7 +866,13 @@ export class DocumentService {
     this.layerSessionVersions.delete(key);
     try {
       await this.pool.run(docId, (jobId) =>
-        wirePack({ kind: 'layer.close' as const, jobId, docId, layerName }),
+        wirePack({
+          kind: 'layer.close' as const,
+          effect: 'close' as const,
+          jobId,
+          docId,
+          layerName,
+        }),
       );
     } catch (err) {
       // DocNotOpen = the pool evicted the doc (or it was never opened on
@@ -891,6 +900,7 @@ export class DocumentService {
       (jobId: WorkerJobId) =>
         wirePack({
           kind: 'measure.viewports' as const,
+          effect: 'read' as const,
           jobId,
           docId,
           layerName,
@@ -915,6 +925,7 @@ export class DocumentService {
     const build = (jobId: WorkerJobId) =>
       wirePack({
         kind: 'metadata.read' as const,
+        effect: 'read' as const,
         jobId,
         docId,
         ...(layerName !== undefined ? { layerName } : {}),
@@ -942,6 +953,7 @@ export class DocumentService {
     const build = (jobId: WorkerJobId) =>
       wirePack({
         kind: 'metadata.readCustom' as const,
+        effect: 'read' as const,
         jobId,
         docId,
         ...(layerName !== undefined ? { layerName } : {}),
@@ -976,7 +988,14 @@ export class DocumentService {
       docId,
       layerName,
       (jobId: WorkerJobId) =>
-        wirePack({ kind: 'signatures.list' as const, jobId, docId, layerName, workingCopy: true }),
+        wirePack({
+          kind: 'signatures.list' as const,
+          effect: 'read' as const,
+          jobId,
+          docId,
+          layerName,
+          workingCopy: true,
+        }),
       signal,
     );
     if (result.tag !== 'signatures.list') {
@@ -999,7 +1018,14 @@ export class DocumentService {
       docId,
       layerName,
       (jobId: WorkerJobId) =>
-        wirePack({ kind: 'signatures.analyze' as const, jobId, docId, layerName, input }),
+        wirePack({
+          kind: 'signatures.analyze' as const,
+          effect: 'read' as const,
+          jobId,
+          docId,
+          layerName,
+          input,
+        }),
       signal,
     );
     if (result.tag !== 'signatures.analyze') {
@@ -1241,6 +1267,7 @@ export class DocumentService {
         this.pool.run(row.id, (jobId) =>
           wirePack({
             kind: 'document.checkPasswordPermissions' as const,
+            effect: 'open' as const,
             jobId,
             docId: row.id,
             ...(layerName !== undefined ? { layerName } : {}),
@@ -1489,6 +1516,7 @@ export class DocumentService {
     const build = (jobId: WorkerJobId) =>
       wirePack({
         kind: 'pages.extract' as const,
+        effect: 'snapshot' as const,
         jobId,
         docId,
         layerName,
@@ -1522,6 +1550,7 @@ export class DocumentService {
     const build = (jobId: WorkerJobId) =>
       wirePack({
         kind: 'annotations.exportAppearance' as const,
+        effect: 'snapshot' as const,
         jobId,
         docId,
         layerName,
@@ -1555,6 +1584,7 @@ export class DocumentService {
     const build = (jobId: WorkerJobId) =>
       wirePack({
         kind: 'annotations.readAppearance' as const,
+        effect: 'read' as const,
         jobId,
         docId,
         layerName,
@@ -1589,6 +1619,7 @@ export class DocumentService {
       const build = (jobId: WorkerJobId) =>
         wirePack({
           kind: 'document.saveFile' as const,
+          effect: 'snapshot' as const,
           jobId,
           docId,
           layerName,
@@ -1704,6 +1735,7 @@ export class DocumentService {
     const build = (jobId: WorkerJobId) =>
       wirePack({
         kind: 'attachments.list' as const,
+        effect: 'read' as const,
         jobId,
         docId,
         ...(layerName !== undefined ? { layerName } : {}),
@@ -1730,6 +1762,7 @@ export class DocumentService {
     return this.readFileToTemp(ctx, docId, layerName, signal, (jobId, path) =>
       wirePack({
         kind: 'attachments.readFile' as const,
+        effect: 'read' as const,
         jobId,
         docId,
         ...(layerName !== undefined ? { layerName } : {}),
@@ -1753,6 +1786,7 @@ export class DocumentService {
     return this.readFileToTemp(ctx, docId, layerName, signal, (jobId, path) =>
       wirePack({
         kind: 'annotations.readFile' as const,
+        effect: 'read' as const,
         jobId,
         docId,
         ...(layerName !== undefined ? { layerName } : {}),
@@ -1865,7 +1899,7 @@ export class DocumentService {
 
   private async loadDurableBasePageStates(ctx: OpenContext, docId: string): Promise<PageState[]> {
     const annotationsBuild = (jobId: WorkerJobId) =>
-      wirePack({ kind: 'annotations.list' as const, jobId, docId });
+      wirePack({ kind: 'annotations.list' as const, effect: 'read' as const, jobId, docId });
     const annotationsResult = await this.readOnPool(ctx, docId, undefined, annotationsBuild);
     if (annotationsResult.tag !== 'annotations.list') {
       throw new EngineError(
@@ -1903,6 +1937,7 @@ export class DocumentService {
     const build = (jobId: WorkerJobId) => {
       const request = {
         kind: 'open.layerFileBase' as const,
+        effect: 'open' as const,
         jobId,
         docId,
         layerName,
@@ -2090,6 +2125,7 @@ export class DocumentService {
         (jobId: WorkerJobId) =>
           wirePack({
             kind: 'open.layerFileBase' as const,
+            effect: 'open' as const,
             jobId,
             docId: sessionId,
             baseKey: version.sha256,

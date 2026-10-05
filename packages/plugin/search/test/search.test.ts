@@ -4,6 +4,7 @@ import {
   isPluginError,
   toPageRef,
   type AnyPlugin,
+  type CallFacts,
   type DocumentHandle,
   type Engine,
   type PageLayout,
@@ -83,8 +84,15 @@ function fakeDocument(
     aborted: boolean;
   }> = [];
   const listeners = new Set<(event: unknown) => void>();
+  /** The facts each `with()` gave: what the scan's calls said about themselves. */
+  const facts: CallFacts[] = [];
   const handle = {
     id: 'doc',
+    with: (given: CallFacts) => {
+      facts.push(given);
+      return handle;
+    },
+    setWorkingSet: () => {},
     events: {
       subscribe: (listener: (event: unknown) => void) => {
         listeners.add(listener);
@@ -121,6 +129,7 @@ function fakeDocument(
   return {
     engine,
     requests,
+    facts,
     held,
     emit: (error: unknown) => listeners.forEach((listener) => listener(error)),
   };
@@ -187,7 +196,7 @@ describe('search session', () => {
   afterEach(() => vi.useRealTimers());
 
   it('streams hits with their page-space geometry and resolves complete with events in order', async () => {
-    const { kernel, api } = await boot([
+    const { kernel, api, facts } = await boot([
       slice([match(5, 0), match(5, 9)], 'c1', 1),
       slice([match(7, 2)], null, 2),
     ]);
@@ -201,6 +210,8 @@ describe('search session', () => {
     const result = await api.search({ text: 'test' });
     expect(result).toEqual({ status: 'complete', hitCount: 3 });
     expect(api.getStatus()).toBe('complete');
+    // A scan nobody waits on: each slice asks to run after the views' work.
+    expect(facts).toEqual([{ priority: 'low' }, { priority: 'low' }]);
     expect(log).toEqual(['started:test', 'progress:1/2:2', 'progress:2/2:3', 'completed:3']);
 
     const first = api.listHits()[0];

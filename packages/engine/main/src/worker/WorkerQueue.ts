@@ -3,35 +3,60 @@ import {
   AbortError,
   EngineError,
   EngineErrorCode,
+  clearlyOutranks,
   deserializeError,
+  placeFor,
+  rank,
   wirePack,
+  type CallFacts,
+  type CallPriority,
+  type JobTarget,
+  type PageBox,
+  type RequestEffect,
+  type ViewSets,
   type WirePack,
+  type WorkerJobRequest,
+  type WorkingSetPage,
 } from '@embedpdf/engine-core/runtime';
 
-import { IndexedPriorityHeap, type HeapHandle } from './IndexedPriorityHeap';
 import { nextJobId } from './jobIds';
-import { Priority } from './Priority';
+import { nextJob } from './jobOrder';
 import type { JobId, WorkerRequest, WorkerResponse, WorkerResultPayload } from './protocol';
 import type { Transport } from '../transport/Transport';
 
-interface PendingJob {
-  jobId: JobId;
-  priority: number;
+export interface JobSpec {
   /**
-   * The producer's typed message + transfer manifest. Returning a
-   * `WirePack<WorkerRequest>` here (instead of a bare request plus a
-   * separate transferables array) means the producer declares both
-   * halves in one return statement; the queue and transport never have
-   * to guess which buffers should move zero-copy.
+   * Producer-supplied factory: given a freshly allocated `jobId`, return
+   * the typed request plus its transfer manifest. For non-binary kinds
+   * use `wirePack(req)`; for kinds that move buffers use
+   * `wirePack(req, [buffer])`. It runs when the job is queued: the request
+   * states the job's effect and page, which decide when it runs.
    */
-  buildPack: (jobId: JobId) => WirePack<WorkerRequest>;
-  resolve: (payload: WorkerResultPayload) => void;
-  reject: (err: unknown) => void;
-  handle: HeapHandle;
+  buildPack: (jobId: JobId) => WirePack<WorkerJobRequest>;
+  /** The part of the request's page the job is about (a tile), in page space. */
+  region?: PageBox;
 }
 
-interface InFlightJob {
-  jobId: JobId;
+/** Where a document's calls queue: the worker queue, with the facts of the handle they're made through. */
+export interface JobQueue {
+  enqueue<R extends WorkerResultPayload>(spec: JobSpec): AbortablePromise<R>;
+}
+
+interface Job {
+  readonly jobId: JobId;
+  readonly pack: WirePack<WorkerJobRequest>;
+  readonly effect: RequestEffect;
+  readonly docId: string | undefined;
+  readonly target: JobTarget;
+  readonly priority: CallPriority;
+  /** Recomputed before each pick, from the document's working sets as they are then. */
+  rank: number;
+  sent: boolean;
+  /**
+   * Told to stop for a more urgent job (see {@link WorkerQueue.preemptFor}):
+   * when the worker answers that it stopped, the job goes back in line.
+   */
+  preempted: boolean;
   resolve: (payload: WorkerResultPayload) => void;
   reject: (err: unknown) => void;
   /**
@@ -44,47 +69,32 @@ interface InFlightJob {
   abortReason: unknown;
 }
 
-export interface EnqueueOptions {
-  priority?: number;
-  /** Orders jobs of one priority: higher first, equal ones in enqueue order. Default 0. */
-  rank?: number;
-  /** Number of dispatch slots the queue may use concurrently. */
-  concurrency?: number;
-}
-
-export interface JobSpec {
-  /**
-   * Producer-supplied factory: given a freshly allocated `jobId`, return
-   * the typed request plus its transfer manifest. For non-binary kinds
-   * use `wirePack(req)`; for kinds that move buffers use
-   * `wirePack(req, [buffer])`.
-   */
-  buildPack: (jobId: JobId) => WirePack<WorkerRequest>;
-}
-
-/** A job in the queue: await it, abort it, or re-rank it while it waits. */
-export interface QueuedJob<R> extends AbortablePromise<R> {
-  /** The job's new rank among jobs of its priority. No effect once it was sent. */
-  setRank(rank: number): void;
-}
-
 /**
- * Priority queue with O(log n) abort-removes-pending semantics.
+ * The line of jobs to the worker: every document's calls, sent one at a time
+ * (or `concurrency` at a time) in the order {@link nextJob} picks.
  *
- * - enqueue() returns an AbortablePromise. Calling .abort() before
- *   dispatch removes the job from the heap (it never reaches the worker).
- * - Calling .abort() after dispatch sends an AbortRequest to the worker.
- *   The worker will reject when it next checks signal.aborted between
- *   PDFium calls, then we deliver an AbortError to the caller.
- * - Calling .setRank() before dispatch moves the job among the jobs of its
- *   priority; after dispatch it does nothing.
+ * - A job's request states its effect, which keeps its document's order
+ *   (`jobOrder.ts`); among the jobs that may run, the highest rank goes first.
+ * - A job's rank is its call's priority, then its place: where its page is in
+ *   the views' working sets ({@link setWorkingSet}), worked out again before
+ *   every pick, so a job follows the camera with no caller involved.
+ * - A running read gives way to a job that clearly outranks it (a higher
+ *   priority, or a better place): the queue tells the worker to stop it, and
+ *   puts it back in line where it was. Its caller never sees that. The worker
+ *   stops a read at its next slice, and keeps the page it half loaded.
+ * - `abort()` before the job is sent removes it: it never reaches the worker.
+ *   After, it sends an AbortRequest; the worker rejects when it next checks
+ *   its signal, and the caller sees an AbortError either way.
  */
-export class WorkerQueue {
-  private readonly pending = new Map<JobId, PendingJob>();
-  private readonly inFlight = new Map<JobId, InFlightJob>();
-  private readonly heap = new IndexedPriorityHeap<JobId>();
+export class WorkerQueue implements JobQueue {
+  /** Every job not done yet, sent or not, in call order. */
+  private readonly jobs: Job[] = [];
+  private readonly byId = new Map<JobId, Job>();
+  /** Per document, per view: what the view shows (see {@link setWorkingSet}). */
+  private readonly workingSets = new Map<string, Map<string, Map<number, WorkingSetPage>>>();
   private readonly unsubscribe: () => void;
   private readonly maxConcurrency: number;
+  private inFlight = 0;
 
   private destroyed = false;
 
@@ -96,48 +106,60 @@ export class WorkerQueue {
     this.unsubscribe = transport.onMessage((msg) => this.handleResponse(msg));
   }
 
-  enqueue<R extends WorkerResultPayload>(spec: JobSpec, opts: EnqueueOptions = {}): QueuedJob<R> {
+  /** The same queue, every job queued through it carrying `facts` (see `DocumentHandle.with`). */
+  withFacts(facts: CallFacts): JobQueue {
+    return { enqueue: (spec) => this.enqueue(spec, facts) };
+  }
+
+  enqueue<R extends WorkerResultPayload>(
+    spec: JobSpec,
+    facts: CallFacts = {},
+  ): AbortablePromise<R> {
     if (this.destroyed) {
-      return Object.assign(
-        AbortablePromise.rejectReason<R>(
-          new EngineError(EngineErrorCode.RuntimeUnavailable, 'engine has been destroyed'),
-        ),
-        { setRank: () => {} },
+      return AbortablePromise.rejectReason<R>(
+        new EngineError(EngineErrorCode.RuntimeUnavailable, 'engine has been destroyed'),
       );
     }
     const jobId = nextJobId();
-    const priority = opts.priority ?? Priority.MEDIUM;
-    const setRank = (rank: number) => {
-      const pending = this.pending.get(jobId);
-      if (pending) this.heap.setRank(pending.handle, rank);
-    };
+    const pack = spec.buildPack(jobId);
+    const request = pack.payload;
 
-    const job = new AbortablePromise<R>((resolve, reject, _progress, signal) => {
-      const handle = this.heap.push(jobId, priority, opts.rank ?? 0);
-      this.pending.set(jobId, {
+    return new AbortablePromise<R>((resolve, reject, _progress, signal) => {
+      const job: Job = {
         jobId,
-        priority,
-        buildPack: spec.buildPack,
-        handle,
+        pack,
+        effect: request.effect,
+        docId: 'docId' in request ? request.docId : undefined,
+        target: {
+          ...('page' in request && request.page ? { page: request.page } : {}),
+          ...(spec.region ? { region: spec.region } : {}),
+          ...(facts.view !== undefined ? { view: facts.view } : {}),
+        },
+        priority: facts.priority ?? 'auto',
+        rank: 0,
+        sent: false,
+        preempted: false,
         resolve: (payload) => resolve(payload as R),
         reject,
-      });
+        aborted: false,
+        abortReason: undefined,
+      };
+      this.jobs.push(job);
+      this.byId.set(jobId, job);
 
       const onAbort = () => {
-        const pending = this.pending.get(jobId);
-        if (pending) {
-          this.pending.delete(jobId);
-          this.heap.remove(pending.handle);
-          pending.reject(new AbortError(signal.reason));
+        if (!this.byId.has(jobId)) return;
+        if (!job.sent) {
+          this.remove(job);
+          job.reject(new AbortError(signal.reason));
+          // A job it held back may run now.
+          this.tick();
           return;
         }
-        const inFlight = this.inFlight.get(jobId);
-        if (inFlight) {
-          inFlight.aborted = true;
-          inFlight.abortReason = signal.reason;
-          // Abort messages never carry buffers — pack with EMPTY_TRANSFER.
-          this.transport.send(wirePack({ kind: 'abort', jobId }));
-        }
+        job.aborted = true;
+        job.abortReason = signal.reason;
+        // Abort messages never carry buffers — pack with EMPTY_TRANSFER.
+        this.transport.send(wirePack({ kind: 'abort', jobId }));
       };
 
       if (signal.aborted) {
@@ -148,45 +170,138 @@ export class WorkerQueue {
 
       this.tick();
     });
-    return Object.assign(job, { setRank });
+  }
+
+  /**
+   * What `view` shows of a document, replacing its last set; an empty set
+   * withdraws it. The jobs waiting for the document take their new places at
+   * the next pick, and the worker hears it at once, for the order its parsed
+   * pages close in.
+   */
+  setWorkingSet(docId: string, view: string, pages: readonly WorkingSetPage[]): void {
+    if (this.destroyed) return;
+    let views = this.workingSets.get(docId);
+    if (pages.length > 0) {
+      if (!views) {
+        views = new Map();
+        this.workingSets.set(docId, views);
+      }
+      views.set(view, new Map(pages.map((entry) => [entry.page.objectNumber, entry])));
+    } else {
+      views?.delete(view);
+      if (views?.size === 0) this.workingSets.delete(docId);
+    }
+    this.tell((jobId) =>
+      wirePack({ kind: 'pages.workingSet', jobId, docId, view, pages: [...pages] }),
+    );
+    // A running read may now give way to work that moved on screen.
+    this.tick();
+  }
+
+  /** A document closed: its views say nothing any more. */
+  forgetWorkingSets(docId: string): void {
+    this.workingSets.delete(docId);
+  }
+
+  /**
+   * Sends a message the worker takes on arrival and never answers (a working
+   * set): past every job waiting here, with no slot and no reply.
+   */
+  tell(buildPack: (jobId: JobId) => WirePack<WorkerRequest>): void {
+    if (this.destroyed) return;
+    this.transport.send(buildPack(nextJobId()));
   }
 
   private tick(): void {
     if (this.destroyed) return;
-    while (this.inFlight.size < this.maxConcurrency && this.heap.size > 0) {
-      const jobId = this.heap.popMax();
-      if (jobId === undefined) return;
-      const pending = this.pending.get(jobId);
-      if (!pending) continue; // tombstoned by abort
-      this.pending.delete(jobId);
-
-      const pack = pending.buildPack(jobId);
-      this.inFlight.set(jobId, {
-        jobId,
-        resolve: pending.resolve,
-        reject: pending.reject,
-        aborted: false,
-        abortReason: undefined,
-      });
-      this.transport.send(pack);
+    for (;;) {
+      const job = this.pick();
+      if (!job) return;
+      if (this.inFlight >= this.maxConcurrency) {
+        this.preemptFor(job);
+        return;
+      }
+      job.sent = true;
+      this.inFlight += 1;
+      this.transport.send(job.pack);
     }
   }
 
-  private handleResponse(msg: WorkerResponse): void {
-    const inFlight = this.inFlight.get(msg.jobId);
-    if (!inFlight) return; // stale or already aborted
-    this.inFlight.delete(msg.jobId);
+  /**
+   * Tells the worker to stop the running read `next` clearly outranks, the
+   * least urgent one if several run. Only reads give way: a read must never
+   * see half a write, and saves and opens can't stop part way. A read with
+   * buffers to move can't be sent twice, so it runs on.
+   */
+  private preemptFor(next: Job): void {
+    let victim: Job | undefined;
+    let victimRank = 0;
+    for (const running of this.jobs) {
+      if (!running.sent || running.preempted || running.aborted) continue;
+      if (running.effect !== 'read' || running.pack.transfer.length > 0) continue;
+      const now = this.rankNow(running);
+      if (!clearlyOutranks(next.rank, now)) continue;
+      if (!victim || now < victimRank) {
+        victim = running;
+        victimRank = now;
+      }
+    }
+    if (!victim) return;
+    victim.preempted = true;
+    this.transport.send(wirePack({ kind: 'abort', jobId: victim.jobId }));
+  }
 
-    if (inFlight.aborted) {
-      inFlight.reject(new AbortError(inFlight.abortReason));
+  /** The job to send next, every waiting job ranked by where it is now. */
+  private pick(): Job | undefined {
+    for (const job of this.jobs) {
+      if (!job.sent) job.rank = this.rankNow(job);
+    }
+    return nextJob(this.jobs);
+  }
+
+  /** The job's rank with the working sets as they are now. */
+  private rankNow(job: Job): number {
+    return rank(
+      { priority: job.priority, ...(job.target.region ? { region: job.target.region } : {}) },
+      placeFor(job.target, this.viewsOf(job.docId)),
+    );
+  }
+
+  private viewsOf(docId: string | undefined): ViewSets {
+    return (docId === undefined ? undefined : this.workingSets.get(docId)) ?? NO_VIEWS;
+  }
+
+  private remove(job: Job): void {
+    this.byId.delete(job.jobId);
+    const index = this.jobs.indexOf(job);
+    if (index >= 0) this.jobs.splice(index, 1);
+  }
+
+  private handleResponse(msg: WorkerResponse): void {
+    const job = this.byId.get(msg.jobId);
+    if (!job?.sent) return; // stale, or not one of ours
+    this.inFlight -= 1;
+    if (job.preempted && !job.aborted && stoppedBy(msg)) {
+      // Stopped for a more urgent job, not by its caller: back in line where it
+      // was in call order, under the same id, to be sent again when its turn
+      // comes. Nothing else is in flight for that id.
+      job.sent = false;
+      job.preempted = false;
+      this.tick();
+      return;
+    }
+    this.remove(job);
+
+    if (job.aborted) {
+      job.reject(new AbortError(job.abortReason));
     } else if (msg.kind === 'resolve') {
-      inFlight.resolve(msg.result);
+      job.resolve(msg.result);
     } else {
       const err = deserializeError(msg.error);
       if (err.code === EngineErrorCode.Aborted) {
-        inFlight.reject(new AbortError(err.message));
+        job.reject(new AbortError(err.message));
       } else {
-        inFlight.reject(err);
+        job.reject(err);
       }
     }
 
@@ -197,12 +312,12 @@ export class WorkerQueue {
     if (this.destroyed) return;
     this.destroyed = true;
 
-    // Reject anything still pending.
-    for (const pending of this.pending.values()) {
-      this.heap.remove(pending.handle);
-      pending.reject(new EngineError(EngineErrorCode.RuntimeUnavailable, 'engine destroyed'));
+    // Reject anything not sent yet.
+    for (const job of [...this.jobs]) {
+      if (job.sent) continue;
+      this.remove(job);
+      job.reject(new EngineError(EngineErrorCode.RuntimeUnavailable, 'engine destroyed'));
     }
-    this.pending.clear();
 
     // In-flight: best-effort send shutdown then settle.
     try {
@@ -222,12 +337,20 @@ export class WorkerQueue {
       // ignore
     }
 
-    for (const inFlight of this.inFlight.values()) {
-      inFlight.reject(new EngineError(EngineErrorCode.RuntimeUnavailable, 'engine destroyed'));
+    for (const job of [...this.jobs]) {
+      this.remove(job);
+      job.reject(new EngineError(EngineErrorCode.RuntimeUnavailable, 'engine destroyed'));
     }
-    this.inFlight.clear();
+    this.inFlight = 0;
 
     this.unsubscribe();
     await this.transport.terminate();
   }
+}
+
+const NO_VIEWS: ViewSets = new Map();
+
+/** Whether the worker answered that the job stopped on an abort. */
+function stoppedBy(msg: WorkerResponse): boolean {
+  return msg.kind === 'reject' && msg.error.code === EngineErrorCode.Aborted;
 }

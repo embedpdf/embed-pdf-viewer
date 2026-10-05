@@ -1,7 +1,8 @@
 /**
  * The runtime's parsed pages, kept within a budget of bytes (PageResidency),
  * against a fake runtime: each page parses into a known number of bytes, over
- * a known number of slices, and can be told its content changed.
+ * a known number of slices, and can be told its content changed. What the
+ * viewers show (working sets) decides which kept pages close first.
  */
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import type { PageObjectNumber } from '@embedpdf/engine-core/runtime';
@@ -109,6 +110,11 @@ const slices = { budgetMs: 8, between: () => Promise.resolve() };
 function use(pool: PagePtrPool, objectNumber: number): void {
   pool.acquire(pon(objectNumber));
   pool.release(pon(objectNumber));
+}
+
+/** A page a view shows, as the worker hears it. */
+function shown(page: number, role: 'visible' | 'near', pixels = 0) {
+  return { pageObjectNumber: pon(page), role, pixels };
 }
 
 describe('PageResidency', () => {
@@ -318,6 +324,77 @@ describe('PageResidency', () => {
     busy = false;
     vi.advanceTimersByTime(1000);
     expect(calls.closes).toEqual([1]);
+  });
+
+  test('closes pages no view shows first, then near ones, then visible ones from the fewest pixels up', () => {
+    const { runtime, calls } = createFakeRuntime(
+      Object.fromEntries([1, 2, 3, 4, 5, 6, 7].map((page) => [page, { bytes: 4 * MB, slices: 1 }])),
+    );
+    // Three pages fit.
+    const residency = new PageResidency(runtime, { budgetBytes: 13 * MB, idleMs: 0 });
+    const pool = new PagePtrPool(runtime, DOC, residency);
+    pool.setWorkingSet('stage', [
+      shown(1, 'visible', 1_000_000),
+      shown(2, 'visible', 30_000),
+      shown(7, 'visible', 500_000),
+      shown(3, 'near'),
+    ]);
+
+    for (const page of [1, 2, 4]) use(pool, page);
+    use(pool, 3); // room for it: 4, in no set, goes before 2, visible and older
+    expect(calls.closes).toEqual([4]);
+    use(pool, 7); // 3, near, goes before 2, visible and older
+    expect(calls.closes).toEqual([4, 3]);
+    use(pool, 5); // 2 shows the fewest pixels; 1, older, shows the most
+    expect(calls.closes).toEqual([4, 3, 2]);
+    use(pool, 6); // 5, in no set
+    expect(calls.closes).toEqual([4, 3, 2, 5]);
+    use(pool, 3); // 6, in no set
+    use(pool, 2); // 3, near, before 7, visible
+    expect(calls.closes).toEqual([4, 3, 2, 5, 6, 3]);
+    expect(pool.isKept(pon(1))).toBe(true);
+  });
+
+  test('only a page a job holds keeps the total over the budget: a visible page closes at its release', () => {
+    const { runtime, calls } = createFakeRuntime({
+      1: { bytes: 4 * MB, slices: 1 },
+      2: { bytes: 4 * MB, slices: 1 },
+      3: { bytes: 4 * MB, slices: 1 },
+    });
+    const residency = new PageResidency(runtime, { budgetBytes: 9 * MB, idleMs: 0 });
+    const pool = new PagePtrPool(runtime, DOC, residency);
+    pool.setWorkingSet('stage', [shown(1, 'visible', 1_000_000)]);
+
+    // Three jobs hold three pages at once: over the budget, as held pages may be.
+    for (const page of [1, 2, 3]) pool.acquire(pon(page));
+    pool.release(pon(1));
+    expect(calls.closes).toEqual([1]); // the only page no job holds
+    pool.release(pon(2));
+    pool.release(pon(3));
+    expect(calls.closes).toEqual([1]); // within the budget again
+  });
+
+  test("the idle timer spares what a view shows on screen; a page keeps its best place; a set replaces the view's last one", () => {
+    vi.useFakeTimers();
+    const { runtime, calls } = createFakeRuntime(
+      Object.fromEntries([1, 2, 3, 4].map((page) => [page, { bytes: MB, slices: 1 }])),
+    );
+    const residency = new PageResidency(runtime, { budgetBytes: 100 * MB, idleMs: 1000 });
+    const pool = new PagePtrPool(runtime, DOC, residency);
+    pool.setWorkingSet('stage', [shown(1, 'visible', 1_000_000), shown(3, 'visible', 200_000)]);
+    // Another view shows page 2, and has page 3 near.
+    pool.setWorkingSet('rail', [shown(2, 'visible', 30_000), shown(3, 'near')]);
+    for (const page of [1, 2, 3, 4]) use(pool, page);
+
+    vi.advanceTimersByTime(1000);
+    expect(calls.closes).toEqual([4]); // in no set; 3 is visible in one view
+    pool.setWorkingSet('stage', [shown(1, 'visible', 1_000_000)]);
+    vi.advanceTimersByTime(1000);
+    expect(calls.closes).toEqual([4, 3]); // only near now
+    pool.setWorkingSet('rail', []); // the rail withdraws
+    vi.advanceTimersByTime(1000);
+    expect(calls.closes).toEqual([4, 3, 2]);
+    expect(pool.isKept(pon(1))).toBe(true);
   });
 
   test('a session without a residency keeps nothing', () => {

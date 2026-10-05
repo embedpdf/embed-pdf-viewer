@@ -1,5 +1,5 @@
-import type { PageObjectNumber } from '@embedpdf/engine-core/runtime';
-import { EngineError, EngineErrorCode } from '@embedpdf/engine-core/runtime';
+import type { PageObjectNumber, Placed, WorkingSetPage } from '@embedpdf/engine-core/runtime';
+import { EngineError, EngineErrorCode, placedBefore } from '@embedpdf/engine-core/runtime';
 import type { PdfRuntimeModule, Ptr } from '@embedpdf/engine-runtime';
 
 import { withScratch } from '../../runtime/memory/scratch';
@@ -18,9 +18,13 @@ import type { Slices } from '../../shared/slices';
  * - A page costs what its parse made (`EPDFPage_GetParsedSize`) and a fixed
  *   overhead for the page itself.
  * - Room is made before a page loads, for its size when it was last open, and
- *   again after every slice of a load, as the page grows. Pages close least
- *   recently used first. A page a job holds never closes, so one page may be
- *   over the budget on its own: the one a job needs.
+ *   again after every slice of a load, as the page grows. A page a job holds
+ *   never closes, so one page may be over the budget on its own: the one a
+ *   job needs.
+ * - What the viewers show decides what closes first (`setWorkingSet`): pages
+ *   in no working set, then `near` pages, then `visible` pages from the
+ *   fewest device pixels on screen up, so a thumbnail rail's pages close
+ *   before the main view's. Least recently used first among equals.
  * - A render loads its page in slices, between which its job can be aborted.
  *   An aborted load is set aside half parsed, and the next job that needs the
  *   page goes on with it.
@@ -30,8 +34,8 @@ import type { Slices } from '../../shared/slices';
  *   that change content in place.
  * - A page's image cache is emptied when its last job releases it, so its next
  *   job renders images as a newly loaded page does.
- * - Pages no job uses close after a while, giving their memory back to the
- *   allocator.
+ * - Pages no job uses and no viewer shows close after a while, giving their
+ *   memory back to the allocator.
  *
  * Pages belong to an owner, one per open document ({@link PagePtrPool}).
  */
@@ -58,6 +62,9 @@ export const PAGE_OVERHEAD_BYTES = 64 * 1024;
 const PARSED_SIZE_BYTES = 40;
 const PARSED_SIZE_ESTIMATED_BYTES_OFFSET = 24;
 
+/** Where a page no view shows is: it closes first. */
+const ELSEWHERE: Placed = { place: 'elsewhere', pixels: 0 };
+
 /** A budget that finishes any load in one call. */
 const WHOLE_LOAD_MS = 0x3fffffff;
 
@@ -79,6 +86,8 @@ export class PageResidency {
   private readonly pages = new Map<object, Map<PageObjectNumber, ResidentPage>>();
   /** What each closed page cost when it was last open: the room its next load needs. */
   private readonly closedSizes = new Map<object, Map<PageObjectNumber, number>>();
+  /** Per owner, per view: where the pages it shows are (see {@link setWorkingSet}). */
+  private readonly workingSets = new Map<object, Map<string, Map<PageObjectNumber, Placed>>>();
   private totalBytes = 0;
   private clock = 0;
   private timer: ReturnType<typeof setTimeout> | null = null;
@@ -181,6 +190,39 @@ export class PageResidency {
     this.makeRoom(0);
   }
 
+  /**
+   * What `view` shows of `owner`'s pages, replacing its last set; an empty set
+   * withdraws it. Decides which kept pages close first (see the class notes).
+   * Only bookkeeping: it touches no PDFium state, so it may run mid-render.
+   */
+  setWorkingSet(
+    owner: object,
+    view: string,
+    pages: Iterable<
+      { pageObjectNumber: PageObjectNumber } & Pick<WorkingSetPage, 'role' | 'pixels'>
+    >,
+  ): void {
+    const shown = new Map<PageObjectNumber, Placed>();
+    for (const { pageObjectNumber, role, pixels } of pages) {
+      const placed: Placed = { place: role, pixels };
+      const listed = shown.get(pageObjectNumber);
+      if (!listed || placedBefore(placed, listed)) shown.set(pageObjectNumber, placed);
+    }
+    let views = this.workingSets.get(owner);
+    if (shown.size > 0) {
+      if (!views) {
+        views = new Map();
+        this.workingSets.set(owner, views);
+      }
+      views.set(view, shown);
+    } else {
+      views?.delete(view);
+      if (views?.size === 0) this.workingSets.delete(owner);
+    }
+    // Pages that left the set may now be idle and unshown: the timer closes them.
+    if (this.totalBytes > 0) this.armTimer();
+  }
+
   /** True while a job holds the page; an idle page is not held. */
   isHeld(owner: object, pageObjectNumber: PageObjectNumber): boolean {
     return (this.pages.get(owner)?.get(pageObjectNumber)?.refs ?? 0) > 0;
@@ -196,6 +238,7 @@ export class PageResidency {
     for (const page of [...(this.pages.get(owner)?.values() ?? [])]) this.close(page);
     this.pages.delete(owner);
     this.closedSizes.delete(owner);
+    this.workingSets.delete(owner);
   }
 
   /** Closes the pages of `owner` no job holds: a write changed its content in place. */
@@ -210,6 +253,15 @@ export class PageResidency {
     for (const owned of [...this.pages.values()]) {
       for (const page of [...owned.values()]) {
         if (page.refs === 0) this.close(page);
+      }
+    }
+  }
+
+  /** Closes the pages no job holds and no viewer shows on screen: the idle timer. */
+  private closeUnshown(): void {
+    for (const owned of [...this.pages.values()]) {
+      for (const page of [...owned.values()]) {
+        if (page.refs === 0 && this.placeOf(page).place !== 'visible') this.close(page);
       }
     }
   }
@@ -279,18 +331,42 @@ export class PageResidency {
     return this.closedSizes.get(owner)?.get(pageObjectNumber) ?? PAGE_OVERHEAD_BYTES;
   }
 
-  /** Closes pages no job holds, least recently used first, until `incoming` more fits. */
+  /**
+   * Closes pages no job holds until `incoming` more bytes fit: the worst
+   * placed first (see the class notes), least recently used first among
+   * equals. Only a page a job holds may keep the total over the budget.
+   */
   private makeRoom(incoming: number): void {
     while (this.totalBytes + incoming > this.policy.budgetBytes) {
       let victim: ResidentPage | null = null;
+      let victimPlace = ELSEWHERE;
       for (const owned of this.pages.values()) {
         for (const page of owned.values()) {
-          if (page.refs === 0 && (!victim || page.lastUsed < victim.lastUsed)) victim = page;
+          if (page.refs > 0) continue;
+          const placed = this.placeOf(page);
+          const worse =
+            !victim ||
+            placedBefore(victimPlace, placed) ||
+            (!placedBefore(placed, victimPlace) && page.lastUsed < victim.lastUsed);
+          if (worse) {
+            victim = page;
+            victimPlace = placed;
+          }
         }
       }
       if (!victim) return;
       this.close(victim);
     }
+  }
+
+  /** Where the working sets have the page: the best place any view gives it. */
+  private placeOf(page: ResidentPage): Placed {
+    let best = ELSEWHERE;
+    for (const shown of this.workingSets.get(page.owner)?.values() ?? []) {
+      const placed = shown.get(page.pageObjectNumber);
+      if (placed && placedBefore(placed, best)) best = placed;
+    }
+    return best;
   }
 
   private close(page: ResidentPage): void {
@@ -321,7 +397,7 @@ export class PageResidency {
     this.timer = setTimeout(() => {
       this.timer = null;
       if (this.busy()) this.armTimer();
-      else this.closeIdle();
+      else this.closeUnshown();
     }, this.policy.idleMs);
     // A Node worker thread must be able to exit while pages are idle.
     (this.timer as { unref?: () => void }).unref?.();

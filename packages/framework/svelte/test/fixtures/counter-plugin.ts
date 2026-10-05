@@ -88,6 +88,11 @@ const handleFor = (id: string, pageCount = 1) =>
     security: { allows: () => true, allowsAnnotation: () => true },
     // The "file" is the document's id, so a test can tell which document was saved.
     download: () => Promise.resolve(new TextEncoder().encode(id)),
+    // Calls' facts and working sets change nothing here: the same document.
+    with() {
+      return this;
+    },
+    setWorkingSet: () => {},
     close: () => Promise.resolve(),
   }) as unknown as DocumentHandle;
 

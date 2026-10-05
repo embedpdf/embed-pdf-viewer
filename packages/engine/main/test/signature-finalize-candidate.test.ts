@@ -105,6 +105,7 @@ describe('signatures.finalizeCandidate', () => {
     await call(
       {
         kind: 'open.layerFileBase',
+        effect: 'open',
         docId: 'sign',
         baseKey: 'base',
         basePath,
@@ -113,7 +114,7 @@ describe('signatures.finalizeCandidate', () => {
       },
       'open',
     );
-    const before = await call({ kind: 'signatures.list', docId: 'sign' }, 'signatures.list');
+    const before = await call({ kind: 'signatures.list', effect: 'read', docId: 'sign' }, 'signatures.list');
     const field = before.snapshot.signatures.find((s) => s.fieldName === 'sig')!;
     expect(field.signed).toBe(false);
     const fieldObjectNumber = field.field.kind === 'objectNumber' ? field.field.objectNumber : -1;
@@ -122,6 +123,7 @@ describe('signatures.finalizeCandidate', () => {
     const { result: prepared } = await call(
       {
         kind: 'signatures.prepare',
+        effect: 'snapshot',
         docId: 'sign',
         input: {
           field: { kind: 'fqn', name: 'sig' },
@@ -143,7 +145,7 @@ describe('signatures.finalizeCandidate', () => {
 
     // The preparing worker forgets the signing; another replica rebuilds it.
     const cancelled = await call(
-      { kind: 'signatures.cancel', docId: 'sign', signingId: prepared.signingId },
+      { kind: 'signatures.cancel', effect: 'session', docId: 'sign', signingId: prepared.signingId },
       'signatures.cancel',
     );
     expect(cancelled.result.status).toBe('cancelled');
@@ -154,6 +156,7 @@ describe('signatures.finalizeCandidate', () => {
     const finalized = await call(
       {
         kind: 'signatures.finalizeCandidate',
+        effect: 'read',
         path: rebuilt,
         byteRange: prepared.byteRange,
         contentsSize: prepared.contentsSize,
@@ -189,6 +192,7 @@ describe('signatures.finalizeCandidate', () => {
     await call(
       {
         kind: 'open.layerFileBase',
+        effect: 'open',
         docId: 'verify',
         baseKey: 'sealed',
         basePath: rebuilt,
@@ -197,7 +201,7 @@ describe('signatures.finalizeCandidate', () => {
       },
       'open',
     );
-    const after = await call({ kind: 'signatures.list', docId: 'verify' }, 'signatures.list');
+    const after = await call({ kind: 'signatures.list', effect: 'read', docId: 'verify' }, 'signatures.list');
     expect(after.snapshot.chainValid).toBe(true);
     expect(after.snapshot.revisions).toHaveLength(before.snapshot.revisions.length + 1);
     const sig = after.snapshot.signatures.find((s) => s.fieldName === 'sig')!;
@@ -205,20 +209,22 @@ describe('signatures.finalizeCandidate', () => {
     const contents = await call(
       {
         kind: 'signatures.contents',
+        effect: 'read',
         docId: 'verify',
         ref: { kind: 'objectNumber', objectNumber: fieldObjectNumber },
       },
       'signatures.contents',
     );
     expect(new Uint8Array(contents.bytes)).toEqual(FAKE_CMS);
-    const version = await call({ kind: 'document.version', docId: 'verify' }, 'document.version');
+    const version = await call({ kind: 'document.version', effect: 'read', docId: 'verify' }, 'document.version');
     expect(version.version).toEqual(finalized.version);
-    await call({ kind: 'close', docId: 'verify' }, 'close');
+    await call({ kind: 'close', effect: 'close', docId: 'verify' }, 'close');
 
     // Finalizing the same file with the same CMS again writes the same bytes.
     const again = await call(
       {
         kind: 'signatures.finalizeCandidate',
+        effect: 'read',
         path: rebuilt,
         byteRange: prepared.byteRange,
         contentsSize: prepared.contentsSize,
@@ -238,6 +244,7 @@ describe('signatures.finalizeCandidate', () => {
     };
     const input = (path: string) => ({
       kind: 'signatures.finalizeCandidate' as const,
+      effect: 'read' as const,
       path,
       byteRange: prepared.byteRange,
       contentsSize: prepared.contentsSize,
@@ -276,6 +283,6 @@ describe('signatures.finalizeCandidate', () => {
     await writeFile(p2, Buffer.concat([base, tail, Buffer.from('\n')]));
     await rejects(input(p2), 'InvalidArg', /does not span/);
 
-    await call({ kind: 'close', docId: 'sign' }, 'close');
+    await call({ kind: 'close', effect: 'close', docId: 'sign' }, 'close');
   });
 });

@@ -11,9 +11,7 @@ import {
   type PageRef,
   type PageRenderImage,
   type PageRenderService,
-  type PageRenderTask,
   type PageRenderTransform,
-  pageRenderTask,
   renderAreaTransform,
   renderTargetArea,
   checkImageQuality,
@@ -35,21 +33,13 @@ export class CloudPageRenderService implements PageRenderService {
     private readonly layout: (signal: AbortSignal) => Promise<PageLayout>,
   ) {}
 
-  /**
-   * The image's URL and transform; the browser fetches the pixels. The
-   * priority does not travel yet (the request header lands with the server's
-   * scheduling), so `setPriority` does nothing.
-   */
-  image(options: PageImageOptions = {}): PageRenderTask<PageRenderImage> {
+  image(options: PageImageOptions = {}): AbortablePromise<PageRenderImage> {
     if (this.isClosed()) {
-      return pageRenderTask(
-        AbortablePromise.rejectReason(
-          new EngineError(EngineErrorCode.DocNotOpen, `document ${this.docId} is closed`),
-        ),
-        () => {},
+      return AbortablePromise.rejectReason(
+        new EngineError(EngineErrorCode.DocNotOpen, `document ${this.docId} is closed`),
       );
     }
-    const task = AbortablePromise.run<PageRenderImage>(async (signal) => {
+    return AbortablePromise.run<PageRenderImage>(async (signal) => {
       checkImageQuality(options.quality);
       const format = normalizeFormat(options.format);
       const includeAnnotations = options.includeAnnotations ?? true;
@@ -122,7 +112,6 @@ export class CloudPageRenderService implements PageRenderService {
       );
       return { ...handle, transform };
     });
-    return pageRenderTask(task, () => {});
   }
 
   /**

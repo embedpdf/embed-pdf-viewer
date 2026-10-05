@@ -23,16 +23,18 @@ import type { PdfRuntimeModule } from '@embedpdf/engine-runtime';
 
 import type { DocumentSession } from '../../document-session/DocumentSession';
 import { throwIfAborted } from '../../shared/abort';
+import { SliceTimer, type Slices } from '../../shared/slices';
 import { PageGeometryReader } from '../geometry/PageGeometryReader';
 import { acquirePageCorpus } from './internal/pageCorpusCache';
 import { decodeSearchCursor, encodeSearchCursor, searchQueryKey } from './internal/searchCursor';
 
 /**
  * Per-slice budget defaults and ceilings. The ceiling is the worker's
- * self-defense: one `query()` call is one synchronous stretch of native
- * work, and no request — whatever budget it asks for — may hold the
- * worker longer than ~a few hundred pages. Callers wanting more issue
- * more slices; the cursor makes that cheap.
+ * self-defense: one `query()` call holds the worker until it answers (it
+ * pauses between pages and inside page loads, so an abort stops it), and no
+ * request — whatever budget it asks for — may hold it for more than ~a few
+ * hundred pages. Callers wanting more issue more slices; the cursor makes
+ * that cheap.
  */
 const DEFAULT_MAX_PAGES = 64;
 const CEILING_MAX_PAGES = 256;
@@ -60,7 +62,11 @@ export class SearchReader {
     private readonly session: DocumentSession,
   ) {}
 
-  query(request: SearchScanRequest, signal: AbortSignal): SearchSlice<PdfCoordinates> {
+  async query(
+    request: SearchScanRequest,
+    signal: AbortSignal,
+    slices: Slices,
+  ): Promise<SearchSlice<PdfCoordinates>> {
     throwIfAborted(signal);
     const query = searchQueryOf(request);
     const snippets = request.snippets ?? false;
@@ -120,10 +126,18 @@ export class SearchReader {
     let pagesThisSlice = 0;
     // Budget checks sit at page granularity: a page's matches are never
     // split across slices, so the cursor only ever points between pages.
+    const timer = new SliceTimer(slices, signal);
     while (scanned < order.length && pagesThisSlice < maxPages && matches.length < maxMatches) {
+      if (timer.due) await timer.pause();
       throwIfAborted(signal);
       const pageObjectNumber = order[scanned].pageObjectNumber;
-      const corpus = acquirePageCorpus(this.runtime, this.session, pageObjectNumber, signal);
+      const corpus = await acquirePageCorpus(
+        this.runtime,
+        this.session,
+        pageObjectNumber,
+        signal,
+        slices,
+      );
 
       const text = corpus.snapshot.text;
       let ranges: TextRange[];
@@ -137,9 +151,10 @@ export class SearchReader {
       }
 
       if (ranges.length > 0) {
-        const geometry = new PageGeometryReader(this.runtime, this.session).read(
+        const geometry = await new PageGeometryReader(this.runtime, this.session).read(
           pageObjectNumber,
           signal,
+          slices,
         );
         // One canonical layout per page, shared by every match on it.
         const layout = createPdfTextLayout(geometry);

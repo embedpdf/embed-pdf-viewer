@@ -6,6 +6,7 @@ import type { PieceInfoService } from './PieceInfoService';
 import type { DownloadOptions } from '../dto/PdfSaveMode';
 import type { PageRef } from '../identity/PageRef';
 import { AbortablePromise } from '../promise/AbortablePromise';
+import type { CallFacts } from '../scheduling/facts';
 import type { BaseVersionInfo } from '../signature/types';
 
 /**
@@ -23,6 +24,7 @@ export interface LocalDocumentHandle extends DocumentHandle {
    */
   readonly pieceInfo: PieceInfoService;
   page(ref: PageRef): LocalPageHandle;
+  with(facts: CallFacts): LocalDocumentHandle;
   /**
    * Node only: write the document to a local file without moving its bytes
    * through JS. An untouched session (no unsaved edits, incremental mode) is
