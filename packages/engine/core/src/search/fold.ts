@@ -3,7 +3,17 @@
  * to BOTH the page text and the needle so that "Café" finds "cafe" and a
  * line-wrapped "hello\n  world" finds "hello world".
  *
- * Fold version 1:
+ * Fold version 2:
+ *   - PDFium line-break hyphen markers are stripped: U+FFFE is the synthetic
+ *     character our PDFium fork inserts at a column-break hyphenation point
+ *     (where a word is split across two text runs, e.g. "con" + U+FFFE +
+ *     "tainers"). U+FFFE has no valid printable meaning and is silently
+ *     dropped so that "containers" finds "con\uFFFEtainers".
+ *     As a secondary guard, a U+002D `-` immediately followed by whitespace
+ *     (an alternative encoding some producers use) is also suppressed along
+ *     with its trailing whitespace run.
+ *     Real hyphens in compound words ("lock-in") are never followed by
+ *     whitespace and are preserved as before.
  *   - whitespace runs collapse to a single space (any `\s`, including the
  *     spaces some compatibility decompositions emit) — or are dropped
  *     entirely with `dropWhitespace` (ignoreWhitespace),
@@ -24,7 +34,7 @@
  */
 
 /** Version stamp for persisted pre-folded corpus artifacts. */
-export const SEARCH_FOLD_VERSION = 1;
+export const SEARCH_FOLD_VERSION = 2;
 
 export interface FoldOptions {
   /** Preserve case (matchCase). */
@@ -51,13 +61,54 @@ export interface SearchMatchRange {
 const WHITESPACE = /\s/;
 const MARKS = /\p{M}/gu;
 
+/**
+ * U+FFFE is the synthetic character our PDFium fork inserts at a
+ * column-break hyphenation boundary between two text runs. It is never
+ * a valid printable code point (it is a BOM/non-character), so it is
+ * always safe to drop.
+ */
+const PDFIUM_LINE_BREAK_HYPHEN = '\uFFFE';
+
+/**
+ * Pre-scan: collect the code-unit indices of every U+002D `-` that is a
+ * soft line-break hyphen — defined as a `-` immediately followed by
+ * whitespace. These are suppressed during folding (along with their
+ * trailing whitespace run) as a secondary guard for producers that emit a
+ * literal hyphen+newline instead of U+FFFE at a column break.
+ */
+function findSoftHyphens(text: string): Set<number> {
+  const hyphens = new Set<number>();
+  for (let i = 0; i < text.length - 1; i++) {
+    if (text[i] === '-' && WHITESPACE.test(text[i + 1])) {
+      hyphens.add(i);
+    }
+  }
+  return hyphens;
+}
+
 export function foldText(original: string, options: FoldOptions = {}): FoldedText {
   const units: string[] = [];
   const map: number[] = [];
   let lastWasSpace = false;
 
+  const softHyphens = findSoftHyphens(original);
+
   let index = 0;
   for (const cp of original) {
+    // U+FFFE: PDFium's synthetic line-break hyphen marker — drop silently.
+    if (cp === PDFIUM_LINE_BREAK_HYPHEN) {
+      index += cp.length;
+      continue;
+    }
+
+    // U+002D followed by whitespace: soft line-break hyphen in an alternative
+    // encoding — drop it and suppress the trailing whitespace run.
+    if (cp === '-' && softHyphens.has(index)) {
+      index += cp.length;
+      lastWasSpace = true;
+      continue;
+    }
+
     let piece: string;
     if (WHITESPACE.test(cp)) {
       piece = ' ';

@@ -39,6 +39,34 @@ describe('matchLiteral', () => {
     expect(find('hello\n   world', { text: 'hello world' })).toEqual([{ start: 0, length: 14 }]);
   });
 
+  test('matches a phrase that spans a line-break hyphen (cross-run hyphenation)', () => {
+    // Secondary guard: some producers emit a literal hyphen+newline.
+    // "con-\ntainers" starts at index 13; range spans 13..24 = length 12.
+    expect(find('locks of the con-\ntainers concerned', { text: 'containers' })).toEqual([
+      { start: 13, length: 12 },
+    ]);
+  });
+
+  test('matches across a U+FFFE PDFium line-break hyphen marker (real engine output)', () => {
+    // PDFium actually inserts U+FFFE (not a literal hyphen) between runs.
+    // "con\uFFFEtainers" starts at index 13; U+FFFE is one code unit (index 16).
+    expect(find('locks of the con\uFFFEtainers concerned', { text: 'containers' })).toEqual([
+      { start: 13, length: 11 },
+    ]);
+  });
+
+  test('the full phrase from the bug report matches across U+FFFE', () => {
+    const page =
+      'The keys or codes for the combination locks of the con\uFFFEtainers concerned must be kept safely.';
+    expect(find(page, { text: 'combination locks of the containers concerned' }).length).toBe(1);
+  });
+
+  test('a real compound hyphen is not stripped and acts as a word boundary', () => {
+    // "lock-in" — hyphen not followed by whitespace, must be preserved.
+    expect(find('lock-in period', { text: 'lock-in' })).toEqual([{ start: 0, length: 7 }]);
+    expect(find('lock-in period', { text: 'lockin' })).toEqual([]);
+  });
+
   test('by default a needle must carry a space wherever the page does', () => {
     expect(find('Ref: i n v o i c e 42', { text: 'invoice' })).toEqual([]);
     expect(find('Invoice 42', { text: 'i n v o i c e' })).toEqual([]);
