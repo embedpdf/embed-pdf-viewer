@@ -329,19 +329,6 @@ export interface StageViewState extends StageSettings {
 }
 
 /**
- * Host timing seam. The pure core (stage-core) never touches time; the camera tween
- * lives in this (impure) shell and asks for frames through a Scheduler. The default
- * is the browser's requestAnimationFrame; inject a fake in tests, or an instant one
- * in Node/SSR.
- */
-export interface Scheduler {
-  /** Run the callback on the next frame; returns a handle for cancellation. */
-  raf(callback: (timestampMs: number) => void): number;
-  /** Cancel a scheduled callback. */
-  caf(handle: number): void;
-}
-
-/**
  * Options for the scroller writes — `Element.scrollTo` semantics: absolute
  * offsets (screen px) into the current scroll range (see
  * {@link StageHostCapability.getScrollMetrics}); an omitted axis does not move.
@@ -622,8 +609,6 @@ export interface StageCapability {
 }
 
 export interface StageConfig extends StageSettingsPatch {
-  /** Override the host timing seam (tests/SSR). Defaults to browser rAF. */
-  scheduler?: Scheduler;
   /**
    * Container queries for the settings bag (see {@link ResponsiveRule}).
    * Defaults to `DEFAULT_RESPONSIVE` (compact containers get the thin phone

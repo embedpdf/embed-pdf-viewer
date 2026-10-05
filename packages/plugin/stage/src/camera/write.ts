@@ -11,7 +11,7 @@ import {
   type Camera,
   type Rect,
 } from '@embedpdf/core-stage';
-import type { PluginContext } from '@embedpdf/core';
+import type { Cancel, PluginContext } from '@embedpdf/core';
 
 import { setCamera, setCameraResting, setCursor, setMotionCause, type StageState } from '../model';
 import { rubberIn, rubberOut } from '../motion';
@@ -22,9 +22,8 @@ const REST_MS = 150;
 
 export function createCameraWrite(
   ctx: PluginContext<StageState>,
-  { scheduler, placement, scene }: Pick<StageServices, 'scheduler' | 'placement' | 'scene'>,
+  { clock, placement, scene }: Pick<StageServices, 'clock' | 'placement' | 'scene'>,
 ) {
-  const { canAnimate, scheduler: frames } = scheduler;
   const { camera, viewport, paged, buildScene, stayBounds, constraint } = scene;
 
   // ── the gesture bracket (touch pan and pinch) ──
@@ -37,28 +36,24 @@ export function createCameraWrite(
 
   // ── the camera-rest detector ──
   // Origin snapping is gated on rest (see `StageState.cameraResting`): pages
-  // place fractionally while the zoom moves and snap once it settles. The
-  // window is counted in scheduler frames, the same timing seam the tween
-  // uses, so tests stay deterministic.
-  let restFrame = 0;
+  // place fractionally while the zoom moves and snap once it has held still
+  // for REST_MS.
+  let cancelRest: Cancel | null = null;
+  const stopRestCountdown = () => {
+    cancelRest?.();
+    cancelRest = null;
+  };
   const armRest = () => {
     // Initial placement snaps immediately (the first paint is crisp), and a
-    // host without real frames keeps snapping always on: rest-gating refines
-    // live gestures and is not part of the contract.
-    if (!canAnimate || !placement.started) return;
+    // host without frames keeps snapping always on: rest-gating refines live
+    // gestures and is not part of the contract.
+    if (!clock.hasFrames || !placement.started) return;
     ctx.state.update(setCameraResting, false);
-    if (restFrame) frames.caf(restFrame);
-    let startedAt = 0;
-    const tick = (timestamp: number) => {
-      restFrame = 0;
-      if (!startedAt) startedAt = timestamp;
-      if (timestamp - startedAt >= REST_MS) {
-        ctx.state.update(setCameraResting, true);
-        return;
-      }
-      restFrame = frames.raf(tick);
-    };
-    restFrame = frames.raf(tick);
+    stopRestCountdown();
+    cancelRest = clock.after(REST_MS, () => {
+      cancelRest = null;
+      ctx.state.update(setCameraResting, true);
+    });
   };
 
   // The one low-level camera write: clamp to `bounds` and store. It never
@@ -71,10 +66,7 @@ export function createCameraWrite(
         // countdown; rest is declared at endGesture, not at a pinch hesitation.
         gesture.zoomed = true;
         ctx.state.update(setCameraResting, false);
-        if (restFrame) {
-          frames.caf(restFrame);
-          restFrame = 0;
-        }
+        stopRestCountdown();
       } else {
         armRest();
       }

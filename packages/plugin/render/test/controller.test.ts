@@ -47,9 +47,14 @@ function makeTask() {
   });
   const task = Object.assign(promise, {
     aborted: undefined as unknown,
+    /** Every priority the render was re-ranked to, in order. */
+    priorities: [] as number[],
     abort(reason?: unknown) {
       task.aborted = reason ?? new Error('aborted');
       rejectPromise(task.aborted);
+    },
+    setPriority(priority: number) {
+      task.priorities.push(priority);
     },
   });
   return {
@@ -544,6 +549,85 @@ describe('page arguments and cancelling', () => {
     controller.abort();
     await expect(single).rejects.toMatchObject({ code: 'operation-cancelled' });
     await expect(batch).rejects.toMatchObject({ code: 'operation-cancelled' });
+    await fixture.kernel.destroy();
+  });
+});
+
+describe('render priority — what the views show orders the renders', () => {
+  // 1224 device px across a 612pt page: past the 640px base, so tiles engage.
+  const showing = (top: number, height: number) => ({
+    desiredDeviceWidth: 1224,
+    visibleRect: { x: 0, y: top, width: 612, height },
+  });
+  const priorityOf = (call: { options: Record<string, unknown> }) =>
+    call.options.priority as number;
+  const isTile = (call: { options: Record<string, unknown> }) => call.options.target !== undefined;
+
+  it('the focus page base, its tiles, other bases, their tiles; a page no view shows last', async () => {
+    const fixture = await boot({ config: { tiles: { settleMs: 0, bleed: 0 } } });
+    const view = fixture.render.createViewDemand('stage');
+    view.setDemand(toPageRef(11), showing(692, 100)); // the bottom of page 11
+    view.setDemand(toPageRef(22), showing(0, 300)); // the top of page 22: the focus
+    const sources = [11, 22, 33].map((page) =>
+      fixture.render.renderSource(toPageRef(page), { scale: 1 }).catch(() => {}),
+    );
+
+    // Page 11 reported first, so its tiles started as the focus page's; page
+    // 22's report re-ranked them at once.
+    const now = fixture.imageCalls.map((call, index) => ({
+      ...call,
+      priority: fixture.tasks[index]!.task.priorities.at(-1) ?? priorityOf(call),
+    }));
+    const baseOf = (page: number) =>
+      now.find((call) => call.pageObjectNumber === page && !isTile(call))!.priority;
+    const tilesOf = (page: number) =>
+      now.filter((call) => call.pageObjectNumber === page && isTile(call)).map((c) => c.priority);
+    expect(tilesOf(22).length).toBeGreaterThan(0);
+    expect(tilesOf(11).length).toBeGreaterThan(0);
+    expect(baseOf(22)).toBeGreaterThan(Math.max(...tilesOf(22)));
+    expect(Math.min(...tilesOf(22))).toBeGreaterThan(baseOf(11));
+    expect(baseOf(11)).toBeGreaterThan(Math.max(...tilesOf(11)));
+    expect(Math.min(...tilesOf(11))).toBeGreaterThan(baseOf(33));
+    expect(baseOf(33)).toBe(0);
+
+    fixture.tasks.forEach((pending) => pending.resolve(image()));
+    await Promise.all(sources);
+    view.dispose();
+    await fixture.kernel.destroy();
+  });
+
+  it('when the views move on, renders still on their way are re-ranked at once', async () => {
+    const fixture = await boot({ config: { tiles: false } });
+    const view = fixture.render.createViewDemand('stage');
+    view.setDemand(toPageRef(11), showing(692, 100));
+    view.setDemand(toPageRef(22), showing(0, 300));
+    const sources = [11, 22].map((page) =>
+      fixture.render.renderSource(toPageRef(page), { scale: 1 }).catch(() => {}),
+    );
+    const [base11, base22] = fixture.tasks.map((pending) => pending.task);
+    const [asked11, asked22] = fixture.imageCalls.map(priorityOf);
+    expect(asked22).toBeGreaterThan(asked11!);
+
+    // Scrolled up: page 11 fills the screen, page 22 is gone.
+    view.setDemand(toPageRef(11), showing(0, 500));
+    view.setDemand(toPageRef(22), showing(0, 0));
+    expect(base11!.priorities.at(-1)).toBeGreaterThan(asked22!);
+    expect(base22!.priorities.at(-1)).toBeLessThan(base11!.priorities.at(-1)!);
+    // A report that changes nothing re-ranks nothing.
+    const counts = [base11!.priorities.length, base22!.priorities.length];
+    view.setDemand(toPageRef(11), showing(0, 500));
+    expect([base11!.priorities.length, base22!.priorities.length]).toEqual(counts);
+
+    // A render that arrived is no longer re-ranked.
+    fixture.tasks[0]!.resolve(image());
+    await sources[0];
+    view.setDemand(toPageRef(22), showing(0, 800));
+    expect(base11!.priorities.length).toBe(counts[0]);
+    expect(base22!.priorities.length).toBe(counts[1]! + 1);
+
+    fixture.tasks[1]!.resolve(image());
+    await Promise.all(sources);
+    view.dispose();
     await fixture.kernel.destroy();
   });
 });

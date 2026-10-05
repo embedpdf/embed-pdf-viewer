@@ -132,10 +132,14 @@ describe('<epdf-render-layer>', () => {
   });
 });
 
-/** A promise with the `abort` / `abortWith` the engine's tasks have. */
+/** A promise with the `abort` / `abortWith` / `setPriority` the engine's tasks have. */
 function task<T>(value: T) {
   const promise = Promise.resolve(value);
-  return Object.assign(promise, { abort: () => {}, abortWith: () => promise });
+  return Object.assign(promise, {
+    abort: () => {},
+    abortWith: () => promise,
+    setPriority: () => {},
+  });
 }
 
 /**

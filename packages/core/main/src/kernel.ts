@@ -1,3 +1,4 @@
+import { timerClock, type HostClock } from './clock';
 import { createStore } from './store';
 import {
   createPluginContext,
@@ -302,6 +303,12 @@ export function createKernel(config: {
   settings?: DeepPartial<ViewerSettings>;
   /** Observability seam: teardown, listener and join failures land here. Default: console.error. */
   report?: (error: unknown) => void;
+  /**
+   * The host's time: what plugins' `ctx.clock` schedules on. A browser passes
+   * `browserClock()` from `@embedpdf/web`, for frames. Default: `timerClock`,
+   * timers and no frames.
+   */
+  clock?: HostClock;
 }): Kernel {
   const { engine, plugins } = config;
   const report = config.report ?? ((error: unknown) => console.error('[kernel]', error));
@@ -789,6 +796,7 @@ export function createKernel(config: {
     workspaceSignal: workspaceCancel.signal,
     workspaceLeases,
     report,
+    clock: config.clock ?? timerClock,
     resolveCapability,
     tryResolveCapability: tryResolveInternal,
     documentHandle,

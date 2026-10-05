@@ -3,8 +3,8 @@
  * once (the events, the timing seam, the scene model), wires each area with
  * the services it declares, and assembles the host capability from the areas'
  * API slices. stage-core is the pure spatial math; the areas are the impure
- * shell that writes state, caches and drives motion, and frame timing enters
- * only through the scheduler.
+ * shell that writes state, caches and drives motion, and time enters only
+ * through the host's clock (`ctx.clock`).
  *
  * The camera model: every camera move is defined by what it holds fixed.
  * Gestures (pan, pinch, wheel) hold the page-point under the pointer;
@@ -34,13 +34,13 @@ export function createStageController(
   ctx: PluginContext<StageState>,
   config: StageConfig = {},
 ) {
-  const services = createServices(ctx, config);
+  const services = createServices(ctx);
   const { events } = services;
 
   // Reads: pure projections of the scene and the camera.
   const reads = createPageReads(ctx, services);
 
-  // The camera: the one write path, motion over the scheduler, gestures.
+  // The camera: the one write path, motion over the clock's frames, gestures.
   const write = createCameraWrite(ctx, services);
   const animation = createAnimation(services, write);
   const gestures = createGestures(ctx, services, write, animation, reads);

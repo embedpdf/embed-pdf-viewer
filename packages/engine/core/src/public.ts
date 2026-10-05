@@ -98,6 +98,7 @@ export type {
   LocalPageAnnotationsService,
   PageTextService,
   PageRenderService,
+  PageRenderTask,
   LocalPageRenderService,
   DocumentSecurityService,
   DocumentSecurityState,

@@ -15,6 +15,14 @@
  *   });
  *   const api = ctx.connect(createMeasurementController(ctx));
  *   ctx.emitDocumentEvent(event); // folds into the plugin's mirrors
+ *
+ * Time is the host's timers unless a test passes a clock: `manualClock()`
+ * steps timers and frames by hand.
+ *
+ *   const time = manualClock();
+ *   const ctx = createTestContext({ clock: time.clock });
+ *   time.advance(300); // timers due by then run
+ *   time.frame(16); // and the callbacks waiting for a frame
  */
 import type {
   DocumentEvent,
@@ -30,6 +38,7 @@ import { pageRefsEqual, subscribeToType } from '@embedpdf/engine-core/runtime';
  *  `isLocalEngine` and `isLocalDocument` accept it. */
 export { LOCAL_ENGINE_BRAND } from '@embedpdf/engine-core/runtime';
 
+import { instanceClock, timerClock, type Cancel, type HostClock } from './clock';
 import { PluginError } from './errors';
 import { createEventHook } from './event-hook';
 import { createLatestLane, type LatestLane } from './lanes';
@@ -84,6 +93,8 @@ export interface TestContextOptions<S, T extends object = NoSettings> {
    *  or a real engine document; `null` for a workspace plugin with no document. */
   readonly doc?: Partial<DocumentHandle> | null;
   readonly engine?: Partial<Engine>;
+  /** The host's time (`ctx.clock`). Default: `timerClock`, the environment's timers and no frames. */
+  readonly clock?: HostClock;
 }
 
 export interface TestContext<S, T extends object = NoSettings> extends PluginContext<S, T> {
@@ -324,6 +335,7 @@ export function createTestContext<S = void, T extends object = NoSettings>(
     cleanup: (fn) => {
       cleanups.push(fn);
     },
+    clock: instanceClock(options.clock ?? timerClock, lifetime.signal),
     onSettle: (flush) => {
       settleFlushes.add(flush);
       cleanups.push(() => {
@@ -415,4 +427,86 @@ export function createTestContext<S = void, T extends object = NoSettings>(
     },
   };
   return context;
+}
+
+/** A clock a test steps by hand (see {@link manualClock}). */
+export interface ManualClock {
+  /** The clock to hand a test context or a kernel. */
+  readonly clock: HostClock;
+  /** The current time in milliseconds. It starts at 0. */
+  readonly now: number;
+  /** How many timers and frame callbacks are waiting. */
+  readonly pending: { readonly timers: number; readonly frames: number };
+  /** Move time forward by `ms`, running the timers that fall due, earliest first. */
+  advance(ms: number): void;
+  /**
+   * Show a frame at `timeMs` (default: now): move time there, running the
+   * timers due by then, and run the callbacks waiting for a frame. What they
+   * schedule waits for the next frame.
+   */
+  frame(timeMs?: number): void;
+}
+
+/**
+ * Time that moves only when the test moves it. `frames: false` gives a host
+ * that never paints, as Node is.
+ */
+export function manualClock(options: { frames?: boolean } = {}): ManualClock {
+  let now = 0;
+  let order = 0;
+  const timers = new Map<number, { due: number; run: () => void }>();
+  const frames = new Map<number, (timeMs: number) => void>();
+
+  const nextDue = (until: number): number | undefined => {
+    let found: number | undefined;
+    for (const [id, timer] of timers) {
+      if (timer.due > until) continue;
+      if (found === undefined || timer.due < timers.get(found)!.due) found = id;
+    }
+    return found;
+  };
+  const advanceTo = (target: number): void => {
+    if (target < now) throw new Error(`manualClock: time does not go back (${target} < ${now})`);
+    for (let id = nextDue(target); id !== undefined; id = nextDue(target)) {
+      const timer = timers.get(id)!;
+      timers.delete(id);
+      now = timer.due;
+      timer.run();
+    }
+    now = target;
+  };
+
+  const clock: HostClock = {
+    now: () => now,
+    after(ms, run): Cancel {
+      const id = ++order;
+      timers.set(id, { due: now + Math.max(0, ms), run });
+      return () => void timers.delete(id);
+    },
+    ...(options.frames === false
+      ? {}
+      : {
+          nextFrame(run: (timeMs: number) => void): Cancel {
+            const id = ++order;
+            frames.set(id, run);
+            return () => void frames.delete(id);
+          },
+        }),
+  };
+  return {
+    clock,
+    get now() {
+      return now;
+    },
+    get pending() {
+      return { timers: timers.size, frames: frames.size };
+    },
+    advance: (ms) => advanceTo(now + ms),
+    frame(timeMs = now) {
+      advanceTo(timeMs);
+      const due = [...frames.values()];
+      frames.clear();
+      for (const run of due) run(now);
+    },
+  };
 }

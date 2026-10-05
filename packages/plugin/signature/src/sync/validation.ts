@@ -37,18 +37,16 @@ export function createValidation(
     return verdicts;
   };
 
-  let timer: ReturnType<typeof setTimeout> | null = null;
+  let cancelRevalidate: (() => void) | null = null;
   const cancelScheduled = (): void => {
-    if (timer === null) return;
-    clearTimeout(timer);
-    timer = null;
+    cancelRevalidate?.();
+    cancelRevalidate = null;
   };
   const validateInBackground = (): void => {
     void validate().catch((error) =>
       globalThis.console?.error('[signature] validation failed:', error),
     );
   };
-  ctx.cleanup(cancelScheduled);
 
   return {
     validate,
@@ -60,10 +58,10 @@ export function createValidation(
     /** Judge once the edits pause. */
     revalidateSoon: (): void => {
       cancelScheduled();
-      timer = setTimeout(() => {
-        timer = null;
+      cancelRevalidate = ctx.clock.after(REVALIDATE_DELAY_MS, () => {
+        cancelRevalidate = null;
         validateInBackground();
-      }, REVALIDATE_DELAY_MS);
+      });
     },
   };
 }

@@ -1,3 +1,4 @@
+import type { PluginClock } from '@embedpdf/core';
 import type { KindName, Point } from '@embedpdf/core-annotation';
 import type { PageRotation } from '@embedpdf/core-geometry';
 import type { PageRef } from '@embedpdf/engine-core/runtime';
@@ -383,6 +384,7 @@ export function createMarqueeHandler(anno: AnnotationHostCapability): Interactio
 export function createDrawHandler(
   anno: AnnotationHostCapability,
   interaction: InteractionHostCapability,
+  clock: Pick<PluginClock, 'after'>,
   onSettle?: (flush: () => void) => void,
 ): InteractionHandler {
   // The active tool id + its routing subtype. The id is what `createPointer` takes
@@ -402,14 +404,15 @@ export function createDrawHandler(
   // The active drag's home page (down→up): moves/ups resolve against it, so a
   // shape keeps sizing along the page edge when the cursor overshoots.
   let origin: { page: PageRef; point: Point } | null = null;
+  // An ink drawing waiting for its next stroke, and the cancel of that wait.
   let pendingInk: {
     tool: string;
     page: PageRef;
-    timer: ReturnType<typeof setTimeout>;
+    cancelWait: () => void;
   } | null = null;
   const flushPendingInk = () => {
     if (!pendingInk) return;
-    clearTimeout(pendingInk.timer);
+    pendingInk.cancelWait();
     pendingInk = null;
     anno.finishInkDraft();
   };
@@ -458,7 +461,7 @@ export function createDrawHandler(
           pendingInk.tool === tool &&
           pendingInk.page.objectNumber === sample.page.ref.objectNumber
         ) {
-          clearTimeout(pendingInk.timer);
+          pendingInk.cancelWait();
           pendingInk = null;
         } else {
           flushPendingInk();
@@ -519,11 +522,11 @@ export function createDrawHandler(
           const groupStrokesMs = anno.getResolvedTool(tool)?.ink?.groupStrokesMs ?? 0;
           if (groupStrokesMs > 0) {
             const page = origin.page;
-            const timer = setTimeout(() => {
+            const cancelWait = clock.after(groupStrokesMs, () => {
               pendingInk = null;
               anno.finishInkDraft();
-            }, groupStrokesMs);
-            pendingInk = { tool, page, timer };
+            });
+            pendingInk = { tool, page, cancelWait };
           }
         }
       }
@@ -537,7 +540,7 @@ export function createDrawHandler(
       // this drops the whole in-window draft (there is no partial discard);
       // a cancel is a cancel, and the grouping window is sub-second.
       if (pendingInk) {
-        clearTimeout(pendingInk.timer);
+        pendingInk.cancelWait();
         pendingInk = null;
       }
       drawingPoly = false;

@@ -186,6 +186,11 @@ export class PageResidency {
     return (this.pages.get(owner)?.get(pageObjectNumber)?.refs ?? 0) > 0;
   }
 
+  /** True while the page is kept, parsed or loading: a job for it parses nothing new. */
+  isKept(owner: object, pageObjectNumber: PageObjectNumber): boolean {
+    return this.pages.get(owner)?.has(pageObjectNumber) ?? false;
+  }
+
   /** Closes every page of `owner`, held or not: its document closes. */
   closeOwner(owner: object): void {
     for (const page of [...(this.pages.get(owner)?.values() ?? [])]) this.close(page);

@@ -27,22 +27,21 @@ interface Waiter {
 }
 
 export function createTextEditing(
-  ctx: Pick<AnnotationContext, 'doc' | 'state' | 'cleanup' | 'cancellable'>,
+  ctx: Pick<AnnotationContext, 'doc' | 'state' | 'clock' | 'cancellable'>,
   { store, identity, fonts }: Pick<AnnotationServices, 'store' | 'identity' | 'fonts'>,
   chrome: Pick<ChromeReads, 'textBoxAt'>,
 ) {
-  /** The pause timer of each record being typed in. */
-  const timers = new Map<Id, ReturnType<typeof setTimeout>>();
+  /** Cancels the pause wait of each record being typed in (the clock drops them at close). */
+  const pauses = new Map<Id, () => void>();
   /** The keystrokes of each record waiting for its next write, oldest first. */
   const waiting = new Map<Id, Waiter[]>();
-  ctx.cleanup(() => timers.forEach((timer) => clearTimeout(timer)));
 
   /** Write the record's text once typing pauses. */
   const writeAfterPause = (id: Id): void => {
-    clearTimeout(timers.get(id));
-    timers.set(
+    pauses.get(id)?.();
+    pauses.set(
       id,
-      setTimeout(() => flushText(id), TEXT_WRITE_DELAY_MS),
+      ctx.clock.after(TEXT_WRITE_DELAY_MS, () => flushText(id)),
     );
   };
 
@@ -54,8 +53,8 @@ export function createTextEditing(
    * write reports a refusal).
    */
   const flushText = (id: Id): Promise<void> => {
-    clearTimeout(timers.get(id));
-    timers.delete(id);
+    pauses.get(id)?.();
+    pauses.delete(id);
     const waiters = waiting.get(id) ?? [];
     waiting.delete(id);
     return identity
@@ -80,8 +79,8 @@ export function createTextEditing(
     const moved = waiting.get(from);
     if (!moved) return;
     waiting.delete(from);
-    clearTimeout(timers.get(from));
-    timers.delete(from);
+    pauses.get(from)?.();
+    pauses.delete(from);
     waiting.set(to, [...moved, ...(waiting.get(to) ?? [])]);
     writeAfterPause(to);
   });

@@ -1,7 +1,8 @@
 /**
  * Parsed pages kept across jobs (PageResidency), through a WorkerHost on the
  * real wasm runtime: which jobs keep a page parsed, which close it, how a
- * render's page loads in slices and how an aborted load goes on.
+ * render's page loads in slices and how an aborted load goes on, and in
+ * which order renders held during a render run.
  *
  * Mock-free: the runtime is only wrapped to count the native calls that load,
  * continue and close pages.
@@ -81,7 +82,7 @@ function counting(runtime: PdfRuntimeModule) {
 const turn = () => new Promise<void>((resolve) => setImmediate(resolve));
 
 /** A worker host with the heavy document open, and the replies it posted. */
-async function openHost(options: WorkerHostOptions = {}) {
+async function openHost(options: WorkerHostOptions = {}, document: Uint8Array = bytes) {
   const { runtime, counts } = counting(await createPdfRuntime({ prefer: 'wasm' }));
   const replies: WorkerResponse[] = [];
   const host = new WorkerHost(
@@ -104,14 +105,18 @@ async function openHost(options: WorkerHostOptions = {}) {
     if (response.kind !== 'resolve') throw new Error(JSON.stringify(response));
     return response;
   };
-  await ok({ kind: 'open.fatMem', bytes: bytes.slice().buffer, password: null });
-  return { counts, send, settled, ok };
+  await ok({ kind: 'open.fatMem', bytes: document.slice().buffer, password: null });
+  return { counts, replies, send, settled, ok };
 }
 
 type Host = Awaited<ReturnType<typeof openHost>>;
 
-const render = (host: Host, page: PageRef) =>
-  host.send({ kind: 'pages.render', page, options: { viewport: { kind: 'scale', scale: 0.25 } } });
+const render = (host: Host, page: PageRef, priority?: number) =>
+  host.send({
+    kind: 'pages.render',
+    page,
+    options: { viewport: { kind: 'scale', scale: 0.25 }, priority },
+  });
 
 async function digest(host: Host, page: PageRef) {
   const response = await host.settled(render(host, page));
@@ -197,5 +202,36 @@ describe('parsed pages kept across jobs (wasm engine)', () => {
     const tight = await openHost({ parsedPageBudgetBytes: 4 * 1024 * 1024 });
     for (const page of [FIRST, SECOND, FIRST, SECOND]) await digest(tight, page);
     expect(parses(tight)).toBe(4);
+  }, 120_000);
+
+  test('renders held during a render run by priority, then parsed page first; other requests hold their place', async () => {
+    const THIRD = toPageRef(7);
+    const host = await openHost({}, heavyPdf(3, 30_000));
+    await digest(host, FIRST); // parsed and kept
+
+    const names = new Map<number, string>();
+    const sent = (name: string, jobId: number) => names.set(jobId, name);
+    sent('running', render(host, SECOND));
+    // All arrive while the render above is in progress, so all are held.
+    sent('third', render(host, THIRD));
+    sent('first, parsed', render(host, FIRST));
+    sent('urgent', render(host, SECOND, 5));
+    sent('list', host.send({ kind: 'pages.list' }));
+    sent('after the list', render(host, THIRD, 9));
+    const ids = [...names.keys()];
+    await Promise.all(ids.map((id) => host.settled(id)));
+
+    const order = host.replies
+      .filter((reply) => names.has(reply.jobId))
+      .map((reply) => names.get(reply.jobId));
+    expect(order).toEqual([
+      'running',
+      'urgent',
+      'first, parsed',
+      'third',
+      'list',
+      'after the list',
+    ]);
+    expect(host.replies.every((reply) => reply.kind === 'resolve')).toBe(true);
   }, 120_000);
 });

@@ -41,10 +41,13 @@ const STAGELESS_TILE_CAP = 64;
  * Invariant it enforces: every screen region paints the sharpest painted
  * pixels available; quality per region only goes up until the want set
  * resolves. Mechanics:
- *   - want vs paint: `plan()` schedules fetches for the want set (visible
- *     tiles first, center-out, then the prefetch ring once every visible
- *     tile resolved) and returns a paint list drawn only from resolved
- *     entries: the current level and retained older generations.
+ *   - want vs paint: `plan()` queues the want set (visible tiles first,
+ *     center-out, then the prefetch ring once every visible tile resolved)
+ *     and returns a paint list drawn only from resolved entries: the
+ *     current level and retained older generations.
+ *   - one line for every view and page: the transit slots go to the most
+ *     urgent queued tile anywhere (`priorityOf`, see `priority.ts`), so the
+ *     focus page's tiles never wait behind a page that planned first.
  *   - release-on-occlusion: when a want-level tile reports painted (after the
  *     layer's first presentation opportunity), retained sources whose
  *     visible footprint is covered by painted want tiles leave the paint
@@ -62,7 +65,7 @@ const STAGELESS_TILE_CAP = 64;
  * `plan()` never wakes readers itself: its callers do, once, when the
  * returned plan changed. Fetch kickoff is idempotent (the store
  * singleflights); resolution handlers call `onAdvance`, which re-plans the
- * page and wakes subscribed layers.
+ * page and wakes subscribed layers, and hand the freed slot on.
  */
 export class TileManager {
   /**
@@ -94,13 +97,22 @@ export class TileManager {
       getPolicy(): EngineRenderPolicy;
       getPageSize(pageObjectNumber: number): PageSizePt | undefined;
       getEpoch(pageObjectNumber: number, includeAnnotations: boolean): number;
-      /** Render a page-space (y-down page points) region; the owner converts to PDF space. */
+      /** Run `run` once, `ms` from now; returns its cancel (the plugin's `ctx.clock.after`). */
+      after(ms: number, run: () => void): () => void;
+      /** How urgent a tile of the page is now: higher starts first. */
+      priorityOf(pageObjectNumber: number, prefetch: boolean): number;
+      /**
+       * Render a page-space (y-down page points) region; the owner converts to
+       * PDF space. `prefetch` says, whenever asked, whether the tile is in the
+       * ring rather than on screen: a pan can bring it on screen in flight.
+       */
       fetchTile(
         pageObjectNumber: number,
         rect: Rect,
         scale: number,
         includeAnnotations: boolean,
         signal: AbortSignal,
+        prefetch: () => boolean,
       ): Promise<PageImageHandle>;
       /** A page's plans changed outside `plan()`: re-plan it and wake subscribed layers. */
       onAdvance(pageObjectNumber: number): void;
@@ -153,6 +165,7 @@ export class TileManager {
         state.wantScale = null;
         state.wantWidth = null;
         state.planCache = null;
+        this.pump();
       }
       return EMPTY_TILE_PLAN;
     }
@@ -339,12 +352,15 @@ export class TileManager {
     if (!state) return;
     this.abortAll(state);
     this.pages.delete(stateKey(view, pageObjectNumber));
+    this.pump();
   }
 
   private pageState(pageObjectNumber: number, view: string): PageTileState {
     let state = this.pages.get(stateKey(view, pageObjectNumber));
     if (!state) {
       state = {
+        pageObjectNumber,
+        queue: null,
         epoch: -1,
         wantScale: null,
         wantWidth: null,
@@ -352,7 +368,7 @@ export class TileManager {
         failedKeys: new Set(),
         version: 0,
         planCache: null,
-        settleTimer: null,
+        cancelSettle: null,
         pendingLevel: null,
         lastVisible: null,
       };
@@ -387,13 +403,16 @@ export class TileManager {
     // instead of re-rendering. Only cross-level retained entries stay, and
     // those are the release rules' business. Without this, panning at deep
     // zoom accumulates every tile ever visited.
-    const wanted = new Set(
-      [...visibleCoords, ...prefetchCoords].map((coord) =>
-        this.tileKey(pageObjectNumber, wantWidth, coord, includeAnnotations, epoch),
-      ),
-    );
+    const keyOf = (coord: TileCoord) =>
+      this.tileKey(pageObjectNumber, wantWidth, coord, includeAnnotations, epoch);
+    const onScreen = new Set(visibleCoords.map(keyOf));
+    const wanted = new Set([...onScreen, ...prefetchCoords.map(keyOf)]);
     for (const [key, entry] of state.entries) {
-      if (wanted.has(key)) continue;
+      if (wanted.has(key)) {
+        // A ring tile a pan brought on screen ranks as on screen from now.
+        entry.prefetch = !onScreen.has(key);
+        continue;
+      }
       if (!entry.resolved) {
         entry.abort?.abort();
         // The transit slot frees now, synchronously — the rejection handler
@@ -420,30 +439,24 @@ export class TileManager {
     );
 
     const kickoff = () => {
-      const allVisibleReady = this.ensureFetches(
-        pageObjectNumber,
-        state,
+      // The prefetch ring strictly after the visible tiles: prefetch never
+      // competes with on-screen tiles. A tile that failed at this level counts
+      // as done; the base shows through its hole.
+      const allVisibleReady = orderedVisible.every((coord) => {
+        const key = keyOf(coord);
+        return state.failedKeys.has(key) || state.entries.get(key)?.resolved === true;
+      });
+      state.queue = {
+        coords: allVisibleReady ? [...orderedVisible, ...prefetchCoords] : orderedVisible,
+        ringFrom: orderedVisible.length,
+        next: 0,
         page,
         grid,
         wantWidth,
         includeAnnotations,
         epoch,
-        orderedVisible,
-      );
-      // The prefetch ring strictly after the visible tiles: prefetch never
-      // competes with on-screen tiles.
-      if (allVisibleReady) {
-        this.ensureFetches(
-          pageObjectNumber,
-          state,
-          page,
-          grid,
-          wantWidth,
-          includeAnnotations,
-          epoch,
-          prefetchCoords,
-        );
-      }
+      };
+      this.pump();
     };
 
     // Level-change settle: a zoom in motion shouldn't fetch each
@@ -452,107 +465,145 @@ export class TileManager {
     // fires immediately — there's nothing on screen above the base yet.
     if (levelChanged && options.tiles.settleMs > 0) {
       this.deps.debug?.(`arm settle page=${pageObjectNumber} level=${wantWidth}`);
+      // Nothing of the old level starts meanwhile.
+      state.queue = null;
       state.pendingLevel = wantWidth;
-      if (state.settleTimer !== null) clearTimeout(state.settleTimer);
-      state.settleTimer = setTimeout(() => {
-        state.settleTimer = null;
+      state.cancelSettle?.();
+      state.cancelSettle = this.deps.after(options.tiles.settleMs, () => {
+        state.cancelSettle = null;
         this.deps.debug?.(
           `settle fired page=${pageObjectNumber} level=${wantWidth} ` +
             `current=${state.pendingLevel === wantWidth}`,
         );
         if (state.pendingLevel === wantWidth) kickoff();
-      }, options.tiles.settleMs);
+      });
       return;
     }
-    if (state.settleTimer !== null && !levelChanged && !firstEngage) {
+    if (state.cancelSettle !== null && !levelChanged && !firstEngage) {
       // Same level again before the timer fired — the zoom came back;
       // cancel the pending level fetch.
-      clearTimeout(state.settleTimer);
-      state.settleTimer = null;
+      state.cancelSettle();
+      state.cancelSettle = null;
       state.pendingLevel = null;
     }
     kickoff();
   }
 
-  /** Start missing fetches; true when every coord is already resolved. */
-  private ensureFetches(
-    pageObjectNumber: number,
-    state: PageTileState,
-    page: PageSizePt,
-    grid: TileGrid,
-    wantWidth: number,
-    includeAnnotations: boolean,
-    epoch: number,
-    coords: TileCoord[],
-  ): boolean {
-    let allReady = true;
-    let started = 0;
-    const bleedPt = this.deps.getOptions().tiles.bleedPx / grid.scale;
-    for (const coord of coords) {
-      const key = this.tileKey(pageObjectNumber, wantWidth, coord, includeAnnotations, epoch);
+  /**
+   * Starts queued tiles while transit slots are free, the most urgent first
+   * across every view and page (`priorityOf`; ties go to the view of a page
+   * that queued first). Within one view of a page, its queue's order holds.
+   * Backpressure bounds raw rasters in transit (render + encode); each
+   * resolution hands its slot on through here, so no other pump is needed.
+   */
+  private pump(): void {
+    const started = new Map<PageTileState, number>();
+    while (this.inFlight < MAX_IN_FLIGHT) {
+      let best: { state: PageTileState; coord: TileCoord; prefetch: boolean } | null = null;
+      let bestPriority = -Infinity;
+      for (const state of this.pages.values()) {
+        const next = this.nextToStart(state);
+        if (!next) continue;
+        const priority = this.deps.priorityOf(state.pageObjectNumber, next.prefetch);
+        if (priority > bestPriority) {
+          best = { state, ...next };
+          bestPriority = priority;
+        }
+      }
+      if (!best) break;
+      this.start(best.state, best.coord, best.prefetch);
+      started.set(best.state, (started.get(best.state) ?? 0) + 1);
+    }
+    for (const [state, count] of started) {
+      this.deps.debug?.(
+        `fetch page=${state.pageObjectNumber} level=${state.queue?.wantWidth} +${count} tiles`,
+      );
+    }
+  }
+
+  /** The first tile of the state's queue not started yet, nor failed at this level. */
+  private nextToStart(state: PageTileState): { coord: TileCoord; prefetch: boolean } | null {
+    const queue = state.queue;
+    if (!queue) return null;
+    for (; queue.next < queue.coords.length; queue.next += 1) {
+      const coord = queue.coords[queue.next]!;
+      const key = this.tileKey(
+        state.pageObjectNumber,
+        queue.wantWidth,
+        coord,
+        queue.includeAnnotations,
+        queue.epoch,
+      );
       // A key that failed (non-abort) at this level is not retried until the
       // level or epoch changes — retrying every plan would loop on a
       // permanent error. The base shows through the hole; degraded, honest.
-      if (state.failedKeys.has(key)) continue;
-      const existing = state.entries.get(key);
-      if (existing) {
-        if (!existing.resolved) allReady = false;
-        continue;
-      }
-      allReady = false;
-      // Backpressure: bound raw rasters in transit (render + encode). The
-      // wake → plan → ensureFetches loop is the pump — each resolution
-      // replans and starts the next batch; no queue machinery needed.
-      if (this.inFlight >= MAX_IN_FLIGHT) continue;
-      this.inFlight += 1;
-      started += 1;
-      const abort = new AbortController();
-      const logical = tilePaintRect(grid, page, coord);
-      const entry: TileEntry = {
+      if (state.failedKeys.has(key) || state.entries.has(key)) continue;
+      return { coord, prefetch: queue.next >= queue.ringFrom };
+    }
+    return null;
+  }
+
+  /** Starts one queued tile's fetch, in a transit slot. */
+  private start(state: PageTileState, coord: TileCoord, prefetch: boolean): void {
+    const { page, grid, wantWidth, includeAnnotations, epoch } = state.queue!;
+    const pageObjectNumber = state.pageObjectNumber;
+    const key = this.tileKey(pageObjectNumber, wantWidth, coord, includeAnnotations, epoch);
+    const bleedPt = this.deps.getOptions().tiles.bleedPx / grid.scale;
+    this.inFlight += 1;
+    const abort = new AbortController();
+    const logical = tilePaintRect(grid, page, coord);
+    const entry: TileEntry = {
+      key,
+      scale: grid.scale,
+      coord,
+      rect: logical,
+      resolved: false,
+      painted: false,
+      charged: true,
+      abort,
+      prefetch,
+    };
+    state.entries.set(key, entry);
+    // The cached plan's `fetching` misses this tile now.
+    state.planCache = null;
+    this.deps.store
+      .acquire(
         key,
-        scale: grid.scale,
-        coord,
-        rect: logical,
-        resolved: false,
-        painted: false,
-        charged: true,
-        abort,
-      };
-      state.entries.set(key, entry);
-      this.deps.store
-        .acquire(
-          key,
-          (signal) =>
-            this.deps.fetchTile(
-              pageObjectNumber,
-              // The rendered region is the bled rect — it matches the bled
-              // placement rect the paint list emits for this entry.
-              bleedPt > 0 ? bleedRect(logical, bleedPt, page) : logical,
-              grid.scale,
-              includeAnnotations,
-              signal,
-            ),
-          abort.signal,
-        )
-        .then(
-          () => {
-            this.releaseSlot(entry);
-            if (state.entries.get(key) !== entry) return; // aborted/superseded
-            // The handle stays in the store (single ownership) — the paint
-            // list peeks it back out; this entry just records success.
+        (signal) =>
+          this.deps.fetchTile(
+            pageObjectNumber,
+            // The rendered region is the bled rect — it matches the bled
+            // placement rect the paint list emits for this entry.
+            bleedPt > 0 ? bleedRect(logical, bleedPt, page) : logical,
+            grid.scale,
+            includeAnnotations,
+            signal,
+            () => entry.prefetch,
+          ),
+        abort.signal,
+      )
+      .then(
+        () => {
+          this.releaseSlot(entry);
+          // Unless aborted or superseded meanwhile. The handle stays in the
+          // store (single ownership) — the paint list peeks it back out;
+          // this entry just records success.
+          if (state.entries.get(key) === entry) {
             entry.resolved = true;
             state.version += 1;
             state.planCache = null;
             this.deps.onAdvance(pageObjectNumber);
-          },
-          (error) => {
-            this.releaseSlot(entry);
-            if (state.entries.get(key) !== entry) return;
+          }
+          this.pump();
+        },
+        (error) => {
+          this.releaseSlot(entry);
+          // Our own abort (pan-away, level change) is expected silence. A
+          // real failure marks the key and wakes the layers: the paint plan
+          // recomputes so the rest of the want set keeps making progress
+          // instead of waiting on a resolution that never comes.
+          if (state.entries.get(key) === entry) {
             state.entries.delete(key);
-            // Our own abort (pan-away, level change) is expected silence. A
-            // real failure marks the key and wakes the layers: the paint
-            // plan recomputes so the rest of the want set keeps making
-            // progress instead of waiting on a resolution that never comes.
             if (!abort.signal.aborted) {
               state.failedKeys.add(key);
               this.deps.debug?.(`tile failed ${key}: ${String(error)}`);
@@ -560,13 +611,10 @@ export class TileManager {
               state.planCache = null;
               this.deps.onAdvance(pageObjectNumber);
             }
-          },
-        );
-    }
-    if (started > 0) {
-      this.deps.debug?.(`fetch page=${pageObjectNumber} level=${wantWidth} +${started} tiles`);
-    }
-    return allReady;
+          }
+          this.pump();
+        },
+      );
   }
 
   /**
@@ -639,10 +687,9 @@ export class TileManager {
   }
 
   private abortAll(state: PageTileState): void {
-    if (state.settleTimer !== null) {
-      clearTimeout(state.settleTimer);
-      state.settleTimer = null;
-    }
+    state.queue = null;
+    state.cancelSettle?.();
+    state.cancelSettle = null;
     for (const entry of state.entries.values()) {
       if (!entry.resolved) {
         entry.abort?.abort();
@@ -690,9 +737,29 @@ interface TileEntry {
   /** Holds an in-flight transit slot (see releaseSlot — idempotent). */
   charged?: boolean;
   abort?: AbortController;
+  /** In the prefetch ring, not on screen; kept current while the tile is wanted. */
+  prefetch: boolean;
+}
+
+/** The tiles one view of a page wants started, in order, with what starting one needs. */
+interface TileQueue {
+  /** Visible tiles center-out, then the prefetch ring once every visible tile resolved. */
+  coords: TileCoord[];
+  /** Where the ring starts in `coords`. */
+  ringFrom: number;
+  /** Where the pump looks next: every coord before it is started or failed. */
+  next: number;
+  page: PageSizePt;
+  grid: TileGrid;
+  wantWidth: number;
+  includeAnnotations: boolean;
+  epoch: number;
 }
 
 interface PageTileState {
+  pageObjectNumber: number;
+  /** What the pump starts for this view of the page; null while nothing should start. */
+  queue: TileQueue | null;
   epoch: number;
   wantScale: number | null;
   /** The want level's identity: integer device px across the page. */
@@ -704,7 +771,8 @@ interface PageTileState {
   /** Bumped on ready/painted/drop; part of the paint-plan memo key. */
   version: number;
   planCache: { demandKey: string; version: number; plan: TilePaintPlan } | null;
-  settleTimer: ReturnType<typeof setTimeout> | null;
+  /** Cancels the level-change settle wait while it runs. */
+  cancelSettle: (() => void) | null;
   /** Pending level identity (wantWidth) while the settle gate runs. */
   pendingLevel: number | null;
   /** Last visible rect from plan() — the release rule's "on screen". */

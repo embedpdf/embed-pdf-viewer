@@ -1,12 +1,15 @@
 /**
- * Max-heap with O(log n) insert, pop, and remove-by-handle.
+ * Max-heap with O(log n) insert, pop, re-rank and remove-by-handle.
  *
  * Insert returns a `HeapHandle` whose .index is kept in sync with the
  * element's location in the heap as items move during sift up/down.
  * That makes random removal cheap, which is what the WorkerQueue needs
- * when an in-flight AbortablePromise is aborted from outside the queue.
+ * when an in-flight AbortablePromise is aborted from outside the queue,
+ * and so is changing an item's rank while it waits.
  *
- * Stable for equal priorities: items inserted earlier come out first.
+ * Items come out by priority, then by rank among equal priorities, then in
+ * insertion order: stable for equals, and a re-ranked item keeps its place
+ * in that order.
  */
 
 export interface HeapHandle {
@@ -17,6 +20,8 @@ export interface HeapHandle {
 interface HeapEntry<V> {
   value: V;
   priority: number;
+  /** Orders items of one priority: higher first. */
+  rank: number;
   /** Insertion sequence number, used as a tiebreaker so the heap is stable. */
   seq: number;
   handle: HeapHandle;
@@ -30,9 +35,9 @@ export class IndexedPriorityHeap<V> {
     return this.arr.length;
   }
 
-  push(value: V, priority: number): HeapHandle {
+  push(value: V, priority: number, rank = 0): HeapHandle {
     const handle: HeapHandle = { index: this.arr.length };
-    const entry: HeapEntry<V> = { value, priority, seq: this.nextSeq++, handle };
+    const entry: HeapEntry<V> = { value, priority, rank, seq: this.nextSeq++, handle };
     this.arr.push(entry);
     this.siftUp(handle.index);
     return handle;
@@ -48,6 +53,19 @@ export class IndexedPriorityHeap<V> {
     this.swapAndPop(0);
     top.handle.index = -1;
     return top.value;
+  }
+
+  /** Changes a waiting item's rank; false once it has left the heap. */
+  setRank(handle: HeapHandle, rank: number): boolean {
+    const i = handle.index;
+    if (i < 0 || i >= this.arr.length) return false;
+    const entry = this.arr[i]!;
+    if (entry.rank === rank) return true;
+    const raised = rank > entry.rank;
+    entry.rank = rank;
+    if (raised) this.siftUp(i);
+    else this.siftDown(i);
+    return true;
   }
 
   remove(handle: HeapHandle): boolean {
@@ -112,6 +130,7 @@ export class IndexedPriorityHeap<V> {
     const ea = this.arr[a]!;
     const eb = this.arr[b]!;
     if (ea.priority !== eb.priority) return ea.priority - eb.priority;
+    if (ea.rank !== eb.rank) return ea.rank - eb.rank;
     // FIFO tiebreaker: lower seq is "above" (popped first).
     return eb.seq - ea.seq;
   }

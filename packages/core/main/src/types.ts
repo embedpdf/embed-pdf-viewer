@@ -7,6 +7,7 @@
  * The kernel adds *document scope*: plugins declare a scope and the kernel
  * multiplexes document-scoped plugins per document.
  */
+import type { PluginClock } from './clock';
 import type { EventHook } from './event-hook';
 import type { Mirror, MirrorSpec } from './mirror';
 import type { PageMirror, PageMirrorSpec } from './page-mirror';
@@ -385,6 +386,12 @@ export interface PluginContext<S = unknown, T extends object = NoSettings> {
    * immediately instead of dropping it, so a late registration cannot leak.
    */
   cleanup(fn: () => void | Promise<void>): void;
+  /**
+   * Time, from the host: `after(ms, run)` and `nextFrame(run)`, each returning
+   * its cancel, and `hasFrames`. What the instance schedules is cancelled when
+   * it closes. Plugins never read timers or frames from the environment.
+   */
+  readonly clock: PluginClock;
   /**
    * Register what this plugin holds back from the engine, such as text typed a moment ago or
    * the writes in its write queue (`() => queue.idle()`). Before anything reads the whole

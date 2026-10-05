@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { PageImageHandle } from '@embedpdf/core';
+import { timerClock, type PageImageHandle } from '@embedpdf/core';
 
 import { resolveRenderOptions, type TilesOptions } from '../src/paint-plan';
 import { RasterStore } from '../src/raster-store';
@@ -36,6 +36,8 @@ function createHarness(
     getPolicy: () => ({ kind: 'continuous' }) as never,
     getPageSize: () => PAGE,
     getEpoch: () => 0,
+    after: timerClock.after,
+    priorityOf: () => 0,
     fetchTile: (_pageObjectNumber, rect, scale: number, _includeAnnotations, signal) =>
       new Promise<PageImageHandle>((resolve, reject) => {
         liveFetches += 1;
@@ -190,7 +192,9 @@ describe('tile residency (the memory red lines)', () => {
     expect(plan.engaged).toBe(true);
     // The whole page is still covered…
     expect(plan.paint.length).toBeGreaterThan(0);
-    // …but by a bounded tile count (the clamp), not tens of thousands.
-    expect(harness.pending.length).toBeLessThanOrEqual(64);
+    // …but by a bounded tile count (the clamp), not tens of thousands: the
+    // cap's 64 tiles, rounded up to whole tiles, are 8 × 10 on this page, and
+    // every one of them is fetched once.
+    expect(harness.pending.length).toBeLessThanOrEqual(80);
   });
 });

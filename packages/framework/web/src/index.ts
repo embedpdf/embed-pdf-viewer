@@ -18,6 +18,8 @@ export {
   saveFile,
 } from './file-picker';
 export type { FilePickerPort, PickFileOptions } from './file-picker';
+export { browserClock } from './clock';
+export type { WebClock } from './clock';
 export { cssText } from './css-text';
 export type { StyleRecord } from './css-text';
 export { copySelection, wireSelectionClipboard } from './clipboard';

@@ -118,4 +118,25 @@ describe('guardHandle', () => {
     expect(abort).toHaveBeenCalledTimes(1);
     await pending.catch(() => {});
   });
+
+  it('keeps setPriority() on render tasks, and adds none where there was none', async () => {
+    const setPriority = vi.fn();
+    const handle = {
+      id: 'd',
+      page: () => ({
+        render: { image: () => Object.assign(Promise.resolve('img'), { setPriority }) },
+        text: { read: () => Promise.resolve('text') },
+      }),
+    } as unknown as DocumentHandle;
+    const controller = new AbortController();
+    const doc = guardHandle(handle, { signal: controller.signal, instanceId: 'd#1' }, 'test');
+    const page = doc.page({ kind: 'objectNumber', objectNumber: 3 });
+    const task = page.render.image();
+    task.setPriority(7);
+    expect(setPriority).toHaveBeenCalledWith(7);
+    await expect(task).resolves.toBe('img');
+    const read = (page as unknown as { text: { read(): Promise<string> } }).text.read();
+    expect('setPriority' in read).toBe(false);
+    await read;
+  });
 });

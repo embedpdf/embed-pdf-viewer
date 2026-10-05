@@ -35,8 +35,7 @@ describe('stage transitions', () => {
   });
 
   it('strip capability config from the initial settings', () => {
-    const state = initialStageState({ responsive: [], scheduler: { raf: () => 0, caf: () => {} } });
+    const state = initialStageState({ responsive: [] });
     expect('responsive' in state).toBe(false);
-    expect('scheduler' in state).toBe(false);
   });
 });

@@ -1,5 +1,6 @@
 import { pageRefsEqual, type DocumentHandle, type PageRef } from '@embedpdf/engine-core/runtime';
 
+import { instanceClock, type HostClock } from './clock';
 import { isDev } from './env';
 import { PluginError } from './errors';
 import { createEventHook, type EventHookSource } from './event-hook';
@@ -75,6 +76,8 @@ export interface ContextServices {
   readonly workspaceSignal: AbortSignal;
   readonly workspaceLeases: Map<AnyPlugin, SliceLease<unknown>>;
   readonly report: (error: unknown) => void;
+  /** The host's time, which each instance's `ctx.clock` schedules on. */
+  readonly clock: HostClock;
   resolveCapability<T>(token: CapabilityToken<T>, documentId?: string): T;
   /** Total resolution (the kernel's internal rule: bring-up or ready) — what
    *  `ctx.tryGet` delegates to. Never exception-driven: a throwing capability
@@ -351,6 +354,7 @@ export function createPluginContext(
     },
 
     cleanup: (teardown) => scope.defer(teardown),
+    clock: instanceClock(services.clock, lifetime),
     onSettle(flush) {
       if (!session) {
         throw new Error(

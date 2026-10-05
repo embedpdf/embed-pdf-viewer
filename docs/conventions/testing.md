@@ -41,6 +41,7 @@ shaped by the test.
 | `doc`          | The document handle members the test uses (`metadata`, `forms`, `page`, …). The default has an event stream and `security.allows` answering true. `null` for a workspace plugin. |
 | `documentId`   | Default `'doc'`.                                                                                                                                                                 |
 | `engine`       | The `ctx.engine` members the test uses.                                                                                                                                          |
+| `clock`        | The host's time behind `ctx.clock`. Default `timerClock`: the environment's timers (so `vi.useFakeTimers()` applies) and no frames. Pass `manualClock().clock` to step time.     |
 
 The returned context adds:
 
@@ -53,6 +54,13 @@ The returned context adds:
 | `settle(signal?)`          | Runs every `ctx.onSettle` flush and waits for them, as `documents.download()` does before it reads the file.       |
 | `download(read)`           | Runs `read` inside every `ctx.aroundDownload` wrap, as `documents.download()` does after settling.                 |
 | `dispose()`                | Aborts the lifetime and runs every registered cleanup.                                                             |
+
+`manualClock(options?)` from `@embedpdf/core/testing` is time that moves only
+when the test moves it: `advance(ms)` runs the timers that fall due, earliest
+first; `frame(timeMs?)` moves to that time and runs the callbacks waiting for a
+frame; `pending` counts what waits. `manualClock({ frames: false })` is a host
+that never paints. The same clock goes to `createKernel({ clock })` for a test
+through the kernel.
 
 Unless the test passes its own, `DocumentsToken` resolves to a read-only
 registry holding the one document; its mutating verbs throw `unsupported`. The

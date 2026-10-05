@@ -8,6 +8,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, shallowRef, toRaw, watch } from 'vue';
 import { createKernel, isLocalEngine, viewerSettingsOf } from '@embedpdf/core';
+import { browserClock } from '@embedpdf/web';
 import type {
   AnyPlugin,
   Engine,
@@ -142,7 +143,12 @@ onMounted(() => {
   if (isLocalEngine(engine)) engine.warmup();
   let created: Kernel;
   try {
-    created = createKernel({ engine, plugins: initial.plugins, settings: settingsOf() });
+    created = createKernel({
+      engine,
+      plugins: initial.plugins,
+      settings: settingsOf(),
+      clock: browserClock(),
+    });
   } catch (error) {
     // A plan or dependency error shows in the `error` slot.
     bootError.value = error;

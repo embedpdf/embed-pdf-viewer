@@ -56,48 +56,55 @@ export async function restoreStampLibraries(
 }
 
 /**
- * Keep the store in sync from now on: every canonical change writes the
- * library's PDF (coalesced per library so a burst of edits saves once),
- * a removal deletes it. `except` names libraries never to persist (the
- * bundled default set, typically). Returns the unsubscribe.
+ * Keep the store in sync from now on: every canonical change saves the
+ * library's PDF, a removal deletes it. `except` names libraries never to
+ * persist (the bundled default set, typically). Returns the unsubscribe;
+ * work already asked for still finishes.
+ *
+ * Each library has one line of store work, so saves never overlap and a
+ * delete never lands under a late save. The changes of one burst (one call
+ * into the plugin) are one save; the changes made while a save runs are one
+ * more after it.
  */
 export function persistStampLibraries(
   stamp: Pick<StampCapability, 'exportLibrary' | 'onLibraryChanged'>,
   store: StampLibraryStore,
-  options: { except?: readonly string[]; debounceMs?: number } = {},
+  options: { except?: readonly string[] } = {},
 ): () => void {
   const except = new Set(options.except ?? []);
-  const timers = new Map<string, ReturnType<typeof setTimeout>>();
-  const write = (libraryId: string) => {
-    timers.delete(libraryId);
-    stamp
-      .exportLibrary(libraryId)
-      .then((bytes) => store.put(libraryId, bytes))
-      .catch((error) => {
-        globalThis.console?.warn(`[stamp] persisting library '${libraryId}' failed:`, error);
-      });
-  };
-  const off = stamp.onLibraryChanged(({ libraryId, reason }) => {
-    if (except.has(libraryId)) return;
-    const pending = timers.get(libraryId);
-    if (pending) clearTimeout(pending);
-    if (reason === 'removed') {
-      timers.delete(libraryId);
-      store.delete(libraryId).catch((error) => {
-        globalThis.console?.warn(`[stamp] deleting stored library '${libraryId}' failed:`, error);
-      });
+  /** Per library: the store step waiting or running, and the one to follow it. */
+  const lines = new Map<string, { step: Step; started: boolean; next: Step | null }>();
+
+  const run = (libraryId: string, step: Step): void => {
+    const line = lines.get(libraryId);
+    if (line) {
+      // Not started yet: it does the latest wish. Running: the latest wish follows it.
+      if (line.started) line.next = step;
+      else line.step = step;
       return;
     }
-    timers.set(
-      libraryId,
-      setTimeout(() => write(libraryId), options.debounceMs ?? 250),
-    );
-  });
-  return () => {
-    off();
-    for (const [libraryId, timer] of timers) {
-      clearTimeout(timer);
-      write(libraryId);
-    }
+    const fresh = { step, started: false, next: null as Step | null };
+    lines.set(libraryId, fresh);
+    // Starts once the current burst of changes is over, so the burst is one step.
+    void Promise.resolve().then(async () => {
+      fresh.started = true;
+      try {
+        if (fresh.step === 'save') await store.put(libraryId, await stamp.exportLibrary(libraryId));
+        else await store.delete(libraryId);
+      } catch (error) {
+        const doing = fresh.step === 'save' ? 'persisting' : 'deleting stored';
+        globalThis.console?.warn(`[stamp] ${doing} library '${libraryId}' failed:`, error);
+      }
+      lines.delete(libraryId);
+      if (fresh.next) run(libraryId, fresh.next);
+    });
   };
+
+  return stamp.onLibraryChanged(({ libraryId, reason }) => {
+    if (except.has(libraryId)) return;
+    run(libraryId, reason === 'removed' ? 'delete' : 'save');
+  });
 }
+
+/** What a library's line does next in the store. */
+type Step = 'save' | 'delete';

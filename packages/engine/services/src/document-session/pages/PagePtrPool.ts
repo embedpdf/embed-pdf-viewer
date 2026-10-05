@@ -55,6 +55,11 @@ export class PagePtrPool {
     return this.residency.isHeld(this, pageObjectNumber);
   }
 
+  /** True while the residency keeps the page, parsed or loading, held or not. */
+  isKept(pageObjectNumber: PageObjectNumber): boolean {
+    return this.residency.isKept(this, pageObjectNumber);
+  }
+
   release(pageObjectNumber: PageObjectNumber): void {
     this.residency.release(this, pageObjectNumber);
   }

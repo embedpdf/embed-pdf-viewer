@@ -7,6 +7,32 @@ const tsParser = require('@typescript-eslint/parser');
 const importPlugin = require('eslint-plugin-import');
 const nextPlugin = require('@next/eslint-plugin-next');
 
+/**
+ * What plugins and the *-core packages may not reach for in the environment.
+ * Time comes from the host, through the context (`ctx.clock`), so the kernel
+ * owns its lifetime and tests can step it; the DOM lives in `@embedpdf/web`.
+ */
+const hostOnlyGlobals = [
+  ...[
+    'setTimeout',
+    'clearTimeout',
+    'setInterval',
+    'clearInterval',
+    'requestAnimationFrame',
+    'cancelAnimationFrame',
+    'requestIdleCallback',
+    'cancelIdleCallback',
+  ].map((name) => ({
+    name,
+    message:
+      'Time comes from the host: use ctx.clock (after, nextFrame) — see docs/conventions/plugins.md.',
+  })),
+  ...['window', 'document', 'navigator'].map((name) => ({
+    name,
+    message: 'Plugins and cores stay DOM-free: browser code lives in @embedpdf/web.',
+  })),
+];
+
 /** @type {import("eslint").Linter.FlatConfig[]} */
 module.exports = [
   {
@@ -133,6 +159,15 @@ module.exports = [
           exceptionPatterns: ['^[TKV]$'],
         },
       ],
+    },
+  },
+  {
+    // Plugins, the kernel and the pure cores never touch the environment's
+    // timers or the DOM. `clock.ts` is the kernel's one door to timers.
+    files: ['packages/plugin/*/src/**/*.ts', 'packages/core/*/src/**/*.ts'],
+    ignores: ['packages/core/main/src/clock.ts'],
+    rules: {
+      'no-restricted-globals': ['error', ...hostOnlyGlobals],
     },
   },
   {

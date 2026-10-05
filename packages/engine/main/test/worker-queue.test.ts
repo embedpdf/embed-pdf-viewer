@@ -1,7 +1,9 @@
 /**
  * The queue's abort contract: a job aborted while it waits never reaches the
  * worker; a job aborted after it was sent rejects at once, the worker is told
- * to stop it, and its slot stays taken until the worker answers.
+ * to stop it, and its slot stays taken until the worker answers. And its
+ * order: by priority, then rank, then arrival, with ranks changeable while
+ * a job waits.
  */
 import { describe, expect, test } from 'vitest';
 import {
@@ -67,5 +69,34 @@ describe('WorkerQueue', () => {
     expect(sent[2]).toEqual(expect.objectContaining({ kind: 'close', docId: 'b' }));
     answer(sent[2]!.jobId);
     await second;
+  });
+
+  test('sends jobs by priority, then rank, then arrival; a waiting job can be re-ranked', async () => {
+    const { transport, sent, answer } = fakeTransport();
+    const queue = new WorkerQueue(transport);
+    const running = queue.enqueue(job('running'));
+    const jobs = [
+      queue.enqueue(job('tile'), { priority: 150, rank: 3 }),
+      queue.enqueue(job('base'), { priority: 150, rank: 3 }),
+      queue.enqueue(job('read'), { priority: 100 }),
+      queue.enqueue(job('write'), { priority: 200 }),
+      queue.enqueue(job('focus'), { priority: 150, rank: 1 }),
+    ];
+    jobs[4]!.setRank(8); // the camera moved: this page is the focus now
+
+    const order: string[] = [];
+    for (let next = sent.length - 1; next < sent.length; next++) {
+      const request = sent[next] as { jobId: number; docId: string };
+      order.push(request.docId);
+      answer(request.jobId);
+    }
+    await Promise.all([running, ...jobs]);
+    expect(order).toEqual(['running', 'write', 'focus', 'tile', 'base', 'read']);
+
+    // Once sent, a job's rank no longer matters.
+    const sentJob = queue.enqueue(job('sent'), { priority: 150 });
+    expect(() => sentJob.setRank(1)).not.toThrow();
+    answer(sent[sent.length - 1]!.jobId);
+    await sentJob;
   });
 });

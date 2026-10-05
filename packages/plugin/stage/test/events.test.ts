@@ -1,14 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { toPageRef } from '@embedpdf/core';
-import { createTestContext } from '@embedpdf/core/testing';
+import { toPageRef, type HostClock } from '@embedpdf/core';
+import { createTestContext, manualClock } from '@embedpdf/core/testing';
 
 import { createStageController } from '../src/controller';
 import { initialStageState } from '../src/model';
 import type { StageConfig, StageHostCapability } from '../src/host-contract';
 
-function harness(config: StageConfig = {}) {
+function harness(config: StageConfig = {}, clock?: HostClock) {
   const ctx = createTestContext({
     id: 'stage',
+    clock,
     state: initialStageState({ viewUnitsPerPoint: 1, ...config }),
     pages: Array.from({ length: 5 }, (_, index) => ({
       ref: toPageRef(index + 1),
@@ -78,22 +79,16 @@ describe('stage events', () => {
   });
 
   it('announce motionEnded where a tween ends or is stopped', () => {
-    const frames: Array<(timestamp: number) => void> = [];
-    const { stage, log } = harness({
-      scheduler: {
-        raf: (callback) => frames.push(callback),
-        caf: () => {},
-      },
-    });
+    const time = manualClock();
+    const { stage, log } = harness({}, time.clock);
     stage.setViewportSize({ width: 1000, height: 700 });
     stage.goToPage(3); // smooth
-    const run = (timestamp: number) => frames.splice(0).forEach((callback) => callback(timestamp));
-    run(0);
-    run(240);
+    time.frame(0);
+    time.frame(240);
     expect(log.filter((entry) => entry === 'motion-ended')).toHaveLength(1);
 
     stage.goToPage(0);
-    run(0);
+    time.frame(300);
     stage.stopMotion();
     expect(log.filter((entry) => entry === 'motion-ended')).toHaveLength(2);
   });

@@ -349,7 +349,7 @@ describe('EpdfStamp', () => {
     expect(await restoreStampLibraries(host.stamp, store)).toEqual(['kept']);
     expect(imported.map((bytes) => new TextDecoder().decode(bytes))).toEqual(['kept']);
 
-    const stop = persistStampLibraries(host.stamp, store, { except: ['skip'], debounceMs: 0 });
+    const stop = persistStampLibraries(host.stamp, store, { except: ['skip'] });
     plugin.addLibrary(libraryOf('mine', []), []);
     plugin.addLibrary(libraryOf('skip', []), []);
     await vi.waitFor(async () =>

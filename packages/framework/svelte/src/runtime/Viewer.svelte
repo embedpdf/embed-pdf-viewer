@@ -14,6 +14,7 @@
   import { untrack } from 'svelte';
   import { createKernel, isLocalEngine, viewerSettingsOf } from '@embedpdf/core';
   import type { Engine, EngineFactory, Kernel, ViewerSettings } from '@embedpdf/core';
+  import { browserClock } from '@embedpdf/web';
   import { KernelBinding, setKernelHolder } from './binding.svelte';
   import { isDev } from './dev';
   import type { ViewerProps } from './props';
@@ -56,7 +57,7 @@
       if (isLocalEngine(created)) created.warmup();
       let kernel: Kernel;
       try {
-        kernel = createKernel({ engine: created, plugins, settings });
+        kernel = createKernel({ engine: created, plugins, settings, clock: browserClock() });
       } catch (error) {
         // A plugin graph that can't be built shows `error`, not an exception mid-render.
         boot = { phase: 'error', error };

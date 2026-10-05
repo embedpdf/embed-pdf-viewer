@@ -1,9 +1,9 @@
 /**
- * Camera motion over the scheduler seam: the coordinate tween, the
- * zoom-anchored tween (it animates the invariant, so the focal page-point
+ * Camera motion over the host's frames (`ctx.clock`): the coordinate tween,
+ * the zoom-anchored tween (it animates the invariant, so the focal page-point
  * holds still by construction), and the momentum and edge physics (glide,
- * spring). One frame handle is shared: `cancelAnimation`, every verb's first
- * act, is also "catch".
+ * spring). One frame is waited for at a time: `cancelAnimation`, every verb's
+ * first act, is also "catch".
  */
 import {
   cameraForAnchorAtScreen,
@@ -13,6 +13,7 @@ import {
   type Point,
   type Rect,
 } from '@embedpdf/core-stage';
+import type { Cancel } from '@embedpdf/core';
 
 import type { StageHostCapability } from '../host-contract';
 import { easeOutCubic, FLING_STOP, glideStep, springStep, zoomLerp } from '../motion';
@@ -25,24 +26,22 @@ const TWEEN_MS = 240;
 const lerp = (from: number, to: number, progress: number) => from + (to - from) * progress;
 
 export function createAnimation(
-  { events, scheduler, scene }: Pick<StageServices, 'events' | 'scheduler' | 'scene'>,
+  { events, clock, scene }: Pick<StageServices, 'events' | 'clock' | 'scene'>,
   write: StageCameraWrite,
 ) {
   const { motionEnded } = events;
-  const { canAnimate, scheduler: frames } = scheduler;
   const { camera, viewport, buildScene, stayBounds, constraint } = scene;
   const { writeCamera, writeCameraUnclamped, axisTravels, syncCursorFromCamera } = write;
 
-  let frame = 0;
+  // Cancels the frame the running motion waits for; null while nothing moves.
+  let cancelFrame: Cancel | null = null;
   const cancelAnimation = () => {
-    if (frame) {
-      frames.caf(frame);
-      frame = 0;
-    }
+    cancelFrame?.();
+    cancelFrame = null;
   };
   /** A tween or fling reached its natural end. */
   const endMotion = () => {
-    frame = 0;
+    cancelFrame = null;
     motionEnded.emit({ camera: camera() });
   };
 
@@ -51,7 +50,7 @@ export function createAnimation(
   // clamped back. `then` runs on natural completion only: a cancelled tween
   // belongs to the verb that cancelled it.
   const animateTo = (target: Camera, bounds: Rect, durationMs = TWEEN_MS, then?: () => void) => {
-    if (!canAnimate) {
+    if (!clock.hasFrames) {
       writeCamera(target, bounds);
       then?.();
       return;
@@ -75,13 +74,13 @@ export function createAnimation(
         bounds,
       );
       if (progress < 1) {
-        frame = frames.raf(tick);
+        cancelFrame = clock.nextFrame(tick);
       } else {
         endMotion();
         then?.();
       }
     };
-    frame = frames.raf(tick);
+    cancelFrame = clock.nextFrame(tick);
   };
 
   /**
@@ -103,7 +102,7 @@ export function createAnimation(
     durationMs = TWEEN_MS,
     then?: () => void,
   ) => {
-    if (!canAnimate) {
+    if (!clock.hasFrames) {
       const scene = buildScene();
       if (scene.itemCount) writeCamera(cameraForAnchorAtScreen(focal, scene, point, targetZoom));
       then?.();
@@ -123,13 +122,13 @@ export function createAnimation(
       const scene = buildScene();
       if (scene.itemCount) writeCamera(cameraForAnchorAtScreen(focal, scene, point, zoom));
       if (progress < 1) {
-        frame = frames.raf(tick);
+        cancelFrame = clock.nextFrame(tick);
       } else {
         endMotion();
         then?.();
       }
     };
-    frame = frames.raf(tick);
+    cancelFrame = clock.nextFrame(tick);
   };
 
   // Momentum and edge physics, the driver over motion.ts's per-axis laws:
@@ -141,10 +140,10 @@ export function createAnimation(
   //            stretched).
   // Axes are independent (a diagonal fling can bounce off the bottom while
   // still gliding horizontally), and every trajectory ends on the clamp. It
-  // shares the tween's frame handle, so cancelAnimation() is also "catch":
+  // shares the tween's frame, so cancelAnimation() is also "catch":
   // catching mid-bounce holds the stretch.
   const startCameraPhysics = (fingerVelocityX: number, fingerVelocityY: number) => {
-    if (!canAnimate) {
+    if (!clock.hasFrames) {
       writeCamera(camera()); // no host frames: snap straight into bounds
       return;
     }
@@ -199,7 +198,7 @@ export function createAnimation(
     let started = false;
     let lastFrameAt = 0;
     const tick = (now: number) => {
-      frame = 0;
+      cancelFrame = null;
       // The first frame assumes one 60 Hz step (anchored like the tween, so a
       // first timestamp of 0 works).
       const elapsedMs = started ? Math.min(64, Math.max(1, now - lastFrameAt)) : 16;
@@ -249,9 +248,9 @@ export function createAnimation(
         motionEnded.emit({ camera: camera() });
         return;
       }
-      frame = frames.raf(tick);
+      cancelFrame = clock.nextFrame(tick);
     };
-    frame = frames.raf(tick);
+    cancelFrame = clock.nextFrame(tick);
   };
 
   return {
@@ -261,9 +260,9 @@ export function createAnimation(
     startCameraPhysics,
     api: {
       fling: (velocityX, velocityY) => startCameraPhysics(velocityX, velocityY),
-      isMoving: () => frame !== 0,
+      isMoving: () => cancelFrame !== null,
       stopMotion: () => {
-        if (!frame) return;
+        if (!cancelFrame) return;
         cancelAnimation();
         motionEnded.emit({ camera: camera() });
       },

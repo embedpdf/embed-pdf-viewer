@@ -232,6 +232,27 @@ type PageRenderRequest =
   | DocumentRenderPageFileWorkerRequest
   | DocumentRenderPageFileEncodedWorkerRequest;
 
+/** A page render as it arrives, in page space: what the held list reorders. */
+type HeldPageRender = Extract<
+  PageSpaceJob,
+  {
+    kind:
+      | 'pages.render'
+      | 'pages.renderEncoded'
+      | 'document.renderPageFile'
+      | 'document.renderPageFileEncoded';
+  }
+>;
+
+function isPageRender(job: PageSpaceJob): job is HeldPageRender {
+  return (
+    job.kind === 'pages.render' ||
+    job.kind === 'pages.renderEncoded' ||
+    job.kind === 'document.renderPageFile' ||
+    job.kind === 'document.renderPageFileEncoded'
+  );
+}
+
 /**
  * The piece that runs "inside the worker": owns runtime, manages document
  * sessions, dispatches requests to the engine-services synchronous code.
@@ -266,7 +287,7 @@ export class WorkerHost {
    * arrive are held (see {@link receive}).
    */
   private rendering = false;
-  /** Requests that arrived while a render was in progress, in arrival order. */
+  /** Requests that arrived while a render was in progress, in arrival order (see {@link takeHeld}). */
   private readonly held: PageSpaceJob[] = [];
   private destroyed = false;
 
@@ -340,12 +361,57 @@ export class WorkerHost {
     this.post(wirePack({ kind: 'reject', jobId, error }, EMPTY_TRANSFER));
   }
 
-  /** Runs held requests in order until one starts a page render. */
+  /** Runs held requests until one starts a page render. */
   private drain(): void {
     while (!this.rendering) {
-      const next = this.held.shift();
+      const next = this.takeHeld();
       if (!next) return;
       this.run(next);
+    }
+  }
+
+  /**
+   * The next held request. Requests run in arrival order, except that page
+   * renders held one after another run by their priority, higher first; then
+   * a render whose page is parsed before one that must parse it; then in
+   * arrival order. A render never passes another kind of request, nor the
+   * other way round.
+   */
+  private takeHeld(): PageSpaceJob | undefined {
+    const first = this.held[0];
+    if (!first || !isPageRender(first)) return this.held.shift();
+    let next = 0;
+    let best = first;
+    for (let i = 1; i < this.held.length; i++) {
+      const candidate = this.held[i]!;
+      if (!isPageRender(candidate)) break;
+      if (this.runsBefore(candidate, best)) {
+        next = i;
+        best = candidate;
+      }
+    }
+    this.held.splice(next, 1);
+    return best;
+  }
+
+  /** Whether held render `a` runs before held render `b`, which arrived first. */
+  private runsBefore(a: HeldPageRender, b: HeldPageRender): boolean {
+    const priorityA = a.options?.priority ?? 0;
+    const priorityB = b.options?.priority ?? 0;
+    if (priorityA !== priorityB) return priorityA > priorityB;
+    return this.pageIsKept(a) && !this.pageIsKept(b);
+  }
+
+  /** Whether the render's page is kept, so the render parses nothing. */
+  private pageIsKept(msg: HeldPageRender): boolean {
+    if (!('docId' in msg)) return false;
+    const session = this.sessions.get(sessionKey(msg.docId, msg.layerName));
+    if (!session) return false;
+    try {
+      return session.pagePool().isKept(session.resolvePageRef(msg.page).pageObjectNumber);
+    } catch {
+      // No such page: the render fails when it runs, at its place in line.
+      return false;
     }
   }
 

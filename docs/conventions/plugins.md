@@ -340,9 +340,18 @@ plugin).
 | `ctx.aroundDownload(wrap)`      | Run something of the document's own around every read of its file: `wrap(read)` returns the bytes `read()` gives, doing what comes before and after (the actions plugin's save actions). Document plugins only; the first registered is outermost.                            |
 | `ctx.cancellable(signal, task)` | Run an engine call the caller can cancel: it is aborted when `signal` fires, and rejects `operation-cancelled`. Every async verb passes its `options.signal` through it.                                                                                                        |
 | `ctx.events.source<T>()`        | An event source, disposed at close.                                                                                                                                                                                                                                             |
+| `ctx.clock`                     | Time, from the host: `after(ms, run)` and `nextFrame(run)` return their cancel; `hasFrames` is false where nothing paints (Node, most tests). What the instance scheduled is cancelled at close.                                                                                |
 
 - Queues come from `ctx.serialQueue(key)`, never from a local
   `createSerialQueue()`.
+- Time comes from `ctx.clock`, never from the environment: no `setTimeout`,
+  `setInterval` or `requestAnimationFrame` in a plugin or a `*-core` package
+  (lint enforces it). The host decides what a timer and a frame are when it
+  builds the kernel (`createKernel({ clock })`): the framework viewers pass
+  `browserClock()` from `@embedpdf/web`, and without one the kernel uses
+  `timerClock`, timers and no frames. A helper an app calls with no context,
+  such as `persistStampLibraries`, coalesces with promise steps instead of a
+  timer.
 - An operation on queue A may enqueue into queue B and await it, but never
   the other way round on the same pair: that deadlocks.
 - The search plugin runs every search on `ctx.latest('session')`, so a new

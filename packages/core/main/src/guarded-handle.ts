@@ -39,7 +39,8 @@ const isPlainWrappable = (value: unknown): value is object =>
  * wrapped lazily and cached; synchronous reads (`doc.security.allows`) pass
  * straight through. Methods run with the raw target as `this`, so classes
  * with private fields keep working. The returned promises keep an `abort()`
- * when the engine's promise had one, so caller-side cancellation still works.
+ * and a `setPriority()` when the engine's promise had them, so callers can
+ * still cancel a call and re-rank a render.
  */
 export function guardHandle(
   handle: DocumentHandle,
@@ -56,7 +57,10 @@ export function guardHandle(
     );
 
   const guardPromise = <T>(pending: PromiseLike<T>): Promise<T> => {
-    const abortable = pending as PromiseLike<T> & { abort?: (reason?: unknown) => void };
+    const abortable = pending as PromiseLike<T> & {
+      abort?: (reason?: unknown) => void;
+      setPriority?: (priority: number) => void;
+    };
     const guarded = new Promise<T>((resolve, reject) => {
       const onAbort = () => {
         abortable.abort?.(lifetime.signal.reason);
@@ -81,6 +85,12 @@ export function guardHandle(
     if (typeof abortable.abort === 'function') {
       Object.defineProperty(guarded, 'abort', {
         value: (reason?: unknown) => abortable.abort!(reason),
+        enumerable: false,
+      });
+    }
+    if (typeof abortable.setPriority === 'function') {
+      Object.defineProperty(guarded, 'setPriority', {
+        value: (priority: number) => abortable.setPriority!(priority),
         enumerable: false,
       });
     }

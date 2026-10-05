@@ -46,6 +46,8 @@ interface InFlightJob {
 
 export interface EnqueueOptions {
   priority?: number;
+  /** Orders jobs of one priority: higher first, equal ones in enqueue order. Default 0. */
+  rank?: number;
   /** Number of dispatch slots the queue may use concurrently. */
   concurrency?: number;
 }
@@ -60,6 +62,12 @@ export interface JobSpec {
   buildPack: (jobId: JobId) => WirePack<WorkerRequest>;
 }
 
+/** A job in the queue: await it, abort it, or re-rank it while it waits. */
+export interface QueuedJob<R> extends AbortablePromise<R> {
+  /** The job's new rank among jobs of its priority. No effect once it was sent. */
+  setRank(rank: number): void;
+}
+
 /**
  * Priority queue with O(log n) abort-removes-pending semantics.
  *
@@ -68,6 +76,8 @@ export interface JobSpec {
  * - Calling .abort() after dispatch sends an AbortRequest to the worker.
  *   The worker will reject when it next checks signal.aborted between
  *   PDFium calls, then we deliver an AbortError to the caller.
+ * - Calling .setRank() before dispatch moves the job among the jobs of its
+ *   priority; after dispatch it does nothing.
  */
 export class WorkerQueue {
   private readonly pending = new Map<JobId, PendingJob>();
@@ -86,20 +96,24 @@ export class WorkerQueue {
     this.unsubscribe = transport.onMessage((msg) => this.handleResponse(msg));
   }
 
-  enqueue<R extends WorkerResultPayload>(
-    spec: JobSpec,
-    opts: EnqueueOptions = {},
-  ): AbortablePromise<R> {
+  enqueue<R extends WorkerResultPayload>(spec: JobSpec, opts: EnqueueOptions = {}): QueuedJob<R> {
     if (this.destroyed) {
-      return AbortablePromise.rejectReason<R>(
-        new EngineError(EngineErrorCode.RuntimeUnavailable, 'engine has been destroyed'),
+      return Object.assign(
+        AbortablePromise.rejectReason<R>(
+          new EngineError(EngineErrorCode.RuntimeUnavailable, 'engine has been destroyed'),
+        ),
+        { setRank: () => {} },
       );
     }
     const jobId = nextJobId();
     const priority = opts.priority ?? Priority.MEDIUM;
+    const setRank = (rank: number) => {
+      const pending = this.pending.get(jobId);
+      if (pending) this.heap.setRank(pending.handle, rank);
+    };
 
-    return new AbortablePromise<R>((resolve, reject, _progress, signal) => {
-      const handle = this.heap.push(jobId, priority);
+    const job = new AbortablePromise<R>((resolve, reject, _progress, signal) => {
+      const handle = this.heap.push(jobId, priority, opts.rank ?? 0);
       this.pending.set(jobId, {
         jobId,
         priority,
@@ -134,6 +148,7 @@ export class WorkerQueue {
 
       this.tick();
     });
+    return Object.assign(job, { setRank });
   }
 
   private tick(): void {

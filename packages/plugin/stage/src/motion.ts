@@ -1,9 +1,9 @@
 /**
  * The camera's motion vocabulary, every formula pure.
  *
- * The capability owns the impure drivers (scheduler frames, state writes,
+ * The capability owns the impure drivers (the clock's frames, state writes,
  * gesture state); the laws those drivers integrate live here, parameterized
- * by elapsed time with no state and no scheduler, so they are unit-testable in
+ * by elapsed time with no state and no clock, so they are unit-testable in
  * isolation and have no plugin dependencies.
  *
  * Two families:

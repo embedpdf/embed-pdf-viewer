@@ -7,8 +7,9 @@
  * its semantic moments (the selection handler on a long-press word-select).
  * The plugin itself stays DOM-free — the provider is injected from outside
  * (`@embedpdf/web` ships `vibrationFeedback` and a WKWebView bridge; native
- * shells bring their own), exactly like the stage's Scheduler seam: host
- * dependencies enter through explicit injection, never a hidden global.
+ * shells bring their own), as the host's clock enters the kernel
+ * (`createKernel({ clock })`): host dependencies enter through explicit
+ * injection, never a hidden global.
  *
  * The vocabulary is deliberately the platform's haptic taxonomy — iOS's three
  * generator families, which Android mirrors in `HapticFeedbackConstants` and

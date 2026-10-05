@@ -59,9 +59,9 @@ export interface StageState extends StageSettings {
 }
 
 export const initialStageState = (config: StageConfig): StageState => {
-  // `scheduler` and `responsive` configure the capability, not the settings:
-  // strip them so the spread below stays a pure settings override.
-  const { scheduler: _scheduler, responsive: _responsive, ...overrides } = config;
+  // `responsive` configures the capability, not the settings: strip it so the
+  // spread below stays a pure settings override.
+  const { responsive: _responsive, ...overrides } = config;
   return {
     camera: { x: 0, y: 0, zoom: 1 },
     placed: false,

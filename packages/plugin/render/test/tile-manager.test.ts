@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { PageImageHandle } from '@embedpdf/core';
+import { timerClock, type PageImageHandle } from '@embedpdf/core';
 import type { Rect } from '@embedpdf/core-geometry';
 
 import { resolveRenderOptions, type TilesOptions } from '../src/paint-plan';
@@ -22,9 +22,15 @@ const LATTICE = {
   enforced: false,
 } as const;
 
-function createHarness(options?: { policy?: unknown; tiling?: TilesOptions }) {
+function createHarness(options?: {
+  policy?: unknown;
+  tiling?: TilesOptions;
+  priorityOf?: (pageObjectNumber: number, prefetch: boolean) => number;
+}) {
   const store = new RasterStore(256);
   const pending: Array<{
+    page: number;
+    prefetch: () => boolean;
     key: string;
     rect: Rect;
     scale: number;
@@ -43,9 +49,13 @@ function createHarness(options?: { policy?: unknown; tiling?: TilesOptions }) {
     getPolicy: () => (options?.policy === undefined ? LATTICE : options.policy) as never,
     getPageSize: () => PAGE,
     getEpoch: () => epoch,
-    fetchTile: (_pageObjectNumber, rect, scale, _includeAnnotations, signal) =>
+    after: timerClock.after,
+    priorityOf: options?.priorityOf ?? (() => 0),
+    fetchTile: (pageObjectNumber, rect, scale, _includeAnnotations, signal, prefetch) =>
       new Promise<PageImageHandle>((resolve, reject) => {
         const record = {
+          page: pageObjectNumber,
+          prefetch,
           key: `${rect.x},${rect.y}@${scale}`,
           rect,
           scale,
@@ -365,6 +375,43 @@ describe('TileManager', () => {
     // A level change clears the failure memory — the coord gets fresh chances.
     harness.manager.plan(1, { ...DEEP, desiredDeviceWidth: 9792 }, true);
     expect(harness.pending.length).toBeGreaterThan(before);
+  });
+});
+
+describe('one line across pages (render priority)', () => {
+  // A wide strip at scale 8: 10 × 4 visible tiles, more than the 8 transit slots.
+  const STRIP = { desiredDeviceWidth: 4896, visibleRect: { x: 0, y: 0, width: 612, height: 256 } };
+
+  it('a freed slot goes to the most urgent page, not to the page that planned first', async () => {
+    const harness = createHarness({
+      tiling: { prefetch: { margin: 0 } },
+      priorityOf: (page) => (page === 2 ? 10 : 1),
+    });
+    harness.manager.plan(1, STRIP, true);
+    harness.manager.plan(2, STRIP, true);
+    // Page 1 planned first and took every slot; page 2 waits.
+    expect(harness.pending.map((request) => request.page)).toEqual(Array(8).fill(1));
+
+    harness.pending[0]!.resolve();
+    await drain();
+    expect(harness.pending).toHaveLength(9);
+    expect(harness.pending[8]!.page).toBe(2);
+  });
+
+  it("a ring tile that a pan brings on screen stops counting as prefetch while it's in flight", async () => {
+    const harness = createHarness();
+    harness.manager.plan(1, DEEP, true);
+    await harness.resolveAll();
+    harness.manager.plan(1, DEEP, true); // every visible tile ready: the ring starts
+    const ring = harness.pending.slice(4);
+    expect(ring.length).toBeGreaterThan(0);
+    expect(ring.every((request) => request.prefetch())).toBe(true);
+
+    // One tile-span right: the column right of the old view is on screen now.
+    const panned = { ...DEEP, visibleRect: { x: 64, y: 0, width: 128, height: 128 } };
+    harness.manager.plan(1, panned, true);
+    const onScreen = ring.filter((request) => !request.aborted() && !request.prefetch());
+    expect(onScreen.map((request) => request.rect.x)).toEqual([128, 128]);
   });
 });
 

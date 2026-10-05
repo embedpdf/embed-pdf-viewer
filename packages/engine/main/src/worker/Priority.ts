@@ -6,6 +6,12 @@
 export const Priority = {
   LOW: 0,
   MEDIUM: 100,
+  /**
+   * Page renders: after the writes and opens a caller waits on (a scroll's
+   * renders never hold up an edit), before reads. A render's own priority
+   * orders renders among themselves, as the job's rank.
+   */
+  RENDER: 150,
   HIGH: 200,
   CRITICAL: 300,
 } as const;

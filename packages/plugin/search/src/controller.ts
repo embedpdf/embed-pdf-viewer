@@ -354,19 +354,16 @@ export function createSearchController(ctx: PluginContext<SearchState, SearchSet
     connect() {
       // Every confirmed mutation (own or remote) invalidates cursors and can change
       // what is findable, so the running or finished session re-runs its query.
-      let timer: ReturnType<typeof setTimeout> | null = null;
+      let cancelRerun: (() => void) | null = null;
       ctx.listen(ctx.doc.events, () => {
         if (state().status === 'idle') return;
-        if (timer !== null) clearTimeout(timer);
-        timer = setTimeout(() => {
-          timer = null;
+        cancelRerun?.();
+        cancelRerun = ctx.clock.after(RERUN_DELAY_MS, () => {
+          cancelRerun = null;
           void api.refresh().catch(() => {
             /* surfaced through getStatus() and onFailed */
           });
-        }, RERUN_DELAY_MS);
-      });
-      ctx.cleanup(() => {
-        if (timer !== null) clearTimeout(timer);
+        });
       });
     },
   };

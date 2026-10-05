@@ -14,6 +14,8 @@ import {
   type LocalPageRenderService as LocalPageRenderServiceContract,
   type PageRef,
   checkImageQuality,
+  pageRenderTask,
+  type PageRenderTask,
 } from '@embedpdf/engine-core/runtime';
 
 import type { LocalImageEncoder } from '../render/BrowserImageEncoder';
@@ -38,10 +40,13 @@ export class LocalPageRenderService implements LocalPageRenderServiceContract {
     private readonly policy: EngineRenderPolicy = CONTINUOUS_RENDER_POLICY,
   ) {}
 
-  raw(options?: PageRenderOptions): AbortablePromise<PageRenderRaster> {
+  raw(options?: PageRenderOptions): PageRenderTask<PageRenderRaster> {
     if (this.view.isClosed()) {
-      return AbortablePromise.rejectReason(
-        new EngineError(EngineErrorCode.DocNotOpen, `document not open: ${this.docId}`),
+      return pageRenderTask(
+        AbortablePromise.rejectReason(
+          new EngineError(EngineErrorCode.DocNotOpen, `document not open: ${this.docId}`),
+        ),
+        () => {},
       );
     }
     // Cloud parity: /render gates on `doc.render` (the session-level
@@ -56,11 +61,13 @@ export class LocalPageRenderService implements LocalPageRenderServiceContract {
       this.guard.assertCapability('doc.render');
       assertFullPageOnLattice(this.policy, options);
     } catch (err) {
-      return AbortablePromise.rejectReason(err);
+      return pageRenderTask(AbortablePromise.rejectReason(err), () => {});
     }
     const effectiveOptions = withRenderBudget(this.policy, options);
     const docId = this.docId;
     const ref = this.ref;
+    // The priority as it is when the request is sent, for the worker's own line.
+    let priority = options?.priority ?? 0;
     const submission = this.queue.enqueue<WorkerResultPayload>(
       {
         buildPack: (jobId: JobId) =>
@@ -69,12 +76,12 @@ export class LocalPageRenderService implements LocalPageRenderServiceContract {
             jobId,
             docId,
             page: ref,
-            options: effectiveOptions,
+            options: { ...effectiveOptions, priority },
           }),
       },
-      { priority: Priority.HIGH },
+      { priority: Priority.RENDER, rank: priority },
     );
-    return AbortablePromise.run<PageRenderRaster>(async (signal) => {
+    const task = AbortablePromise.run<PageRenderRaster>(async (signal) => {
       const onAbort = () => submission.abort(signal.reason);
       if (signal.aborted) onAbort();
       else signal.addEventListener('abort', onAbort, { once: true });
@@ -88,12 +95,19 @@ export class LocalPageRenderService implements LocalPageRenderServiceContract {
         transform: renderTransform(area, options?.rotation ?? 0, raster.width, raster.height),
       };
     });
+    return pageRenderTask(task, (next) => {
+      priority = next;
+      submission.setRank(next);
+    });
   }
 
-  image(options: PageImageOptions = {}): AbortablePromise<PageRenderImage> {
-    return AbortablePromise.run<PageRenderImage>(async (signal) => {
+  image(options: PageImageOptions = {}): PageRenderTask<PageRenderImage> {
+    // Set before `image` returns: the body runs up to its first await at once.
+    let rawTask: PageRenderTask<PageRenderRaster> | undefined;
+    const task = AbortablePromise.run<PageRenderImage>(async (signal) => {
       checkImageQuality(options.quality);
       const raw = this.raw(options);
+      rawTask = raw;
       const onAbort = () => raw.abort(signal.reason);
       if (signal.aborted) onAbort();
       else signal.addEventListener('abort', onAbort, { once: true });
@@ -117,6 +131,7 @@ export class LocalPageRenderService implements LocalPageRenderServiceContract {
       });
       return { ...handle, transform: raster.transform };
     });
+    return pageRenderTask(task, (priority) => rawTask?.setPriority(priority));
   }
 }
 

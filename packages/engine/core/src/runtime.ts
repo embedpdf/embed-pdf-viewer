@@ -98,7 +98,12 @@ export type {
   PieceInfoSnapshot,
 } from './dto/PieceInfo';
 export type { PageTextService } from './engine/PageTextService';
-export type { LocalPageRenderService, PageRenderService } from './engine/PageRenderService';
+export type {
+  LocalPageRenderService,
+  PageRenderService,
+  PageRenderTask,
+} from './engine/PageRenderService';
+export { pageRenderTask } from './engine/PageRenderService';
 
 export { wirePack, EMPTY_TRANSFER } from './wire/WirePack';
 export type { WirePack } from './wire/WirePack';

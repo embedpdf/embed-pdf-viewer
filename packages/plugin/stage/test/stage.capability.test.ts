@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createCapabilityToken, toPageRef } from '@embedpdf/core';
-import { createTestContext } from '@embedpdf/core/testing';
+import { createTestContext, manualClock } from '@embedpdf/core/testing';
+import type { HostClock } from '@embedpdf/core';
 import { createStageController } from '../src/controller';
 import { initialStageState } from '../src/model';
 import { DEFAULT_SETTINGS, settingsEqual } from '../src/settings';
@@ -15,16 +16,18 @@ interface MutableRegistry {
 
 /**
  * Drive the real controller against the real transitions and the real
- * stage-core, with a test document and an injectable scheduler. No DOM and
- * no async: the stage is deterministically testable because the core is pure.
+ * stage-core, with a test document and, where motion matters, a clock the
+ * test steps by hand. No DOM and no async: the stage is deterministically
+ * testable because the core is pure.
  */
 function harness(
   sizes: Array<{ width: number; height: number; rotation?: 0 | 90 | 180 | 270 }>,
   config: StageConfig = {},
-  options: { skipViewport?: boolean } = {},
+  options: { skipViewport?: boolean; clock?: HostClock } = {},
 ) {
   const ctx = createTestContext({
     id: 'stage',
+    clock: options.clock,
     // Lay out at 1:1 (world units = points) so absolute-size assertions read
     // cleanly; the 96/72 physical factor is covered by the stage-core layout test.
     state: initialStageState({ viewUnitsPerPoint: 1, ...config }),
@@ -609,52 +612,30 @@ describe('flow: paged (same scene, smaller clamp rect — no index state)', () =
   });
 });
 
-describe('smooth scroll via the injected scheduler', () => {
+describe('smooth scroll over a clock the test steps', () => {
   it('tweens to the target across frames (deterministic, no real time)', () => {
-    const frames: Array<(timestamp: number) => void> = [];
-    const scheduler = {
-      raf: (callback: (timestamp: number) => void) => {
-        frames.push(callback);
-        return frames.length;
-      },
-      caf: () => {},
-    };
-    const { stage } = harness(PORTRAIT, { scheduler });
-    expect(frames.length).toBe(0); // placement was instant
+    const time = manualClock();
+    const { stage } = harness(PORTRAIT, {}, { clock: time.clock });
+    expect(time.pending.frames).toBe(0); // placement was instant
 
     stage.goToPage(4); // smooth (default)
-    expect(frames.length).toBeGreaterThan(0);
+    expect(time.pending.frames).toBeGreaterThan(0);
 
-    const run = (timestamp: number) => frames.splice(0).forEach((callback) => callback(timestamp));
-    run(0); // first frame: k = 0
-    run(120); // mid
-    run(240); // final: k = 1 → at target
+    time.frame(0); // first frame: k = 0
+    time.frame(120); // mid
+    time.frame(240); // final: k = 1 → at target
     expect(stage.getCurrentPageIndex()).toBe(4);
   });
 
   it('a report of the same viewport size never cancels a tween', () => {
-    // Frames by id, so a cancelled one never runs.
-    const frames = new Map<number, (timestamp: number) => void>();
-    let nextId = 0;
-    const scheduler = {
-      raf: (callback: (timestamp: number) => void) => {
-        frames.set(++nextId, callback);
-        return nextId;
-      },
-      caf: (id: number) => void frames.delete(id),
-    };
-    const { stage } = harness(PORTRAIT, { scheduler });
+    const time = manualClock();
+    const { stage } = harness(PORTRAIT, {}, { clock: time.clock });
     // A reveal as the view opens, then the ResizeObserver's first callback, repeating the size.
     stage.reveal(3, { rect: { x: 72, y: 72, width: 468, height: 96 }, zoom: 'fit-width' });
     stage.setViewportSize({ width: 1000, height: 700 });
-    const run = (timestamp: number) => {
-      const due = [...frames.values()];
-      frames.clear();
-      due.forEach((callback) => callback(timestamp));
-    };
-    run(0);
-    run(120);
-    run(240);
+    time.frame(0);
+    time.frame(120);
+    time.frame(240);
     // The box is on screen, not the zoom alone at the top of page 1.
     const page = stage.getPageFrame(toPageRef(4))!;
     const top = stage.worldToViewport({ x: page.x, y: page.y + 72 }).y;
@@ -664,27 +645,38 @@ describe('smooth scroll via the injected scheduler', () => {
 });
 
 describe('the instance owns its frames and its viewport', () => {
-  it('cancels the frames still scheduled when it closes, and schedules none after', async () => {
-    // Frames by id, so a cancelled one never runs.
-    const frames = new Map<number, (timestamp: number) => void>();
-    let nextId = 0;
-    const scheduler = {
-      raf: (callback: (timestamp: number) => void) => {
-        frames.set(++nextId, callback);
-        return nextId;
-      },
-      caf: (id: number) => void frames.delete(id),
-    };
-    const { stage, ctx } = harness(PORTRAIT, { scheduler });
+  it('cancels the frames and timers still scheduled when it closes, and schedules none after', async () => {
+    const time = manualClock();
+    const { stage, ctx } = harness(PORTRAIT, {}, { clock: time.clock });
     stage.zoomTo(2); // the camera-rest countdown
     stage.goToPage(3); // a tween
-    expect(frames.size).toBeGreaterThan(1);
+    expect(time.pending).toEqual({ timers: 1, frames: 1 });
 
     // The document closes mid-flight (a page left in the docs tears its demos down this way).
     await ctx.dispose();
-    expect(frames.size).toBe(0);
+    expect(time.pending).toEqual({ timers: 0, frames: 0 });
     stage.goToPage(1);
-    expect(frames.size).toBe(0);
+    expect(time.pending).toEqual({ timers: 0, frames: 0 });
+  });
+
+  it('counts the camera as resting once the zoom has held still for a moment', () => {
+    const time = manualClock();
+    const { stage, ctx } = harness(PORTRAIT, {}, { clock: time.clock });
+    expect(ctx.state.get().cameraResting).toBe(true);
+    stage.zoomTo(2);
+    expect(ctx.state.get().cameraResting).toBe(false);
+    time.advance(100);
+    stage.zoomTo(2.5); // moved again: the wait starts over
+    time.advance(100);
+    expect(ctx.state.get().cameraResting).toBe(false);
+    time.advance(50);
+    expect(ctx.state.get().cameraResting).toBe(true);
+  });
+
+  it('on a host without frames, the camera always rests (pages always snap)', () => {
+    const { stage, ctx } = harness(PORTRAIT);
+    stage.zoomTo(2);
+    expect(ctx.state.get().cameraResting).toBe(true);
   });
 
   it('keeps its viewport and view through a report with no area, and carries on after', () => {
@@ -792,22 +784,14 @@ describe('the scroller contract — the camera in native DOM vocabulary', () => 
   });
 
   it('smooth scrollTo tweens and syncs the cursor on arrival', () => {
-    const frames: Array<(timestamp: number) => void> = [];
-    const scheduler = {
-      raf: (callback: (timestamp: number) => void) => {
-        frames.push(callback);
-        return frames.length;
-      },
-      caf: () => {},
-    };
-    const { stage } = harness(PORTRAIT, { scheduler });
+    const time = manualClock();
+    const { stage } = harness(PORTRAIT, {}, { clock: time.clock });
     stage.scrollTo({ top: 2500, behavior: 'smooth' });
-    expect(frames.length).toBeGreaterThan(0);
-    const run = (timestamp: number) => frames.splice(0).forEach((callback) => callback(timestamp));
-    run(0);
-    run(120);
+    expect(time.pending.frames).toBeGreaterThan(0);
+    time.frame(0);
+    time.frame(120);
     expect(stage.getCurrentPageIndex()).toBe(0); // mid-tween: cursor not yet synced
-    run(240);
+    time.frame(240);
     expect(stage.getScrollMetrics().scrollTop).toBeCloseTo(2500, 1);
     expect(stage.getCurrentPageIndex()).toBeGreaterThan(0); // synced on natural completion
   });
@@ -1036,22 +1020,14 @@ describe('cursor is INTENT: a clamped camera never revokes navigation', () => {
   });
 
   it('a smooth tween never flickers the cursor off its target', () => {
-    const frames: Array<(timestamp: number) => void> = [];
-    const scheduler = {
-      raf: (callback: (timestamp: number) => void) => {
-        frames.push(callback);
-        return frames.length;
-      },
-      caf: () => {},
-    };
-    const { stage } = harness(FOUR, { ...config, scheduler });
+    const time = manualClock();
+    const { stage } = harness(FOUR, config, { clock: time.clock });
     stage.goToPage(3); // smooth
     expect(stage.getCurrentPageIndex()).toBe(3); // intent holds immediately
-    const run = (timestamp: number) => frames.splice(0).forEach((callback) => callback(timestamp));
-    run(0);
-    run(120);
+    time.frame(0);
+    time.frame(120);
     expect(stage.getCurrentPageIndex()).toBe(3); // …and mid-tween
-    run(240);
+    time.frame(240);
     expect(stage.getCurrentPageIndex()).toBe(3); // …and at the end
   });
 });
@@ -1823,27 +1799,15 @@ describe("VisiblePage.visibleRect — visibility is the stage's data", () => {
 });
 
 // ── touch physics: gesture bracket, fling, double-tap ──
-// A manual scheduler makes the fling and tween loops fully deterministic:
-// `step(timestamp)` fires every currently queued frame callback with that timestamp.
-function manualScheduler() {
-  const queue = new Map<number, (timestamp: number) => void>();
-  let lastHandle = 0;
+// A clock the test steps makes the fling and tween loops fully deterministic:
+// `step(timestamp)` shows a frame at that time, running every frame callback
+// waiting for it; `pending()` counts the ones waiting.
+function manualFrames() {
+  const time = manualClock();
   return {
-    scheduler: {
-      raf: (callback: (timestamp: number) => void) => {
-        queue.set(++lastHandle, callback);
-        return lastHandle;
-      },
-      caf: (handle: number) => {
-        queue.delete(handle);
-      },
-    },
-    step(timestamp: number) {
-      const callbacks = [...queue.values()];
-      queue.clear();
-      callbacks.forEach((callback) => callback(timestamp));
-    },
-    pending: () => queue.size,
+    clock: time.clock,
+    step: (timestamp: number) => time.frame(timestamp),
+    pending: () => time.pending.frames,
   };
 }
 
@@ -1884,8 +1848,8 @@ describe('gesture bracket (beginGesture/endGesture)', () => {
 
 describe('fling (momentum pan)', () => {
   it('decelerates on the UIScrollView curve and comes to rest', () => {
-    const clock = manualScheduler();
-    const { stage } = harness(PORTRAIT, { scheduler: clock.scheduler });
+    const clock = manualFrames();
+    const { stage } = harness(PORTRAIT, {}, { clock: clock.clock });
     const startY = stage.getCamera().y;
     stage.fling(0, -1000); // a 1000 px/s upward flick (content scrolls down)
     const deltas: number[] = [];
@@ -1909,8 +1873,8 @@ describe('fling (momentum pan)', () => {
   });
 
   it('is caught by the next gesture (beginGesture cancels it)', () => {
-    const clock = manualScheduler();
-    const { stage } = harness(PORTRAIT, { scheduler: clock.scheduler });
+    const clock = manualFrames();
+    const { stage } = harness(PORTRAIT, {}, { clock: clock.clock });
     stage.fling(0, -1000);
     clock.step(0);
     clock.step(16);
@@ -1922,8 +1886,8 @@ describe('fling (momentum pan)', () => {
   });
 
   it('BOUNCES off a content edge: overshoots, springs back, lands exactly at rest', () => {
-    const clock = manualScheduler();
-    const { stage } = harness(PORTRAIT, { scheduler: clock.scheduler });
+    const clock = manualFrames();
+    const { stage } = harness(PORTRAIT, {}, { clock: clock.clock });
     const startY = stage.getCamera().y; // resting at the top already
     stage.fling(0, 5000); // flick downward: content wants to move down — no room
     let timestamp = 0;
@@ -1941,8 +1905,8 @@ describe('fling (momentum pan)', () => {
   });
 
   it('below the stop threshold nothing starts', () => {
-    const clock = manualScheduler();
-    const { stage } = harness(PORTRAIT, { scheduler: clock.scheduler });
+    const clock = manualFrames();
+    const { stage } = harness(PORTRAIT, {}, { clock: clock.clock });
     stage.fling(0, -10); // 10 px/s: imperceptible
     expect(clock.pending()).toBe(0);
   });
@@ -1954,7 +1918,7 @@ describe('doubleTapZoom', () => {
   // fit (inspect) → reset to the base. Stops within 10% collapse.
   const FIT_WIDTH = (1000 - 2 * PAD) / 600; // 1.586̄ in the `PORTRAIT` harness
 
-  const settle = (clock: ReturnType<typeof manualScheduler>, from: number): number => {
+  const settle = (clock: ReturnType<typeof manualFrames>, from: number): number => {
     let timestamp = from;
     while (clock.pending() > 0 && timestamp < from + 5000) {
       clock.step(timestamp);
@@ -1964,8 +1928,8 @@ describe('doubleTapZoom', () => {
   };
 
   it('climbs the ladder: automatic → fit-width → detail → reset to the base', () => {
-    const clock = manualScheduler();
-    const { stage } = harness(PORTRAIT, { scheduler: clock.scheduler });
+    const clock = manualFrames();
+    const { stage } = harness(PORTRAIT, {}, { clock: clock.clock });
     const base = stage.getZoomLevel(); // automatic fit (1: capped at 100%)
     let timestamp = 0;
     stage.doubleTapZoom({ x: 500, y: 350 });
@@ -1981,8 +1945,8 @@ describe('doubleTapZoom', () => {
   });
 
   it('zoomed far OUT, the first tap lands on the nearest posture above, not the top', () => {
-    const clock = manualScheduler();
-    const { stage } = harness(PORTRAIT, { scheduler: clock.scheduler });
+    const clock = manualFrames();
+    const { stage } = harness(PORTRAIT, {}, { clock: clock.clock });
     stage.zoomTo({ level: 0.5 });
     stage.doubleTapZoom({ x: 500, y: 350 });
     settle(clock, 0);
@@ -1990,8 +1954,8 @@ describe('doubleTapZoom', () => {
   });
 
   it('phone shape (automatic IS fit-width): the ladder degenerates to the familiar toggle', () => {
-    const clock = manualScheduler();
-    const { stage } = harness(PORTRAIT, { scheduler: clock.scheduler });
+    const clock = manualFrames();
+    const { stage } = harness(PORTRAIT, {}, { clock: clock.clock });
     stage.setViewportSize({ width: 393, height: 700 });
     // 393 < 600 → the default 'compact' responsive rule asserts padding 4
     const fitWidth = (393 - 2 * 4) / 600; // automatic == fit-width below 100%
@@ -2006,8 +1970,8 @@ describe('doubleTapZoom', () => {
   });
 
   it('phone shape zoomed far out: the first tap restores fit-width (the platform feel)', () => {
-    const clock = manualScheduler();
-    const { stage } = harness(PORTRAIT, { scheduler: clock.scheduler });
+    const clock = manualFrames();
+    const { stage } = harness(PORTRAIT, {}, { clock: clock.clock });
     stage.setViewportSize({ width: 393, height: 700 });
     stage.zoomTo({ level: 0.3 });
     stage.doubleTapZoom({ x: 200, y: 350 });
@@ -2016,8 +1980,8 @@ describe('doubleTapZoom', () => {
   });
 
   it('pinched IN between rungs: double-tap RESETS to the base fit, never climbs (iOS)', () => {
-    const clock = manualScheduler();
-    const { stage } = harness(PORTRAIT, { scheduler: clock.scheduler });
+    const clock = manualFrames();
+    const { stage } = harness(PORTRAIT, {}, { clock: clock.clock });
     stage.setViewportSize({ width: 393, height: 700 });
     const fitWidth = (393 - 2 * 4) / 600;
     stage.zoomTo({ level: fitWidth * 1.5 }); // a pinch left the ladder
@@ -2027,8 +1991,8 @@ describe('doubleTapZoom', () => {
   });
 
   it('pinched BEYOND the top rung: double-tap also resets to the base fit', () => {
-    const clock = manualScheduler();
-    const { stage } = harness(PORTRAIT, { scheduler: clock.scheduler });
+    const clock = manualFrames();
+    const { stage } = harness(PORTRAIT, {}, { clock: clock.clock });
     stage.setViewportSize({ width: 393, height: 700 });
     const fitWidth = (393 - 2 * 4) / 600;
     stage.zoomTo({ level: fitWidth * 3.4 }); // past detail (2.5×)
@@ -2038,8 +2002,8 @@ describe('doubleTapZoom', () => {
   });
 
   it('"at a rung" tolerates ±10% fit drift — a near-fit zoom still climbs', () => {
-    const clock = manualScheduler();
-    const { stage } = harness(PORTRAIT, { scheduler: clock.scheduler });
+    const clock = manualFrames();
+    const { stage } = harness(PORTRAIT, {}, { clock: clock.clock });
     stage.setViewportSize({ width: 393, height: 700 });
     const fitWidth = (393 - 2 * 4) / 600;
     stage.zoomTo({ level: fitWidth * 1.05 }); // within the rung's band
@@ -2049,8 +2013,8 @@ describe('doubleTapZoom', () => {
   });
 
   it('desktop off-ladder reset lands on the base rung (automatic)', () => {
-    const clock = manualScheduler();
-    const { stage } = harness(PORTRAIT, { scheduler: clock.scheduler });
+    const clock = manualFrames();
+    const { stage } = harness(PORTRAIT, {}, { clock: clock.clock });
     stage.zoomTo({ level: 2.0 }); // between fit-width (1.59) and detail (2.5)
     stage.doubleTapZoom({ x: 500, y: 350 });
     settle(clock, 0);
@@ -2060,8 +2024,8 @@ describe('doubleTapZoom', () => {
 
 describe('doubleTapZoom interruption (catch) consistency', () => {
   it('commits the zoom intent UP FRONT — a caught tween never strands a fit intent', () => {
-    const clock = manualScheduler();
-    const { stage } = harness(PORTRAIT, { scheduler: clock.scheduler });
+    const clock = manualFrames();
+    const { stage } = harness(PORTRAIT, {}, { clock: clock.clock });
     expect(stage.getZoomMode()).toBe('automatic');
     stage.doubleTapZoom({ x: 500, y: 350 });
     // the intent is already recorded, before a single frame runs
@@ -2107,8 +2071,8 @@ describe('rubber-band overscroll (elastic gestures)', () => {
   });
 
   it('release while stretched SPRINGS home to the exact clamp position', () => {
-    const clock = manualScheduler();
-    const { stage } = harness(PORTRAIT, { scheduler: clock.scheduler });
+    const clock = manualFrames();
+    const { stage } = harness(PORTRAIT, {}, { clock: clock.clock });
     const rest = stage.getCamera().y;
     stage.beginGesture({ elastic: true });
     stage.panBy(0, 300);
@@ -2133,8 +2097,8 @@ describe('rubber-band overscroll (elastic gestures)', () => {
   });
 
   it('catching a mid-bounce stretch holds it and hands it to the finger', () => {
-    const clock = manualScheduler();
-    const { stage } = harness(PORTRAIT, { scheduler: clock.scheduler });
+    const clock = manualFrames();
+    const { stage } = harness(PORTRAIT, {}, { clock: clock.clock });
     const rest = stage.getCamera().y;
     stage.beginGesture({ elastic: true });
     stage.panBy(0, 300);
@@ -2179,8 +2143,8 @@ describe('fitting axes stay RIGID (no overscroll without travel)', () => {
   });
 
   it('whole document visible: drags move nothing and release starts no spring', () => {
-    const clock = manualScheduler();
-    const { stage } = harness([{ width: 600, height: 500 }], { scheduler: clock.scheduler });
+    const clock = manualFrames();
+    const { stage } = harness([{ width: 600, height: 500 }], {}, { clock: clock.clock });
     const rest = stage.getCamera();
     stage.beginGesture({ elastic: true });
     stage.panBy(100, 80);
@@ -2191,8 +2155,8 @@ describe('fitting axes stay RIGID (no overscroll without travel)', () => {
   });
 
   it('a fling discards the fit-axis velocity: y glides, x never moves', () => {
-    const clock = manualScheduler();
-    const { stage } = harness(PORTRAIT, { scheduler: clock.scheduler });
+    const clock = manualFrames();
+    const { stage } = harness(PORTRAIT, {}, { clock: clock.clock });
     const rest = stage.getCamera();
     stage.fling(800, -600); // strong horizontal component into the fit axis
     let timestamp = 0;
@@ -2319,8 +2283,8 @@ describe('responsive settings (container queries for the settings bag)', () => {
 
 describe('doubleTapZoom animation — the focal point holds still by construction', () => {
   it('keeps the tapped page point stationary at EVERY tween frame', () => {
-    const clock = manualScheduler();
-    const { stage } = harness(PORTRAIT, { scheduler: clock.scheduler });
+    const clock = manualFrames();
+    const { stage } = harness(PORTRAIT, {}, { clock: clock.clock });
     const point = { x: 500, y: 350 };
     const world = stage.viewportToWorld(point); // the content under the tap
     stage.doubleTapZoom(point);
@@ -2339,8 +2303,8 @@ describe('doubleTapZoom animation — the focal point holds still by constructio
   });
 
   it('interpolates the zoom GEOMETRICALLY (constant rate), not linearly', () => {
-    const clock = manualScheduler();
-    const { stage } = harness(PORTRAIT, { scheduler: clock.scheduler });
+    const clock = manualFrames();
+    const { stage } = harness(PORTRAIT, {}, { clock: clock.clock });
     const startZoom = stage.getZoomLevel();
     const target = (1000 - 2 * PAD) / 600; // the first ladder stop above automatic
     stage.doubleTapZoom({ x: 500, y: 350 });

@@ -61,4 +61,35 @@ describe('IndexedPriorityHeap', () => {
     }
     expect(popped).toBe(100);
   });
+
+  test('ranks order items of one priority, below any higher priority', () => {
+    const heap = new IndexedPriorityHeap<string>();
+    heap.push('render-low', 150, 1);
+    heap.push('write', 200);
+    heap.push('render-high', 150, 9);
+    heap.push('read', 100, 50);
+    expect([heap.popMax(), heap.popMax(), heap.popMax(), heap.popMax()]).toEqual([
+      'write',
+      'render-high',
+      'render-low',
+      'read',
+    ]);
+  });
+
+  test('setRank moves a waiting item, which keeps its place among equals', () => {
+    const heap = new IndexedPriorityHeap<string>();
+    heap.push('a', 0, 5);
+    const b = heap.push('b', 0, 1);
+    heap.push('c', 0, 5);
+    const d = heap.push('d', 0, 9);
+    expect(heap.setRank(b, 5)).toBe(true); // now equal to a and c, inserted between them
+    expect(heap.setRank(d, 0)).toBe(true);
+    expect([heap.popMax(), heap.popMax(), heap.popMax(), heap.popMax()]).toEqual([
+      'a',
+      'b',
+      'c',
+      'd',
+    ]);
+    expect(heap.setRank(b, 7)).toBe(false); // gone
+  });
 });

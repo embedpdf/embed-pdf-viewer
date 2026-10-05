@@ -6,6 +6,7 @@
  * (a release over the page gap must not strand the move draft, or the
  * annotation snaps back on the next interaction).
  */
+import { timerClock } from '@embedpdf/core';
 import type { Point } from '@embedpdf/core-annotation';
 import { pageRefsEqual, toPageRef, type PageRef } from '@embedpdf/engine-core/runtime';
 import type {
@@ -180,7 +181,7 @@ describe('annotation draw handler — grouped ink', () => {
         onToolChanged: () => () => {},
         claimCursor: () => {},
       } as unknown as InteractionHostCapability;
-      const handler = createDrawHandler(anno, inkInteraction);
+      const handler = createDrawHandler(anno, inkInteraction, timerClock);
       const at = (phase: PointerSample['phase'], x: number) =>
         sample({ phase, page: { ref: PAGE_1, point: { x, y: 20 } } });
 
@@ -220,7 +221,7 @@ describe('annotation draw handler — grouped ink', () => {
         claimCursor: () => {},
       } as unknown as InteractionHostCapability;
       let settle = () => {};
-      const handler = createDrawHandler(anno, inkInteraction, (flush) => {
+      const handler = createDrawHandler(anno, inkInteraction, timerClock, (flush) => {
         settle = flush;
       });
       const at = (phase: PointerSample['phase'], x: number) =>
@@ -301,7 +302,7 @@ describe('annotation draw handler — cancel discards the draft', () => {
 
   it('onCancel drops the draft — no up, no commit at the cancelling finger', () => {
     const { anno, calls } = makeDrawAnno();
-    const handler = createDrawHandler(anno, drawInteraction);
+    const handler = createDrawHandler(anno, drawInteraction, timerClock);
     expect(handler.onDown(down())).toBe(true);
     handler.onMove?.(sample({ page: { ref: PAGE_1, point: { x: 350, y: 780 } } }));
     // the cancel sample carries the second finger's position — it must never
@@ -379,7 +380,7 @@ describe('distance placement — release, hover, click', () => {
       hasCursorClaim: () => false,
       onToolChanged: () => () => {},
     } as unknown as InteractionHostCapability;
-    const handler = createDrawHandler(anno, drawInteraction);
+    const handler = createDrawHandler(anno, drawInteraction, timerClock);
 
     handler.onDown(down());
     handler.onUp?.(sample({ phase: 'up', page: { ref: PAGE_1, point: { x: 400, y: 730 } } }));
@@ -423,7 +424,7 @@ describe('multi-click placement — hover off the page', () => {
       hasCursorClaim: () => false,
       onToolChanged: () => () => {},
     } as unknown as InteractionHostCapability;
-    return { handler: createDrawHandler(anno, drawInteraction), calls };
+    return { handler: createDrawHandler(anno, drawInteraction, timerClock), calls };
   }
 
   // Cursor over another page, or off every page: the projection onto page 1

@@ -57,7 +57,7 @@ export function connectAnnotation(
     createPlaceHandler(annotation, interaction),
     createEditHandler(annotation, interaction),
     createMarqueeHandler(annotation),
-    createDrawHandler(annotation, interaction, (flush) => ctx.onSettle(flush)),
+    createDrawHandler(annotation, interaction, ctx.clock, (flush) => ctx.onSettle(flush)),
   ]) {
     ctx.cleanup(interaction.registerHandler(handler));
   }
