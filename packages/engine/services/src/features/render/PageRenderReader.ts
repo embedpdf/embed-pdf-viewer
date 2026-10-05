@@ -12,21 +12,11 @@ import type { PdfRuntimeModule } from '@embedpdf/engine-runtime';
 import { FPDF_REVERSE_BYTE_ORDER, rasterizeAsync, readPageBox } from './deviceRaster';
 import type { DocumentSession } from '../../document-session/DocumentSession';
 import { throwIfAborted } from '../../shared/abort';
+import type { Slices } from '../../shared/slices';
 
 const FPDF_RENDER_ANNOT = 0x01;
 const FPDF_RENDER_TOBECONTINUED = 1;
 const FPDF_RENDER_DONE = 2;
-
-/**
- * How a page render is sliced. PDFium renders for `budgetMs` at a time and the
- * render awaits `between()` before it goes on, so the thread can receive
- * messages meanwhile: an abort stops the render at the next slice. The bytes
- * are those of a render at once, however it is sliced.
- */
-export interface RenderSlices {
-  readonly budgetMs: number;
-  between(): Promise<void>;
-}
 
 export class PageRenderReader {
   constructor(
@@ -43,12 +33,13 @@ export class PageRenderReader {
     pageObjectNumber: PageObjectNumber,
     options: PageRenderOptions<PdfCoordinates>,
     signal: AbortSignal,
-    slices: RenderSlices,
+    slices: Slices,
   ): Promise<{ raster: PageRaster; area: PdfRect }> {
     throwIfAborted(signal);
     const { fn } = this.runtime;
     const pool = this.session.pagePool();
-    const pagePtr = pool.acquire(pageObjectNumber);
+    // A page not parsed yet loads in slices too, so an abort stops its load.
+    const pagePtr = await pool.acquireInSlices(pageObjectNumber, signal, slices);
 
     try {
       throwIfAborted(signal);

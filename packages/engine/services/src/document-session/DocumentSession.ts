@@ -1,3 +1,10 @@
+import {
+  EngineError,
+  EngineErrorCode,
+  knownWeakAnnotationState,
+  isValidPageObjectNumber,
+  toPageRef,
+} from '@embedpdf/engine-core/runtime';
 import type {
   DocumentVersionRef,
   PageObjectNumber,
@@ -10,13 +17,6 @@ import type {
   SignedDocumentPolicy,
   WeakAnnotationState,
 } from '@embedpdf/engine-core/runtime';
-import {
-  EngineError,
-  EngineErrorCode,
-  knownWeakAnnotationState,
-  isValidPageObjectNumber,
-  toPageRef,
-} from '@embedpdf/engine-core/runtime';
 import type { PageRef } from '@embedpdf/engine-core/runtime';
 import type { PdfRuntimeModule, Ptr } from '@embedpdf/engine-runtime';
 
@@ -27,9 +27,9 @@ import {
   type OpenedPdfDocument,
   type OpenedPdfDocumentKind,
 } from './lifecycle/PdfDocumentOpener';
-import type { IdlePageCache } from './pages/IdlePageCache';
 import { PagePtrPool } from './pages/PagePtrPool';
 import type { PageRecord } from './pages/PageRecord';
+import type { PageResidency } from './pages/PageResidency';
 import { LocalRevisionAuthority, type RevisionAuthority } from './revisions/RevisionAuthority';
 
 /**
@@ -89,10 +89,10 @@ export class DocumentSession {
   private mutationSeqCounter = 0;
   private pages: PagePtrPool | null = null;
   /**
-   * The runtime's cache for pages kept between jobs. Set before the document
+   * The runtime's parsed pages, kept between jobs. Set before the document
    * loads; without it every page closes when its last holder releases it.
    */
-  idlePages: IdlePageCache | null = null;
+  residency: PageResidency | null = null;
   /**
    * Whether writers honour what the document's signatures forbid (locked
    * fields, structural edits). Set at open from the engine option; the
@@ -172,7 +172,7 @@ export class DocumentSession {
     this._kind = handle.kind;
     this._source = handle.source;
     this.revisions = new LocalRevisionAuthority(this._sessionId);
-    this.pages = new PagePtrPool(this.runtime, handle.docPtr, this.idlePages);
+    this.pages = new PagePtrPool(this.runtime, handle.docPtr, this.residency);
     this.parkedLoad = null;
     this.drawings = null;
     this.loadedSeq = this.mutationSeqCounter;
@@ -228,7 +228,7 @@ export class DocumentSession {
     this.closeDocument = () => handle.close();
     this._kind = handle.kind;
     this._source = handle.source;
-    this.pages = new PagePtrPool(this.runtime, handle.docPtr, this.idlePages);
+    this.pages = new PagePtrPool(this.runtime, handle.docPtr, this.residency);
     this.recordsByIndex.clear();
     this.recordsByObjectNumber.clear();
     this.fullyEnumerated = false;
@@ -322,27 +322,15 @@ export class DocumentSession {
     const cached = this.recordsByObjectNumber.get(pageObjectNumber);
     if (cached) return cached;
 
-    // Probe the doc by loading the page directly via its object number;
-    // walk the index range to find which page index it lives at.
-    const { fn } = this.runtime;
-    const docPtr = this.requireDocPtr();
-    const probePtr = fn.EPDFDoc_LoadPageByObjectNumber(docPtr, pageObjectNumber);
-    if (!probePtr) {
-      throw new EngineError(
-        EngineErrorCode.NotFound,
-        `no page with object number ${pageObjectNumber}`,
-      );
-    }
-    fn.FPDF_ClosePage(probePtr);
-
-    // Now we know the page exists; fall back to a full enumeration to get
-    // its display index. This is O(pageCount) once per session.
+    // Enumerate the page tree for its display index: O(pageCount) once per
+    // session, and no page loads. (Loading a page to see that it exists would
+    // parse its whole content: seconds on a heavy page.)
     this.ensureFullPageRegistry();
     const found = this.recordsByObjectNumber.get(pageObjectNumber);
     if (!found) {
       throw new EngineError(
         EngineErrorCode.NotFound,
-        `page with object number ${pageObjectNumber} present but unindexable`,
+        `no page with object number ${pageObjectNumber}`,
       );
     }
     return found;

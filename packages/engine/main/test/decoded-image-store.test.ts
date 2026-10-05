@@ -14,7 +14,7 @@ function createFakeRuntime(options = { canStore: true }) {
 }
 
 describe('DecodedImageStore', () => {
-  test('keeps decodes during read-only jobs and empties the store before any other job', () => {
+  test('keeps decodes while jobs write nothing and empties the store before a write', () => {
     const { runtime, budgets } = createFakeRuntime();
     const store = new DecodedImageStore(runtime, 1000);
 

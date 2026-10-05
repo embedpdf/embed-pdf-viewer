@@ -326,7 +326,11 @@ describe.each(['wasm', 'native'] as const)('one create (%s runtime)', (prefer) =
 
   test('loads no page, for any kind', async () => {
     const { fault, worker, page, rect, create, note } = await withNote();
-    const loaders = ['EPDFDoc_LoadPageByObjectNumber', 'EPDFDoc_LoadPageByObjectNumberNormalized'];
+    const loaders = [
+      'EPDFDoc_LoadPageByObjectNumber',
+      'EPDFDoc_LoadPageByObjectNumberNormalized',
+      'EPDFDoc_StartLoadPageByObjectNumber',
+    ];
     fault.count(loaders);
     const drafts: Array<Record<string, unknown>> = [
       ...creatables()

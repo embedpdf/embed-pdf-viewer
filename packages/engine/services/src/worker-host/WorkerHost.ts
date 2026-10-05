@@ -124,7 +124,10 @@ import {
   openLayerDocument,
 } from '../document-session/lifecycle/PdfDocumentOpener';
 import { DecodedImageStore } from '../document-session/pages/DecodedImageStore';
-import { DEFAULT_IDLE_PAGE_POLICY, IdlePageCache } from '../document-session/pages/IdlePageCache';
+import {
+  DEFAULT_PAGE_RESIDENCY_POLICY,
+  PageResidency,
+} from '../document-session/pages/PageResidency';
 import { DocumentActionsReader } from '../features/actions';
 import {
   AnnotationAppearanceReader,
@@ -151,7 +154,7 @@ import {
 } from '../features/pages';
 import { PieceInfoAccessor } from '../features/pieceinfo';
 import { RedactionApplier } from '../features/redaction';
-import { PageRenderReader, type RenderSlices } from '../features/render';
+import { PageRenderReader } from '../features/render';
 import { DocumentSaver } from '../features/save';
 import { SearchReader } from '../features/search';
 import { SecurityReader } from '../features/security';
@@ -165,6 +168,7 @@ import {
 } from '../features/signature';
 import { PageTextReader } from '../features/text';
 import { ensureInitialized, destroyLibrary } from '../runtime/lifecycle/bootstrap';
+import type { Slices } from '../shared/slices';
 import { generateUuid } from '../shared/uuid';
 import { createEventLoopYield } from '../shared/yield';
 
@@ -200,10 +204,16 @@ export interface WorkerHostOptions {
    */
   signingCandidatePath?: (basePath: string, signingId: string) => string;
   /**
-   * Bytes of decoded images kept between read-only jobs (see
+   * Bytes of decoded images kept between jobs that write nothing (see
    * {@link DecodedImageStore}). Defaults to 128 MB; 0 keeps none.
    */
   decodedImageBudgetBytes?: number;
+  /**
+   * Bytes of parsed pages kept between jobs, for every document on this
+   * thread (see {@link PageResidency}). Defaults to
+   * {@link DEFAULT_PAGE_RESIDENCY_POLICY}'s; 0 keeps none.
+   */
+  parsedPageBudgetBytes?: number;
   /**
    * Milliseconds a page render runs before it lets this thread receive
    * messages, so an abort stops it about this soon. Defaults to
@@ -215,30 +225,12 @@ export interface WorkerHostOptions {
 /** See {@link WorkerHostOptions.renderSliceMs}. */
 export const DEFAULT_RENDER_SLICE_MS = 8;
 
-/** The kinds that render a page, in slices (see {@link RenderSlices}). */
+/** The kinds that render a page, in slices (see {@link Slices}). */
 type PageRenderRequest =
   | PagesRenderWorkerRequest<PdfCoordinates>
   | PagesRenderEncodedWorkerRequest<PdfCoordinates>
   | DocumentRenderPageFileWorkerRequest
   | DocumentRenderPageFileEncodedWorkerRequest;
-
-/**
- * Job kinds that only read the document and may reuse pages kept loaded by an
- * earlier job. Every other kind closes idle pages before it runs (see
- * {@link IdlePageCache}). A kind belongs here only when its handler writes
- * nothing that a loaded page holds: the appearance renderers may generate a
- * missing form-field appearance stream, which lives in the annotation, not the
- * page, and is read fresh by every render.
- */
-const READ_ONLY_KINDS: ReadonlySet<WorkerRequest['kind']> = new Set<WorkerRequest['kind']>([
-  'pages.render',
-  'pages.renderEncoded',
-  'pages.text',
-  'pages.geometry',
-  'search.query',
-  'annotations.renderAppearances',
-  'annotations.renderAppearancesEncoded',
-]);
 
 /**
  * The piece that runs "inside the worker": owns runtime, manages document
@@ -262,11 +254,11 @@ export class WorkerHost {
    */
   private readonly fontIds = new Map<string, number>();
   private readonly fonts: FontRegistrar;
-  /** Pages kept loaded between read-only jobs, for every session on this runtime. */
-  private readonly idlePages: IdlePageCache;
-  /** Image decodes kept between read-only jobs, for every session on this runtime. */
+  /** Parsed pages kept between jobs, for every session on this runtime. */
+  private readonly residency: PageResidency;
+  /** Image decodes kept between jobs that write nothing, for every session on this runtime. */
   private readonly decodedImages: DecodedImageStore;
-  private readonly renderSlices: RenderSlices;
+  private readonly renderSlices: Slices;
   /**
    * True while a page render is in progress. The render pauses between slices
    * so this thread can receive an abort, but PDFium holds the page's render
@@ -295,9 +287,13 @@ export class WorkerHost {
     ensureInitialized(this.runtime);
     this.baseDocuments = new BaseDocumentRegistry(this.runtime);
     this.fonts = new FontRegistrar(this.runtime, this.fontIds);
-    this.idlePages = new IdlePageCache(
+    this.residency = new PageResidency(
       this.runtime,
-      DEFAULT_IDLE_PAGE_POLICY,
+      {
+        ...DEFAULT_PAGE_RESIDENCY_POLICY,
+        budgetBytes:
+          this.options.parsedPageBudgetBytes ?? DEFAULT_PAGE_RESIDENCY_POLICY.budgetBytes,
+      },
       () => this.rendering,
     );
     this.decodedImages = new DecodedImageStore(this.runtime, this.options.decodedImageBudgetBytes);
@@ -354,12 +350,12 @@ export class WorkerHost {
   }
 
   private run(job: PageSpaceJob): void {
-    // Before any route below: any job that is not read-only closes every
-    // idle page and drops every kept image decode first, so no change can meet
-    // a page or an image decoded before it.
-    const readOnly = READ_ONLY_KINDS.has(job.kind);
-    this.idlePages.beginJob(readOnly);
-    this.decodedImages.beginJob(readOnly);
+    // Before any route below: a write drops every kept image decode, and a
+    // write that changes content closes the pages it may change, so no change
+    // can meet a page or an image decoded before it (see pageEffectOf).
+    const effect = pageEffectOf(job.kind);
+    this.closePagesChangedBy(job, effect);
+    this.decodedImages.beginJob(effect === 'none');
 
     // The handlers work in the file's coordinates: the places a caller sent
     // convert here, as the job runs.
@@ -661,7 +657,20 @@ export class WorkerHost {
       this.post(wirePack({ kind: 'reject', jobId: msg.jobId, error }, EMPTY_TRANSFER));
     } finally {
       this.aborts.delete(msg.jobId);
+      // And after it: the pages the write itself released, done or failed.
+      this.closePagesChangedBy(job, effect);
     }
+  }
+
+  /** Closes the pages a job of this effect may change, as no job holds them. */
+  private closePagesChangedBy(job: PageSpaceJob, effect: PageEffect): void {
+    if (effect === 'runtime') {
+      this.residency.closeIdle();
+      return;
+    }
+    if (effect !== 'document' || !('docId' in job)) return;
+    const layerName = 'layerName' in job ? job.layerName : undefined;
+    this.sessions.get(sessionKey(job.docId, layerName))?.pagePool().closeIdle();
   }
 
   /**
@@ -691,7 +700,7 @@ export class WorkerHost {
       throw new EngineError(EngineErrorCode.InvalidArg, `document session already open: ${key}`);
     }
     const session = new DocumentSession(this.runtime);
-    session.idlePages = this.idlePages;
+    session.residency = this.residency;
     session.signedDocumentPolicy = req.signedDocumentPolicy ?? 'protect';
     session.password = req.password;
     // Every input kind loads the same way with or without a password, so a
@@ -1928,7 +1937,7 @@ export class WorkerHost {
         session.close();
       }
       this.sessions.clear();
-      this.idlePages.closeAll();
+      this.residency.closeIdle();
       this.baseDocuments.releaseAll();
       destroyLibrary(this.runtime);
     }
@@ -2171,6 +2180,65 @@ export class WorkerHost {
 interface LayerArtifactSave {
   payload: { artifact: { bytes: ArrayBuffer; size: number } } | { artifactFile: { path: string } };
   transfer: ArrayBuffer[];
+}
+
+/**
+ * What a job does to the parsed pages the runtime keeps ({@link PageResidency}):
+ * - `none`: it writes nothing.
+ * - `keepsPages`: it writes annotations, form fields, metadata, attachments or
+ *   names - what a page reads afresh at every render, never its parsed
+ *   content - so pages stay.
+ * - `document`: it changes content or the page tree in place (redaction,
+ *   flattening, page edits), so the document's pages close before and after
+ *   it. A write kind not listed as keeping pages does this, so a new write
+ *   kind is safe until someone shows it keeps pages.
+ * - `runtime`: it changes the fonts text is set in, for every document on the
+ *   runtime, so every page closes.
+ * A page also closes when it is next taken after a write in a layer
+ * transaction changed it (`EPDFPage_IsContentCurrent`).
+ */
+type PageEffect = 'none' | 'keepsPages' | 'document' | 'runtime';
+
+const WRITES_THAT_KEEP_PAGES: ReadonlySet<WorkerRequest['kind']> = new Set<WorkerRequest['kind']>([
+  'metadata.update',
+  'metadata.updateCustom',
+  'annotations.create',
+  'annotations.update',
+  'annotations.delete',
+  'annotations.move',
+  'annotations.import',
+  'forms.setValue',
+  'forms.reset',
+  'forms.applyEffects',
+  'forms.import',
+  'forms.repair',
+  'forms.createField',
+  'forms.updateField',
+  'forms.setSignatureAppearance',
+  'forms.deleteField',
+  'forms.addWidget',
+  'forms.detachWidget',
+  'pages.setName',
+  'pages.removeName',
+  'attachments.create',
+  'attachments.delete',
+  'measure.setScale',
+  'pieceInfo.update',
+  'pieceInfo.delete',
+]);
+
+const FONT_KINDS: ReadonlySet<WorkerRequest['kind']> = new Set<WorkerRequest['kind']>([
+  'fonts.register',
+  'fonts.addFallback',
+  'fonts.clearFallbacks',
+  'fonts.clear',
+]);
+
+function pageEffectOf(kind: WorkerRequest['kind']): PageEffect {
+  if (FONT_KINDS.has(kind)) return 'runtime';
+  if (WRITES_THAT_KEEP_PAGES.has(kind)) return 'keepsPages';
+  if (MUTATING_KINDS.has(kind) || kind === 'signatures.complete') return 'document';
+  return 'none';
 }
 
 const BASE_SESSION_SUFFIX = '__base__';
