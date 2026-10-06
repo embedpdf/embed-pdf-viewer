@@ -1199,7 +1199,7 @@ async function resolvePageAndManifestForRead(input: {
           input.scope.layerName,
         )
       : await input.documentService.getManifest(input.scope.ctx, input.scope.docId);
-  const page = manifest.pages.find((p) => p.state.page.objectNumber === input.pageObjectNumber);
+  const page = manifest.pages.find((p) => p.page.objectNumber === input.pageObjectNumber);
   if (page) {
     return { page, baseSha: manifest.baseSha };
   }

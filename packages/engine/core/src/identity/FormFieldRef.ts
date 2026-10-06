@@ -27,7 +27,7 @@ export function toFieldRef(name: string): FormFieldRef {
  * URL-safe encoding of a `FormFieldRef`, used by the cloud HTTP surface as
  * the `:fieldKey` route parameter. Decoded by the server back into a
  * `FormFieldRef` via `decodeFieldRefKey`. Mirrors the annotation plane's
- * `encodeStableIdKey` (`obj:42` / `nm:…`) so the two member-key syntaxes
+ * `encodeAnnotKey` (`obj:42` / `base:2`) so the two member-key syntaxes
  * read the same on the wire:
  *
  *   `{ kind: 'objectNumber', objectNumber: 12 }` -> `'obj:12'`

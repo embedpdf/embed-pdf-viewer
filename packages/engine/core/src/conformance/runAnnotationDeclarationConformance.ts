@@ -27,7 +27,7 @@ export interface AnnotationDeclarationConformanceOptions {
   /** Engine 'kind' for opening: 'bytes' for local, 'id' for cloud. */
   openKind: 'bytes' | 'id';
   /**
-   * A document without weak annotations. One annotation of every kind the
+   * A document without inline annotations. One annotation of every kind the
    * engine can create is added to its first page, then read back.
    */
   authoring: AnnotationDeclarationFixture;
@@ -73,7 +73,7 @@ export function runAnnotationDeclarationConformance(
       try {
         const first = (await doc.annotations.list()).pages[0];
         expect(first !== undefined).toBe(true);
-        const page = first!.page;
+        const page = first!;
         for (const { data, resources } of creatables()) {
           const { annotation: created } = await doc.page(page).annotations.create(data, resources);
           reads.push(created);
@@ -93,7 +93,7 @@ export function runAnnotationDeclarationConformance(
       const doc = await openFixture(engine, opts, opts.authoring);
       try {
         const first = (await doc.annotations.list()).pages[0]!;
-        await run(doc.page(first.page), doc);
+        await run(doc.page(first), doc);
       } finally {
         await doc.close();
       }
@@ -456,22 +456,22 @@ export function runAnnotationDeclarationConformance(
       });
     });
 
-    test('a weak annotation exports by its position ref', async () => {
+    test('an annotation born inline exports by its baseIndex name', async () => {
       for (const fixture of opts.documents) {
         const doc = await openFixture(engine, opts, fixture);
         try {
-          const weak = (await doc.annotations.list()).annotations.find(
-            (annotation) => annotation.ref.kind === 'index',
+          const inline = (await doc.annotations.list()).annotations.find(
+            (annotation) => annotation.ref.kind === 'baseIndex',
           );
-          if (!weak) continue;
-          const bundle = await doc.annotations.export({ refs: [weak.ref] });
-          expect(bundle.items.map((item) => item.data.subtype)).toEqual([weak.subtype]);
+          if (!inline) continue;
+          const bundle = await doc.annotations.export({ refs: [inline.ref] });
+          expect(bundle.items.map((item) => item.data.subtype)).toEqual([inline.subtype]);
           return;
         } finally {
           await doc.close();
         }
       }
-      throw new Error('no fixture document has a weak annotation');
+      throw new Error('no fixture document has an annotation born inline');
     });
 
     test('a link read back can be sent back; its read-only target is kept', async () => {

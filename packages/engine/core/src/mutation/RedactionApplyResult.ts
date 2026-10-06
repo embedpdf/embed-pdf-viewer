@@ -1,9 +1,9 @@
 import type { MutationMeta } from './MutationMeta';
-import type { SerializedEngineError } from '../errors/EngineError';
 import type { AnnotationRef } from '../identity/AnnotationRef';
 import type { PageRef } from '../identity/PageRef';
 
-export type RedactionApplyStatus = 'applied' | 'unchanged' | 'failed' | 'skipped';
+/** Whether a page was redacted, or had nothing to apply. A page that fails fails the whole call. */
+export type RedactionApplyStatus = 'applied' | 'unchanged';
 
 /**
  * What to apply. `pages` applies every redact annotation on each listed
@@ -24,7 +24,6 @@ export interface RedactionApplyItemResult {
    * the "collateral" signal for confirm dialogs and audit logs.
    */
   removedAnnotationCount: number;
-  error?: SerializedEngineError;
 }
 
 /**
@@ -32,7 +31,8 @@ export interface RedactionApplyItemResult {
  * content under each redacted region is destroyed, the configured overlay
  * (`/RO`, else `/IC` + `/OverlayText`) is painted into page content, and
  * the consumed redact annotations (plus intersecting collateral) are
- * removed.
+ * removed. All or nothing: a page that fails, or a cancel, leaves every page
+ * as it was.
  */
 export interface RedactionApplyResult {
   /** The original request, retained for audit/event replay. */

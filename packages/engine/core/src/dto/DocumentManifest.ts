@@ -1,16 +1,14 @@
 import type { CachePins } from './CachePins';
 import type { LayerScopes } from './LayerScopes';
-import type { PageState } from '../revision/PageState';
+import type { PageRef } from '../identity/PageRef';
 import type { DocumentProtection } from '../signature/types';
 
 /**
- * Per-page envelope inside `DocumentManifest`.
- *
- * `state` is universal document/page state; `cache` is the cloud/CDN read
- * coordinate for immutable leaf URLs.
+ * Per-page envelope inside `DocumentManifest`: the page, and `cache`, the
+ * cloud/CDN read coordinate for its immutable leaf URLs.
  */
 export interface ManifestPage {
-  state: PageState;
+  page: PageRef;
   cache: CachePins;
 }
 

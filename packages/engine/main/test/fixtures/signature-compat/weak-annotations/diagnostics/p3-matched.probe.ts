@@ -38,7 +38,7 @@ for (const runtime of ['wasm', 'native'] as const) {
           const page = (await doc.pages.list()).pages[0].ref;
           const annotations = (await doc.page(page).annotations.list()).annotations;
           const squares = annotations.filter((a) => a.subtype === 'square');
-          const weakCount = squares.filter((a) => a.ref.kind === 'index').length;
+          const weakCount = squares.filter((a) => a.ref.kind === 'baseIndex').length;
           const names = fixture.action.includes('names');
           const deleted = fixture.action.startsWith('delete');
           const expected = ['control', 'rewrite'].includes(fixture.action)

@@ -1693,7 +1693,7 @@ export class WorkerHost {
     if (rendered.payload.tag !== 'annotations.renderAppearances') {
       throw new EngineError(EngineErrorCode.WireFormat, `unexpected ${rendered.payload.tag}`);
     }
-    const { pageState, appearances } = rendered.payload.result;
+    const { appearances } = rendered.payload.result;
     // Sequential encode, deliberately: the whole raster batch already
     // exists in `rendered` (peak memory is set by the render, not by encode
     // order), so fanning every appearance into the process-wide encoder
@@ -1713,7 +1713,7 @@ export class WorkerHost {
       {
         tag: 'annotations.renderAppearancesEncoded',
         page,
-        result: { pageState, appearances: encoded },
+        result: { page: rendered.payload.result.page, appearances: encoded },
       },
       encoded.map((e) => e.image.bytes.buffer),
     );
@@ -2121,7 +2121,7 @@ export class WorkerHost {
     const session = this.requireSession(req);
     const mutator = new FormMutator(this.runtime, session);
     const { field } = mutator.createField(req.draft, signal);
-    const meta = formMutationMeta(session, [field.ref], field.widgets);
+    const meta = formMutationMeta([field.ref], field.widgets);
     return this.finishMutation(
       session,
       { tag: 'forms.createField', result: { field, meta } },
@@ -2136,7 +2136,7 @@ export class WorkerHost {
     const session = this.requireSession(req);
     const mutator = new FormMutator(this.runtime, session);
     const { field } = mutator.updateField(req.ref, req.patch, signal);
-    const meta = formMutationMeta(session, [field.ref], field.widgets);
+    const meta = formMutationMeta([field.ref], field.widgets);
     return this.finishMutation(
       session,
       { tag: 'forms.updateField', result: { field, meta } },
@@ -2154,7 +2154,7 @@ export class WorkerHost {
       new Uint8Array(req.pdf),
       signal,
     );
-    const meta = formMutationMeta(session, [field.ref], field.widgets);
+    const meta = formMutationMeta([field.ref], field.widgets);
     return this.finishMutation(
       session,
       { tag: 'forms.setSignatureAppearance', result: { field, meta } },
@@ -2169,7 +2169,7 @@ export class WorkerHost {
     const session = this.requireSession(req);
     const mutator = new FormMutator(this.runtime, session);
     const { deleted, removedWidgets } = mutator.deleteField(req.ref, signal);
-    const meta = formMutationMeta(session, [deleted], removedWidgets);
+    const meta = formMutationMeta([deleted], removedWidgets);
     return this.finishMutation(
       session,
       { tag: 'forms.deleteField', result: { meta } },
@@ -2184,7 +2184,7 @@ export class WorkerHost {
     const session = this.requireSession(req);
     const mutator = new FormMutator(this.runtime, session);
     const { field, widget } = mutator.addWidget(req.ref, req.placement, signal);
-    const meta = formMutationMeta(session, [field.ref], [widget]);
+    const meta = formMutationMeta([field.ref], [widget]);
     return this.finishMutation(
       session,
       { tag: 'forms.addWidget', result: { field, meta } },
@@ -2199,7 +2199,7 @@ export class WorkerHost {
     const session = this.requireSession(req);
     const mutator = new FormMutator(this.runtime, session);
     const { field, widget } = mutator.detachWidget(req.ref, req.widget, signal);
-    const meta = formMutationMeta(session, [field.ref], [widget]);
+    const meta = formMutationMeta([field.ref], [widget]);
     return this.finishMutation(
       session,
       { tag: 'forms.detachWidget', result: { field, meta } },

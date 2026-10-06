@@ -194,9 +194,9 @@ const { results } = await doc.pages.flatten([page.ref]);
 // results: [{ page, status: 'applied' }]
 ```
 
-Each page's `status` is `'applied'`, or `'unchanged'` when it had nothing to flatten. If a page
-fails, its status is `'failed'` (with an `error`) and the pages after it are `'skipped'`. Hidden
-annotations, popups and annotations without an appearance stay as they are.
+Each page's `status` is `'applied'`, or `'unchanged'` when it had nothing to flatten. Flattening is
+all or nothing: when a page fails, or the call is cancelled, no page changes and the call rejects
+with the error. Hidden annotations, popups and annotations without an appearance stay as they are.
 
 By default the page is flattened as it's shown on screen. Pass `{ usage: 'print' }` to flatten it
 as it prints, which leaves out annotations that don't print:

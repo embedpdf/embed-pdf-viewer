@@ -38,7 +38,7 @@ runAnnotationAppearanceConformance(runner, {
     expected: { trapped: 'unknown' },
     pageObjectNumber: 2,
     minAppearanceCount: 4,
-    expectsWeakAppearance: false,
+    expectsInlineAppearance: false,
   },
   makeEngine: () => createLocalEngine({ runtime: { prefer: 'wasm' } }),
 });

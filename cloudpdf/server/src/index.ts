@@ -82,8 +82,6 @@ export type {
   DocumentPagesTable,
   LayersTable,
   LayerPagesTable,
-  WeakAnnotationSessionsTable,
-  WeakAnnotationSessionPagesTable,
   AuditLogTable,
 } from './db/schema';
 export { DocumentsRepo } from './db/repos/documents.repo';
@@ -101,11 +99,6 @@ export type {
   LayerRow,
   CreateLayerInput,
 } from './db/repos/page_state.repo';
-export { WeakAnnotationSessionsRepo } from './db/repos/weak_annotation_sessions.repo';
-export type {
-  WeakAnnotationSessionRow,
-  WeakAnnotationSessionScope,
-} from './db/repos/weak_annotation_sessions.repo';
 export { AuditLogRepo } from './db/repos/audit_log.repo';
 export type {
   AppendAuditLogInput,
@@ -232,8 +225,6 @@ export type {
   DocumentManifest,
   OpenContext,
 } from './services/DocumentService';
-export { CloudRevisionBridge } from './services/CloudRevisionBridge';
-export type { AnnotationMutationResult } from './services/CloudRevisionBridge';
 export { EventLogService } from './services/EventLogService';
 export type {
   AuditEvent,
@@ -244,19 +235,13 @@ export type {
   ExportDocDayResult,
 } from './services/EventLogService';
 export { LayerStateService } from './services/LayerStateService';
-export type { LayerStateServiceOptions, MutationImpactKind } from './services/LayerStateService';
+export type { LayerStateServiceOptions } from './services/LayerStateService';
 export { LayerService } from './services/LayerService';
 export type {
   LayerServiceOptions,
   LayerWriteContext,
   MaterializedLayer,
 } from './services/LayerService';
-export { WeakAnnotationSessionService } from './services/WeakAnnotationSessionService';
-export type {
-  WeakAnnotationSessionServiceOptions,
-  WeakAnnotationSessionContext,
-  WeakAnnotationSessionResult,
-} from './services/WeakAnnotationSessionService';
 
 /**
  * Stable URL of the bundled worker_thread entry. Resolves to:

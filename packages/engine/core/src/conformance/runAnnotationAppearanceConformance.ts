@@ -9,15 +9,14 @@ import type { DocumentHandle } from '../engine/DocumentHandle';
 import type { Engine } from '../engine/Engine';
 import { isLocalPage } from '../engine/LocalPageHandle';
 import type { AnnotationRef } from '../identity/AnnotationRef';
-import { toPageRef } from '../identity/PageRef';
+import { toPageRef, type PageRef } from '../identity/PageRef';
 import { AbortError } from '../promise/AbortError';
-import type { PageState } from '../revision/PageState';
 
 /**
  * Per-fixture knowledge for the annotation appearance conformance suite. The
  * harness asserts thresholds (not exact wire content) so the same suite runs
  * unchanged against the local and cloud engines and proves they emit the same
- * set of appearances — including weak (index-only) annotations.
+ * set of appearances, including those of annotations born inline in the file.
  */
 export interface AnnotationAppearanceConformanceFixture extends ConformanceFixture {
   /** PDF object number of the page whose appearances are rendered. */
@@ -25,11 +24,11 @@ export interface AnnotationAppearanceConformanceFixture extends ConformanceFixtu
   /** At least this many `/AP` appearances are expected on that page. */
   minAppearanceCount: number;
   /**
-   * `true` when the page has at least one weak (index-only) annotation that
-   * carries an appearance stream. The point of this suite: that weak
-   * appearance must still be emitted on the wire.
+   * `true` when the page has at least one annotation born inline in the
+   * file (named by `baseIndex`) that carries an appearance stream: it must
+   * be emitted too, under that name.
    */
-  expectsWeakAppearance: boolean;
+  expectsInlineAppearance: boolean;
 }
 
 export interface AnnotationAppearanceConformanceOptions extends Omit<
@@ -72,14 +71,14 @@ export function runAnnotationAppearanceConformance(
     test('renders the expected set of appearances with valid output', async () => {
       const doc = await openFixture(engine, opts);
       try {
-        const { pageState, appearances } = await collect(doc, opts);
+        const { page, appearances } = await collect(doc, opts);
 
-        expect(pageState.page.objectNumber).toBe(opts.fixture.pageObjectNumber);
+        expect(page.objectNumber).toBe(opts.fixture.pageObjectNumber);
         expect(appearances.length >= opts.fixture.minAppearanceCount).toBe(true);
 
         for (const appearance of appearances) {
-          // Identity is the ref (durable or weak) — never a stableId.
-          expect(['objectNumber', 'nm', 'index'].includes(appearance.ref.kind)).toBe(true);
+          // Identity is the ref — never a stableId.
+          expect(['objectNumber', 'baseIndex'].includes(appearance.ref.kind)).toBe(true);
           expect(['normal', 'rollover', 'down'].includes(appearance.mode)).toBe(true);
           expect(appearance.width > 0 && appearance.height > 0).toBe(true);
 
@@ -94,13 +93,13 @@ export function runAnnotationAppearanceConformance(
       }
     });
 
-    if (opts.fixture.expectsWeakAppearance) {
-      test('weak (index-only) annotations are emitted, not dropped', async () => {
+    if (opts.fixture.expectsInlineAppearance) {
+      test('annotations born inline are emitted under their baseIndex name', async () => {
         const doc = await openFixture(engine, opts);
         try {
           const { appearances } = await collect(doc, opts);
-          const weak = appearances.find((a) => a.ref.kind === 'index');
-          expect(weak !== undefined).toBe(true);
+          const inline = appearances.find((a) => a.ref.kind === 'baseIndex');
+          expect(inline !== undefined).toBe(true);
         } finally {
           await doc.close();
         }
@@ -151,14 +150,14 @@ export function runAnnotationAppearanceConformance(
 async function collect(
   doc: DocumentHandle,
   opts: AnnotationAppearanceConformanceOptions,
-): Promise<{ pageState: PageState; appearances: NormalizedAppearance[] }> {
+): Promise<{ page: PageRef; appearances: NormalizedAppearance[] }> {
   const page = doc.page(toPageRef(opts.fixture.pageObjectNumber));
   if (isLocalPage(page)) {
     const result = await page.annotations.renderAppearancesRaw({
       viewport: { kind: 'scale', scale: 1 },
     });
     return {
-      pageState: result.pageState,
+      page: result.page,
       appearances: result.appearances.map((a) => ({
         ref: a.ref,
         mode: a.mode,
@@ -174,7 +173,7 @@ async function collect(
     viewport: { kind: 'scale', scale: 1 },
   });
   return {
-    pageState: result.pageState,
+    page: result.page,
     appearances: result.appearances.map((a) => ({
       ref: a.ref,
       mode: a.mode,

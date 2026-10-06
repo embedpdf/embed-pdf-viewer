@@ -1,14 +1,12 @@
 import type { Annotation } from './kinds';
 import type { Coordinates, PageCoordinates } from '../pageSpace/coordinates';
 import type { PageRef } from '../identity/PageRef';
-import type { PageState } from '../revision/PageState';
 
 /**
  * What `doc.annotations.list()` and `page.annotations.list()` return, and
  * what the server's annotation list endpoints send: the annotations of the
- * listed pages, each page's in display order, and the state of each listed
- * page (its `revision` goes back with weak refs). Every annotation names its
- * `page`.
+ * listed pages, each page's in display order, and the pages it listed. Every
+ * annotation names its `page`.
  *
  * A whole-document list's page order is unspecified — the local engine
  * reads in document order, the cloud in its page registry's order; join
@@ -16,7 +14,7 @@ import type { PageState } from '../revision/PageState';
  */
 export interface AnnotationList<C extends Coordinates = PageCoordinates> {
   annotations: Annotation<C>[];
-  pages: PageState[];
+  pages: PageRef[];
   /**
    * Cloud, whole document only: the audit-log position the list is
    * consistent with. Every page reflects exactly the mutations with

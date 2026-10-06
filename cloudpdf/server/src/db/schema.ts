@@ -89,8 +89,6 @@ export interface DocumentPagesTable {
   page_object_number: number;
   content_version: number;
   annotation_version: number;
-  annotation_generation: number;
-  has_weak_annotations: boolean | number;
   updated_at: number;
 }
 
@@ -151,27 +149,7 @@ export interface LayerPagesTable {
   page_object_number: number;
   content_version: number;
   annotation_version: number;
-  annotation_generation: number;
-  has_weak_annotations: boolean | number;
   updated_at: number;
-}
-
-export interface WeakAnnotationSessionsTable {
-  id: string;
-  tenant_id: string;
-  doc_id: string;
-  layer_name: string;
-  sub: string;
-  created_at: number;
-  updated_at: number;
-  expires_at: number;
-}
-
-export interface WeakAnnotationSessionPagesTable {
-  session_id: string;
-  page_object_number: number;
-  updated_at: number;
-  expires_at: number;
 }
 
 export interface AuditLogTable {
@@ -555,8 +533,6 @@ export interface Database {
   layer_pages: LayerPagesTable;
   base_versions: BaseVersionsTable;
   document_signings: DocumentSigningsTable;
-  weak_annotation_sessions: WeakAnnotationSessionsTable;
-  weak_annotation_session_pages: WeakAnnotationSessionPagesTable;
   audit_log: AuditLogTable;
   audit_exports: AuditExportsTable;
   pdf_password_verifications: PdfPasswordVerificationsTable;

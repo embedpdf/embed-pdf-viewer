@@ -463,7 +463,9 @@
             "required": true,
             "schema": {
               "type": "string",
-              "minLength": 1
+              "minLength": 1,
+              "pattern": "^(obj:[1-9][0-9]*|base:(0|[1-9][0-9]*))$",
+              "description": "The annotation's address on the page: `obj:N`, its indirect object number, or `base:N` for an annotation the uploaded file stored inline (without an object number of its own), the position it was born at in the page's /Annots. The name the annotation's `ref` carries for life."
             }
           },
           {
@@ -581,7 +583,9 @@
             "required": true,
             "schema": {
               "type": "string",
-              "minLength": 1
+              "minLength": 1,
+              "pattern": "^(obj:[1-9][0-9]*|base:(0|[1-9][0-9]*))$",
+              "description": "The annotation's address on the page: `obj:N`, its indirect object number, or `base:N` for an annotation the uploaded file stored inline (without an object number of its own), the position it was born at in the page's /Annots. The name the annotation's `ref` carries for life."
             }
           },
           {
@@ -681,7 +685,9 @@
             "required": true,
             "schema": {
               "type": "string",
-              "minLength": 1
+              "minLength": 1,
+              "pattern": "^(obj:[1-9][0-9]*|base:(0|[1-9][0-9]*))$",
+              "description": "The annotation's address on the page: `obj:N`, its indirect object number, or `base:N` for an annotation the uploaded file stored inline (without an object number of its own), the position it was born at in the page's /Annots. The name the annotation's `ref` carries for life."
             }
           },
           {
@@ -6299,8 +6305,6 @@
               "NotFound",
               "WireFormat",
               "RuntimeUnavailable",
-              "InvalidReference",
-              "WeakAnnotationSessionConflict",
               "LayerVersionConflict",
               "NotImplemented",
               "MalformedPdf",
@@ -7177,51 +7181,17 @@
                     "properties": {
                       "kind": {
                         "type": "string",
-                        "enum": ["nm"]
+                        "enum": ["baseIndex"]
                       },
                       "page": {
                         "$ref": "#/components/schemas/Annotation/anyOf/0/properties/ref/anyOf/0/properties/page"
                       },
-                      "nm": {
-                        "type": "string"
-                      }
-                    },
-                    "required": ["kind", "page", "nm"],
-                    "additionalProperties": false
-                  },
-                  {
-                    "type": "object",
-                    "properties": {
-                      "kind": {
-                        "type": "string",
-                        "enum": ["index"]
-                      },
-                      "page": {
-                        "$ref": "#/components/schemas/Annotation/anyOf/0/properties/ref/anyOf/0/properties/page"
-                      },
-                      "index": {
+                      "baseIndex": {
                         "type": "integer",
                         "minimum": 0
-                      },
-                      "revision": {
-                        "type": "object",
-                        "properties": {
-                          "docSessionId": {
-                            "type": "string"
-                          },
-                          "page": {
-                            "$ref": "#/components/schemas/Annotation/anyOf/0/properties/ref/anyOf/0/properties/page"
-                          },
-                          "generation": {
-                            "type": "integer",
-                            "minimum": 0
-                          }
-                        },
-                        "required": ["docSessionId", "page", "generation"],
-                        "additionalProperties": false
                       }
                     },
-                    "required": ["kind", "page", "index", "revision"],
+                    "required": ["kind", "page", "baseIndex"],
                     "additionalProperties": false
                   }
                 ]
@@ -7232,10 +7202,6 @@
               "index": {
                 "type": "integer",
                 "minimum": 0
-              },
-              "identityQuality": {
-                "type": "string",
-                "enum": ["durable", "weak"]
               },
               "hasAppearance": {
                 "type": "boolean"
@@ -7441,7 +7407,6 @@
               "ref",
               "page",
               "index",
-              "identityQuality",
               "hasAppearance",
               "nm",
               "rect",
@@ -7491,9 +7456,6 @@
               "index": {
                 "$ref": "#/components/schemas/Annotation/anyOf/0/properties/index"
               },
-              "identityQuality": {
-                "$ref": "#/components/schemas/Annotation/anyOf/0/properties/identityQuality"
-              },
               "hasAppearance": {
                 "$ref": "#/components/schemas/Annotation/anyOf/0/properties/hasAppearance"
               },
@@ -7628,7 +7590,6 @@
               "ref",
               "page",
               "index",
-              "identityQuality",
               "hasAppearance",
               "nm",
               "rect",
@@ -7678,9 +7639,6 @@
               "index": {
                 "$ref": "#/components/schemas/Annotation/anyOf/0/properties/index"
               },
-              "identityQuality": {
-                "$ref": "#/components/schemas/Annotation/anyOf/0/properties/identityQuality"
-              },
               "hasAppearance": {
                 "$ref": "#/components/schemas/Annotation/anyOf/0/properties/hasAppearance"
               },
@@ -7815,7 +7773,6 @@
               "ref",
               "page",
               "index",
-              "identityQuality",
               "hasAppearance",
               "nm",
               "rect",
@@ -7864,9 +7821,6 @@
               },
               "index": {
                 "$ref": "#/components/schemas/Annotation/anyOf/0/properties/index"
-              },
-              "identityQuality": {
-                "$ref": "#/components/schemas/Annotation/anyOf/0/properties/identityQuality"
               },
               "hasAppearance": {
                 "$ref": "#/components/schemas/Annotation/anyOf/0/properties/hasAppearance"
@@ -8007,7 +7961,6 @@
               "ref",
               "page",
               "index",
-              "identityQuality",
               "hasAppearance",
               "nm",
               "rect",
@@ -8057,9 +8010,6 @@
               },
               "index": {
                 "$ref": "#/components/schemas/Annotation/anyOf/0/properties/index"
-              },
-              "identityQuality": {
-                "$ref": "#/components/schemas/Annotation/anyOf/0/properties/identityQuality"
               },
               "hasAppearance": {
                 "$ref": "#/components/schemas/Annotation/anyOf/0/properties/hasAppearance"
@@ -8229,7 +8179,6 @@
               "ref",
               "page",
               "index",
-              "identityQuality",
               "hasAppearance",
               "nm",
               "rect",
@@ -8284,9 +8233,6 @@
               },
               "index": {
                 "$ref": "#/components/schemas/Annotation/anyOf/0/properties/index"
-              },
-              "identityQuality": {
-                "$ref": "#/components/schemas/Annotation/anyOf/0/properties/identityQuality"
               },
               "hasAppearance": {
                 "$ref": "#/components/schemas/Annotation/anyOf/0/properties/hasAppearance"
@@ -8456,7 +8402,6 @@
               "ref",
               "page",
               "index",
-              "identityQuality",
               "hasAppearance",
               "nm",
               "rect",
@@ -8511,9 +8456,6 @@
               },
               "index": {
                 "$ref": "#/components/schemas/Annotation/anyOf/0/properties/index"
-              },
-              "identityQuality": {
-                "$ref": "#/components/schemas/Annotation/anyOf/0/properties/identityQuality"
               },
               "hasAppearance": {
                 "$ref": "#/components/schemas/Annotation/anyOf/0/properties/hasAppearance"
@@ -8830,7 +8772,6 @@
               "ref",
               "page",
               "index",
-              "identityQuality",
               "hasAppearance",
               "nm",
               "rect",
@@ -8889,9 +8830,6 @@
               },
               "index": {
                 "$ref": "#/components/schemas/Annotation/anyOf/0/properties/index"
-              },
-              "identityQuality": {
-                "$ref": "#/components/schemas/Annotation/anyOf/0/properties/identityQuality"
               },
               "hasAppearance": {
                 "$ref": "#/components/schemas/Annotation/anyOf/0/properties/hasAppearance"
@@ -9106,7 +9044,6 @@
               "ref",
               "page",
               "index",
-              "identityQuality",
               "hasAppearance",
               "nm",
               "rect",
@@ -9165,9 +9102,6 @@
               },
               "index": {
                 "$ref": "#/components/schemas/Annotation/anyOf/0/properties/index"
-              },
-              "identityQuality": {
-                "$ref": "#/components/schemas/Annotation/anyOf/0/properties/identityQuality"
               },
               "hasAppearance": {
                 "$ref": "#/components/schemas/Annotation/anyOf/0/properties/hasAppearance"
@@ -9394,7 +9328,6 @@
               "ref",
               "page",
               "index",
-              "identityQuality",
               "hasAppearance",
               "nm",
               "rect",
@@ -9455,9 +9388,6 @@
               },
               "index": {
                 "$ref": "#/components/schemas/Annotation/anyOf/0/properties/index"
-              },
-              "identityQuality": {
-                "$ref": "#/components/schemas/Annotation/anyOf/0/properties/identityQuality"
               },
               "hasAppearance": {
                 "$ref": "#/components/schemas/Annotation/anyOf/0/properties/hasAppearance"
@@ -9681,7 +9611,6 @@
               "ref",
               "page",
               "index",
-              "identityQuality",
               "hasAppearance",
               "nm",
               "rect",
@@ -9728,9 +9657,6 @@
               },
               "index": {
                 "$ref": "#/components/schemas/Annotation/anyOf/0/properties/index"
-              },
-              "identityQuality": {
-                "$ref": "#/components/schemas/Annotation/anyOf/0/properties/identityQuality"
               },
               "hasAppearance": {
                 "$ref": "#/components/schemas/Annotation/anyOf/0/properties/hasAppearance"
@@ -9896,7 +9822,6 @@
               "ref",
               "page",
               "index",
-              "identityQuality",
               "hasAppearance",
               "nm",
               "rect",
@@ -9950,9 +9875,6 @@
               },
               "index": {
                 "$ref": "#/components/schemas/Annotation/anyOf/0/properties/index"
-              },
-              "identityQuality": {
-                "$ref": "#/components/schemas/Annotation/anyOf/0/properties/identityQuality"
               },
               "hasAppearance": {
                 "$ref": "#/components/schemas/Annotation/anyOf/0/properties/hasAppearance"
@@ -10367,7 +10289,6 @@
               "ref",
               "page",
               "index",
-              "identityQuality",
               "hasAppearance",
               "nm",
               "rect",
@@ -10431,9 +10352,6 @@
               },
               "index": {
                 "$ref": "#/components/schemas/Annotation/anyOf/0/properties/index"
-              },
-              "identityQuality": {
-                "$ref": "#/components/schemas/Annotation/anyOf/0/properties/identityQuality"
               },
               "hasAppearance": {
                 "$ref": "#/components/schemas/Annotation/anyOf/0/properties/hasAppearance"
@@ -10578,7 +10496,6 @@
               "ref",
               "page",
               "index",
-              "identityQuality",
               "hasAppearance",
               "nm",
               "rect",
@@ -10629,9 +10546,6 @@
               },
               "index": {
                 "$ref": "#/components/schemas/Annotation/anyOf/0/properties/index"
-              },
-              "identityQuality": {
-                "$ref": "#/components/schemas/Annotation/anyOf/0/properties/identityQuality"
               },
               "hasAppearance": {
                 "$ref": "#/components/schemas/Annotation/anyOf/0/properties/hasAppearance"
@@ -10781,7 +10695,6 @@
               "ref",
               "page",
               "index",
-              "identityQuality",
               "hasAppearance",
               "nm",
               "rect",
@@ -10833,9 +10746,6 @@
               },
               "index": {
                 "$ref": "#/components/schemas/Annotation/anyOf/0/properties/index"
-              },
-              "identityQuality": {
-                "$ref": "#/components/schemas/Annotation/anyOf/0/properties/identityQuality"
               },
               "hasAppearance": {
                 "$ref": "#/components/schemas/Annotation/anyOf/0/properties/hasAppearance"
@@ -10983,7 +10893,6 @@
               "ref",
               "page",
               "index",
-              "identityQuality",
               "hasAppearance",
               "nm",
               "rect",
@@ -11034,9 +10943,6 @@
               },
               "index": {
                 "$ref": "#/components/schemas/Annotation/anyOf/0/properties/index"
-              },
-              "identityQuality": {
-                "$ref": "#/components/schemas/Annotation/anyOf/0/properties/identityQuality"
               },
               "hasAppearance": {
                 "$ref": "#/components/schemas/Annotation/anyOf/0/properties/hasAppearance"
@@ -11225,7 +11131,6 @@
               "ref",
               "page",
               "index",
-              "identityQuality",
               "hasAppearance",
               "nm",
               "rect",
@@ -11275,9 +11180,6 @@
               },
               "index": {
                 "$ref": "#/components/schemas/Annotation/anyOf/0/properties/index"
-              },
-              "identityQuality": {
-                "$ref": "#/components/schemas/Annotation/anyOf/0/properties/identityQuality"
               },
               "hasAppearance": {
                 "$ref": "#/components/schemas/Annotation/anyOf/0/properties/hasAppearance"
@@ -11513,7 +11415,6 @@
               "ref",
               "page",
               "index",
-              "identityQuality",
               "hasAppearance",
               "nm",
               "rect",
@@ -11569,9 +11470,6 @@
               },
               "index": {
                 "$ref": "#/components/schemas/Annotation/anyOf/0/properties/index"
-              },
-              "identityQuality": {
-                "$ref": "#/components/schemas/Annotation/anyOf/0/properties/identityQuality"
               },
               "hasAppearance": {
                 "$ref": "#/components/schemas/Annotation/anyOf/0/properties/hasAppearance"
@@ -11738,7 +11636,6 @@
               "ref",
               "page",
               "index",
-              "identityQuality",
               "hasAppearance",
               "nm",
               "rect",
@@ -11794,9 +11691,6 @@
               },
               "index": {
                 "$ref": "#/components/schemas/Annotation/anyOf/0/properties/index"
-              },
-              "identityQuality": {
-                "$ref": "#/components/schemas/Annotation/anyOf/0/properties/identityQuality"
               },
               "hasAppearance": {
                 "$ref": "#/components/schemas/Annotation/anyOf/0/properties/hasAppearance"
@@ -11934,7 +11828,6 @@
               "ref",
               "page",
               "index",
-              "identityQuality",
               "hasAppearance",
               "nm",
               "rect",
@@ -11982,9 +11875,6 @@
               },
               "index": {
                 "$ref": "#/components/schemas/Annotation/anyOf/0/properties/index"
-              },
-              "identityQuality": {
-                "$ref": "#/components/schemas/Annotation/anyOf/0/properties/identityQuality"
               },
               "hasAppearance": {
                 "$ref": "#/components/schemas/Annotation/anyOf/0/properties/hasAppearance"
@@ -12118,7 +12008,6 @@
               "ref",
               "page",
               "index",
-              "identityQuality",
               "hasAppearance",
               "nm",
               "rect",
@@ -12165,7 +12054,20 @@
           "pages": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/PageState"
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "enum": ["objectNumber"]
+                },
+                "objectNumber": {
+                  "type": "integer",
+                  "exclusiveMinimum": true,
+                  "minimum": 0
+                }
+              },
+              "required": ["kind", "objectNumber"],
+              "additionalProperties": false
             }
           },
           "auditHead": {
@@ -12182,7 +12084,20 @@
           "affectedPages": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/PageState"
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "enum": ["objectNumber"]
+                },
+                "objectNumber": {
+                  "type": "integer",
+                  "exclusiveMinimum": true,
+                  "minimum": 0
+                }
+              },
+              "required": ["kind", "objectNumber"],
+              "additionalProperties": false
             }
           },
           "cacheDelta": {
@@ -12230,20 +12145,7 @@
                   "type": "object",
                   "properties": {
                     "page": {
-                      "type": "object",
-                      "properties": {
-                        "kind": {
-                          "type": "string",
-                          "enum": ["objectNumber"]
-                        },
-                        "objectNumber": {
-                          "type": "integer",
-                          "exclusiveMinimum": true,
-                          "minimum": 0
-                        }
-                      },
-                      "required": ["kind", "objectNumber"],
-                      "additionalProperties": false
+                      "$ref": "#/components/schemas/AnnotationMutationMeta/properties/affectedPages/items"
                     },
                     "cache": {
                       "type": "object",
@@ -12283,12 +12185,16 @@
                       "type": "string",
                       "enum": ["objectNumber"]
                     },
+                    "page": {
+                      "$ref": "#/components/schemas/AnnotationMutationMeta/properties/affectedPages/items"
+                    },
                     "objectNumber": {
                       "type": "integer",
+                      "exclusiveMinimum": true,
                       "minimum": 0
                     }
                   },
-                  "required": ["kind", "objectNumber"],
+                  "required": ["kind", "page", "objectNumber"],
                   "additionalProperties": false
                 },
                 {
@@ -12296,110 +12202,24 @@
                   "properties": {
                     "kind": {
                       "type": "string",
-                      "enum": ["nm"]
+                      "enum": ["baseIndex"]
                     },
-                    "nm": {
-                      "type": "string"
+                    "page": {
+                      "$ref": "#/components/schemas/AnnotationMutationMeta/properties/affectedPages/items"
+                    },
+                    "baseIndex": {
+                      "type": "integer",
+                      "minimum": 0
                     }
                   },
-                  "required": ["kind", "nm"],
+                  "required": ["kind", "page", "baseIndex"],
                   "additionalProperties": false
                 }
               ]
             }
-          },
-          "weakRefsInvalidated": {
-            "type": "boolean"
-          },
-          "shouldRefetch": {
-            "type": "object",
-            "properties": {
-              "reason": {
-                "type": "string",
-                "enum": ["weakRefsInvalidated", "externalChange", "pageRebuilt"]
-              }
-            },
-            "required": ["reason"],
-            "additionalProperties": false,
-            "nullable": true
           }
         },
-        "required": [
-          "affectedPages",
-          "cacheDelta",
-          "changed",
-          "weakRefsInvalidated",
-          "shouldRefetch"
-        ],
-        "additionalProperties": false
-      },
-      "PageState": {
-        "type": "object",
-        "properties": {
-          "page": {
-            "type": "object",
-            "properties": {
-              "kind": {
-                "type": "string",
-                "enum": ["objectNumber"]
-              },
-              "objectNumber": {
-                "type": "integer",
-                "exclusiveMinimum": true,
-                "minimum": 0
-              }
-            },
-            "required": ["kind", "objectNumber"],
-            "additionalProperties": false
-          },
-          "revision": {
-            "type": "object",
-            "properties": {
-              "docSessionId": {
-                "type": "string"
-              },
-              "page": {
-                "$ref": "#/components/schemas/PageState/properties/page"
-              },
-              "generation": {
-                "type": "integer",
-                "minimum": 0
-              }
-            },
-            "required": ["docSessionId", "page", "generation"],
-            "additionalProperties": false
-          },
-          "weakAnnotationState": {
-            "anyOf": [
-              {
-                "type": "object",
-                "properties": {
-                  "kind": {
-                    "type": "string",
-                    "enum": ["unknown"]
-                  }
-                },
-                "required": ["kind"],
-                "additionalProperties": false
-              },
-              {
-                "type": "object",
-                "properties": {
-                  "kind": {
-                    "type": "string",
-                    "enum": ["known"]
-                  },
-                  "hasAnyWeakAnnotations": {
-                    "type": "boolean"
-                  }
-                },
-                "required": ["kind", "hasAnyWeakAnnotations"],
-                "additionalProperties": false
-              }
-            ]
-          }
-        },
-        "required": ["page", "revision", "weakAnnotationState"],
+        "required": ["affectedPages", "cacheDelta", "changed"],
         "additionalProperties": false
       },
       "TenantsCreateRequest": {
@@ -14906,8 +14726,6 @@
               "NotFound",
               "WireFormat",
               "RuntimeUnavailable",
-              "InvalidReference",
-              "WeakAnnotationSessionConflict",
               "LayerVersionConflict",
               "NotImplemented",
               "MalformedPdf",
@@ -15109,8 +14927,21 @@
             "items": {
               "type": "object",
               "properties": {
-                "state": {
-                  "$ref": "#/components/schemas/PageState"
+                "page": {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "enum": ["objectNumber"]
+                    },
+                    "objectNumber": {
+                      "type": "integer",
+                      "exclusiveMinimum": true,
+                      "minimum": 0
+                    }
+                  },
+                  "required": ["kind", "objectNumber"],
+                  "additionalProperties": false
                 },
                 "cache": {
                   "type": "object",
@@ -15130,7 +14961,7 @@
                   "additionalProperties": false
                 }
               },
-              "required": ["state", "cache"],
+              "required": ["page", "cache"],
               "additionalProperties": false
             }
           }
@@ -15170,8 +15001,6 @@
               "NotFound",
               "WireFormat",
               "RuntimeUnavailable",
-              "InvalidReference",
-              "WeakAnnotationSessionConflict",
               "LayerVersionConflict",
               "NotImplemented",
               "MalformedPdf",
@@ -15277,8 +15106,6 @@
               "NotFound",
               "WireFormat",
               "RuntimeUnavailable",
-              "InvalidReference",
-              "WeakAnnotationSessionConflict",
               "LayerVersionConflict",
               "NotImplemented",
               "MalformedPdf",
@@ -15332,8 +15159,6 @@
               "NotFound",
               "WireFormat",
               "RuntimeUnavailable",
-              "InvalidReference",
-              "WeakAnnotationSessionConflict",
               "LayerVersionConflict",
               "NotImplemented",
               "MalformedPdf",
@@ -15479,51 +15304,17 @@
                           "properties": {
                             "kind": {
                               "type": "string",
-                              "enum": ["nm"]
+                              "enum": ["baseIndex"]
                             },
                             "page": {
                               "$ref": "#/components/schemas/DocSignaturesList200Response/properties/signatures/items/properties/widget/properties/ref/anyOf/0/properties/page"
                             },
-                            "nm": {
-                              "type": "string"
-                            }
-                          },
-                          "required": ["kind", "page", "nm"],
-                          "additionalProperties": false
-                        },
-                        {
-                          "type": "object",
-                          "properties": {
-                            "kind": {
-                              "type": "string",
-                              "enum": ["index"]
-                            },
-                            "page": {
-                              "$ref": "#/components/schemas/DocSignaturesList200Response/properties/signatures/items/properties/widget/properties/ref/anyOf/0/properties/page"
-                            },
-                            "index": {
+                            "baseIndex": {
                               "type": "integer",
                               "minimum": 0
-                            },
-                            "revision": {
-                              "type": "object",
-                              "properties": {
-                                "docSessionId": {
-                                  "type": "string"
-                                },
-                                "page": {
-                                  "$ref": "#/components/schemas/DocSignaturesList200Response/properties/signatures/items/properties/widget/properties/ref/anyOf/0/properties/page"
-                                },
-                                "generation": {
-                                  "type": "integer",
-                                  "minimum": 0
-                                }
-                              },
-                              "required": ["docSessionId", "page", "generation"],
-                              "additionalProperties": false
                             }
                           },
-                          "required": ["kind", "page", "index", "revision"],
+                          "required": ["kind", "page", "baseIndex"],
                           "additionalProperties": false
                         }
                       ],
@@ -15883,8 +15674,6 @@
               "NotFound",
               "WireFormat",
               "RuntimeUnavailable",
-              "InvalidReference",
-              "WeakAnnotationSessionConflict",
               "LayerVersionConflict",
               "NotImplemented",
               "MalformedPdf",
@@ -16130,8 +15919,6 @@
               "NotFound",
               "WireFormat",
               "RuntimeUnavailable",
-              "InvalidReference",
-              "WeakAnnotationSessionConflict",
               "LayerVersionConflict",
               "NotImplemented",
               "MalformedPdf",
@@ -16179,8 +15966,6 @@
               "NotFound",
               "WireFormat",
               "RuntimeUnavailable",
-              "InvalidReference",
-              "WeakAnnotationSessionConflict",
               "LayerVersionConflict",
               "NotImplemented",
               "MalformedPdf",
@@ -16306,8 +16091,6 @@
               "NotFound",
               "WireFormat",
               "RuntimeUnavailable",
-              "InvalidReference",
-              "WeakAnnotationSessionConflict",
               "LayerVersionConflict",
               "NotImplemented",
               "MalformedPdf",
@@ -16355,8 +16138,6 @@
               "NotFound",
               "WireFormat",
               "RuntimeUnavailable",
-              "InvalidReference",
-              "WeakAnnotationSessionConflict",
               "LayerVersionConflict",
               "NotImplemented",
               "MalformedPdf",
@@ -16404,8 +16185,6 @@
               "NotFound",
               "WireFormat",
               "RuntimeUnavailable",
-              "InvalidReference",
-              "WeakAnnotationSessionConflict",
               "LayerVersionConflict",
               "NotImplemented",
               "MalformedPdf",
@@ -16549,51 +16328,17 @@
                         "properties": {
                           "kind": {
                             "type": "string",
-                            "enum": ["nm"]
+                            "enum": ["baseIndex"]
                           },
                           "page": {
                             "$ref": "#/components/schemas/DocSignaturesComplete200Response/properties/signature/properties/widget/properties/ref/anyOf/0/properties/page"
                           },
-                          "nm": {
-                            "type": "string"
-                          }
-                        },
-                        "required": ["kind", "page", "nm"],
-                        "additionalProperties": false
-                      },
-                      {
-                        "type": "object",
-                        "properties": {
-                          "kind": {
-                            "type": "string",
-                            "enum": ["index"]
-                          },
-                          "page": {
-                            "$ref": "#/components/schemas/DocSignaturesComplete200Response/properties/signature/properties/widget/properties/ref/anyOf/0/properties/page"
-                          },
-                          "index": {
+                          "baseIndex": {
                             "type": "integer",
                             "minimum": 0
-                          },
-                          "revision": {
-                            "type": "object",
-                            "properties": {
-                              "docSessionId": {
-                                "type": "string"
-                              },
-                              "page": {
-                                "$ref": "#/components/schemas/DocSignaturesComplete200Response/properties/signature/properties/widget/properties/ref/anyOf/0/properties/page"
-                              },
-                              "generation": {
-                                "type": "integer",
-                                "minimum": 0
-                              }
-                            },
-                            "required": ["docSessionId", "page", "generation"],
-                            "additionalProperties": false
                           }
                         },
-                        "required": ["kind", "page", "index", "revision"],
+                        "required": ["kind", "page", "baseIndex"],
                         "additionalProperties": false
                       }
                     ],
@@ -16960,7 +16705,7 @@
               "affectedPages": {
                 "type": "array",
                 "items": {
-                  "$ref": "#/components/schemas/PageState"
+                  "$ref": "#/components/schemas/DocSignaturesComplete200Response/properties/signature/properties/widget/properties/ref/anyOf/0/properties/page"
                 }
               },
               "cacheDelta": {
@@ -17069,8 +16814,6 @@
               "NotFound",
               "WireFormat",
               "RuntimeUnavailable",
-              "InvalidReference",
-              "WeakAnnotationSessionConflict",
               "LayerVersionConflict",
               "NotImplemented",
               "MalformedPdf",
@@ -17118,8 +16861,6 @@
               "NotFound",
               "WireFormat",
               "RuntimeUnavailable",
-              "InvalidReference",
-              "WeakAnnotationSessionConflict",
               "LayerVersionConflict",
               "NotImplemented",
               "MalformedPdf",
@@ -17167,8 +16908,6 @@
               "NotFound",
               "WireFormat",
               "RuntimeUnavailable",
-              "InvalidReference",
-              "WeakAnnotationSessionConflict",
               "LayerVersionConflict",
               "NotImplemented",
               "MalformedPdf",
@@ -17227,8 +16966,6 @@
               "NotFound",
               "WireFormat",
               "RuntimeUnavailable",
-              "InvalidReference",
-              "WeakAnnotationSessionConflict",
               "LayerVersionConflict",
               "NotImplemented",
               "MalformedPdf",
@@ -17333,8 +17070,6 @@
               "NotFound",
               "WireFormat",
               "RuntimeUnavailable",
-              "InvalidReference",
-              "WeakAnnotationSessionConflict",
               "LayerVersionConflict",
               "NotImplemented",
               "MalformedPdf",
@@ -17480,51 +17215,17 @@
                           "properties": {
                             "kind": {
                               "type": "string",
-                              "enum": ["nm"]
+                              "enum": ["baseIndex"]
                             },
                             "page": {
                               "$ref": "#/components/schemas/DocVersionsSignatures200Response/properties/signatures/items/properties/widget/properties/ref/anyOf/0/properties/page"
                             },
-                            "nm": {
-                              "type": "string"
-                            }
-                          },
-                          "required": ["kind", "page", "nm"],
-                          "additionalProperties": false
-                        },
-                        {
-                          "type": "object",
-                          "properties": {
-                            "kind": {
-                              "type": "string",
-                              "enum": ["index"]
-                            },
-                            "page": {
-                              "$ref": "#/components/schemas/DocVersionsSignatures200Response/properties/signatures/items/properties/widget/properties/ref/anyOf/0/properties/page"
-                            },
-                            "index": {
+                            "baseIndex": {
                               "type": "integer",
                               "minimum": 0
-                            },
-                            "revision": {
-                              "type": "object",
-                              "properties": {
-                                "docSessionId": {
-                                  "type": "string"
-                                },
-                                "page": {
-                                  "$ref": "#/components/schemas/DocVersionsSignatures200Response/properties/signatures/items/properties/widget/properties/ref/anyOf/0/properties/page"
-                                },
-                                "generation": {
-                                  "type": "integer",
-                                  "minimum": 0
-                                }
-                              },
-                              "required": ["docSessionId", "page", "generation"],
-                              "additionalProperties": false
                             }
                           },
-                          "required": ["kind", "page", "index", "revision"],
+                          "required": ["kind", "page", "baseIndex"],
                           "additionalProperties": false
                         }
                       ],
@@ -17884,8 +17585,6 @@
               "NotFound",
               "WireFormat",
               "RuntimeUnavailable",
-              "InvalidReference",
-              "WeakAnnotationSessionConflict",
               "LayerVersionConflict",
               "NotImplemented",
               "MalformedPdf",
@@ -17933,8 +17632,6 @@
               "NotFound",
               "WireFormat",
               "RuntimeUnavailable",
-              "InvalidReference",
-              "WeakAnnotationSessionConflict",
               "LayerVersionConflict",
               "NotImplemented",
               "MalformedPdf",
@@ -17982,8 +17679,6 @@
               "NotFound",
               "WireFormat",
               "RuntimeUnavailable",
-              "InvalidReference",
-              "WeakAnnotationSessionConflict",
               "LayerVersionConflict",
               "NotImplemented",
               "MalformedPdf",
@@ -18229,8 +17924,6 @@
               "NotFound",
               "WireFormat",
               "RuntimeUnavailable",
-              "InvalidReference",
-              "WeakAnnotationSessionConflict",
               "LayerVersionConflict",
               "NotImplemented",
               "MalformedPdf",
@@ -18278,8 +17971,6 @@
               "NotFound",
               "WireFormat",
               "RuntimeUnavailable",
-              "InvalidReference",
-              "WeakAnnotationSessionConflict",
               "LayerVersionConflict",
               "NotImplemented",
               "MalformedPdf",
@@ -18327,8 +18018,6 @@
               "NotFound",
               "WireFormat",
               "RuntimeUnavailable",
-              "InvalidReference",
-              "WeakAnnotationSessionConflict",
               "LayerVersionConflict",
               "NotImplemented",
               "MalformedPdf",
@@ -18376,8 +18065,6 @@
               "NotFound",
               "WireFormat",
               "RuntimeUnavailable",
-              "InvalidReference",
-              "WeakAnnotationSessionConflict",
               "LayerVersionConflict",
               "NotImplemented",
               "MalformedPdf",
@@ -18425,8 +18112,6 @@
               "NotFound",
               "WireFormat",
               "RuntimeUnavailable",
-              "InvalidReference",
-              "WeakAnnotationSessionConflict",
               "LayerVersionConflict",
               "NotImplemented",
               "MalformedPdf",
@@ -18506,8 +18191,6 @@
               "NotFound",
               "WireFormat",
               "RuntimeUnavailable",
-              "InvalidReference",
-              "WeakAnnotationSessionConflict",
               "LayerVersionConflict",
               "NotImplemented",
               "MalformedPdf",
@@ -18558,8 +18241,6 @@
               "NotFound",
               "WireFormat",
               "RuntimeUnavailable",
-              "InvalidReference",
-              "WeakAnnotationSessionConflict",
               "LayerVersionConflict",
               "NotImplemented",
               "MalformedPdf",
@@ -18610,8 +18291,6 @@
               "NotFound",
               "WireFormat",
               "RuntimeUnavailable",
-              "InvalidReference",
-              "WeakAnnotationSessionConflict",
               "LayerVersionConflict",
               "NotImplemented",
               "MalformedPdf",
@@ -18659,8 +18338,6 @@
               "NotFound",
               "WireFormat",
               "RuntimeUnavailable",
-              "InvalidReference",
-              "WeakAnnotationSessionConflict",
               "LayerVersionConflict",
               "NotImplemented",
               "MalformedPdf",
@@ -18725,8 +18402,6 @@
               "NotFound",
               "WireFormat",
               "RuntimeUnavailable",
-              "InvalidReference",
-              "WeakAnnotationSessionConflict",
               "LayerVersionConflict",
               "NotImplemented",
               "MalformedPdf",
@@ -18774,8 +18449,6 @@
               "NotFound",
               "WireFormat",
               "RuntimeUnavailable",
-              "InvalidReference",
-              "WeakAnnotationSessionConflict",
               "LayerVersionConflict",
               "NotImplemented",
               "MalformedPdf",
@@ -18854,8 +18527,6 @@
               "NotFound",
               "WireFormat",
               "RuntimeUnavailable",
-              "InvalidReference",
-              "WeakAnnotationSessionConflict",
               "LayerVersionConflict",
               "NotImplemented",
               "MalformedPdf",
@@ -18903,8 +18574,6 @@
               "NotFound",
               "WireFormat",
               "RuntimeUnavailable",
-              "InvalidReference",
-              "WeakAnnotationSessionConflict",
               "LayerVersionConflict",
               "NotImplemented",
               "MalformedPdf",
@@ -18962,8 +18631,6 @@
               "NotFound",
               "WireFormat",
               "RuntimeUnavailable",
-              "InvalidReference",
-              "WeakAnnotationSessionConflict",
               "LayerVersionConflict",
               "NotImplemented",
               "MalformedPdf",
@@ -19045,51 +18712,17 @@
                       "properties": {
                         "kind": {
                           "type": "string",
-                          "enum": ["nm"]
+                          "enum": ["baseIndex"]
                         },
                         "page": {
                           "$ref": "#/components/schemas/DocAnnotationsFlatten200Response/properties/page"
                         },
-                        "nm": {
-                          "type": "string"
-                        }
-                      },
-                      "required": ["kind", "page", "nm"],
-                      "additionalProperties": false
-                    },
-                    {
-                      "type": "object",
-                      "properties": {
-                        "kind": {
-                          "type": "string",
-                          "enum": ["index"]
-                        },
-                        "page": {
-                          "$ref": "#/components/schemas/DocAnnotationsFlatten200Response/properties/page"
-                        },
-                        "index": {
+                        "baseIndex": {
                           "type": "integer",
                           "minimum": 0
-                        },
-                        "revision": {
-                          "type": "object",
-                          "properties": {
-                            "docSessionId": {
-                              "type": "string"
-                            },
-                            "page": {
-                              "$ref": "#/components/schemas/DocAnnotationsFlatten200Response/properties/page"
-                            },
-                            "generation": {
-                              "type": "integer",
-                              "minimum": 0
-                            }
-                          },
-                          "required": ["docSessionId", "page", "generation"],
-                          "additionalProperties": false
                         }
                       },
-                      "required": ["kind", "page", "index", "revision"],
+                      "required": ["kind", "page", "baseIndex"],
                       "additionalProperties": false
                     }
                   ]
@@ -19109,7 +18742,7 @@
               "affectedPages": {
                 "type": "array",
                 "items": {
-                  "$ref": "#/components/schemas/PageState"
+                  "$ref": "#/components/schemas/DocAnnotationsFlatten200Response/properties/page"
                 }
               },
               "cacheDelta": {
@@ -19218,8 +18851,6 @@
               "NotFound",
               "WireFormat",
               "RuntimeUnavailable",
-              "InvalidReference",
-              "WeakAnnotationSessionConflict",
               "LayerVersionConflict",
               "NotImplemented",
               "MalformedPdf",
@@ -19267,8 +18898,6 @@
               "NotFound",
               "WireFormat",
               "RuntimeUnavailable",
-              "InvalidReference",
-              "WeakAnnotationSessionConflict",
               "LayerVersionConflict",
               "NotImplemented",
               "MalformedPdf",
@@ -19320,8 +18949,6 @@
               "NotFound",
               "WireFormat",
               "RuntimeUnavailable",
-              "InvalidReference",
-              "WeakAnnotationSessionConflict",
               "LayerVersionConflict",
               "NotImplemented",
               "MalformedPdf",
@@ -19369,8 +18996,6 @@
               "NotFound",
               "WireFormat",
               "RuntimeUnavailable",
-              "InvalidReference",
-              "WeakAnnotationSessionConflict",
               "LayerVersionConflict",
               "NotImplemented",
               "MalformedPdf",
@@ -19418,8 +19043,6 @@
               "NotFound",
               "WireFormat",
               "RuntimeUnavailable",
-              "InvalidReference",
-              "WeakAnnotationSessionConflict",
               "LayerVersionConflict",
               "NotImplemented",
               "MalformedPdf",
@@ -19467,8 +19090,6 @@
               "NotFound",
               "WireFormat",
               "RuntimeUnavailable",
-              "InvalidReference",
-              "WeakAnnotationSessionConflict",
               "LayerVersionConflict",
               "NotImplemented",
               "MalformedPdf",
@@ -19675,51 +19296,17 @@
                                 "properties": {
                                   "kind": {
                                     "type": "string",
-                                    "enum": ["nm"]
+                                    "enum": ["baseIndex"]
                                   },
                                   "page": {
                                     "$ref": "#/components/schemas/DocFormsList200Response/properties/fields/items/anyOf/0/properties/widgets/items/properties/ref/anyOf/0/properties/page"
                                   },
-                                  "nm": {
-                                    "type": "string"
-                                  }
-                                },
-                                "required": ["kind", "page", "nm"],
-                                "additionalProperties": false
-                              },
-                              {
-                                "type": "object",
-                                "properties": {
-                                  "kind": {
-                                    "type": "string",
-                                    "enum": ["index"]
-                                  },
-                                  "page": {
-                                    "$ref": "#/components/schemas/DocFormsList200Response/properties/fields/items/anyOf/0/properties/widgets/items/properties/ref/anyOf/0/properties/page"
-                                  },
-                                  "index": {
+                                  "baseIndex": {
                                     "type": "integer",
                                     "minimum": 0
-                                  },
-                                  "revision": {
-                                    "type": "object",
-                                    "properties": {
-                                      "docSessionId": {
-                                        "type": "string"
-                                      },
-                                      "page": {
-                                        "$ref": "#/components/schemas/DocFormsList200Response/properties/fields/items/anyOf/0/properties/widgets/items/properties/ref/anyOf/0/properties/page"
-                                      },
-                                      "generation": {
-                                        "type": "integer",
-                                        "minimum": 0
-                                      }
-                                    },
-                                    "required": ["docSessionId", "page", "generation"],
-                                    "additionalProperties": false
                                   }
                                 },
-                                "required": ["kind", "page", "index", "revision"],
+                                "required": ["kind", "page", "baseIndex"],
                                 "additionalProperties": false
                               }
                             ],
@@ -20394,8 +19981,6 @@
               "NotFound",
               "WireFormat",
               "RuntimeUnavailable",
-              "InvalidReference",
-              "WeakAnnotationSessionConflict",
               "LayerVersionConflict",
               "NotImplemented",
               "MalformedPdf",
@@ -20597,51 +20182,17 @@
                               "properties": {
                                 "kind": {
                                   "type": "string",
-                                  "enum": ["nm"]
+                                  "enum": ["baseIndex"]
                                 },
                                 "page": {
                                   "$ref": "#/components/schemas/DocFormsSetValue200Response/properties/field/anyOf/0/properties/widgets/items/properties/ref/anyOf/0/properties/page"
                                 },
-                                "nm": {
-                                  "type": "string"
-                                }
-                              },
-                              "required": ["kind", "page", "nm"],
-                              "additionalProperties": false
-                            },
-                            {
-                              "type": "object",
-                              "properties": {
-                                "kind": {
-                                  "type": "string",
-                                  "enum": ["index"]
-                                },
-                                "page": {
-                                  "$ref": "#/components/schemas/DocFormsSetValue200Response/properties/field/anyOf/0/properties/widgets/items/properties/ref/anyOf/0/properties/page"
-                                },
-                                "index": {
+                                "baseIndex": {
                                   "type": "integer",
                                   "minimum": 0
-                                },
-                                "revision": {
-                                  "type": "object",
-                                  "properties": {
-                                    "docSessionId": {
-                                      "type": "string"
-                                    },
-                                    "page": {
-                                      "$ref": "#/components/schemas/DocFormsSetValue200Response/properties/field/anyOf/0/properties/widgets/items/properties/ref/anyOf/0/properties/page"
-                                    },
-                                    "generation": {
-                                      "type": "integer",
-                                      "minimum": 0
-                                    }
-                                  },
-                                  "required": ["docSessionId", "page", "generation"],
-                                  "additionalProperties": false
                                 }
                               },
-                              "required": ["kind", "page", "index", "revision"],
+                              "required": ["kind", "page", "baseIndex"],
                               "additionalProperties": false
                             }
                           ],
@@ -21282,7 +20833,7 @@
               "affectedPages": {
                 "type": "array",
                 "items": {
-                  "$ref": "#/components/schemas/PageState"
+                  "$ref": "#/components/schemas/DocFormsSetValue200Response/properties/field/anyOf/0/properties/widgets/items/properties/ref/anyOf/0/properties/page"
                 }
               },
               "cacheDelta": {
@@ -21416,8 +20967,6 @@
               "NotFound",
               "WireFormat",
               "RuntimeUnavailable",
-              "InvalidReference",
-              "WeakAnnotationSessionConflict",
               "LayerVersionConflict",
               "NotImplemented",
               "MalformedPdf",
@@ -21465,8 +21014,6 @@
               "NotFound",
               "WireFormat",
               "RuntimeUnavailable",
-              "InvalidReference",
-              "WeakAnnotationSessionConflict",
               "LayerVersionConflict",
               "NotImplemented",
               "MalformedPdf",
@@ -21710,51 +21257,17 @@
                                 "properties": {
                                   "kind": {
                                     "type": "string",
-                                    "enum": ["nm"]
+                                    "enum": ["baseIndex"]
                                   },
                                   "page": {
                                     "$ref": "#/components/schemas/DocFormsReset200Response/properties/fields/items/anyOf/0/properties/widgets/items/properties/ref/anyOf/0/properties/page"
                                   },
-                                  "nm": {
-                                    "type": "string"
-                                  }
-                                },
-                                "required": ["kind", "page", "nm"],
-                                "additionalProperties": false
-                              },
-                              {
-                                "type": "object",
-                                "properties": {
-                                  "kind": {
-                                    "type": "string",
-                                    "enum": ["index"]
-                                  },
-                                  "page": {
-                                    "$ref": "#/components/schemas/DocFormsReset200Response/properties/fields/items/anyOf/0/properties/widgets/items/properties/ref/anyOf/0/properties/page"
-                                  },
-                                  "index": {
+                                  "baseIndex": {
                                     "type": "integer",
                                     "minimum": 0
-                                  },
-                                  "revision": {
-                                    "type": "object",
-                                    "properties": {
-                                      "docSessionId": {
-                                        "type": "string"
-                                      },
-                                      "page": {
-                                        "$ref": "#/components/schemas/DocFormsReset200Response/properties/fields/items/anyOf/0/properties/widgets/items/properties/ref/anyOf/0/properties/page"
-                                      },
-                                      "generation": {
-                                        "type": "integer",
-                                        "minimum": 0
-                                      }
-                                    },
-                                    "required": ["docSessionId", "page", "generation"],
-                                    "additionalProperties": false
                                   }
                                 },
-                                "required": ["kind", "page", "index", "revision"],
+                                "required": ["kind", "page", "baseIndex"],
                                 "additionalProperties": false
                               }
                             ],
@@ -22396,7 +21909,7 @@
               "affectedPages": {
                 "type": "array",
                 "items": {
-                  "$ref": "#/components/schemas/PageState"
+                  "$ref": "#/components/schemas/DocFormsReset200Response/properties/fields/items/anyOf/0/properties/widgets/items/properties/ref/anyOf/0/properties/page"
                 }
               },
               "cacheDelta": {
@@ -22530,8 +22043,6 @@
               "NotFound",
               "WireFormat",
               "RuntimeUnavailable",
-              "InvalidReference",
-              "WeakAnnotationSessionConflict",
               "LayerVersionConflict",
               "NotImplemented",
               "MalformedPdf",
@@ -22579,8 +22090,6 @@
               "NotFound",
               "WireFormat",
               "RuntimeUnavailable",
-              "InvalidReference",
-              "WeakAnnotationSessionConflict",
               "LayerVersionConflict",
               "NotImplemented",
               "MalformedPdf",
@@ -22628,8 +22137,6 @@
               "NotFound",
               "WireFormat",
               "RuntimeUnavailable",
-              "InvalidReference",
-              "WeakAnnotationSessionConflict",
               "LayerVersionConflict",
               "NotImplemented",
               "MalformedPdf",
@@ -22843,51 +22350,17 @@
                                     "properties": {
                                       "kind": {
                                         "type": "string",
-                                        "enum": ["nm"]
+                                        "enum": ["baseIndex"]
                                       },
                                       "page": {
                                         "$ref": "#/components/schemas/DocFormsImportData200Response/properties/form/properties/fields/items/anyOf/0/properties/widgets/items/properties/ref/anyOf/0/properties/page"
                                       },
-                                      "nm": {
-                                        "type": "string"
-                                      }
-                                    },
-                                    "required": ["kind", "page", "nm"],
-                                    "additionalProperties": false
-                                  },
-                                  {
-                                    "type": "object",
-                                    "properties": {
-                                      "kind": {
-                                        "type": "string",
-                                        "enum": ["index"]
-                                      },
-                                      "page": {
-                                        "$ref": "#/components/schemas/DocFormsImportData200Response/properties/form/properties/fields/items/anyOf/0/properties/widgets/items/properties/ref/anyOf/0/properties/page"
-                                      },
-                                      "index": {
+                                      "baseIndex": {
                                         "type": "integer",
                                         "minimum": 0
-                                      },
-                                      "revision": {
-                                        "type": "object",
-                                        "properties": {
-                                          "docSessionId": {
-                                            "type": "string"
-                                          },
-                                          "page": {
-                                            "$ref": "#/components/schemas/DocFormsImportData200Response/properties/form/properties/fields/items/anyOf/0/properties/widgets/items/properties/ref/anyOf/0/properties/page"
-                                          },
-                                          "generation": {
-                                            "type": "integer",
-                                            "minimum": 0
-                                          }
-                                        },
-                                        "required": ["docSessionId", "page", "generation"],
-                                        "additionalProperties": false
                                       }
                                     },
-                                    "required": ["kind", "page", "index", "revision"],
+                                    "required": ["kind", "page", "baseIndex"],
                                     "additionalProperties": false
                                   }
                                 ],
@@ -23552,7 +23025,7 @@
               "affectedPages": {
                 "type": "array",
                 "items": {
-                  "$ref": "#/components/schemas/PageState"
+                  "$ref": "#/components/schemas/DocFormsImportData200Response/properties/form/properties/fields/items/anyOf/0/properties/widgets/items/properties/ref/anyOf/0/properties/page"
                 }
               },
               "cacheDelta": {
@@ -23661,8 +23134,6 @@
               "NotFound",
               "WireFormat",
               "RuntimeUnavailable",
-              "InvalidReference",
-              "WeakAnnotationSessionConflict",
               "LayerVersionConflict",
               "NotImplemented",
               "MalformedPdf",
@@ -23710,8 +23181,6 @@
               "NotFound",
               "WireFormat",
               "RuntimeUnavailable",
-              "InvalidReference",
-              "WeakAnnotationSessionConflict",
               "LayerVersionConflict",
               "NotImplemented",
               "MalformedPdf",
@@ -23933,8 +23402,6 @@
               "NotFound",
               "WireFormat",
               "RuntimeUnavailable",
-              "InvalidReference",
-              "WeakAnnotationSessionConflict",
               "LayerVersionConflict",
               "NotImplemented",
               "MalformedPdf",
@@ -24095,7 +23562,7 @@
               "affectedPages": {
                 "type": "array",
                 "items": {
-                  "$ref": "#/components/schemas/PageState"
+                  "$ref": "#/components/schemas/DocPagesSetScale200Response/properties/page"
                 }
               },
               "cacheDelta": {
@@ -24204,8 +23671,6 @@
               "NotFound",
               "WireFormat",
               "RuntimeUnavailable",
-              "InvalidReference",
-              "WeakAnnotationSessionConflict",
               "LayerVersionConflict",
               "NotImplemented",
               "MalformedPdf",
@@ -24253,8 +23718,6 @@
               "NotFound",
               "WireFormat",
               "RuntimeUnavailable",
-              "InvalidReference",
-              "WeakAnnotationSessionConflict",
               "LayerVersionConflict",
               "NotImplemented",
               "MalformedPdf",
@@ -24505,7 +23968,7 @@
               "affectedPages": {
                 "type": "array",
                 "items": {
-                  "$ref": "#/components/schemas/PageState"
+                  "$ref": "#/components/schemas/DocPagesMove200Response/properties/layout/properties/pages/items/properties/ref"
                 }
               },
               "cacheDelta": {
@@ -24614,8 +24077,6 @@
               "NotFound",
               "WireFormat",
               "RuntimeUnavailable",
-              "InvalidReference",
-              "WeakAnnotationSessionConflict",
               "LayerVersionConflict",
               "NotImplemented",
               "MalformedPdf",
@@ -24663,8 +24124,6 @@
               "NotFound",
               "WireFormat",
               "RuntimeUnavailable",
-              "InvalidReference",
-              "WeakAnnotationSessionConflict",
               "LayerVersionConflict",
               "NotImplemented",
               "MalformedPdf",
@@ -24915,7 +24374,7 @@
               "affectedPages": {
                 "type": "array",
                 "items": {
-                  "$ref": "#/components/schemas/PageState"
+                  "$ref": "#/components/schemas/DocPagesRotate200Response/properties/layout/properties/pages/items/properties/ref"
                 }
               },
               "cacheDelta": {
@@ -25024,8 +24483,6 @@
               "NotFound",
               "WireFormat",
               "RuntimeUnavailable",
-              "InvalidReference",
-              "WeakAnnotationSessionConflict",
               "LayerVersionConflict",
               "NotImplemented",
               "MalformedPdf",
@@ -25073,8 +24530,6 @@
               "NotFound",
               "WireFormat",
               "RuntimeUnavailable",
-              "InvalidReference",
-              "WeakAnnotationSessionConflict",
               "LayerVersionConflict",
               "NotImplemented",
               "MalformedPdf",
@@ -25325,7 +24780,7 @@
               "affectedPages": {
                 "type": "array",
                 "items": {
-                  "$ref": "#/components/schemas/PageState"
+                  "$ref": "#/components/schemas/DocPagesDelete200Response/properties/layout/properties/pages/items/properties/ref"
                 }
               },
               "cacheDelta": {
@@ -25434,8 +24889,6 @@
               "NotFound",
               "WireFormat",
               "RuntimeUnavailable",
-              "InvalidReference",
-              "WeakAnnotationSessionConflict",
               "LayerVersionConflict",
               "NotImplemented",
               "MalformedPdf",
@@ -25483,8 +24936,6 @@
               "NotFound",
               "WireFormat",
               "RuntimeUnavailable",
-              "InvalidReference",
-              "WeakAnnotationSessionConflict",
               "LayerVersionConflict",
               "NotImplemented",
               "MalformedPdf",
@@ -25735,7 +25186,7 @@
               "affectedPages": {
                 "type": "array",
                 "items": {
-                  "$ref": "#/components/schemas/PageState"
+                  "$ref": "#/components/schemas/DocPagesSetName200Response/properties/layout/properties/pages/items/properties/ref"
                 }
               },
               "cacheDelta": {
@@ -25844,8 +25295,6 @@
               "NotFound",
               "WireFormat",
               "RuntimeUnavailable",
-              "InvalidReference",
-              "WeakAnnotationSessionConflict",
               "LayerVersionConflict",
               "NotImplemented",
               "MalformedPdf",
@@ -25893,8 +25342,6 @@
               "NotFound",
               "WireFormat",
               "RuntimeUnavailable",
-              "InvalidReference",
-              "WeakAnnotationSessionConflict",
               "LayerVersionConflict",
               "NotImplemented",
               "MalformedPdf",
@@ -26145,7 +25592,7 @@
               "affectedPages": {
                 "type": "array",
                 "items": {
-                  "$ref": "#/components/schemas/PageState"
+                  "$ref": "#/components/schemas/DocPagesRemoveName200Response/properties/layout/properties/pages/items/properties/ref"
                 }
               },
               "cacheDelta": {
@@ -26254,8 +25701,6 @@
               "NotFound",
               "WireFormat",
               "RuntimeUnavailable",
-              "InvalidReference",
-              "WeakAnnotationSessionConflict",
               "LayerVersionConflict",
               "NotImplemented",
               "MalformedPdf",
@@ -26303,8 +25748,6 @@
               "NotFound",
               "WireFormat",
               "RuntimeUnavailable",
-              "InvalidReference",
-              "WeakAnnotationSessionConflict",
               "LayerVersionConflict",
               "NotImplemented",
               "MalformedPdf",
@@ -26368,56 +25811,7 @@
                 },
                 "status": {
                   "type": "string",
-                  "enum": ["applied", "unchanged", "failed", "skipped"]
-                },
-                "error": {
-                  "type": "object",
-                  "properties": {
-                    "name": {
-                      "type": "string",
-                      "enum": ["EngineError"]
-                    },
-                    "code": {
-                      "type": "string",
-                      "enum": [
-                        "Unknown",
-                        "InvalidArg",
-                        "DocNotOpen",
-                        "DocOpenFailed",
-                        "DocPasswordRequired",
-                        "DocPasswordIncorrect",
-                        "SharePasswordRequired",
-                        "Aborted",
-                        "Network",
-                        "Unauthenticated",
-                        "Forbidden",
-                        "NotFound",
-                        "WireFormat",
-                        "RuntimeUnavailable",
-                        "InvalidReference",
-                        "WeakAnnotationSessionConflict",
-                        "LayerVersionConflict",
-                        "NotImplemented",
-                        "MalformedPdf",
-                        "SigningPending",
-                        "SigningExpired",
-                        "SigningVersionMismatch",
-                        "SignatureRefused",
-                        "ProtectedDocument",
-                        "StaleBase",
-                        "PayloadTooLarge"
-                      ]
-                    },
-                    "message": {
-                      "type": "string"
-                    },
-                    "details": {
-                      "type": "object",
-                      "additionalProperties": {}
-                    }
-                  },
-                  "required": ["name", "code", "message"],
-                  "additionalProperties": false
+                  "enum": ["applied", "unchanged"]
                 }
               },
               "required": ["page", "status"],
@@ -26430,7 +25824,7 @@
               "affectedPages": {
                 "type": "array",
                 "items": {
-                  "$ref": "#/components/schemas/PageState"
+                  "$ref": "#/components/schemas/DocPagesFlatten200Response/properties/pages/items"
                 }
               },
               "cacheDelta": {
@@ -26539,8 +25933,6 @@
               "NotFound",
               "WireFormat",
               "RuntimeUnavailable",
-              "InvalidReference",
-              "WeakAnnotationSessionConflict",
               "LayerVersionConflict",
               "NotImplemented",
               "MalformedPdf",
@@ -26588,8 +25980,6 @@
               "NotFound",
               "WireFormat",
               "RuntimeUnavailable",
-              "InvalidReference",
-              "WeakAnnotationSessionConflict",
               "LayerVersionConflict",
               "NotImplemented",
               "MalformedPdf",
@@ -26842,7 +26232,7 @@
               "affectedPages": {
                 "type": "array",
                 "items": {
-                  "$ref": "#/components/schemas/PageState"
+                  "$ref": "#/components/schemas/DocPagesInsert200Response/properties/insertedPages/items"
                 }
               },
               "cacheDelta": {
@@ -26951,8 +26341,6 @@
               "NotFound",
               "WireFormat",
               "RuntimeUnavailable",
-              "InvalidReference",
-              "WeakAnnotationSessionConflict",
               "LayerVersionConflict",
               "NotImplemented",
               "MalformedPdf",
@@ -27000,8 +26388,6 @@
               "NotFound",
               "WireFormat",
               "RuntimeUnavailable",
-              "InvalidReference",
-              "WeakAnnotationSessionConflict",
               "LayerVersionConflict",
               "NotImplemented",
               "MalformedPdf",
@@ -27258,7 +26644,7 @@
               "affectedPages": {
                 "type": "array",
                 "items": {
-                  "$ref": "#/components/schemas/PageState"
+                  "$ref": "#/components/schemas/DocPagesInsertBlank200Response/properties/insertedPages/items"
                 }
               },
               "cacheDelta": {
@@ -27367,8 +26753,6 @@
               "NotFound",
               "WireFormat",
               "RuntimeUnavailable",
-              "InvalidReference",
-              "WeakAnnotationSessionConflict",
               "LayerVersionConflict",
               "NotImplemented",
               "MalformedPdf",
@@ -27416,8 +26800,6 @@
               "NotFound",
               "WireFormat",
               "RuntimeUnavailable",
-              "InvalidReference",
-              "WeakAnnotationSessionConflict",
               "LayerVersionConflict",
               "NotImplemented",
               "MalformedPdf",
@@ -27469,8 +26851,6 @@
               "NotFound",
               "WireFormat",
               "RuntimeUnavailable",
-              "InvalidReference",
-              "WeakAnnotationSessionConflict",
               "LayerVersionConflict",
               "NotImplemented",
               "MalformedPdf",
@@ -27518,8 +26898,6 @@
               "NotFound",
               "WireFormat",
               "RuntimeUnavailable",
-              "InvalidReference",
-              "WeakAnnotationSessionConflict",
               "LayerVersionConflict",
               "NotImplemented",
               "MalformedPdf",
@@ -27593,51 +26971,17 @@
                   "properties": {
                     "kind": {
                       "type": "string",
-                      "enum": ["nm"]
+                      "enum": ["baseIndex"]
                     },
                     "page": {
                       "$ref": "#/components/schemas/DocRedactionsApplyRequest/properties/pages/items"
                     },
-                    "nm": {
-                      "type": "string"
-                    }
-                  },
-                  "required": ["kind", "page", "nm"],
-                  "additionalProperties": false
-                },
-                {
-                  "type": "object",
-                  "properties": {
-                    "kind": {
-                      "type": "string",
-                      "enum": ["index"]
-                    },
-                    "page": {
-                      "$ref": "#/components/schemas/DocRedactionsApplyRequest/properties/pages/items"
-                    },
-                    "index": {
+                    "baseIndex": {
                       "type": "integer",
                       "minimum": 0
-                    },
-                    "revision": {
-                      "type": "object",
-                      "properties": {
-                        "docSessionId": {
-                          "type": "string"
-                        },
-                        "page": {
-                          "$ref": "#/components/schemas/DocRedactionsApplyRequest/properties/pages/items"
-                        },
-                        "generation": {
-                          "type": "integer",
-                          "minimum": 0
-                        }
-                      },
-                      "required": ["docSessionId", "page", "generation"],
-                      "additionalProperties": false
                     }
                   },
-                  "required": ["kind", "page", "index", "revision"],
+                  "required": ["kind", "page", "baseIndex"],
                   "additionalProperties": false
                 }
               ]
@@ -27699,51 +27043,17 @@
                       "properties": {
                         "kind": {
                           "type": "string",
-                          "enum": ["nm"]
+                          "enum": ["baseIndex"]
                         },
                         "page": {
                           "$ref": "#/components/schemas/DocRedactionsApply200Response/properties/scope/properties/pages/items"
                         },
-                        "nm": {
-                          "type": "string"
-                        }
-                      },
-                      "required": ["kind", "page", "nm"],
-                      "additionalProperties": false
-                    },
-                    {
-                      "type": "object",
-                      "properties": {
-                        "kind": {
-                          "type": "string",
-                          "enum": ["index"]
-                        },
-                        "page": {
-                          "$ref": "#/components/schemas/DocRedactionsApply200Response/properties/scope/properties/pages/items"
-                        },
-                        "index": {
+                        "baseIndex": {
                           "type": "integer",
                           "minimum": 0
-                        },
-                        "revision": {
-                          "type": "object",
-                          "properties": {
-                            "docSessionId": {
-                              "type": "string"
-                            },
-                            "page": {
-                              "$ref": "#/components/schemas/DocRedactionsApply200Response/properties/scope/properties/pages/items"
-                            },
-                            "generation": {
-                              "type": "integer",
-                              "minimum": 0
-                            }
-                          },
-                          "required": ["docSessionId", "page", "generation"],
-                          "additionalProperties": false
                         }
                       },
-                      "required": ["kind", "page", "index", "revision"],
+                      "required": ["kind", "page", "baseIndex"],
                       "additionalProperties": false
                     }
                   ]
@@ -27762,60 +27072,11 @@
                 },
                 "status": {
                   "type": "string",
-                  "enum": ["applied", "unchanged", "failed", "skipped"]
+                  "enum": ["applied", "unchanged"]
                 },
                 "removedAnnotationCount": {
                   "type": "integer",
                   "minimum": 0
-                },
-                "error": {
-                  "type": "object",
-                  "properties": {
-                    "name": {
-                      "type": "string",
-                      "enum": ["EngineError"]
-                    },
-                    "code": {
-                      "type": "string",
-                      "enum": [
-                        "Unknown",
-                        "InvalidArg",
-                        "DocNotOpen",
-                        "DocOpenFailed",
-                        "DocPasswordRequired",
-                        "DocPasswordIncorrect",
-                        "SharePasswordRequired",
-                        "Aborted",
-                        "Network",
-                        "Unauthenticated",
-                        "Forbidden",
-                        "NotFound",
-                        "WireFormat",
-                        "RuntimeUnavailable",
-                        "InvalidReference",
-                        "WeakAnnotationSessionConflict",
-                        "LayerVersionConflict",
-                        "NotImplemented",
-                        "MalformedPdf",
-                        "SigningPending",
-                        "SigningExpired",
-                        "SigningVersionMismatch",
-                        "SignatureRefused",
-                        "ProtectedDocument",
-                        "StaleBase",
-                        "PayloadTooLarge"
-                      ]
-                    },
-                    "message": {
-                      "type": "string"
-                    },
-                    "details": {
-                      "type": "object",
-                      "additionalProperties": {}
-                    }
-                  },
-                  "required": ["name", "code", "message"],
-                  "additionalProperties": false
                 }
               },
               "required": ["page", "status", "removedAnnotationCount"],
@@ -27832,7 +27093,7 @@
               "affectedPages": {
                 "type": "array",
                 "items": {
-                  "$ref": "#/components/schemas/PageState"
+                  "$ref": "#/components/schemas/DocRedactionsApply200Response/properties/scope/properties/pages/items"
                 }
               },
               "cacheDelta": {
@@ -27941,8 +27202,6 @@
               "NotFound",
               "WireFormat",
               "RuntimeUnavailable",
-              "InvalidReference",
-              "WeakAnnotationSessionConflict",
               "LayerVersionConflict",
               "NotImplemented",
               "MalformedPdf",
@@ -27990,8 +27249,6 @@
               "NotFound",
               "WireFormat",
               "RuntimeUnavailable",
-              "InvalidReference",
-              "WeakAnnotationSessionConflict",
               "LayerVersionConflict",
               "NotImplemented",
               "MalformedPdf",
@@ -28039,8 +27296,6 @@
               "NotFound",
               "WireFormat",
               "RuntimeUnavailable",
-              "InvalidReference",
-              "WeakAnnotationSessionConflict",
               "LayerVersionConflict",
               "NotImplemented",
               "MalformedPdf",

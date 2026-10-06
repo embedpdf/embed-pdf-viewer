@@ -57,8 +57,7 @@ export function runAnnotationAppearanceExportConformance(
         expect([...bytes.subarray(0, 4)]).toEqual(PDF_MAGIC);
 
         const after = await page.annotations.list();
-        expect(after.annotations.length).toBe(before.annotations.length);
-        expect(after.pages[0].revision.generation).toBe(before.pages[0].revision.generation);
+        expect(after.annotations).toEqual(before.annotations);
 
         if (opts.openKind !== 'bytes') return;
         exported = await engine.open({ kind: 'bytes', id: `${opts.fixture.id}-appearance`, bytes });

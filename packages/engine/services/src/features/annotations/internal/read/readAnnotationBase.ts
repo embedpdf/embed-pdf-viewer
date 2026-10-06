@@ -3,19 +3,18 @@ import type {
   PageObjectNumber,
   PdfAnnotationActions,
   PdfDestination,
-  RevisionToken,
   PdfCoordinates,
 } from '@embedpdf/engine-core/runtime';
 import { toPageRef } from '@embedpdf/engine-core/runtime';
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
 
 import { readAnnotFlags, readAnnotRect, readAnnotString } from './annotationReadPrimitives';
-import { readAnnotationIdentity } from './readAnnotationIdentity';
 import { readAnnotationRelationship, readLinkedAnnotationRef } from './readAnnotationRelationship';
 import { readEmbedMetadata } from './readEmbedMetadata';
 import { pdfDateToIso } from '../../../../shared/pdf-date';
 import { ActionReadBudgetTracker, readActionModel } from '../../../actions/ActionModelReader';
 import { blendModeFromCode } from '../blendMode';
+import { annotationRefOf } from '../identity/annotationName';
 
 /** `FPDF_ANNOT_APPEARANCEMODE_NORMAL`: the `/AP /N` stream. */
 const APPEARANCE_MODE_NORMAL = 0;
@@ -34,10 +33,9 @@ export function readAnnotationBase(
   annotPtr: Ptr,
   pageObjectNumber: PageObjectNumber,
   index: number,
-  revision: RevisionToken,
   actionBudget = new ActionReadBudgetTracker(),
 ): AnnotationBase<PdfCoordinates> {
-  const identity = readAnnotationIdentity(fn, mem, annotPtr, pageObjectNumber, index, revision);
+  const page = toPageRef(pageObjectNumber);
   const rect = readAnnotRect(fn, mem, annotPtr);
   const flags = readAnnotFlags(fn, annotPtr);
   const contents = readAnnotString(fn, mem, annotPtr, 'Contents');
@@ -48,17 +46,16 @@ export function readAnnotationBase(
   const blendMode = blendModeFromCode(fn.EPDFAnnot_GetBlendMode(annotPtr));
   // /EMBD_Metadata is absent for anonymous annotations and those written by other tools.
   const embd = readEmbedMetadata(fn, mem, annotPtr);
-  const relationship = readAnnotationRelationship(fn, mem, annotPtr, pageObjectNumber);
-  const popup = readLinkedAnnotationRef(fn, mem, annotPtr, 'Popup', pageObjectNumber);
+  const relationship = readAnnotationRelationship(fn, mem, docPtr, annotPtr, pageObjectNumber);
+  const popup = readLinkedAnnotationRef(fn, mem, docPtr, annotPtr, 'Popup', pageObjectNumber);
   const actions = readAnnotationActions(fn, mem, docPtr, annotPtr, actionBudget);
 
   return {
-    ref: identity.ref,
-    page: toPageRef(pageObjectNumber),
+    ref: annotationRefOf(fn, mem, docPtr, page, annotPtr, index),
+    page,
     index,
-    identityQuality: identity.identityQuality,
     hasAppearance: fn.EPDFAnnot_HasAppearanceStream(annotPtr, APPEARANCE_MODE_NORMAL),
-    nm: identity.nm,
+    nm: readAnnotString(fn, mem, annotPtr, 'NM'),
     ...flags,
     rect,
     contents,

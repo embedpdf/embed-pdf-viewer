@@ -10,7 +10,7 @@
  * `cancelled`.
  */
 import { isPluginError, PluginError, type OperationOptions } from '@embedpdf/core';
-import type { PdfActionTree } from '@embedpdf/engine-core/runtime';
+import { annotationKey, type PdfActionTree } from '@embedpdf/engine-core/runtime';
 
 import { eventOf, triggerOriginOf } from '../contract';
 import type {
@@ -32,7 +32,7 @@ import type { ActionsOpenSequence } from '../lifecycle/open-sequence';
 import type { ActionsContext, ActionsServices } from '../services';
 import { foldSteps } from './fold';
 import type { ActionsRunner } from './run';
-import { sameRef, type ActionsTriggers } from './triggers';
+import type { ActionsTriggers } from './triggers';
 
 /** The source a trigger reports for: what its diagnostics carry before a tree is found. */
 const sourceOfTrigger = (trigger: ActionTrigger): ActionSource => {
@@ -147,7 +147,8 @@ export function createDispatcher(
         case 'annotation': {
           const event = trigger.scope === 'activate' ? 'activate' : trigger.event;
           const { annotations } = await read(ctx.doc.page(trigger.page).annotations.list());
-          const annotation = annotations.find((candidate) => sameRef(candidate.ref, trigger.ref));
+          const key = annotationKey(trigger.ref);
+          const annotation = annotations.find((candidate) => annotationKey(candidate.ref) === key);
           // ISO 32000-2 Table 197: "the A entry, if present, takes precedence
           // over [the /AA U entry]"; a shadowed U tree is silently inert,
           // exactly like an absent one.
@@ -240,9 +241,8 @@ export function createDispatcher(
     switch (source.kind) {
       case 'annotation': {
         const { annotations } = await ctx.doc.page(source.page).annotations.list();
-        const annotation = annotations.find((candidate) =>
-          sameRef(candidate.ref, source.annotation),
-        );
+        const key = annotationKey(source.annotation);
+        const annotation = annotations.find((candidate) => annotationKey(candidate.ref) === key);
         const tree = annotation?.actions?.[source.event ?? 'activate'];
         return tree ?? null;
       }

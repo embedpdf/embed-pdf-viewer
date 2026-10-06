@@ -598,7 +598,8 @@ export class HttpClient {
 function mapStatusToCode(status: number): EngineErrorCode {
   if (status === 401) return EngineErrorCode.Unauthenticated;
   if (status === 403) return EngineErrorCode.Forbidden;
-  if (status === 409) return EngineErrorCode.WeakAnnotationSessionConflict;
+  // A conflict whose body names no code: the layer moved under the write.
+  if (status === 409) return EngineErrorCode.LayerVersionConflict;
   if (status === 404) return EngineErrorCode.NotFound;
   // A request body past the server's limit, refused before any route runs.
   if (status === 413) return EngineErrorCode.PayloadTooLarge;

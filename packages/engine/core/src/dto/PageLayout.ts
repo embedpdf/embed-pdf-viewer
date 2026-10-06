@@ -23,9 +23,7 @@ export interface PageBoxes<C extends Coordinates = PageCoordinates> {
 
 /**
  * Static attributes for one page. This is the per-page element returned by
- * `pages.list()`. It carries no annotation liveness (`revision`,
- * `weakAnnotationState`) — that lives on annotation reads and the cloud
- * manifest only.
+ * `pages.list()`.
  *
  * `size` is the un-rotated size of the visible page (`boxes.crop`), not
  * swapped for rotation.

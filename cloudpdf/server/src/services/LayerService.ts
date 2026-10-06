@@ -66,7 +66,6 @@ import {
   type PageRef,
   type PageRotateResult,
   type PdfRotation,
-  type PageState,
   type WirePack,
   type WorkerJobId,
   type WorkerRequest,
@@ -89,12 +88,9 @@ import {
 } from '@embedpdf/engine-core/wire';
 import { sql, type Kysely, type Transaction } from 'kysely';
 
-import type { CloudRevisionBridge } from './CloudRevisionBridge';
 import type { DocumentService, OpenContext } from './DocumentService';
 import type { AuditEvent, EventLogService } from './EventLogService';
 import type { LayerStateService } from './LayerStateService';
-import type { MutationImpactKind } from './LayerStateService';
-import type { WeakAnnotationSessionService } from './WeakAnnotationSessionService';
 import type { EngineCounters } from '../app/engine-counters';
 import { AuditLogRepo, type AuditMutationKind } from '../db/repos/audit_log.repo';
 import type { DocumentSigningsRepo, SigningRow } from '../db/repos/document_signings.repo';
@@ -115,8 +111,8 @@ type LayerArtifactInput = { bytes: ArrayBuffer; size: number } | { path: string 
 
 /**
  * Page addresses arrive on the wire as `PageRef`s (one kind: the canonical
- * `objectNumber`); everything this service persists — weak-session guards,
- * `layer_pages` rows, audit rows — is keyed by the number. Unwrap once at
+ * `objectNumber`); everything this service persists — `layer_pages` rows,
+ * audit rows — is keyed by the number. Unwrap once at
  * the entry point; the worker request carries the refs as received.
  */
 function pageObjectNumbersOf(pages: readonly PageRef[]): PageObjectNumber[] {
@@ -161,24 +157,14 @@ export class LayerFenceConflict extends EngineError {
  *  the input `finalizePayload` turns into the wire result. */
 interface CommittedAnnotationMutation {
   page: DurablePageRow;
-  weakRefsInvalidated: boolean;
   previousLayerDocVersion: number;
   layerDocVersion: number;
   /** The new bulk-annotations pin this mutation committed. */
   annotationsVersion: number;
 }
 
-/**
- * Per-page impact of a form mutation, in the annotation-plane vocabulary
- * `mutationBumps` already understands: `create` for pages that gained
- * widget annotations, `delete` for pages that lost them (the /Annots index
- * space shifts, so the annotation generation must advance), `update` for
- * pages whose widget appearances changed in place.
- */
-interface FormPageImpact {
-  pageObjectNumber: number;
-  kind: MutationImpactKind;
-}
+/** The audit kinds of a one-page annotation write (`annot.{kind}`). */
+type AnnotationWriteKind = 'create' | 'update' | 'delete' | 'move';
 
 /**
  * Form audit kinds that change annotation list bodies (field/widget
@@ -216,10 +202,8 @@ export interface LayerServiceOptions {
   db?: Kysely<Schema>;
   documents: DocumentsRepo;
   layerState: LayerStateService;
-  revisionBridge?: CloudRevisionBridge;
   documentService?: DocumentService;
   eventLog?: EventLogService;
-  weakAnnotationSessions?: WeakAnnotationSessionService;
   pool?: EnginePool;
   storage?: ObjectStore;
   /** Cross-replica doorbell — rung after every mutation commit. */
@@ -255,10 +239,8 @@ export class LayerService {
   private readonly db?: Kysely<Schema>;
   private readonly documents: DocumentsRepo;
   private readonly layerState: LayerStateService;
-  private readonly revisionBridge?: CloudRevisionBridge;
   private readonly documentService?: DocumentService;
   private readonly eventLog?: EventLogService;
-  private readonly weakAnnotationSessions?: WeakAnnotationSessionService;
   private readonly pool?: EnginePool;
   private readonly storage?: ObjectStore;
   private readonly realtime?: RealtimeBus;
@@ -288,10 +270,8 @@ export class LayerService {
     this.passwordSessions = opts.passwordSessions;
     this.signingRoot = opts.signingRoot;
     this.signingTtlMs = opts.signingTtlMs ?? DEFAULT_SIGNING_TTL_MS;
-    this.revisionBridge = opts.revisionBridge;
     this.documentService = opts.documentService;
     this.eventLog = opts.eventLog;
-    this.weakAnnotationSessions = opts.weakAnnotationSessions;
     this.pool = opts.pool;
     this.storage = opts.storage;
     this.realtime = opts.realtime;
@@ -300,8 +280,8 @@ export class LayerService {
   /**
    * Create or fetch the physical layer for a write.
    *
-   * The initialized `layer_pages` rows copy only durable base topology
-   * and weak-annotation truth. The base document is immutable, so
+   * The initialized `layer_pages` rows copy only durable base topology.
+   * The base document is immutable, so
    * copying its counters is the initial layer epoch; after this point
    * only `layer_pages` advances.
    *
@@ -515,13 +495,6 @@ export class LayerService {
   ): Promise<AnnotationUpdateResult> {
     return this.enqueueLayerWrite(ctx, input.docId, input.layerName, async () => {
       const { layer } = await this.prepareLayerMutation(ctx, input.docId, input.layerName);
-      const ref = await this.rewriteRefForWorker(
-        input.docId,
-        input.layerName,
-        layer,
-        input.ref,
-        signal,
-      );
       return this.withTempWorkerFile('layer-artifact', 'artifact.layer', async (artifactPath) => {
         const build = (jobId: WorkerJobId) =>
           wirePack({
@@ -530,7 +503,7 @@ export class LayerService {
             jobId,
             docId: input.docId,
             layerName: input.layerName,
-            ref,
+            ref: input.ref,
             patch: input.patch,
             authority: input.authority,
             ...(input.resources ? { resources: input.resources } : {}),
@@ -564,19 +537,6 @@ export class LayerService {
   ): Promise<AnnotationDeleteResult> {
     return this.enqueueLayerWrite(ctx, input.docId, input.layerName, async () => {
       const { layer } = await this.prepareLayerMutation(ctx, input.docId, input.layerName);
-      await this.assertWeakAnnotationStructuralEditAllowed(ctx, {
-        docId: input.docId,
-        layerName: input.layerName,
-        layer,
-        pageObjectNumber: input.ref.page.objectNumber,
-      });
-      const ref = await this.rewriteRefForWorker(
-        input.docId,
-        input.layerName,
-        layer,
-        input.ref,
-        signal,
-      );
       return this.withTempWorkerFile('layer-artifact', 'artifact.layer', async (artifactPath) => {
         const build = (jobId: WorkerJobId) =>
           wirePack({
@@ -585,7 +545,7 @@ export class LayerService {
             jobId,
             docId: input.docId,
             layerName: input.layerName,
-            ref,
+            ref: input.ref,
             authority: input.authority,
             artifactPath,
           });
@@ -617,17 +577,6 @@ export class LayerService {
   ): Promise<AnnotationMoveResult> {
     return this.enqueueLayerWrite(ctx, input.docId, input.layerName, async () => {
       const { layer } = await this.prepareLayerMutation(ctx, input.docId, input.layerName);
-      await this.assertWeakAnnotationStructuralEditAllowed(ctx, {
-        docId: input.docId,
-        layerName: input.layerName,
-        layer,
-        pageObjectNumber: input.pageObjectNumber,
-      });
-      const refs = await Promise.all(
-        input.refs.map((ref) =>
-          this.rewriteRefForWorker(input.docId, input.layerName, layer, ref, signal),
-        ),
-      );
       return this.withTempWorkerFile('layer-artifact', 'artifact.layer', async (artifactPath) => {
         const build = (jobId: WorkerJobId) =>
           wirePack({
@@ -637,7 +586,7 @@ export class LayerService {
             docId: input.docId,
             layerName: input.layerName,
             page: toPageRef(input.pageObjectNumber),
-            refs,
+            refs: input.refs,
             toIndex: input.toIndex,
             artifactPath,
           });
@@ -733,7 +682,7 @@ export class LayerService {
         // The artifact/docVersion advances. Calibration changes no pixels or annotation indices.
         return this.persistDocumentMutation(ctx, input.docId, input.layerName, layer, {
           auditKind: 'measure.setScale',
-          impacts: [],
+          touchedPages: [],
           result: payload.result,
           artifact: requireLayerArtifact(payload),
         });
@@ -830,9 +779,9 @@ export class LayerService {
   }
 
   /**
-   * `pages.flatten` for a chosen set of one page's annotations. Same weak-
-   * editor guard and the same persistence as a page flatten (content +
-   * annotation versions of that page advance, a new layer artifact).
+   * `pages.flatten` for a chosen set of one page's annotations. The same
+   * persistence as a page flatten (content + annotation versions of that
+   * page advance, a new layer artifact).
    */
   async flattenAnnotations(
     ctx: LayerWriteContext,
@@ -847,12 +796,6 @@ export class LayerService {
   ): Promise<AnnotationFlattenResult> {
     return this.enqueueLayerWrite(ctx, input.docId, input.layerName, async () => {
       const { layer } = await this.prepareLayerMutation(ctx, input.docId, input.layerName);
-      await this.assertWeakAnnotationStructuralEditAllowed(ctx, {
-        docId: input.docId,
-        layerName: input.layerName,
-        layer,
-        pageObjectNumber: input.pageObjectNumber,
-      });
       return this.withTempWorkerFile('layer-artifact', 'artifact.layer', async (artifactPath) => {
         const payload = await this.requirePool().run(
           input.docId,
@@ -898,8 +841,6 @@ export class LayerService {
     const pageObjectNumbers = pageObjectNumbersOf(input.pages);
     return this.enqueueLayerWrite(ctx, input.docId, input.layerName, async () => {
       const { layer } = await this.prepareLayerMutation(ctx, input.docId, input.layerName);
-      // No weak-session guard: rotation is presentation metadata — it never
-      // touches a page's /Annots array, so no in-flight weak edit can break.
       return this.withTempWorkerFile('layer-artifact', 'artifact.layer', async (artifactPath) => {
         const build = (jobId: WorkerJobId) =>
           wirePack({
@@ -940,17 +881,6 @@ export class LayerService {
     const pageObjectNumbers = pageObjectNumbersOf(input.pages);
     return this.enqueueLayerWrite(ctx, input.docId, input.layerName, async () => {
       const { layer } = await this.prepareLayerMutation(ctx, input.docId, input.layerName);
-      // Destroying a page someone is mid-edit on is the collaboration
-      // conflict the weak-session model exists for: for every target page
-      // with weak annotations the caller must be the sole active editor.
-      for (const pageObjectNumber of pageObjectNumbers) {
-        await this.assertWeakAnnotationStructuralEditAllowed(ctx, {
-          docId: input.docId,
-          layerName: input.layerName,
-          layer,
-          pageObjectNumber,
-        });
-      }
       return this.withTempWorkerFile('layer-artifact', 'artifact.layer', async (artifactPath) => {
         const build = (jobId: WorkerJobId) =>
           wirePack({
@@ -994,8 +924,6 @@ export class LayerService {
   ): Promise<PageInsertResult> {
     return this.enqueueLayerWrite(ctx, input.docId, input.layerName, async () => {
       const { layer } = await this.prepareLayerMutation(ctx, input.docId, input.layerName);
-      // No weak-session guard: like move, an insert only shifts display
-      // indices — it never touches an existing page's /Annots or identity.
       return this.withTempWorkerFile('layer-artifact', 'artifact.layer', async (artifactPath) => {
         const build = (jobId: WorkerJobId) =>
           wirePack({
@@ -1076,19 +1004,8 @@ export class LayerService {
     },
     signal?: AbortSignal,
   ): Promise<PageFlattenResult> {
-    const pageObjectNumbers = pageObjectNumbersOf(input.pages);
     return this.enqueueLayerWrite(ctx, input.docId, input.layerName, async () => {
       const { layer } = await this.prepareLayerMutation(ctx, input.docId, input.layerName);
-      // Eligible annotations are removed from /Annots. Protect weak index
-      // editors before the worker can shift any target page's index space.
-      for (const pageObjectNumber of pageObjectNumbers) {
-        await this.assertWeakAnnotationStructuralEditAllowed(ctx, {
-          docId: input.docId,
-          layerName: input.layerName,
-          layer,
-          pageObjectNumber,
-        });
-      }
       return this.withTempWorkerFile('layer-artifact', 'artifact.layer', async (artifactPath) => {
         const payload = await this.requirePool().run(
           input.docId,
@@ -1131,21 +1048,6 @@ export class LayerService {
   ): Promise<RedactionApplyResult> {
     return this.enqueueLayerWrite(ctx, input.docId, input.layerName, async () => {
       const { layer } = await this.prepareLayerMutation(ctx, input.docId, input.layerName);
-      // Apply removes annotations from /Annots. Protect weak index editors
-      // before the worker can shift any target page's index space — the same
-      // guard flatten takes, over every page the scope can touch.
-      const targetPages =
-        'pages' in input.scope
-          ? pageObjectNumbersOf(input.scope.pages)
-          : [...new Set(input.scope.annotations.map((ref) => ref.page.objectNumber))];
-      for (const pageObjectNumber of targetPages) {
-        await this.assertWeakAnnotationStructuralEditAllowed(ctx, {
-          docId: input.docId,
-          layerName: input.layerName,
-          layer,
-          pageObjectNumber,
-        });
-      }
       return this.withTempWorkerFile('layer-artifact', 'artifact.layer', async (artifactPath) => {
         const payload = await this.requirePool().run(
           input.docId,
@@ -1259,8 +1161,7 @@ export class LayerService {
   // the catalog, so mutations touch no page rows — they advance the layer
   // doc version plus the dedicated `attachments_version` pin that keys
   // the immutable /attachments@… and /attachment-files/…@… leaves.
-  // Identity is the name-tree key (unique by construction) — no weak
-  // refs, no revision bookkeeping.
+  // Identity is the name-tree key (unique by construction).
 
   /** Create a document-level embedded file (multipart mutation envelope). */
   async createAttachment(
@@ -1348,9 +1249,8 @@ export class LayerService {
   // keyed by field ref rather than page. The worker returns results whose
   // `meta` is empty (the session has no durable page state); the commit
   // here is what turns per-widget change reports into real per-page
-  // version bumps, using the same `mutationBumps` vocabulary as the
-  // annotation plane — a widget appearance change invalidates the same
-  // caches an annotation update does.
+  // version bumps — a widget change invalidates the same caches an
+  // annotation write does.
 
   /** Read: the reconciled form snapshot from the layer's current state. */
   async getFormSnapshot(
@@ -1430,8 +1330,7 @@ export class LayerService {
             value: input.value,
             artifactPath,
           }),
-        impacts: (result: FormSetValueResult) =>
-          widgetImpacts(result.meta.changedWidgets, 'update'),
+        touchedPages: (result: FormSetValueResult) => widgetPages(result.meta.changedWidgets),
       },
       signal,
     );
@@ -1460,7 +1359,7 @@ export class LayerService {
             ...(input.refs ? { refs: input.refs } : {}),
             artifactPath,
           }),
-        impacts: (result: FormResetResult) => widgetImpacts(result.meta.changedWidgets, 'update'),
+        touchedPages: (result: FormResetResult) => widgetPages(result.meta.changedWidgets),
       },
       signal,
     );
@@ -1498,26 +1397,21 @@ export class LayerService {
         const result = payload.result;
         if (!payload.wrote) return result;
 
-        const impacts = widgetImpacts(result.meta.changedWidgets, 'update');
+        const touchedPages = widgetPages(result.meta.changedWidgets);
         const failed = result.results.filter((entry) => entry.status === 'failed');
         for (const entry of failed) {
-          impacts.push(
-            ...widgetImpacts(
-              entry.fields.flatMap((field) => field.widgets),
-              'update',
-            ),
-          );
+          touchedPages.push(...widgetPages(entry.fields.flatMap((field) => field.widgets)));
         }
         // A failed native call is outcome-indeterminate. If its field could
         // not be re-read, invalidate every page rather than under-reporting
         // a possibly changed widget appearance.
-        const conservativeImpacts = failed.some((entry) => entry.fields.length === 0)
-          ? allPageImpacts(materialized)
-          : impacts;
+        const conservativePages = failed.some((entry) => entry.fields.length === 0)
+          ? allPages(materialized)
+          : touchedPages;
 
         return this.persistDocumentMutation(ctx, input.docId, input.layerName, layer, {
           auditKind: 'form.applyEffects',
-          impacts: conservativeImpacts,
+          touchedPages: conservativePages,
           result,
           artifact: requireLayerArtifact(payload as unknown),
         });
@@ -1554,7 +1448,7 @@ export class LayerService {
         // The worker reports per-field counts, not per-widget pages; an
         // import may touch widgets on any page, so every page's annotation
         // collection is conservatively invalidated.
-        impacts: (_result: FormImportResult, materialized) => allPageImpacts(materialized),
+        touchedPages: (_result: FormImportResult, materialized) => allPages(materialized),
       },
       signal,
     );
@@ -1583,7 +1477,7 @@ export class LayerService {
             artifactPath,
           }),
         // Repair may bake appearances for widgets anywhere in the document.
-        impacts: (_result: FormRepairResult, materialized) => allPageImpacts(materialized),
+        touchedPages: (_result: FormRepairResult, materialized) => allPages(materialized),
       },
       signal,
     );
@@ -1612,7 +1506,7 @@ export class LayerService {
             artifactPath,
           }),
         // Inline placements birth widget annotations on their pages.
-        impacts: (result: FormFieldCreateResult) => widgetImpacts(result.field.widgets, 'create'),
+        touchedPages: (result: FormFieldCreateResult) => widgetPages(result.field.widgets),
       },
       signal,
     );
@@ -1643,7 +1537,7 @@ export class LayerService {
           }),
         // Option/value re-syncs can regenerate appearances on every widget
         // of the field, so all hosting pages are treated as updated.
-        impacts: (result: FormFieldUpdateResult) => widgetImpacts(result.field.widgets, 'update'),
+        touchedPages: (result: FormFieldUpdateResult) => widgetPages(result.field.widgets),
       },
       signal,
     );
@@ -1683,7 +1577,7 @@ export class LayerService {
             },
             [pdf],
           ),
-        impacts: (result: FormFieldUpdateResult) => widgetImpacts(result.field.widgets, 'update'),
+        touchedPages: (result: FormFieldUpdateResult) => widgetPages(result.field.widgets),
       },
       signal,
     );
@@ -1711,10 +1605,8 @@ export class LayerService {
             ref: input.ref,
             artifactPath,
           }),
-        // The cascade removes widget annotations — /Annots index space
-        // shifts on those pages ('delete' also advances the generation).
-        impacts: (result: FormFieldDeleteResult) =>
-          widgetImpacts(result.meta.changedWidgets, 'delete'),
+        // The cascade removes widget annotations from those pages.
+        touchedPages: (result: FormFieldDeleteResult) => widgetPages(result.meta.changedWidgets),
       },
       signal,
     );
@@ -1745,8 +1637,7 @@ export class LayerService {
             artifactPath,
           }),
         // The new widget annotation is born on its page.
-        impacts: (result: FormWidgetLinkResult) =>
-          widgetImpacts(result.meta.changedWidgets, 'create'),
+        touchedPages: (result: FormWidgetLinkResult) => widgetPages(result.meta.changedWidgets),
       },
       signal,
     );
@@ -1775,7 +1666,7 @@ export class LayerService {
             widget: input.widget,
             artifactPath,
           }),
-        impacts: () => widgetImpacts([widgetOfRef(input.widget)], 'update'),
+        touchedPages: () => widgetPages([widgetOfRef(input.widget)]),
       },
       signal,
     );
@@ -1795,7 +1686,7 @@ export class LayerService {
       tag: string;
       auditKind: AuditMutationKind;
       build: (jobId: WorkerJobId, artifactPath: string) => WirePack<WorkerRequest>;
-      impacts: (result: TResult, materialized: MaterializedLayer) => FormPageImpact[];
+      touchedPages: (result: TResult, materialized: MaterializedLayer) => PageObjectNumber[];
     },
     signal?: AbortSignal,
   ): Promise<TResult> {
@@ -1817,7 +1708,7 @@ export class LayerService {
         const result = (payload as unknown as { result: TResult }).result;
         return this.persistDocumentMutation(ctx, input.docId, input.layerName, layer, {
           auditKind: input.auditKind,
-          impacts: input.impacts(result, materialized),
+          touchedPages: input.touchedPages(result, materialized),
           result,
           artifact: requireLayerArtifact(payload as unknown),
         });
@@ -1832,7 +1723,7 @@ export class LayerService {
     layer: LayerRow,
     input: {
       auditKind: AuditMutationKind;
-      impacts: FormPageImpact[];
+      touchedPages: PageObjectNumber[];
       result: TResult;
       artifact: LayerArtifactInput;
     },
@@ -1846,7 +1737,7 @@ export class LayerService {
       layerName,
       layer,
       kind: input.auditKind,
-      impacts: dedupeImpacts(input.impacts),
+      touchedPages: [...new Set(input.touchedPages)],
       artifactKey,
       artifactSha: uploaded.sha256,
       artifactSize: uploaded.size,
@@ -1861,8 +1752,8 @@ export class LayerService {
 
   /**
    * Turn the worker's session-relative result (whose `meta` is empty by
-   * construction) into the finalized wire result: decorated per-page states
-   * and the real cacheDelta from the committed version bumps.
+   * construction) into the finalized wire result: the pages it touched and
+   * the real cacheDelta from the committed version bumps.
    */
   private finalizeDocumentMutationResult<TResult extends { meta: MutationMeta }>(
     docId: string,
@@ -1881,9 +1772,7 @@ export class LayerService {
       ...raw,
       meta: {
         ...raw.meta,
-        affectedPages: durable.pages.map((page) =>
-          this.layerState.decorateLayerPageState(docId, layerName, page),
-        ),
+        affectedPages: durable.pages.map((page) => toPageRef(page.pageObjectNumber)),
         cacheDelta,
       },
     };
@@ -1891,8 +1780,7 @@ export class LayerService {
 
   /**
    * Document mutation commit: advance the layer's `doc_version` (a new artifact always
-   * exists) and bump the affected pages' annotation counters per their
-   * impact kind. Non-rendering mutations (field rename, unplaced create, page calibration)
+   * exists) and the annotation version of every page it touched. Non-rendering mutations (field rename, unplaced create, page calibration)
    * legitimately touch zero pages — the layer still advances so the new
    * artifact becomes current.
    */
@@ -1902,7 +1790,7 @@ export class LayerService {
     layerName: string;
     layer: LayerRow;
     kind: AuditMutationKind;
-    impacts: FormPageImpact[];
+    touchedPages: PageObjectNumber[];
     artifactKey: string;
     artifactSha: string;
     artifactSize: number;
@@ -1916,32 +1804,23 @@ export class LayerService {
         const currentLayer = await this.readLayerForCommit(trx, input.layer);
 
         const nextPages: DurablePageRow[] = [];
-        for (const impact of input.impacts) {
+        for (const pageObjectNumber of input.touchedPages) {
           const page = await trx
             .selectFrom('layer_pages')
             .selectAll()
             .where('layer_id', '=', input.layer.id)
-            .where('page_object_number', '=', impact.pageObjectNumber)
+            .where('page_object_number', '=', pageObjectNumber)
             .executeTakeFirst();
           if (!page) {
             throw new EngineError(
               EngineErrorCode.WireFormat,
-              `form mutation reported unknown page object number ${impact.pageObjectNumber}`,
+              `form mutation reported unknown page object number ${pageObjectNumber}`,
             );
           }
-          const bumps = this.layerState.mutationBumps(impact.kind, {
-            hasWeakAnnotations: Boolean(page.has_weak_annotations),
-          });
           nextPages.push({
             pageObjectNumber: Number(page.page_object_number),
-            contentVersion: Number(page.content_version) + (bumps.bumpContentVersion ? 1 : 0),
-            annotationVersion:
-              Number(page.annotation_version) + (bumps.bumpAnnotationVersion ? 1 : 0),
-            annotationGeneration:
-              Number(page.annotation_generation) + (bumps.bumpAnnotationGeneration ? 1 : 0),
-            // Widgets are strong annotations; the page's weak truth is
-            // untouched by any form mutation.
-            hasWeakAnnotations: Boolean(page.has_weak_annotations),
+            contentVersion: Number(page.content_version),
+            annotationVersion: Number(page.annotation_version) + 1,
             updatedAt: now,
           });
         }
@@ -1997,7 +1876,6 @@ export class LayerService {
             .set({
               content_version: page.contentVersion,
               annotation_version: page.annotationVersion,
-              annotation_generation: page.annotationGeneration,
               updated_at: now,
             })
             .where('layer_id', '=', input.layer.id)
@@ -2060,7 +1938,7 @@ export class LayerService {
     docId: string,
     layerName: string,
     layer: LayerRow,
-    kind: MutationImpactKind,
+    kind: AnnotationWriteKind,
     input: {
       result: TResult;
       artifact: LayerArtifactInput;
@@ -2074,16 +1952,12 @@ export class LayerService {
       docId,
       layerName,
       layer,
-      pageObjectNumber: requireSingleAffectedPage(input.result.meta.affectedPages).page
-        .objectNumber,
+      pageObjectNumber: requireSingleAffectedPage(input.result.meta.affectedPages).objectNumber,
       kind,
       artifactKey,
       artifactSha: uploaded.sha256,
       artifactSize: uploaded.size,
       nextVersion,
-      hasWeakAnnotations: requireKnownWeakAnnotationBoolean(
-        requireSingleAffectedPage(input.result.meta.affectedPages),
-      ),
       finalizePayload: (durable) =>
         this.finalizeAnnotationResult(docId, layerName, input.result, durable),
     });
@@ -2094,10 +1968,9 @@ export class LayerService {
 
   /**
    * Turn the worker's session-relative result into the finalized wire result:
-   * cloud-stable revision tokens (the bridge's deterministic
-   * `cloud:layer:{doc}:{layer}` scope + the durable generation) and the real
-   * cacheDelta from the committed version bumps. Pure and synchronous — it
-   * runs inside the commit transaction so the audit row can store its output.
+   * the real cacheDelta from the committed version bumps. Pure and
+   * synchronous — it runs inside the commit transaction so the audit row can
+   * store its output.
    */
   private finalizeAnnotationResult<
     TResult extends
@@ -2114,20 +1987,7 @@ export class LayerService {
       annotationsVersion: durable.annotationsVersion,
       pages: [durable.page],
     });
-    const pageState = this.layerState.decorateLayerPageState(docId, layerName, durable.page);
-    const result = {
-      ...raw,
-      meta: {
-        ...raw.meta,
-        cacheDelta,
-        affectedPages: [pageState],
-        weakRefsInvalidated: durable.weakRefsInvalidated,
-        shouldRefetch: durable.weakRefsInvalidated
-          ? { reason: 'weakRefsInvalidated' as const }
-          : null,
-      },
-    };
-    return this.requireRevisionBridge().decorateAnnotationMutationResult([pageState], result);
+    return { ...raw, meta: { ...raw.meta, cacheDelta } };
   }
 
   private async persistPageMove(
@@ -2432,163 +2292,20 @@ export class LayerService {
     }
   }
 
-  /**
-   * A read's position refs as the worker addresses them, the way a write's
-   * are ({@link rewriteRefForWorker}) but without materializing the layer:
-   * each is checked against the page state the layer's manifest gives it,
-   * then stamped with the worker's. Durable refs pass as they are.
-   */
-  async workerRefsForRead(
-    ctx: LayerWriteContext,
-    docId: string,
-    layerName: string,
-    refs: readonly AnnotationRef[],
-    signal?: AbortSignal,
-  ): Promise<AnnotationRef[]> {
-    if (!refs.some((ref) => ref.kind === 'index')) return [...refs];
-    const documentService = this.requireDocumentService();
-    const manifest = await documentService.getLayerManifest(ctx, docId, layerName);
-    await documentService.ensureLayerOnPool(ctx, docId, layerName);
-    const bridge = this.requireRevisionBridge();
-    const workerStates = new Map<PageObjectNumber, PageState>();
-    const translated: AnnotationRef[] = [];
-    for (const ref of refs) {
-      if (ref.kind !== 'index') {
-        translated.push(ref);
-        continue;
-      }
-      const page = ref.page.objectNumber;
-      const durable = manifest.pages.find((entry) => entry.state.page.objectNumber === page)?.state;
-      if (!durable) {
-        throw new EngineError(
-          EngineErrorCode.NotFound,
-          `no page with object number ${page} in layer ${layerName} for document ${docId}`,
-        );
-      }
-      bridge.validateClientIndexRef(durable, ref, {
-        aliasDocSessionIds: [this.layerState.baseRevisionScopeId(docId)],
-      });
-      let worker = workerStates.get(page);
-      if (!worker) {
-        worker = await this.loadWorkerPageState(docId, layerName, page, signal);
-        workerStates.set(page, worker);
-      }
-      translated.push(bridge.rewriteIndexRefForWorker(worker, ref));
-    }
-    return translated;
-  }
-
-  private async rewriteRefForWorker(
-    docId: string,
-    layerName: string,
-    layer: LayerRow,
-    ref: AnnotationRef,
-    signal?: AbortSignal,
-  ): Promise<AnnotationRef> {
-    if (ref.kind !== 'index') return ref;
-
-    const page = await this.requireLayerPage(layer.id, ref.page.objectNumber);
-    const durablePageState = this.layerState.decorateLayerPageState(docId, layerName, page);
-    // Refs minted by shared base reads carry the base revision scope;
-    // the generation check still gates staleness (see the bridge's doc).
-    this.requireRevisionBridge().validateClientIndexRef(durablePageState, ref, {
-      aliasDocSessionIds: [this.layerState.baseRevisionScopeId(docId)],
-    });
-    const workerPageState = await this.loadWorkerPageState(
-      docId,
-      layerName,
-      ref.page.objectNumber,
-      signal,
-    );
-    return this.requireRevisionBridge().rewriteIndexRefForWorker(workerPageState, ref);
-  }
-
-  private async loadWorkerPageState(
-    docId: string,
-    layerName: string,
-    pageObjectNumber: PageObjectNumber,
-    signal?: AbortSignal,
-  ): Promise<PageState> {
-    // Raw read: only `pageState` is consumed here — the cheapest possible
-    // way to learn the worker's revision state for this page.
-    const build = (jobId: WorkerJobId) =>
-      wirePack({
-        kind: 'annotations.list' as const,
-        effect: 'read' as const,
-        jobId,
-        docId,
-        layerName,
-        pages: [toPageRef(pageObjectNumber)],
-      });
-    const payload = await this.requirePool().run(docId, build, signal);
-    const pageState = payload.tag === 'annotations.list' ? payload.list.pages[0] : undefined;
-    if (!pageState) {
-      throw new EngineError(
-        EngineErrorCode.WireFormat,
-        `unexpected annotations.list payload while rewriting index ref: ${payload.tag}`,
-      );
-    }
-    return pageState;
-  }
-
-  private async requireLayerPage(
-    layerId: string,
-    pageObjectNumber: PageObjectNumber,
-  ): Promise<DurablePageRow> {
-    const pages = await this.layerState.repos.layerPages.findByLayer(layerId);
-    const page = pages.find((candidate) => candidate.pageObjectNumber === pageObjectNumber);
-    if (!page) {
-      throw new EngineError(
-        EngineErrorCode.NotFound,
-        `layer page ${pageObjectNumber} not found for layer ${layerId}`,
-      );
-    }
-    return page;
-  }
-
-  private async assertWeakAnnotationStructuralEditAllowed(
-    ctx: LayerWriteContext,
-    input: {
-      docId: string;
-      layerName: string;
-      layer: LayerRow;
-      pageObjectNumber: PageObjectNumber;
-    },
-  ): Promise<void> {
-    const page = await this.requireLayerPage(input.layer.id, input.pageObjectNumber);
-    if (!page.hasWeakAnnotations) {
-      return;
-    }
-    if (!this.weakAnnotationSessions) {
-      throw new EngineError(
-        EngineErrorCode.NotImplemented,
-        'weak annotation session service is not configured',
-      );
-    }
-    await this.weakAnnotationSessions.assertSoleEditorForWeakPage({
-      tenantId: ctx.tenantId,
-      docId: input.docId,
-      layerName: input.layerName,
-      sub: ctx.sub,
-      pageObjectNumber: input.pageObjectNumber,
-    });
-  }
-
   private async commitAnnotationMutation(input: {
     ctx: LayerWriteContext;
     docId: string;
     layerName: string;
     layer: LayerRow;
     pageObjectNumber: number;
-    kind: MutationImpactKind;
+    kind: AnnotationWriteKind;
     artifactKey: string;
     artifactSha: string;
     artifactSize: number;
     nextVersion: number;
-    hasWeakAnnotations: boolean;
     /**
-     * Builds the finalized result (cloud-stable revision tokens, real
-     * cacheDelta) from the in-transaction durable state. Its return is what
+     * Builds the finalized result (the real cacheDelta) from the
+     * in-transaction durable state. Its return is what
      * the audit row stores and what the caller receives — the invariant is
      * that the audited payload is byte-identical to the response: what we
      * tell the caller is what we tell history (and, later, every remote
@@ -2626,37 +2343,28 @@ export class LayerService {
           );
         }
 
-        const bumps = this.layerState.mutationBumps(input.kind, {
-          hasWeakAnnotations: Boolean(page.has_weak_annotations),
-        });
         const nextPage: DurablePageRow = {
           pageObjectNumber: Number(page.page_object_number),
-          contentVersion: Number(page.content_version) + (bumps.bumpContentVersion ? 1 : 0),
-          annotationVersion:
-            Number(page.annotation_version) + (bumps.bumpAnnotationVersion ? 1 : 0),
-          annotationGeneration:
-            Number(page.annotation_generation) + (bumps.bumpAnnotationGeneration ? 1 : 0),
-          hasWeakAnnotations: input.hasWeakAnnotations,
+          contentVersion: Number(page.content_version),
+          annotationVersion: Number(page.annotation_version) + 1,
           updatedAt: now,
         };
 
         const previousLayerDocVersion = Number(currentLayer.doc_version);
-        const layerDocVersion = previousLayerDocVersion + (bumps.bumpLayerDocVersion ? 1 : 0);
-        // Every annotation CRUD kind changes list bodies, so the bulk pin
+        const layerDocVersion = previousLayerDocVersion + 1;
+        // Every annotation write changes list bodies, so the bulk pin
         // advances in lockstep with the per-page annotationVersion.
-        const annotationsVersion =
-          Number(currentLayer.annotations_version ?? 1) + (bumps.bumpAnnotationVersion ? 1 : 0);
+        const annotationsVersion = Number(currentLayer.annotations_version ?? 1) + 1;
 
         const durable: CommittedAnnotationMutation = {
           page: nextPage,
-          weakRefsInvalidated: bumps.weakRefsInvalidated,
           previousLayerDocVersion,
           layerDocVersion,
           annotationsVersion,
         };
         // Finalize before the audit append so the row stores exactly what the
-        // caller will receive (cloud-stable tokens + real cacheDelta), never
-        // the worker's session-relative draft.
+        // caller will receive (the real cacheDelta), never the worker's
+        // session-relative draft.
         const payload = input.finalizePayload(durable);
 
         const auditEvent = makeAuditEvent({
@@ -2692,8 +2400,6 @@ export class LayerService {
           .set({
             content_version: nextPage.contentVersion,
             annotation_version: nextPage.annotationVersion,
-            annotation_generation: nextPage.annotationGeneration,
-            has_weak_annotations: nextPage.hasWeakAnnotations ? 1 : 0,
             updated_at: now,
           })
           .where('layer_id', '=', input.layer.id)
@@ -2801,9 +2507,8 @@ export class LayerService {
   /**
    * Delete commit: the only page-structure op that mutates the page set. On
    * top of the shared version bumps it removes the deleted pages'
-   * `layer_pages` rows and any weak-annotation-session claims on them
-   * (sessions themselves survive — they may hold other pages). Surviving
-   * pages' rows are untouched, so their pins and revisions stay warm.
+   * `layer_pages` rows. Surviving pages' rows are untouched, so their pins
+   * stay warm.
    */
   private async commitPageDelete(input: {
     ctx: LayerWriteContext;
@@ -2864,27 +2569,6 @@ export class LayerService {
           .where('page_object_number', 'in', input.deletedPages)
           .execute();
 
-        // Weak-annotation sessions of this layer lose their claims on the
-        // deleted pages (the guard ran pre-worker; this is the cleanup).
-        const sessions = await trx
-          .selectFrom('weak_annotation_sessions')
-          .select('id')
-          .where('tenant_id', '=', input.ctx.tenantId)
-          .where('doc_id', '=', input.docId)
-          .where('layer_name', '=', input.layerName)
-          .execute();
-        if (sessions.length > 0) {
-          await trx
-            .deleteFrom('weak_annotation_session_pages')
-            .where(
-              'session_id',
-              'in',
-              sessions.map((session) => session.id),
-            )
-            .where('page_object_number', 'in', input.deletedPages)
-            .execute();
-        }
-
         const previousDocVersion = Number(currentLayer.doc_version);
         const versions: LayoutVersions = {
           previousDocVersion,
@@ -2936,10 +2620,9 @@ export class LayerService {
    * Insert commit: the other page-structure op that mutates the page set —
    * the mirror of {@link commitPageDelete}. On top of the shared version
    * bumps it adds `layer_pages` rows for the fresh page object numbers at the initial
-   * epoch (`content_version` 1, `annotation_version` 1, generation 0, no
-   * weak annotations — exactly what the base snapshot would have written
-   * had the pages always existed). Pre-existing rows are untouched, so
-   * their pins and revisions stay warm.
+   * epoch (`content_version` 1, `annotation_version` 1 — exactly what the
+   * base snapshot would have written had the pages always existed).
+   * Pre-existing rows are untouched, so their pins stay warm.
    */
   private async commitPageInsert(input: {
     ctx: LayerWriteContext;
@@ -3009,8 +2692,6 @@ export class LayerService {
               page_object_number: pageObjectNumber,
               content_version: 1,
               annotation_version: 1,
-              annotation_generation: 0,
-              has_weak_annotations: 0,
               updated_at: now,
             })),
           )
@@ -3069,9 +2750,7 @@ export class LayerService {
 
   /**
    * Flatten commit: the page registry/layout stays intact, while every page
-   * whose native outcome may have changed advances both cache planes and the
-   * annotation index generation. Unknown post-failure weak state preserves
-   * the prior durable `true`/`false` conservatively.
+   * whose native outcome may have changed advances both cache planes.
    */
   private async commitPageFlatten<T extends { meta: MutationMeta }>(input: {
     ctx: LayerWriteContext;
@@ -3089,13 +2768,7 @@ export class LayerService {
       .execute(async (trx) => {
         const now = Date.now();
         const currentLayer = await this.readLayerForCommit(trx, input.layer);
-        const weakStateByPage = new Map(
-          input.raw.meta.affectedPages.map((page) => [
-            page.page.objectNumber,
-            page.weakAnnotationState,
-          ]),
-        );
-        const affected = [...weakStateByPage.keys()];
+        const affected = input.raw.meta.affectedPages.map((page) => page.objectNumber);
         if (affected.length === 0) {
           throw new EngineError(
             EngineErrorCode.WireFormat,
@@ -3117,16 +2790,10 @@ export class LayerService {
               `pages.flatten reported unknown page object number ${pageObjectNumber}`,
             );
           }
-          const weakState = weakStateByPage.get(pageObjectNumber);
           nextPages.push({
             pageObjectNumber,
             contentVersion: Number(row.content_version) + 1,
             annotationVersion: Number(row.annotation_version) + 1,
-            annotationGeneration: Number(row.annotation_generation) + 1,
-            hasWeakAnnotations:
-              weakState?.kind === 'known'
-                ? weakState.hasAnyWeakAnnotations
-                : Boolean(row.has_weak_annotations),
             updatedAt: now,
           });
         }
@@ -3143,9 +2810,6 @@ export class LayerService {
           ...input.raw,
           meta: {
             ...input.raw.meta,
-            affectedPages: nextPages.map((page) =>
-              this.layerState.decorateLayerPageState(input.docId, input.layerName, page),
-            ),
             cacheDelta: this.layerState.buildCacheDelta({
               docId: input.docId,
               layerName: input.layerName,
@@ -3187,8 +2851,6 @@ export class LayerService {
             .set({
               content_version: page.contentVersion,
               annotation_version: page.annotationVersion,
-              annotation_generation: page.annotationGeneration,
-              has_weak_annotations: page.hasWeakAnnotations ? 1 : 0,
               updated_at: now,
             })
             .where('layer_id', '=', input.layer.id)
@@ -3201,9 +2863,8 @@ export class LayerService {
   }
 
   /**
-   * An import's commit: every page it touched advances as a create does
-   * (appended annotations shift no index), the layer's `doc_version` and bulk
-   * annotations pin once, and one audit row holds the finalized result
+   * An import's commit: every page it touched advances its annotation
+   * version, the layer's `doc_version` and bulk annotations pin once, and one audit row holds the finalized result
    * under the request's idempotency key.
    */
   private async commitAnnotationImport(input: {
@@ -3223,9 +2884,8 @@ export class LayerService {
       .execute(async (trx) => {
         const now = Date.now();
         const currentLayer = await this.readLayerForCommit(trx, input.layer);
-        const affected = input.raw.meta.affectedPages.map((state) => state.page.objectNumber);
+        const affected = input.raw.meta.affectedPages.map((page) => page.objectNumber);
 
-        let bumpLayerDocVersion = false;
         const nextPages: DurablePageRow[] = [];
         for (const pageObjectNumber of affected) {
           const row = await trx
@@ -3240,34 +2900,21 @@ export class LayerService {
               `annotations.import reported unknown page object number ${pageObjectNumber}`,
             );
           }
-          const hasWeakAnnotations = Boolean(row.has_weak_annotations);
-          const bumps = this.layerState.mutationBumps('create', { hasWeakAnnotations });
-          bumpLayerDocVersion ||= bumps.bumpLayerDocVersion;
           nextPages.push({
             pageObjectNumber,
-            contentVersion: Number(row.content_version) + (bumps.bumpContentVersion ? 1 : 0),
-            annotationVersion:
-              Number(row.annotation_version) + (bumps.bumpAnnotationVersion ? 1 : 0),
-            annotationGeneration:
-              Number(row.annotation_generation) + (bumps.bumpAnnotationGeneration ? 1 : 0),
-            // New annotations are indirect objects: no page gains a weak one.
-            hasWeakAnnotations,
+            contentVersion: Number(row.content_version),
+            annotationVersion: Number(row.annotation_version) + 1,
             updatedAt: now,
           });
         }
 
         const previousLayerDocVersion = Number(currentLayer.doc_version);
-        const layerDocVersion = previousLayerDocVersion + (bumpLayerDocVersion ? 1 : 0);
+        const layerDocVersion = previousLayerDocVersion + 1;
         const annotationsVersion = Number(currentLayer.annotations_version ?? 1) + 1;
-        // The created annotations are addressed by object number, which no
-        // revision token decorates; only the page states are the layer's.
         const result: AnnotationImportResult = {
           ...input.raw,
           meta: {
             ...input.raw.meta,
-            affectedPages: nextPages.map((page) =>
-              this.layerState.decorateLayerPageState(input.docId, input.layerName, page),
-            ),
             cacheDelta: this.layerState.buildCacheDelta({
               docId: input.docId,
               layerName: input.layerName,
@@ -3310,7 +2957,6 @@ export class LayerService {
             .set({
               content_version: page.contentVersion,
               annotation_version: page.annotationVersion,
-              annotation_generation: page.annotationGeneration,
               updated_at: now,
             })
             .where('layer_id', '=', input.layer.id)
@@ -3338,13 +2984,7 @@ export class LayerService {
       .execute(async (trx) => {
         const now = Date.now();
         const currentLayer = await this.readLayerForCommit(trx, input.layer);
-        const weakStateByPage = new Map(
-          input.raw.meta.affectedPages.map((page) => [
-            page.page.objectNumber,
-            page.weakAnnotationState,
-          ]),
-        );
-        const affected = [...weakStateByPage.keys()];
+        const affected = input.raw.meta.affectedPages.map((page) => page.objectNumber);
         if (affected.length === 0) {
           throw new EngineError(
             EngineErrorCode.WireFormat,
@@ -3368,16 +3008,10 @@ export class LayerService {
               `redaction.apply reported unknown page object number ${pageObjectNumber}`,
             );
           }
-          const weakState = weakStateByPage.get(pageObjectNumber);
           nextPages.push({
             pageObjectNumber,
             contentVersion: Number(row.content_version) + 1,
             annotationVersion: Number(row.annotation_version) + 1,
-            annotationGeneration: Number(row.annotation_generation) + 1,
-            hasWeakAnnotations:
-              weakState?.kind === 'known'
-                ? weakState.hasAnyWeakAnnotations
-                : Boolean(row.has_weak_annotations),
             updatedAt: now,
           });
         }
@@ -3391,9 +3025,6 @@ export class LayerService {
           ...input.raw,
           meta: {
             ...input.raw.meta,
-            affectedPages: nextPages.map((page) =>
-              this.layerState.decorateLayerPageState(input.docId, input.layerName, page),
-            ),
             cacheDelta: this.layerState.buildCacheDelta({
               docId: input.docId,
               layerName: input.layerName,
@@ -3435,8 +3066,6 @@ export class LayerService {
             .set({
               content_version: page.contentVersion,
               annotation_version: page.annotationVersion,
-              annotation_generation: page.annotationGeneration,
-              has_weak_annotations: page.hasWeakAnnotations ? 1 : 0,
               updated_at: now,
             })
             .where('layer_id', '=', input.layer.id)
@@ -4280,9 +3909,7 @@ export class LayerService {
           },
           protection: finalized.protection,
           meta: {
-            affectedPages: promoted.map((page) =>
-              this.layerState.decorateLayerPageState(input.docId, input.layerName, page),
-            ),
+            affectedPages: promoted.map((page) => toPageRef(page.pageObjectNumber)),
             // No delta: a publish changes more of the manifest than a delta
             // carries; the client refreshes its manifest on completion.
             cacheDelta: null,
@@ -4741,16 +4368,6 @@ export class LayerService {
     return this.documentService;
   }
 
-  private requireRevisionBridge(): CloudRevisionBridge {
-    if (!this.revisionBridge) {
-      throw new EngineError(
-        EngineErrorCode.NotImplemented,
-        'LayerService revision bridge is not configured',
-      );
-    }
-    return this.revisionBridge;
-  }
-
   private requirePool(): EnginePool {
     if (!this.pool) {
       throw new EngineError(
@@ -4832,67 +4449,32 @@ function requireLayerArtifact(payload: unknown): LayerArtifactInput {
 }
 
 /**
- * Project a widget change report onto page impacts. Unplaced widgets
- * (`pageObjectNumber === 0`) have no page-visible effect and are skipped.
+ * The pages a widget change report touched. A widget stored as a direct
+ * object has no page (`page === null`) and is skipped.
  */
-function widgetImpacts(
-  widgets: ReadonlyArray<FormWidget>,
-  kind: MutationImpactKind,
-): FormPageImpact[] {
-  // A widget stored as a direct object has no page to attribute the
-  // impact to (`page === null`) — it cannot be addressed at all.
-  return widgets.flatMap((widget) =>
-    widget.page === null ? [] : [{ pageObjectNumber: widget.page.objectNumber, kind }],
-  );
+function widgetPages(widgets: ReadonlyArray<FormWidget>): PageObjectNumber[] {
+  return widgets.flatMap((widget) => (widget.page === null ? [] : [widget.page.objectNumber]));
 }
 
-/** Conservative impact for document-wide form ops (import, repair). */
 /** One key grammar for everything scoped to a layer's write pipeline. */
 function layerWriteKey(ctx: LayerWriteContext, docId: string, layerName: string): string {
   return `${ctx.tenantId}::${docId}::${layerName}`;
 }
 
-function allPageImpacts(materialized: MaterializedLayer): FormPageImpact[] {
-  return materialized.pages.map((page) => ({
-    pageObjectNumber: page.pageObjectNumber,
-    kind: 'update' as MutationImpactKind,
-  }));
+/** Every page: the conservative answer for document-wide form ops (import, repair). */
+function allPages(materialized: MaterializedLayer): PageObjectNumber[] {
+  return materialized.pages.map((page) => page.pageObjectNumber);
 }
 
-/**
- * One impact per page. When several widgets on the same page report
- * different kinds, `delete` wins (it is the only kind that must advance
- * the annotation generation — the /Annots index space shifted).
- */
-function dedupeImpacts(impacts: FormPageImpact[]): FormPageImpact[] {
-  const byPage = new Map<number, FormPageImpact>();
-  for (const impact of impacts) {
-    const existing = byPage.get(impact.pageObjectNumber);
-    if (!existing || (existing.kind !== 'delete' && impact.kind === 'delete')) {
-      byPage.set(impact.pageObjectNumber, impact);
-    }
-  }
-  return Array.from(byPage.values());
-}
-
-function requireSingleAffectedPage(pages: readonly PageState[]): PageState {
+/** The one page an annotation write touched. */
+function requireSingleAffectedPage(pages: readonly PageRef[]): PageRef {
   if (pages.length !== 1) {
     throw new EngineError(
       EngineErrorCode.WireFormat,
       `annotation mutation expected exactly one affected page, got ${pages.length}`,
     );
   }
-  return pages[0];
-}
-
-function requireKnownWeakAnnotationBoolean(page: PageState): boolean {
-  if (page.weakAnnotationState.kind !== 'known') {
-    throw new EngineError(
-      EngineErrorCode.WireFormat,
-      `annotation mutation returned unknown weak annotation state for page ${page.page.objectNumber}`,
-    );
-  }
-  return page.weakAnnotationState.hasAnyWeakAnnotations;
+  return pages[0]!;
 }
 
 /**

@@ -16,17 +16,12 @@ import type { PageRef } from '../identity/PageRef';
 import { AbortablePromise } from '../promise/AbortablePromise';
 import type { CallFacts, WorkingSetPage } from '../scheduling/facts';
 
-export interface DocumentCapabilities {
-  readonly weakAnnotationEditSessions: 'not-needed' | 'required';
-}
-
 /**
  * A document an engine opened: the same on every engine. What only the local
  * engine can do lives on `LocalDocumentHandle` (see `isLocalDocument`).
  */
 export interface DocumentHandle {
   readonly id: string;
-  readonly capabilities: DocumentCapabilities;
   readonly security: DocumentSecurityService;
   readonly metadata: MetadataService;
   readonly annotations: DocumentAnnotationsService;

@@ -75,10 +75,9 @@ export interface AttachmentFileInfo {
 
 /**
  * Durable address of a document-level attachment: its name-tree key.
- * Keys are unique within the tree by construction (ISO 32000 §7.9.6), so
- * — unlike annotations — no weak/index tier and no revision validation is
- * needed. A discriminated union so future ref kinds can be added without
- * a breaking change (the `AnnotationRef` pattern).
+ * Keys are unique within the tree by construction (ISO 32000 §7.9.6). A
+ * discriminated union so future ref kinds can be added without a breaking
+ * change (the `AnnotationRef` pattern).
  *
  * The key usually equals the file's display `name` (`/UF`) — always, for
  * engine-created attachments — but foreign PDFs may diverge, and `/UF`

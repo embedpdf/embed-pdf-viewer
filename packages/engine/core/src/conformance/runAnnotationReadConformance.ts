@@ -9,6 +9,7 @@ import type { Annotation } from '../annotation/kinds';
 import type { Engine } from '../engine/Engine';
 import { EngineError } from '../errors/EngineError';
 import { EngineErrorCode } from '../errors/EngineErrorCode';
+import { annotationKey } from '../identity/annotationKey';
 import { toPageRef } from '../identity/PageRef';
 import { AbortError } from '../promise/AbortError';
 import { AnnotationListSchema } from '../wire/schemas';
@@ -44,10 +45,10 @@ export interface AnnotationReadConformanceFixture extends ConformanceFixture {
   /** At least this many `'caret'` annotations on the page. Defaults to 0. */
   minCaretCount?: number;
   /**
-   * `true` if the fixture has at least one weak annotation (no /NM, direct
-   * object). Drives the weak-ref + revision tests.
+   * `true` if the fixture page has at least one annotation born inline (a
+   * dictionary in `/Annots`, no object number). Drives the `baseIndex` tests.
    */
-  expectsWeakAnnotation: boolean;
+  expectsInlineAnnotation: boolean;
 }
 
 export interface AnnotationConformanceOptions extends Omit<ConformanceOptions, 'fixture'> {
@@ -71,7 +72,7 @@ export function runAnnotationReadConformance(
       if (engine) await engine.destroy();
     });
 
-    test('list() returns every page with a valid PageState, and each annotation names its page', async () => {
+    test('list() returns every page, and each annotation names its page', async () => {
       const doc = await openFixture(engine, opts);
       try {
         const list = await doc.annotations.list();
@@ -82,9 +83,7 @@ export function runAnnotationReadConformance(
         if (list.auditHead !== undefined) {
           expect(Number.isInteger(list.auditHead) && list.auditHead >= 0).toBe(true);
         }
-        const target = list.pages.find(
-          (p) => p.page.objectNumber === opts.fixture.pageObjectNumber,
-        );
+        const target = list.pages.find((p) => p.objectNumber === opts.fixture.pageObjectNumber);
         expect(target !== undefined).toBe(true);
         const onTarget = list.annotations.filter(
           (a) => a.page.objectNumber === opts.fixture.pageObjectNumber,
@@ -102,7 +101,7 @@ export function runAnnotationReadConformance(
           pages: [toPageRef(opts.fixture.pageObjectNumber)],
         });
         expect(AnnotationListSchema.safeParse(snap).success).toBe(true);
-        expect(snap.pages.map((p) => p.page.objectNumber)).toEqual([opts.fixture.pageObjectNumber]);
+        expect(snap.pages.map((p) => p.objectNumber)).toEqual([opts.fixture.pageObjectNumber]);
         expect(snap.annotations.length).toBe(opts.fixture.expectedAnnotationCount);
         const highlights = snap.annotations.filter((a) => a.subtype === 'highlight');
         expect(highlights.length >= opts.fixture.minHighlightCount).toBe(true);
@@ -244,7 +243,6 @@ export function runAnnotationReadConformance(
         },
         pageObjectNumber: 1,
         index: 0,
-        identityQuality: 'durable',
         nm: null,
         flags: emptyFlags(),
         rect: { left: 0, top: 0, right: 0, bottom: 0 },
@@ -257,38 +255,44 @@ export function runAnnotationReadConformance(
       expect(result.success).toBe(false);
     });
 
-    if (opts.fixture.expectsWeakAnnotation) {
-      test('weak annotations carry identityQuality: weak and ref.kind: index', async () => {
+    if (opts.fixture.expectsInlineAnnotation) {
+      test('an annotation born inline is named by its baseIndex: its position in the file', async () => {
         const doc = await openFixture(engine, opts);
         try {
-          const snap = await doc.annotations.list({
-            pages: [toPageRef(opts.fixture.pageObjectNumber)],
-          });
-          const weak = snap.annotations.find((a) => a.identityQuality === 'weak');
-          expect(weak !== undefined).toBe(true);
-          expect(weak!.ref.kind).toBe('index');
+          const page = doc.page(toPageRef(opts.fixture.pageObjectNumber));
+          const { annotations } = await page.annotations.list();
+          const inline = annotations.find((a) => a.ref.kind === 'baseIndex');
+          expect(inline !== undefined).toBe(true);
+          expect(inline!.ref.kind === 'baseIndex' && inline!.ref.baseIndex).toBe(inline!.index);
+          // The name resolves: a read by it finds the same annotation.
+          const again = await page.annotations.list();
+          expect(
+            again.annotations.find((a) => annotationKey(a.ref) === annotationKey(inline!.ref)),
+          ).toEqual(inline);
         } finally {
           await doc.close();
         }
       });
 
-      test('a stale revision token throws InvalidReference', async () => {
+      test('a baseIndex that names no inline annotation is NotFound', async () => {
         const doc = await openFixture(engine, opts);
         try {
           const page = doc.page(toPageRef(opts.fixture.pageObjectNumber));
-          const snap = await page.annotations.list();
-          const weak = snap.annotations.find((a) => a.identityQuality === 'weak');
-          expect(weak !== undefined).toBe(true);
-          const staleRevision = {
-            ...snap.pages[0].revision,
-            generation: snap.pages[0].revision.generation + 999,
-          };
-          // create() will fail in this slice with NotImplemented; the
-          // path we exercise here is reading-back via a fabricated
-          // index-ref. We can't hit it via a public read API today, so
-          // this test is a placeholder until mutations land. It still
-          // proves the schema accepts a stale revision shape.
-          expect(staleRevision.generation > snap.pages[0].revision.generation).toBe(true);
+          const { annotations } = await page.annotations.list();
+          const missing = await page.annotations
+            .update(
+              {
+                kind: 'baseIndex',
+                page: toPageRef(opts.fixture.pageObjectNumber),
+                baseIndex: annotations.length + 10,
+              },
+              { contents: 'nobody' },
+            )
+            .then(
+              () => null,
+              (error: unknown) => error,
+            );
+          expect(EngineError.is(missing, EngineErrorCode.NotFound)).toBe(true);
         } finally {
           await doc.close();
         }

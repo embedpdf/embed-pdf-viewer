@@ -4,7 +4,7 @@ import {
   EngineErrorCode,
   deletedAnnotationsOf,
   createPageImageHandle,
-  encodeStableIdKey,
+  encodeAnnotKey,
   hasAnnotationResources,
   resolveAnnotationResources,
   withFileFromResource,
@@ -80,7 +80,7 @@ export class CloudPageAnnotationsService implements PageAnnotationsService {
       const buildPath = async (s: AbortSignal): Promise<string> => {
         const manifest = await this.manifest.get(s);
         const pageObjectNumber = this.pageRef.objectNumber;
-        const page = manifest.pages.find((p) => p.state.page.objectNumber === pageObjectNumber);
+        const page = manifest.pages.find((p) => p.page.objectNumber === pageObjectNumber);
         if (!page) {
           throw new EngineError(
             EngineErrorCode.NotFound,
@@ -88,9 +88,9 @@ export class CloudPageAnnotationsService implements PageAnnotationsService {
           );
         }
         // Plane-scope rule: the list depends on the `annotations` plane. A
-        // base's own annotations (weak-identity ones included) are simply
-        // visible through an inheriting layer, so every visitor reads one
-        // doc-level URL served from the base session.
+        // base's own annotations are simply visible through an inheriting
+        // layer, so every visitor reads one doc-level URL served from the
+        // base session.
         return planesInherited(manifest, ['annotations'])
           ? wirePaths.docPageAnnotations(this.docId, this.pageRef, page.cache.annotationVersion)
           : wirePaths.layerPageAnnotations(
@@ -128,7 +128,7 @@ export class CloudPageAnnotationsService implements PageAnnotationsService {
       const buildPath = async (s: AbortSignal): Promise<string> => {
         const manifest = await this.manifest.get(s);
         const pageObjectNumber = this.pageRef.objectNumber;
-        const page = manifest.pages.find((p) => p.state.page.objectNumber === pageObjectNumber);
+        const page = manifest.pages.find((p) => p.page.objectNumber === pageObjectNumber);
         if (!page) {
           throw new EngineError(
             EngineErrorCode.NotFound,
@@ -166,9 +166,8 @@ export class CloudPageAnnotationsService implements PageAnnotationsService {
    * `attachment-files` leaf, pinned by the manifest's `attachmentsVersion`
    * (annotation-level files re-key on the same pin as document-level ones),
    * with the same stale-404 refresh retry as {@link list}. `appearance` is a
-   * derived read (no-store), like {@link exportAppearance}. Weak `index` refs
-   * cannot be spliced into a GET URL (no body to carry the revision), so both
-   * require a stable id — the same `:annotKey` routing update()/delete() use.
+   * derived read (no-store), like {@link exportAppearance}. Both address the
+   * annotation by the same `:annotKey` update()/delete() use.
    */
   downloadResource(ref: AnnotationRef, role: AnnotationResourceRole): AbortablePromise<Uint8Array> {
     if (this.isClosed()) {
@@ -184,15 +183,7 @@ export class CloudPageAnnotationsService implements PageAnnotationsService {
         ),
       );
     }
-    if (ref.kind === 'index') {
-      return AbortablePromise.rejectReason(
-        new EngineError(
-          EngineErrorCode.InvalidArg,
-          'downloadResource requires a stable ref (objectNumber or nm); index refs cannot address a resource URL',
-        ),
-      );
-    }
-    const annotKey = encodeStableIdKey(refToStableId(ref));
+    const annotKey = encodeAnnotKey(ref);
     if (role === 'appearance') {
       return AbortablePromise.run<Uint8Array>(async (signal) =>
         this.http.getBytes(
@@ -285,28 +276,11 @@ export class CloudPageAnnotationsService implements PageAnnotationsService {
         ),
       );
     }
-    if (ref.kind === 'index') {
-      // Index refs cannot be addressed by stable id. Send the full ref
-      // in the body so the server can validate the revision and resolve
-      // it the same way the local mutator does.
-      const path = wirePaths.layerAnnotationByKey(
-        this.docId,
-        this.layerName,
-        this.pageRef,
-        'index',
-      );
-      return AbortablePromise.run<AnnotationUpdateResult>(async (signal) => {
-        const wireResources = await resolveAnnotationResources(resources);
-        const result = await this.patchMutation(path, { ref, patch }, wireResources, signal);
-        return this.absorbMutation(result, 'annotations.updated');
-      });
-    }
-    const stableKey = encodeStableIdKey(refToStableId(ref));
     const path = wirePaths.layerAnnotationByKey(
       this.docId,
       this.layerName,
       this.pageRef,
-      stableKey,
+      encodeAnnotKey(ref),
     );
     return AbortablePromise.run<AnnotationUpdateResult>(async (signal) => {
       const wireResources = await resolveAnnotationResources(resources);
@@ -348,32 +322,11 @@ export class CloudPageAnnotationsService implements PageAnnotationsService {
         ),
       );
     }
-    if (ref.kind === 'index') {
-      // DELETE has no body in plain HTTP, so we PATCH the same
-      // 'index' key with `{ ref, op: 'delete' }`. This keeps the
-      // semantics atomic on the server (single round-trip).
-      const path = wirePaths.layerAnnotationByKey(
-        this.docId,
-        this.layerName,
-        this.pageRef,
-        'index',
-      );
-      return AbortablePromise.run<AnnotationDeleteResult>(async (signal) => {
-        const result = await this.http.patchJson(
-          path,
-          { ref, op: 'delete' },
-          (raw) => AnnotationDeleteResultSchema.parse(raw),
-          signal,
-        );
-        return this.absorbDelete(result);
-      });
-    }
-    const stableKey = encodeStableIdKey(refToStableId(ref));
     const path = wirePaths.layerAnnotationByKey(
       this.docId,
       this.layerName,
       this.pageRef,
-      stableKey,
+      encodeAnnotKey(ref),
     );
     return AbortablePromise.run<AnnotationDeleteResult>(async (signal) => {
       const result = await this.http.deleteJson(
@@ -570,19 +523,5 @@ async function parseAppearanceForm(form: FormData): Promise<AnnotationAppearance
     }),
   );
 
-  return { pageState: manifest.pageState, appearances };
-}
-
-/**
- * Local helper: project a non-index `AnnotationRef` into the matching
- * `AnnotationStableId` shape so we can route by stable key. The compiler
- * narrows on `ref.kind` here so we can't accidentally pass an index ref.
- */
-function refToStableId(
-  ref: Extract<AnnotationRef, { kind: 'objectNumber' | 'nm' }>,
-): { kind: 'objectNumber'; objectNumber: number } | { kind: 'nm'; nm: string } {
-  if (ref.kind === 'objectNumber') {
-    return { kind: 'objectNumber', objectNumber: ref.objectNumber };
-  }
-  return { kind: 'nm', nm: ref.nm };
+  return { page: manifest.page, appearances };
 }

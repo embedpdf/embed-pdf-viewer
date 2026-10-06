@@ -90,9 +90,7 @@ export type PageGeometryRun<C extends Coordinates = PageCoordinates> =
  * Geometry-only text layout for one page, in page space: points from the
  * top-left of the page's visible box, y down.
  *
- * Pure content, addressed and cached by `contentVersion`. Carries no
- * annotation liveness envelope (`PageState`) — see `PageTextSnapshot` for
- * the rationale; liveness lives on annotation reads.
+ * Pure content, addressed and cached by `contentVersion`.
  */
 export interface PageGeometrySnapshot<C extends Coordinates = PageCoordinates> {
   runs: PageGeometryRun<C>[];

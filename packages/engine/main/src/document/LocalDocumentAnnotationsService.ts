@@ -12,8 +12,6 @@ import {
   type AnnotationList,
   type AnnotationListOptions,
   type DocumentAnnotationsService,
-  type WeakAnnotationEditSession,
-  type PageRef,
 } from '@embedpdf/engine-core/runtime';
 import type { SessionEventPublisher } from '@embedpdf/engine-services';
 
@@ -203,43 +201,5 @@ export class LocalDocumentAnnotationsService implements DocumentAnnotationsServi
       }
       return payload.list;
     });
-  }
-
-  beginEdit(pages: readonly PageRef[]): AbortablePromise<WeakAnnotationEditSession> {
-    const session = new LocalWeakAnnotationEditSession(pages);
-    return AbortablePromise.resolveValue(session);
-  }
-}
-
-class LocalWeakAnnotationEditSession implements WeakAnnotationEditSession {
-  readonly id = 'local-noop';
-  readonly expiresAt = Number.MAX_SAFE_INTEGER;
-  readonly heartbeatIntervalMs = Number.MAX_SAFE_INTEGER;
-  private _pages: readonly PageRef[];
-
-  constructor(pages: readonly PageRef[]) {
-    this._pages = [...pages];
-  }
-
-  get pages(): readonly PageRef[] {
-    return this._pages;
-  }
-
-  covers(page: PageRef): boolean {
-    return this._pages.some((p) => p.objectNumber === page.objectNumber);
-  }
-
-  updatePages(pages: readonly PageRef[]): AbortablePromise<void> {
-    this._pages = [...pages];
-    return AbortablePromise.resolveValue(undefined);
-  }
-
-  heartbeat(): AbortablePromise<void> {
-    return AbortablePromise.resolveValue(undefined);
-  }
-
-  close(): AbortablePromise<void> {
-    this._pages = [];
-    return AbortablePromise.resolveValue(undefined);
   }
 }

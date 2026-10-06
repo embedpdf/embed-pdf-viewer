@@ -142,16 +142,6 @@ export class TenantsRepo {
     await this.db.deleteFrom('tenant_usage_counter').where('tenant_id', '=', tenantId).execute();
 
     await this.db
-      .deleteFrom('weak_annotation_session_pages')
-      .where('session_id', 'in', (eb) =>
-        eb.selectFrom('weak_annotation_sessions').select('id').where('tenant_id', '=', tenantId),
-      )
-      .execute();
-    await this.db
-      .deleteFrom('weak_annotation_sessions')
-      .where('tenant_id', '=', tenantId)
-      .execute();
-    await this.db
       .deleteFrom('layer_pages')
       .where('layer_id', 'in', (eb) =>
         eb.selectFrom('layers').select('id').where('tenant_id', '=', tenantId),

@@ -8,7 +8,7 @@ import type {
   SignaturePrepareInput,
   SignaturePrepared,
 } from '@embedpdf/engine-core/runtime';
-import { EngineError, EngineErrorCode } from '@embedpdf/engine-core/runtime';
+import { EngineError, EngineErrorCode, toPageRef } from '@embedpdf/engine-core/runtime';
 import { NULL_PTR, type PdfRuntimeModule, type Ptr } from '@embedpdf/engine-runtime';
 
 import {
@@ -308,9 +308,7 @@ export class SignatureMutator {
       previous: pending.prepared.expectedVersion,
       protection: snapshot.protection,
       meta: {
-        affectedPages: this.session
-          .allRecords()
-          .map((r) => this.session.pageState(r.pageObjectNumber)),
+        affectedPages: this.session.allRecords().map((r) => toPageRef(r.pageObjectNumber)),
         cacheDelta: null,
       },
     };

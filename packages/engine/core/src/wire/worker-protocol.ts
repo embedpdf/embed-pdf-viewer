@@ -65,7 +65,6 @@ import type { PageScaleResult } from '../mutation/PageScaleResult';
 import type { RedactionApplyResult, RedactionApplyScope } from '../mutation/RedactionApplyResult';
 import type { Coordinates, PageCoordinates } from '../pageSpace/coordinates';
 import type { WireResourceMap } from '../resource/BinarySource';
-import type { PageState } from '../revision/PageState';
 import type { WorkingSetPage } from '../scheduling/facts';
 import type { SearchRequest, SearchSlice } from '../search/types';
 import type { AnalyzeInput, ChangeAnalysis } from '../signature/analysis/types';
@@ -834,7 +833,7 @@ export interface EncodedAppearanceWire<C extends Coordinates = PageCoordinates> 
 }
 
 export interface AnnotationAppearancesEncodedResultWire<C extends Coordinates = PageCoordinates> {
-  pageState: PageState;
+  page: PageRef;
   appearances: EncodedAppearanceWire<C>[];
 }
 

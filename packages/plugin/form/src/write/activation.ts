@@ -5,7 +5,7 @@
  */
 import { PluginError } from '@embedpdf/core';
 import {
-  pageRefsEqual,
+  annotationKey,
   type AnnotationRef,
   type FormFieldRef,
 } from '@embedpdf/engine-core/runtime';
@@ -18,20 +18,6 @@ import { fieldForWidget } from '../model';
 import { widgetObjectOf } from '../read/fields';
 import type { FormContext, FormServices } from '../services';
 
-const sameAnnotationRef = (left: AnnotationRef, right: AnnotationRef): boolean => {
-  if (left.kind !== right.kind || !pageRefsEqual(left.page, right.page)) return false;
-  if (left.kind === 'objectNumber' && right.kind === 'objectNumber') {
-    return left.objectNumber === right.objectNumber;
-  }
-  if (left.kind === 'nm' && right.kind === 'nm') return left.nm === right.nm;
-  return (
-    left.kind === 'index' &&
-    right.kind === 'index' &&
-    left.index === right.index &&
-    left.revision === right.revision
-  );
-};
-
 export function createActivation(
   ctx: FormContext,
   services: Pick<FormServices, 'fields' | 'siblings' | 'scripting' | 'enqueue'>,
@@ -43,7 +29,8 @@ export function createActivation(
     const loaded = annotationHost?.get(ref);
     if (loaded?.subtype === 'widget') return loaded.actions?.activate ?? null;
     const { annotations } = await ctx.doc.page(ref.page).annotations.list();
-    const annotation = annotations.find((candidate) => sameAnnotationRef(candidate.ref, ref));
+    const key = annotationKey(ref);
+    const annotation = annotations.find((candidate) => annotationKey(candidate.ref) === key);
     return annotation?.subtype === 'widget' ? (annotation.actions?.activate ?? null) : null;
   };
 

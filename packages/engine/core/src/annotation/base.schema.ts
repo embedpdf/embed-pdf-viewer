@@ -19,8 +19,6 @@ import type {
 import { STANDARD_FONTS } from './primitives';
 import { PdfPointSchema, PdfRectSchema } from '../geometry/schemas';
 import type { AnnotationRef } from '../identity/AnnotationRef';
-import type { AnnotationStableId } from '../identity/AnnotationStableId';
-import type { RevisionToken } from '../revision/RevisionToken';
 
 /** @deprecated Use `PdfPointSchema` from `../geometry/schemas`. */
 export const PointSchema = PdfPointSchema;
@@ -104,20 +102,6 @@ export const BlendModeSchema: z.ZodType<BlendMode> = z.enum([
   'luminosity',
 ]);
 
-export const AnnotationStableIdSchema: z.ZodType<AnnotationStableId> = z.discriminatedUnion(
-  'kind',
-  [
-    z.object({ kind: z.literal('objectNumber'), objectNumber: z.number().int().nonnegative() }),
-    z.object({ kind: z.literal('nm'), nm: z.string() }),
-  ],
-);
-
-export const RevisionTokenSchema: z.ZodType<RevisionToken> = z.object({
-  docSessionId: z.string(),
-  page: PageRefSchema,
-  generation: z.number().int().nonnegative(),
-});
-
 export const AnnotationRefSchema: z.ZodType<AnnotationRef> = z.discriminatedUnion('kind', [
   z.object({
     kind: z.literal('objectNumber'),
@@ -125,14 +109,8 @@ export const AnnotationRefSchema: z.ZodType<AnnotationRef> = z.discriminatedUnio
     objectNumber: z.number().int().positive(),
   }),
   z.object({
-    kind: z.literal('nm'),
+    kind: z.literal('baseIndex'),
     page: PageRefSchema,
-    nm: z.string(),
-  }),
-  z.object({
-    kind: z.literal('index'),
-    page: PageRefSchema,
-    index: z.number().int().nonnegative(),
-    revision: RevisionTokenSchema,
+    baseIndex: z.number().int().nonnegative(),
   }),
 ]);

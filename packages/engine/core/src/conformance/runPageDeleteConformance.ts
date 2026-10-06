@@ -1,22 +1,12 @@
 import type { ConformanceTestRunner, ConformanceOptions } from './runMetadataConformance';
-import type { AnnotationPatch, HighlightDraft } from '../annotation/kinds';
 import type { DocumentHandle } from '../engine/DocumentHandle';
 import type { Engine } from '../engine/Engine';
 import { EngineError } from '../errors/EngineError';
 import { EngineErrorCode } from '../errors/EngineErrorCode';
-import type { AnnotationRef } from '../identity/AnnotationRef';
+import { annotationKey } from '../identity/annotationKey';
 import { toPageRef } from '../identity/PageRef';
 import { AbortError } from '../promise/AbortError';
 import { PageDeleteResultSchema } from '../wire/schemas';
-
-const QUAD: HighlightDraft['quadPoints'] = [
-  {
-    upperLeft: { x: 50, y: 100 },
-    upperRight: { x: 150, y: 100 },
-    lowerLeft: { x: 50, y: 80 },
-    lowerRight: { x: 150, y: 80 },
-  },
-];
 
 /**
  * Page delete conformance suite. Verifies the architectural invariants —
@@ -26,8 +16,8 @@ const QUAD: HighlightDraft['quadPoints'] = [
  *      full surviving layout; a subsequent `list()` agrees.
  *   2. Deleted page object numbers are retired: addressing a deleted page afterwards is a
  *      clean `NotFound` (an API-level error, never native-memory danger).
- *   3. Surviving pages keep identity and `RevisionToken`s — an index-based
- *      annotation ref on an unrelated page survives a neighbour's deletion.
+ *   3. Surviving pages keep identity, and their annotations keep their
+ *      names — a `baseIndex` ref survives a neighbour's deletion.
  *   4. Deleting every page is rejected (`InvalidArg`) — a document keeps at
  *      least one page.
  *   5. Duplicate / unknown page object numbers reject with `InvalidArg` / `NotFound`;
@@ -105,43 +95,23 @@ export function runPageDeleteConformance(
       }
     });
 
-    test('surviving pages keep their weak index-based annotation refs', async () => {
+    test('an annotation born inline keeps its baseIndex name when another page is deleted', async () => {
       const doc = await openFixture(engine, opts);
       try {
         const list = await doc.pages.list();
-        if (list.pages.length < 2) return;
-
-        const hostPageObjectNumber = list.pages[0].ref.objectNumber;
-        const victimPageObjectNumber = list.pages[1].ref.objectNumber;
-        const hostPage = doc.page(toPageRef(hostPageObjectNumber));
-
-        const draft: HighlightDraft = {
-          subtype: 'highlight',
-          contents: 'neighbour deletion survives this',
-          quadPoints: QUAD,
-        };
-        const created = await hostPage.annotations.create(draft);
-        const afterCreate = await hostPage.annotations.list();
-        const targetIndex = afterCreate.annotations.findIndex(
-          (a) =>
-            a.ref.kind === 'objectNumber' &&
-            created.annotation.ref.kind === 'objectNumber' &&
-            a.ref.objectNumber === created.annotation.ref.objectNumber,
+        const inline = (await doc.annotations.list()).annotations.find(
+          (a) => a.ref.kind === 'baseIndex',
         );
-        expect(targetIndex >= 0).toBe(true);
+        const victim = list.pages.find((p) => p.ref.objectNumber !== inline?.page.objectNumber);
+        if (!inline || !victim) return;
 
-        const indexRef: AnnotationRef = {
-          kind: 'index',
-          page: toPageRef(hostPageObjectNumber),
-          index: targetIndex,
-          revision: afterCreate.pages[0].revision,
-        };
+        await doc.pages.delete([victim.ref]);
 
-        await doc.pages.delete([toPageRef(victimPageObjectNumber)]);
-
-        const patch: AnnotationPatch = { subtype: 'highlight', contents: 'still alive' };
-        const update = await hostPage.annotations.update(indexRef, patch);
+        const update = await doc.page(inline.page).annotations.update(inline.ref, {
+          contents: 'still alive',
+        });
         expect(update.annotation.contents).toBe('still alive');
+        expect(annotationKey(update.annotation.ref)).toBe(annotationKey(inline.ref));
       } finally {
         await doc.close();
       }

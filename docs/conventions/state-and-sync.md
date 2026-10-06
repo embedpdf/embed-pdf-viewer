@@ -305,8 +305,7 @@ two. The rules:
   flags, its new geometry, its typed text: each is its own entry, so settling
   one write never touches other outstanding work on the same record.
 - **Keyed by the record, following it.** When a record gets another key (a new
-  record confirmed under the engine's key, a weak record the engine named),
-  its entries move with it. A new record has no key until the engine answers,
+  record confirmed under the engine's key), its entries move with it. A new record has no key until the engine answers,
   so its create carries one the confirmation carries too, chosen before the
   engine call; a write to a record that does not exist in the engine yet waits
   for its create.
@@ -325,8 +324,8 @@ The annotation plugin is the reference
 message's changes and settles them, `model.ts` holds the transitions
 (`stage`, `writeSettled`, `followRecord`), and `services/record-identity.ts`
 is the one place a record changes its key: it matches new records to their
-confirmation by `/NM`, notices weak records the engine named, and moves
-everything keyed by the record, including what other areas keep per record.
+confirmation by `/NM` and moves everything keyed by the record, including
+what other areas keep per record.
 
 A write that shows no value before it is confirmed needs no overlay. An in-flight flag in
 session state is enough: the form plugin marks a field in `writing` for the

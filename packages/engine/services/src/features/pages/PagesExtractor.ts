@@ -15,7 +15,7 @@ const FPDF_NO_INCREMENTAL = 1 << 1;
 /**
  * Export a subset of pages as a standalone PDF. A read over the session:
  * `FPDF_ImportPagesByIndex` copies pages into a scratch document, so the
- * source is untouched — no revision bumps, no registry refresh, no layer
+ * source is untouched — no registry refresh, no layer
  * artifact. Lives next to `PagesReader`/`PagesMutator` (one file per page
  * verb family) so both worker hosts share the code path.
  */

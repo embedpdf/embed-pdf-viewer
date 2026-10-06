@@ -3,7 +3,7 @@ import type { AnnotationRef } from '../../src/identity/AnnotationRef';
 import { annotationOfDraft, resolveAnnotationDraft } from '../../src/pageSpace/helpers';
 
 const page = { kind: 'objectNumber', objectNumber: 3 } as const;
-const ref: AnnotationRef = { kind: 'nm', page, nm: 'pending-1' };
+const ref: AnnotationRef = { kind: 'objectNumber', page, objectNumber: 41 };
 const box = { x: 72, y: 72, width: 120, height: 80 };
 
 describe('annotationOfDraft', () => {

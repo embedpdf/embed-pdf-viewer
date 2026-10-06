@@ -1,8 +1,8 @@
 /**
  * A write that moves entries of a page's /Annots (a delete, a reorder)
  * first makes the page's inline annotations objects, in place. Every other
- * annotation keeps what it shows, under a durable name, and the layer saves
- * and reopens to the same page.
+ * annotation keeps what it shows under the name it had (an inline one its
+ * `baseIndex`), and the layer saves and reopens to the same page.
  */
 import { describe, expect, test } from 'vitest';
 import type { Annotation, DocumentHandle, Engine, PageRef } from '@embedpdf/engine-core/runtime';
@@ -34,14 +34,8 @@ function inlineAnnotationsPdf(): Uint8Array {
   return new TextEncoder().encode(pdf);
 }
 
-/** What an annotation shows, apart from how it is named. */
-const shown = ({
-  ref: _ref,
-  index: _index,
-  nm: _nm,
-  identityQuality: _identityQuality,
-  ...rest
-}: Annotation) => rest;
+/** An annotation as a read gives it, apart from its stacking order. */
+const shown = ({ index: _index, ...rest }: Annotation) => rest;
 
 describe.each(['wasm', 'native'] as const)(
   'inline annotations are promoted first (%s runtime)',
@@ -55,7 +49,12 @@ describe.each(['wasm', 'native'] as const)(
       );
       const page = (await doc.pages.list()).pages[0]!.ref;
       const before = (await doc.page(page).annotations.list()).annotations;
-      expect(before.map((a) => a.ref.kind)).toEqual(['index', 'objectNumber', 'index', 'index']);
+      expect(before.map((a) => a.ref.kind)).toEqual([
+        'baseIndex',
+        'objectNumber',
+        'baseIndex',
+        'baseIndex',
+      ]);
       return { engine, baseBytes, doc, page, before };
     }
 
@@ -86,7 +85,6 @@ describe.each(['wasm', 'native'] as const)(
         await doc.page(page).annotations.delete(victim.ref);
 
         const after = (await doc.page(page).annotations.list()).annotations;
-        expect(after.filter((a) => a.ref.kind === 'index')).toEqual([]);
         const kept = before.filter((a) => a !== victim).map(shown);
         expect(after.map(shown)).toEqual(kept);
         expect((await reopened(engine, baseBytes, doc, page)).map(shown)).toEqual(kept);
@@ -103,7 +101,6 @@ describe.each(['wasm', 'native'] as const)(
         await doc.page(page).annotations.move([last.ref], 0);
 
         const after = (await doc.page(page).annotations.list()).annotations;
-        expect(after.filter((a) => a.ref.kind === 'index')).toEqual([]);
         const reordered = [last, ...before.slice(0, -1)].map(shown);
         expect(after.map(shown)).toEqual(reordered);
         expect((await reopened(engine, baseBytes, doc, page)).map(shown)).toEqual(reordered);

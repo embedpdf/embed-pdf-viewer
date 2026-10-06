@@ -24,8 +24,8 @@ export interface LayerScopes {
   content: 'base' | 'layer';
   /** Annotation lists and appearance batches (and, with `content`,
    *  annotated renders) — per-page `annotationVersion` vs the base
-   *  counterpart plus page-set equality. A base's own annotations,
-   *  weak-identity ones included, are visible through an inheriting layer. */
+   *  counterpart plus page-set equality. A base's own annotations, inline
+   *  ones included, are visible through an inheriting layer. */
   annotations: 'base' | 'layer';
   /** The /layout leaf (page order, geometry, rotation) — `layoutVersion`. */
   layout: 'base' | 'layer';

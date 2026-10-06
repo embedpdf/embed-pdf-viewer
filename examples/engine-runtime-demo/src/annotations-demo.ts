@@ -1,4 +1,4 @@
-import type { Annotation, AnnotationList, PageState } from '@embedpdf/engine-core';
+import type { Annotation, AnnotationList } from '@embedpdf/engine-core';
 import type { Engine } from '@embedpdf/engine-core/runtime';
 
 /**
@@ -29,8 +29,8 @@ export async function runAnnotationsDemo(
     const all = await doc.annotations.list();
 
     const byPage: Record<number, AnnotationList> = {};
-    for (const state of all.pages) {
-      byPage[state.page.objectNumber] = await doc.page(state.page).annotations.list();
+    for (const page of all.pages) {
+      byPage[page.objectNumber] = await doc.page(page).annotations.list();
     }
 
     return { label, docId: doc.id, elapsedMs: Date.now() - started, all, byPage };
@@ -44,11 +44,9 @@ export interface AnnotationsSummary {
   pages: Array<{
     pageObjectNumber: number;
     pageIndex: number;
-    hasAnyWeakAnnotations: boolean | null;
     annotations: Array<{
       index: number;
       subtype: string;
-      identityQuality: string;
       ref: string;
       nm: string | null;
     }>;
@@ -57,16 +55,14 @@ export interface AnnotationsSummary {
 
 export function summarizeList(list: AnnotationList): AnnotationsSummary {
   return {
-    pages: list.pages.map((state, pageIndex) => ({
-      pageObjectNumber: state.page.objectNumber,
+    pages: list.pages.map((page, pageIndex) => ({
+      pageObjectNumber: page.objectNumber,
       pageIndex,
-      hasAnyWeakAnnotations: knownWeakFlag(state),
       annotations: list.annotations
-        .filter((a) => a.page.objectNumber === state.page.objectNumber)
+        .filter((a) => a.page.objectNumber === page.objectNumber)
         .map((a) => ({
           index: a.index,
           subtype: a.subtype,
-          identityQuality: a.identityQuality,
           ref: describeRef(a),
           nm: a.nm,
         })),
@@ -74,19 +70,11 @@ export function summarizeList(list: AnnotationList): AnnotationsSummary {
   };
 }
 
-function knownWeakFlag(pageState: PageState): boolean | null {
-  return pageState.weakAnnotationState.kind === 'known'
-    ? pageState.weakAnnotationState.hasAnyWeakAnnotations
-    : null;
-}
-
 function describeRef(a: Annotation): string {
   switch (a.ref.kind) {
     case 'objectNumber':
       return `objectNumber=${a.ref.objectNumber}`;
-    case 'nm':
-      return `nm=${a.ref.nm}`;
-    case 'index':
-      return `index=${a.ref.index}@gen=${a.ref.revision.generation}`;
+    case 'baseIndex':
+      return `baseIndex=${a.ref.baseIndex}`;
   }
 }

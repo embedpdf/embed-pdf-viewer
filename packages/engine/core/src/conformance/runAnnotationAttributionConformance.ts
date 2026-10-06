@@ -445,7 +445,7 @@ export function runAnnotationAttributionConformance(
 async function firstPage(doc: DocumentHandle): Promise<PageHandle> {
   const first = (await doc.annotations.list()).pages[0];
   if (!first) throw new Error('the authoring document has no pages');
-  return doc.page(first.page);
+  return doc.page(first);
 }
 
 async function readBack(page: PageHandle, ref: AnnotationRef): Promise<Annotation> {

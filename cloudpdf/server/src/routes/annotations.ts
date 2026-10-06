@@ -23,7 +23,6 @@ import {
   type PageNetworkRenderFormat,
   type DocumentProtection,
   type PdfBits,
-  type PageRef,
   type WorkerJobId,
   type AnnotationAppearanceExportInput,
   type AnnotationFlattenInput,
@@ -46,7 +45,6 @@ import {
   type AnnotationsExportToken,
   PageNetworkRenderFormatSchema,
   unflatten,
-  WeakAnnotationSessionPagesRequestSchema,
   type ManifestPage,
 } from '@embedpdf/engine-core/wire';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
@@ -56,10 +54,8 @@ import {
   parseOrInvalidArg,
   parseTokenOrInvalidArg,
   resolvePageKeyParam,
-  resolvePageRefToNumber,
   setImmutableCache,
   setNoStore,
-  toPageState,
   type SchemaLike,
 } from './_helpers';
 import { readAnnotationImportRequest } from './_annotationImportRequest';
@@ -76,21 +72,17 @@ import {
   type RequestJwtContext,
 } from '../app/jwt-plugin';
 import { SharpImageEncoder } from '../render/SharpImageEncoder';
-import type { CloudRevisionBridge } from '../services/CloudRevisionBridge';
 import type { DerivedRenderService } from '../services/DerivedRenderService';
 import type { DocumentService, OpenContext } from '../services/DocumentService';
 import type { LayerService } from '../services/LayerService';
-import type { WeakAnnotationSessionService } from '../services/WeakAnnotationSessionService';
 
 interface AnnotationRouteDeps {
   documentService: DocumentService;
   layerService: LayerService;
-  revisionBridge: CloudRevisionBridge;
   imageEncoder: SharpImageEncoder;
   /** Encode appearance renders in the engine worker by default.
    *  `false` = the `CLOUDPDF_ENCODE_IN_ENGINE=0` escape hatch. */
   encodeInEngine?: boolean;
-  weakAnnotationSessions?: WeakAnnotationSessionService;
   /** Render-lattice policy plane (absent = legacy compute-only). */
   derivedRenders?: DerivedRenderService;
   /** How large an exported or imported annotation bundle may be; the defaults otherwise. */
@@ -105,19 +97,12 @@ export async function registerAnnotationRoutes(
   app: FastifyInstance,
   deps: AnnotationRouteDeps,
 ): Promise<void> {
-  const {
-    documentService,
-    layerService,
-    revisionBridge,
-    imageEncoder,
-    weakAnnotationSessions,
-    derivedRenders,
-  } = deps;
+  const { documentService, layerService, imageEncoder, derivedRenders } = deps;
   const encodeInEngine = deps.encodeInEngine ?? true;
   const bundleLimits = deps.bundleLimits ?? DEFAULT_ANNOTATION_BUNDLE_LIMITS;
 
   // ── Plane-scoped doc-level reads: a base's own annotations —
-  //    weak-identity ones included — are simply visible through every
+  //    inline ones included — are simply visible through every
   //    annotations-inheriting layer, so the list and appearance batches are
   //    one CDN object served from the base worker session. Guarded by the
   //    `annotations` plane (`requireSharedDocRead`); an annotation-writing
@@ -135,7 +120,6 @@ export async function registerAnnotationRoutes(
     ]);
     return readAnnotations({
       documentService,
-      revisionBridge,
       reply,
       signal: abortSignalOf(reply),
       scope: { kind: 'base', ctx, docId },
@@ -193,7 +177,6 @@ export async function registerAnnotationRoutes(
       const ctx = requireLayerResource(req, docId, layerName, 'annotations-read', pdfBits);
       return readAnnotations({
         documentService,
-        revisionBridge,
         reply,
         signal: abortSignalOf(reply),
         scope: { kind: 'layer', ctx, docId, layerName },
@@ -220,7 +203,6 @@ export async function registerAnnotationRoutes(
       const ctx = requireLayerResource(req, docId, layerName, 'annotations-read', pdfBits);
       return readAnnotations({
         documentService,
-        revisionBridge,
         reply,
         signal: abortSignalOf(reply),
         scope: { kind: 'layer', ctx, docId, layerName },
@@ -243,7 +225,6 @@ export async function registerAnnotationRoutes(
     ]);
     return readAnnotationsAll({
       documentService,
-      revisionBridge,
       reply,
       signal: abortSignalOf(reply),
       scope: { kind: 'base', ctx, docId },
@@ -266,7 +247,6 @@ export async function registerAnnotationRoutes(
     const ctx = requireLayerResource(req, docId, layerName, 'layer-annotations-all', pdfBits);
     return readAnnotationsAll({
       documentService,
-      revisionBridge,
       reply,
       signal: abortSignalOf(reply),
       scope: { kind: 'layer', ctx, docId, layerName },
@@ -335,8 +315,8 @@ export async function registerAnnotationRoutes(
     },
   );
 
-  // An export whose selection a URL can't carry (position refs, long ref
-  // lists): the same pins and the selection in the body, answered uncached.
+  // An export whose selection a URL can't carry (a long ref list): the same
+  // pins and the selection in the body, answered uncached.
   app.post(
     '/v1/docs/:docId/layers/:layerName/annotations/export',
     { config: { compress: false } },
@@ -350,23 +330,13 @@ export async function registerAnnotationRoutes(
         req.body,
         'request body',
       );
-      const signal = abortSignalOf(reply);
-      const refs = request.selection.refs
-        ? await layerService.workerRefsForRead(
-            accessCtx,
-            docId,
-            layerName,
-            request.selection.refs,
-            signal,
-          )
-        : undefined;
       return exportAnnotations({
         documentService,
         limits: bundleLimits,
         reply,
-        signal,
+        signal: abortSignalOf(reply),
         scope: { kind: 'layer', ctx, docId, layerName },
-        token: { ...request, selection: { ...request.selection, ...(refs ? { refs } : {}) } },
+        token: request,
         cache: 'no-store',
       });
     },
@@ -382,7 +352,6 @@ export async function registerAnnotationRoutes(
     const ctx = requireLayerResource(req, docId, layerName, 'layer-annotations-all', pdfBits);
     return readAnnotationsAll({
       documentService,
-      revisionBridge,
       reply,
       signal: abortSignalOf(reply),
       scope: { kind: 'layer', ctx, docId, layerName },
@@ -450,127 +419,6 @@ export async function registerAnnotationRoutes(
         pageObjectNumber: resolvePageKeyParam(pageKey),
         query: req.query,
       });
-    },
-  );
-
-  app.post('/v1/docs/:docId/layers/:layerName/weak-annotation-sessions', async (req, reply) => {
-    const { docId, layerName } = req.params as { docId: string; layerName: string };
-    const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-    const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
-    const protection = await documentService.getProtection(accessCtx, docId, layerName);
-    const ctx = requireLayerCapability(
-      req,
-      docId,
-      layerName,
-      'doc.annotate.modify',
-      pdfBits,
-      protection,
-    );
-    setNoStore(reply);
-    const body = parseOrInvalidArg(
-      WeakAnnotationSessionPagesRequestSchema,
-      req.body,
-      'request body',
-    );
-    return requireWeakAnnotationSessions(weakAnnotationSessions).begin(
-      { tenantId: ctx.tenantId, sub: ctx.sub },
-      {
-        docId,
-        layerName,
-        pageObjectNumbers: weakSessionPages(body.pages),
-      },
-    );
-  });
-
-  app.post(
-    '/v1/docs/:docId/layers/:layerName/weak-annotation-sessions/:sessionId/pages',
-    async (req, reply) => {
-      const { docId, layerName, sessionId } = req.params as {
-        docId: string;
-        layerName: string;
-        sessionId: string;
-      };
-      const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-      const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
-      const protection = await documentService.getProtection(accessCtx, docId, layerName);
-      const ctx = requireLayerCapability(
-        req,
-        docId,
-        layerName,
-        'doc.annotate.modify',
-        pdfBits,
-        protection,
-      );
-      setNoStore(reply);
-      const body = parseOrInvalidArg(
-        WeakAnnotationSessionPagesRequestSchema,
-        req.body,
-        'request body',
-      );
-      return requireWeakAnnotationSessions(weakAnnotationSessions).updatePages(
-        { tenantId: ctx.tenantId, sub: ctx.sub },
-        {
-          docId,
-          layerName,
-          sessionId,
-          pageObjectNumbers: weakSessionPages(body.pages),
-        },
-      );
-    },
-  );
-
-  app.post(
-    '/v1/docs/:docId/layers/:layerName/weak-annotation-sessions/:sessionId/heartbeat',
-    async (req, reply) => {
-      const { docId, layerName, sessionId } = req.params as {
-        docId: string;
-        layerName: string;
-        sessionId: string;
-      };
-      const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-      const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
-      const protection = await documentService.getProtection(accessCtx, docId, layerName);
-      const ctx = requireLayerCapability(
-        req,
-        docId,
-        layerName,
-        'doc.annotate.modify',
-        pdfBits,
-        protection,
-      );
-      setNoStore(reply);
-      return requireWeakAnnotationSessions(weakAnnotationSessions).heartbeat(
-        { tenantId: ctx.tenantId, sub: ctx.sub },
-        { docId, layerName, sessionId },
-      );
-    },
-  );
-
-  app.delete(
-    '/v1/docs/:docId/layers/:layerName/weak-annotation-sessions/:sessionId',
-    async (req, reply) => {
-      const { docId, layerName, sessionId } = req.params as {
-        docId: string;
-        layerName: string;
-        sessionId: string;
-      };
-      const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
-      const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
-      const protection = await documentService.getProtection(accessCtx, docId, layerName);
-      const ctx = requireLayerCapability(
-        req,
-        docId,
-        layerName,
-        'doc.annotate.modify',
-        pdfBits,
-        protection,
-      );
-      await requireWeakAnnotationSessions(weakAnnotationSessions).release(
-        { tenantId: ctx.tenantId, sub: ctx.sub },
-        { docId, layerName, sessionId },
-      );
-      setNoStore(reply);
-      return reply.code(204).send();
     },
   );
 
@@ -836,7 +684,6 @@ export async function registerAnnotationRoutes(
 
   // An annotation's `appearance` resource: its drawing, as a one-page PDF. A
   // read that egresses content, gated by `doc.download` like the export above.
-  // Durable keys only: a weak index ref needs a revision-validated body.
   app.get(
     '/v1/docs/:docId/layers/:layerName/annotations/pages/:pageKey/items/:annotKey/resources/appearance',
     async (req, reply) => {
@@ -882,32 +729,6 @@ export async function registerAnnotationRoutes(
       const resources = annotationResourcesOf(envelope);
       const signal = abortSignalOf(reply);
 
-      if (annotKey === 'index') {
-        const ref = parseOrInvalidArg<AnnotationRef>(
-          AnnotationRefSchema as unknown as SchemaLike<AnnotationRef>,
-          body?.ref,
-          'body.ref',
-        );
-        assertRefMatchesPage(ref, pageObjectNumber);
-        if (ref.kind !== 'index') {
-          throw new EngineError(
-            EngineErrorCode.InvalidArg,
-            `annotKey 'index' requires ref.kind === 'index', got '${ref.kind}'`,
-          );
-        }
-        setNoStore(reply);
-        if (body?.op === 'delete') {
-          return deleteAnnotation(req, pdfBits, protection, { docId, layerName, ref }, signal);
-        }
-        return updateAnnotation(
-          req,
-          pdfBits,
-          protection,
-          { docId, layerName, ref, patch: body?.patch, resources },
-          signal,
-        );
-      }
-
       setNoStore(reply);
       return updateAnnotation(
         req,
@@ -938,13 +759,6 @@ export async function registerAnnotationRoutes(
       const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
       const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
       const protection = await documentService.getProtection(accessCtx, docId, layerName);
-
-      if (annotKey === 'index') {
-        throw new EngineError(
-          EngineErrorCode.InvalidArg,
-          "cannot DELETE by index; use PATCH with { ref, op: 'delete' } so the revision token can be validated",
-        );
-      }
 
       setNoStore(reply);
       return deleteAnnotation(
@@ -1011,27 +825,6 @@ export async function registerAnnotationRoutes(
     const ctx = requireLayerAnnotationWrite(req, input.docId, input.layerName, pdfBits, protection);
     return layerService.deleteAnnotation(ctx, { ...input, authority: ctx.authority }, signal);
   }
-}
-
-/**
- * Weak sessions are keyed by page object number (DB rows, SSE events); the
- * wire carries `PageRef`s. Unwrap at the route, then dedupe — the schema no
- * longer collapses duplicates itself.
- */
-function weakSessionPages(pages: readonly PageRef[]): number[] {
-  return [...new Set(pages.map(resolvePageRefToNumber))];
-}
-
-function requireWeakAnnotationSessions(
-  service: WeakAnnotationSessionService | undefined,
-): WeakAnnotationSessionService {
-  if (!service) {
-    throw new EngineError(
-      EngineErrorCode.NotImplemented,
-      'weak annotation sessions are not configured',
-    );
-  }
-  return service;
 }
 
 // ----------------------------------------------------------------------
@@ -1234,7 +1027,7 @@ async function renderAnnotationAppearances(input: {
   // The legacy branch (CLOUDPDF_ENCODE_IN_ENGINE=0) keeps API-side sharp
   // on the raw raster payload for one release.
   const collect = async (): Promise<{
-    pageState: AnnotationAppearanceManifest['pageState'];
+    page: AnnotationAppearanceManifest['page'];
     entries: AnnotationAppearanceManifestEntry[];
     parts: MultipartPart[];
   }> => {
@@ -1271,9 +1064,9 @@ async function renderAnnotationAppearances(input: {
           `unexpected annotations.renderAppearancesEncoded payload: ${payload.tag}`,
         );
       }
-      // Every annotation with an appearance stream is emitted — including
-      // weak (index-only) ones: the client addresses the image by `part`
-      // name and identifies the annotation by `ref`.
+      // Every annotation with an appearance stream is emitted: the client
+      // addresses the image by `part` name and identifies the annotation
+      // by `ref`.
       for (const appearance of payload.result.appearances) {
         const partName = `appearance-${i++}`;
         entries.push({
@@ -1293,7 +1086,7 @@ async function renderAnnotationAppearances(input: {
           body: Buffer.from(appearance.image.bytes),
         });
       }
-      return { pageState: payload.result.pageState, entries, parts };
+      return { page: payload.result.page, entries, parts };
     }
     const build = (jobId: WorkerJobId) =>
       wirePack({
@@ -1325,8 +1118,8 @@ async function renderAnnotationAppearances(input: {
     const result = payload.result;
 
     // Encode each appearance to the requested format. Every annotation with an
-    // appearance stream is emitted — including weak (index-only) ones: the client
-    // addresses the image by `part` name and identifies the annotation by `ref`.
+    // appearance stream is emitted: the client addresses the image by `part`
+    // name and identifies the annotation by `ref`.
     for (const appearance of result.appearances) {
       const encoded = input.imageEncoder.encode(appearance.raster, {
         format,
@@ -1351,22 +1144,22 @@ async function renderAnnotationAppearances(input: {
         body,
       });
     }
-    return { pageState: result.pageState, entries, parts };
+    return { page: result.page, entries, parts };
   };
-  const { pageState, entries, parts } = await collect();
+  const collected = await collect();
 
   const manifest: AnnotationAppearanceManifest = {
-    pageState,
-    appearances: entries,
+    page: collected.page,
+    appearances: collected.entries,
   };
 
   requestedAnnotationVersion === undefined
     ? setNoStore(input.reply)
     : setImmutableCache(input.reply);
 
-  const { contentType, body } = buildMultipart(manifest, parts);
+  const { contentType, body } = buildMultipart(manifest, collected.parts);
   input.reply.type(contentType);
-  input.reply.header('X-EmbedPDF-Appearance-Count', String(entries.length));
+  input.reply.header('X-EmbedPDF-Appearance-Count', String(collected.entries.length));
   return input.reply.send(body);
 }
 
@@ -1381,7 +1174,6 @@ function rejectQueryParamsOnTokenUrl(query: unknown): void {
 
 async function readAnnotations(input: {
   documentService: DocumentService;
-  revisionBridge: CloudRevisionBridge;
   reply: { header(name: 'Cache-Control', value: string): unknown };
   signal: AbortSignal;
   scope: ReadScope;
@@ -1464,8 +1256,7 @@ async function readAnnotations(input: {
   }
 
   input.requestedVersion === undefined ? setNoStore(input.reply) : setImmutableCache(input.reply);
-  const pageState = toPageState(page);
-  return input.revisionBridge.decorateAnnotationList(result.list, () => pageState);
+  return result.list;
 }
 
 /**
@@ -1554,7 +1345,6 @@ async function exportAnnotations(input: {
 
 async function readAnnotationsAll(input: {
   documentService: DocumentService;
-  revisionBridge: CloudRevisionBridge;
   reply: { header(name: 'Cache-Control', value: string): unknown };
   signal: AbortSignal;
   scope: ReadScope;
@@ -1628,18 +1418,8 @@ async function readAnnotationsAll(input: {
       );
     }
 
-    // Decorate every page with its cloud-stable PageState from the same
-    // manifest that certified the pin (toManifestPage already scope-stamped
-    // the revision tokens).
-    const stateByPageObjectNumber = new Map(
-      manifest.pages.map((page) => [page.state.page.objectNumber, page.state]),
-    );
-    const list = input.revisionBridge.decorateAnnotationList(result.list, (page) =>
-      stateByPageObjectNumber.get(page.objectNumber),
-    );
-
     input.requestedVersion === undefined ? setNoStore(input.reply) : setImmutableCache(input.reply);
-    return { ...list, auditHead: manifest.auditHead };
+    return { ...result.list, auditHead: manifest.auditHead };
   }
 
   throw new EngineError(
@@ -1661,7 +1441,7 @@ async function resolvePageForRead(input: {
           input.scope.layerName,
         )
       : await input.documentService.getManifest(input.scope.ctx, input.scope.docId);
-  const page = manifest.pages.find((p) => p.state.page.objectNumber === input.pageObjectNumber);
+  const page = manifest.pages.find((p) => p.page.objectNumber === input.pageObjectNumber);
   if (page) {
     return page;
   }

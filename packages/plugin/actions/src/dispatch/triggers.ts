@@ -1,6 +1,5 @@
 /**
- * Trigger resolution helpers: the `triggers` setting, annotation identity, the
- * per-page cache of annotations bearing page-lifecycle trees (the fan-out's
+ * Trigger resolution helpers: the `triggers` setting, the per-page cache of annotations bearing page-lifecycle trees (the fan-out's
  * read amplifier) and ISO 32000-2 Table 197's page-step order.
  */
 import type {
@@ -15,19 +14,6 @@ import type {
 
 import type { ActionSource, ActionTrigger } from '../contract';
 import type { ActionsContext, ActionsServices } from '../services';
-
-export const sameRef = (left: AnnotationRef, right: AnnotationRef): boolean => {
-  if (left.kind === 'objectNumber' && right.kind === 'objectNumber') {
-    return left.objectNumber === right.objectNumber;
-  }
-  if (left.kind === 'nm' && right.kind === 'nm') {
-    return left.page.objectNumber === right.page.objectNumber && left.nm === right.nm;
-  }
-  if (left.kind === 'index' && right.kind === 'index') {
-    return left.page.objectNumber === right.page.objectNumber && left.index === right.index;
-  }
-  return false;
-};
 
 /** An annotation that carries at least one page-lifecycle tree (/PO, /PC, /PV, /PI), as read. */
 interface LifecycleAnnotation {

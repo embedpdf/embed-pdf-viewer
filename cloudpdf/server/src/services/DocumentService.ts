@@ -17,7 +17,7 @@ import {
   type DocumentActionsSnapshot,
   type DocumentSecurityProbeInfo,
   type PageListSnapshot,
-  type PageState,
+  type PageRef,
   type PdfBits,
   type PdfSaveMode,
   type WorkerJobId,
@@ -503,7 +503,7 @@ export class DocumentService {
   async getManifest(ctx: OpenContext, docId: string): Promise<DocumentManifest> {
     const head = await this.openOnPool(ctx, docId);
     const pages = await this.layerState.ensureBasePages(docId, () =>
-      this.loadDurableBasePageStates(ctx, docId),
+      this.loadBasePages(ctx, docId),
     );
     const version = await this.layerState.baseVersionFacts(
       docId,
@@ -564,7 +564,7 @@ export class DocumentService {
     );
     if (!layer) {
       const pages = await this.layerState.ensureBasePages(docId, () =>
-        this.loadDurableBasePageStates(ctx, docId),
+        this.loadBasePages(ctx, docId),
       );
       // No layer row yet -> immutable base view: docVersion from head, the
       // plane pointers the HEAD version publishes (the initial epochs for a
@@ -592,7 +592,7 @@ export class DocumentService {
     }
 
     const basePages = await this.layerState.ensureBasePages(docId, () =>
-      this.loadDurableBasePageStates(ctx, docId),
+      this.loadBasePages(ctx, docId),
     );
     const pages = await this.layerState.ensureLayerPagesFromBase({ layerId: layer.id, docId });
     // The layer's own base version (law 2): behind the head once a sibling
@@ -1897,17 +1897,18 @@ export class DocumentService {
     };
   }
 
-  private async loadDurableBasePageStates(ctx: OpenContext, docId: string): Promise<PageState[]> {
-    const annotationsBuild = (jobId: WorkerJobId) =>
-      wirePack({ kind: 'annotations.list' as const, effect: 'read' as const, jobId, docId });
-    const annotationsResult = await this.readOnPool(ctx, docId, undefined, annotationsBuild);
-    if (annotationsResult.tag !== 'annotations.list') {
+  /** The base's pages, in document order, for the first manifest of a document. */
+  private async loadBasePages(ctx: OpenContext, docId: string): Promise<PageRef[]> {
+    const build = (jobId: WorkerJobId) =>
+      wirePack({ kind: 'pages.list' as const, effect: 'read' as const, jobId, docId });
+    const result = await this.readOnPool(ctx, docId, undefined, build);
+    if (result.tag !== 'pages.list') {
       throw new EngineError(
         EngineErrorCode.WireFormat,
-        `unexpected manifest annotation payload: ${annotationsResult.tag}`,
+        `unexpected manifest pages payload: ${result.tag}`,
       );
     }
-    return annotationsResult.list.pages;
+    return result.snapshot.pages.map((page) => page.ref);
   }
 
   private async openLayerOnPool(

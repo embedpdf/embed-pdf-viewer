@@ -65,9 +65,6 @@ interface OpenDocument {
 
 export class LocalDocumentHandle implements LocalDocumentHandleContract {
   readonly [LOCAL_ENGINE_BRAND] = true;
-  readonly capabilities = {
-    weakAnnotationEditSessions: 'not-needed',
-  } as const;
   readonly metadata: MetadataService;
   readonly pieceInfo: LocalPieceInfoService;
   readonly annotations: DocumentAnnotationsService;

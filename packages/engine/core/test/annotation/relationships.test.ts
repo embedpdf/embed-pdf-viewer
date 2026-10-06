@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { NO_ANNOTATION_FLAGS } from '../../src/annotation/primitives';
 import { buildThreads, classifyRelation } from '../../src/annotation/relationships';
-import { annotationKey, refFromStableId } from '../../src/identity/annotationKey';
+import { annotationKey } from '../../src/identity/annotationKey';
 import type { Annotation } from '../../src/annotation/kinds';
 import type { AnnotationRef } from '../../src/identity/AnnotationRef';
 import type { AnnotationReplyType } from '../../src/annotation/primitives';
@@ -33,7 +33,6 @@ function annot(
     ref: objRef(objNum),
     page: { kind: 'objectNumber', objectNumber: PAGE },
     index: 0,
-    identityQuality: 'durable',
     hasAppearance: true,
     nm: rel.nm ?? null,
     ...NO_ANNOTATION_FLAGS,
@@ -67,34 +66,20 @@ describe('classifyRelation', () => {
 });
 
 describe('annotationKey', () => {
-  it('drops the page for object numbers (document-unique) and keeps it for names and indexes', () => {
+  it('drops the page for object numbers (document-unique) and keeps it for base indexes', () => {
     expect(annotationKey(objRef(7))).toBe('obj:7');
     expect(
       annotationKey({
-        kind: 'nm',
+        kind: 'baseIndex',
         page: { kind: 'objectNumber', objectNumber: PAGE },
-        nm: 'abc',
+        baseIndex: 3,
       }),
-    ).toBe('nm:1:abc');
-    expect(
-      annotationKey({
-        kind: 'index',
-        page: { kind: 'objectNumber', objectNumber: PAGE },
-        index: 3,
-        revision: 'r1' as never,
-      }),
-    ).toBe('idx:1:3');
+    ).toBe('base:1:3');
   });
 
-  it('agrees with the wire member key for durable object numbers', () => {
-    // encodeStableIdKey({ kind: 'objectNumber', objectNumber: 7 }) === 'obj:7'
+  it('agrees with the wire member key for object numbers', () => {
+    // encodeAnnotKey({ kind: 'objectNumber', objectNumber: 7, page }) === 'obj:7'
     expect(annotationKey(objRef(7))).toBe('obj:7');
-  });
-
-  it('refFromStableId rebuilds the address an event split into page + stable id', () => {
-    const page = { kind: 'objectNumber' as const, objectNumber: PAGE };
-    expect(refFromStableId(page, { kind: 'objectNumber', objectNumber: 7 })).toEqual(objRef(7));
-    expect(annotationKey(refFromStableId(page, { kind: 'nm', nm: 'abc' }))).toBe('nm:1:abc');
   });
 });
 
@@ -136,24 +121,6 @@ describe('buildThreads', () => {
 
     expect(threads).toHaveLength(1);
     expect(threads[0]!.groupedParts).toEqual([caret]);
-    expect(threads[0]!.replies).toEqual([reply]);
-  });
-
-  it('matches a child that points at the parent by /NM', () => {
-    const primary = annot(1, { nm: 'parent-nm' });
-    const reply = annot(2, {
-      reply: {
-        to: {
-          kind: 'nm',
-          page: { kind: 'objectNumber', objectNumber: PAGE },
-          nm: 'parent-nm',
-        },
-        type: 'reply',
-      },
-    });
-    const threads = buildThreads([primary, reply]);
-
-    expect(threads).toHaveLength(1);
     expect(threads[0]!.replies).toEqual([reply]);
   });
 

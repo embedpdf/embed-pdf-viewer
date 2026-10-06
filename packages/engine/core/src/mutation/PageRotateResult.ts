@@ -7,7 +7,7 @@ import type { Coordinates, PageCoordinates } from '../pageSpace/coordinates';
  * always loaded normalized (rotation forced to 0 — see `PagePtrPool`), so
  * render/text/geometry/annotation coordinates are rotation-independent and
  * every cached render stays byte-valid across a rotate. Nothing per-page is
- * invalidated and no `RevisionToken` bumps — like a move, the op returns the
+ * invalidated — like a move, the op returns the
  * new `layout` (each page's `rotation` field carries the value) and the
  * viewer re-applies its display transform.
  */

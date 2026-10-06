@@ -21,14 +21,11 @@ import {
   type PageObjectNumber,
   type PageRef,
   type ResourceId,
-  type WeakAnnotationEditSession,
 } from '@embedpdf/engine-core/runtime';
 import {
   AnnotationImportResultSchema,
   AnnotationListSchema,
-  WeakAnnotationSessionResponseSchema,
   wirePaths,
-  type WeakAnnotationSessionResponse,
 } from '@embedpdf/engine-core/wire';
 import type { SessionEventPublisher } from '@embedpdf/engine-services';
 
@@ -149,8 +146,8 @@ export class CloudDocumentAnnotationsService implements DocumentAnnotationsServi
         const manifest = await this.manifest.get(s);
         const path = this.exportPathAt(manifest, selection);
         if (path) return this.http.getFormData(path, s);
-        // Position refs, or more refs than a URL holds: the pins and the
-        // selection in a POST body.
+        // More refs than a URL holds: the pins and the selection in a POST
+        // body.
         return this.http.postJsonFormData(
           wirePaths.layerAnnotationsExportRequest(this.docId, this.layerName),
           {
@@ -249,18 +246,16 @@ export class CloudDocumentAnnotationsService implements DocumentAnnotationsServi
     });
   }
 
-  /** The export leaf at the manifest's pins: the base leaf while the layer
-   *  inherits both planes the bundle depends on. */
   /**
-   * The cacheable export URL for `selection`, or `null` when a URL can't
-   * carry it: position refs have no durable address, and a URL has room for
-   * a few hundred refs.
+   * The cacheable export URL for `selection` at the manifest's pins — the
+   * base leaf while the layer inherits both planes the bundle depends on —
+   * or `null` when a URL can't carry it: a URL has room for a few hundred
+   * refs.
    */
   private exportPathAt(
     manifest: DocumentManifest,
     selection: AnnotationExportSelection,
   ): string | null {
-    if (selection.refs?.some((ref) => ref.kind === 'index')) return null;
     const token = {
       annotationsVersion: manifest.annotationsVersion,
       layoutVersion: manifest.layoutVersion,
@@ -279,7 +274,7 @@ export class CloudDocumentAnnotationsService implements DocumentAnnotationsServi
    *  plane routing as `CloudPageAnnotationsService.list()`: an inherited
    *  `annotations` plane reads the doc-level base leaf. */
   private pagePathAt(manifest: DocumentManifest, page: ManifestPage): string {
-    const ref = page.state.page;
+    const ref = page.page;
     return planesInherited(manifest, ['annotations'])
       ? wirePaths.docPageAnnotations(this.docId, ref, page.cache.annotationVersion)
       : wirePaths.layerPageAnnotations(
@@ -294,7 +289,7 @@ export class CloudDocumentAnnotationsService implements DocumentAnnotationsServi
     manifest: DocumentManifest,
     pageObjectNumber: PageObjectNumber,
   ): string {
-    const page = manifest.pages.find((p) => p.state.page.objectNumber === pageObjectNumber);
+    const page = manifest.pages.find((p) => p.page.objectNumber === pageObjectNumber);
     if (!page) {
       throw new EngineError(
         EngineErrorCode.NotFound,
@@ -302,108 +297,5 @@ export class CloudDocumentAnnotationsService implements DocumentAnnotationsServi
       );
     }
     return this.pagePathAt(manifest, page);
-  }
-
-  beginEdit(pages: readonly PageRef[]): AbortablePromise<WeakAnnotationEditSession> {
-    if (this.isClosed()) {
-      return AbortablePromise.rejectReason(
-        new EngineError(EngineErrorCode.DocNotOpen, `document ${this.docId} is closed`),
-      );
-    }
-    return AbortablePromise.run<WeakAnnotationEditSession>(async (signal) => {
-      const response = await this.http.postJson(
-        wirePaths.layerWeakAnnotationSession(this.docId, this.layerName),
-        { pages },
-        (raw) => WeakAnnotationSessionResponseSchema.parse(raw),
-        signal,
-      );
-      return new CloudWeakAnnotationEditSession(
-        this.http,
-        this.docId,
-        this.layerName,
-        () => this.isClosed(),
-        response,
-      );
-    });
-  }
-}
-
-class CloudWeakAnnotationEditSession implements WeakAnnotationEditSession {
-  private response: WeakAnnotationSessionResponse;
-  private released = false;
-
-  constructor(
-    private readonly http: HttpClient,
-    private readonly docId: string,
-    private readonly layerName: string,
-    private readonly isClosed: () => boolean,
-    response: WeakAnnotationSessionResponse,
-  ) {
-    this.response = response;
-  }
-
-  get id(): string {
-    return this.response.sessionId;
-  }
-
-  get expiresAt(): number {
-    return this.response.expiresAt;
-  }
-
-  get heartbeatIntervalMs(): number {
-    return this.response.heartbeatIntervalMs;
-  }
-
-  get pages(): readonly PageRef[] {
-    return this.response.pages;
-  }
-
-  covers(page: PageRef): boolean {
-    return this.response.pages.some((p) => p.objectNumber === page.objectNumber);
-  }
-
-  updatePages(pages: readonly PageRef[]): AbortablePromise<void> {
-    if (this.isClosed() || this.released) {
-      return AbortablePromise.rejectReason(
-        new EngineError(EngineErrorCode.DocNotOpen, `weak annotation session ${this.id} is closed`),
-      );
-    }
-    return AbortablePromise.run<void>(async (signal) => {
-      this.response = await this.http.postJson(
-        wirePaths.layerWeakAnnotationSessionPages(this.docId, this.layerName, this.id),
-        { pages },
-        (raw) => WeakAnnotationSessionResponseSchema.parse(raw),
-        signal,
-      );
-    });
-  }
-
-  heartbeat(): AbortablePromise<void> {
-    if (this.isClosed() || this.released) {
-      return AbortablePromise.rejectReason(
-        new EngineError(EngineErrorCode.DocNotOpen, `weak annotation session ${this.id} is closed`),
-      );
-    }
-    return AbortablePromise.run<void>(async (signal) => {
-      this.response = await this.http.postJson(
-        wirePaths.layerWeakAnnotationSessionHeartbeat(this.docId, this.layerName, this.id),
-        {},
-        (raw) => WeakAnnotationSessionResponseSchema.parse(raw),
-        signal,
-      );
-    });
-  }
-
-  close(): AbortablePromise<void> {
-    if (this.released) {
-      return AbortablePromise.resolveValue(undefined);
-    }
-    this.released = true;
-    return AbortablePromise.run<void>((signal) =>
-      this.http.deleteEmpty(
-        wirePaths.layerWeakAnnotationSessionRelease(this.docId, this.layerName, this.id),
-        signal,
-      ),
-    );
   }
 }

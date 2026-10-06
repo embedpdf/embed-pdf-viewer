@@ -1,4 +1,4 @@
-import type { AnnotationRef, PageRef } from '@embedpdf/engine-core/runtime';
+import { annotationKey, type AnnotationRef, type PageRef } from '@embedpdf/engine-core/runtime';
 
 import type { ActionSource, ActionTrigger, ActionTriggerResult } from './contract';
 
@@ -22,17 +22,10 @@ export interface HoverPump {
 
 const sameTarget = (left: HoverTarget | null, right: HoverTarget | null): boolean => {
   if (left === null || right === null) return left === right;
-  if (left.ref.kind !== right.ref.kind || left.page.objectNumber !== right.page.objectNumber) {
-    return false;
-  }
-  if (left.ref.kind === 'objectNumber' && right.ref.kind === 'objectNumber') {
-    return left.ref.objectNumber === right.ref.objectNumber;
-  }
-  if (left.ref.kind === 'nm' && right.ref.kind === 'nm') return left.ref.nm === right.ref.nm;
-  if (left.ref.kind === 'index' && right.ref.kind === 'index') {
-    return left.ref.index === right.ref.index && left.ref.revision === right.ref.revision;
-  }
-  return false;
+  return (
+    left.page.objectNumber === right.page.objectNumber &&
+    annotationKey(left.ref) === annotationKey(right.ref)
+  );
 };
 
 /**

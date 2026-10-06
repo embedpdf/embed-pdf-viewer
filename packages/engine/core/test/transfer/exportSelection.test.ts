@@ -98,25 +98,23 @@ describe('closeExportSelection', () => {
     expect(reads).toEqual([7]);
   });
 
-  test('finds an annotation by name and by position', () => {
+  test('finds an annotation by its base index', () => {
     const named = { ...document };
     named[3] = [
       annotation(first, 10, 0, { nm: 'note', popup: refOf(first, 11) }),
       ...document[3]!.slice(1),
     ];
-    const read = (page: PageRef) => named[page.objectNumber] ?? [];
-    const byName = closeExportSelection(
-      { refs: [{ kind: 'nm', page: first, nm: 'note' }], include: 'references' },
+    const inline: AnnotationRef = { kind: 'baseIndex', page: first, baseIndex: 0 };
+    const born: Record<number, Annotation[]> = {
+      ...named,
+      3: [{ ...named[3]![0]!, ref: inline }, ...named[3]!.slice(1)],
+    };
+    const byBaseIndex = closeExportSelection(
+      { refs: [inline], include: 'references' },
       pages,
-      read,
+      (page) => born[page.objectNumber] ?? [],
     );
-    expect(byName.map((item) => item.index)).toEqual([0, 1]);
-    const byPosition = closeExportSelection(
-      { refs: [{ kind: 'index', page: first, index: 1 } as AnnotationRef], include: 'references' },
-      pages,
-      read,
-    );
-    expect(byPosition.map((item) => item.index)).toEqual([0, 1]);
+    expect(byBaseIndex.map((item) => item.index)).toEqual([0, 1]);
   });
 
   test('refuses a page or an annotation the document does not have', () => {

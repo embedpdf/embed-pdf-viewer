@@ -21,7 +21,6 @@ const square = (objectNumber: number, x: number, extra: Record<string, unknown> 
     ref: refOf(objectNumber),
     page: PAGE,
     index: objectNumber,
-    identityQuality: 'durable',
     hasAppearance: true,
     nm: null,
     invisible: false,

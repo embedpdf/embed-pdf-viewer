@@ -60,62 +60,43 @@ try {
     ),
   );
 
-  // Parity check: both engines should bump the revision the same number
-  // of times and report the same impact envelope shape. We don't compare
-  // the engine-stamped UUIDs (they're random by design) or session ids.
+  // Parity check: both engines should report the same impact envelope
+  // shape: the same kinds of ref changed, on the same pages.
   const errs: string[] = [];
-  diffNum(
-    'createA.meta.generation',
-    mutationGeneration(localResult.createdA.meta),
-    mutationGeneration(cloudResult.createdA.meta),
-    errs,
-  );
-  diffNum(
-    'createB.meta.generation',
-    mutationGeneration(localResult.createdB.meta),
-    mutationGeneration(cloudResult.createdB.meta),
-    errs,
-  );
-  diffNum(
-    'moveSingle.meta.generation',
-    mutationGeneration(localResult.movedSingle.meta),
-    mutationGeneration(cloudResult.movedSingle.meta),
-    errs,
-  );
-  diffNum(
-    'moveBatch.meta.generation',
-    mutationGeneration(localResult.movedBatch.meta),
-    mutationGeneration(cloudResult.movedBatch.meta),
-    errs,
-  );
-  diffNum(
-    'deleteA.meta.generation',
-    mutationGeneration(localResult.deletedA.meta),
-    mutationGeneration(cloudResult.deletedA.meta),
-    errs,
-  );
-  diffNum(
-    'deleteB.meta.generation',
-    mutationGeneration(localResult.deletedB.meta),
-    mutationGeneration(cloudResult.deletedB.meta),
+  diffStr(
+    'createA.meta',
+    impactOf(localResult.createdA.meta),
+    impactOf(cloudResult.createdA.meta),
     errs,
   );
   diffStr(
-    'createA.meta.shouldRefetch',
-    localResult.createdA.meta.shouldRefetch?.reason ?? null,
-    cloudResult.createdA.meta.shouldRefetch?.reason ?? null,
+    'createB.meta',
+    impactOf(localResult.createdB.meta),
+    impactOf(cloudResult.createdB.meta),
     errs,
   );
   diffStr(
-    'moveBatch.meta.shouldRefetch',
-    localResult.movedBatch.meta.shouldRefetch?.reason ?? null,
-    cloudResult.movedBatch.meta.shouldRefetch?.reason ?? null,
+    'moveSingle.meta',
+    impactOf(localResult.movedSingle.meta),
+    impactOf(cloudResult.movedSingle.meta),
     errs,
   );
   diffStr(
-    'updated.identityQuality',
-    localResult.updated?.annotation.identityQuality ?? '<skipped>',
-    cloudResult.updated?.annotation.identityQuality ?? '<skipped>',
+    'moveBatch.meta',
+    impactOf(localResult.movedBatch.meta),
+    impactOf(cloudResult.movedBatch.meta),
+    errs,
+  );
+  diffStr(
+    'deleteA.meta',
+    impactOf(localResult.deletedA.meta),
+    impactOf(cloudResult.deletedA.meta),
+    errs,
+  );
+  diffStr(
+    'deleteB.meta',
+    impactOf(localResult.deletedB.meta),
+    impactOf(cloudResult.deletedB.meta),
     errs,
   );
   diffStr(
@@ -151,6 +132,11 @@ function diffNum(label: string, a: number, b: number, errs: string[]): void {
 function diffStr(label: string, a: string | null, b: string | null, errs: string[]): void {
   if (a !== b) errs.push(`${label}: local=${a ?? 'null'}, cloud=${b ?? 'null'}`);
 }
-function mutationGeneration(meta: { affectedPages: Array<{ revision: { generation: number } }> }) {
-  return meta.affectedPages[0]?.revision.generation ?? -1;
+/** What a write reports it touched: the pages, and the kinds of ref it changed. */
+function impactOf(meta: {
+  affectedPages: Array<{ objectNumber: number }>;
+  changed: Array<{ kind: string }>;
+}): string {
+  const pages = meta.affectedPages.map((page) => page.objectNumber).join(',');
+  return `pages=${pages} changed=${meta.changed.map((ref) => ref.kind).join(',')}`;
 }

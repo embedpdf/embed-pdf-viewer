@@ -88,7 +88,7 @@ describe('plane-scoped view sharing (cloud SDK, real runtime)', () => {
 
       // The annotation list is the base's list — non-empty, identical
       // across visitors, served from the shared doc-level URL (a wrong
-      // path family would 404 through the real runtime here). Weak-identity
+      // path family would 404 through the real runtime here). Inline
       // annotations ride along untouched.
       const [listA, listB] = await Promise.all([
         alice.doc.page(toPageRef(pageObjectNumber)).annotations.list(),

@@ -21,20 +21,6 @@ export const EngineErrorCode = {
   WireFormat: 'WireFormat',
   RuntimeUnavailable: 'RuntimeUnavailable',
   /**
-   * A position (index) ref no longer points where it did: its
-   * `RevisionToken` doesn't match the page's current generation, or its
-   * `index` is out of range. A ref by object number or `/NM` that finds
-   * nothing is `NotFound`, like any other missing thing.
-   */
-  InvalidReference: 'InvalidReference',
-  /**
-   * A weak-annotation structural edit (delete/move) was attempted while the
-   * caller does not have sole active edit presence for that page. This is a
-   * collaboration guard for index-addressed annotations; stable pages and
-   * non-shifting annotation updates do not use it.
-   */
-  WeakAnnotationSessionConflict: 'WeakAnnotationSessionConflict',
-  /**
    * A layer write lost its optimistic-concurrency check: the layer's
    * durable version advanced (another writer — typically another server
    * replica — committed) between the operation's prepare and its commit,

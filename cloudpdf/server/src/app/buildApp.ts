@@ -44,7 +44,6 @@ import { SecurityEventsRepo } from '../db/repos/security-events.repo';
 import { ShareGrantsRepo } from '../db/repos/share_grants.repo';
 import { TenantUsageRepo } from '../db/repos/tenant_usage.repo';
 import { TenantsRepo } from '../db/repos/tenants.repo';
-import { WeakAnnotationSessionsRepo } from '../db/repos/weak_annotation_sessions.repo';
 import type { Database as Schema } from '../db/schema';
 import type { ImportConnection } from '../import/config/ImportConnectionSchema';
 import { defaultImportPolicy, type ImportPolicy } from '../import/config/ImportPolicySchema';
@@ -87,7 +86,6 @@ import { defaultSigningRoot } from '../runtime/signing-paths';
 import { resolvePoolSize } from '../runtime/WorkerThreadPool';
 import { WorkerThreadPool, type FallbackFontDescriptor } from '../runtime/WorkerThreadPool';
 import type { KmsKeyring } from '../security';
-import { CloudRevisionBridge } from '../services/CloudRevisionBridge';
 import { CrashJournal, DocumentQuarantinedError } from '../services/CrashJournal';
 import { DerivedRenderService } from '../services/DerivedRenderService';
 import {
@@ -99,7 +97,6 @@ import { DocumentService } from '../services/DocumentService';
 import { EventLogService } from '../services/EventLogService';
 import { LayerService } from '../services/LayerService';
 import { LayerStateService } from '../services/LayerStateService';
-import { WeakAnnotationSessionService } from '../services/WeakAnnotationSessionService';
 import { BaseFileCache } from '../storage/BaseFileCache';
 import type { ObjectStoreWithInfo } from '../storage/ObjectStore';
 
@@ -1243,10 +1240,6 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
         documents: new DocumentsRepo(opts.db),
         baseVersions: new BaseVersionsRepo(opts.db),
       });
-      const cloudRevisionBridge = new CloudRevisionBridge();
-      const weakAnnotationSessions = new WeakAnnotationSessionService({
-        repo: new WeakAnnotationSessionsRepo(opts.db),
-      });
       const eventLog = new EventLogService({ storage: opts.objectStore });
       const passwordSessionServerSecret = {
         id:
@@ -1318,9 +1311,7 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
         documents: new DocumentsRepo(opts.db),
         counters: engineCounters,
         layerState: layerStateService,
-        revisionBridge: cloudRevisionBridge,
         eventLog,
-        weakAnnotationSessions,
         documentService,
         pool,
         storage: opts.objectStore,
@@ -1365,10 +1356,8 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
       await registerAnnotationRoutes(app, {
         documentService,
         layerService,
-        revisionBridge: cloudRevisionBridge,
         imageEncoder: new SharpImageEncoder(),
         ...(opts.encodeInEngine !== undefined ? { encodeInEngine: opts.encodeInEngine } : {}),
-        weakAnnotationSessions,
         ...(derivedRenders ? { derivedRenders } : {}),
         ...(opts.annotationBundleLimits ? { bundleLimits: opts.annotationBundleLimits } : {}),
       });
@@ -1623,7 +1612,6 @@ function mapToHttp(code: string): number {
   switch (code) {
     case EngineErrorCode.InvalidArg:
     case EngineErrorCode.WireFormat:
-    case EngineErrorCode.InvalidReference:
       return 400;
     case EngineErrorCode.Unauthenticated:
       return 401;
@@ -1634,7 +1622,6 @@ function mapToHttp(code: string): number {
     // signing (expired/aborted) is gone for good; a refused CMS is the
     // caller's input. A change the document's own signatures refuse is a
     // conflict with its state, not a matter of the caller's authority.
-    case EngineErrorCode.WeakAnnotationSessionConflict:
     case EngineErrorCode.LayerVersionConflict:
     case EngineErrorCode.SigningPending:
     case EngineErrorCode.SigningVersionMismatch:

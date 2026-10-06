@@ -6,8 +6,8 @@ import type {
 } from './PageRender';
 import type { PdfRotation } from '../geometry/primitives';
 import type { AnnotationRef } from '../identity/AnnotationRef';
+import type { PageRef } from '../identity/PageRef';
 import type { Coordinates, PageCoordinates } from '../pageSpace/coordinates';
-import type { PageState } from '../revision/PageState';
 
 /**
  * Which `/AP` sub-dictionary to render. PDFium exposes Normal (`/N`),
@@ -95,7 +95,7 @@ export interface AnnotationAppearancesQuery {
  * writing an appearance has no raster.
  */
 export interface AnnotationAppearanceRaster<C extends Coordinates = PageCoordinates> {
-  /** Full wire identity (durable or weak), including index-only annotations. */
+  /** The annotation's name, for every annotation with an appearance. */
   ref: AnnotationRef;
   mode: AnnotationAppearanceMode;
   rect: C['box'];
@@ -103,11 +103,11 @@ export interface AnnotationAppearanceRaster<C extends Coordinates = PageCoordina
 }
 
 /**
- * Batch result for one page: the page revision state plus every rendered
- * appearance, keyed implicitly by `ref` on each entry.
+ * Batch result for one page: the page, and every rendered appearance, keyed
+ * implicitly by `ref` on each entry.
  */
 export interface AnnotationAppearancesResult<C extends Coordinates = PageCoordinates> {
-  pageState: PageState;
+  page: PageRef;
   appearances: AnnotationAppearanceRaster<C>[];
 }
 
@@ -132,7 +132,7 @@ export interface AnnotationAppearanceImage<C extends Coordinates = PageCoordinat
  * {@link AnnotationAppearancesResult}.
  */
 export interface AnnotationAppearanceImagesResult<C extends Coordinates = PageCoordinates> {
-  pageState: PageState;
+  page: PageRef;
   appearances: AnnotationAppearanceImage<C>[];
 }
 
@@ -141,9 +141,8 @@ export interface AnnotationAppearanceImagesResult<C extends Coordinates = PageCo
  * endpoint returns. Identifies which multipart part (`part`) carries the
  * encoded bitmap for this annotation, plus the metadata the client needs to
  * place and identify it without a second round-trip. The client addresses the
- * image by `part` and identifies the annotation by `ref` (durable or weak), so
- * every annotation with an appearance stream is emitted — including index-only
- * ones.
+ * image by `part` and identifies the annotation by `ref`, so every annotation
+ * with an appearance stream is emitted.
  */
 export interface AnnotationAppearanceManifestEntry<C extends Coordinates = PageCoordinates> {
   /** `name` of the multipart part carrying this appearance's image bytes. */
@@ -162,6 +161,6 @@ export interface AnnotationAppearanceManifestEntry<C extends Coordinates = PageC
  * remaining parts are the encoded images, one per `appearances[i].part`.
  */
 export interface AnnotationAppearanceManifest<C extends Coordinates = PageCoordinates> {
-  pageState: PageState;
+  page: PageRef;
   appearances: AnnotationAppearanceManifestEntry<C>[];
 }

@@ -399,7 +399,7 @@ describe('Phase 3 doc routes — GET /v1/docs/:docId/manifest@dN', () => {
     const body = (await res.json()) as {
       docVersion: number;
       pages: Array<{
-        state: { weakAnnotationState: { kind: string; hasAnyWeakAnnotations: boolean } };
+        page: { kind: string; objectNumber: number };
         cache: { contentVersion: number; annotationVersion: number };
       }>;
     };
@@ -408,10 +408,7 @@ describe('Phase 3 doc routes — GET /v1/docs/:docId/manifest@dN', () => {
     for (const page of body.pages) {
       expect(page.cache.contentVersion).toBe(1);
       expect(page.cache.annotationVersion).toBe(1);
-      expect(page.state.weakAnnotationState).toEqual({
-        kind: 'known',
-        hasAnyWeakAnnotations: false,
-      });
+      expect(page.page.kind).toBe('objectNumber');
     }
   });
 

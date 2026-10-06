@@ -168,19 +168,8 @@ export type { PageObjectNumber } from './identity/PageObjectNumber';
 export type { PageRef } from './identity/PageRef';
 export { toPageRef, pageRefsEqual, encodePageKey, decodePageKey } from './identity/PageRef';
 export { generateUuid } from './identity/uuid';
-export type { AnnotationStableId } from './identity/AnnotationStableId';
-export { encodeStableIdKey, decodeStableIdKey } from './identity/AnnotationStableId';
 export type { AnnotationRef } from './identity/AnnotationRef';
-export type { AnnotationIdentityQuality } from './identity/AnnotationIdentityQuality';
-
-export { revisionTokensEqual } from './revision/RevisionToken';
-export type { RevisionToken } from './revision/RevisionToken';
-export type { PageState } from './revision/PageState';
-export {
-  UNKNOWN_WEAK_ANNOTATION_STATE,
-  knownWeakAnnotationState,
-} from './revision/WeakAnnotationState';
-export type { WeakAnnotationState } from './revision/WeakAnnotationState';
+export { encodeAnnotKey, decodeAnnotKey } from './identity/AnnotationRef';
 
 export { colorOf, rgbOf, sameColor } from './annotation/color';
 export type {
@@ -409,12 +398,7 @@ export { concatAnnotationLists } from './annotation/AnnotationList';
 export type { AnnotationList, AnnotationListOptions } from './annotation/AnnotationList';
 
 export { classifyRelation, buildThreads, deletedWith } from './annotation/relationships';
-export {
-  annotationKey,
-  annotationKeysOf,
-  positionKey,
-  refFromStableId,
-} from './identity/annotationKey';
+export { annotationKey } from './identity/annotationKey';
 export type { AnnotationRelationKind, AnnotationThread } from './annotation/relationships';
 
 export {
@@ -439,13 +423,6 @@ export type {
 } from './dto/PdfLinkTarget';
 export type { CacheDelta, MutationMeta } from './mutation/MutationMeta';
 export type { AnnotationListMutationMeta } from './mutation/AnnotationListMutationMeta';
-export {
-  changesAnnotationList,
-  shiftsExistingAnnotationIndices,
-  invalidatesWeakIndexRefs,
-} from './mutation/AnnotationMutationImpactPolicy';
-export type { AnnotationMutationKind } from './mutation/AnnotationMutationImpactPolicy';
-export type { RefetchReason } from './mutation/RefetchReason';
 export type {
   AnnotationCreateResult,
   AnnotationUpdateResult,

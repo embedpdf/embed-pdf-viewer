@@ -9,19 +9,8 @@
  * (read/view.ts). What happens when a change is confirmed (new records find
  * their keys, record events fire) is in sync/confirmed.ts.
  */
-import {
-  refFromStableId,
-  reload,
-  type DocumentEvent,
-  type Mirror,
-  type PageRef,
-} from '@embedpdf/core';
-import {
-  annotationKey,
-  positionKey,
-  type Annotation,
-  type FormWidget,
-} from '@embedpdf/engine-core/runtime';
+import { reload, type DocumentEvent, type Mirror, type PageRef } from '@embedpdf/core';
+import { annotationKey, type Annotation, type FormWidget } from '@embedpdf/engine-core/runtime';
 
 import { moveInOrder } from '../model';
 import type { AnnotationContext } from '../services/context';
@@ -51,9 +40,8 @@ export const NO_RECORDS: AnnotationRecords = { byKey: {}, order: [] };
 
 /**
  * Add or replace these records, advancing their appearance version when
- * `bump` is set. A weak record the engine just named (a direct-object
- * annotation that got an /NM when it was written) keeps its place under its
- * new key: its position (`dto.index`) is the key it had.
+ * `bump` is set. A record keeps its key for life (an annotation's ref is its
+ * name for life), so a replaced record keeps its place.
  */
 function put(
   records: AnnotationRecords,
@@ -63,22 +51,13 @@ function put(
   if (!dtos.length) return records;
   const byKey = { ...records.byKey };
   const added: string[] = [];
-  const renamed = new Map<string, string>();
   for (const dto of dtos) {
     const key = annotationKey(dto.ref);
-    const position = positionKey(dto.page, dto.index);
-    const named = key !== position && !(key in byKey) && position in byKey;
-    const previous = named ? byKey[position] : byKey[key];
-    if (named) {
-      delete byKey[position];
-      renamed.set(position, key);
-    } else if (!previous) {
-      added.push(key);
-    }
+    const previous = byKey[key];
+    if (!previous) added.push(key);
     byKey[key] = { dto, apVersion: (previous?.apVersion ?? 0) + (bump ? 1 : 0) };
   }
-  const order = renamed.size ? records.order.map((key) => renamed.get(key) ?? key) : records.order;
-  return { byKey, order: added.length ? [...order, ...added] : order };
+  return { byKey, order: added.length ? [...records.order, ...added] : records.order };
 }
 
 function drop(records: AnnotationRecords, keys: readonly string[]): AnnotationRecords {
@@ -138,58 +117,6 @@ const pagesOfWidgets = (widgets: readonly FormWidget[]): PageRef[] =>
 const widgetKeys = (widgets: readonly FormWidget[]): string[] =>
   widgets.flatMap((widget) => (widget.ref ? [annotationKey(widget.ref)] : []));
 
-type AnnotationEvent = Extract<
-  DocumentEvent,
-  {
-    type:
-      | 'annotations.created'
-      | 'annotations.updated'
-      | 'annotations.deleted'
-      | 'annotations.moved';
-  }
->;
-
-const recordsOf = (event: AnnotationEvent): readonly Annotation[] => {
-  switch (event.type) {
-    case 'annotations.created':
-      return [event.annotation];
-    case 'annotations.updated':
-      return [event.annotation];
-    case 'annotations.moved':
-      return event.annotations;
-    case 'annotations.deleted':
-      return [];
-  }
-};
-
-/** Does this page hold a record addressed by its position? */
-const hasWeakRecords = (records: AnnotationRecords, page: PageRef): boolean =>
-  records.order.some((key) => {
-    const { ref } = records.byKey[key]!.dto;
-    return ref.kind === 'index' && ref.page.objectNumber === page.objectNumber;
-  });
-
-/**
- * Weak annotations (direct objects without /NM) are addressed by position, so
- * two kinds of annotation event need the page read again instead of applied:
- * one the engine says moved positions (`shouldRefetch`: a weak delete, a
- * move), and one that names a record this event does not carry and the
- * records do not hold (a reply whose weak parent the engine just named).
- * Pages without weak annotations never take this path.
- */
-function positionsReload(
-  records: AnnotationRecords,
-  event: AnnotationEvent,
-): ReturnType<typeof reload> | null {
-  if (event.meta.shouldRefetch) return reload({ pages: [event.page] });
-  const carried = new Set(recordsOf(event).map((dto) => annotationKey(dto.ref)));
-  const unknown = event.meta.changed.some((id) => {
-    const key = annotationKey(refFromStableId(event.page, id));
-    return !carried.has(key) && !(key in records.byKey);
-  });
-  return unknown && hasWeakRecords(records, event.page) ? reload({ pages: [event.page] }) : null;
-}
-
 /**
  * Apply one confirmed document event to the records. Pure, and the same for
  * every origin. Events that change widgets through the form plane re-read
@@ -203,15 +130,10 @@ export function foldRecords(
     // A new record comes with a freshly baked appearance; the engine says
     // whether an update changed one; a z-order move changes none.
     case 'annotations.created':
-      return positionsReload(records, event) ?? put(records, [event.annotation], true);
+      return put(records, [event.annotation], true);
     case 'annotations.updated':
-      return (
-        positionsReload(records, event) ??
-        put(records, [event.annotation], event.appearance.changed)
-      );
+      return put(records, [event.annotation], event.appearance.changed);
     case 'annotations.moved': {
-      const reloaded = positionsReload(records, event);
-      if (reloaded) return reloaded;
       // The moved records, in their new order, from the first one's new index.
       const moved = put(records, event.annotations, false);
       const keys = event.annotations.map((annotation) => annotationKey(annotation.ref));
@@ -227,13 +149,7 @@ export function foldRecords(
       };
     }
     case 'annotations.deleted':
-      return (
-        positionsReload(records, event) ??
-        drop(
-          records,
-          event.deleted.map((id) => annotationKey(refFromStableId(event.page, id))),
-        )
-      );
+      return drop(records, event.deleted.map(annotationKey));
     case 'pages.deleted':
       return drop(records, keysOnPages(records, event.pages));
     case 'pages.inserted':

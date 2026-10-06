@@ -121,21 +121,19 @@ see [Setup](/docs/engine/setup#busy-servers).
 
 ### Every code
 
-| Code                            | What happened                                                                                             |
-| :------------------------------ | :-------------------------------------------------------------------------------------------------------- |
-| `DocNotOpen`                    | The document was closed.                                                                                  |
-| `RuntimeUnavailable`            | The engine was destroyed, or the browser lacks something it needs.                                        |
-| `MalformedPdf`                  | The file opened, but part of it is too damaged to use.                                                    |
-| `InvalidReference`              | An index ref whose page changed since you read it.                                                        |
-| `WeakAnnotationSessionConflict` | Someone else is editing the same page by position. See [Refs & identity](/docs/engine/concepts/identity). |
-| `NotImplemented`                | This engine can't do this (yet).                                                                          |
-| `SigningPending`                | A signature is being made; finish or cancel it first.                                                     |
-| `SigningExpired`                | The signature took too long; start it again.                                                              |
-| `SigningVersionMismatch`        | The document changed while the signature was being made; start it again.                                  |
-| `SignatureRefused`              | This field can't be signed. The message says why.                                                         |
-| `StaleBase`                     | The document was signed elsewhere; this copy can be edited but not signed.                                |
-| `WireFormat`                    | The server sent something the engine didn't expect.                                                       |
-| `Unknown`                       | Anything else. Please report it.                                                                          |
+| Code                     | What happened                                                              |
+| :----------------------- | :------------------------------------------------------------------------- |
+| `DocNotOpen`             | The document was closed.                                                   |
+| `RuntimeUnavailable`     | The engine was destroyed, or the browser lacks something it needs.         |
+| `MalformedPdf`           | The file opened, but part of it is too damaged to use.                     |
+| `NotImplemented`         | This engine can't do this (yet).                                           |
+| `SigningPending`         | A signature is being made; finish or cancel it first.                      |
+| `SigningExpired`         | The signature took too long; start it again.                               |
+| `SigningVersionMismatch` | The document changed while the signature was being made; start it again.   |
+| `SignatureRefused`       | This field can't be signed. The message says why.                          |
+| `StaleBase`              | The document was signed elsewhere; this copy can be edited but not signed. |
+| `WireFormat`             | The server sent something the engine didn't expect.                        |
+| `Unknown`                | Anything else. Please report it.                                           |
 
 ### `details`
 

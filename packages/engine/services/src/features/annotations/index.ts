@@ -7,5 +7,3 @@ export { AnnotationExporter } from './AnnotationExporter';
 export { AnnotationImporter } from './AnnotationImporter';
 export { AnnotationBatchApplier } from './AnnotationBatchApplier';
 export type { BatchCreate, BatchCreateResult } from './AnnotationBatchApplier';
-export { computeMutationImpact } from './internal/mutations/computeMutationImpact';
-export type { MutationKind, ImpactInputs } from './internal/mutations/computeMutationImpact';

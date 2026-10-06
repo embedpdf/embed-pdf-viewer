@@ -53,13 +53,8 @@ describe('LayerStateService durable authority', () => {
       })
       .execute();
     await new DocumentPagesRepo(db).replaceForDocument('doc-ls', [
-      { pageObjectNumber: 11, hasWeakAnnotations: false },
-      {
-        pageObjectNumber: 22,
-        annotationVersion: 4,
-        annotationGeneration: 2,
-        hasWeakAnnotations: true,
-      },
+      { pageObjectNumber: 11 },
+      { pageObjectNumber: 22, annotationVersion: 4 },
     ]);
     const layer = await new LayersRepo(db).createEmpty({
       id: 'layer-ls',
@@ -78,44 +73,6 @@ describe('LayerStateService durable authority', () => {
       pageObjectNumber: 22,
       contentVersion: 1,
       annotationVersion: 4,
-      annotationGeneration: 2,
-      hasWeakAnnotations: true,
-    });
-  });
-
-  test('keeps cache versions and index-ref generations separate', () => {
-    const strongPage = { hasWeakAnnotations: false };
-    const weakPage = { hasWeakAnnotations: true };
-
-    expect(service.mutationBumps('create', strongPage)).toMatchObject({
-      bumpAnnotationVersion: true,
-      bumpAnnotationGeneration: false,
-      weakRefsInvalidated: false,
-    });
-    expect(service.mutationBumps('update', strongPage)).toMatchObject({
-      bumpAnnotationVersion: true,
-      bumpAnnotationGeneration: false,
-      weakRefsInvalidated: false,
-    });
-    expect(service.mutationBumps('delete', strongPage)).toMatchObject({
-      bumpAnnotationVersion: true,
-      bumpAnnotationGeneration: true,
-      weakRefsInvalidated: false,
-    });
-    expect(service.mutationBumps('move', strongPage)).toMatchObject({
-      bumpAnnotationVersion: true,
-      bumpAnnotationGeneration: true,
-      weakRefsInvalidated: false,
-    });
-    expect(service.mutationBumps('delete', weakPage)).toMatchObject({
-      bumpAnnotationVersion: true,
-      bumpAnnotationGeneration: true,
-      weakRefsInvalidated: true,
-    });
-    expect(service.mutationBumps('move', weakPage)).toMatchObject({
-      bumpAnnotationVersion: true,
-      bumpAnnotationGeneration: true,
-      weakRefsInvalidated: true,
     });
   });
 });

@@ -1,6 +1,5 @@
 import type { CachePins } from '../dto/CachePins';
 import type { PageRef } from '../identity/PageRef';
-import type { PageState } from '../revision/PageState';
 
 /**
  * Cache pin patch returned by cloud mutations after the durable DB transaction
@@ -54,11 +53,11 @@ export interface CacheDelta {
  * Base envelope for every layer-mutating operation: the `meta` of every
  * write result.
  *
- * `affectedPages` is the state delta. `cacheDelta` is the cloud/CDN URL pin
- * delta and is `null` for local engines (and for a write that changed
- * nothing).
+ * `affectedPages` names the pages whose annotations or content the write
+ * changed. `cacheDelta` is the cloud/CDN URL pin delta and is `null` for
+ * local engines (and for a write that changed nothing).
  */
 export interface MutationMeta {
-  affectedPages: PageState[];
+  affectedPages: PageRef[];
   cacheDelta: CacheDelta | null;
 }

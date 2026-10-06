@@ -4,6 +4,7 @@ import type {
   PageObjectNumber,
   PdfCoordinates,
 } from '@embedpdf/engine-core/runtime';
+import { toPageRef } from '@embedpdf/engine-core/runtime';
 import type { PdfRuntimeModule, Ptr } from '@embedpdf/engine-runtime';
 
 import { readContextFor } from './annotationReadContext';
@@ -19,8 +20,8 @@ import type { FontRegistrar } from '../../../fonts/FontRegistrar';
  * Shared per-page annotation read loop, used by both read paths. The raw
  * path (off `docPtr`, no `pagePtr`) and the full path (off an acquired
  * `pagePtr`) differ only in how they obtain the annotation count and each
- * `annotPtr`; everything after that — per-subtype dispatch, weak-flag
- * accounting, `pageState` decoration — is identical, so it lives here once.
+ * `annotPtr`; everything after that — naming, per-subtype dispatch — is
+ * identical, so it lives here once.
  *
  * `getAnnotPtrAt(i)` returns the annotation handle at index `i`; this loop
  * always closes it via `FPDFPage_CloseAnnot`. The caller owns acquiring and
@@ -39,8 +40,6 @@ export function collectPageAnnotations(input: {
   const { fn, mem } = runtime;
 
   const annotations: Annotation<PdfCoordinates>[] = [];
-  let hasWeak = false;
-  const revision = session.pageState(pageObjectNumber).revision;
   const actionBudget = new ActionReadBudgetTracker();
   const readCtx = readContextFor(session, fonts);
 
@@ -56,20 +55,17 @@ export function collectPageAnnotations(input: {
         annotPtr,
         pageObjectNumber,
         i,
-        revision,
         actionBudget,
       );
       const subtypeCode = fn.FPDFAnnot_GetSubtype(annotPtr);
       const { reader } = pickReader(subtypeCode);
       const dto = reader(fn, mem, annotPtr, base, subtypeCode, readCtx);
       annotations.push(dto);
-      if (dto.identityQuality === 'weak') hasWeak = true;
     } finally {
       fn.FPDFPage_CloseAnnot(annotPtr);
     }
   }
 
   joinWidgetFieldNumbers(runtime, session, annotations);
-  session.recordWeakFlag(pageObjectNumber, hasWeak);
-  return { annotations, pages: [session.pageState(pageObjectNumber)] };
+  return { annotations, pages: [toPageRef(pageObjectNumber)] };
 }

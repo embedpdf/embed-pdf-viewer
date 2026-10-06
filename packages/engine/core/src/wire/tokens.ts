@@ -19,6 +19,7 @@ import {
   SearchTokenSchema,
 } from './tokenSchemas';
 import type { PdfSaveMode } from '../dto/PdfSaveMode';
+import { decodeAnnotKey, encodeAnnotKey } from '../identity/AnnotationRef';
 import { toPageRef } from '../identity/PageRef';
 import type { AnnotationExportSelection } from '../transfer/exportSelection';
 import type { ModificationLevel } from '../signature/types';
@@ -134,12 +135,10 @@ export interface AnnotationsExportToken {
   selection: AnnotationExportSelection;
 }
 
-// A selection as the token holds it: page object numbers, and refs as
-// [page, object number] or [page, name]. Weak index refs have no durable
-// address, so a versioned read can't carry them.
+/** A selection as the token holds it: pages by object number, refs as `[page, annotKey]` (`obj:42`, `base:2`). */
 interface TokenSelection {
   p?: number[];
-  r?: Array<[number, number | string]>;
+  r?: Array<[number, string]>;
 }
 
 export const encodeAnnotationsExportToken = (token: AnnotationsExportToken): string => {
@@ -151,15 +150,9 @@ export const encodeAnnotationsExportToken = (token: AnnotationsExportToken): str
     );
   }
   if (selection.refs) {
-    const refs = new Map<string, [number, number | string]>();
+    const refs = new Map<string, [number, string]>();
     for (const ref of selection.refs) {
-      if (ref.kind === 'index') {
-        throw new Error('an export names annotations by object number or name, not by position');
-      }
-      const entry: [number, number | string] = [
-        ref.page.objectNumber,
-        ref.kind === 'objectNumber' ? ref.objectNumber : ref.nm,
-      ];
+      const entry: [number, string] = [ref.page.objectNumber, encodeAnnotKey(ref)];
       refs.set(JSON.stringify(entry), entry);
     }
     wire.r = [...refs.keys()].sort().map((key) => refs.get(key)!);
@@ -198,11 +191,10 @@ export const decodeAnnotationsExportToken = (raw: string): AnnotationsExportToke
         if (!Array.isArray(entry) || entry.length !== 2 || !isNumber(entry[0])) {
           throw new Error('malformed export ref');
         }
-        const page = toPageRef(entry[0]);
-        const [, id] = entry;
-        if (isNumber(id)) return { kind: 'objectNumber', page, objectNumber: id } as const;
-        if (typeof id === 'string' && id.length > 0) return { kind: 'nm', page, nm: id } as const;
-        throw new Error('malformed export ref');
+        const ref =
+          typeof entry[1] === 'string' ? decodeAnnotKey(toPageRef(entry[0]), entry[1]) : null;
+        if (!ref) throw new Error('malformed export ref');
+        return ref;
       });
     }
   }

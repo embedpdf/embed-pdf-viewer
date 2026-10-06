@@ -34,7 +34,7 @@ type StampAppearance = NonNullable<WireAnnotationResources['appearance']>;
 /**
  * Validate every caller-controlled stamp input before the mutation owner
  * performs its first native write. AnnotationMutator invokes these before
- * creating an annotation or strengthening a weak annotation id.
+ * creating an annotation.
  */
 export function preflightStampDraft(
   draft: StampDraft<PdfCoordinates>,

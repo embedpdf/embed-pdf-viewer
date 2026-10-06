@@ -1,22 +1,12 @@
 import type { ConformanceTestRunner, ConformanceOptions } from './runMetadataConformance';
-import type { AnnotationPatch, HighlightDraft } from '../annotation/kinds';
 import type { DocumentHandle } from '../engine/DocumentHandle';
 import type { Engine } from '../engine/Engine';
 import { EngineError } from '../errors/EngineError';
 import { EngineErrorCode } from '../errors/EngineErrorCode';
-import type { AnnotationRef } from '../identity/AnnotationRef';
+import { annotationKey } from '../identity/annotationKey';
 import { toPageRef } from '../identity/PageRef';
 import { AbortError } from '../promise/AbortError';
 import { PageRotateResultSchema } from '../wire/schemas';
-
-const QUAD: HighlightDraft['quadPoints'] = [
-  {
-    upperLeft: { x: 50, y: 100 },
-    upperRight: { x: 150, y: 100 },
-    lowerLeft: { x: 50, y: 80 },
-    lowerRight: { x: 150, y: 80 },
-  },
-];
 
 /**
  * Page rotate conformance suite. Verifies the architectural invariants —
@@ -26,8 +16,8 @@ const QUAD: HighlightDraft['quadPoints'] = [
  *      `rotate(pons, 90)` once. The wire never speaks "turn by".
  *   2. Rotation is presentation metadata over normalized content: the
  *      layout's `width`/`height` stay un-rotated, order and identity are
- *      untouched, and per-page `RevisionToken`s survive (an index-based
- *      annotation ref captured before the rotate works after it).
+ *      untouched, and annotation names survive (a `baseIndex` ref captured
+ *      before the rotate works after it).
  *   3. The result returns the full new `layout`; a subsequent `list()`
  *      agrees with it.
  *   4. Invalid inputs (bad rotation value, duplicate page object numbers, unknown page object numbers)
@@ -117,42 +107,21 @@ export function runPageRotateConformance(
       }
     });
 
-    test('weak index-based annotation refs survive a rotate (no revision bump)', async () => {
+    test('an annotation born inline keeps its baseIndex name when its page is rotated', async () => {
       const doc = await openFixture(engine, opts);
       try {
-        const list = await doc.pages.list();
-        const hostPageObjectNumber = list.pages[0].ref.objectNumber;
-        const hostPage = doc.page(toPageRef(hostPageObjectNumber));
-
-        const draft: HighlightDraft = {
-          subtype: 'highlight',
-          contents: 'rotate survives this',
-          quadPoints: QUAD,
-        };
-        const created = await hostPage.annotations.create(draft);
-        const afterCreate = await hostPage.annotations.list();
-        const targetIndex = afterCreate.annotations.findIndex(
-          (a) =>
-            a.ref.kind === 'objectNumber' &&
-            created.annotation.ref.kind === 'objectNumber' &&
-            a.ref.objectNumber === created.annotation.ref.objectNumber,
+        const inline = (await doc.annotations.list()).annotations.find(
+          (a) => a.ref.kind === 'baseIndex',
         );
-        expect(targetIndex >= 0).toBe(true);
+        if (!inline) return;
 
-        const indexRef: AnnotationRef = {
-          kind: 'index',
-          page: toPageRef(hostPageObjectNumber),
-          index: targetIndex,
-          revision: afterCreate.pages[0].revision,
-        };
+        await doc.pages.rotate([inline.page], 90);
 
-        // Rotate the host page itself — the strongest version of the
-        // invariant: even the rotated page's revision stays put.
-        await doc.pages.rotate([toPageRef(hostPageObjectNumber)], 90);
-
-        const patch: AnnotationPatch = { subtype: 'highlight', contents: 'still alive' };
-        const update = await hostPage.annotations.update(indexRef, patch);
+        const update = await doc.page(inline.page).annotations.update(inline.ref, {
+          contents: 'still alive',
+        });
         expect(update.annotation.contents).toBe('still alive');
+        expect(annotationKey(update.annotation.ref)).toBe(annotationKey(inline.ref));
       } finally {
         await doc.close();
       }

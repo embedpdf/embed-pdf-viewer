@@ -8,7 +8,7 @@
  */
 export { annotationPlugin } from './annotation.plugin';
 // The one annotation key, re-exported so app code keying by ref needs only this package.
-export { annotationKey, refFromStableId } from '@embedpdf/core';
+export { annotationKey } from '@embedpdf/core';
 export * from './contract';
 // The shared placement layer + the one click↔drag threshold, re-exported so a
 // sibling commit plane (the form plugin's place handler) places a gesture with

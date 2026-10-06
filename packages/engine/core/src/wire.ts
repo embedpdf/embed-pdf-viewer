@@ -53,7 +53,6 @@ export {
   CacheDeltaSchema,
   MutationMetaSchema,
   EngineErrorPayloadSchema,
-  PageStateSchema,
   AnnotationListSchema,
   PageTextSnapshotSchema,
   PageGeometrySnapshotSchema,
@@ -62,7 +61,6 @@ export {
   PageRenderAnnotatedQuerySchema,
   AnnotationAppearancesQuerySchema,
   AnnotationAppearanceManifestSchema,
-  RefetchReasonSchema,
   AnnotationListMutationMetaSchema,
   AnnotationCreateResultSchema,
   AppearanceOutcomeSchema,
@@ -111,8 +109,6 @@ export {
   PageFlattenResultSchema,
   RedactionApplyScopeSchema,
   RedactionApplyResultSchema,
-  WeakAnnotationSessionResponseSchema,
-  WeakAnnotationSessionPagesRequestSchema,
   SearchQuerySchema,
   SearchRequestSchema,
   SearchSnippetSchema,
@@ -143,8 +139,6 @@ export type {
   LayerScopePlane,
   CacheDelta,
   MutationMeta,
-  WeakAnnotationSessionResponse,
-  WeakAnnotationSessionPagesRequest,
 } from './wire/schemas';
 export {
   FormFieldRefSchema,
@@ -265,9 +259,7 @@ export {
 } from './geometry/schemas';
 
 export {
-  AnnotationStableIdSchema,
   AnnotationRefSchema,
-  RevisionTokenSchema,
   ColorSchema,
   PointSchema,
   RectSchema,

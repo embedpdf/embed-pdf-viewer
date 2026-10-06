@@ -7,8 +7,8 @@ import type { Coordinates, PageCoordinates } from '../pageSpace/coordinates';
  * Result of a `pages.insert()`. The inserted pages are copies of the source
  * document's pages: they get fresh, never-recycled object numbers in the
  * destination, listed here in insertion order. Every pre-existing page keeps
- * its identity and `RevisionToken` — an insert never invalidates refs on its
- * neighbours (same rule as `pages.move`).
+ * its identity — an insert never invalidates refs on its neighbours (same
+ * rule as `pages.move`).
  */
 export interface PageInsertResult<C extends Coordinates = PageCoordinates> {
   /** The new pages, in the order they were inserted. */

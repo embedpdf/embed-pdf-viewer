@@ -32,7 +32,6 @@ function annotation(
     ref: refOf(page, annotObjectNumber),
     page,
     index,
-    identityQuality: 'durable',
     hasAppearance: true,
     nm: null,
     rect: box,
@@ -98,18 +97,15 @@ describe('planAnnotationImport', () => {
     expect(creates[2]!.draft).not.toHaveProperty('reply');
   });
 
-  test('finds a link however the bundle names its target', () => {
-    const note = annotation(first, 10, 0, { subtype: 'text', nm: 'note' });
-    const byName = annotation(first, 11, 1, {
+  test('finds a link to a target named by its base index', () => {
+    const inline = { kind: 'baseIndex', page: first, baseIndex: 0 } as const;
+    const note = annotation(first, 10, 0, { subtype: 'text', nm: 'note', ref: inline });
+    const byBaseIndex = annotation(first, 12, 1, {
       subtype: 'text',
-      reply: { to: { kind: 'nm', page: first, nm: 'note' }, type: 'group' },
+      reply: { to: inline, type: 'group' },
     });
-    const byPosition = annotation(first, 12, 2, {
-      subtype: 'text',
-      reply: { to: { kind: 'index', page: first, index: 0, revision: 'r' }, type: 'reply' },
-    });
-    const { creates } = plan(bundleOf(note, byName, byPosition));
-    expect(creates.map((create) => create.replyTo?.planned)).toEqual([undefined, 0, 0]);
+    const { creates } = plan(bundleOf(note, byBaseIndex));
+    expect(creates.map((create) => create.replyTo?.planned)).toEqual([undefined, 0]);
     expect(creates[1]!.replyTo!.type).toBe('group');
   });
 

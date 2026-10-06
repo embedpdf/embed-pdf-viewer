@@ -1,21 +1,8 @@
 import type { AnnotationList, AnnotationListOptions } from '../annotation/AnnotationList';
-import type { PageRef } from '../identity/PageRef';
 import { AbortablePromise } from '../promise/AbortablePromise';
 import type { AnnotationBundle } from '../transfer/AnnotationBundle';
 import type { AnnotationImportOptions, AnnotationImportResult } from '../transfer/annotationImport';
 import type { AnnotationExportSelection } from '../transfer/exportSelection';
-
-export interface WeakAnnotationEditSession {
-  readonly id: string;
-  readonly expiresAt: number;
-  readonly heartbeatIntervalMs: number;
-  /** The pages this session claims edit presence on. */
-  readonly pages: readonly PageRef[];
-  covers(page: PageRef): boolean;
-  updatePages(pages: readonly PageRef[]): AbortablePromise<void>;
-  heartbeat(): AbortablePromise<void>;
-  close(): AbortablePromise<void>;
-}
 
 /**
  * Document-scoped annotation service exposed via
@@ -28,7 +15,6 @@ export interface DocumentAnnotationsService {
    * `page.annotations.list()` returns for each page.
    */
   list(options?: AnnotationListOptions): AbortablePromise<AnnotationList>;
-  beginEdit(pages: readonly PageRef[]): AbortablePromise<WeakAnnotationEditSession>;
   /**
    * Take annotations out of the document, with the bytes beside them, as one
    * bundle: every annotation, or the selection with what it points at and,

@@ -49,7 +49,6 @@ export {
   encodePageKey,
   decodePageKey,
   annotationKey,
-  refFromStableId,
   // Local-only members (warmup, fonts) are reached through this check.
   isLocalEngine,
 } from '@embedpdf/engine-core/runtime';

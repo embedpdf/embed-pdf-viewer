@@ -222,7 +222,7 @@ export class LocalPageAnnotationsService implements LocalPageAnnotationsServiceC
           image,
         });
       }
-      return { pageState: result.pageState, appearances };
+      return { page: result.page, appearances };
     });
   }
 

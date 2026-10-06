@@ -21,11 +21,6 @@ import type { CharMapAnchor } from '../text/charmap';
  * the invariants documented there.
  *
  * This snapshot is pure content, addressed and cached by `contentVersion`.
- * It deliberately carries no annotation liveness envelope (`PageState`):
- * the caller already knows the `pageObjectNumber` it requested, and
- * annotation `revision` / weak-state changes on a different cadence than
- * `contentVersion`, so baking liveness into this content-cached body would
- * be a stale-data hazard. Liveness lives on annotation reads instead.
  */
 export interface PageTextSnapshot {
   text: string;

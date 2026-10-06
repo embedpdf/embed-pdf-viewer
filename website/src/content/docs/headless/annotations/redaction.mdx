@@ -102,8 +102,9 @@ Everything `useRedaction()` gives you.
 | `canMark()`, `canUnmark(ref)`, `canUpdateLabel(ref)`, `canApply()` | Whether marking, removing a mark, changing its label and applying are allowed. [Permissions](#permissions)                          |
 | `getSettings()`, `updateSettings(changes)`, `resetSettings()` | Reads the settings, changes them while the app runs, or goes back to what you registered. In a component, use `useRedactionSettings()`. [Settings](#settings) |
 
-Applying resolves the result: each page's `status` (`'applied'`, `'unchanged'`, `'skipped'` or
-`'failed'`) and how many other annotations were removed. Every method that returns a promise also
+Applying resolves the result: each page's `status` (`'applied'` or `'unchanged'`) and how many
+other annotations were removed. Applying is all or nothing: when a page fails, no page changes and
+the promise rejects. Every method that returns a promise also
 takes a `signal` in its options, to cancel it.
 
 ## State

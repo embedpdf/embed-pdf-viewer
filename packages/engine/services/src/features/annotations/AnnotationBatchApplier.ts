@@ -2,28 +2,26 @@ import {
   EngineError,
   EngineErrorCode,
   PDF_SUBTYPE_TO_CODE,
+  toPageRef,
   type AnnotationActor,
   type AnnotationDraft,
   type Annotation,
   type AnnotationListMutationMeta,
   type AnnotationRef,
   type AnnotationReplyType,
-  type AnnotationStableId,
   type AttachmentFileInfo,
   type PageObjectNumber,
   type PageRef,
-  type RevisionToken,
   type WireAnnotationResources,
   type PdfCoordinates,
 } from '@embedpdf/engine-core/runtime';
 import type { PdfRuntimeModule, Ptr } from '@embedpdf/engine-runtime';
 
 import { pdfPageCountOf } from './internal/write/stampDrawing';
-import { captureOrStampStableId } from './internal/identity/captureOrStampStableId';
+import { annotationRefOf } from './internal/identity/annotationName';
 import { resolveAnnotIndexRaw } from './internal/identity/resolveAnnotIndexRaw';
 import { prepareCreate } from './internal/mutations/prepareCreate';
 import { annotationIndexByName } from './internal/read/annotationIndexByName';
-import { pageHasWeakAnnotations } from './internal/read/pageHasWeakAnnotations';
 import { readContextFor } from './internal/read/annotationReadContext';
 import { joinWidgetFieldNumbers } from './internal/read/joinWidgetField';
 import { readAnnotationFromPtr } from './internal/read/readAnnotationFromPtr';
@@ -94,6 +92,7 @@ interface Placed {
 
 /** An annotation the document has, which a create links to: its place in its page's `/Annots`. */
 interface Existing {
+  readonly page: PageRef;
   readonly pageIndex: number;
   readonly index: number;
 }
@@ -111,8 +110,8 @@ interface Existing {
  * 1. create every annotation in order, so each page's `/Annots` keeps it,
  *    with its data and its appearance;
  * 2. link replies and popups to what they name: another create, or an
- *    annotation the document has (a weak one is named first, so the link
- *    has a durable address);
+ *    annotation the document has (one born inline becomes an object, which
+ *    a link needs, and keeps its name);
  * 3. attribute each, stamped as the session or restored as it was, last,
  *    so no later write touches `/M`.
  */
@@ -157,7 +156,7 @@ export class AnnotationBatchApplier {
       return { create, record, ctx, draft, replyTo, parent };
     });
     throwIfAborted(signal);
-    if (prepared.length === 0) return { created: [], meta: metaOf(this.session, [], []) };
+    if (prepared.length === 0) return { created: [], meta: metaOf([], []) };
 
     const placed = prepared.map(({ create, record, ctx, draft }): Placed => {
       throwIfAborted(signal);
@@ -194,15 +193,13 @@ export class AnnotationBatchApplier {
       };
     });
 
-    // Parents that are already in the document, strengthened by a link.
-    const linked: AnnotationStableId[] = [];
-    const openTarget = <T>(target: number | Existing, body: (parentPtr: Ptr) => T): T => {
-      if (typeof target === 'number') return this.withOpen(placed[target]!, body);
-      return this.withOpenExisting(target, (parentPtr) => {
-        linked.push(captureOrStampStableId(this.runtime, parentPtr));
-        return body(parentPtr);
-      });
-    };
+    // A reply writes only itself. A popup's parent gains its `/Popup`: one
+    // the document has already is named in the change too.
+    const linked: AnnotationRef[] = [];
+    const openTarget = <T>(target: number | Existing, body: (parentPtr: Ptr) => T): T =>
+      typeof target === 'number'
+        ? this.withOpen(placed[target]!, body)
+        : this.withOpenExisting(target, body);
     prepared.forEach(({ replyTo, parent }, at) => {
       if (replyTo) {
         this.withOpen(placed[at]!, (annotPtr) =>
@@ -213,7 +210,11 @@ export class AnnotationBatchApplier {
       }
       if (parent !== undefined) {
         this.withOpen(placed[at]!, (popupPtr) =>
-          openTarget(parent, (parentPtr) => linkPopup(this.runtime, popupPtr, parentPtr)),
+          openTarget(parent, (parentPtr) => {
+            linkPopup(this.runtime, popupPtr, parentPtr);
+            if (typeof parent === 'number') return;
+            linked.push(annotationRefOf(fn, mem, docPtr, parent.page, parentPtr, parent.index));
+          }),
         );
       }
     });
@@ -233,20 +234,13 @@ export class AnnotationBatchApplier {
     });
 
     const readCtx = readContextFor(this.session, this.fonts);
-    const revisions = new Map<PageObjectNumber, RevisionToken>();
-    const created = placed.map((at) => {
-      let revision = revisions.get(at.pageObjectNumber);
-      if (revision === undefined) {
-        revision = this.session.pageState(at.pageObjectNumber).revision;
-        revisions.set(at.pageObjectNumber, revision);
-      }
-      return this.withOpen(at, (annotPtr) =>
-        readAnnotationFromPtr(fn, mem, annotPtr, at.pageObjectNumber, at.index, revision, readCtx),
-      );
-    });
+    const created = placed.map((at) =>
+      this.withOpen(at, (annotPtr) =>
+        readAnnotationFromPtr(fn, mem, annotPtr, at.pageObjectNumber, at.index, readCtx),
+      ),
+    );
     joinWidgetFieldNumbers(this.runtime, this.session, created);
-    this.knowWeakAnnotations(placed, linked.length > 0);
-    return { created, meta: metaOf(this.session, placed, linked) };
+    return { created, meta: metaOf(placed, linked) };
   }
 
   /**
@@ -300,26 +294,7 @@ export class AnnotationBatchApplier {
           : `a popup's parent must be on the same page (parent page ${existing.page.objectNumber}, popup page ${page.objectNumber})`,
       );
     }
-    return resolveAnnotIndexRaw(this.runtime, this.session, existing);
-  }
-
-  /**
-   * Keep each touched page's weak-annotation state known: read raw where it
-   * isn't known yet, or where a link may have strengthened a weak parent.
-   * New annotations are durable, so they never make a page weak.
-   */
-  private knowWeakAnnotations(placed: readonly Placed[], strengthened: boolean): void {
-    const docPtr = this.session.requireDocPtr();
-    const pages = new Map(placed.map((at) => [at.pageObjectNumber, at.pageIndex]));
-    for (const [pageObjectNumber, pageIndex] of pages) {
-      if (!strengthened && this.session.weakAnnotationState(pageObjectNumber).kind === 'known') {
-        continue;
-      }
-      this.session.recordWeakFlag(
-        pageObjectNumber,
-        pageHasWeakAnnotations(this.runtime, docPtr, pageIndex),
-      );
-    }
+    return { page: existing.page, ...resolveAnnotIndexRaw(this.runtime, this.session, existing) };
   }
 
   private writeContext(resources?: WireAnnotationResources): AnnotationWriteContext {
@@ -376,26 +351,27 @@ export class AnnotationBatchApplier {
 
 /**
  * One envelope for the change: each page it touched, each annotation it made,
- * and each it linked to and strengthened. Creates only append, so no
- * revision moves and no weak ref goes stale.
+ * and each it linked a popup to. Creates only append, so no other annotation
+ * moves.
  */
 function metaOf(
-  session: DocumentSession,
   placed: readonly Placed[],
-  linked: readonly AnnotationStableId[],
+  linked: readonly AnnotationRef[],
 ): AnnotationListMutationMeta {
   const pages = [...new Set(placed.map((at) => at.pageObjectNumber))];
   return {
-    affectedPages: pages.map((page) => session.pageState(page)),
+    affectedPages: pages.map((page) => toPageRef(page)),
     cacheDelta: null,
     changed: [
       ...placed.map(
-        (at): AnnotationStableId => ({ kind: 'objectNumber', objectNumber: at.objectNumber }),
+        (at): AnnotationRef => ({
+          kind: 'objectNumber',
+          page: toPageRef(at.pageObjectNumber),
+          objectNumber: at.objectNumber,
+        }),
       ),
       ...linked,
     ],
-    weakRefsInvalidated: false,
-    shouldRefetch: null,
   };
 }
 

@@ -13,7 +13,7 @@
  * The data itself is already in the records mirror when this runs.
  */
 import type { MirrorChange } from '@embedpdf/core';
-import { annotationKey, refFromStableId } from '@embedpdf/engine-core/runtime';
+import { annotationKey } from '@embedpdf/engine-core/runtime';
 
 import { preferBaked, preferVector } from '../model';
 import type { AnnotationRecords } from './records';
@@ -54,11 +54,7 @@ export function followConfirmedChanges(
         return;
       case 'annotations.deleted':
         // A note goes with its thread and popups: one event names them all, the note first.
-        announce.deleted(
-          event.deleted.map((id) => refFromStableId(event.page, id)),
-          event.page,
-          origin,
-        );
+        announce.deleted(event.deleted, event.page, origin);
         return;
       case 'annotations.moved':
         announce.moved(

@@ -67,7 +67,6 @@ export { clearlyOutranks, placeFor, placeIn, placedBefore, rank } from './schedu
 export type { JobTarget, Place, Placed, RankedJob, ViewSets } from './scheduling/place';
 export { passwordPromptFromState } from './engine/passwordPrompt';
 export type { PasswordPrompt } from './engine/passwordPrompt';
-export type { DocumentCapabilities } from './engine/DocumentHandle';
 export type { MetadataService } from './engine/MetadataService';
 export type { CustomMetadataService } from './engine/CustomMetadataService';
 export type { PageHandle } from './engine/PageHandle';
@@ -80,7 +79,6 @@ export type { DocumentAnnotationsService } from './engine/DocumentAnnotationsSer
 export type { DocumentActionsService } from './engine/DocumentActionsService';
 export type { DocumentFormsService, FormRepairOptions } from './engine/DocumentFormsService';
 export type { DocumentSearchService } from './engine/DocumentSearchService';
-export type { WeakAnnotationEditSession } from './engine/DocumentAnnotationsService';
 export type { DocumentPagesService } from './engine/DocumentPagesService';
 export type { DocumentRedactionService } from './engine/DocumentRedactionService';
 export type { DocumentSignaturesService } from './engine/DocumentSignaturesService';

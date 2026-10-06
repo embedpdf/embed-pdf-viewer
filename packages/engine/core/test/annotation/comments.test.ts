@@ -135,20 +135,6 @@ describe('buildCommentThreads — threading', () => {
     expect(num(threads[0]!.root.ref)).toBe(1);
     expect(threads[0]!.replies.map((r) => num(r.ref))).toEqual([2]);
   });
-
-  it('resolves a parent addressed by /NM when its own ref is objectNumber-form', () => {
-    const threads = buildCommentThreads([
-      annot(1, { nm: 'root-nm' }),
-      reply(2, 0, {
-        reply: {
-          to: { kind: 'nm', page: { kind: 'objectNumber', objectNumber: 1 }, nm: 'root-nm' },
-          type: 'reply',
-        },
-      }),
-    ]);
-    expect(threads).toHaveLength(1);
-    expect(threads[0]!.replies).toHaveLength(1);
-  });
 });
 
 describe('buildCommentThreads — review status', () => {

@@ -42,7 +42,7 @@ for (const runtime of ['wasm', 'native'] as const) {
           layout: fixture.layout,
           action: fixture.action,
           policyVersion: analysis.policyVersion,
-          weakCount: squares.filter((a) => a.ref.kind === 'index').length,
+          weakCount: squares.filter((a) => a.ref.kind === 'baseIndex').length,
           verdict: verdicts[0].modifications,
           integrity: verdicts[0].integrity,
           findings: analysis.steps.flatMap((step) => step.findings),
@@ -51,7 +51,7 @@ for (const runtime of ['wasm', 'native'] as const) {
         expect(verdicts[0].cryptography).toBe('valid');
         expect(verdicts[0].trust).toBe('trusted');
         expect(squares).toHaveLength(fixture.action.startsWith('delete') ? 3 : 4);
-        expect(squares.filter((a) => a.ref.kind === 'index')).toHaveLength(
+        expect(squares.filter((a) => a.ref.kind === 'baseIndex')).toHaveLength(
           fixture.action.includes('names')
             ? fixture.profile === 'locked-markup'
               ? 1

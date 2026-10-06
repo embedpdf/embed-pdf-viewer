@@ -14,9 +14,8 @@ import { AbortablePromise } from '../promise/AbortablePromise';
  * Document-level attachments: the catalog's `/EmbeddedFiles` name tree
  * (ISO 32000 §7.11.4). Exposed via `DocumentHandle.attachments`.
  *
- * Addressing is by name-tree key (`AttachmentRef`) — unique by
- * construction, so there is no weak/index tier and no revision to
- * validate (see the ref's doc comment). `list()` returns metadata only;
+ * Addressing is by name-tree key (`AttachmentRef`), unique by
+ * construction (see the ref's doc comment). `list()` returns metadata only;
  * bytes leave the engine exclusively through {@link download}. The
  * annotation-level counterpart is
  * `PageAnnotationsService.downloadResource(ref, 'file')`.

@@ -168,9 +168,8 @@ from the fields above.
 
 ### When a page fails
 
-Pages are applied one after the other. When one fails, its `status` is `'failed'` with an
-`error`, the pages after it are `'skipped'`, and the pages before it keep their redactions. Apply
-again to retry the rest.
+Apply is all or nothing. When a page fails, or the call is cancelled, no page changes and the call
+rejects with the error. Apply again to retry.
 
 ### Events
 

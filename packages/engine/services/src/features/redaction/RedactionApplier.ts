@@ -8,7 +8,6 @@ import type {
 import {
   EngineError,
   EngineErrorCode,
-  serializeError,
   subtypeFromCode,
   toPageRef,
 } from '@embedpdf/engine-core/runtime';
@@ -18,15 +17,14 @@ import type { DocumentSession } from '../../document-session/DocumentSession';
 import { I32_BYTES, readI32 } from '../../runtime/memory/structs';
 import { withScratch } from '../../runtime/memory/scratch';
 import { throwIfAborted } from '../../shared/abort';
-import { AnnotationReader } from '../annotations';
 import { resolveAnnotPtr } from '../annotations/internal/identity/resolveAnnotationPointer';
 import { promoteInlineAnnotations } from '../annotations/internal/write/promoteInlineAnnotations';
 
 /**
  * The destructive half of redaction (see `DocumentRedactionService` for the
  * model and the layer trust boundary). Content and annotation liveness
- * change together, exactly like {@link PagesFlattener} — this class mirrors
- * its validate-then-apply boundary and ordered-batch semantics.
+ * change together, exactly like {@link PagesFlattener}: all or nothing, so a
+ * page that fails, or a cancel, aborts the whole apply.
  *
  * Scope semantics:
  *   - `pages`: every redact annotation on each listed page is applied; a
@@ -58,23 +56,14 @@ export class RedactionApplier {
     const results: RedactionApplyResult['results'] = [];
     const affected = new Set<PageObjectNumber>();
     let totalRemoved = 0;
-    let stop = false;
 
     for (const [pageObjectNumber, refs] of plan) {
-      if (stop || (signal.aborted && affected.size > 0)) {
-        stop = true;
-        results.push({
-          page: toPageRef(pageObjectNumber),
-          status: 'skipped',
-          removedAnnotationCount: 0,
-        });
-        continue;
-      }
-      if (signal.aborted) throwIfAborted(signal);
-
+      throwIfAborted(signal);
       // A redaction removes entries from /Annots; promotion keeps every
       // position.
-      promoteInlineAnnotations(this.runtime, this.session, pageObjectNumber);
+      if (promoteInlineAnnotations(this.runtime, this.session, pageObjectNumber)) {
+        affected.add(pageObjectNumber);
+      }
       const pool = this.session.pagePool();
       const pagePtr = pool.acquire(pageObjectNumber);
       try {
@@ -90,15 +79,6 @@ export class RedactionApplier {
           status: outcome.status,
           removedAnnotationCount: outcome.removed,
         });
-      } catch (error) {
-        affected.add(pageObjectNumber);
-        results.push({
-          page: toPageRef(pageObjectNumber),
-          status: 'failed',
-          removedAnnotationCount: 0,
-          error: serializeError(error),
-        });
-        stop = true;
       } finally {
         pool.release(pageObjectNumber);
       }
@@ -110,20 +90,8 @@ export class RedactionApplier {
     }
 
     this.session.invalidateDerived();
-    for (const pageObjectNumber of affected) {
-      this.session.bumpRevision(pageObjectNumber);
-      try {
-        // Recompute the weak-annotation flag from the annotations that remain.
-        new AnnotationReader(this.runtime, this.session).list(pageObjectNumber, signal);
-      } catch {
-        // The page state remains conservatively unknown. Never lose the layer
-        // artifact because a post-apply diagnostic read failed.
-      }
-    }
     const meta: MutationMeta = {
-      affectedPages: [...affected].map((pageObjectNumber) =>
-        this.session.pageState(pageObjectNumber),
-      ),
+      affectedPages: [...affected].map((pageObjectNumber) => toPageRef(pageObjectNumber)),
       cacheDelta: null,
     };
     return { scope, results, removedAnnotationCount: totalRemoved, meta };
@@ -167,17 +135,6 @@ export class RedactionApplier {
       }
       if (existing) existing.push(ref);
       else plan.set(ref.page.objectNumber, [ref]);
-    }
-    // Applying removes annotations, which shifts positional indices — a
-    // batch of multiple refs on one page can only address the survivors
-    // stably through durable ref kinds.
-    for (const [pageObjectNumber, refs] of plan) {
-      if (refs !== null && refs.length > 1 && refs.some((r) => r.kind === 'index')) {
-        throw new EngineError(
-          EngineErrorCode.InvalidArg,
-          `multiple redactions on page ${pageObjectNumber} cannot be addressed by positional 'index' refs — use objectNumber/nm refs, or one apply call per index ref`,
-        );
-      }
     }
     return plan;
   }
@@ -260,8 +217,8 @@ export class RedactionApplier {
     let removed = 0;
     for (const ref of refs) {
       // Re-resolve at apply time: an earlier apply on this page may have
-      // removed collateral annotations, and durable refs stay valid across
-      // that (preflight rejected fragile batched index refs).
+      // removed collateral annotations, and names stay valid across that
+      // (the page was promoted first).
       const annotPtr = resolveAnnotPtr(this.runtime, this.session, pagePtr, ref);
       try {
         const ok = withScratch(mem, I32_BYTES, (countPtr) => {

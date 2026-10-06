@@ -17,7 +17,12 @@ import {
   selectionAnchor as coreSelectionAnchor,
   type ViewEnv,
 } from '@embedpdf/core-annotation';
-import type { Annotation, AnnotationRef, PageRef } from '@embedpdf/engine-core/runtime';
+import {
+  annotationKey,
+  type Annotation,
+  type AnnotationRef,
+  type PageRef,
+} from '@embedpdf/engine-core/runtime';
 
 import type { AnnotationAnchor, AnnotationSelectionAnchor, ChromeSettings } from '../contract';
 import type { AnnotationContext, AnnotationServices } from '../services';
@@ -230,7 +235,7 @@ export function createChromeReads(
   };
   const annotationAnchorOf = (ref: AnnotationRef, view?: ViewEnv): AnnotationAnchor | null => {
     const model = store.model();
-    const key = `${ref.page.objectNumber}:${ref.kind === 'nm' ? ref.nm : ref.kind === 'objectNumber' ? ref.objectNumber : ref.index}`;
+    const key = annotationKey(ref);
     const cached = anchors.get(key);
     if (
       cached &&

@@ -376,7 +376,7 @@ export const wirePaths = {
   /**
    * Immutable base annotation list for a single page (plane-scope model):
    * the shared-URL variant an annotations-inheriting layer resolves at — a
-   * base's own annotations (weak-identity ones included) are simply visible
+   * base's own annotations (inline ones included) are simply visible
    * through every pristine layer, so 1,000 visitors' sidebars are one CDN
    * object served from the base worker session.
    */
@@ -622,23 +622,6 @@ export const wirePaths = {
 
   layerDownloadVersioned: (docId: string, layerName: string, token: DownloadToken) =>
     `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/download@${encodeDownloadToken(token)}`,
-
-  /**
-   * Weak-annotation-sessions: plural, so the collection lives at
-   * `/weak-annotation-sessions` and members at
-   * `/weak-annotation-sessions/{sessionId}` — REST-conventional.
-   */
-  layerWeakAnnotationSession: (docId: string, layerName: string) =>
-    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/weak-annotation-sessions`,
-
-  layerWeakAnnotationSessionHeartbeat: (docId: string, layerName: string, sessionId: string) =>
-    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/weak-annotation-sessions/${encodeURIComponent(sessionId)}/heartbeat`,
-
-  layerWeakAnnotationSessionPages: (docId: string, layerName: string, sessionId: string) =>
-    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/weak-annotation-sessions/${encodeURIComponent(sessionId)}/pages`,
-
-  layerWeakAnnotationSessionRelease: (docId: string, layerName: string, sessionId: string) =>
-    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/weak-annotation-sessions/${encodeURIComponent(sessionId)}`,
 
   /**
    * POST: pre-warm the doc cache + worker open before any user

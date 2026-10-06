@@ -79,14 +79,10 @@ describe('Phase 5 layer mutation pipeline', () => {
             };
           }>;
         };
-        affectedPages: Array<{
-          page: { objectNumber: number };
-          revision: { generation: number };
-        }>;
+        affectedPages: Array<{ objectNumber: number }>;
       };
     };
-    expect(body.meta.affectedPages[0]?.page.objectNumber).toBe(1);
-    expect(body.meta.affectedPages[0]?.revision.generation).toBe(0);
+    expect(body.meta.affectedPages).toEqual([toPageRef(1)]);
     expect(body.meta.cacheDelta).toMatchObject({
       previousDocVersion: 1,
       docVersion: 2,
@@ -186,16 +182,8 @@ describe('Phase 5 layer mutation pipeline', () => {
       .orderBy('page_object_number', 'asc')
       .execute();
     expect(pages).toHaveLength(2);
-    expect(pages[0]).toMatchObject({
-      page_object_number: 1,
-      annotation_version: 2,
-      annotation_generation: 0,
-    });
-    expect(pages[1]).toMatchObject({
-      page_object_number: 2,
-      annotation_version: 1,
-      annotation_generation: 0,
-    });
+    expect(pages[0]).toMatchObject({ page_object_number: 1, annotation_version: 2 });
+    expect(pages[1]).toMatchObject({ page_object_number: 2, annotation_version: 1 });
 
     const stale = await fetch(
       `${fx.baseUrl}/v1/docs/${docId}/layers/${layerName}/manifest@docVersion=1`,
@@ -214,16 +202,14 @@ describe('Phase 5 layer mutation pipeline', () => {
     expect(fresh.status).toBe(200);
     const manifest = (await fresh.json()) as {
       pages: Array<{
-        state: { page: { objectNumber: number } };
+        page: { objectNumber: number };
         cache: { annotationVersion: number };
       }>;
     };
-    expect(
-      manifest.pages.find((p) => p.state.page.objectNumber === 1)?.cache.annotationVersion,
-    ).toBe(2);
+    expect(manifest.pages.find((p) => p.page.objectNumber === 1)?.cache.annotationVersion).toBe(2);
   });
 
-  test('stable delete creates the next artifact and bumps index generation', async () => {
+  test('delete creates the next artifact and bumps the annotation version', async () => {
     const tenantId = 'tenant-layer-del';
     const docId = 'doclayermut002';
     const layerName = 'alice';
@@ -270,61 +256,25 @@ describe('Phase 5 layer mutation pipeline', () => {
       .where('page_object_number', '=', 1)
       .executeTakeFirstOrThrow();
     expect(page.annotation_version).toBe(3);
-    expect(page.annotation_generation).toBe(1);
   });
 
-  test('fresh cloud index delete bridges to worker epoch and bumps generation from DB state', async () => {
-    const tenantId = 'tenant-layer-idx';
+  test('a base-index key addresses an inline annotation of the file', async () => {
+    const tenantId = 'tenant-layer-base';
     const docId = 'doclayermut003';
     const layerName = 'alice';
     await seedDocument(fx, tenantId, docId, { pageCount: 1 });
-    await seedLayerPage(fx, {
-      tenantId,
-      docId,
-      layerName,
-      annotationVersion: 17,
-      annotationGeneration: 10,
-      hasWeakAnnotations: true,
-    });
-    await beginWeakAnnotationSession(fx, tenantId, docId, layerName, [1]);
+    await seedLayerPage(fx, { tenantId, docId, layerName, annotationVersion: 17 });
 
     const res = await fetch(
-      `${fx.baseUrl}/v1/docs/${docId}/layers/${layerName}/annotations/pages/obj:1/items/index`,
+      `${fx.baseUrl}/v1/docs/${docId}/layers/${layerName}/annotations/pages/obj:1/items/base:0`,
       {
-        method: 'PATCH',
-        headers: {
-          Authorization: `Bearer ${docToken(tenantId, docId, layerName)}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          op: 'delete',
-          ref: {
-            kind: 'index',
-            page: toPageRef(1),
-            index: 0,
-            revision: {
-              docSessionId: `cloud:layer:${docId}:${layerName}`,
-              page: toPageRef(1),
-              generation: 10,
-            },
-          },
-        }),
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${docToken(tenantId, docId, layerName)}` },
       },
     );
     expect(res.status).toBe(200);
-    const body = (await res.json()) as {
-      meta: {
-        weakRefsInvalidated: boolean;
-        shouldRefetch: { reason: string } | null;
-        affectedPages: Array<{ revision: { docSessionId: string; generation: number } }>;
-      };
-    };
-    expect(body.meta.weakRefsInvalidated).toBe(true);
-    expect(body.meta.shouldRefetch).toEqual({ reason: 'weakRefsInvalidated' });
-    expect(body.meta.affectedPages[0]?.revision).toMatchObject({
-      docSessionId: `cloud:layer:${docId}:${layerName}`,
-      generation: 11,
-    });
+    const body = (await res.json()) as { meta: { affectedPages: Array<{ objectNumber: number }> } };
+    expect(body.meta.affectedPages).toEqual([toPageRef(1)]);
 
     const layer = await fx.db
       .selectFrom('layers')
@@ -342,163 +292,20 @@ describe('Phase 5 layer mutation pipeline', () => {
       .where('page_object_number', '=', 1)
       .executeTakeFirstOrThrow();
     expect(page.annotation_version).toBe(18);
-    expect(page.annotation_generation).toBe(11);
   });
 
-  test('weak page delete requires an active weak annotation session covering the page', async () => {
-    const tenantId = 'tenant-layer-weak-required';
-    const docId = 'doclayermut006';
-    const layerName = 'alice';
-    await seedDocument(fx, tenantId, docId, { pageCount: 1 });
-    await seedLayerPage(fx, {
-      tenantId,
-      docId,
-      layerName,
-      annotationVersion: 17,
-      annotationGeneration: 10,
-      hasWeakAnnotations: true,
-    });
-
-    const denied = await fetch(
-      `${fx.baseUrl}/v1/docs/${docId}/layers/${layerName}/annotations/pages/obj:1/items/index`,
-      {
-        method: 'PATCH',
-        headers: {
-          Authorization: `Bearer ${docToken(tenantId, docId, layerName)}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          op: 'delete',
-          ref: cloudIndexRef(docId, layerName, 1, 0, 10),
-        }),
-      },
-    );
-    expect(denied.status).toBe(409);
-
-    const session = await beginWeakAnnotationSession(fx, tenantId, docId, layerName, []);
-    const stillDenied = await fetch(
-      `${fx.baseUrl}/v1/docs/${docId}/layers/${layerName}/annotations/pages/obj:1/items/index`,
-      {
-        method: 'PATCH',
-        headers: {
-          Authorization: `Bearer ${docToken(tenantId, docId, layerName)}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          op: 'delete',
-          ref: cloudIndexRef(docId, layerName, 1, 0, 10),
-        }),
-      },
-    );
-    expect(stillDenied.status).toBe(409);
-
-    const update = await fetch(
-      `${fx.baseUrl}/v1/docs/${docId}/layers/${layerName}/weak-annotation-sessions/${session.sessionId}/pages`,
-      {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${docToken(tenantId, docId, layerName)}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ pages: [1].map(toPageRef) }),
-      },
-    );
-    expect(update.status).toBe(200);
-
-    const allowed = await fetch(
-      `${fx.baseUrl}/v1/docs/${docId}/layers/${layerName}/annotations/pages/obj:1/items/index`,
-      {
-        method: 'PATCH',
-        headers: {
-          Authorization: `Bearer ${docToken(tenantId, docId, layerName)}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          op: 'delete',
-          ref: cloudIndexRef(docId, layerName, 1, 0, 10),
-        }),
-      },
-    );
-    expect(allowed.status).toBe(200);
-  });
-
-  test('weak page structural edit is blocked when another distinct editor is active', async () => {
-    const tenantId = 'tenant-layer-weak-two-editors';
-    const docId = 'doclayermut007';
-    const layerName = 'alice';
-    await seedDocument(fx, tenantId, docId, { pageCount: 1 });
-    await seedLayerPage(fx, {
-      tenantId,
-      docId,
-      layerName,
-      annotationVersion: 17,
-      annotationGeneration: 10,
-      hasWeakAnnotations: true,
-    });
-    await beginWeakAnnotationSession(fx, tenantId, docId, layerName, [1], 'user-1');
-    await beginWeakAnnotationSession(fx, tenantId, docId, layerName, [1], 'user-2');
-
-    const res = await fetch(
-      `${fx.baseUrl}/v1/docs/${docId}/layers/${layerName}/annotations/pages/obj:1/items/index`,
-      {
-        method: 'PATCH',
-        headers: {
-          Authorization: `Bearer ${docToken(tenantId, docId, layerName, 'user-1')}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          op: 'delete',
-          ref: cloudIndexRef(docId, layerName, 1, 0, 10),
-        }),
-      },
-    );
-    expect(res.status).toBe(409);
-
-    const layer = await fx.db
-      .selectFrom('layers')
-      .selectAll()
-      .where('doc_id', '=', docId)
-      .where('name', '=', layerName)
-      .executeTakeFirstOrThrow();
-    expect(layer.current_version).toBe(1);
-  });
-
-  test('stale cloud index ref fails before saving a new artifact', async () => {
-    const tenantId = 'tenant-layer-stale';
+  test('an annotation key that names no annotation fails before saving a new artifact', async () => {
+    const tenantId = 'tenant-layer-badkey';
     const docId = 'doclayermut004';
     const layerName = 'alice';
     await seedDocument(fx, tenantId, docId, { pageCount: 1 });
-    await seedLayerPage(fx, {
-      tenantId,
-      docId,
-      layerName,
-      annotationVersion: 17,
-      annotationGeneration: 10,
-      hasWeakAnnotations: true,
-    });
-    await beginWeakAnnotationSession(fx, tenantId, docId, layerName, [1]);
+    await seedLayerPage(fx, { tenantId, docId, layerName, annotationVersion: 17 });
 
     const res = await fetch(
       `${fx.baseUrl}/v1/docs/${docId}/layers/${layerName}/annotations/pages/obj:1/items/index`,
       {
-        method: 'PATCH',
-        headers: {
-          Authorization: `Bearer ${docToken(tenantId, docId, layerName)}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          op: 'delete',
-          ref: {
-            kind: 'index',
-            page: toPageRef(1),
-            index: 0,
-            revision: {
-              docSessionId: `cloud:layer:${docId}:${layerName}`,
-              page: toPageRef(1),
-              generation: 9,
-            },
-          },
-        }),
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${docToken(tenantId, docId, layerName)}` },
       },
     );
     expect(res.status).toBe(400);
@@ -574,13 +381,12 @@ describe('Phase 5 layer mutation pipeline', () => {
     // artifact/layout, not the table). Assert the page set + pins survive.
     const pages = await fx.db
       .selectFrom('layer_pages')
-      .select(['page_object_number', 'annotation_version', 'annotation_generation'])
+      .select(['page_object_number', 'annotation_version'])
       .where('layer_id', '=', layer.id)
       .orderBy('page_object_number', 'asc')
       .execute();
     expect(pages.map((page) => Number(page.page_object_number))).toEqual([1, 2, 3]);
     expect(pages.map((page) => Number(page.annotation_version))).toEqual([1, 1, 1]);
-    expect(pages.map((page) => Number(page.annotation_generation))).toEqual([0, 0, 0]);
   });
 
   test('page rotate shares the move commit: versions bump, page rows stay warm', async () => {
@@ -647,7 +453,7 @@ describe('Phase 5 layer mutation pipeline', () => {
       .executeTakeFirstOrThrow();
     const pages = await fx.db
       .selectFrom('layer_pages')
-      .select(['page_object_number', 'annotation_version', 'annotation_generation'])
+      .select(['page_object_number', 'annotation_version'])
       .where('layer_id', '=', layer.id)
       .orderBy('page_object_number', 'asc')
       .execute();
@@ -655,7 +461,7 @@ describe('Phase 5 layer mutation pipeline', () => {
     expect(pages.map((page) => Number(page.annotation_version))).toEqual([1, 1, 1]);
   });
 
-  test('page delete removes the page, its row, and its weak-session claims', async () => {
+  test('page delete removes the page and its row', async () => {
     const tenantId = 'tenant-layer-pages';
     const docId = 'doclayermut007';
     const layerName = 'alice';
@@ -722,9 +528,8 @@ describe('Phase 5 layer mutation pipeline', () => {
 
   test('the audited payload is byte-identical to the HTTP response (event-stream invariant)', async () => {
     // What we tell the caller is what we tell history: the audit row must
-    // store the finalized result (cloud-stable revision tokens, real
-    // cacheDelta / coherence pins), never the worker's session-relative
-    // draft. A remote event subscriber replays exactly these payloads.
+    // store the finalized result (real cacheDelta / coherence pins), never
+    // the worker's session-relative draft. A remote event subscriber replays exactly these payloads.
     const tenantId = 'tenant-layer-pages';
     const docId = 'doclayermut009';
     const layerName = 'alice';
@@ -980,48 +785,6 @@ function docToken(tenantId: string, docId: string, layerName: string, sub = 'use
   });
 }
 
-async function beginWeakAnnotationSession(
-  fx: Fixture,
-  tenantId: string,
-  docId: string,
-  layerName: string,
-  pageObjectNumbers: number[],
-  sub = 'user-1',
-): Promise<{ sessionId: string; pages: Array<{ objectNumber: number }> }> {
-  const res = await fetch(
-    `${fx.baseUrl}/v1/docs/${docId}/layers/${layerName}/weak-annotation-sessions`,
-    {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${docToken(tenantId, docId, layerName, sub)}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ pages: pageObjectNumbers.map(toPageRef) }),
-    },
-  );
-  expect(res.status).toBe(200);
-  return (await res.json()) as { sessionId: string; pages: Array<{ objectNumber: number }> };
-}
-
-function cloudIndexRef(
-  docId: string,
-  layerName: string,
-  pageObjectNumber: number,
-  index: number,
-  generation: number,
-): unknown {
-  return {
-    kind: 'index',
-    page: toPageRef(pageObjectNumber),
-    index,
-    revision: {
-      docSessionId: `cloud:layer:${docId}:${layerName}`,
-      page: toPageRef(pageObjectNumber),
-      generation,
-    },
-  };
-}
-
 async function seedDocument(
   fx: Fixture,
   tenantId: string,
@@ -1067,8 +830,6 @@ async function seedLayerPage(
     docId: string;
     layerName: string;
     annotationVersion: number;
-    annotationGeneration: number;
-    hasWeakAnnotations: boolean;
   },
 ): Promise<void> {
   const storage = new FsObjectStore({ root: fx.storageRoot });
@@ -1102,8 +863,6 @@ async function seedLayerPage(
       page_object_number: 1,
       content_version: 1,
       annotation_version: input.annotationVersion,
-      annotation_generation: input.annotationGeneration,
-      has_weak_annotations: input.hasWeakAnnotations ? 1 : 0,
       updated_at: now,
     })
     .execute();

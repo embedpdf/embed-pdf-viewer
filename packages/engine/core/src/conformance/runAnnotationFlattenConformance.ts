@@ -70,7 +70,7 @@ export function runAnnotationFlattenConformance(
         expect(result.page.objectNumber).toBe(pageObjectNumber);
         expect(result.usage).toBe('display');
         expect(result.results.map((item) => item.status)).toEqual(['applied', 'unchanged']);
-        expect(result.meta.affectedPages.map((state) => state.page)).toEqual([page.ref]);
+        expect(result.meta.affectedPages).toEqual([page.ref]);
         expect(events).toHaveLength(1);
 
         // Layout untouched; `a` gone, `b` and `c` still there.
@@ -80,7 +80,6 @@ export function runAnnotationFlattenConformance(
         expect(after.annotations.some((dto) => sameRef(dto.ref, b))).toBe(true);
         expect(after.annotations.some((dto) => sameRef(dto.ref, c))).toBe(true);
         expect(after.annotations.some((dto) => sameRef(dto.ref, a))).toBe(false);
-        expect(after.pages[0].revision.generation > before.pages[0].revision.generation).toBe(true);
       } finally {
         await doc.close();
       }

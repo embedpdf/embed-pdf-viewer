@@ -78,7 +78,7 @@ Feature behavior belongs in `features/`, not in worker adapters.
 - Every job whose effect is `write` or `contentWrite` runs as one layer transaction, begun and ended
   in `WorkerHost.run` (a signing's `signatures.complete` is the exception: it replaces the
   document's bytes instead). The transaction commits in `finishMutation`, before the layer is saved; any throw before
-  that aborts it, and the document, the page revisions and the derived caches are as they were. A
+  that aborts it, and the document and the derived caches are as they were. A
   writer never begins, commits or rolls back on its own.
 - A commit or an abort that fails leaves the session unusable: every later job is refused with
   `DocNotOpen`, and the document has to be opened again.
@@ -92,9 +92,10 @@ Feature behavior belongs in `features/`, not in worker adapters.
 - A write that moves entries of a page's `/Annots` (a delete, a reorder, a flatten, a redaction, a
   merged field's split) calls `promoteInlineAnnotations` first, before it loads the page: an inline
   annotation is named by its position only while no entry has moved.
-- Ordered batch verbs (redaction apply, page flatten) report per-item outcomes instead of throwing
-  once a write may have occurred: the current item `failed`, the rest `skipped`. The transaction
-  commits what the result reports.
+- A batch is all or nothing too: redaction apply and page flatten throw when a page fails or the
+  call is cancelled, and their per-page results only say `applied` or `unchanged`.
+  `forms.applyEffects` is the exception: it still reports a failed effect and skips the rest, and
+  the transaction commits what its result reports.
 - Writes bump `cacheSeq` (derived caches) as they go; `finishMutation` bumps `editsSeq` (unsaved
   edits, the signing version) once per committed write.
 

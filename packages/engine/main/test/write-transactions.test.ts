@@ -31,15 +31,20 @@ import { InlineTransport } from '../src/transport/InlineTransport';
 const here = dirname(fileURLToPath(import.meta.url));
 const fixture = (name: string) => readFile(resolve(here, 'fixtures', name));
 
-/** The runtime, with one native call made to throw once when armed. */
+/** The runtime, with one native call made to throw once when armed, after `skip` calls go through. */
 function failing(runtime: PdfRuntimeModule) {
   let armed: string | null = null;
+  let skip = 0;
   let fired = false;
   const fn = new Proxy(runtime.fn, {
     get(target, name, receiver) {
       const original = Reflect.get(target, name, receiver) as unknown;
       if (name !== armed || typeof original !== 'function') return original;
-      return () => {
+      return (...args: unknown[]) => {
+        if (skip > 0) {
+          skip--;
+          return (original as (...a: unknown[]) => unknown)(...args);
+        }
         armed = null;
         fired = true;
         throw new Error(`forced failure in ${String(name)}`);
@@ -48,8 +53,9 @@ function failing(runtime: PdfRuntimeModule) {
   });
   return {
     runtime: Object.create(runtime, { fn: { value: fn } }) as PdfRuntimeModule,
-    arm(name: string) {
+    arm(name: string, calls = 0) {
       armed = name;
+      skip = calls;
       fired = false;
     },
     fired: () => fired,
@@ -291,6 +297,43 @@ describe.each(['wasm', 'native'] as const)(
           (error: unknown) => error,
         );
         expect(EngineError.is(after, EngineErrorCode.DocNotOpen)).toBe(true);
+      } finally {
+        await engine.destroy();
+      }
+    });
+
+    test('a batch that fails on a later page leaves the earlier pages as they were', async () => {
+      const { fault, engine, doc, firstPage } = await open();
+      try {
+        const { layout } = await doc.pages.insertBlank({ size: { width: 200, height: 200 } });
+        const secondPage = layout.pages.at(-1)!.ref;
+        const marks = async () => {
+          for (const page of [firstPage, secondPage]) {
+            await doc.page(page).annotations.create({ subtype: 'square', box: rect(20) });
+            await doc.page(page).annotations.create({ subtype: 'redact', rect: rect(80) });
+          }
+        };
+        await marks();
+        const state = async () => comparable(await doc.download({ mode: 'incremental' }));
+        const before = await state();
+        const batches = [
+          {
+            native: 'EPDFPage_Flatten',
+            write: () => doc.pages.flatten([firstPage, secondPage], { usage: 'display' }),
+          },
+          {
+            native: 'EPDFPage_ApplyRedactions',
+            write: () => doc.redaction.apply({ pages: [firstPage, secondPage] }),
+          },
+        ];
+        for (const { native, write } of batches) {
+          fault.arm(native, 1);
+          await expect(write()).rejects.toBeInstanceOf(Error);
+          expect(fault.fired()).toBe(true);
+          expect(await state()).toBe(before);
+        }
+        const flattened = await doc.pages.flatten([firstPage, secondPage], { usage: 'display' });
+        expect(flattened.results.map((result) => result.status)).toEqual(['applied', 'applied']);
       } finally {
         await engine.destroy();
       }

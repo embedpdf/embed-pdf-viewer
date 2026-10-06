@@ -1,20 +1,15 @@
 import {
   EngineError,
   EngineErrorCode,
-  knownWeakAnnotationState,
   isValidPageObjectNumber,
-  toPageRef,
 } from '@embedpdf/engine-core/runtime';
 import type {
   DocumentVersionRef,
   PageObjectNumber,
-  PageState,
-  RevisionToken,
   SignatureCompleteResult,
   PdfCoordinates,
   SignaturePrepared,
   SignedDocumentPolicy,
-  WeakAnnotationState,
 } from '@embedpdf/engine-core/runtime';
 import type { PageRef } from '@embedpdf/engine-core/runtime';
 import type { PdfRuntimeModule, Ptr } from '@embedpdf/engine-runtime';
@@ -29,13 +24,11 @@ import {
 import { PagePtrPool } from './pages/PagePtrPool';
 import type { PageRecord } from './pages/PageRecord';
 import type { PageResidency } from './pages/PageResidency';
-import { LocalRevisionAuthority, type RevisionAuthority } from './revisions/RevisionAuthority';
 
 /**
  * Owns the lifecycle of a single open PDFium document and the
- * identity machinery: page registry (pageObjectNumber <-> pageIndex),
- * `RevisionAuthority` (per-page generation counters), and `PagePtrPool`
- * (refcounted pagePtr access).
+ * identity machinery: page registry (pageObjectNumber <-> pageIndex) and
+ * `PagePtrPool` (refcounted pagePtr access).
  *
  * Both the local browser Worker and the server worker_thread instantiate
  * this exactly the same way; the only thing that differs is the
@@ -84,7 +77,6 @@ export class DocumentSession {
   private readonly recordsByIndex = new Map<number, PageRecord>();
   private fullyEnumerated = false;
 
-  private revisions: RevisionAuthority | null = null;
   /** Bumped by {@link invalidateDerived}: the version caches built from the document key on. */
   private cacheSeqCounter = 0;
   /** Bumped by {@link noteEdit}: one per committed write, never inside or for an abort. */
@@ -169,7 +161,6 @@ export class DocumentSession {
     this.closeDocument = () => handle.close();
     this._kind = handle.kind;
     this._source = handle.source;
-    this.revisions = new LocalRevisionAuthority(this._sessionId);
     this.pages = new PagePtrPool(this.runtime, handle.docPtr, this.residency);
     this.parkedLoad = null;
     this.drawings = null;
@@ -202,7 +193,7 @@ export class DocumentSession {
    * installs its sealed file. The session id, its page object numbers
    * (an incremental save never renumbers) and its retained resources
    * survive; the old document is closed, every page is re-pinned (its
-   * revision bumped, its cached pointer dropped), and both sequences
+   * cached pointer dropped), and both sequences
    * advance, so every version-keyed cache rebuilds and the new bytes count as
    * loaded.
    */
@@ -211,7 +202,6 @@ export class DocumentSession {
       handle.close();
       throw new EngineError(EngineErrorCode.DocNotOpen, 'no document to replace');
     }
-    const previousPages = Array.from(this.recordsByObjectNumber.keys());
     let firstError: unknown = null;
     try {
       this.pages?.closeAll();
@@ -231,7 +221,6 @@ export class DocumentSession {
     this.recordsByIndex.clear();
     this.recordsByObjectNumber.clear();
     this.fullyEnumerated = false;
-    for (const pageObjectNumber of previousPages) this.requireRevisions().bump(pageObjectNumber);
     this.cacheSeqCounter++;
     this.editsSeqCounter++;
     this.loadedSeq = this.editsSeqCounter;
@@ -302,8 +291,7 @@ export class DocumentSession {
         // page dicts from broken generators, but the engine's
         // identity model requires a real indirect object number,
         // so we refuse the document here with a clear, actionable
-        // error rather than silently routing through a weak
-        // identity path.
+        // error.
         throw new EngineError(
           EngineErrorCode.MalformedPdf,
           `page at index ${i} is a direct (non-indirect) PDF object; the engine requires every page to have a stable indirect object number`,
@@ -361,46 +349,13 @@ export class DocumentSession {
   /**
    * Drop the cached `pageIndex <-> pageObjectNumber` mapping and force a
    * fresh enumeration on next access. Called by `PagesMutator`
-   * after `FPDF_MovePages` shuffles page positions; we keep
-   * weak-annotation knowledge and per-page revision counters intact, both of
-   * which are keyed by durable `pageObjectNumber` and survive a page reorder.
+   * after `FPDF_MovePages` shuffles page positions.
    */
   refreshPageRegistry(): void {
     this.recordsByIndex.clear();
     this.recordsByObjectNumber.clear();
     this.fullyEnumerated = false;
     this.ensureFullPageRegistry();
-  }
-
-  /** Per-page liveness envelope used by annotation read/mutation results. */
-  pageState(pageObjectNumber: PageObjectNumber): PageState {
-    // Validate the page exists (throws NotFound for bad pons); liveness is
-    // keyed by pon and carries no display order — that lives in PageLayout.
-    this.recordByObjectNumber(pageObjectNumber);
-    const weakAnnotationState = this.requireRevisions().weakAnnotationState(pageObjectNumber);
-    return {
-      page: toPageRef(pageObjectNumber),
-      revision: this.requireRevisions().token(pageObjectNumber),
-      weakAnnotationState,
-    };
-  }
-
-  /** Set by readers as they discover whether a page has weak annotations. */
-  recordWeakFlag(pageObjectNumber: PageObjectNumber, hasWeak: boolean): void {
-    this.recordWeakAnnotationState(pageObjectNumber, knownWeakAnnotationState(hasWeak));
-  }
-
-  recordWeakAnnotationState(pageObjectNumber: PageObjectNumber, state: WeakAnnotationState): void {
-    this.requireRevisions().recordWeakAnnotationState(pageObjectNumber, state);
-  }
-
-  weakAnnotationState(pageObjectNumber: PageObjectNumber): WeakAnnotationState {
-    return this.requireRevisions().weakAnnotationState(pageObjectNumber);
-  }
-
-  /** Bump and return the new revision token; called by mutation paths. */
-  bumpRevision(pageObjectNumber: PageObjectNumber): RevisionToken {
-    return this.requireRevisions().bump(pageObjectNumber);
   }
 
   /**
@@ -446,8 +401,8 @@ export class DocumentSession {
   /**
    * Open a layer transaction: until {@link commitTransaction} or
    * {@link abortTransaction}, every write lands in an overlay that only a
-   * commit keeps, and every read sees it. The page revisions this session
-   * bumps follow it. Only a layer document has transactions.
+   * commit keeps, and every read sees it. Only a layer document has
+   * transactions.
    */
   beginTransaction(): void {
     const docPtr = this.requireDocPtr();
@@ -457,7 +412,6 @@ export class DocumentSession {
     if (!this.runtime.fn.EPDFLayer_BeginTransaction(docPtr)) {
       throw new EngineError(EngineErrorCode.Unknown, 'EPDFLayer_BeginTransaction refused');
     }
-    this.requireRevisions().begin();
     this.transaction = { docPtr };
   }
 
@@ -480,7 +434,6 @@ export class DocumentSession {
       if (!committed) this.unusableReason = COMMIT_FAILED;
     }
     if (!committed) throw new EngineError(EngineErrorCode.DocNotOpen, COMMIT_FAILED);
-    this.requireRevisions().commit();
   }
 
   /**
@@ -497,7 +450,6 @@ export class DocumentSession {
     } catch {
       // Reported below: the session can't say what the document holds.
     }
-    this.revisions?.abort();
     // Object numbers the transaction used now resolve to nothing, and its
     // page edits are gone: the drawings and page registry read them again.
     this.drawings?.forget();
@@ -526,19 +478,6 @@ export class DocumentSession {
       throw new EngineError(EngineErrorCode.Unknown, 'no transaction is open');
     }
     return this.transaction;
-  }
-
-  /**
-   * Forget a page's per-session state (revision generation + weak-annotation
-   * flag). Called by `pages.delete` after the page object is retired; the
-   * page object number is never recycled, so this is hygiene, not correctness.
-   */
-  dropPageState(pageObjectNumber: PageObjectNumber): void {
-    this.requireRevisions().drop(pageObjectNumber);
-  }
-
-  validateRevision(token: RevisionToken): void {
-    this.requireRevisions().validate(token);
   }
 
   pagePool(): PagePtrPool {
@@ -611,8 +550,6 @@ export class DocumentSession {
       this.lastCompletion = null;
       this.drawings = null;
       this.transaction = null;
-      this.revisions?.clear();
-      this.revisions = null;
       this.recordsByIndex.clear();
       this.recordsByObjectNumber.clear();
       this.fullyEnumerated = false;
@@ -631,22 +568,13 @@ export class DocumentSession {
 
     if (firstError) throw firstError;
   }
-
-  private requireRevisions(): RevisionAuthority {
-    if (!this.revisions) {
-      throw new EngineError(EngineErrorCode.DocNotOpen, 'document is not open');
-    }
-    return this.revisions;
-  }
 }
 
 const COMMIT_FAILED = 'a layer transaction failed to commit';
 
-// Monotonic per-realm counter: the docSessionId exists only for the local
-// bleed-over check (a revision token minted by one session must not validate
-// against another), so uniqueness is the whole requirement — a counter makes
-// collisions structurally impossible within a realm, and the timestamp
-// distinguishes ids across realm restarts. Deliberately not random: there is
+// Monotonic per-realm counter: a session id only has to be unique, so a
+// counter makes collisions structurally impossible within a realm, and the
+// timestamp distinguishes ids across realm restarts. Deliberately not random: there is
 // no adversary to hide the id from (anyone in-process can call the engine
 // directly), and pulling in crypto would add runtime constraints for nothing.
 let sessionCounter = 0;

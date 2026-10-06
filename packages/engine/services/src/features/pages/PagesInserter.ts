@@ -11,6 +11,7 @@ import { NULL_PTR } from '@embedpdf/engine-runtime';
 import type { PdfRuntimeModule, Ptr } from '@embedpdf/engine-runtime';
 
 import { PagesReader } from './PagesReader';
+import { promoteInlineAnnotations } from '../annotations/internal/write/promoteInlineAnnotations';
 import type { DocumentSession } from '../../document-session/DocumentSession';
 import { loadFailure } from '../../runtime/loadError';
 import { throwIfAborted } from '../../shared/abort';
@@ -96,14 +97,18 @@ export class PagesInserter {
       throw error;
     }
 
-    // Page count and order changed; rebuild the index<->pon map. Existing
-    // pages' revisions and weak-flag bookkeeping stay put (keyed by pon).
+    // Page count and order changed; rebuild the index<->pon map.
     this.session.refreshPageRegistry();
 
     const layout = new PagesReader(this.runtime, this.session).read(signal);
     const insertedPages: PageRef[] = layout.pages
       .slice(at, at + insertedCount)
       .map((page) => page.ref);
+    // An inserted page is born in this document, not in its file, so its
+    // inline annotations are born as objects here, named by their numbers.
+    for (const page of insertedPages) {
+      promoteInlineAnnotations(this.runtime, this.session, page.objectNumber);
+    }
     return { insertedPages, layout, meta: { affectedPages: [], cacheDelta: null } };
   }
 

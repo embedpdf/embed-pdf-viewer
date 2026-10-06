@@ -55,7 +55,7 @@ runAnnotationMutationConformance(runner, {
     bytes: async () => new Uint8Array(),
     expected: { trapped: 'unknown' },
     pageObjectNumber: 3,
-    expectsWeakAnnotation: true,
+    expectsInlineAnnotation: true,
   },
   makeEngine: () => {
     if (!fx) throw new Error('fixture not initialised');

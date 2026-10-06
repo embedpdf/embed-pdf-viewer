@@ -2,7 +2,7 @@ import type { Annotation } from '../annotation/kinds';
 import type { PdfCoordinates } from '../pageSpace/coordinates';
 import { EngineError } from '../errors/EngineError';
 import { EngineErrorCode } from '../errors/EngineErrorCode';
-import { annotationKey, annotationKeysOf } from '../identity/annotationKey';
+import { annotationKey } from '../identity/annotationKey';
 import type { AnnotationRef } from '../identity/AnnotationRef';
 import { encodePageKey, type PageRef } from '../identity/PageRef';
 
@@ -48,9 +48,7 @@ export function closeExportSelection<A extends Annotation | Annotation<PdfCoordi
     if (read.has(pageKey) || !inDocument.has(pageKey)) return;
     const annotations = readPage(page);
     read.set(pageKey, annotations);
-    for (const annotation of annotations) {
-      for (const key of annotationKeysOf(annotation)) byKey.set(key, annotation);
-    }
+    for (const annotation of annotations) byKey.set(annotationKey(annotation.ref), annotation);
   };
   const find = (ref: AnnotationRef): A | undefined => {
     readOnce(ref.page);

@@ -10,7 +10,7 @@ import type { PageHandle } from '../engine/PageHandle';
 import { pdfRectTurnedBounds } from '../geometry/convert';
 import type { PageBox } from '../geometry/pageSpace';
 import type { PdfRect } from '../geometry/primitives';
-import { annotationKey, annotationKeysOf } from '../identity/annotationKey';
+import { annotationKey } from '../identity/annotationKey';
 import type { AnnotationRef } from '../identity/AnnotationRef';
 import { encodePageKey, toPageRef, type PageRef } from '../identity/PageRef';
 import type { AnnotationBundle } from '../transfer/AnnotationBundle';
@@ -92,22 +92,15 @@ export function runAnnotationTransferConformance(
       const pages = (await doc.pages.list()).pages.map((entry) =>
         toPageRef(entry.ref.objectNumber),
       );
-      const session = await doc.annotations.beginEdit(pages);
-      try {
-        for (const pageRef of pages) {
-          for (;;) {
-            const { annotations } = await doc.annotations.list({ pages: [pageRef] });
-            const last = [...annotations]
-              .reverse()
-              .find((annotation) => !isFieldWidget(annotation));
-            if (!last) break;
-            await doc.page(pageRef).annotations.delete(last.ref);
-          }
+      for (const pageRef of pages) {
+        for (;;) {
           const { annotations } = await doc.annotations.list({ pages: [pageRef] });
-          for (const annotation of annotations) kept.add(annotationKey(annotation.ref));
+          const last = [...annotations].reverse().find((annotation) => !isFieldWidget(annotation));
+          if (!last) break;
+          await doc.page(pageRef).annotations.delete(last.ref);
         }
-      } finally {
-        await session.close();
+        const { annotations } = await doc.annotations.list({ pages: [pageRef] });
+        for (const annotation of annotations) kept.add(annotationKey(annotation.ref));
       }
       return { doc, kept };
     };
@@ -339,7 +332,7 @@ function asTaken(bundle: AnnotationBundle, dropped: readonly AnnotationImportDro
 /**
  * What two documents can agree on after import. Refs to
  * annotations become positions in the bundle, pages their position in the
- * source document; `index`, `importedBy`, `identityQuality` and
+ * source document; `index`, `importedBy` and
  * `hasAppearance` (how the source stored it: an import draws its copies from
  * data) and a file's size and checksum (the bytes', which are compared by
  * their id) go, and in `stamp` mode the attribution it stamps.
@@ -363,7 +356,8 @@ function turnOf(data: Annotation): { rotation: number; box: PageBox } | null {
 function normalized(bundle: AnnotationBundle, attribution: Attribution) {
   const position = new Map<string, number>();
   bundle.items.forEach(({ data }, at) => {
-    for (const key of annotationKeysOf(data)) if (!position.has(key)) position.set(key, at);
+    const key = annotationKey(data.ref);
+    if (!position.has(key)) position.set(key, at);
   });
   const at = (ref: AnnotationRef | null | undefined) =>
     ref ? (position.get(annotationKey(ref)) ?? null) : null;
@@ -389,7 +383,6 @@ function normalized(bundle: AnnotationBundle, attribution: Attribution) {
         ref,
         index: _index,
         importedBy: _importedBy,
-        identityQuality: _identityQuality,
         hasAppearance: _hasAppearance,
         popup,
         reply,

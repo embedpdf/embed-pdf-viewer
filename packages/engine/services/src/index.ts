@@ -39,10 +39,6 @@ export {
   type OpenedPdfDocument,
   type OpenedPdfDocumentKind,
 } from './document-session/lifecycle/PdfDocumentOpener';
-export {
-  LocalRevisionAuthority,
-  type RevisionAuthority,
-} from './document-session/revisions/RevisionAuthority';
 export { PagePtrPool } from './document-session/pages/PagePtrPool';
 export type { PageRecord } from './document-session/pages/PageRecord';
 

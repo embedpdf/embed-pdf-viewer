@@ -95,7 +95,6 @@ function annotation(index: number) {
     },
     page: toPageRef(PAGE_OBJECT_NUMBER),
     index,
-    identityQuality: 'durable',
     hasAppearance: true,
     nm: `stub-${index}`,
     invisible: false,
@@ -125,18 +124,6 @@ function annotation(index: number) {
     actions: null,
     rawSubtypeCode: 0,
     rawSubtypeName: null,
-  };
-}
-
-function pageState(generation = 0) {
-  return {
-    page: toPageRef(PAGE_OBJECT_NUMBER),
-    revision: {
-      docSessionId: 'stub-session',
-      page: toPageRef(PAGE_OBJECT_NUMBER),
-      generation,
-    },
-    weakAnnotationState: { kind: 'known', hasAnyWeakAnnotations: false },
   };
 }
 
@@ -244,7 +231,7 @@ function buildStub(initial: ServerState): StubbedFixture {
           protection: null,
           pages: [
             {
-              state: pageState(),
+              page: toPageRef(PAGE_OBJECT_NUMBER),
               cache: {
                 contentVersion: state.pageContentVersion,
                 annotationVersion: state.pageAnnotationVersion,
@@ -336,7 +323,6 @@ function buildStub(initial: ServerState): StubbedFixture {
       }
       return new Response(
         JSON.stringify({
-          pageState: pageState(),
           text: state.text,
           charCount: state.text.length,
         }),
@@ -367,7 +353,7 @@ function buildStub(initial: ServerState): StubbedFixture {
           annotations: Array.from({ length: state.annotationCount }, (_, index) =>
             annotation(index),
           ),
-          pages: [pageState()],
+          pages: [toPageRef(PAGE_OBJECT_NUMBER)],
         }),
         { status: 200, headers: { 'content-type': 'application/json' } },
       );
@@ -406,10 +392,8 @@ function buildStub(initial: ServerState): StubbedFixture {
                 },
               ],
             },
-            affectedPages: [pageState()],
-            changed: [{ kind: 'objectNumber', objectNumber: created.ref.objectNumber }],
-            weakRefsInvalidated: false,
-            shouldRefetch: null,
+            affectedPages: [toPageRef(PAGE_OBJECT_NUMBER)],
+            changed: [created.ref],
           },
         }),
         { status: 200, headers: { 'content-type': 'application/json' } },
@@ -810,7 +794,7 @@ describe('CloudPageTextService — end-to-end transparent retry', () => {
       await page.annotations.list();
 
       doc.absorbMutation({
-        affectedPages: [pageState()],
+        affectedPages: [toPageRef(PAGE_OBJECT_NUMBER)],
         cacheDelta: {
           previousDocVersion: 2,
           docVersion: 3,
@@ -906,11 +890,7 @@ describe('CloudEngine schema parity — DocumentHeadSchema / DocumentManifestSch
       protection: null,
       pages: [
         {
-          state: {
-            page: toPageRef(5),
-            revision: { docSessionId: 's', page: toPageRef(5), generation: 0 },
-            weakAnnotationState: { kind: 'known', hasAnyWeakAnnotations: false },
-          },
+          page: toPageRef(5),
           cache: {
             contentVersion: 1,
             annotationVersion: 1,

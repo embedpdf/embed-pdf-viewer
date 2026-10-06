@@ -132,7 +132,6 @@ describe('appearanceImpactOf — value diffing (inert)', () => {
       subtype: 'square',
       page: { kind: 'objectNumber', objectNumber: 3 },
       index: 7,
-      identityQuality: 'durable',
       hasAppearance: true,
       author: 'Someone else',
       modifiedAt: '2026-01-01T00:00:00Z',

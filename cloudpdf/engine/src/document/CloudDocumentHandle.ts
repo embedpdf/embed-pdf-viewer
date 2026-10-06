@@ -82,9 +82,6 @@ export interface ManifestAccessor {
 
 export class CloudDocumentHandle implements DocumentHandle {
   readonly id: string;
-  readonly capabilities = {
-    weakAnnotationEditSessions: 'required',
-  } as const;
   readonly metadata: CloudMetadataService;
   readonly annotations: DocumentAnnotationsService;
   readonly actions: DocumentActionsService;
@@ -422,17 +419,8 @@ export class CloudDocumentHandle implements DocumentHandle {
     }
 
     const byPageObjectNumber = new Map(
-      this.manifestCache.pages.map((page) => [page.state.page.objectNumber, page]),
+      this.manifestCache.pages.map((page) => [page.page.objectNumber, page]),
     );
-    for (const pageState of meta.affectedPages) {
-      const existing = byPageObjectNumber.get(pageState.page.objectNumber);
-      if (existing) {
-        byPageObjectNumber.set(pageState.page.objectNumber, {
-          ...existing,
-          state: pageState,
-        });
-      }
-    }
     if (delta) {
       for (const page of delta.pages) {
         const existing = byPageObjectNumber.get(page.page.objectNumber);
@@ -469,7 +457,7 @@ export class CloudDocumentHandle implements DocumentHandle {
       // (/layout). Keep a deterministic order by page object number so cache merges are
       // stable; display order is the SDK's concern via PageLayout.index.
       pages: Array.from(byPageObjectNumber.values()).sort(
-        (a, b) => a.state.page.objectNumber - b.state.page.objectNumber,
+        (a, b) => a.page.objectNumber - b.page.objectNumber,
       ),
     };
   }
@@ -488,7 +476,7 @@ export class CloudDocumentHandle implements DocumentHandle {
     const deleted = new Set(deletedPages.map((page) => page.objectNumber));
     this.manifestCache = {
       ...this.manifestCache,
-      pages: this.manifestCache.pages.filter((page) => !deleted.has(page.state.page.objectNumber)),
+      pages: this.manifestCache.pages.filter((page) => !deleted.has(page.page.objectNumber)),
     };
   }
 

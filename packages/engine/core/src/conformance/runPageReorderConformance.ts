@@ -3,12 +3,11 @@ import type {
   ConformanceFixture,
   ConformanceOptions,
 } from './runMetadataConformance';
-import type { AnnotationPatch, HighlightDraft } from '../annotation/kinds';
 import type { DocumentHandle } from '../engine/DocumentHandle';
 import type { Engine } from '../engine/Engine';
 import { EngineError } from '../errors/EngineError';
 import { EngineErrorCode } from '../errors/EngineErrorCode';
-import type { AnnotationRef } from '../identity/AnnotationRef';
+import { annotationKey } from '../identity/annotationKey';
 import { toPageRef } from '../identity/PageRef';
 import { AbortError } from '../promise/AbortError';
 import { PageListSnapshotSchema, PageMoveResultSchema } from '../wire/schemas';
@@ -25,31 +24,11 @@ export interface PageReorderConformanceFixture extends ConformanceFixture {
    *  order; the suite reads `pages.list()` first and works in document
    *  order. */
   pageObjectNumbersForReorderTest?: number[];
-  /**
-   * Page used for the weak-ref-survival assertion. Defaults to the
-   * first page object number in `ponsForReorderTest`. The fixture page must already
-   * have at least one weak annotation (no /NM, direct object) so the
-   * harness can capture an `index`-kind ref before the page move and
-   * re-use it after.
-   */
-  weakRefHostPageObjectNumber?: number;
-  /** Quad to use for the `create()` step that produces a stable ref
-   *  the suite uses. */
-  createQuad?: HighlightDraft['quadPoints'];
 }
 
 export interface PageReorderConformanceOptions extends Omit<ConformanceOptions, 'fixture'> {
   fixture: PageReorderConformanceFixture;
 }
-
-const DEFAULT_QUAD: HighlightDraft['quadPoints'] = [
-  {
-    upperLeft: { x: 50, y: 100 },
-    upperRight: { x: 150, y: 100 },
-    lowerLeft: { x: 50, y: 80 },
-    lowerRight: { x: 150, y: 80 },
-  },
-];
 
 /**
  * Page reorder conformance suite. Verifies the architectural invariants
@@ -61,11 +40,9 @@ const DEFAULT_QUAD: HighlightDraft['quadPoints'] = [
  *   2. `pages.move()` returns the full new order + geometry via
  *      `result.layout` (the same shape `pages.list()` returns). There is
  *      no document-level revision; the wire never asks the caller for one.
- *   3. Index-based annotation refs survive a page reorder. This is the
- *      whole reason per-page revisions stay put across a move: a user
- *      shuffling pages mid-edit must not lose a pending highlight. (The
- *      "move never bumps a RevisionToken" invariant is asserted directly
- *      in the annotation mutation suite, where revision liveness lives.)
+ *   3. Annotation names survive a page reorder: a user shuffling pages
+ *      mid-edit must not lose a pending highlight, so a `baseIndex` ref
+ *      captured before the move works after it.
  *   4. Invalid inputs (duplicate page object numbers, unknown page object numbers, out-of-range
  *      `toIndex`) reject with `InvalidArg`.
  *   5. Abort propagates as `AbortError`.
@@ -79,7 +56,6 @@ export function runPageReorderConformance(
 ): void {
   const { describe, test, beforeAll, afterAll, expect } = runner;
   const fix = opts.fixture;
-  const quad = fix.createQuad ?? DEFAULT_QUAD;
 
   describe(`page reorder conformance: ${opts.label}`, () => {
     let engine: Engine;
@@ -160,73 +136,23 @@ export function runPageReorderConformance(
       }
     });
 
-    test('weak index-based annotation refs survive a page reorder', async () => {
+    test('an annotation born inline keeps its baseIndex name across a page reorder', async () => {
       const doc = await openFixture(engine, opts);
       try {
         const list = await doc.pages.list();
-        if (list.pages.length < 2) return;
-
-        // Pick a host page and create a fresh annotation we can address
-        // by index after the move. The created annotation is durable
-        // (so we use its index ref via FPDFPage_GetAnnot, which yields
-        // a working index-style ref bound to the current revision).
-        const hostPageObjectNumber =
-          fix.weakRefHostPageObjectNumber ?? list.pages[0].ref.objectNumber;
-        const hostPage = doc.page(toPageRef(hostPageObjectNumber));
-        const beforePageList = await hostPage.annotations.list();
-
-        const draft: HighlightDraft = {
-          subtype: 'highlight',
-          contents: 'page-reorder survives this',
-          quadPoints: quad,
-        };
-        const created = await hostPage.annotations.create(draft);
-
-        // Capture the *post-create* page state. Neither create
-        // (append-only, non-invalidating) nor pages.move bumps the
-        // host page's revision, so the revision we capture here is
-        // the same one a fresh `list()` would return after the move.
-        // We bind the index ref to that revision and use it as a
-        // weak ref across the page reorder.
-        const afterCreate = await hostPage.annotations.list();
-        const targetIndex = afterCreate.annotations.findIndex(
-          (a) =>
-            a.ref.kind === 'objectNumber' &&
-            created.annotation.ref.kind === 'objectNumber' &&
-            a.ref.objectNumber === created.annotation.ref.objectNumber,
+        const inline = (await doc.annotations.list()).annotations.find(
+          (a) => a.ref.kind === 'baseIndex',
         );
-        expect(targetIndex >= 0).toBe(true);
+        const other = list.pages.find((p) => p.ref.objectNumber !== inline?.page.objectNumber);
+        if (!inline || !other) return;
 
-        const indexRef: AnnotationRef = {
-          kind: 'index',
-          page: toPageRef(hostPageObjectNumber),
-          index: targetIndex,
-          revision: afterCreate.pages[0].revision,
-        };
+        await doc.pages.move([other.ref], 0);
 
-        // Move some other page (not the host page) to the front. The
-        // host page's revision must stay put.
-        const otherPageObjectNumber = list.pages.find(
-          (p) => p.ref.objectNumber !== hostPageObjectNumber,
-        )?.ref.objectNumber;
-        if (otherPageObjectNumber === undefined) return;
-        await doc.pages.move([toPageRef(otherPageObjectNumber)], 0);
-
-        // Use the captured weak-style ref to update the annotation.
-        // This is the locked invariant: per-page RevisionToken survives
-        // a page reorder, so an index ref captured before the move
-        // remains valid after.
-        const patch: AnnotationPatch = {
-          subtype: 'highlight',
+        const update = await doc.page(inline.page).annotations.update(inline.ref, {
           contents: 'still alive',
-        };
-        const update = await hostPage.annotations.update(indexRef, patch);
+        });
         expect(update.annotation.contents).toBe('still alive');
-
-        // Also: the annotation index inside the host page is unchanged
-        // (the host page's /Annots array was never touched).
-        const afterMove = await hostPage.annotations.list();
-        expect(afterMove.annotations.length).toBe(beforePageList.annotations.length + 1);
+        expect(annotationKey(update.annotation.ref)).toBe(annotationKey(inline.ref));
       } finally {
         await doc.close();
       }

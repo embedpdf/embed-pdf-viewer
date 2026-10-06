@@ -12,7 +12,7 @@ import type { ConformanceOptions, ConformanceTestRunner } from './runMetadataCon
  * Runs against a fixture page with no pre-existing annotations so the
  * collateral counts are exact. Content-removal fidelity itself is pinned by
  * the native embeddertests; this suite pins the transport contract: scopes,
- * statuses, counts, revision bumps, events, and preflight rejection.
+ * statuses, counts, affected pages, events, and preflight rejection.
  */
 export function runRedactionApplyConformance(
   runner: ConformanceTestRunner,
@@ -87,15 +87,14 @@ export function runRedactionApplyConformance(
         // The highlight and the mark's popup count: the consumed redact never does.
         expect(result.results[0].removedAnnotationCount).toBe(2);
         expect(result.removedAnnotationCount).toBe(2);
-        expect(result.meta.affectedPages.map((state) => state.page)).toEqual([page.ref]);
+        expect(result.meta.affectedPages).toEqual([page.ref]);
         expect(events).toHaveLength(1);
         unsubscribe();
 
         // The redaction, its popup and its collateral are gone; layout is
-        // not a casualty; the page revision advanced (weak refs invalidated).
+        // not a casualty.
         const after = await page.annotations.list();
         expect(after.annotations.length).toBe(before.annotations.length - 3);
-        expect(after.pages[0].revision.generation > before.pages[0].revision.generation).toBe(true);
         expect(await doc.pages.list()).toEqual(layoutBefore);
         // The label is part of the page now.
         expect((await page.text.get()).text).toContain('REDACTED');

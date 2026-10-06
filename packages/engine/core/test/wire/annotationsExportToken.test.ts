@@ -33,9 +33,9 @@ describe('the annotation export token', () => {
     expect(one).toBe(other);
   });
 
-  test('round-trips pins, pages, refs by number and name, and include', () => {
+  test('round-trips pins, pages, refs by number and base index, and include', () => {
     const selection = {
-      refs: [byNumber(10), { kind: 'nm', page, nm: 'Café · review' } as AnnotationRef],
+      refs: [byNumber(10), { kind: 'baseIndex', page, baseIndex: 0 } as AnnotationRef],
       pages: [page],
       include: 'references' as const,
     };
@@ -55,15 +55,6 @@ describe('the annotation export token', () => {
       encodeAnnotationsExportToken({ ...pins, selection: { pages: [] } }),
     );
     expect(none.selection.pages).toEqual([]);
-  });
-
-  test('refuses a weak ref, which has no durable address', () => {
-    expect(() =>
-      encodeAnnotationsExportToken({
-        ...pins,
-        selection: { refs: [{ kind: 'index', page, index: 0 } as AnnotationRef] },
-      }),
-    ).toThrow(/not by position/);
   });
 
   test.each([

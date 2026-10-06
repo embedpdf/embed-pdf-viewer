@@ -108,7 +108,6 @@ const NOT_DEFAULTS = [
   'ref',
   'page',
   'index',
-  'identityQuality',
   'hasAppearance',
   'nm',
   'rect',

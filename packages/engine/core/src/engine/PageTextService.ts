@@ -5,8 +5,7 @@ import type { TextRange } from '../text/TextRange';
 
 /**
  * Per-page text service exposed via `PageHandle.text`. Text changes only
- * with the page's content, so none of these carry annotation state
- * (`PageState`).
+ * with the page's content.
  */
 export interface PageTextService {
   /**

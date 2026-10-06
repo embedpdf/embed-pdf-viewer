@@ -65,7 +65,7 @@ export function readValueOf(name: string, value: unknown, current: unknown): unk
 /**
  * `current` with a resolved patch's data fields in place, each as a read
  * spells it. Fields the engine works out or stamps itself (a drawn kind's
- * `rect`, the modified date and author, a weak annotation's new name) keep
+ * `rect`, the modified date and author) keep
  * the value `current` has: the engine's answer brings the new one. Works in
  * either space: it only moves values by field name.
  */

@@ -271,8 +271,7 @@ const replyOf = (patch: AnnotationPatch | undefined): { to: AnnotationRef } | nu
 /**
  * A record got another key: a new record was confirmed (the key of the `nm`
  * ref it was written under becomes the engine's key, and `ref` its
- * annotation's ref), or the engine named a weak record (`ref` its new ref).
- * Its pending changes, render preference and text range follow it, and so do
+ * annotation's ref). Its pending changes, render preference and text range follow it, and so do
  * the annotations that answer it: their `/IRT` names it by `ref`. A new
  * record's `create` change stays, under the confirmed key, until its write
  * settles: the records mirror may not hold the record yet (a page read that

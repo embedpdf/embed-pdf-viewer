@@ -16,6 +16,7 @@ import {
   EngineErrorCode,
   normalizePdfRect,
   subtypeFromCode,
+  toPageRef,
 } from '@embedpdf/engine-core/runtime';
 import type {
   PdfFunctions,
@@ -30,7 +31,7 @@ import { withScratch } from '../../runtime/memory/scratch';
 import { RECTF_BYTES, readRectF, writeRectF } from '../../runtime/memory/structs';
 import { FPDF_REVERSE_BYTE_ORDER, rasterize, readPageBox } from '../render/deviceRaster';
 import { readAnnotRect, readIntent } from './internal/read/annotationReadPrimitives';
-import { readAnnotationIdentity } from './internal/read/readAnnotationIdentity';
+import { annotationRefOf } from './internal/identity/annotationName';
 import { pdfFromClockwise } from './internal/read/readAnnotationTransformMetadata';
 import { throwIfAborted } from '../../shared/abort';
 import { SliceTimer, type Slices } from '../../shared/slices';
@@ -100,7 +101,8 @@ export class AnnotationAppearanceReader {
 
     const rotation = (options.rotation ?? 0) as PdfRotation;
     const modes = resolveModes(options.modes);
-    const revision = this.session.pageState(pageObjectNumber).revision;
+    const docPtr = this.session.requireDocPtr();
+    const pageRef = toPageRef(pageObjectNumber);
 
     const appearances: AnnotationAppearanceRaster<PdfCoordinates>[] = [];
 
@@ -125,7 +127,7 @@ export class AnnotationAppearanceReader {
           const drawn = available & NORMAL.bit ? null : readDrawingRect(fn, mem, annotPtr);
           if (!available && !drawn) continue;
 
-          const identity = readAnnotationIdentity(fn, mem, annotPtr, pageObjectNumber, i, revision);
+          const ref = annotationRefOf(fn, mem, docPtr, pageRef, annotPtr, i);
           // Rotation-stripped rendering (`pdfAppearanceTurnOf`, the rule the
           // viewer mirrors from the DTO): a box kind drawn turned
           // (`readAnnotationTurn`: ours, a stamp Acrobat turned, a text box
@@ -171,7 +173,7 @@ export class AnnotationAppearanceReader {
             );
             if (!raster) continue;
             appearances.push({
-              ref: identity.ref,
+              ref,
               mode: mode.name,
               rect: box,
               raster,
@@ -182,7 +184,7 @@ export class AnnotationAppearanceReader {
         }
       }
 
-      return { pageState: this.session.pageState(pageObjectNumber), appearances };
+      return { page: pageRef, appearances };
     } finally {
       pool.release(pageObjectNumber);
     }

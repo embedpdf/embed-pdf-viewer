@@ -33,7 +33,6 @@ const base = (objectNumber: number) => ({
   ref: refOf(objectNumber),
   page: PAGE,
   index: objectNumber,
-  identityQuality: 'durable',
   hasAppearance: true,
   nm: null,
   ...FLAGS,

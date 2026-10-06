@@ -1,7 +1,7 @@
 import type { PageScaleResult } from '../mutation/PageScaleResult';
 import type { FormEffectsResult } from '../forms/effects';
 import type { PdfRotation } from '../geometry/primitives';
-import type { AnnotationStableId } from '../identity/AnnotationStableId';
+import type { AnnotationRef } from '../identity/AnnotationRef';
 import type { PageRef } from '../identity/PageRef';
 import type {
   AnnotationCreateResult,
@@ -116,10 +116,10 @@ export type DocumentEvent =
       origin: EventOrigin;
       /**
        * What was deleted: the annotation and what went with it (replies,
-       * grouped parts, review states, popups), by stable id, the annotation
-       * first; see `deletedAnnotationsOf`.
+       * grouped parts, review states, popups), the annotation first; see
+       * `deletedAnnotationsOf`.
        */
-      deleted: AnnotationStableId[];
+      deleted: AnnotationRef[];
     } & AnnotationDeleteResult)
   | ({
       type: 'annotations.moved';

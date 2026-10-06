@@ -50,7 +50,6 @@ function annotation(pageObjectNumber: number, index: number) {
     },
     page: toPageRef(pageObjectNumber),
     index,
-    identityQuality: 'durable',
     hasAppearance: true,
     nm: `stub-${pageObjectNumber}-${index}`,
     invisible: false,
@@ -80,14 +79,6 @@ function annotation(pageObjectNumber: number, index: number) {
     actions: null,
     rawSubtypeCode: 0,
     rawSubtypeName: null,
-  };
-}
-
-function pageState(pageObjectNumber: number) {
-  return {
-    page: toPageRef(pageObjectNumber),
-    revision: { docSessionId: 'stub-session', page: toPageRef(pageObjectNumber), generation: 0 },
-    weakAnnotationState: { kind: 'known', hasAnyWeakAnnotations: false },
   };
 }
 
@@ -164,7 +155,7 @@ function buildStub(overrides: Partial<StubState> = {}): Stub {
         baseSha: 'stub-sha',
         protection: null,
         pages: PAGE_OBJECT_NUMBERS.map((pageObjectNumber) => ({
-          state: pageState(pageObjectNumber),
+          page: toPageRef(pageObjectNumber),
           cache: {
             contentVersion: 1,
             annotationVersion: state.annotationVersions.get(pageObjectNumber)!,
@@ -180,7 +171,7 @@ function buildStub(overrides: Partial<StubState> = {}): Stub {
       }
       return json({
         annotations: PAGE_OBJECT_NUMBERS.map((pageObjectNumber) => annotation(pageObjectNumber, 0)),
-        pages: PAGE_OBJECT_NUMBERS.map((pageObjectNumber) => pageState(pageObjectNumber)),
+        pages: PAGE_OBJECT_NUMBERS.map((pageObjectNumber) => toPageRef(pageObjectNumber)),
         auditHead: state.auditHead,
       });
     }
@@ -196,7 +187,7 @@ function buildStub(overrides: Partial<StubState> = {}): Stub {
         return notFound('stale annotationVersion');
       return json({
         annotations: [annotation(pageObjectNumber, 0)],
-        pages: [pageState(pageObjectNumber)],
+        pages: [toPageRef(pageObjectNumber)],
       });
     }
 
@@ -241,9 +232,7 @@ describe('annotations.list() — one bulk read at the manifest pin', () => {
 
       expect(snap.pages).toHaveLength(PAGE_OBJECT_NUMBERS.length);
       expect(snap.auditHead).toBe(40);
-      expect(new Set(snap.pages.map((p) => p.page.objectNumber))).toEqual(
-        new Set(PAGE_OBJECT_NUMBERS),
-      );
+      expect(new Set(snap.pages.map((p) => p.objectNumber))).toEqual(new Set(PAGE_OBJECT_NUMBERS));
       // Exactly one items request — the versioned bulk leaf; the per-page
       // leaves are never touched.
       const itemCalls = fx.calls.filter((p) => p.includes('/items'));

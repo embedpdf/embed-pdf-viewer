@@ -32,7 +32,6 @@ const squareDTO = (objectNumber: number): FileAnnotation =>
     ref: { kind: 'objectNumber', page: PAGE, objectNumber },
     page: PAGE,
     index: objectNumber,
-    identityQuality: 'durable',
     hasAppearance: true,
     nm: null,
     ...NO_FLAGS,

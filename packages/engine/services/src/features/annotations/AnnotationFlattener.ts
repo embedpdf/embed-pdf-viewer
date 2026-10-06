@@ -14,7 +14,6 @@ import {
 } from '@embedpdf/engine-core/runtime';
 import type { PdfRuntimeModule, Ptr } from '@embedpdf/engine-runtime';
 
-import { AnnotationReader } from './AnnotationReader';
 import { resolveAnnotPtr } from './internal/identity/resolveAnnotationPointer';
 import { exportUnturnedAppearance } from './internal/read/exportUnturnedAppearance';
 import { promoteInlineAnnotations } from './internal/write/promoteInlineAnnotations';
@@ -26,7 +25,6 @@ import { throwIfAborted } from '../../shared/abort';
 // `FLATTEN_*` / `EPDF_FLATTEN_STATUS_*` from public/fpdf_flatten.h.
 const FLATTEN_FAIL = 0;
 const FLATTEN_SUCCESS = 1;
-const FLATTEN_NOTHING_TO_DO = 2;
 const STATUS_APPLIED = 0;
 const STATUS_SKIPPED = 1;
 const STATUS_NOT_ON_PAGE = 2;
@@ -54,7 +52,7 @@ export class AnnotationFlattener {
     this.requireRefs('annotations.flatten', pageObjectNumber, refs);
     const { fn, mem } = this.runtime;
     // A flatten removes entries from /Annots; promotion keeps every position.
-    promoteInlineAnnotations(this.runtime, this.session, pageObjectNumber);
+    const promoted = promoteInlineAnnotations(this.runtime, this.session, pageObjectNumber);
     const pool = this.session.pagePool();
     const pagePtr = pool.acquire(pageObjectNumber);
     try {
@@ -98,23 +96,16 @@ export class AnnotationFlattener {
         ref,
         status: statuses[i] === STATUS_APPLIED ? ('applied' as const) : ('unchanged' as const),
       }));
-      if (code === FLATTEN_NOTHING_TO_DO || code !== FLATTEN_SUCCESS) {
+      // A promotion with nothing to flatten still changed the page.
+      if (code !== FLATTEN_SUCCESS && !promoted) {
         const meta: MutationMeta = { affectedPages: [], cacheDelta: null };
         return { page: toPageRef(pageObjectNumber), usage, results, meta };
       }
 
-      // Content + annotation liveness changed on this page — the same
-      // bookkeeping PagesFlattener performs per affected page.
+      // Content and annotations changed on this page.
       this.session.invalidateDerived();
-      this.session.bumpRevision(pageObjectNumber);
-      try {
-        new AnnotationReader(this.runtime, this.session).list(pageObjectNumber, signal);
-      } catch {
-        // Weak-annotation state stays conservatively unknown; never lose
-        // the layer artifact over a post-flatten diagnostic read.
-      }
       const meta: MutationMeta = {
-        affectedPages: [this.session.pageState(pageObjectNumber)],
+        affectedPages: [toPageRef(pageObjectNumber)],
         cacheDelta: null,
       };
       return { page: toPageRef(pageObjectNumber), usage, results, meta };
@@ -206,8 +197,8 @@ export class AnnotationFlattener {
     }
   }
 
-  /** Resolve every ref on `pagePtr` (NotFound / InvalidReference from the
-   *  resolver on caller error); on any failure, close what was opened. */
+  /** Resolve every ref on `pagePtr` (NotFound from the resolver on caller
+   *  error); on any failure, close what was opened. */
   private resolveAll(pagePtr: Ptr, refs: AnnotationRef[]): Ptr[] {
     const { fn } = this.runtime;
     const annotPtrs: Ptr[] = [];

@@ -105,7 +105,6 @@ const INERT_KEYS: ReadonlySet<string> = new Set([
   'ref',
   'page',
   'index',
-  'identityQuality',
   'hasAppearance',
   'author',
   'createdAt',

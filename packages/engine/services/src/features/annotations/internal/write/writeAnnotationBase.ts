@@ -25,9 +25,7 @@ import { flagFieldsOf } from '../annotationFlagBits';
  * `/T` (author display) is stamped by the mutator from
  * `AnnotationActor.displayName` via {@link writeAnnotationAuthor}.
  *
- * `nm` is written verbatim if the caller supplied one. The mutator
- * decides whether to opportunistically stamp a UUID v4 on a weak
- * annotation; the writer does not.
+ * `nm` is written verbatim if the caller supplied one.
  */
 export function applyAnnotationBaseDraft(
   fn: PdfFunctions,
@@ -54,9 +52,7 @@ export function applyAnnotationBaseDraft(
 /**
  * Write the annotation-wide base fields shared by every Patch
  * (contents/subject). /T is bound at creation and not patchable — see
- * `AnnotationPatchBase`. /NM is monotonic per annotation; the mutator
- * may stamp /NM opportunistically on a weak annotation via
- * `writeAnnotationNm`.
+ * `AnnotationPatchBase`. /NM is set only at create.
  *
  * Three-state semantics on string|null fields:
  *   undefined -> don't touch the dict
@@ -93,21 +89,6 @@ export function writeAnnotationAuthor(
 ): void {
   if (displayName.length === 0) return;
   writeAnnotString(fn, mem, annotPtr, 'T', displayName);
-}
-
-/**
- * Stamp /NM on an annotation that didn't have one. Used by the mutator
- * (not by the writers proper) to upgrade a weak annotation to durable
- * identity during update. Idempotent and silent if the value is empty.
- */
-export function writeAnnotationNm(
-  fn: PdfFunctions,
-  mem: PdfRuntimeMemory,
-  annotPtr: Ptr,
-  nm: string,
-): void {
-  if (nm.length === 0) return;
-  writeAnnotString(fn, mem, annotPtr, 'NM', nm);
 }
 
 /**

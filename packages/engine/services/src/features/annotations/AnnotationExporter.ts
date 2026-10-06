@@ -58,9 +58,6 @@ export class AnnotationExporter {
     signal: AbortSignal,
   ): WireAnnotationBundle {
     throwIfAborted(signal);
-    for (const ref of selection.refs ?? []) {
-      if (ref.kind === 'index') this.session.validateRevision(ref.revision);
-    }
     const records = this.session.allRecords();
     const reader = new RawAnnotationReader(this.runtime, this.session, this.fonts);
     const annotations = closeExportSelection(

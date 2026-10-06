@@ -21,22 +21,11 @@ try {
     docId: result.docId,
     elapsedMs: result.elapsedMs,
     summary: summarizeList(result.all),
-    pageStateByPon: Object.fromEntries(
-      Object.entries(result.byPage).map(([pageObjectNumber, list]) => {
-        const state = list.pages[0]!;
-        return [
-          pageObjectNumber,
-          {
-            pageObjectNumber: state.page.objectNumber,
-            hasAnyWeakAnnotations:
-              state.weakAnnotationState.kind === 'known'
-                ? state.weakAnnotationState.hasAnyWeakAnnotations
-                : null,
-            generation: state.revision.generation,
-            count: list.annotations.length,
-          },
-        ];
-      }),
+    countByPon: Object.fromEntries(
+      Object.entries(result.byPage).map(([pageObjectNumber, list]) => [
+        pageObjectNumber,
+        list.annotations.length,
+      ]),
     ),
   };
   out.textContent = JSON.stringify(view, null, 2);

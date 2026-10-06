@@ -73,7 +73,6 @@ export type {
   Engine,
   EngineFactory,
   DocumentHandle,
-  DocumentCapabilities,
   PageHandle,
   LocalEngine,
   LocalDocumentHandle,

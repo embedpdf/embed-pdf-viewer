@@ -130,8 +130,8 @@ export function runAnnotationExportConformance(
     // or to the canonical drawing, changes these on purpose: update them here.
     test('exports a document to the same file on every engine', async () => {
       const expected = {
-        'acrobat-stamps': 'cc7f8fca743f031cdaa807656928933bd86c62e7f53529f2272c2a6fd2960f19',
-        'acrobat-rewrapped': '79cd03671886f207593d96375aa2bcce0631744ddcd4f23768a2f8c65ff843de',
+        'acrobat-stamps': 'cfeeafc373a3cddda7cee968bbbe864cff78d4a4fa35103bed9145a9fc93b60a',
+        'acrobat-rewrapped': 'dfc573e037896f8d1da75692129686e6813777b0c47abc737f4cd99655f2f4f5',
       } as const;
       for (const [fixture, hash] of Object.entries(expected)) {
         await onPage(fixture as AnnotationResourceFixture, async (_page, doc) => {
@@ -206,24 +206,20 @@ export function runAnnotationExportConformance(
 
     test('takes a selection larger than a URL holds', async () => {
       await onPage('authoring', async (page, doc) => {
-        // Long names push the selection past what an export URL carries.
-        const created: Annotation[] = [];
-        for (let i = 0; i < 24; i++) {
-          const { annotation } = await page.annotations.create({
-            subtype: 'square',
-            box: { x: 10 + i, y: 10, width: 30, height: 30 },
-            nm: `export-conformance-long-selection-${String(i).padStart(3, '0')}-${'x'.repeat(200)}`,
-          });
-          created.push(annotation);
-        }
-        const refs = created.map((annotation) => ({
-          kind: 'nm' as const,
-          page: annotation.ref.page,
-          nm: annotation.nm!,
-        }));
+        // An export URL carries a few hundred refs: make more, as one import.
+        const { annotation: seed } = await page.annotations.create({
+          subtype: 'square',
+          box: { x: 10, y: 10, width: 30, height: 30 },
+        });
+        const one = await doc.annotations.export({ refs: [seed.ref] });
+        const many = await doc.annotations.import(
+          { ...one, items: Array.from({ length: 300 }, () => one.items[0]!) },
+          { attribution: 'stamp' },
+        );
+        const refs = many.annotations.map((annotation) => annotation.ref);
         const bundle = await doc.annotations.export({ refs });
-        expect(bundle.items.map((item) => item.data.nm).sort()).toEqual(
-          created.map((annotation) => annotation.nm).sort(),
+        expect(bundle.items.map((item) => annotationKey(item.data.ref)).sort()).toEqual(
+          refs.map(annotationKey).sort(),
         );
       });
     });

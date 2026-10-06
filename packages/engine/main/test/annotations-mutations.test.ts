@@ -37,7 +37,7 @@ runAnnotationMutationConformance(runner, {
     bytes: async () => new Uint8Array(await readFile(fixturePath)),
     expected: { trapped: 'unknown' },
     pageObjectNumber: 3,
-    expectsWeakAnnotation: true,
+    expectsInlineAnnotation: true,
   },
   makeEngine: () => createLocalEngine({ runtime: { prefer: 'wasm' } }),
 });

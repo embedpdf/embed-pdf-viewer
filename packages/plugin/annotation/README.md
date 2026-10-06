@@ -81,11 +81,10 @@ The same pipeline carries every kind of change:
   write carries every keystroke that waited for it: they settle together, and
   a refusal is reported once. An older write's echo cannot replace newer
   typing: a write only settles its own changes.
-- **Weak annotations** (direct objects without `/NM`, addressed by position)
-  that the engine names move to the new key.
 
-Both kinds of key change go through one door, `follow` in
-`services/record-identity.ts`: the session (selection, hover, text editing,
+A confirmed record keeps its key for life (an annotation's ref is its name
+for life), so the one key change is a new record's, and it goes through one
+door, `follow` in `services/record-identity.ts`: the session (selection, hover, text editing,
 the gesture), the pending changes, the render preference and the text range
 move, and so does what an area keeps per record (`onFollow`: typing waiting
 for its write, a link sync in progress). An id taken before the move still

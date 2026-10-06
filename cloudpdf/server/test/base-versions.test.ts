@@ -67,8 +67,8 @@ async function seedReadyDocument(): Promise<void> {
     createdAt: 1,
   });
   await new DocumentPagesRepo(db).upsertForDocument(DOC, [
-    { pageObjectNumber: 11, hasWeakAnnotations: false },
-    { pageObjectNumber: 22, hasWeakAnnotations: false },
+    { pageObjectNumber: 11 },
+    { pageObjectNumber: 22 },
   ]);
 }
 
@@ -125,7 +125,7 @@ describe('storage keys', () => {
 describe('migration 030', () => {
   test('backfills version 1 for every document with a base and stamps layers with the head', async () => {
     const upTo029 = sqliteMigrations.filter((m) => m.version < '030');
-    expect(upTo029).toHaveLength(sqliteMigrations.length - 1);
+    expect(upTo029.at(-1)?.version).toBe('029');
     await migrate(db, { source: { kind: 'inline', migrations: upTo029 } });
     const now = 1000;
     await db.insertInto('tenants').values({ id: TENANT, name: TENANT }).execute();

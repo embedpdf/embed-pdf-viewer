@@ -404,7 +404,7 @@ describe.each(['wasm', 'native'] as const)('one create (%s runtime)', (prefer) =
     expect(await worker.save('rewrite')).toMatch(/\/Popup \d+ 0 R/);
   });
 
-  test('that fails after naming a weak note leaves the note weak', async () => {
+  test('a reply to an inline note that fails leaves the note inline', async () => {
     const fault = withFault(await createPdfRuntime({ prefer }));
     const worker = await openWorker(
       fault.runtime,
@@ -416,7 +416,7 @@ describe.each(['wasm', 'native'] as const)('one create (%s runtime)', (prefer) =
       'annotations.list',
     );
     const weak = list.annotations.find(
-      (dto) => dto.ref.kind === 'index' && dto.subtype !== 'popup',
+      (dto) => dto.ref.kind === 'baseIndex' && dto.subtype !== 'popup',
     )!.ref;
     expect(weak).toBeDefined();
     const baseline = {
@@ -434,8 +434,8 @@ describe.each(['wasm', 'native'] as const)('one create (%s runtime)', (prefer) =
           reply: { to: weak },
         },
       });
-    // The reply names the note (and makes it indirect) before its creation
-    // date is written: failing there must take both back.
+    // The reply makes the note an object before its creation date is
+    // written: failing there must take both back.
     fault.arm('FPDFAnnot_SetStringValue', 1, (args) => args[1] === 'CreationDate');
     const response = await reply();
     expect(fault.fired()).toBe(true);
@@ -448,10 +448,11 @@ describe.each(['wasm', 'native'] as const)('one create (%s runtime)', (prefer) =
     );
     expect(after.list).toEqual(list);
 
-    // And a reply that holds names it.
+    // And a reply that holds links to the note under the name it had.
     const held = await reply();
     expect(held.kind).toBe('resolve');
     if (held.kind !== 'resolve' || held.result.tag !== 'annotations.create') return;
-    expect(held.result.result.meta.changed).toHaveLength(2);
+    expect(held.result.result.meta.changed).toHaveLength(1);
+    expect(held.result.result.annotation.reply?.to).toEqual(weak);
   });
 });

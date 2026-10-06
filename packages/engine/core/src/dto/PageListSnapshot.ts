@@ -8,11 +8,7 @@ import type { Coordinates, PageCoordinates } from '../pageSpace/coordinates';
  *
  * This is a geometry view: each `PageLayout` carries size, rotation,
  * label, userUnit, and the raw PDF boxes — the things a developer expects
- * when listing pages. It deliberately carries no annotation liveness
- * (`revision`, `weakAnnotationState`); that lives on annotation reads
- * (`AnnotationListSnapshot.pageState`) and inside the cloud manifest,
- * because it changes on a different (annotation) cadence and is joined back
- * by `pageObjectNumber`.
+ * when listing pages.
  *
  * The container name is kept (consistent with the other `*Snapshot` read
  * DTOs); only the element type changed from a liveness envelope to

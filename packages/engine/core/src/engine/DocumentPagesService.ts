@@ -21,9 +21,8 @@ import { AbortablePromise } from '../promise/AbortablePromise';
  *
  * Identity rule: pages are addressed by `PageRef` (the durable object
  * number) everywhere except `list()`, which exposes display order through
- * `PageLayout.index`. There is no "weak page ref" model — structure
- * verbs therefore do not bump per-page revisions and do not invalidate
- * any in-flight annotation refs on surviving pages.
+ * `PageLayout.index`. Structure verbs never change the names of the
+ * annotations on surviving pages.
  */
 export interface DocumentPagesService {
   /**
@@ -35,9 +34,8 @@ export interface DocumentPagesService {
   /**
    * Reorder pages. The supplied pages are detached and re-inserted as
    * a contiguous block starting at `toIndex` in the post-removal
-   * index space, preserving caller order. Per-page `RevisionToken`s
-   * survive — index-based annotation refs the caller is holding remain
-   * valid across a page reorder.
+   * index space, preserving caller order. Annotation refs the caller is
+   * holding stay valid across a page reorder.
    *
    * @param pages Pages to move, in the order they should appear after
    *              the move.
@@ -48,8 +46,8 @@ export interface DocumentPagesService {
   /**
    * Set the absolute display rotation of the supplied pages (one value
    * for all — the multi-select thumbnail gesture). Pure presentation
-   * metadata: content coordinates are normalized, so cached renders,
-   * annotation refs, and `RevisionToken`s all survive untouched. See
+   * metadata: content coordinates are normalized, so cached renders and
+   * annotation refs survive untouched. See
    * `PageRotateInput` for why the wire is absolute, never relative.
    */
   rotate(pages: PageRef[], rotation: PdfRotation): AbortablePromise<PageRotateResult>;

@@ -146,9 +146,7 @@ export function runFormConformance(
         expect(result.meta.changedWidgets.length).toBe(1);
         // The meta names the field and the page its repainted widget is on.
         expect(result.meta.changedFields).toEqual([result.field.ref]);
-        expect(result.meta.affectedPages.map((state) => state.page)).toEqual([
-          result.meta.changedWidgets[0]!.page,
-        ]);
+        expect(result.meta.affectedPages).toEqual([result.meta.changedWidgets[0]!.page]);
 
         const truncated = await doc.forms.setValue(
           { kind: 'fqn', name: 'maxlen_text' },

@@ -1,18 +1,12 @@
 import type {
-  AnnotationMutationKind,
   CacheDelta,
   DocumentManifest,
   DocumentProtection,
   LayerScopes,
   ManifestPage,
-  PageState,
+  PageRef,
 } from '@embedpdf/engine-core/runtime';
-import {
-  changesAnnotationList,
-  invalidatesWeakIndexRefs,
-  knownWeakAnnotationState,
-  toPageRef,
-} from '@embedpdf/engine-core/runtime';
+import { toPageRef } from '@embedpdf/engine-core/runtime';
 import type { Transaction } from 'kysely';
 
 import type { DocumentHead } from './DocumentService';
@@ -49,8 +43,6 @@ export interface BaseVersionFacts extends BasePlanePointers {
   sha256: string;
   byteLength: number;
 }
-
-export type MutationImpactKind = AnnotationMutationKind;
 
 /**
  * Geometry-pointer epoch for the immutable base view. The base topology is
@@ -97,7 +89,7 @@ function pagePlaneScope(
  *
  * Worker sessions are still responsible for PDF parsing/mutation. This
  * service owns the durable DB-backed page state used by manifests and CDN
- * version checks; `CloudRevisionBridge` owns worker/cloud token translation.
+ * version checks.
  */
 export class LayerStateService {
   private readonly documentPages: DocumentPagesRepo;
@@ -148,7 +140,7 @@ export class LayerStateService {
 
   async ensureBasePages(
     docId: string,
-    loadPages: () => Promise<PageState[]>,
+    loadPages: () => Promise<PageRef[]>,
   ): Promise<DurablePageRow[]> {
     const existing = await this.documentPages.findByDocument(docId);
     if (existing.length > 0) return existing;
@@ -156,10 +148,7 @@ export class LayerStateService {
     const observed = await loadPages();
     await this.documentPages.upsertForDocument(
       docId,
-      observed.map((page) => ({
-        pageObjectNumber: page.page.objectNumber,
-        hasWeakAnnotations: requireKnownWeakAnnotationBoolean(page),
-      })),
+      observed.map((page) => ({ pageObjectNumber: page.objectNumber })),
     );
     return this.documentPages.findByDocument(docId);
   }
@@ -282,7 +271,7 @@ export class LayerStateService {
       working: false,
       baseByteLength: version.byteLength,
       protection,
-      pages: pages.map((page) => this.toManifestPage(`cloud:base:${head.id}`, page)),
+      pages: pages.map((page) => this.toManifestPage(page)),
     };
   }
 
@@ -331,9 +320,7 @@ export class LayerStateService {
       baseByteLength: base.byteLength,
       scopes,
       protection,
-      pages: pages.map((page) =>
-        this.toManifestPage(this.layerRevisionScopeId(docId, layerName), page),
-      ),
+      pages: pages.map((page) => this.toManifestPage(page)),
     };
   }
 
@@ -405,8 +392,6 @@ export class LayerStateService {
         pageObjectNumber: Number(row.page_object_number),
         contentVersion: Number(row.content_version),
         annotationVersion: Number(row.annotation_version) + (signed ? 1 : 0),
-        annotationGeneration: Number(row.annotation_generation),
-        hasWeakAnnotations: Boolean(row.has_weak_annotations),
         updatedAt: signed ? input.now : Number(row.updated_at),
       };
     });
@@ -420,8 +405,6 @@ export class LayerStateService {
             page_object_number: page.pageObjectNumber,
             content_version: page.contentVersion,
             annotation_version: page.annotationVersion,
-            annotation_generation: page.annotationGeneration,
-            has_weak_annotations: page.hasWeakAnnotations ? 1 : 0,
             updated_at: page.updatedAt,
           })),
         )
@@ -437,67 +420,12 @@ export class LayerStateService {
             page_object_number: page.pageObjectNumber,
             content_version: page.contentVersion,
             annotation_version: page.annotationVersion,
-            annotation_generation: page.annotationGeneration,
-            has_weak_annotations: page.hasWeakAnnotations ? 1 : 0,
             updated_at: page.updatedAt,
           })),
         )
         .execute();
     }
     return promoted;
-  }
-
-  decorateBasePageState(docId: string, page: DurablePageRow): PageState {
-    return this.toPageState(`cloud:base:${docId}`, page);
-  }
-
-  decorateLayerPageState(docId: string, layerName: string, page: DurablePageRow): PageState {
-    return this.toPageState(this.layerRevisionScopeId(docId, layerName), page);
-  }
-
-  toLayerManifestPage(docId: string, layerName: string, page: DurablePageRow): ManifestPage {
-    return this.toManifestPage(this.layerRevisionScopeId(docId, layerName), page);
-  }
-
-  layerRevisionScopeId(docId: string, layerName: string): string {
-    return `cloud:layer:${docId}:${layerName}`;
-  }
-
-  /** The base view's revision scope — the `docSessionId` every shared
-   *  (doc-level) annotation read stamps on its tokens. */
-  baseRevisionScopeId(docId: string): string {
-    return `cloud:base:${docId}`;
-  }
-
-  mutationBumps(
-    kind: MutationImpactKind,
-    pageBefore: Pick<DurablePageRow, 'hasWeakAnnotations'>,
-  ): {
-    bumpLayerDocVersion: boolean;
-    bumpAnnotationVersion: boolean;
-    bumpContentVersion: boolean;
-    bumpAnnotationGeneration: boolean;
-    weakRefsInvalidated: boolean;
-  } {
-    const weakRefsInvalidated = invalidatesWeakIndexRefs(
-      kind,
-      knownWeakAnnotationState(pageBefore.hasWeakAnnotations),
-    );
-    // `annotation_generation` is the durable epoch of the page's /Annots
-    // index space, not a count of currently-weak annotations. Keep bumping
-    // it for every delete/move even when `hasWeakAnnotations` is false:
-    // older CDN-cached snapshots may still contain index refs minted before
-    // an update strengthened those annotations with /NM or object numbers.
-    // `weakRefsInvalidated` is only the client refetch hint for refs known
-    // to be weak in the current page state.
-    const shiftsAnnotationIndexes = kind === 'delete' || kind === 'move';
-    return {
-      bumpLayerDocVersion: true,
-      bumpAnnotationVersion: changesAnnotationList(kind),
-      bumpContentVersion: false,
-      bumpAnnotationGeneration: shiftsAnnotationIndexes,
-      weakRefsInvalidated,
-    };
   }
 
   get repos(): {
@@ -516,11 +444,8 @@ export class LayerStateService {
     };
   }
 
-  private toManifestPage(scopeId: string, page: DurablePageRow): ManifestPage {
-    return {
-      state: this.toPageState(scopeId, page),
-      cache: this.toCachePins(page),
-    };
+  private toManifestPage(page: DurablePageRow): ManifestPage {
+    return { page: toPageRef(page.pageObjectNumber), cache: this.toCachePins(page) };
   }
 
   private toCachePins(page: DurablePageRow): { contentVersion: number; annotationVersion: number } {
@@ -529,28 +454,4 @@ export class LayerStateService {
       annotationVersion: page.annotationVersion,
     };
   }
-
-  private toPageState(scopeId: string, page: DurablePageRow): PageState {
-    return {
-      page: toPageRef(page.pageObjectNumber),
-      revision: {
-        docSessionId: scopeId,
-        page: toPageRef(page.pageObjectNumber),
-        generation: page.annotationGeneration,
-      },
-      weakAnnotationState: {
-        kind: 'known',
-        hasAnyWeakAnnotations: page.hasWeakAnnotations,
-      },
-    };
-  }
-}
-
-function requireKnownWeakAnnotationBoolean(page: PageState): boolean {
-  if (page.weakAnnotationState.kind !== 'known') {
-    throw new Error(
-      `cannot initialize durable manifest state from unknown weak annotation state for page ${page.page.objectNumber}`,
-    );
-  }
-  return page.weakAnnotationState.hasAnyWeakAnnotations;
 }

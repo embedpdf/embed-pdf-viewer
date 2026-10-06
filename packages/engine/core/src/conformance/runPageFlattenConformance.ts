@@ -41,9 +41,7 @@ export function runPageFlattenConformance(
         expect(result.pages).toEqual([toPageRef(pageObjectNumber)]);
         expect(result.usage).toBe('display');
         expect(result.results.map((item) => item.status)).toEqual(['applied']);
-        expect(result.meta.affectedPages.map((state) => state.page)).toEqual([
-          toPageRef(pageObjectNumber),
-        ]);
+        expect(result.meta.affectedPages).toEqual([toPageRef(pageObjectNumber)]);
         expect(events).toHaveLength(1);
 
         const layoutAfter = await doc.pages.list();
@@ -52,10 +50,6 @@ export function runPageFlattenConformance(
         expect(annotationsAfter.annotations.length < annotationsBefore.annotations.length).toBe(
           true,
         );
-        expect(
-          annotationsAfter.pages[0].revision.generation >
-            annotationsBefore.pages[0].revision.generation,
-        ).toBe(true);
 
         const noOp = await doc.pages.flatten([toPageRef(pageObjectNumber)], { usage: 'display' });
         expect(noOp.results.map((item) => item.status)).toEqual(['unchanged']);

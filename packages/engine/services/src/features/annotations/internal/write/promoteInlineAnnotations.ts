@@ -13,7 +13,9 @@ import type { DocumentSession } from '../../../../document-session/DocumentSessi
  * that moves entries of the page's `/Annots`: a delete, a reorder, a flatten,
  * a redaction. An inline annotation is named by its position, which holds
  * while no entry has moved; the layer records those positions at the first
- * promotion. A page with nothing inline is left as it is.
+ * promotion. A page with nothing inline is left as it is. Returns whether
+ * the page changed: a promotion is a write, which the job reports even when
+ * the write it prepared for finds nothing to do.
  *
  * Call it before the write loads its page: a page loaded earlier still holds
  * the inline entries, so a promotion closes the pages no job holds.
@@ -22,7 +24,7 @@ export function promoteInlineAnnotations(
   runtime: PdfRuntimeModule,
   session: DocumentSession,
   pageObjectNumber: PageObjectNumber,
-): void {
+): boolean {
   const { pageIndex } = session.resolvePageRef(toPageRef(pageObjectNumber));
   const moved = runtime.fn.EPDFPage_PromoteInlineAnnotsRaw(session.requireDocPtr(), pageIndex);
   if (moved < 0) {
@@ -31,8 +33,7 @@ export function promoteInlineAnnotations(
       `the inline annotations of page ${pageObjectNumber} could not be promoted`,
     );
   }
-  if (moved === 0) return;
+  if (moved === 0) return false;
   session.pagePool().closeIdle();
-  // Every annotation on the page has an object number now.
-  session.recordWeakFlag(pageObjectNumber, false);
+  return true;
 }

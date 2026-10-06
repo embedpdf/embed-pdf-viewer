@@ -36,7 +36,6 @@ const square = (objectNumber: number, extra: Partial<FileAnnotation> = {}): File
     ref: ref(objectNumber),
     page: PAGE,
     index: objectNumber,
-    identityQuality: 'durable',
     hasAppearance: true,
     nm: null,
     ...NO_FLAGS,

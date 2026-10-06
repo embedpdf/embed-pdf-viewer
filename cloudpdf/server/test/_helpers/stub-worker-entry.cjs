@@ -150,14 +150,6 @@ function layerMeta(msg) {
   return { layerKind: 'fresh', layerByte0: null, annots: [], seq: 1 };
 }
 
-function pageState(pon, generation = 0, hasWeak = false) {
-  return {
-    page: pageRef(pon),
-    revision: { docSessionId: 'stub-session', page: pageRef(pon), generation },
-    weakAnnotationState: { kind: 'known', hasAnyWeakAnnotations: hasWeak },
-  };
-}
-
 // Pure geometry for one page. Mirrors `PageLayout`: durable PON, display
 // `index`, and a letter-sized media/crop box. No annotation liveness here —
 // that rides on annotation reads, not the geometry list.
@@ -197,7 +189,6 @@ function annotationDto(a, index) {
     },
     page: pageRef(a.pon),
     index,
-    identityQuality: 'durable',
     hasAppearance: true,
     nm: a.nm,
     flags: {
@@ -242,21 +233,15 @@ function resolveRef(meta, ref) {
   if (ref.kind === 'objectNumber') {
     return annots.find((a) => OBJECT_NUMBER_BASE + a.seq === ref.objectNumber) ?? null;
   }
-  if (ref.kind === 'nm') {
-    return annots.find((a) => a.pon === ponOf(ref.page) && a.nm === ref.nm) ?? null;
-  }
   const page = annots.filter((a) => a.pon === ponOf(ref.page));
-  return page[ref.index] ?? null;
+  return page[ref.baseIndex] ?? null;
 }
 
-function mutationMeta(pon, generation, changedValue, hasWeak = false) {
-  const state = pageState(pon, generation, hasWeak);
+function mutationMeta(pon, changedValue) {
   return {
-    affectedPages: [state],
+    affectedPages: [pageRef(pon)],
     cacheDelta: null,
-    changed: [{ kind: 'objectNumber', objectNumber: changedValue }],
-    weakRefsInvalidated: false,
-    shouldRefetch: null,
+    changed: [{ kind: 'objectNumber', page: pageRef(pon), objectNumber: changedValue }],
   };
 }
 
@@ -371,14 +356,14 @@ function rejectAnnotationNotFound(msg) {
 }
 
 /**
- * Durable refs (objectNumber / nm) only ever come from annotations the
- * session actually knows about — an unresolved one means the annotation is
- * GONE (e.g. deleted by another replica before this session reloaded), and
- * the real engine answers NotFound. Index refs keep the lenient canned
- * fallback: direct-seed tests use them against artifacts with no state.
+ * Object-number refs only ever come from annotations the session actually
+ * knows about — an unresolved one means the annotation is GONE (e.g. deleted
+ * by another replica before this session reloaded), and the real engine
+ * answers NotFound. Base-index refs keep the lenient canned fallback: they
+ * name a file's inline annotations, which a direct-seed layer has no state for.
  */
 function isStrictRef(ref) {
-  return ref.kind === 'objectNumber' || ref.kind === 'nm';
+  return ref.kind === 'objectNumber';
 }
 
 parentPort.on('message', (msg) => {
@@ -580,7 +565,7 @@ parentPort.on('message', (msg) => {
           tag: 'annotations.list',
           list: {
             annotations: pons.flatMap((pon) => pageAnnotationDtos(meta, pon)),
-            pages: pons.map((pon) => pageState(pon)),
+            pages: pons.map(pageRef),
           },
         },
       });
@@ -615,8 +600,7 @@ parentPort.on('message', (msg) => {
         jobId: msg.jobId,
         result: {
           tag: 'pages.text',
-          // No pageState: content reads carry geometry/text only; liveness
-          // (revision/weak state) rides on annotation reads + the manifest.
+          // Content reads carry geometry/text only; the manifest carries the pins.
           snapshot: {
             text,
             charCount: text.length,
@@ -651,7 +635,7 @@ parentPort.on('message', (msg) => {
         tag: 'annotations.create',
         result: {
           annotation: annotationDto(a, index),
-          meta: mutationMeta(pon, 0, objectNumber, false),
+          meta: mutationMeta(pon, objectNumber),
         },
         artifact: layerArtifact(msg, meta),
       });
@@ -672,7 +656,7 @@ parentPort.on('message', (msg) => {
           tag: 'annotations.update',
           result: {
             annotation: annotationDto(found, index),
-            meta: mutationMeta(pon, 0, OBJECT_NUMBER_BASE + found.seq, false),
+            meta: mutationMeta(pon, OBJECT_NUMBER_BASE + found.seq),
           },
           artifact: layerArtifact(msg, meta),
         });
@@ -682,14 +666,14 @@ parentPort.on('message', (msg) => {
         rejectAnnotationNotFound(msg);
         return;
       }
-      // Lenient fallback for INDEX refs: seeded layers have no session
-      // state — keep the old canned behavior so direct-seed tests stay valid.
-      const ann = cannedAnnotation(pon, msg.ref.index);
+      // Lenient fallback for base-index refs: seeded layers have no session
+      // state — answer with a canned annotation so direct-seed tests stay valid.
+      const ann = cannedAnnotation(pon, msg.ref.baseIndex);
       resolveMutation(msg, {
         tag: 'annotations.update',
         result: {
           annotation: ann,
-          meta: mutationMeta(pon, 0, ann.ref.objectNumber, false),
+          meta: mutationMeta(pon, ann.ref.objectNumber),
         },
         artifact: layerArtifact(msg, meta),
       });
@@ -708,7 +692,7 @@ parentPort.on('message', (msg) => {
         resolveMutation(msg, {
           tag: 'annotations.delete',
           result: {
-            meta: mutationMeta(pon, 1, OBJECT_NUMBER_BASE + found.seq, false),
+            meta: mutationMeta(pon, OBJECT_NUMBER_BASE + found.seq),
           },
           artifact: layerArtifact(msg, meta),
         });
@@ -721,7 +705,7 @@ parentPort.on('message', (msg) => {
       resolveMutation(msg, {
         tag: 'annotations.delete',
         result: {
-          meta: mutationMeta(pon, 1, OBJECT_NUMBER_BASE + pon, false),
+          meta: mutationMeta(pon, OBJECT_NUMBER_BASE + pon),
         },
         artifact: layerArtifact(msg, meta),
       });
@@ -747,7 +731,7 @@ parentPort.on('message', (msg) => {
           tag: 'annotations.move',
           result: {
             annotations: moving.map((a, i) => annotationDto(a, msg.toIndex + i)),
-            meta: mutationMeta(pon, 1, OBJECT_NUMBER_BASE + moving[0].seq, false),
+            meta: mutationMeta(pon, OBJECT_NUMBER_BASE + moving[0].seq),
           },
           artifact: layerArtifact(msg, meta),
         });
@@ -757,7 +741,7 @@ parentPort.on('message', (msg) => {
         tag: 'annotations.move',
         result: {
           annotations: msg.refs.map((_, i) => cannedAnnotation(pon, msg.toIndex + i)),
-          meta: mutationMeta(pon, 1, OBJECT_NUMBER_BASE + pon, false),
+          meta: mutationMeta(pon, OBJECT_NUMBER_BASE + pon),
         },
         artifact: layerArtifact(msg, meta),
       });
@@ -919,7 +903,7 @@ parentPort.on('message', (msg) => {
           result: {
             tag: 'annotations.renderAppearances',
             result: {
-              pageState: pageState(pon),
+              page: pageRef(pon),
               appearances: [
                 {
                   ref: { kind: 'objectNumber', page: pageRef(pon), objectNumber: 9001 },
@@ -982,7 +966,7 @@ parentPort.on('message', (msg) => {
               result: {
                 tag: 'annotations.renderAppearancesEncoded',
                 result: {
-                  pageState: pageState(pon),
+                  page: pageRef(pon),
                   appearances: [
                     {
                       ref: { kind: 'objectNumber', page: pageRef(pon), objectNumber: 9001 },

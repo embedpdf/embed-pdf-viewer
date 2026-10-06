@@ -56,9 +56,8 @@ function copyToExactBuffer(view: Uint8Array): ArrayBuffer {
  *     multi-call client logic from having to account for index drift
  *     between requests.
  *   - Successful `move()` returns the new `layout` (order + geometry) plus
- *     cloud coherence pins. The server does not bump per-page revisions on a
- *     page move (page reorder is intentionally outside the weak-ref staleness
- *     model), only `docVersion` + `layoutVersion`.
+ *     cloud coherence pins. A page move bumps only `docVersion` +
+ *     `layoutVersion`; every per-page pin stays warm.
  */
 export class CloudDocumentPagesService implements DocumentPagesService {
   /** The last layout leaf read by {@link pageLayout}, keyed by its URL path. */

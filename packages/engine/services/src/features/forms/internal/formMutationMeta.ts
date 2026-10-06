@@ -1,5 +1,5 @@
 import type { FormFieldRef, FormMutationMeta, FormWidget } from '@embedpdf/engine-core/runtime';
-import type { DocumentSession } from '../../../document-session/DocumentSession';
+import { toPageRef } from '@embedpdf/engine-core/runtime';
 
 /**
  * The meta of a form write: the fields and widgets it changed, and the pages
@@ -7,7 +7,6 @@ import type { DocumentSession } from '../../../document-session/DocumentSession'
  * change the page list, so there is no cache delta.
  */
 export function formMutationMeta(
-  session: DocumentSession,
   changedFields: FormFieldRef[],
   changedWidgets: FormWidget[],
 ): FormMutationMeta {
@@ -16,7 +15,7 @@ export function formMutationMeta(
     if (widget.page) pages.add(widget.page.objectNumber);
   }
   return {
-    affectedPages: [...pages].map((pageObjectNumber) => session.pageState(pageObjectNumber)),
+    affectedPages: [...pages].map((pageObjectNumber) => toPageRef(pageObjectNumber)),
     cacheDelta: null,
     changedFields,
     changedWidgets,

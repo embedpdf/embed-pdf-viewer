@@ -1,7 +1,6 @@
 import { isDimension, type PdfCoordinates } from '@embedpdf/engine-core/runtime';
 import {
   annotationKey,
-  annotationKeysOf,
   assertAnnotationResources,
   appearanceImpactOf,
   authorizeAnnotationDelete,
@@ -15,15 +14,12 @@ import {
   type AppearanceOutcome,
   type AnnotationCreateResult,
   type AnnotationDeleteResult,
-  type Annotation,
   type AnnotationDraft,
-  type AnnotationListMutationMeta,
   type AnnotationMoveResult,
   type AnnotationPatch,
   type WireAnnotationResources,
   type AnnotationRef,
   type AnnotationReplyType,
-  type AnnotationStableId,
   type AnnotationUpdateResult,
   type PageObjectNumber,
   PdfAnnotationSubtypeCode,
@@ -39,12 +35,10 @@ import type { DocumentSession } from '../../document-session/DocumentSession';
 import { withScratch } from '../../runtime/memory/scratch';
 import { throwIfAborted } from '../../shared/abort';
 import type { FontRegistrar } from '../fonts';
-import { captureOrStampStableId } from './internal/identity/captureOrStampStableId';
+import { annotationRefOf } from './internal/identity/annotationName';
 import { openAnnotAtRaw, resolveAnnotIndexRaw } from './internal/identity/resolveAnnotIndexRaw';
-import { computeMutationImpact } from './internal/mutations/computeMutationImpact';
+import { annotationMutationMeta } from './internal/mutations/annotationMutationMeta';
 import { readContextFor } from './internal/read/annotationReadContext';
-import { readAnnotString } from './internal/read/annotationReadPrimitives';
-import { pageHasWeakAnnotations } from './internal/read/pageHasWeakAnnotations';
 import {
   joinWidgetFieldNumbers,
   resolveWidgetFieldObjectNumber,
@@ -66,9 +60,8 @@ import { applyEmbedMetadataOnUpdate } from './internal/write/writeEmbedMetadata'
 
 /**
  * Synchronous orchestrator for `create` / `update` / `delete` annotation
- * mutations. Owns the dance between PDFium calls, identity bookkeeping,
- * revision bumping (only for structural ops), and the
- * `AnnotationListMutationMeta` envelope every result type carries.
+ * mutations. Owns the dance between PDFium calls, identity bookkeeping, and
+ * the `AnnotationListMutationMeta` envelope every result type carries.
  *
  * Lives in `engine-services` (not the worker hosts) so the local Web
  * Worker, the Node `worker_thread` server, and any future direct-thread
@@ -78,22 +71,17 @@ import { applyEmbedMetadataOnUpdate } from './internal/write/writeEmbedMetadata'
  * Identity rules enforced here, locked with the user:
  *   - `create` is a one-item change set on `AnnotationBatchApplier`, which
  *     makes the annotation with `EPDFPage_CreateAnnotRaw` (an indirect
- *     object, on a page that isn't loaded), so new annotations are born
- *     durable. If the fork helper ever returns a direct object, it throws —
- *     never silently producing a weak annotation.
- *   - `update` is non-structural. /NM is monotonic per annotation:
- *       * already durable (objectNumber > 0 or /NM present) -> never touched.
- *       * weak (no objectNumber, no /NM) -> stamp engine-generated UUID v4.
- *     The patch type has no `nm` field, so the writer surface enforces
- *     "callers cannot rename a stable id" at the type level. Updates do
- *     not bump the revision.
- *   - `delete` is subtype-agnostic. A weak annotation has no durable id
- *     to report, so its delete names nothing in `meta.changed`.
+ *     object, on a page that isn't loaded), so a new annotation is named by
+ *     its object number. If the fork helper ever returns a direct object, it
+ *     throws.
+ *   - Every annotation keeps its name through every write (see
+ *     `annotationRefOf`). No write stamps an /NM to name one, and the patch
+ *     type has no `nm` field, so callers cannot rename one either.
+ *   - `delete` is subtype-agnostic and names everything it removed.
  *
  * Every write finds its annotations from the page's dictionaries (raw
  * handles), so none parses the page's content. Each runs inside its job's
- * layer transaction: a failure after the first write aborts all of it,
- * revisions included.
+ * layer transaction: a failure after the first write aborts all of it.
  */
 export class AnnotationMutator {
   constructor(
@@ -188,9 +176,6 @@ export class AnnotationMutator {
 
       const writeCtx = this.writeContext(resources);
 
-      this.knowWeakAnnotations(ref.page.objectNumber, pageIndex);
-      const pageStateBefore = this.session.pageState(ref.page.objectNumber);
-
       // Blend mode lives inside the existing /AP graphics state rather than in
       // the annotation dictionary. Capture it before re-baking so an unrelated
       // patch (colour, geometry, contents...) cannot silently reset it.
@@ -205,7 +190,6 @@ export class AnnotationMutator {
         annotPtr,
         ref.page.objectNumber,
         index,
-        pageStateBefore.revision,
         readContextFor(this.session, this.fonts),
       );
       const actor = authorizeAnnotationUpdate(
@@ -225,14 +209,8 @@ export class AnnotationMutator {
       preflightPatch(patch, writeCtx);
 
       // Apply boundary: validation and cancellation are complete before the
-      // first possible document write (weak-id strengthening below).
+      // first document write.
       throwIfAborted(signal);
-
-      // Opportunistic /NM stamp for weak annotations + capture the
-      // resulting stable id for `meta.changed`. Same monotonic /NM
-      // rule that `move()` uses; sharing the helper guarantees the
-      // two paths cannot drift in their identity bookkeeping.
-      const stableId = this.captureOrStampStableId(annotPtr);
 
       // The appearance decision (see below) depends only on the read and the
       // patch. A write that redraws or re-places the drawing starts from the
@@ -251,12 +229,12 @@ export class AnnotationMutator {
       ) {
         fn.EPDFAnnot_RemoveKey(annotPtr, 'RC');
       }
-      // Apply /IRT + /RT changes (set/relink/clear, or RT-only). Setting a
-      // link may promote a weak parent to indirect (non-structural); the
-      // strengthened parent id is folded into `meta.changed` below.
-      let linkedParentId: AnnotationStableId | null = null;
+      // Apply /IRT + /RT changes (set/relink/clear, or RT-only). Only this
+      // annotation is written; a popup relink and a shared `/Open` also write
+      // the other annotation, which `meta.changed` names after this one.
+      let linkedParent: AnnotationRef | null = null;
       if (patch.reply !== undefined && !sameReply(patch.reply, currentDto.reply)) {
-        linkedParentId = writeAnnotationRelationship(
+        writeAnnotationRelationship(
           this.runtime,
           this.session,
           annotPtr,
@@ -274,7 +252,7 @@ export class AnnotationMutator {
         !sameRef(patch.parent, currentDto.parent)
       ) {
         relinked = true;
-        linkedParentId = writePopupParent(
+        linkedParent = writePopupParent(
           this.runtime,
           this.session,
           annotPtr,
@@ -285,7 +263,7 @@ export class AnnotationMutator {
       }
       // A note and its popup hold one `/Open`: writing it on one writes the
       // other (a relink has made them equal already).
-      let linkedOpenId: AnnotationStableId | null = null;
+      let linkedOpen: AnnotationRef | null = null;
       const open = (patch as { open?: boolean }).open;
       if (open !== undefined && !relinked) {
         const other =
@@ -295,7 +273,7 @@ export class AnnotationMutator {
               ? currentDto.parent
               : null;
         if (other) {
-          linkedOpenId = writeLinkedOpen(
+          linkedOpen = writeLinkedOpen(
             this.runtime,
             this.session,
             other,
@@ -349,33 +327,21 @@ export class AnnotationMutator {
       annotPtr = null;
       annotPtr = openAnnotAtRaw(this.runtime, this.session, pageIndex, index);
 
-      // Read back. Update is non-structural, so the index does not move
-      // and the revision does not bump.
+      // Read back. Update is non-structural, so the index does not move.
       const dto = readAnnotationFromPtr(
         fn,
         mem,
         annotPtr,
         ref.page.objectNumber,
         index,
-        pageStateBefore.revision,
         readContextFor(this.session, this.fonts),
       );
       joinWidgetFieldNumbers(this.runtime, this.session, [dto]);
 
-      this.recordWeakAnnotations(ref.page.objectNumber, pageIndex);
-      const pageStateAfter = this.session.pageState(ref.page.objectNumber);
-      const meta = computeMutationImpact({
-        mutation: 'update',
-        pageStateBefore,
-        pageStateAfter,
-        changed: [
-          ...new Set(
-            [stableId, linkedParentId, linkedOpenId].filter(
-              (id): id is AnnotationStableId => id !== null,
-            ),
-          ),
-        ],
-      });
+      const meta = annotationMutationMeta(
+        ref.page.objectNumber,
+        uniqueRefs([dto.ref, linkedParent, linkedOpen]),
+      );
       return { annotation: dto, appearance, meta };
     } finally {
       if (annotPtr !== null) fn.FPDFPage_CloseAnnot(annotPtr);
@@ -429,19 +395,12 @@ export class AnnotationMutator {
     const docPtr = this.session.requireDocPtr();
     const pageObjectNumber = ref.page.objectNumber;
     const { pageIndex } = this.session.resolvePageRef(ref.page);
-    if (ref.kind === 'index') this.session.validateRevision(ref.revision);
     // Raw handles off the document, never a loaded page: a page loaded
     // before this change's writes (a layer's copy-on-write) could miss them.
     const { annotations } = new RawAnnotationReader(this.runtime, this.session, this.fonts).listOne(
       pageObjectNumber,
       signal,
     );
-    const hasWeak = (list: readonly Annotation<PdfCoordinates>[]) =>
-      list.some((annotation) => annotation.ref.kind === 'index');
-    if (this.session.weakAnnotationState(pageObjectNumber).kind !== 'known') {
-      this.session.recordWeakFlag(pageObjectNumber, hasWeak(annotations));
-    }
-    const pageStateBefore = this.session.pageState(pageObjectNumber);
 
     const members = deletedWith(annotations, ref);
     if (members.length === 0) throw missingAnnotation(ref);
@@ -453,13 +412,12 @@ export class AnnotationMutator {
     }
     // A popup deleted without the annotation it shows leaves that
     // annotation, which stops naming it.
-    const going = new Set(members.flatMap(annotationKeysOf));
+    const going = new Set(members.map((member) => annotationKey(member.ref)));
     const keptParents = members.flatMap((member) => {
       if (member.subtype !== 'popup' || !member.parent) return [];
-      const parent = annotations.find((annotation) =>
-        annotationKeysOf(annotation).includes(annotationKey(member.parent!)),
-      );
-      return parent && !going.has(annotationKey(parent.ref)) ? [parent] : [];
+      const key = annotationKey(member.parent);
+      const parent = annotations.find((annotation) => annotationKey(annotation.ref) === key);
+      return parent && !going.has(key) ? [parent] : [];
     });
 
     // Apply boundary. Promotion keeps every position; then the highest
@@ -482,16 +440,9 @@ export class AnnotationMutator {
         fn.EPDFAnnot_RemoveKey(annotPtr, 'Popup'),
       );
     }
-    this.session.bumpRevision(pageObjectNumber);
-    this.recordWeakAnnotations(pageObjectNumber, pageIndex);
-    const meta = computeMutationImpact({
-      mutation: 'delete',
-      pageStateBefore,
-      pageStateAfter: this.session.pageState(pageObjectNumber),
-      // The annotation first, then what went with it.
-      changed: [...members].reverse().flatMap((member) => stableIdOf(member.ref)),
-    });
-    return { meta };
+    // The annotation first, then what went with it.
+    const changed = [...members].reverse().map((member) => member.ref);
+    return { meta: annotationMutationMeta(pageObjectNumber, changed) };
   }
 
   /**
@@ -505,40 +456,22 @@ export class AnnotationMutator {
     releasedFieldObjectNumber: number,
   ): AnnotationDeleteResult {
     const { fn, mem } = this.runtime;
+    const docPtr = this.session.requireDocPtr();
     const pageObjectNumber = ref.page.objectNumber;
     const { pageIndex, index } = resolveAnnotIndexRaw(this.runtime, this.session, ref);
-    this.knowWeakAnnotations(pageObjectNumber, pageIndex);
-    const pageStateBefore = this.session.pageState(pageObjectNumber);
 
-    // What the ref names it by; a weak widget has no durable id to report.
     const deleted = this.withAnnotAt(pageIndex, index, (annotPtr) => {
       this.assertNotAttachedWidget(annotPtr, releasedFieldObjectNumber);
-      if (ref.kind !== 'index') return stableIdOf(ref)[0]!;
-      const objectNumber = fn.EPDFAnnot_GetObjectNumber(annotPtr);
-      if (objectNumber > 0) return { kind: 'objectNumber', objectNumber } as const;
-      const nm = readAnnotString(fn, mem, annotPtr, 'NM');
-      return nm ? ({ kind: 'nm', nm } as const) : null;
+      return annotationRefOf(fn, mem, docPtr, ref.page, annotPtr, index);
     });
 
     // Promotion keeps every position; the raw remove also deletes the
     // indirect object.
     promoteInlineAnnotations(this.runtime, this.session, pageObjectNumber);
-    if (!fn.EPDFPage_RemoveAnnotRaw(this.session.requireDocPtr(), pageIndex, index)) {
+    if (!fn.EPDFPage_RemoveAnnotRaw(docPtr, pageIndex, index)) {
       throw new EngineError(EngineErrorCode.Unknown, `failed to remove annotation: ${ref.kind}`);
     }
-
-    // A structural change advances the local index-space epoch whatever the
-    // page's weak state: old snapshots can still hold index refs from before
-    // annotations were strengthened, and a delete makes those point elsewhere.
-    this.session.bumpRevision(pageObjectNumber);
-    this.recordWeakAnnotations(pageObjectNumber, pageIndex);
-    const meta = computeMutationImpact({
-      mutation: 'delete',
-      pageStateBefore,
-      pageStateAfter: this.session.pageState(pageObjectNumber),
-      changed: deleted ? [deleted] : [],
-    });
-    return { meta };
+    return { meta: annotationMutationMeta(pageObjectNumber, [deleted]) };
   }
 
   /**
@@ -551,13 +484,8 @@ export class AnnotationMutator {
    *     post-removal index space, preserving caller-supplied order.
    *   - Single-annotation case is `move([ref], toIndex)`. There is no
    *     separate single-move path; one batch primitive serves both.
-   *   - One revision bump and one `AnnotationListMutationMeta` envelope
-   *     per batch, regardless of `refs.length`.
-   *   - Identity strengthening: each weak ref in the batch (no
-   *     `objectNumber`, no `/NM`) is opportunistically stamped with a
-   *     fresh engine-generated UUID v4 before the move. So
-   *     `meta.changed` always lists durable stable ids, and the moved
-   *     DTOs come out durable. Same monotonic `/NM` rule as `update()`.
+   *   - One `AnnotationListMutationMeta` envelope per batch, regardless of
+   *     `refs.length`; the moved annotations keep their names.
    *
    * Validation rules applied here before calling the helper, so callers
    * get clean errors instead of an opaque `false` return code:
@@ -597,9 +525,8 @@ export class AnnotationMutator {
 
     const { fn, mem } = this.runtime;
     const docPtr = this.session.requireDocPtr();
-    const { pageIndex } = this.session.resolvePageRef(toPageRef(pageObjectNumber));
-    this.knowWeakAnnotations(pageObjectNumber, pageIndex);
-    const pageStateBefore = this.session.pageState(pageObjectNumber);
+    const page = toPageRef(pageObjectNumber);
+    const { pageIndex } = this.session.resolvePageRef(page);
 
     // 1. Resolve every ref, in caller order, to its current /Annots index.
     const fromIndices = refs.map((ref) => {
@@ -630,12 +557,8 @@ export class AnnotationMutator {
       );
     }
 
-    // Apply boundary. Each annotation's stable id, stamped on a weak one
-    // before promotion gives it an object number.
+    // Apply boundary.
     throwIfAborted(signal);
-    const stableIds = fromIndices.map((index) =>
-      this.withAnnotAt(pageIndex, index, (annotPtr) => this.captureOrStampStableId(annotPtr)),
-    );
 
     // 4. Promotion keeps every position; then the block moves.
     promoteInlineAnnotations(this.runtime, this.session, pageObjectNumber);
@@ -652,10 +575,8 @@ export class AnnotationMutator {
       );
     }
 
-    // 5. One revision bump for the whole batch. This is the local
-    //    index-space epoch, so it advances for every move even if the page
-    //    is strong. The moved DTOs read against the bumped revision.
-    const bumpedRev = this.session.bumpRevision(pageObjectNumber);
+    // 5. Read the moved annotations back where they now are; each keeps its
+    //    name.
     const annotations = fromIndices.map((_, i) => {
       throwIfAborted(signal);
       return this.withAnnotAt(pageIndex, toIndex + i, (annotPtr) =>
@@ -665,24 +586,16 @@ export class AnnotationMutator {
           annotPtr,
           pageObjectNumber,
           toIndex + i,
-          bumpedRev,
           readContextFor(this.session, this.fonts),
         ),
       );
     });
 
-    this.recordWeakAnnotations(pageObjectNumber, pageIndex);
-    const meta: AnnotationListMutationMeta = computeMutationImpact({
-      mutation: 'move',
-      pageStateBefore,
-      pageStateAfter: this.session.pageState(pageObjectNumber),
-      changed: stableIds,
-    });
+    const meta = annotationMutationMeta(
+      pageObjectNumber,
+      annotations.map((annotation) => annotation.ref),
+    );
     return { annotations, meta };
-  }
-
-  private captureOrStampStableId(annotPtr: Ptr): AnnotationStableId {
-    return captureOrStampStableId(this.runtime, annotPtr);
   }
 
   /** An annotation of the page opened raw at `index`, closed after `body`. */
@@ -694,48 +607,24 @@ export class AnnotationMutator {
       this.runtime.fn.FPDFPage_CloseAnnot(annotPtr);
     }
   }
-
-  private knowWeakAnnotations(pageObjectNumber: PageObjectNumber, pageIndex: number): void {
-    if (this.session.weakAnnotationState(pageObjectNumber).kind === 'known') return;
-    this.recordWeakAnnotations(pageObjectNumber, pageIndex);
-  }
-
-  private recordWeakAnnotations(pageObjectNumber: PageObjectNumber, pageIndex: number): void {
-    this.session.recordWeakFlag(
-      pageObjectNumber,
-      pageHasWeakAnnotations(this.runtime, this.session.requireDocPtr(), pageIndex),
-    );
-  }
 }
 
-/** `NotFound` for a ref by number or name, `InvalidReference` for a position out of range. */
+/** `NotFound` for a ref that names no annotation on its page. */
 function missingAnnotation(ref: AnnotationRef): EngineError {
-  const page = ref.page.objectNumber;
-  switch (ref.kind) {
-    case 'objectNumber':
-      return new EngineError(
-        EngineErrorCode.NotFound,
-        `no annotation with object number ${ref.objectNumber} on page ${page}`,
-      );
-    case 'nm':
-      return new EngineError(
-        EngineErrorCode.NotFound,
-        `no annotation with /NM '${ref.nm}' on page ${page}`,
-      );
-    case 'index':
-      return new EngineError(
-        EngineErrorCode.InvalidReference,
-        `index ${ref.index} out of range on page ${page}`,
-      );
-  }
+  return new EngineError(
+    EngineErrorCode.NotFound,
+    `no annotation ${annotationKey(ref)} on page ${ref.page.objectNumber}`,
+  );
 }
 
-/** What `meta.changed` names an annotation by; a weak one has no stable id. */
-function stableIdOf(ref: AnnotationRef): AnnotationStableId[] {
-  if (ref.kind === 'objectNumber')
-    return [{ kind: 'objectNumber', objectNumber: ref.objectNumber }];
-  if (ref.kind === 'nm') return [{ kind: 'nm', nm: ref.nm }];
-  return [];
+/** What a write reports touching, once each, in order. */
+function uniqueRefs(refs: ReadonlyArray<AnnotationRef | null>): AnnotationRef[] {
+  const seen = new Set<string>();
+  return refs.filter((ref): ref is AnnotationRef => {
+    if (ref === null || seen.has(annotationKey(ref))) return false;
+    seen.add(annotationKey(ref));
+    return true;
+  });
 }
 
 const sameRef = (left: AnnotationRef | null, right: AnnotationRef | null): boolean =>

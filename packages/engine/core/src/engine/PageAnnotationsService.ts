@@ -73,10 +73,8 @@ export interface PageAnnotationsService {
   delete(ref: AnnotationRef): AbortablePromise<AnnotationDeleteResult>;
   /**
    * Batch move (contiguous-block; `refs.length === 1` is the
-   * single-annotation case). Refs may mix stable ids and weak `index`
-   * refs; weak refs are opportunistically upgraded to durable `/NM`
-   * before the move (same rule as `update()`). Atomic — one revision
-   * bump and one impact computation per batch.
+   * single-annotation case). Moved annotations keep their names. All or
+   * nothing, one impact per batch.
    *
    * @param refs Annotations to move, in the order they should appear
    *             after the move.

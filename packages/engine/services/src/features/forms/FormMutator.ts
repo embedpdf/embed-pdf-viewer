@@ -73,8 +73,8 @@ const CHANGED_WIDGETS_CAPACITY = 256;
 const REPAIR_BAKE_APPEARANCES = 0x1;
 
 /**
- * Value writes are non-structural: no page-list revision bumps, and the
- * cloud layer computes its own cache delta server-side.
+ * Value writes are non-structural: the cloud layer computes its own cache
+ * delta server-side.
  */
 const EMPTY_META: MutationMeta = { affectedPages: [], cacheDelta: null };
 
@@ -165,7 +165,6 @@ export class FormMutator {
     return {
       fields,
       meta: formMutationMeta(
-        this.session,
         fields.map((field) => field.ref),
         changedWidgets,
       ),
@@ -243,7 +242,7 @@ export class FormMutator {
     const form = readFormSnapshot(this.runtime, fresh, this.session.requireDocPtr());
     // The import names no widgets, so every page with a widget may have repainted.
     const widgets = counts.applied > 0 ? form.fields.flatMap((field) => field.widgets) : [];
-    const { affectedPages, cacheDelta } = formMutationMeta(this.session, [], widgets);
+    const { affectedPages, cacheDelta } = formMutationMeta([], widgets);
     return { form, ...counts, meta: { affectedPages, cacheDelta } };
   }
 
@@ -421,8 +420,7 @@ export class FormMutator {
    * Draw a PDF page into every widget of an unsigned signature field: the
    * visual "sign" of a viewer without a signer. The field's value stays
    * empty and nothing is sealed; a signed field is refused (its appearance
-   * is part of what the signature covers). The pages of its widgets get a
-   * new revision so their renders re-pin.
+   * is part of what the signature covers).
    */
   setSignatureAppearance(
     ref: FormFieldRef,
@@ -465,10 +463,6 @@ export class FormMutator {
       bakeWidgetAppearance(this.runtime, docPtr, widget, pdf);
     }
     this.session.invalidateDerived();
-    const pages = [
-      ...new Set(before.widgets.flatMap((w) => (w.page ? [w.page.objectNumber] : []))),
-    ];
-    for (const pageObjectNumber of pages) this.session.bumpRevision(pageObjectNumber);
     return { field: this.readBackField(resolved.fieldObjectNumber) };
   }
 
@@ -566,8 +560,8 @@ export class FormMutator {
    * Delete a terminal field and its widgets in one mutation. The native
    * write detaches kid widgets and unlinks the field from /Fields or its
    * parent's /Kids; the cascade then removes every placed widget from its
-   * page through the annotation feature, which owns /Annots bookkeeping,
-   * weak-ref invalidation and page revisions. A merged field/widget has no
+   * page through the annotation feature, which owns /Annots bookkeeping. A
+   * merged field/widget has no
    * kid to detach: its own dictionary leaves its page in the same cascade.
    */
   deleteField(
@@ -640,7 +634,6 @@ export class FormMutator {
     ) {
       throw new EngineError(EngineErrorCode.InvalidArg, 'the widget could not join the field');
     }
-    if (mergedPage) this.session.bumpRevision(mergedPage.objectNumber);
     this.session.invalidateDerived();
     return {
       field: this.readBackField(resolved.fieldObjectNumber),
@@ -823,7 +816,7 @@ export class FormMutator {
     const changedWidgets: FormWidget[] = field.widgets
       .filter((w) => changedSet.has(w.objectNumber))
       .map((w) => formWidget(w.objectNumber, w.page));
-    return { field, meta: formMutationMeta(this.session, [field.ref], changedWidgets) };
+    return { field, meta: formMutationMeta([field.ref], changedWidgets) };
   }
 }
 

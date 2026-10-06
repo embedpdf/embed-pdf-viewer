@@ -11,9 +11,8 @@ import type { AnnotationReplyType } from '../annotation/primitives';
 import type { PdfActionTree } from '../dto/PdfAction';
 import { EngineError } from '../errors/EngineError';
 import { EngineErrorCode } from '../errors/EngineErrorCode';
-import { annotationKey, annotationKeysOf } from '../identity/annotationKey';
+import { annotationKey } from '../identity/annotationKey';
 import type { AnnotationRef } from '../identity/AnnotationRef';
-import type { AnnotationStableId } from '../identity/AnnotationStableId';
 import { encodePageKey, type PageRef } from '../identity/PageRef';
 import type { AnnotationListMutationMeta } from '../mutation/AnnotationListMutationMeta';
 import type { AnnotationCreateResult } from '../mutation/AnnotationMutationResults';
@@ -117,21 +116,15 @@ export function annotationImportFacts(
   const last = result.annotations.length - 1;
   return result.annotations.map((annotation, index) => {
     const { page } = annotation.ref;
-    const id: AnnotationStableId =
-      annotation.ref.kind === 'objectNumber'
-        ? { kind: 'objectNumber', objectNumber: annotation.ref.objectNumber }
-        : { kind: 'nm', nm: annotation.nm! };
     return {
       page,
       annotation,
       meta: {
         affectedPages: result.meta.affectedPages.filter(
-          (state) => state.page.objectNumber === page.objectNumber,
+          (affected) => affected.objectNumber === page.objectNumber,
         ),
         cacheDelta: index === last ? result.meta.cacheDelta : null,
-        changed: [id],
-        weakRefsInvalidated: false,
-        shouldRefetch: null,
+        changed: [annotation.ref],
       },
     };
   });
@@ -240,7 +233,8 @@ export function planAnnotationImport(input: {
 
   const byKey = new Map<string, number>();
   items.forEach((data, index) => {
-    for (const key of annotationKeysOf(data)) if (!byKey.has(key)) byKey.set(key, index);
+    const key = annotationKey(data.ref);
+    if (!byKey.has(key)) byKey.set(key, index);
   });
   // A reply and a popup are on their parent's page (ISO 32000-2 §12.5.6.2),
   // so a link finds its target only there.

@@ -18,7 +18,7 @@ import type { AnnotationBase } from './base';
 import type { Annotation } from './kinds';
 import type { PdfCoordinates } from '../pageSpace/coordinates';
 import type { AnnotationRef } from '../identity/AnnotationRef';
-import { annotationKey, annotationKeysOf } from '../identity/annotationKey';
+import { annotationKey } from '../identity/annotationKey';
 
 /**
  * Where a single annotation sits in the reply/group taxonomy.
@@ -81,15 +81,7 @@ export interface AnnotationThread<T extends Annotation = Annotation> {
  * input; this helper is intentionally unopinionated about eligibility.
  */
 export function buildThreads(annotations: readonly Annotation[]): AnnotationThread[] {
-  const byKey = new Map<string, Annotation>();
-  for (const a of annotations) {
-    byKey.set(annotationKey(a.ref), a);
-    // Index under /NM too, so a child that points at the parent by name
-    // still resolves when the parent's own ref is objectNumber-form.
-    if (a.nm && a.nm.length > 0) {
-      byKey.set(`nm:${a.ref.page.objectNumber}:${a.nm}`, a);
-    }
-  }
+  const byKey = new Map(annotations.map((a) => [annotationKey(a.ref), a]));
 
   const threads: AnnotationThread[] = [];
   const threadByPrimaryKey = new Map<string, AnnotationThread>();
@@ -142,12 +134,9 @@ export function deletedWith<A extends Annotation | Annotation<PdfCoordinates>>(
   annotations: readonly A[],
   ref: AnnotationRef,
 ): A[] {
-  const byKey = new Map<string, A>();
-  for (const annotation of annotations) {
-    for (const key of annotationKeysOf(annotation)) {
-      if (!byKey.has(key)) byKey.set(key, annotation);
-    }
-  }
+  const byKey = new Map(
+    annotations.map((annotation) => [annotationKey(annotation.ref), annotation]),
+  );
   const target = byKey.get(annotationKey(ref));
   if (!target) return [];
 

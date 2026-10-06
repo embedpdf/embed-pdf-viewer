@@ -1308,8 +1308,8 @@ export type AdminOperationId = keyof typeof adminOperations;
 // can genuinely call — plain origin paths, credentialed by the API token
 // (which the server resolves to the document's own tenant) or a doc JWT
 // carrying the listed capabilities. The viewer-session protocol — /v1/access,
-// /v1/warm, the immutable `@{version}` CDN variants, SSE, weak annotation
-// sessions, password sessions — deliberately stays out of this registry: it
+// /v1/warm, the immutable `@{version}` CDN variants, SSE, password
+// sessions — deliberately stays out of this registry: it
 // is the transport between the CloudPDF viewer SDK and the engine, free to
 // evolve behind the SDK boundary. Body/response schemas start deliberately
 // loose (documented paths, params, credentials, capabilities) and tighten
@@ -1331,7 +1331,13 @@ export const DocPageParamsSchema = DocLayerParamsSchema.extend({
     ),
 });
 export const DocAnnotationParamsSchema = DocPageParamsSchema.extend({
-  annotKey: z.string().min(1),
+  annotKey: z
+    .string()
+    .min(1)
+    .regex(/^(obj:[1-9][0-9]*|base:(0|[1-9][0-9]*))$/)
+    .describe(
+      "The annotation's address on the page: `obj:N`, its indirect object number, or `base:N` for an annotation the uploaded file stored inline (without an object number of its own), the position it was born at in the page's /Annots. The name the annotation's `ref` carries for life.",
+    ),
 });
 export const DocFieldParamsSchema = DocLayerParamsSchema.extend({
   fieldKey: z.string().min(1),

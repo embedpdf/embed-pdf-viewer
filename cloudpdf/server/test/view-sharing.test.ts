@@ -154,7 +154,7 @@ describe('plane-scoped view sharing', () => {
 
     const manifest = await fetchLayerManifest(fx, tenantId, docId, 'alice');
     expect(manifest.scopes).toEqual({ ...ALL_BASE, annotations: 'layer' });
-    const page1 = manifest.pages.find((p) => p.state.page.objectNumber === 1)!;
+    const page1 = manifest.pages.find((p) => p.page.objectNumber === 1)!;
     expect(page1.cache.annotationVersion).toBeGreaterThan(1);
     expect(page1.cache.contentVersion).toBe(1);
 

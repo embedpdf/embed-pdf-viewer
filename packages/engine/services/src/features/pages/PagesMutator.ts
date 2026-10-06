@@ -26,26 +26,16 @@ import { throwIfAborted } from '../../shared/abort';
  * `worker_thread`) share the same code path.
  *
  * Architectural anchor — locked with the user, do not loosen without
- * re-reading the doc comments on `PageMoveResult` and `RevisionAuthority`:
+ * re-reading the doc comment on `PageMoveResult`:
  *
- *   - Pages are addressed by their durable `pageObjectNumber`. There is
- *     no "weak page ref" model in the engine; therefore there is no
- *     document-level revision token, no `DocumentRevisionStore`, and no
- *     "doc-level shouldRefetch" semantic. Anything that *is* listed
- *     here must remain stable across every reorder permutation.
+ *   - Pages are addressed by their durable `pageObjectNumber`, which must
+ *     remain stable across every reorder permutation.
  *
- *   - Per-page `RevisionToken`s do not bump on `move()`. The /Annots
- *     array of each affected page is untouched (PDFium just rewrites
- *     pointer entries in the doc-level pages tree), so weak
- *     `AnnotationRef.kind === 'index'` references the caller is
- *     holding remain valid across a page reorder. This is the right
- *     semantic for an editing UI: shuffling pages must not silently
- *     break a pending highlight edit.
- *
- *   - Identity strengthening (the opportunistic `/NM` stamping that
- *     applies to weak annotations on `update()` / `move()`) is also
- *     intentionally absent here. Pages are durable by construction;
- *     there is nothing to upgrade.
+ *   - The /Annots array of each page is untouched by `move()` (PDFium just
+ *     rewrites pointer entries in the doc-level pages tree), so every
+ *     annotation ref the caller is holding stays valid across a page
+ *     reorder: shuffling pages must not silently break a pending
+ *     highlight edit.
  */
 export class PagesMutator {
   constructor(
@@ -126,9 +116,7 @@ export class PagesMutator {
       );
     }
 
-    // Page positions changed; rebuild the index<->pon map. Per-page
-    // revisions and weak-flag bookkeeping survive — both keyed by pon,
-    // both untouched by the reorder.
+    // Page positions changed; rebuild the index<->pon map.
     this.session.refreshPageRegistry();
 
     // A move returns geometry, not liveness: read the new layout off the
@@ -191,9 +179,9 @@ export class PagesMutator {
   /**
    * Delete pages. Deleted object numbers are retired — the engine nulls the
    * page object rather than freeing the number — so per-page state keyed by
-   * page object number can never silently attach to an unrelated future page; we still drop
-   * the session's revision/weak entries as hygiene. Surviving pages keep
-   * their identity and `RevisionToken`s.
+   * page object number can never silently attach to an unrelated future
+   * page. Surviving pages keep their identity, and their annotations their
+   * names.
    *
    * Guards:
    *   - a document must keep at least one page (`InvalidArg`);
@@ -238,11 +226,9 @@ export class PagesMutator {
           `EPDFDoc_DeletePageByObjectNumber rejected page ${pageObjectNumber} after validation`,
         );
       }
-      this.session.dropPageState(pageObjectNumber);
     }
 
-    // Page count and order changed; rebuild the index<->pon map. Surviving
-    // pages' revisions and weak-flag bookkeeping stay put (keyed by pon).
+    // Page count and order changed; rebuild the index<->pon map.
     this.session.refreshPageRegistry();
 
     const layout = new PagesReader(this.runtime, this.session).read(signal);
@@ -253,7 +239,7 @@ export class PagesMutator {
    * Register `name` → page in `/Names /Pages` (create, or replace what the
    * key points at); with `replace`, drop that other key first — a rename as
    * one job. Named pages are layout: page identity and order are untouched
-   * (no registry refresh, no revision bumps) and the fresh snapshot is
+   * (no registry refresh) and the fresh snapshot is
    * returned like `move()`.
    */
   setName(input: PageNameInput, signal: AbortSignal): PageNameResult<PdfCoordinates> {

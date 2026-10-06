@@ -23,7 +23,7 @@ export type DraftAttribution = Readonly<
  * will sit, who creates it, and what the engine works out from its drawing.
  */
 export interface DraftContext<Box = unknown> {
-  /** The ref it will have. A viewer names a create it's still waiting on by its `nm`. */
+  /** The ref the read names it by. */
   readonly ref: AnnotationRef;
   /** Its place among its page's annotations: a create goes last. */
   readonly index: number;
@@ -86,7 +86,6 @@ export function annotationOfResolvedDraft<C extends Coordinates>(
   read.ref = context.ref;
   read.page = context.ref.page;
   read.index = context.index;
-  read.identityQuality = 'durable';
   read.hasAppearance = !UNBAKED_KINDS.has(subtype);
   if (read.rect === null) read.rect = context.rect ?? given.rect ?? given.box ?? NO_BOX;
 

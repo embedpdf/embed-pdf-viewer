@@ -1,6 +1,5 @@
 import { describe, expect, test } from 'vitest';
 import { toPageRef, wirePack, type WorkerResponse } from '@embedpdf/engine-core/runtime';
-import { ManifestPageSchema } from '@embedpdf/engine-core/wire';
 import type { PdfRuntimeModule, Ptr } from '@embedpdf/engine-runtime';
 import { BaseDocumentRegistry } from '../../services/src/document-session/lifecycle/BaseDocumentRegistry';
 import { DocumentSession } from '../../services/src/document-session/DocumentSession';
@@ -180,37 +179,6 @@ describe('DocumentSession open ownership', () => {
     session.close();
 
     expect(runtime.calls.closeDocuments).toEqual([ptr(101)]);
-  });
-
-  test('pageState keeps weak annotation knowledge explicit', () => {
-    const runtime = createFakeRuntime();
-    const session = new DocumentSession(runtime);
-
-    session.open(new Uint8Array([1]), null);
-
-    const initial = session.pageState(1101);
-    expect(initial.weakAnnotationState).toEqual({ kind: 'unknown' });
-    expect(
-      ManifestPageSchema.safeParse({
-        state: initial,
-        cache: { contentVersion: 1, annotationVersion: 1 },
-      }).success,
-    ).toBe(false);
-
-    session.recordWeakFlag(1101, false);
-    const known = session.pageState(1101);
-    expect(known.weakAnnotationState).toEqual({
-      kind: 'known',
-      hasAnyWeakAnnotations: false,
-    });
-    expect(
-      ManifestPageSchema.safeParse({
-        state: known,
-        cache: { contentVersion: 1, annotationVersion: 1 },
-      }).success,
-    ).toBe(true);
-
-    session.close();
   });
 
   test('base registry shares one loaded memory base until the last release', () => {

@@ -66,11 +66,11 @@ describe('changes faster than the engine answers (local engine)', () => {
     }
   });
 
-  test('two edits of a weak annotation: the first names it, both land on one record', async () => {
-    const { doc, ctx, annotation } = await openFixture('pending-weak-edits');
+  test('two edits of an inline annotation land on one record, under its birth name', async () => {
+    const { doc, ctx, annotation } = await openFixture('pending-inline-edits');
     try {
-      const weak = annotation.list().find((entry) => entry.ref.kind === 'index')!.ref;
-      annotation.select(weak);
+      const inline = annotation.list().find((entry) => entry.ref.kind === 'baseIndex')!.ref;
+      annotation.select(inline);
       const green = annotation.updateSelection({ color: '#00ff00' });
       const faded = annotation.updateSelection({ opacity: 0.2 });
       await Promise.all([green, faded]);
@@ -82,7 +82,7 @@ describe('changes faster than the engine answers (local engine)', () => {
         .sort();
       expect(keys).toEqual(await engineKeys(doc));
       const [selected] = annotation.getSelection();
-      expect(selected?.kind).toBe('nm');
+      expect(selected).toEqual(inline);
       // The engine stores opacity in 1/255 steps.
       const shown = annotation.get(selected!);
       expect(shown && 'color' in shown ? shown.color : null).toBe('#00ff00');

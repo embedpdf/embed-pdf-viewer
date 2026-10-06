@@ -38,8 +38,8 @@ export function pageRefsEqual(a: PageRef, b: PageRef): boolean {
 
 /**
  * URL-safe encoding of a `PageRef`, used by the cloud HTTP surface as the
- * `:pageKey` route parameter. Mirrors `encodeStableIdKey` (`obj:42` /
- * `nm:…`) and `encodeFieldRefKey` (`obj:12` / `fqn:…`), so every identity
+ * `:pageKey` route parameter. Mirrors `encodeAnnotKey` (`obj:42` /
+ * `base:2`) and `encodeFieldRefKey` (`obj:12` / `fqn:…`), so every identity
  * reads the same on the wire:
  *
  *   `{ kind: 'objectNumber', objectNumber: 3 }` -> `'obj:3'`

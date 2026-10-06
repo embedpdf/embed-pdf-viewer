@@ -1,11 +1,9 @@
 import {
   EngineError,
   EngineErrorCode,
-  type PageState,
   decodePageKey,
   type PageRef,
 } from '@embedpdf/engine-core/runtime';
-import type { ManifestPage } from '@embedpdf/engine-core/wire';
 
 /**
  * Shared route helpers. Lives next to the route files (prefixed with
@@ -84,10 +82,6 @@ export function resolvePageRefToNumber(ref: PageRef): number {
 /** `parsePageKey` + `resolvePageRefToNumber` in one call, for route handlers. */
 export function resolvePageKeyParam(raw: string): number {
   return resolvePageRefToNumber(parsePageKey(raw));
-}
-
-export function toPageState(page: ManifestPage): PageState {
-  return page.state;
 }
 
 /**

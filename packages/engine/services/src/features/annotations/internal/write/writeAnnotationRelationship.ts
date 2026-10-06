@@ -1,7 +1,6 @@
 import type {
   AnnotationRef,
   AnnotationReplyType,
-  AnnotationStableId,
   PageObjectNumber,
 } from '@embedpdf/engine-core/runtime';
 import {
@@ -12,8 +11,7 @@ import {
 import { NULL_PTR, type PdfRuntimeModule, type Ptr } from '@embedpdf/engine-runtime';
 
 import type { DocumentSession } from '../../../../document-session/DocumentSession';
-import { captureOrStampStableId } from '../identity/captureOrStampStableId';
-import { openAnnotRaw } from '../identity/resolveAnnotIndexRaw';
+import { openAnnotRaw, openNamedAnnotRaw } from '../identity/resolveAnnotIndexRaw';
 import { readAnnotBoolean } from '../read/annotationReadPrimitives';
 import { RT_UNKNOWN, replyTypeToCode } from '../replyType';
 
@@ -34,18 +32,9 @@ export interface RelationshipWrite {
 
 /**
  * Apply the `/IRT` + `/RT` relationship to `annotPtr`; the parent is
- * opened raw, so no page is loaded. Returns the parent's (possibly newly
- * strengthened) {@link AnnotationStableId} when a link was set, so the
- * mutator can report the side-effecting promotion in `meta.changed`;
- * `null` for the clear / RT-only / no-op cases.
- *
- * Linking to a parent that is a weak/direct object promotes it to an
- * indirect object (`/IRT` must be an indirect reference). This is
- * non-structural — it assigns the parent an object number in place
- * without shifting any `/Annots` index — so it does not invalidate weak
- * refs or warrant a revision bump. We strengthen the parent with a
- * durable `/NM` before linking (via {@link captureOrStampStableId}) so its
- * identity survives a full save/reload, and report that id upstream.
+ * opened raw, so no page is loaded. Only the reply is written: linking to a
+ * parent born inline makes it an object (`/IRT` must be an indirect
+ * reference), which keeps its name.
  *
  * ISO 32000 §12.5.6.2 requires the reply and its parent to share a page;
  * we enforce that here with a fast `InvalidArg` (PDFium itself only checks
@@ -57,14 +46,14 @@ export function writeAnnotationRelationship(
   annotPtr: Ptr,
   pageObjectNumber: PageObjectNumber,
   rel: RelationshipWrite,
-): AnnotationStableId | null {
+): void {
   const { fn } = runtime;
 
   // Clear: remove /IRT and /RT; the annotation becomes top-level.
   if (rel.inReplyTo === null) {
     fn.EPDFAnnot_SetLinkedAnnot(annotPtr, 'IRT', NULL_PTR);
     fn.EPDFAnnot_SetReplyType(annotPtr, RT_UNKNOWN);
-    return null;
+    return;
   }
 
   // Set / relink.
@@ -77,14 +66,11 @@ export function writeAnnotationRelationship(
     }
     const parentPtr = openAnnotRaw(runtime, session, rel.inReplyTo);
     try {
-      // Strengthen before the link promotes the parent to indirect, so the
-      // reported id is the save-stable /NM rather than a renumberable objNum.
-      const parentStableId = captureOrStampStableId(runtime, parentPtr);
       linkReply(runtime, annotPtr, parentPtr, rel.replyType ?? 'reply');
-      return parentStableId;
     } finally {
       fn.FPDFPage_CloseAnnot(parentPtr);
     }
+    return;
   }
 
   // inReplyTo undefined: a standalone /RT change only applies if the
@@ -100,14 +86,13 @@ export function writeAnnotationRelationship(
       }
     }
   }
-  return null;
 }
 
 /**
  * Link a popup to the annotation it shows, in both directions: the popup's
  * `/Parent` and the parent's `/Popup` (ISO 32000-2 §12.5.6.14). `null`
  * unlinks it. A previous parent loses its `/Popup` when it pointed at this
- * popup. Returns the parent's stable id, which linking may strengthen.
+ * popup. Returns the parent's name, as the annotation the link wrote.
  */
 export function writePopupParent(
   runtime: PdfRuntimeModule,
@@ -116,7 +101,7 @@ export function writePopupParent(
   pageObjectNumber: PageObjectNumber,
   parent: AnnotationRef | null,
   previousParent: AnnotationRef | null,
-): AnnotationStableId | null {
+): AnnotationRef | null {
   const { fn } = runtime;
   if (previousParent) {
     const previousPtr = openAnnotRaw(runtime, session, previousParent);
@@ -143,11 +128,10 @@ export function writePopupParent(
       `a popup's parent must be on the same page (parent page ${parent.page.objectNumber}, popup page ${pageObjectNumber})`,
     );
   }
-  const parentPtr = openAnnotRaw(runtime, session, parent);
+  const { annotPtr: parentPtr, name } = openNamedAnnotRaw(runtime, session, parent);
   try {
-    const parentStableId = captureOrStampStableId(runtime, parentPtr);
     linkPopup(runtime, popupPtr, parentPtr);
-    return parentStableId;
+    return name;
   } finally {
     fn.FPDFPage_CloseAnnot(parentPtr);
   }
@@ -218,8 +202,8 @@ function syncNoteOpen(runtime: PdfRuntimeModule, popupPtr: Ptr, parentPtr: Ptr):
 /**
  * Write `open` on the other half of a note and its popup: `target` is the
  * note's popup, or the popup's parent. Only a note shares it: `null` when
- * `target` is another parent, which keeps its own. Returns the stable id of
- * the annotation it wrote.
+ * `target` is another parent, which keeps its own. Returns the name of the
+ * annotation it wrote.
  */
 export function writeLinkedOpen(
   runtime: PdfRuntimeModule,
@@ -227,15 +211,15 @@ export function writeLinkedOpen(
   target: AnnotationRef,
   open: boolean,
   onlyNote: boolean,
-): AnnotationStableId | null {
+): AnnotationRef | null {
   const { fn } = runtime;
-  const targetPtr = openAnnotRaw(runtime, session, target);
+  const { annotPtr: targetPtr, name } = openNamedAnnotRaw(runtime, session, target);
   try {
     if (onlyNote && fn.FPDFAnnot_GetSubtype(targetPtr) !== PdfAnnotationSubtypeCode.TEXT) {
       return null;
     }
     setOpen(runtime, targetPtr, open);
-    return captureOrStampStableId(runtime, targetPtr);
+    return name;
   } finally {
     fn.FPDFPage_CloseAnnot(targetPtr);
   }

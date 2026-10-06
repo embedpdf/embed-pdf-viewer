@@ -24,15 +24,14 @@ import type {
   TextDraft,
   TextPatch,
 } from '../annotation/kinds';
-import type { WeakAnnotationEditSession } from '../engine/DocumentAnnotationsService';
 import type { DocumentHandle } from '../engine/DocumentHandle';
 import type { Engine } from '../engine/Engine';
 import { EngineError } from '../errors/EngineError';
 import { EngineErrorCode } from '../errors/EngineErrorCode';
 import type { PageBox, PagePoint } from '../geometry/pageSpace';
 import { pagePointsBounds, pagePointTurned, pageTurnOfUpright } from '../pageSpace/helpers';
+import { annotationKey } from '../identity/annotationKey';
 import type { AnnotationRef } from '../identity/AnnotationRef';
-import type { AnnotationStableId } from '../identity/AnnotationStableId';
 import { toPageRef } from '../identity/PageRef';
 import { AbortError } from '../promise/AbortError';
 import {
@@ -51,8 +50,8 @@ import {
 export interface AnnotationMutationConformanceFixture extends ConformanceFixture {
   /** PDF object number of the page used by the mutation tests. */
   pageObjectNumber: number;
-  /** Page already has at least one weak annotation (no /NM, direct object). */
-  expectsWeakAnnotation: boolean;
+  /** The page has at least one annotation born inline (a dictionary in `/Annots`, no object number). */
+  expectsInlineAnnotation: boolean;
   /**
    * QuadPoints to use for the create() smoke test, in page space; pick a
    * small rectangle that fits anywhere on the fixture page so we don't
@@ -141,16 +140,10 @@ const DEFAULT_INK_STROKES: InkDraft['inkList'] = [
  *
  * The locked rules being verified here:
  *   - `create` is append-only: PDFium drops the new annotation at
- *     `index = previousCount`, so no existing index shifts. Treated
- *     as non-invalidating — revisions do not bump and weak refs
- *     captured before the create remain valid.
- *   - `update` is non-structural; revisions do not bump.
- *   - Opportunistic /NM stamp upgrades a weak annotation's ref to
- *     `kind: 'nm'` on update; an already-durable annotation's /NM is
- *     never touched.
- *   - `delete` and `move` are the only index-shifting ops. They bump
- *     the per-page revision and, on a page that had weak refs before
- *     the mutation, surface `shouldRefetch: 'weakRefsInvalidated'`.
+ *     `index = previousCount`, so no existing index shifts.
+ *   - Every annotation keeps its name through every write: an object
+ *     number, or the `baseIndex` of one born inline in the file. No write
+ *     stamps an /NM to name one.
  *   - Abort propagates as `AbortError` even before the worker
  *     responds.
  */
@@ -177,7 +170,7 @@ export function runAnnotationMutationConformance(
       if (engine) await engine.destroy();
     });
 
-    test('create appends without shifting indices and leaves weak refs valid', async () => {
+    test('create appends without shifting indices', async () => {
       const doc = await openFixture(engine, opts);
       try {
         const page = doc.page(toPageRef(fix.pageObjectNumber));
@@ -194,22 +187,13 @@ export function runAnnotationMutationConformance(
         const result = await page.annotations.create(draft);
         expect(AnnotationCreateResultSchema.safeParse(result).success).toBe(true);
         expect(result.meta.affectedPages.length).toBe(1);
-        expect(result.meta.affectedPages[0].page.objectNumber).toBe(fix.pageObjectNumber);
+        expect(result.meta.affectedPages[0].objectNumber).toBe(fix.pageObjectNumber);
         expect('cacheDelta' in result.meta).toBe(true);
 
-        // Always durable (engine uses the EPDFPage_CreateAnnot fork helper).
-        expect(result.annotation.identityQuality).toBe('durable');
+        // Born as an object (the engine creates it with EPDFPage_CreateAnnotRaw).
         expect(result.annotation.subtype).toBe('highlight');
         expect(result.annotation.ref.kind).toBe('objectNumber');
 
-        // Locked rule: create is append-only, so the page revision does
-        // not bump and no weak refs become stale — regardless of whether
-        // the page had pre-existing weak annotations.
-        expect(result.meta.affectedPages[0].revision.generation).toBe(
-          before.pages[0].revision.generation,
-        );
-        expect(result.meta.shouldRefetch).toBe(null);
-        expect(result.meta.weakRefsInvalidated).toBe(false);
         expect(result.meta.changed.length).toBe(1);
 
         // The annotation is actually on the page now, at the end of the
@@ -273,7 +257,6 @@ export function runAnnotationMutationConformance(
         const circle = await page.annotations.create(circleDraft);
         expect(AnnotationCreateResultSchema.safeParse(circle).success).toBe(true);
         expect(circle.annotation.subtype).toBe('circle');
-        expect(circle.annotation.identityQuality).toBe('durable');
         expect(circle.annotation.ref.kind).toBe('objectNumber');
         if (circle.annotation.subtype === 'circle') {
           expect(circle.annotation.interiorColor).toBe('#ff0000');
@@ -1089,11 +1072,6 @@ export function runAnnotationMutationConformance(
           expect(result.annotation.color).toBe('#0050a0');
           expect(result.annotation.interiorColor).toBe('#f0f0f0');
         }
-        // Update never bumps the revision.
-        expect(result.meta.affectedPages[0].revision.generation).toBe(
-          before.pages[0].revision.generation,
-        );
-        expect(result.meta.weakRefsInvalidated).toBe(false);
       } finally {
         await doc.close();
       }
@@ -1258,7 +1236,6 @@ export function runAnnotationMutationConformance(
           ]);
           expect(rewritten.annotation.richText.body.size).toBe(14);
         }
-        expect(rewritten.meta.weakRefsInvalidated).toBe(false);
       } finally {
         await doc.close();
       }
@@ -1467,12 +1444,6 @@ export function runAnnotationMutationConformance(
           expect(cleared.annotation.repeat).toBe(false);
           expect(cleared.annotation.interiorColor).toBe(null);
         }
-
-        // Updates never bump the revision.
-        expect(cleared.meta.affectedPages[0].revision.generation).toBe(
-          before.pages[0].revision.generation,
-        );
-        expect(cleared.meta.weakRefsInvalidated).toBe(false);
       } finally {
         await doc.close();
       }
@@ -1494,7 +1465,6 @@ export function runAnnotationMutationConformance(
         const caret = await page.annotations.create(caretDraft);
         expect(AnnotationCreateResultSchema.safeParse(caret).success).toBe(true);
         expect(caret.annotation.subtype).toBe('caret');
-        expect(caret.annotation.identityQuality).toBe('durable');
         expect(caret.annotation.ref.kind).toBe('objectNumber');
         if (caret.annotation.subtype === 'caret') {
           expect(caret.annotation.intent).toBe('replace');
@@ -1522,11 +1492,6 @@ export function runAnnotationMutationConformance(
           expect(result.annotation.color).toBe('#ff0000');
           expect(result.annotation.box).toEqual(shapeRect);
         }
-        // Update never bumps the revision.
-        expect(result.meta.affectedPages[0].revision.generation).toBe(
-          before.pages[0].revision.generation,
-        );
-        expect(result.meta.weakRefsInvalidated).toBe(false);
 
         const after = await page.annotations.list();
         expect(after.annotations.some((a) => a.subtype === 'caret')).toBe(true);
@@ -1568,11 +1533,6 @@ export function runAnnotationMutationConformance(
           expect(result.annotation.inkList.length).toBe(newStrokes.length);
           expect(result.annotation.color).toBe('#dc143c');
         }
-        // Update never bumps the revision.
-        expect(result.meta.affectedPages[0].revision.generation).toBe(
-          before.pages[0].revision.generation,
-        );
-        expect(result.meta.weakRefsInvalidated).toBe(false);
       } finally {
         await doc.close();
       }
@@ -1648,11 +1608,6 @@ export function runAnnotationMutationConformance(
           expect(result.annotation.lineEndings.start).toBe('circle');
           expect(result.annotation.lineEndings.end).toBe('diamond');
         }
-        // Update never bumps the revision.
-        expect(result.meta.affectedPages[0].revision.generation).toBe(
-          before.pages[0].revision.generation,
-        );
-        expect(result.meta.weakRefsInvalidated).toBe(false);
       } finally {
         await doc.close();
       }
@@ -1687,11 +1642,6 @@ export function runAnnotationMutationConformance(
           // Unpatched fields are preserved.
           expect(result.annotation.borderStyle).toBe('solid');
         }
-        // Update never bumps the revision.
-        expect(result.meta.affectedPages[0].revision.generation).toBe(
-          before.pages[0].revision.generation,
-        );
-        expect(result.meta.weakRefsInvalidated).toBe(false);
       } finally {
         await doc.close();
       }
@@ -1722,92 +1672,86 @@ export function runAnnotationMutationConformance(
       }
     });
 
-    test('update on a durable annotation is non-structural and never touches /NM', async () => {
+    test("update keeps the annotation's name and never touches /NM", async () => {
       const doc = await openFixture(engine, opts);
       try {
         const page = doc.page(toPageRef(fix.pageObjectNumber));
         const before = await page.annotations.list();
 
-        const target = before.annotations.find((a) => a.identityQuality === 'durable');
-        // Skip the assertion gracefully if the fixture has no durable annot
-        // up front; the test fixture used in our suites does (the existing
-        // highlights have /NM).
+        const target = before.annotations.find((a) => a.ref.kind === 'objectNumber');
+        // Skip gracefully if the fixture page has no annotation born as an
+        // object; the fixture used in our suites has some.
         if (!target) return;
 
-        const ref: AnnotationRef = target.ref;
         const newContents = `mutation conformance: updated@${Date.now()}`;
         const patch = subtypeAwarePatch(target.subtype, newContents);
         if (!patch) return;
 
-        const result = await page.annotations.update(ref, patch);
+        const result = await page.annotations.update(target.ref, patch);
         expect(AnnotationUpdateResultSchema.safeParse(result).success).toBe(true);
-        expect(result.meta.affectedPages.length).toBe(1);
-        expect(result.meta.affectedPages[0].page.objectNumber).toBe(fix.pageObjectNumber);
+        expect(result.meta.affectedPages).toEqual([toPageRef(fix.pageObjectNumber)]);
         expect('cacheDelta' in result.meta).toBe(true);
 
-        // Same identity, /NM untouched.
-        expect(result.annotation.ref.kind).toBe(target.ref.kind);
+        // Same name, /NM untouched.
+        expect(annotationKey(result.annotation.ref)).toBe(annotationKey(target.ref));
         expect(result.annotation.nm).toBe(target.nm);
-
-        // Update never bumps the revision.
-        expect(result.meta.affectedPages[0].revision.generation).toBe(
-          before.pages[0].revision.generation,
-        );
-        expect(result.meta.shouldRefetch).toBe(null);
-        expect(result.meta.weakRefsInvalidated).toBe(false);
-
-        // Round-trip the new contents.
         expect(result.annotation.contents).toBe(newContents);
       } finally {
         await doc.close();
       }
     });
 
-    if (fix.expectsWeakAnnotation) {
-      test('update on a weak annotation stamps a UUID v4 /NM and upgrades the ref', async () => {
+    if (fix.expectsInlineAnnotation) {
+      test('update of an annotation born inline keeps its baseIndex name and writes no /NM', async () => {
         const doc = await openFixture(engine, opts);
         try {
           const page = doc.page(toPageRef(fix.pageObjectNumber));
           const before = await page.annotations.list();
+          const inline = before.annotations.find((a) => a.ref.kind === 'baseIndex');
+          expect(inline !== undefined).toBe(true);
+          if (!inline) return;
 
-          const weak = before.annotations.find((a) => a.identityQuality === 'weak');
-          expect(weak !== undefined).toBe(true);
-          if (!weak) return;
-          expect(weak.ref.kind).toBe('index');
-
-          const newContents = `weak-upgrade@${Date.now()}`;
-          const patch = subtypeAwarePatch(weak.subtype, newContents);
+          const newContents = `inline-update@${Date.now()}`;
+          const patch = subtypeAwarePatch(inline.subtype, newContents);
           if (!patch) return;
 
-          const result = await page.annotations.update(weak.ref, patch);
+          const result = await page.annotations.update(inline.ref, patch);
           expect(AnnotationUpdateResultSchema.safeParse(result).success).toBe(true);
-          expect(result.meta.affectedPages.length).toBe(1);
-          expect(result.meta.affectedPages[0].page.objectNumber).toBe(fix.pageObjectNumber);
-          expect('cacheDelta' in result.meta).toBe(true);
+          expect(annotationKey(result.annotation.ref)).toBe(annotationKey(inline.ref));
+          expect(result.annotation.nm).toBe(inline.nm);
+          expect(result.meta.changed).toEqual([inline.ref]);
 
-          // The ref is upgraded to durable. Either nm (engine-stamped) or
-          // objectNumber (if the annotation surprisingly had one) is fine.
-          expect(
-            result.annotation.ref.kind === 'nm' || result.annotation.ref.kind === 'objectNumber',
-          ).toBe(true);
-          expect(result.annotation.identityQuality).toBe('durable');
-          if (result.annotation.ref.kind === 'nm') {
-            expect(result.annotation.nm !== null).toBe(true);
-            expect(typeof result.annotation.nm).toBe('string');
-            // Engine stamps RFC 4122 v4 UUIDs: 8-4-4-4-12 hex with
-            // version 4 and variant 10xx. Match loosely.
-            expect(
-              /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(
-                result.annotation.nm!,
-              ),
-            ).toBe(true);
-          }
-
-          // Still non-structural.
-          expect(result.meta.affectedPages[0].revision.generation).toBe(
-            before.pages[0].revision.generation,
+          // A later read finds it under the same name, changed.
+          const after = await page.annotations.list();
+          const read = after.annotations.find(
+            (a) => annotationKey(a.ref) === annotationKey(inline.ref),
           );
-          expect(result.meta.shouldRefetch).toBe(null);
+          expect(read?.contents).toBe(newContents);
+        } finally {
+          await doc.close();
+        }
+      });
+    }
+
+    // Runs before the inline delete below: an engine whose documents persist
+    // between tests (cloud) loses the fixture's one inline annotation to it.
+    if (fix.expectsInlineAnnotation) {
+      test('move of an annotation born inline keeps its baseIndex name', async () => {
+        const doc = await openFixture(engine, opts);
+        try {
+          const page = doc.page(toPageRef(fix.pageObjectNumber));
+          const before = await page.annotations.list();
+          const inline = before.annotations.find((a) => a.ref.kind === 'baseIndex');
+          expect(inline !== undefined).toBe(true);
+          if (!inline) return;
+
+          const target = inline.index === 0 ? 1 : 0;
+          const result = await page.annotations.move([inline.ref], target);
+          expect(result.annotations.length).toBe(1);
+          expect(annotationKey(result.annotations[0].ref)).toBe(annotationKey(inline.ref));
+          expect(result.annotations[0].index).toBe(target);
+          expect(result.annotations[0].nm).toBe(inline.nm);
+          expect(result.meta.changed).toEqual([inline.ref]);
         } finally {
           await doc.close();
         }
@@ -1827,81 +1771,58 @@ export function runAnnotationMutationConformance(
         const created = await page.annotations.create(draft);
         const before = await page.annotations.list();
 
-        const weakSession = await beginEditIfRequired(doc, fix.pageObjectNumber, fix);
-        const deletions: AnnotationStableId[][] = [];
+        const deletions: AnnotationRef[][] = [];
         const stop = doc.events.subscribe((event) => {
           if (event.type === 'annotations.deleted') deletions.push(event.deleted);
         });
         const result = await page.annotations.delete(created.annotation.ref);
         stop();
-        try {
-          // Nothing exists after a delete: the result is its meta only, and
-          // the event names what went, for listeners that didn't delete it.
-          expect(Object.keys(result)).toEqual(['meta']);
-          expect(deletions).toEqual([
-            [
-              {
-                kind: 'objectNumber',
-                objectNumber: (created.annotation.ref as { objectNumber: number }).objectNumber,
-              },
-            ],
-          ]);
-          expect(result.meta.affectedPages.length).toBe(1);
-          expect(result.meta.affectedPages[0].page.objectNumber).toBe(fix.pageObjectNumber);
-          expect('cacheDelta' in result.meta).toBe(true);
+        // Nothing exists after a delete: the result is its meta only, and
+        // the event names what went, for listeners that didn't delete it.
+        expect(Object.keys(result)).toEqual(['meta']);
+        expect(deletions).toEqual([[created.annotation.ref]]);
+        expect(result.meta.affectedPages).toEqual([toPageRef(fix.pageObjectNumber)]);
+        expect('cacheDelta' in result.meta).toBe(true);
+        expect(result.meta.changed).toEqual([created.annotation.ref]);
 
-          // Its stable id is in meta (we created it; it's durable).
-          expect(result.meta.changed).toHaveLength(1);
-          expect(result.meta.changed[0]?.kind).toBe('objectNumber');
-
-          // Structural: revision bumped.
-          expect(result.meta.affectedPages[0].revision.generation).toBe(
-            before.pages[0].revision.generation + 1,
-          );
-
-          // The annotation is gone.
-          const after = await page.annotations.list();
-          expect(after.annotations.length).toBe(before.annotations.length - 1);
-        } finally {
-          await weakSession?.close();
-        }
+        // The annotation is gone.
+        const after = await page.annotations.list();
+        expect(after.annotations.length).toBe(before.annotations.length - 1);
       } finally {
         await doc.close();
       }
     });
 
-    if (fix.expectsWeakAnnotation) {
-      test('delete by index of a weak annotation reports no stable id and a refetch reason', async () => {
+    if (fix.expectsInlineAnnotation) {
+      test('delete of an annotation born inline reports its baseIndex name; the others keep theirs', async () => {
         const doc = await openFixture(engine, opts);
         try {
           const page = doc.page(toPageRef(fix.pageObjectNumber));
           const before = await page.annotations.list();
-          const weak = before.annotations.find((a) => a.identityQuality === 'weak');
-          if (!weak) return;
-          expect(weak.ref.kind).toBe('index');
+          const inline = before.annotations.find((a) => a.ref.kind === 'baseIndex');
+          expect(inline !== undefined).toBe(true);
+          if (!inline) return;
 
-          const weakSession = await beginEditIfRequired(doc, fix.pageObjectNumber, fix);
-          const result = await page.annotations.delete(weak.ref);
-          try {
-            // The weak annotation may have had /NM in some shapes (very
-            // legacy PDFs), but the locked semantics say a true weak
-            // delete reports no stable id. We assert "none or a stable id"
-            // since the fixture controls which side this lands on.
-            expect(
-              result.meta.changed.every((id) => id.kind === 'objectNumber' || id.kind === 'nm'),
-            ).toBe(true);
-            expect(result.meta.changed.length <= 1).toBe(true);
-            expect(result.meta.affectedPages.length).toBe(1);
-            expect(result.meta.affectedPages[0].page.objectNumber).toBe(fix.pageObjectNumber);
-            expect('cacheDelta' in result.meta).toBe(true);
+          const result = await page.annotations.delete(inline.ref);
+          expect(result.meta.changed[0]).toEqual(inline.ref);
+          expect(result.meta.affectedPages).toEqual([toPageRef(fix.pageObjectNumber)]);
 
-            // The page had weak refs before, structural mutation,
-            // therefore: shouldRefetch is set.
-            expect(result.meta.shouldRefetch?.reason).toBe('weakRefsInvalidated');
-            expect(result.meta.weakRefsInvalidated).toBe(true);
-          } finally {
-            await weakSession?.close();
-          }
+          // What went with it (popups, replies) goes; everything else keeps
+          // its name.
+          const gone = new Set(result.meta.changed.map(annotationKey));
+          const after = await page.annotations.list();
+          expect(after.annotations.map((a) => annotationKey(a.ref))).toEqual(
+            before.annotations.map((a) => annotationKey(a.ref)).filter((key) => !gone.has(key)),
+          );
+
+          // The name is never reused: it now names nothing.
+          const patch = subtypeAwarePatch(inline.subtype, 'gone');
+          if (!patch) return;
+          const again = await page.annotations.update(inline.ref, patch).then(
+            () => null,
+            (error: unknown) => error,
+          );
+          expect(EngineError.is(again, EngineErrorCode.NotFound)).toBe(true);
         } finally {
           await doc.close();
         }
@@ -1925,52 +1846,13 @@ export function runAnnotationMutationConformance(
       }
     });
 
-    test('update with a stale index revision throws InvalidReference', async () => {
-      const doc = await openFixture(engine, opts);
-      try {
-        const page = doc.page(toPageRef(fix.pageObjectNumber));
-        const before = await page.annotations.list();
-        const weak = before.annotations.find((a) => a.identityQuality === 'weak');
-        if (!weak || weak.ref.kind !== 'index') return;
-
-        // Force the revision out of date by minting an *index-shifting*
-        // mutation, then trying to update against the stale ref. We
-        // deliberately use a throwaway create+delete pair (delete is
-        // the rev-bumping op now — create is append-only and does not
-        // bump revisions, so it can't be used here).
-        const throwaway = await page.annotations.create({
-          subtype: 'highlight',
-          contents: 'rev-bump-throwaway',
-          quadPoints: quad,
-        });
-        const weakSession = await beginEditIfRequired(doc, fix.pageObjectNumber, fix);
-        await page.annotations.delete(throwaway.annotation.ref);
-        await weakSession?.close();
-
-        const patch = subtypeAwarePatch(weak.subtype, 'should-fail');
-        if (!patch) return;
-        let caught: unknown;
-        try {
-          await page.annotations.update(weak.ref, patch);
-        } catch (err) {
-          caught = err;
-        }
-        expect(EngineError.is(caught, EngineErrorCode.InvalidReference)).toBe(true);
-      } finally {
-        await doc.close();
-      }
-    });
-
     // ─────────────────────────────────────────────────────────────────
     //  move() — batch contiguous-block reorder. Locked invariants:
     //  - `move([ref], toIndex)` is the single-annotation case; same
     //    primitive as multi-move.
-    //  - One revision bump per batch, regardless of `refs.length`.
     //  - Caller-supplied order is preserved at the destination.
-    //  - Weak refs in the batch are upgraded to durable /NM before the
-    //    move; the moved DTOs come out durable and `meta.changed` lists
-    //    stable ids.
-    //  - Stale revision, out-of-range, duplicate, and abort all reject.
+    //  - Moved annotations keep their names; `meta.changed` lists them.
+    //  - Out-of-range, duplicate, and abort all reject.
     // ─────────────────────────────────────────────────────────────────
 
     test('move single durable annotation reorders within the page (single-as-batch)', async () => {
@@ -1992,7 +1874,6 @@ export function runAnnotationMutationConformance(
         const a = await page.annotations.create(aDraft);
         const b = await page.annotations.create(bDraft);
         const list = await page.annotations.list();
-        const beforeRev = list.pages[0].revision.generation;
 
         // Find current indices of a and b.
         const aIdx = list.annotations.findIndex(
@@ -2014,32 +1895,18 @@ export function runAnnotationMutationConformance(
         // so B's position becomes bIdx - 1. Targeting bIdx puts A after
         // B's original position. Use `bIdx` as toIndex => A lands right
         // after B in the new order.
-        const weakSession = await beginEditIfRequired(doc, fix.pageObjectNumber, fix);
         const result = await page.annotations.move([a.annotation.ref], bIdx);
-        try {
-          expect(AnnotationMoveResultSchema.safeParse(result).success).toBe(true);
-          expect(result.meta.affectedPages.length).toBe(1);
-          expect(result.meta.affectedPages[0].page.objectNumber).toBe(fix.pageObjectNumber);
-          expect('cacheDelta' in result.meta).toBe(true);
-          expect(result.annotations.length).toBe(1);
+        expect(AnnotationMoveResultSchema.safeParse(result).success).toBe(true);
+        expect(result.meta.affectedPages).toEqual([toPageRef(fix.pageObjectNumber)]);
+        expect('cacheDelta' in result.meta).toBe(true);
+        expect(result.annotations.length).toBe(1);
 
-          // Single revision bump per batch.
-          expect(result.meta.affectedPages[0].revision.generation).toBe(beforeRev + 1);
+        // The moved DTO keeps its name and sits at toIndex.
+        expect(annotationKey(result.annotations[0].ref)).toBe(annotationKey(a.annotation.ref));
+        expect(result.annotations[0].index).toBe(bIdx);
 
-          // The moved DTO sits at toIndex.
-          if (result.annotations[0].ref.kind === 'objectNumber') {
-            const movedObjNum = result.annotations[0].ref.objectNumber;
-            if (a.annotation.ref.kind === 'objectNumber') {
-              expect(movedObjNum).toBe(a.annotation.ref.objectNumber);
-            }
-          }
-
-          // Verify the page now has A at its new position.
-          const after = await page.annotations.list();
-          expect(after.annotations.length).toBe(list.annotations.length);
-        } finally {
-          await weakSession?.close();
-        }
+        const after = await page.annotations.list();
+        expect(after.annotations.length).toBe(list.annotations.length);
       } finally {
         await doc.close();
       }
@@ -2061,126 +1928,17 @@ export function runAnnotationMutationConformance(
           ),
         );
 
-        const list = await page.annotations.list();
-        const beforeRev = list.pages[0].revision.generation;
-
         // Move the three to position 0 in caller order [3, 1, 2].
         const callerOrder = [ids[2].annotation.ref, ids[0].annotation.ref, ids[1].annotation.ref];
-        const weakSession = await beginEditIfRequired(doc, fix.pageObjectNumber, fix);
         const result = await page.annotations.move(callerOrder, 0);
-        try {
-          // One revision bump even though three annotations moved.
-          expect(result.meta.affectedPages[0].revision.generation).toBe(beforeRev + 1);
-          expect(result.annotations.length).toBe(3);
-          expect(result.meta.changed.length).toBe(3);
+        expect(result.annotations.length).toBe(3);
+        expect(result.meta.changed.length).toBe(3);
 
-          // Caller-supplied order preserved at the destination. Indices
-          // 0, 1, 2 of the page now hold the moved DTOs in that order.
-          const expectedOrder = [
-            ids[2].annotation.ref,
-            ids[0].annotation.ref,
-            ids[1].annotation.ref,
-          ].map((r) => (r.kind === 'objectNumber' ? r.objectNumber : null));
-
-          const movedObjNums = result.annotations.map((d) =>
-            d.ref.kind === 'objectNumber' ? d.ref.objectNumber : null,
-          );
-          for (let i = 0; i < expectedOrder.length; i++) {
-            expect(movedObjNums[i]).toBe(expectedOrder[i]);
-          }
-        } finally {
-          await weakSession?.close();
-        }
-      } finally {
-        await doc.close();
-      }
-    });
-
-    if (fix.expectsWeakAnnotation) {
-      test('move on a weak annotation upgrades it to durable /NM (one rev bump for batch)', async () => {
-        const doc = await openFixture(engine, opts);
-        try {
-          const page = doc.page(toPageRef(fix.pageObjectNumber));
-          const before = await page.annotations.list();
-          const weak = before.annotations.find((a) => a.identityQuality === 'weak');
-          if (!weak || weak.ref.kind !== 'index') return;
-          const beforeRev = before.pages[0].revision.generation;
-
-          // Move the weak annotation to position 0 (or somewhere
-          // non-trivial). The engine must stamp a fresh /NM before the
-          // move so the result is durable.
-          const target = weak.ref.index === 0 ? 1 : 0;
-          const weakSession = await beginEditIfRequired(doc, fix.pageObjectNumber, fix);
-          const result = await page.annotations.move([weak.ref], target);
-          try {
-            expect(result.meta.affectedPages[0].revision.generation).toBe(beforeRev + 1);
-            expect(result.annotations.length).toBe(1);
-            expect(result.annotations[0].identityQuality).toBe('durable');
-            expect(
-              result.annotations[0].ref.kind === 'nm' ||
-                result.annotations[0].ref.kind === 'objectNumber',
-            ).toBe(true);
-
-            // meta.changed is a stable id, never a weak ref.
-            expect(result.meta.changed.length).toBe(1);
-            expect(
-              result.meta.changed[0].kind === 'nm' ||
-                result.meta.changed[0].kind === 'objectNumber',
-            ).toBe(true);
-          } finally {
-            await weakSession?.close();
-          }
-        } finally {
-          await doc.close();
-        }
-      });
-    }
-
-    test('move with a stale index revision rejects (locked rev-token guard)', async () => {
-      const doc = await openFixture(engine, opts);
-      try {
-        const page = doc.page(toPageRef(fix.pageObjectNumber));
-        const a = await page.annotations.create({
-          subtype: 'highlight',
-          contents: 'stale-a',
-          quadPoints: quad,
-        });
-        const list = await page.annotations.list();
-        const aIdx = list.annotations.findIndex(
-          (x) =>
-            x.ref.kind === 'objectNumber' &&
-            a.annotation.ref.kind === 'objectNumber' &&
-            x.ref.objectNumber === a.annotation.ref.objectNumber,
+        // Caller-supplied order preserved at the destination: indices 0, 1,
+        // 2 of the page now hold the moved DTOs in that order.
+        expect(result.annotations.map((d) => annotationKey(d.ref))).toEqual(
+          callerOrder.map(annotationKey),
         );
-        if (aIdx < 0) return;
-
-        const staleIndexRef: AnnotationRef = {
-          kind: 'index',
-          page: toPageRef(fix.pageObjectNumber),
-          index: aIdx,
-          revision: list.pages[0].revision,
-        };
-
-        // Bump the revision by an unrelated index-shifting mutation.
-        // create is append-only and no longer bumps revisions, so we
-        // use a throwaway create+delete pair (the delete does the bump).
-        const throwaway = await page.annotations.create({
-          subtype: 'highlight',
-          contents: 'bump-throwaway',
-          quadPoints: quad,
-        });
-        const weakSession = await beginEditIfRequired(doc, fix.pageObjectNumber, fix);
-        await page.annotations.delete(throwaway.annotation.ref);
-
-        let caught: unknown;
-        try {
-          await page.annotations.move([staleIndexRef], 0);
-        } catch (err) {
-          caught = err;
-        } finally {
-          await weakSession?.close();
-        }
-        expect(EngineError.is(caught, EngineErrorCode.InvalidReference)).toBe(true);
       } finally {
         await doc.close();
       }
@@ -2197,14 +1955,11 @@ export function runAnnotationMutationConformance(
         });
         const list = await page.annotations.list();
         const farTooBig = list.annotations.length + 100;
-        const weakSession = await beginEditIfRequired(doc, fix.pageObjectNumber, fix);
         let caught: unknown;
         try {
           await page.annotations.move([a.annotation.ref], farTooBig);
         } catch (err) {
           caught = err;
-        } finally {
-          await weakSession?.close();
         }
         expect(EngineError.is(caught, EngineErrorCode.InvalidArg)).toBe(true);
       } finally {
@@ -2221,14 +1976,11 @@ export function runAnnotationMutationConformance(
           contents: 'dup-a',
           quadPoints: quad,
         });
-        const weakSession = await beginEditIfRequired(doc, fix.pageObjectNumber, fix);
         let caught: unknown;
         try {
           await page.annotations.move([a.annotation.ref, a.annotation.ref], 0);
         } catch (err) {
           caught = err;
-        } finally {
-          await weakSession?.close();
         }
         expect(EngineError.is(caught, EngineErrorCode.InvalidArg)).toBe(true);
       } finally {
@@ -2245,44 +1997,9 @@ export function runAnnotationMutationConformance(
           contents: 'abort-a',
           quadPoints: quad,
         });
-        const weakSession = await beginEditIfRequired(doc, fix.pageObjectNumber, fix);
         const p = page.annotations.move([a.annotation.ref], 0);
         p.abort('test');
-        try {
-          await expect(p).rejects.toBeInstanceOf(AbortError);
-        } finally {
-          await weakSession?.close();
-        }
-      } finally {
-        await doc.close();
-      }
-    });
-
-    test('a page move does NOT bump per-page RevisionTokens (weak refs survive reorder)', async () => {
-      const doc = await openFixture(engine, opts);
-      try {
-        const list = await doc.pages.list();
-        if (list.pages.length < 1) return;
-
-        // Revision is annotation liveness, keyed by `pageObjectNumber`. A
-        // page move is structural-geometry-only: no page's /Annots array is
-        // touched, so no `RevisionToken` bumps and index-kind refs captured
-        // before the reorder stay valid. We observe the host page's
-        // revision via `annotations.list().pageState` (the move result no
-        // longer carries liveness — it returns geometry).
-        const page = doc.page(toPageRef(fix.pageObjectNumber));
-        const beforeGen = (await page.annotations.list()).pages[0].revision.generation;
-
-        // Pull some page to the front (prefer one that is not the host so
-        // we exercise the cross-page case; fall back to the host itself for
-        // single-page fixtures).
-        const mover =
-          list.pages.find((pg) => pg.ref.objectNumber !== fix.pageObjectNumber)?.ref ??
-          toPageRef(fix.pageObjectNumber);
-        await doc.pages.move([mover], 0);
-
-        const afterGen = (await page.annotations.list()).pages[0].revision.generation;
-        expect(afterGen).toBe(beforeGen);
+        await expect(p).rejects.toBeInstanceOf(AbortError);
       } finally {
         await doc.close();
       }
@@ -2294,12 +2011,12 @@ export function runAnnotationMutationConformance(
     //    `reply.type` is left out (ISO 32000 §12.5.6.2 default).
     //  - The DTO surfaces `reply` ({ to, type }); a top-level annotation
     //    reports `reply: null`.
-    //  - Linking reports the (possibly strengthened) parent id in
-    //    `meta.changed` and is non-structural (no rev bump / refetch).
+    //  - Linking writes only the reply: `meta.changed` names the reply,
+    //    and the parent keeps its name.
     //  - A cross-page parent is rejected with InvalidArg.
     // ─────────────────────────────────────────────────────────────────
 
-    test('create a reply links /IRT and defaults /RT to "reply", reporting the parent', async () => {
+    test('create a reply links /IRT and defaults /RT to "reply"', async () => {
       const doc = await openFixture(engine, opts);
       try {
         const page = doc.page(toPageRef(fix.pageObjectNumber));
@@ -2328,11 +2045,8 @@ export function runAnnotationMutationConformance(
           expect(reply.annotation.reply!.to.objectNumber).toBe(parent.annotation.ref.objectNumber);
           expect(reply.annotation.reply!.to.page.objectNumber).toBe(fix.pageObjectNumber);
         }
-        // The parent (already durable) is reported alongside the new reply.
-        expect(reply.meta.changed.length).toBe(2);
-        // Linking is non-structural: no rev bump, no refetch.
-        expect(reply.meta.shouldRefetch).toBe(null);
-        expect(reply.meta.weakRefsInvalidated).toBe(false);
+        // Only the reply was written.
+        expect(reply.meta.changed).toEqual([reply.annotation.ref]);
 
         // The relationship survives a fresh read.
         const after = await page.annotations.list();
@@ -2927,17 +2641,6 @@ export function runAnnotationMutationConformance(
       }
     });
   });
-}
-
-async function beginEditIfRequired(
-  doc: DocumentHandle,
-  pageObjectNumber: number,
-  fix: AnnotationMutationConformanceFixture,
-): Promise<WeakAnnotationEditSession | null> {
-  if (doc.capabilities.weakAnnotationEditSessions !== 'required' || !fix.expectsWeakAnnotation) {
-    return null;
-  }
-  return doc.annotations.beginEdit([toPageRef(pageObjectNumber)]);
 }
 
 async function openFixture(

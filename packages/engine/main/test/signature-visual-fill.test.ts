@@ -79,7 +79,7 @@ describe('signature fields in the viewer phase', () => {
         { pdf: artwork },
       );
       expect(filled.field.name).toBe('sig2');
-      expect(filled.meta.affectedPages.map((p) => p.page.objectNumber)).toEqual([
+      expect(filled.meta.affectedPages.map((p) => p.objectNumber)).toEqual([
         page.ref.objectNumber,
       ]);
       // The mark is actually drawn: the widget's appearance renders opaque pixels

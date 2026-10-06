@@ -16,7 +16,6 @@ const callout = {
   ref: REF,
   page: PAGE,
   index: 0,
-  identityQuality: 'durable',
   hasAppearance: true,
   nm: null,
   invisible: false,

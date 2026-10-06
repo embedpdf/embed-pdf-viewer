@@ -305,7 +305,6 @@ describe('records mirror through the controller', () => {
     const widget = {
       ...recordOn(1, 5),
       index: 0,
-      identityQuality: 'durable',
       hasAppearance: true,
       nm: null,
       print: true,

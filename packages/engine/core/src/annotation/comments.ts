@@ -136,19 +136,7 @@ export function buildCommentThreads(
 ): CommentThread[] {
   const eligible = annotations.filter((a) => !EXCLUDED_SUBTYPES.has(a.subtype));
 
-  // Index by ref key, with an /NM alias so a child that addresses its
-  // parent by name still resolves when the parent's own ref is
-  // objectNumber-form (same dual index as buildThreads). ObjectNumber
-  // entries win over nm aliases on duplicate /NM.
-  const byKey = new Map<string, Annotation>();
-  for (const a of eligible) {
-    const key = annotationKey(a.ref);
-    if (!byKey.has(key)) byKey.set(key, a);
-    if (a.nm) {
-      const aliasKey = annotationKey({ kind: 'nm', page: a.page, nm: a.nm });
-      if (!byKey.has(aliasKey)) byKey.set(aliasKey, a);
-    }
-  }
+  const byKey = new Map(eligible.map((a) => [annotationKey(a.ref), a]));
 
   // Children adjacency over resolvable /IRT edges.
   const children = new Map<string, Annotation[]>();

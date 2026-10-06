@@ -1,6 +1,4 @@
 import type { AnnotationRef } from './AnnotationRef';
-import type { AnnotationStableId } from './AnnotationStableId';
-import type { PageRef } from './PageRef';
 
 /**
  * The string key for an annotation address — for maps, sets and React keys.
@@ -12,58 +10,18 @@ import type { PageRef } from './PageRef';
  *
  *   objectNumber  →  `obj:42`              an indirect object number is unique
  *                                           across the whole document
- *   nm            →  `nm:<page>:<name>`     ISO 32000 §12.5.2: /NM is unique per
- *                                           page, not per document
- *   index         →  `idx:<page>:<i>`       a weak ref is page-relative by definition
+ *   baseIndex     →  `base:<page>:<i>`      a position in one page's /Annots
  *
- * For the durable kinds this agrees with the wire: `obj:42` is the route's
- * `:annotKey` (`encodeStableIdKey`), and an `nm` key is the route's
- * `:pageKey` + `:annotKey` folded into one string because a client-side map
- * has no path segment to keep the page in.
+ * This agrees with the wire: `obj:42` is the route's `:annotKey`
+ * (`encodeAnnotKey`), and a `base` key is the route's `:pageKey` +
+ * `:annotKey` folded into one string, because a client-side map has no path
+ * segment to keep the page in.
  */
 export function annotationKey(ref: AnnotationRef): string {
   switch (ref.kind) {
     case 'objectNumber':
       return `obj:${ref.objectNumber}`;
-    case 'nm':
-      return `nm:${ref.page.objectNumber}:${ref.nm}`;
-    case 'index':
-      return positionKey(ref.page, ref.index);
+    case 'baseIndex':
+      return `base:${ref.page.objectNumber}:${ref.baseIndex}`;
   }
-}
-
-/**
- * The key of the annotation at this position of a page's `/Annots` array, as
- * a weak ref addresses it. A record carries its position (`dto.index`), so a
- * reader can find the key a weak record had before the engine named it.
- */
-export function positionKey(page: PageRef, index: number): string {
-  return `idx:${page.objectNumber}:${index}`;
-}
-
-/**
- * Every key a ref to this annotation can have: its own ref's, its position's
- * and, when it has one, its name's. A ref another annotation holds (`/IRT`,
- * `/Parent`) may use any of them.
- */
-export function annotationKeysOf(annotation: {
-  readonly ref: AnnotationRef;
-  readonly index: number;
-  readonly nm: string | null;
-}): string[] {
-  const { ref } = annotation;
-  const keys = [annotationKey(ref), positionKey(ref.page, annotation.index)];
-  if (annotation.nm) keys.push(annotationKey({ kind: 'nm', page: ref.page, nm: annotation.nm }));
-  return keys;
-}
-
-/**
- * Rebuild an address from the two halves an event carries separately: the
- * page it happened on and the page-local stable id. The inverse of the
- * cloud client's split into `:pageKey` + `:annotKey`.
- */
-export function refFromStableId(page: PageRef, id: AnnotationStableId): AnnotationRef {
-  return id.kind === 'objectNumber'
-    ? { kind: 'objectNumber', page, objectNumber: id.objectNumber }
-    : { kind: 'nm', page, nm: id.nm };
 }
