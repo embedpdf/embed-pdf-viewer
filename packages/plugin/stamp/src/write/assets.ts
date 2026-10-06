@@ -149,7 +149,7 @@ export function createAssetWrites(
                 box: { x: 0, y: 0, width: rasterSize!.width, height: rasterSize!.height },
                 fit: 'fill',
               },
-              { appearance: new Uint8Array(resolved.bytes) },
+              { resources: { appearance: new Uint8Array(resolved.bytes) } },
             );
             const flattened = await doc.pages.flatten([page], { usage: 'display' });
             if (flattened.results.some(({ status }) => status !== 'applied')) {

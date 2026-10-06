@@ -1,5 +1,6 @@
 import { appearanceRasters, maxShiftedDifference } from './appearanceRasters';
 import { creatables, iconRect } from './creatables';
+import { UUID_V7 } from './names';
 import type { ConformanceTestRunner } from './runMetadataConformance';
 import { BANDS_PDF, sameBytes } from './stampFixtures';
 import { drawnPointsOf } from '../pageSpace/helpers';
@@ -34,8 +35,11 @@ export interface AnnotationTransferConformanceOptions {
 
 type Attribution = 'restore' | 'stamp';
 
-/** The attribution `stamp` writes afresh, and so leaves out of a comparison. */
-const STAMPED = ['author', 'createdAt', 'modifiedAt', 'userId', 'createdBy', 'modifiedBy'];
+/**
+ * What `stamp` writes afresh, and so leaves out of a comparison: the
+ * attribution, and the name, which a copy gets new.
+ */
+const STAMPED = ['author', 'createdAt', 'modifiedAt', 'userId', 'createdBy', 'modifiedBy', 'nm'];
 
 /**
  * Check annotation transfer over every fixture on both engines. The source
@@ -187,9 +191,10 @@ export function runAnnotationTransferConformance(
           });
         });
 
-        test('R1–R2: a stamping import does too, apart from the attribution it stamps', async () => {
+        test('R1–R2: a stamping import does too, apart from the attribution and names it stamps', async () => {
           await roundTrip(fixture, 'stamp', async ({ bundle, result, again }) => {
             const taken = asTaken(bundle, result.dropped);
+            for (const annotation of result.annotations) expect(annotation.nm).toMatch(UUID_V7);
             expect(normalized(again, 'stamp')).toEqual(normalized(taken, 'stamp'));
             expectFramesHoldGeometry(again);
             expectTurnedRects(again);
@@ -427,10 +432,16 @@ async function fill(doc: DocumentHandle): Promise<void> {
     draft: Parameters<PageHandle['annotations']['create']>[0],
     resources?: Parameters<PageHandle['annotations']['create']>[1],
   ) => (await page.annotations.create(draft, resources)).annotation as Annotation;
-  for (const { data, resources } of creatables()) await create(data, resources);
+  for (const { data, resources } of creatables()) await create(data, { resources });
   const box = (x: number): PageBox => ({ x, y: 300, width: 40, height: 30 });
-  await create({ subtype: 'stamp', box: box(20), nm: 'approved' }, { appearance: BANDS_PDF });
-  await create({ subtype: 'stamp', box: box(80), opacity: 0.5 }, { appearance: BANDS_PDF });
+  await create(
+    { subtype: 'stamp', box: box(20), nm: 'approved' },
+    { resources: { appearance: BANDS_PDF } },
+  );
+  await create(
+    { subtype: 'stamp', box: box(80), opacity: 0.5 },
+    { resources: { appearance: BANDS_PDF } },
+  );
   const note = await create({
     subtype: 'text',
     rect: iconRect(box(140).x, box(140).y),

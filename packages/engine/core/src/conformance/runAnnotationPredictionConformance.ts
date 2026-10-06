@@ -1,6 +1,7 @@
-import type { ConformanceTestRunner } from './runMetadataConformance';
-import { pdfOf } from './pdfOf';
 import { iconRect, PNG_1X1 } from './creatables';
+import { UUID_V7 } from './names';
+import { pdfOf } from './pdfOf';
+import type { ConformanceTestRunner } from './runMetadataConformance';
 import type { AnnotationDraft, Annotation, AnnotationPatch } from '../annotation/kinds';
 import type { AnnotationResources } from '../annotation/resources';
 import { DRAWN_RECT_KINDS } from '../annotation/shapeForRect';
@@ -539,33 +540,32 @@ export function runAnnotationPredictionConformance(
 
     for (const scenario of CASES) {
       test(scenario.name, async () => {
-        const { annotation: created } = await page.annotations.create(
-          scenario.draft,
-          scenario.resources,
-        );
+        const { annotation: created } = await page.annotations.create(scenario.draft, {
+          resources: scenario.resources,
+        });
         const patch =
           typeof scenario.patch === 'function' ? scenario.patch(created) : scenario.patch;
         const predicted = applyAnnotationPatch(created, patch);
-        const { annotation: actual } = await page.annotations.update(
-          created.ref,
-          patch,
-          scenario.updateResources,
-        );
+        const { annotation: actual } = await page.annotations.update(created.ref, patch, {
+          resources: scenario.updateResources,
+        });
         expect(differences(predicted, actual)).toEqual([]);
       });
     }
 
     for (const scenario of CREATE_CASES) {
       test(`create: ${scenario.name}`, async () => {
-        const { annotation: actual } = await page.annotations.create(
-          scenario.draft,
-          scenario.resources,
-        );
-        // What the draft can't say: the ref, place and author the engine
-        // gives, and the drawing's box, which the engine works out.
+        const { annotation: actual } = await page.annotations.create(scenario.draft, {
+          resources: scenario.resources,
+        });
+        // A create without a name gets a fresh UUIDv7 one.
+        if (!scenario.draft.nm) expect(actual.nm).toMatch(UUID_V7);
+        // What the draft can't say: the ref, place, name and author the
+        // engine gives, and the drawing's box, which the engine works out.
         const predicted = annotationOfDraft(scenario.draft, {
           ref: actual.ref,
           index: actual.index,
+          ...(actual.nm !== null ? { nm: actual.nm } : {}),
           attribution: {
             ...(actual.author !== null ? { author: actual.author } : {}),
             ...(actual.userId !== null ? { userId: actual.userId } : {}),

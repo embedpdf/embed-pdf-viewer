@@ -6,10 +6,12 @@ import {
   createPageImageHandle,
   encodeAnnotKey,
   hasAnnotationResources,
+  opIdOf,
   resolveAnnotationResources,
   withFileFromResource,
   type AnnotationResourceRole,
-  type AnnotationResources,
+  type AnnotationCreateOptions,
+  type AnnotationUpdateOptions,
   type WireAnnotationResources,
   type AnnotationAppearanceImage,
   type AnnotationAppearanceImageOptions,
@@ -22,7 +24,7 @@ import {
   type AnnotationDeleteResult,
   type AnnotationFlattenResult,
   type AnnotationMoveResult,
-  type FlattenOptions,
+  type FlattenWriteOptions,
   type AnnotationUpdateResult,
   type DocumentEventInit,
   type MutationMeta,
@@ -30,6 +32,7 @@ import {
   type PageImageResult,
   type PageNetworkRenderFormat,
   type PageRef,
+  type WriteOptions,
   checkImageQuality,
 } from '@embedpdf/engine-core/runtime';
 import {
@@ -47,6 +50,7 @@ import type { SessionEventPublisher } from '@embedpdf/engine-services';
 
 import { buildAnnotationMutationForm } from './buildMutationForm';
 import type { ManifestAccessor } from './CloudDocumentHandle';
+import { assertNoObjectNumber } from './CloudObjectNumberPool';
 import { planesInherited } from './planes';
 import type { HttpClient } from '../transport/HttpClient';
 
@@ -231,13 +235,21 @@ export class CloudPageAnnotationsService implements PageAnnotationsService {
 
   create(
     draft: AnnotationDraft,
-    resources?: AnnotationResources,
+    options: AnnotationCreateOptions = {},
   ): AbortablePromise<AnnotationCreateResult> {
     if (this.isClosed()) {
       return AbortablePromise.rejectReason(
         new EngineError(EngineErrorCode.DocNotOpen, `document ${this.docId} is closed`),
       );
     }
+    let opId: string;
+    try {
+      opId = opIdOf(options);
+      assertNoObjectNumber(options.objectNumber);
+    } catch (err) {
+      return AbortablePromise.rejectReason(err);
+    }
+    const { resources } = options;
     // A `File` brings its name and type; the bytes travel without them.
     const data = withFileFromResource(draft, resources);
     return AbortablePromise.run<AnnotationCreateResult>(async (signal) => {
@@ -254,20 +266,27 @@ export class CloudPageAnnotationsService implements PageAnnotationsService {
             signal,
           )
         : await this.http.postJson(path, data, parse, signal);
-      return this.absorbMutation(result, 'annotations.created');
+      return this.absorbMutation(opId, result, 'annotations.created');
     });
   }
 
   update(
     ref: AnnotationRef,
     patch: AnnotationPatch,
-    resources?: AnnotationResources,
+    options: AnnotationUpdateOptions = {},
   ): AbortablePromise<AnnotationUpdateResult> {
     if (this.isClosed()) {
       return AbortablePromise.rejectReason(
         new EngineError(EngineErrorCode.DocNotOpen, `document ${this.docId} is closed`),
       );
     }
+    let opId: string;
+    try {
+      opId = opIdOf(options);
+    } catch (err) {
+      return AbortablePromise.rejectReason(err);
+    }
+    const { resources } = options;
     if (ref.page.objectNumber !== this.pageRef.objectNumber) {
       return AbortablePromise.rejectReason(
         new EngineError(
@@ -285,7 +304,7 @@ export class CloudPageAnnotationsService implements PageAnnotationsService {
     return AbortablePromise.run<AnnotationUpdateResult>(async (signal) => {
       const wireResources = await resolveAnnotationResources(resources);
       const result = await this.patchMutation(path, { patch }, wireResources, signal);
-      return this.absorbMutation(result, 'annotations.updated');
+      return this.absorbMutation(opId, result, 'annotations.updated');
     });
   }
 
@@ -308,11 +327,17 @@ export class CloudPageAnnotationsService implements PageAnnotationsService {
     return this.http.patchJson(path, body, parse, signal);
   }
 
-  delete(ref: AnnotationRef): AbortablePromise<AnnotationDeleteResult> {
+  delete(ref: AnnotationRef, options?: WriteOptions): AbortablePromise<AnnotationDeleteResult> {
     if (this.isClosed()) {
       return AbortablePromise.rejectReason(
         new EngineError(EngineErrorCode.DocNotOpen, `document ${this.docId} is closed`),
       );
+    }
+    let opId: string;
+    try {
+      opId = opIdOf(options);
+    } catch (err) {
+      return AbortablePromise.rejectReason(err);
     }
     if (ref.page.objectNumber !== this.pageRef.objectNumber) {
       return AbortablePromise.rejectReason(
@@ -334,15 +359,25 @@ export class CloudPageAnnotationsService implements PageAnnotationsService {
         (raw) => AnnotationDeleteResultSchema.parse(raw),
         signal,
       );
-      return this.absorbDelete(result);
+      return this.absorbDelete(opId, result);
     });
   }
 
-  move(refs: AnnotationRef[], toIndex: number): AbortablePromise<AnnotationMoveResult> {
+  move(
+    refs: AnnotationRef[],
+    toIndex: number,
+    options?: WriteOptions,
+  ): AbortablePromise<AnnotationMoveResult> {
     if (this.isClosed()) {
       return AbortablePromise.rejectReason(
         new EngineError(EngineErrorCode.DocNotOpen, `document ${this.docId} is closed`),
       );
+    }
+    let opId: string;
+    try {
+      opId = opIdOf(options);
+    } catch (err) {
+      return AbortablePromise.rejectReason(err);
     }
     // The page is part of the URL; the worker validates per-ref consistency
     // again, but rejecting up front gives a cleaner error from the client side.
@@ -364,19 +399,25 @@ export class CloudPageAnnotationsService implements PageAnnotationsService {
         (raw) => AnnotationMoveResultSchema.parse(raw),
         signal,
       );
-      return this.absorbMutation(result, 'annotations.moved');
+      return this.absorbMutation(opId, result, 'annotations.moved');
     });
   }
 
   flatten(
     refs: AnnotationRef[],
-    options?: FlattenOptions,
+    options?: FlattenWriteOptions,
   ): AbortablePromise<AnnotationFlattenResult> {
     const usage = options?.usage ?? 'display';
     if (this.isClosed()) {
       return AbortablePromise.rejectReason(
         new EngineError(EngineErrorCode.DocNotOpen, `document ${this.docId} is closed`),
       );
+    }
+    let opId: string;
+    try {
+      opId = opIdOf(options);
+    } catch (err) {
+      return AbortablePromise.rejectReason(err);
     }
     for (const r of refs) {
       if (r.page.objectNumber !== this.pageRef.objectNumber) {
@@ -401,7 +442,7 @@ export class CloudPageAnnotationsService implements PageAnnotationsService {
       if (result.meta.cacheDelta === null) return result;
       // Flatten bakes annotations into page content, so both planes flip.
       this.manifest.apply(result.meta, ['content', 'annotations']);
-      this.publisher.publishLocal({ type: 'annotations.flattened', ...result });
+      this.publisher.publishWrite(opId, { type: 'annotations.flattened', ...result });
       return result;
     });
   }
@@ -440,9 +481,9 @@ export class CloudPageAnnotationsService implements PageAnnotationsService {
    * pairing here instead of widening every site.
    */
   /** A delete's event names what went, for listeners that didn't delete it. */
-  private absorbDelete(result: AnnotationDeleteResult): AnnotationDeleteResult {
+  private absorbDelete(opId: string, result: AnnotationDeleteResult): AnnotationDeleteResult {
     this.manifest.apply(result.meta, ['annotations']);
-    this.publisher.publishLocal({
+    this.publisher.publishWrite(opId, {
       type: 'annotations.deleted',
       page: this.pageRef,
       deleted: deletedAnnotationsOf(result),
@@ -452,11 +493,12 @@ export class CloudPageAnnotationsService implements PageAnnotationsService {
   }
 
   private absorbMutation<T extends { meta: MutationMeta }>(
+    opId: string,
     result: T,
     type: 'annotations.created' | 'annotations.updated' | 'annotations.moved',
   ): T {
     this.manifest.apply(result.meta, ['annotations']);
-    this.publisher.publishLocal({
+    this.publisher.publishWrite(opId, {
       type,
       page: this.pageRef,
       ...result,

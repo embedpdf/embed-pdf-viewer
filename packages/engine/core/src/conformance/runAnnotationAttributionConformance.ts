@@ -284,7 +284,7 @@ export function runAnnotationAttributionConformance(
           rect: iconRect(rect.x, rect.y),
           file: { name: 'minutes.txt' },
         },
-        { file: new TextEncoder().encode('minutes') },
+        { resources: { file: new TextEncoder().encode('minutes') } },
       );
       const bob = await opts.openAs(engine, { scope: READ, identity: BOB }, alice);
       await alice.close();

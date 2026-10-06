@@ -73,7 +73,8 @@ async function everyKind(): Promise<AnnotationBundle> {
     const { pages } = await doc.pages.list();
     const pageRef = toPageRef(pages[0]!.ref.objectNumber);
     const page = doc.page(pageRef);
-    for (const { data, resources } of creatables()) await page.annotations.create(data, resources);
+    for (const { data, resources } of creatables())
+      await page.annotations.create(data, { resources });
     const rect = { x: 300, y: 300, width: 20, height: 20 };
     const { annotation: note } = await page.annotations.create({
       subtype: 'text',

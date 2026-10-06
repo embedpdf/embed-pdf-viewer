@@ -62,15 +62,15 @@ export function runAnnotationExportConformance(
         const box = (x: number): PageBox => ({ x, y: 20, width: 60, height: 30 });
         const first = await page.annotations.create(
           { subtype: 'stamp', box: box(20) },
-          { appearance: BANDS_PDF },
+          { resources: { appearance: BANDS_PDF } },
         );
         const second = await page.annotations.create(
           { subtype: 'stamp', box: box(100), opacity: 0.5 },
-          { appearance: BANDS_PDF },
+          { resources: { appearance: BANDS_PDF } },
         );
         const image = await page.annotations.create(
           { subtype: 'stamp', box: box(180) },
-          { appearance: BANDS_PNG },
+          { resources: { appearance: BANDS_PNG } },
         );
         const file = await page.annotations.create(
           {
@@ -78,7 +78,7 @@ export function runAnnotationExportConformance(
             rect: iconRect(box(260).x, box(260).y),
             file: { name: 'note.txt' },
           },
-          { file: new TextEncoder().encode('attached') },
+          { resources: { file: new TextEncoder().encode('attached') } },
         );
 
         const bundle = await doc.annotations.export();

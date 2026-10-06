@@ -1,4 +1,5 @@
 import type { FormFieldRef } from '../identity/FormFieldRef';
+import type { WriteOptions } from '../mutation/WriteOptions';
 import type { AbortablePromise } from '../promise/AbortablePromise';
 import type { AnalyzeInput, ChangeAnalysis } from '../signature/analysis/types';
 import type {
@@ -60,7 +61,10 @@ export interface DocumentSignaturesService {
    * `complete` or `abort` (`SigningPending`). Refusals are
    * `SignatureRefused` with the reason in the message.
    */
-  prepare(input: SignaturePrepareInput): AbortablePromise<SignaturePrepared>;
+  prepare(
+    input: SignaturePrepareInput,
+    options?: WriteOptions,
+  ): AbortablePromise<SignaturePrepared>;
 
   /**
    * Write the CMS into the candidate and install the sealed bytes as the
@@ -69,8 +73,11 @@ export interface DocumentSignaturesService {
    * with the same CMS answers `already-completed`. Emits
    * `signatures.completed` and `document.versioned`.
    */
-  complete(input: SignatureCompleteInput): AbortablePromise<SignatureCompleteResult>;
+  complete(
+    input: SignatureCompleteInput,
+    options?: WriteOptions,
+  ): AbortablePromise<SignatureCompleteResult>;
 
   /** Discard a pending candidate. */
-  cancel(signingId: string): AbortablePromise<SignatureCancelResult>;
+  cancel(signingId: string, options?: WriteOptions): AbortablePromise<SignatureCancelResult>;
 }

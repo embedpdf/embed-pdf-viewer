@@ -89,17 +89,19 @@ The call is cancelled when the signal aborts, or at once if it already has.
 
 The codes you'll handle most:
 
-| Code                   | What happened                                                                                                |
-| :--------------------- | :----------------------------------------------------------------------------------------------------------- |
-| `Forbidden`            | The user doesn't have the permission. `error.details.required` names it.                                     |
-| `NotFound`             | The page, annotation or field isn't there (anymore).                                                         |
-| `InvalidArg`           | Something you passed isn't valid. The message says what.                                                     |
-| `Aborted`              | You cancelled the call.                                                                                      |
-| `DocPasswordRequired`  | The file needs a password. See [Opening documents](/docs/engine/documents/opening#password-protected-files). |
-| `DocPasswordIncorrect` | `unlock()` got a wrong password.                                                                             |
-| `DocOpenFailed`        | The file isn't a PDF, or is too damaged to open.                                                             |
-| `PayloadTooLarge`      | An import or export is past a limit. `error.details` has the `limit` and `max`.                              |
-| `ProtectedDocument`    | A signature in the document forbids this change.                                                             |
+| Code                      | What happened                                                                                                |
+| :------------------------ | :----------------------------------------------------------------------------------------------------------- |
+| `Forbidden`               | The user doesn't have the permission. `error.details.required` names it.                                     |
+| `NotFound`                | The page, annotation or field isn't there (anymore).                                                         |
+| `InvalidArg`              | Something you passed isn't valid. The message says what.                                                     |
+| `Aborted`                 | You cancelled the call.                                                                                      |
+| `DocPasswordRequired`     | The file needs a password. See [Opening documents](/docs/engine/documents/opening#password-protected-files). |
+| `DocPasswordIncorrect`    | `unlock()` got a wrong password.                                                                             |
+| `DocOpenFailed`           | The file isn't a PDF, or is too damaged to open.                                                             |
+| `PayloadTooLarge`         | An import or export is past a limit. `error.details` has the `limit` and `max`.                              |
+| `ProtectedDocument`       | A signature in the document forbids this change.                                                             |
+| `ObjectNumberUnavailable` | A create named an object number this session doesn't hold, or used one twice.                                |
+| `LayerFull`               | The document has as many objects as a PDF file should; a compacted copy starts afresh.                       |
 
 <Engine cloud>
 

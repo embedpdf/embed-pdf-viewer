@@ -1,4 +1,5 @@
 import {
+  opIdOf,
   AbortablePromise,
   EngineError,
   EngineErrorCode,
@@ -11,6 +12,7 @@ import {
   type MetadataService,
   type MetadataUpdateResult,
   type MutationMeta,
+  type WriteOptions,
 } from '@embedpdf/engine-core/runtime';
 import {
   CustomMetadataSchema,
@@ -97,16 +99,18 @@ function readLeaf<T>(deps: MetadataDeps, leaf: MetadataLeaf<T, unknown>): Aborta
 /**
  * The write. It only advances docVersion + metadataVersion (no per-page pin
  * changes, no layoutVersion), so the cached manifest is patched in place —
- * no refetch.
+ * no refetch. `publish` gets the write's `opId`.
  */
 function writeLeaf<R extends { meta: MutationMeta }>(
   deps: MetadataDeps,
   leaf: MetadataLeaf<unknown, R>,
   patch: MetadataPatch | CustomMetadataPatch,
-  publish: (result: R) => void,
+  options: WriteOptions | undefined,
+  publish: (result: R, opId: string) => void,
 ): AbortablePromise<R> {
   if (deps.isClosed()) return AbortablePromise.rejectReason(closedError(deps.docId));
   return AbortablePromise.run<R>(async (signal) => {
+    const opId = opIdOf(options);
     const result = await deps.http.postJson(
       leaf.updatePath(deps.docId, deps.layerName),
       patch,
@@ -114,7 +118,7 @@ function writeLeaf<R extends { meta: MutationMeta }>(
       signal,
     );
     deps.manifest.apply(result.meta, ['metadata']);
-    publish(result);
+    publish(result, opId);
     return result;
   });
 }
@@ -126,9 +130,12 @@ class CloudCustomMetadataService implements CustomMetadataService {
     return readLeaf(this.deps, CUSTOM);
   }
 
-  update(patch: CustomMetadataPatch): AbortablePromise<CustomMetadataUpdateResult> {
-    return writeLeaf(this.deps, CUSTOM, patch, (result) =>
-      this.deps.publisher.publishLocal({ type: 'metadata.customUpdated', ...result }),
+  update(
+    patch: CustomMetadataPatch,
+    options?: WriteOptions,
+  ): AbortablePromise<CustomMetadataUpdateResult> {
+    return writeLeaf(this.deps, CUSTOM, patch, options, (result, opId) =>
+      this.deps.publisher.publishWrite(opId, { type: 'metadata.customUpdated', ...result }),
     );
   }
 }
@@ -153,9 +160,9 @@ export class CloudMetadataService implements MetadataService {
     return readLeaf(this.deps, STANDARD);
   }
 
-  update(patch: MetadataPatch): AbortablePromise<MetadataUpdateResult> {
-    return writeLeaf(this.deps, STANDARD, patch, (result) =>
-      this.deps.publisher.publishLocal({ type: 'metadata.updated', ...result }),
+  update(patch: MetadataPatch, options?: WriteOptions): AbortablePromise<MetadataUpdateResult> {
+    return writeLeaf(this.deps, STANDARD, patch, options, (result, opId) =>
+      this.deps.publisher.publishWrite(opId, { type: 'metadata.updated', ...result }),
     );
   }
 }

@@ -57,9 +57,10 @@ export interface AuditEventRow {
  * Translate a remote audit row into the `DocumentEvent`s it records — pure,
  * so the exactly-once and verbatim-payload invariants are unit-testable
  * without a server. Most rows are one fact; a form reset is one
- * `forms.valueSet` per field it changed, and an import is one
- * `annotations.created` per annotation, sharing `origin.tx` (its id the
- * request's `Idempotency-Key`). Returns none for an own echo and for kinds
+ * `forms.valueSet` per field it changed, an import is one
+ * `annotations.created` per annotation, and a completed signing is the
+ * signature and the new version. Every event of a row shares `origin.tx`,
+ * its id the request's `Idempotency-Key`. Returns none for an own echo and for kinds
  * this engine version doesn't know (a newer server's events degrade to
  * "ignored", never to a crash).
  *
@@ -84,22 +85,30 @@ export function auditRowToEvents(row: AuditEventRow, mySessionId: string): Docum
     ts: row.ts,
     serverId: row.id,
   };
+  // Every event of the write shares its id: the request's `Idempotency-Key`,
+  // or the row's own id when it came without one.
+  const id = row.idempotencyKey ?? `audit:${row.id}`;
+  const events = factsOf(row, origin);
+  return events.map((event, index) => ({
+    ...event,
+    origin: { ...origin, tx: { id, index, count: events.length } },
+  }));
+}
+
+/** The events a row records, in order, or none for a kind this version doesn't know. */
+function factsOf(row: AuditEventRow, origin: EventOrigin): DocumentEvent[] {
   if (row.kind === 'annot.import') {
-    const facts = annotationImportFacts(row.payload as AnnotationImportResult);
-    const id = row.idempotencyKey ?? `audit:${row.id}`;
-    return facts.map((fact, index) => ({
+    return annotationImportFacts(row.payload as AnnotationImportResult).map((fact) => ({
       type: 'annotations.created',
-      origin: { ...origin, tx: { id, index, count: facts.length } },
+      origin,
       ...fact,
     }));
   }
   if (row.kind === 'form.reset') {
     // One `forms.valueSet` per field the reset changed, as locally.
-    const facts = formResetFacts(row.payload as FormResetResult);
-    const id = row.idempotencyKey ?? `audit:${row.id}`;
-    return facts.map((fact, index) => ({
+    return formResetFacts(row.payload as FormResetResult).map((fact) => ({
       type: 'forms.valueSet',
-      origin: { ...origin, tx: { id, index, count: facts.length } },
+      origin,
       ...fact,
     }));
   }

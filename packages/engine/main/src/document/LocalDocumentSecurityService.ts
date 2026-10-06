@@ -37,6 +37,8 @@ export class LocalDocumentSecurityService implements DocumentSecurityService {
      * works.
      */
     private readonly guard: ScopeGuard | null = null,
+    /** Called once an unlock loaded the document for real. */
+    private readonly onUnlocked: () => void = () => {},
   ) {
     this.securityState = securityStateFromProbe(initial);
   }
@@ -158,6 +160,7 @@ export class LocalDocumentSecurityService implements DocumentSecurityService {
       // call on.
       this.guard?.setPdfPermissions(payload.security.pdfPermissionsBits);
       this.guard?.setProtection(payload.protection ?? null);
+      this.onUnlocked();
       return { security: this.state };
     });
   }

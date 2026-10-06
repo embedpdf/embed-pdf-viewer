@@ -1,6 +1,6 @@
 import type { AnnotationList } from '../annotation/AnnotationList';
 import type { AnnotationDraft, AnnotationPatch } from '../annotation/kinds';
-import type { AnnotationResourceRole, AnnotationResources } from '../annotation/resources';
+import type { AnnotationResourceRole } from '../annotation/resources';
 import type {
   AnnotationAppearanceImageOptions,
   AnnotationAppearanceImagesResult,
@@ -9,13 +9,18 @@ import type {
 } from '../dto/AnnotationRender';
 import type { AnnotationRef } from '../identity/AnnotationRef';
 import type { AnnotationFlattenResult } from '../mutation/AnnotationFlattenResult';
-import type { FlattenOptions } from '../mutation/PageFlattenResult';
 import type {
   AnnotationCreateResult,
   AnnotationDeleteResult,
   AnnotationMoveResult,
   AnnotationUpdateResult,
 } from '../mutation/AnnotationMutationResults';
+import type {
+  AnnotationCreateOptions,
+  AnnotationUpdateOptions,
+  FlattenWriteOptions,
+  WriteOptions,
+} from '../mutation/WriteOptions';
 import { AbortablePromise } from '../promise/AbortablePromise';
 
 /**
@@ -39,7 +44,7 @@ export interface PageAnnotationsService {
     options?: AnnotationAppearanceImageOptions,
   ): AbortablePromise<AnnotationAppearanceImagesResult>;
   /**
-   * One of an annotation's resources: the bytes `create(data, resources)`
+   * One of an annotation's resources: the bytes `create(data, { resources })`
    * takes to make the same annotation again. A read never contains them.
    *
    * - `appearance` (stamps): the drawing, as a one-page PDF, before the fit,
@@ -53,13 +58,20 @@ export interface PageAnnotationsService {
    */
   downloadResource(ref: AnnotationRef, role: AnnotationResourceRole): AbortablePromise<Uint8Array>;
   /**
-   * Create an annotation on this page from its data. Bytes travel beside the
-   * data, by role: a stamp needs its `appearance`, a file attachment its
-   * `file`. A resource the kind doesn't take is refused.
+   * Create an annotation on this page from its data. The options say how:
+   * bytes beside the data by role (`resources`: a stamp needs its
+   * `appearance`, a file attachment its `file`; a resource the kind doesn't
+   * take is refused), and the object number it gets (`objectNumber`, taken
+   * from `doc.objectNumbers`), which makes its ref known before the engine
+   * answers. Without a number the engine picks the next free one. Without
+   * an `nm` in the data the annotation gets a fresh UUIDv7 `/NM`.
+   *
+   * A number this session doesn't hold, or one an object already has, is
+   * refused with `ObjectNumberUnavailable`.
    */
   create(
     data: AnnotationDraft,
-    resources?: AnnotationResources,
+    options?: AnnotationCreateOptions,
   ): AbortablePromise<AnnotationCreateResult>;
   /**
    * Change the fields `patch` names; the others stay. A resource replaces
@@ -68,9 +80,9 @@ export interface PageAnnotationsService {
   update(
     ref: AnnotationRef,
     patch: AnnotationPatch,
-    resources?: AnnotationResources,
+    options?: AnnotationUpdateOptions,
   ): AbortablePromise<AnnotationUpdateResult>;
-  delete(ref: AnnotationRef): AbortablePromise<AnnotationDeleteResult>;
+  delete(ref: AnnotationRef, options?: WriteOptions): AbortablePromise<AnnotationDeleteResult>;
   /**
    * Batch move (contiguous-block; `refs.length === 1` is the
    * single-annotation case). Moved annotations keep their names. All or
@@ -81,7 +93,11 @@ export interface PageAnnotationsService {
    * @param toIndex Insertion point in the post-removal /Annots index
    *                space, in `[0, count - refs.length]`.
    */
-  move(refs: AnnotationRef[], toIndex: number): AbortablePromise<AnnotationMoveResult>;
+  move(
+    refs: AnnotationRef[],
+    toIndex: number,
+    options?: WriteOptions,
+  ): AbortablePromise<AnnotationMoveResult>;
 
   /**
    * Flatten the given annotations of this page into its content —
@@ -96,7 +112,7 @@ export interface PageAnnotationsService {
    */
   flatten(
     refs: AnnotationRef[],
-    options?: FlattenOptions,
+    options?: FlattenWriteOptions,
   ): AbortablePromise<AnnotationFlattenResult>;
 
   /**

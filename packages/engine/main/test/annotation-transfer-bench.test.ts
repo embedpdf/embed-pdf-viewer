@@ -134,7 +134,7 @@ describe.skipIf(!ENABLED).each(['wasm', 'native'] as const)(
                 .page(refs[i % refs.length]!)
                 .annotations.create(
                   { subtype: 'stamp', box: { x, y, width: 50, height: 40 } },
-                  { appearance: png(16, 16, [i & 255, (i >> 8) & 255, 128]) },
+                  { resources: { appearance: png(16, 16, [i & 255, (i >> 8) & 255, 128]) } },
                 );
             }
           });
@@ -161,7 +161,7 @@ describe.skipIf(!ENABLED).each(['wasm', 'native'] as const)(
                 rect: iconRect(40, 60),
                 file: { name: 'large.bin' },
               },
-              { file: bytes },
+              { resources: { file: bytes } },
             );
           });
           await measure(engine, 'bundle bytes', base, source, rows);
@@ -183,7 +183,7 @@ describe.skipIf(!ENABLED).each(['wasm', 'native'] as const)(
               .page((await pageRefs(source))[0]!)
               .annotations.create(
                 { subtype: 'stamp', box: { x: 40, y: 40, width: 400, height: 250 } },
-                { appearance: image },
+                { resources: { appearance: image } },
               );
           });
           await measure(engine, 'image pixels', base, source, rows);

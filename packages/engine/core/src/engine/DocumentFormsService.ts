@@ -19,10 +19,15 @@ import type {
   FormSetValueResult,
   FormWidgetLinkResult,
 } from '../mutation/FormMutationResults';
+import type {
+  FormFieldCreateOptions,
+  FormWidgetAddOptions,
+  WriteOptions,
+} from '../mutation/WriteOptions';
 import type { AbortablePromise } from '../promise/AbortablePromise';
 
 /** Options for {@link DocumentFormsService.repair}. */
-export interface FormRepairOptions {
+export interface FormRepairOptions extends WriteOptions {
   /**
    * Also regenerate widget appearance streams: widgets with no /AP get
    * one, and when the /AcroForm sets /NeedAppearances every widget is
@@ -66,7 +71,11 @@ export interface DocumentFormsService {
    * text/choice widgets; toggles flip their appearance state. Emits
    * `forms.valueSet`.
    */
-  setValue(ref: FormFieldRef, value: FormFieldValue): AbortablePromise<FormSetValueResult>;
+  setValue(
+    ref: FormFieldRef,
+    value: FormFieldValue,
+    options?: WriteOptions,
+  ): AbortablePromise<FormSetValueResult>;
 
   /**
    * Put fields back to their default value (/DV), or empty them when they
@@ -77,7 +86,10 @@ export interface DocumentFormsService {
    * fields that changed. Emits one `forms.valueSet` per changed field,
    * sharing `origin.tx`.
    */
-  reset(fields?: FormFieldRef | FormFieldRef[]): AbortablePromise<FormResetResult>;
+  reset(
+    fields?: FormFieldRef | FormFieldRef[],
+    options?: WriteOptions,
+  ): AbortablePromise<FormResetResult>;
 
   /**
    * Apply one script run's ordered effects as one worker/cloud job. The batch
@@ -85,7 +97,7 @@ export interface DocumentFormsService {
    * after a post-preflight internal failure the remaining effects are marked
    * skipped and any landed state is finalized as one artifact/event/version.
    */
-  applyEffects(effects: FormEffect[]): AbortablePromise<FormEffectsResult>;
+  applyEffects(effects: FormEffect[], options?: WriteOptions): AbortablePromise<FormEffectsResult>;
 
   /**
    * Deliver a resolved form submission to the document's home. Present only
@@ -118,6 +130,7 @@ export interface DocumentFormsService {
   import(
     data: Uint8Array | ArrayBuffer,
     format?: FormDataFormat,
+    options?: WriteOptions,
   ): AbortablePromise<FormImportResult>;
 
   /**
@@ -126,8 +139,18 @@ export interface DocumentFormsService {
    * (see {@link addWidget}); the inline `widget(s)` config is sugar for
    * exactly that composition. Gated by `doc.forms.modify`. Emits
    * `forms.created`.
+   *
+   * `options.objectNumber` names the field and `options.widgetObjectNumbers`
+   * its widgets (in `draft.widgets` order), all taken from
+   * `doc.objectNumbers`, so their refs are known before the engine answers.
+   * Parent fields created on the way get the next free numbers. A number
+   * this session doesn't hold, or one an object already has, is refused
+   * with `ObjectNumberUnavailable`.
    */
-  create(draft: FormFieldDraft): AbortablePromise<FormFieldCreateResult>;
+  create(
+    draft: FormFieldDraft,
+    options?: FormFieldCreateOptions,
+  ): AbortablePromise<FormFieldCreateResult>;
 
   /**
    * Update field-plane properties (name, universal and family flags,
@@ -135,7 +158,11 @@ export interface DocumentFormsService {
    * target field. Validate-then-apply per property. Emits
    * `forms.updated`.
    */
-  update(ref: FormFieldRef, patch: FormFieldPatch): AbortablePromise<FormFieldUpdateResult>;
+  update(
+    ref: FormFieldRef,
+    patch: FormFieldPatch,
+    options?: WriteOptions,
+  ): AbortablePromise<FormFieldUpdateResult>;
 
   /**
    * Draw a PDF page into every widget of an unsigned signature field — the
@@ -146,6 +173,7 @@ export interface DocumentFormsService {
   setSignatureAppearance(
     ref: FormFieldRef,
     appearance: SignatureAppearanceInput,
+    options?: WriteOptions,
   ): AbortablePromise<FormFieldUpdateResult>;
 
   /**
@@ -153,15 +181,26 @@ export interface DocumentFormsService {
    * page, the field leaves the tree, and empty ancestors are pruned.
    * Emits `forms.deleted`.
    */
-  delete(ref: FormFieldRef): AbortablePromise<FormFieldDeleteResult>;
+  delete(ref: FormFieldRef, options?: WriteOptions): AbortablePromise<FormFieldDeleteResult>;
 
   /**
    * Show the field in one more place: a new widget, placed and styled like
    * an entry of a draft's `widgets`, in one change. A radio button needs
-   * its `exportValue`. Adding a widget to a legacy merged field splits it —
-   * the field object number never changes. Emits `forms.widgetAdded`.
+   * its `exportValue`. Adding a widget to a legacy merged field splits it:
+   * the field keeps its object number and its widget moves to a new one
+   * (`options.splitObjectNumber`, or the next free one). Emits
+   * `forms.widgetAdded`.
+   *
+   * `options.objectNumber` names the new widget, taken from
+   * `doc.objectNumbers` like `splitObjectNumber`. A number this session
+   * doesn't hold, or one an object already has, is refused with
+   * `ObjectNumberUnavailable`.
    */
-  addWidget(ref: FormFieldRef, placement: WidgetPlacement): AbortablePromise<FormWidgetLinkResult>;
+  addWidget(
+    ref: FormFieldRef,
+    placement: WidgetPlacement,
+    options?: FormWidgetAddOptions,
+  ): AbortablePromise<FormWidgetLinkResult>;
 
   /**
    * Take a widget out of its field: it keeps its page placement and last
@@ -170,7 +209,11 @@ export interface DocumentFormsService {
    * survives, "unplaced" when this was its last widget. Emits
    * `forms.widgetRemoved`.
    */
-  removeWidget(ref: FormFieldRef, widget: AnnotationRef): AbortablePromise<FormWidgetLinkResult>;
+  removeWidget(
+    ref: FormFieldRef,
+    widget: AnnotationRef,
+    options?: WriteOptions,
+  ): AbortablePromise<FormWidgetLinkResult>;
 
   /**
    * Make the engine's read-time reconciliation durable in the document

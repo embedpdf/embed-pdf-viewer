@@ -2,11 +2,13 @@ import {
   AbortablePromise,
   EngineError,
   EngineErrorCode,
+  opIdOf,
   wirePack,
   type AnalyzeInput,
   type ChangeAnalysis,
   type DigestAlgorithm,
   type DocumentSignaturesService,
+  type WriteOptions,
   type FormFieldRef,
   type SignatureCancelResult,
   type SignatureCompleteInput,
@@ -115,17 +117,22 @@ export class LocalDocumentSignaturesService implements DocumentSignaturesService
     return this.await(submission, 'signatures.analyze', (payload) => payload.analysis);
   }
 
-  prepare(input: SignaturePrepareInput): AbortablePromise<SignaturePrepared> {
+  prepare(
+    input: SignaturePrepareInput,
+    options?: WriteOptions,
+  ): AbortablePromise<SignaturePrepared> {
     const rejected =
       this.gate('doc.sign') ?? (input.certify ? this.gate('doc.sign.certify') : null);
     if (rejected) return rejected;
+    const write = this.opIdFor(options);
+    if (write.rejected) return write.rejected;
     const docId = this.docId;
     const submission = this.queue.enqueue<WorkerResultPayload>({
       buildPack: (jobId: JobId) =>
         wirePack({ kind: 'signatures.prepare', effect: 'snapshot', jobId, docId, input }),
     });
     return this.await(submission, 'signatures.prepare', (payload) => {
-      this.publisher.publishLocal({
+      this.publisher.publishWrite(write.opId, {
         type: 'signatures.prepared',
         field: input.field,
         ...payload.result,
@@ -134,9 +141,14 @@ export class LocalDocumentSignaturesService implements DocumentSignaturesService
     });
   }
 
-  complete(input: SignatureCompleteInput): AbortablePromise<SignatureCompleteResult> {
+  complete(
+    input: SignatureCompleteInput,
+    options?: WriteOptions,
+  ): AbortablePromise<SignatureCompleteResult> {
     const rejected = this.gate('doc.sign');
     if (rejected) return rejected;
+    const write = this.opIdFor(options);
+    if (write.rejected) return write.rejected;
     const docId = this.docId;
     const submission = this.queue.enqueue<WorkerResultPayload>({
       buildPack: (jobId: JobId) =>
@@ -148,20 +160,21 @@ export class LocalDocumentSignaturesService implements DocumentSignaturesService
         // The session is on new bytes: what its signatures forbid applies
         // from the next call on, and every byte-level fact must be re-read.
         this.guard.setProtection(result.protection);
-        this.publisher.publishLocal({
-          type: 'signatures.completed',
-          signingId: input.signingId,
-          ...result,
-        });
-        this.publisher.publishLocal({ type: 'document.versioned', version: result.version });
+        this.publisher.publishWrite(
+          write.opId,
+          { type: 'signatures.completed', signingId: input.signingId, ...result },
+          { type: 'document.versioned', version: result.version },
+        );
       }
       return result;
     });
   }
 
-  cancel(signingId: string): AbortablePromise<SignatureCancelResult> {
+  cancel(signingId: string, options?: WriteOptions): AbortablePromise<SignatureCancelResult> {
     const rejected = this.gate('doc.sign');
     if (rejected) return rejected;
+    const write = this.opIdFor(options);
+    if (write.rejected) return write.rejected;
     const docId = this.docId;
     const submission = this.queue.enqueue<WorkerResultPayload>({
       buildPack: (jobId: JobId) =>
@@ -169,10 +182,21 @@ export class LocalDocumentSignaturesService implements DocumentSignaturesService
     });
     return this.await(submission, 'signatures.cancel', (payload) => {
       if (payload.result.status === 'cancelled') {
-        this.publisher.publishLocal({ type: 'signatures.cancelled', signingId });
+        this.publisher.publishWrite(write.opId, { type: 'signatures.cancelled', signingId });
       }
       return payload.result;
     });
+  }
+
+  /** The write's `opId` (the caller's, else a fresh one), or the refusal of an invalid one. */
+  private opIdFor(
+    options: WriteOptions | undefined,
+  ): { opId: string; rejected?: never } | { rejected: AbortablePromise<never> } {
+    try {
+      return { opId: opIdOf(options) };
+    } catch (err) {
+      return { rejected: AbortablePromise.rejectReason(err) };
+    }
   }
 
   private gate(

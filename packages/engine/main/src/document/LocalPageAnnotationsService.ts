@@ -6,6 +6,7 @@ import {
   deletedAnnotationsOf,
   createPageImageHandle,
   hasAnnotationResources,
+  opIdOf,
   resolveAnnotationResources,
   withFileFromResource,
   wirePack,
@@ -20,16 +21,18 @@ import {
   type AnnotationPatch,
   type AnnotationRef,
   type AnnotationResourceRole,
-  type AnnotationResources,
+  type AnnotationCreateOptions,
+  type AnnotationUpdateOptions,
   type WireAnnotationResources,
   type AnnotationCreateResult,
   type AnnotationDeleteResult,
   type AnnotationFlattenResult,
   type AnnotationMoveResult,
-  type FlattenOptions,
+  type FlattenWriteOptions,
   type AnnotationUpdateResult,
   type LocalPageAnnotationsService as LocalPageAnnotationsServiceContract,
   type PageRef,
+  type WriteOptions,
   checkImageQuality,
 } from '@embedpdf/engine-core/runtime';
 import type { SessionEventPublisher } from '@embedpdf/engine-services';
@@ -228,7 +231,7 @@ export class LocalPageAnnotationsService implements LocalPageAnnotationsServiceC
 
   create(
     draft: AnnotationDraft,
-    resources?: AnnotationResources,
+    options: AnnotationCreateOptions = {},
   ): AbortablePromise<AnnotationCreateResult> {
     if (this.view.isClosed()) {
       return AbortablePromise.rejectReason(
@@ -242,7 +245,9 @@ export class LocalPageAnnotationsService implements LocalPageAnnotationsServiceC
     // A group other than the caller's own takes the same authority as
     // reassigning one (cloud parity).
     const groupId = (draft as { groupId?: string | null }).groupId ?? undefined;
+    let opId: string;
     try {
+      opId = opIdOf(options);
       if (groupId !== undefined && groupId !== this.guard.identity().groupId) {
         this.guard.assertSetGroup(groupId);
       }
@@ -251,32 +256,38 @@ export class LocalPageAnnotationsService implements LocalPageAnnotationsServiceC
       return AbortablePromise.rejectReason(err);
     }
     const actor = this.guard.actorForCreate(groupId);
+    const { resources, objectNumber } = options;
     // A `File` brings its name and type; the bytes travel without them.
     const data = withFileFromResource(draft, resources);
 
     const docId = this.docId;
     const ref = this.ref;
+    // Queued now, so it keeps its place among this document's calls while
+    // its bytes are read.
+    const submission = this.queue.enqueue<WorkerResultPayload>({
+      line: { effect: 'write', docId, page: ref },
+      buildPack: async (jobId: JobId) => {
+        // Each resource becomes a private copy (async: Blob bytes resolve
+        // async). The copy rides the wirePack transfer list and is detached
+        // by the worker transport, while the caller's bytes stay intact.
+        const wireResources = await resolveAnnotationResources(resources);
+        return wirePack(
+          {
+            kind: 'annotations.create',
+            effect: 'write',
+            jobId,
+            docId,
+            page: ref,
+            draft: data,
+            ...(objectNumber !== undefined ? { objectNumber } : {}),
+            ...(hasAnnotationResources(wireResources) ? { resources: wireResources } : {}),
+            ...(actor ? { actor } : {}),
+          },
+          transferOf(wireResources),
+        );
+      },
+    });
     return AbortablePromise.run<AnnotationCreateResult>(async (signal) => {
-      // Each resource becomes a private copy (async: Blob bytes resolve
-      // async). The copy rides the wirePack transfer list and is detached by
-      // the worker transport, while the caller's bytes stay intact.
-      const wireResources = await resolveAnnotationResources(resources);
-      const submission = this.queue.enqueue<WorkerResultPayload>({
-        buildPack: (jobId: JobId) =>
-          wirePack(
-            {
-              kind: 'annotations.create',
-              effect: 'write',
-              jobId,
-              docId,
-              page: ref,
-              draft: data,
-              ...(hasAnnotationResources(wireResources) ? { resources: wireResources } : {}),
-              ...(actor ? { actor } : {}),
-            },
-            transferOf(wireResources),
-          ),
-      });
       const onAbort = () => submission.abort(signal.reason);
       if (signal.aborted) onAbort();
       else signal.addEventListener('abort', onAbort, { once: true });
@@ -284,7 +295,7 @@ export class LocalPageAnnotationsService implements LocalPageAnnotationsServiceC
       if (payload.tag !== 'annotations.create') {
         throw new EngineError(EngineErrorCode.WireFormat, `unexpected payload tag: ${payload.tag}`);
       }
-      this.publisher.publishLocal({
+      this.publisher.publishWrite(opId, {
         type: 'annotations.created',
         page: this.ref,
         ...payload.result,
@@ -296,7 +307,7 @@ export class LocalPageAnnotationsService implements LocalPageAnnotationsServiceC
   update(
     ref: AnnotationRef,
     patch: AnnotationPatch,
-    resources?: AnnotationResources,
+    options: AnnotationUpdateOptions = {},
   ): AbortablePromise<AnnotationUpdateResult> {
     if (this.view.isClosed()) {
       return AbortablePromise.rejectReason(
@@ -306,32 +317,38 @@ export class LocalPageAnnotationsService implements LocalPageAnnotationsServiceC
     // The worker checks the caller's authority against the annotation inside
     // the write (its owner, a group reassignment) and stamps the actor it
     // gives. A signature's protection is the document's, checked here.
+    let opId: string;
     try {
+      opId = opIdOf(options);
       this.guard.assertAnnotationsUnprotected();
     } catch (err) {
       return AbortablePromise.rejectReason(err);
     }
     const authority = this.guard.annotationAuthority();
+    const { resources } = options;
+    const docId = this.docId;
+    // Queued now, as in create().
+    const submission = this.queue.enqueue<WorkerResultPayload>({
+      line: { effect: 'write', docId },
+      buildPack: async (jobId: JobId) => {
+        // Owned copies, as in create().
+        const wireResources = await resolveAnnotationResources(resources);
+        return wirePack(
+          {
+            kind: 'annotations.update',
+            effect: 'write',
+            jobId,
+            docId,
+            ref,
+            patch,
+            authority,
+            ...(hasAnnotationResources(wireResources) ? { resources: wireResources } : {}),
+          },
+          transferOf(wireResources),
+        );
+      },
+    });
     return AbortablePromise.run<AnnotationUpdateResult>(async (signal) => {
-      const docId = this.docId;
-      // Owned copies, as in create().
-      const wireResources = await resolveAnnotationResources(resources);
-      const submission = this.queue.enqueue<WorkerResultPayload>({
-        buildPack: (jobId: JobId) =>
-          wirePack(
-            {
-              kind: 'annotations.update',
-              effect: 'write',
-              jobId,
-              docId,
-              ref,
-              patch,
-              authority,
-              ...(hasAnnotationResources(wireResources) ? { resources: wireResources } : {}),
-            },
-            transferOf(wireResources),
-          ),
-      });
       const onAbort = () => submission.abort(signal.reason);
       if (signal.aborted) onAbort();
       else signal.addEventListener('abort', onAbort, { once: true });
@@ -339,7 +356,7 @@ export class LocalPageAnnotationsService implements LocalPageAnnotationsServiceC
       if (payload.tag !== 'annotations.update') {
         throw new EngineError(EngineErrorCode.WireFormat, `unexpected payload tag: ${payload.tag}`);
       }
-      this.publisher.publishLocal({
+      this.publisher.publishWrite(opId, {
         type: 'annotations.updated',
         page: this.ref,
         ...payload.result,
@@ -348,7 +365,7 @@ export class LocalPageAnnotationsService implements LocalPageAnnotationsServiceC
     });
   }
 
-  delete(ref: AnnotationRef): AbortablePromise<AnnotationDeleteResult> {
+  delete(ref: AnnotationRef, options?: WriteOptions): AbortablePromise<AnnotationDeleteResult> {
     if (this.view.isClosed()) {
       return AbortablePromise.rejectReason(
         new EngineError(EngineErrorCode.DocNotOpen, `document not open: ${this.docId}`),
@@ -357,7 +374,9 @@ export class LocalPageAnnotationsService implements LocalPageAnnotationsServiceC
     // The annotation goes with its thread and popups: the worker checks the
     // caller's authority against each of them inside the write. A
     // signature's protection is the document's, checked here.
+    let opId: string;
     try {
+      opId = opIdOf(options);
       this.guard.assertAnnotationsUnprotected();
     } catch (err) {
       return AbortablePromise.rejectReason(err);
@@ -383,7 +402,7 @@ export class LocalPageAnnotationsService implements LocalPageAnnotationsServiceC
       if (payload.tag !== 'annotations.delete') {
         throw new EngineError(EngineErrorCode.WireFormat, `unexpected payload tag: ${payload.tag}`);
       }
-      this.publisher.publishLocal({
+      this.publisher.publishWrite(opId, {
         type: 'annotations.deleted',
         page: this.ref,
         deleted: deletedAnnotationsOf(payload.result),
@@ -393,7 +412,11 @@ export class LocalPageAnnotationsService implements LocalPageAnnotationsServiceC
     });
   }
 
-  move(refs: AnnotationRef[], toIndex: number): AbortablePromise<AnnotationMoveResult> {
+  move(
+    refs: AnnotationRef[],
+    toIndex: number,
+    options?: WriteOptions,
+  ): AbortablePromise<AnnotationMoveResult> {
     if (this.view.isClosed()) {
       return AbortablePromise.rejectReason(
         new EngineError(EngineErrorCode.DocNotOpen, `document not open: ${this.docId}`),
@@ -402,7 +425,9 @@ export class LocalPageAnnotationsService implements LocalPageAnnotationsServiceC
     // Move is a structural reorder — gates on `doc.annotate.modify`,
     // not on per-record collab (no specific target to check). For
     // wildcard / admin tokens, this passes trivially.
+    let opId: string;
     try {
+      opId = opIdOf(options);
       this.guard.assertCapability('doc.annotate.modify');
     } catch (err) {
       return AbortablePromise.rejectReason(err);
@@ -429,7 +454,7 @@ export class LocalPageAnnotationsService implements LocalPageAnnotationsServiceC
       if (payload.tag !== 'annotations.move') {
         throw new EngineError(EngineErrorCode.WireFormat, `unexpected payload tag: ${payload.tag}`);
       }
-      this.publisher.publishLocal({
+      this.publisher.publishWrite(opId, {
         type: 'annotations.moved',
         page: this.ref,
         ...payload.result,
@@ -440,7 +465,7 @@ export class LocalPageAnnotationsService implements LocalPageAnnotationsServiceC
 
   flatten(
     refs: AnnotationRef[],
-    options?: FlattenOptions,
+    options?: FlattenWriteOptions,
   ): AbortablePromise<AnnotationFlattenResult> {
     const usage = options?.usage ?? 'display';
     if (this.view.isClosed()) {
@@ -450,7 +475,9 @@ export class LocalPageAnnotationsService implements LocalPageAnnotationsServiceC
     }
     // `pages.flatten` for a chosen set: rewrites page content and removes
     // the painted annotations, so it carries the whole-page verb's gates.
+    let opId: string;
     try {
+      opId = opIdOf(options);
       this.guard.assertCapability('doc.pages.modify');
       this.guard.assertCapability('doc.annotate.modify');
     } catch (err) {
@@ -479,7 +506,7 @@ export class LocalPageAnnotationsService implements LocalPageAnnotationsServiceC
         throw new EngineError(EngineErrorCode.WireFormat, `unexpected payload tag: ${payload.tag}`);
       }
       if (payload.wrote) {
-        this.publisher.publishLocal({ type: 'annotations.flattened', ...payload.result });
+        this.publisher.publishWrite(opId, { type: 'annotations.flattened', ...payload.result });
       }
       return payload.result;
     });

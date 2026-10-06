@@ -4,7 +4,7 @@ import {
   EngineErrorCode,
   deletedFieldOf,
   formResetFacts,
-  generateUuid,
+  opIdOf,
   wirePack,
   type DocumentFormsService,
   type FormDataExport,
@@ -24,6 +24,9 @@ import {
   type WidgetPlacement,
   type FormImportResult,
   type FormRepairOptions,
+  type FormFieldCreateOptions,
+  type FormWidgetAddOptions,
+  type WriteOptions,
   type FormRepairResult,
   type FormSetValueResult,
   type FormSnapshot,
@@ -88,23 +91,30 @@ export class LocalDocumentFormsService implements DocumentFormsService {
     });
   }
 
-  setValue(ref: FormFieldRef, value: FormFieldValue): AbortablePromise<FormSetValueResult> {
-    const rejected = this.gate('doc.forms.fill');
-    if (rejected) return rejected;
+  setValue(
+    ref: FormFieldRef,
+    value: FormFieldValue,
+    options?: WriteOptions,
+  ): AbortablePromise<FormSetValueResult> {
+    const write = this.beginWrite('doc.forms.fill', options);
+    if (write.rejected) return write.rejected;
     const docId = this.docId;
     const submission = this.queue.enqueue<WorkerResultPayload>({
       buildPack: (jobId: JobId) =>
         wirePack({ kind: 'forms.setValue', effect: 'write', jobId, docId, ref, value }),
     });
     return this.await(submission, 'forms.setValue', (payload) => {
-      this.publisher.publishLocal({ type: 'forms.valueSet', ...payload.result });
+      this.publisher.publishWrite(write.opId, { type: 'forms.valueSet', ...payload.result });
       return payload.result;
     });
   }
 
-  reset(fields?: FormFieldRef | FormFieldRef[]): AbortablePromise<FormResetResult> {
-    const rejected = this.gate('doc.forms.fill');
-    if (rejected) return rejected;
+  reset(
+    fields?: FormFieldRef | FormFieldRef[],
+    options?: WriteOptions,
+  ): AbortablePromise<FormResetResult> {
+    const write = this.beginWrite('doc.forms.fill', options);
+    if (write.rejected) return write.rejected;
     const docId = this.docId;
     const refs = fields === undefined ? undefined : Array.isArray(fields) ? fields : [fields];
     const submission = this.queue.enqueue<WorkerResultPayload>({
@@ -112,22 +122,21 @@ export class LocalDocumentFormsService implements DocumentFormsService {
         wirePack({ kind: 'forms.reset', effect: 'write', jobId, docId, ...(refs ? { refs } : {}) }),
     });
     return this.await(submission, 'forms.reset', (payload) => {
-      // One event per field that changed, sharing one transaction.
-      const facts = formResetFacts(payload.result);
-      const id = generateUuid();
-      facts.forEach((fact, index) => {
-        this.publisher.publishLocal(
-          { type: 'forms.valueSet', ...fact },
-          { id, index, count: facts.length },
-        );
-      });
+      // One event per field that changed, sharing the write's opId.
+      this.publisher.publishWrite(
+        write.opId,
+        ...formResetFacts(payload.result).map((fact) => ({
+          type: 'forms.valueSet' as const,
+          ...fact,
+        })),
+      );
       return payload.result;
     });
   }
 
-  applyEffects(effects: FormEffect[]): AbortablePromise<FormEffectsResult> {
-    const rejected = this.gate('doc.forms.fill');
-    if (rejected) return rejected;
+  applyEffects(effects: FormEffect[], options?: WriteOptions): AbortablePromise<FormEffectsResult> {
+    const write = this.beginWrite('doc.forms.fill', options);
+    if (write.rejected) return write.rejected;
     const docId = this.docId;
     const submission = this.queue.enqueue<WorkerResultPayload>({
       buildPack: (jobId: JobId) =>
@@ -135,7 +144,10 @@ export class LocalDocumentFormsService implements DocumentFormsService {
     });
     return this.await(submission, 'forms.applyEffects', (payload) => {
       if (payload.wrote) {
-        this.publisher.publishLocal({ type: 'forms.effectsApplied', ...payload.result });
+        this.publisher.publishWrite(write.opId, {
+          type: 'forms.effectsApplied',
+          ...payload.result,
+        });
       }
       return payload.result;
     });
@@ -158,9 +170,10 @@ export class LocalDocumentFormsService implements DocumentFormsService {
   import(
     data: Uint8Array | ArrayBuffer,
     format?: FormDataFormat,
+    options?: WriteOptions,
   ): AbortablePromise<FormImportResult> {
-    const rejected = this.gate('doc.forms.fill');
-    if (rejected) return rejected;
+    const write = this.beginWrite('doc.forms.fill', options);
+    if (write.rejected) return write.rejected;
     const docId = this.docId;
     const buffer = toOwnedArrayBuffer(data);
     const submission = this.queue.enqueue<WorkerResultPayload>({
@@ -178,21 +191,34 @@ export class LocalDocumentFormsService implements DocumentFormsService {
         ),
     });
     return this.await(submission, 'forms.import', (payload) => {
-      this.publisher.publishLocal({ type: 'forms.imported', ...payload.result });
+      this.publisher.publishWrite(write.opId, { type: 'forms.imported', ...payload.result });
       return payload.result;
     });
   }
 
-  create(draft: FormFieldDraft): AbortablePromise<FormFieldCreateResult> {
-    const rejected = this.gate('doc.forms.modify');
-    if (rejected) return rejected;
+  create(
+    draft: FormFieldDraft,
+    options: FormFieldCreateOptions = {},
+  ): AbortablePromise<FormFieldCreateResult> {
+    const write = this.beginWrite('doc.forms.modify', options);
+    if (write.rejected) return write.rejected;
     const docId = this.docId;
     const submission = this.queue.enqueue<WorkerResultPayload>({
       buildPack: (jobId: JobId) =>
-        wirePack({ kind: 'forms.createField', effect: 'write', jobId, docId, draft }),
+        wirePack({
+          kind: 'forms.createField',
+          effect: 'write',
+          jobId,
+          docId,
+          draft,
+          ...(options.objectNumber !== undefined ? { objectNumber: options.objectNumber } : {}),
+          ...(options.widgetObjectNumbers
+            ? { widgetObjectNumbers: [...options.widgetObjectNumbers] }
+            : {}),
+        }),
     });
     return this.await(submission, 'forms.createField', (payload) => {
-      this.publisher.publishLocal({ type: 'forms.created', ...payload.result });
+      this.publisher.publishWrite(write.opId, { type: 'forms.created', ...payload.result });
       return payload.result;
     });
   }
@@ -200,9 +226,10 @@ export class LocalDocumentFormsService implements DocumentFormsService {
   setSignatureAppearance(
     ref: FormFieldRef,
     appearance: SignatureAppearanceInput,
+    options?: WriteOptions,
   ): AbortablePromise<FormFieldUpdateResult> {
-    const rejected = this.gate('doc.forms.fill');
-    if (rejected) return rejected;
+    const write = this.beginWrite('doc.forms.fill', options);
+    if (write.rejected) return write.rejected;
     const docId = this.docId;
     const pdf = appearance.pdf.slice().buffer as ArrayBuffer;
     const submission = this.queue.enqueue<WorkerResultPayload>({
@@ -213,35 +240,39 @@ export class LocalDocumentFormsService implements DocumentFormsService {
         ),
     });
     return this.await(submission, 'forms.setSignatureAppearance', (payload) => {
-      this.publisher.publishLocal({ type: 'forms.updated', ...payload.result });
+      this.publisher.publishWrite(write.opId, { type: 'forms.updated', ...payload.result });
       return payload.result;
     });
   }
 
-  update(ref: FormFieldRef, patch: FormFieldPatch): AbortablePromise<FormFieldUpdateResult> {
-    const rejected = this.gate('doc.forms.modify');
-    if (rejected) return rejected;
+  update(
+    ref: FormFieldRef,
+    patch: FormFieldPatch,
+    options?: WriteOptions,
+  ): AbortablePromise<FormFieldUpdateResult> {
+    const write = this.beginWrite('doc.forms.modify', options);
+    if (write.rejected) return write.rejected;
     const docId = this.docId;
     const submission = this.queue.enqueue<WorkerResultPayload>({
       buildPack: (jobId: JobId) =>
         wirePack({ kind: 'forms.updateField', effect: 'write', jobId, docId, ref, patch }),
     });
     return this.await(submission, 'forms.updateField', (payload) => {
-      this.publisher.publishLocal({ type: 'forms.updated', ...payload.result });
+      this.publisher.publishWrite(write.opId, { type: 'forms.updated', ...payload.result });
       return payload.result;
     });
   }
 
-  delete(ref: FormFieldRef): AbortablePromise<FormFieldDeleteResult> {
-    const rejected = this.gate('doc.forms.modify');
-    if (rejected) return rejected;
+  delete(ref: FormFieldRef, options?: WriteOptions): AbortablePromise<FormFieldDeleteResult> {
+    const write = this.beginWrite('doc.forms.modify', options);
+    if (write.rejected) return write.rejected;
     const docId = this.docId;
     const submission = this.queue.enqueue<WorkerResultPayload>({
       buildPack: (jobId: JobId) =>
         wirePack({ kind: 'forms.deleteField', effect: 'write', jobId, docId, ref }),
     });
     return this.await(submission, 'forms.deleteField', (payload) => {
-      this.publisher.publishLocal({
+      this.publisher.publishWrite(write.opId, {
         type: 'forms.deleted',
         deleted: deletedFieldOf(payload.result),
         ...payload.result,
@@ -250,37 +281,56 @@ export class LocalDocumentFormsService implements DocumentFormsService {
     });
   }
 
-  addWidget(ref: FormFieldRef, placement: WidgetPlacement): AbortablePromise<FormWidgetLinkResult> {
-    const rejected = this.gate('doc.forms.modify');
-    if (rejected) return rejected;
+  addWidget(
+    ref: FormFieldRef,
+    placement: WidgetPlacement,
+    options: FormWidgetAddOptions = {},
+  ): AbortablePromise<FormWidgetLinkResult> {
+    const write = this.beginWrite('doc.forms.modify', options);
+    if (write.rejected) return write.rejected;
     const docId = this.docId;
     const submission = this.queue.enqueue<WorkerResultPayload>({
       buildPack: (jobId: JobId) =>
-        wirePack({ kind: 'forms.addWidget', effect: 'write', jobId, docId, ref, placement }),
+        wirePack({
+          kind: 'forms.addWidget',
+          effect: 'write',
+          jobId,
+          docId,
+          ref,
+          placement,
+          ...(options.objectNumber !== undefined ? { objectNumber: options.objectNumber } : {}),
+          ...(options.splitObjectNumber !== undefined
+            ? { splitObjectNumber: options.splitObjectNumber }
+            : {}),
+        }),
     });
     return this.await(submission, 'forms.addWidget', (payload) => {
-      this.publisher.publishLocal({ type: 'forms.widgetAdded', ...payload.result });
+      this.publisher.publishWrite(write.opId, { type: 'forms.widgetAdded', ...payload.result });
       return payload.result;
     });
   }
 
-  removeWidget(ref: FormFieldRef, widget: AnnotationRef): AbortablePromise<FormWidgetLinkResult> {
-    const rejected = this.gate('doc.forms.modify');
-    if (rejected) return rejected;
+  removeWidget(
+    ref: FormFieldRef,
+    widget: AnnotationRef,
+    options?: WriteOptions,
+  ): AbortablePromise<FormWidgetLinkResult> {
+    const write = this.beginWrite('doc.forms.modify', options);
+    if (write.rejected) return write.rejected;
     const docId = this.docId;
     const submission = this.queue.enqueue<WorkerResultPayload>({
       buildPack: (jobId: JobId) =>
         wirePack({ kind: 'forms.detachWidget', effect: 'write', jobId, docId, ref, widget }),
     });
     return this.await(submission, 'forms.detachWidget', (payload) => {
-      this.publisher.publishLocal({ type: 'forms.widgetRemoved', ...payload.result });
+      this.publisher.publishWrite(write.opId, { type: 'forms.widgetRemoved', ...payload.result });
       return payload.result;
     });
   }
 
   repair(options?: FormRepairOptions): AbortablePromise<FormRepairResult> {
-    const rejected = this.gate('doc.forms.modify');
-    if (rejected) return rejected;
+    const write = this.beginWrite('doc.forms.modify', options);
+    if (write.rejected) return write.rejected;
     const docId = this.docId;
     const bakeAppearances = options?.bakeAppearances ?? false;
     const submission = this.queue.enqueue<WorkerResultPayload>({
@@ -288,9 +338,26 @@ export class LocalDocumentFormsService implements DocumentFormsService {
         wirePack({ kind: 'forms.repair', effect: 'write', jobId, docId, bakeAppearances }),
     });
     return this.await(submission, 'forms.repair', (payload) => {
-      this.publisher.publishLocal({ type: 'forms.repaired', ...payload.result });
+      this.publisher.publishWrite(write.opId, { type: 'forms.repaired', ...payload.result });
       return payload.result;
     });
+  }
+
+  /**
+   * The checks before a write: the document is open, the caller may, and the
+   * caller's `opId` is valid. Returns the write's `opId`, or the refusal.
+   */
+  private beginWrite(
+    cap: 'doc.forms.fill' | 'doc.forms.modify',
+    options: WriteOptions | undefined,
+  ): { opId: string; rejected?: never } | { rejected: AbortablePromise<never> } {
+    const rejected = this.gate(cap);
+    if (rejected) return { rejected };
+    try {
+      return { opId: opIdOf(options) };
+    } catch (err) {
+      return { rejected: AbortablePromise.rejectReason(err) };
+    }
   }
 
   private gate(

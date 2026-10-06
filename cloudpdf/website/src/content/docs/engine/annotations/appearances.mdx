@@ -165,7 +165,7 @@ It's all or nothing: a ref that isn't on the page, is hidden, or has no appearan
 with `InvalidArg`. The PDF is a one-page drawing, so it can become a [stamp](/docs/engine/annotations/stamps):
 
 ```ts
-await page.annotations.create({ subtype: 'stamp', box: rect }, { appearance: pdf });
+await page.annotations.create({ subtype: 'stamp', box: rect }, { resources: { appearance: pdf } });
 ```
 
 ## Permissions

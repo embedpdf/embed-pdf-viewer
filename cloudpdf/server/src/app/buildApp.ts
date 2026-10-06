@@ -1627,6 +1627,8 @@ function mapToHttp(code: string): number {
     case EngineErrorCode.SigningVersionMismatch:
     case EngineErrorCode.StaleBase:
     case EngineErrorCode.ProtectedDocument:
+    case EngineErrorCode.ObjectNumberUnavailable:
+    case EngineErrorCode.LayerFull:
       return 409;
     case EngineErrorCode.NotFound:
     case EngineErrorCode.DocNotOpen:

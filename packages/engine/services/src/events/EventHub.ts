@@ -5,7 +5,6 @@ import type {
   DocumentEventOf,
   DocumentEventStream,
   DocumentEventType,
-  EventOrigin,
 } from '@embedpdf/engine-core/runtime';
 
 /**
@@ -95,20 +94,24 @@ export class SessionEventPublisher {
   ) {}
 
   /**
-   * Publish a mutation this engine instance just confirmed. `tx` marks it as
-   * one of several facts committed together (`origin.tx`).
+   * Publish what one write of this engine instance just committed: one
+   * event per fact, in order, all carrying the write's `opId` as
+   * `origin.tx`.
    */
-  publishLocal(event: DocumentEventInit, tx?: EventOrigin['tx']): void {
-    this.hub.publish({
-      ...event,
-      origin: {
-        kind: 'local',
-        sessionId: this.sessionId,
-        sub: this.sub,
-        ts: Date.now(),
-        serverId: null,
-        ...(tx ? { tx } : {}),
-      },
-    } as DocumentEvent);
+  publishWrite(opId: string, ...events: DocumentEventInit[]): void {
+    const ts = Date.now();
+    events.forEach((event, index) => {
+      this.hub.publish({
+        ...event,
+        origin: {
+          kind: 'local',
+          sessionId: this.sessionId,
+          sub: this.sub,
+          ts,
+          serverId: null,
+          tx: { id: opId, index, count: events.length },
+        },
+      } as DocumentEvent);
+    });
   }
 }

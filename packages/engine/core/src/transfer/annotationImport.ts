@@ -16,6 +16,7 @@ import type { AnnotationRef } from '../identity/AnnotationRef';
 import { encodePageKey, type PageRef } from '../identity/PageRef';
 import type { AnnotationListMutationMeta } from '../mutation/AnnotationListMutationMeta';
 import type { AnnotationCreateResult } from '../mutation/AnnotationMutationResults';
+import type { WriteOptions } from '../mutation/WriteOptions';
 import type { Coordinates, PageCoordinates } from '../pageSpace/coordinates';
 
 /**
@@ -30,20 +31,21 @@ export type AnnotationImportPages =
   | 'by-position'
   | ReadonlyArray<{ readonly from: PageRef; readonly to: PageRef }>;
 
-export interface AnnotationImportOptions {
+/**
+ * How to import. The `opId` names the import: its events share it as
+ * `origin.tx.id`, and on the cloud a retry with the same id applies once.
+ */
+export interface AnnotationImportOptions extends WriteOptions {
   /** Default `'same'`. A page an item is on or points at that maps nowhere refuses the import. */
   readonly pages?: AnnotationImportPages;
   /**
-   * `'restore'` (the default) writes the authors and dates as the bundle has
-   * them, and needs `doc.annotate.import`. `'stamp'` stamps the session and
-   * the time, as `create` does.
+   * `'restore'` (the default) writes the authors, dates and names (`nm`) as
+   * the bundle has them, and needs `doc.annotate.import`; an item whose name
+   * its page already has is dropped as `'name-conflict'`. `'stamp'` makes
+   * copies: it stamps the session and the time, as `create` does, and gives
+   * every annotation a fresh name.
    */
   readonly attribution?: 'restore' | 'stamp';
-  /**
-   * Names the import: its events share it as `origin.tx.id`, and on the
-   * cloud a retry with the same id applies once. Minted when absent.
-   */
-  readonly opId?: string;
 }
 
 /**

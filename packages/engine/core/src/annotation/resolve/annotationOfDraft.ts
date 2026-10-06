@@ -27,6 +27,12 @@ export interface DraftContext<Box = unknown> {
   readonly ref: AnnotationRef;
   /** Its place among its page's annotations: a create goes last. */
   readonly index: number;
+  /**
+   * The name the engine gives it when the draft has no `nm`: a fresh UUIDv7
+   * the engine mints. Left out, the prediction says `null` until the engine
+   * answers.
+   */
+  readonly nm?: string;
   /** Who creates it and when, as the engine stamps it. Left out, a read says `null`. */
   readonly attribution?: DraftAttribution;
   /**
@@ -83,6 +89,7 @@ export function annotationOfResolvedDraft<C extends Coordinates>(
       read[name] = null;
     }
   }
+  if (read.nm === null && context.nm !== undefined) read.nm = context.nm;
   read.ref = context.ref;
   read.page = context.ref.page;
   read.index = context.index;

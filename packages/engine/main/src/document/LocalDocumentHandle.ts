@@ -8,6 +8,8 @@ import {
   type DocumentAnnotationsService,
   type DocumentActionsService,
   type DocumentEventStream,
+  type ObjectNumberPool,
+  type ObjectNumberRange,
   LOCAL_ENGINE_BRAND,
   type LocalDocumentHandle as LocalDocumentHandleContract,
   type DocumentPagesService,
@@ -38,6 +40,7 @@ import { LocalDocumentSearchService } from './LocalDocumentSearchService';
 import { LocalDocumentSecurityService } from './LocalDocumentSecurityService';
 import { LocalDocumentSignaturesService } from './LocalDocumentSignaturesService';
 import { LocalMetadataService } from './LocalMetadataService';
+import { LocalObjectNumberPool } from './LocalObjectNumberPool';
 import { LocalPageHandle } from './LocalPageHandle';
 import { LocalPieceInfoService } from './LocalPieceInfoService';
 import type { JobId, WorkerResultPayload } from '../worker/protocol';
@@ -56,6 +59,7 @@ interface OpenDocument {
   readonly publisher: SessionEventPublisher;
   readonly events: DocumentEventStream;
   readonly security: LocalDocumentSecurityService;
+  readonly objectNumbers: LocalObjectNumberPool;
   readonly render: DocumentRenderService;
   readonly isClosed: () => boolean;
   close(): void;
@@ -88,6 +92,7 @@ export class LocalDocumentHandle implements LocalDocumentHandleContract {
    */
   readonly render: DocumentRenderService;
   readonly events: DocumentEventStream;
+  readonly objectNumbers: ObjectNumberPool;
   readonly id: string;
   /** The queue with this handle's facts: every call made through it carries them. */
   private readonly queue: JobQueue;
@@ -101,10 +106,13 @@ export class LocalDocumentHandle implements LocalDocumentHandleContract {
     guard: ScopeGuard,
     sessionId: string,
     renderPolicy: EngineRenderPolicy = CONTINUOUS_RENDER_POLICY,
+    /** The numbers the open handed out; absent for a locked open, which gets them on unlock. */
+    objectNumbers?: ObjectNumberRange,
   ): LocalDocumentHandle {
     let closed = false;
     const isClosed = () => closed;
     const hub = new EventHub();
+    const pool = new LocalObjectNumberPool(id, queue, hub, objectNumbers);
     const doc: OpenDocument = {
       id,
       queue,
@@ -115,7 +123,15 @@ export class LocalDocumentHandle implements LocalDocumentHandleContract {
       // interface as cloud with the collaborative fields at rest.
       publisher: new SessionEventPublisher(hub, sessionId),
       events: hub,
-      security: new LocalDocumentSecurityService(initialSecurity, id, queue, { isClosed }, guard),
+      security: new LocalDocumentSecurityService(
+        initialSecurity,
+        id,
+        queue,
+        { isClosed },
+        guard,
+        () => pool.topUp(),
+      ),
+      objectNumbers: pool,
       render: { getPolicy: () => AbortablePromise.resolveValue(renderPolicy) },
       isClosed,
       close: () => {
@@ -137,6 +153,7 @@ export class LocalDocumentHandle implements LocalDocumentHandleContract {
     this.queue = queue;
     this.render = doc.render;
     this.events = doc.events;
+    this.objectNumbers = doc.objectNumbers;
     this.security = doc.security;
     this.metadata = new LocalMetadataService(id, queue, view, guard, publisher);
     // Catalog-level /PieceInfo (no pon); page-level lives on each page handle.

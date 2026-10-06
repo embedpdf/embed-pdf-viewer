@@ -1,10 +1,10 @@
 import {
+  opIdOf,
   AbortablePromise,
   EngineError,
   EngineErrorCode,
   type DocumentPagesService,
   type PageFlattenResult,
-  type FlattenOptions,
   type PageDeleteResult,
   type PageInsertBlankSpec,
   type PageInsertResult,
@@ -18,6 +18,9 @@ import {
   type PageRotateResult,
   type PdfRotation,
   pageRefsEqual,
+  type WriteOptions,
+  type FlattenWriteOptions,
+  type PageInsertBlankOptions,
 } from '@embedpdf/engine-core/runtime';
 import {
   PageDeleteResultSchema,
@@ -33,6 +36,7 @@ import type { SessionEventPublisher } from '@embedpdf/engine-services';
 
 import { buildMutationForm } from './buildMutationForm';
 import type { ManifestAccessor } from './CloudDocumentHandle';
+import { assertNoObjectNumber } from './CloudObjectNumberPool';
 import { planesInherited } from './planes';
 import { awaitSignal } from '../shared/awaitSignal';
 import type { HttpClient } from '../transport/HttpClient';
@@ -144,13 +148,18 @@ export class CloudDocumentPagesService implements DocumentPagesService {
     );
   }
 
-  move(pages: PageRef[], toIndex: number): AbortablePromise<PageMoveResult> {
+  move(
+    pages: PageRef[],
+    toIndex: number,
+    options?: WriteOptions,
+  ): AbortablePromise<PageMoveResult> {
     if (this.isClosed()) {
       return AbortablePromise.rejectReason(
         new EngineError(EngineErrorCode.DocNotOpen, `document ${this.docId} is closed`),
       );
     }
     return AbortablePromise.run<PageMoveResult>(async (signal) => {
+      const opId = opIdOf(options);
       const result = await this.http.postJson(
         wirePaths.layerPagesMove(this.docId, this.layerName),
         { pages, toIndex },
@@ -162,26 +171,28 @@ export class CloudDocumentPagesService implements DocumentPagesService {
       this.manifest.apply(result.meta, ['layout']);
       // Publish after absorb: listeners reading the manifest in their
       // callback must see post-mutation state.
-      this.publisher.publishLocal({ type: 'pages.moved', pages, toIndex, ...result });
+      this.publisher.publishWrite(opId, { type: 'pages.moved', pages, toIndex, ...result });
       return result;
     });
   }
 
-  setName(input: PageNameInput): AbortablePromise<PageNameResult> {
+  setName(input: PageNameInput, options?: WriteOptions): AbortablePromise<PageNameResult> {
     return this.runNameMutation(
       wirePaths.layerPagesNames(this.docId, this.layerName),
       input,
       input.name,
       input.page,
+      options,
     );
   }
 
-  removeName(input: PageRemoveNameInput): AbortablePromise<PageNameResult> {
+  removeName(input: PageRemoveNameInput, options?: WriteOptions): AbortablePromise<PageNameResult> {
     return this.runNameMutation(
       wirePaths.layerPagesNamesDelete(this.docId, this.layerName),
       input,
       input.name,
       null,
+      options,
     );
   }
 
@@ -195,6 +206,7 @@ export class CloudDocumentPagesService implements DocumentPagesService {
     body: PageNameInput | PageRemoveNameInput,
     name: string,
     page: PageRef | null,
+    options: WriteOptions | undefined,
   ): AbortablePromise<PageNameResult> {
     if (this.isClosed()) {
       return AbortablePromise.rejectReason(
@@ -202,6 +214,7 @@ export class CloudDocumentPagesService implements DocumentPagesService {
       );
     }
     return AbortablePromise.run<PageNameResult>(async (signal) => {
+      const opId = opIdOf(options);
       const result = await this.http.postJson(
         path,
         body,
@@ -209,18 +222,23 @@ export class CloudDocumentPagesService implements DocumentPagesService {
         signal,
       );
       this.manifest.apply(result.meta, ['layout']);
-      this.publisher.publishLocal({ type: 'pages.named', name, page, ...result });
+      this.publisher.publishWrite(opId, { type: 'pages.named', name, page, ...result });
       return result;
     });
   }
 
-  rotate(pages: PageRef[], rotation: PdfRotation): AbortablePromise<PageRotateResult> {
+  rotate(
+    pages: PageRef[],
+    rotation: PdfRotation,
+    options?: WriteOptions,
+  ): AbortablePromise<PageRotateResult> {
     if (this.isClosed()) {
       return AbortablePromise.rejectReason(
         new EngineError(EngineErrorCode.DocNotOpen, `document ${this.docId} is closed`),
       );
     }
     return AbortablePromise.run<PageRotateResult>(async (signal) => {
+      const opId = opIdOf(options);
       const result = await this.http.postJson(
         wirePaths.layerPagesRotate(this.docId, this.layerName),
         { pages, rotation },
@@ -230,18 +248,19 @@ export class CloudDocumentPagesService implements DocumentPagesService {
       // Rotation shares the move patch exactly: docVersion + layoutVersion
       // advance, every per-page pin (and its cached render) stays warm.
       this.manifest.apply(result.meta, ['layout']);
-      this.publisher.publishLocal({ type: 'pages.rotated', pages, rotation, ...result });
+      this.publisher.publishWrite(opId, { type: 'pages.rotated', pages, rotation, ...result });
       return result;
     });
   }
 
-  delete(pages: PageRef[]): AbortablePromise<PageDeleteResult> {
+  delete(pages: PageRef[], options?: WriteOptions): AbortablePromise<PageDeleteResult> {
     if (this.isClosed()) {
       return AbortablePromise.rejectReason(
         new EngineError(EngineErrorCode.DocNotOpen, `document ${this.docId} is closed`),
       );
     }
     return AbortablePromise.run<PageDeleteResult>(async (signal) => {
+      const opId = opIdOf(options);
       const result = await this.http.postJson(
         wirePaths.layerPagesDelete(this.docId, this.layerName),
         { pages },
@@ -251,18 +270,23 @@ export class CloudDocumentPagesService implements DocumentPagesService {
       // The structural advance plus dropping the deleted pages' manifest
       // rows — a retired page object number must not be buildable from the local cache.
       this.manifest.applyPageDelete(result.meta, pages);
-      this.publisher.publishLocal({ type: 'pages.deleted', pages, ...result });
+      this.publisher.publishWrite(opId, { type: 'pages.deleted', pages, ...result });
       return result;
     });
   }
 
-  insert(bytes: Uint8Array | ArrayBuffer, toIndex?: number): AbortablePromise<PageInsertResult> {
+  insert(
+    bytes: Uint8Array | ArrayBuffer,
+    toIndex?: number,
+    options?: WriteOptions,
+  ): AbortablePromise<PageInsertResult> {
     if (this.isClosed()) {
       return AbortablePromise.rejectReason(
         new EngineError(EngineErrorCode.DocNotOpen, `document ${this.docId} is closed`),
       );
     }
     return AbortablePromise.run<PageInsertResult>(async (signal) => {
+      const opId = opIdOf(options);
       // The multipart mutation envelope: the JSON the plain request would
       // have been rides the `body` part; the source PDF is `resource:source`.
       const buffer = bytes instanceof ArrayBuffer ? bytes : copyToExactBuffer(bytes);
@@ -279,18 +303,24 @@ export class CloudDocumentPagesService implements DocumentPagesService {
       // the fresh page object numbers, so the absorb drops it for a lazy refetch (the
       // result already carries the full new layout — nothing waits).
       this.manifest.applyPageInsert(result.meta);
-      this.publisher.publishLocal({ type: 'pages.inserted', toIndex, ...result });
+      this.publisher.publishWrite(opId, { type: 'pages.inserted', toIndex, ...result });
       return result;
     });
   }
 
-  insertBlank(spec: PageInsertBlankSpec, toIndex?: number): AbortablePromise<PageInsertResult> {
+  insertBlank(
+    spec: PageInsertBlankSpec,
+    toIndex?: number,
+    options: PageInsertBlankOptions = {},
+  ): AbortablePromise<PageInsertResult> {
     if (this.isClosed()) {
       return AbortablePromise.rejectReason(
         new EngineError(EngineErrorCode.DocNotOpen, `document ${this.docId} is closed`),
       );
     }
     return AbortablePromise.run<PageInsertResult>(async (signal) => {
+      const opId = opIdOf(options);
+      assertNoObjectNumber(...(options.objectNumbers ?? []));
       const result = await this.http.postJson(
         wirePaths.layerPagesInsertBlank(this.docId, this.layerName),
         {
@@ -302,7 +332,7 @@ export class CloudDocumentPagesService implements DocumentPagesService {
         signal,
       );
       this.manifest.applyPageInsert(result.meta);
-      this.publisher.publishLocal({ type: 'pages.inserted', toIndex, ...result });
+      this.publisher.publishWrite(opId, { type: 'pages.inserted', toIndex, ...result });
       return result;
     });
   }
@@ -324,7 +354,7 @@ export class CloudDocumentPagesService implements DocumentPagesService {
     );
   }
 
-  flatten(pages: PageRef[], options?: FlattenOptions): AbortablePromise<PageFlattenResult> {
+  flatten(pages: PageRef[], options?: FlattenWriteOptions): AbortablePromise<PageFlattenResult> {
     const usage = options?.usage ?? 'display';
     if (this.isClosed()) {
       return AbortablePromise.rejectReason(
@@ -332,6 +362,7 @@ export class CloudDocumentPagesService implements DocumentPagesService {
       );
     }
     return AbortablePromise.run<PageFlattenResult>(async (signal) => {
+      const opId = opIdOf(options);
       const result = await this.http.postJson(
         wirePaths.layerPagesFlatten(this.docId, this.layerName),
         { pages, usage },
@@ -343,7 +374,7 @@ export class CloudDocumentPagesService implements DocumentPagesService {
       if (result.meta.cacheDelta === null) return result;
       // Flatten bakes annotations into page content, so both planes flip.
       this.manifest.apply(result.meta, ['content', 'annotations']);
-      this.publisher.publishLocal({
+      this.publisher.publishWrite(opId, {
         type: 'pages.flattened',
         ...result,
       });

@@ -85,7 +85,7 @@ describe('drawing bytes across runtimes', () => {
       );
       const { annotation: created } = await page.annotations.create(
         { subtype: 'stamp', box: { x: 20, y: 20, width: 100, height: 50 }, opacity: 0.5 },
-        { appearance: drawing },
+        { resources: { appearance: drawing } },
       );
       const drawings = [];
       for (const stamp of [created, ...acrobat]) {
@@ -159,19 +159,25 @@ describe('replacing a stamp drawing', () => {
       const page = doc.page(toPageRef(pages[0]!.ref.objectNumber));
       const rect = { x: 20, y: 20, width: 100, height: 100 };
       const small = (
-        await page.annotations.create({ subtype: 'stamp', box: rect }, { appearance: drawing })
+        await page.annotations.create(
+          { subtype: 'stamp', box: rect },
+          { resources: { appearance: drawing } },
+        )
       ).annotation;
       const withSmall = (await doc.download({ mode: 'rewrite' })).length;
       await page.annotations.delete(small.ref);
 
       const image = noisePng();
       const stamp = (
-        await page.annotations.create({ subtype: 'stamp', box: rect }, { appearance: image })
+        await page.annotations.create(
+          { subtype: 'stamp', box: rect },
+          { resources: { appearance: image } },
+        )
       ).annotation;
       const withImage = (await doc.download({ mode: 'rewrite' })).length;
       expect(withImage - withSmall > image.length / 2).toBe(true);
 
-      await page.annotations.update(stamp.ref, {}, { appearance: drawing });
+      await page.annotations.update(stamp.ref, {}, { resources: { appearance: drawing } });
       const replaced = (await doc.download({ mode: 'rewrite' })).length;
       // Back to the size with the small drawing: the image is gone.
       expect(Math.abs(replaced - withSmall) < 1024).toBe(true);
@@ -198,7 +204,7 @@ describe('stamp drawings across a reopen', () => {
         const page = doc.page(toPageRef(pages[0]!.ref.objectNumber));
         await page.annotations.create(
           { subtype: 'stamp', box: { x, y: 20, width: 100, height: 100 } },
-          { appearance: image },
+          { resources: { appearance: image } },
         );
         const saved = await doc.download({ mode: 'rewrite' });
         await doc.close();

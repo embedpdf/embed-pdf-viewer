@@ -456,7 +456,7 @@ describe("annotation rotation (local engine) — Acrobat's /Rotate", () => {
       });
     const { annotation: stamp } = await page.annotations.create(
       { subtype: 'stamp', box, rotation: 36 },
-      { appearance: png },
+      { resources: { appearance: png } },
     );
     const { annotation: quarter } = await textBox(270);
     const { annotation: other } = await textBox(30);

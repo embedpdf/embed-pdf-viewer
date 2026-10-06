@@ -932,7 +932,7 @@ describe('CloudPageAnnotationsService — binary payload wire shape', () => {
         .page(toPageRef(PAGE_OBJECT_NUMBER))
         .annotations.create(
           { subtype: 'stamp', box: { x: 10, y: 10, width: 100, height: 50 }, fit: 'cover' },
-          { appearance: TINY_PNG },
+          { resources: { appearance: TINY_PNG } },
         );
 
       const post = fx.calls.find((c) => c.method === 'POST' && c.path.endsWith('/items'));

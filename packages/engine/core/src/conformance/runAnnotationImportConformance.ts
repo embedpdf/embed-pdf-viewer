@@ -1,4 +1,5 @@
 import { creatables, iconRect, PNG_1X1 } from './creatables';
+import { UUID_V7 } from './names';
 import type {
   AnnotationResourceConformanceOptions,
   AnnotationResourceFixture,
@@ -67,12 +68,16 @@ export function runAnnotationImportConformance(
     test('imports every kind a create makes, as the export has it', async () => {
       await twoCopies('authoring', async (source, target, pageRef) => {
         const page = source.page(pageRef);
-        for (const { data, resources } of creatables()) await create(page, data, resources);
-        await create(page, { subtype: 'stamp', box: box(20) }, { appearance: BANDS_PDF });
+        for (const { data, resources } of creatables()) await create(page, data, { resources });
+        await create(
+          page,
+          { subtype: 'stamp', box: box(20) },
+          { resources: { appearance: BANDS_PDF } },
+        );
         await create(
           page,
           { subtype: 'stamp', box: box(80), opacity: 0.5 },
-          { appearance: BANDS_PDF },
+          { resources: { appearance: BANDS_PDF } },
         );
         const note = await create(page, {
           subtype: 'text',
@@ -99,9 +104,15 @@ export function runAnnotationImportConformance(
           bundle.items.map((item) => annotationKey(item.data.ref)),
         );
 
+        // Copies, so each has a fresh name.
+        const names = new Set(bundle.items.map((item) => item.data.nm));
+        for (const annotation of result.annotations) {
+          expect(annotation.nm).toMatch(UUID_V7);
+          expect(names.has(annotation.nm)).toBe(false);
+        }
         // Exported again, the target gives the same file, apart from the new
-        // refs and the attribution the import stamped: the same data, and
-        // each drawing and file under the same id.
+        // refs and names and the attribution the import stamped: the same
+        // data, and each drawing and file under the same id.
         const again = await target.annotations.export();
         expect(comparable(again, result)).toEqual(comparable(bundle));
         expect(Object.keys(again.resources).sort()).toEqual(Object.keys(bundle.resources).sort());
@@ -133,7 +144,7 @@ export function runAnnotationImportConformance(
       });
     });
 
-    test('leaves out a name the page has, and what points at it, then names on a repeat', async () => {
+    test('a restore leaves out a name the page has, and what points at it, then names on a repeat', async () => {
       await twoCopies('authoring', async (source, target, pageRef) => {
         const page = source.page(pageRef);
         const taken = await create(page, {
@@ -147,28 +158,58 @@ export function runAnnotationImportConformance(
           reply: { to: taken.ref },
         });
         const free = await create(page, { subtype: 'square', box: box(80), nm: 'free' });
-        const unnamed = await create(page, { subtype: 'circle', box: box(140) });
+        // Named by the engine, as every create is.
+        const circle = await create(page, { subtype: 'circle', box: box(140) });
         await create(target.page(pageRef), { subtype: 'square', box: box(200), nm: 'taken' });
         const bundle = await source.annotations.export();
 
-        const first = await target.annotations.import(bundle, { attribution: 'stamp' });
+        const first = await target.annotations.import(bundle, { attribution: 'restore' });
         expect(first.dropped).toEqual([
           { ref: taken.ref, reason: 'name-conflict' },
           { ref: reply.ref, reason: 'parent-dropped' },
         ]);
         expect(first.refMap.map((pair) => annotationKey(pair.from))).toEqual(
-          [free, unnamed].map((annotation) => annotationKey(annotation.ref)),
+          [free, circle].map((annotation) => annotationKey(annotation.ref)),
         );
-        expect(first.annotations.map((annotation) => annotation.nm)).toEqual(['free', null]);
+        expect(first.annotations.map((annotation) => annotation.nm)).toEqual(['free', circle.nm]);
 
-        // A name is recognized again; an unnamed annotation can't be.
-        const second = await target.annotations.import(bundle, { attribution: 'stamp' });
+        // Every name is recognized again.
+        const second = await target.annotations.import(bundle, { attribution: 'restore' });
         expect(second.dropped.map((drop) => drop.reason)).toEqual([
           'name-conflict',
           'parent-dropped',
           'name-conflict',
+          'name-conflict',
         ]);
-        expect(second.annotations.map((annotation) => annotation.subtype)).toEqual(['circle']);
+        expect(second.annotations).toEqual([]);
+      });
+    });
+
+    test('a stamp makes copies: each gets a fresh name, so a name the page has is no conflict', async () => {
+      await twoCopies('authoring', async (source, target, pageRef) => {
+        const page = source.page(pageRef);
+        const taken = await create(page, {
+          subtype: 'text',
+          rect: iconRect(box(20).x, box(20).y),
+          nm: 'taken',
+        });
+        await create(page, {
+          subtype: 'text',
+          rect: iconRect(box(20).x, box(20).y),
+          reply: { to: taken.ref },
+        });
+        await create(target.page(pageRef), { subtype: 'square', box: box(200), nm: 'taken' });
+        const bundle = await source.annotations.export();
+
+        for (let copy = 0; copy < 2; copy++) {
+          const result = await target.annotations.import(bundle, { attribution: 'stamp' });
+          expect(result.dropped).toEqual([]);
+          const [note, reply] = result.annotations;
+          expect(note!.nm).toMatch(UUID_V7);
+          expect(reply!.nm).toMatch(UUID_V7);
+          expect(note!.nm === 'taken').toBe(false);
+          expect(reply!.reply?.to).toEqual(note!.ref);
+        }
       });
     });
 
@@ -203,7 +244,7 @@ export function runAnnotationImportConformance(
         const stamp = await create(
           page,
           { subtype: 'stamp', box: box(20) },
-          { appearance: PNG_1X1 },
+          { resources: { appearance: PNG_1X1 } },
         );
         await source.pages.insertBlank({ size: { width: 300, height: 300 } }, 1);
         const { pages } = await source.pages.list();
@@ -270,6 +311,7 @@ function comparable(bundle: AnnotationBundle, result?: AnnotationImportResult) {
       userId: _userId,
       createdBy: _createdBy,
       modifiedBy: _modifiedBy,
+      nm: _nm,
       ...rest
     } = data as Annotation & Record<string, unknown>;
     const fields = rest as Record<string, unknown>;

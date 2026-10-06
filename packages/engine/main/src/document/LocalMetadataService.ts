@@ -2,6 +2,7 @@ import {
   AbortablePromise,
   EngineError,
   EngineErrorCode,
+  opIdOf,
   wirePack,
   type CustomMetadata,
   type CustomMetadataPatch,
@@ -12,6 +13,7 @@ import {
   type MetadataPatch,
   type MetadataService,
   type MetadataUpdateResult,
+  type WriteOptions,
 } from '@embedpdf/engine-core/runtime';
 import type { SessionEventPublisher } from '@embedpdf/engine-services';
 
@@ -31,21 +33,25 @@ interface MetadataDeps {
 }
 
 /**
- * One metadata job: refused on a closed document or a missing capability,
- * otherwise the worker round trip, with the payload's tag checked.
+ * One metadata job: refused on a closed document, a missing capability or an
+ * invalid `opId`, otherwise the worker round trip, with the payload's tag
+ * checked. `pick` gets the job's `opId` (the caller's, else a fresh one).
  */
 function runMetadataJob<Tag extends WorkerResultPayload['tag'], T>(
   deps: MetadataDeps,
   capability: DocCapability,
   job: { tag: Tag; buildPack: JobSpec['buildPack'] },
-  pick: (payload: Extract<WorkerResultPayload, { tag: Tag }>) => T,
+  pick: (payload: Extract<WorkerResultPayload, { tag: Tag }>, opId: string) => T,
+  options?: WriteOptions,
 ): AbortablePromise<T> {
   if (deps.view.isClosed()) {
     return AbortablePromise.rejectReason(
       new EngineError(EngineErrorCode.DocNotOpen, `document not open: ${deps.docId}`),
     );
   }
+  let opId: string;
   try {
+    opId = opIdOf(options);
     deps.guard.assertCapability(capability);
   } catch (err) {
     return AbortablePromise.rejectReason(err);
@@ -59,7 +65,7 @@ function runMetadataJob<Tag extends WorkerResultPayload['tag'], T>(
     if (payload.tag !== job.tag) {
       throw new EngineError(EngineErrorCode.WireFormat, `unexpected payload tag: ${payload.tag}`);
     }
-    return pick(payload as Extract<WorkerResultPayload, { tag: Tag }>);
+    return pick(payload as Extract<WorkerResultPayload, { tag: Tag }>, opId);
   });
 }
 
@@ -87,7 +93,10 @@ class LocalCustomMetadataService implements CustomMetadataService {
     );
   }
 
-  update(patch: CustomMetadataPatch): AbortablePromise<CustomMetadataUpdateResult> {
+  update(
+    patch: CustomMetadataPatch,
+    options?: WriteOptions,
+  ): AbortablePromise<CustomMetadataUpdateResult> {
     const { docId } = this.deps;
     return runMetadataJob(
       this.deps,
@@ -97,10 +106,11 @@ class LocalCustomMetadataService implements CustomMetadataService {
         buildPack: (jobId) =>
           wirePack({ kind: 'metadata.updateCustom', effect: 'write', jobId, docId, patch }),
       },
-      (payload) => {
-        this.publisher.publishLocal({ type: 'metadata.customUpdated', ...payload.result });
+      (payload, opId) => {
+        this.publisher.publishWrite(opId, { type: 'metadata.customUpdated', ...payload.result });
         return payload.result;
       },
+      options,
     );
   }
 }
@@ -133,7 +143,7 @@ export class LocalMetadataService implements MetadataService {
     );
   }
 
-  update(patch: MetadataPatch): AbortablePromise<MetadataUpdateResult> {
+  update(patch: MetadataPatch, options?: WriteOptions): AbortablePromise<MetadataUpdateResult> {
     const { docId } = this.deps;
     return runMetadataJob(
       this.deps,
@@ -143,10 +153,11 @@ export class LocalMetadataService implements MetadataService {
         buildPack: (jobId) =>
           wirePack({ kind: 'metadata.update', effect: 'write', jobId, docId, patch }),
       },
-      (payload) => {
-        this.publisher.publishLocal({ type: 'metadata.updated', ...payload.result });
+      (payload, opId) => {
+        this.publisher.publishWrite(opId, { type: 'metadata.updated', ...payload.result });
         return payload.result;
       },
+      options,
     );
   }
 }

@@ -93,6 +93,21 @@ export const EngineErrorCode = {
    * written. `details` has the `limit`, its `max` and the `value` found.
    */
   PayloadTooLarge: 'PayloadTooLarge',
+  /**
+   * A create named an object number it can't use. `details.objectNumber`
+   * is the number; `details.reason` is `'not-held'` when the caller's
+   * session doesn't hold it (never reserved, already spent, or lost to
+   * another session) and `'taken'` when an object is already at it. Nothing
+   * was written.
+   */
+  ObjectNumberUnavailable: 'ObjectNumberUnavailable',
+  /**
+   * The document would pass the highest object number a file should have
+   * (`OBJECT_NUMBER_CEILING`): no more numbers are handed out, and a write
+   * that needs more is refused. `details.lastObjectNumber` is the document's
+   * last number. A compacted copy of the document starts afresh.
+   */
+  LayerFull: 'LayerFull',
 } as const;
 
 export type EngineErrorCode = (typeof EngineErrorCode)[keyof typeof EngineErrorCode];

@@ -67,8 +67,10 @@ export class AnnotationImporter {
     const { bundle, limits } = request;
     this.assertBundle(bundle, limits);
 
+    // A copy is a new annotation, so it gets a fresh name (the applier mints
+    // one): a name the bundle carries is neither kept nor checked.
     const plan = planAnnotationImport({
-      bundle,
+      bundle: request.attribution === 'stamp' ? withoutNames(bundle) : bundle,
       ...(request.pages !== undefined ? { pages: request.pages } : {}),
       target: this.session.allRecords().map((record) => ({
         page: toPageRef(record.pageObjectNumber),
@@ -193,5 +195,13 @@ function attributionOf(
       groupId: data.groupId ?? null,
     },
     ...(actor?.userId ? { importedBy: actor.userId } : {}),
+  };
+}
+
+/** `bundle` with every item's name dropped. */
+function withoutNames(bundle: WireAnnotationBundle): WireAnnotationBundle {
+  return {
+    ...bundle,
+    items: bundle.items.map((item) => ({ ...item, data: { ...item.data, nm: null } })),
   };
 }

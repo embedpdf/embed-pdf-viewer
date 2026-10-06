@@ -12,6 +12,7 @@ import type { MetadataService } from './MetadataService';
 import type { PageHandle } from './PageHandle';
 import type { DownloadOptions } from '../dto/PdfSaveMode';
 import type { DocumentEventStream } from '../events/DocumentEventStream';
+import type { ObjectNumberPool } from '../identity/ObjectNumbers';
 import type { PageRef } from '../identity/PageRef';
 import { AbortablePromise } from '../promise/AbortablePromise';
 import type { CallFacts, WorkingSetPage } from '../scheduling/facts';
@@ -69,6 +70,14 @@ export interface DocumentHandle {
    * engine-instance identity lives on each event's `origin.sessionId`.
    */
   readonly events: DocumentEventStream;
+  /**
+   * This session's reserved object numbers: take one to name an object
+   * before creating it (`page.annotations.create(data, { objectNumber })`,
+   * `pages.insertBlank(spec, toIndex, { objectNumbers })`, `forms.create`,
+   * `forms.addWidget`). Its ref is then known at once and stays its name
+   * for life. Creates without a number still work; the engine picks one.
+   */
+  readonly objectNumbers: ObjectNumberPool;
   /**
    * A handle for the page `ref` names: an address with the page's verbs,
    * made without asking the engine anything (so synchronous). The page is

@@ -3,7 +3,7 @@ import {
   EngineError,
   EngineErrorCode,
   annotationImportFacts,
-  generateUuid,
+  opIdOf,
   wirePack,
   type AnnotationBundle,
   type AnnotationExportSelection,
@@ -88,7 +88,9 @@ export class LocalDocumentAnnotationsService implements DocumentAnnotationsServi
       );
     }
     const attribution = options.attribution ?? 'restore';
+    let opId: string;
     try {
+      opId = opIdOf(options);
       if (attribution === 'restore') {
         // Restoring writes attribution that isn't the session's.
         this.guard.assertCapability('doc.annotate.modify');
@@ -102,7 +104,6 @@ export class LocalDocumentAnnotationsService implements DocumentAnnotationsServi
     }
     // The session: whom `stamp` attributes to, whom `restore` records as `importedBy`.
     const actor = this.guard.actorForCreate();
-    const opId = options.opId ?? generateUuid();
     const docId = this.docId;
     return AbortablePromise.run<AnnotationImportResult>(async (signal) => {
       // A private copy of each resource rides the transfer list, once
@@ -136,13 +137,13 @@ export class LocalDocumentAnnotationsService implements DocumentAnnotationsServi
       if (payload.tag !== 'annotations.import') {
         throw new EngineError(EngineErrorCode.WireFormat, `unexpected payload tag: ${payload.tag}`);
       }
-      const facts = annotationImportFacts(payload.result);
-      facts.forEach((fact, index) => {
-        this.publisher.publishLocal(
-          { type: 'annotations.created', ...fact },
-          { id: opId, index, count: facts.length },
-        );
-      });
+      this.publisher.publishWrite(
+        opId,
+        ...annotationImportFacts(payload.result).map((fact) => ({
+          type: 'annotations.created' as const,
+          ...fact,
+        })),
+      );
       return payload.result;
     });
   }

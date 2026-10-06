@@ -141,7 +141,7 @@ describe.skipIf(!ENABLED)('E8 annotation transfer (cloud, localhost)', () => {
           .page(page!)
           .annotations.create(
             { subtype: 'stamp', box: { left, bottom, right: left + 50, top: bottom + 40 } },
-            { appearance: image },
+            { resources: { appearance: image } },
           );
       }
     });
@@ -167,7 +167,7 @@ describe.skipIf(!ENABLED)('E8 annotation transfer (cloud, localhost)', () => {
           rect: iconRect(40, 60),
           file: { name: 'large.bin' },
         },
-        { file: bytes },
+        { resources: { file: bytes } },
       );
     });
     await onTheServer('bundle bytes', base, 1, bundle);

@@ -17,6 +17,7 @@ import {
 import { generateUuid } from '@embedpdf/engine-services';
 
 import { LocalDocumentHandle } from './document/LocalDocumentHandle';
+import { OBJECT_NUMBER_POOL_SIZE } from './document/LocalObjectNumberPool';
 import { LocalFontService } from './fonts/LocalFontService';
 import { BrowserImageEncoder, type LocalImageEncoder } from './render/BrowserImageEncoder';
 import { PortableImageEncoder } from './render/PortableImageEncoder';
@@ -187,6 +188,7 @@ export class LocalEngine implements LocalEngineContract {
             password,
             signedDocumentPolicy,
             ...(baseSha256 ? { baseSha256 } : {}),
+            reserveObjectNumbers: OBJECT_NUMBER_POOL_SIZE,
           },
           transfer,
         ),
@@ -221,6 +223,7 @@ export class LocalEngine implements LocalEngineContract {
             bytes: buffer,
             password,
             signedDocumentPolicy,
+            reserveObjectNumbers: OBJECT_NUMBER_POOL_SIZE,
           },
           [buffer],
         ),
@@ -260,6 +263,7 @@ export class LocalEngine implements LocalEngineContract {
             layer,
             password,
             signedDocumentPolicy,
+            reserveObjectNumbers: OBJECT_NUMBER_POOL_SIZE,
           },
           transfer,
         ),
@@ -304,6 +308,7 @@ export class LocalEngine implements LocalEngineContract {
         guard,
         this.sessionId,
         this.renderPolicy,
+        payload.objectNumbers,
       );
       if (payload.passwordRejected) handle.security.markPasswordRejected();
       return handle;

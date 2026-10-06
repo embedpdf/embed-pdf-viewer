@@ -23,6 +23,7 @@ import {
   type DownloadOptions,
   type CallFacts,
   type WorkingSetPage,
+  type ObjectNumberPool,
 } from '@embedpdf/engine-core/runtime';
 import {
   DEFAULT_LAYER_NAME,
@@ -45,6 +46,7 @@ import { CloudDocumentSearchService } from './CloudDocumentSearchService';
 import { CloudDocumentSecurityService } from './CloudDocumentSecurityService';
 import { CloudDocumentSignaturesService } from './CloudDocumentSignaturesService';
 import { CloudMetadataService } from './CloudMetadataService';
+import { CloudObjectNumberPool } from './CloudObjectNumberPool';
 import { CloudPageHandle } from './CloudPageHandle';
 import { auditRowToEvents } from '../realtime/auditRowToEvents';
 import { SseClient } from '../realtime/SseClient';
@@ -94,6 +96,7 @@ export class CloudDocumentHandle implements DocumentHandle {
   readonly security: DocumentSecurityService;
   readonly render: DocumentRenderService;
   readonly events: DocumentEventStream;
+  readonly objectNumbers: ObjectNumberPool = new CloudObjectNumberPool();
   private readonly publisher: SessionEventPublisher;
   private readonly hub: EventHub;
   private readonly sessionId: string;

@@ -18,7 +18,7 @@ const job = (
   name: string,
   effect: RequestEffect,
   { doc = 'a', rank = 0 }: { doc?: string | undefined; rank?: number } = {},
-): Named => ({ name, effect, docId: doc, rank, sent: false });
+): Named => ({ name, effect, docId: doc, rank, sent: false, built: true });
 
 /** Runs the jobs one at a time, as a queue of one slot does, and names them in the order they ran. */
 function runOrder(jobs: Named[]): string[] {
@@ -49,6 +49,15 @@ describe('the job order', () => {
       job('edit 2', 'write', { rank: 9 }),
     ]);
     expect(order).toEqual(['edit 1', 'save', 'edit 2']);
+  });
+
+  test('a job still being built holds its place: the writes after it wait, and nothing runs it', () => {
+    const create = { ...job('create', 'write'), built: false };
+    const update = job('update', 'write', { rank: 9 });
+    const read = job('read', 'read');
+    const other = job('other document', 'write', { doc: 'b' });
+    expect(nextJob([create, update, read, other])).toBe(other);
+    expect(nextJob([create, update, read])).toBeUndefined();
   });
 
   test('a save holds back no read: a read asked after it may run first', () => {

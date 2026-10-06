@@ -1,5 +1,6 @@
 import type { PdfMeasure, PageMeasurementViewportList } from '../dto/Measure';
 import type { PageScaleResult } from '../mutation/PageScaleResult';
+import type { WriteOptions } from '../mutation/WriteOptions';
 import type { AbortablePromise } from '../promise/AbortablePromise';
 
 export interface PageMeasureService {
@@ -7,5 +8,5 @@ export interface PageMeasureService {
   listViewports(): AbortablePromise<PageMeasurementViewportList>;
   /** Upsert/remove EmbedPDF's full-page calibration. Other producers' entries survive.
    * Existing annotations retain their own scale snapshots. */
-  setScale(measure: PdfMeasure | null): AbortablePromise<PageScaleResult>;
+  setScale(measure: PdfMeasure | null, options?: WriteOptions): AbortablePromise<PageScaleResult>;
 }

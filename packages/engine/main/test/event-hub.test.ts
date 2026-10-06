@@ -50,18 +50,25 @@ describe('EventHub: delivery contract', () => {
     expect(hub.lastServerId()).toBe(7);
   });
 
-  test('publisher stamps a local origin with the session identity', () => {
+  test('publisher stamps a local origin with the session identity and the write', () => {
     const hub = new EventHub(() => {});
     const publisher = new SessionEventPublisher(hub, 'session-x', 'alice');
     const events: DocumentEvent[] = [];
     hub.subscribe((event) => events.push(event));
 
     const { origin: _origin, ...init } = metadataEvent();
-    publisher.publishLocal(init);
+    publisher.publishWrite('op-1', init, init);
 
-    expect(events).toHaveLength(1);
-    expect(events[0]).toMatchObject({
-      origin: { kind: 'local', sessionId: 'session-x', sub: 'alice', serverId: null },
-    });
+    expect(events).toHaveLength(2);
+    expect(events.map((event) => event.origin)).toMatchObject([
+      {
+        kind: 'local',
+        sessionId: 'session-x',
+        sub: 'alice',
+        serverId: null,
+        tx: { id: 'op-1', index: 0, count: 2 },
+      },
+      { tx: { id: 'op-1', index: 1, count: 2 } },
+    ]);
   });
 });

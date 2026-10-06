@@ -4,6 +4,7 @@ import {
   EngineErrorCode,
   deletedAttachmentOf,
   normalizeAttachmentFileSource,
+  opIdOf,
   wirePack,
   type AttachmentContent,
   type AttachmentCreateResult,
@@ -12,6 +13,7 @@ import {
   type AttachmentList,
   type AttachmentRef,
   type DocumentAttachmentsService,
+  type WriteOptions,
 } from '@embedpdf/engine-core/runtime';
 import type { SessionEventPublisher } from '@embedpdf/engine-services';
 
@@ -112,36 +114,45 @@ export class LocalDocumentAttachmentsService implements DocumentAttachmentsServi
     });
   }
 
-  create(file: AttachmentFileSource): AbortablePromise<AttachmentCreateResult> {
+  create(
+    file: AttachmentFileSource,
+    options?: WriteOptions,
+  ): AbortablePromise<AttachmentCreateResult> {
     if (this.view.isClosed()) {
       return AbortablePromise.rejectReason(
         new EngineError(EngineErrorCode.DocNotOpen, `document not open: ${this.docId}`),
       );
     }
+    let opId: string;
     try {
+      opId = opIdOf(options);
       this.guard.assertCapability('doc.attachments.modify');
     } catch (err) {
       return AbortablePromise.rejectReason(err);
     }
     const docId = this.docId;
+    // Queued now, so it keeps its place among this document's calls while
+    // its bytes are read.
+    const submission = this.queue.enqueue<WorkerResultPayload>({
+      line: { effect: 'write', docId },
+      buildPack: async (jobId: JobId) => {
+        // Same splitter the file-attachment annotation draft uses: metadata
+        // into the JSON body, bytes onto the transfer list.
+        const { wireFile, resource } = await normalizeAttachmentFileSource(file, 'r0');
+        return wirePack(
+          {
+            kind: 'attachments.create',
+            effect: 'write',
+            jobId,
+            docId,
+            file: wireFile,
+            resources: { r0: resource },
+          },
+          [resource.bytes],
+        );
+      },
+    });
     return AbortablePromise.run<AttachmentCreateResult>(async (signal) => {
-      // Same splitter the file-attachment annotation draft uses: metadata
-      // into the JSON body, bytes onto the transfer list.
-      const { wireFile, resource } = await normalizeAttachmentFileSource(file, 'r0');
-      const submission = this.queue.enqueue<WorkerResultPayload>({
-        buildPack: (jobId: JobId) =>
-          wirePack(
-            {
-              kind: 'attachments.create',
-              effect: 'write',
-              jobId,
-              docId,
-              file: wireFile,
-              resources: { r0: resource },
-            },
-            [resource.bytes],
-          ),
-      });
       const onAbort = () => submission.abort(signal.reason);
       if (signal.aborted) onAbort();
       else signal.addEventListener('abort', onAbort, { once: true });
@@ -149,18 +160,20 @@ export class LocalDocumentAttachmentsService implements DocumentAttachmentsServi
       if (payload.tag !== 'attachments.create') {
         throw new EngineError(EngineErrorCode.WireFormat, `unexpected payload tag: ${payload.tag}`);
       }
-      this.publisher.publishLocal({ type: 'attachments.created', ...payload.result });
+      this.publisher.publishWrite(opId, { type: 'attachments.created', ...payload.result });
       return payload.result;
     });
   }
 
-  delete(ref: AttachmentRef): AbortablePromise<AttachmentDeleteResult> {
+  delete(ref: AttachmentRef, options?: WriteOptions): AbortablePromise<AttachmentDeleteResult> {
     if (this.view.isClosed()) {
       return AbortablePromise.rejectReason(
         new EngineError(EngineErrorCode.DocNotOpen, `document not open: ${this.docId}`),
       );
     }
+    let opId: string;
     try {
+      opId = opIdOf(options);
       this.guard.assertCapability('doc.attachments.modify');
     } catch (err) {
       return AbortablePromise.rejectReason(err);
@@ -178,7 +191,7 @@ export class LocalDocumentAttachmentsService implements DocumentAttachmentsServi
       if (payload.tag !== 'attachments.delete') {
         throw new EngineError(EngineErrorCode.WireFormat, `unexpected payload tag: ${payload.tag}`);
       }
-      this.publisher.publishLocal({
+      this.publisher.publishWrite(opId, {
         type: 'attachments.deleted',
         deleted: deletedAttachmentOf(payload.result),
         ...payload.result,

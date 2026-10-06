@@ -1,10 +1,12 @@
 import {
+  opIdOf,
   AbortablePromise,
   EngineError,
   EngineErrorCode,
   type DocumentRedactionService,
   type RedactionApplyResult,
   type RedactionApplyScope,
+  type WriteOptions,
 } from '@embedpdf/engine-core/runtime';
 import { RedactionApplyResultSchema, wirePaths } from '@embedpdf/engine-core/wire';
 import type { SessionEventPublisher } from '@embedpdf/engine-services';
@@ -30,13 +32,17 @@ export class CloudDocumentRedactionService implements DocumentRedactionService {
     private readonly publisher: SessionEventPublisher,
   ) {}
 
-  apply(scope: RedactionApplyScope): AbortablePromise<RedactionApplyResult> {
+  apply(
+    scope: RedactionApplyScope,
+    options?: WriteOptions,
+  ): AbortablePromise<RedactionApplyResult> {
     if (this.isClosed()) {
       return AbortablePromise.rejectReason(
         new EngineError(EngineErrorCode.DocNotOpen, `document ${this.docId} is closed`),
       );
     }
     return AbortablePromise.run<RedactionApplyResult>(async (signal) => {
+      const opId = opIdOf(options);
       const result = await this.http.postJson(
         wirePaths.layerRedactionsApply(this.docId, this.layerName),
         scope,
@@ -49,7 +55,7 @@ export class CloudDocumentRedactionService implements DocumentRedactionService {
       // Redaction-apply rewrites content and consumes the marks, so both
       // planes flip.
       this.manifest.apply(result.meta, ['content', 'annotations']);
-      this.publisher.publishLocal({
+      this.publisher.publishWrite(opId, {
         type: 'redaction.applied',
         ...result,
       });

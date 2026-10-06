@@ -13,11 +13,11 @@ const image = await (await fetch('/approved.png')).blob();
 
 const { annotation } = await page.annotations.create(
   { subtype: 'stamp', box: { x: 72, y: 102, width: 150, height: 50 } },
-  { appearance: image },
+  { resources: { appearance: image } },
 );
 ```
 
-The picture goes in the second argument, as the `appearance`. A `Blob` (such as a file the user
+The picture goes in the options, as `resources.appearance`. A `Blob` (such as a file the user
 picked) and a `Uint8Array` both work.
 
 | Field      | What it is                                                                           | Default     |
@@ -56,7 +56,7 @@ PDF.
 ```ts
 const drawing = await doc.pages.extract([pageRef]);
 
-await page.annotations.create({ subtype: 'stamp', box }, { appearance: drawing });
+await page.annotations.create({ subtype: 'stamp', box }, { resources: { appearance: drawing } });
 ```
 
 ### Standard stamps
@@ -81,7 +81,7 @@ if (approved?.target.kind === 'page') {
   const drawing = await library.pages.extract([approved.target.page]);
   await page.annotations.create(
     { subtype: 'stamp', box, name: 'Approved', subject: 'Approved' },
-    { appearance: drawing },
+    { resources: { appearance: drawing } },
   );
 }
 await library.close();
@@ -106,7 +106,7 @@ const { annotation } = await page.annotations.create(
     box: { x: 300, y: 442, width: 100, height: 50 }, // 100 × 50
     rotation: 90,
   },
-  { appearance: image },
+  { resources: { appearance: image } },
 );
 
 annotation.rect; // { x: 325, y: 417, width: 50, height: 100 }: the same box, turned
@@ -129,10 +129,10 @@ await page.annotations.update(annotation.ref, { fit: 'cover' });
 The stamp keeps its whole picture, whatever box it's in, so a stamp set from `'cover'` back to
 `'contain'` shows all of it again.
 
-To change the picture itself, pass a new `appearance`:
+To change the picture itself, pass a new `resources.appearance`:
 
 ```ts
-await page.annotations.update(annotation.ref, {}, { appearance: otherImage });
+await page.annotations.update(annotation.ref, {}, { resources: { appearance: otherImage } });
 ```
 
 A new `opacity` replaces the old one, and applies to the picture as a whole: overlapping parts of
@@ -158,7 +158,7 @@ document:
 ```ts
 const drawing = await page.annotations.downloadResource(stamp.ref, 'appearance');
 
-await otherPage.annotations.create(stamp, { appearance: drawing });
+await otherPage.annotations.create(stamp, { resources: { appearance: drawing } });
 ```
 
 The copy has the same box, `fit`, `rotation`, `opacity` and `name`; the engine records the user

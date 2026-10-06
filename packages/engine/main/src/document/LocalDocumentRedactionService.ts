@@ -2,10 +2,12 @@ import {
   AbortablePromise,
   EngineError,
   EngineErrorCode,
+  opIdOf,
   wirePack,
   type DocumentRedactionService,
   type RedactionApplyResult,
   type RedactionApplyScope,
+  type WriteOptions,
 } from '@embedpdf/engine-core/runtime';
 import type { SessionEventPublisher } from '@embedpdf/engine-services';
 
@@ -32,13 +34,18 @@ export class LocalDocumentRedactionService implements DocumentRedactionService {
     private readonly publisher: SessionEventPublisher,
   ) {}
 
-  apply(scope: RedactionApplyScope): AbortablePromise<RedactionApplyResult> {
+  apply(
+    scope: RedactionApplyScope,
+    options?: WriteOptions,
+  ): AbortablePromise<RedactionApplyResult> {
     if (this.view.isClosed()) {
       return AbortablePromise.rejectReason(
         new EngineError(EngineErrorCode.DocNotOpen, `document not open: ${this.docId}`),
       );
     }
+    let opId: string;
     try {
+      opId = opIdOf(options);
       // Apply rewrites page content and removes annotations (flatten's dual
       // gate), and information destruction is additionally its own granted
       // power: `doc.redact` narrows the gate rather than replacing it.
@@ -62,7 +69,7 @@ export class LocalDocumentRedactionService implements DocumentRedactionService {
         throw new EngineError(EngineErrorCode.WireFormat, `unexpected payload tag: ${payload.tag}`);
       }
       if (payload.wrote) {
-        this.publisher.publishLocal({ type: 'redaction.applied', ...payload.result });
+        this.publisher.publishWrite(opId, { type: 'redaction.applied', ...payload.result });
       }
       return payload.result;
     });

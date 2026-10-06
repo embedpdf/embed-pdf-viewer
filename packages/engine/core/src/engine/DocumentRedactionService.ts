@@ -1,4 +1,5 @@
 import type { RedactionApplyResult, RedactionApplyScope } from '../mutation/RedactionApplyResult';
+import type { WriteOptions } from '../mutation/WriteOptions';
 import { AbortablePromise } from '../promise/AbortablePromise';
 
 /**
@@ -32,5 +33,5 @@ export interface DocumentRedactionService {
    * had no matching redact annotation. Returns no `meta` only when nothing
    * changed.
    */
-  apply(scope: RedactionApplyScope): AbortablePromise<RedactionApplyResult>;
+  apply(scope: RedactionApplyScope, options?: WriteOptions): AbortablePromise<RedactionApplyResult>;
 }

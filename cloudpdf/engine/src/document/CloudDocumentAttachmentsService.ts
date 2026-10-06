@@ -1,4 +1,5 @@
 import {
+  opIdOf,
   AbortablePromise,
   EngineError,
   EngineErrorCode,
@@ -11,6 +12,7 @@ import {
   type AttachmentList,
   type AttachmentRef,
   type DocumentAttachmentsService,
+  type WriteOptions,
 } from '@embedpdf/engine-core/runtime';
 import {
   AttachmentCreateResultSchema,
@@ -122,13 +124,17 @@ export class CloudDocumentAttachmentsService implements DocumentAttachmentsServi
    * JSON part, bytes into the `resource:r0` file part — POSTed as the
    * standard multipart mutation envelope.
    */
-  create(file: AttachmentFileSource): AbortablePromise<AttachmentCreateResult> {
+  create(
+    file: AttachmentFileSource,
+    options?: WriteOptions,
+  ): AbortablePromise<AttachmentCreateResult> {
     if (this.isClosed()) {
       return AbortablePromise.rejectReason(
         new EngineError(EngineErrorCode.DocNotOpen, `document ${this.docId} is closed`),
       );
     }
     return AbortablePromise.run<AttachmentCreateResult>(async (signal) => {
+      const opId = opIdOf(options);
       const { wireFile, resource } = await normalizeAttachmentFileSource(file, 'r0');
       const result = await this.http.postMultipartJson(
         wirePaths.layerAttachmentsCollection(this.docId, this.layerName),
@@ -142,19 +148,20 @@ export class CloudDocumentAttachmentsService implements DocumentAttachmentsServi
       // attachmentsVersion (no per-page pin changes, no layoutVersion), so
       // the cached manifest is patched in place — no refetch.
       this.manifest.apply(result.meta, ['attachments']);
-      this.publisher.publishLocal({ type: 'attachments.created', ...result });
+      this.publisher.publishWrite(opId, { type: 'attachments.created', ...result });
       return result;
     });
   }
 
   /** Delete an embedded file from the name tree by its durable key. */
-  delete(ref: AttachmentRef): AbortablePromise<AttachmentDeleteResult> {
+  delete(ref: AttachmentRef, options?: WriteOptions): AbortablePromise<AttachmentDeleteResult> {
     if (this.isClosed()) {
       return AbortablePromise.rejectReason(
         new EngineError(EngineErrorCode.DocNotOpen, `document ${this.docId} is closed`),
       );
     }
     return AbortablePromise.run<AttachmentDeleteResult>(async (signal) => {
+      const opId = opIdOf(options);
       const result = await this.http.deleteJson(
         wirePaths.layerAttachmentItem(this.docId, this.layerName, ref.key),
         (raw) => AttachmentDeleteResultSchema.parse(raw),
@@ -162,7 +169,7 @@ export class CloudDocumentAttachmentsService implements DocumentAttachmentsServi
       );
       // Same absorb-then-publish rails as create().
       this.manifest.apply(result.meta, ['attachments']);
-      this.publisher.publishLocal({
+      this.publisher.publishWrite(opId, {
         type: 'attachments.deleted',
         deleted: deletedAttachmentOf(result),
         ...result,

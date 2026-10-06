@@ -19,6 +19,7 @@ export { isLocalPage } from './engine/LocalPageHandle';
 
 // Refs.
 export { toPageRef, pageRefsEqual } from './identity/PageRef';
+export { OBJECT_NUMBER_CEILING } from './identity/ObjectNumbers';
 export { toFieldRef } from './identity/FormFieldRef';
 export { toAttachmentRef } from './dto/Attachment';
 export { annotationKey } from './identity/annotationKey';
@@ -110,6 +111,17 @@ export type {
   PdfSaveMode,
   DownloadOptions,
   FlattenOptions,
+  // Writes: how to write, and this session's object numbers.
+  WriteOptions,
+  AnnotationCreateOptions,
+  AnnotationUpdateOptions,
+  FlattenWriteOptions,
+  PageInsertBlankOptions,
+  FormFieldCreateOptions,
+  FormWidgetAddOptions,
+  ObjectNumberPool,
+  ObjectNumberRange,
+  ObjectNumbersLost,
   // Data.
   PageRef,
   PageLayout,

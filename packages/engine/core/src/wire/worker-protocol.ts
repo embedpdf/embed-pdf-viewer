@@ -31,6 +31,7 @@ import type { FormDataFormat, FormFieldValue } from '../forms/value';
 import type { PdfRect, PdfRotation, PdfSize } from '../geometry/primitives';
 import type { AnnotationRef } from '../identity/AnnotationRef';
 import type { FormFieldRef, FormWidget } from '../identity/FormFieldRef';
+import type { ObjectNumberRange } from '../identity/ObjectNumbers';
 import type { PageRef } from '../identity/PageRef';
 import type { AnnotationFlattenResult } from '../mutation/AnnotationFlattenResult';
 import type {
@@ -136,6 +137,16 @@ export interface OpenFatMemoryWorkerRequest {
   password: string | null;
   /** Default `protect`. */
   signedDocumentPolicy?: SignedDocumentPolicy;
+  /**
+   * Who decides which object numbers a create may name. `'session'` (the
+   * default) hands numbers out itself (`objectNumbers.reserve`, and
+   * `reserveObjectNumbers` here) and refuses a create naming one it doesn't
+   * hold. `'caller'` trusts the caller, which checked every number before
+   * sending the job (a server that hands numbers to editing sessions).
+   */
+  objectNumbers?: 'session' | 'caller';
+  /** Object numbers to hand this session as it opens (`'session'` only); the result has them. */
+  reserveObjectNumbers?: number;
 }
 
 export type LayerOpenSource =
@@ -166,6 +177,16 @@ export interface OpenLayerMemoryBaseWorkerRequest {
    * claim only (a wrong value breaks the caller's own layer artifacts).
    */
   baseSha256?: string;
+  /**
+   * Who decides which object numbers a create may name. `'session'` (the
+   * default) hands numbers out itself (`objectNumbers.reserve`, and
+   * `reserveObjectNumbers` here) and refuses a create naming one it doesn't
+   * hold. `'caller'` trusts the caller, which checked every number before
+   * sending the job (a server that hands numbers to editing sessions).
+   */
+  objectNumbers?: 'session' | 'caller';
+  /** Object numbers to hand this session as it opens (`'session'` only); the result has them. */
+  reserveObjectNumbers?: number;
 }
 
 export interface OpenLayerFileBaseWorkerRequest {
@@ -185,6 +206,16 @@ export interface OpenLayerFileBaseWorkerRequest {
   signedDocumentPolicy?: SignedDocumentPolicy;
   /** See `OpenLayerMemoryBaseWorkerRequest.baseSha256`. */
   baseSha256?: string;
+  /**
+   * Who decides which object numbers a create may name. `'session'` (the
+   * default) hands numbers out itself (`objectNumbers.reserve`, and
+   * `reserveObjectNumbers` here) and refuses a create naming one it doesn't
+   * hold. `'caller'` trusts the caller, which checked every number before
+   * sending the job (a server that hands numbers to editing sessions).
+   */
+  objectNumbers?: 'session' | 'caller';
+  /** Object numbers to hand this session as it opens (`'session'` only); the result has them. */
+  reserveObjectNumbers?: number;
 }
 
 export type OpenWorkerRequest =
@@ -389,6 +420,8 @@ export interface AnnotationsCreateWorkerRequest<C extends Coordinates = PageCoor
   layerName?: string;
   page: PageRef;
   draft: AnnotationDraft<C>;
+  /** The object number the annotation gets; the next free one when absent. */
+  objectNumber?: number;
   /**
    * The bytes beside the draft, by role. The producer puts each buffer on
    * the wirePack transfer list (zero-copy, same convention as `PageRaster`).
@@ -616,6 +649,10 @@ export interface FormsCreateFieldWorkerRequest<C extends Coordinates = PageCoord
   docId: string;
   layerName?: string;
   draft: FormFieldDraft<C>;
+  /** The field's object number; the next free one when absent. */
+  objectNumber?: number;
+  /** Its widgets' object numbers, in `draft.widgets` order; the next free ones when absent. */
+  widgetObjectNumbers?: number[];
   artifactPath?: string;
 }
 
@@ -660,6 +697,10 @@ export interface FormsAddWidgetWorkerRequest<C extends Coordinates = PageCoordin
   layerName?: string;
   ref: FormFieldRef;
   placement: WidgetPlacement<C>;
+  /** The new widget's object number; the next free one when absent. */
+  objectNumber?: number;
+  /** Where a merged field's widget moves when it splits; the next free one when absent. */
+  splitObjectNumber?: number;
   artifactPath?: string;
 }
 
@@ -1028,6 +1069,8 @@ export interface PagesInsertBlankWorkerRequest {
   size: PdfSize;
   count?: number;
   toIndex?: number;
+  /** The object numbers the new pages get, one per page; the next free ones when absent. */
+  objectNumbers?: number[];
   artifactPath?: string;
 }
 
@@ -1188,6 +1231,22 @@ export interface FontsClearFallbacksWorkerRequest {
   kind: 'fonts.clearFallbacks';
   effect: 'runtimeWrite';
   jobId: WorkerJobId;
+}
+
+/**
+ * Hand the session `count` more object numbers: the layer's last object
+ * number moves up by `count`, and the numbers passed become the session's to
+ * name objects with. Only a session that hands numbers out itself
+ * (`objectNumbers: 'session'`) takes it. Refused with `LayerFull` past
+ * `OBJECT_NUMBER_ISSUE_LIMIT`.
+ */
+export interface ObjectNumbersReserveWorkerRequest {
+  kind: 'objectNumbers.reserve';
+  effect: 'session';
+  jobId: WorkerJobId;
+  docId: string;
+  layerName?: string;
+  count: number;
 }
 
 export interface FontsClearWorkerRequest {
@@ -1377,6 +1436,7 @@ export type WorkerRequest<C extends Coordinates = PageCoordinates> =
   | FontsClearFallbacksWorkerRequest
   | FontsClearWorkerRequest
   | FontsAuthorizeEditingWorkerRequest
+  | ObjectNumbersReserveWorkerRequest
   | DocumentSetFontSettingsWorkerRequest
   | CloseWorkerRequest
   | LayerCloseWorkerRequest
@@ -1413,7 +1473,10 @@ export type WorkerResultPayload<C extends Coordinates = PageCoordinates> =
       protection?: DocumentProtection | null;
       /** A locked open whose password was given and wrong. */
       passwordRejected?: boolean;
+      /** The numbers `reserveObjectNumbers` asked for; absent for a locked open. */
+      objectNumbers?: ObjectNumberRange;
     }
+  | { tag: 'objectNumbers.reserve'; range: ObjectNumberRange }
   | { tag: 'signatures.list'; snapshot: SignatureSnapshot<C> }
   | { tag: 'signatures.contents'; bytes: ArrayBuffer }
   | { tag: 'signatures.digest'; digest: ArrayBuffer }

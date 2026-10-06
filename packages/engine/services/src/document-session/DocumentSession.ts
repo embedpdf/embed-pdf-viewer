@@ -1,10 +1,13 @@
 import {
   EngineError,
   EngineErrorCode,
+  OBJECT_NUMBER_CEILING,
+  OBJECT_NUMBER_ISSUE_LIMIT,
   isValidPageObjectNumber,
 } from '@embedpdf/engine-core/runtime';
 import type {
   DocumentVersionRef,
+  ObjectNumberRange,
   PageObjectNumber,
   SignatureCompleteResult,
   PdfCoordinates,
@@ -226,6 +229,9 @@ export class DocumentSession {
     this.loadedSeq = this.editsSeqCounter;
     this.pendingSigning = null;
     this.drawings = null;
+    // The new version's objects may sit at numbers this session held.
+    this.heldObjectNumbers.clear();
+    this.objectNumbersInUse = [];
     if (firstError) throw firstError;
   }
 
@@ -426,6 +432,15 @@ export class DocumentSession {
     if (!this.runtime.fn.EPDFLayer_IsInTransaction(docPtr)) {
       throw new EngineError(EngineErrorCode.Unknown, 'the layer transaction is no longer open');
     }
+    // A document past the ceiling is refused, the same way.
+    const lastObjectNumber = this.runtime.fn.EPDFLayer_GetLastObjectNumber(docPtr);
+    if (lastObjectNumber > OBJECT_NUMBER_CEILING) {
+      throw new EngineError(
+        EngineErrorCode.LayerFull,
+        `the document would pass object number ${OBJECT_NUMBER_CEILING}`,
+        { details: { lastObjectNumber } },
+      );
+    }
     this.transaction = null;
     let committed = false;
     try {
@@ -434,6 +449,8 @@ export class DocumentSession {
       if (!committed) this.unusableReason = COMMIT_FAILED;
     }
     if (!committed) throw new EngineError(EngineErrorCode.DocNotOpen, COMMIT_FAILED);
+    for (const objectNumber of this.objectNumbersInUse) this.heldObjectNumbers.delete(objectNumber);
+    this.objectNumbersInUse = [];
   }
 
   /**
@@ -444,6 +461,8 @@ export class DocumentSession {
   abortTransaction(): void {
     const { docPtr } = this.requireTransaction();
     this.transaction = null;
+    // The numbers it created objects at are free again, and still held.
+    this.objectNumbersInUse = [];
     let aborted = false;
     try {
       aborted = this.runtime.fn.EPDFLayer_AbortTransaction(docPtr);
@@ -458,6 +477,76 @@ export class DocumentSession {
     this.fullyEnumerated = false;
     this.invalidateDerived();
     if (!aborted) this.unusableReason = 'a layer transaction failed to abort';
+  }
+
+  // ── object numbers ────────────────────────────────────────────────────────
+
+  /**
+   * Who decides which object numbers a create may name: `'session'` hands
+   * them out ({@link reserveObjectNumbers}) and refuses a number it doesn't
+   * hold; `'caller'` checked every number before sending the job (a server
+   * that hands numbers to editing sessions).
+   */
+  objectNumberAuthority: 'session' | 'caller' = 'session';
+  /** Numbers this session handed out that no committed create has used. */
+  private readonly heldObjectNumbers = new Set<number>();
+  /** Held numbers the open transaction made objects at: spent when it commits. */
+  private objectNumbersInUse: number[] = [];
+
+  /**
+   * Hand out `count` more numbers: the layer's last object number moves up
+   * by `count`, so nothing the engine makes lands on them, and they are this
+   * session's to name objects with.
+   */
+  reserveObjectNumbers(count: number): ObjectNumberRange {
+    if (this.objectNumberAuthority !== 'session') {
+      throw new EngineError(
+        EngineErrorCode.InvalidArg,
+        'object numbers are handed out by the caller, not this session',
+      );
+    }
+    if (!Number.isInteger(count) || count < 1) {
+      throw new EngineError(EngineErrorCode.InvalidArg, `cannot reserve ${count} object numbers`, {
+        details: { field: 'count' },
+      });
+    }
+    const { fn } = this.runtime;
+    const docPtr = this.requireDocPtr();
+    const last = fn.EPDFLayer_GetLastObjectNumber(docPtr);
+    if (last + count > OBJECT_NUMBER_ISSUE_LIMIT) {
+      throw new EngineError(EngineErrorCode.LayerFull, 'no more object numbers to hand out', {
+        details: { lastObjectNumber: last },
+      });
+    }
+    if (!fn.EPDFLayer_RaiseLastObjectNumber(docPtr, last + count)) {
+      throw new EngineError(EngineErrorCode.Unknown, 'EPDFLayer_RaiseLastObjectNumber refused');
+    }
+    const range = { first: last + 1, count };
+    for (let i = 0; i < count; i++) this.heldObjectNumbers.add(range.first + i);
+    return range;
+  }
+
+  /**
+   * Checks the number a create names before anything is written, and counts
+   * it as used by the open transaction: spent when it commits, held again
+   * if it aborts. A session that hands numbers out refuses one it doesn't
+   * hold (`not-held`); a number the transaction already used is `taken`.
+   * Nothing else creates objects at held numbers, so a held number is free
+   * otherwise; the fork checks that again as it creates.
+   */
+  useObjectNumber(objectNumber: number): void {
+    if (!Number.isInteger(objectNumber) || objectNumber < 1) {
+      throw new EngineError(EngineErrorCode.InvalidArg, `${objectNumber} is not an object number`, {
+        details: { field: 'objectNumber' },
+      });
+    }
+    if (this.objectNumberAuthority === 'session' && !this.heldObjectNumbers.has(objectNumber)) {
+      throw objectNumberUnavailable(objectNumber, 'not-held');
+    }
+    if (this.objectNumbersInUse.includes(objectNumber)) {
+      throw objectNumberUnavailable(objectNumber, 'taken');
+    }
+    this.objectNumbersInUse.push(objectNumber);
   }
 
   /**
@@ -581,4 +670,21 @@ let sessionCounter = 0;
 
 function generateSessionId(): string {
   return `sess_${(++sessionCounter).toString(36)}_${Date.now().toString(36)}`;
+}
+
+/**
+ * A create named a number it can't use: one the session doesn't hold
+ * (`not-held`), or one an object already has (`taken`).
+ */
+export function objectNumberUnavailable(
+  objectNumber: number,
+  reason: 'not-held' | 'taken',
+): EngineError {
+  return new EngineError(
+    EngineErrorCode.ObjectNumberUnavailable,
+    reason === 'not-held'
+      ? `object number ${objectNumber} isn't one this session holds`
+      : `an object already has object number ${objectNumber}`,
+    { details: { objectNumber, reason } },
+  );
 }

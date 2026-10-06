@@ -44,7 +44,10 @@ describe.skipIf(!ENABLED).each(['wasm', 'native'] as const)('save point cost (%s
   test('as the layer grows', { timeout: 600_000 }, async () => {
     const engine = createLocalEngine({ runtime: { prefer } });
     const base = pages(20);
-    const doc = await engine.open({ kind: 'bytes', id: 'savepoint', bytes: base }, { scope: ['*'] });
+    const doc = await engine.open(
+      { kind: 'bytes', id: 'savepoint', bytes: base },
+      { scope: ['*'] },
+    );
     const page = doc.page((await pageRefs(doc))[0]!);
     const { annotation: target } = await page.annotations.create({
       subtype: 'text',
@@ -100,9 +103,11 @@ describe.skipIf(!ENABLED).each(['wasm', 'native'] as const)('save point cost (%s
       const t0 = performance.now();
       await page.annotations.create(
         { subtype: 'stamp', box: { x: 40 + i * 20, y: 300 + i * 20, width: 300, height: 200 } },
-        { appearance: bytes },
+        { resources: { appearance: bytes } },
       );
-      images.push(`placing image ${i + 1} (${mb(bytes.byteLength).trim()} PNG): ${ms(performance.now() - t0).trim()}`);
+      images.push(
+        `placing image ${i + 1} (${mb(bytes.byteLength).trim()} PNG): ${ms(performance.now() - t0).trim()}`,
+      );
       if (i === 0) await stage('+ 1 large image (3000x2000)');
     }
     await stage('+ 4 large images');

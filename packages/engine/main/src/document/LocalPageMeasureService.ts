@@ -2,6 +2,7 @@ import {
   AbortablePromise,
   EngineError,
   EngineErrorCode,
+  opIdOf,
   wirePack,
   type PageMeasureService,
   type PdfMeasure,
@@ -9,6 +10,7 @@ import {
   type PageScaleResult,
   type WorkerResultPayload,
   type PageRef,
+  type WriteOptions,
 } from '@embedpdf/engine-core/runtime';
 import type { SessionEventPublisher } from '@embedpdf/engine-services';
 import type { ScopeGuard } from '../scope';
@@ -42,27 +44,29 @@ export class LocalPageMeasureService implements PageMeasureService {
       return { viewports: payload.viewports };
     });
   }
-  setScale(measure: PdfMeasure | null): AbortablePromise<PageScaleResult> {
-    return AbortablePromise.run(async (signal) => {
-      // Allow immediate cancellation before an inline transport can apply the write.
-      await Promise.resolve();
-      signal.throwIfAborted();
+  setScale(measure: PdfMeasure | null, options?: WriteOptions): AbortablePromise<PageScaleResult> {
+    let opId: string;
+    try {
+      opId = opIdOf(options);
       this.check('doc.annotate.modify');
-      const submission = this.queue.enqueue<WorkerResultPayload>({
-        buildPack: (jobId) =>
-          wirePack({
-            kind: 'measure.setScale',
-            effect: 'write',
-            jobId,
-            docId: this.docId,
-            page: this.ref,
-            measure,
-          }),
-      });
+    } catch (err) {
+      return AbortablePromise.rejectReason(err);
+    }
+    const docId = this.docId;
+    const page = this.ref;
+    // Built a microtask later: the job takes its place among this document's
+    // calls now, and an abort right after the call still takes it out before
+    // it reaches the worker.
+    const submission = this.queue.enqueue<WorkerResultPayload>({
+      line: { effect: 'write', docId, page },
+      buildPack: async (jobId) =>
+        wirePack({ kind: 'measure.setScale', effect: 'write', jobId, docId, page, measure }),
+    });
+    return AbortablePromise.run(async (signal) => {
       const payload = await this.wait(submission, signal);
       if (payload.tag !== 'measure.setScale')
         throw new EngineError(EngineErrorCode.WireFormat, 'Unexpected scale response');
-      this.publisher.publishLocal({ type: 'pages.scaleSet', ...payload.result });
+      this.publisher.publishWrite(opId, { type: 'pages.scaleSet', ...payload.result });
       return payload.result;
     });
   }

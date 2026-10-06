@@ -49,7 +49,7 @@ export function registerEffectRunners(
         try {
           const { annotation: created } = await ctx.doc
             .page(page)
-            .annotations.create(create, resources);
+            .annotations.create(create, { resources });
           identity.confirm(id, created.ref);
           return { created: { [id]: created.ref }, annotation: created };
         } catch (error) {
@@ -71,7 +71,7 @@ export function registerEffectRunners(
       identity.withRef(id, async (ref) => {
         const { annotation } = await ctx.doc
           .page(ref.page)
-          .annotations.update(ref, patch, resources);
+          .annotations.update(ref, patch, { resources });
         const parent = annotationKey(ref);
         if (linkChildrenOf(store.model(), parent).length) {
           void links.scheduleSync(parent, 'keep');

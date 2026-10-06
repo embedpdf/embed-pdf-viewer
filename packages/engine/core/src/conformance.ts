@@ -101,6 +101,11 @@ export { runAttachmentConformance } from './conformance/runAttachmentConformance
 export { runPageInsertConformance } from './conformance/runPageInsertConformance';
 export { runPageInsertBlankConformance } from './conformance/runPageInsertBlankConformance';
 export {
+  OBJECT_NUMBER_FIXTURE_PDF,
+  runObjectNumberConformance,
+  type ObjectNumberConformanceOptions,
+} from './conformance/runObjectNumberConformance';
+export {
   runPieceInfoConformance,
   type PieceInfoConformanceOptions,
 } from './conformance/runPieceInfoConformance';

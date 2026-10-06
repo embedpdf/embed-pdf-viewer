@@ -1,5 +1,6 @@
 import type { PieceInfoPatch, PieceInfoSnapshot } from '../dto/PieceInfo';
 import type { MutationMeta } from '../mutation/MutationMeta';
+import type { WriteOptions } from '../mutation/WriteOptions';
 import { AbortablePromise } from '../promise/AbortablePromise';
 
 /** Result of `pieceInfo.update()`: the application's data after the write. */
@@ -45,9 +46,13 @@ export interface PieceInfoService {
    * is one worker job — atomic with respect to every other engine
    * operation on this document.
    */
-  update(application: string, patch: PieceInfoPatch): AbortablePromise<PieceInfoUpdateResult>;
+  update(
+    application: string,
+    patch: PieceInfoPatch,
+    options?: WriteOptions,
+  ): AbortablePromise<PieceInfoUpdateResult>;
   /** Application names present under this holder's `/PieceInfo`. */
   list(): AbortablePromise<string[]>;
   /** Remove the application's entire entry (sibling applications survive). */
-  delete(application: string): AbortablePromise<PieceInfoDeleteResult>;
+  delete(application: string, options?: WriteOptions): AbortablePromise<PieceInfoDeleteResult>;
 }

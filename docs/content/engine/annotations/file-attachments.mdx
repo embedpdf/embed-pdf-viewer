@@ -15,11 +15,11 @@ await page.annotations.create(
     rect: { x: 40, y: 732, width: 20, height: 20 },
     file: { name: 'figures.csv', mimeType: 'text/csv' },
   },
-  { file: bytes },
+  { resources: { file: bytes } },
 );
 ```
 
-The first argument describes the file; its bytes go in the second, as the `file`. A `Uint8Array`,
+The first argument describes the file; its bytes go in the options, as `resources.file`. A `Uint8Array`,
 a `Blob` or a `File` works. A `File` the user picked brings its name and type, so it can go in as
 it is:
 
@@ -28,7 +28,7 @@ const picked = input.files![0];
 
 await page.annotations.create(
   { subtype: 'file-attachment', rect: { x: 40, y: 732, width: 20, height: 20 } },
-  { file: picked },
+  { resources: { file: picked } },
 );
 ```
 
@@ -90,7 +90,7 @@ await page.annotations.update(attachment.ref, {
   file: { ...attachment.file, name: 'figures-2026.csv' },
 });
 
-await page.annotations.update(attachment.ref, {}, { file: newBytes });
+await page.annotations.update(attachment.ref, {}, { resources: { file: newBytes } });
 ```
 
 A field of `file` you leave out is removed, so start from the one you read, as above. `size`,
@@ -107,7 +107,7 @@ document:
 ```ts
 const bytes = await page.annotations.downloadResource(attachment.ref, 'file');
 
-await otherPage.annotations.create(attachment, { file: bytes });
+await otherPage.annotations.create(attachment, { resources: { file: bytes } });
 ```
 
 ## Files on a page and files of the document

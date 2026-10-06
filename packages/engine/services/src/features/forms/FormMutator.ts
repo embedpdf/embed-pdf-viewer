@@ -280,6 +280,12 @@ export class FormMutator {
   createField(
     draft: FormFieldDraft<PdfCoordinates>,
     signal: AbortSignal,
+    numbers: {
+      /** The field's object number; the next free one when absent. */
+      readonly objectNumber?: number;
+      /** Its widgets', in `draft.widgets` order; the next free ones when absent. */
+      readonly widgetObjectNumbers?: readonly number[];
+    } = {},
   ): { field: FormFieldDTO<PdfCoordinates> } {
     throwIfAborted(signal);
     const { fn } = this.runtime;
@@ -300,11 +306,21 @@ export class FormMutator {
         );
       }
     }
+    const { objectNumber, widgetObjectNumbers } = numbers;
+    if (widgetObjectNumbers && widgetObjectNumbers.length !== placements.length) {
+      throw new EngineError(
+        EngineErrorCode.InvalidArg,
+        `forms.create needs one widget object number per widget: ${widgetObjectNumbers.length} for ${placements.length}`,
+        { details: { field: 'widgetObjectNumbers' } },
+      );
+    }
+    if (objectNumber !== undefined) this.session.useObjectNumber(objectNumber);
+    for (const number of widgetObjectNumbers ?? []) this.session.useObjectNumber(number);
     throwIfAborted(signal);
 
     // A failure from here on aborts the job's layer transaction, which takes
     // back the field, its widgets and any parent's /Kids together.
-    const fieldObjectNumber = this.createFieldNode(draft);
+    const fieldObjectNumber = this.createFieldNode(draft, objectNumber);
     this.configureNewField(draft, fieldObjectNumber);
     placements.forEach((placement, at) => {
       const widgetObjectNumber = createUnattachedWidget(
@@ -312,6 +328,7 @@ export class FormMutator {
         docPtr,
         pageIndexes[at]!,
         placement,
+        widgetObjectNumbers?.[at],
       );
       // A new field is never merged, so no split number is needed.
       if (
@@ -352,8 +369,11 @@ export class FormMutator {
     return record.pageIndex;
   }
 
-  /** The native field node, linked into the tree. */
-  private createFieldNode(draft: FormFieldDraft<PdfCoordinates>): number {
+  /**
+   * The native field node, linked into the tree, at `objectNumber` (checked
+   * by the session) or the next free number.
+   */
+  private createFieldNode(draft: FormFieldDraft<PdfCoordinates>, objectNumber?: number): number {
     const { fn, mem } = this.runtime;
     const namePtr = mem.writeU16String(draft.name);
     let fieldObjectNumber: number;
@@ -362,7 +382,7 @@ export class FormMutator {
         this.session.requireDocPtr(),
         FAMILY_CODE[draft.family],
         namePtr,
-        0, // object number: the next free one
+        objectNumber ?? 0, // 0: the next free one
       );
     } finally {
       mem.free(namePtr);
@@ -614,6 +634,12 @@ export class FormMutator {
     ref: FormFieldRef,
     placement: WidgetPlacement<PdfCoordinates>,
     signal: AbortSignal,
+    numbers: {
+      /** The new widget's object number; the next free one when absent. */
+      readonly objectNumber?: number;
+      /** Where a merged field's widget moves; the next free one when absent. */
+      readonly splitObjectNumber?: number;
+    } = {},
   ): { field: FormFieldDTO<PdfCoordinates>; widget: FormWidget } {
     throwIfAborted(signal);
     const { fn } = this.runtime;
@@ -628,14 +654,29 @@ export class FormMutator {
     // /Annots for a new widget at the end, which moves that page's entries.
     const mergedPage =
       before.widgets.find((w) => w.objectNumber === resolved.fieldObjectNumber)?.page ?? null;
+    if (numbers.objectNumber !== undefined) this.session.useObjectNumber(numbers.objectNumber);
+    // The split number is used only when the field is merged.
+    const splitObjectNumber = mergedPage ? numbers.splitObjectNumber : undefined;
+    if (splitObjectNumber !== undefined) this.session.useObjectNumber(splitObjectNumber);
     throwIfAborted(signal);
 
     // A failure from here on aborts the job's layer transaction.
     if (mergedPage) promoteInlineAnnotations(this.runtime, this.session, mergedPage.objectNumber);
-    const widgetObjectNumber = createUnattachedWidget(this.runtime, docPtr, pageIndex, placement);
-    // Split number 0: a merged field's widget half moves to the next free one.
+    const widgetObjectNumber = createUnattachedWidget(
+      this.runtime,
+      docPtr,
+      pageIndex,
+      placement,
+      numbers.objectNumber,
+    );
     if (
-      !fn.EPDFForm_AttachWidget(docPtr, resolved.fieldObjectNumber, widgetObjectNumber, onState, 0)
+      !fn.EPDFForm_AttachWidget(
+        docPtr,
+        resolved.fieldObjectNumber,
+        widgetObjectNumber,
+        onState,
+        splitObjectNumber ?? 0, // 0: the next free one
+      )
     ) {
       throw new EngineError(EngineErrorCode.InvalidArg, 'the widget could not join the field');
     }

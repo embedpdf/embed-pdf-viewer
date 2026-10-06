@@ -203,7 +203,7 @@ export function runAttachmentConformance(
         const picked = new File([new Uint8Array([1, 2, 3])], 'figures.csv', { type: 'text/csv' });
         const { annotation: fromFile } = await annotations.create(
           { subtype: 'file-attachment', rect: iconRect(rect.x, rect.y) },
-          { file: picked },
+          { resources: { file: picked } },
         );
         const file = (fromFile as FileAttachmentAnnotation).file!;
         expect(file.name).toBe('figures.csv');
@@ -215,7 +215,7 @@ export function runAttachmentConformance(
             rect: iconRect(rect.x, rect.y),
             file: { name: 'raw.bin' },
           },
-          { file: new Uint8Array([4, 5]) },
+          { resources: { file: new Uint8Array([4, 5]) } },
         );
         expect((untyped as FileAttachmentAnnotation).file!.mimeType).toBe(null);
 
@@ -223,7 +223,7 @@ export function runAttachmentConformance(
         await expect(
           annotations.create(
             { subtype: 'file-attachment', rect: iconRect(rect.x, rect.y) },
-            { file: new Uint8Array([6]) },
+            { resources: { file: new Uint8Array([6]) } },
           ),
         ).rejects.toMatchObject({
           code: EngineErrorCode.InvalidArg,
@@ -255,7 +255,7 @@ export function runAttachmentConformance(
             color: '#dc2626',
             contents: 'conformance attachment',
           },
-          { file: data },
+          { resources: { file: data } },
         );
 
         // Metadata rides the DTO; bytes never do.
@@ -280,7 +280,7 @@ export function runAttachmentConformance(
         // update that sends its file back unchanged.
         const { annotation: copy } = await annotations.create(
           { ...dto, nm: null },
-          { file: bytes },
+          { resources: { file: bytes } },
         );
         expect((copy as FileAttachmentAnnotation).file).toMatchObject({
           name: 'conformance.bin',

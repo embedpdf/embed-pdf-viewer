@@ -54,10 +54,36 @@ changes a ref, and neither does editing the annotation itself: an annotation the
 without a number keeps its `baseIndex` even after the engine gives it a number of its own to
 save a change. A deleted annotation's ref is never given to another annotation.
 
-An annotation's `nm` (its name in the PDF, when it has one) is data you can read and set, like
-its contents. It's not how the engine finds the annotation.
+An annotation's `nm` (its name in the PDF) is data you can read and set, like its contents. It's
+not how the engine finds the annotation. An annotation the engine creates without one gets a fresh
+UUIDv7 name, and a copy made by an import with `attribution: 'stamp'` gets a new one.
 
 To use a ref as a key in a `Map` or an object, turn it into a string with `annotationKey(ref)`.
+
+## Naming an object before it exists
+
+A ref usually comes back from the call that creates the thing. When you need it sooner (to show the
+new annotation, select it or annotate a new page at once), take an object number from the
+document's pool and create the object at it:
+
+```ts
+const objectNumber = doc.objectNumbers.take(); // null when the pool is empty: await reserve(n)
+const pending = page.annotations.create({ subtype: 'square', box }, { objectNumber });
+
+const ref = { kind: 'objectNumber', page: page.ref, objectNumber } as const;
+await page.annotations.update(ref, { color: '#e11d48' }); // fine before the create answers
+```
+
+The object is made at exactly that number, so the ref is final from the start. Writes apply in the
+order you make them, so the update above runs after the create. Pages and form fields work the
+same way: `pages.insertBlank(spec, toIndex, { objectNumbers })` names each new page, and
+`forms.create(draft, { objectNumber, widgetObjectNumbers })` names a field and its widgets.
+
+The numbers are this document session's alone. A create that names a number the session doesn't
+hold (never taken from the pool, or already used) is refused with `ObjectNumberUnavailable` and
+`reason: 'not-held'`, and one a call uses twice with `reason: 'taken'`; nothing is written. Leave
+the number out and the engine picks one, as before. `doc.objectNumbers.reserve(n)` waits until at
+least `n` are held, for a large paste.
 
 ## Other refs
 

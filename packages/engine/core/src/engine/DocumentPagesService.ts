@@ -8,7 +8,12 @@ import type { PageMoveResult } from '../mutation/PageMoveResult';
 import type { PageNameInput, PageRemoveNameInput } from '../mutation/PageNameInput';
 import type { PageNameResult } from '../mutation/PageNameResult';
 import type { PageRotateResult } from '../mutation/PageRotateResult';
-import type { FlattenOptions, PageFlattenResult } from '../mutation/PageFlattenResult';
+import type { PageFlattenResult } from '../mutation/PageFlattenResult';
+import type {
+  FlattenWriteOptions,
+  PageInsertBlankOptions,
+  WriteOptions,
+} from '../mutation/WriteOptions';
 import { AbortablePromise } from '../promise/AbortablePromise';
 
 /**
@@ -41,7 +46,7 @@ export interface DocumentPagesService {
    *              the move.
    * @param toIndex Insertion point in `[0, pageCount - len]`.
    */
-  move(pages: PageRef[], toIndex: number): AbortablePromise<PageMoveResult>;
+  move(pages: PageRef[], toIndex: number, options?: WriteOptions): AbortablePromise<PageMoveResult>;
 
   /**
    * Set the absolute display rotation of the supplied pages (one value
@@ -50,14 +55,18 @@ export interface DocumentPagesService {
    * annotation refs survive untouched. See
    * `PageRotateInput` for why the wire is absolute, never relative.
    */
-  rotate(pages: PageRef[], rotation: PdfRotation): AbortablePromise<PageRotateResult>;
+  rotate(
+    pages: PageRef[],
+    rotation: PdfRotation,
+    options?: WriteOptions,
+  ): AbortablePromise<PageRotateResult>;
 
   /**
    * Delete pages. Deleting every page is rejected (`InvalidArg`) — a
    * document must keep at least one. Deleted page object numbers are retired, never
    * recycled; surviving pages keep their identity and revisions.
    */
-  delete(pages: PageRef[]): AbortablePromise<PageDeleteResult>;
+  delete(pages: PageRef[], options?: WriteOptions): AbortablePromise<PageDeleteResult>;
 
   /**
    * Register `name` → page in the catalog's `/Names /Pages` tree (create,
@@ -70,21 +79,21 @@ export interface DocumentPagesService {
    * Rejects with `InvalidArg` for an empty name and `NotFound` for a page
    * that is not in the page tree (hidden templates included).
    */
-  setName(input: PageNameInput): AbortablePromise<PageNameResult>;
+  setName(input: PageNameInput, options?: WriteOptions): AbortablePromise<PageNameResult>;
 
   /**
    * Remove one `/Names /Pages` registration; the page itself is untouched.
    * `NotFound` when no registration has that decoded key. Page deletion
    * removes registrations by itself — callers never need to pair the two.
    */
-  removeName(input: PageRemoveNameInput): AbortablePromise<PageNameResult>;
+  removeName(input: PageRemoveNameInput, options?: WriteOptions): AbortablePromise<PageNameResult>;
 
   /**
    * Paint eligible annotation appearances into page content and remove only
    * those annotations that were painted. This changes content and annotation
    * liveness, not layout. The default usage is normal display.
    */
-  flatten(pages: PageRef[], options?: FlattenOptions): AbortablePromise<PageFlattenResult>;
+  flatten(pages: PageRef[], options?: FlattenWriteOptions): AbortablePromise<PageFlattenResult>;
 
   /**
    * Export the given pages, in the supplied order, as a standalone PDF
@@ -112,7 +121,11 @@ export interface DocumentPagesService {
    * so this is a mandatory member: any engine implements it or is not a
    * conforming engine.
    */
-  insert(bytes: Uint8Array | ArrayBuffer, toIndex?: number): AbortablePromise<PageInsertResult>;
+  insert(
+    bytes: Uint8Array | ArrayBuffer,
+    toIndex?: number,
+    options?: WriteOptions,
+  ): AbortablePromise<PageInsertResult>;
 
   /**
    * Create `spec.count` (default 1) blank pages of `spec.size` (PDF points)
@@ -120,9 +133,18 @@ export interface DocumentPagesService {
    * same gate (`doc.pages.assemble`), same result shape, same
    * `pages.inserted` event — it is a separate verb because its wire is pure
    * parameters where `insert`'s is a binary payload (cloud: JSON
-   * POST /pages/insert-blank). The new pages get fresh, never-recycled
-   * object numbers; every pre-existing page keeps its identity and
-   * revisions. Mandatory, like `insert`.
+   * POST /pages/insert-blank). Every pre-existing page keeps its identity.
+   * Mandatory, like `insert`.
+   *
+   * `options.objectNumbers` names the new pages, one number per page in
+   * order, taken from `doc.objectNumbers`: their refs are known before the
+   * engine answers, so they can be annotated at once. Without them the
+   * engine picks the next free numbers. A number this session doesn't hold,
+   * or one an object already has, is refused with `ObjectNumberUnavailable`.
    */
-  insertBlank(spec: PageInsertBlankSpec, toIndex?: number): AbortablePromise<PageInsertResult>;
+  insertBlank(
+    spec: PageInsertBlankSpec,
+    toIndex?: number,
+    options?: PageInsertBlankOptions,
+  ): AbortablePromise<PageInsertResult>;
 }

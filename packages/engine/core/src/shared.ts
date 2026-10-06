@@ -167,8 +167,18 @@ export { isValidPageObjectNumber } from './identity/PageObjectNumber';
 export type { PageObjectNumber } from './identity/PageObjectNumber';
 export type { PageRef } from './identity/PageRef';
 export { toPageRef, pageRefsEqual, encodePageKey, decodePageKey } from './identity/PageRef';
-export { generateUuid } from './identity/uuid';
+export { generateUuid, generateUuidV7 } from './identity/uuid';
 export type { AnnotationRef } from './identity/AnnotationRef';
+export {
+  OBJECT_NUMBER_CEILING,
+  OBJECT_NUMBER_ISSUE_LIMIT,
+  objectNumbersIn,
+} from './identity/ObjectNumbers';
+export type {
+  ObjectNumberPool,
+  ObjectNumberRange,
+  ObjectNumbersLost,
+} from './identity/ObjectNumbers';
 export { encodeAnnotKey, decodeAnnotKey } from './identity/AnnotationRef';
 
 export { colorOf, rgbOf, sameColor } from './annotation/color';
@@ -695,6 +705,16 @@ export type { PageDeleteInput } from './mutation/PageDeleteInput';
 export type { PageDeleteResult } from './mutation/PageDeleteResult';
 export type { PageInsertResult } from './mutation/PageInsertResult';
 export type { PageInsertBlankSpec } from './mutation/PageInsertBlankInput';
+export { opIdOf } from './mutation/WriteOptions';
+export type {
+  WriteOptions,
+  AnnotationCreateOptions,
+  AnnotationUpdateOptions,
+  FlattenWriteOptions,
+  PageInsertBlankOptions,
+  FormFieldCreateOptions,
+  FormWidgetAddOptions,
+} from './mutation/WriteOptions';
 export { PAGE_INSERT_BLANK_MAX_COUNT } from './mutation/PageInsertBlankInput';
 export type {
   FlattenOptions,

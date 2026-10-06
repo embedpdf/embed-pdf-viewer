@@ -1,4 +1,5 @@
 import {
+  opIdOf,
   AbortablePromise,
   EngineError,
   EngineErrorCode,
@@ -7,6 +8,7 @@ import {
   type PdfMeasure,
   type PageMeasurementViewportList,
   type PageScaleResult,
+  type WriteOptions,
 } from '@embedpdf/engine-core/runtime';
 import {
   PageMeasurementViewportListSchema,
@@ -38,8 +40,9 @@ export class CloudPageMeasureService implements PageMeasureService {
       );
     });
   }
-  setScale(measure: PdfMeasure | null): AbortablePromise<PageScaleResult> {
+  setScale(measure: PdfMeasure | null, options?: WriteOptions): AbortablePromise<PageScaleResult> {
     return AbortablePromise.run(async (signal) => {
+      const opId = opIdOf(options);
       await Promise.resolve();
       signal.throwIfAborted();
       this.check();
@@ -50,7 +53,7 @@ export class CloudPageMeasureService implements PageMeasureService {
         signal,
       );
       this.manifest.apply(result.meta, []);
-      this.publisher.publishLocal({ type: 'pages.scaleSet', ...result });
+      this.publisher.publishWrite(opId, { type: 'pages.scaleSet', ...result });
       return result;
     });
   }

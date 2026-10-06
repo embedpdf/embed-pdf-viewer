@@ -2,6 +2,7 @@ import {
   AbortablePromise,
   EngineError,
   EngineErrorCode,
+  opIdOf,
   wirePack,
   type DocumentPagesService,
   type PageDeleteResult,
@@ -14,7 +15,9 @@ import {
   type PageRemoveNameInput,
   type PageRotateResult,
   type PageFlattenResult,
-  type FlattenOptions,
+  type FlattenWriteOptions,
+  type PageInsertBlankOptions,
+  type WriteOptions,
   type PageRef,
   type PdfRotation,
 } from '@embedpdf/engine-core/runtime';
@@ -82,7 +85,11 @@ export class LocalDocumentPagesService implements DocumentPagesService {
     });
   }
 
-  move(pages: PageRef[], toIndex: number): AbortablePromise<PageMoveResult> {
+  move(
+    pages: PageRef[],
+    toIndex: number,
+    options?: WriteOptions,
+  ): AbortablePromise<PageMoveResult> {
     if (this.view.isClosed()) {
       return AbortablePromise.rejectReason(
         new EngineError(EngineErrorCode.DocNotOpen, `document not open: ${this.docId}`),
@@ -90,7 +97,9 @@ export class LocalDocumentPagesService implements DocumentPagesService {
     }
     // pages.move maps to the cloud's POST /pages/move (gated by
     // `doc.pages.assemble`).
+    let opId: string;
     try {
+      opId = opIdOf(options);
       this.guard.assertCapability('doc.pages.assemble');
     } catch (err) {
       return AbortablePromise.rejectReason(err);
@@ -115,7 +124,7 @@ export class LocalDocumentPagesService implements DocumentPagesService {
       if (payload.tag !== 'pages.move') {
         throw new EngineError(EngineErrorCode.WireFormat, `unexpected payload tag: ${payload.tag}`);
       }
-      this.publisher.publishLocal({
+      this.publisher.publishWrite(opId, {
         type: 'pages.moved',
         pages,
         toIndex,
@@ -125,19 +134,21 @@ export class LocalDocumentPagesService implements DocumentPagesService {
     });
   }
 
-  setName(input: PageNameInput): AbortablePromise<PageNameResult> {
+  setName(input: PageNameInput, options?: WriteOptions): AbortablePromise<PageNameResult> {
     return this.runNameJob(
       { kind: 'pages.setName', effect: 'write', ...input },
       'pages.setName',
       input.name,
+      options,
     );
   }
 
-  removeName(input: PageRemoveNameInput): AbortablePromise<PageNameResult> {
+  removeName(input: PageRemoveNameInput, options?: WriteOptions): AbortablePromise<PageNameResult> {
     return this.runNameJob(
       { kind: 'pages.removeName', effect: 'write', name: input.name },
       'pages.removeName',
       input.name,
+      options,
     );
   }
 
@@ -159,13 +170,16 @@ export class LocalDocumentPagesService implements DocumentPagesService {
       | { kind: 'pages.removeName'; effect: 'write'; name: string },
     tag: 'pages.setName' | 'pages.removeName',
     name: string,
+    options: WriteOptions | undefined,
   ): AbortablePromise<PageNameResult> {
     if (this.view.isClosed()) {
       return AbortablePromise.rejectReason(
         new EngineError(EngineErrorCode.DocNotOpen, `document not open: ${this.docId}`),
       );
     }
+    let opId: string;
     try {
+      opId = opIdOf(options);
       this.guard.assertCapability('doc.pages.assemble');
     } catch (err) {
       return AbortablePromise.rejectReason(err);
@@ -182,7 +196,7 @@ export class LocalDocumentPagesService implements DocumentPagesService {
       if (payload.tag !== tag) {
         throw new EngineError(EngineErrorCode.WireFormat, `unexpected payload tag: ${payload.tag}`);
       }
-      this.publisher.publishLocal({
+      this.publisher.publishWrite(opId, {
         type: 'pages.named',
         name,
         page: request.kind === 'pages.setName' ? request.page : null,
@@ -192,7 +206,11 @@ export class LocalDocumentPagesService implements DocumentPagesService {
     });
   }
 
-  rotate(pages: PageRef[], rotation: PdfRotation): AbortablePromise<PageRotateResult> {
+  rotate(
+    pages: PageRef[],
+    rotation: PdfRotation,
+    options?: WriteOptions,
+  ): AbortablePromise<PageRotateResult> {
     if (this.view.isClosed()) {
       return AbortablePromise.rejectReason(
         new EngineError(EngineErrorCode.DocNotOpen, `document not open: ${this.docId}`),
@@ -200,7 +218,9 @@ export class LocalDocumentPagesService implements DocumentPagesService {
     }
     // pages.rotate maps to the cloud's POST /pages/rotate (gated by
     // `doc.pages.assemble`, like every page-structure verb).
+    let opId: string;
     try {
+      opId = opIdOf(options);
       this.guard.assertCapability('doc.pages.assemble');
     } catch (err) {
       return AbortablePromise.rejectReason(err);
@@ -225,7 +245,7 @@ export class LocalDocumentPagesService implements DocumentPagesService {
       if (payload.tag !== 'pages.rotate') {
         throw new EngineError(EngineErrorCode.WireFormat, `unexpected payload tag: ${payload.tag}`);
       }
-      this.publisher.publishLocal({
+      this.publisher.publishWrite(opId, {
         type: 'pages.rotated',
         pages,
         rotation,
@@ -235,7 +255,7 @@ export class LocalDocumentPagesService implements DocumentPagesService {
     });
   }
 
-  delete(pages: PageRef[]): AbortablePromise<PageDeleteResult> {
+  delete(pages: PageRef[], options?: WriteOptions): AbortablePromise<PageDeleteResult> {
     if (this.view.isClosed()) {
       return AbortablePromise.rejectReason(
         new EngineError(EngineErrorCode.DocNotOpen, `document not open: ${this.docId}`),
@@ -243,7 +263,9 @@ export class LocalDocumentPagesService implements DocumentPagesService {
     }
     // pages.delete maps to the cloud's POST /pages/delete (gated by
     // `doc.pages.assemble`, like every page-structure verb).
+    let opId: string;
     try {
+      opId = opIdOf(options);
       this.guard.assertCapability('doc.pages.assemble');
     } catch (err) {
       return AbortablePromise.rejectReason(err);
@@ -267,7 +289,7 @@ export class LocalDocumentPagesService implements DocumentPagesService {
       if (payload.tag !== 'pages.delete') {
         throw new EngineError(EngineErrorCode.WireFormat, `unexpected payload tag: ${payload.tag}`);
       }
-      this.publisher.publishLocal({
+      this.publisher.publishWrite(opId, {
         type: 'pages.deleted',
         pages,
         ...payload.result,
@@ -276,14 +298,16 @@ export class LocalDocumentPagesService implements DocumentPagesService {
     });
   }
 
-  flatten(pages: PageRef[], options?: FlattenOptions): AbortablePromise<PageFlattenResult> {
+  flatten(pages: PageRef[], options?: FlattenWriteOptions): AbortablePromise<PageFlattenResult> {
     const usage = options?.usage ?? 'display';
     if (this.view.isClosed()) {
       return AbortablePromise.rejectReason(
         new EngineError(EngineErrorCode.DocNotOpen, `document not open: ${this.docId}`),
       );
     }
+    let opId: string;
     try {
+      opId = opIdOf(options);
       // Flatten rewrites page content and removes painted annotations. Broad
       // annotation authority is deliberate; collab-scoped deletion cannot be
       // safely enforced by a whole-page verb.
@@ -306,13 +330,17 @@ export class LocalDocumentPagesService implements DocumentPagesService {
         throw new EngineError(EngineErrorCode.WireFormat, `unexpected payload tag: ${payload.tag}`);
       }
       if (payload.wrote) {
-        this.publisher.publishLocal({ type: 'pages.flattened', ...payload.result });
+        this.publisher.publishWrite(opId, { type: 'pages.flattened', ...payload.result });
       }
       return payload.result;
     });
   }
 
-  insert(bytes: Uint8Array | ArrayBuffer, toIndex?: number): AbortablePromise<PageInsertResult> {
+  insert(
+    bytes: Uint8Array | ArrayBuffer,
+    toIndex?: number,
+    options?: WriteOptions,
+  ): AbortablePromise<PageInsertResult> {
     if (this.view.isClosed()) {
       return AbortablePromise.rejectReason(
         new EngineError(EngineErrorCode.DocNotOpen, `document not open: ${this.docId}`),
@@ -320,7 +348,9 @@ export class LocalDocumentPagesService implements DocumentPagesService {
     }
     // pages.insert is a structure verb like move/delete — same gate; it will
     // map to the cloud's POST /pages/insert (multipart) when that ships.
+    let opId: string;
     try {
+      opId = opIdOf(options);
       this.guard.assertCapability('doc.pages.assemble');
     } catch (err) {
       return AbortablePromise.rejectReason(err);
@@ -345,7 +375,7 @@ export class LocalDocumentPagesService implements DocumentPagesService {
       if (payload.tag !== 'pages.insert') {
         throw new EngineError(EngineErrorCode.WireFormat, `unexpected payload tag: ${payload.tag}`);
       }
-      this.publisher.publishLocal({
+      this.publisher.publishWrite(opId, {
         type: 'pages.inserted',
         toIndex,
         ...payload.result,
@@ -354,7 +384,11 @@ export class LocalDocumentPagesService implements DocumentPagesService {
     });
   }
 
-  insertBlank(spec: PageInsertBlankSpec, toIndex?: number): AbortablePromise<PageInsertResult> {
+  insertBlank(
+    spec: PageInsertBlankSpec,
+    toIndex?: number,
+    options: PageInsertBlankOptions = {},
+  ): AbortablePromise<PageInsertResult> {
     if (this.view.isClosed()) {
       return AbortablePromise.rejectReason(
         new EngineError(EngineErrorCode.DocNotOpen, `document not open: ${this.docId}`),
@@ -363,7 +397,9 @@ export class LocalDocumentPagesService implements DocumentPagesService {
     // The blank-page sibling of pages.insert: same structure gate, same
     // event; it will map to the cloud's JSON POST /pages/insert-blank when
     // that ships. Pure parameters — nothing to transfer.
+    let opId: string;
     try {
+      opId = opIdOf(options);
       this.guard.assertCapability('doc.pages.assemble');
     } catch (err) {
       return AbortablePromise.rejectReason(err);
@@ -379,6 +415,7 @@ export class LocalDocumentPagesService implements DocumentPagesService {
           size: spec.size,
           count: spec.count,
           toIndex,
+          ...(options.objectNumbers ? { objectNumbers: [...options.objectNumbers] } : {}),
         }),
     });
     return AbortablePromise.run<PageInsertResult>(async (signal) => {
@@ -389,7 +426,7 @@ export class LocalDocumentPagesService implements DocumentPagesService {
       if (payload.tag !== 'pages.insertBlank') {
         throw new EngineError(EngineErrorCode.WireFormat, `unexpected payload tag: ${payload.tag}`);
       }
-      this.publisher.publishLocal({
+      this.publisher.publishWrite(opId, {
         type: 'pages.inserted',
         toIndex,
         ...payload.result,

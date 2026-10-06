@@ -123,9 +123,16 @@ export class AnnotationMutator {
     pageObjectNumber: PageObjectNumber,
     draft: AnnotationDraft<PdfCoordinates>,
     signal: AbortSignal,
-    actor?: AnnotationActor,
-    resources?: WireAnnotationResources,
+    options: {
+      /** Who creates it: stamped as its author. */
+      readonly actor?: AnnotationActor;
+      /** The bytes beside the draft, by role. */
+      readonly resources?: WireAnnotationResources;
+      /** The object number it gets; the next free one when absent. */
+      readonly objectNumber?: number;
+    } = {},
   ): AnnotationCreateResult<PdfCoordinates> {
+    const { actor, resources, objectNumber } = options;
     const { reply, ...data } = draft as AnnotationDraft<PdfCoordinates> & {
       parent?: AnnotationRef | null;
     };
@@ -145,6 +152,7 @@ export class AnnotationMutator {
             : {}),
           ...(parent ? { parent: { existing: parent } } : {}),
           ...(resources ? { resources } : {}),
+          ...(objectNumber !== undefined ? { objectNumber } : {}),
           attribution: { kind: 'stamp', ...(actor ? { actor } : {}) },
         },
       ],

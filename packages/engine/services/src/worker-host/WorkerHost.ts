@@ -688,6 +688,12 @@ export class WorkerHost {
         case 'document.setFontSettings':
           resultPack = this.handleDocumentSetFontSettings(msg);
           break;
+        case 'objectNumbers.reserve':
+          resultPack = wirePack({
+            tag: 'objectNumbers.reserve',
+            range: this.requireSession(msg).reserveObjectNumbers(msg.count),
+          });
+          break;
         case 'layer.close':
           resultPack = this.handleLayerClose(msg);
           break;
@@ -773,6 +779,7 @@ export class WorkerHost {
     session.residency = this.residency;
     session.signedDocumentPolicy = req.signedDocumentPolicy ?? 'protect';
     session.password = req.password;
+    session.objectNumberAuthority = req.objectNumbers ?? 'session';
     // Every input kind loads the same way with or without a password, so a
     // locked file parks and unlocks the same way whatever it came from.
     let load: (password: string | null) => void;
@@ -835,6 +842,9 @@ export class WorkerHost {
         req.password ?? '',
       ),
       protection: this.probeProtection(session),
+      ...(req.reserveObjectNumbers
+        ? { objectNumbers: session.reserveObjectNumbers(req.reserveObjectNumbers) }
+        : {}),
     });
   }
 
@@ -1085,7 +1095,11 @@ export class WorkerHost {
     const session = this.requireSession(req);
     const pageObjectNumber = session.resolvePageRef(req.page).pageObjectNumber;
     const mutator = new AnnotationMutator(this.runtime, session, this.fonts);
-    const result = mutator.create(pageObjectNumber, req.draft, signal, req.actor, req.resources);
+    const result = mutator.create(pageObjectNumber, req.draft, signal, {
+      ...(req.actor ? { actor: req.actor } : {}),
+      ...(req.resources ? { resources: req.resources } : {}),
+      ...(req.objectNumber !== undefined ? { objectNumber: req.objectNumber } : {}),
+    });
     return this.finishMutation(session, { tag: 'annotations.create', result }, req.artifactPath);
   }
 
@@ -1327,7 +1341,12 @@ export class WorkerHost {
   ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
     const inserter = new PagesInserter(this.runtime, session);
-    const result = inserter.insertBlank({ size: req.size, count: req.count }, req.toIndex, signal);
+    const result = inserter.insertBlank(
+      { size: req.size, count: req.count },
+      req.toIndex,
+      signal,
+      req.objectNumbers,
+    );
     return this.finishMutation(session, { tag: 'pages.insertBlank', result }, req.artifactPath);
   }
 
@@ -2120,7 +2139,10 @@ export class WorkerHost {
   ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
     const mutator = new FormMutator(this.runtime, session);
-    const { field } = mutator.createField(req.draft, signal);
+    const { field } = mutator.createField(req.draft, signal, {
+      ...(req.objectNumber !== undefined ? { objectNumber: req.objectNumber } : {}),
+      ...(req.widgetObjectNumbers ? { widgetObjectNumbers: req.widgetObjectNumbers } : {}),
+    });
     const meta = formMutationMeta([field.ref], field.widgets);
     return this.finishMutation(
       session,
@@ -2183,7 +2205,10 @@ export class WorkerHost {
   ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
     const mutator = new FormMutator(this.runtime, session);
-    const { field, widget } = mutator.addWidget(req.ref, req.placement, signal);
+    const { field, widget } = mutator.addWidget(req.ref, req.placement, signal, {
+      ...(req.objectNumber !== undefined ? { objectNumber: req.objectNumber } : {}),
+      ...(req.splitObjectNumber !== undefined ? { splitObjectNumber: req.splitObjectNumber } : {}),
+    });
     const meta = formMutationMeta([field.ref], [widget]);
     return this.finishMutation(
       session,

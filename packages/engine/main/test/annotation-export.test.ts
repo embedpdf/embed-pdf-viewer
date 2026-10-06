@@ -76,7 +76,7 @@ async function documentWithStamps(): Promise<Uint8Array> {
     for (const x of [20, 100]) {
       await page.annotations.create(
         { subtype: 'stamp', box: { x, y: 20, width: 60, height: 20 } },
-        { appearance: PNG },
+        { resources: { appearance: PNG } },
       );
     }
     await page.annotations.create({

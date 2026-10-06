@@ -100,7 +100,7 @@ export async function fill(doc: Doc, count: number): Promise<void> {
     } else if (i % 10 === 0) {
       await page.annotations.create(
         { subtype: 'stamp', box: rect },
-        { appearance: images[Math.floor(i / 10) % 10]! },
+        { resources: { appearance: images[Math.floor(i / 10) % 10]! } },
       );
     } else {
       const { data, resources } = kinds[i % kinds.length]!;
@@ -109,7 +109,7 @@ export async function fill(doc: Doc, count: number): Promise<void> {
           return `"x":${Number(value) - 40 + x}`;
         }),
       );
-      await page.annotations.create({ ...shifted, rect }, resources);
+      await page.annotations.create({ ...shifted, rect }, { resources });
     }
   }
 }

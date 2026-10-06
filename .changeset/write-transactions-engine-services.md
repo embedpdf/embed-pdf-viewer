@@ -13,3 +13,7 @@ Remove plain (non-layer) sessions and checkpoint rollback.
 Page flatten and redaction apply are all or nothing: a page that fails, or a cancel, rejects the call and leaves every page as it was, instead of keeping the pages before it.
 
 Name every annotation for life: by its object number, or, for an annotation the file stores inline, by the position it was born at, which it keeps after the layer gives it an object number. Pages inserted into a layer hold only objects. The engine no longer writes an `/NM` into an annotation it changes, and keeps no page revisions.
+
+Create objects at the object numbers a write names: annotations, blank pages, form fields, widgets and a merged field's split widget. A session that hands numbers out (`objectNumbers: 'session'`, the default) refuses a number it doesn't hold, spends the ones a write commits, and keeps them when it aborts; one the caller vouches for (`'caller'`) is created as asked. A write that would pass the highest object number a file should have is refused with `LayerFull`.
+
+Name every annotation a create makes without an `nm` with a fresh UUIDv7, widgets included, and give the copies of a stamping import fresh names. `SessionEventPublisher.publishWrite(opId, ...events)` replaces `publishLocal`: every event of a write carries its `opId` as `origin.tx`.

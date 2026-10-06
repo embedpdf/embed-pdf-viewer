@@ -2,6 +2,7 @@ import {
   AbortablePromise,
   EngineError,
   EngineErrorCode,
+  opIdOf,
   wirePack,
   type PieceInfoDeleteResult,
   type PieceInfoPatch,
@@ -9,6 +10,7 @@ import {
   type PieceInfoUpdateResult,
   type PieceInfoSnapshot,
   type PageRef,
+  type WriteOptions,
 } from '@embedpdf/engine-core/runtime';
 
 import type { ScopeGuard } from '../scope';
@@ -56,8 +58,12 @@ export class LocalPieceInfoService implements PieceInfoService {
     });
   }
 
-  update(application: string, patch: PieceInfoPatch): AbortablePromise<PieceInfoUpdateResult> {
-    const rejected = this.gate('doc.metadata.modify');
+  update(
+    application: string,
+    patch: PieceInfoPatch,
+    options?: WriteOptions,
+  ): AbortablePromise<PieceInfoUpdateResult> {
+    const rejected = this.gate('doc.metadata.modify', options);
     if (rejected) return rejected;
     const { docId, page } = this;
     const submission = this.queue.enqueue<WorkerResultPayload>({
@@ -98,8 +104,8 @@ export class LocalPieceInfoService implements PieceInfoService {
     });
   }
 
-  delete(application: string): AbortablePromise<PieceInfoDeleteResult> {
-    const rejected = this.gate('doc.metadata.modify');
+  delete(application: string, options?: WriteOptions): AbortablePromise<PieceInfoDeleteResult> {
+    const rejected = this.gate('doc.metadata.modify', options);
     if (rejected) return rejected;
     const { docId, page } = this;
     const submission = this.queue.enqueue<WorkerResultPayload>({
@@ -115,14 +121,22 @@ export class LocalPieceInfoService implements PieceInfoService {
     });
   }
 
-  /** Shared closed-check + capability gate; null when the call may proceed. */
-  private gate(capability: 'doc.open' | 'doc.metadata.modify'): AbortablePromise<never> | null {
+  /**
+   * Shared closed-check + capability gate, and for a write the `opId` rule
+   * (PieceInfo writes publish no event, so the id is only checked); null
+   * when the call may proceed.
+   */
+  private gate(
+    capability: 'doc.open' | 'doc.metadata.modify',
+    options?: WriteOptions,
+  ): AbortablePromise<never> | null {
     if (this.view.isClosed()) {
       return AbortablePromise.rejectReason(
         new EngineError(EngineErrorCode.DocNotOpen, `document not open: ${this.docId}`),
       );
     }
     try {
+      opIdOf(options);
       this.guard.assertCapability(capability);
     } catch (err) {
       return AbortablePromise.rejectReason(err);

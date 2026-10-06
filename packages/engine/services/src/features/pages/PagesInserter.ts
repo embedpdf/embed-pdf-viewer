@@ -12,7 +12,10 @@ import type { PdfRuntimeModule, Ptr } from '@embedpdf/engine-runtime';
 
 import { PagesReader } from './PagesReader';
 import { promoteInlineAnnotations } from '../annotations/internal/write/promoteInlineAnnotations';
-import type { DocumentSession } from '../../document-session/DocumentSession';
+import {
+  objectNumberUnavailable,
+  type DocumentSession,
+} from '../../document-session/DocumentSession';
 import { loadFailure } from '../../runtime/loadError';
 import { throwIfAborted } from '../../shared/abort';
 
@@ -118,11 +121,15 @@ export class PagesInserter {
    * which never loads the page) instead of a deep copy: no source document,
    * so none of the retain-until-close lifetime hazard above. A blank page has
    * no `/Contents`, which ISO 32000-2 defines as an empty page.
+   *
+   * `objectNumbers`, one per page, names the pages: numbers the session
+   * holds, each checked before the first page is made.
    */
   insertBlank(
     spec: PageInsertBlankSpec,
     toIndex: number | undefined,
     signal: AbortSignal,
+    objectNumbers?: readonly number[],
   ): PageInsertResult<PdfCoordinates> {
     throwIfAborted(signal);
     const { size } = spec;
@@ -156,14 +163,26 @@ export class PagesInserter {
       );
     }
 
+    if (objectNumbers && objectNumbers.length !== count) {
+      throw new EngineError(
+        EngineErrorCode.InvalidArg,
+        `pages.insertBlank needs one object number per page: ${objectNumbers.length} for ${count}`,
+        { details: { field: 'objectNumbers' } },
+      );
+    }
+    for (const objectNumber of objectNumbers ?? []) this.session.useObjectNumber(objectNumber);
+
+    // A failure takes back the pages already made: the job's layer
+    // transaction aborts.
     for (let i = 0; i < count; i++) {
-      // Object number 0: the next free one.
-      if (!fn.EPDFPage_InsertBlankRaw(destPtr, at + i, size.width, size.height, 0)) {
-        // Undo the pages already created so a failure leaves the document
-        // untouched (the registry was never refreshed, so it still agrees).
-        // A layer's transaction would take them back too; a fat-memory
-        // document has none.
-        for (let j = 0; j < i; j++) fn.FPDFPage_Delete(destPtr, at);
+      const objectNumber = objectNumbers?.[i];
+      // 0: the next free one.
+      if (
+        !fn.EPDFPage_InsertBlankRaw(destPtr, at + i, size.width, size.height, objectNumber ?? 0)
+      ) {
+        // The index was checked: a numbered page refused is a number another
+        // object has.
+        if (objectNumber !== undefined) throw objectNumberUnavailable(objectNumber, 'taken');
         throw new EngineError(
           EngineErrorCode.Unknown,
           `EPDFPage_InsertBlankRaw rejected page ${i + 1}/${count} at index ${at + i}`,

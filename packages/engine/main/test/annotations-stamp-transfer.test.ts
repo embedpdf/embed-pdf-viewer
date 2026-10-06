@@ -144,7 +144,7 @@ describe('stamp annotations: resource buffers survive a detaching transport', ()
         box: { x: 100, y: 500, width: 160, height: 80 },
         name: 'Approved',
       },
-      { appearance: png },
+      { resources: { appearance: png } },
     );
     expect(png.byteLength).toBe(original.length);
     expect(Array.from(png)).toEqual(original);
@@ -156,13 +156,17 @@ describe('stamp annotations: resource buffers survive a detaching transport', ()
         box: { x: 100, y: 300, width: 160, height: 80 },
         name: 'Approved',
       },
-      { appearance: png },
+      { resources: { appearance: png } },
     );
     expect((second.annotation as StampAnnotation).name).toBe('Approved');
     expect(png.byteLength).toBe(original.length);
 
     // Source update through the same path.
-    await page.annotations.update(first.annotation.ref, { subtype: 'stamp' }, { appearance: png });
+    await page.annotations.update(
+      first.annotation.ref,
+      { subtype: 'stamp' },
+      { resources: { appearance: png } },
+    );
     expect(png.byteLength).toBe(original.length);
     expect(Array.from(png)).toEqual(original);
 

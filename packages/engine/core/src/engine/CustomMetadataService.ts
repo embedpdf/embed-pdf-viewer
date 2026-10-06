@@ -1,6 +1,7 @@
 import type { CustomMetadata } from '../dto/CustomMetadata';
 import type { CustomMetadataPatch } from '../dto/CustomMetadataPatch';
 import type { CustomMetadataUpdateResult } from '../mutation/CustomMetadataUpdateResult';
+import type { WriteOptions } from '../mutation/WriteOptions';
 import { AbortablePromise } from '../promise/AbortablePromise';
 
 /**
@@ -15,5 +16,8 @@ export interface CustomMetadataService {
    * as they are after the write plus cloud coherence pins (`null` for local
    * engines). Gated by `doc.metadata.modify` on the cloud.
    */
-  update(patch: CustomMetadataPatch): AbortablePromise<CustomMetadataUpdateResult>;
+  update(
+    patch: CustomMetadataPatch,
+    options?: WriteOptions,
+  ): AbortablePromise<CustomMetadataUpdateResult>;
 }

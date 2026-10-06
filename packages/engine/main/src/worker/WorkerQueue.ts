@@ -12,6 +12,7 @@ import {
   type CallPriority,
   type JobTarget,
   type PageBox,
+  type PageRef,
   type RequestEffect,
   type ViewSets,
   type WirePack,
@@ -31,10 +32,32 @@ export interface JobSpec {
    * use `wirePack(req)`; for kinds that move buffers use
    * `wirePack(req, [buffer])`. It runs when the job is queued: the request
    * states the job's effect and page, which decide when it runs.
+   *
+   * It may return a promise when the request needs bytes read first (a
+   * Blob's). The job still takes its place in line when queued, as `line`
+   * describes it, so every call made after it waits for it as for any other
+   * job of its document; it is sent once its request is built.
    */
-  buildPack: (jobId: JobId) => WirePack<WorkerJobRequest>;
+  buildPack: (jobId: JobId) => WirePack<WorkerJobRequest> | Promise<WirePack<WorkerJobRequest>>;
+  /**
+   * The job's place in line while its request is being built: required when
+   * `buildPack` returns a promise, and must match the request it builds.
+   */
+  line?: JobLine;
   /** The part of the request's page the job is about (a tile), in page space. */
   region?: PageBox;
+}
+
+/** What decides a job's place in line: its effect, its document and its page. */
+interface JobPlace {
+  readonly effect: RequestEffect;
+  readonly docId: string | undefined;
+  readonly page?: PageRef;
+}
+
+/** A job's place in line before its request exists: always of a document. */
+export interface JobLine extends JobPlace {
+  readonly docId: string;
 }
 
 /** Where a document's calls queue: the worker queue, with the facts of the handle they're made through. */
@@ -44,7 +67,9 @@ export interface JobQueue {
 
 interface Job {
   readonly jobId: JobId;
-  readonly pack: WirePack<WorkerJobRequest>;
+  /** Null while an async `buildPack` builds it. */
+  pack: WirePack<WorkerJobRequest> | null;
+  built: boolean;
   readonly effect: RequestEffect;
   readonly docId: string | undefined;
   readonly target: JobTarget;
@@ -121,17 +146,29 @@ export class WorkerQueue implements JobQueue {
       );
     }
     const jobId = nextJobId();
-    const pack = spec.buildPack(jobId);
-    const request = pack.payload;
+    let built: WirePack<WorkerJobRequest> | Promise<WirePack<WorkerJobRequest>>;
+    try {
+      built = spec.buildPack(jobId);
+    } catch (err) {
+      return AbortablePromise.rejectReason<R>(err);
+    }
+    const pack = built instanceof Promise ? null : built;
+    const line: JobPlace | undefined = pack ? lineOf(pack.payload) : spec.line;
+    if (!line) {
+      return AbortablePromise.rejectReason<R>(
+        new EngineError(EngineErrorCode.Unknown, 'a job built later must state its line'),
+      );
+    }
 
     return new AbortablePromise<R>((resolve, reject, _progress, signal) => {
       const job: Job = {
         jobId,
         pack,
-        effect: request.effect,
-        docId: 'docId' in request ? request.docId : undefined,
+        built: pack !== null,
+        effect: line.effect,
+        docId: line.docId,
         target: {
-          ...('page' in request && request.page ? { page: request.page } : {}),
+          ...(line.page ? { page: line.page } : {}),
           ...(spec.region ? { region: spec.region } : {}),
           ...(facts.view !== undefined ? { view: facts.view } : {}),
         },
@@ -168,8 +205,42 @@ export class WorkerQueue implements JobQueue {
         signal.addEventListener('abort', onAbort, { once: true });
       }
 
+      if (built instanceof Promise) {
+        built.then(
+          (later) => this.built(job, later, line),
+          (err: unknown) => this.failedToBuild(job, err),
+        );
+      }
       this.tick();
     });
+  }
+
+  /** An async request is ready: the job may be sent when its turn comes. */
+  private built(job: Job, pack: WirePack<WorkerJobRequest>, line: JobPlace): void {
+    if (!this.byId.has(job.jobId)) return; // aborted, or the queue shut down
+    const actual = lineOf(pack.payload);
+    if (
+      actual.effect !== line.effect ||
+      actual.docId !== line.docId ||
+      actual.page?.objectNumber !== line.page?.objectNumber
+    ) {
+      this.failedToBuild(
+        job,
+        new EngineError(EngineErrorCode.Unknown, `job ${job.jobId} left the line it took`),
+      );
+      return;
+    }
+    job.pack = pack;
+    job.built = true;
+    this.tick();
+  }
+
+  /** Building the request failed: the job leaves the line and its caller sees why. */
+  private failedToBuild(job: Job, err: unknown): void {
+    if (!this.byId.has(job.jobId)) return;
+    this.remove(job);
+    job.reject(err);
+    this.tick();
   }
 
   /**
@@ -223,7 +294,7 @@ export class WorkerQueue implements JobQueue {
       }
       job.sent = true;
       this.inFlight += 1;
-      this.transport.send(job.pack);
+      this.transport.send(job.pack!);
     }
   }
 
@@ -238,7 +309,7 @@ export class WorkerQueue implements JobQueue {
     let victimRank = 0;
     for (const running of this.jobs) {
       if (!running.sent || running.preempted || running.aborted) continue;
-      if (running.effect !== 'read' || running.pack.transfer.length > 0) continue;
+      if (running.effect !== 'read' || running.pack!.transfer.length > 0) continue;
       const now = this.rankNow(running);
       if (!clearlyOutranks(next.rank, now)) continue;
       if (!victim || now < victimRank) {
@@ -349,6 +420,15 @@ export class WorkerQueue implements JobQueue {
 }
 
 const NO_VIEWS: ViewSets = new Map();
+
+/** The place a built request states. */
+function lineOf(request: WorkerJobRequest): JobPlace {
+  return {
+    effect: request.effect,
+    docId: 'docId' in request ? request.docId : undefined,
+    ...('page' in request && request.page ? { page: request.page } : {}),
+  };
+}
 
 /** Whether the worker answered that the job stopped on an abort. */
 function stoppedBy(msg: WorkerResponse): boolean {

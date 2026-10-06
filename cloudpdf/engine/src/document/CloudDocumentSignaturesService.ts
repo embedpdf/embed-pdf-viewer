@@ -1,4 +1,5 @@
 import {
+  opIdOf,
   AbortablePromise,
   EngineError,
   EngineErrorCode,
@@ -13,6 +14,7 @@ import {
   type SignaturePrepareInput,
   type SignaturePrepared,
   type SignatureSnapshot,
+  type WriteOptions,
 } from '@embedpdf/engine-core/runtime';
 import {
   ChangeAnalysisSchema,
@@ -158,10 +160,14 @@ export class CloudDocumentSignaturesService implements DocumentSignaturesService
     });
   }
 
-  prepare(input: SignaturePrepareInput): AbortablePromise<SignaturePrepared> {
+  prepare(
+    input: SignaturePrepareInput,
+    options?: WriteOptions,
+  ): AbortablePromise<SignaturePrepared> {
     const rejected = this.closedRejection();
     if (rejected) return rejected;
     return AbortablePromise.run<SignaturePrepared>(async (signal) => {
+      const opId = opIdOf(options);
       const { appearance, ...rest } = input;
       const body = {
         ...rest,
@@ -188,15 +194,23 @@ export class CloudDocumentSignaturesService implements DocumentSignaturesService
       // Prepare is a layer write (layerVersion, working, docVersion moved)
       // that returns no mutation envelope: refresh, don't guess.
       await this.manifest.refresh(signal);
-      this.publisher.publishLocal({ type: 'signatures.prepared', field: input.field, ...prepared });
+      this.publisher.publishWrite(opId, {
+        type: 'signatures.prepared',
+        field: input.field,
+        ...prepared,
+      });
       return prepared;
     });
   }
 
-  complete(input: SignatureCompleteInput): AbortablePromise<SignatureCompleteResult> {
+  complete(
+    input: SignatureCompleteInput,
+    options?: WriteOptions,
+  ): AbortablePromise<SignatureCompleteResult> {
     const rejected = this.closedRejection();
     if (rejected) return rejected;
     return AbortablePromise.run<SignatureCompleteResult>(async (signal) => {
+      const opId = opIdOf(options);
       const result = await this.http.postJson(
         wirePaths.layerSignatureComplete(this.docId, this.layerName, input.signingId),
         { cms: toBase64(input.cms), expectedVersion: input.expectedVersion },
@@ -209,28 +223,28 @@ export class CloudDocumentSignaturesService implements DocumentSignaturesService
       // replay alike, then announce the new version.
       await this.manifest.refresh(signal);
       if (result.status === 'completed') {
-        this.publisher.publishLocal({
-          type: 'signatures.completed',
-          signingId: input.signingId,
-          ...result,
-        });
-        this.publisher.publishLocal({ type: 'document.versioned', version: result.version });
+        this.publisher.publishWrite(
+          opId,
+          { type: 'signatures.completed', signingId: input.signingId, ...result },
+          { type: 'document.versioned', version: result.version },
+        );
       }
       return result;
     });
   }
 
-  cancel(signingId: string): AbortablePromise<SignatureCancelResult> {
+  cancel(signingId: string, options?: WriteOptions): AbortablePromise<SignatureCancelResult> {
     const rejected = this.closedRejection();
     if (rejected) return rejected;
     return AbortablePromise.run<SignatureCancelResult>(async (signal) => {
+      const opId = opIdOf(options);
       const result = await this.http.deleteJson(
         wirePaths.layerSignatureCancel(this.docId, this.layerName, signingId),
         (raw) => SignatureCancelResultSchema.parse(raw),
         signal,
       );
       if (result.status === 'cancelled') {
-        this.publisher.publishLocal({ type: 'signatures.cancelled', signingId });
+        this.publisher.publishWrite(opId, { type: 'signatures.cancelled', signingId });
       }
       return result;
     });

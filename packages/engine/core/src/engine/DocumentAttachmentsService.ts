@@ -8,6 +8,7 @@ import type {
   AttachmentCreateResult,
   AttachmentDeleteResult,
 } from '../mutation/AttachmentMutationResults';
+import type { WriteOptions } from '../mutation/WriteOptions';
 import { AbortablePromise } from '../promise/AbortablePromise';
 
 /**
@@ -38,7 +39,10 @@ export interface DocumentAttachmentsService {
    * published. Note the tree is key-sorted, so other entries' indices
    * may shift; keys never move.
    */
-  create(file: AttachmentFileSource): AbortablePromise<AttachmentCreateResult>;
+  create(
+    file: AttachmentFileSource,
+    options?: WriteOptions,
+  ): AbortablePromise<AttachmentCreateResult>;
   /**
    * Delete an embedded file from the name tree. Unlinks the entry only —
    * the stream bytes remain in the document until a full rewrite (the
@@ -46,5 +50,5 @@ export interface DocumentAttachmentsService {
    * unknown key. A mutation: layer sessions persist an artifact and an
    * `attachments.deleted` event is published.
    */
-  delete(ref: AttachmentRef): AbortablePromise<AttachmentDeleteResult>;
+  delete(ref: AttachmentRef, options?: WriteOptions): AbortablePromise<AttachmentDeleteResult>;
 }

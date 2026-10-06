@@ -219,6 +219,39 @@ describe('WorkerQueue', () => {
     await Promise.all([running, after]);
   });
 
+  test('a job built later keeps its place: what is asked after it waits, and an abort before it is built drops it', async () => {
+    const { transport, sent, answer } = fakeTransport();
+    const queue = new WorkerQueue(transport);
+    let build!: () => void;
+    const built = new Promise<void>((resolve) => (build = resolve));
+    const create = queue.enqueue({
+      line: { effect: 'write', docId: 'doc' },
+      buildPack: async (jobId: number) => {
+        await built;
+        return write('create').buildPack(jobId);
+      },
+    });
+    const update = queue.enqueue(write('update'));
+    const after = queue.enqueue(read('read'));
+    expect(sent).toEqual([]);
+    build();
+    await built;
+    await Promise.resolve();
+    expect(await drain(sent, answer)).toEqual(['create', 'update', 'read']);
+    await Promise.all([create, update, after]);
+
+    const dropped = queue.enqueue({
+      line: { effect: 'write', docId: 'doc' },
+      buildPack: async (jobId: number) => write('dropped').buildPack(jobId),
+    });
+    dropped.abort('gone');
+    await expect(dropped).rejects.toBeInstanceOf(AbortError);
+    const from = sent.length;
+    const next = queue.enqueue(write('next'));
+    expect(await drain(sent, answer, from)).toEqual(['next']);
+    await next;
+  });
+
   test('a working set reaches the worker at once, and is forgotten when the document closes', async () => {
     const { transport, sent, answer } = fakeTransport();
     const queue = new WorkerQueue(transport);

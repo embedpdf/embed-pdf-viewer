@@ -2,6 +2,7 @@ import {
   EngineError,
   EngineErrorCode,
   PDF_SUBTYPE_TO_CODE,
+  generateUuidV7,
   toPageRef,
   type AnnotationActor,
   type AnnotationDraft,
@@ -35,7 +36,10 @@ import {
 } from './internal/write/restoreAttribution';
 import { stampCreation } from './internal/write/stampCreation';
 import { linkPopup, linkReply } from './internal/write/writeAnnotationRelationship';
-import type { DocumentSession } from '../../document-session/DocumentSession';
+import {
+  objectNumberUnavailable,
+  type DocumentSession,
+} from '../../document-session/DocumentSession';
 import { throwIfAborted } from '../../shared/abort';
 import type { FontRegistrar } from '../fonts/FontRegistrar';
 
@@ -58,9 +62,13 @@ export interface BatchCreate {
   readonly parent?: BatchLinkTarget;
   /** The bytes beside the draft, by role. */
   readonly resources?: WireAnnotationResources;
+  /** The object number it gets; the next free one when absent. */
+  readonly objectNumber?: number;
   /**
    * Who wrote the annotation, and when: the session now, as `create`
-   * stamps it, or the attribution it already had, restored as it is.
+   * stamps it, or the attribution it already had, restored as it is. A
+   * stamped one is a new annotation: without an `nm` in its data it gets a
+   * fresh UUIDv7 name. A restored one keeps the name it had, or none.
    */
   readonly attribution:
     | { readonly kind: 'stamp'; readonly actor?: AnnotationActor }
@@ -114,6 +122,10 @@ interface Existing {
  *    a link needs, and keeps its name);
  * 3. attribute each, stamped as the session or restored as it was, last,
  *    so no later write touches `/M`.
+ *
+ * A create that names its object number makes the annotation at exactly
+ * that number: one the session holds, checked before the first write, and
+ * free in the layer, which the create itself checks.
  */
 export class AnnotationBatchApplier {
   constructor(
@@ -131,10 +143,18 @@ export class AnnotationBatchApplier {
     const prepared = creates.map((create) => {
       const record = this.session.resolvePageRef(create.page);
       const ctx = this.writeContext(create.resources);
-      const draft = labelled(create.label, () =>
+      const given = labelled(create.label, () =>
         prepareCreate(create.draft, create.resources, ctx),
       );
-      labelled(create.label, () => this.claimName(draft.nm, record, claimed));
+      labelled(create.label, () => this.claimName(given.nm, record, claimed));
+      // A fresh name is never taken: no claim needed.
+      const draft =
+        given.nm || create.attribution.kind !== 'stamp'
+          ? given
+          : { ...given, nm: generateUuidV7() };
+      if (create.objectNumber !== undefined) {
+        labelled(create.label, () => this.session.useObjectNumber(create.objectNumber!));
+      }
       const replyTo = create.replyTo && {
         type: create.replyTo.type,
         to: labelled(create.label, () =>
@@ -164,8 +184,13 @@ export class AnnotationBatchApplier {
         docPtr,
         record.pageIndex,
         PDF_SUBTYPE_TO_CODE[draft.subtype],
-        0, // object number: the next free one
+        create.objectNumber ?? 0, // 0: the next free one
       );
+      // The page and subtype were checked: a numbered create refused is a
+      // number another object has.
+      if (!annotPtr && create.objectNumber !== undefined) {
+        throw objectNumberUnavailable(create.objectNumber, 'taken');
+      }
       if (!annotPtr) {
         throw new EngineError(
           EngineErrorCode.Unknown,

@@ -14,6 +14,9 @@
  *   | `runtimeWrite`                         | any job                                        |
  *   | any job                                | a runtime write                                |
  *
+ * A job whose request is still being built (its bytes are being read) holds
+ * its place like any other, and runs once it is built.
+ *
  * Then urgency: of the jobs that may run, the one with the highest rank goes
  * first, the earliest asked among equals. A job that holds others back lends
  * them its place in line: it runs at the highest rank of anything it holds
@@ -31,6 +34,8 @@ export interface JobInLine {
   readonly docId: string | undefined;
   /** Sent to the worker: it can't be sent again, but it holds back until it's done. */
   readonly sent: boolean;
+  /** Its request is built. One that isn't yet holds back what it would, but can't be sent. */
+  readonly built: boolean;
   /** How soon it should run (see `rank`): higher first. */
   readonly rank: number;
 }
@@ -71,7 +76,8 @@ export function nextJob<J extends JobInLine>(jobs: readonly J[]): J | undefined 
 
   let next = -1;
   for (let index = 0; index < jobs.length; index++) {
-    if (jobs[index]!.sent || blockers[index]!.length > 0) continue;
+    const job = jobs[index]!;
+    if (job.sent || !job.built || blockers[index]!.length > 0) continue;
     if (next < 0 || lent[index]! > lent[next]!) next = index;
   }
   return next < 0 ? undefined : jobs[next];

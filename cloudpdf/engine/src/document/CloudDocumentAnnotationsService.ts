@@ -6,7 +6,7 @@ import {
   concatAnnotationLists,
   assertAnnotationBundle,
   assertBundleManifest,
-  generateUuid,
+  opIdOf,
   type AnnotationBundle,
   type AnnotationBundleLimits,
   type AnnotationExportSelection,
@@ -210,8 +210,8 @@ export class CloudDocumentAnnotationsService implements DocumentAnnotationsServi
         new EngineError(EngineErrorCode.DocNotOpen, `document ${this.docId} is closed`),
       );
     }
-    const opId = options.opId ?? generateUuid();
     return AbortablePromise.run<AnnotationImportResult>(async (signal) => {
+      const opId = opIdOf(options);
       const { resources, ...rest } = bundle;
       const sizes = new Map(Object.entries(resources).map(([id, bytes]) => [id, bytes.length]));
       assertBundleManifest(bundle, sizes, await this.importLimits());
@@ -235,13 +235,13 @@ export class CloudDocumentAnnotationsService implements DocumentAnnotationsServi
         { 'Idempotency-Key': opId },
       );
       this.manifest.apply(result.meta, ['annotations']);
-      const facts = annotationImportFacts(result);
-      facts.forEach((fact, index) => {
-        this.publisher.publishLocal(
-          { type: 'annotations.created', ...fact },
-          { id: opId, index, count: facts.length },
-        );
-      });
+      this.publisher.publishWrite(
+        opId,
+        ...annotationImportFacts(result).map((fact) => ({
+          type: 'annotations.created' as const,
+          ...fact,
+        })),
+      );
       return result;
     });
   }

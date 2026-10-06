@@ -115,7 +115,7 @@ describe('stamp annotations: engine-local (inline transport, wasm runtime)', () 
         box: rect,
         name: 'Approved',
       },
-      { appearance: png },
+      { resources: { appearance: png } },
     );
 
     expect(result.annotation.subtype).toBe('stamp');
@@ -159,7 +159,7 @@ describe('stamp annotations: engine-local (inline transport, wasm runtime)', () 
         subtype: 'stamp',
         box: { x: 50, y: 50, width: 40, height: 40 },
       },
-      { appearance: new Blob([png], { type: 'image/png' }) },
+      { resources: { appearance: new Blob([png], { type: 'image/png' }) } },
     );
     expect(result.annotation.subtype).toBe('stamp');
   });
@@ -192,7 +192,7 @@ describe('stamp annotations: engine-local (inline transport, wasm runtime)', () 
         subtype: 'stamp',
         box: { x: 10, y: 10, width: 40, height: 40 },
       },
-      { appearance: png },
+      { resources: { appearance: png } },
     );
     const updated = await page.annotations.update(created.ref, {
       subtype: 'stamp',
@@ -215,7 +215,7 @@ describe('stamp annotations: engine-local (inline transport, wasm runtime)', () 
         fit: 'fill',
         rotation: 90,
       },
-      { appearance: png },
+      { resources: { appearance: png } },
     );
     expect((created as StampAnnotation).rotation).toBe(90);
 
@@ -265,7 +265,7 @@ describe('stamp annotations: engine-local (inline transport, wasm runtime)', () 
         fit: 'contain',
         rotation: 90,
       },
-      { appearance: png },
+      { resources: { appearance: png } },
     );
     expect((created as StampAnnotation).rotation).toBe(90);
 
@@ -315,7 +315,7 @@ describe('stamp annotations: engine-local (inline transport, wasm runtime)', () 
         fit: 'contain',
         rotation: 90,
       },
-      { appearance: png },
+      { resources: { appearance: png } },
     );
     expect((created as StampAnnotation).rotation).toBe(90);
 
@@ -356,7 +356,7 @@ describe('stamp annotations: engine-local (inline transport, wasm runtime)', () 
           subtype: 'stamp',
           box: { x: 0, y: 0, width: 10, height: 10 },
         },
-        { appearance: new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8]) },
+        { resources: { appearance: new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8]) } },
       ),
     ).rejects.toMatchObject({ code: expect.anything() });
   });
@@ -374,7 +374,7 @@ describe('stamp annotations: engine-local (inline transport, wasm runtime)', () 
           box: { x: 20, y: 100, width: 60, height: 30 },
           name: '',
         },
-        { appearance: makePng(2, 1, [255, 0, 0, 255]) },
+        { resources: { appearance: makePng(2, 1, [255, 0, 0, 255]) } },
       ),
     ).rejects.toMatchObject({ code: EngineErrorCode.InvalidArg });
 
@@ -389,7 +389,7 @@ describe('stamp annotations: engine-local (inline transport, wasm runtime)', () 
         name: customName,
         contents: 'before',
       },
-      { appearance: makePng(2, 1, [0, 128, 0, 255]) },
+      { resources: { appearance: makePng(2, 1, [0, 128, 0, 255]) } },
     );
     expect(created.subtype).toBe('stamp');
     if (created.subtype === 'stamp') expect(created.name).toBe(customName);
