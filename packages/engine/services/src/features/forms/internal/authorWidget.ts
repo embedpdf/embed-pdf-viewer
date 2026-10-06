@@ -22,7 +22,8 @@ export function createUnattachedWidget(
   placement: WidgetPlacement<PdfCoordinates>,
 ): number {
   const { fn, mem } = runtime;
-  const annotPtr = fn.EPDFPage_CreateAnnotRaw(docPtr, pageIndex, WIDGET_SUBTYPE_CODE);
+  // Object number 0: the next free one.
+  const annotPtr = fn.EPDFPage_CreateAnnotRaw(docPtr, pageIndex, WIDGET_SUBTYPE_CODE, 0);
   if (annotPtr === NULL_PTR) {
     throw new EngineError(EngineErrorCode.Unknown, 'failed to create widget annotation');
   }

@@ -313,7 +313,10 @@ export class FormMutator {
         pageIndexes[at]!,
         placement,
       );
-      if (!fn.EPDFForm_AttachWidget(docPtr, fieldObjectNumber, widgetObjectNumber, onStates[at]!)) {
+      // A new field is never merged, so no split number is needed.
+      if (
+        !fn.EPDFForm_AttachWidget(docPtr, fieldObjectNumber, widgetObjectNumber, onStates[at]!, 0)
+      ) {
         throw new EngineError(EngineErrorCode.Unknown, 'widget adoption failed');
       }
     });
@@ -359,6 +362,7 @@ export class FormMutator {
         this.session.requireDocPtr(),
         FAMILY_CODE[draft.family],
         namePtr,
+        0, // object number: the next free one
       );
     } finally {
       mem.free(namePtr);
@@ -629,8 +633,9 @@ export class FormMutator {
     // A failure from here on aborts the job's layer transaction.
     if (mergedPage) promoteInlineAnnotations(this.runtime, this.session, mergedPage.objectNumber);
     const widgetObjectNumber = createUnattachedWidget(this.runtime, docPtr, pageIndex, placement);
+    // Split number 0: a merged field's widget half moves to the next free one.
     if (
-      !fn.EPDFForm_AttachWidget(docPtr, resolved.fieldObjectNumber, widgetObjectNumber, onState)
+      !fn.EPDFForm_AttachWidget(docPtr, resolved.fieldObjectNumber, widgetObjectNumber, onState, 0)
     ) {
       throw new EngineError(EngineErrorCode.InvalidArg, 'the widget could not join the field');
     }

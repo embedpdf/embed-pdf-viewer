@@ -114,11 +114,10 @@ export class PagesInserter {
 
   /**
    * Create `count` blank pages of `size` at `toIndex`. Same mutation
-   * contract as `insert`, but native creation (`FPDFPage_New`) instead of a
-   * deep copy: no source document, so none of the retain-until-close
-   * lifetime hazard above. Each page gets an empty content stream
-   * (`FPDFPage_GenerateContent`) so the saved PDF renders identically in
-   * third-party viewers.
+   * contract as `insert`, but native creation (`EPDFPage_InsertBlankRaw`,
+   * which never loads the page) instead of a deep copy: no source document,
+   * so none of the retain-until-close lifetime hazard above. A blank page has
+   * no `/Contents`, which ISO 32000-2 defines as an empty page.
    */
   insertBlank(
     spec: PageInsertBlankSpec,
@@ -158,20 +157,18 @@ export class PagesInserter {
     }
 
     for (let i = 0; i < count; i++) {
-      // FPDFPage_New would clamp an out-of-range index to "append"; the
-      // guard above keeps that PDFium leniency out of the contract.
-      const pagePtr = fn.FPDFPage_New(destPtr, at + i, size.width, size.height);
-      if (!pagePtr) {
+      // Object number 0: the next free one.
+      if (!fn.EPDFPage_InsertBlankRaw(destPtr, at + i, size.width, size.height, 0)) {
         // Undo the pages already created so a failure leaves the document
         // untouched (the registry was never refreshed, so it still agrees).
+        // A layer's transaction would take them back too; a fat-memory
+        // document has none.
         for (let j = 0; j < i; j++) fn.FPDFPage_Delete(destPtr, at);
         throw new EngineError(
           EngineErrorCode.Unknown,
-          `FPDFPage_New rejected page ${i + 1}/${count} at index ${at + i}`,
+          `EPDFPage_InsertBlankRaw rejected page ${i + 1}/${count} at index ${at + i}`,
         );
       }
-      fn.FPDFPage_GenerateContent(pagePtr);
-      fn.FPDF_ClosePage(pagePtr);
     }
 
     this.session.refreshPageRegistry();

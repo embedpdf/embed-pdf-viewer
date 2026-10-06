@@ -8,6 +8,8 @@ Annotation updates, deletes and reorders find their annotations without loading 
 
 Remove plain (non-layer) sessions and checkpoint rollback.
 
+`pages.insertBlank` inserts each page without loading it.
+
 Page flatten and redaction apply are all or nothing: a page that fails, or a cancel, rejects the call and leaves every page as it was, instead of keeping the pages before it.
 
 Name every annotation for life: by its object number, or, for an annotation the file stores inline, by the position it was born at, which it keeps after the layer gives it an object number. Pages inserted into a layer hold only objects. The engine no longer writes an `/NM` into an annotation it changes, and keeps no page revisions.

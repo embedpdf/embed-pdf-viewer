@@ -164,6 +164,7 @@ export class AnnotationBatchApplier {
         docPtr,
         record.pageIndex,
         PDF_SUBTYPE_TO_CODE[draft.subtype],
+        0, // object number: the next free one
       );
       if (!annotPtr) {
         throw new EngineError(
