@@ -16,6 +16,7 @@ import type { PdfRuntimeModule } from '@embedpdf/engine-runtime';
 import type { DocumentSession } from '../../document-session/DocumentSession';
 import { throwIfAborted } from '../../shared/abort';
 import { AnnotationReader } from '../annotations';
+import { promoteInlineAnnotations } from '../annotations/internal/write/promoteInlineAnnotations';
 
 const FLATTEN_FAIL = 0;
 const FLATTEN_SUCCESS = 1;
@@ -44,6 +45,9 @@ export class PagesFlattener {
       }
       if (signal.aborted) throwIfAborted(signal);
 
+      // A flatten removes entries from /Annots; promotion keeps every
+      // position.
+      promoteInlineAnnotations(this.runtime, this.session, pageObjectNumber);
       const pool = this.session.pagePool();
       const pagePtr = pool.acquire(pageObjectNumber);
       let code: number;
@@ -89,7 +93,7 @@ export class PagesFlattener {
       return { pages, usage, results, meta: { affectedPages: [], cacheDelta: null } };
     }
 
-    this.session.noteMutation();
+    this.session.invalidateDerived();
     for (const pageObjectNumber of affected) {
       this.session.bumpRevision(pageObjectNumber);
       try {

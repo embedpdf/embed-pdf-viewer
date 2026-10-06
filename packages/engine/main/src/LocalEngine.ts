@@ -1,5 +1,4 @@
 import {
-  type SessionKind,
   type SignedDocumentPolicy,
   AbortablePromise,
   checkCapability,
@@ -49,14 +48,6 @@ export interface LocalEngineOptions {
    * invalid files). Signature analysis never depends on it.
    */
   signedDocumentPolicy?: SignedDocumentPolicy;
-  /**
-   * The shape every `open({ kind: 'bytes' })` session takes. Default
-   * `layer`: an immutable base with a layer of edits on top, so saves append
-   * only what changed and signatures survive later edits. `plain` keeps the
-   * classic single in-memory document (a signed file still opens as a
-   * layer). See {@link SessionKind}.
-   */
-  sessionKind?: SessionKind;
 }
 
 /**
@@ -73,7 +64,6 @@ export class LocalEngine implements LocalEngineContract {
       opts.imageEncoder,
       opts.renderPolicy,
       opts.signedDocumentPolicy ?? 'protect',
-      opts.sessionKind ?? 'layer',
     );
   }
 
@@ -100,7 +90,6 @@ export class LocalEngine implements LocalEngineContract {
     imageEncoder: LocalImageEncoder | undefined,
     renderPolicy: EngineRenderPolicy | undefined,
     private readonly signedDocumentPolicy: SignedDocumentPolicy,
-    private readonly sessionKind: SessionKind,
   ) {
     this.queue = new WorkerQueue(transport, { concurrency });
     // A canvas where there is one; the portable PNG/BMP encoder elsewhere
@@ -215,7 +204,6 @@ export class LocalEngine implements LocalEngineContract {
     const buffer = toArrayBuffer(input.bytes);
     const docId = input.id ?? generateUuid();
     const signedDocumentPolicy = this.signedDocumentPolicy;
-    const sessionKind = this.sessionKind;
 
     const submission = queue.enqueue<WorkerResultPayload>({
       // open() is the one current producer that actually carries a buffer.
@@ -233,7 +221,6 @@ export class LocalEngine implements LocalEngineContract {
             bytes: buffer,
             password,
             signedDocumentPolicy,
-            sessionKind,
           },
           [buffer],
         ),

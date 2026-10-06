@@ -46,7 +46,7 @@ const CEILING_MAX_MATCHES = 1024;
  * trust boundary (worker locally, server process in the cloud):
  *
  *   extract — page text via the session corpus cache (version-keyed on
- *             `mutationSeq`, so results always reflect the current layer
+ *             `cacheSeq`, so results always reflect the current layer
  *             view — text a redaction removed is unfindable),
  *   match   — the pure engine-core matcher (identical code on every
  *             engine; parity by construction),
@@ -90,7 +90,7 @@ export class SearchReader {
       return { matches: [], nextCursor: null, pagesSearched: 0, pageCount };
     }
 
-    const seq = this.session.mutationSeq();
+    const seq = this.session.cacheSeq();
     const key = searchQueryKey(query, snippets);
 
     let start = 0;

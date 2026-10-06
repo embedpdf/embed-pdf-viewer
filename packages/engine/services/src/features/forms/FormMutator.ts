@@ -53,7 +53,7 @@ import {
   type ResolvedField,
 } from './internal/resolveFieldRef';
 import { AnnotationMutator } from '../annotations/AnnotationMutator';
-import { DocumentCheckpoint } from '../../document-session/DocumentCheckpoint';
+import { promoteInlineAnnotations } from '../annotations/internal/write/promoteInlineAnnotations';
 import { readUtf16String } from '../../runtime/memory/strings';
 
 // Mirrors EPDF_FORMFIELD_FAMILY_* in public/epdf_form.h.
@@ -147,7 +147,7 @@ export class FormMutator {
         }
         return { before, changed };
       });
-    if (written.length > 0) this.session.noteMutation();
+    if (written.length > 0) this.session.invalidateDerived();
 
     const fields: FormFieldDTO<PdfCoordinates>[] = [];
     const changedWidgets: FormWidget[] = [];
@@ -238,7 +238,7 @@ export class FormMutator {
       };
     });
 
-    this.session.noteMutation();
+    this.session.invalidateDerived();
     const fresh = acquireFormModel(this.runtime, this.session);
     const form = readFormSnapshot(this.runtime, fresh, this.session.requireDocPtr());
     // The import names no widgets, so every page with a widget may have repainted.
@@ -267,7 +267,7 @@ export class FormMutator {
       };
     });
 
-    this.session.noteMutation();
+    this.session.invalidateDerived();
     return { ...report, meta: EMPTY_META };
   }
 
@@ -275,9 +275,8 @@ export class FormMutator {
    * Create a field and (optionally) its widgets as one change: native
    * field creation, widget birth through the annotation plane, adoption,
    * then field-plane setters. Everything a caller can get wrong is checked
-   * before the first write; any failure after it undoes the whole create
-   * (the field is unlinked from an existing parent, then a checkpoint rolls
-   * back the rest), so a rejected draft creates nothing.
+   * before the first write; any failure after it aborts the job's layer
+   * transaction, so a rejected draft creates nothing.
    */
   createField(
     draft: FormFieldDraft<PdfCoordinates>,
@@ -304,39 +303,23 @@ export class FormMutator {
     }
     throwIfAborted(signal);
 
-    const checkpoint = DocumentCheckpoint.begin(fn, docPtr);
-    let fieldObjectNumber = 0;
-    try {
-      fieldObjectNumber = this.createFieldNode(draft);
-      this.configureNewField(draft, fieldObjectNumber);
-      placements.forEach((placement, at) => {
-        const pageIndex = pageIndexes[at]!;
-        checkpoint.page(pageIndex);
-        const widgetObjectNumber = createUnattachedWidget(
-          this.runtime,
-          docPtr,
-          pageIndex,
-          placement,
-        );
-        const onState = onStates[at]!;
-        if (!fn.EPDFForm_AttachWidget(docPtr, fieldObjectNumber, widgetObjectNumber, onState)) {
-          throw new EngineError(EngineErrorCode.Unknown, 'widget adoption failed');
-        }
-      });
-      this.session.noteMutation();
-      return { field: this.readBackField(fieldObjectNumber) };
-    } catch (error) {
-      // The checkpoint records the form dictionary and the pages, not an
-      // existing parent field whose /Kids gained the new one: unlink the
-      // field first, then roll back everything else.
-      if (fieldObjectNumber > 0) this.nativeDeleteField(fieldObjectNumber);
-      checkpoint.rollback();
-      throw error;
-    } finally {
-      checkpoint.end();
-      // Written or rolled back, the form model must be read again.
-      this.session.noteMutation();
-    }
+    // A failure from here on aborts the job's layer transaction, which takes
+    // back the field, its widgets and any parent's /Kids together.
+    const fieldObjectNumber = this.createFieldNode(draft);
+    this.configureNewField(draft, fieldObjectNumber);
+    placements.forEach((placement, at) => {
+      const widgetObjectNumber = createUnattachedWidget(
+        this.runtime,
+        docPtr,
+        pageIndexes[at]!,
+        placement,
+      );
+      if (!fn.EPDFForm_AttachWidget(docPtr, fieldObjectNumber, widgetObjectNumber, onStates[at]!)) {
+        throw new EngineError(EngineErrorCode.Unknown, 'widget adoption failed');
+      }
+    });
+    this.session.invalidateDerived();
+    return { field: this.readBackField(fieldObjectNumber) };
   }
 
   /** EPDFForm_DeleteField: unlink the field and detach its kid widgets. */
@@ -481,7 +464,7 @@ export class FormMutator {
     for (const widget of before.widgets) {
       bakeWidgetAppearance(this.runtime, docPtr, widget, pdf);
     }
-    this.session.noteMutation();
+    this.session.invalidateDerived();
     const pages = [
       ...new Set(before.widgets.flatMap((w) => (w.page ? [w.page.objectNumber] : []))),
     ];
@@ -575,7 +558,7 @@ export class FormMutator {
       this.applyOptions(fieldObjectNumber, patch.options);
     }
 
-    this.session.noteMutation();
+    this.session.invalidateDerived();
     return { field: this.readBackField(fieldObjectNumber) };
   }
 
@@ -611,7 +594,7 @@ export class FormMutator {
       throw new EngineError(EngineErrorCode.InvalidArg, 'field cannot be deleted');
     }
     // Rebuild the form model before the cascade's attachment guard reads it.
-    this.session.noteMutation();
+    this.session.invalidateDerived();
 
     const annotations = new AnnotationMutator(this.runtime, this.session);
     for (const widget of removedWidgets) {
@@ -620,7 +603,7 @@ export class FormMutator {
     }
     // The cascade edited /Annots after the bump above; bump again so the
     // form model rebuilds.
-    this.session.noteMutation();
+    this.session.invalidateDerived();
     return { deleted: before.ref, removedWidgets };
   }
 
@@ -643,30 +626,26 @@ export class FormMutator {
     const before = readFieldAt(this.runtime, model, resolved.fieldIndex, docPtr);
     const pageIndex = this.preflightPlacement(placement);
     const onState = onStateOf(before.family, placement);
+    // A merged field/widget splits: its widget half leaves its place in
+    // /Annots for a new widget at the end, which moves that page's entries.
+    const mergedPage =
+      before.widgets.find((w) => w.objectNumber === resolved.fieldObjectNumber)?.page ?? null;
     throwIfAborted(signal);
 
-    const checkpoint = DocumentCheckpoint.begin(fn, docPtr);
-    try {
-      checkpoint.page(pageIndex);
-      const widgetObjectNumber = createUnattachedWidget(this.runtime, docPtr, pageIndex, placement);
-      if (
-        !fn.EPDFForm_AttachWidget(docPtr, resolved.fieldObjectNumber, widgetObjectNumber, onState)
-      ) {
-        throw new EngineError(EngineErrorCode.InvalidArg, 'the widget could not join the field');
-      }
-      this.session.noteMutation();
-      return {
-        field: this.readBackField(resolved.fieldObjectNumber),
-        widget: formWidget(widgetObjectNumber, placement.page),
-      };
-    } catch (error) {
-      checkpoint.rollback();
-      throw error;
-    } finally {
-      checkpoint.end();
-      // Written or rolled back, the form model must be read again.
-      this.session.noteMutation();
+    // A failure from here on aborts the job's layer transaction.
+    if (mergedPage) promoteInlineAnnotations(this.runtime, this.session, mergedPage.objectNumber);
+    const widgetObjectNumber = createUnattachedWidget(this.runtime, docPtr, pageIndex, placement);
+    if (
+      !fn.EPDFForm_AttachWidget(docPtr, resolved.fieldObjectNumber, widgetObjectNumber, onState)
+    ) {
+      throw new EngineError(EngineErrorCode.InvalidArg, 'the widget could not join the field');
     }
+    if (mergedPage) this.session.bumpRevision(mergedPage.objectNumber);
+    this.session.invalidateDerived();
+    return {
+      field: this.readBackField(resolved.fieldObjectNumber),
+      widget: formWidget(widgetObjectNumber, placement.page),
+    };
   }
 
   detachWidget(
@@ -698,7 +677,7 @@ export class FormMutator {
     ) {
       throw new EngineError(EngineErrorCode.InvalidArg, 'widget is not attached to this field');
     }
-    this.session.noteMutation();
+    this.session.invalidateDerived();
     return {
       field: this.readBackField(resolved.fieldObjectNumber),
       widget: formWidget(widgetObjectNumber(widget), widget.page),
@@ -828,7 +807,7 @@ export class FormMutator {
     fieldObjectNumber: number,
     changedObjNums: number[],
   ): FormSetValueResult<PdfCoordinates> {
-    this.session.noteMutation();
+    this.session.invalidateDerived();
     const fresh = acquireFormModel(this.runtime, this.session);
     const fieldIndex = this.runtime.fn.EPDFForm_GetFieldIndexByObjNum(fresh, fieldObjectNumber);
     if (fieldIndex < 0) {

@@ -128,7 +128,7 @@ export class SignatureAnalyzer {
     // working copy is opened below (an annotation added and removed again
     // leaves the loaded bytes as the document); otherwise the loaded bytes.
     let basisSource: 'persisted' | 'working-copy' = 'persisted';
-    const editsVersion = this.session.mutationSeq();
+    const editsVersion = this.session.editsSeq();
 
     let sinceRevision: number;
     let sinceSignature: number | null = null;

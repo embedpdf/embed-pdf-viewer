@@ -119,10 +119,7 @@ import {
 } from './pageSpaceBoundary';
 import { DocumentSession } from '../document-session/DocumentSession';
 import { BaseDocumentRegistry } from '../document-session/lifecycle/BaseDocumentRegistry';
-import {
-  openFatMemoryDocument,
-  openLayerDocument,
-} from '../document-session/lifecycle/PdfDocumentOpener';
+import { openLayerDocument } from '../document-session/lifecycle/PdfDocumentOpener';
 import { DecodedImageStore } from '../document-session/pages/DecodedImageStore';
 import {
   DEFAULT_PAGE_RESIDENCY_POLICY,
@@ -164,7 +161,6 @@ import {
   SignatureMutator,
   SignatureReader,
   disposeSignatureModel,
-  hasSignedSignature,
 } from '../features/signature';
 import { PageTextReader } from '../features/text';
 import { ensureInitialized, destroyLibrary } from '../runtime/lifecycle/bootstrap';
@@ -468,12 +464,17 @@ export class WorkerHost {
     // are effectively atomic from our side and intentionally non-abortable,
     // so they do not receive the signal.
     let resultPack: WirePack<WorkerResultPayload<PdfCoordinates>>;
+    // A write runs as one layer transaction: it commits in finishMutation,
+    // before the layer is saved, or below when the write had nothing to do,
+    // and any throw before then aborts it, leaving the document as it was.
+    const transacted = this.transactedSession(msg);
     try {
       // A parked signing candidate freezes the session: every mutating kind
       // is refused at dispatch, before any native write, until the signing
       // completes or is cancelled. Reads keep seeing the live document, which the
       // candidate never changed.
       this.assertNoPendingSigning(msg);
+      transacted?.beginTransaction();
       switch (msg.kind) {
         case 'open.fatMem':
         case 'open.layerMemBase':
@@ -702,8 +703,10 @@ export class WorkerHost {
             `unknown request kind: ${(msg as WorkerRequest).kind}`,
           );
       }
+      if (transacted?.inTransaction()) transacted.commitTransaction();
       this.resolve(msg, resultPack);
     } catch (err) {
+      if (transacted?.inTransaction()) transacted.abortTransaction();
       const error: SerializedEngineError = serializeError(err);
       // Reject envelopes never carry binary; explicit EMPTY_TRANSFER
       // documents that intent.
@@ -713,6 +716,20 @@ export class WorkerHost {
       // And after it: the pages the write itself released, done or failed.
       this.closePagesChangedBy(job, effect);
     }
+  }
+
+  /**
+   * The session a job writes to, when it runs as a transaction: a write to an
+   * open, usable layer document. Anything else (no such session, a locked
+   * one) gets its handler's own error.
+   */
+  private transactedSession(msg: FileSpaceJob): DocumentSession | undefined {
+    if (!writesDocument(msg)) return undefined;
+    const layerName = 'layerName' in msg ? msg.layerName : undefined;
+    const session = this.sessions.get(sessionKey(msg.docId, layerName));
+    if (!session?.isOpen() || session.kind !== 'layer') return undefined;
+    session.assertUsable();
+    return session;
   }
 
   /** Closes the pages a job of this effect may change, as no job holds them. */
@@ -760,9 +777,8 @@ export class WorkerHost {
     // locked file parks and unlocks the same way whatever it came from.
     let load: (password: string | null) => void;
     if (req.kind === 'open.fatMem') {
-      session.sessionKind = req.sessionKind ?? 'layer';
       const bytes = new Uint8Array(req.bytes);
-      load = (password) => this.openSignedAware(session, bytes, password);
+      load = (password) => this.openBytesAsLayer(session, bytes, password);
     } else if (req.kind === 'open.layerMemBase') {
       const baseBytes = new Uint8Array(req.baseBytes);
       load = (password) => {
@@ -823,43 +839,22 @@ export class WorkerHost {
   }
 
   /**
-   * Open plain bytes into `session` in the shape it asked for. The default,
-   * `layer`, makes the bytes an immutable base with a fresh layer on top:
-   * reads fall through to the base, a write promotes only what it touches,
-   * a save appends exactly that, and a signature keeps its validity across
-   * later edits because the signature dictionary is never rewritten. The
-   * `plain` shape keeps one in-memory document — unless the bytes already
-   * carry a signature value, which always opens as a layer, because a plain
-   * save rewrites every loaded object into the new revision and strict
-   * validators reject that. Auto-layered sessions serialize no artifact per
-   * mutation: the caller never asked for one.
+   * Open bytes into `session` as an immutable base with a fresh layer on top:
+   * reads fall through to the base, a write promotes only what it touches and
+   * runs as a layer transaction, a save appends exactly that, and a signature
+   * keeps its validity across later edits because the signature dictionary is
+   * never rewritten. The session serializes no artifact per mutation: the
+   * caller holds the document, not a layer.
    */
-  private openSignedAware(
+  private openBytesAsLayer(
     session: DocumentSession,
     bytes: Uint8Array,
     password: string | null,
   ): void {
-    if (session.sessionKind === 'plain') {
-      const plain = openFatMemoryDocument(this.runtime, bytes, password);
-      // A signed signature, not merely a signature field: an unsigned form
-      // with empty signature fields is an ordinary document and honours the
-      // plain request. (FPDF_GetSignatureCount counts fields.)
-      let signed = false;
-      try {
-        signed = hasSignedSignature(this.runtime, plain.docPtr);
-      } catch {
-        signed = false;
-      }
-      if (!signed) {
-        session.openFromHandle(plain);
-        return;
-      }
-      plain.close();
-    }
     // The base registry reports a password failure the way a plain open
     // does, so a locked document parks and unlocks the same way.
     const base = this.baseDocuments.acquireMemoryBase({
-      key: `signed-open:${generateUuid()}`,
+      key: `bytes-open:${generateUuid()}`,
       bytes,
       password,
     });
@@ -1002,9 +997,7 @@ export class WorkerHost {
    * that is not open falls through to its handler's own `DocNotOpen`.
    */
   private assertNoPendingSigning(msg: FileSpaceJob): void {
-    if (msg.kind === 'shutdown' || msg.kind === 'signatures.complete') return;
-    if (msg.effect !== 'write' && msg.effect !== 'contentWrite') return;
-    if (!('docId' in msg)) return;
+    if (!writesDocument(msg)) return;
     const layerName = 'layerName' in msg ? msg.layerName : undefined;
     const session = this.sessions.get(sessionKey(msg.docId, layerName));
     if (session?.pendingSigning) {
@@ -1102,7 +1095,7 @@ export class WorkerHost {
   ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
     const mutator = new AnnotationMutator(this.runtime, session, this.fonts);
-    const result = mutator.update(req.ref, req.patch, signal, req.actor, req.resources);
+    const result = mutator.update(req.ref, req.patch, req.authority, signal, req.resources);
     return this.finishMutation(session, { tag: 'annotations.update', result }, req.artifactPath);
   }
 
@@ -1112,7 +1105,7 @@ export class WorkerHost {
   ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
     const mutator = new AnnotationMutator(this.runtime, session, this.fonts);
-    const result = mutator.delete(req.ref, req.checked, signal);
+    const result = mutator.delete(req.ref, req.authority, signal);
     return this.finishMutation(session, { tag: 'annotations.delete', result }, req.artifactPath);
   }
 
@@ -2031,6 +2024,7 @@ export class WorkerHost {
     if (!session || !session.isOpen()) {
       throw new EngineError(EngineErrorCode.DocNotOpen, `document session not open: ${key}`);
     }
+    session.assertUsable();
     return session;
   }
 
@@ -2218,20 +2212,25 @@ export class WorkerHost {
     payload: P,
     artifactPath?: string,
   ): WirePack<WorkerResultPayload<PdfCoordinates>> {
-    // Every successful mutation funnels through here; the sequence bump
-    // invalidates version-keyed caches (the forms model). Forms mutators
-    // bump themselves before reading back, so their tags are skipped to
-    // avoid rebuilding the model cache twice per write — as do the
-    // flattener and redaction applier, which note the mutation before
-    // their post-apply annotation re-read.
+    // The write is done and read back: keep it. Nothing after this point
+    // can abort it; a failure from here on (the layer save) leaves a
+    // committed write that the caller must not mistake for a refused one.
+    if (session.inTransaction()) session.commitTransaction();
+    // Every successful write funnels through here. Forms mutators
+    // invalidate the derived caches themselves before reading back, so their
+    // tags are skipped to avoid rebuilding the model cache twice per write,
+    // as do the flattener and redaction applier, which invalidate before
+    // their post-apply annotation re-read. A completed signing installed new
+    // bytes, which already counted.
     if (
       !payload.tag.startsWith('forms.') &&
       payload.tag !== 'pages.flatten' &&
       payload.tag !== 'redaction.apply' &&
       payload.tag !== 'signatures.complete'
     ) {
-      session.noteMutation();
+      session.invalidateDerived();
     }
+    if (payload.tag !== 'signatures.complete') session.noteEdit();
     if (session.kind !== 'layer' || !session.persistLayerArtifact) {
       return wirePack(payload);
     }
@@ -2287,6 +2286,17 @@ const PAGE_EFFECT: Record<RequestEffect, PageEffect> = {
 
 function pageEffectOf(job: PageSpaceJob): PageEffect {
   return job.kind === 'shutdown' ? 'none' : PAGE_EFFECT[job.effect];
+}
+
+/**
+ * Whether a job writes to an open document: a `write` or `contentWrite`,
+ * except a signing's completion, which replaces the document's bytes instead.
+ * Such a job runs as one layer transaction, and a parked signing refuses it.
+ */
+function writesDocument(msg: FileSpaceJob): msg is Extract<FileSpaceJob, { docId: string }> {
+  if (msg.kind === 'shutdown' || msg.kind === 'signatures.complete') return false;
+  if (msg.effect !== 'write' && msg.effect !== 'contentWrite') return false;
+  return 'docId' in msg;
 }
 
 const BASE_SESSION_SUFFIX = '__base__';

@@ -131,7 +131,6 @@ export type {
 } from './dto/AnnotationRender';
 export type { CachePins } from './dto/CachePins';
 export { DEFAULT_PDF_SAVE_MODE } from './dto/PdfSaveMode';
-export type { SessionKind } from './dto/SessionKind';
 export type { DownloadOptions, PdfSaveMode } from './dto/PdfSaveMode';
 export type {
   FontEmbeddingPermission,
@@ -754,6 +753,8 @@ export type {
 export { PDF_BITS, decodePdfBits } from './auth/scope';
 export { parseScope, validateScopeArray } from './auth/scope';
 export { InvalidScope, MissingIdentity, PermissionDenied } from './auth/scope';
+export type { AnnotationAuthority } from './auth/scope';
+export { authorizeAnnotationDelete, authorizeAnnotationUpdate } from './auth/scope';
 export type { CollabTarget } from './auth/scope';
 export { collabTargetOf } from './auth/scope';
 export {

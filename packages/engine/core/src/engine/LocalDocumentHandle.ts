@@ -40,8 +40,7 @@ export interface LocalDocumentHandle extends DocumentHandle {
   /**
    * Export just this document's layer as a self-contained artifact (the small
    * overlay diff over the unchanged base), which `open()` takes back with
-   * `{ kind: 'artifact', bytes }`. Rejects on a session opened with
-   * `sessionKind: 'plain'`.
+   * `{ kind: 'artifact', bytes }`.
    */
   downloadLayer(): AbortablePromise<Uint8Array>;
 }

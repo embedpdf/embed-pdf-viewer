@@ -23,8 +23,8 @@ import { captureOrStampStableId } from './internal/identity/captureOrStampStable
 import { resolveAnnotIndexRaw } from './internal/identity/resolveAnnotIndexRaw';
 import { prepareCreate } from './internal/mutations/prepareCreate';
 import { annotationIndexByName } from './internal/read/annotationIndexByName';
+import { pageHasWeakAnnotations } from './internal/read/pageHasWeakAnnotations';
 import { readContextFor } from './internal/read/annotationReadContext';
-import { readAnnotString } from './internal/read/annotationReadPrimitives';
 import { joinWidgetFieldNumbers } from './internal/read/joinWidgetField';
 import { readAnnotationFromPtr } from './internal/read/readAnnotationFromPtr';
 import type { AnnotationWriteContext } from './internal/write/annotationWriteContext';
@@ -37,7 +37,6 @@ import {
 } from './internal/write/restoreAttribution';
 import { stampCreation } from './internal/write/stampCreation';
 import { linkPopup, linkReply } from './internal/write/writeAnnotationRelationship';
-import { DocumentCheckpoint } from '../../document-session/DocumentCheckpoint';
 import type { DocumentSession } from '../../document-session/DocumentSession';
 import { throwIfAborted } from '../../shared/abort';
 import type { FontRegistrar } from '../fonts/FontRegistrar';
@@ -100,11 +99,10 @@ interface Existing {
 }
 
 /**
- * Applies a change set as one unit: every item
- * is checked before the first write, the writes run inside a
- * {@link DocumentCheckpoint}, and any failure, an abort included, returns
- * the document to where it was. It currently applies annotation creates
- * for imports.
+ * Applies a change set as one unit: every item is checked before the first
+ * write, and the writes run inside the job's layer transaction, so any
+ * failure, an abort included, leaves the document as it was. It currently
+ * applies annotation creates for imports.
  *
  * No page is loaded or parsed. Each annotation is made on a raw handle
  * (`EPDFPage_CreateAnnotRaw`) and opened again the same way, by its place in
@@ -113,8 +111,8 @@ interface Existing {
  * 1. create every annotation in order, so each page's `/Annots` keeps it,
  *    with its data and its appearance;
  * 2. link replies and popups to what they name: another create, or an
- *    annotation the document has, recorded before a write to it (a weak
- *    one is named first, so the link has a durable address);
+ *    annotation the document has (a weak one is named first, so the link
+ *    has a durable address);
  * 3. attribute each, stamped as the session or restored as it was, last,
  *    so no later write touches `/M`.
  */
@@ -161,118 +159,94 @@ export class AnnotationBatchApplier {
     throwIfAborted(signal);
     if (prepared.length === 0) return { created: [], meta: metaOf(this.session, [], []) };
 
-    const checkpoint = DocumentCheckpoint.begin(fn, docPtr);
-    try {
-      const placed = prepared.map(({ create, record, ctx, draft }): Placed => {
-        throwIfAborted(signal);
-        checkpoint.page(record.pageIndex);
-        const annotPtr = fn.EPDFPage_CreateAnnotRaw(
-          docPtr,
-          record.pageIndex,
-          PDF_SUBTYPE_TO_CODE[draft.subtype],
+    const placed = prepared.map(({ create, record, ctx, draft }): Placed => {
+      throwIfAborted(signal);
+      const annotPtr = fn.EPDFPage_CreateAnnotRaw(
+        docPtr,
+        record.pageIndex,
+        PDF_SUBTYPE_TO_CODE[draft.subtype],
+      );
+      if (!annotPtr) {
+        throw new EngineError(
+          EngineErrorCode.Unknown,
+          `${create.label ?? 'create'}: EPDFPage_CreateAnnotRaw returned NULL`,
         );
-        if (!annotPtr) {
+      }
+      let objectNumber: number;
+      try {
+        labelled(create.label, () => applyDraft(fn, mem, annotPtr, draft, ctx));
+        generateAppearance(fn, annotPtr, draft.blendMode);
+        objectNumber = fn.EPDFAnnot_GetObjectNumber(annotPtr);
+        if (objectNumber <= 0) {
           throw new EngineError(
             EngineErrorCode.Unknown,
-            `${create.label ?? 'create'}: EPDFPage_CreateAnnotRaw returned NULL`,
+            `${create.label ?? 'create'}: EPDFPage_CreateAnnotRaw made a direct object`,
           );
         }
-        let objectNumber: number;
-        try {
-          labelled(create.label, () => applyDraft(fn, mem, annotPtr, draft, ctx));
-          generateAppearance(fn, annotPtr, draft.blendMode);
-          objectNumber = fn.EPDFAnnot_GetObjectNumber(annotPtr);
-          if (objectNumber <= 0) {
-            throw new EngineError(
-              EngineErrorCode.Unknown,
-              `${create.label ?? 'create'}: EPDFPage_CreateAnnotRaw made a direct object`,
-            );
-          }
-        } finally {
-          fn.FPDFPage_CloseAnnot(annotPtr);
-        }
-        return {
-          pageIndex: record.pageIndex,
-          pageObjectNumber: record.pageObjectNumber,
-          index: fn.EPDFPage_GetAnnotCountRaw(docPtr, record.pageIndex) - 1,
-          objectNumber,
-        };
-      });
-
-      // Parents that are already in the document, strengthened by a link.
-      const linked: AnnotationStableId[] = [];
-      const openTarget = <T>(target: number | Existing, body: (parentPtr: Ptr) => T): T => {
-        if (typeof target === 'number') return this.withOpen(placed[target]!, body);
-        return this.withOpenExisting(target, (parentPtr) => {
-          linked.push(captureOrStampStableId(this.runtime, parentPtr));
-          return body(parentPtr);
-        });
+      } finally {
+        fn.FPDFPage_CloseAnnot(annotPtr);
+      }
+      return {
+        pageIndex: record.pageIndex,
+        pageObjectNumber: record.pageObjectNumber,
+        index: fn.EPDFPage_GetAnnotCountRaw(docPtr, record.pageIndex) - 1,
+        objectNumber,
       };
-      prepared.forEach(({ replyTo, parent }, at) => {
-        if (replyTo) {
-          this.withOpen(placed[at]!, (annotPtr) =>
-            openTarget(replyTo.to, (parentPtr) =>
-              linkReply(this.runtime, annotPtr, parentPtr, replyTo.type),
-            ),
-          );
-        }
-        if (parent !== undefined) {
-          this.withOpen(placed[at]!, (popupPtr) =>
-            openTarget(parent, (parentPtr) => {
-              // The parent gets a /Popup: one the document had is recorded first.
-              const number = fn.EPDFAnnot_GetObjectNumber(parentPtr);
-              if (number > 0) checkpoint.object(number);
-              linkPopup(this.runtime, popupPtr, parentPtr);
-            }),
-          );
-        }
-      });
+    });
 
-      const now = new Date();
-      prepared.forEach(({ create: { attribution, fileDates, label } }, at) => {
+    // Parents that are already in the document, strengthened by a link.
+    const linked: AnnotationStableId[] = [];
+    const openTarget = <T>(target: number | Existing, body: (parentPtr: Ptr) => T): T => {
+      if (typeof target === 'number') return this.withOpen(placed[target]!, body);
+      return this.withOpenExisting(target, (parentPtr) => {
+        linked.push(captureOrStampStableId(this.runtime, parentPtr));
+        return body(parentPtr);
+      });
+    };
+    prepared.forEach(({ replyTo, parent }, at) => {
+      if (replyTo) {
         this.withOpen(placed[at]!, (annotPtr) =>
-          labelled(label, () => {
-            if (attribution.kind === 'stamp') {
-              stampCreation(fn, mem, annotPtr, attribution.actor, now);
-            } else {
-              restoreAttribution(fn, mem, annotPtr, attribution.from, attribution.importedBy);
-            }
-            if (fileDates) restoreFileDates(fn, mem, annotPtr, fileDates);
-          }),
-        );
-      });
-
-      const readCtx = readContextFor(this.session, this.fonts);
-      const revisions = new Map<PageObjectNumber, RevisionToken>();
-      const created = placed.map((at) => {
-        let revision = revisions.get(at.pageObjectNumber);
-        if (revision === undefined) {
-          revision = this.session.pageState(at.pageObjectNumber).revision;
-          revisions.set(at.pageObjectNumber, revision);
-        }
-        return this.withOpen(at, (annotPtr) =>
-          readAnnotationFromPtr(
-            fn,
-            mem,
-            annotPtr,
-            at.pageObjectNumber,
-            at.index,
-            revision,
-            readCtx,
+          openTarget(replyTo.to, (parentPtr) =>
+            linkReply(this.runtime, annotPtr, parentPtr, replyTo.type),
           ),
         );
-      });
-      joinWidgetFieldNumbers(this.runtime, this.session, created);
-      this.knowWeakAnnotations(placed, linked.length > 0);
-      return { created, meta: metaOf(this.session, placed, linked) };
-    } catch (error) {
-      checkpoint.rollback();
-      // The rollback freed the numbers the new drawings had.
-      this.session.drawingIndex().forget();
-      throw error;
-    } finally {
-      checkpoint.end();
-    }
+      }
+      if (parent !== undefined) {
+        this.withOpen(placed[at]!, (popupPtr) =>
+          openTarget(parent, (parentPtr) => linkPopup(this.runtime, popupPtr, parentPtr)),
+        );
+      }
+    });
+
+    const now = new Date();
+    prepared.forEach(({ create: { attribution, fileDates, label } }, at) => {
+      this.withOpen(placed[at]!, (annotPtr) =>
+        labelled(label, () => {
+          if (attribution.kind === 'stamp') {
+            stampCreation(fn, mem, annotPtr, attribution.actor, now);
+          } else {
+            restoreAttribution(fn, mem, annotPtr, attribution.from, attribution.importedBy);
+          }
+          if (fileDates) restoreFileDates(fn, mem, annotPtr, fileDates);
+        }),
+      );
+    });
+
+    const readCtx = readContextFor(this.session, this.fonts);
+    const revisions = new Map<PageObjectNumber, RevisionToken>();
+    const created = placed.map((at) => {
+      let revision = revisions.get(at.pageObjectNumber);
+      if (revision === undefined) {
+        revision = this.session.pageState(at.pageObjectNumber).revision;
+        revisions.set(at.pageObjectNumber, revision);
+      }
+      return this.withOpen(at, (annotPtr) =>
+        readAnnotationFromPtr(fn, mem, annotPtr, at.pageObjectNumber, at.index, revision, readCtx),
+      );
+    });
+    joinWidgetFieldNumbers(this.runtime, this.session, created);
+    this.knowWeakAnnotations(placed, linked.length > 0);
+    return { created, meta: metaOf(this.session, placed, linked) };
   }
 
   /**
@@ -335,27 +309,16 @@ export class AnnotationBatchApplier {
    * New annotations are durable, so they never make a page weak.
    */
   private knowWeakAnnotations(placed: readonly Placed[], strengthened: boolean): void {
-    const { fn, mem } = this.runtime;
     const docPtr = this.session.requireDocPtr();
     const pages = new Map(placed.map((at) => [at.pageObjectNumber, at.pageIndex]));
     for (const [pageObjectNumber, pageIndex] of pages) {
       if (!strengthened && this.session.weakAnnotationState(pageObjectNumber).kind === 'known') {
         continue;
       }
-      let weak = false;
-      const count = fn.EPDFPage_GetAnnotCountRaw(docPtr, pageIndex);
-      for (let index = 0; index < count && !weak; index++) {
-        const annotPtr = fn.EPDFPage_GetAnnotRaw(docPtr, pageIndex, index);
-        if (!annotPtr) continue;
-        try {
-          weak =
-            fn.EPDFAnnot_GetObjectNumber(annotPtr) <= 0 &&
-            !readAnnotString(fn, mem, annotPtr, 'NM');
-        } finally {
-          fn.FPDFPage_CloseAnnot(annotPtr);
-        }
-      }
-      this.session.recordWeakFlag(pageObjectNumber, weak);
+      this.session.recordWeakFlag(
+        pageObjectNumber,
+        pageHasWeakAnnotations(this.runtime, docPtr, pageIndex),
+      );
     }
   }
 

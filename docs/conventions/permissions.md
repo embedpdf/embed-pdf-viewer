@@ -8,7 +8,8 @@ the engine will refuse.
 ## The four layers, one direction
 
 ```
-1. Engine / server        enforces   scope + collab grammar + PDF bits (ScopeGuard, routes)
+1. Engine / server        enforces   scope + collab grammar + PDF bits (ScopeGuard, routes,
+                                     and per-record checks inside the worker's write)
 2. Security service       mirrors    doc.security.allows(cap) + the per-record collab mirrors
 3. Plugin capability      translates verbs → capabilities; gates; exposes twins
 4. Chrome / host UI       renders    from the plugin's twins only

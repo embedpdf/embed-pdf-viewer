@@ -8,13 +8,11 @@ import {
   checkCapability,
   checkCollab,
   checkSetGroup,
-  collabTargetOf,
   decodePdfBits,
   describeProtection,
   expandRawScope,
   type AnnotationActor,
-  type AnnotationOwner,
-  type AnnotationRef,
+  type AnnotationAuthority,
   type CollabAction,
   type CollabTarget,
   type DocCapability,
@@ -160,29 +158,20 @@ export class ScopeGuard {
   }
 
   /**
-   * {@link assertCollab} over annotations one write changes together (a
-   * thread's delete): all or nothing, `PermissionDenied` naming every one
-   * refused.
+   * What an annotation write carries for the worker to check against the
+   * annotations it changes, inside the write: who the handle acts for and
+   * its grants. The document's signature protection is not in it; check
+   * {@link assertAnnotationsUnprotected} before the write.
    */
-  assertCollabEach(
-    action: CollabAction,
-    annotations: readonly (AnnotationOwner & { ref: AnnotationRef })[],
-  ): void {
-    this.assertAnnotationsUnprotected();
-    const refused = annotations.filter(
-      (annotation) => !this.canCollab(action, collabTargetOf(annotation)),
-    );
-    if (refused.length > 0) {
-      throw new PermissionDenied(
-        `annotations:${action}`,
-        'engine-local',
-        undefined,
-        refused.map((annotation) => annotation.ref),
-      );
-    }
+  annotationAuthority(): AnnotationAuthority {
+    return {
+      identity: this.ctx.identity,
+      grants: { scope: this.ctx.scope, pdfBits: this.ctx.pdfBits },
+    };
   }
 
-  private assertAnnotationsUnprotected(): void {
+  /** Throws `ProtectedDocument` when a signature forbids annotation writes. */
+  assertAnnotationsUnprotected(): void {
     if (protectedCapabilities(this.protection).has('doc.annotate.modify')) {
       throw new EngineError(
         EngineErrorCode.ProtectedDocument,
@@ -244,29 +233,5 @@ export class ScopeGuard {
       ...(id.userId !== undefined ? { userId: id.userId } : {}),
       ...(groupId !== undefined ? { groupId } : {}),
     };
-  }
-
-  /**
-   * Build the actor for an annotation update.
-   *   - userId      → caller's identity (UpdatedBy stamp)
-   *   - groupId     → only when the patch reassigns it (differs from current)
-   *   - displayName → caller's displayName (for the modification trail;
-   *                   the worker does not touch /T on update)
-   *
-   * No set-group check here — call `assertSetGroup` separately first,
-   * before producing the actor.
-   */
-  actorForUpdate(
-    currentGroupId: string | undefined,
-    patchGroupId: string | undefined,
-  ): AnnotationActor | undefined {
-    const id = this.ctx.identity;
-    const isReassigning = patchGroupId !== undefined && patchGroupId !== currentGroupId;
-    const actor: AnnotationActor = {
-      ...(id.userId !== undefined ? { userId: id.userId } : {}),
-      ...(id.displayName !== undefined ? { displayName: id.displayName } : {}),
-      ...(isReassigning ? { groupId: patchGroupId } : {}),
-    };
-    return actor.userId || actor.groupId || actor.displayName ? actor : undefined;
   }
 }

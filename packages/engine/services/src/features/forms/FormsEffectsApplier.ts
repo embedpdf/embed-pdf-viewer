@@ -121,7 +121,7 @@ export class FormsEffectsApplier {
           // Native false is outcome-indeterminate at this layer. Finalize the
           // session and stop; compounding writes would make recovery harder.
           mustFinalize = true;
-          this.session.noteMutation();
+          this.session.invalidateDerived();
           const fields = this.readFieldsBestEffort(item.fieldObjectNumbers, resultActionBudget);
           const changedWidgets = widgetRefs(native.changedWidgetObjectNumbers, before, fields);
           rememberWidgets(allChangedWidgets, changedWidgets);
@@ -146,7 +146,7 @@ export class FormsEffectsApplier {
         }
 
         mustFinalize = true;
-        this.session.noteMutation();
+        this.session.invalidateDerived();
         const fields = this.readFieldsBestEffort(item.fieldObjectNumbers, resultActionBudget);
         const changedWidgets = widgetRefs(native.changedWidgetObjectNumbers, before, fields);
         rememberWidgets(allChangedWidgets, changedWidgets);
@@ -154,7 +154,7 @@ export class FormsEffectsApplier {
         results.push({ index, status: 'applied', fields, changedWidgets });
       } catch (error) {
         mustFinalize = true;
-        this.session.noteMutation();
+        this.session.invalidateDerived();
         results.push({
           index,
           status: 'failed',

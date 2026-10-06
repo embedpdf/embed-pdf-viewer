@@ -51,7 +51,7 @@ export function restoreFileDates(
   annotPtr: Ptr,
   file: Pick<AttachmentFileInfo, 'createdAt' | 'modifiedAt'>,
 ): void {
-  const attachmentPtr = fn.FPDFAnnot_GetFileAttachment(annotPtr);
+  const attachmentPtr = fn.EPDFAnnot_GetFileAttachmentForWrite(annotPtr);
   if (!attachmentPtr) return;
   for (const [key, value] of [
     ['CreationDate', file.createdAt],

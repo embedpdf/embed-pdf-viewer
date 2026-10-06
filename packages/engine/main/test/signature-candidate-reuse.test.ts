@@ -1,8 +1,7 @@
 /**
- * C1: a layer session signs on a candidate opened over its own base (no
+ * A layer session signs on a candidate opened over its own base (no
  * whole-file copy). With unsaved edits the candidate is fed the artifact a
- * save would write, so edits and signature share one revision; a plain
- * session keeps the freeze-the-loaded-bytes path and produces two.
+ * save would write, so edits and signature share one revision.
  */
 import { readFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
@@ -17,16 +16,13 @@ type Engine = Awaited<ReturnType<typeof createLocalEngine>>;
 
 let unsigned: Uint8Array;
 let layerEngine: Engine;
-let plainEngine: Engine;
 
 beforeAll(async () => {
   unsigned = new Uint8Array(await readFile(resolve(here, 'fixtures', 'unsigned_sigfield.pdf')));
   layerEngine = await createLocalEngine({ runtime: { prefer: 'wasm' } });
-  plainEngine = await createLocalEngine({ runtime: { prefer: 'wasm' }, sessionKind: 'plain' });
 });
 afterAll(async () => {
   await layerEngine.destroy();
-  await plainEngine.destroy();
 });
 
 async function fillThenSign(engine: Engine, id: string) {
@@ -62,12 +58,6 @@ describe("signing candidate over the session's own base", () => {
     expect(
       last.findings.some((f) => f.rule === 'signature-added' && f.verdict === 'permitted'),
     ).toBe(true);
-  });
-
-  test('a plain session keeps the freeze path: edits revision, then signature revision', async () => {
-    const { before, after, analysis } = await fillThenSign(plainEngine, 'reuse-plain');
-    expect(after).toBe(before + 2);
-    expect(analysis.verdict).toBe('permitted');
   });
 
   test('a second signature on a layer session reuses the sealed base and appends one revision', async () => {

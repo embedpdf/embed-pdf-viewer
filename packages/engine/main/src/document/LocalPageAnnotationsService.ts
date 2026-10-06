@@ -3,9 +3,7 @@ import {
   CONTINUOUS_RENDER_POLICY,
   EngineError,
   EngineErrorCode,
-  collabTargetOf,
   deletedAnnotationsOf,
-  deletedWith,
   createPageImageHandle,
   hasAnnotationResources,
   resolveAnnotationResources,
@@ -18,7 +16,6 @@ import {
   type AnnotationAppearanceRenderOptions,
   type AnnotationAppearancesResult,
   type AnnotationDraft,
-  type Annotation,
   type AnnotationList,
   type AnnotationPatch,
   type AnnotationRef,
@@ -31,7 +28,6 @@ import {
   type AnnotationMoveResult,
   type FlattenOptions,
   type AnnotationUpdateResult,
-  type CollabTarget,
   type LocalPageAnnotationsService as LocalPageAnnotationsServiceContract,
   type PageRef,
   checkImageQuality,
@@ -307,29 +303,16 @@ export class LocalPageAnnotationsService implements LocalPageAnnotationsServiceC
         new EngineError(EngineErrorCode.DocNotOpen, `document not open: ${this.docId}`),
       );
     }
+    // The worker checks the caller's authority against the annotation inside
+    // the write (its owner, a group reassignment) and stamps the actor it
+    // gives. A signature's protection is the document's, checked here.
+    try {
+      this.guard.assertAnnotationsUnprotected();
+    } catch (err) {
+      return AbortablePromise.rejectReason(err);
+    }
+    const authority = this.guard.annotationAuthority();
     return AbortablePromise.run<AnnotationUpdateResult>(async (signal) => {
-      // Look up the target row's collab identity before the mutation so
-      // the collab check can fire against the existing /EMBD_Metadata.
-      // V1 approach: page-fetch + filter — same as the cloud's
-      // `LayerService.getAnnotationCollabTarget`. Optimizable to a
-      // targeted worker job later.
-      const target = await this.collabTargetForRef(ref, signal);
-      this.guard.assertCollab('update', target);
-
-      // Group reassignment runs `:set-group` against the caller's
-      // default group before building the actor (cloud PATCH parity).
-      const patchGroupId = (patch as { groupId?: string | null }).groupId;
-      // `null` sent back for an annotation without a group changes nothing;
-      // an existing group can only be reassigned, never removed.
-      if (patchGroupId === null && target.groupId !== undefined) {
-        throw new EngineError(EngineErrorCode.InvalidArg, "an annotation's group can't be removed");
-      }
-      const isReassigning = typeof patchGroupId === 'string' && patchGroupId !== target.groupId;
-      if (isReassigning) {
-        this.guard.assertSetGroup(patchGroupId);
-      }
-      const actor = this.guard.actorForUpdate(target.groupId, patchGroupId ?? undefined);
-
       const docId = this.docId;
       // Owned copies, as in create().
       const wireResources = await resolveAnnotationResources(resources);
@@ -343,8 +326,8 @@ export class LocalPageAnnotationsService implements LocalPageAnnotationsServiceC
               docId,
               ref,
               patch,
+              authority,
               ...(hasAnnotationResources(wireResources) ? { resources: wireResources } : {}),
-              ...(actor ? { actor } : {}),
             },
             transferOf(wireResources),
           ),
@@ -371,14 +354,16 @@ export class LocalPageAnnotationsService implements LocalPageAnnotationsServiceC
         new EngineError(EngineErrorCode.DocNotOpen, `document not open: ${this.docId}`),
       );
     }
+    // The annotation goes with its thread and popups: the worker checks the
+    // caller's authority against each of them inside the write. A
+    // signature's protection is the document's, checked here.
+    try {
+      this.guard.assertAnnotationsUnprotected();
+    } catch (err) {
+      return AbortablePromise.rejectReason(err);
+    }
+    const authority = this.guard.annotationAuthority();
     return AbortablePromise.run<AnnotationDeleteResult>(async (signal) => {
-      // The annotation goes with its thread and popups: each is checked,
-      // and the worker deletes only what was.
-      const members = deletedWith(await this.pageAnnotations(ref.page, signal), ref);
-      if (members.length === 0) this.guard.assertCollab('delete', {});
-      else this.guard.assertCollabEach('delete', members);
-      const checked = members.map((member) => member.ref);
-
       const docId = this.docId;
       const submission = this.queue.enqueue<WorkerResultPayload>({
         buildPack: (jobId: JobId) =>
@@ -388,7 +373,7 @@ export class LocalPageAnnotationsService implements LocalPageAnnotationsServiceC
             jobId,
             docId,
             ref,
-            checked,
+            authority,
           }),
       });
       const onAbort = () => submission.abort(signal.reason);
@@ -536,55 +521,6 @@ export class LocalPageAnnotationsService implements LocalPageAnnotationsServiceC
       }
       return new Uint8Array(payload.bytes);
     });
-  }
-
-  /**
-   * Resolve the collab subject (userId / groupId) of the target row
-   * an update or DELETE is about to act on. Mirrors the cloud's
-   * `LayerService.getAnnotationCollabTarget` — page-fetch + filter
-   * over the existing list worker job. Returns `{}` when the
-   * row can't be located; the collab resolver then denies
-   * `:self`/`:group=X` filters and the mutator's own InvalidReference
-   * surfaces the real error.
-   */
-  private async collabTargetForRef(ref: AnnotationRef, signal: AbortSignal): Promise<CollabTarget> {
-    const match = (await this.pageAnnotations(ref.page, signal)).find((a) => {
-      switch (ref.kind) {
-        case 'objectNumber':
-          return a.ref.kind === 'objectNumber' && a.ref.objectNumber === ref.objectNumber;
-        case 'nm':
-          return a.nm === ref.nm;
-        case 'index':
-          return a.index === ref.index;
-      }
-    });
-    return match ? collabTargetOf(match) : {};
-  }
-
-  /** The page's annotations as the worker reads them, for a check before a write. */
-  private async pageAnnotations(page: PageRef, signal: AbortSignal): Promise<Annotation[]> {
-    const submission = this.queue.enqueue<WorkerResultPayload>({
-      buildPack: (jobId: JobId) =>
-        wirePack({
-          kind: 'annotations.list',
-          effect: 'read',
-          jobId,
-          docId: this.docId,
-          pages: [page],
-        }),
-    });
-    const onAbort = () => submission.abort(signal.reason);
-    if (signal.aborted) onAbort();
-    else signal.addEventListener('abort', onAbort, { once: true });
-
-    const payload = await submission;
-    if (payload.tag !== 'annotations.list') {
-      throw new EngineError(
-        EngineErrorCode.WireFormat,
-        `unexpected payload tag while resolving collab target: ${payload.tag}`,
-      );
-    }
-    return payload.list.annotations;
   }
 }
 

@@ -1,7 +1,7 @@
 import type { AnnotationList } from '../annotation/AnnotationList';
 import type { AnnotationDraft, AnnotationPatch } from '../annotation/kinds';
 import type { WireAnnotationResources } from '../annotation/resources';
-import type { AnnotationActor } from '../auth/scope';
+import type { AnnotationActor, AnnotationAuthority } from '../auth/scope';
 import type {
   AnnotationAppearanceMode,
   AnnotationAppearanceRenderOptions,
@@ -21,7 +21,6 @@ import type { PageTextSnapshot } from '../dto/PageTextSnapshot';
 import type { DocumentActionsSnapshot } from '../dto/PdfAction';
 import type { PdfSaveMode } from '../dto/PdfSaveMode';
 import type { PieceInfoPatch, PieceInfoSnapshot } from '../dto/PieceInfo';
-import type { SessionKind } from '../dto/SessionKind';
 import type { PieceInfoDeleteResult, PieceInfoUpdateResult } from '../engine/PieceInfoService';
 import type { SerializedEngineError } from '../errors/EngineError';
 import type { FormFieldDraft, WidgetPlacement } from '../forms/draft';
@@ -138,8 +137,6 @@ export interface OpenFatMemoryWorkerRequest {
   password: string | null;
   /** Default `protect`. */
   signedDocumentPolicy?: SignedDocumentPolicy;
-  /** Default `layer`: the bytes become an immutable base with a fresh layer on top. */
-  sessionKind?: SessionKind;
 }
 
 export type LayerOpenSource =
@@ -422,11 +419,12 @@ export interface AnnotationsUpdateWorkerRequest<C extends Coordinates = PageCoor
   resources?: WireAnnotationResources;
   artifactPath?: string;
   /**
-   * Identity of the editor. Drives /EMBD_Metadata/UpdatedBy refresh on
-   * update; preserves UserID/GroupID/CreatedBy. When absent, only /M
-   * is refreshed.
+   * Who the update acts for and what they may do, checked against the
+   * annotation inside the write. Its identity refreshes
+   * /EMBD_Metadata/UpdatedBy; UserID, GroupID and CreatedBy stay unless the
+   * patch reassigns the group.
    */
-  actor?: AnnotationActor;
+  authority: AnnotationAuthority;
 }
 
 export interface AnnotationsDeleteWorkerRequest {
@@ -437,11 +435,10 @@ export interface AnnotationsDeleteWorkerRequest {
   layerName?: string;
   ref: AnnotationRef;
   /**
-   * What the caller's permission check covered: the annotation and
-   * everything deleted with it (`deletedWith`). A member it doesn't name
-   * (added since) is refused, so nothing is deleted unchecked.
+   * Who the delete acts for and what they may do, checked inside the write
+   * against the annotation and everything deleted with it (`deletedWith`).
    */
-  checked: AnnotationRef[];
+  authority: AnnotationAuthority;
   artifactPath?: string;
 }
 

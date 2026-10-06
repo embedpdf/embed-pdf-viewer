@@ -17,7 +17,7 @@ interface SignatureModelEntry {
 const cache = new WeakMap<DocumentSession, SignatureModelEntry>();
 
 export function acquireSignatureModel(runtime: PdfRuntimeModule, session: DocumentSession): Ptr {
-  const seq = session.mutationSeq();
+  const seq = session.cacheSeq();
   const hit = cache.get(session);
   if (hit && hit.seq === seq) {
     return hit.ptr;

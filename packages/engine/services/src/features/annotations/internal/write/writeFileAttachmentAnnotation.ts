@@ -116,7 +116,9 @@ function writeFileChange(
 ): void {
   const bytes = ctx?.resources?.file;
   if (metadata === undefined && bytes === undefined) return;
-  let attachmentPtr = fn.FPDFAnnot_GetFileAttachment(annotPtr);
+  // The handle for writing: inside a layer transaction it copies the file
+  // specification up before any change.
+  let attachmentPtr = fn.EPDFAnnot_GetFileAttachmentForWrite(annotPtr);
   if (metadata === null) {
     if (attachmentPtr) {
       throw new EngineError(

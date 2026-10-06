@@ -29,7 +29,7 @@ interface PageCorpusEntry extends PageCorpus {
  * artifacts — same fold version, same shape, built lazily on first search
  * and reused across slices and re-queries.
  *
- * Version-keyed on `DocumentSession.mutationSeq()` per page (not per
+ * Version-keyed on `DocumentSession.cacheSeq()` per page (not per
  * session): a form fill or annotation edit bumps the sequence, and only
  * the pages actually re-read after that pay the re-extraction — untouched
  * cache entries for other pages are refreshed lazily as they're revisited.
@@ -49,7 +49,7 @@ export async function acquirePageCorpus(
   signal: AbortSignal,
   slices: Slices,
 ): Promise<PageCorpus> {
-  const seq = session.mutationSeq();
+  const seq = session.cacheSeq();
   let pages = cache.get(session);
   if (!pages) {
     pages = new Map();

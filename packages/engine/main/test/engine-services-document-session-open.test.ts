@@ -304,9 +304,6 @@ describe('DocumentSession open ownership', () => {
       docId: 'doc-a',
       bytes: new ArrayBuffer(1),
       password: null,
-      // This test counts the fake runtime's handles: keep the base-view
-      // session a plain document so the accounting below stays exact.
-      sessionKind: 'plain',
     });
     host.receive({
       kind: 'open.layerMemBase',
@@ -316,13 +313,27 @@ describe('DocumentSession open ownership', () => {
       layerName: 'alice',
       baseKey: 'base-a',
       baseBytes: new ArrayBuffer(1),
-      layer: { kind: 'fresh' },
+      // A saved layer, so this session's document differs from the
+      // base-view session's fresh one in the fake runtime's accounting.
+      layer: { kind: 'artifact', bytes: new ArrayBuffer(1) },
       password: null,
     });
     host.receive({ kind: 'pages.list', effect: 'read', jobId: 3, docId: 'doc-a' });
-    host.receive({ kind: 'pages.list', effect: 'read', jobId: 4, docId: 'doc-a', layerName: 'alice' });
+    host.receive({
+      kind: 'pages.list',
+      effect: 'read',
+      jobId: 4,
+      docId: 'doc-a',
+      layerName: 'alice',
+    });
     host.receive({ kind: 'close', effect: 'close', jobId: 5, docId: 'doc-a' });
-    host.receive({ kind: 'pages.list', effect: 'read', jobId: 6, docId: 'doc-a', layerName: 'alice' });
+    host.receive({
+      kind: 'pages.list',
+      effect: 'read',
+      jobId: 6,
+      docId: 'doc-a',
+      layerName: 'alice',
+    });
 
     expect(responses.map((r) => r.kind)).toEqual([
       'resolve',
@@ -340,15 +351,17 @@ describe('DocumentSession open ownership', () => {
     if (baseList.kind !== 'resolve' || layerList.kind !== 'resolve') return;
     expect(baseList.result).toMatchObject({
       tag: 'pages.list',
-      snapshot: { pages: [{ ref: toPageRef(1101) }] },
+      snapshot: { pages: [{ ref: toPageRef(3101) }, { ref: toPageRef(3102) }] },
     });
     expect(layerList.result).toMatchObject({
       tag: 'pages.list',
-      snapshot: { pages: [{ ref: toPageRef(3101) }, { ref: toPageRef(3102) }] },
+      snapshot: { pages: [{ ref: toPageRef(3201) }, { ref: toPageRef(3202) }] },
     });
     expect(runtime.calls.loadPages).toEqual([]);
-    expect(runtime.calls.closeDocuments).toEqual([ptr(101), ptr(301)]);
-    expect(runtime.calls.releaseBases).toEqual([ptr(201)]);
+    // Closing the document closes both sessions' layers and releases both
+    // bases (the fake hands every memory base the same pointer).
+    expect(runtime.calls.closeDocuments).toEqual([ptr(301), ptr(302)]);
+    expect(runtime.calls.releaseBases).toEqual([ptr(201), ptr(201)]);
   });
 
   test('worker can open the base-view session from a file-backed base', () => {

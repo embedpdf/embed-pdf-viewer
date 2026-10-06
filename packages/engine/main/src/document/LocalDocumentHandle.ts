@@ -273,9 +273,7 @@ export class LocalDocumentHandle implements LocalDocumentHandleContract {
     });
   }
 
-  /** Export just this document's layer as a re-openable artifact. Works for every
-   *  session opened as a layer (the default); rejects on a `sessionKind: 'plain'`
-   *  session, which has no layer to export. */
+  /** Export just this document's layer as a re-openable artifact. */
   downloadLayer(): AbortablePromise<Uint8Array> {
     if (this.closed) {
       return AbortablePromise.rejectReason(

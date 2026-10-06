@@ -17,6 +17,7 @@ import type { PdfRuntimeModule, Ptr } from '@embedpdf/engine-runtime';
 import { AnnotationReader } from './AnnotationReader';
 import { resolveAnnotPtr } from './internal/identity/resolveAnnotationPointer';
 import { exportUnturnedAppearance } from './internal/read/exportUnturnedAppearance';
+import { promoteInlineAnnotations } from './internal/write/promoteInlineAnnotations';
 import { saveDocumentToBuffer } from './internal/saveDocumentToBuffer';
 import type { DocumentSession } from '../../document-session/DocumentSession';
 import { withScratch } from '../../runtime/memory/scratch';
@@ -52,6 +53,8 @@ export class AnnotationFlattener {
     throwIfAborted(signal);
     this.requireRefs('annotations.flatten', pageObjectNumber, refs);
     const { fn, mem } = this.runtime;
+    // A flatten removes entries from /Annots; promotion keeps every position.
+    promoteInlineAnnotations(this.runtime, this.session, pageObjectNumber);
     const pool = this.session.pagePool();
     const pagePtr = pool.acquire(pageObjectNumber);
     try {
@@ -102,7 +105,7 @@ export class AnnotationFlattener {
 
       // Content + annotation liveness changed on this page — the same
       // bookkeeping PagesFlattener performs per affected page.
-      this.session.noteMutation();
+      this.session.invalidateDerived();
       this.session.bumpRevision(pageObjectNumber);
       try {
         new AnnotationReader(this.runtime, this.session).list(pageObjectNumber, signal);

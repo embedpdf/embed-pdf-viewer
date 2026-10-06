@@ -4,13 +4,11 @@ import {
   checkAnyCapability,
   checkCapability,
   checkCollab,
-  collabTargetOf,
   describeProtection,
   EngineError,
   EngineErrorCode,
   protectedCapabilities,
-  type AnnotationOwner,
-  type AnnotationRef,
+  type AnnotationAuthority,
   type CollabAction,
   type CollabTarget,
   type DocCapability,
@@ -698,36 +696,29 @@ export function requireLayerCollabAction(
 }
 
 /**
- * {@link requireLayerCollabAction} over annotations one write changes
- * together (a thread's delete): all or nothing, `PermissionDenied` naming
- * every one refused.
+ * An annotation write whose permission the worker checks against what the
+ * write finds, inside the write (an update, a delete): the token reaches
+ * this document's layer, no signature forbids annotation writes, and the
+ * authority the write carries names who it acts for and the token's grants
+ * (none to check for a tenant, which owns its documents).
  */
-export function requireLayerCollabActionEach(
+export function requireLayerAnnotationWrite(
   req: FastifyRequest,
   docId: string,
   layerName: string,
-  action: CollabAction,
-  annotations: readonly (AnnotationOwner & { ref: AnnotationRef })[],
   pdfBits: PdfBits,
   protection: DocumentProtection | null,
-): LayerGuardContext {
+): LayerGuardContext & { authority: AnnotationAuthority } {
   const ctx = requireLayerDocAccessOnly(req, docId, layerName);
   refuseProtected('doc.annotate.modify', protection);
-  if (ctx.mode !== 'tenant') {
-    const refused = annotations.filter(
-      (annotation) =>
-        !checkCollab(action, collabTargetOf(annotation), ctx.jwt.scope, ctx.jwt.identity, pdfBits),
-    );
-    if (refused.length > 0) {
-      throw new PermissionDenied(
-        `annotations:${action}`,
-        'target',
-        undefined,
-        refused.map((annotation) => annotation.ref),
-      );
-    }
-  }
-  return { ...ctx, originSessionId: originSessionIdFromRequest(req) };
+  return {
+    ...ctx,
+    originSessionId: originSessionIdFromRequest(req),
+    authority: {
+      identity: ctx.jwt.identity,
+      grants: ctx.mode === 'tenant' ? null : { scope: ctx.jwt.scope, pdfBits },
+    },
+  };
 }
 
 /**

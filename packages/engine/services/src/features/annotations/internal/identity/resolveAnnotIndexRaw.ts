@@ -1,5 +1,5 @@
 import { EngineError, EngineErrorCode, type AnnotationRef } from '@embedpdf/engine-core/runtime';
-import type { PdfRuntimeModule } from '@embedpdf/engine-runtime';
+import type { PdfRuntimeModule, Ptr } from '@embedpdf/engine-runtime';
 
 import type { DocumentSession } from '../../../../document-session/DocumentSession';
 import { annotationIndexByName } from '../read/annotationIndexByName';
@@ -51,4 +51,34 @@ export function resolveAnnotIndexRaw(
       return { pageIndex, index: ref.index };
     }
   }
+}
+
+/**
+ * The annotation `ref` names, opened from its page's `/Annots` without
+ * loading the page ({@link resolveAnnotIndexRaw}). The caller closes it.
+ */
+export function openAnnotRaw(
+  runtime: PdfRuntimeModule,
+  session: DocumentSession,
+  ref: AnnotationRef,
+): Ptr {
+  const { pageIndex, index } = resolveAnnotIndexRaw(runtime, session, ref);
+  return openAnnotAtRaw(runtime, session, pageIndex, index);
+}
+
+/** The annotation at `index` of a page's `/Annots`, opened without loading the page. */
+export function openAnnotAtRaw(
+  runtime: PdfRuntimeModule,
+  session: DocumentSession,
+  pageIndex: number,
+  index: number,
+): Ptr {
+  const annotPtr = runtime.fn.EPDFPage_GetAnnotRaw(session.requireDocPtr(), pageIndex, index);
+  if (!annotPtr) {
+    throw new EngineError(
+      EngineErrorCode.Unknown,
+      `annotation ${index} of page index ${pageIndex} could not be opened`,
+    );
+  }
+  return annotPtr;
 }

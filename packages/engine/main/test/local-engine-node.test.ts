@@ -129,7 +129,6 @@ describe('localEngine() in Node', () => {
     const engine = localEngine({
       runtime: { prefer: 'wasm' },
       signedDocumentPolicy: 'permit',
-      sessionKind: 'plain',
     });
     try {
       const doc = await engine.open({

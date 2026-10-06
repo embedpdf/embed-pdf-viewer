@@ -13,6 +13,7 @@ import {
   type AnnotationAppearanceManifest,
   type AnnotationAppearanceManifestEntry,
   type AnnotationDeleteResult,
+  type AnnotationUpdateResult,
   type AnnotationDraft,
   type AnnotationPatch,
   type AnnotationResourceRole,
@@ -27,14 +28,12 @@ import {
   type AnnotationAppearanceExportInput,
   type AnnotationFlattenInput,
   toPageRef,
-  type AnnotationSubtype,
   PermissionDenied,
 } from '@embedpdf/engine-core/runtime';
 import {
   AnnotationAppearancesQuerySchema,
   AnnotationDraftSchema,
   AnnotationPatchSchema,
-  annotationPatchSchemaOf,
   AnnotationAppearanceExportInputSchema,
   AnnotationFlattenInputSchema,
   AnnotationRefSchema,
@@ -70,8 +69,8 @@ import { requireSharedDocRead } from './_planeGuard';
 import { assertRefMatchesPage, refFromKey } from './annotation-route-helpers';
 import {
   requireLayerCapability,
+  requireLayerAnnotationWrite,
   requireLayerCollabAction,
-  requireLayerCollabActionEach,
   requireLayerDocAccessOnly,
   requireLayerResource,
   type RequestJwtContext,
@@ -896,80 +895,31 @@ export async function registerAnnotationRoutes(
             `annotKey 'index' requires ref.kind === 'index', got '${ref.kind}'`,
           );
         }
-        const action = body?.op === 'delete' ? 'delete' : 'update';
-        if (action === 'delete') {
-          setNoStore(reply);
-          return deleteWithThread(
-            req,
-            accessCtx,
-            pdfBits,
-            protection,
-            { docId, layerName, ref },
-            signal,
-          );
+        setNoStore(reply);
+        if (body?.op === 'delete') {
+          return deleteAnnotation(req, pdfBits, protection, { docId, layerName, ref }, signal);
         }
-        // Use the outer accessCtx (already JWT-verified, no capability
-        // check) for the layer open the target lookup needs to perform.
-        const target = await layerService.getAnnotationCollabTarget(
-          accessCtx,
-          docId,
-          layerName,
-          pageObjectNumber,
-          ref,
-          signal,
-        );
-        const ctx = requireLayerCollabAction(
+        return updateAnnotation(
           req,
-          docId,
-          layerName,
-          action,
-          target,
           pdfBits,
           protection,
-        );
-
-        const patch = parseOrInvalidArg<AnnotationPatch>(
-          patchSchemaFor(target.subtype),
-          body?.patch,
-          'body.patch',
-        );
-        const actor = buildUpdateActor(ctx.jwt, target, patch, pdfBits);
-        setNoStore(reply);
-        return layerService.updateAnnotation(
-          ctx,
-          { docId, layerName, ref, patch, actor, ...(resources ? { resources } : {}) },
+          { docId, layerName, ref, patch: body?.patch, resources },
           signal,
         );
       }
 
-      const ref = refFromKey(annotKey, pageObjectNumber);
-      const target = await layerService.getAnnotationCollabTarget(
-        accessCtx,
-        docId,
-        layerName,
-        pageObjectNumber,
-        ref,
-        signal,
-      );
-      const ctx = requireLayerCollabAction(
+      setNoStore(reply);
+      return updateAnnotation(
         req,
-        docId,
-        layerName,
-        'update',
-        target,
         pdfBits,
         protection,
-      );
-      const patch = parseOrInvalidArg<AnnotationPatch>(
-        patchSchemaFor(target.subtype),
-        body?.patch,
-        'body.patch',
-      );
-      const actor = buildUpdateActor(ctx.jwt, target, patch, pdfBits);
-      setNoStore(reply);
-      return layerService.updateAnnotation(
-        ctx,
-        { docId, layerName, ref, patch, actor, ...(resources ? { resources } : {}) },
+        {
+          docId,
+          layerName,
+          ref: refFromKey(annotKey, pageObjectNumber),
+          patch: body?.patch,
+          resources,
+        },
         signal,
       );
     },
@@ -996,54 +946,70 @@ export async function registerAnnotationRoutes(
         );
       }
 
-      const signal = abortSignalOf(reply);
-      const ref = refFromKey(annotKey, pageObjectNumber);
       setNoStore(reply);
-      return deleteWithThread(
+      return deleteAnnotation(
         req,
-        accessCtx,
         pdfBits,
         protection,
-        { docId, layerName, ref },
-        signal,
+        { docId, layerName, ref: refFromKey(annotKey, pageObjectNumber) },
+        abortSignalOf(reply),
       );
     },
   );
 
   /**
-   * Delete an annotation with its thread and popups: each is checked, all
-   * or nothing, and the worker deletes only what was.
+   * Update an annotation. The patch has to fit some kind here; the worker
+   * checks it against its target's kind, and the caller's authority against
+   * the target's owner, inside the write.
    */
-  async function deleteWithThread(
+  async function updateAnnotation(
     req: FastifyRequest,
-    accessCtx: ReturnType<typeof requireLayerDocAccessOnly>,
+    pdfBits: PdfBits,
+    protection: DocumentProtection | null,
+    input: {
+      docId: string;
+      layerName: string;
+      ref: AnnotationRef;
+      patch: unknown;
+      resources: WireAnnotationResources | undefined;
+    },
+    signal: AbortSignal,
+  ): Promise<AnnotationUpdateResult> {
+    const { docId, layerName, ref, resources } = input;
+    const ctx = requireLayerAnnotationWrite(req, docId, layerName, pdfBits, protection);
+    const patch = parseOrInvalidArg<AnnotationPatch>(
+      AnnotationPatchSchema as unknown as SchemaLike<AnnotationPatch>,
+      input.patch,
+      'body.patch',
+    );
+    return layerService.updateAnnotation(
+      ctx,
+      {
+        docId,
+        layerName,
+        ref,
+        patch,
+        authority: ctx.authority,
+        ...(resources ? { resources } : {}),
+      },
+      signal,
+    );
+  }
+
+  /**
+   * Delete an annotation with its thread and popups. The worker checks the
+   * caller's authority against each of them inside the write: all or
+   * nothing.
+   */
+  async function deleteAnnotation(
+    req: FastifyRequest,
     pdfBits: PdfBits,
     protection: DocumentProtection | null,
     input: { docId: string; layerName: string; ref: AnnotationRef },
     signal: AbortSignal,
   ): Promise<AnnotationDeleteResult> {
-    const members = await layerService.getAnnotationDeleteMembers(
-      accessCtx,
-      input.docId,
-      input.layerName,
-      input.ref.page.objectNumber,
-      input.ref,
-      signal,
-    );
-    const ctx = requireLayerCollabActionEach(
-      req,
-      input.docId,
-      input.layerName,
-      'delete',
-      members,
-      pdfBits,
-      protection,
-    );
-    return layerService.deleteAnnotation(
-      ctx,
-      { ...input, checked: members.map((member) => member.ref) },
-      signal,
-    );
+    const ctx = requireLayerAnnotationWrite(req, input.docId, input.layerName, pdfBits, protection);
+    return layerService.deleteAnnotation(ctx, { ...input, authority: ctx.authority }, signal);
   }
 }
 
@@ -1180,52 +1146,6 @@ function actorFromJwt(
     ...(userId !== undefined ? { userId } : {}),
     ...(groupId !== undefined ? { groupId } : {}),
     ...(displayName !== undefined ? { displayName } : {}),
-  };
-  return actor.userId || actor.groupId || actor.displayName ? actor : undefined;
-}
-
-/**
- * Build the worker-side actor for UPDATE.
- *
- *   - `userId`      = the caller's `identity.userId` → stamped as
- *                     /EMBD_Metadata/UpdatedBy (modification trail).
- *   - `displayName` = the caller's `identity.displayName` → carried for the
- *                     modification trail. The worker does not touch /T
- *                     on update; /T is bound at creation.
- *   - `groupId`     = `patch.groupId` only when it reassigns the row
- *                     (differs from current groupId) → stamped as the
- *                     new /EMBD_Metadata/GroupID. Absent means "don't
- *                     touch."
- *
- * Throws 403 if the patch is reassigning groupId and the caller lacks
- * `annotations:set-group` authority for the new group. UserID and
- * CreatedBy are bound at creation and cannot be patched.
- */
-function buildUpdateActor(
-  jwt: RequestJwtContext,
-  currentTarget: CollabTarget,
-  patch: AnnotationPatch,
-  pdfBits: PdfBits,
-): AnnotationActor | undefined {
-  const patchedGroupId = (patch as { groupId?: string | null }).groupId;
-  // `null` sent back for an annotation without a group changes nothing;
-  // an existing group can only be reassigned, never removed.
-  if (patchedGroupId === null && currentTarget.groupId !== undefined) {
-    throw new EngineError(EngineErrorCode.InvalidArg, "an annotation's group can't be removed");
-  }
-  const isReassigningGroup =
-    typeof patchedGroupId === 'string' && patchedGroupId !== currentTarget.groupId;
-
-  if (isReassigningGroup) {
-    if (!checkSetGroup(patchedGroupId, jwt.identity.groupId, jwt.scope, pdfBits)) {
-      throw new PermissionDenied('annotations:set-group', `group=${patchedGroupId}`);
-    }
-  }
-
-  const actor: AnnotationActor = {
-    ...(jwt.identity.userId !== undefined ? { userId: jwt.identity.userId } : {}),
-    ...(jwt.identity.displayName !== undefined ? { displayName: jwt.identity.displayName } : {}),
-    ...(isReassigningGroup ? { groupId: patchedGroupId } : {}),
   };
   return actor.userId || actor.groupId || actor.displayName ? actor : undefined;
 }
@@ -1751,15 +1671,4 @@ async function resolvePageForRead(input: {
       ? `no page with object number ${input.pageObjectNumber} in layer ${input.scope.layerName} for document ${input.scope.docId}`
       : `no page with object number ${input.pageObjectNumber} in document ${input.scope.docId}`,
   );
-}
-
-/**
- * How a patch is checked: against its target's kind when the target was
- * found, so a field that kind doesn't declare is refused here, otherwise
- * against every kind. The engine refuses a subtype that doesn't match.
- */
-function patchSchemaFor(subtype: AnnotationSubtype | undefined): SchemaLike<AnnotationPatch> {
-  return (subtype === undefined || subtype === 'unsupported'
-    ? AnnotationPatchSchema
-    : annotationPatchSchemaOf(subtype)) as unknown as SchemaLike<AnnotationPatch>;
 }

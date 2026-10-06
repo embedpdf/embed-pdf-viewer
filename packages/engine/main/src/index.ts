@@ -93,7 +93,6 @@ export function createLocalEngine(opts: CreateLocalEngineOptions = {}): LocalEng
     imageEncoder: opts.imageEncoder,
     renderPolicy: opts.renderPolicy,
     signedDocumentPolicy: opts.signedDocumentPolicy,
-    sessionKind: opts.sessionKind,
   });
 }
 
@@ -121,7 +120,6 @@ export function createLocalEngineWithWorker(opts: CreateLocalEngineWithWorkerOpt
     imageEncoder: opts.imageEncoder,
     renderPolicy: opts.renderPolicy,
     signedDocumentPolicy: opts.signedDocumentPolicy,
-    sessionKind: opts.sessionKind,
   });
 }
 
@@ -328,8 +326,6 @@ export interface LocalEngineRecipeOptions extends WasmSourceOptions {
   renderPolicy?: EngineRenderPolicy;
   /** How a signed document's protection is applied. See {@link LocalEngineOptions.signedDocumentPolicy}. */
   signedDocumentPolicy?: LocalEngineOptions['signedDocumentPolicy'];
-  /** Layer or plain sessions. See {@link LocalEngineOptions.sessionKind}. */
-  sessionKind?: LocalEngineOptions['sessionKind'];
   /**
    * Where there is no `Worker` (Node), PDFium runs in this thread: natively
    * when this platform has a build, as WebAssembly otherwise. `runtime`
@@ -407,7 +403,6 @@ export function localEngine(options: LocalEngineRecipeOptions = {}): LocalEngine
         : undefined),
     renderPolicy: options.renderPolicy,
     signedDocumentPolicy: options.signedDocumentPolicy,
-    sessionKind: options.sessionKind,
   });
   return engine;
 }

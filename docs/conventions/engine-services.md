@@ -75,16 +75,28 @@ Feature behavior belongs in `features/`, not in worker adapters.
 
 ## Mutation safety
 
-- Multi-step mutators validate all caller-controlled input and check cancellation before the first
-  native write. After that apply boundary, caller validation and abort checks must not introduce a
-  throw path: these mutations are not rollback-atomic.
-- Ordered batch verbs do not throw after a write may have occurred. They record the current item as
-  `failed`, mark remaining items `skipped`, and finalize whenever state changed or a native outcome
-  is indeterminate. They return no mutation artifact only when every outcome is known not to have
-  changed the document.
-- A non-batch native failure after the apply boundary is an internal-invariant path, not a validation
-  outcome. Never describe a multi-call mutation as atomic unless the native layer provides an actual
-  transaction or rollback guarantee.
+- Every job whose effect is `write` or `contentWrite` runs as one layer transaction, begun and ended
+  in `WorkerHost.run` (a signing's `signatures.complete` is the exception: it replaces the
+  document's bytes instead). The transaction commits in `finishMutation`, before the layer is saved; any throw before
+  that aborts it, and the document, the page revisions and the derived caches are as they were. A
+  writer never begins, commits or rolls back on its own.
+- A commit or an abort that fails leaves the session unusable: every later job is refused with
+  `DocNotOpen`, and the document has to be opened again.
+- Mutators still validate caller input and check cancellation before the first native write: a
+  refusal costs no copies, and the error names the caller's mistake.
+- A check that depends on the document runs inside the write, against what the write reads: the
+  caller's authority over an annotation's owner (`AnnotationAuthority`), the members of a thread a
+  delete takes. No read job runs before a write to check it.
+- Writers find annotations from the page's dictionaries (raw handles), so a write never parses a
+  page's content unless it writes that content (flatten, redaction).
+- A write that moves entries of a page's `/Annots` (a delete, a reorder, a flatten, a redaction, a
+  merged field's split) calls `promoteInlineAnnotations` first, before it loads the page: an inline
+  annotation is named by its position only while no entry has moved.
+- Ordered batch verbs (redaction apply, page flatten) report per-item outcomes instead of throwing
+  once a write may have occurred: the current item `failed`, the rest `skipped`. The transaction
+  commits what the result reports.
+- Writes bump `cacheSeq` (derived caches) as they go; `finishMutation` bumps `editsSeq` (unsaved
+  edits, the signing version) once per committed write.
 
 ## Adding a feature
 

@@ -60,13 +60,11 @@ function buildDocument(): Uint8Array {
 
 describe.skipIf(!ENABLED)('signature analysis cost on a large multi-revision document', () => {
   let engine: Engine;
-  let plainEngine: Engine;
   let signed: Uint8Array;
   const rows: string[] = [];
 
   beforeAll(async () => {
     engine = await createLocalEngine({ runtime: { prefer: 'wasm' } });
-    plainEngine = await createLocalEngine({ runtime: { prefer: 'wasm' }, sessionKind: 'plain' });
     const base = await timed(`build ${MB} MB, ${FIELDS} fields`, rows, async () => buildDocument());
     const doc = await engine.open(
       { kind: 'bytes', id: 'bench-base', bytes: base },
@@ -104,7 +102,6 @@ describe.skipIf(!ENABLED)('signature analysis cost on a large multi-revision doc
   afterAll(async () => {
     console.log(['', ...rows, ''].join('\n'));
     await engine.destroy();
-    await plainEngine.destroy();
   });
 
   async function measure(label: string, eng: Engine): Promise<void> {
@@ -144,9 +141,5 @@ describe.skipIf(!ENABLED)('signature analysis cost on a large multi-revision doc
 
   test('layer session', async () => {
     await measure('layer', engine);
-  }, 600_000);
-
-  test('plain session', async () => {
-    await measure('plain', plainEngine);
   }, 600_000);
 });

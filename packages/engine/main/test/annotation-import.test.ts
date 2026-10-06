@@ -175,9 +175,18 @@ async function openWorker(runtime: PdfRuntimeModule, bytes: Uint8Array, docId: s
     result,
     /** A save, with the trailer's /ID blanked. */
     save: async (mode: 'rewrite' | 'incremental') =>
-      withoutId((await result({ kind: 'document.saveBuffer', effect: 'snapshot', mode }, 'document.saveBuffer')).bytes),
+      withoutId(
+        (
+          await result(
+            { kind: 'document.saveBuffer', effect: 'snapshot', mode },
+            'document.saveBuffer',
+          )
+        ).bytes,
+      ),
     draw: async (page: PageRef) =>
-      Buffer.from((await result({ kind: 'pages.render', effect: 'read', page }, 'pages.render')).raster.data),
+      Buffer.from(
+        (await result({ kind: 'pages.render', effect: 'read', page }, 'pages.render')).raster.data,
+      ),
   };
 }
 
@@ -186,6 +195,20 @@ function withoutId(bytes: ArrayBuffer): string {
   return new TextDecoder('latin1')
     .decode(bytes)
     .replace(/\/ID\s*\[\s*<[0-9A-Fa-f]*>\s*<[0-9A-Fa-f]*>\s*\]/g, '/ID[]');
+}
+
+/**
+ * Expects an incremental `save` equal to `baseline` except for the trailer's
+ * `/Size`, which may only grow: a refused write's transaction never hands its
+ * object numbers out again, so a later save counts them.
+ */
+function expectSameSaveBut(save: string, baseline: string, what?: string): void {
+  const sizes = (text: string) => [...text.matchAll(/\/Size (\d+)/g)].map((m) => Number(m[1]));
+  const blank = (text: string) => text.replace(/\/Size \d+/g, '/Size _');
+  expect(blank(save), what).toBe(blank(baseline));
+  sizes(save).forEach((value, at) =>
+    expect(value, what).toBeGreaterThanOrEqual(sizes(baseline)[at]!),
+  );
 }
 
 describe.each(['wasm', 'native'] as const)(
@@ -219,7 +242,8 @@ describe.each(['wasm', 'native'] as const)(
       // Each attribution mode writes its own last pass: both run, each
       // against the document as the one before left it.
       for (const attribution of ['stamp', 'restore'] as const) {
-        const importing = () => send({ kind: 'annotations.import', effect: 'write', bundle: wire, attribution });
+        const importing = () =>
+          send({ kind: 'annotations.import', effect: 'write', bundle: wire, attribution });
         const drawn = await draw();
         const baseline = { rewrite: await save('rewrite'), incremental: await save('incremental') };
         expect(await save('rewrite')).toBe(baseline.rewrite);
@@ -242,7 +266,11 @@ describe.each(['wasm', 'native'] as const)(
           expect(fault.fired(), `${what} was called`).toBe(true);
           expect(response.kind, what).toBe('reject');
           expect(await save('rewrite'), `${what}: rewrite`).toBe(baseline.rewrite);
-          expect(await save('incremental'), `${what}: incremental`).toBe(baseline.incremental);
+          expectSameSaveBut(
+            await save('incremental'),
+            baseline.incremental,
+            `${what}: incremental`,
+          );
           expect((await draw()).equals(drawn), `${what}: drawn`).toBe(true);
         }
 
@@ -369,7 +397,7 @@ describe.each(['wasm', 'native'] as const)('one create (%s runtime)', (prefer) =
     expect(fault.fired()).toBe(true);
     expect(response.kind).toBe('reject');
     expect(await worker.save('rewrite')).toBe(baseline.rewrite);
-    expect(await worker.save('incremental')).toBe(baseline.incremental);
+    expectSameSaveBut(await worker.save('incremental'), baseline.incremental);
 
     // And a create that holds finds the note free.
     expect((await create({ subtype: 'popup', rect, parent: note })).kind).toBe('resolve');
@@ -383,7 +411,10 @@ describe.each(['wasm', 'native'] as const)('one create (%s runtime)', (prefer) =
       new Uint8Array(await readFile(fixtures.weak)),
       'weak-reply',
     );
-    const { list } = await worker.result({ kind: 'annotations.list', effect: 'read' }, 'annotations.list');
+    const { list } = await worker.result(
+      { kind: 'annotations.list', effect: 'read' },
+      'annotations.list',
+    );
     const weak = list.annotations.find(
       (dto) => dto.ref.kind === 'index' && dto.subtype !== 'popup',
     )!.ref;
@@ -410,8 +441,11 @@ describe.each(['wasm', 'native'] as const)('one create (%s runtime)', (prefer) =
     expect(fault.fired()).toBe(true);
     expect(response.kind).toBe('reject');
     expect(await worker.save('rewrite')).toBe(baseline.rewrite);
-    expect(await worker.save('incremental')).toBe(baseline.incremental);
-    const after = await worker.result({ kind: 'annotations.list', effect: 'read' }, 'annotations.list');
+    expectSameSaveBut(await worker.save('incremental'), baseline.incremental);
+    const after = await worker.result(
+      { kind: 'annotations.list', effect: 'read' },
+      'annotations.list',
+    );
     expect(after.list).toEqual(list);
 
     // And a reply that holds names it.

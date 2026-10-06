@@ -10,7 +10,6 @@ import type {
   PageObjectNumber,
   PageState,
   RevisionToken,
-  SessionKind,
   SignatureCompleteResult,
   PdfCoordinates,
   SignaturePrepared,
@@ -86,7 +85,14 @@ export class DocumentSession {
   private fullyEnumerated = false;
 
   private revisions: RevisionAuthority | null = null;
-  private mutationSeqCounter = 0;
+  /** Bumped by {@link invalidateDerived}: the version caches built from the document key on. */
+  private cacheSeqCounter = 0;
+  /** Bumped by {@link noteEdit}: one per committed write, never inside or for an abort. */
+  private editsSeqCounter = 0;
+  /** The open layer transaction, if any (see {@link beginTransaction}). */
+  private transaction: { readonly docPtr: Ptr } | null = null;
+  /** Why the session can't be used anymore, after a transaction neither committed nor aborted. */
+  private unusableReason: string | null = null;
   private pages: PagePtrPool | null = null;
   /**
    * The runtime's parsed pages, kept between jobs. Set before the document
@@ -99,24 +105,16 @@ export class DocumentSession {
    * main-thread guard subtracts the matching capabilities.
    */
   signedDocumentPolicy: SignedDocumentPolicy = 'protect';
-  /**
-   * The shape the caller asked for when opening plain bytes. `layer` (the
-   * default) opens them as an immutable base with a fresh layer; `plain`
-   * keeps one in-memory document unless the bytes already carry a
-   * signature, which always opens as a layer.
-   */
-  sessionKind: SessionKind = 'layer';
   /** The password the document was opened with; signing candidates open with the same one. */
   password: string | null = null;
   /**
    * Whether mutations on a layer session also serialize the layer artifact
-   * into their response (what a server persists). False for a session that
-   * became a layer only because its document is signed (see
-   * `WorkerHost.openSignedAware`): the caller opened plain bytes and never
-   * asked for artifacts.
+   * into their response (what a server persists). False for a session opened
+   * from bytes (`WorkerHost.openBytesAsLayer`): the caller holds the document
+   * and never asked for artifacts.
    */
   persistLayerArtifact = true;
-  /** The mutation sequence the current bytes were loaded at (see `hasUnsavedEdits`). */
+  /** The edits sequence the current bytes were loaded at (see `hasUnsavedEdits`). */
   private loadedSeq = 0;
   /** SHA-256 (hex) of a plain session's loaded bytes, hashed once per load. */
   private plainSha256: { loadedSeq: number; sha256: string } | null = null;
@@ -175,16 +173,16 @@ export class DocumentSession {
     this.pages = new PagePtrPool(this.runtime, handle.docPtr, this.residency);
     this.parkedLoad = null;
     this.drawings = null;
-    this.loadedSeq = this.mutationSeqCounter;
+    this.loadedSeq = this.editsSeqCounter;
   }
 
   /**
-   * Whether anything was mutated since the current bytes were loaded. When
+   * Whether a write was committed since the current bytes were loaded. When
    * false, the loaded bytes are the document: a save returns them verbatim
    * and a signing candidate is built straight on them.
    */
   hasUnsavedEdits(): boolean {
-    return this.mutationSeqCounter !== this.loadedSeq;
+    return this.editsSeqCounter !== this.loadedSeq;
   }
 
   /** Cached hash of the current loaded bytes, or `null` when not computed since the last load. */
@@ -204,8 +202,9 @@ export class DocumentSession {
    * installs its sealed file. The session id, its page object numbers
    * (an incremental save never renumbers) and its retained resources
    * survive; the old document is closed, every page is re-pinned (its
-   * revision bumped, its cached pointer dropped), and the mutation
-   * sequence advances so every version-keyed cache rebuilds.
+   * revision bumped, its cached pointer dropped), and both sequences
+   * advance, so every version-keyed cache rebuilds and the new bytes count as
+   * loaded.
    */
   install(handle: OpenedPdfDocument): void {
     if (!this.docPtr) {
@@ -233,8 +232,9 @@ export class DocumentSession {
     this.recordsByObjectNumber.clear();
     this.fullyEnumerated = false;
     for (const pageObjectNumber of previousPages) this.requireRevisions().bump(pageObjectNumber);
-    this.mutationSeqCounter++;
-    this.loadedSeq = this.mutationSeqCounter;
+    this.cacheSeqCounter++;
+    this.editsSeqCounter++;
+    this.loadedSeq = this.editsSeqCounter;
     this.pendingSigning = null;
     this.drawings = null;
     if (firstError) throw firstError;
@@ -242,7 +242,7 @@ export class DocumentSession {
 
   /** The two publish fences a candidate is built on. */
   versionRef(baseSha256: string): DocumentVersionRef {
-    return { baseSha256, editsVersion: this.mutationSeqCounter };
+    return { baseSha256, editsVersion: this.editsSeqCounter };
   }
 
   /**
@@ -404,20 +404,128 @@ export class DocumentSession {
   }
 
   /**
-   * Monotonic count of successful document mutations in this session.
-   * Version key for detached-snapshot caches (e.g. the forms model):
-   * a cache entry built at sequence N is exactly valid while the
-   * sequence is still N. Coarse on purpose — widgets are annotations
-   * and page ops move widgets, so any mutation may affect derived
-   * form state; per-domain counters are a later optimization.
+   * The version key for caches built from the document (the forms model,
+   * the signature model, search text): an entry built at sequence N is
+   * exactly valid while the sequence is still N. Coarse on purpose: widgets
+   * are annotations and page edits move widgets, so any write may change
+   * derived form state.
    */
-  mutationSeq(): number {
-    return this.mutationSeqCounter;
+  cacheSeq(): number {
+    return this.cacheSeqCounter;
   }
 
-  /** Record one successful mutation; called by mutation paths. */
-  noteMutation(): void {
-    this.mutationSeqCounter++;
+  /**
+   * Make every cache keyed on {@link cacheSeq} build again. Writers call it
+   * after a write, before they read back; an abort calls it too, because a
+   * cache may have been built from what the transaction wrote.
+   */
+  invalidateDerived(): void {
+    this.cacheSeqCounter++;
+  }
+
+  /**
+   * The count of committed writes: what {@link hasUnsavedEdits} and a signing
+   * candidate's `editsVersion` compare.
+   */
+  editsSeq(): number {
+    return this.editsSeqCounter;
+  }
+
+  /** Count one committed write. Called once per write, after its commit. */
+  noteEdit(): void {
+    this.editsSeqCounter++;
+  }
+
+  // ── transactions ──────────────────────────────────────────────────────────
+
+  /** Whether a layer transaction is open (see {@link beginTransaction}). */
+  inTransaction(): boolean {
+    return this.transaction !== null;
+  }
+
+  /**
+   * Open a layer transaction: until {@link commitTransaction} or
+   * {@link abortTransaction}, every write lands in an overlay that only a
+   * commit keeps, and every read sees it. The page revisions this session
+   * bumps follow it. Only a layer document has transactions.
+   */
+  beginTransaction(): void {
+    const docPtr = this.requireDocPtr();
+    if (this.transaction) {
+      throw new EngineError(EngineErrorCode.Unknown, 'a transaction is already open');
+    }
+    if (!this.runtime.fn.EPDFLayer_BeginTransaction(docPtr)) {
+      throw new EngineError(EngineErrorCode.Unknown, 'EPDFLayer_BeginTransaction refused');
+    }
+    this.requireRevisions().begin();
+    this.transaction = { docPtr };
+  }
+
+  /**
+   * Keep everything the open transaction wrote. A commit that fails can't
+   * say how far it got, so the session becomes unusable.
+   */
+  commitTransaction(): void {
+    const { docPtr } = this.requireTransaction();
+    // Both sides must agree a transaction is open before one is kept. This
+    // throws with the transaction still open, so the caller aborts it.
+    if (!this.runtime.fn.EPDFLayer_IsInTransaction(docPtr)) {
+      throw new EngineError(EngineErrorCode.Unknown, 'the layer transaction is no longer open');
+    }
+    this.transaction = null;
+    let committed = false;
+    try {
+      committed = this.runtime.fn.EPDFLayer_CommitTransaction(docPtr);
+    } finally {
+      if (!committed) this.unusableReason = COMMIT_FAILED;
+    }
+    if (!committed) throw new EngineError(EngineErrorCode.DocNotOpen, COMMIT_FAILED);
+    this.requireRevisions().commit();
+  }
+
+  /**
+   * Drop everything the open transaction wrote, and forget what this session
+   * learned from it. Never throws: it runs while a failure is on its way out,
+   * and a failed abort makes the session unusable instead.
+   */
+  abortTransaction(): void {
+    const { docPtr } = this.requireTransaction();
+    this.transaction = null;
+    let aborted = false;
+    try {
+      aborted = this.runtime.fn.EPDFLayer_AbortTransaction(docPtr);
+    } catch {
+      // Reported below: the session can't say what the document holds.
+    }
+    this.revisions?.abort();
+    // Object numbers the transaction used now resolve to nothing, and its
+    // page edits are gone: the drawings and page registry read them again.
+    this.drawings?.forget();
+    this.recordsByIndex.clear();
+    this.recordsByObjectNumber.clear();
+    this.fullyEnumerated = false;
+    this.invalidateDerived();
+    if (!aborted) this.unusableReason = 'a layer transaction failed to abort';
+  }
+
+  /**
+   * Throws once a transaction neither committed nor aborted, so nothing reads
+   * or writes a document in an unknown state.
+   */
+  assertUsable(): void {
+    if (this.unusableReason) {
+      throw new EngineError(
+        EngineErrorCode.DocNotOpen,
+        `${this.unusableReason}; open the document again`,
+      );
+    }
+  }
+
+  private requireTransaction(): { readonly docPtr: Ptr } {
+    if (!this.transaction) {
+      throw new EngineError(EngineErrorCode.Unknown, 'no transaction is open');
+    }
+    return this.transaction;
   }
 
   /**
@@ -502,6 +610,7 @@ export class DocumentSession {
       this.pendingSigning = null;
       this.lastCompletion = null;
       this.drawings = null;
+      this.transaction = null;
       this.revisions?.clear();
       this.revisions = null;
       this.recordsByIndex.clear();
@@ -530,6 +639,8 @@ export class DocumentSession {
     return this.revisions;
   }
 }
+
+const COMMIT_FAILED = 'a layer transaction failed to commit';
 
 // Monotonic per-realm counter: the docSessionId exists only for the local
 // bleed-over check (a revision token minted by one session must not validate

@@ -20,6 +20,7 @@ import { withScratch } from '../../runtime/memory/scratch';
 import { throwIfAborted } from '../../shared/abort';
 import { AnnotationReader } from '../annotations';
 import { resolveAnnotPtr } from '../annotations/internal/identity/resolveAnnotationPointer';
+import { promoteInlineAnnotations } from '../annotations/internal/write/promoteInlineAnnotations';
 
 /**
  * The destructive half of redaction (see `DocumentRedactionService` for the
@@ -71,6 +72,9 @@ export class RedactionApplier {
       }
       if (signal.aborted) throwIfAborted(signal);
 
+      // A redaction removes entries from /Annots; promotion keeps every
+      // position.
+      promoteInlineAnnotations(this.runtime, this.session, pageObjectNumber);
       const pool = this.session.pagePool();
       const pagePtr = pool.acquire(pageObjectNumber);
       try {
@@ -105,7 +109,7 @@ export class RedactionApplier {
       return { scope, results, removedAnnotationCount: totalRemoved, meta };
     }
 
-    this.session.noteMutation();
+    this.session.invalidateDerived();
     for (const pageObjectNumber of affected) {
       this.session.bumpRevision(pageObjectNumber);
       try {
