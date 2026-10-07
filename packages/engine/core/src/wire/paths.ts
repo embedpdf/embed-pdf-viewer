@@ -90,6 +90,13 @@ export const wirePaths = {
   accessLegacy: '/v1/access',
 
   /**
+   * POST `{ count }`: hand the caller's editing session `count` more object
+   * numbers at once (at most 1,000), for a large paste.
+   */
+  objectNumbers: (docId: string, layerName: string) =>
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/object-numbers`,
+
+  /**
    * GET: open the document referenced by the doc-scoped JWT and
    * return its `DocumentHead`. The server materialises the base
    * PDF into its file cache and binds it to a worker the first

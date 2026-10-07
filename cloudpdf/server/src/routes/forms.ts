@@ -26,7 +26,14 @@ import {
 import { requireLayerCapability, requireLayerDocAccessOnly } from '../app/jwt-plugin';
 import type { DocumentService } from '../services/DocumentService';
 import type { LayerService } from '../services/LayerService';
-import { abortSignalOf, parseOrInvalidArg, setNoStore, type SchemaLike } from './_helpers';
+import {
+  abortSignalOf,
+  objectNumberQuery,
+  objectNumbersQuery,
+  parseOrInvalidArg,
+  setNoStore,
+  type SchemaLike,
+} from './_helpers';
 import { readMutationEnvelope } from './_mutationEnvelope';
 
 interface FormRouteDeps {
@@ -178,8 +185,20 @@ export async function registerFormRoutes(app: FastifyInstance, deps: FormRouteDe
       req.body,
       'request body',
     );
+    const objectNumber = objectNumberQuery(req.query, 'objectNumber');
+    const widgetObjectNumbers = objectNumbersQuery(req.query, 'widgetObjectNumbers');
     setNoStore(reply);
-    return layerService.createFormField(ctx, { docId, layerName, draft }, abortSignalOf(reply));
+    return layerService.createFormField(
+      ctx,
+      {
+        docId,
+        layerName,
+        draft,
+        ...(objectNumber !== undefined ? { objectNumber } : {}),
+        ...(widgetObjectNumbers ? { widgetObjectNumbers } : {}),
+      },
+      abortSignalOf(reply),
+    );
   });
 
   app.patch('/v1/docs/:docId/layers/:layerName/form/fields/:fieldKey', async (req, reply) => {
@@ -370,10 +389,19 @@ export async function registerFormRoutes(app: FastifyInstance, deps: FormRouteDe
         req.body,
         'body',
       );
+      const objectNumber = objectNumberQuery(req.query, 'objectNumber');
+      const splitObjectNumber = objectNumberQuery(req.query, 'splitObjectNumber');
       setNoStore(reply);
       return layerService.addFormWidget(
         ctx,
-        { docId, layerName, ref, placement },
+        {
+          docId,
+          layerName,
+          ref,
+          placement,
+          ...(objectNumber !== undefined ? { objectNumber } : {}),
+          ...(splitObjectNumber !== undefined ? { splitObjectNumber } : {}),
+        },
         abortSignalOf(reply),
       );
     },

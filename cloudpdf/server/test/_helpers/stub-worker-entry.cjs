@@ -19,7 +19,11 @@
  * is what lets multi-replica tests observe lost updates exactly the way
  * the native engine would produce them.
  *
- * Artifact format v2: [0x4c 'L', 0x02, ...utf8 JSON {"annots":[...]}].
+ * Artifact format v2: [0x4c 'L', 0x02, ...utf8 JSON {"annots":[...],"last":N}].
+ * `last` is the layer's last object number: like the engine, the session
+ * starts from the artifact's (or OBJECT_NUMBER_BASE), raises it to a
+ * write's `objectNumberFloor - 1`, makes one object of its own per write,
+ * and reports it with the open and with each artifact.
  * Artifacts seeded by tests with arbitrary bytes parse as "no annotations"
  * (legacy fallback), and `layerByte0` still echoes the raw first byte so
  * versioned-read tests keep their `artifact:<byte>` text probes.
@@ -93,8 +97,8 @@ function ponsOf(msg) {
 }
 
 /** Serialize session annotation state into the v2 artifact format. */
-function serializeAnnots(annots) {
-  const json = Buffer.from(JSON.stringify({ annots }), 'utf8');
+function serializeAnnots(annots, last) {
+  const json = Buffer.from(JSON.stringify({ annots, last }), 'utf8');
   const view = new Uint8Array(2 + json.byteLength);
   view[0] = ARTIFACT_MAGIC;
   view[1] = ARTIFACT_VERSION;
@@ -102,15 +106,18 @@ function serializeAnnots(annots) {
   return view;
 }
 
-/** Parse a v2 artifact back into annotation state; anything else -> []. */
-function parseAnnots(bytes) {
+/** Parse a v2 artifact back into annotation state and last object number; anything else -> none. */
+function parseArtifact(bytes) {
+  const none = { annots: [], last: OBJECT_NUMBER_BASE };
   const buf = Buffer.isBuffer(bytes) ? bytes : Buffer.from(bytes ?? []);
-  if (buf.byteLength < 2 || buf[0] !== ARTIFACT_MAGIC || buf[1] !== ARTIFACT_VERSION) return [];
+  if (buf.byteLength < 2 || buf[0] !== ARTIFACT_MAGIC || buf[1] !== ARTIFACT_VERSION) return none;
   try {
     const parsed = JSON.parse(buf.subarray(2).toString('utf8'));
-    return Array.isArray(parsed.annots) ? parsed.annots : [];
+    const annots = Array.isArray(parsed.annots) ? parsed.annots : [];
+    const last = Number.isInteger(parsed.last) ? parsed.last : OBJECT_NUMBER_BASE;
+    return { annots, last: Math.max(last, OBJECT_NUMBER_BASE + nextSeq(annots) - 1) };
   } catch {
-    return [];
+    return none;
   }
 }
 
@@ -129,25 +136,27 @@ function layerMeta(msg) {
   const kind = msg.layer?.kind ?? 'fresh';
   if (kind === 'artifact' || kind === 'raw-delta') {
     const view = msg.layer.bytes ? Buffer.from(msg.layer.bytes) : Buffer.alloc(0);
-    const annots = parseAnnots(view);
+    const { annots, last } = parseArtifact(view);
     return {
       layerKind: kind,
       layerByte0: view.byteLength > 0 ? view[0] : null,
       annots,
       seq: nextSeq(annots),
+      last,
     };
   }
   if (kind === 'artifact-file') {
     const bytes = msg.layer.path ? readFileSync(msg.layer.path) : Buffer.alloc(0);
-    const annots = parseAnnots(bytes);
+    const { annots, last } = parseArtifact(bytes);
     return {
       layerKind: 'artifact',
       layerByte0: bytes.byteLength > 0 ? bytes[0] : null,
       annots,
       seq: nextSeq(annots),
+      last,
     };
   }
-  return { layerKind: 'fresh', layerByte0: null, annots: [], seq: 1 };
+  return { layerKind: 'fresh', layerByte0: null, annots: [], seq: 1, last: OBJECT_NUMBER_BASE };
 }
 
 // Pure geometry for one page. Mirrors `PageLayout`: durable PON, display
@@ -251,8 +260,19 @@ function mutationMeta(pon, changedValue) {
  */
 function layerArtifact(msg, sessionMeta) {
   if (!msg.layerName) return undefined;
-  const view = serializeAnnots(sessionMeta?.annots ?? []);
-  return { bytes: view.buffer, size: view.byteLength };
+  const meta = sessionMeta ?? {};
+  const annots = meta.annots ?? [];
+  // The write's own objects, numbered past its floor: one, or 100 for a
+  // create whose contents ask for more than any estimate.
+  const own = msg.draft?.contents === '__MANY_OBJECTS__' ? 100 : 1;
+  meta.last =
+    Math.max(
+      meta.last ?? OBJECT_NUMBER_BASE,
+      (msg.objectNumberFloor ?? 0) - 1,
+      OBJECT_NUMBER_BASE + nextSeq(annots) - 1,
+    ) + own;
+  const view = serializeAnnots(annots, meta.last);
+  return { bytes: view.buffer, size: view.byteLength, lastObjectNumber: meta.last };
 }
 
 /**
@@ -388,11 +408,17 @@ parentPort.on('message', (msg) => {
       // byte of the base payload still encodes page count for tests.
       const view = msg.baseBytes ? new Uint8Array(msg.baseBytes) : new Uint8Array(0);
       const pageCount = view.byteLength > 0 ? view[0] : 0;
-      openDocs.set(sessionKey(msg), { pageCount, ...layerMeta(msg) });
+      const meta = { pageCount, ...layerMeta(msg) };
+      openDocs.set(sessionKey(msg), meta);
       parentPort.postMessage({
         kind: 'resolve',
         jobId: msg.jobId,
-        result: { tag: 'open', docId: msg.docId, security: openSecurity() },
+        result: {
+          tag: 'open',
+          docId: msg.docId,
+          security: openSecurity(),
+          lastObjectNumber: meta.last,
+        },
       });
       return;
     }
@@ -402,12 +428,18 @@ parentPort.on('message', (msg) => {
       // the test page-count byte.
       const bytes = msg.basePath ? readFileSync(msg.basePath) : Buffer.alloc(0);
       const pageCount = bytes.byteLength > 0 ? bytes[0] : 0;
-      openDocs.set(sessionKey(msg), { pageCount, ...layerMeta(msg) });
+      const meta = { pageCount, ...layerMeta(msg) };
+      openDocs.set(sessionKey(msg), meta);
       const resolveOpen = () =>
         parentPort.postMessage({
           kind: 'resolve',
           jobId: msg.jobId,
-          result: { tag: 'open', docId: msg.docId, security: openSecurity() },
+          result: {
+            tag: 'open',
+            docId: msg.docId,
+            security: openSecurity(),
+            lastObjectNumber: meta.last,
+          },
         });
       // Deterministic singleflight seam for the API-password integration
       // test: keep the canonical open in flight long enough for a second

@@ -6,6 +6,7 @@ import {
   EngineError,
   EngineErrorCode,
   type AnnotationBundleLimits,
+  formatObjectNumberRanges,
 } from '@embedpdf/engine-core/runtime';
 import compress from '@fastify/compress';
 import cors from '@fastify/cors';
@@ -66,6 +67,7 @@ import { registerDocsRoutes } from '../routes/docs';
 import { registerEventsRoutes } from '../routes/events';
 import { registerFormRoutes } from '../routes/forms';
 import { registerMetadataRoutes } from '../routes/metadata';
+import { registerObjectNumberRoutes } from '../routes/object-numbers';
 import { registerPageRoutes } from '../routes/pages';
 import { registerRedactionRoutes } from '../routes/redactions';
 import { registerSearchRoutes } from '../routes/search';
@@ -96,6 +98,7 @@ import { DocumentSecurityProbe } from '../services/DocumentSecurityProbe';
 import { DocumentService } from '../services/DocumentService';
 import { EventLogService } from '../services/EventLogService';
 import { LayerService } from '../services/LayerService';
+import { ObjectNumberService } from '../services/ObjectNumberService';
 import { LayerStateService } from '../services/LayerStateService';
 import { BaseFileCache } from '../storage/BaseFileCache';
 import type { ObjectStoreWithInfo } from '../storage/ObjectStore';
@@ -598,8 +601,10 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
         'content-type',
         'x-engine-session-id',
         'last-event-id',
-        // Names a change a retry must not repeat (annotation import).
+        // Names a change a retry must not repeat.
         'idempotency-key',
+        // Asks a write to top the editing session's object numbers up.
+        'embedpdf-reserve-object-numbers',
         // Document affinity: SDKs may send the document routing key; the server
         // never parses it, but the preflight must allow it.
         'x-cloudpdf-doc',
@@ -614,6 +619,8 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
         'x-embedpdf-appearance-count',
         'x-embedpdf-file-name',
         'x-embedpdf-file-type',
+        // The object numbers a write handed the editing session.
+        'embedpdf-object-numbers',
       ],
       credentials: false,
       maxAge: 86_400,
@@ -1241,6 +1248,16 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
         baseVersions: new BaseVersionsRepo(opts.db),
       });
       const eventLog = new EventLogService({ storage: opts.objectStore });
+      // Object numbers handed to editing sessions; a write that handed some
+      // out says so in its response.
+      const objectNumbers = new ObjectNumberService({ db: opts.db });
+      app.addHook('onSend', async (req, reply, payload) => {
+        const issued = req.editRequest?.issued;
+        if (issued && issued.length > 0 && reply.statusCode < 300) {
+          reply.header('EmbedPDF-Object-Numbers', formatObjectNumberRanges(issued));
+        }
+        return payload;
+      });
       const passwordSessionServerSecret = {
         id:
           opts.pdfPasswordSessionServerSecretId ??
@@ -1320,6 +1337,7 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
         ...(passwordSessionsRepo ? { passwordSessions: passwordSessionsRepo } : {}),
         signingRoot,
         ...(opts.signingTtlMs !== undefined ? { signingTtlMs: opts.signingTtlMs } : {}),
+        objectNumbers,
       });
       // A signature published on another replica: forget every session
       // over the old base here too (this replica's own publish already did).
@@ -1329,12 +1347,14 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
       app.addHook('onClose', () => unsubscribeBaseChanged());
       await registerAccessRoutes(app, {
         service: documentService,
+        layers: layerService,
         cdnSigner: opts.cdnSigner ?? new NoneCdnSigner(),
         ...(derivedRenders ? { derivedRenders } : {}),
         ...(usageMeters ? { usageMeters } : {}),
         tenantUsage: new TenantUsageRepo(opts.db),
         annotationBundleLimits: opts.annotationBundleLimits ?? DEFAULT_ANNOTATION_BUNDLE_LIMITS,
       });
+      await registerObjectNumberRoutes(app, { documentService, layerService });
       await registerDocsRoutes(app, { service: documentService });
       await registerMetadataRoutes(app, { service: documentService, layerService });
       await registerSignatureRoutes(app, { service: documentService, layerService });
@@ -1349,6 +1369,7 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
       await registerEventsRoutes(app, {
         db: opts.db,
         documentService,
+        layerService,
         realtimeBus,
         drain: drainCoordinator,
         ...(revokedJtisGuard ? { revocation: revokedJtisGuard } : {}),

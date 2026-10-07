@@ -12,7 +12,11 @@ import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import type { Kysely } from 'kysely';
 import { buildDetachedCms, createTestSigner, profileFor } from '@embedpdf/core-signature';
-import type { SignatureSubFilter } from '@embedpdf/engine-core/runtime';
+import {
+  objectNumbersIn,
+  type ObjectNumberRange,
+  type SignatureSubFilter,
+} from '@embedpdf/engine-core/runtime';
 import { decodePrepared, SignaturePreparedWireSchema, toBase64 } from '@embedpdf/engine-core/wire';
 import {
   createSqliteDb,
@@ -154,6 +158,38 @@ const prepareForm = (body: unknown) => {
 };
 const layer = `/v1/docs/${DOC}/layers/alice`;
 
+/** `/access` on the layer as editing session `session`: the numbers handed out, if any. */
+async function handOut(replica: Replica, session: string): Promise<number[] | null> {
+  const answer = await json<{ edit?: { objectNumbers: ObjectNumberRange[] } }>(
+    await fetch(`${replica.baseUrl}${layer}/access`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token('alice')}`,
+        'Content-Type': 'application/json',
+        'X-Engine-Session-Id': session,
+      },
+      body: JSON.stringify({ objectNumbers: 8 }),
+    }),
+  );
+  return answer.edit ? objectNumbersIn(answer.edit.objectNumbers) : null;
+}
+
+/** The layer's object number counter and the blocks handed out on it. */
+async function layerNumbers(): Promise<{ counter: number; blocks: number }> {
+  const row = await a.db
+    .selectFrom('layers')
+    .select(['id', 'next_object_number'])
+    .where('doc_id', '=', DOC)
+    .where('name', '=', 'alice')
+    .executeTakeFirstOrThrow();
+  const blocks = await a.db
+    .selectFrom('object_number_blocks')
+    .select('first')
+    .where('layer_id', '=', row.id)
+    .execute();
+  return { counter: Number(row.next_object_number), blocks: blocks.length };
+}
+
 describe('signing across replicas', () => {
   test('prepared on A, completed on B; A follows the published version on its next read', async () => {
     const signer = await createTestSigner({ commonName: 'Replica Signer' });
@@ -198,6 +234,10 @@ describe('signing across replicas', () => {
       'application/json',
     );
     expect(blocked.status).toBe(409);
+    // An editing session holds numbers on the layer.
+    const before = (await handOut(b, 'cloud:editor'))!;
+    expect(before).toHaveLength(8);
+    expect((await layerNumbers()).blocks).toBeGreaterThan(0);
 
     const cms = await buildDetachedCms({
       digest: prepared.digest,
@@ -280,6 +320,23 @@ describe('signing across replicas', () => {
       );
       expect(sha256(new Uint8Array(await download.arrayBuffer()))).toBe(version.sha256);
     }
+
+    // The publish numbered the version's objects anew: every number handed
+    // out on the layer is gone, and new ones would start past all of them.
+    const published = await layerNumbers();
+    expect(published.blocks).toBe(0);
+    expect(published.counter).toBeGreaterThan(Math.max(...before));
+    const versionBytes = Buffer.from(
+      await (
+        await call(a, 'GET', `/v1/docs/${DOC}/versions/download/${version.sha256}`, 'alice')
+      ).arrayBuffer(),
+    ).toString('latin1');
+    // The last trailer's /Size is one past the version's last object number.
+    const size = Number([...versionBytes.matchAll(/\/Size (\d+)/g)].at(-1)![1]);
+    expect(published.counter).toBeGreaterThanOrEqual(size);
+    // The certification forbids creating anything: no editing session, on
+    // the replica that published it.
+    expect(await handOut(winner === 'a' ? a : b, 'cloud:editor')).toBeNull();
 
     // A new signing on the published version works from either replica; a
     // fence recorded by A is checked by B.

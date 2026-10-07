@@ -234,8 +234,43 @@ export const AccessRequestSchema = z.object({
   password: z.string().optional(),
   passwordGrant: z.string().optional(),
   mode: z.enum(['any', 'owner']).optional(),
+  /**
+   * How many object numbers the caller's editing session wants now, at
+   * most 32: 8 for a new session when absent, 0 for a client that holds
+   * enough.
+   */
+  objectNumbers: z.number().int().nonnegative().optional(),
 });
 export type AccessRequest = z.infer<typeof AccessRequestSchema>;
+
+/** `first`, `first + 1`, …, `first + count - 1`. */
+export const ObjectNumberRangeSchema = z.object({
+  first: z.number().int().positive(),
+  count: z.number().int().positive(),
+});
+
+/** See `EditSessionAccess`. */
+export const EditSessionAccessSchema = z.object({
+  session: z.enum(['new', 'revived', 'live']),
+  expiresIn: z.number().int().nonnegative(),
+  objectNumbers: z.array(ObjectNumberRangeSchema),
+});
+
+/** See `EditSessionStatus`: the event stream's `session` event. */
+export const EditSessionStatusSchema = z.object({
+  held: z.array(ObjectNumberRangeSchema),
+  expiresIn: z.number().int().nonnegative(),
+});
+
+/** `POST …/object-numbers`: a bulk reservation. */
+export const ObjectNumberReservationRequestSchema = z.object({
+  count: z.number().int().positive(),
+});
+
+export const ObjectNumberReservationResponseSchema = z.object({
+  objectNumbers: z.array(ObjectNumberRangeSchema),
+  expiresIn: z.number().int().nonnegative(),
+});
 
 /**
  * Typed boolean view of the PDF user-access permission word. Names
@@ -422,6 +457,8 @@ export const AccessResponseSchema = z.object({
     .optional(),
   /** The deployment's limits for an annotation import (see `AnnotationBundleLimits`). */
   annotationBundleLimits: AnnotationBundleLimitsSchema,
+  /** The caller's editing session (see `DocumentAccessInfo.edit`). */
+  edit: EditSessionAccessSchema.optional(),
 });
 export type AccessResponse = z.infer<typeof AccessResponseSchema>;
 export type RenderPolicy = NonNullable<AccessResponse['renderPolicy']>;

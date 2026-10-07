@@ -172,9 +172,13 @@ export type { AnnotationRef } from './identity/AnnotationRef';
 export {
   OBJECT_NUMBER_CEILING,
   OBJECT_NUMBER_ISSUE_LIMIT,
+  formatObjectNumberRanges,
   objectNumbersIn,
+  parseObjectNumberRanges,
 } from './identity/ObjectNumbers';
 export type {
+  EditSessionAccess,
+  EditSessionStatus,
   ObjectNumberPool,
   ObjectNumberRange,
   ObjectNumbersLost,

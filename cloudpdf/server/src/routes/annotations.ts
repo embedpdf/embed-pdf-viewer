@@ -57,6 +57,7 @@ import {
   setImmutableCache,
   setNoStore,
   type SchemaLike,
+  objectNumberQuery,
 } from './_helpers';
 import { readAnnotationImportRequest } from './_annotationImportRequest';
 import { buildMultipart, type MultipartPart } from './_multipart';
@@ -430,7 +431,6 @@ export async function registerAnnotationRoutes(
     const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
     const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
     const protection = await documentService.getProtection(accessCtx, docId, layerName);
-    const idempotencyKey = idempotencyKeyOf(req.headers['idempotency-key']);
     const limits = bundleLimits;
     const { manifest, resources } = await readAnnotationImportRequest(req, limits);
     const attribution = manifest.options.attribution ?? 'restore';
@@ -491,7 +491,6 @@ export async function registerAnnotationRoutes(
         attribution,
         ...(actor ? { actor } : {}),
         limits,
-        ...(idempotencyKey ? { idempotencyKey } : {}),
       },
       abortSignalOf(reply),
     );
@@ -535,6 +534,7 @@ export async function registerAnnotationRoutes(
         protection,
       );
       const actor = actorFromJwt(ctx.jwt, groupId);
+      const objectNumber = objectNumberQuery(req.query, 'objectNumber');
 
       setNoStore(reply);
       return layerService.createAnnotation(
@@ -546,6 +546,7 @@ export async function registerAnnotationRoutes(
           draft,
           actor,
           ...(resources ? { resources } : {}),
+          ...(objectNumber !== undefined ? { objectNumber } : {}),
         },
         abortSignalOf(reply),
       );
@@ -861,18 +862,6 @@ function createGroupOf(
     }
   }
   return groupId;
-}
-
-/** The `Idempotency-Key` header: printable ASCII, 1 to 255 characters. */
-function idempotencyKeyOf(header: string | string[] | undefined): string | undefined {
-  if (header === undefined) return undefined;
-  if (typeof header !== 'string' || !/^[\x21-\x7e]{1,255}$/.test(header)) {
-    throw new EngineError(
-      EngineErrorCode.InvalidArg,
-      'Idempotency-Key must be 1 to 255 printable ASCII characters',
-    );
-  }
-  return header;
 }
 
 /**

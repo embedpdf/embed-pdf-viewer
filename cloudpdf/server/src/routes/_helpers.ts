@@ -4,6 +4,7 @@ import {
   decodePageKey,
   type PageRef,
 } from '@embedpdf/engine-core/runtime';
+import type { FastifyReply } from 'fastify';
 
 /**
  * Shared route helpers. Lives next to the route files (prefixed with
@@ -45,6 +46,14 @@ export function setImmutableCache(reply: {
 
 export function setNoStore(reply: { header(name: 'Cache-Control', value: string): unknown }): void {
   reply.header('Cache-Control', NO_STORE);
+}
+
+/** `429` with `Retry-After`: the caller is over a request budget for `retryAfterMs` more. */
+export function tooManyRequests(reply: FastifyReply, retryAfterMs: number): FastifyReply {
+  return reply
+    .code(429)
+    .header('retry-after', String(Math.ceil(retryAfterMs / 1000)))
+    .send({ error: { code: 'TooManyRequests', message: 'rate limited; retry later' } });
 }
 
 /**
@@ -151,4 +160,37 @@ export function parseTokenOrInvalidArg<T>(
       `${where}: ${error instanceof Error ? error.message : String(error)}`,
     );
   }
+}
+
+/**
+ * The object numbers a create names, from its query string: `name` is one
+ * number (`?objectNumber=42`) or a comma list (`?objectNumbers=42,43`). The
+ * body stays the data. A value that isn't a positive whole number is
+ * `InvalidArg` naming the parameter; an absent one is `undefined`.
+ */
+export function objectNumbersQuery(query: unknown, name: string): number[] | undefined {
+  const raw = (query as Record<string, unknown> | undefined)?.[name];
+  if (raw === undefined || raw === '') return undefined;
+  const numbers = String(raw)
+    .split(',')
+    .map((part) => Number(part.trim()));
+  if (!numbers.every((number) => Number.isSafeInteger(number) && number > 0)) {
+    throw new EngineError(
+      EngineErrorCode.InvalidArg,
+      `${name} must be positive whole numbers, comma-separated`,
+      { details: { field: name } },
+    );
+  }
+  return numbers;
+}
+
+/** One object number a create names, from its query string (see {@link objectNumbersQuery}). */
+export function objectNumberQuery(query: unknown, name: string): number | undefined {
+  const numbers = objectNumbersQuery(query, name);
+  if (numbers && numbers.length !== 1) {
+    throw new EngineError(EngineErrorCode.InvalidArg, `${name} is one object number`, {
+      details: { field: name },
+    });
+  }
+  return numbers?.[0];
 }

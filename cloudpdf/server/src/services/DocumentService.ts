@@ -36,6 +36,7 @@ import { DEFAULT_LAYER_NAME, wirePaths } from '@embedpdf/engine-core/wire';
 import type { DocumentManifest, LayerScopes } from '@embedpdf/engine-core/wire';
 
 import type { LayerStateService } from './LayerStateService';
+import type { EditRequest } from './LayerWriteObjectNumbers';
 import type { EngineCounters } from '../app/engine-counters';
 import { pinnedLayerName, type RequestJwtContext } from '../app/jwt-plugin';
 import type { BaseVersionRow, BaseVersionsRepo } from '../db/repos/base_versions.repo';
@@ -130,6 +131,17 @@ export interface OpenContext {
   /** Mutating client's engine-instance id (X-Engine-Session-Id), stored on
    *  audit rows for SSE own-echo suppression. Absent on read contexts. */
   originSessionId?: string | null;
+  /**
+   * What the request asks of its editing session's object numbers: a
+   * top-up with a write, and where the numbers handed out go for the
+   * response. Set by the layer guards; absent on read contexts.
+   */
+  edit?: EditRequest;
+  /**
+   * The request's `Idempotency-Key`: a write that already committed under
+   * it answers with what it committed. Set by the layer guards.
+   */
+  idempotencyKey?: string;
 }
 
 export interface SavedPdfFile {
@@ -223,6 +235,12 @@ export class DocumentService {
    * Absent entry = no live session (never opened, invalidated, or evicted).
    */
   private readonly layerSessionVersions = new Map<string, number>();
+  /**
+   * The layer's last object number as its worker session reported it on
+   * opening (session key → number): where its object number counter starts
+   * (see LayerService.prepareObjectNumbers).
+   */
+  private readonly layerOpenObjectNumbers = new Map<string, number>();
   private readonly layerOpens = new Map<string, Promise<void>>();
   /**
    * One marker per layer while a write op is in flight (worker mutation
@@ -767,6 +785,11 @@ export class DocumentService {
     recordAlignment();
   }
 
+  /** The layer's last object number as its worker session reported it on opening. */
+  lastObjectNumberAtOpen(docId: string, layerName: string): number | undefined {
+    return this.layerOpenObjectNumbers.get(layerSessionKey(docId, layerName));
+  }
+
   /** Mark a layer session stale: the next fresh-ensure reloads it. */
   invalidateLayerSession(docId: string, layerName: string): void {
     this.layerSessionVersions.delete(layerSessionKey(docId, layerName));
@@ -864,6 +887,7 @@ export class DocumentService {
   private async closeLayerOnPool(docId: string, layerName: string): Promise<void> {
     const key = layerSessionKey(docId, layerName);
     this.layerSessionVersions.delete(key);
+    this.layerOpenObjectNumbers.delete(key);
     try {
       await this.pool.run(docId, (jobId) =>
         wirePack({
@@ -1679,6 +1703,7 @@ export class DocumentService {
       // Full clear — the K=1 path and the always-safe fallback.
       this.heads.clear();
       this.layerSessionVersions.clear();
+      this.layerOpenObjectNumbers.clear();
       this.releaseAllBaseHandles();
       return;
     }
@@ -1696,6 +1721,9 @@ export class DocumentService {
       const prefix = `${docId}::`;
       for (const key of Array.from(this.layerSessionVersions.keys())) {
         if (key.startsWith(prefix)) this.layerSessionVersions.delete(key);
+      }
+      for (const key of Array.from(this.layerOpenObjectNumbers.keys())) {
+        if (key.startsWith(prefix)) this.layerOpenObjectNumbers.delete(key);
       }
       for (const key of Array.from(this.layerArtifactHandles.keys())) {
         if (key.startsWith(prefix)) this.releaseLayerArtifactHandle(key);
@@ -1947,6 +1975,9 @@ export class DocumentService {
         layer: layerSource,
         password: openPassword,
         baseSha256: layerBaseSha,
+        // The server hands object numbers to editing sessions and checks
+        // them before dispatch (LayerWriteObjectNumbers).
+        objectNumbers: 'caller' as const,
       };
       return wirePack(request);
     };
@@ -1961,6 +1992,9 @@ export class DocumentService {
       }
       this.replaceLayerArtifactHandle(sessionKey, layerHandle);
       layerHandle = null;
+      if (result.lastObjectNumber !== undefined) {
+        this.layerOpenObjectNumbers.set(sessionKey, result.lastObjectNumber);
+      }
       // The fence entry: this session is a materialization of exactly the
       // layer version whose artifact was just opened (0 = fresh, no row).
       this.layerSessionVersions.set(sessionKey, layer?.currentVersion ?? 0);
@@ -2009,6 +2043,9 @@ export class DocumentService {
   private forgetLayerSessions(docId: string): void {
     for (const key of Array.from(this.layerSessionVersions.keys())) {
       if (key.startsWith(`${docId}::`)) this.layerSessionVersions.delete(key);
+    }
+    for (const key of Array.from(this.layerOpenObjectNumbers.keys())) {
+      if (key.startsWith(`${docId}::`)) this.layerOpenObjectNumbers.delete(key);
     }
     for (const key of Array.from(this.layerArtifactHandles.keys())) {
       if (key.startsWith(`${docId}::`)) this.releaseLayerArtifactHandle(key);

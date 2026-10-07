@@ -38,6 +38,8 @@ import {
 } from '../auth/JwtVerifier';
 import { matchesOrigin } from '../auth/origins';
 import type { SuspendedTenantsGuard } from '../auth/SuspendedTenantsGuard';
+import type { EditRequest } from '../services/LayerWriteObjectNumbers';
+import { MAX_OBJECT_NUMBER_TOP_UP } from '../services/ObjectNumberService';
 
 declare module 'fastify' {
   interface FastifyRequest {
@@ -54,6 +56,12 @@ declare module 'fastify' {
      * hook. Never logged; carried into `RequestJwtContext.docPassword`.
      */
     docPassword?: string;
+    /**
+     * The request's editing session asks (see `editSessionOf`): set by the
+     * layer guards, read back for the `EmbedPDF-Object-Numbers` response
+     * header.
+     */
+    editRequest?: EditRequest;
   }
 }
 
@@ -587,6 +595,30 @@ export function requireCollabAction(
   return ctx;
 }
 
+/**
+ * Whether the token may make new objects on the document, so its editing
+ * session is handed object numbers: create annotations (as itself, in its
+ * own group), insert pages, or add form fields. What the document's
+ * signatures forbid doesn't count. A tenant owns its documents.
+ */
+export function mayCreateObjects(
+  ctx: { mode: DocAccessMode; jwt: RequestJwtContext },
+  pdfBits: PdfBits,
+  protection: DocumentProtection | null,
+): boolean {
+  if (ctx.mode === 'tenant') return true;
+  const { scope, identity } = ctx.jwt;
+  if (checkAnyCapability(['doc.pages.assemble', 'doc.forms.modify'], scope, pdfBits, protection)) {
+    return true;
+  }
+  if (protection && protectedCapabilities(protection).has('doc.annotate.modify')) return false;
+  const self: CollabTarget = {
+    ...(identity.userId !== undefined ? { userId: identity.userId } : {}),
+    ...(identity.groupId !== undefined ? { groupId: identity.groupId } : {}),
+  };
+  return checkCollab('create', self, scope, identity, pdfBits);
+}
+
 // Layer-scoped variants — wrap the doc-only versions with the existing
 // layer pin check (the token's `layer_name` claim, defaulting to
 // 'default', must match the URL).
@@ -614,6 +646,8 @@ type LayerGuardContext = {
   mode: DocAccessMode;
   jwt: RequestJwtContext;
   originSessionId: string | null;
+  edit?: EditRequest;
+  idempotencyKey?: string;
 };
 
 export function requireLayerCapability<C extends DocCapability>(
@@ -632,17 +666,66 @@ export function requireLayerCapability<C extends DocCapability>(
     protectionOf(protection),
   );
   enforceLayerPin(req, layerName);
-  // The mutating client's engine-instance id (X-Engine-Session-Id). Stored on
-  // the audit row so SSE subscribers can drop their own echoes. Advisory only
-  // — it never participates in auth — so it's length-capped, not validated.
-  return { ...ctx, originSessionId: originSessionIdFromRequest(req) };
+  return { ...ctx, ...writeRequestOf(req) };
 }
 
-function originSessionIdFromRequest(req: FastifyRequest): string | null {
+/**
+ * The request's editing session. `originSessionId` is the client's
+ * engine-instance id (X-Engine-Session-Id), stored on the audit row so SSE
+ * subscribers can drop their own echoes; it is length-capped, not
+ * validated. With it, `edit` says how many object numbers to top the session
+ * up by (EmbedPDF-Reserve-Object-Numbers, at most 32) and collects what a
+ * write hands out, for the response's `EmbedPDF-Object-Numbers`. Object
+ * numbers belong to the session id and the token's subject together, so
+ * the id alone grants nothing.
+ */
+export function editSessionOf(req: FastifyRequest): {
+  originSessionId: string | null;
+  edit?: EditRequest;
+} {
   const raw = req.headers['x-engine-session-id'];
   const value = Array.isArray(raw) ? raw[0] : raw;
-  if (typeof value !== 'string' || value.length === 0) return null;
-  return value.slice(0, 128);
+  if (typeof value !== 'string' || value.length === 0) return { originSessionId: null };
+  req.editRequest ??= { topUp: reserveCountOf(req), issued: [] };
+  return { originSessionId: value.slice(0, 128), edit: req.editRequest };
+}
+
+/** What a layer request carries for a write: its editing session and its `Idempotency-Key`. */
+function writeRequestOf(req: FastifyRequest): {
+  originSessionId: string | null;
+  edit?: EditRequest;
+  idempotencyKey?: string;
+} {
+  const idempotencyKey = idempotencyKeyOf(req);
+  return { ...editSessionOf(req), ...(idempotencyKey ? { idempotencyKey } : {}) };
+}
+
+/** The `Idempotency-Key` header: printable ASCII, 1 to 255 characters. */
+function idempotencyKeyOf(req: FastifyRequest): string | undefined {
+  const header = req.headers['idempotency-key'];
+  if (header === undefined) return undefined;
+  if (typeof header !== 'string' || !/^[\x21-\x7e]{1,255}$/.test(header)) {
+    throw new EngineError(
+      EngineErrorCode.InvalidArg,
+      'Idempotency-Key must be 1 to 255 printable ASCII characters',
+    );
+  }
+  return header;
+}
+
+/** `EmbedPDF-Reserve-Object-Numbers`: how many numbers to top the session up by, at most 32. */
+function reserveCountOf(req: FastifyRequest): number {
+  const raw = req.headers['embedpdf-reserve-object-numbers'];
+  const value = Array.isArray(raw) ? raw[0] : raw;
+  if (value === undefined || value === '') return 0;
+  const count = Number(value);
+  if (!Number.isInteger(count) || count < 0) {
+    throw new EngineError(
+      EngineErrorCode.InvalidArg,
+      'EmbedPDF-Reserve-Object-Numbers must be a whole number of object numbers',
+    );
+  }
+  return Math.min(count, MAX_OBJECT_NUMBER_TOP_UP);
 }
 
 export function requireLayerAnyCapability(
@@ -651,16 +734,10 @@ export function requireLayerAnyCapability(
   layerName: string,
   capabilities: ReadonlyArray<UnprotectableCapability>,
   pdfBits: PdfBits,
-): {
-  tenantId: string;
-  sub: string;
-  mode: DocAccessMode;
-  jwt: RequestJwtContext;
-  originSessionId: string | null;
-} {
+): LayerGuardContext {
   const ctx = requireAnyCapability(req, docId, capabilities, pdfBits);
   enforceLayerPin(req, layerName);
-  return { ...ctx, originSessionId: originSessionIdFromRequest(req) };
+  return { ...ctx, ...writeRequestOf(req) };
 }
 
 export function requireLayerResource(
@@ -669,16 +746,10 @@ export function requireLayerResource(
   layerName: string,
   resourceId: DocResourceId,
   pdfBits: PdfBits,
-): {
-  tenantId: string;
-  sub: string;
-  mode: DocAccessMode;
-  jwt: RequestJwtContext;
-  originSessionId: string | null;
-} {
+): LayerGuardContext {
   const ctx = requireResource(req, docId, resourceId, pdfBits);
   enforceLayerPin(req, layerName);
-  return { ...ctx, originSessionId: originSessionIdFromRequest(req) };
+  return { ...ctx, ...writeRequestOf(req) };
 }
 
 export function requireLayerCollabAction(
@@ -692,7 +763,7 @@ export function requireLayerCollabAction(
 ): LayerGuardContext {
   const ctx = requireCollabAction(req, docId, action, target, pdfBits, protection);
   enforceLayerPin(req, layerName);
-  return { ...ctx, originSessionId: originSessionIdFromRequest(req) };
+  return { ...ctx, ...writeRequestOf(req) };
 }
 
 /**
@@ -713,7 +784,7 @@ export function requireLayerAnnotationWrite(
   refuseProtected('doc.annotate.modify', protection);
   return {
     ...ctx,
-    originSessionId: originSessionIdFromRequest(req),
+    ...writeRequestOf(req),
     authority: {
       identity: ctx.jwt.identity,
       grants: ctx.mode === 'tenant' ? null : { scope: ctx.jwt.scope, pdfBits },

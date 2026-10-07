@@ -1357,6 +1357,15 @@ export const documentPasswordHeader: AdminOperationHeader = {
     'the header is absent. Viewer doc JWTs use the SDK password-session flow instead.',
 };
 
+/** The header that makes a layer write safe to retry. */
+export const idempotencyKeyHeader: AdminOperationHeader = {
+  name: 'Idempotency-Key',
+  required: false,
+  description:
+    'Names the change: 1 to 255 printable ASCII characters. A retry under the same key on ' +
+    'the same layer answers with what the first request committed, and changes nothing.',
+};
+
 const looseJson = z.record(z.string(), z.unknown());
 const docCredentials = ['api-token', 'doc-jwt'] as const;
 
@@ -1763,7 +1772,7 @@ export const docOperations = {
     credentials: docCredentials,
     scope: [],
     docCapabilities: ['doc.annotate.modify'],
-    requestHeaders: [documentPasswordHeader],
+    requestHeaders: [documentPasswordHeader, idempotencyKeyHeader],
     params: DocPageParamsSchema,
     body: { contentType: 'application/json', schema: looseJson },
     notes:
@@ -1784,7 +1793,7 @@ export const docOperations = {
     credentials: docCredentials,
     scope: [],
     docCapabilities: ['doc.annotate.modify'],
-    requestHeaders: [documentPasswordHeader],
+    requestHeaders: [documentPasswordHeader, idempotencyKeyHeader],
     params: DocAnnotationParamsSchema,
     body: { contentType: 'application/json', schema: looseJson },
     responses: {
@@ -1802,7 +1811,7 @@ export const docOperations = {
     credentials: docCredentials,
     scope: [],
     docCapabilities: ['doc.annotate.modify'],
-    requestHeaders: [documentPasswordHeader],
+    requestHeaders: [documentPasswordHeader, idempotencyKeyHeader],
     params: DocAnnotationParamsSchema,
     responses: {
       200: { contentType: 'application/json', schema: AnnotationDeleteResultSchema },
@@ -1819,7 +1828,7 @@ export const docOperations = {
     credentials: docCredentials,
     scope: [],
     docCapabilities: ['doc.pages.modify', 'doc.annotate.modify'],
-    requestHeaders: [documentPasswordHeader],
+    requestHeaders: [documentPasswordHeader, idempotencyKeyHeader],
     params: DocPageParamsSchema,
     body: { contentType: 'application/json', schema: looseJson },
     responses: {
@@ -1890,7 +1899,7 @@ export const docOperations = {
     credentials: docCredentials,
     scope: [],
     docCapabilities: ['doc.forms.fill'],
-    requestHeaders: [documentPasswordHeader],
+    requestHeaders: [documentPasswordHeader, idempotencyKeyHeader],
     params: DocFieldParamsSchema,
     body: { contentType: 'application/json', schema: looseJson },
     responses: {
@@ -1909,7 +1918,7 @@ export const docOperations = {
     credentials: docCredentials,
     scope: [],
     docCapabilities: ['doc.forms.fill'],
-    requestHeaders: [documentPasswordHeader],
+    requestHeaders: [documentPasswordHeader, idempotencyKeyHeader],
     params: DocLayerParamsSchema,
     body: { contentType: 'application/json', schema: FormResetBodySchema },
     responses: {
@@ -1944,7 +1953,7 @@ export const docOperations = {
     credentials: docCredentials,
     scope: [],
     docCapabilities: ['doc.forms.fill'],
-    requestHeaders: [documentPasswordHeader],
+    requestHeaders: [documentPasswordHeader, idempotencyKeyHeader],
     params: DocLayerParamsSchema,
     body: { contentType: 'application/json', schema: looseJson },
     responses: {
@@ -1979,7 +1988,7 @@ export const docOperations = {
     credentials: docCredentials,
     scope: [],
     docCapabilities: ['doc.annotate.modify'],
-    requestHeaders: [documentPasswordHeader],
+    requestHeaders: [documentPasswordHeader, idempotencyKeyHeader],
     params: DocPageParamsSchema,
     body: { contentType: 'application/json', schema: PageScaleInputSchema },
     responses: {
@@ -1997,7 +2006,7 @@ export const docOperations = {
     credentials: docCredentials,
     scope: [],
     docCapabilities: ['doc.pages.assemble'],
-    requestHeaders: [documentPasswordHeader],
+    requestHeaders: [documentPasswordHeader, idempotencyKeyHeader],
     params: DocLayerParamsSchema,
     body: { contentType: 'application/json', schema: looseJson },
     responses: {
@@ -2015,7 +2024,7 @@ export const docOperations = {
     credentials: docCredentials,
     scope: [],
     docCapabilities: ['doc.pages.assemble'],
-    requestHeaders: [documentPasswordHeader],
+    requestHeaders: [documentPasswordHeader, idempotencyKeyHeader],
     params: DocLayerParamsSchema,
     body: { contentType: 'application/json', schema: looseJson },
     responses: {
@@ -2033,7 +2042,7 @@ export const docOperations = {
     credentials: docCredentials,
     scope: [],
     docCapabilities: ['doc.pages.assemble'],
-    requestHeaders: [documentPasswordHeader],
+    requestHeaders: [documentPasswordHeader, idempotencyKeyHeader],
     params: DocLayerParamsSchema,
     body: { contentType: 'application/json', schema: looseJson },
     responses: {
@@ -2052,7 +2061,7 @@ export const docOperations = {
     credentials: docCredentials,
     scope: [],
     docCapabilities: ['doc.pages.assemble'],
-    requestHeaders: [documentPasswordHeader],
+    requestHeaders: [documentPasswordHeader, idempotencyKeyHeader],
     params: DocLayerParamsSchema,
     body: { contentType: 'application/json', schema: looseJson },
     responses: {
@@ -2070,7 +2079,7 @@ export const docOperations = {
     credentials: docCredentials,
     scope: [],
     docCapabilities: ['doc.pages.assemble'],
-    requestHeaders: [documentPasswordHeader],
+    requestHeaders: [documentPasswordHeader, idempotencyKeyHeader],
     params: DocLayerParamsSchema,
     body: { contentType: 'application/json', schema: looseJson },
     responses: {
@@ -2088,7 +2097,7 @@ export const docOperations = {
     credentials: docCredentials,
     scope: [],
     docCapabilities: ['doc.pages.modify', 'doc.annotate.modify'],
-    requestHeaders: [documentPasswordHeader],
+    requestHeaders: [documentPasswordHeader, idempotencyKeyHeader],
     params: DocLayerParamsSchema,
     body: { contentType: 'application/json', schema: looseJson, required: false },
     responses: {
@@ -2106,7 +2115,7 @@ export const docOperations = {
     credentials: docCredentials,
     scope: [],
     docCapabilities: ['doc.pages.assemble'],
-    requestHeaders: [documentPasswordHeader],
+    requestHeaders: [documentPasswordHeader, idempotencyKeyHeader],
     params: DocLayerParamsSchema,
     body: {
       contentType: 'multipart/form-data',
@@ -2128,7 +2137,7 @@ export const docOperations = {
     credentials: docCredentials,
     scope: [],
     docCapabilities: ['doc.pages.assemble'],
-    requestHeaders: [documentPasswordHeader],
+    requestHeaders: [documentPasswordHeader, idempotencyKeyHeader],
     params: DocLayerParamsSchema,
     body: { contentType: 'application/json', schema: looseJson },
     responses: {
@@ -2168,7 +2177,7 @@ export const docOperations = {
     credentials: docCredentials,
     scope: [],
     docCapabilities: ['doc.pages.modify', 'doc.annotate.modify', 'doc.redact'],
-    requestHeaders: [documentPasswordHeader],
+    requestHeaders: [documentPasswordHeader, idempotencyKeyHeader],
     params: DocLayerParamsSchema,
     body: { contentType: 'application/json', schema: RedactionApplyScopeSchema },
     responses: {

@@ -493,6 +493,26 @@ export class DocumentSession {
   /** Held numbers the open transaction made objects at: spent when it commits. */
   private objectNumbersInUse: number[] = [];
 
+  /** The layer's last object number: every object it has is at or below it. */
+  lastObjectNumber(): number {
+    return this.runtime.fn.EPDFLayer_GetLastObjectNumber(this.requireDocPtr());
+  }
+
+  /**
+   * Raise the layer's last object number to at least `last`, so the objects
+   * the next write makes for itself get numbers above it. A raise outlives
+   * an abort: numbers once passed are never handed out again.
+   */
+  raiseLastObjectNumber(last: number): void {
+    if (!this.runtime.fn.EPDFLayer_RaiseLastObjectNumber(this.requireDocPtr(), last)) {
+      throw new EngineError(
+        EngineErrorCode.LayerFull,
+        `the document would pass object number ${last}`,
+        { details: { lastObjectNumber: this.lastObjectNumber() } },
+      );
+    }
+  }
+
   /**
    * Hand out `count` more numbers: the layer's last object number moves up
    * by `count`, so nothing the engine makes lands on them, and they are this

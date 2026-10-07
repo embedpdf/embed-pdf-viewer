@@ -2,6 +2,7 @@ import type { Identity } from '../auth/scope/types';
 import type { DocCapability, PdfBits } from '../auth/scope';
 import type { AbortablePromise } from '../promise/AbortablePromise';
 import type { DocumentProtection } from '../signature/types';
+import type { EditSessionAccess } from '../identity/ObjectNumbers';
 import type { AnnotationBundleLimits } from '../transfer/bundleLimits';
 
 export type DocumentOpenMode = 'none' | 'user' | 'owner';
@@ -170,6 +171,12 @@ export interface DocumentAccessInfo {
    * checks a bundle against these before its bytes move.
    */
   readonly annotationBundleLimits: AnnotationBundleLimits;
+  /**
+   * The caller's editing session and the object numbers handed to it,
+   * present when the caller may create objects and named its session
+   * (`X-Engine-Session-Id`).
+   */
+  readonly edit?: EditSessionAccess;
 }
 
 export interface DocumentUnlockInput {

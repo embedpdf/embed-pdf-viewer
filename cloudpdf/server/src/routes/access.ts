@@ -19,15 +19,23 @@ import {
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 
 import { setNoStore } from './_helpers';
-import { requireLayerDocAccessOnly, type RequestJwtContext } from '../app/jwt-plugin';
+import {
+  editSessionOf,
+  mayCreateObjects,
+  requireLayerDocAccessOnly,
+  type RequestJwtContext,
+} from '../app/jwt-plugin';
 import type { CdnSigner } from '../cdn/CdnSigner';
 import type { TenantUsageRepo } from '../db/repos/tenant_usage.repo';
 import type { UsageMeters } from '../licensing/UsageMeters';
 import type { DerivedRenderService } from '../services/DerivedRenderService';
 import type { DocumentService } from '../services/DocumentService';
+import type { LayerService } from '../services/LayerService';
 
 export interface AccessRouteDeps {
   service: DocumentService;
+  /** Opens the editing sessions of callers that may create. */
+  layers: LayerService;
   cdnSigner: CdnSigner;
   /** When present, /access advertises the deployment's render lattice. */
   derivedRenders?: DerivedRenderService;
@@ -41,8 +49,15 @@ export async function registerAccessRoutes(
   app: FastifyInstance,
   deps: AccessRouteDeps,
 ): Promise<void> {
-  const { service, cdnSigner, derivedRenders, usageMeters, tenantUsage, annotationBundleLimits } =
-    deps;
+  const {
+    service,
+    layers,
+    cdnSigner,
+    derivedRenders,
+    usageMeters,
+    tenantUsage,
+    annotationBundleLimits,
+  } = deps;
 
   const handleAccess = async (
     req: FastifyRequest,
@@ -121,6 +136,20 @@ export async function registerAccessRoutes(
       derivedRenders?.policy(),
       layerScopes,
     );
+    // A caller that may create gets its editing session: made, revived or
+    // kept alive, and handed the object numbers it asks for.
+    const session = editSessionOf(req);
+    const edit =
+      session.originSessionId && mayCreateObjects(ctx, pdfBits, protection)
+        ? await layers.openEditSession(
+            { ...ctx, ...session },
+            {
+              docId,
+              layerName,
+              ...(body.objectNumbers !== undefined ? { wanted: body.objectNumbers } : {}),
+            },
+          )
+        : undefined;
     // A view is a successfully authorized viewer access grant. Counting at
     // this choke point avoids charging internal render/cache operations.
     // Share sessions (`sub: share:<id>`) were already counted at exchange —
@@ -134,6 +163,7 @@ export async function registerAccessRoutes(
     return {
       security: unlocked.security,
       ...access,
+      ...(edit ? { edit } : {}),
     };
   };
 

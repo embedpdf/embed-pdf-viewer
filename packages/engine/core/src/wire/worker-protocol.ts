@@ -128,6 +128,18 @@ export type RequestEffect =
   | 'open'
   | 'close';
 
+/** What every document write request may carry besides its own fields. */
+export interface WriteJobFields {
+  /**
+   * The first object number the objects the write makes for itself may take
+   * (appearance streams, fonts). The worker raises the layer's last object
+   * number to just below it before the write runs. A caller that hands
+   * object numbers to editing sessions keeps them all below it, so the
+   * write's own objects never land on one.
+   */
+  objectNumberFloor?: number;
+}
+
 export interface OpenFatMemoryWorkerRequest {
   kind: 'open.fatMem';
   effect: 'open';
@@ -287,7 +299,7 @@ export interface SignaturesPrepareWorkerRequest {
   input: SignaturePrepareInput;
 }
 
-export interface SignaturesCompleteWorkerRequest {
+export interface SignaturesCompleteWorkerRequest extends WriteJobFields {
   kind: 'signatures.complete';
   effect: 'contentWrite';
   jobId: WorkerJobId;
@@ -346,7 +358,7 @@ export interface MetadataReadWorkerRequest {
   layerName?: string;
 }
 
-export interface MetadataUpdateWorkerRequest {
+export interface MetadataUpdateWorkerRequest extends WriteJobFields {
   kind: 'metadata.update';
   effect: 'write';
   jobId: WorkerJobId;
@@ -364,7 +376,7 @@ export interface MetadataReadCustomWorkerRequest {
   layerName?: string;
 }
 
-export interface MetadataUpdateCustomWorkerRequest {
+export interface MetadataUpdateCustomWorkerRequest extends WriteJobFields {
   kind: 'metadata.updateCustom';
   effect: 'write';
   jobId: WorkerJobId;
@@ -412,7 +424,9 @@ export interface AnnotationsRenderAppearancesWorkerRequest {
   options?: AnnotationAppearanceRenderOptions;
 }
 
-export interface AnnotationsCreateWorkerRequest<C extends Coordinates = PageCoordinates> {
+export interface AnnotationsCreateWorkerRequest<
+  C extends Coordinates = PageCoordinates,
+> extends WriteJobFields {
   kind: 'annotations.create';
   effect: 'write';
   jobId: WorkerJobId;
@@ -439,7 +453,9 @@ export interface AnnotationsCreateWorkerRequest<C extends Coordinates = PageCoor
   actor?: AnnotationActor;
 }
 
-export interface AnnotationsUpdateWorkerRequest<C extends Coordinates = PageCoordinates> {
+export interface AnnotationsUpdateWorkerRequest<
+  C extends Coordinates = PageCoordinates,
+> extends WriteJobFields {
   kind: 'annotations.update';
   effect: 'write';
   jobId: WorkerJobId;
@@ -459,7 +475,7 @@ export interface AnnotationsUpdateWorkerRequest<C extends Coordinates = PageCoor
   authority: AnnotationAuthority;
 }
 
-export interface AnnotationsDeleteWorkerRequest {
+export interface AnnotationsDeleteWorkerRequest extends WriteJobFields {
   kind: 'annotations.delete';
   effect: 'write';
   jobId: WorkerJobId;
@@ -476,7 +492,7 @@ export interface AnnotationsDeleteWorkerRequest {
 
 /** Flatten a chosen set of one page's annotations into its content — see
  *  `AnnotationFlattenInput`. A content + annotation mutation of that page. */
-export interface AnnotationsFlattenWorkerRequest {
+export interface AnnotationsFlattenWorkerRequest extends WriteJobFields {
   kind: 'annotations.flatten';
   effect: 'contentWrite';
   jobId: WorkerJobId;
@@ -518,7 +534,7 @@ export interface AnnotationsExportWorkerRequest {
  * stays in page space on its way in: the import measures each item on the
  * page it goes to, which only the import works out.
  */
-export interface AnnotationsImportWorkerRequest {
+export interface AnnotationsImportWorkerRequest extends WriteJobFields {
   kind: 'annotations.import';
   effect: 'write';
   jobId: WorkerJobId;
@@ -553,7 +569,7 @@ export interface AnnotationsReadAppearanceWorkerRequest {
  * move so the impact computation has a single before-state and one
  * revision bump per batch.
  */
-export interface AnnotationsMoveWorkerRequest {
+export interface AnnotationsMoveWorkerRequest extends WriteJobFields {
   kind: 'annotations.move';
   effect: 'write';
   jobId: WorkerJobId;
@@ -578,7 +594,7 @@ export interface FormsListWorkerRequest {
   layerName?: string;
 }
 
-export interface FormsSetValueWorkerRequest {
+export interface FormsSetValueWorkerRequest extends WriteJobFields {
   kind: 'forms.setValue';
   effect: 'write';
   jobId: WorkerJobId;
@@ -589,7 +605,7 @@ export interface FormsSetValueWorkerRequest {
   artifactPath?: string;
 }
 
-export interface FormsResetWorkerRequest {
+export interface FormsResetWorkerRequest extends WriteJobFields {
   kind: 'forms.reset';
   effect: 'write';
   jobId: WorkerJobId;
@@ -600,7 +616,7 @@ export interface FormsResetWorkerRequest {
   artifactPath?: string;
 }
 
-export interface FormsApplyEffectsWorkerRequest {
+export interface FormsApplyEffectsWorkerRequest extends WriteJobFields {
   kind: 'forms.applyEffects';
   effect: 'write';
   jobId: WorkerJobId;
@@ -619,7 +635,7 @@ export interface FormsExportWorkerRequest {
   format: FormDataFormat;
 }
 
-export interface FormsImportWorkerRequest {
+export interface FormsImportWorkerRequest extends WriteJobFields {
   kind: 'forms.import';
   effect: 'write';
   jobId: WorkerJobId;
@@ -632,7 +648,7 @@ export interface FormsImportWorkerRequest {
   artifactPath?: string;
 }
 
-export interface FormsRepairWorkerRequest {
+export interface FormsRepairWorkerRequest extends WriteJobFields {
   kind: 'forms.repair';
   effect: 'write';
   jobId: WorkerJobId;
@@ -642,7 +658,9 @@ export interface FormsRepairWorkerRequest {
   artifactPath?: string;
 }
 
-export interface FormsCreateFieldWorkerRequest<C extends Coordinates = PageCoordinates> {
+export interface FormsCreateFieldWorkerRequest<
+  C extends Coordinates = PageCoordinates,
+> extends WriteJobFields {
   kind: 'forms.createField';
   effect: 'write';
   jobId: WorkerJobId;
@@ -656,7 +674,7 @@ export interface FormsCreateFieldWorkerRequest<C extends Coordinates = PageCoord
   artifactPath?: string;
 }
 
-export interface FormsUpdateFieldWorkerRequest {
+export interface FormsUpdateFieldWorkerRequest extends WriteJobFields {
   kind: 'forms.updateField';
   effect: 'write';
   jobId: WorkerJobId;
@@ -668,7 +686,7 @@ export interface FormsUpdateFieldWorkerRequest {
 }
 
 /** Draw a PDF page into every widget of an unsigned signature field (the visual fill). */
-export interface FormsSetSignatureAppearanceWorkerRequest {
+export interface FormsSetSignatureAppearanceWorkerRequest extends WriteJobFields {
   kind: 'forms.setSignatureAppearance';
   effect: 'write';
   jobId: WorkerJobId;
@@ -679,7 +697,7 @@ export interface FormsSetSignatureAppearanceWorkerRequest {
   artifactPath?: string;
 }
 
-export interface FormsDeleteFieldWorkerRequest {
+export interface FormsDeleteFieldWorkerRequest extends WriteJobFields {
   kind: 'forms.deleteField';
   effect: 'write';
   jobId: WorkerJobId;
@@ -689,7 +707,9 @@ export interface FormsDeleteFieldWorkerRequest {
   artifactPath?: string;
 }
 
-export interface FormsAddWidgetWorkerRequest<C extends Coordinates = PageCoordinates> {
+export interface FormsAddWidgetWorkerRequest<
+  C extends Coordinates = PageCoordinates,
+> extends WriteJobFields {
   kind: 'forms.addWidget';
   effect: 'write';
   jobId: WorkerJobId;
@@ -704,7 +724,7 @@ export interface FormsAddWidgetWorkerRequest<C extends Coordinates = PageCoordin
   artifactPath?: string;
 }
 
-export interface FormsDetachWidgetWorkerRequest {
+export interface FormsDetachWidgetWorkerRequest extends WriteJobFields {
   kind: 'forms.detachWidget';
   effect: 'write';
   jobId: WorkerJobId;
@@ -878,7 +898,7 @@ export interface AnnotationAppearancesEncodedResultWire<C extends Coordinates = 
   appearances: EncodedAppearanceWire<C>[];
 }
 
-export interface PagesMoveWorkerRequest {
+export interface PagesMoveWorkerRequest extends WriteJobFields {
   kind: 'pages.move';
   effect: 'contentWrite';
   jobId: WorkerJobId;
@@ -889,7 +909,7 @@ export interface PagesMoveWorkerRequest {
   artifactPath?: string;
 }
 
-export interface PagesRotateWorkerRequest {
+export interface PagesRotateWorkerRequest extends WriteJobFields {
   kind: 'pages.rotate';
   effect: 'contentWrite';
   jobId: WorkerJobId;
@@ -901,7 +921,7 @@ export interface PagesRotateWorkerRequest {
   artifactPath?: string;
 }
 
-export interface PagesDeleteWorkerRequest {
+export interface PagesDeleteWorkerRequest extends WriteJobFields {
   kind: 'pages.delete';
   effect: 'contentWrite';
   jobId: WorkerJobId;
@@ -912,7 +932,7 @@ export interface PagesDeleteWorkerRequest {
 }
 
 /** Register/rename a `/Names /Pages` entry — see `PageNameInput`. */
-export interface PagesSetNameWorkerRequest {
+export interface PagesSetNameWorkerRequest extends WriteJobFields {
   kind: 'pages.setName';
   effect: 'write';
   jobId: WorkerJobId;
@@ -925,7 +945,7 @@ export interface PagesSetNameWorkerRequest {
 }
 
 /** Remove a `/Names /Pages` entry — see `PageRemoveNameInput`. */
-export interface PagesRemoveNameWorkerRequest {
+export interface PagesRemoveNameWorkerRequest extends WriteJobFields {
   kind: 'pages.removeName';
   effect: 'write';
   jobId: WorkerJobId;
@@ -935,7 +955,7 @@ export interface PagesRemoveNameWorkerRequest {
   artifactPath?: string;
 }
 
-export interface PagesFlattenWorkerRequest {
+export interface PagesFlattenWorkerRequest extends WriteJobFields {
   kind: 'pages.flatten';
   effect: 'contentWrite';
   jobId: WorkerJobId;
@@ -946,7 +966,7 @@ export interface PagesFlattenWorkerRequest {
   artifactPath?: string;
 }
 
-export interface RedactionApplyWorkerRequest {
+export interface RedactionApplyWorkerRequest extends WriteJobFields {
   kind: 'redaction.apply';
   effect: 'contentWrite';
   jobId: WorkerJobId;
@@ -1004,7 +1024,7 @@ export interface AttachmentsReadFileWorkerRequest {
  * out-of-band under the referenced resource key. `file.name` becomes the
  * name-tree key.
  */
-export interface AttachmentsCreateWorkerRequest {
+export interface AttachmentsCreateWorkerRequest extends WriteJobFields {
   kind: 'attachments.create';
   effect: 'write';
   jobId: WorkerJobId;
@@ -1017,7 +1037,7 @@ export interface AttachmentsCreateWorkerRequest {
 }
 
 /** Delete a document-level embedded file by key (a mutation). */
-export interface AttachmentsDeleteWorkerRequest {
+export interface AttachmentsDeleteWorkerRequest extends WriteJobFields {
   kind: 'attachments.delete';
   effect: 'write';
   jobId: WorkerJobId;
@@ -1045,7 +1065,7 @@ export interface AnnotationsReadFileWorkerRequest {
 /** Insert every page of a standalone PDF (transferable `bytes`) at
  *  `toIndex` (omitted → append). A structural mutation: layer sessions
  *  persist an artifact like move/rotate/delete. */
-export interface PagesInsertWorkerRequest {
+export interface PagesInsertWorkerRequest extends WriteJobFields {
   kind: 'pages.insert';
   effect: 'contentWrite';
   jobId: WorkerJobId;
@@ -1060,7 +1080,7 @@ export interface PagesInsertWorkerRequest {
  *  `toIndex` (omitted → append). A structural mutation exactly like
  *  `pages.insert`, minus the bytes: pure parameters, so nothing transfers;
  *  layer sessions persist an artifact identically. */
-export interface PagesInsertBlankWorkerRequest {
+export interface PagesInsertBlankWorkerRequest extends WriteJobFields {
   kind: 'pages.insertBlank';
   effect: 'contentWrite';
   jobId: WorkerJobId;
@@ -1089,7 +1109,7 @@ export interface MeasureViewportsWorkerRequest {
   layerName?: string;
   page: PageRef;
 }
-export interface MeasureSetScaleWorkerRequest {
+export interface MeasureSetScaleWorkerRequest extends WriteJobFields {
   kind: 'measure.setScale';
   effect: 'write';
   jobId: WorkerJobId;
@@ -1110,7 +1130,7 @@ export interface PieceInfoReadWorkerRequest {
   application: string;
 }
 
-export interface PieceInfoUpdateWorkerRequest {
+export interface PieceInfoUpdateWorkerRequest extends WriteJobFields {
   kind: 'pieceInfo.update';
   effect: 'write';
   jobId: WorkerJobId;
@@ -1131,7 +1151,7 @@ export interface PieceInfoApplicationsWorkerRequest {
   page?: PageRef;
 }
 
-export interface PieceInfoDeleteWorkerRequest {
+export interface PieceInfoDeleteWorkerRequest extends WriteJobFields {
   kind: 'pieceInfo.delete';
   effect: 'write';
   jobId: WorkerJobId;
@@ -1330,6 +1350,8 @@ export interface ShutdownWorkerRequest {
 export interface LayerArtifactWorkerPayload {
   bytes: ArrayBuffer;
   size: number;
+  /** The layer's last object number as saved: every object it has is at or below it. */
+  lastObjectNumber: number;
 }
 
 /**
@@ -1348,6 +1370,8 @@ export interface AttachmentFileWorkerPayload {
 
 export interface LayerArtifactFileWorkerPayload {
   path: string;
+  /** The layer's last object number as saved: every object it has is at or below it. */
+  lastObjectNumber: number;
 }
 
 /**
@@ -1475,6 +1499,8 @@ export type WorkerResultPayload<C extends Coordinates = PageCoordinates> =
       passwordRejected?: boolean;
       /** The numbers `reserveObjectNumbers` asked for; absent for a locked open. */
       objectNumbers?: ObjectNumberRange;
+      /** The layer's last object number as it opened; absent for a locked open. */
+      lastObjectNumber?: number;
     }
   | { tag: 'objectNumbers.reserve'; range: ObjectNumberRange }
   | { tag: 'signatures.list'; snapshot: SignatureSnapshot<C> }
@@ -1498,6 +1524,8 @@ export type WorkerResultPayload<C extends Coordinates = PageCoordinates> =
        * the finalizer measures it while its own session is open.
        */
       signature: SignatureDTO;
+      /** The sealed file's last object number: every object it has is at or below it. */
+      lastObjectNumber: number;
       /** What the sealed file's signatures forbid from now on. */
       protection: DocumentProtection;
       /** The version the sealed file is (hash and length of the whole file). */

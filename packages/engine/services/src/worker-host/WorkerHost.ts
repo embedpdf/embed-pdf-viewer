@@ -107,6 +107,8 @@ import {
   type WorkerResultPayload,
   type PdfCoordinates,
   type VisibleBoxOf,
+  type LayerArtifactFileWorkerPayload,
+  type LayerArtifactWorkerPayload,
 } from '@embedpdf/engine-core/runtime';
 import type { PdfRuntimeModule } from '@embedpdf/engine-runtime';
 
@@ -475,6 +477,10 @@ export class WorkerHost {
       // candidate never changed.
       this.assertNoPendingSigning(msg);
       transacted?.beginTransaction();
+      // The write's own objects go at or above the floor its caller set.
+      if (transacted && 'objectNumberFloor' in msg && msg.objectNumberFloor !== undefined) {
+        transacted.raiseLastObjectNumber(msg.objectNumberFloor - 1);
+      }
       switch (msg.kind) {
         case 'open.fatMem':
         case 'open.layerMemBase':
@@ -845,6 +851,7 @@ export class WorkerHost {
       ...(req.reserveObjectNumbers
         ? { objectNumbers: session.reserveObjectNumbers(req.reserveObjectNumbers) }
         : {}),
+      lastObjectNumber: session.lastObjectNumber(),
     });
   }
 
@@ -2265,17 +2272,20 @@ export class WorkerHost {
 
   private saveLayerArtifact(session: DocumentSession, artifactPath?: string): LayerArtifactSave {
     const saver = new DocumentSaver(this.runtime, session);
+    const lastObjectNumber = session.lastObjectNumber();
     if (artifactPath) {
-      const artifactFile = saver.saveLayerArtifactToFile(artifactPath);
+      const artifactFile = { ...saver.saveLayerArtifactToFile(artifactPath), lastObjectNumber };
       return { payload: { artifactFile }, transfer: [] };
     }
-    const artifact = saver.saveLayerArtifact();
+    const artifact = { ...saver.saveLayerArtifact(), lastObjectNumber };
     return { payload: { artifact }, transfer: [artifact.bytes] };
   }
 }
 
 interface LayerArtifactSave {
-  payload: { artifact: { bytes: ArrayBuffer; size: number } } | { artifactFile: { path: string } };
+  payload:
+    | { artifact: LayerArtifactWorkerPayload }
+    | { artifactFile: LayerArtifactFileWorkerPayload };
   transfer: ArrayBuffer[];
 }
 

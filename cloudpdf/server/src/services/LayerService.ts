@@ -1,4 +1,10 @@
-import type { PdfMeasure, PageScaleResult } from '@embedpdf/engine-core/runtime';
+import type {
+  EditSessionAccess,
+  EditSessionStatus,
+  ObjectNumberRange,
+  PdfMeasure,
+  PageScaleResult,
+} from '@embedpdf/engine-core/runtime';
 import { createHash, randomUUID } from 'node:crypto';
 import { createReadStream, createWriteStream } from 'node:fs';
 import { copyFile, mkdtemp, rm, stat } from 'node:fs/promises';
@@ -69,6 +75,7 @@ import {
   type WirePack,
   type WorkerJobId,
   type WorkerRequest,
+  type WorkerResultPayload,
   type WireAttachmentFile,
   type AttachmentRef,
   type AttachmentCreateResult,
@@ -91,7 +98,22 @@ import { sql, type Kysely, type Transaction } from 'kysely';
 import type { DocumentService, OpenContext } from './DocumentService';
 import type { AuditEvent, EventLogService } from './EventLogService';
 import type { LayerStateService } from './LayerStateService';
+import {
+  LayerWriteObjectNumbers,
+  OBJECT_NUMBER_ESTIMATES,
+  type WriteObjectNumbersInput,
+} from './LayerWriteObjectNumbers';
+import { rangesOf } from './objectNumberBlocks';
+import {
+  FIRST_OBJECT_NUMBERS,
+  MAX_OBJECT_NUMBER_RESERVATION,
+  MAX_OBJECT_NUMBER_TOP_UP,
+  objectNumberNotHeld,
+  type EditSessionKey,
+  type ObjectNumberService,
+} from './ObjectNumberService';
 import type { EngineCounters } from '../app/engine-counters';
+import { RequestRateLimiter } from '../app/request-rate-limiter';
 import { AuditLogRepo, type AuditMutationKind } from '../db/repos/audit_log.repo';
 import type { DocumentSigningsRepo, SigningRow } from '../db/repos/document_signings.repo';
 import type { DocumentsRepo } from '../db/repos/documents.repo';
@@ -100,7 +122,7 @@ import type { PdfPasswordSessionsRepo } from '../db/repos/pdf_password_sessions.
 import type { Database as Schema } from '../db/schema';
 import { isUniqueViolation } from '../db/uniqueViolation';
 import type { RealtimeBus } from '../realtime/RealtimeBus';
-import type { EnginePool } from '../runtime/EnginePool';
+import type { BuildPack, EnginePool } from '../runtime/EnginePool';
 import { signingCandidatePath } from '../runtime/signing-paths';
 import type { PasswordSessionBinding } from '../security/password-session';
 import type { LocalFileHandle } from '../storage/BaseFileCache';
@@ -144,6 +166,13 @@ const DEFAULT_SIGNING_TTL_MS = 15 * 60 * 1000;
 class AlreadyCompleted extends Error {
   constructor(readonly signing: SigningRow) {
     super('already completed');
+  }
+}
+
+/** A write its `Idempotency-Key` already committed: `payload` is the answer. */
+class CommittedWrite extends Error {
+  constructor(readonly payload: unknown) {
+    super('already committed');
   }
 }
 
@@ -218,9 +247,38 @@ export interface LayerServiceOptions {
   signingRoot?: string;
   /** How long a prepared signing may wait for its CMS. Default 15 minutes. */
   signingTtlMs?: number;
+  /**
+   * Object numbers handed to editing sessions (migration 032). Without it,
+   * writes number their objects as the engine does, and a create naming a
+   * number is refused.
+   */
+  objectNumbers?: ObjectNumberService;
 }
 
 export type LayerWriteContext = OpenContext;
+
+/**
+ * The guard against scripts: one token may be handed numbers by 30 requests
+ * a minute (`/access`, the event stream, write top-ups); later ones get
+ * none, and still succeed.
+ */
+const OBJECT_NUMBER_ISSUE_TURNS = { maxAttempts: 30, windowMs: 60_000 };
+
+/** Whole seconds left of `ms`, rounded down: a client stops a little early, never late. */
+function secondsOf(ms: number): number {
+  return Math.max(0, Math.floor(ms / 1000));
+}
+
+/** The editing session a request acts as, on `layerId`. */
+function editSessionKey(ctx: LayerWriteContext, layerId: string): EditSessionKey {
+  if (!ctx.originSessionId) {
+    throw new EngineError(
+      EngineErrorCode.InvalidArg,
+      'object numbers need an editing session: send X-Engine-Session-Id',
+    );
+  }
+  return { layerId, sessionId: ctx.originSessionId, sub: ctx.sub };
+}
 
 export interface MaterializedLayer {
   layer: LayerRow;
@@ -258,6 +316,16 @@ export class LayerService {
    * forever.
    */
   private readonly pendingAttemptKeys = new Map<string, Set<string>>();
+  /**
+   * The object numbers of each layer write in flight (layer id → write):
+   * made by {@link prepareLayerMutation}, used by {@link runLayerWrite} and
+   * at the version fence, and given back by the write wrapper. One write
+   * per layer runs at a time in a process (the layer write queue).
+   */
+  private readonly layerWrites = new Map<string, LayerWriteObjectNumbers>();
+  /** The guard against scripts: how often one token may be handed numbers. */
+  private readonly issueTurns = new RequestRateLimiter(OBJECT_NUMBER_ISSUE_TURNS);
+  private readonly objectNumbers?: ObjectNumberService;
 
   private readonly counters?: EngineCounters;
 
@@ -275,6 +343,7 @@ export class LayerService {
     this.pool = opts.pool;
     this.storage = opts.storage;
     this.realtime = opts.realtime;
+    this.objectNumbers = opts.objectNumbers;
   }
 
   /**
@@ -354,12 +423,16 @@ export class LayerService {
       actor?: AnnotationActor;
       /** The bytes beside the draft, by role (multipart `resource:{role}` parts). */
       resources?: WireAnnotationResources;
+      /** The object number the annotation gets: one the request's editing session holds. */
+      objectNumber?: number;
     },
     signal?: AbortSignal,
   ): Promise<AnnotationCreateResult> {
     const actor = input.actor ?? actorFromContext(ctx);
     return this.enqueueLayerWrite(ctx, input.docId, input.layerName, async () => {
-      const { layer } = await this.prepareLayerMutation(ctx, input.docId, input.layerName);
+      const { layer } = await this.prepareLayerMutation(ctx, input.docId, input.layerName, {
+        ...(input.objectNumber !== undefined ? { named: [input.objectNumber] } : {}),
+      });
       return this.withTempWorkerFile('layer-artifact', 'artifact.layer', async (artifactPath) => {
         const build = (jobId: WorkerJobId) =>
           wirePack({
@@ -370,11 +443,12 @@ export class LayerService {
             layerName: input.layerName,
             page: toPageRef(input.pageObjectNumber),
             draft: input.draft,
+            ...(input.objectNumber !== undefined ? { objectNumber: input.objectNumber } : {}),
             ...(input.resources ? { resources: input.resources } : {}),
             artifactPath,
             ...(actor ? { actor } : {}),
           });
-        const payload = await this.requirePool().run(input.docId, build, signal);
+        const payload = await this.runLayerWrite(input.docId, build, signal);
         if (payload.tag !== 'annotations.create') {
           throw new EngineError(
             EngineErrorCode.WireFormat,
@@ -392,8 +466,7 @@ export class LayerService {
   /**
    * `doc.annotations.import` on a layer: one worker job, whose failure
    * leaves the session as it was, then one artifact, one commit across every
-   * page it touched and one audit row. A retry under the same
-   * `idempotencyKey` gets back what the first request committed.
+   * page it touched and one audit row.
    */
   async importAnnotations(
     ctx: LayerWriteContext,
@@ -406,14 +479,11 @@ export class LayerService {
       /** The caller's identity, which `'stamp'` attributes each annotation to. */
       actor?: AnnotationActor;
       limits: AnnotationBundleLimits;
-      idempotencyKey?: string;
     },
     signal?: AbortSignal,
   ): Promise<AnnotationImportResult> {
     return this.enqueueLayerWrite(ctx, input.docId, input.layerName, async () => {
       const { layer } = await this.prepareLayerMutation(ctx, input.docId, input.layerName);
-      const replay = await this.committedImport(layer.id, input.idempotencyKey);
-      if (replay) return replay;
       return this.withTempWorkerFile('layer-artifact', 'artifact.layer', async (artifactPath) => {
         const build = (jobId: WorkerJobId) =>
           wirePack(
@@ -432,7 +502,7 @@ export class LayerService {
             },
             Object.values(input.bundle.resources),
           );
-        const payload = await this.requirePool().run(input.docId, build, signal);
+        const payload = await this.runLayerWrite(input.docId, build, signal);
         if (payload.tag !== 'annotations.import') {
           throw new EngineError(
             EngineErrorCode.WireFormat,
@@ -441,42 +511,12 @@ export class LayerService {
         }
         // Everything was left out: nothing was written, nothing to commit.
         if (payload.result.annotations.length === 0) return payload.result;
-        try {
-          return await this.persistAnnotationImport(ctx, input.docId, input.layerName, layer, {
-            result: payload.result,
-            artifact: requireLayerArtifact(payload as unknown),
-            ...(input.idempotencyKey ? { idempotencyKey: input.idempotencyKey } : {}),
-          });
-        } catch (err) {
-          // Another replica committed the same key first: that is the result.
-          const committed = isUniqueViolation(err)
-            ? await this.committedImport(layer.id, input.idempotencyKey)
-            : null;
-          if (committed) return committed;
-          throw err;
-        }
+        return this.persistAnnotationImport(ctx, input.docId, input.layerName, layer, {
+          result: payload.result,
+          artifact: requireLayerArtifact(payload as unknown),
+        });
       });
     });
-  }
-
-  /** The result an import committed under `idempotencyKey`, if one did. */
-  private async committedImport(
-    layerId: string,
-    idempotencyKey: string | undefined,
-  ): Promise<AnnotationImportResult | null> {
-    if (!idempotencyKey) return null;
-    const row = await new AuditLogRepo(this.requireDb()).findByIdempotencyKey(
-      layerId,
-      idempotencyKey,
-    );
-    if (!row) return null;
-    if (row.kind !== 'annot.import') {
-      throw new EngineError(
-        EngineErrorCode.InvalidArg,
-        `idempotency key ${idempotencyKey} was used for another change (${row.kind})`,
-      );
-    }
-    return row.payload as AnnotationImportResult;
   }
 
   async updateAnnotation(
@@ -509,7 +549,7 @@ export class LayerService {
             ...(input.resources ? { resources: input.resources } : {}),
             artifactPath,
           });
-        const payload = await this.requirePool().run(input.docId, build, signal);
+        const payload = await this.runLayerWrite(input.docId, build, signal);
         if (payload.tag !== 'annotations.update') {
           throw new EngineError(
             EngineErrorCode.WireFormat,
@@ -549,7 +589,7 @@ export class LayerService {
             authority: input.authority,
             artifactPath,
           });
-        const payload = await this.requirePool().run(input.docId, build, signal);
+        const payload = await this.runLayerWrite(input.docId, build, signal);
         if (payload.tag !== 'annotations.delete') {
           throw new EngineError(
             EngineErrorCode.WireFormat,
@@ -590,7 +630,7 @@ export class LayerService {
             toIndex: input.toIndex,
             artifactPath,
           });
-        const payload = await this.requirePool().run(input.docId, build, signal);
+        const payload = await this.runLayerWrite(input.docId, build, signal);
         if (payload.tag !== 'annotations.move') {
           throw new EngineError(
             EngineErrorCode.WireFormat,
@@ -629,7 +669,7 @@ export class LayerService {
             toIndex: input.toIndex,
             artifactPath,
           });
-        const payload = await this.requirePool().run(input.docId, build, signal);
+        const payload = await this.runLayerWrite(input.docId, build, signal);
         if (payload.tag !== 'pages.move') {
           throw new EngineError(
             EngineErrorCode.WireFormat,
@@ -662,7 +702,7 @@ export class LayerService {
     return this.enqueueLayerWrite(ctx, input.docId, input.layerName, async () => {
       const { layer } = await this.prepareLayerMutation(ctx, input.docId, input.layerName);
       return this.withTempWorkerFile('layer-artifact', 'artifact.layer', async (artifactPath) => {
-        const payload = await this.requirePool().run(
+        const payload = await this.runLayerWrite(
           input.docId,
           (jobId: WorkerJobId) =>
             wirePack({
@@ -758,7 +798,7 @@ export class LayerService {
     return this.enqueueLayerWrite(ctx, docId, layerName, async () => {
       const { layer } = await this.prepareLayerMutation(ctx, docId, layerName);
       return this.withTempWorkerFile('layer-artifact', 'artifact.layer', async (artifactPath) => {
-        const payload = await this.requirePool().run(
+        const payload = await this.runLayerWrite(
           docId,
           (jobId) => build(jobId, artifactPath),
           signal,
@@ -797,7 +837,7 @@ export class LayerService {
     return this.enqueueLayerWrite(ctx, input.docId, input.layerName, async () => {
       const { layer } = await this.prepareLayerMutation(ctx, input.docId, input.layerName);
       return this.withTempWorkerFile('layer-artifact', 'artifact.layer', async (artifactPath) => {
-        const payload = await this.requirePool().run(
+        const payload = await this.runLayerWrite(
           input.docId,
           (jobId) =>
             wirePack({
@@ -853,7 +893,7 @@ export class LayerService {
             rotation: input.rotation,
             artifactPath,
           });
-        const payload = await this.requirePool().run(input.docId, build, signal);
+        const payload = await this.runLayerWrite(input.docId, build, signal);
         if (payload.tag !== 'pages.rotate') {
           throw new EngineError(
             EngineErrorCode.WireFormat,
@@ -892,7 +932,7 @@ export class LayerService {
             pages: input.pages,
             artifactPath,
           });
-        const payload = await this.requirePool().run(input.docId, build, signal);
+        const payload = await this.runLayerWrite(input.docId, build, signal);
         if (payload.tag !== 'pages.delete') {
           throw new EngineError(
             EngineErrorCode.WireFormat,
@@ -923,7 +963,9 @@ export class LayerService {
     signal?: AbortSignal,
   ): Promise<PageInsertResult> {
     return this.enqueueLayerWrite(ctx, input.docId, input.layerName, async () => {
-      const { layer } = await this.prepareLayerMutation(ctx, input.docId, input.layerName);
+      const { layer } = await this.prepareLayerMutation(ctx, input.docId, input.layerName, {
+        estimate: OBJECT_NUMBER_ESTIMATES.insertedPages(input.bytes.byteLength),
+      });
       return this.withTempWorkerFile('layer-artifact', 'artifact.layer', async (artifactPath) => {
         const build = (jobId: WorkerJobId) =>
           wirePack({
@@ -936,7 +978,7 @@ export class LayerService {
             ...(input.toIndex !== undefined ? { toIndex: input.toIndex } : {}),
             artifactPath,
           });
-        const payload = await this.requirePool().run(input.docId, build, signal);
+        const payload = await this.runLayerWrite(input.docId, build, signal);
         if (payload.tag !== 'pages.insert') {
           throw new EngineError(
             EngineErrorCode.WireFormat,
@@ -960,11 +1002,16 @@ export class LayerService {
       size: PdfSize;
       count?: number;
       toIndex?: number;
+      /** The new pages' object numbers, one per page: ones the editing session holds. */
+      objectNumbers?: readonly number[];
     },
     signal?: AbortSignal,
   ): Promise<PageInsertResult> {
     return this.enqueueLayerWrite(ctx, input.docId, input.layerName, async () => {
-      const { layer } = await this.prepareLayerMutation(ctx, input.docId, input.layerName);
+      const { layer } = await this.prepareLayerMutation(ctx, input.docId, input.layerName, {
+        estimate: OBJECT_NUMBER_ESTIMATES.blankPages(input.count ?? 1),
+        ...(input.objectNumbers ? { named: input.objectNumbers } : {}),
+      });
       return this.withTempWorkerFile('layer-artifact', 'artifact.layer', async (artifactPath) => {
         const build = (jobId: WorkerJobId) =>
           wirePack({
@@ -976,9 +1023,10 @@ export class LayerService {
             size: input.size,
             ...(input.count !== undefined ? { count: input.count } : {}),
             ...(input.toIndex !== undefined ? { toIndex: input.toIndex } : {}),
+            ...(input.objectNumbers ? { objectNumbers: [...input.objectNumbers] } : {}),
             artifactPath,
           });
-        const payload = await this.requirePool().run(input.docId, build, signal);
+        const payload = await this.runLayerWrite(input.docId, build, signal);
         if (payload.tag !== 'pages.insertBlank') {
           throw new EngineError(
             EngineErrorCode.WireFormat,
@@ -1007,7 +1055,7 @@ export class LayerService {
     return this.enqueueLayerWrite(ctx, input.docId, input.layerName, async () => {
       const { layer } = await this.prepareLayerMutation(ctx, input.docId, input.layerName);
       return this.withTempWorkerFile('layer-artifact', 'artifact.layer', async (artifactPath) => {
-        const payload = await this.requirePool().run(
+        const payload = await this.runLayerWrite(
           input.docId,
           (jobId) =>
             wirePack({
@@ -1049,7 +1097,7 @@ export class LayerService {
     return this.enqueueLayerWrite(ctx, input.docId, input.layerName, async () => {
       const { layer } = await this.prepareLayerMutation(ctx, input.docId, input.layerName);
       return this.withTempWorkerFile('layer-artifact', 'artifact.layer', async (artifactPath) => {
-        const payload = await this.requirePool().run(
+        const payload = await this.runLayerWrite(
           input.docId,
           (jobId) =>
             wirePack({
@@ -1100,7 +1148,7 @@ export class LayerService {
             patch: input.patch,
             artifactPath,
           });
-        const payload = await this.requirePool().run(input.docId, build, signal);
+        const payload = await this.runLayerWrite(input.docId, build, signal);
         if (payload.tag !== 'metadata.update') {
           throw new EngineError(
             EngineErrorCode.WireFormat,
@@ -1139,7 +1187,7 @@ export class LayerService {
             patch: input.patch,
             artifactPath,
           });
-        const payload = await this.requirePool().run(input.docId, build, signal);
+        const payload = await this.runLayerWrite(input.docId, build, signal);
         if (payload.tag !== 'metadata.updateCustom') {
           throw new EngineError(
             EngineErrorCode.WireFormat,
@@ -1188,7 +1236,7 @@ export class LayerService {
             resources: input.resources,
             artifactPath,
           });
-        const payload = await this.requirePool().run(input.docId, build, signal);
+        const payload = await this.runLayerWrite(input.docId, build, signal);
         if (payload.tag !== 'attachments.create') {
           throw new EngineError(
             EngineErrorCode.WireFormat,
@@ -1227,7 +1275,7 @@ export class LayerService {
             ref: input.ref,
             artifactPath,
           });
-        const payload = await this.requirePool().run(input.docId, build, signal);
+        const payload = await this.runLayerWrite(input.docId, build, signal);
         if (payload.tag !== 'attachments.delete') {
           throw new EngineError(
             EngineErrorCode.WireFormat,
@@ -1374,7 +1422,7 @@ export class LayerService {
       const materialized = await this.prepareLayerMutation(ctx, input.docId, input.layerName);
       const { layer } = materialized;
       return this.withTempWorkerFile('layer-artifact', 'artifact.layer', async (artifactPath) => {
-        const payload = await this.requirePool().run(
+        const payload = await this.runLayerWrite(
           input.docId,
           (jobId) =>
             wirePack({
@@ -1485,7 +1533,15 @@ export class LayerService {
 
   async createFormField(
     ctx: LayerWriteContext,
-    input: { docId: string; layerName: string; draft: FormFieldDraft },
+    input: {
+      docId: string;
+      layerName: string;
+      draft: FormFieldDraft;
+      /** The field's object number: one the editing session holds. */
+      objectNumber?: number;
+      /** Its widgets', in `draft.widgets` order: ones the editing session holds. */
+      widgetObjectNumbers?: readonly number[];
+    },
     signal?: AbortSignal,
   ): Promise<FormFieldCreateResult> {
     return this.runFormMutation(
@@ -1495,6 +1551,10 @@ export class LayerService {
         layerName: input.layerName,
         tag: 'forms.createField',
         auditKind: 'form.createField',
+        named: [
+          ...(input.objectNumber !== undefined ? [input.objectNumber] : []),
+          ...(input.widgetObjectNumbers ?? []),
+        ],
         build: (jobId, artifactPath) =>
           wirePack({
             kind: 'forms.createField' as const,
@@ -1503,6 +1563,10 @@ export class LayerService {
             docId: input.docId,
             layerName: input.layerName,
             draft: input.draft,
+            ...(input.objectNumber !== undefined ? { objectNumber: input.objectNumber } : {}),
+            ...(input.widgetObjectNumbers
+              ? { widgetObjectNumbers: [...input.widgetObjectNumbers] }
+              : {}),
             artifactPath,
           }),
         // Inline placements birth widget annotations on their pages.
@@ -1615,7 +1679,16 @@ export class LayerService {
   /** Add a widget to a field, created where its placement says. */
   async addFormWidget(
     ctx: LayerWriteContext,
-    input: { docId: string; layerName: string; ref: FormFieldRef; placement: WidgetPlacement },
+    input: {
+      docId: string;
+      layerName: string;
+      ref: FormFieldRef;
+      placement: WidgetPlacement;
+      /** The new widget's object number: one the editing session holds. */
+      objectNumber?: number;
+      /** Where a merged field's widget moves when it splits: one the editing session holds. */
+      splitObjectNumber?: number;
+    },
     signal?: AbortSignal,
   ): Promise<FormWidgetLinkResult> {
     return this.runFormMutation(
@@ -1625,6 +1698,12 @@ export class LayerService {
         layerName: input.layerName,
         tag: 'forms.addWidget',
         auditKind: 'form.addWidget',
+        // A split number is spent whether or not the field was merged: the
+        // client took it for this write.
+        named: [
+          ...(input.objectNumber !== undefined ? [input.objectNumber] : []),
+          ...(input.splitObjectNumber !== undefined ? [input.splitObjectNumber] : []),
+        ],
         build: (jobId, artifactPath) =>
           wirePack({
             kind: 'forms.addWidget' as const,
@@ -1634,6 +1713,10 @@ export class LayerService {
             layerName: input.layerName,
             ref: input.ref,
             placement: input.placement,
+            ...(input.objectNumber !== undefined ? { objectNumber: input.objectNumber } : {}),
+            ...(input.splitObjectNumber !== undefined
+              ? { splitObjectNumber: input.splitObjectNumber }
+              : {}),
             artifactPath,
           }),
         // The new widget annotation is born on its page.
@@ -1685,16 +1768,21 @@ export class LayerService {
       layerName: string;
       tag: string;
       auditKind: AuditMutationKind;
+      /** The object numbers the write's creates name. */
+      named?: readonly number[];
       build: (jobId: WorkerJobId, artifactPath: string) => WirePack<WorkerRequest>;
       touchedPages: (result: TResult, materialized: MaterializedLayer) => PageObjectNumber[];
     },
     signal?: AbortSignal,
   ): Promise<TResult> {
     return this.enqueueLayerWrite(ctx, input.docId, input.layerName, async () => {
-      const materialized = await this.prepareLayerMutation(ctx, input.docId, input.layerName);
+      const materialized = await this.prepareLayerMutation(ctx, input.docId, input.layerName, {
+        estimate: OBJECT_NUMBER_ESTIMATES.forms,
+        ...(input.named?.length ? { named: input.named } : {}),
+      });
       const { layer } = materialized;
       return this.withTempWorkerFile('layer-artifact', 'artifact.layer', async (artifactPath) => {
-        const payload = await this.requirePool().run(
+        const payload = await this.runLayerWrite(
           input.docId,
           (jobId) => input.build(jobId, artifactPath),
           signal,
@@ -1891,10 +1979,15 @@ export class LayerService {
     ctx: LayerWriteContext,
     docId: string,
     layerName: string,
+    numbers: WriteObjectNumbersInput = {},
   ): Promise<MaterializedLayer> {
     const documentService = this.requireDocumentService();
     await documentService.getLayerManifest(ctx, docId, layerName);
     const materialized = await this.materializeLayerForWrite(ctx, docId, layerName);
+    // A retry of a write that committed gets what it committed, before
+    // anything is checked or run again (its numbers are spent by now).
+    const committed = await this.committedWrite(materialized.layer.id, ctx.idempotencyKey);
+    if (committed) throw committed;
     // A pending signing blocks layer writes. This check is the courtesy;
     // the guarantee is that `prepare` is a fenced layer write (its
     // version bump makes a racing edit lose its own CAS and land here on
@@ -1924,7 +2017,245 @@ export class LayerService {
       // session blessed with the committed version (advanceLayerSession).
       { forWrite: true },
     );
+    await this.prepareObjectNumbers(ctx, materialized.layer, numbers);
     return materialized;
+  }
+
+  /**
+   * The write's object numbers (see LayerWriteObjectNumbers): the numbers
+   * it names must be its session's, and it takes a range for the objects
+   * the engine makes for itself. The layer's counter starts here the first
+   * time, past what the engine reported when it opened the layer.
+   */
+  private async prepareObjectNumbers(
+    ctx: LayerWriteContext,
+    layer: LayerRow,
+    numbers: WriteObjectNumbersInput,
+  ): Promise<void> {
+    if (!this.objectNumbers) {
+      if (numbers.named?.length) throw objectNumberNotHeld(numbers.named[0]!);
+      return;
+    }
+    const db = this.requireDb();
+    await this.startObjectCounter(layer);
+    let write = this.layerWrites.get(layer.id);
+    if (!write) {
+      write = new LayerWriteObjectNumbers(
+        this.objectNumbers,
+        db,
+        layer.id,
+        layer.docId,
+        layer.name,
+        ctx.originSessionId
+          ? { layerId: layer.id, sessionId: ctx.originSessionId, sub: ctx.sub }
+          : null,
+        ctx.edit,
+        ctx.edit && ctx.edit.topUp > 0 && this.takeIssueTurn(ctx) ? ctx.edit.topUp : 0,
+      );
+      this.layerWrites.set(layer.id, write);
+    }
+    await write.prepare(layer.baseSha, numbers);
+  }
+
+  /**
+   * Run a layer write on the engine. Its request carries the write's object
+   * number floor, and the layer's last object number the worker reports
+   * with the saved artifact is kept for the commit.
+   */
+  private async runLayerWrite(
+    docId: string,
+    build: BuildPack,
+    signal?: AbortSignal,
+  ): Promise<WorkerResultPayload> {
+    let write: LayerWriteObjectNumbers | undefined;
+    const payload = await this.requirePool().run(
+      docId,
+      (jobId) => {
+        const pack = build(jobId);
+        const request = pack.payload;
+        const layerName = 'layerName' in request ? request.layerName : undefined;
+        write = [...this.layerWrites.values()].find(
+          (candidate) => candidate.docId === docId && candidate.layerName === layerName,
+        );
+        if (
+          write &&
+          'effect' in request &&
+          (request.effect === 'write' || request.effect === 'contentWrite')
+        ) {
+          (request as { objectNumberFloor?: number }).objectNumberFloor = write.floor;
+        }
+        return pack;
+      },
+      signal,
+    );
+    write?.recordResult(payload);
+    return payload;
+  }
+
+  // ── editing sessions ──────────────────────────────────────────────────────
+
+  /**
+   * `/access` for a client that may create: make, revive or keep alive its
+   * editing session (`ctx.originSessionId` with the token's subject) and
+   * hand it `wanted` numbers (`FIRST_OBJECT_NUMBERS` for a new session when
+   * the client names no count). The layer becomes real here if it wasn't.
+   */
+  async openEditSession(
+    ctx: LayerWriteContext,
+    input: { docId: string; layerName: string; wanted?: number },
+  ): Promise<EditSessionAccess> {
+    const objectNumbers = this.requireObjectNumbers();
+    const layer = await this.prepareEditLayer(ctx, input.docId, input.layerName);
+    const key = editSessionKey(ctx, layer.id);
+    return this.requireDb()
+      .transaction()
+      .execute(async (trx) => {
+        const touched = await objectNumbers.touchSession(trx, key);
+        const wanted = Math.min(
+          input.wanted ?? (touched.state === 'new' ? FIRST_OBJECT_NUMBERS : 0),
+          MAX_OBJECT_NUMBER_TOP_UP,
+        );
+        const issued =
+          wanted > 0 && this.takeIssueTurn(ctx) ? await objectNumbers.issue(trx, key, wanted) : [];
+        return {
+          session: touched.state,
+          expiresIn: secondsOf(touched.expiresIn),
+          objectNumbers: rangesOf(issued),
+        };
+      });
+  }
+
+  /**
+   * `POST …/object-numbers`: hand the editing session `count` more numbers
+   * (at most `MAX_OBJECT_NUMBER_RESERVATION`), for a large paste; a few more
+   * when a reclaimed block covers them, since blocks move whole. Refused with
+   * `LayerFull` when the layer has fewer to hand out.
+   */
+  async reserveObjectNumbers(
+    ctx: LayerWriteContext,
+    input: { docId: string; layerName: string; count: number },
+  ): Promise<{ objectNumbers: ObjectNumberRange[]; expiresIn: number }> {
+    const objectNumbers = this.requireObjectNumbers();
+    if (
+      !Number.isInteger(input.count) ||
+      input.count < 1 ||
+      input.count > MAX_OBJECT_NUMBER_RESERVATION
+    ) {
+      throw new EngineError(
+        EngineErrorCode.InvalidArg,
+        `count must be 1 to ${MAX_OBJECT_NUMBER_RESERVATION}`,
+        { details: { field: 'count' } },
+      );
+    }
+    const layer = await this.prepareEditLayer(ctx, input.docId, input.layerName);
+    const key = editSessionKey(ctx, layer.id);
+    return this.requireDb()
+      .transaction()
+      .execute(async (trx) => {
+        const touched = await objectNumbers.touchSession(trx, key);
+        const issued = await objectNumbers.issue(trx, key, input.count);
+        if (issued.length < input.count) {
+          throw new EngineError(EngineErrorCode.LayerFull, 'no more object numbers to hand out');
+        }
+        return { objectNumbers: rangesOf(issued), expiresIn: secondsOf(touched.expiresIn) };
+      });
+  }
+
+  /**
+   * The event stream's view of an editing session, on connect and at each
+   * heartbeat: `null` when the request's session doesn't exist (only
+   * `/access` and writes make one). Otherwise it is kept alive, and a session
+   * that may create and holds nothing (a publish dropped its numbers) gets
+   * `FIRST_OBJECT_NUMBERS`.
+   */
+  async editSessionHeartbeat(
+    ctx: LayerWriteContext,
+    input: { docId: string; layerName: string; mayCreate: boolean },
+  ): Promise<EditSessionStatus | null> {
+    if (!this.objectNumbers || !this.db || !ctx.originSessionId) return null;
+    const objectNumbers = this.objectNumbers;
+    const layer = await this.layerState.repos.layers.findByDocAndName(input.docId, input.layerName);
+    if (!layer || layer.tenantId !== ctx.tenantId) return null;
+    const key = editSessionKey(ctx, layer.id);
+    if (!(await objectNumbers.findSession(this.db, key))) return null;
+    return this.db.transaction().execute(async (trx) => {
+      const touched = await objectNumbers.touchSession(trx, key);
+      let held = await objectNumbers.held(trx, key);
+      if (
+        held.length === 0 &&
+        input.mayCreate &&
+        (await objectNumbers.hasCounter(trx, layer.id)) &&
+        this.takeIssueTurn(ctx)
+      ) {
+        await objectNumbers.issue(trx, key, FIRST_OBJECT_NUMBERS);
+        held = await objectNumbers.held(trx, key);
+      }
+      return { held, expiresIn: secondsOf(touched.expiresIn) };
+    });
+  }
+
+  /**
+   * The layer an editing session hands numbers out on: real (its row made),
+   * open on the engine, and with its counter started.
+   */
+  private async prepareEditLayer(
+    ctx: LayerWriteContext,
+    docId: string,
+    layerName: string,
+  ): Promise<LayerRow> {
+    const documentService = this.requireDocumentService();
+    await documentService.getLayerManifest(ctx, docId, layerName);
+    const { layer } = await this.materializeLayerForWrite(ctx, docId, layerName);
+    await documentService.ensureLayerFreshOnPool(ctx, docId, layerName, layer.currentVersion);
+    await this.startObjectCounter(layer);
+    return layer;
+  }
+
+  /** Start the layer's counter the first time, past what the engine reported on opening it. */
+  private async startObjectCounter(layer: LayerRow): Promise<void> {
+    const objectNumbers = this.requireObjectNumbers();
+    const db = this.requireDb();
+    if (await objectNumbers.hasCounter(db, layer.id)) return;
+    const last = this.requireDocumentService().lastObjectNumberAtOpen(layer.docId, layer.name);
+    if (last === undefined) {
+      throw new EngineError(EngineErrorCode.Unknown, `layer ${layer.id} is not open`);
+    }
+    await objectNumbers.startCounter(db, layer.id, last);
+  }
+
+  /**
+   * Whether `ctx`'s token may be handed numbers now: one turn per request
+   * that asks. Past its turns it is handed none, and the request still
+   * succeeds.
+   */
+  private takeIssueTurn(ctx: LayerWriteContext): boolean {
+    return this.issueTurns.consume(ctx.jwt?.jti ?? `${ctx.tenantId}:${ctx.sub}`) === 0;
+  }
+
+  private requireObjectNumbers(): ObjectNumberService {
+    if (!this.objectNumbers) {
+      throw new EngineError(
+        EngineErrorCode.NotImplemented,
+        'this server hands out no object numbers',
+      );
+    }
+    return this.objectNumbers;
+  }
+
+  /** A write's commit landed: the numbers it handed out go to the response. */
+  private answerObjectNumbers(docId: string, layerName: string): void {
+    for (const write of this.layerWrites.values()) {
+      if (write.docId === docId && write.layerName === layerName) write.answer();
+    }
+  }
+
+  /** The write wrapper's last step: the write's unsettled ranges go back. */
+  private async releaseObjectNumbers(docId: string, layerName: string): Promise<void> {
+    for (const [layerId, write] of this.layerWrites) {
+      if (write.docId !== docId || write.layerName !== layerName) continue;
+      this.layerWrites.delete(layerId);
+      await write.release();
+    }
   }
 
   private async persistAnnotationMutation<
@@ -2097,7 +2428,6 @@ export class LayerService {
     input: {
       result: AnnotationImportResult;
       artifact: LayerArtifactInput;
-      idempotencyKey?: string;
     },
   ): Promise<AnnotationImportResult> {
     const nextVersion = layer.currentVersion + 1;
@@ -2113,7 +2443,6 @@ export class LayerService {
       artifactSha: uploaded.sha256,
       artifactSize: uploaded.size,
       nextVersion,
-      idempotencyKey: input.idempotencyKey ?? null,
     });
     this.finishLayerCommit(ctx, docId, layerName, nextVersion, artifactKey, committed.auditId);
     // The response is the audited payload — one fact for caller and history.
@@ -2877,7 +3206,6 @@ export class LayerService {
     artifactSha: string;
     artifactSize: number;
     nextVersion: number;
-    idempotencyKey: string | null;
   }): Promise<{ result: AnnotationImportResult; auditId: number }> {
     return this.requireDb()
       .transaction()
@@ -2938,7 +3266,6 @@ export class LayerService {
           artifactKey: input.artifactKey,
           artifactSha: input.artifactSha,
           artifactSize: input.artifactSize,
-          idempotencyKey: input.idempotencyKey,
           payload: result,
           ts: now,
         });
@@ -3569,6 +3896,8 @@ export class LayerService {
       artifactKey: input.layer.currentArtifactKey ?? '',
       artifactSha: input.layer.currentArtifactSha ?? '',
       artifactSize: input.layer.currentArtifactSize ?? 0,
+      // A signing answers a retry by the signing itself.
+      idempotencyKey: null,
       payload: input.payload,
       ts: input.ts,
     });
@@ -3729,6 +4058,8 @@ export class LayerService {
         signature: SignatureCompleteResult['signature'];
         protection: SignatureCompleteResult['protection'];
         version: SignatureCompleteResult['version'];
+        /** The new version's last object number. */
+        lastObjectNumber: number;
       };
       versionKey: string;
       cms: Uint8Array;
@@ -3820,6 +4151,9 @@ export class LayerService {
             updated_at: now,
           },
         );
+        // The new version numbers its objects anew: every number handed out
+        // on the layer is dropped, and new ones start past the version's.
+        await this.objectNumbers?.publish(trx, layer.id, finalized.lastObjectNumber);
 
         // (4) The version row, numbered after the fenced parent; carries
         //     the layer's plane pointers (law 9). A document committed
@@ -3927,6 +4261,8 @@ export class LayerService {
           artifactKey: input.versionKey,
           artifactSha: finalized.version.sha256,
           artifactSize: finalized.version.byteLength,
+          // A signing answers a retry by the signing itself.
+          idempotencyKey: null,
           // The event names the signing, as the local engine's does.
           payload: { signingId: signing.id, ...result },
           ts: now,
@@ -3978,6 +4314,13 @@ export class LayerService {
     if (Number(result?.numUpdatedRows ?? 0) !== 1) {
       throw new LayerFenceConflict(
         `layer version moved while committing ${layer.id} (prepared=${layer.currentVersion})`,
+      );
+    }
+    // The write's object numbers commit with it (see LayerWriteObjectNumbers).
+    const write = this.layerWrites.get(layer.id);
+    if (write && (await write.commit(trx)) === 'overran') {
+      throw new LayerFenceConflict(
+        `the write's objects on ${layer.id} passed object numbers handed out meanwhile`,
       );
     }
   }
@@ -4297,7 +4640,7 @@ export class LayerService {
     const settle = documentService.beginLayerWrite(docId, layerName);
     try {
       try {
-        return await op();
+        return await this.attemptOrReplay(ctx, docId, layerName, op);
       } catch (err) {
         // Two retryable-once shapes, same mechanical recovery (invalidate
         // → re-prepare reloads durable truth → re-apply):
@@ -4317,19 +4660,63 @@ export class LayerService {
           if (this.counters) this.counters.layerWriteConflicts += 1;
         }
         documentService.invalidateLayerSession(docId, layerName);
-        return await op();
+        return await this.attemptOrReplay(ctx, docId, layerName, op);
       }
     } catch (err) {
       documentService.invalidateLayerSession(docId, layerName);
       throw err;
     } finally {
       settle();
+      await this.releaseObjectNumbers(docId, layerName);
       // Attempt-artifact hygiene: any upload whose commit did not win is
       // unreachable garbage (unique per-attempt keys). Best-effort, awaited
       // so a caller observing the response never sees the orphan; crash
       // windows are the orphan sweeper's job.
       await this.cleanupPendingAttempts(ctx, docId, layerName);
     }
+  }
+
+  /**
+   * One attempt of a queued write. A request whose `Idempotency-Key`
+   * already committed gets what it committed instead: found before the
+   * write runs again (`prepareLayerMutation`), or after this attempt
+   * failed, since the same request may have committed on another replica
+   * meanwhile (its commit won, or it spent the numbers this attempt
+   * checked).
+   */
+  private async attemptOrReplay<T>(
+    ctx: LayerWriteContext,
+    docId: string,
+    layerName: string,
+    op: () => Promise<T>,
+  ): Promise<T> {
+    try {
+      const result = await op();
+      this.answerObjectNumbers(docId, layerName);
+      return result;
+    } catch (err) {
+      if (err instanceof CommittedWrite) return err.payload as T;
+      if (!ctx.idempotencyKey) throw err;
+      const layer = await this.layerState.repos.layers.findByDocAndName(docId, layerName);
+      const committed = layer ? await this.committedWrite(layer.id, ctx.idempotencyKey) : null;
+      if (!committed) throw err;
+      // This attempt's change never landed: the session drops it.
+      this.requireDocumentService().invalidateLayerSession(docId, layerName);
+      return committed.payload as T;
+    }
+  }
+
+  /** What a write committed under `idempotencyKey` on the layer, if one did. */
+  private async committedWrite(
+    layerId: string,
+    idempotencyKey: string | undefined,
+  ): Promise<CommittedWrite | null> {
+    if (!idempotencyKey) return null;
+    const row = await new AuditLogRepo(this.requireDb()).findByIdempotencyKey(
+      layerId,
+      idempotencyKey,
+    );
+    return row ? new CommittedWrite(row.payload) : null;
   }
 
   /** Delete every registered attempt key that no commit claimed. */
@@ -4405,7 +4792,10 @@ function makeAuditEvent(input: {
   artifactKey: string;
   artifactSha: string;
   artifactSize: number;
-  /** The request's `Idempotency-Key`, for the changes a retry must not repeat. */
+  /**
+   * The key a retry finds this row by: the request's `Idempotency-Key`
+   * unless given. A row whose payload isn't the response stores none.
+   */
   idempotencyKey?: string | null;
   payload: unknown;
   ts: number;
@@ -4424,7 +4814,10 @@ function makeAuditEvent(input: {
     artifactKey: input.artifactKey,
     artifactSha: input.artifactSha,
     artifactSize: input.artifactSize,
-    idempotencyKey: input.idempotencyKey ?? null,
+    idempotencyKey:
+      input.idempotencyKey === undefined
+        ? (input.ctx.idempotencyKey ?? null)
+        : input.idempotencyKey,
     payload: input.payload,
     originSessionId: input.ctx.originSessionId ?? null,
   };

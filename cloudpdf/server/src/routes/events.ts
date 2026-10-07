@@ -2,13 +2,18 @@ import type { FastifyInstance, FastifyRequest } from 'fastify';
 import type { Kysely } from 'kysely';
 
 import type { DrainCoordinator } from '../app/drain';
-import { requireLayerCapability, requireLayerDocAccessOnly } from '../app/jwt-plugin';
+import {
+  mayCreateObjects,
+  requireLayerCapability,
+  requireLayerDocAccessOnly,
+} from '../app/jwt-plugin';
 import type { RevocationCheck } from '../auth/JwtVerifier';
 import { AuditLogRepo } from '../db/repos/audit_log.repo';
 import type { Database as Schema } from '../db/schema';
 import type { RealtimeBus } from '../realtime/RealtimeBus';
 import type { DocumentService } from '../services/DocumentService';
 import { toJsonlEvent } from '../services/EventLogService';
+import type { LayerService } from '../services/LayerService';
 
 /** Per-drain page size; rings coalesce, so a burst streams in pages. */
 const DRAIN_LIMIT = 200;
@@ -26,6 +31,8 @@ const EXP_GRACE_MS = 5_000;
 export interface EventsRoutesOptions {
   db: Kysely<Schema>;
   documentService: DocumentService;
+  /** Keeps the connection's editing session alive (`session` events). */
+  layerService: LayerService;
   realtimeBus: RealtimeBus;
   /** The jti denylist (present when `enableRevocation` is on). Heartbeats
    *  revalidate against it — the belt-and-braces for a replica whose
@@ -57,6 +64,12 @@ export interface EventsRoutesOptions {
  *     with a heartbeat revalidation sweep as the fallback for a broken
  *     push subscription. The client treats it as terminal — a revoked
  *     credential must not keep watching a document either.
+ *   - `session` (no `id`: it is not a row of the log) tells an editing
+ *     client, whose session `/access` or a write made, every object number
+ *     its session holds and when it expires: on connect, and whenever the
+ *     expiry moves or what it holds changes. The heartbeat keeps the
+ *     session alive while the stream is open, and hands numbers to a
+ *     session that may create and holds none (a publish dropped them).
  */
 export async function registerEventsRoutes(
   app: FastifyInstance,
@@ -71,6 +84,11 @@ export async function registerEventsRoutes(
     // Events are a read of the document's mutation history — same gate as
     // opening the document at all.
     const ctx = requireLayerCapability(req, docId, layerName, 'doc.open', pdfBits);
+    const mayCreate = mayCreateObjects(
+      ctx,
+      pdfBits,
+      await opts.documentService.getProtection(accessCtx, docId, layerName),
+    );
 
     const head = await layerAuditHead(opts.db, ctx.tenantId, docId, layerName);
     const requested = parseLastEventId(req);
@@ -134,6 +152,8 @@ export async function registerEventsRoutes(
               `id: ${row.id}\nevent: mutation\ndata: ${JSON.stringify(toJsonlEvent(row))}\n\n`,
             );
             cursor = row.id;
+            // A publish dropped every session's numbers: tell this one now.
+            if (row.kind === 'signature.complete') void sendSession();
           }
           if (rows.length === DRAIN_LIMIT) ringAgain = true; // page through bursts
         } while (ringAgain && !closed);
@@ -141,6 +161,33 @@ export async function registerEventsRoutes(
         req.log.error({ err }, 'events drain failed');
       } finally {
         draining = false;
+      }
+    };
+
+    // The editing session, when the request's exists: sent when its expiry
+    // moved or what it holds changed since the last `session` event.
+    let lastSession: { held: string; expiresAt: number } | null = null;
+    let checkingSession = false;
+    const sendSession = async (): Promise<void> => {
+      if (closed || checkingSession) return;
+      checkingSession = true;
+      try {
+        const status = await opts.layerService.editSessionHeartbeat(ctx, {
+          docId,
+          layerName,
+          mayCreate,
+        });
+        if (!status || closed) return;
+        const held = JSON.stringify(status.held);
+        const expiresAt = Date.now() + status.expiresIn * 1000;
+        // `expiresIn` is in whole seconds: a second's drift is no move.
+        if (lastSession?.held === held && expiresAt <= lastSession.expiresAt + 1000) return;
+        lastSession = { held, expiresAt };
+        raw.write(`event: session\ndata: ${JSON.stringify(status)}\n\n`);
+      } catch (err) {
+        req.log.warn({ err }, 'edit session heartbeat failed');
+      } finally {
+        checkingSession = false;
       }
     };
 
@@ -171,6 +218,7 @@ export async function registerEventsRoutes(
     const heartbeat = setInterval(() => {
       if (closed) return;
       raw.write(':ping\n\n');
+      void sendSession();
       // Sweep path: revalidate the jti against the denylist (LRU-backed,
       // cheap). Covers a replica whose push subscription is down — the
       // worst case becomes one heartbeat interval, not token expiry.
@@ -226,6 +274,7 @@ export async function registerEventsRoutes(
 
     req.raw.on('close', cleanup);
     armExpClose();
+    void sendSession();
     void drain();
   });
 }

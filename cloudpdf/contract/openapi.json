@@ -354,6 +354,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "description": "Names the change: 1 to 255 printable ASCII characters. A retry under the same key on the same layer answers with what the first request committed, and changes nothing.",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -476,6 +485,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "description": "Names the change: 1 to 255 printable ASCII characters. A retry under the same key on the same layer answers with what the first request committed, and changes nothing.",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -593,6 +611,15 @@
             "in": "header",
             "required": false,
             "description": "Base64-encoded password for an encrypted document. Valid only with the API token (403 anywhere else). An encrypted document answers 422 DocPasswordRequired when the header is absent. Viewer doc JWTs use the SDK password-session flow instead.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "description": "Names the change: 1 to 255 printable ASCII characters. A retry under the same key on the same layer answers with what the first request committed, and changes nothing.",
             "schema": {
               "type": "string"
             }
@@ -909,6 +936,15 @@
             "in": "header",
             "required": false,
             "description": "Base64-encoded password for an encrypted document. Valid only with the API token (403 anywhere else). An encrypted document answers 422 DocPasswordRequired when the header is absent. Viewer doc JWTs use the SDK password-session flow instead.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "description": "Names the change: 1 to 255 printable ASCII characters. A retry under the same key on the same layer answers with what the first request committed, and changes nothing.",
             "schema": {
               "type": "string"
             }
@@ -1267,6 +1303,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "description": "Names the change: 1 to 255 printable ASCII characters. A retry under the same key on the same layer answers with what the first request committed, and changes nothing.",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -1376,6 +1421,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "description": "Names the change: 1 to 255 printable ASCII characters. A retry under the same key on the same layer answers with what the first request committed, and changes nothing.",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -1473,6 +1527,15 @@
             "in": "header",
             "required": false,
             "description": "Base64-encoded password for an encrypted document. Valid only with the API token (403 anywhere else). An encrypted document answers 422 DocPasswordRequired when the header is absent. Viewer doc JWTs use the SDK password-session flow instead.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "description": "Names the change: 1 to 255 printable ASCII characters. A retry under the same key on the same layer answers with what the first request committed, and changes nothing.",
             "schema": {
               "type": "string"
             }
@@ -1827,6 +1890,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "description": "Names the change: 1 to 255 printable ASCII characters. A retry under the same key on the same layer answers with what the first request committed, and changes nothing.",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -2015,6 +2087,15 @@
             "in": "header",
             "required": false,
             "description": "Base64-encoded password for an encrypted document. Valid only with the API token (403 anywhere else). An encrypted document answers 422 DocPasswordRequired when the header is absent. Viewer doc JWTs use the SDK password-session flow instead.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "description": "Names the change: 1 to 255 printable ASCII characters. A retry under the same key on the same layer answers with what the first request committed, and changes nothing.",
             "schema": {
               "type": "string"
             }
@@ -2220,6 +2301,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "description": "Names the change: 1 to 255 printable ASCII characters. A retry under the same key on the same layer answers with what the first request committed, and changes nothing.",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -2318,6 +2408,15 @@
             "in": "header",
             "required": false,
             "description": "Base64-encoded password for an encrypted document. Valid only with the API token (403 anywhere else). An encrypted document answers 422 DocPasswordRequired when the header is absent. Viewer doc JWTs use the SDK password-session flow instead.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "description": "Names the change: 1 to 255 printable ASCII characters. A retry under the same key on the same layer answers with what the first request committed, and changes nothing.",
             "schema": {
               "type": "string"
             }
@@ -2429,6 +2528,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "description": "Names the change: 1 to 255 printable ASCII characters. A retry under the same key on the same layer answers with what the first request committed, and changes nothing.",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -2526,6 +2634,15 @@
             "in": "header",
             "required": false,
             "description": "Base64-encoded password for an encrypted document. Valid only with the API token (403 anywhere else). An encrypted document answers 422 DocPasswordRequired when the header is absent. Viewer doc JWTs use the SDK password-session flow instead.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "description": "Names the change: 1 to 255 printable ASCII characters. A retry under the same key on the same layer answers with what the first request committed, and changes nothing.",
             "schema": {
               "type": "string"
             }
@@ -2629,6 +2746,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "description": "Names the change: 1 to 255 printable ASCII characters. A retry under the same key on the same layer answers with what the first request committed, and changes nothing.",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -2726,6 +2852,15 @@
             "in": "header",
             "required": false,
             "description": "Base64-encoded password for an encrypted document. Valid only with the API token (403 anywhere else). An encrypted document answers 422 DocPasswordRequired when the header is absent. Viewer doc JWTs use the SDK password-session flow instead.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "description": "Names the change: 1 to 255 printable ASCII characters. A retry under the same key on the same layer answers with what the first request committed, and changes nothing.",
             "schema": {
               "type": "string"
             }
@@ -2829,6 +2964,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "description": "Names the change: 1 to 255 printable ASCII characters. A retry under the same key on the same layer answers with what the first request committed, and changes nothing.",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -2926,6 +3070,15 @@
             "in": "header",
             "required": false,
             "description": "Base64-encoded password for an encrypted document. Valid only with the API token (403 anywhere else). An encrypted document answers 422 DocPasswordRequired when the header is absent. Viewer doc JWTs use the SDK password-session flow instead.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "description": "Names the change: 1 to 255 printable ASCII characters. A retry under the same key on the same layer answers with what the first request committed, and changes nothing.",
             "schema": {
               "type": "string"
             }
@@ -6314,7 +6467,9 @@
               "SignatureRefused",
               "ProtectedDocument",
               "StaleBase",
-              "PayloadTooLarge"
+              "PayloadTooLarge",
+              "ObjectNumberUnavailable",
+              "LayerFull"
             ]
           },
           "message": {
@@ -14735,7 +14890,9 @@
               "SignatureRefused",
               "ProtectedDocument",
               "StaleBase",
-              "PayloadTooLarge"
+              "PayloadTooLarge",
+              "ObjectNumberUnavailable",
+              "LayerFull"
             ]
           },
           "message": {
@@ -15010,7 +15167,9 @@
               "SignatureRefused",
               "ProtectedDocument",
               "StaleBase",
-              "PayloadTooLarge"
+              "PayloadTooLarge",
+              "ObjectNumberUnavailable",
+              "LayerFull"
             ]
           },
           "message": {
@@ -15115,7 +15274,9 @@
               "SignatureRefused",
               "ProtectedDocument",
               "StaleBase",
-              "PayloadTooLarge"
+              "PayloadTooLarge",
+              "ObjectNumberUnavailable",
+              "LayerFull"
             ]
           },
           "message": {
@@ -15168,7 +15329,9 @@
               "SignatureRefused",
               "ProtectedDocument",
               "StaleBase",
-              "PayloadTooLarge"
+              "PayloadTooLarge",
+              "ObjectNumberUnavailable",
+              "LayerFull"
             ]
           },
           "message": {
@@ -15683,7 +15846,9 @@
               "SignatureRefused",
               "ProtectedDocument",
               "StaleBase",
-              "PayloadTooLarge"
+              "PayloadTooLarge",
+              "ObjectNumberUnavailable",
+              "LayerFull"
             ]
           },
           "message": {
@@ -15928,7 +16093,9 @@
               "SignatureRefused",
               "ProtectedDocument",
               "StaleBase",
-              "PayloadTooLarge"
+              "PayloadTooLarge",
+              "ObjectNumberUnavailable",
+              "LayerFull"
             ]
           },
           "message": {
@@ -15975,7 +16142,9 @@
               "SignatureRefused",
               "ProtectedDocument",
               "StaleBase",
-              "PayloadTooLarge"
+              "PayloadTooLarge",
+              "ObjectNumberUnavailable",
+              "LayerFull"
             ]
           },
           "message": {
@@ -16100,7 +16269,9 @@
               "SignatureRefused",
               "ProtectedDocument",
               "StaleBase",
-              "PayloadTooLarge"
+              "PayloadTooLarge",
+              "ObjectNumberUnavailable",
+              "LayerFull"
             ]
           },
           "message": {
@@ -16147,7 +16318,9 @@
               "SignatureRefused",
               "ProtectedDocument",
               "StaleBase",
-              "PayloadTooLarge"
+              "PayloadTooLarge",
+              "ObjectNumberUnavailable",
+              "LayerFull"
             ]
           },
           "message": {
@@ -16194,7 +16367,9 @@
               "SignatureRefused",
               "ProtectedDocument",
               "StaleBase",
-              "PayloadTooLarge"
+              "PayloadTooLarge",
+              "ObjectNumberUnavailable",
+              "LayerFull"
             ]
           },
           "message": {
@@ -16823,7 +16998,9 @@
               "SignatureRefused",
               "ProtectedDocument",
               "StaleBase",
-              "PayloadTooLarge"
+              "PayloadTooLarge",
+              "ObjectNumberUnavailable",
+              "LayerFull"
             ]
           },
           "message": {
@@ -16870,7 +17047,9 @@
               "SignatureRefused",
               "ProtectedDocument",
               "StaleBase",
-              "PayloadTooLarge"
+              "PayloadTooLarge",
+              "ObjectNumberUnavailable",
+              "LayerFull"
             ]
           },
           "message": {
@@ -16917,7 +17096,9 @@
               "SignatureRefused",
               "ProtectedDocument",
               "StaleBase",
-              "PayloadTooLarge"
+              "PayloadTooLarge",
+              "ObjectNumberUnavailable",
+              "LayerFull"
             ]
           },
           "message": {
@@ -16975,7 +17156,9 @@
               "SignatureRefused",
               "ProtectedDocument",
               "StaleBase",
-              "PayloadTooLarge"
+              "PayloadTooLarge",
+              "ObjectNumberUnavailable",
+              "LayerFull"
             ]
           },
           "message": {
@@ -17079,7 +17262,9 @@
               "SignatureRefused",
               "ProtectedDocument",
               "StaleBase",
-              "PayloadTooLarge"
+              "PayloadTooLarge",
+              "ObjectNumberUnavailable",
+              "LayerFull"
             ]
           },
           "message": {
@@ -17594,7 +17779,9 @@
               "SignatureRefused",
               "ProtectedDocument",
               "StaleBase",
-              "PayloadTooLarge"
+              "PayloadTooLarge",
+              "ObjectNumberUnavailable",
+              "LayerFull"
             ]
           },
           "message": {
@@ -17641,7 +17828,9 @@
               "SignatureRefused",
               "ProtectedDocument",
               "StaleBase",
-              "PayloadTooLarge"
+              "PayloadTooLarge",
+              "ObjectNumberUnavailable",
+              "LayerFull"
             ]
           },
           "message": {
@@ -17688,7 +17877,9 @@
               "SignatureRefused",
               "ProtectedDocument",
               "StaleBase",
-              "PayloadTooLarge"
+              "PayloadTooLarge",
+              "ObjectNumberUnavailable",
+              "LayerFull"
             ]
           },
           "message": {
@@ -17933,7 +18124,9 @@
               "SignatureRefused",
               "ProtectedDocument",
               "StaleBase",
-              "PayloadTooLarge"
+              "PayloadTooLarge",
+              "ObjectNumberUnavailable",
+              "LayerFull"
             ]
           },
           "message": {
@@ -17980,7 +18173,9 @@
               "SignatureRefused",
               "ProtectedDocument",
               "StaleBase",
-              "PayloadTooLarge"
+              "PayloadTooLarge",
+              "ObjectNumberUnavailable",
+              "LayerFull"
             ]
           },
           "message": {
@@ -18027,7 +18222,9 @@
               "SignatureRefused",
               "ProtectedDocument",
               "StaleBase",
-              "PayloadTooLarge"
+              "PayloadTooLarge",
+              "ObjectNumberUnavailable",
+              "LayerFull"
             ]
           },
           "message": {
@@ -18074,7 +18271,9 @@
               "SignatureRefused",
               "ProtectedDocument",
               "StaleBase",
-              "PayloadTooLarge"
+              "PayloadTooLarge",
+              "ObjectNumberUnavailable",
+              "LayerFull"
             ]
           },
           "message": {
@@ -18121,7 +18320,9 @@
               "SignatureRefused",
               "ProtectedDocument",
               "StaleBase",
-              "PayloadTooLarge"
+              "PayloadTooLarge",
+              "ObjectNumberUnavailable",
+              "LayerFull"
             ]
           },
           "message": {
@@ -18200,7 +18401,9 @@
               "SignatureRefused",
               "ProtectedDocument",
               "StaleBase",
-              "PayloadTooLarge"
+              "PayloadTooLarge",
+              "ObjectNumberUnavailable",
+              "LayerFull"
             ]
           },
           "message": {
@@ -18250,7 +18453,9 @@
               "SignatureRefused",
               "ProtectedDocument",
               "StaleBase",
-              "PayloadTooLarge"
+              "PayloadTooLarge",
+              "ObjectNumberUnavailable",
+              "LayerFull"
             ]
           },
           "message": {
@@ -18300,7 +18505,9 @@
               "SignatureRefused",
               "ProtectedDocument",
               "StaleBase",
-              "PayloadTooLarge"
+              "PayloadTooLarge",
+              "ObjectNumberUnavailable",
+              "LayerFull"
             ]
           },
           "message": {
@@ -18347,7 +18554,9 @@
               "SignatureRefused",
               "ProtectedDocument",
               "StaleBase",
-              "PayloadTooLarge"
+              "PayloadTooLarge",
+              "ObjectNumberUnavailable",
+              "LayerFull"
             ]
           },
           "message": {
@@ -18411,7 +18620,9 @@
               "SignatureRefused",
               "ProtectedDocument",
               "StaleBase",
-              "PayloadTooLarge"
+              "PayloadTooLarge",
+              "ObjectNumberUnavailable",
+              "LayerFull"
             ]
           },
           "message": {
@@ -18458,7 +18669,9 @@
               "SignatureRefused",
               "ProtectedDocument",
               "StaleBase",
-              "PayloadTooLarge"
+              "PayloadTooLarge",
+              "ObjectNumberUnavailable",
+              "LayerFull"
             ]
           },
           "message": {
@@ -18536,7 +18749,9 @@
               "SignatureRefused",
               "ProtectedDocument",
               "StaleBase",
-              "PayloadTooLarge"
+              "PayloadTooLarge",
+              "ObjectNumberUnavailable",
+              "LayerFull"
             ]
           },
           "message": {
@@ -18583,7 +18798,9 @@
               "SignatureRefused",
               "ProtectedDocument",
               "StaleBase",
-              "PayloadTooLarge"
+              "PayloadTooLarge",
+              "ObjectNumberUnavailable",
+              "LayerFull"
             ]
           },
           "message": {
@@ -18640,7 +18857,9 @@
               "SignatureRefused",
               "ProtectedDocument",
               "StaleBase",
-              "PayloadTooLarge"
+              "PayloadTooLarge",
+              "ObjectNumberUnavailable",
+              "LayerFull"
             ]
           },
           "message": {
@@ -18860,7 +19079,9 @@
               "SignatureRefused",
               "ProtectedDocument",
               "StaleBase",
-              "PayloadTooLarge"
+              "PayloadTooLarge",
+              "ObjectNumberUnavailable",
+              "LayerFull"
             ]
           },
           "message": {
@@ -18907,7 +19128,9 @@
               "SignatureRefused",
               "ProtectedDocument",
               "StaleBase",
-              "PayloadTooLarge"
+              "PayloadTooLarge",
+              "ObjectNumberUnavailable",
+              "LayerFull"
             ]
           },
           "message": {
@@ -18958,7 +19181,9 @@
               "SignatureRefused",
               "ProtectedDocument",
               "StaleBase",
-              "PayloadTooLarge"
+              "PayloadTooLarge",
+              "ObjectNumberUnavailable",
+              "LayerFull"
             ]
           },
           "message": {
@@ -19005,7 +19230,9 @@
               "SignatureRefused",
               "ProtectedDocument",
               "StaleBase",
-              "PayloadTooLarge"
+              "PayloadTooLarge",
+              "ObjectNumberUnavailable",
+              "LayerFull"
             ]
           },
           "message": {
@@ -19052,7 +19279,9 @@
               "SignatureRefused",
               "ProtectedDocument",
               "StaleBase",
-              "PayloadTooLarge"
+              "PayloadTooLarge",
+              "ObjectNumberUnavailable",
+              "LayerFull"
             ]
           },
           "message": {
@@ -19099,7 +19328,9 @@
               "SignatureRefused",
               "ProtectedDocument",
               "StaleBase",
-              "PayloadTooLarge"
+              "PayloadTooLarge",
+              "ObjectNumberUnavailable",
+              "LayerFull"
             ]
           },
           "message": {
@@ -19990,7 +20221,9 @@
               "SignatureRefused",
               "ProtectedDocument",
               "StaleBase",
-              "PayloadTooLarge"
+              "PayloadTooLarge",
+              "ObjectNumberUnavailable",
+              "LayerFull"
             ]
           },
           "message": {
@@ -20976,7 +21209,9 @@
               "SignatureRefused",
               "ProtectedDocument",
               "StaleBase",
-              "PayloadTooLarge"
+              "PayloadTooLarge",
+              "ObjectNumberUnavailable",
+              "LayerFull"
             ]
           },
           "message": {
@@ -21023,7 +21258,9 @@
               "SignatureRefused",
               "ProtectedDocument",
               "StaleBase",
-              "PayloadTooLarge"
+              "PayloadTooLarge",
+              "ObjectNumberUnavailable",
+              "LayerFull"
             ]
           },
           "message": {
@@ -22052,7 +22289,9 @@
               "SignatureRefused",
               "ProtectedDocument",
               "StaleBase",
-              "PayloadTooLarge"
+              "PayloadTooLarge",
+              "ObjectNumberUnavailable",
+              "LayerFull"
             ]
           },
           "message": {
@@ -22099,7 +22338,9 @@
               "SignatureRefused",
               "ProtectedDocument",
               "StaleBase",
-              "PayloadTooLarge"
+              "PayloadTooLarge",
+              "ObjectNumberUnavailable",
+              "LayerFull"
             ]
           },
           "message": {
@@ -22146,7 +22387,9 @@
               "SignatureRefused",
               "ProtectedDocument",
               "StaleBase",
-              "PayloadTooLarge"
+              "PayloadTooLarge",
+              "ObjectNumberUnavailable",
+              "LayerFull"
             ]
           },
           "message": {
@@ -23143,7 +23386,9 @@
               "SignatureRefused",
               "ProtectedDocument",
               "StaleBase",
-              "PayloadTooLarge"
+              "PayloadTooLarge",
+              "ObjectNumberUnavailable",
+              "LayerFull"
             ]
           },
           "message": {
@@ -23190,7 +23435,9 @@
               "SignatureRefused",
               "ProtectedDocument",
               "StaleBase",
-              "PayloadTooLarge"
+              "PayloadTooLarge",
+              "ObjectNumberUnavailable",
+              "LayerFull"
             ]
           },
           "message": {
@@ -23411,7 +23658,9 @@
               "SignatureRefused",
               "ProtectedDocument",
               "StaleBase",
-              "PayloadTooLarge"
+              "PayloadTooLarge",
+              "ObjectNumberUnavailable",
+              "LayerFull"
             ]
           },
           "message": {
@@ -23680,7 +23929,9 @@
               "SignatureRefused",
               "ProtectedDocument",
               "StaleBase",
-              "PayloadTooLarge"
+              "PayloadTooLarge",
+              "ObjectNumberUnavailable",
+              "LayerFull"
             ]
           },
           "message": {
@@ -23727,7 +23978,9 @@
               "SignatureRefused",
               "ProtectedDocument",
               "StaleBase",
-              "PayloadTooLarge"
+              "PayloadTooLarge",
+              "ObjectNumberUnavailable",
+              "LayerFull"
             ]
           },
           "message": {
@@ -24086,7 +24339,9 @@
               "SignatureRefused",
               "ProtectedDocument",
               "StaleBase",
-              "PayloadTooLarge"
+              "PayloadTooLarge",
+              "ObjectNumberUnavailable",
+              "LayerFull"
             ]
           },
           "message": {
@@ -24133,7 +24388,9 @@
               "SignatureRefused",
               "ProtectedDocument",
               "StaleBase",
-              "PayloadTooLarge"
+              "PayloadTooLarge",
+              "ObjectNumberUnavailable",
+              "LayerFull"
             ]
           },
           "message": {
@@ -24492,7 +24749,9 @@
               "SignatureRefused",
               "ProtectedDocument",
               "StaleBase",
-              "PayloadTooLarge"
+              "PayloadTooLarge",
+              "ObjectNumberUnavailable",
+              "LayerFull"
             ]
           },
           "message": {
@@ -24539,7 +24798,9 @@
               "SignatureRefused",
               "ProtectedDocument",
               "StaleBase",
-              "PayloadTooLarge"
+              "PayloadTooLarge",
+              "ObjectNumberUnavailable",
+              "LayerFull"
             ]
           },
           "message": {
@@ -24898,7 +25159,9 @@
               "SignatureRefused",
               "ProtectedDocument",
               "StaleBase",
-              "PayloadTooLarge"
+              "PayloadTooLarge",
+              "ObjectNumberUnavailable",
+              "LayerFull"
             ]
           },
           "message": {
@@ -24945,7 +25208,9 @@
               "SignatureRefused",
               "ProtectedDocument",
               "StaleBase",
-              "PayloadTooLarge"
+              "PayloadTooLarge",
+              "ObjectNumberUnavailable",
+              "LayerFull"
             ]
           },
           "message": {
@@ -25304,7 +25569,9 @@
               "SignatureRefused",
               "ProtectedDocument",
               "StaleBase",
-              "PayloadTooLarge"
+              "PayloadTooLarge",
+              "ObjectNumberUnavailable",
+              "LayerFull"
             ]
           },
           "message": {
@@ -25351,7 +25618,9 @@
               "SignatureRefused",
               "ProtectedDocument",
               "StaleBase",
-              "PayloadTooLarge"
+              "PayloadTooLarge",
+              "ObjectNumberUnavailable",
+              "LayerFull"
             ]
           },
           "message": {
@@ -25710,7 +25979,9 @@
               "SignatureRefused",
               "ProtectedDocument",
               "StaleBase",
-              "PayloadTooLarge"
+              "PayloadTooLarge",
+              "ObjectNumberUnavailable",
+              "LayerFull"
             ]
           },
           "message": {
@@ -25757,7 +26028,9 @@
               "SignatureRefused",
               "ProtectedDocument",
               "StaleBase",
-              "PayloadTooLarge"
+              "PayloadTooLarge",
+              "ObjectNumberUnavailable",
+              "LayerFull"
             ]
           },
           "message": {
@@ -25942,7 +26215,9 @@
               "SignatureRefused",
               "ProtectedDocument",
               "StaleBase",
-              "PayloadTooLarge"
+              "PayloadTooLarge",
+              "ObjectNumberUnavailable",
+              "LayerFull"
             ]
           },
           "message": {
@@ -25989,7 +26264,9 @@
               "SignatureRefused",
               "ProtectedDocument",
               "StaleBase",
-              "PayloadTooLarge"
+              "PayloadTooLarge",
+              "ObjectNumberUnavailable",
+              "LayerFull"
             ]
           },
           "message": {
@@ -26350,7 +26627,9 @@
               "SignatureRefused",
               "ProtectedDocument",
               "StaleBase",
-              "PayloadTooLarge"
+              "PayloadTooLarge",
+              "ObjectNumberUnavailable",
+              "LayerFull"
             ]
           },
           "message": {
@@ -26397,7 +26676,9 @@
               "SignatureRefused",
               "ProtectedDocument",
               "StaleBase",
-              "PayloadTooLarge"
+              "PayloadTooLarge",
+              "ObjectNumberUnavailable",
+              "LayerFull"
             ]
           },
           "message": {
@@ -26762,7 +27043,9 @@
               "SignatureRefused",
               "ProtectedDocument",
               "StaleBase",
-              "PayloadTooLarge"
+              "PayloadTooLarge",
+              "ObjectNumberUnavailable",
+              "LayerFull"
             ]
           },
           "message": {
@@ -26809,7 +27092,9 @@
               "SignatureRefused",
               "ProtectedDocument",
               "StaleBase",
-              "PayloadTooLarge"
+              "PayloadTooLarge",
+              "ObjectNumberUnavailable",
+              "LayerFull"
             ]
           },
           "message": {
@@ -26860,7 +27145,9 @@
               "SignatureRefused",
               "ProtectedDocument",
               "StaleBase",
-              "PayloadTooLarge"
+              "PayloadTooLarge",
+              "ObjectNumberUnavailable",
+              "LayerFull"
             ]
           },
           "message": {
@@ -26907,7 +27194,9 @@
               "SignatureRefused",
               "ProtectedDocument",
               "StaleBase",
-              "PayloadTooLarge"
+              "PayloadTooLarge",
+              "ObjectNumberUnavailable",
+              "LayerFull"
             ]
           },
           "message": {
@@ -27211,7 +27500,9 @@
               "SignatureRefused",
               "ProtectedDocument",
               "StaleBase",
-              "PayloadTooLarge"
+              "PayloadTooLarge",
+              "ObjectNumberUnavailable",
+              "LayerFull"
             ]
           },
           "message": {
@@ -27258,7 +27549,9 @@
               "SignatureRefused",
               "ProtectedDocument",
               "StaleBase",
-              "PayloadTooLarge"
+              "PayloadTooLarge",
+              "ObjectNumberUnavailable",
+              "LayerFull"
             ]
           },
           "message": {
@@ -27305,7 +27598,9 @@
               "SignatureRefused",
               "ProtectedDocument",
               "StaleBase",
-              "PayloadTooLarge"
+              "PayloadTooLarge",
+              "ObjectNumberUnavailable",
+              "LayerFull"
             ]
           },
           "message": {

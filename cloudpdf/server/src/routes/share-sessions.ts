@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { ShareExchangeRequestSchema, adminOperations } from '@cloudpdf/contract';
 import type { FastifyInstance, FastifyReply } from 'fastify';
 
-import { setNoStore } from './_helpers';
+import { setNoStore, tooManyRequests } from './_helpers';
 import { AuthFailureLimiter } from '../app/auth-failure-limiter';
 import { RequestRateLimiter } from '../app/request-rate-limiter';
 import type { SignDevTokenInput } from '../auth/JwtVerifier';
@@ -87,12 +87,12 @@ export async function registerShareSessionRoutes(
       // check and its accounting cannot be separated by awaited work —
       // a concurrent burst cannot overshoot the budget.
       const ipBlockedMs = ipAttempts.consume(req.ip);
-      if (ipBlockedMs > 0) return tooMany(reply, ipBlockedMs);
+      if (ipBlockedMs > 0) return tooManyRequests(reply, ipBlockedMs);
 
       // Probe tier: sources over their failure budget stay locked out.
       // Read-only — a blocked probe does not extend its own block.
       const blockedMs = ipFailures.retryAfterMs(req.ip);
-      if (blockedMs > 0) return tooMany(reply, blockedMs);
+      if (blockedMs > 0) return tooManyRequests(reply, blockedMs);
 
       const parsed = ShareExchangeRequestSchema.safeParse(req.body ?? {});
       if (!parsed.success) {
@@ -120,7 +120,7 @@ export async function registerShareSessionRoutes(
       // not successes: stale-grant outcomes and passphrase roundtrips
       // consume too, so no single token can demand unbounded work.
       const tokenBlockedMs = tokenAttempts.consume(shareToken);
-      if (tokenBlockedMs > 0) return tooMany(reply, tokenBlockedMs);
+      if (tokenBlockedMs > 0) return tooManyRequests(reply, tokenBlockedMs);
 
       const grant = await grants.findById(shareToken);
       if (!grant) {
@@ -198,11 +198,4 @@ function notFound(reply: FastifyReply): FastifyReply {
   return reply
     .code(404)
     .send({ error: { code: 'NotFound', message: 'unknown or revoked share token' } });
-}
-
-function tooMany(reply: FastifyReply, retryAfterMs: number): FastifyReply {
-  return reply
-    .code(429)
-    .header('retry-after', String(Math.ceil(retryAfterMs / 1000)))
-    .send({ error: { code: 'TooManyRequests', message: 'rate limited; retry later' } });
 }

@@ -26,6 +26,7 @@
     "lint": "eslint src --color",
     "lint:fix": "eslint src --color --fix",
     "bench:isolation": "node --import tsx --import ./test/bench/register-sql-loader.mjs test/bench/isolation-bench.ts",
+    "bench:edit-sessions": "node --import tsx --import ./test/bench/register-sql-loader.mjs test/bench/edit-sessions-bench.ts",
     "test": "vitest run"
   },
   "files": [

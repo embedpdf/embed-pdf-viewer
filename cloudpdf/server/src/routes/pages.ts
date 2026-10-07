@@ -59,6 +59,7 @@ import {
   setImmutableCache,
   setNoStore,
   type SchemaLike,
+  objectNumbersQuery,
 } from './_helpers';
 
 interface PageRouteDeps {
@@ -717,6 +718,7 @@ export async function registerPageRoutes(app: FastifyInstance, deps: PageRouteDe
       'request body',
     );
 
+    const objectNumbers = objectNumbersQuery(req.query, 'objectNumbers');
     setNoStore(reply);
     return layerService.insertBlankPages(
       ctx,
@@ -726,6 +728,7 @@ export async function registerPageRoutes(app: FastifyInstance, deps: PageRouteDe
         size: body.size,
         ...(body.count !== undefined ? { count: body.count } : {}),
         ...(body.toIndex !== undefined ? { toIndex: body.toIndex } : {}),
+        ...(objectNumbers ? { objectNumbers } : {}),
       },
       abortSignalOf(reply),
     );

@@ -31,6 +31,8 @@ export interface FinalizedCandidate {
   signature: SignatureDTO;
   protection: DocumentProtection;
   version: BaseVersionInfo;
+  /** The sealed file's last object number: every object it has is at or below it. */
+  lastObjectNumber: number;
 }
 
 /**
@@ -107,6 +109,7 @@ export class CandidateFinalizer {
         signature: pageSignatureOf(signature, visibleBoxReader(this.runtime, session)),
         protection: snapshot.protection,
         version: reader.version(),
+        lastObjectNumber: session.lastObjectNumber(),
       };
     } finally {
       // Releases the base acquisition through the handle's close stack.

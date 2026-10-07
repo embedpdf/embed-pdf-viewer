@@ -60,6 +60,8 @@ import down030 from './030_signatures.down.sql';
 import sql030 from './030_signatures.sql';
 import down031 from './031_drop_weak_annotation_state.down.sql';
 import sql031 from './031_drop_weak_annotation_state.sql';
+import down032 from './032_object_numbers.down.sql';
+import sql032 from './032_object_numbers.sql';
 import type { MigrationSource } from '../../migrator/runner';
 
 /**
@@ -109,5 +111,11 @@ export const postgresMigrations: ReadonlyArray<MigrationSource> = [
     name: '031_drop_weak_annotation_state.sql',
     sql: sql031,
     down: down031,
+  },
+  {
+    version: '032',
+    name: '032_object_numbers.sql',
+    sql: sql032,
+    down: down032,
   },
 ];

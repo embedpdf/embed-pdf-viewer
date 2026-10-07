@@ -21,6 +21,27 @@ export interface ObjectNumberRange {
   readonly count: number;
 }
 
+/**
+ * Runs of numbers as an HTTP header value, inclusive like an HTTP `Range`:
+ * `1003-1035, 2040-2042` (`EmbedPDF-Object-Numbers`).
+ */
+export function formatObjectNumberRanges(ranges: readonly ObjectNumberRange[]): string {
+  return ranges.map(({ first, count }) => `${first}-${first + count - 1}`).join(', ');
+}
+
+/** The runs a {@link formatObjectNumberRanges} header value names; `[]` for one that names none. */
+export function parseObjectNumberRanges(value: string | null | undefined): ObjectNumberRange[] {
+  const ranges: ObjectNumberRange[] = [];
+  for (const part of (value ?? '').split(',')) {
+    const match = /^\s*(\d+)-(\d+)\s*$/.exec(part);
+    if (!match) continue;
+    const first = Number(match[1]);
+    const last = Number(match[2]);
+    if (last >= first) ranges.push({ first, count: last - first + 1 });
+  }
+  return ranges;
+}
+
 /** Every number in `ranges`, in order. */
 export function objectNumbersIn(ranges: readonly ObjectNumberRange[]): number[] {
   const numbers: number[] = [];
@@ -28,6 +49,27 @@ export function objectNumbersIn(ranges: readonly ObjectNumberRange[]): number[] 
     for (let i = 0; i < count; i++) numbers.push(first + i);
   }
   return numbers;
+}
+
+/**
+ * A cloud editing session, as `/access` tells a client that may create:
+ * `'new'`, `'revived'` (it had expired, and its numbers came back with it
+ * unless another session took them) or `'live'`; the seconds until it
+ * expires without a sign of life; and the numbers handed out now.
+ */
+export interface EditSessionAccess {
+  readonly session: 'new' | 'revived' | 'live';
+  readonly expiresIn: number;
+  readonly objectNumbers: readonly ObjectNumberRange[];
+}
+
+/**
+ * The event stream's `session` event: every number the editing session
+ * holds now, and the seconds until it expires without a sign of life.
+ */
+export interface EditSessionStatus {
+  readonly held: readonly ObjectNumberRange[];
+  readonly expiresIn: number;
 }
 
 /** Numbers a session can no longer use, and why. */
