@@ -305,7 +305,7 @@ export function computeCalloutOverallRect(
 
 export const calloutVertexConfig = {
   extractVertices: (a: PdfFreeTextAnnoObject): Position[] => {
-    const textBox = computeTextBoxFromRD(a.rect, a.rectangleDifferences);
+    const textBox = computeTextBoxFromRD(a.unrotatedRect ?? a.rect, a.rectangleDifferences);
     const cl = a.calloutLine;
     if (!cl || cl.length < 3) {
       return [
