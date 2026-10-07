@@ -9,13 +9,29 @@ export interface DocFormsReset200Response {
 
 export namespace DocFormsReset200Response {
     export interface Meta {
-        affectedPages: CloudPDF.PageState[];
+        affectedPages: Meta.AffectedPages.Item[];
         cacheDelta: Meta.CacheDelta | null;
         changedFields: CloudPDF.DocFormsReset200ResponseMetaChangedFieldsItem[];
         changedWidgets: Meta.ChangedWidgets.Item[];
     }
 
     export namespace Meta {
+        export type AffectedPages = AffectedPages.Item[];
+
+        export namespace AffectedPages {
+            export interface Item {
+                kind: Item.Kind;
+                objectNumber: number;
+            }
+
+            export namespace Item {
+                export const Kind = {
+                    ObjectNumber: "objectNumber",
+                } as const;
+                export type Kind = (typeof Kind)[keyof typeof Kind];
+            }
+        }
+
         export interface CacheDelta {
             previousDocVersion: number;
             docVersion: number;

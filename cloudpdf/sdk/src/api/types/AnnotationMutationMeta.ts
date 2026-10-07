@@ -3,14 +3,28 @@
 import type * as CloudPDF from "../index.js";
 
 export interface AnnotationMutationMeta {
-    affectedPages: CloudPDF.PageState[];
+    affectedPages: AnnotationMutationMeta.AffectedPages.Item[];
     cacheDelta: AnnotationMutationMeta.CacheDelta | null;
     changed: CloudPDF.AnnotationMutationMetaChangedItem[];
-    weakRefsInvalidated: boolean;
-    shouldRefetch: AnnotationMutationMeta.ShouldRefetch | null;
 }
 
 export namespace AnnotationMutationMeta {
+    export type AffectedPages = AffectedPages.Item[];
+
+    export namespace AffectedPages {
+        export interface Item {
+            kind: Item.Kind;
+            objectNumber: number;
+        }
+
+        export namespace Item {
+            export const Kind = {
+                ObjectNumber: "objectNumber",
+            } as const;
+            export type Kind = (typeof Kind)[keyof typeof Kind];
+        }
+    }
+
     export interface CacheDelta {
         previousDocVersion: number;
         docVersion: number;
@@ -51,18 +65,5 @@ export namespace AnnotationMutationMeta {
                 }
             }
         }
-    }
-
-    export interface ShouldRefetch {
-        reason: ShouldRefetch.Reason;
-    }
-
-    export namespace ShouldRefetch {
-        export const Reason = {
-            WeakRefsInvalidated: "weakRefsInvalidated",
-            ExternalChange: "externalChange",
-            PageRebuilt: "pageRebuilt",
-        } as const;
-        export type Reason = (typeof Reason)[keyof typeof Reason];
     }
 }

@@ -4,8 +4,7 @@ import type * as CloudPDF from "../index.js";
 
 export type DocFormsImportData200ResponseFormFieldsItemPushbuttonWidgetsItemRef =
     | CloudPDF.DocFormsImportData200ResponseFormFieldsItemPushbuttonWidgetsItemRef.ObjectNumber
-    | CloudPDF.DocFormsImportData200ResponseFormFieldsItemPushbuttonWidgetsItemRef.Nm
-    | CloudPDF.DocFormsImportData200ResponseFormFieldsItemPushbuttonWidgetsItemRef.Index;
+    | CloudPDF.DocFormsImportData200ResponseFormFieldsItemPushbuttonWidgetsItemRef.BaseIndex;
 
 export namespace DocFormsImportData200ResponseFormFieldsItemPushbuttonWidgetsItemRef {
     export interface ObjectNumber {
@@ -28,13 +27,13 @@ export namespace DocFormsImportData200ResponseFormFieldsItemPushbuttonWidgetsIte
         }
     }
 
-    export interface Nm {
-        kind: "nm";
-        page: DocFormsImportData200ResponseFormFieldsItemPushbuttonWidgetsItemRefNm.Page;
-        nm: string;
+    export interface BaseIndex {
+        kind: "baseIndex";
+        page: DocFormsImportData200ResponseFormFieldsItemPushbuttonWidgetsItemRefBaseIndex.Page;
+        baseIndex: number;
     }
 
-    export namespace DocFormsImportData200ResponseFormFieldsItemPushbuttonWidgetsItemRefNm {
+    export namespace DocFormsImportData200ResponseFormFieldsItemPushbuttonWidgetsItemRefBaseIndex {
         export interface Page {
             kind: Page.Kind;
             objectNumber: number;
@@ -45,47 +44,6 @@ export namespace DocFormsImportData200ResponseFormFieldsItemPushbuttonWidgetsIte
                 ObjectNumber: "objectNumber",
             } as const;
             export type Kind = (typeof Kind)[keyof typeof Kind];
-        }
-    }
-
-    export interface Index {
-        kind: "index";
-        page: DocFormsImportData200ResponseFormFieldsItemPushbuttonWidgetsItemRefIndex.Page;
-        index: number;
-        revision: DocFormsImportData200ResponseFormFieldsItemPushbuttonWidgetsItemRefIndex.Revision;
-    }
-
-    export namespace DocFormsImportData200ResponseFormFieldsItemPushbuttonWidgetsItemRefIndex {
-        export interface Page {
-            kind: Page.Kind;
-            objectNumber: number;
-        }
-
-        export namespace Page {
-            export const Kind = {
-                ObjectNumber: "objectNumber",
-            } as const;
-            export type Kind = (typeof Kind)[keyof typeof Kind];
-        }
-
-        export interface Revision {
-            docSessionId: string;
-            page: Revision.Page;
-            generation: number;
-        }
-
-        export namespace Revision {
-            export interface Page {
-                kind: Page.Kind;
-                objectNumber: number;
-            }
-
-            export namespace Page {
-                export const Kind = {
-                    ObjectNumber: "objectNumber",
-                } as const;
-                export type Kind = (typeof Kind)[keyof typeof Kind];
-            }
         }
     }
 }

@@ -17,26 +17,11 @@ describe("RedactionsClient", () => {
                 ],
             },
             results: [
-                {
-                    page: { kind: "objectNumber", objectNumber: 1 },
-                    status: "applied",
-                    removedAnnotationCount: 1,
-                    error: { name: "EngineError", code: "Unknown", message: "message" },
-                },
+                { page: { kind: "objectNumber", objectNumber: 1 }, status: "applied", removedAnnotationCount: 1 },
             ],
             removedAnnotationCount: 1,
             meta: {
-                affectedPages: [
-                    {
-                        page: { kind: "objectNumber", objectNumber: 1 },
-                        revision: {
-                            docSessionId: "docSessionId",
-                            page: { kind: "objectNumber", objectNumber: 1 },
-                            generation: 1,
-                        },
-                        weakAnnotationState: { kind: "unknown" },
-                    },
-                ],
+                affectedPages: [{ kind: "objectNumber", objectNumber: 1 }],
                 cacheDelta: {
                     previousDocVersion: 1,
                     docVersion: 1,

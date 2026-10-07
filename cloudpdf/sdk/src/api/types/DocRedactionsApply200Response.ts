@@ -40,7 +40,6 @@ export namespace DocRedactionsApply200Response {
             page: Item.Page;
             status: Item.Status;
             removedAnnotationCount: number;
-            error?: Item.Error_ | undefined;
         }
 
         export namespace Item {
@@ -59,62 +58,33 @@ export namespace DocRedactionsApply200Response {
             export const Status = {
                 Applied: "applied",
                 Unchanged: "unchanged",
-                Failed: "failed",
-                Skipped: "skipped",
             } as const;
             export type Status = (typeof Status)[keyof typeof Status];
-
-            export interface Error_ {
-                name: Error_.Name;
-                code: Error_.Code;
-                message: string;
-                details?: Record<string, unknown> | undefined;
-            }
-
-            export namespace Error_ {
-                export const Name = {
-                    EngineError: "EngineError",
-                } as const;
-                export type Name = (typeof Name)[keyof typeof Name];
-                export const Code = {
-                    Unknown: "Unknown",
-                    InvalidArg: "InvalidArg",
-                    DocNotOpen: "DocNotOpen",
-                    DocOpenFailed: "DocOpenFailed",
-                    DocPasswordRequired: "DocPasswordRequired",
-                    DocPasswordIncorrect: "DocPasswordIncorrect",
-                    SharePasswordRequired: "SharePasswordRequired",
-                    Aborted: "Aborted",
-                    Network: "Network",
-                    Unauthenticated: "Unauthenticated",
-                    Forbidden: "Forbidden",
-                    NotFound: "NotFound",
-                    WireFormat: "WireFormat",
-                    RuntimeUnavailable: "RuntimeUnavailable",
-                    InvalidReference: "InvalidReference",
-                    WeakAnnotationSessionConflict: "WeakAnnotationSessionConflict",
-                    LayerVersionConflict: "LayerVersionConflict",
-                    NotImplemented: "NotImplemented",
-                    MalformedPdf: "MalformedPdf",
-                    SigningPending: "SigningPending",
-                    SigningExpired: "SigningExpired",
-                    SigningVersionMismatch: "SigningVersionMismatch",
-                    SignatureRefused: "SignatureRefused",
-                    ProtectedDocument: "ProtectedDocument",
-                    StaleBase: "StaleBase",
-                    PayloadTooLarge: "PayloadTooLarge",
-                } as const;
-                export type Code = (typeof Code)[keyof typeof Code];
-            }
         }
     }
 
     export interface Meta {
-        affectedPages: CloudPDF.PageState[];
+        affectedPages: Meta.AffectedPages.Item[];
         cacheDelta: Meta.CacheDelta | null;
     }
 
     export namespace Meta {
+        export type AffectedPages = AffectedPages.Item[];
+
+        export namespace AffectedPages {
+            export interface Item {
+                kind: Item.Kind;
+                objectNumber: number;
+            }
+
+            export namespace Item {
+                export const Kind = {
+                    ObjectNumber: "objectNumber",
+                } as const;
+                export type Kind = (typeof Kind)[keyof typeof Kind];
+            }
+        }
+
         export interface CacheDelta {
             previousDocVersion: number;
             docVersion: number;

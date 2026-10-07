@@ -192,17 +192,7 @@ describe("SignaturesClient", () => {
                 policyVersion: 1,
             },
             meta: {
-                affectedPages: [
-                    {
-                        page: { kind: "objectNumber", objectNumber: 1 },
-                        revision: {
-                            docSessionId: "docSessionId",
-                            page: { kind: "objectNumber", objectNumber: 1 },
-                            generation: 1,
-                        },
-                        weakAnnotationState: { kind: "unknown" },
-                    },
-                ],
+                affectedPages: [{ kind: "objectNumber", objectNumber: 1 }],
                 cacheDelta: {
                     previousDocVersion: 1,
                     docVersion: 1,

@@ -212,12 +212,19 @@ export class AnnotationsClient {
         request: CloudPDF.doc.CreateAnnotationsRequest,
         requestOptions?: AnnotationsClient.RequestOptions,
     ): Promise<core.WithRawResponse<CloudPDF.DocAnnotationsCreate200Response>> {
-        const { docId, layerName, pageKey, "X-Document-Password": documentPassword, body: _body } = request;
+        const {
+            docId,
+            layerName,
+            pageKey,
+            "X-Document-Password": documentPassword,
+            "Idempotency-Key": idempotencyKey,
+            body: _body,
+        } = request;
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
             _authRequest.headers,
             this._options?.headers,
-            mergeOnlyDefinedHeaders({ "X-Document-Password": documentPassword }),
+            mergeOnlyDefinedHeaders({ "X-Document-Password": documentPassword, "Idempotency-Key": idempotencyKey }),
             requestOptions?.headers,
         );
         const _response = await core.fetcher({
@@ -295,12 +302,19 @@ export class AnnotationsClient {
         request: CloudPDF.doc.DeleteAnnotationsRequest,
         requestOptions?: AnnotationsClient.RequestOptions,
     ): Promise<core.WithRawResponse<CloudPDF.DocAnnotationsDelete200Response>> {
-        const { docId, layerName, pageKey, annotKey, "X-Document-Password": documentPassword } = request;
+        const {
+            docId,
+            layerName,
+            pageKey,
+            annotKey,
+            "X-Document-Password": documentPassword,
+            "Idempotency-Key": idempotencyKey,
+        } = request;
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
             _authRequest.headers,
             this._options?.headers,
-            mergeOnlyDefinedHeaders({ "X-Document-Password": documentPassword }),
+            mergeOnlyDefinedHeaders({ "X-Document-Password": documentPassword, "Idempotency-Key": idempotencyKey }),
             requestOptions?.headers,
         );
         const _response = await core.fetcher({
@@ -377,12 +391,20 @@ export class AnnotationsClient {
         request: CloudPDF.doc.UpdateAnnotationsRequest,
         requestOptions?: AnnotationsClient.RequestOptions,
     ): Promise<core.WithRawResponse<CloudPDF.DocAnnotationsUpdate200Response>> {
-        const { docId, layerName, pageKey, annotKey, "X-Document-Password": documentPassword, body: _body } = request;
+        const {
+            docId,
+            layerName,
+            pageKey,
+            annotKey,
+            "X-Document-Password": documentPassword,
+            "Idempotency-Key": idempotencyKey,
+            body: _body,
+        } = request;
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
             _authRequest.headers,
             this._options?.headers,
-            mergeOnlyDefinedHeaders({ "X-Document-Password": documentPassword }),
+            mergeOnlyDefinedHeaders({ "X-Document-Password": documentPassword, "Idempotency-Key": idempotencyKey }),
             requestOptions?.headers,
         );
         const _response = await core.fetcher({
@@ -602,12 +624,19 @@ export class AnnotationsClient {
         request: CloudPDF.doc.FlattenAnnotationsRequest,
         requestOptions?: AnnotationsClient.RequestOptions,
     ): Promise<core.WithRawResponse<CloudPDF.DocAnnotationsFlatten200Response>> {
-        const { docId, layerName, pageKey, "X-Document-Password": documentPassword, body: _body } = request;
+        const {
+            docId,
+            layerName,
+            pageKey,
+            "X-Document-Password": documentPassword,
+            "Idempotency-Key": idempotencyKey,
+            body: _body,
+        } = request;
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
             _authRequest.headers,
             this._options?.headers,
-            mergeOnlyDefinedHeaders({ "X-Document-Password": documentPassword }),
+            mergeOnlyDefinedHeaders({ "X-Document-Password": documentPassword, "Idempotency-Key": idempotencyKey }),
             requestOptions?.headers,
         );
         const _response = await core.fetcher({

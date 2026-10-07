@@ -48,12 +48,18 @@ export class RedactionsClient {
         request: CloudPDF.doc.DocRedactionsApplyRequest,
         requestOptions?: RedactionsClient.RequestOptions,
     ): Promise<core.WithRawResponse<CloudPDF.DocRedactionsApply200Response>> {
-        const { docId, layerName, "X-Document-Password": documentPassword, ..._body } = request;
+        const {
+            docId,
+            layerName,
+            "X-Document-Password": documentPassword,
+            "Idempotency-Key": idempotencyKey,
+            ..._body
+        } = request;
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
             _authRequest.headers,
             this._options?.headers,
-            mergeOnlyDefinedHeaders({ "X-Document-Password": documentPassword }),
+            mergeOnlyDefinedHeaders({ "X-Document-Password": documentPassword, "Idempotency-Key": idempotencyKey }),
             requestOptions?.headers,
         );
         const _response = await core.fetcher({

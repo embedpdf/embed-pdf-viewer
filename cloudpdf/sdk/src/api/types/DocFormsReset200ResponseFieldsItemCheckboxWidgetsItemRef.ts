@@ -4,8 +4,7 @@ import type * as CloudPDF from "../index.js";
 
 export type DocFormsReset200ResponseFieldsItemCheckboxWidgetsItemRef =
     | CloudPDF.DocFormsReset200ResponseFieldsItemCheckboxWidgetsItemRef.ObjectNumber
-    | CloudPDF.DocFormsReset200ResponseFieldsItemCheckboxWidgetsItemRef.Nm
-    | CloudPDF.DocFormsReset200ResponseFieldsItemCheckboxWidgetsItemRef.Index;
+    | CloudPDF.DocFormsReset200ResponseFieldsItemCheckboxWidgetsItemRef.BaseIndex;
 
 export namespace DocFormsReset200ResponseFieldsItemCheckboxWidgetsItemRef {
     export interface ObjectNumber {
@@ -28,13 +27,13 @@ export namespace DocFormsReset200ResponseFieldsItemCheckboxWidgetsItemRef {
         }
     }
 
-    export interface Nm {
-        kind: "nm";
-        page: DocFormsReset200ResponseFieldsItemCheckboxWidgetsItemRefNm.Page;
-        nm: string;
+    export interface BaseIndex {
+        kind: "baseIndex";
+        page: DocFormsReset200ResponseFieldsItemCheckboxWidgetsItemRefBaseIndex.Page;
+        baseIndex: number;
     }
 
-    export namespace DocFormsReset200ResponseFieldsItemCheckboxWidgetsItemRefNm {
+    export namespace DocFormsReset200ResponseFieldsItemCheckboxWidgetsItemRefBaseIndex {
         export interface Page {
             kind: Page.Kind;
             objectNumber: number;
@@ -45,47 +44,6 @@ export namespace DocFormsReset200ResponseFieldsItemCheckboxWidgetsItemRef {
                 ObjectNumber: "objectNumber",
             } as const;
             export type Kind = (typeof Kind)[keyof typeof Kind];
-        }
-    }
-
-    export interface Index {
-        kind: "index";
-        page: DocFormsReset200ResponseFieldsItemCheckboxWidgetsItemRefIndex.Page;
-        index: number;
-        revision: DocFormsReset200ResponseFieldsItemCheckboxWidgetsItemRefIndex.Revision;
-    }
-
-    export namespace DocFormsReset200ResponseFieldsItemCheckboxWidgetsItemRefIndex {
-        export interface Page {
-            kind: Page.Kind;
-            objectNumber: number;
-        }
-
-        export namespace Page {
-            export const Kind = {
-                ObjectNumber: "objectNumber",
-            } as const;
-            export type Kind = (typeof Kind)[keyof typeof Kind];
-        }
-
-        export interface Revision {
-            docSessionId: string;
-            page: Revision.Page;
-            generation: number;
-        }
-
-        export namespace Revision {
-            export interface Page {
-                kind: Page.Kind;
-                objectNumber: number;
-            }
-
-            export namespace Page {
-                export const Kind = {
-                    ObjectNumber: "objectNumber",
-                } as const;
-                export type Kind = (typeof Kind)[keyof typeof Kind];
-            }
         }
     }
 }

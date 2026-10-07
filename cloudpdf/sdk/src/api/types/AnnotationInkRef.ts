@@ -2,10 +2,7 @@
 
 import type * as CloudPDF from "../index.js";
 
-export type AnnotationInkRef =
-    | CloudPDF.AnnotationInkRef.ObjectNumber
-    | CloudPDF.AnnotationInkRef.Nm
-    | CloudPDF.AnnotationInkRef.Index;
+export type AnnotationInkRef = CloudPDF.AnnotationInkRef.ObjectNumber | CloudPDF.AnnotationInkRef.BaseIndex;
 
 export namespace AnnotationInkRef {
     export interface ObjectNumber {
@@ -28,13 +25,13 @@ export namespace AnnotationInkRef {
         }
     }
 
-    export interface Nm {
-        kind: "nm";
-        page: AnnotationInkRefNm.Page;
-        nm: string;
+    export interface BaseIndex {
+        kind: "baseIndex";
+        page: AnnotationInkRefBaseIndex.Page;
+        baseIndex: number;
     }
 
-    export namespace AnnotationInkRefNm {
+    export namespace AnnotationInkRefBaseIndex {
         export interface Page {
             kind: Page.Kind;
             objectNumber: number;
@@ -45,47 +42,6 @@ export namespace AnnotationInkRef {
                 ObjectNumber: "objectNumber",
             } as const;
             export type Kind = (typeof Kind)[keyof typeof Kind];
-        }
-    }
-
-    export interface Index {
-        kind: "index";
-        page: AnnotationInkRefIndex.Page;
-        index: number;
-        revision: AnnotationInkRefIndex.Revision;
-    }
-
-    export namespace AnnotationInkRefIndex {
-        export interface Page {
-            kind: Page.Kind;
-            objectNumber: number;
-        }
-
-        export namespace Page {
-            export const Kind = {
-                ObjectNumber: "objectNumber",
-            } as const;
-            export type Kind = (typeof Kind)[keyof typeof Kind];
-        }
-
-        export interface Revision {
-            docSessionId: string;
-            page: Revision.Page;
-            generation: number;
-        }
-
-        export namespace Revision {
-            export interface Page {
-                kind: Page.Kind;
-                objectNumber: number;
-            }
-
-            export namespace Page {
-                export const Kind = {
-                    ObjectNumber: "objectNumber",
-                } as const;
-                export type Kind = (typeof Kind)[keyof typeof Kind];
-            }
         }
     }
 }

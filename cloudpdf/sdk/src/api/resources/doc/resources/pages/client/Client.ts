@@ -49,12 +49,19 @@ export class PagesClient {
         request: CloudPDF.doc.DocPagesSetScaleRequest,
         requestOptions?: PagesClient.RequestOptions,
     ): Promise<core.WithRawResponse<CloudPDF.DocPagesSetScale200Response>> {
-        const { docId, layerName, pageKey, "X-Document-Password": documentPassword, ..._body } = request;
+        const {
+            docId,
+            layerName,
+            pageKey,
+            "X-Document-Password": documentPassword,
+            "Idempotency-Key": idempotencyKey,
+            ..._body
+        } = request;
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
             _authRequest.headers,
             this._options?.headers,
-            mergeOnlyDefinedHeaders({ "X-Document-Password": documentPassword }),
+            mergeOnlyDefinedHeaders({ "X-Document-Password": documentPassword, "Idempotency-Key": idempotencyKey }),
             requestOptions?.headers,
         );
         const _response = await core.fetcher({
@@ -208,12 +215,18 @@ export class PagesClient {
         request: CloudPDF.doc.DeletePagesRequest,
         requestOptions?: PagesClient.RequestOptions,
     ): Promise<core.WithRawResponse<CloudPDF.DocPagesDelete200Response>> {
-        const { docId, layerName, "X-Document-Password": documentPassword, body: _body } = request;
+        const {
+            docId,
+            layerName,
+            "X-Document-Password": documentPassword,
+            "Idempotency-Key": idempotencyKey,
+            body: _body,
+        } = request;
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
             _authRequest.headers,
             this._options?.headers,
-            mergeOnlyDefinedHeaders({ "X-Document-Password": documentPassword }),
+            mergeOnlyDefinedHeaders({ "X-Document-Password": documentPassword, "Idempotency-Key": idempotencyKey }),
             requestOptions?.headers,
         );
         const _response = await core.fetcher({
@@ -363,12 +376,18 @@ export class PagesClient {
         request: CloudPDF.doc.FlattenPagesRequest,
         requestOptions?: PagesClient.RequestOptions,
     ): Promise<core.WithRawResponse<CloudPDF.DocPagesFlatten200Response>> {
-        const { docId, layerName, "X-Document-Password": documentPassword, body: _body } = request;
+        const {
+            docId,
+            layerName,
+            "X-Document-Password": documentPassword,
+            "Idempotency-Key": idempotencyKey,
+            body: _body,
+        } = request;
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
             _authRequest.headers,
             this._options?.headers,
-            mergeOnlyDefinedHeaders({ "X-Document-Password": documentPassword }),
+            mergeOnlyDefinedHeaders({ "X-Document-Password": documentPassword, "Idempotency-Key": idempotencyKey }),
             requestOptions?.headers,
         );
         const _response = await core.fetcher({
@@ -455,6 +474,7 @@ export class PagesClient {
             this._options?.headers,
             mergeOnlyDefinedHeaders({
                 "X-Document-Password": request["X-Document-Password"],
+                "Idempotency-Key": request["Idempotency-Key"],
                 ..._maybeEncodedRequest.headers,
             }),
             requestOptions?.headers,
@@ -535,12 +555,18 @@ export class PagesClient {
         request: CloudPDF.doc.InsertBlankPagesRequest,
         requestOptions?: PagesClient.RequestOptions,
     ): Promise<core.WithRawResponse<CloudPDF.DocPagesInsertBlank200Response>> {
-        const { docId, layerName, "X-Document-Password": documentPassword, body: _body } = request;
+        const {
+            docId,
+            layerName,
+            "X-Document-Password": documentPassword,
+            "Idempotency-Key": idempotencyKey,
+            body: _body,
+        } = request;
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
             _authRequest.headers,
             this._options?.headers,
-            mergeOnlyDefinedHeaders({ "X-Document-Password": documentPassword }),
+            mergeOnlyDefinedHeaders({ "X-Document-Password": documentPassword, "Idempotency-Key": idempotencyKey }),
             requestOptions?.headers,
         );
         const _response = await core.fetcher({
@@ -620,12 +646,18 @@ export class PagesClient {
         request: CloudPDF.doc.MovePagesRequest,
         requestOptions?: PagesClient.RequestOptions,
     ): Promise<core.WithRawResponse<CloudPDF.DocPagesMove200Response>> {
-        const { docId, layerName, "X-Document-Password": documentPassword, body: _body } = request;
+        const {
+            docId,
+            layerName,
+            "X-Document-Password": documentPassword,
+            "Idempotency-Key": idempotencyKey,
+            body: _body,
+        } = request;
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
             _authRequest.headers,
             this._options?.headers,
-            mergeOnlyDefinedHeaders({ "X-Document-Password": documentPassword }),
+            mergeOnlyDefinedHeaders({ "X-Document-Password": documentPassword, "Idempotency-Key": idempotencyKey }),
             requestOptions?.headers,
         );
         const _response = await core.fetcher({
@@ -702,12 +734,18 @@ export class PagesClient {
         request: CloudPDF.doc.SetNamePagesRequest,
         requestOptions?: PagesClient.RequestOptions,
     ): Promise<core.WithRawResponse<CloudPDF.DocPagesSetName200Response>> {
-        const { docId, layerName, "X-Document-Password": documentPassword, body: _body } = request;
+        const {
+            docId,
+            layerName,
+            "X-Document-Password": documentPassword,
+            "Idempotency-Key": idempotencyKey,
+            body: _body,
+        } = request;
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
             _authRequest.headers,
             this._options?.headers,
-            mergeOnlyDefinedHeaders({ "X-Document-Password": documentPassword }),
+            mergeOnlyDefinedHeaders({ "X-Document-Password": documentPassword, "Idempotency-Key": idempotencyKey }),
             requestOptions?.headers,
         );
         const _response = await core.fetcher({
@@ -784,12 +822,18 @@ export class PagesClient {
         request: CloudPDF.doc.RemoveNamePagesRequest,
         requestOptions?: PagesClient.RequestOptions,
     ): Promise<core.WithRawResponse<CloudPDF.DocPagesRemoveName200Response>> {
-        const { docId, layerName, "X-Document-Password": documentPassword, body: _body } = request;
+        const {
+            docId,
+            layerName,
+            "X-Document-Password": documentPassword,
+            "Idempotency-Key": idempotencyKey,
+            body: _body,
+        } = request;
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
             _authRequest.headers,
             this._options?.headers,
-            mergeOnlyDefinedHeaders({ "X-Document-Password": documentPassword }),
+            mergeOnlyDefinedHeaders({ "X-Document-Password": documentPassword, "Idempotency-Key": idempotencyKey }),
             requestOptions?.headers,
         );
         const _response = await core.fetcher({
@@ -869,12 +913,18 @@ export class PagesClient {
         request: CloudPDF.doc.RotatePagesRequest,
         requestOptions?: PagesClient.RequestOptions,
     ): Promise<core.WithRawResponse<CloudPDF.DocPagesRotate200Response>> {
-        const { docId, layerName, "X-Document-Password": documentPassword, body: _body } = request;
+        const {
+            docId,
+            layerName,
+            "X-Document-Password": documentPassword,
+            "Idempotency-Key": idempotencyKey,
+            body: _body,
+        } = request;
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
             _authRequest.headers,
             this._options?.headers,
-            mergeOnlyDefinedHeaders({ "X-Document-Password": documentPassword }),
+            mergeOnlyDefinedHeaders({ "X-Document-Password": documentPassword, "Idempotency-Key": idempotencyKey }),
             requestOptions?.headers,
         );
         const _response = await core.fetcher({

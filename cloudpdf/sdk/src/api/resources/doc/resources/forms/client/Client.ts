@@ -196,12 +196,18 @@ export class FormsClient {
         request: CloudPDF.doc.ImportDataFormsRequest,
         requestOptions?: FormsClient.RequestOptions,
     ): Promise<core.WithRawResponse<CloudPDF.DocFormsImportData200Response>> {
-        const { docId, layerName, "X-Document-Password": documentPassword, body: _body } = request;
+        const {
+            docId,
+            layerName,
+            "X-Document-Password": documentPassword,
+            "Idempotency-Key": idempotencyKey,
+            body: _body,
+        } = request;
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
             _authRequest.headers,
             this._options?.headers,
-            mergeOnlyDefinedHeaders({ "X-Document-Password": documentPassword }),
+            mergeOnlyDefinedHeaders({ "X-Document-Password": documentPassword, "Idempotency-Key": idempotencyKey }),
             requestOptions?.headers,
         );
         const _response = await core.fetcher({
@@ -282,12 +288,19 @@ export class FormsClient {
         request: CloudPDF.doc.SetValueFormsRequest,
         requestOptions?: FormsClient.RequestOptions,
     ): Promise<core.WithRawResponse<CloudPDF.DocFormsSetValue200Response>> {
-        const { docId, layerName, fieldKey, "X-Document-Password": documentPassword, body: _body } = request;
+        const {
+            docId,
+            layerName,
+            fieldKey,
+            "X-Document-Password": documentPassword,
+            "Idempotency-Key": idempotencyKey,
+            body: _body,
+        } = request;
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
             _authRequest.headers,
             this._options?.headers,
-            mergeOnlyDefinedHeaders({ "X-Document-Password": documentPassword }),
+            mergeOnlyDefinedHeaders({ "X-Document-Password": documentPassword, "Idempotency-Key": idempotencyKey }),
             requestOptions?.headers,
         );
         const _response = await core.fetcher({
@@ -361,12 +374,18 @@ export class FormsClient {
         request: CloudPDF.doc.DocFormsResetRequest,
         requestOptions?: FormsClient.RequestOptions,
     ): Promise<core.WithRawResponse<CloudPDF.DocFormsReset200Response>> {
-        const { docId, layerName, "X-Document-Password": documentPassword, ..._body } = request;
+        const {
+            docId,
+            layerName,
+            "X-Document-Password": documentPassword,
+            "Idempotency-Key": idempotencyKey,
+            ..._body
+        } = request;
         const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
         const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
             _authRequest.headers,
             this._options?.headers,
-            mergeOnlyDefinedHeaders({ "X-Document-Password": documentPassword }),
+            mergeOnlyDefinedHeaders({ "X-Document-Password": documentPassword, "Idempotency-Key": idempotencyKey }),
             requestOptions?.headers,
         );
         const _response = await core.fetcher({

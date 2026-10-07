@@ -27,8 +27,6 @@ export namespace DocFormsReset404Response {
         NotFound: "NotFound",
         WireFormat: "WireFormat",
         RuntimeUnavailable: "RuntimeUnavailable",
-        InvalidReference: "InvalidReference",
-        WeakAnnotationSessionConflict: "WeakAnnotationSessionConflict",
         LayerVersionConflict: "LayerVersionConflict",
         NotImplemented: "NotImplemented",
         MalformedPdf: "MalformedPdf",
@@ -39,6 +37,8 @@ export namespace DocFormsReset404Response {
         ProtectedDocument: "ProtectedDocument",
         StaleBase: "StaleBase",
         PayloadTooLarge: "PayloadTooLarge",
+        ObjectNumberUnavailable: "ObjectNumberUnavailable",
+        LayerFull: "LayerFull",
     } as const;
     export type Code = (typeof Code)[keyof typeof Code];
 }

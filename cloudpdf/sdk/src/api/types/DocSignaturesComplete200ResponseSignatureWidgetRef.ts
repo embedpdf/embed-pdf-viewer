@@ -4,8 +4,7 @@ import type * as CloudPDF from "../index.js";
 
 export type DocSignaturesComplete200ResponseSignatureWidgetRef =
     | CloudPDF.DocSignaturesComplete200ResponseSignatureWidgetRef.ObjectNumber
-    | CloudPDF.DocSignaturesComplete200ResponseSignatureWidgetRef.Nm
-    | CloudPDF.DocSignaturesComplete200ResponseSignatureWidgetRef.Index;
+    | CloudPDF.DocSignaturesComplete200ResponseSignatureWidgetRef.BaseIndex;
 
 export namespace DocSignaturesComplete200ResponseSignatureWidgetRef {
     export interface ObjectNumber {
@@ -28,13 +27,13 @@ export namespace DocSignaturesComplete200ResponseSignatureWidgetRef {
         }
     }
 
-    export interface Nm {
-        kind: "nm";
-        page: DocSignaturesComplete200ResponseSignatureWidgetRefNm.Page;
-        nm: string;
+    export interface BaseIndex {
+        kind: "baseIndex";
+        page: DocSignaturesComplete200ResponseSignatureWidgetRefBaseIndex.Page;
+        baseIndex: number;
     }
 
-    export namespace DocSignaturesComplete200ResponseSignatureWidgetRefNm {
+    export namespace DocSignaturesComplete200ResponseSignatureWidgetRefBaseIndex {
         export interface Page {
             kind: Page.Kind;
             objectNumber: number;
@@ -45,47 +44,6 @@ export namespace DocSignaturesComplete200ResponseSignatureWidgetRef {
                 ObjectNumber: "objectNumber",
             } as const;
             export type Kind = (typeof Kind)[keyof typeof Kind];
-        }
-    }
-
-    export interface Index {
-        kind: "index";
-        page: DocSignaturesComplete200ResponseSignatureWidgetRefIndex.Page;
-        index: number;
-        revision: DocSignaturesComplete200ResponseSignatureWidgetRefIndex.Revision;
-    }
-
-    export namespace DocSignaturesComplete200ResponseSignatureWidgetRefIndex {
-        export interface Page {
-            kind: Page.Kind;
-            objectNumber: number;
-        }
-
-        export namespace Page {
-            export const Kind = {
-                ObjectNumber: "objectNumber",
-            } as const;
-            export type Kind = (typeof Kind)[keyof typeof Kind];
-        }
-
-        export interface Revision {
-            docSessionId: string;
-            page: Revision.Page;
-            generation: number;
-        }
-
-        export namespace Revision {
-            export interface Page {
-                kind: Page.Kind;
-                objectNumber: number;
-            }
-
-            export namespace Page {
-                export const Kind = {
-                    ObjectNumber: "objectNumber",
-                } as const;
-                export type Kind = (typeof Kind)[keyof typeof Kind];
-            }
         }
     }
 }

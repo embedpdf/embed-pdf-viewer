@@ -2,10 +2,7 @@
 
 import type * as CloudPDF from "../index.js";
 
-export type AnnotationPolygonRef =
-    | CloudPDF.AnnotationPolygonRef.ObjectNumber
-    | CloudPDF.AnnotationPolygonRef.Nm
-    | CloudPDF.AnnotationPolygonRef.Index;
+export type AnnotationPolygonRef = CloudPDF.AnnotationPolygonRef.ObjectNumber | CloudPDF.AnnotationPolygonRef.BaseIndex;
 
 export namespace AnnotationPolygonRef {
     export interface ObjectNumber {
@@ -28,13 +25,13 @@ export namespace AnnotationPolygonRef {
         }
     }
 
-    export interface Nm {
-        kind: "nm";
-        page: AnnotationPolygonRefNm.Page;
-        nm: string;
+    export interface BaseIndex {
+        kind: "baseIndex";
+        page: AnnotationPolygonRefBaseIndex.Page;
+        baseIndex: number;
     }
 
-    export namespace AnnotationPolygonRefNm {
+    export namespace AnnotationPolygonRefBaseIndex {
         export interface Page {
             kind: Page.Kind;
             objectNumber: number;
@@ -45,47 +42,6 @@ export namespace AnnotationPolygonRef {
                 ObjectNumber: "objectNumber",
             } as const;
             export type Kind = (typeof Kind)[keyof typeof Kind];
-        }
-    }
-
-    export interface Index {
-        kind: "index";
-        page: AnnotationPolygonRefIndex.Page;
-        index: number;
-        revision: AnnotationPolygonRefIndex.Revision;
-    }
-
-    export namespace AnnotationPolygonRefIndex {
-        export interface Page {
-            kind: Page.Kind;
-            objectNumber: number;
-        }
-
-        export namespace Page {
-            export const Kind = {
-                ObjectNumber: "objectNumber",
-            } as const;
-            export type Kind = (typeof Kind)[keyof typeof Kind];
-        }
-
-        export interface Revision {
-            docSessionId: string;
-            page: Revision.Page;
-            generation: number;
-        }
-
-        export namespace Revision {
-            export interface Page {
-                kind: Page.Kind;
-                objectNumber: number;
-            }
-
-            export namespace Page {
-                export const Kind = {
-                    ObjectNumber: "objectNumber",
-                } as const;
-                export type Kind = (typeof Kind)[keyof typeof Kind];
-            }
         }
     }
 }

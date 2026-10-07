@@ -12,17 +12,7 @@ describe("PagesClient", () => {
         const rawResponseBody = {
             page: { kind: "objectNumber", objectNumber: 1 },
             meta: {
-                affectedPages: [
-                    {
-                        page: { kind: "objectNumber", objectNumber: 1 },
-                        revision: {
-                            docSessionId: "docSessionId",
-                            page: { kind: "objectNumber", objectNumber: 1 },
-                            generation: 1,
-                        },
-                        weakAnnotationState: { kind: "unknown" },
-                    },
-                ],
+                affectedPages: [{ kind: "objectNumber", objectNumber: 1 }],
                 cacheDelta: {
                     previousDocVersion: 1,
                     docVersion: 1,
@@ -198,17 +188,7 @@ describe("PagesClient", () => {
                 ],
             },
             meta: {
-                affectedPages: [
-                    {
-                        page: { kind: "objectNumber", objectNumber: 1 },
-                        revision: {
-                            docSessionId: "docSessionId",
-                            page: { kind: "objectNumber", objectNumber: 1 },
-                            generation: 1,
-                        },
-                        weakAnnotationState: { kind: "unknown" },
-                    },
-                ],
+                affectedPages: [{ kind: "objectNumber", objectNumber: 1 }],
                 cacheDelta: {
                     previousDocVersion: 1,
                     docVersion: 1,
@@ -310,25 +290,9 @@ describe("PagesClient", () => {
         const rawResponseBody = {
             pages: [{ kind: "objectNumber", objectNumber: 1 }],
             usage: "display",
-            results: [
-                {
-                    page: { kind: "objectNumber", objectNumber: 1 },
-                    status: "applied",
-                    error: { name: "EngineError", code: "Unknown", message: "message" },
-                },
-            ],
+            results: [{ page: { kind: "objectNumber", objectNumber: 1 }, status: "applied" }],
             meta: {
-                affectedPages: [
-                    {
-                        page: { kind: "objectNumber", objectNumber: 1 },
-                        revision: {
-                            docSessionId: "docSessionId",
-                            page: { kind: "objectNumber", objectNumber: 1 },
-                            generation: 1,
-                        },
-                        weakAnnotationState: { kind: "unknown" },
-                    },
-                ],
+                affectedPages: [{ kind: "objectNumber", objectNumber: 1 }],
                 cacheDelta: {
                     previousDocVersion: 1,
                     docVersion: 1,
@@ -454,17 +418,7 @@ describe("PagesClient", () => {
                 ],
             },
             meta: {
-                affectedPages: [
-                    {
-                        page: { kind: "objectNumber", objectNumber: 1 },
-                        revision: {
-                            docSessionId: "docSessionId",
-                            page: { kind: "objectNumber", objectNumber: 1 },
-                            generation: 1,
-                        },
-                        weakAnnotationState: { kind: "unknown" },
-                    },
-                ],
+                affectedPages: [{ kind: "objectNumber", objectNumber: 1 }],
                 cacheDelta: {
                     previousDocVersion: 1,
                     docVersion: 1,
@@ -589,17 +543,7 @@ describe("PagesClient", () => {
                 ],
             },
             meta: {
-                affectedPages: [
-                    {
-                        page: { kind: "objectNumber", objectNumber: 1 },
-                        revision: {
-                            docSessionId: "docSessionId",
-                            page: { kind: "objectNumber", objectNumber: 1 },
-                            generation: 1,
-                        },
-                        weakAnnotationState: { kind: "unknown" },
-                    },
-                ],
+                affectedPages: [{ kind: "objectNumber", objectNumber: 1 }],
                 cacheDelta: {
                     previousDocVersion: 1,
                     docVersion: 1,
@@ -724,17 +668,7 @@ describe("PagesClient", () => {
                 ],
             },
             meta: {
-                affectedPages: [
-                    {
-                        page: { kind: "objectNumber", objectNumber: 1 },
-                        revision: {
-                            docSessionId: "docSessionId",
-                            page: { kind: "objectNumber", objectNumber: 1 },
-                            generation: 1,
-                        },
-                        weakAnnotationState: { kind: "unknown" },
-                    },
-                ],
+                affectedPages: [{ kind: "objectNumber", objectNumber: 1 }],
                 cacheDelta: {
                     previousDocVersion: 1,
                     docVersion: 1,
@@ -859,17 +793,7 @@ describe("PagesClient", () => {
                 ],
             },
             meta: {
-                affectedPages: [
-                    {
-                        page: { kind: "objectNumber", objectNumber: 1 },
-                        revision: {
-                            docSessionId: "docSessionId",
-                            page: { kind: "objectNumber", objectNumber: 1 },
-                            generation: 1,
-                        },
-                        weakAnnotationState: { kind: "unknown" },
-                    },
-                ],
+                affectedPages: [{ kind: "objectNumber", objectNumber: 1 }],
                 cacheDelta: {
                     previousDocVersion: 1,
                     docVersion: 1,
@@ -994,17 +918,7 @@ describe("PagesClient", () => {
                 ],
             },
             meta: {
-                affectedPages: [
-                    {
-                        page: { kind: "objectNumber", objectNumber: 1 },
-                        revision: {
-                            docSessionId: "docSessionId",
-                            page: { kind: "objectNumber", objectNumber: 1 },
-                            generation: 1,
-                        },
-                        weakAnnotationState: { kind: "unknown" },
-                    },
-                ],
+                affectedPages: [{ kind: "objectNumber", objectNumber: 1 }],
                 cacheDelta: {
                     previousDocVersion: 1,
                     docVersion: 1,

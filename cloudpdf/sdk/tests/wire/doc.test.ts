@@ -94,18 +94,7 @@ describe("DocClient", () => {
                 policyVersion: 1,
             },
             pages: [
-                {
-                    state: {
-                        page: { kind: "objectNumber", objectNumber: 1 },
-                        revision: {
-                            docSessionId: "docSessionId",
-                            page: { kind: "objectNumber", objectNumber: 1 },
-                            generation: 1,
-                        },
-                        weakAnnotationState: { kind: "unknown" },
-                    },
-                    cache: { contentVersion: 1, annotationVersion: 1 },
-                },
+                { page: { kind: "objectNumber", objectNumber: 1 }, cache: { contentVersion: 1, annotationVersion: 1 } },
             ],
         };
 

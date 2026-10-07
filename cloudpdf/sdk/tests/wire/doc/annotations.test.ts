@@ -16,7 +16,6 @@ describe("AnnotationsClient", () => {
                     ref: { kind: "objectNumber", page: { kind: "objectNumber", objectNumber: 1 }, objectNumber: 1 },
                     page: { kind: "objectNumber", objectNumber: 1 },
                     index: 1,
-                    identityQuality: "durable",
                     hasAppearance: true,
                     nm: "nm",
                     rect: { x: 1.1, y: 1.1, width: 1.1, height: 1.1 },
@@ -59,17 +58,7 @@ describe("AnnotationsClient", () => {
                     ],
                 },
             ],
-            pages: [
-                {
-                    page: { kind: "objectNumber", objectNumber: 1 },
-                    revision: {
-                        docSessionId: "docSessionId",
-                        page: { kind: "objectNumber", objectNumber: 1 },
-                        generation: 1,
-                    },
-                    weakAnnotationState: { kind: "unknown" },
-                },
-            ],
+            pages: [{ kind: "objectNumber", objectNumber: 1 }],
             auditHead: 1,
         };
 
@@ -143,7 +132,6 @@ describe("AnnotationsClient", () => {
                     ref: { kind: "objectNumber", page: { kind: "objectNumber", objectNumber: 1 }, objectNumber: 1 },
                     page: { kind: "objectNumber", objectNumber: 1 },
                     index: 1,
-                    identityQuality: "durable",
                     hasAppearance: true,
                     nm: "nm",
                     rect: { x: 1.1, y: 1.1, width: 1.1, height: 1.1 },
@@ -186,17 +174,7 @@ describe("AnnotationsClient", () => {
                     ],
                 },
             ],
-            pages: [
-                {
-                    page: { kind: "objectNumber", objectNumber: 1 },
-                    revision: {
-                        docSessionId: "docSessionId",
-                        page: { kind: "objectNumber", objectNumber: 1 },
-                        generation: 1,
-                    },
-                    weakAnnotationState: { kind: "unknown" },
-                },
-            ],
+            pages: [{ kind: "objectNumber", objectNumber: 1 }],
             auditHead: 1,
         };
 
@@ -249,7 +227,6 @@ describe("AnnotationsClient", () => {
                 ref: { kind: "objectNumber", page: { kind: "objectNumber", objectNumber: 1 }, objectNumber: 1 },
                 page: { kind: "objectNumber", objectNumber: 1 },
                 index: 1,
-                identityQuality: "durable",
                 hasAppearance: true,
                 nm: "nm",
                 rect: { x: 1.1, y: 1.1, width: 1.1, height: 1.1 },
@@ -304,17 +281,7 @@ describe("AnnotationsClient", () => {
                 ],
             },
             meta: {
-                affectedPages: [
-                    {
-                        page: { kind: "objectNumber", objectNumber: 1 },
-                        revision: {
-                            docSessionId: "docSessionId",
-                            page: { kind: "objectNumber", objectNumber: 1 },
-                            generation: 1,
-                        },
-                        weakAnnotationState: { kind: "unknown" },
-                    },
-                ],
+                affectedPages: [{ kind: "objectNumber", objectNumber: 1 }],
                 cacheDelta: {
                     previousDocVersion: 1,
                     docVersion: 1,
@@ -331,9 +298,7 @@ describe("AnnotationsClient", () => {
                         },
                     ],
                 },
-                changed: [{ kind: "objectNumber", objectNumber: 1 }],
-                weakRefsInvalidated: true,
-                shouldRefetch: { reason: "weakRefsInvalidated" },
+                changed: [{ kind: "objectNumber", page: { kind: "objectNumber", objectNumber: 1 }, objectNumber: 1 }],
             },
         };
 
@@ -421,17 +386,7 @@ describe("AnnotationsClient", () => {
 
         const rawResponseBody = {
             meta: {
-                affectedPages: [
-                    {
-                        page: { kind: "objectNumber", objectNumber: 1 },
-                        revision: {
-                            docSessionId: "docSessionId",
-                            page: { kind: "objectNumber", objectNumber: 1 },
-                            generation: 1,
-                        },
-                        weakAnnotationState: { kind: "unknown" },
-                    },
-                ],
+                affectedPages: [{ kind: "objectNumber", objectNumber: 1 }],
                 cacheDelta: {
                     previousDocVersion: 1,
                     docVersion: 1,
@@ -448,9 +403,7 @@ describe("AnnotationsClient", () => {
                         },
                     ],
                 },
-                changed: [{ kind: "objectNumber", objectNumber: 1 }],
-                weakRefsInvalidated: true,
-                shouldRefetch: { reason: "weakRefsInvalidated" },
+                changed: [{ kind: "objectNumber", page: { kind: "objectNumber", objectNumber: 1 }, objectNumber: 1 }],
             },
         };
 
@@ -505,7 +458,6 @@ describe("AnnotationsClient", () => {
                 ref: { kind: "objectNumber", page: { kind: "objectNumber", objectNumber: 1 }, objectNumber: 1 },
                 page: { kind: "objectNumber", objectNumber: 1 },
                 index: 1,
-                identityQuality: "durable",
                 hasAppearance: true,
                 nm: "nm",
                 rect: { x: 1.1, y: 1.1, width: 1.1, height: 1.1 },
@@ -561,17 +513,7 @@ describe("AnnotationsClient", () => {
             },
             appearance: { action: "preserved", changed: true },
             meta: {
-                affectedPages: [
-                    {
-                        page: { kind: "objectNumber", objectNumber: 1 },
-                        revision: {
-                            docSessionId: "docSessionId",
-                            page: { kind: "objectNumber", objectNumber: 1 },
-                            generation: 1,
-                        },
-                        weakAnnotationState: { kind: "unknown" },
-                    },
-                ],
+                affectedPages: [{ kind: "objectNumber", objectNumber: 1 }],
                 cacheDelta: {
                     previousDocVersion: 1,
                     docVersion: 1,
@@ -588,9 +530,7 @@ describe("AnnotationsClient", () => {
                         },
                     ],
                 },
-                changed: [{ kind: "objectNumber", objectNumber: 1 }],
-                weakRefsInvalidated: true,
-                shouldRefetch: { reason: "weakRefsInvalidated" },
+                changed: [{ kind: "objectNumber", page: { kind: "objectNumber", objectNumber: 1 }, objectNumber: 1 }],
             },
         };
 
@@ -689,17 +629,7 @@ describe("AnnotationsClient", () => {
                 },
             ],
             meta: {
-                affectedPages: [
-                    {
-                        page: { kind: "objectNumber", objectNumber: 1 },
-                        revision: {
-                            docSessionId: "docSessionId",
-                            page: { kind: "objectNumber", objectNumber: 1 },
-                            generation: 1,
-                        },
-                        weakAnnotationState: { kind: "unknown" },
-                    },
-                ],
+                affectedPages: [{ kind: "objectNumber", objectNumber: 1 }],
                 cacheDelta: {
                     previousDocVersion: 1,
                     docVersion: 1,

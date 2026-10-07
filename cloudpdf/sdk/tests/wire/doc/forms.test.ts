@@ -109,17 +109,7 @@ describe("FormsClient", () => {
             applied: 1,
             skipped: 1,
             meta: {
-                affectedPages: [
-                    {
-                        page: { kind: "objectNumber", objectNumber: 1 },
-                        revision: {
-                            docSessionId: "docSessionId",
-                            page: { kind: "objectNumber", objectNumber: 1 },
-                            generation: 1,
-                        },
-                        weakAnnotationState: { kind: "unknown" },
-                    },
-                ],
+                affectedPages: [{ kind: "objectNumber", objectNumber: 1 }],
                 cacheDelta: {
                     previousDocVersion: 1,
                     docVersion: 1,
@@ -246,17 +236,7 @@ describe("FormsClient", () => {
                 comb: true,
             },
             meta: {
-                affectedPages: [
-                    {
-                        page: { kind: "objectNumber", objectNumber: 1 },
-                        revision: {
-                            docSessionId: "docSessionId",
-                            page: { kind: "objectNumber", objectNumber: 1 },
-                            generation: 1,
-                        },
-                        weakAnnotationState: { kind: "unknown" },
-                    },
-                ],
+                affectedPages: [{ kind: "objectNumber", objectNumber: 1 }],
                 cacheDelta: {
                     previousDocVersion: 1,
                     docVersion: 1,
@@ -384,17 +364,7 @@ describe("FormsClient", () => {
                 },
             ],
             meta: {
-                affectedPages: [
-                    {
-                        page: { kind: "objectNumber", objectNumber: 1 },
-                        revision: {
-                            docSessionId: "docSessionId",
-                            page: { kind: "objectNumber", objectNumber: 1 },
-                            generation: 1,
-                        },
-                        weakAnnotationState: { kind: "unknown" },
-                    },
-                ],
+                affectedPages: [{ kind: "objectNumber", objectNumber: 1 }],
                 cacheDelta: {
                     previousDocVersion: 1,
                     docVersion: 1,

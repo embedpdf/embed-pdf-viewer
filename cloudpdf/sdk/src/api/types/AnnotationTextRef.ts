@@ -2,10 +2,7 @@
 
 import type * as CloudPDF from "../index.js";
 
-export type AnnotationTextRef =
-    | CloudPDF.AnnotationTextRef.ObjectNumber
-    | CloudPDF.AnnotationTextRef.Nm
-    | CloudPDF.AnnotationTextRef.Index;
+export type AnnotationTextRef = CloudPDF.AnnotationTextRef.ObjectNumber | CloudPDF.AnnotationTextRef.BaseIndex;
 
 export namespace AnnotationTextRef {
     export interface ObjectNumber {
@@ -28,13 +25,13 @@ export namespace AnnotationTextRef {
         }
     }
 
-    export interface Nm {
-        kind: "nm";
-        page: AnnotationTextRefNm.Page;
-        nm: string;
+    export interface BaseIndex {
+        kind: "baseIndex";
+        page: AnnotationTextRefBaseIndex.Page;
+        baseIndex: number;
     }
 
-    export namespace AnnotationTextRefNm {
+    export namespace AnnotationTextRefBaseIndex {
         export interface Page {
             kind: Page.Kind;
             objectNumber: number;
@@ -45,47 +42,6 @@ export namespace AnnotationTextRef {
                 ObjectNumber: "objectNumber",
             } as const;
             export type Kind = (typeof Kind)[keyof typeof Kind];
-        }
-    }
-
-    export interface Index {
-        kind: "index";
-        page: AnnotationTextRefIndex.Page;
-        index: number;
-        revision: AnnotationTextRefIndex.Revision;
-    }
-
-    export namespace AnnotationTextRefIndex {
-        export interface Page {
-            kind: Page.Kind;
-            objectNumber: number;
-        }
-
-        export namespace Page {
-            export const Kind = {
-                ObjectNumber: "objectNumber",
-            } as const;
-            export type Kind = (typeof Kind)[keyof typeof Kind];
-        }
-
-        export interface Revision {
-            docSessionId: string;
-            page: Revision.Page;
-            generation: number;
-        }
-
-        export namespace Revision {
-            export interface Page {
-                kind: Page.Kind;
-                objectNumber: number;
-            }
-
-            export namespace Page {
-                export const Kind = {
-                    ObjectNumber: "objectNumber",
-                } as const;
-                export type Kind = (typeof Kind)[keyof typeof Kind];
-            }
         }
     }
 }

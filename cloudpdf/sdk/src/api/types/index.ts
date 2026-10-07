@@ -370,8 +370,6 @@ export * from "./DocVersionsSignatures200ResponseSignaturesItemWidgetRef.js";
 export * from "./DocVersionsSignatures404Response.js";
 export * from "./EngineErrorPayload.js";
 export * from "./PageDestination.js";
-export * from "./PageState.js";
-export * from "./PageStateWeakAnnotationState.js";
 export * from "./PdfActionNode.js";
 export * from "./PdfActionTargetRef.js";
 export * from "./PdfActionTree.js";

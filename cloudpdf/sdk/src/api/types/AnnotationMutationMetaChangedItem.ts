@@ -4,16 +4,46 @@ import type * as CloudPDF from "../index.js";
 
 export type AnnotationMutationMetaChangedItem =
     | CloudPDF.AnnotationMutationMetaChangedItem.ObjectNumber
-    | CloudPDF.AnnotationMutationMetaChangedItem.Nm;
+    | CloudPDF.AnnotationMutationMetaChangedItem.BaseIndex;
 
 export namespace AnnotationMutationMetaChangedItem {
     export interface ObjectNumber {
         kind: "objectNumber";
+        page: AnnotationMutationMetaChangedItemObjectNumber.Page;
         objectNumber: number;
     }
 
-    export interface Nm {
-        kind: "nm";
-        nm: string;
+    export namespace AnnotationMutationMetaChangedItemObjectNumber {
+        export interface Page {
+            kind: Page.Kind;
+            objectNumber: number;
+        }
+
+        export namespace Page {
+            export const Kind = {
+                ObjectNumber: "objectNumber",
+            } as const;
+            export type Kind = (typeof Kind)[keyof typeof Kind];
+        }
+    }
+
+    export interface BaseIndex {
+        kind: "baseIndex";
+        page: AnnotationMutationMetaChangedItemBaseIndex.Page;
+        baseIndex: number;
+    }
+
+    export namespace AnnotationMutationMetaChangedItemBaseIndex {
+        export interface Page {
+            kind: Page.Kind;
+            objectNumber: number;
+        }
+
+        export namespace Page {
+            export const Kind = {
+                ObjectNumber: "objectNumber",
+            } as const;
+            export type Kind = (typeof Kind)[keyof typeof Kind];
+        }
     }
 }

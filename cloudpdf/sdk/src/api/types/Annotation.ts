@@ -30,7 +30,6 @@ export namespace Annotation {
         ref: CloudPDF.AnnotationHighlightRef;
         page: AnnotationHighlight.Page;
         index: number;
-        identityQuality: AnnotationHighlight.IdentityQuality;
         hasAppearance: boolean;
         nm: string | null;
         rect: AnnotationHighlight.Rect;
@@ -75,12 +74,6 @@ export namespace Annotation {
             } as const;
             export type Kind = (typeof Kind)[keyof typeof Kind];
         }
-
-        export const IdentityQuality = {
-            Durable: "durable",
-            Weak: "weak",
-        } as const;
-        export type IdentityQuality = (typeof IdentityQuality)[keyof typeof IdentityQuality];
 
         export interface Rect {
             x: number;
@@ -161,7 +154,6 @@ export namespace Annotation {
         ref: CloudPDF.AnnotationUnderlineRef;
         page: AnnotationUnderline.Page;
         index: number;
-        identityQuality: AnnotationUnderline.IdentityQuality;
         hasAppearance: boolean;
         nm: string | null;
         rect: AnnotationUnderline.Rect;
@@ -206,12 +198,6 @@ export namespace Annotation {
             } as const;
             export type Kind = (typeof Kind)[keyof typeof Kind];
         }
-
-        export const IdentityQuality = {
-            Durable: "durable",
-            Weak: "weak",
-        } as const;
-        export type IdentityQuality = (typeof IdentityQuality)[keyof typeof IdentityQuality];
 
         export interface Rect {
             x: number;
@@ -292,7 +278,6 @@ export namespace Annotation {
         ref: CloudPDF.AnnotationSquigglyRef;
         page: AnnotationSquiggly.Page;
         index: number;
-        identityQuality: AnnotationSquiggly.IdentityQuality;
         hasAppearance: boolean;
         nm: string | null;
         rect: AnnotationSquiggly.Rect;
@@ -337,12 +322,6 @@ export namespace Annotation {
             } as const;
             export type Kind = (typeof Kind)[keyof typeof Kind];
         }
-
-        export const IdentityQuality = {
-            Durable: "durable",
-            Weak: "weak",
-        } as const;
-        export type IdentityQuality = (typeof IdentityQuality)[keyof typeof IdentityQuality];
 
         export interface Rect {
             x: number;
@@ -423,7 +402,6 @@ export namespace Annotation {
         ref: CloudPDF.AnnotationStrikeoutRef;
         page: AnnotationStrikeout.Page;
         index: number;
-        identityQuality: AnnotationStrikeout.IdentityQuality;
         hasAppearance: boolean;
         nm: string | null;
         rect: AnnotationStrikeout.Rect;
@@ -469,12 +447,6 @@ export namespace Annotation {
             } as const;
             export type Kind = (typeof Kind)[keyof typeof Kind];
         }
-
-        export const IdentityQuality = {
-            Durable: "durable",
-            Weak: "weak",
-        } as const;
-        export type IdentityQuality = (typeof IdentityQuality)[keyof typeof IdentityQuality];
 
         export interface Rect {
             x: number;
@@ -560,7 +532,6 @@ export namespace Annotation {
         ref: CloudPDF.AnnotationCircleRef;
         page: AnnotationCircle.Page;
         index: number;
-        identityQuality: AnnotationCircle.IdentityQuality;
         hasAppearance: boolean;
         nm: string | null;
         rect: AnnotationCircle.Rect;
@@ -611,12 +582,6 @@ export namespace Annotation {
             } as const;
             export type Kind = (typeof Kind)[keyof typeof Kind];
         }
-
-        export const IdentityQuality = {
-            Durable: "durable",
-            Weak: "weak",
-        } as const;
-        export type IdentityQuality = (typeof IdentityQuality)[keyof typeof IdentityQuality];
 
         export interface Rect {
             x: number;
@@ -679,7 +644,6 @@ export namespace Annotation {
         ref: CloudPDF.AnnotationSquareRef;
         page: AnnotationSquare.Page;
         index: number;
-        identityQuality: AnnotationSquare.IdentityQuality;
         hasAppearance: boolean;
         nm: string | null;
         rect: AnnotationSquare.Rect;
@@ -730,12 +694,6 @@ export namespace Annotation {
             } as const;
             export type Kind = (typeof Kind)[keyof typeof Kind];
         }
-
-        export const IdentityQuality = {
-            Durable: "durable",
-            Weak: "weak",
-        } as const;
-        export type IdentityQuality = (typeof IdentityQuality)[keyof typeof IdentityQuality];
 
         export interface Rect {
             x: number;
@@ -798,7 +756,6 @@ export namespace Annotation {
         ref: CloudPDF.AnnotationPolygonRef;
         page: AnnotationPolygon.Page;
         index: number;
-        identityQuality: AnnotationPolygon.IdentityQuality;
         hasAppearance: boolean;
         nm: string | null;
         rect: AnnotationPolygon.Rect;
@@ -853,12 +810,6 @@ export namespace Annotation {
             } as const;
             export type Kind = (typeof Kind)[keyof typeof Kind];
         }
-
-        export const IdentityQuality = {
-            Durable: "durable",
-            Weak: "weak",
-        } as const;
-        export type IdentityQuality = (typeof IdentityQuality)[keyof typeof IdentityQuality];
 
         export interface Rect {
             x: number;
@@ -933,7 +884,6 @@ export namespace Annotation {
         ref: CloudPDF.AnnotationPolylineRef;
         page: AnnotationPolyline.Page;
         index: number;
-        identityQuality: AnnotationPolyline.IdentityQuality;
         hasAppearance: boolean;
         nm: string | null;
         rect: AnnotationPolyline.Rect;
@@ -988,12 +938,6 @@ export namespace Annotation {
             } as const;
             export type Kind = (typeof Kind)[keyof typeof Kind];
         }
-
-        export const IdentityQuality = {
-            Durable: "durable",
-            Weak: "weak",
-        } as const;
-        export type IdentityQuality = (typeof IdentityQuality)[keyof typeof IdentityQuality];
 
         export interface Rect {
             x: number;
@@ -1101,7 +1045,6 @@ export namespace Annotation {
         ref: CloudPDF.AnnotationLineRef;
         page: AnnotationLine.Page;
         index: number;
-        identityQuality: AnnotationLine.IdentityQuality;
         hasAppearance: boolean;
         nm: string | null;
         rect: AnnotationLine.Rect;
@@ -1158,12 +1101,6 @@ export namespace Annotation {
             } as const;
             export type Kind = (typeof Kind)[keyof typeof Kind];
         }
-
-        export const IdentityQuality = {
-            Durable: "durable",
-            Weak: "weak",
-        } as const;
-        export type IdentityQuality = (typeof IdentityQuality)[keyof typeof IdentityQuality];
 
         export interface Rect {
             x: number;
@@ -1292,7 +1229,6 @@ export namespace Annotation {
         ref: CloudPDF.AnnotationLinkRef;
         page: AnnotationLink.Page;
         index: number;
-        identityQuality: AnnotationLink.IdentityQuality;
         hasAppearance: boolean;
         nm: string | null;
         rect: AnnotationLink.Rect;
@@ -1335,12 +1271,6 @@ export namespace Annotation {
             } as const;
             export type Kind = (typeof Kind)[keyof typeof Kind];
         }
-
-        export const IdentityQuality = {
-            Durable: "durable",
-            Weak: "weak",
-        } as const;
-        export type IdentityQuality = (typeof IdentityQuality)[keyof typeof IdentityQuality];
 
         export interface Rect {
             x: number;
@@ -1388,7 +1318,6 @@ export namespace Annotation {
         ref: CloudPDF.AnnotationInkRef;
         page: AnnotationInk.Page;
         index: number;
-        identityQuality: AnnotationInk.IdentityQuality;
         hasAppearance: boolean;
         nm: string | null;
         rect: AnnotationInk.Rect;
@@ -1438,12 +1367,6 @@ export namespace Annotation {
             } as const;
             export type Kind = (typeof Kind)[keyof typeof Kind];
         }
-
-        export const IdentityQuality = {
-            Durable: "durable",
-            Weak: "weak",
-        } as const;
-        export type IdentityQuality = (typeof IdentityQuality)[keyof typeof IdentityQuality];
 
         export interface Rect {
             x: number;
@@ -1512,7 +1435,6 @@ export namespace Annotation {
         ref: CloudPDF.AnnotationFreeTextRef;
         page: AnnotationFreeText.Page;
         index: number;
-        identityQuality: AnnotationFreeText.IdentityQuality;
         hasAppearance: boolean;
         nm: string | null;
         rect: AnnotationFreeText.Rect;
@@ -1572,12 +1494,6 @@ export namespace Annotation {
             } as const;
             export type Kind = (typeof Kind)[keyof typeof Kind];
         }
-
-        export const IdentityQuality = {
-            Durable: "durable",
-            Weak: "weak",
-        } as const;
-        export type IdentityQuality = (typeof IdentityQuality)[keyof typeof IdentityQuality];
 
         export interface Rect {
             x: number;
@@ -1817,7 +1733,6 @@ export namespace Annotation {
         ref: CloudPDF.AnnotationCaretRef;
         page: AnnotationCaret.Page;
         index: number;
-        identityQuality: AnnotationCaret.IdentityQuality;
         hasAppearance: boolean;
         nm: string | null;
         rect: AnnotationCaret.Rect;
@@ -1864,12 +1779,6 @@ export namespace Annotation {
             } as const;
             export type Kind = (typeof Kind)[keyof typeof Kind];
         }
-
-        export const IdentityQuality = {
-            Durable: "durable",
-            Weak: "weak",
-        } as const;
-        export type IdentityQuality = (typeof IdentityQuality)[keyof typeof IdentityQuality];
 
         export interface Rect {
             x: number;
@@ -1929,7 +1838,6 @@ export namespace Annotation {
         ref: CloudPDF.AnnotationTextRef;
         page: AnnotationText.Page;
         index: number;
-        identityQuality: AnnotationText.IdentityQuality;
         hasAppearance: boolean;
         nm: string | null;
         rect: AnnotationText.Rect;
@@ -1977,12 +1885,6 @@ export namespace Annotation {
             } as const;
             export type Kind = (typeof Kind)[keyof typeof Kind];
         }
-
-        export const IdentityQuality = {
-            Durable: "durable",
-            Weak: "weak",
-        } as const;
-        export type IdentityQuality = (typeof IdentityQuality)[keyof typeof IdentityQuality];
 
         export interface Rect {
             x: number;
@@ -2041,7 +1943,6 @@ export namespace Annotation {
         ref: CloudPDF.AnnotationStampRef;
         page: AnnotationStamp.Page;
         index: number;
-        identityQuality: AnnotationStamp.IdentityQuality;
         hasAppearance: boolean;
         nm: string | null;
         rect: AnnotationStamp.Rect;
@@ -2088,12 +1989,6 @@ export namespace Annotation {
             } as const;
             export type Kind = (typeof Kind)[keyof typeof Kind];
         }
-
-        export const IdentityQuality = {
-            Durable: "durable",
-            Weak: "weak",
-        } as const;
-        export type IdentityQuality = (typeof IdentityQuality)[keyof typeof IdentityQuality];
 
         export interface Rect {
             x: number;
@@ -2155,7 +2050,6 @@ export namespace Annotation {
         ref: CloudPDF.AnnotationFileAttachmentRef;
         page: AnnotationFileAttachment.Page;
         index: number;
-        identityQuality: AnnotationFileAttachment.IdentityQuality;
         hasAppearance: boolean;
         nm: string | null;
         rect: AnnotationFileAttachment.Rect;
@@ -2201,12 +2095,6 @@ export namespace Annotation {
             } as const;
             export type Kind = (typeof Kind)[keyof typeof Kind];
         }
-
-        export const IdentityQuality = {
-            Durable: "durable",
-            Weak: "weak",
-        } as const;
-        export type IdentityQuality = (typeof IdentityQuality)[keyof typeof IdentityQuality];
 
         export interface Rect {
             x: number;
@@ -2272,7 +2160,6 @@ export namespace Annotation {
         ref: CloudPDF.AnnotationWidgetRef;
         page: AnnotationWidget.Page;
         index: number;
-        identityQuality: AnnotationWidget.IdentityQuality;
         hasAppearance: boolean;
         nm: string | null;
         rect: AnnotationWidget.Rect;
@@ -2324,12 +2211,6 @@ export namespace Annotation {
             } as const;
             export type Kind = (typeof Kind)[keyof typeof Kind];
         }
-
-        export const IdentityQuality = {
-            Durable: "durable",
-            Weak: "weak",
-        } as const;
-        export type IdentityQuality = (typeof IdentityQuality)[keyof typeof IdentityQuality];
 
         export interface Rect {
             x: number;
@@ -2419,7 +2300,6 @@ export namespace Annotation {
         ref: CloudPDF.AnnotationRedactRef;
         page: AnnotationRedact.Page;
         index: number;
-        identityQuality: AnnotationRedact.IdentityQuality;
         hasAppearance: boolean;
         nm: string | null;
         rect: AnnotationRedact.Rect;
@@ -2471,12 +2351,6 @@ export namespace Annotation {
             } as const;
             export type Kind = (typeof Kind)[keyof typeof Kind];
         }
-
-        export const IdentityQuality = {
-            Durable: "durable",
-            Weak: "weak",
-        } as const;
-        export type IdentityQuality = (typeof IdentityQuality)[keyof typeof IdentityQuality];
 
         export interface Rect {
             x: number;
@@ -2564,7 +2438,6 @@ export namespace Annotation {
         ref: CloudPDF.AnnotationPopupRef;
         page: AnnotationPopup.Page;
         index: number;
-        identityQuality: AnnotationPopup.IdentityQuality;
         hasAppearance: boolean;
         nm: string | null;
         rect: AnnotationPopup.Rect;
@@ -2608,12 +2481,6 @@ export namespace Annotation {
             } as const;
             export type Kind = (typeof Kind)[keyof typeof Kind];
         }
-
-        export const IdentityQuality = {
-            Durable: "durable",
-            Weak: "weak",
-        } as const;
-        export type IdentityQuality = (typeof IdentityQuality)[keyof typeof IdentityQuality];
 
         export interface Rect {
             x: number;
@@ -2661,7 +2528,6 @@ export namespace Annotation {
         ref: CloudPDF.AnnotationUnsupportedRef;
         page: AnnotationUnsupported.Page;
         index: number;
-        identityQuality: AnnotationUnsupported.IdentityQuality;
         hasAppearance: boolean;
         nm: string | null;
         rect: AnnotationUnsupported.Rect;
@@ -2705,12 +2571,6 @@ export namespace Annotation {
             } as const;
             export type Kind = (typeof Kind)[keyof typeof Kind];
         }
-
-        export const IdentityQuality = {
-            Durable: "durable",
-            Weak: "weak",
-        } as const;
-        export type IdentityQuality = (typeof IdentityQuality)[keyof typeof IdentityQuality];
 
         export interface Rect {
             x: number;
