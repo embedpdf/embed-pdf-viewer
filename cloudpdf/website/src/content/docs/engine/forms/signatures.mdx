@@ -128,6 +128,9 @@ Between the two steps:
 Calling `complete()` again with the same `cms` returns the same result, with
 `status: 'already-completed'`; a different `cms` fails with `SignatureRefused`.
 
+A signature can't be undone, and completing one ends undo for every change made before it; see
+[Changes & undo](/docs/engine/documents/changes#what-cant-be-undone).
+
 <Engine local>
 
 A prepared signature waits until you complete or cancel it: `prepared.expiresAt` is `null`.

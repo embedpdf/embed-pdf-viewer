@@ -76,6 +76,8 @@ const image = await doc.page(pages[0].ref).render.image();
   split.
 - **[Redact](/docs/engine/documents/redaction)** content for good, and
   **[save](/docs/engine/documents/saving)** the result.
+- **[Group edits into changes](/docs/engine/documents/changes)** that apply all or none, and undo
+  or redo any of them.
 
 Every call is async, can be cancelled, and fails with a typed error you can branch on. The same
 code runs on the local engine and on the CloudPDF engine: only how you create the engine and

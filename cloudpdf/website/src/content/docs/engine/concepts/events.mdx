@@ -41,12 +41,13 @@ doc.events.on('annotations.updated', ({ annotation, origin }) => {
 });
 ```
 
-| Field         | What it is                                                                    |
-| :------------ | :---------------------------------------------------------------------------- |
-| `origin.kind` | `'local'` when this engine made the change, `'remote'` when someone else did. |
-| `origin.sub`  | The user who made it (on the cloud).                                          |
-| `origin.ts`   | When it happened, in milliseconds.                                            |
-| `origin.tx`   | The write it came from: its `opId`, and its place among that write's events.  |
+| Field           | What it is                                                                    |
+| :-------------- | :---------------------------------------------------------------------------- |
+| `origin.kind`   | `'local'` when this engine made the change, `'remote'` when someone else did. |
+| `origin.sub`    | The user who made it (on the cloud).                                          |
+| `origin.ts`     | When it happened, in milliseconds.                                            |
+| `origin.tx`     | The write it came from: its `opId`, and its place among that write's events.  |
+| `origin.undoOf` | On an undo's events: the `opId` of the change it undid.                       |
 
 An event fires after the change is saved, never before, and before the call's promise resolves.
 By the time `await page.annotations.create(…)` returns, your listeners have run.
@@ -56,6 +57,7 @@ By the time `await page.annotations.create(…)` returns, your listeners have ru
 | Type                                                                      | When                                                                                      |
 | :------------------------------------------------------------------------ | :---------------------------------------------------------------------------------------- |
 | `annotations.created`, `.updated`, `.deleted`, `.moved`                   | An annotation changed.                                                                    |
+| `annotations.restored`                                                    | An undo brought back deleted annotations.                                                 |
 | `annotations.flattened`                                                   | Annotations were baked into a page.                                                       |
 | `pages.moved`, `.rotated`, `.deleted`, `.inserted`                        | The page order or rotation changed.                                                       |
 | `pages.named`                                                             | A page name was added or removed.                                                         |
@@ -63,6 +65,7 @@ By the time `await page.annotations.create(…)` returns, your listeners have ru
 | `pages.scaleSet`                                                          | A page's measurement scale changed.                                                       |
 | `forms.valueSet`                                                          | A field was filled in.                                                                    |
 | `forms.created`, `.updated`, `.deleted`, `.widgetAdded`, `.widgetRemoved` | A field's structure changed.                                                              |
+| `forms.restored`                                                          | An undo brought back a deleted field.                                                     |
 | `forms.imported`, `forms.repaired`, `forms.effectsApplied`                | Many values or fields changed at once.                                                    |
 | `attachments.created`, `.deleted`                                         | An attached file was added or removed.                                                    |
 | `metadata.updated`                                                        | The title, author or another standard metadata field.                                     |
@@ -92,7 +95,11 @@ await page.annotations.update(ref, { contents: 'Seen' }, { opId });
 An `opId` is 1 to 255 visible ASCII characters (what an HTTP header can carry), on every engine.
 On the cloud, a write retried with the same `opId` is applied once, and the retry gets the first
 answer. The cloud engine retries a write lost on the network itself, under the same `opId`, so use
-a fresh `opId` for every write.
+a fresh `opId` for every write. A [change](/docs/engine/documents/changes#asking-again), and the
+annotation, form and metadata calls a change can hold, do the same on the local engine.
+
+The `opId` is also how you undo a write: `doc.apply({ undoOf: opId })`. See
+[Changes & undo](/docs/engine/documents/changes).
 
 Some calls make many changes at once. An [import](/docs/engine/annotations/import-export) of 50
 annotations fires 50 `annotations.created` events, one after the other, all with the same
