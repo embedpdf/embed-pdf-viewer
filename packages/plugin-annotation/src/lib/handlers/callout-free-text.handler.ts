@@ -11,6 +11,7 @@ import {
 import { clamp } from '@embedpdf/core';
 import { HandlerFactory, PreviewState } from './types';
 import { useState } from '../utils/use-state';
+import { createUprightCalloutHandler } from './upright-callout';
 import {
   computeCalloutConnectionPoint,
   computeCalloutOverallRect,
@@ -23,7 +24,7 @@ const DEFAULT_TB_HEIGHT = 40;
 
 type Phase = 'arrow' | 'knee' | 'textbox' | 'idle';
 
-export const calloutFreeTextHandlerFactory: HandlerFactory<PdfFreeTextAnnoObject> = {
+const unrotatedCalloutFreeTextHandlerFactory: HandlerFactory<PdfFreeTextAnnoObject> = {
   annotationType: PdfAnnotationSubtype.FREETEXT,
   create(context) {
     const { onCommit, onPreview, getTool, pageSize, pageIndex } = context;
@@ -267,5 +268,12 @@ export const calloutFreeTextHandlerFactory: HandlerFactory<PdfFreeTextAnnoObject
         evt.releasePointerCapture?.();
       },
     };
+  },
+};
+
+export const calloutFreeTextHandlerFactory: HandlerFactory<PdfFreeTextAnnoObject> = {
+  annotationType: PdfAnnotationSubtype.FREETEXT,
+  create(context) {
+    return createUprightCalloutHandler(context, unrotatedCalloutFreeTextHandlerFactory);
   },
 };
