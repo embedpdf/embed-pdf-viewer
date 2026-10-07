@@ -70,7 +70,7 @@ export function usePdfiumEngine(config?: UsePdfiumEngineProps) {
         engineRef.current = null;
       }, ignore);
     };
-  }, [wasmUrl, worker, logger, fontFallback, workerUrl, encoderWorkerUrl]);
+  }, [wasmUrl, worker, logger, encoderPoolSize, fontFallback, workerUrl, encoderWorkerUrl]);
 
   return { engine, isLoading: loading, error };
 }
