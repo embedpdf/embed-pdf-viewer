@@ -7,7 +7,10 @@
 import type { DocumentHandle, PageLayout } from '@embedpdf/engine-core/runtime';
 import { createTestContext } from '../../../../core/main/src/testing';
 
-import { ANNOTATION_DEFAULTS } from '../../../../plugin/annotation/src/contract';
+import {
+  ANNOTATION_DEFAULTS,
+  type AnnotationSettings,
+} from '../../../../plugin/annotation/src/contract';
 import { createAnnotationController } from '../../../../plugin/annotation/src/controller';
 import {
   initialAnnotationState,
@@ -15,7 +18,7 @@ import {
 } from '../../../../plugin/annotation/src/model';
 
 export async function annotationShell(doc: DocumentHandle, pages: readonly PageLayout[]) {
-  const ctx = createTestContext<AnnotationState>({
+  const ctx = createTestContext<AnnotationState, AnnotationSettings>({
     id: 'annotation',
     state: initialAnnotationState(),
     documentId: doc.id,

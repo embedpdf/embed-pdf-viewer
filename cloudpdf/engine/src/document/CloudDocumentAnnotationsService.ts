@@ -30,6 +30,7 @@ import {
 import type { SessionEventPublisher } from '@embedpdf/engine-services';
 
 import type { ManifestAccessor } from './CloudDocumentHandle';
+import type { CloudWrites } from './CloudWrites';
 import { planesInherited } from './planes';
 import type { HttpClient } from '../transport/HttpClient';
 
@@ -56,6 +57,7 @@ export class CloudDocumentAnnotationsService implements DocumentAnnotationsServi
     private readonly isClosed: () => boolean,
     private readonly manifest: ManifestAccessor,
     private readonly publisher: SessionEventPublisher,
+    private readonly writes: CloudWrites,
     /** The server's import limits, as its `/v1/access` advertises them. */
     private readonly importLimits: () => Promise<AnnotationBundleLimits>,
   ) {}
@@ -197,8 +199,8 @@ export class CloudDocumentAnnotationsService implements DocumentAnnotationsServi
 
   /**
    * One request: the bundle's manifest and each resource once, as parts of
-   * one multipart POST under the import's `Idempotency-Key`, so a retry
-   * applies once. The server holds the limits; the same numbers are checked
+   * one multipart POST under the import's `opId` as `Idempotency-Key`, so a
+   * retry applies once. The server holds the limits; the same numbers are checked
    * here first, so a bundle past one fails before its bytes move.
    */
   import(
@@ -212,37 +214,41 @@ export class CloudDocumentAnnotationsService implements DocumentAnnotationsServi
     }
     return AbortablePromise.run<AnnotationImportResult>(async (signal) => {
       const opId = opIdOf(options);
-      const { resources, ...rest } = bundle;
-      const sizes = new Map(Object.entries(resources).map(([id, bytes]) => [id, bytes.length]));
-      assertBundleManifest(bundle, sizes, await this.importLimits());
-      const manifest: AnnotationImportManifest = {
-        bundle: rest,
-        options: {
-          ...(options.pages !== undefined ? { pages: options.pages } : {}),
-          ...(options.attribution !== undefined ? { attribution: options.attribution } : {}),
-        },
-      };
-      const form = new FormData();
-      form.append('manifest', JSON.stringify(manifest));
-      for (const [id, bytes] of Object.entries(resources)) {
-        form.append(`resource:${id}`, new Blob([bytes as BlobPart]), id);
-      }
-      const result = await this.http.postMultipartJson(
-        wirePaths.layerAnnotationsImport(this.docId, this.layerName),
-        form,
-        (raw) => AnnotationImportResultSchema.parse(raw),
-        signal,
-        { 'Idempotency-Key': opId },
-      );
-      this.manifest.apply(result.meta, ['annotations']);
-      this.publisher.publishWrite(
-        opId,
-        ...annotationImportFacts(result).map((fact) => ({
-          type: 'annotations.created' as const,
-          ...fact,
-        })),
-      );
-      return result;
+      return this.writes.run(opId, signal, async (write) => {
+        const { resources, ...rest } = bundle;
+        const sizes = new Map(Object.entries(resources).map(([id, bytes]) => [id, bytes.length]));
+        assertBundleManifest(bundle, sizes, await this.importLimits());
+        const manifest: AnnotationImportManifest = {
+          bundle: rest,
+          options: {
+            ...(options.pages !== undefined ? { pages: options.pages } : {}),
+            ...(options.attribution !== undefined ? { attribution: options.attribution } : {}),
+          },
+        };
+        const form = new FormData();
+        form.append('manifest', JSON.stringify(manifest));
+        for (const [id, bytes] of Object.entries(resources)) {
+          form.append(`resource:${id}`, new Blob([bytes as BlobPart]), id);
+        }
+        const result = await write.send((sent) =>
+          this.http.postMultipartJson(
+            wirePaths.layerAnnotationsImport(this.docId, this.layerName),
+            form,
+            (raw) => AnnotationImportResultSchema.parse(raw),
+            signal,
+            sent,
+          ),
+        );
+        this.manifest.apply(result.meta, ['annotations']);
+        this.publisher.publishWrite(
+          opId,
+          ...annotationImportFacts(result).map((fact) => ({
+            type: 'annotations.created' as const,
+            ...fact,
+          })),
+        );
+        return result;
+      });
     });
   }
 

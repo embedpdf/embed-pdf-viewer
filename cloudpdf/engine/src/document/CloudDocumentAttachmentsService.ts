@@ -24,6 +24,7 @@ import type { SessionEventPublisher } from '@embedpdf/engine-services';
 
 import { buildMutationForm } from './buildMutationForm';
 import type { ManifestAccessor } from './CloudDocumentHandle';
+import type { CloudWrites } from './CloudWrites';
 import { planesInherited } from './planes';
 import { parseAttachmentContent } from './parseAttachmentContent';
 import type { HttpClient } from '../transport/HttpClient';
@@ -46,6 +47,7 @@ export class CloudDocumentAttachmentsService implements DocumentAttachmentsServi
     private readonly isClosed: () => boolean,
     private readonly manifest: ManifestAccessor,
     private readonly publisher: SessionEventPublisher,
+    private readonly writes: CloudWrites,
   ) {}
 
   /**
@@ -135,21 +137,26 @@ export class CloudDocumentAttachmentsService implements DocumentAttachmentsServi
     }
     return AbortablePromise.run<AttachmentCreateResult>(async (signal) => {
       const opId = opIdOf(options);
-      const { wireFile, resource } = await normalizeAttachmentFileSource(file, 'r0');
-      const result = await this.http.postMultipartJson(
-        wirePaths.layerAttachmentsCollection(this.docId, this.layerName),
-        buildMutationForm(wireFile, { r0: resource }),
-        (raw) => AttachmentCreateResultSchema.parse(raw),
-        signal,
-      );
-      // Patch the cached manifest, then publish (in that order — listeners
-      // reading the manifest in their callback must see post-mutation
-      // state). An attachment write only advances docVersion +
-      // attachmentsVersion (no per-page pin changes, no layoutVersion), so
-      // the cached manifest is patched in place — no refetch.
-      this.manifest.apply(result.meta, ['attachments']);
-      this.publisher.publishWrite(opId, { type: 'attachments.created', ...result });
-      return result;
+      return this.writes.run(opId, signal, async (write) => {
+        const { wireFile, resource } = await normalizeAttachmentFileSource(file, 'r0');
+        const result = await write.send((sent) =>
+          this.http.postMultipartJson(
+            wirePaths.layerAttachmentsCollection(this.docId, this.layerName),
+            buildMutationForm(wireFile, { r0: resource }),
+            (raw) => AttachmentCreateResultSchema.parse(raw),
+            signal,
+            sent,
+          ),
+        );
+        // Patch the cached manifest, then publish (in that order — listeners
+        // reading the manifest in their callback must see post-mutation
+        // state). An attachment write only advances docVersion +
+        // attachmentsVersion (no per-page pin changes, no layoutVersion), so
+        // the cached manifest is patched in place — no refetch.
+        this.manifest.apply(result.meta, ['attachments']);
+        this.publisher.publishWrite(opId, { type: 'attachments.created', ...result });
+        return result;
+      });
     });
   }
 
@@ -162,19 +169,24 @@ export class CloudDocumentAttachmentsService implements DocumentAttachmentsServi
     }
     return AbortablePromise.run<AttachmentDeleteResult>(async (signal) => {
       const opId = opIdOf(options);
-      const result = await this.http.deleteJson(
-        wirePaths.layerAttachmentItem(this.docId, this.layerName, ref.key),
-        (raw) => AttachmentDeleteResultSchema.parse(raw),
-        signal,
-      );
-      // Same absorb-then-publish rails as create().
-      this.manifest.apply(result.meta, ['attachments']);
-      this.publisher.publishWrite(opId, {
-        type: 'attachments.deleted',
-        deleted: deletedAttachmentOf(result),
-        ...result,
+      return this.writes.run(opId, signal, async (write) => {
+        const result = await write.send((sent) =>
+          this.http.deleteJson(
+            wirePaths.layerAttachmentItem(this.docId, this.layerName, ref.key),
+            (raw) => AttachmentDeleteResultSchema.parse(raw),
+            signal,
+            sent,
+          ),
+        );
+        // Same absorb-then-publish rails as create().
+        this.manifest.apply(result.meta, ['attachments']);
+        this.publisher.publishWrite(opId, {
+          type: 'attachments.deleted',
+          deleted: deletedAttachmentOf(result),
+          ...result,
+        });
+        return result;
       });
-      return result;
     });
   }
 }

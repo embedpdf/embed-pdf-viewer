@@ -7,7 +7,12 @@ import {
   type OpenInput,
   type OpenOptions,
 } from '@embedpdf/engine-core/runtime';
-import { DEFAULT_LAYER_NAME, DocumentHeadSchema, wirePaths } from '@embedpdf/engine-core/wire';
+import {
+  DEFAULT_LAYER_NAME,
+  DocumentHeadSchema,
+  wirePaths,
+  type DocumentHead,
+} from '@embedpdf/engine-core/wire';
 import { generateUuid } from '@embedpdf/engine-services';
 
 import { CloudDocumentHandle } from './document/CloudDocumentHandle';
@@ -126,8 +131,7 @@ export class CloudEngine implements Engine {
         );
         this.handles.add(handle);
         try {
-          await maybeAutoEstablishAccess(handle, head, signal, effectivePassword);
-          await handle.learnProtection(signal);
+          await establishOnOpen(handle, head, signal, effectivePassword, false);
         } catch (error) {
           await handle.close();
           throw error;
@@ -176,9 +180,12 @@ export class CloudEngine implements Engine {
           () => this.handles.delete(handle),
         );
         this.handles.add(handle);
+        // A token naming no document is a tenant's, which owns its documents.
+        const tenant =
+          resolvedToken !== null &&
+          typeof decodeUnverifiedClaims(resolvedToken).doc_id !== 'string';
         try {
-          await maybeAutoEstablishAccess(handle, head, signal, effectivePassword);
-          await handle.learnProtection(signal);
+          await establishOnOpen(handle, head, signal, effectivePassword, tenant);
         } catch (error) {
           await handle.close();
           throw error;
@@ -212,6 +219,46 @@ export class CloudEngine implements Engine {
 }
 
 /**
+ * What `open()` learns before handing the document over: access when the
+ * password or a CDN needs it (see {@link maybeAutoEstablishAccess}), then
+ * what the document's signatures forbid (the manifest). A caller that may
+ * create objects calls `/access` anyway, beside the manifest fetch, for its
+ * editing session's first object numbers; on a document locked by a
+ * password, `unlock()` brings them. A failed `/access` doesn't fail the
+ * open: creates then go without numbers until the pool gets some.
+ */
+async function establishOnOpen(
+  handle: CloudDocumentHandle,
+  head: DocumentHead,
+  signal: AbortSignal,
+  password: string | null,
+  tenant: boolean,
+): Promise<void> {
+  const accessed = await maybeAutoEstablishAccess(handle, head, signal, password);
+  const security = handle.security as CloudDocumentSecurityService;
+  const locked = !accessed && head.access.reasons.includes('password');
+  await Promise.all([
+    !accessed && !locked && (tenant || mayCreateObjects(security))
+      ? settleLinked(security.establishAccess(), signal)
+      : undefined,
+    handle.learnProtection(signal),
+  ]);
+}
+
+/**
+ * Whether the caller may make new objects (annotations as itself, pages,
+ * form fields): the server's own test for handing out object numbers, from
+ * what the client knows before `/access`.
+ */
+function mayCreateObjects(security: CloudDocumentSecurityService): boolean {
+  return (
+    security.allowsAnnotation('create') ||
+    security.allows('doc.pages.assemble') ||
+    security.allows('doc.forms.modify')
+  );
+}
+
+/**
  * Post-/head access establishment, in two layers:
  *
  * 1. **Supplied password** — a password given at open is always tried
@@ -238,6 +285,8 @@ export class CloudEngine implements Engine {
  * request still tries origin, where the JWT check produces a regular
  * Forbidden) — but they are also never mistaken for a wrong password:
  * only a DocPasswordRequired/Incorrect rejection means "wrong password".
+ *
+ * Returns whether `/access` answered.
  */
 async function maybeAutoEstablishAccess(
   handle: CloudDocumentHandle,
@@ -247,7 +296,7 @@ async function maybeAutoEstablishAccess(
   },
   signal: AbortSignal,
   password: string | null,
-): Promise<void> {
+): Promise<boolean> {
   const reasons = new Set(head.access.reasons);
   // CloudDocumentSecurityService exposes `establishAccess()` — the
   // no-password sibling of `unlock()`. The public DocumentSecurityService
@@ -259,19 +308,19 @@ async function maybeAutoEstablishAccess(
     password != null && (reasons.has('password') || head.permissions.canUpgradeToOwner);
   if (tryPassword) {
     const unlocked = await settleLinked(security.unlock({ password, mode: 'any' }), signal);
-    if (unlocked) return; // /access succeeded — CDN binding installed too
+    if (unlocked) return true; // /access succeeded — CDN binding installed too
     // Rejected or failed: in the required case the handle stays locked and
     // the caller's password prompt takes over (`incorrect` when the password
     // was wrong; retrying re-POSTs /access); in the upgrade case the
     // document is readable regardless — fall through so a CDN-only
     // establishment still happens.
-    if (reasons.has('password')) return;
+    if (reasons.has('password')) return false;
   }
 
-  if (!head.access.required) return;
-  if (reasons.has('password')) return; // wait for explicit unlock()
-  if (!reasons.has('cdn')) return; // nothing actionable for the SDK
-  await settleLinked(security.establishAccess(), signal);
+  if (!head.access.required) return false;
+  if (reasons.has('password')) return false; // wait for explicit unlock()
+  if (!reasons.has('cdn')) return false; // nothing actionable for the SDK
+  return settleLinked(security.establishAccess(), signal);
 }
 
 /** Await an /access attempt with open()-abort linkage. Returns whether it

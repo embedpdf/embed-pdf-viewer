@@ -1,9 +1,9 @@
 /**
  * Changes made faster than the engine answers, through the annotation plugin
  * on the real engine: an edit of a new annotation before its create is
- * confirmed, and two edits of a weak annotation where the first makes the
- * engine name it. The engine must end with every change, and the plugin's
- * records must be the engine's.
+ * confirmed, and two edits of an inline annotation, which keeps its base
+ * position as its name through both. The engine must end with every change,
+ * and the plugin's records must be the engine's.
  */
 import { readFile } from 'node:fs/promises';
 import { describe, expect, test } from 'vitest';
@@ -43,12 +43,14 @@ describe('changes faster than the engine answers (local engine)', () => {
         { select: true },
       );
       // The create is in flight: the new annotation is selected under the name it was created with.
-      const restyled = annotation.updateSelection({ color: '#00ff00' });
+      expect(annotation.selection.list()).toHaveLength(1);
+      const restyled = annotation.selection.update({ color: '#00ff00' });
       const { ref } = (await created).annotation;
-      await restyled;
+      expect((await restyled).failed).toEqual([]);
       await annotation.whenSynced();
 
-      expect(annotation.getSelection()).toEqual([ref]);
+      expect(ref.kind).toBe('objectNumber');
+      expect(annotation.selection.list().map((entry) => entry.ref)).toEqual([ref]);
       const shown = annotation.get(ref);
       expect(shown && 'color' in shown ? shown.color : null).toBe('#00ff00');
       const raw = (await doc.page(ref.page).annotations.list()).annotations.find(
@@ -70,10 +72,11 @@ describe('changes faster than the engine answers (local engine)', () => {
     const { doc, ctx, annotation } = await openFixture('pending-inline-edits');
     try {
       const inline = annotation.list().find((entry) => entry.ref.kind === 'baseIndex')!.ref;
-      annotation.select(inline);
-      const green = annotation.updateSelection({ color: '#00ff00' });
-      const faded = annotation.updateSelection({ opacity: 0.2 });
-      await Promise.all([green, faded]);
+      annotation.selection.set([inline]);
+      const green = annotation.selection.update({ color: '#00ff00' });
+      const faded = annotation.selection.update({ opacity: 0.2 });
+      const results = await Promise.all([green, faded]);
+      expect(results.flatMap((result) => result.failed)).toEqual([]);
       await annotation.whenSynced();
 
       const keys = annotation
@@ -81,12 +84,17 @@ describe('changes faster than the engine answers (local engine)', () => {
         .map((entry) => annotationKey(entry.ref))
         .sort();
       expect(keys).toEqual(await engineKeys(doc));
-      const [selected] = annotation.getSelection();
-      expect(selected).toEqual(inline);
+      const selected = annotation.selection.list().map((entry) => entry.ref);
+      expect(selected).toEqual([inline]);
       // The engine stores opacity in 1/255 steps.
-      const shown = annotation.get(selected!);
+      const shown = annotation.get(inline);
       expect(shown && 'color' in shown ? shown.color : null).toBe('#00ff00');
       expect(shown && 'opacity' in shown ? shown.opacity : null).toBeCloseTo(0.2, 2);
+      const raw = (await doc.page(inline.page).annotations.list()).annotations.find(
+        (dto) => annotationKey(dto.ref) === annotationKey(inline),
+      );
+      expect(raw && 'color' in raw ? raw.color : null).toBe('#00ff00');
+      expect(raw && 'opacity' in raw ? raw.opacity : null).toBeCloseTo(0.2, 2);
     } finally {
       await ctx.dispose();
     }

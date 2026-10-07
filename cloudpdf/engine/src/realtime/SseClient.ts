@@ -1,4 +1,9 @@
-import { EngineError, EngineErrorCode } from '@embedpdf/engine-core/runtime';
+import {
+  EngineError,
+  EngineErrorCode,
+  type EditSessionStatus,
+} from '@embedpdf/engine-core/runtime';
+import { EditSessionStatusSchema } from '@embedpdf/engine-core/wire';
 
 import type { AuditEventRow } from './auditRowToEvents';
 import type { HttpClient } from '../transport/HttpClient';
@@ -15,6 +20,10 @@ export interface SseClientOptions {
   onFullRefresh(): void;
   /** Auth is permanently gone (401/403); the client stopped for good. */
   onAuthLost(): void;
+  /** The editing session's `session` event: every object number it holds, and its expiry. */
+  onSession?(status: EditSessionStatus): void;
+  /** The stream is up (`true`) or down (`false`). */
+  onConnected?(connected: boolean): void;
 }
 
 /**
@@ -77,7 +86,12 @@ export class SseClient {
       if (!res.ok || !res.body) {
         throw new EngineError(EngineErrorCode.Network, `events stream HTTP ${res.status}`);
       }
-      await this.consume(res.body);
+      this.opts.onConnected?.(true);
+      try {
+        await this.consume(res.body);
+      } finally {
+        this.opts.onConnected?.(false);
+      }
       // Stream ended (server close / auth-expiring / network): reconnect.
       if (Date.now() - startedAt >= 30_000) this.retryDelayMs = 500;
     } catch {
@@ -125,6 +139,10 @@ export class SseClient {
         // A malformed row advances the cursor and is skipped; the audit log
         // remains the source of truth for anyone who refetches.
       }
+    } else if (event === 'session') {
+      const parsed = safeJson(data.join('\n'));
+      const status = EditSessionStatusSchema.safeParse(parsed);
+      if (status.success) this.opts.onSession?.(status.data);
     } else if (event === 'full-refresh') {
       this.opts.onFullRefresh();
     } else if (event === 'auth-revoked') {
@@ -137,5 +155,13 @@ export class SseClient {
     }
     // 'auth-expiring' needs no handling: the server ends the stream right
     // after, and the reconnect path fetches a fresh token.
+  }
+}
+
+function safeJson(text: string): unknown {
+  try {
+    return JSON.parse(text);
+  } catch {
+    return null;
   }
 }

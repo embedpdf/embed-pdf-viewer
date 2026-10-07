@@ -83,6 +83,22 @@ hold (never taken from the pool, or already used) is refused with `ObjectNumberU
 the number out and the engine picks one, as before. `doc.objectNumbers.reserve(n)` waits until at
 least `n` are held, for a large paste.
 
+A number you hold stays yours until a create uses it, except in two cases, which
+`doc.objectNumbers.onLost` reports:
+
+```ts
+doc.objectNumbers.onLost(({ numbers, reason }) => dropPending(numbers));
+```
+
+- **`'versioned'`:** a signature published a new version of the document, which numbers every
+  object anew.
+- **`'reclaimed'`:** on the cloud, the numbers belong to an editing session, which stays alive
+  while the document's event stream is connected or you keep writing. Left idle for 15 minutes
+  without the stream, it expires, and its numbers may go to someone else. The pool stops handing
+  out numbers it can no longer vouch for, and gets fresh ones with the next write or `reserve`.
+
+Drop anything you showed at a lost number; a create that names one is refused with `not-held`.
+
 ## Other refs
 
 Form fields and attachments have refs too, handed out the same way:

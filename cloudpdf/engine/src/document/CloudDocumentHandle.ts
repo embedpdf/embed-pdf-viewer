@@ -29,6 +29,7 @@ import {
   DEFAULT_LAYER_NAME,
   DocumentHeadSchema,
   DocumentManifestSchema,
+  ObjectNumberReservationResponseSchema,
   wirePaths,
   type DocumentHead,
   type DocumentManifest,
@@ -48,6 +49,7 @@ import { CloudDocumentSignaturesService } from './CloudDocumentSignaturesService
 import { CloudMetadataService } from './CloudMetadataService';
 import { CloudObjectNumberPool } from './CloudObjectNumberPool';
 import { CloudPageHandle } from './CloudPageHandle';
+import { CloudWrites } from './CloudWrites';
 import { auditRowToEvents } from '../realtime/auditRowToEvents';
 import { SseClient } from '../realtime/SseClient';
 import { awaitSignal } from '../shared/awaitSignal';
@@ -96,7 +98,9 @@ export class CloudDocumentHandle implements DocumentHandle {
   readonly security: DocumentSecurityService;
   readonly render: DocumentRenderService;
   readonly events: DocumentEventStream;
-  readonly objectNumbers: ObjectNumberPool = new CloudObjectNumberPool();
+  readonly objectNumbers: ObjectNumberPool;
+  private readonly pool: CloudObjectNumberPool;
+  private readonly writes: CloudWrites;
   private readonly publisher: SessionEventPublisher;
   private readonly hub: EventHub;
   private readonly sessionId: string;
@@ -142,6 +146,21 @@ export class CloudDocumentHandle implements DocumentHandle {
   ) {
     this.id = id;
     this.pendingInitialHead = initialHead ?? null;
+    // The editing session's object numbers: from `/access`, write
+    // responses, the stream's `session` events and the bulk reservation.
+    const pool = new CloudObjectNumberPool({
+      reserve: (count, signal) =>
+        http.postJson(
+          wirePaths.objectNumbers(id, layerName),
+          { count },
+          (raw) => ObjectNumberReservationResponseSchema.parse(raw),
+          signal,
+          { session: true },
+        ),
+    });
+    this.pool = pool;
+    this.objectNumbers = pool;
+    this.writes = new CloudWrites(pool);
     const security = new CloudDocumentSecurityService(
       http,
       id,
@@ -149,6 +168,7 @@ export class CloudDocumentHandle implements DocumentHandle {
       initialHead ?? fallbackUnknownHead(id),
       { isClosed: () => this.closed },
       initialToken,
+      { wanted: () => pool.wantedAtAccess(), opened: (edit) => pool.opened(edit) },
     );
     this.security = security;
     this.cloudSecurity = security;
@@ -206,6 +226,10 @@ export class CloudDocumentHandle implements DocumentHandle {
       lastServerId: () => hub.lastServerId(),
     };
     this.publisher = new SessionEventPublisher(hub, sessionId);
+    // A version this engine published itself numbers objects anew too.
+    hub.subscribe((event) => {
+      if (event.type === 'document.versioned') pool.versioned(event.version.sha256);
+    });
     this.manifestAccessor = {
       get: (signal) => this.getManifest(signal),
       refresh: (signal) => this.refreshManifest(signal),
@@ -220,6 +244,7 @@ export class CloudDocumentHandle implements DocumentHandle {
       () => this.closed,
       this.manifestAccessor,
       this.publisher,
+      this.writes,
     );
     this.annotations = new CloudDocumentAnnotationsService(
       http,
@@ -228,6 +253,7 @@ export class CloudDocumentHandle implements DocumentHandle {
       () => this.closed,
       this.manifestAccessor,
       this.publisher,
+      this.writes,
       // The deployment's import limits ride /v1/access, as the render lattice does.
       async () =>
         (security.currentAccess ?? (await security.establishAccess()).access)
@@ -247,6 +273,7 @@ export class CloudDocumentHandle implements DocumentHandle {
       () => this.closed,
       this.manifestAccessor,
       this.publisher,
+      this.writes,
     );
     this.signatures = new CloudDocumentSignaturesService(
       http,
@@ -255,6 +282,7 @@ export class CloudDocumentHandle implements DocumentHandle {
       () => this.closed,
       this.manifestAccessor,
       this.publisher,
+      this.writes,
     );
     this.forms = new CloudDocumentFormsService(
       http,
@@ -263,6 +291,7 @@ export class CloudDocumentHandle implements DocumentHandle {
       () => this.closed,
       this.manifestAccessor,
       this.publisher,
+      this.writes,
     );
     this.search = new CloudDocumentSearchService(
       http,
@@ -278,6 +307,7 @@ export class CloudDocumentHandle implements DocumentHandle {
       () => this.closed,
       this.manifestAccessor,
       this.publisher,
+      this.writes,
     );
     this.redaction = new CloudDocumentRedactionService(
       http,
@@ -286,6 +316,7 @@ export class CloudDocumentHandle implements DocumentHandle {
       () => this.closed,
       this.manifestAccessor,
       this.publisher,
+      this.writes,
     );
   }
 
@@ -298,6 +329,7 @@ export class CloudDocumentHandle implements DocumentHandle {
       () => this.closed,
       this.manifestAccessor,
       this.publisher,
+      this.writes,
       (signal) => this.pages.pageLayout(ref, signal),
     );
   }
@@ -601,6 +633,12 @@ export class CloudDocumentHandle implements DocumentHandle {
         if (this.manifestCache && row.id > this.manifestCache.auditHead) {
           this.manifestCache = { ...this.manifestCache, auditHead: row.id };
         }
+        // A new version, this engine's own included: in stream order, before
+        // the `session` event that hands out its fresh numbers.
+        if (row.kind === 'signature.complete') {
+          const sha = (row.payload as { version?: { sha256?: unknown } }).version?.sha256;
+          if (typeof sha === 'string') this.pool.versioned(sha);
+        }
         // None for an own echo or an unknown kind; one per fact otherwise.
         for (const event of auditRowToEvents(row, this.sessionId)) {
           // Absorb before publish: a listener reading the manifest in its
@@ -623,6 +661,8 @@ export class CloudDocumentHandle implements DocumentHandle {
         // with a fresh token.
         this.sseClient = null;
       },
+      onSession: (status) => this.pool.sync(status),
+      onConnected: (connected) => this.pool.connected(connected),
     });
     this.sseClient.open();
   }

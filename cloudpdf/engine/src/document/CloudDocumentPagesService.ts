@@ -36,9 +36,10 @@ import type { SessionEventPublisher } from '@embedpdf/engine-services';
 
 import { buildMutationForm } from './buildMutationForm';
 import type { ManifestAccessor } from './CloudDocumentHandle';
-import { assertNoObjectNumber } from './CloudObjectNumberPool';
+import type { CloudWrites } from './CloudWrites';
 import { planesInherited } from './planes';
 import { awaitSignal } from '../shared/awaitSignal';
+import { withObjectNumbers } from '../shared/withObjectNumbers';
 import type { HttpClient } from '../transport/HttpClient';
 
 /** Detach a Uint8Array view into a standalone ArrayBuffer (the resource-map
@@ -74,6 +75,7 @@ export class CloudDocumentPagesService implements DocumentPagesService {
     private readonly isClosed: () => boolean,
     private readonly manifest: ManifestAccessor,
     private readonly publisher: SessionEventPublisher,
+    private readonly writes: CloudWrites,
   ) {}
 
   /**
@@ -160,19 +162,24 @@ export class CloudDocumentPagesService implements DocumentPagesService {
     }
     return AbortablePromise.run<PageMoveResult>(async (signal) => {
       const opId = opIdOf(options);
-      const result = await this.http.postJson(
-        wirePaths.layerPagesMove(this.docId, this.layerName),
-        { pages, toIndex },
-        (raw) => PageMoveResultSchema.parse(raw),
-        signal,
-      );
-      // A move only advances docVersion + layoutVersion (no per-page pin
-      // changes), so the cached manifest can be patched in place — no refetch.
-      this.manifest.apply(result.meta, ['layout']);
-      // Publish after absorb: listeners reading the manifest in their
-      // callback must see post-mutation state.
-      this.publisher.publishWrite(opId, { type: 'pages.moved', pages, toIndex, ...result });
-      return result;
+      return this.writes.run(opId, signal, async (write) => {
+        const result = await write.send((sent) =>
+          this.http.postJson(
+            wirePaths.layerPagesMove(this.docId, this.layerName),
+            { pages, toIndex },
+            (raw) => PageMoveResultSchema.parse(raw),
+            signal,
+            sent,
+          ),
+        );
+        // A move only advances docVersion + layoutVersion (no per-page pin
+        // changes), so the cached manifest can be patched in place — no refetch.
+        this.manifest.apply(result.meta, ['layout']);
+        // Publish after absorb: listeners reading the manifest in their
+        // callback must see post-mutation state.
+        this.publisher.publishWrite(opId, { type: 'pages.moved', pages, toIndex, ...result });
+        return result;
+      });
     });
   }
 
@@ -215,15 +222,14 @@ export class CloudDocumentPagesService implements DocumentPagesService {
     }
     return AbortablePromise.run<PageNameResult>(async (signal) => {
       const opId = opIdOf(options);
-      const result = await this.http.postJson(
-        path,
-        body,
-        (raw) => PageNameResultSchema.parse(raw),
-        signal,
-      );
-      this.manifest.apply(result.meta, ['layout']);
-      this.publisher.publishWrite(opId, { type: 'pages.named', name, page, ...result });
-      return result;
+      return this.writes.run(opId, signal, async (write) => {
+        const result = await write.send((sent) =>
+          this.http.postJson(path, body, (raw) => PageNameResultSchema.parse(raw), signal, sent),
+        );
+        this.manifest.apply(result.meta, ['layout']);
+        this.publisher.publishWrite(opId, { type: 'pages.named', name, page, ...result });
+        return result;
+      });
     });
   }
 
@@ -239,17 +245,22 @@ export class CloudDocumentPagesService implements DocumentPagesService {
     }
     return AbortablePromise.run<PageRotateResult>(async (signal) => {
       const opId = opIdOf(options);
-      const result = await this.http.postJson(
-        wirePaths.layerPagesRotate(this.docId, this.layerName),
-        { pages, rotation },
-        (raw) => PageRotateResultSchema.parse(raw),
-        signal,
-      );
-      // Rotation shares the move patch exactly: docVersion + layoutVersion
-      // advance, every per-page pin (and its cached render) stays warm.
-      this.manifest.apply(result.meta, ['layout']);
-      this.publisher.publishWrite(opId, { type: 'pages.rotated', pages, rotation, ...result });
-      return result;
+      return this.writes.run(opId, signal, async (write) => {
+        const result = await write.send((sent) =>
+          this.http.postJson(
+            wirePaths.layerPagesRotate(this.docId, this.layerName),
+            { pages, rotation },
+            (raw) => PageRotateResultSchema.parse(raw),
+            signal,
+            sent,
+          ),
+        );
+        // Rotation shares the move patch exactly: docVersion + layoutVersion
+        // advance, every per-page pin (and its cached render) stays warm.
+        this.manifest.apply(result.meta, ['layout']);
+        this.publisher.publishWrite(opId, { type: 'pages.rotated', pages, rotation, ...result });
+        return result;
+      });
     });
   }
 
@@ -261,17 +272,22 @@ export class CloudDocumentPagesService implements DocumentPagesService {
     }
     return AbortablePromise.run<PageDeleteResult>(async (signal) => {
       const opId = opIdOf(options);
-      const result = await this.http.postJson(
-        wirePaths.layerPagesDelete(this.docId, this.layerName),
-        { pages },
-        (raw) => PageDeleteResultSchema.parse(raw),
-        signal,
-      );
-      // The structural advance plus dropping the deleted pages' manifest
-      // rows — a retired page object number must not be buildable from the local cache.
-      this.manifest.applyPageDelete(result.meta, pages);
-      this.publisher.publishWrite(opId, { type: 'pages.deleted', pages, ...result });
-      return result;
+      return this.writes.run(opId, signal, async (write) => {
+        const result = await write.send((sent) =>
+          this.http.postJson(
+            wirePaths.layerPagesDelete(this.docId, this.layerName),
+            { pages },
+            (raw) => PageDeleteResultSchema.parse(raw),
+            signal,
+            sent,
+          ),
+        );
+        // The structural advance plus dropping the deleted pages' manifest
+        // rows — a retired page object number must not be buildable from the local cache.
+        this.manifest.applyPageDelete(result.meta, pages);
+        this.publisher.publishWrite(opId, { type: 'pages.deleted', pages, ...result });
+        return result;
+      });
     });
   }
 
@@ -287,24 +303,29 @@ export class CloudDocumentPagesService implements DocumentPagesService {
     }
     return AbortablePromise.run<PageInsertResult>(async (signal) => {
       const opId = opIdOf(options);
-      // The multipart mutation envelope: the JSON the plain request would
-      // have been rides the `body` part; the source PDF is `resource:source`.
-      const buffer = bytes instanceof ArrayBuffer ? bytes : copyToExactBuffer(bytes);
-      const form = buildMutationForm(toIndex !== undefined ? { toIndex } : {}, {
-        source: { bytes: buffer, mimeType: 'application/pdf', name: 'source.pdf' },
+      return this.writes.run(opId, signal, async (write) => {
+        // The multipart mutation envelope: the JSON the plain request would
+        // have been rides the `body` part; the source PDF is `resource:source`.
+        const buffer = bytes instanceof ArrayBuffer ? bytes : copyToExactBuffer(bytes);
+        const form = buildMutationForm(toIndex !== undefined ? { toIndex } : {}, {
+          source: { bytes: buffer, mimeType: 'application/pdf', name: 'source.pdf' },
+        });
+        const result = await write.send((sent) =>
+          this.http.postMultipartJson(
+            wirePaths.layerPagesInsert(this.docId, this.layerName),
+            form,
+            (raw) => PageInsertResultSchema.parse(raw),
+            signal,
+            sent,
+          ),
+        );
+        // Insert changes the page set: the cached manifest has no rows for
+        // the fresh page object numbers, so the absorb drops it for a lazy refetch (the
+        // result already carries the full new layout — nothing waits).
+        this.manifest.applyPageInsert(result.meta);
+        this.publisher.publishWrite(opId, { type: 'pages.inserted', toIndex, ...result });
+        return result;
       });
-      const result = await this.http.postMultipartJson(
-        wirePaths.layerPagesInsert(this.docId, this.layerName),
-        form,
-        (raw) => PageInsertResultSchema.parse(raw),
-        signal,
-      );
-      // Insert changes the page set: the cached manifest has no rows for
-      // the fresh page object numbers, so the absorb drops it for a lazy refetch (the
-      // result already carries the full new layout — nothing waits).
-      this.manifest.applyPageInsert(result.meta);
-      this.publisher.publishWrite(opId, { type: 'pages.inserted', toIndex, ...result });
-      return result;
     });
   }
 
@@ -320,20 +341,32 @@ export class CloudDocumentPagesService implements DocumentPagesService {
     }
     return AbortablePromise.run<PageInsertResult>(async (signal) => {
       const opId = opIdOf(options);
-      assertNoObjectNumber(...(options.objectNumbers ?? []));
-      const result = await this.http.postJson(
-        wirePaths.layerPagesInsertBlank(this.docId, this.layerName),
-        {
-          size: spec.size,
-          ...(spec.count !== undefined ? { count: spec.count } : {}),
-          ...(toIndex !== undefined ? { toIndex } : {}),
-        },
-        (raw) => PageInsertResultSchema.parse(raw),
+      const { objectNumbers } = options;
+      return this.writes.run(
+        opId,
         signal,
+        async (write) => {
+          const result = await write.send((sent) =>
+            this.http.postJson(
+              withObjectNumbers(wirePaths.layerPagesInsertBlank(this.docId, this.layerName), {
+                objectNumbers,
+              }),
+              {
+                size: spec.size,
+                ...(spec.count !== undefined ? { count: spec.count } : {}),
+                ...(toIndex !== undefined ? { toIndex } : {}),
+              },
+              (raw) => PageInsertResultSchema.parse(raw),
+              signal,
+              sent,
+            ),
+          );
+          this.manifest.applyPageInsert(result.meta);
+          this.publisher.publishWrite(opId, { type: 'pages.inserted', toIndex, ...result });
+          return result;
+        },
+        objectNumbers ?? [],
       );
-      this.manifest.applyPageInsert(result.meta);
-      this.publisher.publishWrite(opId, { type: 'pages.inserted', toIndex, ...result });
-      return result;
     });
   }
 
@@ -363,22 +396,27 @@ export class CloudDocumentPagesService implements DocumentPagesService {
     }
     return AbortablePromise.run<PageFlattenResult>(async (signal) => {
       const opId = opIdOf(options);
-      const result = await this.http.postJson(
-        wirePaths.layerPagesFlatten(this.docId, this.layerName),
-        { pages, usage },
-        (raw) => PageFlattenResultSchema.parse(raw),
-        signal,
-      );
-      // Nothing flattened comes back without a cache delta: no artifact, no
-      // coherence bump, no event.
-      if (result.meta.cacheDelta === null) return result;
-      // Flatten bakes annotations into page content, so both planes flip.
-      this.manifest.apply(result.meta, ['content', 'annotations']);
-      this.publisher.publishWrite(opId, {
-        type: 'pages.flattened',
-        ...result,
+      return this.writes.run(opId, signal, async (write) => {
+        const result = await write.send((sent) =>
+          this.http.postJson(
+            wirePaths.layerPagesFlatten(this.docId, this.layerName),
+            { pages, usage },
+            (raw) => PageFlattenResultSchema.parse(raw),
+            signal,
+            sent,
+          ),
+        );
+        // Nothing flattened comes back without a cache delta: no artifact, no
+        // coherence bump, no event.
+        if (result.meta.cacheDelta === null) return result;
+        // Flatten bakes annotations into page content, so both planes flip.
+        this.manifest.apply(result.meta, ['content', 'annotations']);
+        this.publisher.publishWrite(opId, {
+          type: 'pages.flattened',
+          ...result,
+        });
+        return result;
       });
-      return result;
     });
   }
 }

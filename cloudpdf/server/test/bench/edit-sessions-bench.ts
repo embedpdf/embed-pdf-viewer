@@ -172,7 +172,7 @@ async function main(): Promise<void> {
     );
     const accessSummary = summary(access, (performance.now() - started) / 1000);
 
-    // Heartbeats for MINUTES simulated minutes, with writes spread over them.
+    // Heartbeats over the simulated minutes, with writes spread over them.
     const rounds = Math.ceil((MINUTES * 60_000) / HEARTBEAT_MS);
     const writesPerRound = Math.ceil(WRITES / rounds);
     const extensionsBefore = extensions;

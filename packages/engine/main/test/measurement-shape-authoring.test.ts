@@ -49,7 +49,7 @@ describe.each(['wasm', 'native'] as const)('shape authoring integration (%s)', (
           scale,
         );
         for (const preset of annotation.listResolvedTools()) {
-          if (preset.defaults) annotation.updateToolDefaults(preset.id, preset.defaults);
+          if (preset.defaults) annotation.tools.updateDefaults(preset.id, preset.defaults);
         }
         for (const point of [
           { x: 100, y: 300 },
@@ -59,10 +59,13 @@ describe.each(['wasm', 'native'] as const)('shape authoring integration (%s)', (
         ]) {
           annotation.createPointer(tool, 'down', page.ref, point);
         }
-        void annotation.finishCreationDraft();
+        const finished = annotation.draft.finish();
         // Written and confirmed: its ref is the engine's.
-        await vi.waitFor(() => expect(annotation.listSelected()[0]?.ref.kind).toBe('objectNumber'));
-        const created = annotation.listSelected()[0]!;
+        await vi.waitFor(() =>
+          expect(annotation.selection.list()[0]?.ref.kind).toBe('objectNumber'),
+        );
+        const created = annotation.selection.list()[0]!;
+        expect((await finished)?.annotation.ref).toEqual(created.ref);
         if (created.subtype !== 'polygon' && created.subtype !== 'polyline')
           throw new Error('Expected shape');
         const current = () => {
@@ -113,7 +116,7 @@ describe.each(['wasm', 'native'] as const)('shape authoring integration (%s)', (
         const before = current();
         const pivot = turnPivotOf(shapeOf(fromDTO(before).annotation));
         const rotatedCaption = rotatePoint(target, pivot, 90);
-        await annotation.rotateSelectionBy(90);
+        await annotation.selection.rotateBy(90);
         await vi.waitFor(() => {
           expect(current().rotation).toBe(90);
           // The points and the caption center stay upright; the turn draws them.

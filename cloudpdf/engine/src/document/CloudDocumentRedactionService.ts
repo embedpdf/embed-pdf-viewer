@@ -12,6 +12,7 @@ import { RedactionApplyResultSchema, wirePaths } from '@embedpdf/engine-core/wir
 import type { SessionEventPublisher } from '@embedpdf/engine-services';
 
 import type { ManifestAccessor } from './CloudDocumentHandle';
+import type { CloudWrites } from './CloudWrites';
 import type { HttpClient } from '../transport/HttpClient';
 
 /**
@@ -30,6 +31,7 @@ export class CloudDocumentRedactionService implements DocumentRedactionService {
     private readonly isClosed: () => boolean,
     private readonly manifest: ManifestAccessor,
     private readonly publisher: SessionEventPublisher,
+    private readonly writes: CloudWrites,
   ) {}
 
   apply(
@@ -43,23 +45,28 @@ export class CloudDocumentRedactionService implements DocumentRedactionService {
     }
     return AbortablePromise.run<RedactionApplyResult>(async (signal) => {
       const opId = opIdOf(options);
-      const result = await this.http.postJson(
-        wirePaths.layerRedactionsApply(this.docId, this.layerName),
-        scope,
-        (raw) => RedactionApplyResultSchema.parse(raw),
-        signal,
-      );
-      // Nothing applied comes back without a cache delta: no artifact, no
-      // coherence bump, no event.
-      if (result.meta.cacheDelta === null) return result;
-      // Redaction-apply rewrites content and consumes the marks, so both
-      // planes flip.
-      this.manifest.apply(result.meta, ['content', 'annotations']);
-      this.publisher.publishWrite(opId, {
-        type: 'redaction.applied',
-        ...result,
+      return this.writes.run(opId, signal, async (write) => {
+        const result = await write.send((sent) =>
+          this.http.postJson(
+            wirePaths.layerRedactionsApply(this.docId, this.layerName),
+            scope,
+            (raw) => RedactionApplyResultSchema.parse(raw),
+            signal,
+            sent,
+          ),
+        );
+        // Nothing applied comes back without a cache delta: no artifact, no
+        // coherence bump, no event.
+        if (result.meta.cacheDelta === null) return result;
+        // Redaction-apply rewrites content and consumes the marks, so both
+        // planes flip.
+        this.manifest.apply(result.meta, ['content', 'annotations']);
+        this.publisher.publishWrite(opId, {
+          type: 'redaction.applied',
+          ...result,
+        });
+        return result;
       });
-      return result;
     });
   }
 }

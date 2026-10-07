@@ -2,6 +2,8 @@ import {
   AbortError,
   EngineError,
   EngineErrorCode,
+  parseObjectNumberRanges,
+  type ObjectNumberRange,
   type SerializedEngineError,
   type TokenSource,
 } from '@embedpdf/engine-core/runtime';
@@ -23,9 +25,11 @@ export interface HttpClientOptions {
    */
   token?: TokenSource;
   /**
-   * Engine-instance session id, sent as `X-Engine-Session-Id` on every
-   * request. The server stores it on mutation audit rows so this
-   * instance's SSE stream can drop its own echoes (exactly-once events).
+   * Engine-instance session id, sent as `X-Engine-Session-Id` where the
+   * server reads it: on writes, `/access`, the event stream and the bulk
+   * reservation (see {@link RequestOptions}). The server stores it on a
+   * write's audit row, so this instance's stream can drop its own echoes,
+   * and hands the editing session it names its object numbers.
    */
   sessionId?: string;
   /** Replace the global fetch (e.g. in Node tests with undici). */
@@ -69,6 +73,30 @@ export interface CdnBinding {
 }
 
 /**
+ * What a write sends beside its request: its `opId` as `Idempotency-Key`,
+ * so a retry is answered with what the first try committed, and how many
+ * object numbers to top the editing session up by.
+ */
+export interface WriteRequest {
+  readonly opId: string;
+  /** `EmbedPDF-Reserve-Object-Numbers`, when more than 0. */
+  readonly reserveObjectNumbers?: number;
+  /** Called with the numbers the response hands out (`EmbedPDF-Object-Numbers`). */
+  readonly onObjectNumbers?: (ranges: ObjectNumberRange[]) => void;
+}
+
+/** How one request is sent, beyond its path and body. */
+export interface RequestOptions {
+  /**
+   * A write: sent as the editing session with its `Idempotency-Key`, and
+   * sent again with the same key after a network failure.
+   */
+  readonly write?: WriteRequest;
+  /** Sent as the editing session though not a write: `/access`, the bulk reservation. */
+  readonly session?: boolean;
+}
+
+/**
  * A raw-bytes response plus its headers. The attachment-file leaves carry
  * their metadata as headers (`Content-Type`, `X-EmbedPDF-File-Name`), so
  * unlike `getBytes` the caller needs the `Headers` object back.
@@ -88,6 +116,8 @@ export class HttpClient {
   private static readonly MAX_RETRIES = 2;
   private static readonly RETRY_AFTER_CAP_MS = 5_000;
   private static readonly RETRY_AFTER_DEFAULT_MS = 1_000;
+  /** A write whose request failed on the network is sent again after these waits. */
+  private static readonly NETWORK_RETRY_MS = [250, 1_000, 3_000];
   private readonly sessionId: string | null;
   private cdnBinding: CdnBinding | null = null;
 
@@ -141,11 +171,11 @@ export class HttpClient {
     headers: Record<string, string>,
     signal: AbortSignal,
   ): Promise<Response> {
-    return this.request(path, {
-      method: 'GET',
-      headers: new Headers({ Accept: 'text/event-stream', ...headers }),
-      signal,
-    });
+    return this.request(
+      path,
+      { method: 'GET', headers: new Headers({ Accept: 'text/event-stream', ...headers }), signal },
+      { session: true },
+    );
   }
 
   /**
@@ -341,14 +371,9 @@ export class HttpClient {
     body: FormData,
     parser: (raw: unknown) => T,
     signal: AbortSignal,
-    headers?: Record<string, string>,
+    options: RequestOptions = {},
   ): Promise<T> {
-    const res = await this.request(path, {
-      method: 'POST',
-      body,
-      signal,
-      ...(headers ? { headers } : {}),
-    });
+    const res = await this.request(path, { method: 'POST', body, signal }, options);
     return await this.parseJsonResponse(res, parser);
   }
 
@@ -358,8 +383,9 @@ export class HttpClient {
     body: FormData,
     parser: (raw: unknown) => T,
     signal: AbortSignal,
+    options: RequestOptions = {},
   ): Promise<T> {
-    const res = await this.request(path, { method: 'PATCH', body, signal });
+    const res = await this.request(path, { method: 'PATCH', body, signal }, options);
     return await this.parseJsonResponse(res, parser);
   }
 
@@ -368,8 +394,9 @@ export class HttpClient {
     body: unknown,
     parser: (raw: unknown) => T,
     signal: AbortSignal,
+    options: RequestOptions = {},
   ): Promise<T> {
-    const res = await this.requestJson(path, 'POST', body, signal);
+    const res = await this.requestJson(path, 'POST', body, signal, options);
     return await this.parseJsonResponse(res, parser);
   }
 
@@ -378,8 +405,12 @@ export class HttpClient {
     body: unknown,
     parser: (raw: unknown) => T,
     signal: AbortSignal,
+    options: RequestOptions = {},
   ): Promise<T> {
-    return this.parseJsonResponse(await this.requestJson(path, 'PUT', body, signal), parser);
+    return this.parseJsonResponse(
+      await this.requestJson(path, 'PUT', body, signal, options),
+      parser,
+    );
   }
 
   /** POST a JSON body and parse a `multipart/form-data` response (a large annotation export). */
@@ -411,12 +442,13 @@ export class HttpClient {
     contentType: string,
     parser: (raw: unknown) => T,
     signal: AbortSignal,
+    options: RequestOptions = {},
   ): Promise<T> {
     const headers = new Headers({ 'Content-Type': contentType });
     // Copy into a fresh ArrayBuffer: `bytes` may be a view over a larger
     // (or SharedArrayBuffer-backed) buffer, which fetch bodies reject.
     const body = new Uint8Array(bytes).buffer as ArrayBuffer;
-    const res = await this.request(path, { method: 'POST', body, headers, signal });
+    const res = await this.request(path, { method: 'POST', body, headers, signal }, options);
     return await this.parseJsonResponse(res, parser);
   }
 
@@ -425,26 +457,20 @@ export class HttpClient {
     body: unknown,
     parser: (raw: unknown) => T,
     signal: AbortSignal,
+    options: RequestOptions = {},
   ): Promise<T> {
-    const res = await this.requestJson(path, 'PATCH', body, signal);
+    const res = await this.requestJson(path, 'PATCH', body, signal, options);
     return await this.parseJsonResponse(res, parser);
   }
 
-  async deleteJson<T>(path: string, parser: (raw: unknown) => T, signal: AbortSignal): Promise<T> {
-    const res = await this.request(path, { method: 'DELETE', signal });
+  async deleteJson<T>(
+    path: string,
+    parser: (raw: unknown) => T,
+    signal: AbortSignal,
+    options: RequestOptions = {},
+  ): Promise<T> {
+    const res = await this.request(path, { method: 'DELETE', signal }, options);
     return await this.parseJsonResponse(res, parser);
-  }
-
-  async deleteEmpty(path: string, signal: AbortSignal): Promise<void> {
-    const res = await this.request(path, { method: 'DELETE', signal });
-    if (res.status === 204) return;
-    if (!res.ok) await this.throwFromBody(res);
-  }
-
-  async postEmpty(path: string, body: unknown, signal: AbortSignal): Promise<void> {
-    const res = await this.requestJson(path, 'POST', body, signal);
-    if (res.status === 204) return;
-    if (!res.ok) await this.throwFromBody(res);
   }
 
   private requestJson(
@@ -452,25 +478,40 @@ export class HttpClient {
     method: 'POST' | 'PATCH' | 'PUT',
     body: unknown,
     signal: AbortSignal,
+    options: RequestOptions = {},
   ): Promise<Response> {
     const headers = new Headers({ 'Content-Type': 'application/json' });
-    return this.request(path, {
-      method,
-      body: JSON.stringify(body ?? {}),
-      headers,
-      signal,
-    });
+    return this.request(
+      path,
+      { method, body: JSON.stringify(body ?? {}), headers, signal },
+      options,
+    );
   }
 
-  private async request(path: string, init: RequestInit): Promise<Response> {
-    const { url, extraHeader, routedToCdn } = this.resolveOutgoing(path);
+  private async request(
+    path: string,
+    init: RequestInit,
+    options: RequestOptions = {},
+  ): Promise<Response> {
+    const { url, extraHeader, routedToCdn } = this.resolveOutgoing(path, init.method ?? 'GET');
     const headers = new Headers(init.headers ?? {});
     if (this.tokenFn) {
       const token = await this.tokenFn();
       headers.set('Authorization', `Bearer ${token}`);
     }
     if (!headers.has('Accept')) headers.set('Accept', 'application/json');
-    if (this.sessionId) headers.set('X-Engine-Session-Id', this.sessionId);
+    // The session header only where the server reads it: on any other read
+    // it would turn a plain CDN request into one that needs a preflight.
+    const { write } = options;
+    if (this.sessionId && (write || options.session)) {
+      headers.set('X-Engine-Session-Id', this.sessionId);
+    }
+    if (write) {
+      headers.set('Idempotency-Key', write.opId);
+      if (write.reserveObjectNumbers && write.reserveObjectNumbers > 0) {
+        headers.set('EmbedPDF-Reserve-Object-Numbers', String(write.reserveObjectNumbers));
+      }
+    }
     if (extraHeader) headers.set(extraHeader.name, extraHeader.value);
     // Document affinity key: origin-bound doc requests only (a CDN GET is a
     // "simple" request today — a custom header would create preflights
@@ -484,8 +525,32 @@ export class HttpClient {
     // shed before dispatch, `EngineRestarting` = the apply never landed)
     // — both mean nothing happened, so retrying is method-agnostic-safe,
     // mutations included. A foreign 503 is returned without a retry.
-    for (let attempt = 0; ; attempt++) {
-      const res = await this.execute(url, { ...init, headers });
+    for (let attempt = 0, networkFailures = 0; ; attempt++) {
+      let res: Response;
+      try {
+        res = await this.execute(url, { ...init, headers });
+      } catch (err) {
+        // A write that may or may not have landed goes again under the same
+        // key: the server answers a repeat with what the first one committed.
+        const wait = HttpClient.NETWORK_RETRY_MS[networkFailures];
+        if (
+          !write ||
+          wait === undefined ||
+          !EngineError.is(err, EngineErrorCode.Network) ||
+          isStreamBody(init.body ?? null)
+        ) {
+          throw err;
+        }
+        networkFailures++;
+        const waitMs = wait * (0.9 + 0.2 * Math.random());
+        this.onRetry?.({ path, code: EngineErrorCode.Network, attempt, waitMs });
+        await sleepRacingAbort(waitMs, init.signal ?? null);
+        continue;
+      }
+      if (res.ok && write?.onObjectNumbers) {
+        const ranges = parseObjectNumberRanges(res.headers.get('EmbedPDF-Object-Numbers'));
+        if (ranges.length > 0) write.onObjectNumbers(ranges);
+      }
       if (
         res.status !== 503 ||
         attempt >= HttpClient.MAX_RETRIES ||
@@ -546,17 +611,23 @@ export class HttpClient {
 
   /**
    * Decide where this request actually goes. With no CDN binding (or
-   * binding's `cdn` is null) every request stays on origin. Otherwise
+   * binding's `cdn` is null) every request stays on origin, and so does
+   * every request that isn't a read (`GET`, `HEAD`): a write must reach the
+   * server itself, whatever read its path looks like. Otherwise
    * `applyCdnAccess` decides per-request based on the resource the
    * path resolves to (and whether the caller's scope granted CDN
    * access to it).
    */
-  private resolveOutgoing(path: string): {
+  private resolveOutgoing(
+    path: string,
+    method: string,
+  ): {
     url: string;
     extraHeader: { name: string; value: string } | null;
     routedToCdn: boolean;
   } {
-    if (!this.cdnBinding || !this.cdnBinding.cdn) {
+    const read = method === 'GET' || method === 'HEAD';
+    if (!read || !this.cdnBinding || !this.cdnBinding.cdn) {
       return { url: `${this.baseUrl}${path}`, extraHeader: null, routedToCdn: false };
     }
     const applied = applyCdnAccess({

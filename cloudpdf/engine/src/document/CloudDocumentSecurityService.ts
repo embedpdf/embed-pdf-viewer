@@ -19,6 +19,7 @@ import {
   type DocumentSecurityState,
   type DocumentUnlockInput,
   type DocumentUnlockResult,
+  type EditSessionAccess,
   type Identity,
   type PasswordPrompt,
 } from '@embedpdf/engine-core/runtime';
@@ -26,6 +27,12 @@ import { AccessResponseSchema, wirePaths, type DocumentHead } from '@embedpdf/en
 
 import { decodeUnverifiedClaims } from '../transport/decodeUnverifiedClaims';
 import type { HttpClient } from '../transport/HttpClient';
+
+/** The editing session's side of `/access`: how many numbers to ask for, and what came. */
+export interface AccessEditing {
+  wanted(): number;
+  opened(edit: EditSessionAccess): void;
+}
 
 export class CloudDocumentSecurityService implements DocumentSecurityService {
   private securityState: DocumentSecurityState;
@@ -54,6 +61,7 @@ export class CloudDocumentSecurityService implements DocumentSecurityService {
     initialHead: DocumentHead,
     private readonly view: { isClosed(): boolean },
     initialToken: string | null = null,
+    private readonly editing: AccessEditing | null = null,
   ) {
     this.securityState = securityStateFromHead(initialHead);
     const claims = initialToken ? safeDecodeClaims(initialToken) : null;
@@ -223,7 +231,9 @@ export class CloudDocumentSecurityService implements DocumentSecurityService {
    * password) and `establishAccess()` (no password). Updates cached
    * security state, caches the access block, and pushes the CDN
    * binding into the HttpClient so subsequent fetches apply CDN
-   * tokens via `applyCdnAccess`.
+   * tokens via `applyCdnAccess`. It goes as the editing session, and a
+   * caller that may create gets the session's object numbers with it
+   * (`edit`).
    *
    * `none` CDN adapter → the access block has null overrides/policies
    * and `applyCdnAccess` short-circuits to origin; safe to call always.
@@ -240,9 +250,11 @@ export class CloudDocumentSecurityService implements DocumentSecurityService {
       {
         ...(body.password ? { password: body.password } : {}),
         mode: body.mode,
+        ...(this.editing ? { objectNumbers: this.editing.wanted() } : {}),
       },
       (raw) => AccessResponseSchema.parse(raw),
       signal,
+      { session: true },
     );
     this.securityState = response.security;
     this.protection = response.protection;
@@ -259,7 +271,9 @@ export class CloudDocumentSecurityService implements DocumentSecurityService {
       // Deployment render lattice. Absent on older servers without render policy support.
       ...(response.renderPolicy ? { renderPolicy: response.renderPolicy } : {}),
       annotationBundleLimits: response.annotationBundleLimits,
+      ...(response.edit ? { edit: response.edit } : {}),
     };
+    if (response.edit) this.editing?.opened(response.edit);
     this.http.setCdnAccess({
       cdn: response.cdn,
       docId: this.docId,

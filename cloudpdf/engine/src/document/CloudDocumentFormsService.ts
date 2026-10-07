@@ -53,7 +53,8 @@ import type { SessionEventPublisher } from '@embedpdf/engine-services';
 
 import { buildMutationForm } from './buildMutationForm';
 import type { ManifestAccessor } from './CloudDocumentHandle';
-import { assertNoObjectNumber } from './CloudObjectNumberPool';
+import type { CloudWrites } from './CloudWrites';
+import { withObjectNumbers } from '../shared/withObjectNumbers';
 import type { HttpClient } from '../transport/HttpClient';
 
 /** Content types the import POST body may carry; the server sniffs the
@@ -82,6 +83,7 @@ export class CloudDocumentFormsService implements DocumentFormsService {
     private readonly isClosed: () => boolean,
     private readonly manifest: ManifestAccessor,
     private readonly publisher: SessionEventPublisher,
+    private readonly writes: CloudWrites,
   ) {}
 
   list(): AbortablePromise<FormSnapshot> {
@@ -117,13 +119,18 @@ export class CloudDocumentFormsService implements DocumentFormsService {
     if (rejected) return rejected;
     return AbortablePromise.run<FormSetValueResult>(async (signal) => {
       const opId = opIdOf(options);
-      const result = await this.http.postJson(
-        wirePaths.layerFormFieldValue(this.docId, this.layerName, encodeFieldRefKey(ref)),
-        { value },
-        (raw) => FormSetValueResultSchema.parse(raw),
-        signal,
-      );
-      return this.absorbMutation(opId, result, 'forms.valueSet');
+      return this.writes.run(opId, signal, async (write) => {
+        const result = await write.send((sent) =>
+          this.http.postJson(
+            wirePaths.layerFormFieldValue(this.docId, this.layerName, encodeFieldRefKey(ref)),
+            { value },
+            (raw) => FormSetValueResultSchema.parse(raw),
+            signal,
+            sent,
+          ),
+        );
+        return this.absorbMutation(opId, result, 'forms.valueSet');
+      });
     });
   }
 
@@ -136,19 +143,24 @@ export class CloudDocumentFormsService implements DocumentFormsService {
     const refs = fields === undefined ? undefined : Array.isArray(fields) ? fields : [fields];
     return AbortablePromise.run<FormResetResult>(async (signal) => {
       const opId = opIdOf(options);
-      const result = await this.http.postJson(
-        wirePaths.layerFormReset(this.docId, this.layerName),
-        refs ? { refs } : {},
-        (raw) => FormResetResultSchema.parse(raw),
-        signal,
-      );
-      this.manifest.apply(result.meta, ['annotations']);
-      // One event per field that changed, sharing the write's opId.
-      this.publisher.publishWrite(
-        opId,
-        ...formResetFacts(result).map((fact) => ({ type: 'forms.valueSet' as const, ...fact })),
-      );
-      return result;
+      return this.writes.run(opId, signal, async (write) => {
+        const result = await write.send((sent) =>
+          this.http.postJson(
+            wirePaths.layerFormReset(this.docId, this.layerName),
+            refs ? { refs } : {},
+            (raw) => FormResetResultSchema.parse(raw),
+            signal,
+            sent,
+          ),
+        );
+        this.manifest.apply(result.meta, ['annotations']);
+        // One event per field that changed, sharing the write's opId.
+        this.publisher.publishWrite(
+          opId,
+          ...formResetFacts(result).map((fact) => ({ type: 'forms.valueSet' as const, ...fact })),
+        );
+        return result;
+      });
     });
   }
 
@@ -157,19 +169,24 @@ export class CloudDocumentFormsService implements DocumentFormsService {
     if (rejected) return rejected;
     return AbortablePromise.run<FormEffectsResult>(async (signal) => {
       const opId = opIdOf(options);
-      const result = await this.http.postJson(
-        wirePaths.layerFormEffects(this.docId, this.layerName),
-        { effects },
-        (raw) => FormEffectsResultSchema.parse(raw),
-        signal,
-      );
-      // A batch that wrote nothing (every effect a no-op or rejected in
-      // preflight) comes back without a cache delta: no artifact, cache
-      // advance, or event.
-      if (result.meta.cacheDelta === null) return result;
-      this.manifest.apply(result.meta, ['annotations']);
-      this.publisher.publishWrite(opId, { type: 'forms.effectsApplied', ...result });
-      return result;
+      return this.writes.run(opId, signal, async (write) => {
+        const result = await write.send((sent) =>
+          this.http.postJson(
+            wirePaths.layerFormEffects(this.docId, this.layerName),
+            { effects },
+            (raw) => FormEffectsResultSchema.parse(raw),
+            signal,
+            sent,
+          ),
+        );
+        // A batch that wrote nothing (every effect a no-op or rejected in
+        // preflight) comes back without a cache delta: no artifact, cache
+        // advance, or event.
+        if (result.meta.cacheDelta === null) return result;
+        this.manifest.apply(result.meta, ['annotations']);
+        this.publisher.publishWrite(opId, { type: 'forms.effectsApplied', ...result });
+        return result;
+      });
     });
   }
 
@@ -195,14 +212,19 @@ export class CloudDocumentFormsService implements DocumentFormsService {
     const bytes = data instanceof ArrayBuffer ? new Uint8Array(data) : data;
     return AbortablePromise.run<FormImportResult>(async (signal) => {
       const opId = opIdOf(options);
-      const result = await this.http.postBytesJson(
-        wirePaths.layerFormData(this.docId, this.layerName, format),
-        bytes,
-        format ? IMPORT_CONTENT_TYPE[format] : 'application/octet-stream',
-        (raw) => FormImportResultSchema.parse(raw),
-        signal,
-      );
-      return this.absorbMutation(opId, result, 'forms.imported');
+      return this.writes.run(opId, signal, async (write) => {
+        const result = await write.send((sent) =>
+          this.http.postBytesJson(
+            wirePaths.layerFormData(this.docId, this.layerName, format),
+            bytes,
+            format ? IMPORT_CONTENT_TYPE[format] : 'application/octet-stream',
+            (raw) => FormImportResultSchema.parse(raw),
+            signal,
+            sent,
+          ),
+        );
+        return this.absorbMutation(opId, result, 'forms.imported');
+      });
     });
   }
 
@@ -214,14 +236,27 @@ export class CloudDocumentFormsService implements DocumentFormsService {
     if (rejected) return rejected;
     return AbortablePromise.run<FormFieldCreateResult>(async (signal) => {
       const opId = opIdOf(options);
-      assertNoObjectNumber(options.objectNumber, ...(options.widgetObjectNumbers ?? []));
-      const result = await this.http.postJson(
-        wirePaths.layerFormFields(this.docId, this.layerName),
-        draft,
-        (raw) => FormFieldCreateResultSchema.parse(raw),
+      const { objectNumber, widgetObjectNumbers } = options;
+      return this.writes.run(
+        opId,
         signal,
+        async (write) => {
+          const result = await write.send((sent) =>
+            this.http.postJson(
+              withObjectNumbers(wirePaths.layerFormFields(this.docId, this.layerName), {
+                objectNumber,
+                widgetObjectNumbers,
+              }),
+              draft,
+              (raw) => FormFieldCreateResultSchema.parse(raw),
+              signal,
+              sent,
+            ),
+          );
+          return this.absorbMutation(opId, result, 'forms.created');
+        },
+        [objectNumber, ...(widgetObjectNumbers ?? [])],
       );
-      return this.absorbMutation(opId, result, 'forms.created');
     });
   }
 
@@ -234,13 +269,18 @@ export class CloudDocumentFormsService implements DocumentFormsService {
     if (rejected) return rejected;
     return AbortablePromise.run<FormFieldUpdateResult>(async (signal) => {
       const opId = opIdOf(options);
-      const result = await this.http.patchJson(
-        wirePaths.layerFormFieldByKey(this.docId, this.layerName, encodeFieldRefKey(ref)),
-        patch,
-        (raw) => FormFieldUpdateResultSchema.parse(raw),
-        signal,
-      );
-      return this.absorbMutation(opId, result, 'forms.updated');
+      return this.writes.run(opId, signal, async (write) => {
+        const result = await write.send((sent) =>
+          this.http.patchJson(
+            wirePaths.layerFormFieldByKey(this.docId, this.layerName, encodeFieldRefKey(ref)),
+            patch,
+            (raw) => FormFieldUpdateResultSchema.parse(raw),
+            signal,
+            sent,
+          ),
+        );
+        return this.absorbMutation(opId, result, 'forms.updated');
+      });
     });
   }
 
@@ -253,23 +293,28 @@ export class CloudDocumentFormsService implements DocumentFormsService {
     if (rejected) return rejected;
     return AbortablePromise.run<FormFieldUpdateResult>(async (signal) => {
       const opId = opIdOf(options);
-      const bytes = new ArrayBuffer(appearance.pdf.byteLength);
-      new Uint8Array(bytes).set(appearance.pdf);
-      const form = buildMutationForm(
-        { resource: 'r0' },
-        { r0: { bytes, mimeType: 'application/pdf', name: 'appearance.pdf' } },
-      );
-      const result = await this.http.postMultipartJson(
-        wirePaths.layerFormFieldSignatureAppearance(
-          this.docId,
-          this.layerName,
-          encodeFieldRefKey(ref),
-        ),
-        form,
-        (raw) => FormFieldUpdateResultSchema.parse(raw),
-        signal,
-      );
-      return this.absorbMutation(opId, result, 'forms.updated');
+      return this.writes.run(opId, signal, async (write) => {
+        const bytes = new ArrayBuffer(appearance.pdf.byteLength);
+        new Uint8Array(bytes).set(appearance.pdf);
+        const form = buildMutationForm(
+          { resource: 'r0' },
+          { r0: { bytes, mimeType: 'application/pdf', name: 'appearance.pdf' } },
+        );
+        const result = await write.send((sent) =>
+          this.http.postMultipartJson(
+            wirePaths.layerFormFieldSignatureAppearance(
+              this.docId,
+              this.layerName,
+              encodeFieldRefKey(ref),
+            ),
+            form,
+            (raw) => FormFieldUpdateResultSchema.parse(raw),
+            signal,
+            sent,
+          ),
+        );
+        return this.absorbMutation(opId, result, 'forms.updated');
+      });
     });
   }
 
@@ -278,18 +323,23 @@ export class CloudDocumentFormsService implements DocumentFormsService {
     if (rejected) return rejected;
     return AbortablePromise.run<FormFieldDeleteResult>(async (signal) => {
       const opId = opIdOf(options);
-      const result = await this.http.deleteJson(
-        wirePaths.layerFormFieldByKey(this.docId, this.layerName, encodeFieldRefKey(ref)),
-        (raw) => FormFieldDeleteResultSchema.parse(raw),
-        signal,
-      );
-      this.manifest.apply(result.meta, ['annotations']);
-      this.publisher.publishWrite(opId, {
-        type: 'forms.deleted',
-        deleted: deletedFieldOf(result),
-        ...result,
+      return this.writes.run(opId, signal, async (write) => {
+        const result = await write.send((sent) =>
+          this.http.deleteJson(
+            wirePaths.layerFormFieldByKey(this.docId, this.layerName, encodeFieldRefKey(ref)),
+            (raw) => FormFieldDeleteResultSchema.parse(raw),
+            signal,
+            sent,
+          ),
+        );
+        this.manifest.apply(result.meta, ['annotations']);
+        this.publisher.publishWrite(opId, {
+          type: 'forms.deleted',
+          deleted: deletedFieldOf(result),
+          ...result,
+        });
+        return result;
       });
-      return result;
     });
   }
 
@@ -302,14 +352,27 @@ export class CloudDocumentFormsService implements DocumentFormsService {
     if (rejected) return rejected;
     return AbortablePromise.run<FormWidgetLinkResult>(async (signal) => {
       const opId = opIdOf(options);
-      assertNoObjectNumber(options.objectNumber, options.splitObjectNumber);
-      const result = await this.http.postJson(
-        wirePaths.layerFormFieldWidgets(this.docId, this.layerName, encodeFieldRefKey(ref)),
-        placement,
-        (raw) => FormWidgetLinkResultSchema.parse(raw),
+      const { objectNumber, splitObjectNumber } = options;
+      return this.writes.run(
+        opId,
         signal,
+        async (write) => {
+          const result = await write.send((sent) =>
+            this.http.postJson(
+              withObjectNumbers(
+                wirePaths.layerFormFieldWidgets(this.docId, this.layerName, encodeFieldRefKey(ref)),
+                { objectNumber, splitObjectNumber },
+              ),
+              placement,
+              (raw) => FormWidgetLinkResultSchema.parse(raw),
+              signal,
+              sent,
+            ),
+          );
+          return this.absorbMutation(opId, result, 'forms.widgetAdded');
+        },
+        [objectNumber, splitObjectNumber],
       );
-      return this.absorbMutation(opId, result, 'forms.widgetAdded');
     });
   }
 
@@ -322,13 +385,22 @@ export class CloudDocumentFormsService implements DocumentFormsService {
     if (rejected) return rejected;
     return AbortablePromise.run<FormWidgetLinkResult>(async (signal) => {
       const opId = opIdOf(options);
-      const result = await this.http.postJson(
-        wirePaths.layerFormFieldWidgetsDetach(this.docId, this.layerName, encodeFieldRefKey(ref)),
-        { widget },
-        (raw) => FormWidgetLinkResultSchema.parse(raw),
-        signal,
-      );
-      return this.absorbMutation(opId, result, 'forms.widgetRemoved');
+      return this.writes.run(opId, signal, async (write) => {
+        const result = await write.send((sent) =>
+          this.http.postJson(
+            wirePaths.layerFormFieldWidgetsDetach(
+              this.docId,
+              this.layerName,
+              encodeFieldRefKey(ref),
+            ),
+            { widget },
+            (raw) => FormWidgetLinkResultSchema.parse(raw),
+            signal,
+            sent,
+          ),
+        );
+        return this.absorbMutation(opId, result, 'forms.widgetRemoved');
+      });
     });
   }
 
@@ -337,13 +409,18 @@ export class CloudDocumentFormsService implements DocumentFormsService {
     if (rejected) return rejected;
     return AbortablePromise.run<FormRepairResult>(async (signal) => {
       const opId = opIdOf(options);
-      const result = await this.http.postJson(
-        wirePaths.layerFormRepair(this.docId, this.layerName),
-        { bakeAppearances: options?.bakeAppearances ?? false },
-        (raw) => FormRepairResultSchema.parse(raw),
-        signal,
-      );
-      return this.absorbMutation(opId, result, 'forms.repaired');
+      return this.writes.run(opId, signal, async (write) => {
+        const result = await write.send((sent) =>
+          this.http.postJson(
+            wirePaths.layerFormRepair(this.docId, this.layerName),
+            { bakeAppearances: options?.bakeAppearances ?? false },
+            (raw) => FormRepairResultSchema.parse(raw),
+            signal,
+            sent,
+          ),
+        );
+        return this.absorbMutation(opId, result, 'forms.repaired');
+      });
     });
   }
 

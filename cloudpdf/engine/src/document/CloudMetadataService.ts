@@ -24,6 +24,7 @@ import {
 import type { SessionEventPublisher } from '@embedpdf/engine-services';
 
 import type { ManifestAccessor } from './CloudDocumentHandle';
+import type { CloudWrites } from './CloudWrites';
 import { planesInherited } from './planes';
 import type { HttpClient } from '../transport/HttpClient';
 
@@ -34,6 +35,7 @@ interface MetadataDeps {
   isClosed: () => boolean;
   manifest: ManifestAccessor;
   publisher: SessionEventPublisher;
+  writes: CloudWrites;
 }
 
 /** One half of the Info dict: the leaf it reads and the route it writes. */
@@ -111,15 +113,20 @@ function writeLeaf<R extends { meta: MutationMeta }>(
   if (deps.isClosed()) return AbortablePromise.rejectReason(closedError(deps.docId));
   return AbortablePromise.run<R>(async (signal) => {
     const opId = opIdOf(options);
-    const result = await deps.http.postJson(
-      leaf.updatePath(deps.docId, deps.layerName),
-      patch,
-      leaf.parseResult,
-      signal,
-    );
-    deps.manifest.apply(result.meta, ['metadata']);
-    publish(result, opId);
-    return result;
+    return deps.writes.run(opId, signal, async (write) => {
+      const result = await write.send((sent) =>
+        deps.http.postJson(
+          leaf.updatePath(deps.docId, deps.layerName),
+          patch,
+          leaf.parseResult,
+          signal,
+          sent,
+        ),
+      );
+      deps.manifest.apply(result.meta, ['metadata']);
+      publish(result, opId);
+      return result;
+    });
   });
 }
 
@@ -151,8 +158,9 @@ export class CloudMetadataService implements MetadataService {
     isClosed: () => boolean,
     manifest: ManifestAccessor,
     publisher: SessionEventPublisher,
+    writes: CloudWrites,
   ) {
-    this.deps = { http, docId, layerName, isClosed, manifest, publisher };
+    this.deps = { http, docId, layerName, isClosed, manifest, publisher, writes };
     this.custom = new CloudCustomMetadataService(this.deps);
   }
 

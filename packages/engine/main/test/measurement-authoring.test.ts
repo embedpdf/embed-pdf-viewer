@@ -35,18 +35,18 @@ describe.each(['wasm', 'native'] as const)('distance authoring integration (%s)'
       );
       for (const tool of annotation.listResolvedTools()) {
         if (tool.defaults) {
-          annotation.updateToolDefaults(tool.id, tool.defaults);
+          annotation.tools.updateDefaults(tool.id, tool.defaults);
         }
       }
       annotation.createPointer('distance', 'down', page.ref, { x: 50, y: 100 });
       annotation.createPointer('distance', 'move', page.ref, { x: 250, y: 100 });
       annotation.createPointer('distance', 'up', page.ref, { x: 250, y: 100 });
-      expect(annotation.listSelected()).toHaveLength(0);
+      expect(annotation.selection.list()).toHaveLength(0);
       annotation.createPointer('distance', 'move', page.ref, { x: 250, y: 88 });
       annotation.createPointer('distance', 'down', page.ref, { x: 250, y: 88 });
       // Written and confirmed: its ref is the engine's.
-      await vi.waitFor(() => expect(annotation.listSelected()[0]?.ref.kind).toBe('objectNumber'));
-      const created = annotation.listSelected()[0]!;
+      await vi.waitFor(() => expect(annotation.selection.list()[0]?.ref.kind).toBe('objectNumber'));
+      const created = annotation.selection.list()[0]!;
       const createdId = annotationKey(created.ref);
       const expectVector = () => {
         expect(
@@ -112,7 +112,7 @@ describe.each(['wasm', 'native'] as const)('distance authoring integration (%s)'
         x: pivot.x - (start.y - pivot.y),
         y: pivot.y + (start.x - pivot.x),
       };
-      await annotation.rotateSelectionBy(90);
+      await annotation.selection.rotateBy(90);
       await vi.waitFor(() => {
         const rotated = annotation.get(created.ref)!;
         if (rotated.subtype !== 'line') throw new Error('Expected distance annotation');
@@ -128,7 +128,7 @@ describe.each(['wasm', 'native'] as const)('distance authoring integration (%s)'
         expect(actual.y).toBeCloseTo(pivot.y, 3);
       });
       expectVector();
-      await annotation.resetSelectionRotation();
+      await annotation.selection.resetRotation();
       await vi.waitFor(() => {
         const reset = annotation.get(created.ref)!;
         if (reset.subtype !== 'line') throw new Error('Expected distance annotation');
@@ -136,7 +136,7 @@ describe.each(['wasm', 'native'] as const)('distance authoring integration (%s)'
         expect(reset.linePoints.start.y).toBeCloseTo(beforeRotation.linePoints.start.y, 3);
       });
       expectVector();
-      await annotation.rotateSelectionBy(90);
+      await annotation.selection.rotateBy(90);
       await vi.waitFor(() => {
         const rotated = annotation.get(created.ref)!;
         if (rotated.subtype !== 'line') throw new Error('Expected distance annotation');

@@ -18,7 +18,7 @@ import {
   sign,
   validateSignatures,
 } from '@embedpdf/core-signature';
-import type { SignatureSubFilter } from '@embedpdf/engine-core/runtime';
+import type { ObjectNumbersLost, SignatureSubFilter } from '@embedpdf/engine-core/runtime';
 import { EngineError, EngineErrorCode } from '@embedpdf/engine-core/runtime';
 import { cloudEngine } from '../src/index';
 import {
@@ -160,12 +160,20 @@ describe('digital signatures (cloud SDK, real runtime)', () => {
       expect(before.signatures.map((s) => [s.fieldName, s.signed])).toEqual([['sig', false]]);
 
       await alice.doc.forms.setValue({ kind: 'fqn', name: 'group.total' }, { value: 'alice' });
+      const held = alice.doc.objectNumbers.held;
+      expect(held).toBeGreaterThan(0);
+      const lost: ObjectNumbersLost[] = [];
+      alice.doc.objectNumbers.onLost((event) => lost.push(event));
       const result = await sign(alice.doc, {
         field: { kind: 'fqn', name: 'sig' },
         certify: { permission: 2 },
         key: signer,
       });
       expect(result.status).toBe('completed');
+      // The new version numbers its objects anew: Alice's numbers are gone.
+      expect(lost).toEqual([{ numbers: expect.any(Array), reason: 'versioned' }]);
+      expect(lost[0]!.numbers).toHaveLength(held);
+      expect(alice.doc.objectNumbers.held).toBe(0);
       expect(result.signature.signed).toBe(true);
       expect(result.signature.coverage).toBe('whole-revision');
       expect(result.signature.docMdp).toBe(2);

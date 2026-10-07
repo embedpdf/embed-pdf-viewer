@@ -6,6 +6,7 @@ import { CloudPageAnnotationsService } from './CloudPageAnnotationsService';
 import { CloudPageRenderService } from './CloudPageRenderService';
 import { CloudPageTextService } from './CloudPageTextService';
 import { CloudPageMeasureService } from './CloudPageMeasureService';
+import type { CloudWrites } from './CloudWrites';
 import type { HttpClient } from '../transport/HttpClient';
 
 /**
@@ -28,6 +29,7 @@ export class CloudPageHandle implements PageHandle {
     isClosed: () => boolean,
     manifest: ManifestAccessor,
     publisher: SessionEventPublisher,
+    writes: CloudWrites,
     layout: (signal: AbortSignal) => Promise<PageLayout>,
   ) {
     this.measure = new CloudPageMeasureService(
@@ -38,6 +40,7 @@ export class CloudPageHandle implements PageHandle {
       isClosed,
       manifest,
       publisher,
+      writes,
     );
     this.annotations = new CloudPageAnnotationsService(
       http,
@@ -47,6 +50,7 @@ export class CloudPageHandle implements PageHandle {
       isClosed,
       manifest,
       publisher,
+      writes,
     );
     this.text = new CloudPageTextService(http, docId, layerName, ref, isClosed, manifest);
     this.render = new CloudPageRenderService(

@@ -89,7 +89,8 @@ await page.annotations.update(ref, { contents: 'Seen' }, { opId });
 
 An `opId` is 1 to 255 visible ASCII characters (what an HTTP header can carry), on every engine.
 On the cloud, a write retried with the same `opId` is applied once, and the retry gets the first
-answer.
+answer. The cloud engine retries a write lost on the network itself, under the same `opId`, so use
+a fresh `opId` for every write.
 
 Some calls make many changes at once. An [import](/docs/engine/annotations/import-export) of 50
 annotations fires 50 `annotations.created` events, one after the other, all with the same

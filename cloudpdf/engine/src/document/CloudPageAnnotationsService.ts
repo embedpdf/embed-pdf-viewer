@@ -50,8 +50,9 @@ import type { SessionEventPublisher } from '@embedpdf/engine-services';
 
 import { buildAnnotationMutationForm } from './buildMutationForm';
 import type { ManifestAccessor } from './CloudDocumentHandle';
-import { assertNoObjectNumber } from './CloudObjectNumberPool';
+import type { CloudWrite, CloudWrites } from './CloudWrites';
 import { planesInherited } from './planes';
+import { withObjectNumbers } from '../shared/withObjectNumbers';
 import type { HttpClient } from '../transport/HttpClient';
 
 /**
@@ -72,6 +73,7 @@ export class CloudPageAnnotationsService implements PageAnnotationsService {
     private readonly isClosed: () => boolean,
     private readonly manifest: ManifestAccessor,
     private readonly publisher: SessionEventPublisher,
+    private readonly writes: CloudWrites,
   ) {}
 
   list(): AbortablePromise<AnnotationList> {
@@ -245,29 +247,41 @@ export class CloudPageAnnotationsService implements PageAnnotationsService {
     let opId: string;
     try {
       opId = opIdOf(options);
-      assertNoObjectNumber(options.objectNumber);
     } catch (err) {
       return AbortablePromise.rejectReason(err);
     }
-    const { resources } = options;
+    const { resources, objectNumber } = options;
     // A `File` brings its name and type; the bytes travel without them.
     const data = withFileFromResource(draft, resources);
-    return AbortablePromise.run<AnnotationCreateResult>(async (signal) => {
-      // Without resources the request is the plain JSON POST of the data;
-      // with them it is multipart (see `buildAnnotationMutationForm`).
-      const wireResources = await resolveAnnotationResources(resources);
-      const path = wirePaths.layerPageAnnotationsCreate(this.docId, this.layerName, this.pageRef);
-      const parse = (raw: unknown) => AnnotationCreateResultSchema.parse(raw);
-      const result = hasAnnotationResources(wireResources)
-        ? await this.http.postMultipartJson(
-            path,
-            buildAnnotationMutationForm(data, wireResources),
-            parse,
-            signal,
-          )
-        : await this.http.postJson(path, data, parse, signal);
-      return this.absorbMutation(opId, result, 'annotations.created');
-    });
+    const path = withObjectNumbers(
+      wirePaths.layerPageAnnotationsCreate(this.docId, this.layerName, this.pageRef),
+      { objectNumber },
+    );
+    return AbortablePromise.run<AnnotationCreateResult>((signal) =>
+      this.writes.run(
+        opId,
+        signal,
+        async (write) => {
+          // Without resources the request is the plain JSON POST of the data;
+          // with them it is multipart (see `buildAnnotationMutationForm`).
+          const wireResources = await resolveAnnotationResources(resources);
+          const parse = (raw: unknown) => AnnotationCreateResultSchema.parse(raw);
+          const result = await write.send((sent) =>
+            hasAnnotationResources(wireResources)
+              ? this.http.postMultipartJson(
+                  path,
+                  buildAnnotationMutationForm(data, wireResources),
+                  parse,
+                  signal,
+                  sent,
+                )
+              : this.http.postJson(path, data, parse, signal, sent),
+          );
+          return this.absorbMutation(opId, result, 'annotations.created');
+        },
+        [objectNumber],
+      ),
+    );
   }
 
   update(
@@ -301,30 +315,35 @@ export class CloudPageAnnotationsService implements PageAnnotationsService {
       this.pageRef,
       encodeAnnotKey(ref),
     );
-    return AbortablePromise.run<AnnotationUpdateResult>(async (signal) => {
-      const wireResources = await resolveAnnotationResources(resources);
-      const result = await this.patchMutation(path, { patch }, wireResources, signal);
-      return this.absorbMutation(opId, result, 'annotations.updated');
-    });
+    return AbortablePromise.run<AnnotationUpdateResult>((signal) =>
+      this.writes.run(opId, signal, async (write) => {
+        const wireResources = await resolveAnnotationResources(resources);
+        const result = await this.patchMutation(write, path, { patch }, wireResources, signal);
+        return this.absorbMutation(opId, result, 'annotations.updated');
+      }),
+    );
   }
 
   /** PATCH as plain JSON, or as multipart when resources came with the patch. */
   private patchMutation(
+    write: CloudWrite,
     path: string,
     body: unknown,
     resources: WireAnnotationResources,
     signal: AbortSignal,
   ): Promise<AnnotationUpdateResult> {
     const parse = (raw: unknown) => AnnotationUpdateResultSchema.parse(raw);
-    if (hasAnnotationResources(resources)) {
-      return this.http.patchMultipartJson(
-        path,
-        buildAnnotationMutationForm(body, resources),
-        parse,
-        signal,
-      );
-    }
-    return this.http.patchJson(path, body, parse, signal);
+    return write.send((sent) =>
+      hasAnnotationResources(resources)
+        ? this.http.patchMultipartJson(
+            path,
+            buildAnnotationMutationForm(body, resources),
+            parse,
+            signal,
+            sent,
+          )
+        : this.http.patchJson(path, body, parse, signal, sent),
+    );
   }
 
   delete(ref: AnnotationRef, options?: WriteOptions): AbortablePromise<AnnotationDeleteResult> {
@@ -353,14 +372,19 @@ export class CloudPageAnnotationsService implements PageAnnotationsService {
       this.pageRef,
       encodeAnnotKey(ref),
     );
-    return AbortablePromise.run<AnnotationDeleteResult>(async (signal) => {
-      const result = await this.http.deleteJson(
-        path,
-        (raw) => AnnotationDeleteResultSchema.parse(raw),
-        signal,
-      );
-      return this.absorbDelete(opId, result);
-    });
+    return AbortablePromise.run<AnnotationDeleteResult>((signal) =>
+      this.writes.run(opId, signal, async (write) => {
+        const result = await write.send((sent) =>
+          this.http.deleteJson(
+            path,
+            (raw) => AnnotationDeleteResultSchema.parse(raw),
+            signal,
+            sent,
+          ),
+        );
+        return this.absorbDelete(opId, result);
+      }),
+    );
   }
 
   move(
@@ -392,15 +416,20 @@ export class CloudPageAnnotationsService implements PageAnnotationsService {
       }
     }
     const path = wirePaths.layerPageAnnotationsMove(this.docId, this.layerName, this.pageRef);
-    return AbortablePromise.run<AnnotationMoveResult>(async (signal) => {
-      const result = await this.http.postJson(
-        path,
-        { refs, toIndex },
-        (raw) => AnnotationMoveResultSchema.parse(raw),
-        signal,
-      );
-      return this.absorbMutation(opId, result, 'annotations.moved');
-    });
+    return AbortablePromise.run<AnnotationMoveResult>((signal) =>
+      this.writes.run(opId, signal, async (write) => {
+        const result = await write.send((sent) =>
+          this.http.postJson(
+            path,
+            { refs, toIndex },
+            (raw) => AnnotationMoveResultSchema.parse(raw),
+            signal,
+            sent,
+          ),
+        );
+        return this.absorbMutation(opId, result, 'annotations.moved');
+      }),
+    );
   }
 
   flatten(
@@ -430,21 +459,26 @@ export class CloudPageAnnotationsService implements PageAnnotationsService {
       }
     }
     const path = wirePaths.layerPageAnnotationsFlatten(this.docId, this.layerName, this.pageRef);
-    return AbortablePromise.run<AnnotationFlattenResult>(async (signal) => {
-      const result = await this.http.postJson(
-        path,
-        { refs, usage },
-        (raw) => AnnotationFlattenResultSchema.parse(raw),
-        signal,
-      );
-      // Nothing applied comes back without a cache delta: no artifact, no
-      // coherence bump, no event.
-      if (result.meta.cacheDelta === null) return result;
-      // Flatten bakes annotations into page content, so both planes flip.
-      this.manifest.apply(result.meta, ['content', 'annotations']);
-      this.publisher.publishWrite(opId, { type: 'annotations.flattened', ...result });
-      return result;
-    });
+    return AbortablePromise.run<AnnotationFlattenResult>((signal) =>
+      this.writes.run(opId, signal, async (write) => {
+        const result = await write.send((sent) =>
+          this.http.postJson(
+            path,
+            { refs, usage },
+            (raw) => AnnotationFlattenResultSchema.parse(raw),
+            signal,
+            sent,
+          ),
+        );
+        // Nothing applied comes back without a cache delta: no artifact, no
+        // coherence bump, no event.
+        if (result.meta.cacheDelta === null) return result;
+        // Flatten bakes annotations into page content, so both planes flip.
+        this.manifest.apply(result.meta, ['content', 'annotations']);
+        this.publisher.publishWrite(opId, { type: 'annotations.flattened', ...result });
+        return result;
+      }),
+    );
   }
 
   exportAppearance(refs: AnnotationRef[]): AbortablePromise<Uint8Array> {
