@@ -7,6 +7,12 @@ import {
   AbortError,
   EMPTY_TRANSFER,
   EngineError,
+  PermissionDenied,
+  changeFingerprint,
+  deserializeError,
+  isKeptRefusal,
+  isSkippedItem,
+  isUndoChange,
   EngineErrorCode,
   serializeError,
   wirePack,
@@ -106,6 +112,16 @@ import {
   type WorkerResponse,
   type WorkerResultPayload,
   type PdfCoordinates,
+  type ChangeItem,
+  type ChangeResult,
+  type DocumentApplyWorkerRequest,
+  type DocumentApplyChangesWorkerRequest,
+  type ServerChange,
+  type ServerChangeOutcome,
+  type AnnotationActor,
+  type ChangeAuthority,
+  type ChangeOp,
+  type WireAnnotationResources,
   type VisibleBoxOf,
   type LayerArtifactFileWorkerPayload,
   type LayerArtifactWorkerPayload,
@@ -133,16 +149,21 @@ import {
   AnnotationExporter,
   AnnotationImporter,
   AnnotationFlattener,
-  AnnotationMutator,
   RawAnnotationReader,
 } from '../features/annotations';
 import { AttachmentMutator, AttachmentReader } from '../features/attachments';
+import {
+  ChangeApplier,
+  changeLedgerOf,
+  type AppliedChange,
+  type ChangeOutcome,
+  type ChangeRecord,
+} from '../features/changes';
 import { FontRegistrar, type StartupFontSpec } from '../features/fonts';
 import { FormMutator, FormReader, FormsEffectsApplier, disposeFormModel } from '../features/forms';
-import { formMutationMeta } from '../features/forms/internal/formMutationMeta';
 import { PageGeometryReader } from '../features/geometry';
 import { MeasureReader, MeasureMutator } from '../features/measure';
-import { MetadataMutator, MetadataReader } from '../features/metadata';
+import { MetadataReader } from '../features/metadata';
 import {
   PagesExtractor,
   PagesFlattener,
@@ -476,7 +497,7 @@ export class WorkerHost {
       // completes or is cancelled. Reads keep seeing the live document, which the
       // candidate never changed.
       this.assertNoPendingSigning(msg);
-      transacted?.beginTransaction();
+      if (transacted && writesDocument(msg)) transacted.beginTransaction(msg.opId);
       // The write's own objects go at or above the floor its caller set.
       if (transacted && 'objectNumberFloor' in msg && msg.objectNumberFloor !== undefined) {
         transacted.raiseLastObjectNumber(msg.objectNumberFloor - 1);
@@ -516,6 +537,12 @@ export class WorkerHost {
           break;
         case 'annotations.move':
           resultPack = this.handleAnnotationsMove(msg, ctrl.signal);
+          break;
+        case 'document.apply':
+          resultPack = this.handleDocumentApply(msg, ctrl.signal);
+          break;
+        case 'document.applyChanges':
+          resultPack = this.handleDocumentApplyChanges(msg, ctrl.signal);
           break;
         case 'signatures.list':
           resultPack = this.handleSignaturesList(msg);
@@ -959,7 +986,7 @@ export class WorkerHost {
       session,
       this.baseDocuments,
       this.options.signingCandidatePath,
-    ).complete(req.input);
+    ).complete(req.input, req.opId);
     if (result.status === 'already-completed') {
       return wirePack({ tag: 'signatures.complete', result });
     }
@@ -1039,8 +1066,17 @@ export class WorkerHost {
     signal: AbortSignal,
   ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
-    const mutator = new MetadataMutator(this.runtime, session);
-    const result = mutator.update(req.patch, signal);
+    const {
+      type: _type,
+      skipped: _skipped,
+      ...result
+    } = this.applyOne(
+      session,
+      req.opId,
+      { type: 'metadata.update', patch: req.patch },
+      checkedAuthority(),
+      signal,
+    );
     return this.finishMutation(session, { tag: 'metadata.update', result }, req.artifactPath);
   }
 
@@ -1058,8 +1094,17 @@ export class WorkerHost {
     signal: AbortSignal,
   ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
-    const mutator = new MetadataMutator(this.runtime, session);
-    const result = mutator.updateCustom(req.patch, signal);
+    const {
+      type: _type,
+      skipped: _skipped,
+      ...result
+    } = this.applyOne(
+      session,
+      req.opId,
+      { type: 'metadata.updateCustom', patch: req.patch },
+      checkedAuthority(),
+      signal,
+    );
     return this.finishMutation(session, { tag: 'metadata.updateCustom', result }, req.artifactPath);
   }
 
@@ -1100,13 +1145,23 @@ export class WorkerHost {
     signal: AbortSignal,
   ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
-    const pageObjectNumber = session.resolvePageRef(req.page).pageObjectNumber;
-    const mutator = new AnnotationMutator(this.runtime, session, this.fonts);
-    const result = mutator.create(pageObjectNumber, req.draft, signal, {
-      ...(req.actor ? { actor: req.actor } : {}),
-      ...(req.resources ? { resources: req.resources } : {}),
-      ...(req.objectNumber !== undefined ? { objectNumber: req.objectNumber } : {}),
-    });
+    const {
+      type: _type,
+      page: _page,
+      ...result
+    } = this.applyOne(
+      session,
+      req.opId,
+      {
+        type: 'annotations.create',
+        page: req.page,
+        data: req.draft,
+        ...(req.resources ? { resources: req.resources } : {}),
+        ...(req.objectNumber !== undefined ? { objectNumber: req.objectNumber } : {}),
+      },
+      checkedAuthority(req.actor),
+      signal,
+    );
     return this.finishMutation(session, { tag: 'annotations.create', result }, req.artifactPath);
   }
 
@@ -1115,8 +1170,23 @@ export class WorkerHost {
     signal: AbortSignal,
   ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
-    const mutator = new AnnotationMutator(this.runtime, session, this.fonts);
-    const result = mutator.update(req.ref, req.patch, req.authority, signal, req.resources);
+    const {
+      type: _type,
+      page: _page,
+      skipped: _skipped,
+      ...result
+    } = this.applyOne(
+      session,
+      req.opId,
+      {
+        type: 'annotations.update',
+        ref: req.ref,
+        patch: req.patch,
+        ...(req.resources ? { resources: req.resources } : {}),
+      },
+      { ...req.authority, protection: null },
+      signal,
+    );
     return this.finishMutation(session, { tag: 'annotations.update', result }, req.artifactPath);
   }
 
@@ -1125,8 +1195,17 @@ export class WorkerHost {
     signal: AbortSignal,
   ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
-    const mutator = new AnnotationMutator(this.runtime, session, this.fonts);
-    const result = mutator.delete(req.ref, req.authority, signal);
+    const {
+      type: _type,
+      page: _page,
+      ...result
+    } = this.applyOne(
+      session,
+      req.opId,
+      { type: 'annotations.delete', ref: req.ref },
+      { ...req.authority, protection: null },
+      signal,
+    );
     return this.finishMutation(session, { tag: 'annotations.delete', result }, req.artifactPath);
   }
 
@@ -1219,10 +1298,187 @@ export class WorkerHost {
     signal: AbortSignal,
   ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
-    const pageObjectNumber = session.resolvePageRef(req.page).pageObjectNumber;
-    const mutator = new AnnotationMutator(this.runtime, session);
-    const result = mutator.move(pageObjectNumber, req.refs, req.toIndex, signal);
+    const {
+      type: _type,
+      page: _page,
+      ...result
+    } = this.applyOne(
+      session,
+      req.opId,
+      { type: 'annotations.move', page: req.page, refs: req.refs, toIndex: req.toIndex },
+      checkedAuthority(),
+      signal,
+    );
     return this.finishMutation(session, { tag: 'annotations.move', result }, req.artifactPath);
+  }
+
+  /**
+   * `doc.apply`: one change, in the job's transaction. A change asked again
+   * under its `opId` answers what it answered the first time, refusals
+   * included, and a different change under it is refused. An undo runs the
+   * record its change left, when the same user asks and nothing ended undo
+   * since.
+   */
+  private handleDocumentApply(
+    req: DocumentApplyWorkerRequest<PdfCoordinates>,
+    signal: AbortSignal,
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
+    const session = this.requireSession(req);
+    const fingerprint = changeFingerprint(req.change);
+    const prior = changeLedgerOf(session).outcome(req.opId);
+    if (prior) {
+      const result = this.replayed(prior, fingerprint, req.opId);
+      return wirePack({ tag: 'document.apply', result, replayed: true });
+    }
+    const result = this.recorded(session, req.opId, fingerprint, () =>
+      this.runChange(session, req, signal),
+    );
+    const payload = { tag: 'document.apply' as const, result, replayed: false };
+    // A change that wrote nothing needs no save.
+    if (result.items.every(isSkippedItem)) return wirePack(payload);
+    return this.finishMutation(session, payload, req.artifactPath);
+  }
+
+  /**
+   * A single verb as a one-op change: the same op, checks and record as
+   * `doc.apply`, so its `opId` undoes it, and a retry under it gets the first
+   * answer. What the handle may do was checked before the job; `authority`
+   * carries who the write acts for, and what it checks per annotation.
+   */
+  private applyOne<T extends ChangeOp['type']>(
+    session: DocumentSession,
+    opId: string,
+    op: Extract<ChangeOp<PdfCoordinates, WireAnnotationResources>, { type: T }>,
+    authority: ChangeAuthority,
+    signal: AbortSignal,
+  ): Extract<ChangeItem<PdfCoordinates>, { type: T }> {
+    const change = { ops: [op] };
+    const ledger = changeLedgerOf(session);
+    const fingerprint = changeFingerprint(change);
+    const prior = ledger.outcome(opId);
+    let result: ChangeResult<PdfCoordinates>;
+    if (prior) {
+      result = this.replayed(prior, fingerprint, opId);
+    } else {
+      result = this.recorded(session, opId, fingerprint, () =>
+        new ChangeApplier(this.runtime, session, this.fonts).apply(change.ops, authority, signal),
+      );
+    }
+    const item = result.items[0];
+    if (!item || isSkippedItem(item)) {
+      throw new EngineError(EngineErrorCode.Unknown, `${op.type} wrote nothing`);
+    }
+    return item as Extract<ChangeItem<PdfCoordinates>, { type: T }>;
+  }
+
+  /** A change's answer the first time, kept under its `opId`; a retry's checks. */
+  private replayed(
+    prior: ChangeOutcome,
+    fingerprint: string,
+    opId: string,
+  ): ChangeResult<PdfCoordinates> {
+    if (prior.fingerprint !== fingerprint) {
+      throw new EngineError(
+        EngineErrorCode.IdempotencyKeyReused,
+        `opId ${opId} already answered a different change`,
+      );
+    }
+    if (prior.kind === 'refused') throw deserializeError(prior.error);
+    return prior.result;
+  }
+
+  /**
+   * Runs a change and keeps its answer under `opId`: the result and the record
+   * that undoes it, or a refusal the change keeps (see `isKeptRefusal`).
+   */
+  private recorded(
+    session: DocumentSession,
+    opId: string,
+    fingerprint: string,
+    run: () => AppliedChange,
+  ): ChangeResult<PdfCoordinates> {
+    const ledger = changeLedgerOf(session);
+    try {
+      const applied = run();
+      const result = resultOf(session, applied);
+      ledger.keepApplied(opId, fingerprint, result, result.meta.undoable ? applied.record : null);
+      return result;
+    } catch (err) {
+      if (EngineError.is(err) && isKeptRefusal(err.code)) {
+        ledger.keepRefused(opId, fingerprint, serializeError(err));
+      }
+      throw err;
+    }
+  }
+
+  /**
+   * A server request's changes (`POST …/changes`) as one job: each in its own
+   * transaction, committed or rolled back on its own, its record handed back
+   * for the server to keep. An undo of an earlier change of the same request
+   * runs the record this job kept for it. One artifact for all that applied.
+   */
+  private handleDocumentApplyChanges(
+    req: DocumentApplyChangesWorkerRequest<PdfCoordinates>,
+    signal: AbortSignal,
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
+    const session = this.requireSession(req);
+    session.assertUsable();
+    // The changes' own objects go at or above the floor its caller set.
+    if (req.objectNumberFloor !== undefined) {
+      session.raiseLastObjectNumber(req.objectNumberFloor - 1);
+    }
+    const applier = new ChangeApplier(this.runtime, session, this.fonts);
+    const records = new Map<string, ChangeRecord | null>();
+    const outcomes: ServerChangeOutcome<PdfCoordinates>[] = [];
+    for (const entry of req.changes) {
+      session.beginTransaction(entry.opId);
+      try {
+        const applied = runServerChange(applier, entry, records, signal);
+        const result = resultOf(session, applied);
+        session.commitTransaction();
+        const record = result.meta.undoable ? applied.record : null;
+        records.set(entry.opId, record);
+        outcomes.push({ opId: entry.opId, status: 'applied', result, record });
+      } catch (err) {
+        if (session.inTransaction()) session.abortTransaction();
+        // Anything but a refusal the change keeps fails the whole job.
+        if (!EngineError.is(err) || !isKeptRefusal(err.code)) throw err;
+        records.set(entry.opId, null);
+        outcomes.push({ opId: entry.opId, status: 'refused', error: serializeError(err) });
+      }
+    }
+    const payload = { tag: 'document.applyChanges' as const, outcomes };
+    const wrote = outcomes.some(
+      (outcome) => outcome.status === 'applied' && !outcome.result.items.every(isSkippedItem),
+    );
+    if (!wrote) return wirePack(payload);
+    return this.finishMutation(session, payload, req.artifactPath);
+  }
+
+  /** A change's ops, or the steps of the record an undo names. */
+  private runChange(
+    session: DocumentSession,
+    req: DocumentApplyWorkerRequest<PdfCoordinates>,
+    signal: AbortSignal,
+  ): AppliedChange {
+    const applier = new ChangeApplier(this.runtime, session, this.fonts);
+    const userId = req.authority.identity.userId ?? null;
+    if (!isUndoChange(req.change)) return applier.apply(req.change.ops, req.authority, signal);
+    const kept = changeLedgerOf(session).record(req.change.undoOf);
+    if (!kept || 'unavailable' in kept) {
+      throw new EngineError(
+        EngineErrorCode.UndoUnavailable,
+        `change ${req.change.undoOf} can no longer be undone`,
+        { details: { reason: kept ? kept.unavailable : 'expired' } },
+      );
+    }
+    // A change that was refused, or wrote nothing, leaves nothing to undo.
+    if (!kept.record) return { items: [], record: { userId, steps: [] } };
+    // Only the user who made a change may undo it; one made by no one, anyone.
+    if (kept.record.userId !== null && kept.record.userId !== userId) {
+      throw new PermissionDenied('changes:undo', 'target');
+    }
+    return applier.undo(kept.record, req.authority, signal);
   }
 
   private handlePagesList(
@@ -1452,7 +1708,7 @@ export class WorkerHost {
         tag: 'measure.setScale',
         result: {
           page: req.page,
-          meta: { affectedPages: [], cacheDelta: null },
+          meta: { affectedPages: [], cacheDelta: null, ...session.writeStamp() },
         },
       },
       req.artifactPath,
@@ -1486,7 +1742,7 @@ export class WorkerHost {
     accessor.update(req.application, req.patch, signal);
     const result = {
       pieceInfo: accessor.read(req.application, signal),
-      meta: { affectedPages: [], cacheDelta: null },
+      meta: { affectedPages: [], cacheDelta: null, ...session.writeStamp() },
     };
     // A mutation: layer sessions persist the artifact like every other write.
     return this.finishMutation(session, { tag: 'pieceInfo.update', result }, req.artifactPath);
@@ -1517,7 +1773,7 @@ export class WorkerHost {
       req.page ? session.resolvePageRef(req.page).pageObjectNumber : undefined,
     );
     accessor.delete(req.application, signal);
-    const result = { meta: { affectedPages: [], cacheDelta: null } };
+    const result = { meta: { affectedPages: [], cacheDelta: null, ...session.writeStamp() } };
     return this.finishMutation(session, { tag: 'pieceInfo.delete', result }, req.artifactPath);
   }
 
@@ -2076,8 +2332,13 @@ export class WorkerHost {
     signal: AbortSignal,
   ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
-    const mutator = new FormMutator(this.runtime, session);
-    const result = mutator.setValue(req.ref, req.value, signal);
+    const { type: _type, ...result } = this.applyOne(
+      session,
+      req.opId,
+      { type: 'forms.setValue', field: req.ref, value: req.value },
+      checkedAuthority(),
+      signal,
+    );
     return this.finishMutation(session, { tag: 'forms.setValue', result }, req.artifactPath);
   }
 
@@ -2086,8 +2347,17 @@ export class WorkerHost {
     signal: AbortSignal,
   ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
-    const mutator = new FormMutator(this.runtime, session);
-    const result = mutator.reset(req.refs, signal);
+    const {
+      type: _type,
+      skipped: _skipped,
+      ...result
+    } = this.applyOne(
+      session,
+      req.opId,
+      { type: 'forms.reset', ...(req.refs ? { fields: req.refs } : {}) },
+      checkedAuthority(),
+      signal,
+    );
     return this.finishMutation(session, { tag: 'forms.reset', result }, req.artifactPath);
   }
 
@@ -2145,17 +2415,19 @@ export class WorkerHost {
     signal: AbortSignal,
   ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
-    const mutator = new FormMutator(this.runtime, session);
-    const { field } = mutator.createField(req.draft, signal, {
-      ...(req.objectNumber !== undefined ? { objectNumber: req.objectNumber } : {}),
-      ...(req.widgetObjectNumbers ? { widgetObjectNumbers: req.widgetObjectNumbers } : {}),
-    });
-    const meta = formMutationMeta([field.ref], field.widgets);
-    return this.finishMutation(
+    const { type: _type, ...result } = this.applyOne(
       session,
-      { tag: 'forms.createField', result: { field, meta } },
-      req.artifactPath,
+      req.opId,
+      {
+        type: 'forms.create',
+        draft: req.draft,
+        ...(req.objectNumber !== undefined ? { objectNumber: req.objectNumber } : {}),
+        ...(req.widgetObjectNumbers ? { widgetObjectNumbers: req.widgetObjectNumbers } : {}),
+      },
+      checkedAuthority(),
+      signal,
     );
+    return this.finishMutation(session, { tag: 'forms.createField', result }, req.artifactPath);
   }
 
   private handleFormsUpdateField(
@@ -2163,14 +2435,18 @@ export class WorkerHost {
     signal: AbortSignal,
   ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
-    const mutator = new FormMutator(this.runtime, session);
-    const { field } = mutator.updateField(req.ref, req.patch, signal);
-    const meta = formMutationMeta([field.ref], field.widgets);
-    return this.finishMutation(
+    const {
+      type: _type,
+      skipped: _skipped,
+      ...result
+    } = this.applyOne(
       session,
-      { tag: 'forms.updateField', result: { field, meta } },
-      req.artifactPath,
+      req.opId,
+      { type: 'forms.update', field: req.ref, patch: req.patch },
+      checkedAuthority(),
+      signal,
     );
+    return this.finishMutation(session, { tag: 'forms.updateField', result }, req.artifactPath);
   }
 
   private handleFormsSetSignatureAppearance(
@@ -2178,15 +2454,20 @@ export class WorkerHost {
     signal: AbortSignal,
   ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
-    const { field } = new FormMutator(this.runtime, session).setSignatureAppearance(
-      req.ref,
-      new Uint8Array(req.pdf),
+    const { type: _type, ...result } = this.applyOne(
+      session,
+      req.opId,
+      {
+        type: 'forms.setSignatureAppearance',
+        field: req.ref,
+        appearance: { pdf: new Uint8Array(req.pdf) },
+      },
+      checkedAuthority(),
       signal,
     );
-    const meta = formMutationMeta([field.ref], field.widgets);
     return this.finishMutation(
       session,
-      { tag: 'forms.setSignatureAppearance', result: { field, meta } },
+      { tag: 'forms.setSignatureAppearance', result },
       req.artifactPath,
     );
   }
@@ -2196,14 +2477,14 @@ export class WorkerHost {
     signal: AbortSignal,
   ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
-    const mutator = new FormMutator(this.runtime, session);
-    const { deleted, removedWidgets } = mutator.deleteField(req.ref, signal);
-    const meta = formMutationMeta([deleted], removedWidgets);
-    return this.finishMutation(
+    const { type: _type, ...result } = this.applyOne(
       session,
-      { tag: 'forms.deleteField', result: { meta } },
-      req.artifactPath,
+      req.opId,
+      { type: 'forms.delete', field: req.ref },
+      checkedAuthority(),
+      signal,
     );
+    return this.finishMutation(session, { tag: 'forms.deleteField', result }, req.artifactPath);
   }
 
   private handleFormsAddWidget(
@@ -2211,17 +2492,22 @@ export class WorkerHost {
     signal: AbortSignal,
   ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
-    const mutator = new FormMutator(this.runtime, session);
-    const { field, widget } = mutator.addWidget(req.ref, req.placement, signal, {
-      ...(req.objectNumber !== undefined ? { objectNumber: req.objectNumber } : {}),
-      ...(req.splitObjectNumber !== undefined ? { splitObjectNumber: req.splitObjectNumber } : {}),
-    });
-    const meta = formMutationMeta([field.ref], [widget]);
-    return this.finishMutation(
+    const { type: _type, ...result } = this.applyOne(
       session,
-      { tag: 'forms.addWidget', result: { field, meta } },
-      req.artifactPath,
+      req.opId,
+      {
+        type: 'forms.addWidget',
+        field: req.ref,
+        placement: req.placement,
+        ...(req.objectNumber !== undefined ? { objectNumber: req.objectNumber } : {}),
+        ...(req.splitObjectNumber !== undefined
+          ? { splitObjectNumber: req.splitObjectNumber }
+          : {}),
+      },
+      checkedAuthority(),
+      signal,
     );
+    return this.finishMutation(session, { tag: 'forms.addWidget', result }, req.artifactPath);
   }
 
   private handleFormsDetachWidget(
@@ -2229,14 +2515,14 @@ export class WorkerHost {
     signal: AbortSignal,
   ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
-    const mutator = new FormMutator(this.runtime, session);
-    const { field, widget } = mutator.detachWidget(req.ref, req.widget, signal);
-    const meta = formMutationMeta([field.ref], [widget]);
-    return this.finishMutation(
+    const { type: _type, ...result } = this.applyOne(
       session,
-      { tag: 'forms.detachWidget', result: { field, meta } },
-      req.artifactPath,
+      req.opId,
+      { type: 'forms.removeWidget', field: req.ref, widget: req.widget },
+      checkedAuthority(),
+      signal,
     );
+    return this.finishMutation(session, { tag: 'forms.detachWidget', result }, req.artifactPath);
   }
 
   private finishMutation<P extends WorkerResultPayload<PdfCoordinates>>(
@@ -2248,6 +2534,8 @@ export class WorkerHost {
     // can abort it; a failure from here on (the layer save) leaves a
     // committed write that the caller must not mistake for a refused one.
     if (session.inTransaction()) session.commitTransaction();
+    // A final change ends undo for itself and everything before it.
+    if (FINAL_CHANGES.has(payload.tag)) changeLedgerOf(session).endUndo();
     // Every successful write funnels through here. Forms mutators
     // invalidate the derived caches themselves before reading back, so their
     // tags are skipped to avoid rebuilding the model cache twice per write,
@@ -2328,11 +2616,94 @@ function pageEffectOf(job: PageSpaceJob): PageEffect {
  * except a signing's completion, which replaces the document's bytes instead.
  * Such a job runs as one layer transaction, and a parked signing refuses it.
  */
-function writesDocument(msg: FileSpaceJob): msg is Extract<FileSpaceJob, { docId: string }> {
-  if (msg.kind === 'shutdown' || msg.kind === 'signatures.complete') return false;
+/**
+ * The authority of a write whose handle was checked before the job: it acts
+ * for `actor`, stamping it on what it creates, and checks nothing more.
+ */
+function checkedAuthority(actor?: AnnotationActor): ChangeAuthority {
+  return { identity: actor ?? {}, grants: null, protection: null };
+}
+
+/**
+ * A change's result once it ran: its items, which were read back before the
+ * change knew whether it could be undone, carry that now, as its meta does.
+ */
+function resultOf(session: DocumentSession, applied: AppliedChange): ChangeResult<PdfCoordinates> {
+  const undoable = applied.record.steps.length > 0;
+  if (undoable) session.markUndoable();
+  const items = applied.items.map(
+    (item) => ({ ...item, meta: { ...item.meta, undoable } }) as ChangeItem<PdfCoordinates>,
+  );
+  return {
+    items,
+    meta: { affectedPages: pagesOf(items), cacheDelta: null, ...session.writeStamp() },
+  };
+}
+
+/**
+ * One change of a server request: its ops, or an undo running the record
+ * this job kept for an earlier change of the request, or the one the server
+ * sent. A change that left no record leaves nothing to undo.
+ */
+function runServerChange(
+  applier: ChangeApplier,
+  entry: ServerChange<PdfCoordinates>,
+  records: ReadonlyMap<string, ChangeRecord | null>,
+  signal: AbortSignal,
+): AppliedChange {
+  const { change, authority } = entry;
+  if (!isUndoChange(change)) return applier.apply(change.ops, authority, signal);
+  const userId = authority.identity.userId ?? null;
+  const record = records.has(change.undoOf)
+    ? records.get(change.undoOf)!
+    : (entry.record as ChangeRecord | null | undefined);
+  if (record === undefined) {
+    throw new EngineError(
+      EngineErrorCode.UndoUnavailable,
+      `change ${change.undoOf} can no longer be undone`,
+      { details: { reason: 'expired' } },
+    );
+  }
+  if (!record) return { items: [], record: { userId, steps: [] } };
+  return applier.undo(record, authority, signal);
+}
+
+/** Every page a change's items touched, once each, in order. */
+function pagesOf(items: readonly ChangeItem<PdfCoordinates>[]): PageRef[] {
+  const pages = new Map<number, PageRef>();
+  for (const item of items) {
+    for (const page of item.meta.affectedPages) pages.set(page.objectNumber, page);
+  }
+  return [...pages.values()];
+}
+
+function writesDocument(
+  msg: FileSpaceJob,
+): msg is Extract<FileSpaceJob, { docId: string; opId: string }> {
+  // These run their own transactions: a signing completes outside one, and a
+  // server request's changes each run in their own.
+  if (
+    msg.kind === 'shutdown' ||
+    msg.kind === 'signatures.complete' ||
+    msg.kind === 'document.applyChanges'
+  ) {
+    return false;
+  }
   if (msg.effect !== 'write' && msg.effect !== 'contentWrite') return false;
   return 'docId' in msg;
 }
+
+/**
+ * The writes nothing undoes: what they destroy or seal can't be put back, so
+ * each ends undo for every change before it.
+ */
+const FINAL_CHANGES: ReadonlySet<string> = new Set([
+  'redaction.apply',
+  'pages.flatten',
+  'annotations.flatten',
+  'forms.repair',
+  'signatures.complete',
+]);
 
 const BASE_SESSION_SUFFIX = '__base__';
 

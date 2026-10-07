@@ -6,7 +6,14 @@ describe('batch mutation wire schemas', () => {
   test('a no-op effects batch carries a meta that names nothing', () => {
     const result = {
       results: [],
-      meta: { affectedPages: [], cacheDelta: null, changedFields: [], changedWidgets: [] },
+      meta: {
+        affectedPages: [],
+        cacheDelta: null,
+        opId: 'op-1',
+        undoable: true,
+        changedFields: [],
+        changedWidgets: [],
+      },
     };
     expect(FormEffectsResultSchema.parse(result)).toEqual(result);
   });
@@ -17,7 +24,14 @@ describe('batch mutation wire schemas', () => {
         { index: 0, status: 'failed' as const, fields: [], changedWidgets: [] },
         { index: 1, status: 'skipped' as const, fields: [], changedWidgets: [] },
       ],
-      meta: { affectedPages: [], cacheDelta: null, changedFields: [], changedWidgets: [] },
+      meta: {
+        affectedPages: [],
+        cacheDelta: null,
+        opId: 'op-1',
+        undoable: true,
+        changedFields: [],
+        changedWidgets: [],
+      },
     };
     expect(FormEffectsResultSchema.parse(result)).toEqual(result);
   });
@@ -33,7 +47,7 @@ describe('batch mutation wire schemas', () => {
         { page: { kind: 'objectNumber', objectNumber: 12 }, status: 'applied' as const },
         { page: { kind: 'objectNumber', objectNumber: 18 }, status: 'unchanged' as const },
       ],
-      meta: { affectedPages: [], cacheDelta: null },
+      meta: { affectedPages: [], cacheDelta: null, opId: 'op-1', undoable: false },
     };
     expect(PageFlattenResultSchema.parse(result)).toEqual(result);
   });

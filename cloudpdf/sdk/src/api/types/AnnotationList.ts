@@ -4,24 +4,6 @@ import type * as CloudPDF from "../index.js";
 
 export interface AnnotationList {
     annotations: CloudPDF.Annotation[];
-    pages: AnnotationList.Pages.Item[];
+    pages: CloudPDF.PageRef[];
     auditHead?: number | undefined;
-}
-
-export namespace AnnotationList {
-    export type Pages = Pages.Item[];
-
-    export namespace Pages {
-        export interface Item {
-            kind: Item.Kind;
-            objectNumber: number;
-        }
-
-        export namespace Item {
-            export const Kind = {
-                ObjectNumber: "objectNumber",
-            } as const;
-            export type Kind = (typeof Kind)[keyof typeof Kind];
-        }
-    }
 }

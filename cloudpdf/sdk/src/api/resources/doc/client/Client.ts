@@ -4,6 +4,7 @@ import type { BaseClientOptions, BaseRequestOptions } from "../../../../BaseClie
 import { type NormalizedClientOptionsWithAuth, normalizeClientOptionsWithAuth } from "../../../../BaseClient.js";
 import { mergeHeaders, mergeOnlyDefinedHeaders } from "../../../../core/headers.js";
 import * as core from "../../../../core/index.js";
+import { mergeAdditionalBodyParameters } from "../../../../core/requestBody.js";
 import { handleNonStatusCodeError } from "../../../../errors/handleNonStatusCodeError.js";
 import * as errors from "../../../../errors/index.js";
 import * as CloudPDF from "../../../index.js";
@@ -128,6 +129,99 @@ export class DocClient {
         }
 
         return handleNonStatusCodeError(_response.error, _response.rawResponse, "GET", "/v1/docs/{docId}/head");
+    }
+
+    /**
+     * Each change stands on its own and names itself by `opId`: a refused change rolls back alone, and the answer lists every change in order, applied with its result or refused with its error. Asked again under its `opId`, a change gets the same answer, refusals included; a different change under an answered `opId` is refused (IdempotencyKeyReused). `{ opId, undoOf }` undoes an earlier change of the caller, here or in an earlier request; an undo leaves alone what was changed since, and the undo of an undo redoes. A redaction, a flatten, a form repair or a completed signature ends undo for the changes before it (UndoUnavailable). Each op is checked against its own capability: annotation ops need `doc.annotate.modify`, form values `doc.forms.fill`, form structure `doc.forms.modify`, metadata `doc.metadata.modify`. Bytes (a stamp's drawing, an attached file, a signature's artwork) travel as multipart `resource:<key>` parts beside a JSON `body` part that names them by key. At most 64 changes per request and 512 ops per change.
+     *
+     * @param {CloudPDF.DocChangesRequest} request
+     * @param {DocClient.RequestOptions} requestOptions - Request-specific configuration.
+     *
+     * @throws {@link CloudPDF.BadRequestError}
+     * @throws {@link CloudPDF.NotFoundError}
+     * @throws {@link CloudPDF.ConflictError}
+     * @throws {@link CloudPDF.ContentTooLargeError}
+     * @throws {@link errors.CloudPDFError}
+     * @throws {@link errors.CloudPDFTimeoutError}
+     *
+     * @example
+     *     await client.doc.changes({
+     *         docId: "docId",
+     *         layerName: "layerName",
+     *         changes: [{
+     *                 opId: "opId"
+     *             }]
+     *     })
+     */
+    public changes(
+        request: CloudPDF.DocChangesRequest,
+        requestOptions?: DocClient.RequestOptions,
+    ): core.HttpResponsePromise<CloudPDF.DocChanges200Response> {
+        return core.HttpResponsePromise.fromPromise(this.__changes(request, requestOptions));
+    }
+
+    private async __changes(
+        request: CloudPDF.DocChangesRequest,
+        requestOptions?: DocClient.RequestOptions,
+    ): Promise<core.WithRawResponse<CloudPDF.DocChanges200Response>> {
+        const { docId, layerName, "X-Document-Password": documentPassword, ..._body } = request;
+        const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
+        const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
+            _authRequest.headers,
+            this._options?.headers,
+            mergeOnlyDefinedHeaders({ "X-Document-Password": documentPassword }),
+            requestOptions?.headers,
+        );
+        const _response = await core.fetcher({
+            url: core.url.join(
+                (await core.Supplier.get(this._options.baseUrl)) ??
+                    (await core.Supplier.get(this._options.environment)),
+                `v1/docs/${core.url.encodePathParam(docId)}/layers/${core.url.encodePathParam(layerName)}/changes`,
+            ),
+            method: "POST",
+            headers: _headers,
+            contentType: "application/json",
+            queryString: core.url.queryBuilder().mergeAdditional(requestOptions?.queryParams).build(),
+            requestType: "json",
+            body: mergeAdditionalBodyParameters(_body, requestOptions?.additionalBodyParameters),
+            timeoutMs: (requestOptions?.timeoutInSeconds ?? this._options?.timeoutInSeconds ?? 60) * 1000,
+            maxRetries: requestOptions?.maxRetries ?? this._options?.maxRetries,
+            abortSignal: requestOptions?.abortSignal,
+            fetchFn: this._options?.fetch,
+            logging: this._options.logging,
+        });
+        if (_response.ok) {
+            return { data: _response.body as CloudPDF.DocChanges200Response, rawResponse: _response.rawResponse };
+        }
+
+        if (_response.error.reason === "status-code") {
+            switch (_response.error.statusCode) {
+                case 400:
+                    throw new CloudPDF.BadRequestError(_response.error.body as unknown, _response.rawResponse);
+                case 404:
+                    throw new CloudPDF.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                case 409:
+                    throw new CloudPDF.ConflictError(_response.error.body as unknown, _response.rawResponse);
+                case 413:
+                    throw new CloudPDF.ContentTooLargeError(
+                        _response.error.body as CloudPDF.DocChanges413Response,
+                        _response.rawResponse,
+                    );
+                default:
+                    throw new errors.CloudPDFError({
+                        statusCode: _response.error.statusCode,
+                        body: _response.error.body,
+                        rawResponse: _response.rawResponse,
+                    });
+            }
+        }
+
+        return handleNonStatusCodeError(
+            _response.error,
+            _response.rawResponse,
+            "POST",
+            "/v1/docs/{docId}/layers/{layerName}/changes",
+        );
     }
 
     /**

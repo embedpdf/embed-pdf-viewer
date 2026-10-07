@@ -90,7 +90,16 @@ export async function seedDocumentFromBytes(
   bytesPath: string,
   pageCount: number,
 ): Promise<{ sha: string; size: number }> {
-  const bytes = new Uint8Array(await readFile(bytesPath));
+  return seedDocument(fx, tenantId, docId, new Uint8Array(await readFile(bytesPath)));
+}
+
+/** Seed a `ready` document from PDF bytes in memory (a fixture built in code). */
+export async function seedDocument(
+  fx: DbSeededFixture,
+  tenantId: string,
+  docId: string,
+  bytes: Uint8Array,
+): Promise<{ sha: string; size: number }> {
   const sha = createHash('sha256').update(bytes).digest('hex');
 
   const storage = new FsObjectStore({ root: fx.storageRoot });

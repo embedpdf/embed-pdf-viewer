@@ -111,6 +111,7 @@ export class LocalDocumentPagesService implements DocumentPagesService {
           kind: 'pages.move',
           effect: 'contentWrite',
           jobId,
+          opId,
           docId,
           pages,
           toIndex,
@@ -186,7 +187,7 @@ export class LocalDocumentPagesService implements DocumentPagesService {
     }
     const docId = this.docId;
     const submission = this.queue.enqueue<WorkerResultPayload>({
-      buildPack: (jobId: JobId) => wirePack({ ...request, jobId, docId }),
+      buildPack: (jobId: JobId) => wirePack({ ...request, jobId, opId, docId }),
     });
     return AbortablePromise.run<PageNameResult>(async (signal) => {
       const onAbort = () => submission.abort(signal.reason);
@@ -232,6 +233,7 @@ export class LocalDocumentPagesService implements DocumentPagesService {
           kind: 'pages.rotate',
           effect: 'contentWrite',
           jobId,
+          opId,
           docId,
           pages,
           rotation,
@@ -277,6 +279,7 @@ export class LocalDocumentPagesService implements DocumentPagesService {
           kind: 'pages.delete',
           effect: 'contentWrite',
           jobId,
+          opId,
           docId,
           pages,
         }),
@@ -319,7 +322,7 @@ export class LocalDocumentPagesService implements DocumentPagesService {
     const docId = this.docId;
     const submission = this.queue.enqueue<WorkerResultPayload>({
       buildPack: (jobId: JobId) =>
-        wirePack({ kind: 'pages.flatten', effect: 'contentWrite', jobId, docId, pages, usage }),
+        wirePack({ kind: 'pages.flatten', effect: 'contentWrite', jobId, opId, docId, pages, usage }),
     });
     return AbortablePromise.run<PageFlattenResult>(async (signal) => {
       const onAbort = () => submission.abort(signal.reason);
@@ -363,7 +366,7 @@ export class LocalDocumentPagesService implements DocumentPagesService {
     const submission = this.queue.enqueue<WorkerResultPayload>({
       buildPack: (jobId: JobId) =>
         wirePack(
-          { kind: 'pages.insert', effect: 'contentWrite', jobId, docId, bytes: buffer, toIndex },
+          { kind: 'pages.insert', effect: 'contentWrite', jobId, opId, docId, bytes: buffer, toIndex },
           [buffer],
         ),
     });
@@ -411,6 +414,7 @@ export class LocalDocumentPagesService implements DocumentPagesService {
           kind: 'pages.insertBlank',
           effect: 'contentWrite',
           jobId,
+          opId,
           docId,
           size: spec.size,
           count: spec.count,

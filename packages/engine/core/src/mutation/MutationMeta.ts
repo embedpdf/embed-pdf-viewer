@@ -60,4 +60,17 @@ export interface CacheDelta {
 export interface MutationMeta {
   affectedPages: PageRef[];
   cacheDelta: CacheDelta | null;
+  /**
+   * The write's id: the `opId` it was given, or the one minted for it. Its
+   * events carry it as `origin.tx.id`, and `doc.apply({ undoOf: opId })`
+   * undoes the write.
+   */
+  opId: string;
+  /**
+   * Whether `{ undoOf: opId }` can undo the write. False for a write that
+   * changed nothing, and for the final writes: redaction apply, flatten,
+   * signing and form repair. A final write also ends undo for every write
+   * before it on the layer.
+   */
+  undoable: boolean;
 }

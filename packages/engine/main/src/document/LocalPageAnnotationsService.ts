@@ -1,5 +1,6 @@
 import {
   AbortablePromise,
+  annotationResourceBuffers,
   CONTINUOUS_RENDER_POLICY,
   EngineError,
   EngineErrorCode,
@@ -23,7 +24,6 @@ import {
   type AnnotationResourceRole,
   type AnnotationCreateOptions,
   type AnnotationUpdateOptions,
-  type WireAnnotationResources,
   type AnnotationCreateResult,
   type AnnotationDeleteResult,
   type AnnotationFlattenResult,
@@ -276,6 +276,7 @@ export class LocalPageAnnotationsService implements LocalPageAnnotationsServiceC
             kind: 'annotations.create',
             effect: 'write',
             jobId,
+            opId,
             docId,
             page: ref,
             draft: data,
@@ -283,7 +284,7 @@ export class LocalPageAnnotationsService implements LocalPageAnnotationsServiceC
             ...(hasAnnotationResources(wireResources) ? { resources: wireResources } : {}),
             ...(actor ? { actor } : {}),
           },
-          transferOf(wireResources),
+          annotationResourceBuffers(wireResources),
         );
       },
     });
@@ -338,13 +339,14 @@ export class LocalPageAnnotationsService implements LocalPageAnnotationsServiceC
             kind: 'annotations.update',
             effect: 'write',
             jobId,
+            opId,
             docId,
             ref,
             patch,
             authority,
             ...(hasAnnotationResources(wireResources) ? { resources: wireResources } : {}),
           },
-          transferOf(wireResources),
+          annotationResourceBuffers(wireResources),
         );
       },
     });
@@ -390,6 +392,7 @@ export class LocalPageAnnotationsService implements LocalPageAnnotationsServiceC
             kind: 'annotations.delete',
             effect: 'write',
             jobId,
+            opId,
             docId,
             ref,
             authority,
@@ -440,6 +443,7 @@ export class LocalPageAnnotationsService implements LocalPageAnnotationsServiceC
           kind: 'annotations.move',
           effect: 'write',
           jobId,
+          opId,
           docId,
           page: ref,
           refs,
@@ -491,6 +495,7 @@ export class LocalPageAnnotationsService implements LocalPageAnnotationsServiceC
           kind: 'annotations.flatten',
           effect: 'contentWrite',
           jobId,
+          opId,
           docId,
           page: ref,
           refs,
@@ -555,9 +560,4 @@ function copyToExactArrayBuffer(bytes: Uint8Array): ArrayBuffer {
   const body = new ArrayBuffer(bytes.byteLength);
   new Uint8Array(body).set(bytes);
   return body;
-}
-
-/** The buffers a write's resources hand to the worker. */
-function transferOf(resources: WireAnnotationResources): ArrayBuffer[] {
-  return Object.values(resources).filter((bytes): bytes is ArrayBuffer => bytes !== undefined);
 }

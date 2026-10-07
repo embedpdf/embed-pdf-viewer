@@ -6,125 +6,30 @@ export interface DocRedactionsApply200Response {
     scope: DocRedactionsApply200Response.Scope;
     results: DocRedactionsApply200Response.Results.Item[];
     removedAnnotationCount: number;
-    meta: DocRedactionsApply200Response.Meta;
+    meta: CloudPDF.MutationMeta;
 }
 
 export namespace DocRedactionsApply200Response {
     export interface Scope {
-        pages?: Scope.Pages.Item[] | undefined;
-        annotations?: CloudPDF.DocRedactionsApply200ResponseScopeAnnotationsItem[] | undefined;
-    }
-
-    export namespace Scope {
-        export type Pages = Pages.Item[];
-
-        export namespace Pages {
-            export interface Item {
-                kind: Item.Kind;
-                objectNumber: number;
-            }
-
-            export namespace Item {
-                export const Kind = {
-                    ObjectNumber: "objectNumber",
-                } as const;
-                export type Kind = (typeof Kind)[keyof typeof Kind];
-            }
-        }
+        pages?: CloudPDF.PageRef[] | undefined;
+        annotations?: CloudPDF.AnnotationRef[] | undefined;
     }
 
     export type Results = Results.Item[];
 
     export namespace Results {
         export interface Item {
-            page: Item.Page;
+            page: CloudPDF.PageRef;
             status: Item.Status;
             removedAnnotationCount: number;
         }
 
         export namespace Item {
-            export interface Page {
-                kind: Page.Kind;
-                objectNumber: number;
-            }
-
-            export namespace Page {
-                export const Kind = {
-                    ObjectNumber: "objectNumber",
-                } as const;
-                export type Kind = (typeof Kind)[keyof typeof Kind];
-            }
-
             export const Status = {
                 Applied: "applied",
                 Unchanged: "unchanged",
             } as const;
             export type Status = (typeof Status)[keyof typeof Status];
-        }
-    }
-
-    export interface Meta {
-        affectedPages: Meta.AffectedPages.Item[];
-        cacheDelta: Meta.CacheDelta | null;
-    }
-
-    export namespace Meta {
-        export type AffectedPages = AffectedPages.Item[];
-
-        export namespace AffectedPages {
-            export interface Item {
-                kind: Item.Kind;
-                objectNumber: number;
-            }
-
-            export namespace Item {
-                export const Kind = {
-                    ObjectNumber: "objectNumber",
-                } as const;
-                export type Kind = (typeof Kind)[keyof typeof Kind];
-            }
-        }
-
-        export interface CacheDelta {
-            previousDocVersion: number;
-            docVersion: number;
-            annotationsVersion?: number | undefined;
-            layoutVersion?: number | undefined;
-            metadataVersion?: number | undefined;
-            attachmentsVersion?: number | undefined;
-            layerVersion?: number | undefined;
-            working?: boolean | undefined;
-            pages: CacheDelta.Pages.Item[];
-        }
-
-        export namespace CacheDelta {
-            export type Pages = Pages.Item[];
-
-            export namespace Pages {
-                export interface Item {
-                    page: Item.Page;
-                    cache: Item.Cache;
-                }
-
-                export namespace Item {
-                    export interface Page {
-                        kind: Page.Kind;
-                        objectNumber: number;
-                    }
-
-                    export namespace Page {
-                        export const Kind = {
-                            ObjectNumber: "objectNumber",
-                        } as const;
-                        export type Kind = (typeof Kind)[keyof typeof Kind];
-                    }
-
-                    export interface Cache {
-                        contentVersion: number;
-                        annotationVersion: number;
-                    }
-                }
-            }
         }
     }
 }

@@ -1,10 +1,3 @@
-import type {
-  EditSessionAccess,
-  EditSessionStatus,
-  ObjectNumberRange,
-  PdfMeasure,
-  PageScaleResult,
-} from '@embedpdf/engine-core/runtime';
 import { createHash, randomUUID } from 'node:crypto';
 import { createReadStream, createWriteStream } from 'node:fs';
 import { copyFile, mkdtemp, rm, stat } from 'node:fs/promises';
@@ -13,12 +6,29 @@ import { dirname, join } from 'node:path';
 import { pipeline } from 'node:stream/promises';
 
 import { profileFor, verifyForCompletion } from '@embedpdf/core-signature';
+import type {
+  ChangeAnswer,
+  EditSessionAccess,
+  EditSessionStatus,
+  ObjectNumberRange,
+  PdfMeasure,
+  PageScaleResult,
+} from '@embedpdf/engine-core/runtime';
 import {
   EngineError,
   EngineErrorCode,
+  changeFingerprint,
+  deserializeError,
+  isUndoChange,
+  serializeError,
   toPageRef,
   wirePack,
   type AnnotationActor,
+  type ChangeAuthority,
+  type ChangeOp,
+  type ChangeRecordPayload,
+  type PageCoordinates,
+  type ServerChangeOutcome,
   type AnnotationBundleLimits,
   type AnnotationCreateResult,
   type AnnotationImportPages,
@@ -85,7 +95,6 @@ import {
   type SignatureCompleteResult,
   type SignaturePrepareInput,
   type SignaturePrepared,
-  formWidget,
   type AnnotationAuthority,
 } from '@embedpdf/engine-core/runtime';
 import {
@@ -93,10 +102,29 @@ import {
   decodePrepared,
   encodePrepared,
 } from '@embedpdf/engine-core/wire';
+import { packChangeRecord, unpackChangeRecord } from '@embedpdf/engine-services';
 import { sql, type Kysely, type Transaction } from 'kysely';
 
 import type { DocumentService, OpenContext } from './DocumentService';
 import type { AuditEvent, EventLogService } from './EventLogService';
+import {
+  answerOf,
+  changeRetentionMs,
+  checkedAuthority,
+  factsOf,
+  numbersNamedBy,
+  objectNumberEstimateOf,
+  refusedRow,
+  reusedOpId,
+  undoTargetOf,
+  verbResultOf,
+  withCacheDelta,
+  wrote,
+  type ChangeFacts,
+  type ChangePlan,
+  type RequestedChange,
+  type SingleOpAudit,
+} from './layerChanges';
 import type { LayerStateService } from './LayerStateService';
 import {
   LayerWriteObjectNumbers,
@@ -115,6 +143,7 @@ import {
 import type { EngineCounters } from '../app/engine-counters';
 import { RequestRateLimiter } from '../app/request-rate-limiter';
 import { AuditLogRepo, type AuditMutationKind } from '../db/repos/audit_log.repo';
+import { ChangeOutcomesRepo, type ChangeOutcomeRow } from '../db/repos/change_outcomes.repo';
 import type { DocumentSigningsRepo, SigningRow } from '../db/repos/document_signings.repo';
 import type { DocumentsRepo } from '../db/repos/documents.repo';
 import type { DurablePageRow, LayerRow } from '../db/repos/page_state.repo';
@@ -181,19 +210,6 @@ export class LayerFenceConflict extends EngineError {
     super(EngineErrorCode.LayerVersionConflict, message);
   }
 }
-
-/** The durable state an annotation commit produced inside its transaction —
- *  the input `finalizePayload` turns into the wire result. */
-interface CommittedAnnotationMutation {
-  page: DurablePageRow;
-  previousLayerDocVersion: number;
-  layerDocVersion: number;
-  /** The new bulk-annotations pin this mutation committed. */
-  annotationsVersion: number;
-}
-
-/** The audit kinds of a one-page annotation write (`annot.{kind}`). */
-type AnnotationWriteKind = 'create' | 'update' | 'delete' | 'move';
 
 /**
  * Form audit kinds that change annotation list bodies (field/widget
@@ -267,6 +283,15 @@ const OBJECT_NUMBER_ISSUE_TURNS = { maxAttempts: 30, windowMs: 60_000 };
 /** Whole seconds left of `ms`, rounded down: a client stops a little early, never late. */
 function secondsOf(ms: number): number {
   return Math.max(0, Math.floor(ms / 1000));
+}
+
+/**
+ * A write's id, as its result and events carry it: the request's
+ * `Idempotency-Key` (the engine sends its `opId` there), or one minted for
+ * the write.
+ */
+function writeOpIdOf(ctx: LayerWriteContext): string {
+  return ctx.idempotencyKey ?? randomUUID();
 }
 
 /** The editing session a request acts as, on `layerId`. */
@@ -429,38 +454,20 @@ export class LayerService {
     signal?: AbortSignal,
   ): Promise<AnnotationCreateResult> {
     const actor = input.actor ?? actorFromContext(ctx);
-    return this.enqueueLayerWrite(ctx, input.docId, input.layerName, async () => {
-      const { layer } = await this.prepareLayerMutation(ctx, input.docId, input.layerName, {
-        ...(input.objectNumber !== undefined ? { named: [input.objectNumber] } : {}),
-      });
-      return this.withTempWorkerFile('layer-artifact', 'artifact.layer', async (artifactPath) => {
-        const build = (jobId: WorkerJobId) =>
-          wirePack({
-            kind: 'annotations.create' as const,
-            effect: 'write' as const,
-            jobId,
-            docId: input.docId,
-            layerName: input.layerName,
-            page: toPageRef(input.pageObjectNumber),
-            draft: input.draft,
-            ...(input.objectNumber !== undefined ? { objectNumber: input.objectNumber } : {}),
-            ...(input.resources ? { resources: input.resources } : {}),
-            artifactPath,
-            ...(actor ? { actor } : {}),
-          });
-        const payload = await this.runLayerWrite(input.docId, build, signal);
-        if (payload.tag !== 'annotations.create') {
-          throw new EngineError(
-            EngineErrorCode.WireFormat,
-            `unexpected annotations.create payload: ${payload.tag}`,
-          );
-        }
-        return this.persistAnnotationMutation(ctx, input.docId, input.layerName, layer, 'create', {
-          result: payload.result,
-          artifact: requireLayerArtifact(payload as unknown),
-        });
-      });
-    });
+    return this.applySingleOp<AnnotationCreateResult>(
+      ctx,
+      input,
+      {
+        type: 'annotations.create',
+        page: toPageRef(input.pageObjectNumber),
+        data: input.draft,
+        ...(input.resources ? { resources: input.resources } : {}),
+        ...(input.objectNumber !== undefined ? { objectNumber: input.objectNumber } : {}),
+      },
+      checkedAuthority(actor),
+      'annot.create',
+      signal,
+    );
   }
 
   /**
@@ -482,6 +489,7 @@ export class LayerService {
     },
     signal?: AbortSignal,
   ): Promise<AnnotationImportResult> {
+    const opId = writeOpIdOf(ctx);
     return this.enqueueLayerWrite(ctx, input.docId, input.layerName, async () => {
       const { layer } = await this.prepareLayerMutation(ctx, input.docId, input.layerName);
       return this.withTempWorkerFile('layer-artifact', 'artifact.layer', async (artifactPath) => {
@@ -491,6 +499,7 @@ export class LayerService {
               kind: 'annotations.import' as const,
               effect: 'write' as const,
               jobId,
+              opId,
               docId: input.docId,
               layerName: input.layerName,
               bundle: input.bundle,
@@ -533,35 +542,19 @@ export class LayerService {
     },
     signal?: AbortSignal,
   ): Promise<AnnotationUpdateResult> {
-    return this.enqueueLayerWrite(ctx, input.docId, input.layerName, async () => {
-      const { layer } = await this.prepareLayerMutation(ctx, input.docId, input.layerName);
-      return this.withTempWorkerFile('layer-artifact', 'artifact.layer', async (artifactPath) => {
-        const build = (jobId: WorkerJobId) =>
-          wirePack({
-            kind: 'annotations.update' as const,
-            effect: 'write' as const,
-            jobId,
-            docId: input.docId,
-            layerName: input.layerName,
-            ref: input.ref,
-            patch: input.patch,
-            authority: input.authority,
-            ...(input.resources ? { resources: input.resources } : {}),
-            artifactPath,
-          });
-        const payload = await this.runLayerWrite(input.docId, build, signal);
-        if (payload.tag !== 'annotations.update') {
-          throw new EngineError(
-            EngineErrorCode.WireFormat,
-            `unexpected annotations.update payload: ${payload.tag}`,
-          );
-        }
-        return this.persistAnnotationMutation(ctx, input.docId, input.layerName, layer, 'update', {
-          result: payload.result,
-          artifact: requireLayerArtifact(payload as unknown),
-        });
-      });
-    });
+    return this.applySingleOp<AnnotationUpdateResult>(
+      ctx,
+      input,
+      {
+        type: 'annotations.update',
+        ref: input.ref,
+        patch: input.patch,
+        ...(input.resources ? { resources: input.resources } : {}),
+      },
+      { ...input.authority, protection: null },
+      'annot.update',
+      signal,
+    );
   }
 
   async deleteAnnotation(
@@ -575,33 +568,14 @@ export class LayerService {
     },
     signal?: AbortSignal,
   ): Promise<AnnotationDeleteResult> {
-    return this.enqueueLayerWrite(ctx, input.docId, input.layerName, async () => {
-      const { layer } = await this.prepareLayerMutation(ctx, input.docId, input.layerName);
-      return this.withTempWorkerFile('layer-artifact', 'artifact.layer', async (artifactPath) => {
-        const build = (jobId: WorkerJobId) =>
-          wirePack({
-            kind: 'annotations.delete' as const,
-            effect: 'write' as const,
-            jobId,
-            docId: input.docId,
-            layerName: input.layerName,
-            ref: input.ref,
-            authority: input.authority,
-            artifactPath,
-          });
-        const payload = await this.runLayerWrite(input.docId, build, signal);
-        if (payload.tag !== 'annotations.delete') {
-          throw new EngineError(
-            EngineErrorCode.WireFormat,
-            `unexpected annotations.delete payload: ${payload.tag}`,
-          );
-        }
-        return this.persistAnnotationMutation(ctx, input.docId, input.layerName, layer, 'delete', {
-          result: payload.result,
-          artifact: requireLayerArtifact(payload as unknown),
-        });
-      });
-    });
+    return this.applySingleOp<AnnotationDeleteResult>(
+      ctx,
+      input,
+      { type: 'annotations.delete', ref: input.ref },
+      { ...input.authority, protection: null },
+      'annot.delete',
+      signal,
+    );
   }
 
   async moveAnnotations(
@@ -615,34 +589,19 @@ export class LayerService {
     },
     signal?: AbortSignal,
   ): Promise<AnnotationMoveResult> {
-    return this.enqueueLayerWrite(ctx, input.docId, input.layerName, async () => {
-      const { layer } = await this.prepareLayerMutation(ctx, input.docId, input.layerName);
-      return this.withTempWorkerFile('layer-artifact', 'artifact.layer', async (artifactPath) => {
-        const build = (jobId: WorkerJobId) =>
-          wirePack({
-            kind: 'annotations.move' as const,
-            effect: 'write' as const,
-            jobId,
-            docId: input.docId,
-            layerName: input.layerName,
-            page: toPageRef(input.pageObjectNumber),
-            refs: input.refs,
-            toIndex: input.toIndex,
-            artifactPath,
-          });
-        const payload = await this.runLayerWrite(input.docId, build, signal);
-        if (payload.tag !== 'annotations.move') {
-          throw new EngineError(
-            EngineErrorCode.WireFormat,
-            `unexpected annotations.move payload: ${payload.tag}`,
-          );
-        }
-        return this.persistAnnotationMutation(ctx, input.docId, input.layerName, layer, 'move', {
-          result: payload.result,
-          artifact: requireLayerArtifact(payload as unknown),
-        });
-      });
-    });
+    return this.applySingleOp<AnnotationMoveResult>(
+      ctx,
+      input,
+      {
+        type: 'annotations.move',
+        page: toPageRef(input.pageObjectNumber),
+        refs: input.refs,
+        toIndex: input.toIndex,
+      },
+      checkedAuthority(),
+      'annot.move',
+      signal,
+    );
   }
 
   async movePages(
@@ -655,6 +614,7 @@ export class LayerService {
     },
     signal?: AbortSignal,
   ): Promise<PageMoveResult> {
+    const opId = writeOpIdOf(ctx);
     return this.enqueueLayerWrite(ctx, input.docId, input.layerName, async () => {
       const { layer } = await this.prepareLayerMutation(ctx, input.docId, input.layerName);
       return this.withTempWorkerFile('layer-artifact', 'artifact.layer', async (artifactPath) => {
@@ -663,6 +623,7 @@ export class LayerService {
             kind: 'pages.move' as const,
             effect: 'contentWrite' as const,
             jobId,
+            opId,
             docId: input.docId,
             layerName: input.layerName,
             pages: input.pages,
@@ -699,6 +660,7 @@ export class LayerService {
     },
     signal?: AbortSignal,
   ): Promise<PageScaleResult> {
+    const opId = writeOpIdOf(ctx);
     return this.enqueueLayerWrite(ctx, input.docId, input.layerName, async () => {
       const { layer } = await this.prepareLayerMutation(ctx, input.docId, input.layerName);
       return this.withTempWorkerFile('layer-artifact', 'artifact.layer', async (artifactPath) => {
@@ -709,6 +671,7 @@ export class LayerService {
               kind: 'measure.setScale' as const,
               effect: 'write' as const,
               jobId,
+              opId,
               docId: input.docId,
               layerName: input.layerName,
               page: toPageRef(input.pageObjectNumber),
@@ -741,6 +704,7 @@ export class LayerService {
     },
     signal?: AbortSignal,
   ): Promise<PageNameResult> {
+    const opId = writeOpIdOf(ctx);
     return this.runPageNameMutation(
       ctx,
       input.docId,
@@ -750,6 +714,7 @@ export class LayerService {
           kind: 'pages.setName' as const,
           effect: 'write' as const,
           jobId,
+          opId,
           docId: input.docId,
           layerName: input.layerName,
           name: input.name,
@@ -768,6 +733,7 @@ export class LayerService {
     input: { docId: string; layerName: string; name: string },
     signal?: AbortSignal,
   ): Promise<PageNameResult> {
+    const opId = writeOpIdOf(ctx);
     return this.runPageNameMutation(
       ctx,
       input.docId,
@@ -777,6 +743,7 @@ export class LayerService {
           kind: 'pages.removeName' as const,
           effect: 'write' as const,
           jobId,
+          opId,
           docId: input.docId,
           layerName: input.layerName,
           name: input.name,
@@ -834,6 +801,7 @@ export class LayerService {
     },
     signal?: AbortSignal,
   ): Promise<AnnotationFlattenResult> {
+    const opId = writeOpIdOf(ctx);
     return this.enqueueLayerWrite(ctx, input.docId, input.layerName, async () => {
       const { layer } = await this.prepareLayerMutation(ctx, input.docId, input.layerName);
       return this.withTempWorkerFile('layer-artifact', 'artifact.layer', async (artifactPath) => {
@@ -844,6 +812,7 @@ export class LayerService {
               kind: 'annotations.flatten' as const,
               effect: 'contentWrite' as const,
               jobId,
+              opId,
               docId: input.docId,
               layerName: input.layerName,
               page: toPageRef(input.pageObjectNumber),
@@ -878,6 +847,7 @@ export class LayerService {
     },
     signal?: AbortSignal,
   ): Promise<PageRotateResult> {
+    const opId = writeOpIdOf(ctx);
     const pageObjectNumbers = pageObjectNumbersOf(input.pages);
     return this.enqueueLayerWrite(ctx, input.docId, input.layerName, async () => {
       const { layer } = await this.prepareLayerMutation(ctx, input.docId, input.layerName);
@@ -887,6 +857,7 @@ export class LayerService {
             kind: 'pages.rotate' as const,
             effect: 'contentWrite' as const,
             jobId,
+            opId,
             docId: input.docId,
             layerName: input.layerName,
             pages: input.pages,
@@ -918,6 +889,7 @@ export class LayerService {
     },
     signal?: AbortSignal,
   ): Promise<PageDeleteResult> {
+    const opId = writeOpIdOf(ctx);
     const pageObjectNumbers = pageObjectNumbersOf(input.pages);
     return this.enqueueLayerWrite(ctx, input.docId, input.layerName, async () => {
       const { layer } = await this.prepareLayerMutation(ctx, input.docId, input.layerName);
@@ -927,6 +899,7 @@ export class LayerService {
             kind: 'pages.delete' as const,
             effect: 'contentWrite' as const,
             jobId,
+            opId,
             docId: input.docId,
             layerName: input.layerName,
             pages: input.pages,
@@ -962,6 +935,7 @@ export class LayerService {
     },
     signal?: AbortSignal,
   ): Promise<PageInsertResult> {
+    const opId = writeOpIdOf(ctx);
     return this.enqueueLayerWrite(ctx, input.docId, input.layerName, async () => {
       const { layer } = await this.prepareLayerMutation(ctx, input.docId, input.layerName, {
         estimate: OBJECT_NUMBER_ESTIMATES.insertedPages(input.bytes.byteLength),
@@ -972,6 +946,7 @@ export class LayerService {
             kind: 'pages.insert' as const,
             effect: 'contentWrite' as const,
             jobId,
+            opId,
             docId: input.docId,
             layerName: input.layerName,
             bytes: input.bytes,
@@ -1007,6 +982,7 @@ export class LayerService {
     },
     signal?: AbortSignal,
   ): Promise<PageInsertResult> {
+    const opId = writeOpIdOf(ctx);
     return this.enqueueLayerWrite(ctx, input.docId, input.layerName, async () => {
       const { layer } = await this.prepareLayerMutation(ctx, input.docId, input.layerName, {
         estimate: OBJECT_NUMBER_ESTIMATES.blankPages(input.count ?? 1),
@@ -1018,6 +994,7 @@ export class LayerService {
             kind: 'pages.insertBlank' as const,
             effect: 'contentWrite' as const,
             jobId,
+            opId,
             docId: input.docId,
             layerName: input.layerName,
             size: input.size,
@@ -1052,6 +1029,7 @@ export class LayerService {
     },
     signal?: AbortSignal,
   ): Promise<PageFlattenResult> {
+    const opId = writeOpIdOf(ctx);
     return this.enqueueLayerWrite(ctx, input.docId, input.layerName, async () => {
       const { layer } = await this.prepareLayerMutation(ctx, input.docId, input.layerName);
       return this.withTempWorkerFile('layer-artifact', 'artifact.layer', async (artifactPath) => {
@@ -1062,6 +1040,7 @@ export class LayerService {
               kind: 'pages.flatten' as const,
               effect: 'contentWrite' as const,
               jobId,
+              opId,
               docId: input.docId,
               layerName: input.layerName,
               pages: input.pages,
@@ -1094,6 +1073,7 @@ export class LayerService {
     },
     signal?: AbortSignal,
   ): Promise<RedactionApplyResult> {
+    const opId = writeOpIdOf(ctx);
     return this.enqueueLayerWrite(ctx, input.docId, input.layerName, async () => {
       const { layer } = await this.prepareLayerMutation(ctx, input.docId, input.layerName);
       return this.withTempWorkerFile('layer-artifact', 'artifact.layer', async (artifactPath) => {
@@ -1104,6 +1084,7 @@ export class LayerService {
               kind: 'redaction.apply' as const,
               effect: 'contentWrite' as const,
               jobId,
+              opId,
               docId: input.docId,
               layerName: input.layerName,
               scope: input.scope,
@@ -1135,33 +1116,14 @@ export class LayerService {
     },
     signal?: AbortSignal,
   ): Promise<MetadataUpdateResult> {
-    return this.enqueueLayerWrite(ctx, input.docId, input.layerName, async () => {
-      const { layer } = await this.prepareLayerMutation(ctx, input.docId, input.layerName);
-      return this.withTempWorkerFile('layer-artifact', 'artifact.layer', async (artifactPath) => {
-        const build = (jobId: WorkerJobId) =>
-          wirePack({
-            kind: 'metadata.update' as const,
-            effect: 'write' as const,
-            jobId,
-            docId: input.docId,
-            layerName: input.layerName,
-            patch: input.patch,
-            artifactPath,
-          });
-        const payload = await this.runLayerWrite(input.docId, build, signal);
-        if (payload.tag !== 'metadata.update') {
-          throw new EngineError(
-            EngineErrorCode.WireFormat,
-            `unexpected metadata.update payload: ${payload.tag}`,
-          );
-        }
-        return this.persistMetadataUpdate(ctx, input.docId, input.layerName, layer, {
-          kind: 'metadata.update',
-          result: payload.result,
-          artifact: requireLayerArtifact(payload as unknown),
-        });
-      });
-    });
+    return this.applySingleOp<MetadataUpdateResult>(
+      ctx,
+      input,
+      { type: 'metadata.update', patch: input.patch },
+      checkedAuthority(),
+      'metadata.update',
+      signal,
+    );
   }
 
   /** The Info dict's custom keys: the same Info-dict write as `updateMetadata`. */
@@ -1174,33 +1136,14 @@ export class LayerService {
     },
     signal?: AbortSignal,
   ): Promise<CustomMetadataUpdateResult> {
-    return this.enqueueLayerWrite(ctx, input.docId, input.layerName, async () => {
-      const { layer } = await this.prepareLayerMutation(ctx, input.docId, input.layerName);
-      return this.withTempWorkerFile('layer-artifact', 'artifact.layer', async (artifactPath) => {
-        const build = (jobId: WorkerJobId) =>
-          wirePack({
-            kind: 'metadata.updateCustom' as const,
-            effect: 'write' as const,
-            jobId,
-            docId: input.docId,
-            layerName: input.layerName,
-            patch: input.patch,
-            artifactPath,
-          });
-        const payload = await this.runLayerWrite(input.docId, build, signal);
-        if (payload.tag !== 'metadata.updateCustom') {
-          throw new EngineError(
-            EngineErrorCode.WireFormat,
-            `unexpected metadata.updateCustom payload: ${payload.tag}`,
-          );
-        }
-        return this.persistMetadataUpdate(ctx, input.docId, input.layerName, layer, {
-          kind: 'metadata.updateCustom',
-          result: payload.result,
-          artifact: requireLayerArtifact(payload as unknown),
-        });
-      });
-    });
+    return this.applySingleOp<CustomMetadataUpdateResult>(
+      ctx,
+      input,
+      { type: 'metadata.updateCustom', patch: input.patch },
+      checkedAuthority(),
+      'metadata.updateCustom',
+      signal,
+    );
   }
 
   // ── Attachments ──────────────────────────────────────────────────────
@@ -1222,6 +1165,7 @@ export class LayerService {
     },
     signal?: AbortSignal,
   ): Promise<AttachmentCreateResult> {
+    const opId = writeOpIdOf(ctx);
     return this.enqueueLayerWrite(ctx, input.docId, input.layerName, async () => {
       const { layer } = await this.prepareLayerMutation(ctx, input.docId, input.layerName);
       return this.withTempWorkerFile('layer-artifact', 'artifact.layer', async (artifactPath) => {
@@ -1230,6 +1174,7 @@ export class LayerService {
             kind: 'attachments.create' as const,
             effect: 'write' as const,
             jobId,
+            opId,
             docId: input.docId,
             layerName: input.layerName,
             file: input.file,
@@ -1262,6 +1207,7 @@ export class LayerService {
     },
     signal?: AbortSignal,
   ): Promise<AttachmentDeleteResult> {
+    const opId = writeOpIdOf(ctx);
     return this.enqueueLayerWrite(ctx, input.docId, input.layerName, async () => {
       const { layer } = await this.prepareLayerMutation(ctx, input.docId, input.layerName);
       return this.withTempWorkerFile('layer-artifact', 'artifact.layer', async (artifactPath) => {
@@ -1270,6 +1216,7 @@ export class LayerService {
             kind: 'attachments.delete' as const,
             effect: 'write' as const,
             jobId,
+            opId,
             docId: input.docId,
             layerName: input.layerName,
             ref: input.ref,
@@ -1360,26 +1307,12 @@ export class LayerService {
     input: { docId: string; layerName: string; ref: FormFieldRef; value: FormFieldValue },
     signal?: AbortSignal,
   ): Promise<FormSetValueResult> {
-    return this.runFormMutation(
+    return this.applySingleOp<FormSetValueResult>(
       ctx,
-      {
-        docId: input.docId,
-        layerName: input.layerName,
-        tag: 'forms.setValue',
-        auditKind: 'form.setValue',
-        build: (jobId, artifactPath) =>
-          wirePack({
-            kind: 'forms.setValue' as const,
-            effect: 'write' as const,
-            jobId,
-            docId: input.docId,
-            layerName: input.layerName,
-            ref: input.ref,
-            value: input.value,
-            artifactPath,
-          }),
-        touchedPages: (result: FormSetValueResult) => widgetPages(result.meta.changedWidgets),
-      },
+      input,
+      { type: 'forms.setValue', field: input.ref, value: input.value },
+      checkedAuthority(),
+      'form.setValue',
       signal,
     );
   }
@@ -1390,25 +1323,12 @@ export class LayerService {
     input: { docId: string; layerName: string; refs?: FormFieldRef[] },
     signal?: AbortSignal,
   ): Promise<FormResetResult> {
-    return this.runFormMutation(
+    return this.applySingleOp<FormResetResult>(
       ctx,
-      {
-        docId: input.docId,
-        layerName: input.layerName,
-        tag: 'forms.reset',
-        auditKind: 'form.reset',
-        build: (jobId, artifactPath) =>
-          wirePack({
-            kind: 'forms.reset' as const,
-            effect: 'write' as const,
-            jobId,
-            docId: input.docId,
-            layerName: input.layerName,
-            ...(input.refs ? { refs: input.refs } : {}),
-            artifactPath,
-          }),
-        touchedPages: (result: FormResetResult) => widgetPages(result.meta.changedWidgets),
-      },
+      input,
+      { type: 'forms.reset', ...(input.refs ? { fields: input.refs } : {}) },
+      checkedAuthority(),
+      'form.reset',
       signal,
     );
   }
@@ -1418,6 +1338,7 @@ export class LayerService {
     input: { docId: string; layerName: string; effects: FormEffect[] },
     signal?: AbortSignal,
   ): Promise<FormEffectsResult> {
+    const opId = writeOpIdOf(ctx);
     return this.enqueueLayerWrite(ctx, input.docId, input.layerName, async () => {
       const materialized = await this.prepareLayerMutation(ctx, input.docId, input.layerName);
       const { layer } = materialized;
@@ -1429,6 +1350,7 @@ export class LayerService {
               kind: 'forms.applyEffects' as const,
               effect: 'write' as const,
               jobId,
+              opId,
               docId: input.docId,
               layerName: input.layerName,
               effects: input.effects,
@@ -1472,6 +1394,7 @@ export class LayerService {
     input: { docId: string; layerName: string; data: ArrayBuffer; format?: FormDataFormat },
     signal?: AbortSignal,
   ): Promise<FormImportResult> {
+    const opId = writeOpIdOf(ctx);
     return this.runFormMutation(
       ctx,
       {
@@ -1485,6 +1408,7 @@ export class LayerService {
               kind: 'forms.import' as const,
               effect: 'write' as const,
               jobId,
+              opId,
               docId: input.docId,
               layerName: input.layerName,
               data: input.data,
@@ -1507,6 +1431,7 @@ export class LayerService {
     input: { docId: string; layerName: string; bakeAppearances: boolean },
     signal?: AbortSignal,
   ): Promise<FormRepairResult> {
+    const opId = writeOpIdOf(ctx);
     return this.runFormMutation(
       ctx,
       {
@@ -1519,6 +1444,7 @@ export class LayerService {
             kind: 'forms.repair' as const,
             effect: 'write' as const,
             jobId,
+            opId,
             docId: input.docId,
             layerName: input.layerName,
             bakeAppearances: input.bakeAppearances,
@@ -1544,34 +1470,17 @@ export class LayerService {
     },
     signal?: AbortSignal,
   ): Promise<FormFieldCreateResult> {
-    return this.runFormMutation(
+    return this.applySingleOp<FormFieldCreateResult>(
       ctx,
+      input,
       {
-        docId: input.docId,
-        layerName: input.layerName,
-        tag: 'forms.createField',
-        auditKind: 'form.createField',
-        named: [
-          ...(input.objectNumber !== undefined ? [input.objectNumber] : []),
-          ...(input.widgetObjectNumbers ?? []),
-        ],
-        build: (jobId, artifactPath) =>
-          wirePack({
-            kind: 'forms.createField' as const,
-            effect: 'write' as const,
-            jobId,
-            docId: input.docId,
-            layerName: input.layerName,
-            draft: input.draft,
-            ...(input.objectNumber !== undefined ? { objectNumber: input.objectNumber } : {}),
-            ...(input.widgetObjectNumbers
-              ? { widgetObjectNumbers: [...input.widgetObjectNumbers] }
-              : {}),
-            artifactPath,
-          }),
-        // Inline placements birth widget annotations on their pages.
-        touchedPages: (result: FormFieldCreateResult) => widgetPages(result.field.widgets),
+        type: 'forms.create',
+        draft: input.draft,
+        ...(input.objectNumber !== undefined ? { objectNumber: input.objectNumber } : {}),
+        ...(input.widgetObjectNumbers ? { widgetObjectNumbers: input.widgetObjectNumbers } : {}),
       },
+      checkedAuthority(),
+      'form.createField',
       signal,
     );
   }
@@ -1581,28 +1490,12 @@ export class LayerService {
     input: { docId: string; layerName: string; ref: FormFieldRef; patch: FormFieldPatch },
     signal?: AbortSignal,
   ): Promise<FormFieldUpdateResult> {
-    return this.runFormMutation(
+    return this.applySingleOp<FormFieldUpdateResult>(
       ctx,
-      {
-        docId: input.docId,
-        layerName: input.layerName,
-        tag: 'forms.updateField',
-        auditKind: 'form.updateField',
-        build: (jobId, artifactPath) =>
-          wirePack({
-            kind: 'forms.updateField' as const,
-            effect: 'write' as const,
-            jobId,
-            docId: input.docId,
-            layerName: input.layerName,
-            ref: input.ref,
-            patch: input.patch,
-            artifactPath,
-          }),
-        // Option/value re-syncs can regenerate appearances on every widget
-        // of the field, so all hosting pages are treated as updated.
-        touchedPages: (result: FormFieldUpdateResult) => widgetPages(result.field.widgets),
-      },
+      input,
+      { type: 'forms.update', field: input.ref, patch: input.patch },
+      checkedAuthority(),
+      'form.updateField',
       signal,
     );
   }
@@ -1618,31 +1511,16 @@ export class LayerService {
     },
     signal?: AbortSignal,
   ): Promise<FormFieldUpdateResult> {
-    const pdf = new ArrayBuffer(input.pdf.byteLength);
-    new Uint8Array(pdf).set(input.pdf);
-    return this.runFormMutation(
+    return this.applySingleOp<FormFieldUpdateResult>(
       ctx,
+      input,
       {
-        docId: input.docId,
-        layerName: input.layerName,
-        tag: 'forms.setSignatureAppearance',
-        auditKind: 'form.setSignatureAppearance',
-        build: (jobId, artifactPath) =>
-          wirePack(
-            {
-              kind: 'forms.setSignatureAppearance' as const,
-              effect: 'write' as const,
-              jobId,
-              docId: input.docId,
-              layerName: input.layerName,
-              ref: input.ref,
-              pdf,
-              artifactPath,
-            },
-            [pdf],
-          ),
-        touchedPages: (result: FormFieldUpdateResult) => widgetPages(result.field.widgets),
+        type: 'forms.setSignatureAppearance',
+        field: input.ref,
+        appearance: { pdf: input.pdf },
       },
+      checkedAuthority(),
+      'form.setSignatureAppearance',
       signal,
     );
   }
@@ -1652,26 +1530,12 @@ export class LayerService {
     input: { docId: string; layerName: string; ref: FormFieldRef },
     signal?: AbortSignal,
   ): Promise<FormFieldDeleteResult> {
-    return this.runFormMutation(
+    return this.applySingleOp<FormFieldDeleteResult>(
       ctx,
-      {
-        docId: input.docId,
-        layerName: input.layerName,
-        tag: 'forms.deleteField',
-        auditKind: 'form.deleteField',
-        build: (jobId, artifactPath) =>
-          wirePack({
-            kind: 'forms.deleteField' as const,
-            effect: 'write' as const,
-            jobId,
-            docId: input.docId,
-            layerName: input.layerName,
-            ref: input.ref,
-            artifactPath,
-          }),
-        // The cascade removes widget annotations from those pages.
-        touchedPages: (result: FormFieldDeleteResult) => widgetPages(result.meta.changedWidgets),
-      },
+      input,
+      { type: 'forms.delete', field: input.ref },
+      checkedAuthority(),
+      'form.deleteField',
       signal,
     );
   }
@@ -1691,37 +1555,20 @@ export class LayerService {
     },
     signal?: AbortSignal,
   ): Promise<FormWidgetLinkResult> {
-    return this.runFormMutation(
+    return this.applySingleOp<FormWidgetLinkResult>(
       ctx,
+      input,
       {
-        docId: input.docId,
-        layerName: input.layerName,
-        tag: 'forms.addWidget',
-        auditKind: 'form.addWidget',
-        // A split number is spent whether or not the field was merged: the
-        // client took it for this write.
-        named: [
-          ...(input.objectNumber !== undefined ? [input.objectNumber] : []),
-          ...(input.splitObjectNumber !== undefined ? [input.splitObjectNumber] : []),
-        ],
-        build: (jobId, artifactPath) =>
-          wirePack({
-            kind: 'forms.addWidget' as const,
-            effect: 'write' as const,
-            jobId,
-            docId: input.docId,
-            layerName: input.layerName,
-            ref: input.ref,
-            placement: input.placement,
-            ...(input.objectNumber !== undefined ? { objectNumber: input.objectNumber } : {}),
-            ...(input.splitObjectNumber !== undefined
-              ? { splitObjectNumber: input.splitObjectNumber }
-              : {}),
-            artifactPath,
-          }),
-        // The new widget annotation is born on its page.
-        touchedPages: (result: FormWidgetLinkResult) => widgetPages(result.meta.changedWidgets),
+        type: 'forms.addWidget',
+        field: input.ref,
+        placement: input.placement,
+        ...(input.objectNumber !== undefined ? { objectNumber: input.objectNumber } : {}),
+        ...(input.splitObjectNumber !== undefined
+          ? { splitObjectNumber: input.splitObjectNumber }
+          : {}),
       },
+      checkedAuthority(),
+      'form.addWidget',
       signal,
     );
   }
@@ -1731,26 +1578,12 @@ export class LayerService {
     input: { docId: string; layerName: string; ref: FormFieldRef; widget: AnnotationRef },
     signal?: AbortSignal,
   ): Promise<FormWidgetLinkResult> {
-    return this.runFormMutation(
+    return this.applySingleOp<FormWidgetLinkResult>(
       ctx,
-      {
-        docId: input.docId,
-        layerName: input.layerName,
-        tag: 'forms.detachWidget',
-        auditKind: 'form.detachWidget',
-        build: (jobId, artifactPath) =>
-          wirePack({
-            kind: 'forms.detachWidget' as const,
-            effect: 'write' as const,
-            jobId,
-            docId: input.docId,
-            layerName: input.layerName,
-            ref: input.ref,
-            widget: input.widget,
-            artifactPath,
-          }),
-        touchedPages: () => widgetPages([widgetOfRef(input.widget)]),
-      },
+      input,
+      { type: 'forms.removeWidget', field: input.ref, widget: input.widget },
+      checkedAuthority(),
+      'form.detachWidget',
       signal,
     );
   }
@@ -1941,6 +1774,8 @@ export class LayerService {
           ts: now,
         });
         const auditId = (await this.eventLog?.appendDb(trx, auditEvent)) ?? 0;
+        // A form repair is a final change: no change before it can be undone any more.
+        if (input.kind === 'form.repair') await this.endUndoAt(trx, input.layer.id, auditId);
 
         await this.writeLayerAdvance(
           trx,
@@ -1979,7 +1814,12 @@ export class LayerService {
     ctx: LayerWriteContext,
     docId: string,
     layerName: string,
-    numbers: WriteObjectNumbersInput = {},
+    numbers: WriteObjectNumbersInput | (() => WriteObjectNumbersInput) = {},
+    /**
+     * Finds what an earlier attempt of this write already answered, before
+     * anything is checked or run again: the write then answers that.
+     */
+    answered?: (layer: LayerRow) => Promise<unknown>,
   ): Promise<MaterializedLayer> {
     const documentService = this.requireDocumentService();
     await documentService.getLayerManifest(ctx, docId, layerName);
@@ -1988,6 +1828,8 @@ export class LayerService {
     // anything is checked or run again (its numbers are spent by now).
     const committed = await this.committedWrite(materialized.layer.id, ctx.idempotencyKey);
     if (committed) throw committed;
+    const answer = answered ? await answered(materialized.layer) : undefined;
+    if (answer !== undefined) throw new CommittedWrite(answer);
     // A pending signing blocks layer writes. This check is the courtesy;
     // the guarantee is that `prepare` is a fenced layer write (its
     // version bump makes a racing edit lose its own CAS and land here on
@@ -2017,7 +1859,11 @@ export class LayerService {
       // session blessed with the committed version (advanceLayerSession).
       { forWrite: true },
     );
-    await this.prepareObjectNumbers(ctx, materialized.layer, numbers);
+    await this.prepareObjectNumbers(
+      ctx,
+      materialized.layer,
+      typeof numbers === 'function' ? numbers() : numbers,
+    );
     return materialized;
   }
 
@@ -2090,6 +1936,486 @@ export class LayerService {
     );
     write?.recordResult(payload);
     return payload;
+  }
+
+  // ── changes ───────────────────────────────────────────────────────────────
+
+  /**
+   * A request's changes (`POST …/changes`) as one write. A change that
+   * already has an answer gets it again, refusals included, and a different
+   * change under a used opId is refused. The rest run in one engine job, each
+   * in its own transaction, then one commit: one artifact, an audit row for
+   * each change that wrote, an outcome row for each change answered. A lost
+   * fence reruns all of it on the new head; nothing was stored for the lost
+   * attempt.
+   */
+  async applyChanges(
+    ctx: LayerWriteContext,
+    input: {
+      docId: string;
+      layerName: string;
+      changes: readonly RequestedChange[];
+      /** Who the changes act for: each op is checked against it inside the write. */
+      authority: ChangeAuthority;
+      /** A single-op route's change: its audit row keeps the route's kind and result. */
+      single?: SingleOpAudit;
+    },
+    signal?: AbortSignal,
+  ): Promise<ChangeAnswer[]> {
+    // The outcome table answers retries; the audit log's replay (by
+    // `Idempotency-Key`) stays out of it.
+    const writeCtx: LayerWriteContext = { ...ctx, idempotencyKey: undefined };
+    return this.enqueueLayerWrite(writeCtx, input.docId, input.layerName, async () => {
+      // A request whose every change has its answer gets them, and nothing
+      // else happens: its numbers were spent by the attempt that answered.
+      let kept = new Map<string, ChangeOutcomeRow>();
+      const { layer } = await this.prepareLayerMutation(
+        writeCtx,
+        input.docId,
+        input.layerName,
+        () => ({
+          estimate: objectNumberEstimateOf(input.changes),
+          named: numbersNamedBy(input.changes.filter(({ opId }) => !kept.has(opId))),
+        }),
+        async (current) => {
+          kept = await this.keptOutcomes(current.id, input.changes);
+          const answers = input.changes.map(({ opId, change }) => {
+            const row = kept.get(opId);
+            return row?.payloadHash === changeFingerprint(change) ? answerOf(row) : undefined;
+          });
+          return answers.every((answer) => answer !== undefined) ? answers : undefined;
+        },
+      );
+      const plan = await this.planChanges(writeCtx, layer, input, kept);
+      if (plan.run.length === 0) return this.commitChanges(writeCtx, input, layer, plan, [], null);
+      return this.withTempWorkerFile('layer-artifact', 'artifact.layer', async (artifactPath) => {
+        const payload = await this.runLayerWrite(
+          input.docId,
+          (jobId) =>
+            wirePack({
+              kind: 'document.applyChanges' as const,
+              effect: 'write' as const,
+              jobId,
+              docId: input.docId,
+              layerName: input.layerName,
+              changes: plan.run,
+              artifactPath,
+            }),
+          signal,
+        );
+        if (payload.tag !== 'document.applyChanges') {
+          throw new EngineError(
+            EngineErrorCode.WireFormat,
+            `unexpected document.applyChanges payload: ${payload.tag}`,
+          );
+        }
+        const artifact =
+          payload.artifact || payload.artifactFile ? requireLayerArtifact(payload) : null;
+        return this.commitChanges(writeCtx, input, layer, plan, payload.outcomes, artifact);
+      });
+    });
+  }
+
+  /**
+   * What a request's changes need before anything runs: the answers kept for
+   * those that have one, the refusals of undos that may not run, and the
+   * job's changes, an undo of a change outside the request carrying the
+   * record that change left.
+   */
+  private async planChanges(
+    ctx: LayerWriteContext,
+    layer: LayerRow,
+    input: { changes: readonly RequestedChange[]; authority: ChangeAuthority },
+    kept: ReadonlyMap<string, ChangeOutcomeRow>,
+  ): Promise<ChangePlan> {
+    const now = Date.now();
+    const horizon = await this.undoHorizonOf(layer.id);
+    const plan: ChangePlan = { now, slots: [], run: [] };
+    const running = new Set<string>();
+    for (const { opId, change } of input.changes) {
+      const fingerprint = changeFingerprint(change);
+      const row = kept.get(opId);
+      if (row && row.payloadHash !== fingerprint) {
+        plan.slots.push({
+          kind: 'refused',
+          opId,
+          fingerprint,
+          error: reusedOpId(opId),
+          keep: false,
+        });
+      } else if (row) {
+        plan.slots.push({ kind: 'kept', answer: answerOf(row) });
+      } else if (running.has(opId)) {
+        const error = new EngineError(
+          EngineErrorCode.InvalidArg,
+          `opId ${opId} is in the request twice`,
+        );
+        plan.slots.push({ kind: 'refused', opId, fingerprint, error, keep: false });
+      } else {
+        const undoOf = isUndoChange(change) ? change.undoOf : null;
+        let record: ChangeRecordPayload | null | undefined;
+        // An undo of an earlier change of this request runs the record the job keeps.
+        if (undoOf !== null && !running.has(undoOf)) {
+          const target = undoTargetOf(undoOf, kept.get(undoOf), { sub: ctx.sub, horizon, now });
+          if ('refusal' in target) {
+            plan.slots.push({
+              kind: 'refused',
+              opId,
+              fingerprint,
+              error: target.refusal,
+              keep: true,
+            });
+            continue;
+          }
+          record =
+            target.reverse === null
+              ? null
+              : unpackChangeRecord(target.reverse, await this.readCapture(target.captureKey));
+        }
+        running.add(opId);
+        plan.run.push({
+          opId,
+          change,
+          authority: input.authority,
+          ...(record !== undefined ? { record } : {}),
+        });
+        plan.slots.push({ kind: 'run', opId, fingerprint, undoOf });
+      }
+    }
+    return plan;
+  }
+
+  /**
+   * One commit for a request's changes: their captures first (one blob each),
+   * the artifact when any change wrote, then one database transaction with
+   * the bumps the changes' facts call for, an audit row for each that wrote,
+   * one guarded version bump, and an outcome row for each change answered.
+   * Returns the answers in request order, as the client gets them.
+   */
+  private async commitChanges(
+    ctx: LayerWriteContext,
+    input: { docId: string; layerName: string; single?: SingleOpAudit },
+    layer: LayerRow,
+    plan: ChangePlan,
+    outcomes: readonly ServerChangeOutcome[],
+    artifact: LayerArtifactInput | null,
+  ): Promise<ChangeAnswer[]> {
+    const { docId, layerName } = input;
+    const ran = new Map(outcomes.map((outcome) => [outcome.opId, outcome]));
+    const records = new Map<string, { reverse: string; captureKey: string | null }>();
+    for (const outcome of outcomes) {
+      if (outcome.status !== 'applied' || !outcome.record) continue;
+      const { reverse, capture } = packChangeRecord(outcome.record);
+      let captureKey: string | null = null;
+      if (capture) {
+        captureKey = this.nextCaptureKey(ctx, docId, layerName, outcome.opId);
+        await this.requireStorage().put(captureKey, capture, { contentLength: capture.byteLength });
+      }
+      records.set(outcome.opId, { reverse, captureKey });
+    }
+    const nextVersion = layer.currentVersion + 1;
+    let saved: { key: string; sha256: string; size: number } | null = null;
+    if (artifact) {
+      const key = this.nextArtifactKey(ctx, docId, layerName, nextVersion);
+      saved = { key, ...(await this.uploadLayerArtifact(key, artifact)) };
+    }
+    const now = plan.now;
+    const expiresAt = now + changeRetentionMs();
+
+    const committed = await this.requireDb()
+      .transaction()
+      .execute(async (trx) => {
+        let cacheDelta: CacheDelta | null = null;
+        let advance: ((lastAuditId: number) => Promise<void>) | null = null;
+        if (saved) {
+          const facts = factsOf(
+            outcomes.flatMap((outcome) =>
+              outcome.status === 'applied' && wrote(outcome.result) ? [outcome.result] : [],
+            ),
+          );
+          const bumped = await this.bumpChangeVersions(trx, layer, facts, now);
+          cacheDelta = this.layerState.buildCacheDelta({
+            docId,
+            layerName,
+            previousDocVersion: bumped.previousDocVersion,
+            docVersion: bumped.versions.doc_version,
+            ...(bumped.versions.annotations_version !== undefined
+              ? { annotationsVersion: bumped.versions.annotations_version }
+              : {}),
+            pages: bumped.pages,
+          });
+          if (bumped.versions.metadata_version !== undefined) {
+            cacheDelta = { ...cacheDelta, metadataVersion: bumped.versions.metadata_version };
+          }
+          const artifactFields = {
+            layer,
+            nextVersion,
+            artifactKey: saved.key,
+            artifactSha: saved.sha256,
+            artifactSize: saved.size,
+          };
+          advance = async (lastAuditId) => {
+            await this.writeLayerAdvance(trx, artifactFields, bumped.versions, lastAuditId, now);
+            for (const page of bumped.pages) {
+              await trx
+                .updateTable('layer_pages')
+                .set({ annotation_version: page.annotationVersion, updated_at: now })
+                .where('layer_id', '=', layer.id)
+                .where('page_object_number', '=', page.pageObjectNumber)
+                .execute();
+            }
+          };
+        }
+
+        const answers: ChangeAnswer[] = [];
+        const rows: ChangeOutcomeRow[] = [];
+        let lastAuditId = 0;
+        for (const slot of plan.slots) {
+          if (slot.kind === 'kept') {
+            answers.push(slot.answer);
+            continue;
+          }
+          const outcome = slot.kind === 'run' ? ran.get(slot.opId) : undefined;
+          const error =
+            slot.kind === 'refused'
+              ? serializeError(slot.error)
+              : outcome?.status === 'refused'
+                ? outcome.error
+                : null;
+          if (error || !outcome || outcome.status !== 'applied') {
+            const refusal = error ?? serializeError(new Error(`change ${slot.opId} ran no job`));
+            answers.push({ opId: slot.opId, status: 'refused', error: refusal });
+            if (slot.kind === 'run' || slot.keep) {
+              rows.push(
+                refusedRow(layer.id, slot.opId, slot.fingerprint, refusal, ctx.sub, now, expiresAt),
+              );
+            }
+            continue;
+          }
+          const writes = wrote(outcome.result) && saved !== null;
+          const result = withCacheDelta(outcome.result, writes ? cacheDelta : null);
+          let auditId: number | null = null;
+          if (writes && saved) {
+            const pages = result.meta.affectedPages.map((page) => page.objectNumber);
+            auditId =
+              (await this.eventLog?.appendDb(
+                trx,
+                makeAuditEvent({
+                  ctx,
+                  docId,
+                  layer,
+                  layerName,
+                  kind: input.single?.auditKind ?? 'change',
+                  pageObjectNumber: input.single?.auditKind.startsWith('annot.')
+                    ? (pages[0] ?? null)
+                    : null,
+                  affectedPages: pages,
+                  artifactVersion: nextVersion,
+                  artifactKey: saved.key,
+                  artifactSha: saved.sha256,
+                  artifactSize: saved.size,
+                  idempotencyKey: slot.opId,
+                  undoOf: slot.kind === 'run' ? slot.undoOf : null,
+                  payload: input.single ? input.single.payloadOf(result) : result,
+                  ts: now,
+                }),
+              )) ?? null;
+            if (auditId) lastAuditId = Math.max(lastAuditId, auditId);
+          }
+          const record = records.get(slot.opId);
+          answers.push({ opId: slot.opId, status: 'applied', result });
+          rows.push({
+            layerId: layer.id,
+            opId: slot.opId,
+            payloadHash: slot.fingerprint,
+            status: 'applied',
+            response: result,
+            actor: ctx.sub,
+            auditId,
+            reverse: record?.reverse ?? null,
+            captureKey: record?.captureKey ?? null,
+            createdAt: now,
+            expiresAt,
+          });
+        }
+        if (advance) await advance(lastAuditId);
+        const repo = new ChangeOutcomesRepo(trx);
+        for (const row of rows) await repo.insert(row);
+        return { answers, lastAuditId };
+      })
+      .catch((err: unknown) => {
+        // Another replica committed one of these changes first (its audit
+        // row or its answer holds the opId): rerun, and answer from its row.
+        if (isUniqueViolation(err)) {
+          throw new LayerFenceConflict('a change of this request was answered meanwhile');
+        }
+        throw err;
+      });
+
+    if (saved) {
+      this.finishLayerCommit(ctx, docId, layerName, nextVersion, saved.key, committed.lastAuditId);
+    }
+    // The commit holds every capture now: the write's cleanup leaves them.
+    const pending = this.pendingAttemptKeys.get(layerWriteKey(ctx, docId, layerName));
+    for (const { captureKey } of records.values()) if (captureKey) pending?.delete(captureKey);
+    return committed.answers;
+  }
+
+  /**
+   * The version bumps a commit's facts call for, read inside its transaction:
+   * the document version always, each touched page's annotation version, the
+   * bulk annotation list when annotations or form structure changed, the
+   * metadata when it changed.
+   */
+  private async bumpChangeVersions(
+    trx: Transaction<Schema>,
+    layer: LayerRow,
+    facts: ChangeFacts,
+    now: number,
+  ): Promise<{
+    previousDocVersion: number;
+    versions: { doc_version: number; annotations_version?: number; metadata_version?: number };
+    pages: DurablePageRow[];
+  }> {
+    const current = await trx
+      .selectFrom('layers')
+      .select(['doc_version', 'annotations_version', 'metadata_version'])
+      .where('id', '=', layer.id)
+      .executeTakeFirst();
+    if (!current) throw new EngineError(EngineErrorCode.NotFound, `layer not found: ${layer.id}`);
+    const pages: DurablePageRow[] = [];
+    for (const pageObjectNumber of facts.pages) {
+      const page = await trx
+        .selectFrom('layer_pages')
+        .selectAll()
+        .where('layer_id', '=', layer.id)
+        .where('page_object_number', '=', pageObjectNumber)
+        .executeTakeFirst();
+      if (!page) {
+        throw new EngineError(
+          EngineErrorCode.WireFormat,
+          `a change reported unknown page object number ${pageObjectNumber}`,
+        );
+      }
+      pages.push({
+        pageObjectNumber,
+        contentVersion: Number(page.content_version),
+        annotationVersion: Number(page.annotation_version) + 1,
+        updatedAt: now,
+      });
+    }
+    const previousDocVersion = Number(current.doc_version);
+    return {
+      previousDocVersion,
+      versions: {
+        doc_version: previousDocVersion + 1,
+        ...(facts.annotationList
+          ? { annotations_version: Number(current.annotations_version ?? 1) + 1 }
+          : {}),
+        ...(facts.metadata ? { metadata_version: Number(current.metadata_version) + 1 } : {}),
+      },
+      pages,
+    };
+  }
+
+  /**
+   * A single-op route's write as a one-change request: the same checks,
+   * answer and record as `POST …/changes`, so its opId undoes it, and its
+   * audit row keeps the route's kind and result.
+   */
+  private async applySingleOp<T>(
+    ctx: LayerWriteContext,
+    target: { docId: string; layerName: string },
+    op: ChangeOp<PageCoordinates, WireAnnotationResources>,
+    authority: ChangeAuthority,
+    auditKind: AuditMutationKind,
+    signal?: AbortSignal,
+  ): Promise<T> {
+    const [answer] = await this.applyChanges(
+      ctx,
+      {
+        docId: target.docId,
+        layerName: target.layerName,
+        changes: [{ opId: writeOpIdOf(ctx), change: { ops: [op] } }],
+        authority,
+        single: { auditKind, payloadOf: verbResultOf },
+      },
+      signal,
+    );
+    if (!answer) throw new EngineError(EngineErrorCode.Unknown, `${op.type} gave no answer`);
+    if (answer.status === 'refused') throw deserializeError(answer.error);
+    return verbResultOf(answer.result) as T;
+  }
+
+  /**
+   * A final change committed at audit row `auditId`: an undo naming a change
+   * before it is refused (`final-change`), and the sweeper deletes their
+   * captures.
+   */
+  private async endUndoAt(
+    trx: Transaction<Schema>,
+    layerId: string,
+    auditId: number,
+  ): Promise<void> {
+    await trx
+      .updateTable('layers')
+      .set({ undo_horizon: auditId })
+      .where('id', '=', layerId)
+      .execute();
+  }
+
+  /** The answers kept on the layer for a request's changes and for the changes its undos name. */
+  private async keptOutcomes(
+    layerId: string,
+    changes: readonly RequestedChange[],
+  ): Promise<Map<string, ChangeOutcomeRow>> {
+    const named = new Set<string>();
+    for (const { opId, change } of changes) {
+      named.add(opId);
+      if (isUndoChange(change)) named.add(change.undoOf);
+    }
+    return new ChangeOutcomesRepo(this.requireDb()).findMany(layerId, [...named]);
+  }
+
+  /** The audit id of the layer's last final change: no change before it can be undone. */
+  private async undoHorizonOf(layerId: string): Promise<number | null> {
+    const row = await this.requireDb()
+      .selectFrom('layers')
+      .select('undo_horizon')
+      .where('id', '=', layerId)
+      .executeTakeFirst();
+    return row?.undo_horizon === null || row?.undo_horizon === undefined
+      ? null
+      : Number(row.undo_horizon);
+  }
+
+  /** A change's capture blob, or null when it has none. */
+  private async readCapture(captureKey: string | null): Promise<Uint8Array | null> {
+    if (!captureKey) return null;
+    const bytes = await this.requireStorage().get(captureKey);
+    if (!bytes) {
+      throw new EngineError(
+        EngineErrorCode.Unknown,
+        `a change's capture is missing: ${captureKey}`,
+      );
+    }
+    return bytes;
+  }
+
+  /** A capture's key for this attempt, deleted unless the commit claims it. */
+  private nextCaptureKey(
+    ctx: LayerWriteContext,
+    docId: string,
+    layerName: string,
+    opId: string,
+  ): string {
+    const attempt = randomUUID().replace(/-/g, '').slice(0, 8);
+    const key = StorageKeys.changeCapture(ctx.tenantId, docId, layerName, opId, attempt);
+    const writeKey = layerWriteKey(ctx, docId, layerName);
+    const pending = this.pendingAttemptKeys.get(writeKey) ?? new Set<string>();
+    pending.add(key);
+    this.pendingAttemptKeys.set(writeKey, pending);
+    return key;
   }
 
   // ── editing sessions ──────────────────────────────────────────────────────
@@ -2258,69 +2584,6 @@ export class LayerService {
     }
   }
 
-  private async persistAnnotationMutation<
-    TResult extends
-      | AnnotationCreateResult
-      | AnnotationUpdateResult
-      | AnnotationDeleteResult
-      | AnnotationMoveResult,
-  >(
-    ctx: LayerWriteContext,
-    docId: string,
-    layerName: string,
-    layer: LayerRow,
-    kind: AnnotationWriteKind,
-    input: {
-      result: TResult;
-      artifact: LayerArtifactInput;
-    },
-  ): Promise<TResult> {
-    const nextVersion = layer.currentVersion + 1;
-    const artifactKey = this.nextArtifactKey(ctx, docId, layerName, nextVersion);
-    const uploaded = await this.uploadLayerArtifact(artifactKey, input.artifact);
-    const committed = await this.commitAnnotationMutation({
-      ctx,
-      docId,
-      layerName,
-      layer,
-      pageObjectNumber: requireSingleAffectedPage(input.result.meta.affectedPages).objectNumber,
-      kind,
-      artifactKey,
-      artifactSha: uploaded.sha256,
-      artifactSize: uploaded.size,
-      nextVersion,
-      finalizePayload: (durable) =>
-        this.finalizeAnnotationResult(docId, layerName, input.result, durable),
-    });
-    this.finishLayerCommit(ctx, docId, layerName, nextVersion, artifactKey, committed.auditId);
-    // The response is the audited payload — one fact for caller and history.
-    return committed.payload as TResult;
-  }
-
-  /**
-   * Turn the worker's session-relative result into the finalized wire result:
-   * the real cacheDelta from the committed version bumps. Pure and
-   * synchronous — it runs inside the commit transaction so the audit row can
-   * store its output.
-   */
-  private finalizeAnnotationResult<
-    TResult extends
-      | AnnotationCreateResult
-      | AnnotationUpdateResult
-      | AnnotationDeleteResult
-      | AnnotationMoveResult,
-  >(docId: string, layerName: string, raw: TResult, durable: CommittedAnnotationMutation): TResult {
-    const cacheDelta = this.layerState.buildCacheDelta({
-      docId,
-      layerName,
-      previousDocVersion: durable.previousLayerDocVersion,
-      docVersion: durable.layerDocVersion,
-      annotationsVersion: durable.annotationsVersion,
-      pages: [durable.page],
-    });
-    return { ...raw, meta: { ...raw.meta, cacheDelta } };
-  }
-
   private async persistPageMove(
     ctx: LayerWriteContext,
     docId: string,
@@ -2344,6 +2607,7 @@ export class LayerService {
       layer,
       kind: 'pages.move',
       layout: input.result.layout,
+      stamp: input.result.meta,
       // Every page's position is touched by a reorder.
       affectedPages: input.result.layout.pages.map((page) => page.ref.objectNumber),
       artifactKey,
@@ -2382,6 +2646,7 @@ export class LayerService {
       layer,
       kind: 'pages.rotate',
       layout: input.result.layout,
+      stamp: input.result.meta,
       affectedPages: input.affectedPages,
       artifactKey,
       artifactSha: uploaded.sha256,
@@ -2497,6 +2762,7 @@ export class LayerService {
       layerName,
       layer,
       layout: input.result.layout,
+      stamp: input.result.meta,
       deletedPages: input.deletedPages,
       artifactKey,
       artifactSha: uploaded.sha256,
@@ -2528,41 +2794,8 @@ export class LayerService {
       layer,
       kind: input.kind,
       layout: input.result.layout,
+      stamp: input.result.meta,
       insertedPages: input.result.insertedPages.map((page) => page.objectNumber),
-      artifactKey,
-      artifactSha: uploaded.sha256,
-      artifactSize: uploaded.size,
-      nextVersion,
-    });
-    this.finishLayerCommit(ctx, docId, layerName, nextVersion, artifactKey, committed.auditId);
-    return committed.result;
-  }
-
-  /** Both halves of the Info dict (standard fields, custom keys) commit the same way. */
-  private async persistMetadataUpdate<R extends MetadataUpdateResult | CustomMetadataUpdateResult>(
-    ctx: LayerWriteContext,
-    docId: string,
-    layerName: string,
-    layer: LayerRow,
-    input: {
-      kind: 'metadata.update' | 'metadata.updateCustom';
-      result: R;
-      artifact: LayerArtifactInput;
-    },
-  ): Promise<R> {
-    const nextVersion = layer.currentVersion + 1;
-    const artifactKey = this.nextArtifactKey(ctx, docId, layerName, nextVersion);
-    const uploaded = await this.uploadLayerArtifact(artifactKey, input.artifact);
-    // The commit assembles, audits, and returns the finalized result (the
-    // worker's re-read metadata + the coherence pins it just computed) — the
-    // response is the audited payload, byte for byte.
-    const committed = await this.commitMetadataUpdate({
-      ctx,
-      docId,
-      layerName,
-      layer,
-      kind: input.kind,
-      result: input.result,
       artifactKey,
       artifactSha: uploaded.sha256,
       artifactSize: uploaded.size,
@@ -2621,124 +2854,6 @@ export class LayerService {
     }
   }
 
-  private async commitAnnotationMutation(input: {
-    ctx: LayerWriteContext;
-    docId: string;
-    layerName: string;
-    layer: LayerRow;
-    pageObjectNumber: number;
-    kind: AnnotationWriteKind;
-    artifactKey: string;
-    artifactSha: string;
-    artifactSize: number;
-    nextVersion: number;
-    /**
-     * Builds the finalized result (the real cacheDelta) from the
-     * in-transaction durable state. Its return is what
-     * the audit row stores and what the caller receives — the invariant is
-     * that the audited payload is byte-identical to the response: what we
-     * tell the caller is what we tell history (and, later, every remote
-     * event subscriber).
-     */
-    finalizePayload: (durable: CommittedAnnotationMutation) => unknown;
-  }): Promise<{ durable: CommittedAnnotationMutation; payload: unknown; auditId: number }> {
-    return this.requireDb()
-      .transaction()
-      .execute(async (trx) => {
-        const now = Date.now();
-        // Plain read — values feed the next-version computation. The fence
-        // is not here: it is the guarded UPDATE below, the only check that
-        // is atomic with the write (a SELECT takes no lock; two overlapping
-        // transactions can both pass a read-then-check).
-        const currentLayer = await trx
-          .selectFrom('layers')
-          .select(['current_version', 'doc_version', 'annotations_version'])
-          .where('id', '=', input.layer.id)
-          .executeTakeFirst();
-        if (!currentLayer) {
-          throw new EngineError(EngineErrorCode.NotFound, `layer not found: ${input.layer.id}`);
-        }
-
-        const page = await trx
-          .selectFrom('layer_pages')
-          .selectAll()
-          .where('layer_id', '=', input.layer.id)
-          .where('page_object_number', '=', input.pageObjectNumber)
-          .executeTakeFirst();
-        if (!page) {
-          throw new EngineError(
-            EngineErrorCode.NotFound,
-            `layer page ${input.pageObjectNumber} not found for layer ${input.layer.id}`,
-          );
-        }
-
-        const nextPage: DurablePageRow = {
-          pageObjectNumber: Number(page.page_object_number),
-          contentVersion: Number(page.content_version),
-          annotationVersion: Number(page.annotation_version) + 1,
-          updatedAt: now,
-        };
-
-        const previousLayerDocVersion = Number(currentLayer.doc_version);
-        const layerDocVersion = previousLayerDocVersion + 1;
-        // Every annotation write changes list bodies, so the bulk pin
-        // advances in lockstep with the per-page annotationVersion.
-        const annotationsVersion = Number(currentLayer.annotations_version ?? 1) + 1;
-
-        const durable: CommittedAnnotationMutation = {
-          page: nextPage,
-          previousLayerDocVersion,
-          layerDocVersion,
-          annotationsVersion,
-        };
-        // Finalize before the audit append so the row stores exactly what the
-        // caller will receive (the real cacheDelta), never the worker's
-        // session-relative draft.
-        const payload = input.finalizePayload(durable);
-
-        const auditEvent = makeAuditEvent({
-          ctx: input.ctx,
-          docId: input.docId,
-          layer: input.layer,
-          layerName: input.layerName,
-          kind: `annot.${input.kind}` as AuditEvent['kind'],
-          pageObjectNumber: input.pageObjectNumber,
-          affectedPages: [input.pageObjectNumber],
-          artifactVersion: input.nextVersion,
-          artifactKey: input.artifactKey,
-          artifactSha: input.artifactSha,
-          artifactSize: input.artifactSize,
-          payload,
-          ts: now,
-        });
-        const auditId = (await this.eventLog?.appendDb(trx, auditEvent)) ?? 0;
-
-        await this.guardedVersionBump(trx, input.layer, {
-          doc_version: layerDocVersion,
-          annotations_version: annotationsVersion,
-          current_version: input.nextVersion,
-          current_artifact_key: input.artifactKey,
-          current_artifact_sha: input.artifactSha,
-          current_artifact_size: input.artifactSize,
-          ...(auditId > 0 ? { last_audit_id: auditId } : {}),
-          updated_at: now,
-        });
-
-        await trx
-          .updateTable('layer_pages')
-          .set({
-            content_version: nextPage.contentVersion,
-            annotation_version: nextPage.annotationVersion,
-            updated_at: now,
-          })
-          .where('layer_id', '=', input.layer.id)
-          .where('page_object_number', '=', input.pageObjectNumber)
-          .execute();
-
-        return { durable, payload, auditId };
-      });
-  }
-
   /**
    * Shared commit for the page-structure ops that keep the page set intact
    * (move + rotate). Both have the same shape: the layer's `doc_version` and
@@ -2754,6 +2869,8 @@ export class LayerService {
     kind: 'pages.move' | 'pages.rotate';
     /** The worker's post-mutation layout — becomes `result.layout`. */
     layout: PageListSnapshot;
+    /** The write's id and whether it can be undone, as the worker stamped them. */
+    stamp: WriteStamp;
     affectedPages: PageObjectNumber[];
     artifactKey: string;
     artifactSha: string;
@@ -2802,7 +2919,7 @@ export class LayerService {
 
         // The finalized result — audited and returned identically: what we
         // tell the caller is what we tell history (and remote subscribers).
-        const result = { layout: input.layout, meta: planeMeta(versions) };
+        const result = { layout: input.layout, meta: planeMeta(input.stamp, versions) };
 
         const auditEvent = makeAuditEvent({
           ctx: input.ctx,
@@ -2846,6 +2963,8 @@ export class LayerService {
     layer: LayerRow;
     /** The worker's post-delete layout (survivors) — becomes `result.layout`. */
     layout: PageListSnapshot;
+    /** The write's id and whether it can be undone, as the worker stamped them. */
+    stamp: WriteStamp;
     deletedPages: PageObjectNumber[];
     artifactKey: string;
     artifactSha: string;
@@ -2907,7 +3026,7 @@ export class LayerService {
 
         // The finalized result — audited and returned identically: what we
         // tell the caller is what we tell history (and remote subscribers).
-        const result = { layout: input.layout, meta: planeMeta(versions) };
+        const result = { layout: input.layout, meta: planeMeta(input.stamp, versions) };
 
         const auditEvent = makeAuditEvent({
           ctx: input.ctx,
@@ -2961,6 +3080,8 @@ export class LayerService {
     kind: 'pages.insert' | 'pages.insertBlank';
     /** The worker's post-insert layout — becomes `result.layout`. */
     layout: PageListSnapshot;
+    /** The write's id and whether it can be undone, as the worker stamped them. */
+    stamp: WriteStamp;
     insertedPages: PageObjectNumber[];
     artifactKey: string;
     artifactSha: string;
@@ -3038,7 +3159,7 @@ export class LayerService {
         const result: PageInsertResult = {
           insertedPages: input.insertedPages.map(toPageRef),
           layout: input.layout,
-          meta: planeMeta(versions),
+          meta: planeMeta(input.stamp, versions),
         };
 
         const auditEvent = makeAuditEvent({
@@ -3166,6 +3287,8 @@ export class LayerService {
           ts: now,
         });
         const auditId = (await this.eventLog?.appendDb(trx, auditEvent)) ?? 0;
+        // A final change: no change before it can be undone any more.
+        await this.endUndoAt(trx, input.layer.id, auditId);
 
         await this.writeLayerAdvance(
           trx,
@@ -3379,6 +3502,8 @@ export class LayerService {
           ts: now,
         });
         const auditId = (await this.eventLog?.appendDb(trx, auditEvent)) ?? 0;
+        // A final change: no change before it can be undone any more.
+        await this.endUndoAt(trx, input.layer.id, auditId);
 
         await this.writeLayerAdvance(
           trx,
@@ -3831,6 +3956,41 @@ export class LayerService {
     return expired.length;
   }
 
+  /**
+   * The sweep tick for changes: answers past their retention go, with their
+   * captures; captures below a layer's undo horizon go, their answers kept.
+   * Each pass takes at most `batch` of each.
+   */
+  async sweepChanges(now = Date.now(), batch = 500): Promise<number> {
+    if (!this.db) return 0;
+    const repo = new ChangeOutcomesRepo(this.db);
+    const deleteCaptures = (rows: readonly ChangeOutcomeRow[]) =>
+      Promise.all(
+        rows.flatMap((row) =>
+          row.captureKey
+            ? [
+                this.requireStorage()
+                  .delete(row.captureKey)
+                  .catch(() => undefined),
+              ]
+            : [],
+        ),
+      );
+    const byLayer = (rows: readonly ChangeOutcomeRow[]) => {
+      const layers = new Map<string, string[]>();
+      for (const row of rows)
+        layers.set(row.layerId, [...(layers.get(row.layerId) ?? []), row.opId]);
+      return layers;
+    };
+    const expired = await repo.findExpired(now, batch);
+    await deleteCaptures(expired);
+    for (const [layerId, opIds] of byLayer(expired)) await repo.delete(layerId, opIds);
+    const ended = await repo.findBelowHorizon(batch);
+    await deleteCaptures(ended);
+    for (const [layerId, opIds] of byLayer(ended)) await repo.clearRecords(layerId, opIds);
+    return expired.length + ended.length;
+  }
+
   /** Newest first; the versions listing joins these to the catalog. */
   async listSignings(ctx: LayerWriteContext, docId: string): Promise<SigningRow[]> {
     const signings = this.requireSignings();
@@ -4247,6 +4407,9 @@ export class LayerService {
             // No delta: a publish changes more of the manifest than a delta
             // carries; the client refreshes its manifest on completion.
             cacheDelta: null,
+            // Signing is final: it ends undo for every write before it.
+            opId: writeOpIdOf(ctx),
+            undoable: false,
           },
         };
         const auditEvent = makeAuditEvent({
@@ -4268,6 +4431,8 @@ export class LayerService {
           ts: now,
         });
         const auditId = (await this.eventLog?.appendDb(trx, auditEvent)) ?? 0;
+        // A final change: no change before it can be undone any more.
+        await this.endUndoAt(trx, layer.id, auditId);
         if (auditId > 0) {
           await trx
             .updateTable('layers')
@@ -4419,86 +4584,6 @@ export class LayerService {
     return key;
   }
 
-  private async commitMetadataUpdate<
-    R extends MetadataUpdateResult | CustomMetadataUpdateResult,
-  >(input: {
-    ctx: LayerWriteContext;
-    docId: string;
-    layerName: string;
-    layer: LayerRow;
-    kind: 'metadata.update' | 'metadata.updateCustom';
-    /** The worker's result: its re-read data is kept, its `meta` replaced. */
-    result: R;
-    artifactKey: string;
-    artifactSha: string;
-    artifactSize: number;
-    nextVersion: number;
-  }): Promise<{ result: R; auditId: number }> {
-    return this.requireDb()
-      .transaction()
-      .execute(async (trx) => {
-        const now = Date.now();
-        const currentLayer = await trx
-          .selectFrom('layers')
-          .select(['current_version', 'doc_version', 'metadata_version'])
-          .where('id', '=', input.layer.id)
-          .executeTakeFirst();
-        if (!currentLayer) {
-          throw new EngineError(EngineErrorCode.NotFound, `layer not found: ${input.layer.id}`);
-        }
-        // No SELECT-check here — the fence is writeLayerAdvance's guarded
-        // UPDATE (atomic with the write; see guardedVersionBump).
-
-        // A metadata write touches only the document Info dict — no page set,
-        // no per-page versions, no display order. So `layer_pages` rows are
-        // left entirely untouched; we only advance the layer version pointers.
-        const previousLayerDocVersion = Number(currentLayer.doc_version);
-        const layerDocVersion = previousLayerDocVersion + 1;
-        // Metadata edit: bump the metadata pointer so the CDN-immutable
-        // /metadata@metadataVersion leaf is re-fetched. Layout + per-page
-        // content/annotation versions stay put (their caches stay warm).
-        const metadataVersion = Number(currentLayer.metadata_version) + 1;
-
-        // The finalized result — audited and returned identically: what we
-        // tell the caller is what we tell history (and remote subscribers).
-        const result: R = {
-          ...input.result,
-          meta: planeMeta({
-            previousDocVersion: previousLayerDocVersion,
-            docVersion: layerDocVersion,
-            metadataVersion,
-          }),
-        };
-
-        const auditEvent = makeAuditEvent({
-          ctx: input.ctx,
-          docId: input.docId,
-          layer: input.layer,
-          layerName: input.layerName,
-          kind: input.kind,
-          pageObjectNumber: null,
-          affectedPages: [],
-          artifactVersion: input.nextVersion,
-          artifactKey: input.artifactKey,
-          artifactSha: input.artifactSha,
-          artifactSize: input.artifactSize,
-          payload: result,
-          ts: now,
-        });
-        const auditId = (await this.eventLog?.appendDb(trx, auditEvent)) ?? 0;
-
-        await this.writeLayerAdvance(
-          trx,
-          input,
-          { doc_version: layerDocVersion, metadata_version: metadataVersion },
-          auditId,
-          now,
-        );
-
-        return { result, auditId };
-      });
-  }
-
   private async persistAttachmentMutation<
     R extends AttachmentCreateResult | AttachmentDeleteResult,
   >(
@@ -4543,7 +4628,7 @@ export class LayerService {
           ...input.result,
           meta: {
             ...input.result.meta,
-            ...planeMeta({ previousDocVersion, docVersion, attachmentsVersion }),
+            ...planeMeta(input.result.meta, { previousDocVersion, docVersion, attachmentsVersion }),
           },
         } as R;
 
@@ -4797,6 +4882,8 @@ function makeAuditEvent(input: {
    * unless given. A row whose payload isn't the response stores none.
    */
   idempotencyKey?: string | null;
+  /** An undo's row: the change it undid. */
+  undoOf?: string | null;
   payload: unknown;
   ts: number;
 }): AuditEvent {
@@ -4818,6 +4905,7 @@ function makeAuditEvent(input: {
       input.idempotencyKey === undefined
         ? (input.ctx.idempotencyKey ?? null)
         : input.idempotencyKey,
+    undoOf: input.undoOf ?? null,
     payload: input.payload,
     originSessionId: input.ctx.originSessionId ?? null,
   };
@@ -4859,17 +4947,6 @@ function allPages(materialized: MaterializedLayer): PageObjectNumber[] {
   return materialized.pages.map((page) => page.pageObjectNumber);
 }
 
-/** The one page an annotation write touched. */
-function requireSingleAffectedPage(pages: readonly PageRef[]): PageRef {
-  if (pages.length !== 1) {
-    throw new EngineError(
-      EngineErrorCode.WireFormat,
-      `annotation mutation expected exactly one affected page, got ${pages.length}`,
-    );
-  }
-  return pages[0]!;
-}
-
 /**
  * Project the request's JWT identity claims into the wire-shape
  * `AnnotationActor` the worker uses to stamp /T, /M, and /EMBD_Metadata.
@@ -4894,13 +4971,6 @@ function actorFromContext(ctx: LayerWriteContext): AnnotationActor | undefined {
   return actor;
 }
 
-/** The cache-impact view of a widget addressed by ref: an object-number address is a placed widget. */
-function widgetOfRef(ref: AnnotationRef): FormWidget {
-  return ref.kind === 'objectNumber'
-    ? formWidget(ref.objectNumber, ref.page)
-    : formWidget(0, ref.page);
-}
-
 /** The version bumps of a page-structure write. */
 interface LayoutVersions {
   previousDocVersion: number;
@@ -4913,6 +4983,14 @@ interface LayoutVersions {
  * metadata, attachments) and no page pin: the client absorbs it from
  * `meta.cacheDelta`.
  */
-function planeMeta(delta: Omit<CacheDelta, 'pages'>): MutationMeta {
-  return { affectedPages: [], cacheDelta: { ...delta, pages: [] } };
+function planeMeta(stamp: WriteStamp, delta: Omit<CacheDelta, 'pages'>): MutationMeta {
+  return {
+    affectedPages: [],
+    cacheDelta: { ...delta, pages: [] },
+    opId: stamp.opId,
+    undoable: stamp.undoable,
+  };
 }
+
+/** A write's id and whether it can be undone, as its worker job stamped them. */
+type WriteStamp = Pick<MutationMeta, 'opId' | 'undoable'>;

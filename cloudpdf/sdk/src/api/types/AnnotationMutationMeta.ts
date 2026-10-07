@@ -3,67 +3,9 @@
 import type * as CloudPDF from "../index.js";
 
 export interface AnnotationMutationMeta {
-    affectedPages: AnnotationMutationMeta.AffectedPages.Item[];
-    cacheDelta: AnnotationMutationMeta.CacheDelta | null;
-    changed: CloudPDF.AnnotationMutationMetaChangedItem[];
-}
-
-export namespace AnnotationMutationMeta {
-    export type AffectedPages = AffectedPages.Item[];
-
-    export namespace AffectedPages {
-        export interface Item {
-            kind: Item.Kind;
-            objectNumber: number;
-        }
-
-        export namespace Item {
-            export const Kind = {
-                ObjectNumber: "objectNumber",
-            } as const;
-            export type Kind = (typeof Kind)[keyof typeof Kind];
-        }
-    }
-
-    export interface CacheDelta {
-        previousDocVersion: number;
-        docVersion: number;
-        annotationsVersion?: number | undefined;
-        layoutVersion?: number | undefined;
-        metadataVersion?: number | undefined;
-        attachmentsVersion?: number | undefined;
-        layerVersion?: number | undefined;
-        working?: boolean | undefined;
-        pages: CacheDelta.Pages.Item[];
-    }
-
-    export namespace CacheDelta {
-        export type Pages = Pages.Item[];
-
-        export namespace Pages {
-            export interface Item {
-                page: Item.Page;
-                cache: Item.Cache;
-            }
-
-            export namespace Item {
-                export interface Page {
-                    kind: Page.Kind;
-                    objectNumber: number;
-                }
-
-                export namespace Page {
-                    export const Kind = {
-                        ObjectNumber: "objectNumber",
-                    } as const;
-                    export type Kind = (typeof Kind)[keyof typeof Kind];
-                }
-
-                export interface Cache {
-                    contentVersion: number;
-                    annotationVersion: number;
-                }
-            }
-        }
-    }
+    affectedPages: CloudPDF.PageRef[];
+    cacheDelta: CloudPDF.CacheDelta | null;
+    opId: string;
+    undoable: boolean;
+    changed: CloudPDF.AnnotationRef[];
 }

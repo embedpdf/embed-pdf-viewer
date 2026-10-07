@@ -121,6 +121,7 @@ export class LocalDocumentAnnotationsService implements DocumentAnnotationsServi
               kind: 'annotations.import',
               effect: 'write',
               jobId,
+              opId,
               docId,
               bundle: { ...bundle, resources },
               ...(options.pages !== undefined ? { pages: options.pages } : {}),

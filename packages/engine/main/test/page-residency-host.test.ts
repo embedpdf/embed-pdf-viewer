@@ -78,7 +78,14 @@ async function openHost(options: WorkerHostOptions = {}, document: Uint8Array = 
   );
   let jobId = 0;
   const send = (request: Record<string, unknown>): number => {
-    host.receive({ docId: 'doc', jobId: ++jobId, ...request } as unknown as WorkerRequest);
+    ++jobId;
+    // Every write is its own, under its own opId.
+    host.receive({
+      docId: 'doc',
+      jobId,
+      opId: `op-${jobId}`,
+      ...request,
+    } as unknown as WorkerRequest);
     return jobId;
   };
   const reply = (id: number) => replies.find((response) => response.jobId === id);

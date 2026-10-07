@@ -28,8 +28,14 @@ export { parseScope, validateScopeArray } from './parser';
 
 export { InvalidScope, MissingIdentity, PermissionDenied } from './errors';
 
-export type { AnnotationAuthority } from './authority';
-export { authorizeAnnotationDelete, authorizeAnnotationUpdate } from './authority';
+export type { AnnotationAuthority, ChangeAuthority } from './authority';
+export {
+  authorizeAnnotationCreate,
+  authorizeCapability,
+  authorizeUnprotected,
+  authorizeAnnotationDelete,
+  authorizeAnnotationUpdate,
+} from './authority';
 
 export type { CollabTarget } from './resolver';
 export { collabTargetOf } from './resolver';

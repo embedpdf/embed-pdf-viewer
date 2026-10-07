@@ -11,7 +11,10 @@
 
 import {
   AnnotationWireComponents,
+  ChangeWireComponents,
+  DocumentWireComponents,
   EngineErrorPayloadSchema,
+  FormWireComponents,
   PdfActionWireComponents,
 } from '@embedpdf/engine-core/wire';
 import { z } from 'zod';
@@ -48,7 +51,19 @@ const SECURITY_SCHEME: Record<AdminCredential, string> = {
 const ADMIN_ERROR_REF = '#/components/schemas/AdminErrorPayload';
 const ENGINE_ERROR_REF = '#/components/schemas/EngineErrorPayload';
 
-const SHARED_COMPONENT_SCHEMAS = { ...PdfActionWireComponents, ...AnnotationWireComponents };
+/**
+ * Models with a stable public name: wherever a schema embeds one, the
+ * projection refers to the component instead of inlining it, so SDK
+ * generators make one type per model, not one per place it appears.
+ */
+const SHARED_COMPONENT_SCHEMAS = sharedComponents([
+  { AdminErrorPayload: AdminErrorPayloadSchema, EngineErrorPayload: EngineErrorPayloadSchema },
+  DocumentWireComponents,
+  PdfActionWireComponents,
+  AnnotationWireComponents,
+  FormWireComponents,
+  ChangeWireComponents,
+]);
 
 const SHARED_COMPONENT_BY_DEFINITION = new Map<z.ZodTypeDef, string>(
   Object.entries(SHARED_COMPONENT_SCHEMAS).map(([name, schema]) => [schema._def, name]),
@@ -56,6 +71,19 @@ const SHARED_COMPONENT_BY_DEFINITION = new Map<z.ZodTypeDef, string>(
 const SHARED_COMPONENT_REFS = new Set(
   Object.keys(SHARED_COMPONENT_SCHEMAS).map((name) => `#/components/schemas/${name}`),
 );
+
+function sharedComponents(
+  registries: ReadonlyArray<Record<string, z.ZodTypeAny>>,
+): Record<string, z.ZodTypeAny> {
+  const components: Record<string, z.ZodTypeAny> = {};
+  for (const registry of registries) {
+    for (const [name, schema] of Object.entries(registry)) {
+      if (components[name]) throw new Error(`Duplicate shared component name: ${name}`);
+      components[name] = schema;
+    }
+  }
+  return components;
+}
 
 export interface BuildAdminOpenApiOptions {
   /** Package version stamped into `info.version`; keeps the emitter pure. */
@@ -66,8 +94,6 @@ export function buildAdminOpenApiDocument(opts: BuildAdminOpenApiOptions): Recor
   const paths: Record<string, Record<string, unknown>> = {};
   const schemas: Record<string, Record<string, unknown>> = {};
 
-  registerSchema(schemas, 'AdminErrorPayload', AdminErrorPayloadSchema);
-  registerSchema(schemas, 'EngineErrorPayload', EngineErrorPayloadSchema);
   for (const [name, schema] of Object.entries(SHARED_COMPONENT_SCHEMAS)) {
     registerSchema(schemas, name, schema);
   }

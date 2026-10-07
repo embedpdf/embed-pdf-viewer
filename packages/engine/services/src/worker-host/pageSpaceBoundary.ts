@@ -19,8 +19,14 @@ import {
   pageSignatureSnapshotOf,
   pdfRenderTargetOf,
   type Annotation,
+  type Change,
+  type ChangeItem,
+  type ChangeOp,
+  type ChangeResult,
   type PageRef,
+  type WireAnnotationResources,
   type PageRenderOptions,
+  type PageCoordinates,
   type PdfCoordinates,
   type PdfDestination,
   type PdfRect,
@@ -28,6 +34,7 @@ import {
   type ShutdownWorkerRequest,
   type WorkerJobRequest,
   type WorkerResultPayload,
+  isSkippedItem,
 } from '@embedpdf/engine-core/runtime';
 
 /**
@@ -97,6 +104,17 @@ export function resultInPageSpace(
       return {
         ...payload,
         result: { ...payload.result, annotations: payload.result.annotations.map(annotation) },
+      };
+    case 'document.apply':
+      return { ...payload, result: changeResultInPageSpace(payload.result, boxOf) };
+    case 'document.applyChanges':
+      return {
+        ...payload,
+        outcomes: payload.outcomes.map((outcome) =>
+          outcome.status === 'applied'
+            ? { ...outcome, result: changeResultInPageSpace(outcome.result, boxOf) }
+            : outcome,
+        ),
       };
     case 'annotations.import':
       return {
@@ -173,6 +191,16 @@ export function requestInFileSpace(job: PageSpaceJob, boxOf: VisibleBoxOf): File
       return { ...job, patch: pdfAnnotationPatchOf(job.patch, boxOf(job.ref.page), boxOf) };
     case 'forms.createField':
       return { ...job, draft: pdfFormFieldDraftOf(job.draft, boxOf) };
+    case 'document.apply':
+      return { ...job, change: changeInFileSpace(job.change, boxOf) };
+    case 'document.applyChanges':
+      return {
+        ...job,
+        changes: job.changes.map((entry) => ({
+          ...entry,
+          change: changeInFileSpace(entry.change, boxOf),
+        })),
+      };
     case 'forms.addWidget':
       return { ...job, placement: pdfWidgetPlacementOf(job.placement, boxOf) };
     case 'measure.setScale':
@@ -210,4 +238,83 @@ export function renderOptionsInFileSpace(
     ...rest,
     target: target.kind === 'rect' ? pdfRenderTargetOf(target, visible()) : target,
   };
+}
+
+/** A change's ops, each place measured in the file's coordinates, as its single verb's job is. */
+function changeInFileSpace(
+  change: Change<PageCoordinates, WireAnnotationResources>,
+  boxOf: VisibleBoxOf,
+): Change<PdfCoordinates, WireAnnotationResources> {
+  if ('undoOf' in change) return change;
+  return { ops: change.ops.map((op) => opInFileSpace(op, boxOf)) };
+}
+
+function opInFileSpace(
+  op: ChangeOp<PageCoordinates, WireAnnotationResources>,
+  boxOf: VisibleBoxOf,
+): ChangeOp<PdfCoordinates, WireAnnotationResources> {
+  switch (op.type) {
+    case 'annotations.create':
+      return { ...op, data: pdfAnnotationDraftOf(op.data, boxOf(op.page), boxOf) };
+    case 'annotations.update': {
+      const box = boxOf(op.ref.page);
+      const { expect, ...rest } = op;
+      return {
+        ...rest,
+        patch: pdfAnnotationPatchOf(op.patch, box, boxOf),
+        ...(expect ? { expect: pdfAnnotationPatchOf(expect, box, boxOf) } : {}),
+      };
+    }
+    case 'annotations.delete': {
+      const { expect, ...rest } = op;
+      return expect
+        ? { ...rest, expect: pdfAnnotationPatchOf(expect, boxOf(op.ref.page), boxOf) }
+        : rest;
+    }
+    case 'forms.create':
+      return { ...op, draft: pdfFormFieldDraftOf(op.draft, boxOf) };
+    case 'forms.addWidget':
+      return { ...op, placement: pdfWidgetPlacementOf(op.placement, boxOf) };
+    default:
+      // The rest hold no places: values, flags, names, metadata.
+      return op;
+  }
+}
+
+/** What a change did, each place in page space, as its single verbs' results are. */
+function changeResultInPageSpace(
+  result: ChangeResult<PdfCoordinates>,
+  boxOf: VisibleBoxOf,
+): ChangeResult {
+  return { ...result, items: result.items.map((item) => itemInPageSpace(item, boxOf)) };
+}
+
+function itemInPageSpace(item: ChangeItem<PdfCoordinates>, boxOf: VisibleBoxOf): ChangeItem {
+  // An op an undo left alone holds no places.
+  if (isSkippedItem(item)) return item;
+  const annotation = (read: Annotation<PdfCoordinates>) =>
+    pageAnnotationOf(read, boxOf(read.page), boxOf);
+  switch (item.type) {
+    case 'annotations.create':
+    case 'annotations.update':
+      return { ...item, annotation: annotation(item.annotation) } as ChangeItem;
+    case 'annotations.move':
+    case 'annotations.restore':
+      return { ...item, annotations: item.annotations.map(annotation) } as ChangeItem;
+    case 'forms.setValue':
+    case 'forms.setDisplay':
+    case 'forms.setAppearanceText':
+    case 'forms.setSignatureAppearance':
+    case 'forms.create':
+    case 'forms.update':
+    case 'forms.restore':
+    case 'forms.addWidget':
+    case 'forms.removeWidget':
+      return { ...item, field: pageFormFieldOf(item.field, boxOf) } as ChangeItem;
+    case 'forms.reset':
+      return { ...item, fields: item.fields.map((field) => pageFormFieldOf(field, boxOf)) };
+    default:
+      // The rest hold no places: deletes, metadata.
+      return item;
+  }
 }

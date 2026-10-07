@@ -7,7 +7,13 @@ import { DateInputSchema, IsoDateTimeSchema } from '../dto/IsoDateTime.schema';
 
 import type { AnnotationList } from '../annotation/AnnotationList';
 import { AnnotationRefSchema } from '../annotation/base.schema';
-import { AnnotationSchema } from '../annotation/kinds';
+import {
+  AnnotationDraftSchema,
+  AnnotationPatchSchema,
+  AnnotationSchema,
+  PdfLinkTargetSchema,
+  PdfLinkTargetWritableSchema,
+} from '../annotation/kinds';
 import type {
   AnnotationAppearanceImageOptions,
   AnnotationAppearanceManifest,
@@ -49,10 +55,13 @@ import type { SerializedEngineError } from '../errors/EngineError';
 import { EngineErrorCode } from '../errors/EngineErrorCode';
 import type { FormEffectsResult, FormEffect } from '../forms/effects';
 import {
+  FormFieldDraftSchema,
   FormFieldDTOSchema,
+  FormFieldPatchSchema,
   FormFieldWidgetSchema,
   FormSnapshotSchema,
   FormWidgetSchema,
+  WidgetPlacementSchema,
 } from '../forms/schema';
 import { FormFieldRefSchema, FormFieldValueSchema } from '../forms/schema';
 import {
@@ -901,12 +910,29 @@ export const CacheDeltaSchema: z.ZodType<CacheDelta> = z.object({
 export const MutationMetaSchema: z.ZodType<MutationMeta> = z.object({
   affectedPages: z.array(PageRefSchema),
   cacheDelta: CacheDeltaSchema.nullable(),
+  opId: z.string(),
+  undoable: z.boolean(),
 });
+
+/**
+ * Stable public component names for the models every part of the document
+ * wire shares (page refs, a write's meta, the metadata), like
+ * `AnnotationWireComponents`.
+ */
+export const DocumentWireComponents = {
+  PageRef: PageRefSchema,
+  CacheDelta: CacheDeltaSchema,
+  MutationMeta: MutationMetaSchema,
+  DocumentMetadata: DocumentMetadataSchema,
+  MetadataPatch: MetadataPatchSchema,
+} as const satisfies Record<string, z.ZodTypeAny>;
 
 /** Per-page side-effect envelope every annotation mutation returns. Mirrors `AnnotationListMutationMeta`. */
 export const AnnotationListMutationMetaSchema: z.ZodType<AnnotationListMutationMeta> = z.object({
   affectedPages: z.array(PageRefSchema),
   cacheDelta: CacheDeltaSchema.nullable(),
+  opId: z.string(),
+  undoable: z.boolean(),
   changed: z.array(AnnotationRefSchema),
 });
 
@@ -942,7 +968,7 @@ export const AnnotationImportResultSchema: z.ZodType<AnnotationImportResult> = z
 /** The engine's `/AP` verdict riding every update result (see engine-core
  *  `annotation/appearance.ts`). `changed` drives client raster invalidation. */
 export const AppearanceOutcomeSchema: z.ZodType<AppearanceOutcome> = z.object({
-  action: z.enum(['preserved', 'regenerated', 'generation-unavailable']),
+  action: z.enum(['preserved', 'regenerated', 'generation-unavailable', 'restored']),
   changed: z.boolean(),
 });
 
@@ -963,6 +989,11 @@ export const AnnotationDeleteResultSchema: z.ZodType<AnnotationDeleteResult> = z
  */
 export const AnnotationWireComponents = {
   Annotation: AnnotationSchema,
+  AnnotationRef: AnnotationRefSchema,
+  AnnotationDraft: AnnotationDraftSchema,
+  AnnotationPatch: AnnotationPatchSchema,
+  PdfLinkTarget: PdfLinkTargetSchema,
+  PdfLinkTargetWritable: PdfLinkTargetWritableSchema,
   AnnotationList: AnnotationListSchema,
   AnnotationMutationMeta: AnnotationListMutationMetaSchema,
 } as const satisfies Record<string, z.ZodTypeAny>;
@@ -981,9 +1012,27 @@ export const AnnotationMoveResultSchema: z.ZodType<AnnotationMoveResult> = z.obj
 export const FormMutationMetaSchema: z.ZodType<FormMutationMeta> = z.object({
   affectedPages: z.array(PageRefSchema),
   cacheDelta: CacheDeltaSchema.nullable(),
+  opId: z.string(),
+  undoable: z.boolean(),
   changedFields: z.array(FormFieldRefSchema),
   changedWidgets: z.array(FormWidgetSchema),
 });
+
+/**
+ * Stable public component names for the form wire model, so an OpenAPI
+ * projection names each once (`FormField`, not one type per response that
+ * carries one), like `AnnotationWireComponents`.
+ */
+export const FormWireComponents = {
+  FormFieldRef: FormFieldRefSchema,
+  FormField: FormFieldDTOSchema,
+  FormFieldValue: FormFieldValueSchema,
+  FormWidget: FormWidgetSchema,
+  FormFieldDraft: FormFieldDraftSchema,
+  FormFieldPatch: FormFieldPatchSchema,
+  WidgetPlacement: WidgetPlacementSchema,
+  FormMutationMeta: FormMutationMetaSchema,
+} as const satisfies Record<string, z.ZodTypeAny>;
 
 export const FormSetValueResultSchema: z.ZodType<FormSetValueResult> = z.object({
   field: FormFieldDTOSchema,
@@ -1354,6 +1403,8 @@ export const PageInsertResultSchema: z.ZodType<PageInsertResult> = z.object({
 export const AttachmentMutationMetaSchema: z.ZodType<AttachmentMutationMeta> = z.object({
   affectedPages: z.array(PageRefSchema),
   cacheDelta: CacheDeltaSchema.nullable(),
+  opId: z.string(),
+  undoable: z.boolean(),
   changed: z.array(AttachmentRefSchema),
 });
 

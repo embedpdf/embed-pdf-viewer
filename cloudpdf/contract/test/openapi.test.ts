@@ -258,9 +258,13 @@ describe('openapi document', () => {
     });
     expect(schemas.DocAnnotationsCreate200Response.properties.annotation).toEqual(annotationRef);
     expect(schemas.DocAnnotationsUpdate200Response.properties.annotation).toEqual(annotationRef);
-    expect(
-      schemas.DocFormsList200Response.properties.fields.items.anyOf[0].properties.actions,
-    ).toEqual({ $ref: '#/components/schemas/PdfFieldActions' });
+    // Every form read and write names the one `FormField` component.
+    expect(schemas.DocFormsList200Response.properties.fields.items).toEqual({
+      $ref: '#/components/schemas/FormField',
+    });
+    expect(schemas.FormField.anyOf[0].properties.actions).toEqual({
+      $ref: '#/components/schemas/PdfFieldActions',
+    });
 
     const refs: string[] = [];
     const visit = (value: unknown): void => {
@@ -276,6 +280,30 @@ describe('openapi document', () => {
     };
     visit(doc);
     expect(refs.filter((ref) => ref.includes('/properties/actions'))).toEqual([]);
+  });
+
+  test('a change names the models it carries instead of inlining them', () => {
+    const doc = buildAdminOpenApiDocument({ version: pkg.version }) as {
+      components: { schemas: Record<string, any> };
+    };
+    const schemas = doc.components.schemas;
+    const ref = (name: string) => ({ $ref: `#/components/schemas/${name}` });
+    const op = (type: string) =>
+      schemas.ChangeOp.anyOf.find((arm: any) => arm.properties.type.enum[0] === type);
+
+    expect(op('annotations.create').properties.data).toEqual(ref('AnnotationDraft'));
+    expect(op('annotations.create').properties.page).toEqual(ref('PageRef'));
+    expect(op('annotations.update').properties.patch).toEqual(ref('AnnotationPatch'));
+    expect(op('annotations.update').properties.ref).toEqual(ref('AnnotationRef'));
+    expect(op('forms.create').properties.draft).toEqual(ref('FormFieldDraft'));
+    expect(op('forms.update').properties.patch).toEqual(ref('FormFieldPatch'));
+    expect(op('metadata.update').properties.patch).toEqual(ref('MetadataPatch'));
+    const [applied, refused] = schemas.DocChanges200Response.properties.changes.items.anyOf;
+    expect(applied.properties.result).toEqual(ref('ChangeResult'));
+    expect(refused.properties.error).toEqual(ref('EngineErrorPayload'));
+    // Every error response names the plane's one error envelope.
+    expect(schemas.DocChanges404Response).toEqual(ref('EngineErrorPayload'));
+    expect(schemas.TokensIssue400Response).toEqual(ref('AdminErrorPayload'));
   });
 });
 

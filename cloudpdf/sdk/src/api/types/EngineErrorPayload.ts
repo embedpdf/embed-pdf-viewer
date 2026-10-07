@@ -39,6 +39,9 @@ export namespace EngineErrorPayload {
         PayloadTooLarge: "PayloadTooLarge",
         ObjectNumberUnavailable: "ObjectNumberUnavailable",
         LayerFull: "LayerFull",
+        ChangeConflict: "ChangeConflict",
+        UndoUnavailable: "UndoUnavailable",
+        IdempotencyKeyReused: "IdempotencyKeyReused",
     } as const;
     export type Code = (typeof Code)[keyof typeof Code];
 }

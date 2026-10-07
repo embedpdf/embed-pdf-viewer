@@ -6,6 +6,7 @@
 import {
   EngineError,
   EngineErrorCode,
+  opIdOf,
   serializeError,
   type FormEffectsResult,
   type FormMutationMeta,
@@ -51,6 +52,8 @@ export function createScriptEffects(ctx: FormContext) {
       resolveSubmitDataset,
       commitScriptFormEffects: async (effects) => {
         const doc = ctx.doc;
+        // The batch's id, minted here so a batch that never runs reports it too.
+        const opId = opIdOf(undefined);
         if (!doc.forms.applyEffects) {
           // The sink never throws: report every effect as failed instead.
           return {
@@ -63,12 +66,12 @@ export function createScriptEffects(ctx: FormContext) {
                 new EngineError(EngineErrorCode.NotImplemented, 'no form-effects batch door'),
               ),
             })),
-            meta: nothingChanged(),
+            meta: nothingChanged(opId),
           };
         }
         let result: FormEffectsResult;
         try {
-          result = await doc.forms.applyEffects(effects);
+          result = await doc.forms.applyEffects(effects, { opId });
         } catch (error) {
           // The sink never throws: a refused batch (for example a permission
           // refusal) reports every effect as failed.
@@ -81,7 +84,7 @@ export function createScriptEffects(ctx: FormContext) {
               changedWidgets: [],
               error: refusal,
             })),
-            meta: nothingChanged(),
+            meta: nothingChanged(opId),
           };
         }
         // The fields mirror and the annotation plugin apply the confirmed
@@ -93,6 +96,13 @@ export function createScriptEffects(ctx: FormContext) {
 }
 
 /** The meta of a batch that wrote nothing. */
-function nothingChanged(): FormMutationMeta {
-  return { affectedPages: [], cacheDelta: null, changedFields: [], changedWidgets: [] };
+function nothingChanged(opId: string): FormMutationMeta {
+  return {
+    affectedPages: [],
+    cacheDelta: null,
+    opId,
+    undoable: false,
+    changedFields: [],
+    changedWidgets: [],
+  };
 }

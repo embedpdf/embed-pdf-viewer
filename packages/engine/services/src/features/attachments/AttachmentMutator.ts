@@ -95,7 +95,7 @@ export class AttachmentMutator {
     return {
       attachment: { ...readAttachmentFileInfo(fn, mem, attachmentPtr), ref, index },
       // Cloud coherence pins are a server concern; the worker reports none.
-      meta: { affectedPages: [], cacheDelta: null, changed: [ref] },
+      meta: { affectedPages: [], cacheDelta: null, ...this.session.writeStamp(), changed: [ref] },
     };
   }
 
@@ -115,6 +115,6 @@ export class AttachmentMutator {
     if (!fn.FPDFDoc_DeleteAttachment(docPtr, index)) {
       throw new EngineError(EngineErrorCode.Unknown, 'FPDFDoc_DeleteAttachment returned false');
     }
-    return { meta: { affectedPages: [], cacheDelta: null, changed: [ref] } };
+    return { meta: { affectedPages: [], cacheDelta: null, ...this.session.writeStamp(), changed: [ref] } };
   }
 }

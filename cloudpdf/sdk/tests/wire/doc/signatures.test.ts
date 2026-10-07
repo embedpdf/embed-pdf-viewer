@@ -209,6 +209,8 @@ describe("SignaturesClient", () => {
                         },
                     ],
                 },
+                opId: "opId",
+                undoable: true,
             },
         };
 

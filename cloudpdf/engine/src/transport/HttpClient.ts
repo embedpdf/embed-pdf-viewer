@@ -78,7 +78,8 @@ export interface CdnBinding {
  * object numbers to top the editing session up by.
  */
 export interface WriteRequest {
-  readonly opId: string;
+  /** Absent for a request of changes: its body names each change by its own `opId`. */
+  readonly opId?: string;
   /** `EmbedPDF-Reserve-Object-Numbers`, when more than 0. */
   readonly reserveObjectNumbers?: number;
   /** Called with the numbers the response hands out (`EmbedPDF-Object-Numbers`). */
@@ -507,7 +508,7 @@ export class HttpClient {
       headers.set('X-Engine-Session-Id', this.sessionId);
     }
     if (write) {
-      headers.set('Idempotency-Key', write.opId);
+      if (write.opId !== undefined) headers.set('Idempotency-Key', write.opId);
       if (write.reserveObjectNumbers && write.reserveObjectNumbers > 0) {
         headers.set('EmbedPDF-Reserve-Object-Numbers', String(write.reserveObjectNumbers));
       }

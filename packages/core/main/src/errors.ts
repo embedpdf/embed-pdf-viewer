@@ -91,6 +91,9 @@ const ENGINE_CODE_MAP: Readonly<Record<string, PluginErrorCode>> = {
   SigningVersionMismatch: 'conflict',
   ObjectNumberUnavailable: 'conflict',
   LayerFull: 'conflict',
+  ChangeConflict: 'conflict',
+  UndoUnavailable: 'conflict',
+  IdempotencyKeyReused: 'invalid-input',
 };
 
 /**

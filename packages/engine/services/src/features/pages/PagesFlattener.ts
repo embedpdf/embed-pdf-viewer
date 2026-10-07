@@ -66,13 +66,14 @@ export class PagesFlattener {
     }
 
     if (affected.size === 0) {
-      return { pages, usage, results, meta: { affectedPages: [], cacheDelta: null } };
+      return { pages, usage, results, meta: { affectedPages: [], cacheDelta: null, ...this.session.writeStamp() } };
     }
 
     this.session.invalidateDerived();
     const meta: MutationMeta = {
       affectedPages: [...affected].map((pageObjectNumber) => toPageRef(pageObjectNumber)),
       cacheDelta: null,
+      ...this.session.writeStamp(),
     };
     return { pages, usage, results, meta };
   }

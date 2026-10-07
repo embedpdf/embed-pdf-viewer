@@ -15,164 +15,52 @@ export type PageDestination =
 export namespace PageDestination {
     export interface Xyz {
         kind: "xyz";
-        page: PageDestinationXyz.Page;
+        page: CloudPDF.PageRef;
         x?: (number | null) | undefined;
         y?: (number | null) | undefined;
         zoom?: (number | null) | undefined;
     }
 
-    export namespace PageDestinationXyz {
-        export interface Page {
-            kind: Page.Kind;
-            objectNumber: number;
-        }
-
-        export namespace Page {
-            export const Kind = {
-                ObjectNumber: "objectNumber",
-            } as const;
-            export type Kind = (typeof Kind)[keyof typeof Kind];
-        }
-    }
-
     export interface Fit {
         kind: "fit";
-        page: PageDestinationFit.Page;
-    }
-
-    export namespace PageDestinationFit {
-        export interface Page {
-            kind: Page.Kind;
-            objectNumber: number;
-        }
-
-        export namespace Page {
-            export const Kind = {
-                ObjectNumber: "objectNumber",
-            } as const;
-            export type Kind = (typeof Kind)[keyof typeof Kind];
-        }
+        page: CloudPDF.PageRef;
     }
 
     export interface FitH {
         kind: "fitH";
-        page: PageDestinationFitH.Page;
+        page: CloudPDF.PageRef;
         y?: (number | null) | undefined;
-    }
-
-    export namespace PageDestinationFitH {
-        export interface Page {
-            kind: Page.Kind;
-            objectNumber: number;
-        }
-
-        export namespace Page {
-            export const Kind = {
-                ObjectNumber: "objectNumber",
-            } as const;
-            export type Kind = (typeof Kind)[keyof typeof Kind];
-        }
     }
 
     export interface FitV {
         kind: "fitV";
-        page: PageDestinationFitV.Page;
+        page: CloudPDF.PageRef;
         x?: (number | null) | undefined;
-    }
-
-    export namespace PageDestinationFitV {
-        export interface Page {
-            kind: Page.Kind;
-            objectNumber: number;
-        }
-
-        export namespace Page {
-            export const Kind = {
-                ObjectNumber: "objectNumber",
-            } as const;
-            export type Kind = (typeof Kind)[keyof typeof Kind];
-        }
     }
 
     export interface FitR {
         kind: "fitR";
-        page: PageDestinationFitR.Page;
+        page: CloudPDF.PageRef;
         x: number;
         y: number;
         width: number;
         height: number;
     }
 
-    export namespace PageDestinationFitR {
-        export interface Page {
-            kind: Page.Kind;
-            objectNumber: number;
-        }
-
-        export namespace Page {
-            export const Kind = {
-                ObjectNumber: "objectNumber",
-            } as const;
-            export type Kind = (typeof Kind)[keyof typeof Kind];
-        }
-    }
-
     export interface FitB {
         kind: "fitB";
-        page: PageDestinationFitB.Page;
-    }
-
-    export namespace PageDestinationFitB {
-        export interface Page {
-            kind: Page.Kind;
-            objectNumber: number;
-        }
-
-        export namespace Page {
-            export const Kind = {
-                ObjectNumber: "objectNumber",
-            } as const;
-            export type Kind = (typeof Kind)[keyof typeof Kind];
-        }
+        page: CloudPDF.PageRef;
     }
 
     export interface FitBh {
         kind: "fitBH";
-        page: PageDestinationFitBh.Page;
+        page: CloudPDF.PageRef;
         y?: (number | null) | undefined;
-    }
-
-    export namespace PageDestinationFitBh {
-        export interface Page {
-            kind: Page.Kind;
-            objectNumber: number;
-        }
-
-        export namespace Page {
-            export const Kind = {
-                ObjectNumber: "objectNumber",
-            } as const;
-            export type Kind = (typeof Kind)[keyof typeof Kind];
-        }
     }
 
     export interface FitBv {
         kind: "fitBV";
-        page: PageDestinationFitBv.Page;
+        page: CloudPDF.PageRef;
         x?: (number | null) | undefined;
-    }
-
-    export namespace PageDestinationFitBv {
-        export interface Page {
-            kind: Page.Kind;
-            objectNumber: number;
-        }
-
-        export namespace Page {
-            export const Kind = {
-                ObjectNumber: "objectNumber",
-            } as const;
-            export type Kind = (typeof Kind)[keyof typeof Kind];
-        }
     }
 }

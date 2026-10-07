@@ -95,7 +95,11 @@ export { runNamedPagesConformance } from './conformance/runNamedPagesConformance
 export { runAnnotationFlattenConformance } from './conformance/runAnnotationFlattenConformance';
 export { runAnnotationAppearanceExportConformance } from './conformance/runAnnotationAppearanceExportConformance';
 export { runPageFlattenConformance } from './conformance/runPageFlattenConformance';
-export { runRedactionApplyConformance } from './conformance/runRedactionApplyConformance';
+export {
+  BARE_PAGE_FIXTURE_PDF,
+  runRedactionApplyConformance,
+  type RedactionApplyConformanceOptions,
+} from './conformance/runRedactionApplyConformance';
 export { runPageExtractConformance } from './conformance/runPageExtractConformance';
 export { runAttachmentConformance } from './conformance/runAttachmentConformance';
 export { runPageInsertConformance } from './conformance/runPageInsertConformance';
@@ -105,6 +109,11 @@ export {
   runObjectNumberConformance,
   type ObjectNumberConformanceOptions,
 } from './conformance/runObjectNumberConformance';
+export {
+  CHANGE_FIXTURE_PDF,
+  runChangeConformance,
+  type ChangeConformanceOptions,
+} from './conformance/runChangeConformance';
 export {
   runPieceInfoConformance,
   type PieceInfoConformanceOptions,

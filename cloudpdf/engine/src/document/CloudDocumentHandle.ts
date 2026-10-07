@@ -22,8 +22,11 @@ import {
   type PageRef,
   type DownloadOptions,
   type CallFacts,
+  type Change,
+  type ChangeResult,
   type WorkingSetPage,
   type ObjectNumberPool,
+  type WriteOptions,
 } from '@embedpdf/engine-core/runtime';
 import {
   DEFAULT_LAYER_NAME,
@@ -40,6 +43,7 @@ import { EventHub, SessionEventPublisher } from '@embedpdf/engine-services';
 import { CloudDocumentActionsService } from './CloudDocumentActionsService';
 import { CloudDocumentAnnotationsService } from './CloudDocumentAnnotationsService';
 import { CloudDocumentAttachmentsService } from './CloudDocumentAttachmentsService';
+import { changeSender, CloudDocumentChanges } from './CloudDocumentChanges';
 import { CloudDocumentFormsService } from './CloudDocumentFormsService';
 import { CloudDocumentPagesService } from './CloudDocumentPagesService';
 import { CloudDocumentRedactionService } from './CloudDocumentRedactionService';
@@ -101,6 +105,7 @@ export class CloudDocumentHandle implements DocumentHandle {
   readonly objectNumbers: ObjectNumberPool;
   private readonly pool: CloudObjectNumberPool;
   private readonly writes: CloudWrites;
+  private readonly changes: CloudDocumentChanges;
   private readonly publisher: SessionEventPublisher;
   private readonly hub: EventHub;
   private readonly sessionId: string;
@@ -160,7 +165,7 @@ export class CloudDocumentHandle implements DocumentHandle {
     });
     this.pool = pool;
     this.objectNumbers = pool;
-    this.writes = new CloudWrites(pool);
+    this.writes = new CloudWrites(pool, changeSender(http, id, layerName));
     const security = new CloudDocumentSecurityService(
       http,
       id,
@@ -237,6 +242,12 @@ export class CloudDocumentHandle implements DocumentHandle {
       applyPageDelete: (meta, deletedPages) => this.absorbPageDelete(meta, deletedPages),
       applyPageInsert: (meta) => this.absorbPageInsert(meta),
     };
+    this.changes = new CloudDocumentChanges(
+      () => this.closed,
+      this.manifestAccessor,
+      this.publisher,
+      this.writes,
+    );
     this.metadata = new CloudMetadataService(
       http,
       id,
@@ -341,6 +352,11 @@ export class CloudDocumentHandle implements DocumentHandle {
    */
   with(_facts: CallFacts): DocumentHandle {
     return this;
+  }
+
+  /** One change as one transaction, or the undo of one (see `DocumentHandle.apply`). */
+  apply(change: Change, options?: WriteOptions): AbortablePromise<ChangeResult> {
+    return this.changes.apply(change, options);
   }
 
   /** Ignored: the server learns what's needed from what is asked of it (§10.10). */

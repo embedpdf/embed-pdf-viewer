@@ -53,6 +53,8 @@ export function formResetFacts<C extends Coordinates>(
       meta: {
         affectedPages: result.meta.affectedPages.filter((page) => pages.has(page.objectNumber)),
         cacheDelta: null,
+        opId: result.meta.opId,
+        undoable: result.meta.undoable,
         changedFields: [field.ref],
         changedWidgets,
       },

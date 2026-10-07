@@ -13,6 +13,7 @@ import {
   expandRawScope,
   type AnnotationActor,
   type AnnotationAuthority,
+  type ChangeAuthority,
   type CollabAction,
   type CollabTarget,
   type DocCapability,
@@ -168,6 +169,15 @@ export class ScopeGuard {
       identity: this.ctx.identity,
       grants: { scope: this.ctx.scope, pdfBits: this.ctx.pdfBits },
     };
+  }
+
+  /**
+   * What a change carries for the worker to check each of its ops against,
+   * inside the write: who the handle acts for, its grants, and what the
+   * document's signatures forbid.
+   */
+  changeAuthority(): ChangeAuthority {
+    return { ...this.annotationAuthority(), protection: this.protection };
   }
 
   /** Throws `ProtectedDocument` when a signature forbids annotation writes. */

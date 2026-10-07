@@ -6,15 +6,15 @@ export interface DocFormsImportData200Response {
     form: DocFormsImportData200Response.Form;
     applied: number;
     skipped: number;
-    meta: DocFormsImportData200Response.Meta;
+    meta: CloudPDF.MutationMeta;
 }
 
 export namespace DocFormsImportData200Response {
     export interface Form {
         formKind: Form.FormKind;
         needsAppearances: boolean;
-        fields: CloudPDF.DocFormsImportData200ResponseFormFieldsItem[];
-        calculationOrder: (CloudPDF.DocFormsImportData200ResponseFormCalculationOrderItem | null)[];
+        fields: CloudPDF.FormField[];
+        calculationOrder: (CloudPDF.FormFieldRef | null)[];
     }
 
     export namespace Form {
@@ -24,70 +24,5 @@ export namespace DocFormsImportData200Response {
             Xfa: "xfa",
         } as const;
         export type FormKind = (typeof FormKind)[keyof typeof FormKind];
-    }
-
-    export interface Meta {
-        affectedPages: Meta.AffectedPages.Item[];
-        cacheDelta: Meta.CacheDelta | null;
-    }
-
-    export namespace Meta {
-        export type AffectedPages = AffectedPages.Item[];
-
-        export namespace AffectedPages {
-            export interface Item {
-                kind: Item.Kind;
-                objectNumber: number;
-            }
-
-            export namespace Item {
-                export const Kind = {
-                    ObjectNumber: "objectNumber",
-                } as const;
-                export type Kind = (typeof Kind)[keyof typeof Kind];
-            }
-        }
-
-        export interface CacheDelta {
-            previousDocVersion: number;
-            docVersion: number;
-            annotationsVersion?: number | undefined;
-            layoutVersion?: number | undefined;
-            metadataVersion?: number | undefined;
-            attachmentsVersion?: number | undefined;
-            layerVersion?: number | undefined;
-            working?: boolean | undefined;
-            pages: CacheDelta.Pages.Item[];
-        }
-
-        export namespace CacheDelta {
-            export type Pages = Pages.Item[];
-
-            export namespace Pages {
-                export interface Item {
-                    page: Item.Page;
-                    cache: Item.Cache;
-                }
-
-                export namespace Item {
-                    export interface Page {
-                        kind: Page.Kind;
-                        objectNumber: number;
-                    }
-
-                    export namespace Page {
-                        export const Kind = {
-                            ObjectNumber: "objectNumber",
-                        } as const;
-                        export type Kind = (typeof Kind)[keyof typeof Kind];
-                    }
-
-                    export interface Cache {
-                        contentVersion: number;
-                        annotationVersion: number;
-                    }
-                }
-            }
-        }
     }
 }

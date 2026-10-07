@@ -27,8 +27,8 @@ export type Annotation =
 export namespace Annotation {
     export interface Highlight {
         subtype: "highlight";
-        ref: CloudPDF.AnnotationHighlightRef;
-        page: AnnotationHighlight.Page;
+        ref: CloudPDF.AnnotationRef;
+        page: CloudPDF.PageRef;
         index: number;
         hasAppearance: boolean;
         nm: string | null;
@@ -47,7 +47,7 @@ export namespace Annotation {
         toggleNoView: boolean;
         lockedContents: boolean;
         reply: AnnotationHighlight.Reply | null;
-        popup: CloudPDF.AnnotationHighlightPopup | null;
+        popup: CloudPDF.AnnotationRef | null;
         groupId: string | null;
         author: string | null;
         createdAt: string | null;
@@ -63,18 +63,6 @@ export namespace Annotation {
     }
 
     export namespace AnnotationHighlight {
-        export interface Page {
-            kind: Page.Kind;
-            objectNumber: number;
-        }
-
-        export namespace Page {
-            export const Kind = {
-                ObjectNumber: "objectNumber",
-            } as const;
-            export type Kind = (typeof Kind)[keyof typeof Kind];
-        }
-
         export interface Rect {
             x: number;
             y: number;
@@ -103,7 +91,7 @@ export namespace Annotation {
         export type BlendMode = (typeof BlendMode)[keyof typeof BlendMode];
 
         export interface Reply {
-            to: CloudPDF.AnnotationHighlightReplyTo;
+            to: CloudPDF.AnnotationRef;
             type: Reply.Type;
         }
 
@@ -151,8 +139,8 @@ export namespace Annotation {
 
     export interface Underline {
         subtype: "underline";
-        ref: CloudPDF.AnnotationUnderlineRef;
-        page: AnnotationUnderline.Page;
+        ref: CloudPDF.AnnotationRef;
+        page: CloudPDF.PageRef;
         index: number;
         hasAppearance: boolean;
         nm: string | null;
@@ -171,7 +159,7 @@ export namespace Annotation {
         toggleNoView: boolean;
         lockedContents: boolean;
         reply: AnnotationUnderline.Reply | null;
-        popup: CloudPDF.AnnotationUnderlinePopup | null;
+        popup: CloudPDF.AnnotationRef | null;
         groupId: string | null;
         author: string | null;
         createdAt: string | null;
@@ -187,18 +175,6 @@ export namespace Annotation {
     }
 
     export namespace AnnotationUnderline {
-        export interface Page {
-            kind: Page.Kind;
-            objectNumber: number;
-        }
-
-        export namespace Page {
-            export const Kind = {
-                ObjectNumber: "objectNumber",
-            } as const;
-            export type Kind = (typeof Kind)[keyof typeof Kind];
-        }
-
         export interface Rect {
             x: number;
             y: number;
@@ -227,7 +203,7 @@ export namespace Annotation {
         export type BlendMode = (typeof BlendMode)[keyof typeof BlendMode];
 
         export interface Reply {
-            to: CloudPDF.AnnotationUnderlineReplyTo;
+            to: CloudPDF.AnnotationRef;
             type: Reply.Type;
         }
 
@@ -275,8 +251,8 @@ export namespace Annotation {
 
     export interface Squiggly {
         subtype: "squiggly";
-        ref: CloudPDF.AnnotationSquigglyRef;
-        page: AnnotationSquiggly.Page;
+        ref: CloudPDF.AnnotationRef;
+        page: CloudPDF.PageRef;
         index: number;
         hasAppearance: boolean;
         nm: string | null;
@@ -295,7 +271,7 @@ export namespace Annotation {
         toggleNoView: boolean;
         lockedContents: boolean;
         reply: AnnotationSquiggly.Reply | null;
-        popup: CloudPDF.AnnotationSquigglyPopup | null;
+        popup: CloudPDF.AnnotationRef | null;
         groupId: string | null;
         author: string | null;
         createdAt: string | null;
@@ -311,18 +287,6 @@ export namespace Annotation {
     }
 
     export namespace AnnotationSquiggly {
-        export interface Page {
-            kind: Page.Kind;
-            objectNumber: number;
-        }
-
-        export namespace Page {
-            export const Kind = {
-                ObjectNumber: "objectNumber",
-            } as const;
-            export type Kind = (typeof Kind)[keyof typeof Kind];
-        }
-
         export interface Rect {
             x: number;
             y: number;
@@ -351,7 +315,7 @@ export namespace Annotation {
         export type BlendMode = (typeof BlendMode)[keyof typeof BlendMode];
 
         export interface Reply {
-            to: CloudPDF.AnnotationSquigglyReplyTo;
+            to: CloudPDF.AnnotationRef;
             type: Reply.Type;
         }
 
@@ -399,8 +363,8 @@ export namespace Annotation {
 
     export interface Strikeout {
         subtype: "strikeout";
-        ref: CloudPDF.AnnotationStrikeoutRef;
-        page: AnnotationStrikeout.Page;
+        ref: CloudPDF.AnnotationRef;
+        page: CloudPDF.PageRef;
         index: number;
         hasAppearance: boolean;
         nm: string | null;
@@ -419,7 +383,7 @@ export namespace Annotation {
         toggleNoView: boolean;
         lockedContents: boolean;
         reply: AnnotationStrikeout.Reply | null;
-        popup: CloudPDF.AnnotationStrikeoutPopup | null;
+        popup: CloudPDF.AnnotationRef | null;
         groupId: string | null;
         author: string | null;
         createdAt: string | null;
@@ -436,18 +400,6 @@ export namespace Annotation {
     }
 
     export namespace AnnotationStrikeout {
-        export interface Page {
-            kind: Page.Kind;
-            objectNumber: number;
-        }
-
-        export namespace Page {
-            export const Kind = {
-                ObjectNumber: "objectNumber",
-            } as const;
-            export type Kind = (typeof Kind)[keyof typeof Kind];
-        }
-
         export interface Rect {
             x: number;
             y: number;
@@ -476,7 +428,7 @@ export namespace Annotation {
         export type BlendMode = (typeof BlendMode)[keyof typeof BlendMode];
 
         export interface Reply {
-            to: CloudPDF.AnnotationStrikeoutReplyTo;
+            to: CloudPDF.AnnotationRef;
             type: Reply.Type;
         }
 
@@ -529,8 +481,8 @@ export namespace Annotation {
 
     export interface Circle {
         subtype: "circle";
-        ref: CloudPDF.AnnotationCircleRef;
-        page: AnnotationCircle.Page;
+        ref: CloudPDF.AnnotationRef;
+        page: CloudPDF.PageRef;
         index: number;
         hasAppearance: boolean;
         nm: string | null;
@@ -549,7 +501,7 @@ export namespace Annotation {
         toggleNoView: boolean;
         lockedContents: boolean;
         reply: AnnotationCircle.Reply | null;
-        popup: CloudPDF.AnnotationCirclePopup | null;
+        popup: CloudPDF.AnnotationRef | null;
         groupId: string | null;
         author: string | null;
         createdAt: string | null;
@@ -571,18 +523,6 @@ export namespace Annotation {
     }
 
     export namespace AnnotationCircle {
-        export interface Page {
-            kind: Page.Kind;
-            objectNumber: number;
-        }
-
-        export namespace Page {
-            export const Kind = {
-                ObjectNumber: "objectNumber",
-            } as const;
-            export type Kind = (typeof Kind)[keyof typeof Kind];
-        }
-
         export interface Rect {
             x: number;
             y: number;
@@ -611,7 +551,7 @@ export namespace Annotation {
         export type BlendMode = (typeof BlendMode)[keyof typeof BlendMode];
 
         export interface Reply {
-            to: CloudPDF.AnnotationCircleReplyTo;
+            to: CloudPDF.AnnotationRef;
             type: Reply.Type;
         }
 
@@ -641,8 +581,8 @@ export namespace Annotation {
 
     export interface Square {
         subtype: "square";
-        ref: CloudPDF.AnnotationSquareRef;
-        page: AnnotationSquare.Page;
+        ref: CloudPDF.AnnotationRef;
+        page: CloudPDF.PageRef;
         index: number;
         hasAppearance: boolean;
         nm: string | null;
@@ -661,7 +601,7 @@ export namespace Annotation {
         toggleNoView: boolean;
         lockedContents: boolean;
         reply: AnnotationSquare.Reply | null;
-        popup: CloudPDF.AnnotationSquarePopup | null;
+        popup: CloudPDF.AnnotationRef | null;
         groupId: string | null;
         author: string | null;
         createdAt: string | null;
@@ -683,18 +623,6 @@ export namespace Annotation {
     }
 
     export namespace AnnotationSquare {
-        export interface Page {
-            kind: Page.Kind;
-            objectNumber: number;
-        }
-
-        export namespace Page {
-            export const Kind = {
-                ObjectNumber: "objectNumber",
-            } as const;
-            export type Kind = (typeof Kind)[keyof typeof Kind];
-        }
-
         export interface Rect {
             x: number;
             y: number;
@@ -723,7 +651,7 @@ export namespace Annotation {
         export type BlendMode = (typeof BlendMode)[keyof typeof BlendMode];
 
         export interface Reply {
-            to: CloudPDF.AnnotationSquareReplyTo;
+            to: CloudPDF.AnnotationRef;
             type: Reply.Type;
         }
 
@@ -753,8 +681,8 @@ export namespace Annotation {
 
     export interface Polygon {
         subtype: "polygon";
-        ref: CloudPDF.AnnotationPolygonRef;
-        page: AnnotationPolygon.Page;
+        ref: CloudPDF.AnnotationRef;
+        page: CloudPDF.PageRef;
         index: number;
         hasAppearance: boolean;
         nm: string | null;
@@ -773,7 +701,7 @@ export namespace Annotation {
         toggleNoView: boolean;
         lockedContents: boolean;
         reply: AnnotationPolygon.Reply | null;
-        popup: CloudPDF.AnnotationPolygonPopup | null;
+        popup: CloudPDF.AnnotationRef | null;
         groupId: string | null;
         author: string | null;
         createdAt: string | null;
@@ -799,18 +727,6 @@ export namespace Annotation {
     }
 
     export namespace AnnotationPolygon {
-        export interface Page {
-            kind: Page.Kind;
-            objectNumber: number;
-        }
-
-        export namespace Page {
-            export const Kind = {
-                ObjectNumber: "objectNumber",
-            } as const;
-            export type Kind = (typeof Kind)[keyof typeof Kind];
-        }
-
         export interface Rect {
             x: number;
             y: number;
@@ -839,7 +755,7 @@ export namespace Annotation {
         export type BlendMode = (typeof BlendMode)[keyof typeof BlendMode];
 
         export interface Reply {
-            to: CloudPDF.AnnotationPolygonReplyTo;
+            to: CloudPDF.AnnotationRef;
             type: Reply.Type;
         }
 
@@ -881,8 +797,8 @@ export namespace Annotation {
 
     export interface Polyline {
         subtype: "polyline";
-        ref: CloudPDF.AnnotationPolylineRef;
-        page: AnnotationPolyline.Page;
+        ref: CloudPDF.AnnotationRef;
+        page: CloudPDF.PageRef;
         index: number;
         hasAppearance: boolean;
         nm: string | null;
@@ -901,7 +817,7 @@ export namespace Annotation {
         toggleNoView: boolean;
         lockedContents: boolean;
         reply: AnnotationPolyline.Reply | null;
-        popup: CloudPDF.AnnotationPolylinePopup | null;
+        popup: CloudPDF.AnnotationRef | null;
         groupId: string | null;
         author: string | null;
         createdAt: string | null;
@@ -927,18 +843,6 @@ export namespace Annotation {
     }
 
     export namespace AnnotationPolyline {
-        export interface Page {
-            kind: Page.Kind;
-            objectNumber: number;
-        }
-
-        export namespace Page {
-            export const Kind = {
-                ObjectNumber: "objectNumber",
-            } as const;
-            export type Kind = (typeof Kind)[keyof typeof Kind];
-        }
-
         export interface Rect {
             x: number;
             y: number;
@@ -967,7 +871,7 @@ export namespace Annotation {
         export type BlendMode = (typeof BlendMode)[keyof typeof BlendMode];
 
         export interface Reply {
-            to: CloudPDF.AnnotationPolylineReplyTo;
+            to: CloudPDF.AnnotationRef;
             type: Reply.Type;
         }
 
@@ -1042,8 +946,8 @@ export namespace Annotation {
 
     export interface Line {
         subtype: "line";
-        ref: CloudPDF.AnnotationLineRef;
-        page: AnnotationLine.Page;
+        ref: CloudPDF.AnnotationRef;
+        page: CloudPDF.PageRef;
         index: number;
         hasAppearance: boolean;
         nm: string | null;
@@ -1062,7 +966,7 @@ export namespace Annotation {
         toggleNoView: boolean;
         lockedContents: boolean;
         reply: AnnotationLine.Reply | null;
-        popup: CloudPDF.AnnotationLinePopup | null;
+        popup: CloudPDF.AnnotationRef | null;
         groupId: string | null;
         author: string | null;
         createdAt: string | null;
@@ -1090,18 +994,6 @@ export namespace Annotation {
     }
 
     export namespace AnnotationLine {
-        export interface Page {
-            kind: Page.Kind;
-            objectNumber: number;
-        }
-
-        export namespace Page {
-            export const Kind = {
-                ObjectNumber: "objectNumber",
-            } as const;
-            export type Kind = (typeof Kind)[keyof typeof Kind];
-        }
-
         export interface Rect {
             x: number;
             y: number;
@@ -1130,7 +1022,7 @@ export namespace Annotation {
         export type BlendMode = (typeof BlendMode)[keyof typeof BlendMode];
 
         export interface Reply {
-            to: CloudPDF.AnnotationLineReplyTo;
+            to: CloudPDF.AnnotationRef;
             type: Reply.Type;
         }
 
@@ -1226,8 +1118,8 @@ export namespace Annotation {
 
     export interface Link {
         subtype: "link";
-        ref: CloudPDF.AnnotationLinkRef;
-        page: AnnotationLink.Page;
+        ref: CloudPDF.AnnotationRef;
+        page: CloudPDF.PageRef;
         index: number;
         hasAppearance: boolean;
         nm: string | null;
@@ -1246,7 +1138,7 @@ export namespace Annotation {
         toggleNoView: boolean;
         lockedContents: boolean;
         reply: AnnotationLink.Reply | null;
-        popup: CloudPDF.AnnotationLinkPopup | null;
+        popup: CloudPDF.AnnotationRef | null;
         groupId: string | null;
         author: string | null;
         createdAt: string | null;
@@ -1256,22 +1148,10 @@ export namespace Annotation {
         modifiedBy: string | null;
         importedBy: string | null;
         actions: CloudPDF.PdfAnnotationActions | null;
-        target: CloudPDF.AnnotationLinkTarget | null;
+        target: CloudPDF.PdfLinkTarget | null;
     }
 
     export namespace AnnotationLink {
-        export interface Page {
-            kind: Page.Kind;
-            objectNumber: number;
-        }
-
-        export namespace Page {
-            export const Kind = {
-                ObjectNumber: "objectNumber",
-            } as const;
-            export type Kind = (typeof Kind)[keyof typeof Kind];
-        }
-
         export interface Rect {
             x: number;
             y: number;
@@ -1300,7 +1180,7 @@ export namespace Annotation {
         export type BlendMode = (typeof BlendMode)[keyof typeof BlendMode];
 
         export interface Reply {
-            to: CloudPDF.AnnotationLinkReplyTo;
+            to: CloudPDF.AnnotationRef;
             type: Reply.Type;
         }
 
@@ -1315,8 +1195,8 @@ export namespace Annotation {
 
     export interface Ink {
         subtype: "ink";
-        ref: CloudPDF.AnnotationInkRef;
-        page: AnnotationInk.Page;
+        ref: CloudPDF.AnnotationRef;
+        page: CloudPDF.PageRef;
         index: number;
         hasAppearance: boolean;
         nm: string | null;
@@ -1335,7 +1215,7 @@ export namespace Annotation {
         toggleNoView: boolean;
         lockedContents: boolean;
         reply: AnnotationInk.Reply | null;
-        popup: CloudPDF.AnnotationInkPopup | null;
+        popup: CloudPDF.AnnotationRef | null;
         groupId: string | null;
         author: string | null;
         createdAt: string | null;
@@ -1356,18 +1236,6 @@ export namespace Annotation {
     }
 
     export namespace AnnotationInk {
-        export interface Page {
-            kind: Page.Kind;
-            objectNumber: number;
-        }
-
-        export namespace Page {
-            export const Kind = {
-                ObjectNumber: "objectNumber",
-            } as const;
-            export type Kind = (typeof Kind)[keyof typeof Kind];
-        }
-
         export interface Rect {
             x: number;
             y: number;
@@ -1396,7 +1264,7 @@ export namespace Annotation {
         export type BlendMode = (typeof BlendMode)[keyof typeof BlendMode];
 
         export interface Reply {
-            to: CloudPDF.AnnotationInkReplyTo;
+            to: CloudPDF.AnnotationRef;
             type: Reply.Type;
         }
 
@@ -1432,8 +1300,8 @@ export namespace Annotation {
 
     export interface FreeText {
         subtype: "free-text";
-        ref: CloudPDF.AnnotationFreeTextRef;
-        page: AnnotationFreeText.Page;
+        ref: CloudPDF.AnnotationRef;
+        page: CloudPDF.PageRef;
         index: number;
         hasAppearance: boolean;
         nm: string | null;
@@ -1452,7 +1320,7 @@ export namespace Annotation {
         toggleNoView: boolean;
         lockedContents: boolean;
         reply: AnnotationFreeText.Reply | null;
-        popup: CloudPDF.AnnotationFreeTextPopup | null;
+        popup: CloudPDF.AnnotationRef | null;
         groupId: string | null;
         author: string | null;
         createdAt: string | null;
@@ -1483,18 +1351,6 @@ export namespace Annotation {
     }
 
     export namespace AnnotationFreeText {
-        export interface Page {
-            kind: Page.Kind;
-            objectNumber: number;
-        }
-
-        export namespace Page {
-            export const Kind = {
-                ObjectNumber: "objectNumber",
-            } as const;
-            export type Kind = (typeof Kind)[keyof typeof Kind];
-        }
-
         export interface Rect {
             x: number;
             y: number;
@@ -1523,7 +1379,7 @@ export namespace Annotation {
         export type BlendMode = (typeof BlendMode)[keyof typeof BlendMode];
 
         export interface Reply {
-            to: CloudPDF.AnnotationFreeTextReplyTo;
+            to: CloudPDF.AnnotationRef;
             type: Reply.Type;
         }
 
@@ -1730,8 +1586,8 @@ export namespace Annotation {
 
     export interface Caret {
         subtype: "caret";
-        ref: CloudPDF.AnnotationCaretRef;
-        page: AnnotationCaret.Page;
+        ref: CloudPDF.AnnotationRef;
+        page: CloudPDF.PageRef;
         index: number;
         hasAppearance: boolean;
         nm: string | null;
@@ -1750,7 +1606,7 @@ export namespace Annotation {
         toggleNoView: boolean;
         lockedContents: boolean;
         reply: AnnotationCaret.Reply | null;
-        popup: CloudPDF.AnnotationCaretPopup | null;
+        popup: CloudPDF.AnnotationRef | null;
         groupId: string | null;
         author: string | null;
         createdAt: string | null;
@@ -1768,18 +1624,6 @@ export namespace Annotation {
     }
 
     export namespace AnnotationCaret {
-        export interface Page {
-            kind: Page.Kind;
-            objectNumber: number;
-        }
-
-        export namespace Page {
-            export const Kind = {
-                ObjectNumber: "objectNumber",
-            } as const;
-            export type Kind = (typeof Kind)[keyof typeof Kind];
-        }
-
         export interface Rect {
             x: number;
             y: number;
@@ -1808,7 +1652,7 @@ export namespace Annotation {
         export type BlendMode = (typeof BlendMode)[keyof typeof BlendMode];
 
         export interface Reply {
-            to: CloudPDF.AnnotationCaretReplyTo;
+            to: CloudPDF.AnnotationRef;
             type: Reply.Type;
         }
 
@@ -1835,8 +1679,8 @@ export namespace Annotation {
 
     export interface Text {
         subtype: "text";
-        ref: CloudPDF.AnnotationTextRef;
-        page: AnnotationText.Page;
+        ref: CloudPDF.AnnotationRef;
+        page: CloudPDF.PageRef;
         index: number;
         hasAppearance: boolean;
         nm: string | null;
@@ -1855,7 +1699,7 @@ export namespace Annotation {
         toggleNoView: boolean;
         lockedContents: boolean;
         reply: AnnotationText.Reply | null;
-        popup: CloudPDF.AnnotationTextPopup | null;
+        popup: CloudPDF.AnnotationRef | null;
         groupId: string | null;
         author: string | null;
         createdAt: string | null;
@@ -1874,18 +1718,6 @@ export namespace Annotation {
     }
 
     export namespace AnnotationText {
-        export interface Page {
-            kind: Page.Kind;
-            objectNumber: number;
-        }
-
-        export namespace Page {
-            export const Kind = {
-                ObjectNumber: "objectNumber",
-            } as const;
-            export type Kind = (typeof Kind)[keyof typeof Kind];
-        }
-
         export interface Rect {
             x: number;
             y: number;
@@ -1914,7 +1746,7 @@ export namespace Annotation {
         export type BlendMode = (typeof BlendMode)[keyof typeof BlendMode];
 
         export interface Reply {
-            to: CloudPDF.AnnotationTextReplyTo;
+            to: CloudPDF.AnnotationRef;
             type: Reply.Type;
         }
 
@@ -1940,8 +1772,8 @@ export namespace Annotation {
 
     export interface Stamp {
         subtype: "stamp";
-        ref: CloudPDF.AnnotationStampRef;
-        page: AnnotationStamp.Page;
+        ref: CloudPDF.AnnotationRef;
+        page: CloudPDF.PageRef;
         index: number;
         hasAppearance: boolean;
         nm: string | null;
@@ -1960,7 +1792,7 @@ export namespace Annotation {
         toggleNoView: boolean;
         lockedContents: boolean;
         reply: AnnotationStamp.Reply | null;
-        popup: CloudPDF.AnnotationStampPopup | null;
+        popup: CloudPDF.AnnotationRef | null;
         groupId: string | null;
         author: string | null;
         createdAt: string | null;
@@ -1978,18 +1810,6 @@ export namespace Annotation {
     }
 
     export namespace AnnotationStamp {
-        export interface Page {
-            kind: Page.Kind;
-            objectNumber: number;
-        }
-
-        export namespace Page {
-            export const Kind = {
-                ObjectNumber: "objectNumber",
-            } as const;
-            export type Kind = (typeof Kind)[keyof typeof Kind];
-        }
-
         export interface Rect {
             x: number;
             y: number;
@@ -2018,7 +1838,7 @@ export namespace Annotation {
         export type BlendMode = (typeof BlendMode)[keyof typeof BlendMode];
 
         export interface Reply {
-            to: CloudPDF.AnnotationStampReplyTo;
+            to: CloudPDF.AnnotationRef;
             type: Reply.Type;
         }
 
@@ -2047,8 +1867,8 @@ export namespace Annotation {
 
     export interface FileAttachment {
         subtype: "file-attachment";
-        ref: CloudPDF.AnnotationFileAttachmentRef;
-        page: AnnotationFileAttachment.Page;
+        ref: CloudPDF.AnnotationRef;
+        page: CloudPDF.PageRef;
         index: number;
         hasAppearance: boolean;
         nm: string | null;
@@ -2067,7 +1887,7 @@ export namespace Annotation {
         toggleNoView: boolean;
         lockedContents: boolean;
         reply: AnnotationFileAttachment.Reply | null;
-        popup: CloudPDF.AnnotationFileAttachmentPopup | null;
+        popup: CloudPDF.AnnotationRef | null;
         groupId: string | null;
         author: string | null;
         createdAt: string | null;
@@ -2084,18 +1904,6 @@ export namespace Annotation {
     }
 
     export namespace AnnotationFileAttachment {
-        export interface Page {
-            kind: Page.Kind;
-            objectNumber: number;
-        }
-
-        export namespace Page {
-            export const Kind = {
-                ObjectNumber: "objectNumber",
-            } as const;
-            export type Kind = (typeof Kind)[keyof typeof Kind];
-        }
-
         export interface Rect {
             x: number;
             y: number;
@@ -2124,7 +1932,7 @@ export namespace Annotation {
         export type BlendMode = (typeof BlendMode)[keyof typeof BlendMode];
 
         export interface Reply {
-            to: CloudPDF.AnnotationFileAttachmentReplyTo;
+            to: CloudPDF.AnnotationRef;
             type: Reply.Type;
         }
 
@@ -2157,8 +1965,8 @@ export namespace Annotation {
 
     export interface Widget {
         subtype: "widget";
-        ref: CloudPDF.AnnotationWidgetRef;
-        page: AnnotationWidget.Page;
+        ref: CloudPDF.AnnotationRef;
+        page: CloudPDF.PageRef;
         index: number;
         hasAppearance: boolean;
         nm: string | null;
@@ -2177,7 +1985,7 @@ export namespace Annotation {
         toggleNoView: boolean;
         lockedContents: boolean;
         reply: AnnotationWidget.Reply | null;
-        popup: CloudPDF.AnnotationWidgetPopup | null;
+        popup: CloudPDF.AnnotationRef | null;
         groupId: string | null;
         author: string | null;
         createdAt: string | null;
@@ -2195,23 +2003,11 @@ export namespace Annotation {
         fontSize: number | null;
         fontColor: string | null;
         textAlign: AnnotationWidget.TextAlign;
-        field: CloudPDF.AnnotationWidgetField | null;
+        field: CloudPDF.FormFieldRef | null;
         fieldFamily: AnnotationWidget.FieldFamily;
     }
 
     export namespace AnnotationWidget {
-        export interface Page {
-            kind: Page.Kind;
-            objectNumber: number;
-        }
-
-        export namespace Page {
-            export const Kind = {
-                ObjectNumber: "objectNumber",
-            } as const;
-            export type Kind = (typeof Kind)[keyof typeof Kind];
-        }
-
         export interface Rect {
             x: number;
             y: number;
@@ -2240,7 +2036,7 @@ export namespace Annotation {
         export type BlendMode = (typeof BlendMode)[keyof typeof BlendMode];
 
         export interface Reply {
-            to: CloudPDF.AnnotationWidgetReplyTo;
+            to: CloudPDF.AnnotationRef;
             type: Reply.Type;
         }
 
@@ -2297,8 +2093,8 @@ export namespace Annotation {
 
     export interface Redact {
         subtype: "redact";
-        ref: CloudPDF.AnnotationRedactRef;
-        page: AnnotationRedact.Page;
+        ref: CloudPDF.AnnotationRef;
+        page: CloudPDF.PageRef;
         index: number;
         hasAppearance: boolean;
         nm: string | null;
@@ -2317,7 +2113,7 @@ export namespace Annotation {
         toggleNoView: boolean;
         lockedContents: boolean;
         reply: AnnotationRedact.Reply | null;
-        popup: CloudPDF.AnnotationRedactPopup | null;
+        popup: CloudPDF.AnnotationRef | null;
         groupId: string | null;
         author: string | null;
         createdAt: string | null;
@@ -2340,18 +2136,6 @@ export namespace Annotation {
     }
 
     export namespace AnnotationRedact {
-        export interface Page {
-            kind: Page.Kind;
-            objectNumber: number;
-        }
-
-        export namespace Page {
-            export const Kind = {
-                ObjectNumber: "objectNumber",
-            } as const;
-            export type Kind = (typeof Kind)[keyof typeof Kind];
-        }
-
         export interface Rect {
             x: number;
             y: number;
@@ -2380,7 +2164,7 @@ export namespace Annotation {
         export type BlendMode = (typeof BlendMode)[keyof typeof BlendMode];
 
         export interface Reply {
-            to: CloudPDF.AnnotationRedactReplyTo;
+            to: CloudPDF.AnnotationRef;
             type: Reply.Type;
         }
 
@@ -2435,8 +2219,8 @@ export namespace Annotation {
 
     export interface Popup {
         subtype: "popup";
-        ref: CloudPDF.AnnotationPopupRef;
-        page: AnnotationPopup.Page;
+        ref: CloudPDF.AnnotationRef;
+        page: CloudPDF.PageRef;
         index: number;
         hasAppearance: boolean;
         nm: string | null;
@@ -2455,7 +2239,7 @@ export namespace Annotation {
         toggleNoView: boolean;
         lockedContents: boolean;
         reply: AnnotationPopup.Reply | null;
-        popup: CloudPDF.AnnotationPopupPopup | null;
+        popup: CloudPDF.AnnotationRef | null;
         groupId: string | null;
         author: string | null;
         createdAt: string | null;
@@ -2465,23 +2249,11 @@ export namespace Annotation {
         modifiedBy: string | null;
         importedBy: string | null;
         actions: CloudPDF.PdfAnnotationActions | null;
-        parent: CloudPDF.AnnotationPopupParent | null;
+        parent: CloudPDF.AnnotationRef | null;
         open: boolean;
     }
 
     export namespace AnnotationPopup {
-        export interface Page {
-            kind: Page.Kind;
-            objectNumber: number;
-        }
-
-        export namespace Page {
-            export const Kind = {
-                ObjectNumber: "objectNumber",
-            } as const;
-            export type Kind = (typeof Kind)[keyof typeof Kind];
-        }
-
         export interface Rect {
             x: number;
             y: number;
@@ -2510,7 +2282,7 @@ export namespace Annotation {
         export type BlendMode = (typeof BlendMode)[keyof typeof BlendMode];
 
         export interface Reply {
-            to: CloudPDF.AnnotationPopupReplyTo;
+            to: CloudPDF.AnnotationRef;
             type: Reply.Type;
         }
 
@@ -2525,8 +2297,8 @@ export namespace Annotation {
 
     export interface Unsupported {
         subtype: "unsupported";
-        ref: CloudPDF.AnnotationUnsupportedRef;
-        page: AnnotationUnsupported.Page;
+        ref: CloudPDF.AnnotationRef;
+        page: CloudPDF.PageRef;
         index: number;
         hasAppearance: boolean;
         nm: string | null;
@@ -2545,7 +2317,7 @@ export namespace Annotation {
         toggleNoView: boolean;
         lockedContents: boolean;
         reply: AnnotationUnsupported.Reply | null;
-        popup: CloudPDF.AnnotationUnsupportedPopup | null;
+        popup: CloudPDF.AnnotationRef | null;
         groupId: string | null;
         author: string | null;
         createdAt: string | null;
@@ -2560,18 +2332,6 @@ export namespace Annotation {
     }
 
     export namespace AnnotationUnsupported {
-        export interface Page {
-            kind: Page.Kind;
-            objectNumber: number;
-        }
-
-        export namespace Page {
-            export const Kind = {
-                ObjectNumber: "objectNumber",
-            } as const;
-            export type Kind = (typeof Kind)[keyof typeof Kind];
-        }
-
         export interface Rect {
             x: number;
             y: number;
@@ -2600,7 +2360,7 @@ export namespace Annotation {
         export type BlendMode = (typeof BlendMode)[keyof typeof BlendMode];
 
         export interface Reply {
-            to: CloudPDF.AnnotationUnsupportedReplyTo;
+            to: CloudPDF.AnnotationRef;
             type: Reply.Type;
         }
 

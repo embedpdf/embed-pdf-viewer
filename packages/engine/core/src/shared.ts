@@ -247,6 +247,7 @@ export type {
 } from './annotation/resources';
 export {
   ANNOTATION_RESOURCE_ROLE_NAMES,
+  annotationResourceBuffers,
   assertAnnotationResources,
   hasAnnotationResources,
   withFileFromResource,
@@ -710,6 +711,22 @@ export type { PageDeleteResult } from './mutation/PageDeleteResult';
 export type { PageInsertResult } from './mutation/PageInsertResult';
 export type { PageInsertBlankSpec } from './mutation/PageInsertBlankInput';
 export { opIdOf } from './mutation/WriteOptions';
+export {
+  isSkippedItem,
+  isUndoChange,
+  objectNumbersNamedBy,
+  resolveChangeResources,
+} from './mutation/Change';
+export { changeFingerprint, isKeptRefusal } from './mutation/changeOutcome';
+export type {
+  Change,
+  ChangeAnswer,
+  ChangeOp,
+  ChangeItem,
+  ChangeResult,
+  ChangeItemType,
+  SkippedChangeItem,
+} from './mutation/Change';
 export type {
   WriteOptions,
   AnnotationCreateOptions,
@@ -754,8 +771,14 @@ export type {
 export { PDF_BITS, decodePdfBits } from './auth/scope';
 export { parseScope, validateScopeArray } from './auth/scope';
 export { InvalidScope, MissingIdentity, PermissionDenied } from './auth/scope';
-export type { AnnotationAuthority } from './auth/scope';
-export { authorizeAnnotationDelete, authorizeAnnotationUpdate } from './auth/scope';
+export type { AnnotationAuthority, ChangeAuthority } from './auth/scope';
+export {
+  authorizeAnnotationCreate,
+  authorizeCapability,
+  authorizeUnprotected,
+  authorizeAnnotationDelete,
+  authorizeAnnotationUpdate,
+} from './auth/scope';
 export type { CollabTarget } from './auth/scope';
 export { collabTargetOf } from './auth/scope';
 export {

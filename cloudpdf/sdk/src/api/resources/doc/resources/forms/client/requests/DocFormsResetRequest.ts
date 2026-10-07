@@ -16,5 +16,5 @@ export interface DocFormsResetRequest {
     "X-Document-Password"?: string;
     /** Names the change: 1 to 255 printable ASCII characters. A retry under the same key on the same layer answers with what the first request committed, and changes nothing. */
     "Idempotency-Key"?: string;
-    refs?: CloudPDF.doc.DocFormsResetRequestRefsItem[];
+    refs?: CloudPDF.FormFieldRef[];
 }

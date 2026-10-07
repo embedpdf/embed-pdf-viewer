@@ -429,6 +429,10 @@ export const wirePaths = {
   layerAnnotationsExportRequest: (docId: string, layerName: string) =>
     `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/annotations/export`,
 
+  /** A layer's changes: user actions, each its ops in one transaction, or an undo (`doc.apply`). */
+  layerChanges: (docId: string, layerName: string) =>
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/changes`,
+
   /** A bundle's annotations, created in the layer as one change (`doc.annotations.import`). */
   layerAnnotationsImport: (docId: string, layerName: string) =>
     `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/annotations/import`,
@@ -672,6 +676,7 @@ export function analysisQueryString(query: AnalysisQueryInput): string {
 export const wireTemplates = {
   docHead: '/v1/docs/:docId/head',
   layerManifest: '/v1/docs/:docId/layers/:layerName/manifest',
+  layerChanges: '/v1/docs/:docId/layers/:layerName/changes',
   layerMetadata: '/v1/docs/:docId/layers/:layerName/metadata',
   layerCustomMetadata: '/v1/docs/:docId/layers/:layerName/metadata/custom',
   layerRenderPage: '/v1/docs/:docId/layers/:layerName/render/pages/:pageKey/data',

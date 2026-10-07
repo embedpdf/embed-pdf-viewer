@@ -5,8 +5,8 @@ import type * as CloudPDF from "../index.js";
 export interface DocFormsList200Response {
     formKind: DocFormsList200Response.FormKind;
     needsAppearances: boolean;
-    fields: CloudPDF.DocFormsList200ResponseFieldsItem[];
-    calculationOrder: (CloudPDF.DocFormsList200ResponseCalculationOrderItem | null)[];
+    fields: CloudPDF.FormField[];
+    calculationOrder: (CloudPDF.FormFieldRef | null)[];
 }
 
 export namespace DocFormsList200Response {

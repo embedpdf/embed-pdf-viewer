@@ -155,7 +155,8 @@ async function openWorker(runtime: PdfRuntimeModule, bytes: Uint8Array, docId: s
   const send = (request: Record<string, unknown>) =>
     new Promise<WorkerResponse>((resolveResponse) => {
       results.set(++jobId, resolveResponse);
-      host.receive({ ...request, docId, jobId } as unknown as WorkerRequest);
+      // Every write is its own, under its own opId.
+      host.receive({ opId: `op-${jobId}`, ...request, docId, jobId } as unknown as WorkerRequest);
     });
   const opened = await send({
     kind: 'open.fatMem',

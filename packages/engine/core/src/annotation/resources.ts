@@ -3,8 +3,8 @@ import type { AnnotationDraft } from './kinds';
 import type { AnnotationSubtype } from './subtype';
 import { EngineError } from '../errors/EngineError';
 import { EngineErrorCode } from '../errors/EngineErrorCode';
-import { blobFileName } from '../resource/BinarySource';
 import { sniffBinaryMetadata } from '../resource/binaryMetadata';
+import { blobFileName } from '../resource/BinarySource';
 
 /**
  * Bytes travel beside an annotation's data, never inside it:
@@ -96,6 +96,11 @@ export function withFileFromResource(
 
 export function hasAnnotationResources(resources: WireAnnotationResources): boolean {
   return ANNOTATION_RESOURCE_ROLE_NAMES.some((role) => resources[role] !== undefined);
+}
+
+/** The buffers of a write's resources: what a worker transfer list hands over. */
+export function annotationResourceBuffers(resources: WireAnnotationResources): ArrayBuffer[] {
+  return Object.values(resources).filter((bytes): bytes is ArrayBuffer => bytes !== undefined);
 }
 
 /**

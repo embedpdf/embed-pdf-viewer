@@ -9,6 +9,7 @@ import {
   EngineErrorCode,
   protectedCapabilities,
   type AnnotationAuthority,
+  type ChangeAuthority,
   type CollabAction,
   type CollabTarget,
   type DocCapability,
@@ -788,6 +789,32 @@ export function requireLayerAnnotationWrite(
     authority: {
       identity: ctx.jwt.identity,
       grants: ctx.mode === 'tenant' ? null : { scope: ctx.jwt.scope, pdfBits },
+    },
+  };
+}
+
+/**
+ * A request's changes (`POST …/changes`): the token reaches this document's
+ * layer, and the authority the changes carry names who they act for, the
+ * token's grants (none for a tenant, which owns its documents) and what the
+ * document's signatures forbid. The worker checks each op against it inside
+ * the write, the ops of an undo included.
+ */
+export function requireLayerChangeWrite(
+  req: FastifyRequest,
+  docId: string,
+  layerName: string,
+  pdfBits: PdfBits,
+  protection: DocumentProtection | null,
+): LayerGuardContext & { authority: ChangeAuthority } {
+  const ctx = requireLayerDocAccessOnly(req, docId, layerName);
+  return {
+    ...ctx,
+    ...writeRequestOf(req),
+    authority: {
+      identity: ctx.jwt.identity,
+      grants: ctx.mode === 'tenant' ? null : { scope: ctx.jwt.scope, pdfBits },
+      protection,
     },
   };
 }

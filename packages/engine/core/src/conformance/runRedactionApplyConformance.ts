@@ -5,7 +5,23 @@ import type { Engine } from '../engine/Engine';
 import { EngineErrorCode } from '../errors/EngineErrorCode';
 import { toPageRef } from '../identity/PageRef';
 import { RedactionApplyResultSchema } from '../wire/schemas';
+import { pdfOf } from './pdfOf';
 import type { ConformanceOptions, ConformanceTestRunner } from './runMetadataConformance';
+
+/**
+ * One 300-point page with neither /Contents nor /Resources, as some
+ * generators write a blank page.
+ */
+export const BARE_PAGE_FIXTURE_PDF = pdfOf([
+  '<< /Type /Catalog /Pages 2 0 R >>',
+  '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+  '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 300 300] >>',
+]);
+
+export interface RedactionApplyConformanceOptions extends ConformanceOptions {
+  /** Open {@link BARE_PAGE_FIXTURE_PDF}, fresh for each call, with write access. */
+  openBarePage: (engine: Engine) => Promise<DocumentHandle>;
+}
 
 /**
  * Transport-neutral coverage for the destructive redaction-apply rail.
@@ -16,7 +32,7 @@ import type { ConformanceOptions, ConformanceTestRunner } from './runMetadataCon
  */
 export function runRedactionApplyConformance(
   runner: ConformanceTestRunner,
-  opts: ConformanceOptions,
+  opts: RedactionApplyConformanceOptions,
 ): void {
   const { describe, test, beforeAll, afterAll, expect } = runner;
 
@@ -156,7 +172,7 @@ export function runRedactionApplyConformance(
         // A page with no redactions left is unchanged: no artifact, no event.
         const noOp = await doc.redaction.apply({ pages: [toPageRef(pageObjectNumber)] });
         expect(noOp.results.map((item) => item.status)).toEqual(['unchanged']);
-        expect(noOp.meta).toEqual({ affectedPages: [], cacheDelta: null });
+        expect(noOp.meta).toMatchObject({ affectedPages: [], cacheDelta: null, undoable: false });
         expect(events).toHaveLength(1);
         unsubscribe();
 
@@ -175,6 +191,32 @@ export function runRedactionApplyConformance(
         await expect(
           doc.redaction.apply({ annotations: [notRedact.annotation.ref] }),
         ).rejects.toMatchObject({ code: EngineErrorCode.InvalidArg });
+      } finally {
+        await doc.close();
+      }
+    });
+
+    test('applies on a page without /Contents or /Resources', async () => {
+      const doc = await opts.openBarePage(engine);
+      try {
+        if (!doc.redaction) return;
+        const layout = await doc.pages.list();
+        const page = doc.page(toPageRef(layout.pages[0].ref.objectNumber));
+        await page.annotations.create({
+          subtype: 'redact',
+          rect: REDACT_RECT,
+          interiorColor: '#000000',
+          overlayText: 'REDACTED',
+          fontColor: '#ffffff',
+        } satisfies RedactDraft);
+
+        // The overlay becomes the page's first content, its form named in
+        // /Resources the page gets on the way.
+        const applied = await doc.redaction.apply({ pages: [page.ref] });
+        expect(applied.results.map((item) => item.status)).toEqual(['applied']);
+        expect(applied.meta.affectedPages).toEqual([page.ref]);
+        expect((await page.annotations.list()).annotations).toHaveLength(0);
+        expect((await page.text.get()).text).toContain('REDACTED');
       } finally {
         await doc.close();
       }

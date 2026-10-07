@@ -10,21 +10,7 @@ export type DocPagesRemoveName200ResponseLayoutNamedPagesItemTarget =
 export namespace DocPagesRemoveName200ResponseLayoutNamedPagesItemTarget {
     export interface Page {
         kind: "page";
-        page: DocPagesRemoveName200ResponseLayoutNamedPagesItemTargetPage.Page;
-    }
-
-    export namespace DocPagesRemoveName200ResponseLayoutNamedPagesItemTargetPage {
-        export interface Page {
-            kind: Page.Kind;
-            objectNumber: number;
-        }
-
-        export namespace Page {
-            export const Kind = {
-                ObjectNumber: "objectNumber",
-            } as const;
-            export type Kind = (typeof Kind)[keyof typeof Kind];
-        }
+        page: CloudPDF.PageRef;
     }
 
     export interface Template {

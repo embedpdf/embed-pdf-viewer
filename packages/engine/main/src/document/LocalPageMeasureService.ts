@@ -60,7 +60,7 @@ export class LocalPageMeasureService implements PageMeasureService {
     const submission = this.queue.enqueue<WorkerResultPayload>({
       line: { effect: 'write', docId, page },
       buildPack: async (jobId) =>
-        wirePack({ kind: 'measure.setScale', effect: 'write', jobId, docId, page, measure }),
+        wirePack({ kind: 'measure.setScale', effect: 'write', jobId, opId, docId, page, measure }),
     });
     return AbortablePromise.run(async (signal) => {
       const payload = await this.wait(submission, signal);

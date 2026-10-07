@@ -99,6 +99,14 @@ export class SessionEventPublisher {
    * `origin.tx`.
    */
   publishWrite(opId: string, ...events: DocumentEventInit[]): void {
+    this.publishChange(opId, events);
+  }
+
+  /**
+   * Publish what one change committed: its events as {@link publishWrite}
+   * does, and for an undo, the `opId` of the change it undid.
+   */
+  publishChange(opId: string, events: readonly DocumentEventInit[], undoOf?: string): void {
     const ts = Date.now();
     events.forEach((event, index) => {
       this.hub.publish({
@@ -110,6 +118,7 @@ export class SessionEventPublisher {
           ts,
           serverId: null,
           tx: { id: opId, index, count: events.length },
+          ...(undoOf !== undefined ? { undoOf } : {}),
         },
       } as DocumentEvent);
     });

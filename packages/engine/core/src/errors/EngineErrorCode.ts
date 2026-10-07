@@ -108,6 +108,24 @@ export const EngineErrorCode = {
    * last number. A compacted copy of the document starts afresh.
    */
   LayerFull: 'LayerFull',
+  /**
+   * An op's `expect` didn't match what the document holds: the change was
+   * refused whole. `details.opIndex` names the op and `details.fields` the
+   * fields that differ.
+   */
+  ChangeConflict: 'ChangeConflict',
+  /**
+   * `{ undoOf }` named a change that can no longer be undone.
+   * `details.reason` says why: `'final-change'` (a redaction apply, flatten,
+   * signing or form repair came after it), `'base-changed'` (a new version
+   * was published since) or `'expired'` (past retention).
+   */
+  UndoUnavailable: 'UndoUnavailable',
+  /**
+   * An `opId` that already has an answer came again with a different
+   * payload. Nothing ran; a retry must send the same change.
+   */
+  IdempotencyKeyReused: 'IdempotencyKeyReused',
 } as const;
 
 export type EngineErrorCode = (typeof EngineErrorCode)[keyof typeof EngineErrorCode];

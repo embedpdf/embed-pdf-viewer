@@ -58,7 +58,7 @@ export class LocalDocumentRedactionService implements DocumentRedactionService {
     const docId = this.docId;
     const submission = this.queue.enqueue<WorkerResultPayload>({
       buildPack: (jobId: JobId) =>
-        wirePack({ kind: 'redaction.apply', effect: 'contentWrite', jobId, docId, scope }),
+        wirePack({ kind: 'redaction.apply', effect: 'contentWrite', jobId, opId, docId, scope }),
     });
     return AbortablePromise.run<RedactionApplyResult>(async (signal) => {
       const onAbort = () => submission.abort(signal.reason);

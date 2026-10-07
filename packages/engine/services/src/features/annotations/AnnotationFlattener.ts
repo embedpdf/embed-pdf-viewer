@@ -98,7 +98,7 @@ export class AnnotationFlattener {
       }));
       // A promotion with nothing to flatten still changed the page.
       if (code !== FLATTEN_SUCCESS && !promoted) {
-        const meta: MutationMeta = { affectedPages: [], cacheDelta: null };
+        const meta: MutationMeta = { affectedPages: [], cacheDelta: null, ...this.session.writeStamp() };
         return { page: toPageRef(pageObjectNumber), usage, results, meta };
       }
 
@@ -107,6 +107,7 @@ export class AnnotationFlattener {
       const meta: MutationMeta = {
         affectedPages: [toPageRef(pageObjectNumber)],
         cacheDelta: null,
+        ...this.session.writeStamp(),
       };
       return { page: toPageRef(pageObjectNumber), usage, results, meta };
     } finally {

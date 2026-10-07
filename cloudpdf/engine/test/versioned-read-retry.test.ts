@@ -297,6 +297,8 @@ function buildStub(initial: ServerState): StubbedFixture {
               metadataVersion: state.metadataVersion,
               pages: [],
             },
+            opId: 'op-metadata',
+            undoable: true,
           },
         }),
         { status: 200, headers: { 'content-type': 'application/json' } },
@@ -394,6 +396,8 @@ function buildStub(initial: ServerState): StubbedFixture {
             },
             affectedPages: [toPageRef(PAGE_OBJECT_NUMBER)],
             changed: [created.ref],
+            opId: 'op-create',
+            undoable: true,
           },
         }),
         { status: 200, headers: { 'content-type': 'application/json' } },
@@ -808,6 +812,8 @@ describe('CloudPageTextService — end-to-end transparent retry', () => {
             },
           ],
         },
+        opId: 'op-absorbed',
+        undoable: true,
       });
 
       fx.bump({ docVersion: 3, pageAnnotationVersion: 3 });

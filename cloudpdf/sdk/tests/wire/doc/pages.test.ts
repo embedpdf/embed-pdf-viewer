@@ -29,6 +29,8 @@ describe("PagesClient", () => {
                         },
                     ],
                 },
+                opId: "opId",
+                undoable: true,
             },
         };
 
@@ -205,6 +207,8 @@ describe("PagesClient", () => {
                         },
                     ],
                 },
+                opId: "opId",
+                undoable: true,
             },
         };
 
@@ -309,6 +313,8 @@ describe("PagesClient", () => {
                         },
                     ],
                 },
+                opId: "opId",
+                undoable: true,
             },
         };
 
@@ -435,6 +441,8 @@ describe("PagesClient", () => {
                         },
                     ],
                 },
+                opId: "opId",
+                undoable: true,
             },
         };
 
@@ -560,6 +568,8 @@ describe("PagesClient", () => {
                         },
                     ],
                 },
+                opId: "opId",
+                undoable: true,
             },
         };
 
@@ -685,6 +695,8 @@ describe("PagesClient", () => {
                         },
                     ],
                 },
+                opId: "opId",
+                undoable: true,
             },
         };
 
@@ -810,6 +822,8 @@ describe("PagesClient", () => {
                         },
                     ],
                 },
+                opId: "opId",
+                undoable: true,
             },
         };
 
@@ -935,6 +949,8 @@ describe("PagesClient", () => {
                         },
                     ],
                 },
+                opId: "opId",
+                undoable: true,
             },
         };
 

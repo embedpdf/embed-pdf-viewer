@@ -62,6 +62,8 @@ import down031 from './031_drop_weak_annotation_state.down.sql';
 import sql031 from './031_drop_weak_annotation_state.sql';
 import down032 from './032_object_numbers.down.sql';
 import sql032 from './032_object_numbers.sql';
+import down033 from './033_change_outcomes.down.sql';
+import sql033 from './033_change_outcomes.sql';
 import type { MigrationSource } from '../../migrator/runner';
 
 /**
@@ -117,5 +119,11 @@ export const sqliteMigrations: ReadonlyArray<MigrationSource> = [
     name: '032_object_numbers.sql',
     sql: sql032,
     down: down032,
+  },
+  {
+    version: '033',
+    name: '033_change_outcomes.sql',
+    sql: sql033,
+    down: down033,
   },
 ];

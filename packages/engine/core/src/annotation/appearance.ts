@@ -51,8 +51,12 @@ export type AppearanceChange =
  */
 export const UNBAKED_KINDS: ReadonlySet<AnnotationSubtype> = new Set(['link', 'widget']);
 
-/** What actually happened to `/AP` during an update (the engine's echo). */
-export type AppearanceAction = 'preserved' | 'regenerated' | 'generation-unavailable';
+/**
+ * What actually happened to `/AP` during an update (the engine's echo):
+ * kept, drawn again, not drawable for the kind, or, in an undo, put back as
+ * it was before the change being undone.
+ */
+export type AppearanceAction = 'preserved' | 'regenerated' | 'generation-unavailable' | 'restored';
 
 /**
  * The appearance verdict every `AnnotationUpdateResult` carries. `changed`

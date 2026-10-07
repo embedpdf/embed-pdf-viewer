@@ -126,6 +126,8 @@ describe("FormsClient", () => {
                         },
                     ],
                 },
+                opId: "opId",
+                undoable: true,
             },
         };
 
@@ -253,6 +255,8 @@ describe("FormsClient", () => {
                         },
                     ],
                 },
+                opId: "opId",
+                undoable: true,
                 changedFields: [{ kind: "objectNumber", objectNumber: 1 }],
                 changedWidgets: [{ ref: null, objectNumber: 1, page: null }],
             },
@@ -381,6 +385,8 @@ describe("FormsClient", () => {
                         },
                     ],
                 },
+                opId: "opId",
+                undoable: true,
                 changedFields: [{ kind: "objectNumber", objectNumber: 1 }],
                 changedWidgets: [{ ref: null, objectNumber: 1, page: null }],
             },

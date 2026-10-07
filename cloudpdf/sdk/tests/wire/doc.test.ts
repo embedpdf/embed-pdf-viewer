@@ -62,6 +62,184 @@ describe("DocClient", () => {
         }).rejects.toThrow(CloudPDF.NotFoundError);
     });
 
+    test("changes (1)", async () => {
+        const server = mockServerPool.createServer();
+        const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
+        const rawRequestBody = { changes: [{ opId: "opId" }] };
+        const rawResponseBody = {
+            changes: [
+                {
+                    status: "applied",
+                    opId: "opId",
+                    result: {
+                        items: [
+                            {
+                                type: "skipped",
+                                op: "annotations.create",
+                                meta: {
+                                    affectedPages: [{ kind: "objectNumber", objectNumber: 1 }],
+                                    cacheDelta: null,
+                                    opId: "opId",
+                                    undoable: true,
+                                },
+                            },
+                        ],
+                        meta: {
+                            affectedPages: [{ kind: "objectNumber", objectNumber: 1 }],
+                            cacheDelta: null,
+                            opId: "opId",
+                            undoable: true,
+                        },
+                    },
+                },
+            ],
+        };
+
+        server
+            .mockEndpoint()
+            .post("/v1/docs/docId/layers/layerName/changes")
+            .jsonBody(rawRequestBody)
+            .respondWith()
+            .statusCode(200)
+            .jsonBody(rawResponseBody)
+            .build();
+
+        const response = await client.doc.changes({
+            docId: "docId",
+            layerName: "layerName",
+            changes: [
+                {
+                    opId: "opId",
+                },
+            ],
+        });
+        expect(response).toEqual(rawResponseBody);
+    });
+
+    test("changes (2)", async () => {
+        const server = mockServerPool.createServer();
+        const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
+        const rawRequestBody = { changes: [{ opId: "opId" }, { opId: "opId" }] };
+        const rawResponseBody = { key: "value" };
+
+        server
+            .mockEndpoint()
+            .post("/v1/docs/docId/layers/layerName/changes")
+            .jsonBody(rawRequestBody)
+            .respondWith()
+            .statusCode(400)
+            .jsonBody(rawResponseBody)
+            .build();
+
+        await expect(async () => {
+            return await client.doc.changes({
+                docId: "docId",
+                layerName: "layerName",
+                changes: [
+                    {
+                        opId: "opId",
+                    },
+                    {
+                        opId: "opId",
+                    },
+                ],
+            });
+        }).rejects.toThrow(CloudPDF.BadRequestError);
+    });
+
+    test("changes (3)", async () => {
+        const server = mockServerPool.createServer();
+        const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
+        const rawRequestBody = { changes: [{ opId: "opId" }, { opId: "opId" }] };
+        const rawResponseBody = { key: "value" };
+
+        server
+            .mockEndpoint()
+            .post("/v1/docs/docId/layers/layerName/changes")
+            .jsonBody(rawRequestBody)
+            .respondWith()
+            .statusCode(404)
+            .jsonBody(rawResponseBody)
+            .build();
+
+        await expect(async () => {
+            return await client.doc.changes({
+                docId: "docId",
+                layerName: "layerName",
+                changes: [
+                    {
+                        opId: "opId",
+                    },
+                    {
+                        opId: "opId",
+                    },
+                ],
+            });
+        }).rejects.toThrow(CloudPDF.NotFoundError);
+    });
+
+    test("changes (4)", async () => {
+        const server = mockServerPool.createServer();
+        const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
+        const rawRequestBody = { changes: [{ opId: "opId" }, { opId: "opId" }] };
+        const rawResponseBody = { key: "value" };
+
+        server
+            .mockEndpoint()
+            .post("/v1/docs/docId/layers/layerName/changes")
+            .jsonBody(rawRequestBody)
+            .respondWith()
+            .statusCode(409)
+            .jsonBody(rawResponseBody)
+            .build();
+
+        await expect(async () => {
+            return await client.doc.changes({
+                docId: "docId",
+                layerName: "layerName",
+                changes: [
+                    {
+                        opId: "opId",
+                    },
+                    {
+                        opId: "opId",
+                    },
+                ],
+            });
+        }).rejects.toThrow(CloudPDF.ConflictError);
+    });
+
+    test("changes (5)", async () => {
+        const server = mockServerPool.createServer();
+        const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
+        const rawRequestBody = { changes: [{ opId: "opId" }, { opId: "opId" }] };
+        const rawResponseBody = { name: "EngineError", code: "Unknown", message: "message" };
+
+        server
+            .mockEndpoint()
+            .post("/v1/docs/docId/layers/layerName/changes")
+            .jsonBody(rawRequestBody)
+            .respondWith()
+            .statusCode(413)
+            .jsonBody(rawResponseBody)
+            .build();
+
+        await expect(async () => {
+            return await client.doc.changes({
+                docId: "docId",
+                layerName: "layerName",
+                changes: [
+                    {
+                        opId: "opId",
+                    },
+                    {
+                        opId: "opId",
+                    },
+                ],
+            });
+        }).rejects.toThrow(CloudPDF.ContentTooLargeError);
+    });
+
     test("manifest (1)", async () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });

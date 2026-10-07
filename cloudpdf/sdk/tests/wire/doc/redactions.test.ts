@@ -38,6 +38,8 @@ describe("RedactionsClient", () => {
                         },
                     ],
                 },
+                opId: "opId",
+                undoable: true,
             },
         };
 

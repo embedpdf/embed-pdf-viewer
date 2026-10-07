@@ -85,7 +85,7 @@ export class RedactionApplier {
     }
 
     if (affected.size === 0) {
-      const meta: MutationMeta = { affectedPages: [], cacheDelta: null };
+      const meta: MutationMeta = { affectedPages: [], cacheDelta: null, ...this.session.writeStamp() };
       return { scope, results, removedAnnotationCount: totalRemoved, meta };
     }
 
@@ -93,6 +93,7 @@ export class RedactionApplier {
     const meta: MutationMeta = {
       affectedPages: [...affected].map((pageObjectNumber) => toPageRef(pageObjectNumber)),
       cacheDelta: null,
+      ...this.session.writeStamp(),
     };
     return { scope, results, removedAnnotationCount: totalRemoved, meta };
   }

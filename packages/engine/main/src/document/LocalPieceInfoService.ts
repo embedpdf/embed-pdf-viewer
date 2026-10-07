@@ -42,8 +42,8 @@ export class LocalPieceInfoService implements PieceInfoService {
   ) {}
 
   get(application: string): AbortablePromise<PieceInfoSnapshot | null> {
-    const rejected = this.gate('doc.open');
-    if (rejected) return rejected as AbortablePromise<PieceInfoSnapshot | null>;
+    const read = this.gate('doc.open');
+    if ('rejected' in read) return read.rejected;
     const { docId, page } = this;
     const submission = this.queue.enqueue<WorkerResultPayload>({
       buildPack: (jobId: JobId) =>
@@ -63,8 +63,9 @@ export class LocalPieceInfoService implements PieceInfoService {
     patch: PieceInfoPatch,
     options?: WriteOptions,
   ): AbortablePromise<PieceInfoUpdateResult> {
-    const rejected = this.gate('doc.metadata.modify', options);
-    if (rejected) return rejected;
+    const write = this.gate('doc.metadata.modify', options);
+    if ('rejected' in write) return write.rejected;
+    const { opId } = write;
     const { docId, page } = this;
     const submission = this.queue.enqueue<WorkerResultPayload>({
       buildPack: (jobId: JobId) =>
@@ -72,6 +73,7 @@ export class LocalPieceInfoService implements PieceInfoService {
           kind: 'pieceInfo.update',
           effect: 'write',
           jobId,
+          opId,
           docId,
           page,
           application,
@@ -88,8 +90,8 @@ export class LocalPieceInfoService implements PieceInfoService {
   }
 
   list(): AbortablePromise<string[]> {
-    const rejected = this.gate('doc.open');
-    if (rejected) return rejected as AbortablePromise<string[]>;
+    const read = this.gate('doc.open');
+    if ('rejected' in read) return read.rejected;
     const { docId, page } = this;
     const submission = this.queue.enqueue<WorkerResultPayload>({
       buildPack: (jobId: JobId) =>
@@ -105,12 +107,13 @@ export class LocalPieceInfoService implements PieceInfoService {
   }
 
   delete(application: string, options?: WriteOptions): AbortablePromise<PieceInfoDeleteResult> {
-    const rejected = this.gate('doc.metadata.modify', options);
-    if (rejected) return rejected;
+    const write = this.gate('doc.metadata.modify', options);
+    if ('rejected' in write) return write.rejected;
+    const { opId } = write;
     const { docId, page } = this;
     const submission = this.queue.enqueue<WorkerResultPayload>({
       buildPack: (jobId: JobId) =>
-        wirePack({ kind: 'pieceInfo.delete', effect: 'write', jobId, docId, page, application }),
+        wirePack({ kind: 'pieceInfo.delete', effect: 'write', jobId, opId, docId, page, application }),
     });
     return AbortablePromise.run<PieceInfoDeleteResult>(async (signal) => {
       const payload = await this.await(submission, signal);
@@ -122,26 +125,28 @@ export class LocalPieceInfoService implements PieceInfoService {
   }
 
   /**
-   * Shared closed-check + capability gate, and for a write the `opId` rule
-   * (PieceInfo writes publish no event, so the id is only checked); null
-   * when the call may proceed.
+   * Shared closed-check + capability gate, and for a write the `opId` rule:
+   * the call's `opId` (the caller's, else a fresh one; a read ignores it),
+   * or the refusal.
    */
   private gate(
     capability: 'doc.open' | 'doc.metadata.modify',
     options?: WriteOptions,
-  ): AbortablePromise<never> | null {
+  ): { opId: string } | { rejected: AbortablePromise<never> } {
     if (this.view.isClosed()) {
-      return AbortablePromise.rejectReason(
-        new EngineError(EngineErrorCode.DocNotOpen, `document not open: ${this.docId}`),
-      );
+      return {
+        rejected: AbortablePromise.rejectReason(
+          new EngineError(EngineErrorCode.DocNotOpen, `document not open: ${this.docId}`),
+        ),
+      };
     }
     try {
-      opIdOf(options);
+      const opId = opIdOf(options);
       this.guard.assertCapability(capability);
+      return { opId };
     } catch (err) {
-      return AbortablePromise.rejectReason(err);
+      return { rejected: AbortablePromise.rejectReason(err) };
     }
-    return null;
   }
 
   /** Wire an outer abort into the queued submission (the house idiom). */

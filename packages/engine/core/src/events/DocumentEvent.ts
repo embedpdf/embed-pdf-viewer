@@ -18,10 +18,14 @@ import type {
   FormFieldDeleteResult,
   FormFieldUpdateResult,
   FormImportResult,
+  FormMutationMeta,
   FormRepairResult,
   FormSetValueResult,
   FormWidgetLinkResult,
 } from '../mutation/FormMutationResults';
+import type { AnnotationListMutationMeta } from '../mutation/AnnotationListMutationMeta';
+import type { Annotation } from '../annotation/kinds';
+import type { FormFieldDTO } from '../forms/field';
 import type { CustomMetadataUpdateResult } from '../mutation/CustomMetadataUpdateResult';
 import type { MetadataUpdateResult } from '../mutation/MetadataUpdateResult';
 import type { AnnotationFlattenResult } from '../mutation/AnnotationFlattenResult';
@@ -69,6 +73,8 @@ export interface EventOrigin {
    * `count - 1` in the order they were emitted.
    */
   tx?: { id: string; index: number; count: number };
+  /** Set on the events of an undo: the `opId` of the change it undid. */
+  undoOf?: string;
 }
 
 /**
@@ -126,6 +132,19 @@ export type DocumentEvent =
       page: PageRef;
       origin: EventOrigin;
     } & AnnotationMoveResult)
+  | {
+      /**
+       * An undo brought deleted annotations back: the same objects, under
+       * the refs they had, with their owner, replies and popup. A listener
+       * that keeps things by ref (comments, links) attaches them again.
+       */
+      type: 'annotations.restored';
+      page: PageRef;
+      origin: EventOrigin;
+      /** What came back, in `/Annots` order: the annotation first, then what went with it. */
+      annotations: Annotation[];
+      meta: AnnotationListMutationMeta;
+    }
   | ({
       type: 'annotations.flattened';
       origin: EventOrigin;
@@ -186,6 +205,16 @@ export type DocumentEvent =
       /** The field that went (see `deletedFieldOf`). */
       deleted: FormFieldRef | null;
     } & FormFieldDeleteResult)
+  | {
+      /**
+       * An undo brought a deleted field back: the same field and widgets,
+       * under the refs they had, at their places, with its value.
+       */
+      type: 'forms.restored';
+      origin: EventOrigin;
+      field: FormFieldDTO;
+      meta: FormMutationMeta;
+    }
   | ({ type: 'forms.widgetAdded'; origin: EventOrigin } & FormWidgetLinkResult)
   | ({ type: 'forms.widgetRemoved'; origin: EventOrigin } & FormWidgetLinkResult)
   | ({ type: 'forms.effectsApplied'; origin: EventOrigin } & FormEffectsResult)

@@ -37,7 +37,9 @@ export type AuditMutationKind =
   /** A prepared signing was cancelled. */
   | 'signature.cancel'
   /** A signature published a new base version through this layer. */
-  | 'signature.complete';
+  | 'signature.complete'
+  /** One change of `POST …/changes`: its ops, or an undo (`undoOf`). */
+  | 'change';
 
 export interface AppendAuditLogInput {
   tenantId: string;
@@ -59,6 +61,8 @@ export interface AppendAuditLogInput {
    *  SSE subscribers drop rows whose origin matches their own session — their
    *  local publish already covered them (exactly-once). */
   originSessionId?: string | null;
+  /** An undo's row: the opId of the change it undid. */
+  undoOf?: string | null;
 }
 
 export interface AuditLogRow extends AppendAuditLogInput {
@@ -98,6 +102,7 @@ export class AuditLogRepo {
         idempotency_key: input.idempotencyKey ?? null,
         payload_json: JSON.stringify(input.payload),
         origin_session_id: input.originSessionId ?? null,
+        undo_of: input.undoOf ?? null,
       })
       .returning('id')
       .executeTakeFirstOrThrow();
@@ -202,6 +207,7 @@ interface AuditLogDbRow {
   idempotency_key: string | null;
   payload_json: string;
   origin_session_id: string | null;
+  undo_of?: string | null;
 }
 
 function mapAuditRow(row: AuditLogDbRow): AuditLogRow {
@@ -222,6 +228,7 @@ function mapAuditRow(row: AuditLogDbRow): AuditLogRow {
     artifactSize: Number(row.artifact_size),
     idempotencyKey: row.idempotency_key,
     originSessionId: row.origin_session_id ?? null,
+    undoOf: row.undo_of ?? null,
     payload: JSON.parse(row.payload_json) as unknown,
   };
 }

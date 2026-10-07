@@ -123,6 +123,23 @@ export const StorageKeys = {
     const base = layerArtifactKey(tenantId, docId, layerName, version);
     return `${base.slice(0, -'.layer'.length)}-${attempt}.layer`;
   },
+  /**
+   * What a change captured so it can be undone (one blob per change). Each
+   * attempt writes its own key: a request that loses its commit reruns with
+   * a fresh one, and a key no commit claims is deleted.
+   */
+  changeCapture(
+    tenantId: string,
+    docId: string,
+    layerName: string,
+    opId: string,
+    attempt: string,
+  ): string {
+    if (!/^[a-z0-9]{1,32}$/.test(attempt)) {
+      throw new Error(`changeCapture: bad attempt nonce "${attempt}"`);
+    }
+    return `${tenantId}/docs/${shard(docId)}/${docId}/layers/${encodeURIComponent(layerName)}/changes/${encodeURIComponent(opId)}-${attempt}.capture`;
+  },
   /** @deprecated Use `layerArtifact()`. */
   layerPdf(tenantId: string, docId: string, layerName: string, version: number): string {
     return layerArtifactKey(tenantId, docId, layerName, version);

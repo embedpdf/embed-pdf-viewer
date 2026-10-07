@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
   "canonicalVersion": "3.0.0-next.14",
-  "openapiSha256": "95c16bdf5e94c5711a933e330cf6e8cc5789e3db638534b55219ee722fd9a490",
+  "openapiSha256": "1221b03c1ef31171d72b07d1ee07e1ccef10c7bbeace5a30e04f1a47a53bbd20",
   "languages": {
     "typescript": {
       "label": "TypeScript",
@@ -428,6 +428,43 @@
       "ruby": {
         "status": "available",
         "source": "require \"cloudpdf\"\n\nclient = CloudPDF::Client.new(\n  token: \"<token>\",\n  base_url: \"https://yourhost.com/path/to/api\"\n)\n\nclient.doc.annotations.flatten(\n  doc_id: \"docId\",\n  layer_name: \"layerName\",\n  page_key: \"pageKey\",\n  request: {\n    key: \"value\"\n  }\n)",
+        "frameLines": 7
+      }
+    },
+    "doc.changes": {
+      "typescript": {
+        "status": "available",
+        "source": "import { CloudPDFClient } from \"@cloudpdf/sdk\";\n\nconst client = new CloudPDFClient({\n  baseUrl: \"https://yourhost.com/path/to/api\",\n  token: \"<token>\",\n});\n\nawait client.doc.changes({\n  docId: \"docId\",\n  layerName: \"layerName\",\n  changes: [{\n      opId: \"opId\"\n    }]\n});",
+        "frameLines": 7
+      },
+      "python": {
+        "status": "available",
+        "source": "from cloudpdf import CloudPDFClient\nfrom cloudpdf.doc import DocChangesRequestChangesItem\n\nclient = CloudPDFClient(\n    token=\"<token>\",\n    base_url=\"https://yourhost.com/path/to/api\",\n)\n\nclient.doc.changes(\n    doc_id=\"docId\",\n    layer_name=\"layerName\",\n    changes=[\n        DocChangesRequestChangesItem(\n            op_id=\"opId\",\n        )\n    ],\n)",
+        "frameLines": 8
+      },
+      "php": {
+        "status": "available",
+        "source": "use CloudPDF\\CloudPDFClient;\n\n$client = new CloudPDFClient(\n    token: '<token>',\n    options: ['baseUrl' => 'https://yourhost.com/path/to/api'],\n);\n\n$client->doc->changes(\n    'docId',\n    'layerName',\n    new DocChangesRequest([\n        'changes' => [\n            new DocChangesRequestChangesItem([\n                'opId' => 'opId',\n            ]),\n        ],\n    ]),\n);",
+        "frameLines": 7
+      },
+      "csharp": {
+        "status": "available",
+        "source": "using CloudPDF;\n\nvar client = new CloudPDFClient(\n    \"<token>\",\n    new ClientOptions { BaseUrl = \"https://yourhost.com/path/to/api\" }\n);\n\nawait client.Doc.ChangesAsync(\n    new DocChangesRequest\n    {\n        DocId = \"docId\",\n        LayerName = \"layerName\",\n        Changes = new List<DocChangesRequestChangesItem>()\n        {\n            new DocChangesRequestChangesItem { OpId = \"opId\" },\n        },\n    }\n);",
+        "frameLines": 7
+      },
+      "go": {
+        "status": "available",
+        "source": "import (\n    \"context\"\n\n    cloudpdf \"github.com/embedpdf/cloudpdf-sdk-go/v3\"\n    client \"github.com/embedpdf/cloudpdf-sdk-go/v3/client\"\n    option \"github.com/embedpdf/cloudpdf-sdk-go/v3/option\"\n)\n\nclient := client.NewClient(\n    option.WithToken(\"<token>\"),\n    option.WithBaseURL(\"https://yourhost.com/path/to/api\"),\n)\n\nrequest := &cloudpdf.DocChangesRequest{\n    DocID: \"docId\",\n    LayerName: \"layerName\",\n    Changes: []*cloudpdf.DocChangesRequestChangesItem{\n        &cloudpdf.DocChangesRequestChangesItem{\n            OpID: \"opId\",\n        },\n    },\n}\nclient.Doc.Changes(\n    context.TODO(),\n    request,\n)",
+        "frameLines": 13
+      },
+      "java": {
+        "status": "available",
+        "source": "import com.cloudpdf.api.CloudPDFClient;\n\nCloudPDFClient client = CloudPDFClient\n    .builder()\n    .token(\"<token>\")\n    .url(\"https://yourhost.com/path/to/api\")\n    .build();\n\nclient.doc().changes(\n    \"docId\",\n    \"layerName\",\n    DocChangesRequest\n        .builder()\n        .changes(\n            Arrays.asList(\n                DocChangesRequestChangesItem\n                    .builder()\n                    .opId(\"opId\")\n                    .build()\n            )\n        )\n        .build()\n);",
+        "frameLines": 8
+      },
+      "ruby": {
+        "status": "available",
+        "source": "require \"cloudpdf\"\n\nclient = CloudPDF::Client.new(\n  token: \"<token>\",\n  base_url: \"https://yourhost.com/path/to/api\"\n)\n\nclient.doc.changes(\n  doc_id: \"docId\",\n  layer_name: \"layerName\",\n  changes: [{\n    op_id: \"opId\"\n  }]\n)",
         "frameLines": 7
       }
     },

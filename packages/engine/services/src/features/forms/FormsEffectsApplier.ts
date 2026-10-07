@@ -166,7 +166,7 @@ export class FormsEffectsApplier {
       }
     }
 
-    const meta = formMutationMeta([...allChangedFields.values()], [...allChangedWidgets.values()]);
+    const meta = formMutationMeta(this.session.writeStamp(), [...allChangedFields.values()], [...allChangedWidgets.values()]);
     return { result: { results, meta }, wrote: mustFinalize };
   }
 

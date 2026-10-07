@@ -3,28 +3,12 @@
 import type * as CloudPDF from "../index.js";
 
 export interface DocPagesInsert200Response {
-    insertedPages: DocPagesInsert200Response.InsertedPages.Item[];
+    insertedPages: CloudPDF.PageRef[];
     layout: DocPagesInsert200Response.Layout;
-    meta: DocPagesInsert200Response.Meta;
+    meta: CloudPDF.MutationMeta;
 }
 
 export namespace DocPagesInsert200Response {
-    export type InsertedPages = InsertedPages.Item[];
-
-    export namespace InsertedPages {
-        export interface Item {
-            kind: Item.Kind;
-            objectNumber: number;
-        }
-
-        export namespace Item {
-            export const Kind = {
-                ObjectNumber: "objectNumber",
-            } as const;
-            export type Kind = (typeof Kind)[keyof typeof Kind];
-        }
-    }
-
     export interface Layout {
         pageCount: number;
         pages: Layout.Pages.Item[];
@@ -37,7 +21,7 @@ export namespace DocPagesInsert200Response {
         export namespace Pages {
             export interface Item {
                 index: number;
-                ref: Item.Ref;
+                ref: CloudPDF.PageRef;
                 label: string | null;
                 size: Item.Size;
                 rotation: number;
@@ -48,18 +32,6 @@ export namespace DocPagesInsert200Response {
             }
 
             export namespace Item {
-                export interface Ref {
-                    kind: Ref.Kind;
-                    objectNumber: number;
-                }
-
-                export namespace Ref {
-                    export const Kind = {
-                        ObjectNumber: "objectNumber",
-                    } as const;
-                    export type Kind = (typeof Kind)[keyof typeof Kind];
-                }
-
                 export interface Size {
                     width: number;
                     height: number;
@@ -125,71 +97,6 @@ export namespace DocPagesInsert200Response {
             export interface Item {
                 name: string;
                 target: CloudPDF.DocPagesInsert200ResponseLayoutNamedPagesItemTarget;
-            }
-        }
-    }
-
-    export interface Meta {
-        affectedPages: Meta.AffectedPages.Item[];
-        cacheDelta: Meta.CacheDelta | null;
-    }
-
-    export namespace Meta {
-        export type AffectedPages = AffectedPages.Item[];
-
-        export namespace AffectedPages {
-            export interface Item {
-                kind: Item.Kind;
-                objectNumber: number;
-            }
-
-            export namespace Item {
-                export const Kind = {
-                    ObjectNumber: "objectNumber",
-                } as const;
-                export type Kind = (typeof Kind)[keyof typeof Kind];
-            }
-        }
-
-        export interface CacheDelta {
-            previousDocVersion: number;
-            docVersion: number;
-            annotationsVersion?: number | undefined;
-            layoutVersion?: number | undefined;
-            metadataVersion?: number | undefined;
-            attachmentsVersion?: number | undefined;
-            layerVersion?: number | undefined;
-            working?: boolean | undefined;
-            pages: CacheDelta.Pages.Item[];
-        }
-
-        export namespace CacheDelta {
-            export type Pages = Pages.Item[];
-
-            export namespace Pages {
-                export interface Item {
-                    page: Item.Page;
-                    cache: Item.Cache;
-                }
-
-                export namespace Item {
-                    export interface Page {
-                        kind: Page.Kind;
-                        objectNumber: number;
-                    }
-
-                    export namespace Page {
-                        export const Kind = {
-                            ObjectNumber: "objectNumber",
-                        } as const;
-                        export type Kind = (typeof Kind)[keyof typeof Kind];
-                    }
-
-                    export interface Cache {
-                        contentVersion: number;
-                        annotationVersion: number;
-                    }
-                }
             }
         }
     }

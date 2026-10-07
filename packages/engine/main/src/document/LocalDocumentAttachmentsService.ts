@@ -144,6 +144,7 @@ export class LocalDocumentAttachmentsService implements DocumentAttachmentsServi
             kind: 'attachments.create',
             effect: 'write',
             jobId,
+            opId,
             docId,
             file: wireFile,
             resources: { r0: resource },
@@ -181,7 +182,7 @@ export class LocalDocumentAttachmentsService implements DocumentAttachmentsServi
     const docId = this.docId;
     const submission = this.queue.enqueue<WorkerResultPayload>({
       buildPack: (jobId: JobId) =>
-        wirePack({ kind: 'attachments.delete', effect: 'write', jobId, docId, ref }),
+        wirePack({ kind: 'attachments.delete', effect: 'write', jobId, opId, docId, ref }),
     });
     return AbortablePromise.run<AttachmentDeleteResult>(async (signal) => {
       const onAbort = () => submission.abort(signal.reason);

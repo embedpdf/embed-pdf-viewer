@@ -3,25 +3,13 @@
 import type * as CloudPDF from "../index.js";
 
 export interface DocAnnotationsFlatten200Response {
-    page: DocAnnotationsFlatten200Response.Page;
+    page: CloudPDF.PageRef;
     usage: DocAnnotationsFlatten200Response.Usage;
     results: DocAnnotationsFlatten200Response.Results.Item[];
-    meta: DocAnnotationsFlatten200Response.Meta;
+    meta: CloudPDF.MutationMeta;
 }
 
 export namespace DocAnnotationsFlatten200Response {
-    export interface Page {
-        kind: Page.Kind;
-        objectNumber: number;
-    }
-
-    export namespace Page {
-        export const Kind = {
-            ObjectNumber: "objectNumber",
-        } as const;
-        export type Kind = (typeof Kind)[keyof typeof Kind];
-    }
-
     export const Usage = {
         Display: "display",
         Print: "print",
@@ -31,7 +19,7 @@ export namespace DocAnnotationsFlatten200Response {
 
     export namespace Results {
         export interface Item {
-            ref: CloudPDF.DocAnnotationsFlatten200ResponseResultsItemRef;
+            ref: CloudPDF.AnnotationRef;
             status: Item.Status;
         }
 
@@ -41,71 +29,6 @@ export namespace DocAnnotationsFlatten200Response {
                 Unchanged: "unchanged",
             } as const;
             export type Status = (typeof Status)[keyof typeof Status];
-        }
-    }
-
-    export interface Meta {
-        affectedPages: Meta.AffectedPages.Item[];
-        cacheDelta: Meta.CacheDelta | null;
-    }
-
-    export namespace Meta {
-        export type AffectedPages = AffectedPages.Item[];
-
-        export namespace AffectedPages {
-            export interface Item {
-                kind: Item.Kind;
-                objectNumber: number;
-            }
-
-            export namespace Item {
-                export const Kind = {
-                    ObjectNumber: "objectNumber",
-                } as const;
-                export type Kind = (typeof Kind)[keyof typeof Kind];
-            }
-        }
-
-        export interface CacheDelta {
-            previousDocVersion: number;
-            docVersion: number;
-            annotationsVersion?: number | undefined;
-            layoutVersion?: number | undefined;
-            metadataVersion?: number | undefined;
-            attachmentsVersion?: number | undefined;
-            layerVersion?: number | undefined;
-            working?: boolean | undefined;
-            pages: CacheDelta.Pages.Item[];
-        }
-
-        export namespace CacheDelta {
-            export type Pages = Pages.Item[];
-
-            export namespace Pages {
-                export interface Item {
-                    page: Item.Page;
-                    cache: Item.Cache;
-                }
-
-                export namespace Item {
-                    export interface Page {
-                        kind: Page.Kind;
-                        objectNumber: number;
-                    }
-
-                    export namespace Page {
-                        export const Kind = {
-                            ObjectNumber: "objectNumber",
-                        } as const;
-                        export type Kind = (typeof Kind)[keyof typeof Kind];
-                    }
-
-                    export interface Cache {
-                        contentVersion: number;
-                        annotationVersion: number;
-                    }
-                }
-            }
         }
     }
 }

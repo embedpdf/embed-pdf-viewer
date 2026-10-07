@@ -39,6 +39,7 @@ import { linkPopup, linkReply } from './internal/write/writeAnnotationRelationsh
 import {
   objectNumberUnavailable,
   type DocumentSession,
+  type WriteStamp,
 } from '../../document-session/DocumentSession';
 import { throwIfAborted } from '../../shared/abort';
 import type { FontRegistrar } from '../fonts/FontRegistrar';
@@ -176,7 +177,7 @@ export class AnnotationBatchApplier {
       return { create, record, ctx, draft, replyTo, parent };
     });
     throwIfAborted(signal);
-    if (prepared.length === 0) return { created: [], meta: metaOf([], []) };
+    if (prepared.length === 0) return { created: [], meta: metaOf(this.session.writeStamp(), [], []) };
 
     const placed = prepared.map(({ create, record, ctx, draft }): Placed => {
       throwIfAborted(signal);
@@ -266,7 +267,7 @@ export class AnnotationBatchApplier {
       ),
     );
     joinWidgetFieldNumbers(this.runtime, this.session, created);
-    return { created, meta: metaOf(placed, linked) };
+    return { created, meta: metaOf(this.session.writeStamp(), placed, linked) };
   }
 
   /**
@@ -381,6 +382,7 @@ export class AnnotationBatchApplier {
  * moves.
  */
 function metaOf(
+  stamp: WriteStamp,
   placed: readonly Placed[],
   linked: readonly AnnotationRef[],
 ): AnnotationListMutationMeta {
@@ -388,6 +390,7 @@ function metaOf(
   return {
     affectedPages: pages.map((page) => toPageRef(page)),
     cacheDelta: null,
+    ...stamp,
     changed: [
       ...placed.map(
         (at): AnnotationRef => ({

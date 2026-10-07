@@ -14,6 +14,8 @@ import type { DownloadOptions } from '../dto/PdfSaveMode';
 import type { DocumentEventStream } from '../events/DocumentEventStream';
 import type { ObjectNumberPool } from '../identity/ObjectNumbers';
 import type { PageRef } from '../identity/PageRef';
+import type { Change, ChangeResult } from '../mutation/Change';
+import type { WriteOptions } from '../mutation/WriteOptions';
 import { AbortablePromise } from '../promise/AbortablePromise';
 import type { CallFacts, WorkingSetPage } from '../scheduling/facts';
 
@@ -85,6 +87,15 @@ export interface DocumentHandle {
    * call with `NotFound`. It carries no page data: `pages.list()` does.
    */
   page(ref: PageRef): PageHandle;
+  /**
+   * Apply one change, as one transaction: its ops in order, all of them or
+   * none (`{ ops }`), or the reverse of an earlier write (`{ undoOf: opId }`).
+   * Put everything one user action does into one change; it is one audit
+   * row, one burst of events and one undo step. An undo applies where the
+   * document still shows what the write set, and its items list what it left
+   * alone (`skipped`). Its own result is undoable: that is redo.
+   */
+  apply(change: Change, options?: WriteOptions): AbortablePromise<ChangeResult>;
   /**
    * The same document, every call made through it carrying `facts`: whether
    * a person waits on it, and the view it serves (see {@link CallFacts}). Most

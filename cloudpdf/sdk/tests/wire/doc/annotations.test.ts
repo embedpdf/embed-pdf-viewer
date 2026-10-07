@@ -298,6 +298,8 @@ describe("AnnotationsClient", () => {
                         },
                     ],
                 },
+                opId: "opId",
+                undoable: true,
                 changed: [{ kind: "objectNumber", page: { kind: "objectNumber", objectNumber: 1 }, objectNumber: 1 }],
             },
         };
@@ -403,6 +405,8 @@ describe("AnnotationsClient", () => {
                         },
                     ],
                 },
+                opId: "opId",
+                undoable: true,
                 changed: [{ kind: "objectNumber", page: { kind: "objectNumber", objectNumber: 1 }, objectNumber: 1 }],
             },
         };
@@ -530,6 +534,8 @@ describe("AnnotationsClient", () => {
                         },
                     ],
                 },
+                opId: "opId",
+                undoable: true,
                 changed: [{ kind: "objectNumber", page: { kind: "objectNumber", objectNumber: 1 }, objectNumber: 1 }],
             },
         };
@@ -646,6 +652,8 @@ describe("AnnotationsClient", () => {
                         },
                     ],
                 },
+                opId: "opId",
+                undoable: true,
             },
         };
 

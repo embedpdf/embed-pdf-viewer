@@ -112,7 +112,7 @@ export class PagesInserter {
     for (const page of insertedPages) {
       promoteInlineAnnotations(this.runtime, this.session, page.objectNumber);
     }
-    return { insertedPages, layout, meta: { affectedPages: [], cacheDelta: null } };
+    return { insertedPages, layout, meta: { affectedPages: [], cacheDelta: null, ...this.session.writeStamp() } };
   }
 
   /**
@@ -194,6 +194,6 @@ export class PagesInserter {
 
     const layout = new PagesReader(this.runtime, this.session).read(signal);
     const insertedPages: PageRef[] = layout.pages.slice(at, at + count).map((page) => page.ref);
-    return { insertedPages, layout, meta: { affectedPages: [], cacheDelta: null } };
+    return { insertedPages, layout, meta: { affectedPages: [], cacheDelta: null, ...this.session.writeStamp() } };
   }
 }

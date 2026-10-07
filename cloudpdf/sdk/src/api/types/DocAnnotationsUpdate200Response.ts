@@ -19,6 +19,7 @@ export namespace DocAnnotationsUpdate200Response {
             Preserved: "preserved",
             Regenerated: "regenerated",
             GenerationUnavailable: "generation-unavailable",
+            Restored: "restored",
         } as const;
         export type Action = (typeof Action)[keyof typeof Action];
     }

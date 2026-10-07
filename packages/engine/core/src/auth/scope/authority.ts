@@ -2,8 +2,10 @@ import { EngineError } from '../../errors/EngineError';
 import { EngineErrorCode } from '../../errors/EngineErrorCode';
 import type { AnnotationRef } from '../../identity/AnnotationRef';
 import { PermissionDenied } from './errors';
-import { checkCollab, checkSetGroup, collabTargetOf } from './resolver';
-import type { AnnotationActor, Identity, PdfBits } from './types';
+import { checkCapability, checkCollab, checkSetGroup, collabTargetOf } from './resolver';
+import type { AnnotationActor, DocCapability, Identity, PdfBits } from './types';
+import { describeProtection, protectedCapabilities } from '../../signature/protection';
+import type { DocumentProtection } from '../../signature/types';
 
 /**
  * Who an annotation write acts for, and what they may do to the annotations
@@ -22,10 +24,79 @@ export interface AnnotationAuthority {
   readonly grants: { readonly scope: readonly string[]; readonly pdfBits: PdfBits } | null;
 }
 
+/**
+ * Everything a change is checked against, inside the write, op by op (the
+ * ops of an undo included): who it acts for, their grants, and what the
+ * document's signatures forbid.
+ */
+export interface ChangeAuthority extends AnnotationAuthority {
+  /** What the signatures in the document forbid; `null` when nothing is enforced. */
+  readonly protection: DocumentProtection | null;
+}
+
+/**
+ * Check that the caller may use `capability`: `ProtectedDocument` when a
+ * signature in the document took it away, `PermissionDenied` when the
+ * grants never gave it.
+ */
+export function authorizeCapability(authority: ChangeAuthority, capability: DocCapability): void {
+  authorizeUnprotected(authority, capability);
+  const { grants, protection } = authority;
+  if (grants && !checkCapability(capability, grants.scope, grants.pdfBits, protection)) {
+    throw new PermissionDenied(capability, 'target');
+  }
+}
+
+/**
+ * Check only that no signature in the document took `capability` away
+ * (`ProtectedDocument`). Annotation creates, updates and deletes take this
+ * for `doc.annotate.modify`; their grants are checked per annotation.
+ */
+export function authorizeUnprotected(authority: ChangeAuthority, capability: DocCapability): void {
+  const { protection } = authority;
+  if (protection && protectedCapabilities(protection).has(capability)) {
+    throw new EngineError(
+      EngineErrorCode.ProtectedDocument,
+      describeProtection(capability, protection),
+    );
+  }
+}
+
 /** Whose an annotation is, as the write reads it. */
 interface Owned {
   userId?: string | null;
   groupId?: string | null;
+}
+
+/**
+ * Check a create in `groupId` (the identity's own group without one) and
+ * return the actor the write stamps: the creator, in that group. A group
+ * other than the identity's takes the authority a reassignment takes.
+ */
+export function authorizeAnnotationCreate(
+  authority: AnnotationAuthority,
+  groupId: string | null | undefined,
+): AnnotationActor | undefined {
+  const { identity, grants } = authority;
+  const group = groupId ?? identity.groupId;
+  if (grants) {
+    if (
+      group !== undefined &&
+      !checkSetGroup(group, identity.groupId, grants.scope, grants.pdfBits)
+    ) {
+      throw new PermissionDenied(`annotations:set-group:group=${group}`, 'target');
+    }
+    const target = collabTargetOf({ userId: identity.userId, groupId: group });
+    if (!checkCollab('create', target, grants.scope, identity, grants.pdfBits)) {
+      throw new PermissionDenied('annotations:create', 'target');
+    }
+  }
+  const actor: AnnotationActor = {
+    ...(identity.userId !== undefined ? { userId: identity.userId } : {}),
+    ...(group !== undefined ? { groupId: group } : {}),
+    ...(identity.displayName !== undefined ? { displayName: identity.displayName } : {}),
+  };
+  return actor.userId || actor.groupId || actor.displayName ? actor : undefined;
 }
 
 /**

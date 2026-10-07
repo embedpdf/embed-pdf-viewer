@@ -152,7 +152,7 @@ export class LocalDocumentSignaturesService implements DocumentSignaturesService
     const docId = this.docId;
     const submission = this.queue.enqueue<WorkerResultPayload>({
       buildPack: (jobId: JobId) =>
-        wirePack({ kind: 'signatures.complete', effect: 'contentWrite', jobId, docId, input }),
+        wirePack({ kind: 'signatures.complete', effect: 'contentWrite', jobId, opId: write.opId, docId, input }),
     });
     return this.await(submission, 'signatures.complete', (payload) => {
       const result = payload.result;

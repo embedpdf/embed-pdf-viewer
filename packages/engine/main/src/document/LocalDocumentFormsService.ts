@@ -101,7 +101,7 @@ export class LocalDocumentFormsService implements DocumentFormsService {
     const docId = this.docId;
     const submission = this.queue.enqueue<WorkerResultPayload>({
       buildPack: (jobId: JobId) =>
-        wirePack({ kind: 'forms.setValue', effect: 'write', jobId, docId, ref, value }),
+        wirePack({ kind: 'forms.setValue', effect: 'write', jobId, opId: write.opId, docId, ref, value }),
     });
     return this.await(submission, 'forms.setValue', (payload) => {
       this.publisher.publishWrite(write.opId, { type: 'forms.valueSet', ...payload.result });
@@ -119,7 +119,7 @@ export class LocalDocumentFormsService implements DocumentFormsService {
     const refs = fields === undefined ? undefined : Array.isArray(fields) ? fields : [fields];
     const submission = this.queue.enqueue<WorkerResultPayload>({
       buildPack: (jobId: JobId) =>
-        wirePack({ kind: 'forms.reset', effect: 'write', jobId, docId, ...(refs ? { refs } : {}) }),
+        wirePack({ kind: 'forms.reset', effect: 'write', jobId, opId: write.opId, docId, ...(refs ? { refs } : {}) }),
     });
     return this.await(submission, 'forms.reset', (payload) => {
       // One event per field that changed, sharing the write's opId.
@@ -140,7 +140,7 @@ export class LocalDocumentFormsService implements DocumentFormsService {
     const docId = this.docId;
     const submission = this.queue.enqueue<WorkerResultPayload>({
       buildPack: (jobId: JobId) =>
-        wirePack({ kind: 'forms.applyEffects', effect: 'write', jobId, docId, effects }),
+        wirePack({ kind: 'forms.applyEffects', effect: 'write', jobId, opId: write.opId, docId, effects }),
     });
     return this.await(submission, 'forms.applyEffects', (payload) => {
       if (payload.wrote) {
@@ -183,6 +183,7 @@ export class LocalDocumentFormsService implements DocumentFormsService {
             kind: 'forms.import',
             effect: 'write',
             jobId,
+            opId: write.opId,
             docId,
             data: buffer,
             ...(format ? { format } : {}),
@@ -209,6 +210,7 @@ export class LocalDocumentFormsService implements DocumentFormsService {
           kind: 'forms.createField',
           effect: 'write',
           jobId,
+          opId: write.opId,
           docId,
           draft,
           ...(options.objectNumber !== undefined ? { objectNumber: options.objectNumber } : {}),
@@ -235,7 +237,7 @@ export class LocalDocumentFormsService implements DocumentFormsService {
     const submission = this.queue.enqueue<WorkerResultPayload>({
       buildPack: (jobId: JobId) =>
         wirePack(
-          { kind: 'forms.setSignatureAppearance', effect: 'write', jobId, docId, ref, pdf },
+          { kind: 'forms.setSignatureAppearance', effect: 'write', jobId, opId: write.opId, docId, ref, pdf },
           [pdf],
         ),
     });
@@ -255,7 +257,7 @@ export class LocalDocumentFormsService implements DocumentFormsService {
     const docId = this.docId;
     const submission = this.queue.enqueue<WorkerResultPayload>({
       buildPack: (jobId: JobId) =>
-        wirePack({ kind: 'forms.updateField', effect: 'write', jobId, docId, ref, patch }),
+        wirePack({ kind: 'forms.updateField', effect: 'write', jobId, opId: write.opId, docId, ref, patch }),
     });
     return this.await(submission, 'forms.updateField', (payload) => {
       this.publisher.publishWrite(write.opId, { type: 'forms.updated', ...payload.result });
@@ -269,7 +271,7 @@ export class LocalDocumentFormsService implements DocumentFormsService {
     const docId = this.docId;
     const submission = this.queue.enqueue<WorkerResultPayload>({
       buildPack: (jobId: JobId) =>
-        wirePack({ kind: 'forms.deleteField', effect: 'write', jobId, docId, ref }),
+        wirePack({ kind: 'forms.deleteField', effect: 'write', jobId, opId: write.opId, docId, ref }),
     });
     return this.await(submission, 'forms.deleteField', (payload) => {
       this.publisher.publishWrite(write.opId, {
@@ -295,6 +297,7 @@ export class LocalDocumentFormsService implements DocumentFormsService {
           kind: 'forms.addWidget',
           effect: 'write',
           jobId,
+          opId: write.opId,
           docId,
           ref,
           placement,
@@ -320,7 +323,7 @@ export class LocalDocumentFormsService implements DocumentFormsService {
     const docId = this.docId;
     const submission = this.queue.enqueue<WorkerResultPayload>({
       buildPack: (jobId: JobId) =>
-        wirePack({ kind: 'forms.detachWidget', effect: 'write', jobId, docId, ref, widget }),
+        wirePack({ kind: 'forms.detachWidget', effect: 'write', jobId, opId: write.opId, docId, ref, widget }),
     });
     return this.await(submission, 'forms.detachWidget', (payload) => {
       this.publisher.publishWrite(write.opId, { type: 'forms.widgetRemoved', ...payload.result });
@@ -335,7 +338,7 @@ export class LocalDocumentFormsService implements DocumentFormsService {
     const bakeAppearances = options?.bakeAppearances ?? false;
     const submission = this.queue.enqueue<WorkerResultPayload>({
       buildPack: (jobId: JobId) =>
-        wirePack({ kind: 'forms.repair', effect: 'write', jobId, docId, bakeAppearances }),
+        wirePack({ kind: 'forms.repair', effect: 'write', jobId, opId: write.opId, docId, bakeAppearances }),
     });
     return this.await(submission, 'forms.repair', (payload) => {
       this.publisher.publishWrite(write.opId, { type: 'forms.repaired', ...payload.result });

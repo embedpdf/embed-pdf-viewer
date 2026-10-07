@@ -41,7 +41,7 @@ export class MetadataMutator {
     // shared reader (identical output local + cloud). No cache delta:
     // local engines have no manifest/CDN; the server adds its own.
     const metadata = new MetadataReader(this.runtime, this.session).read(signal);
-    return { metadata, meta: { affectedPages: [], cacheDelta: null } };
+    return { metadata, meta: { affectedPages: [], cacheDelta: null, ...this.session.writeStamp() } };
   }
 
   /** Set and remove custom keys, then re-read them the same way. */
@@ -51,6 +51,6 @@ export class MetadataMutator {
     applyCustomMetadataPatch(fn, mem, this.session.requireDocPtr(), patch);
     throwIfAborted(signal);
     const custom = new MetadataReader(this.runtime, this.session).readCustom(signal);
-    return { custom, meta: { affectedPages: [], cacheDelta: null } };
+    return { custom, meta: { affectedPages: [], cacheDelta: null, ...this.session.writeStamp() } };
   }
 }

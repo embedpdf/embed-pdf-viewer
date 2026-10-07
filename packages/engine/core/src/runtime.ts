@@ -32,6 +32,7 @@ export type {
 } from './events/DocumentEvent';
 export type { DocumentEventStream } from './events/DocumentEventStream';
 export { subscribeToType } from './events/DocumentEventStream';
+export { changeEvents } from './events/changeEvents';
 export {
   advisoryFromPdfBits,
   permissionInfoFromProbe,
@@ -134,6 +135,11 @@ export type {
   AnnotationsUpdateWorkerRequest,
   AnnotationsDeleteWorkerRequest,
   AnnotationsMoveWorkerRequest,
+  DocumentApplyWorkerRequest,
+  DocumentApplyChangesWorkerRequest,
+  ChangeRecordPayload,
+  ServerChange,
+  ServerChangeOutcome,
   DocumentSaveBufferWorkerRequest,
   DocumentSaveLayerBufferWorkerRequest,
   DocumentSaveFileWorkerRequest,

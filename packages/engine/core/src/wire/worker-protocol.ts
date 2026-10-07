@@ -1,7 +1,7 @@
 import type { AnnotationList } from '../annotation/AnnotationList';
 import type { AnnotationDraft, AnnotationPatch } from '../annotation/kinds';
 import type { WireAnnotationResources } from '../annotation/resources';
-import type { AnnotationActor, AnnotationAuthority } from '../auth/scope';
+import type { AnnotationActor, AnnotationAuthority, ChangeAuthority } from '../auth/scope';
 import type {
   AnnotationAppearanceMode,
   AnnotationAppearanceRenderOptions,
@@ -34,6 +34,7 @@ import type { FormFieldRef, FormWidget } from '../identity/FormFieldRef';
 import type { ObjectNumberRange } from '../identity/ObjectNumbers';
 import type { PageRef } from '../identity/PageRef';
 import type { AnnotationFlattenResult } from '../mutation/AnnotationFlattenResult';
+import type { Change, ChangeResult } from '../mutation/Change';
 import type {
   AnnotationCreateResult,
   AnnotationDeleteResult,
@@ -130,6 +131,12 @@ export type RequestEffect =
 
 /** What every document write request may carry besides its own fields. */
 export interface WriteJobFields {
+  /**
+   * The write's id (`WriteOptions.opId`, or the one minted for it). The
+   * worker answers a second job with the same id from the first one's
+   * outcome, and keys what undoing the write needs under it.
+   */
+  opId: string;
   /**
    * The first object number the objects the write makes for itself may take
    * (appearance streams, fonts). The worker raises the layer's last object
@@ -474,6 +481,88 @@ export interface AnnotationsUpdateWorkerRequest<
    */
   authority: AnnotationAuthority;
 }
+
+/**
+ * One change (`doc.apply`): its ops in order, as one transaction, or the
+ * reverse of an earlier write (`{ undoOf }`). Each op is checked as its
+ * single verb's job checks it, inside the write.
+ */
+export interface DocumentApplyWorkerRequest<
+  C extends Coordinates = PageCoordinates,
+> extends WriteJobFields {
+  kind: 'document.apply';
+  effect: 'write';
+  jobId: WorkerJobId;
+  docId: string;
+  layerName?: string;
+  /** The ops, with their bytes by role on the transfer list, as the single verbs send them. */
+  change: Change<C, WireAnnotationResources>;
+  /**
+   * Who the change acts for, what they may do and what the document's
+   * signatures forbid, checked inside the write against each op (the ops of
+   * an undo included) and each annotation an op creates, changes or removes.
+   * Creates stamp its identity, in the group the draft names; an undo needs
+   * its user to be the one who made the change.
+   */
+  authority: ChangeAuthority;
+  artifactPath?: string;
+}
+
+/**
+ * What the engine kept of a change so it can undo it, as it crosses the
+ * worker boundary: who made it and the steps that reverse it. Its steps are
+ * the engine's own; a caller stores them and hands them back, never reads
+ * them.
+ */
+export interface ChangeRecordPayload {
+  readonly userId: string | null;
+  readonly steps: readonly unknown[];
+}
+
+/** One change of a server request (see `DocumentApplyChangesWorkerRequest`). */
+export interface ServerChange<C extends Coordinates = PageCoordinates> {
+  opId: string;
+  change: Change<C, WireAnnotationResources>;
+  /** Who the change acts for (see `DocumentApplyWorkerRequest.authority`). */
+  authority: ChangeAuthority;
+  /**
+   * For an undo of a change outside this request: the record that change
+   * left, or null when it left none (it was refused, or wrote nothing). The
+   * caller checked who may undo it and that nothing ended undo since. An undo
+   * of an earlier change of the same request leaves it out: the job keeps
+   * the records of its own changes.
+   */
+  record?: ChangeRecordPayload | null;
+}
+
+/**
+ * A server request's changes, as one job: each runs in its own layer
+ * transaction, committed or rolled back on its own, in order. A refusal is
+ * that change's answer; anything else fails the job. The job saves one
+ * artifact for the changes that applied.
+ */
+export interface DocumentApplyChangesWorkerRequest<C extends Coordinates = PageCoordinates> {
+  kind: 'document.applyChanges';
+  effect: 'write';
+  jobId: WorkerJobId;
+  docId: string;
+  layerName?: string;
+  changes: ServerChange<C>[];
+  /** See `WriteJobFields.objectNumberFloor`. */
+  objectNumberFloor?: number;
+  artifactPath?: string;
+}
+
+/** What one change of a server request answered. */
+export type ServerChangeOutcome<C extends Coordinates = PageCoordinates> =
+  | {
+      opId: string;
+      status: 'applied';
+      result: ChangeResult<C>;
+      /** What undoes it, for the caller to keep; null when nothing can. */
+      record: ChangeRecordPayload | null;
+    }
+  | { opId: string; status: 'refused'; error: SerializedEngineError };
 
 export interface AnnotationsDeleteWorkerRequest extends WriteJobFields {
   kind: 'annotations.delete';
@@ -1393,6 +1482,8 @@ export type WorkerRequest<C extends Coordinates = PageCoordinates> =
   | AnnotationsUpdateWorkerRequest<C>
   | AnnotationsDeleteWorkerRequest
   | AnnotationsMoveWorkerRequest
+  | DocumentApplyWorkerRequest<C>
+  | DocumentApplyChangesWorkerRequest<C>
   | FormsListWorkerRequest
   | FormsSetValueWorkerRequest
   | FormsResetWorkerRequest
@@ -1592,6 +1683,25 @@ export type WorkerResultPayload<C extends Coordinates = PageCoordinates> =
   | {
       tag: 'annotations.move';
       result: AnnotationMoveResult<C>;
+      artifact?: LayerArtifactWorkerPayload;
+      artifactFile?: LayerArtifactFileWorkerPayload;
+    }
+  | {
+      tag: 'document.applyChanges';
+      /** One per change, in order. */
+      outcomes: ServerChangeOutcome<C>[];
+      /** The artifact, when at least one change applied. */
+      artifact?: LayerArtifactWorkerPayload;
+      artifactFile?: LayerArtifactFileWorkerPayload;
+    }
+  | {
+      tag: 'document.apply';
+      result: ChangeResult<C>;
+      /**
+       * True when this answers an `opId` that already had one: nothing ran
+       * again, so nothing is published again.
+       */
+      replayed: boolean;
       artifact?: LayerArtifactWorkerPayload;
       artifactFile?: LayerArtifactFileWorkerPayload;
     }

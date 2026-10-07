@@ -73,7 +73,9 @@ export {
   AnnotationDeleteResultSchema,
   AnnotationWireComponents,
   AnnotationMoveResultSchema,
+  DocumentWireComponents,
   FormMutationMetaSchema,
+  FormWireComponents,
   FormSetValueResultSchema,
   FormResetResultSchema,
   FormResetBodySchema,
@@ -381,3 +383,14 @@ export * from './dto/Measure.schema';
 
 export { PageScaleResultSchema } from './wire/schemas';
 export { PageRefSchema } from './identity/PageRef.schema';
+export {
+  CHANGE_REQUEST_LIMITS,
+  ChangeAnswerSchema,
+  ChangeEntryWireSchema,
+  ChangeItemSchema,
+  ChangeOpWireSchema,
+  ChangeRequestSchema,
+  ChangeResponseSchema,
+  ChangeResultSchema,
+  ChangeWireComponents,
+} from './wire/changeSchemas';

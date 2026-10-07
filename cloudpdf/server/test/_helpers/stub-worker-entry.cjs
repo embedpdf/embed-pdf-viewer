@@ -264,7 +264,7 @@ function layerArtifact(msg, sessionMeta) {
   const annots = meta.annots ?? [];
   // The write's own objects, numbered past its floor: one, or 100 for a
   // create whose contents ask for more than any estimate.
-  const own = msg.draft?.contents === '__MANY_OBJECTS__' ? 100 : 1;
+  const own = changeOps(msg).some((op) => op.data?.contents === '__MANY_OBJECTS__') ? 100 : 1;
   meta.last =
     Math.max(
       meta.last ?? OBJECT_NUMBER_BASE,
@@ -363,18 +363,6 @@ function rejectPasswordIncorrect(msg) {
   });
 }
 
-function rejectAnnotationNotFound(msg) {
-  parentPort.postMessage({
-    kind: 'reject',
-    jobId: msg.jobId,
-    error: {
-      name: 'EngineError',
-      message: `annotation not found: ${JSON.stringify(msg.ref ?? msg.refs)}`,
-      code: 'NotFound',
-    },
-  });
-}
-
 /**
  * Object-number refs only ever come from annotations the session actually
  * knows about — an unresolved one means the annotation is GONE (e.g. deleted
@@ -384,6 +372,137 @@ function rejectAnnotationNotFound(msg) {
  */
 function isStrictRef(ref) {
   return ref.kind === 'objectNumber';
+}
+
+/** The refusals a change keeps as its answer (engine-core `isKeptRefusal`). */
+const KEPT_REFUSALS = new Set([
+  'InvalidArg',
+  'NotFound',
+  'Forbidden',
+  'ProtectedDocument',
+  'MalformedPdf',
+  'PayloadTooLarge',
+  'ObjectNumberUnavailable',
+  'LayerFull',
+  'ChangeConflict',
+  'UndoUnavailable',
+]);
+
+function stubError(code, message) {
+  return Object.assign(new Error(message), { code });
+}
+
+function serializedOf(err) {
+  return { name: 'EngineError', code: err.code ?? 'Unknown', message: err.message };
+}
+
+/** Every op of a server request's changes. */
+function changeOps(msg) {
+  return (msg.changes ?? []).flatMap((entry) => entry.change.ops ?? []);
+}
+
+/**
+ * One annotation op of a change, on the session's state, as the real
+ * mutator answers it: its item, or a thrown refusal.
+ */
+function applyStubOp(meta, op, opId) {
+  const stamp = { opId, undoable: false };
+  switch (op.type) {
+    case 'annotations.create': {
+      const pon = ponOf(op.page);
+      meta.annots = meta.annots ?? [];
+      meta.seq = meta.seq ?? 1;
+      const a = {
+        pon,
+        seq: meta.seq++,
+        nm: `stub-${pon}-${meta.seq - 1}`,
+        contents: op.data?.contents ?? null,
+      };
+      meta.annots.push(a);
+      const index = meta.annots.filter((x) => x.pon === pon).length - 1;
+      return {
+        type: op.type,
+        page: op.page,
+        annotation: annotationDto(a, index),
+        meta: { ...mutationMeta(pon, OBJECT_NUMBER_BASE + a.seq), ...stamp },
+      };
+    }
+    case 'annotations.update': {
+      const pon = ponOf(op.ref.page);
+      const found = resolveRef(meta, op.ref);
+      if (found) {
+        if (op.patch && 'contents' in op.patch) found.contents = op.patch.contents ?? null;
+        const index = (meta.annots ?? []).filter((x) => x.pon === pon).indexOf(found);
+        return {
+          type: op.type,
+          page: op.ref.page,
+          annotation: annotationDto(found, index),
+          appearance: { action: 'regenerated', changed: true },
+          meta: { ...mutationMeta(pon, OBJECT_NUMBER_BASE + found.seq), ...stamp },
+        };
+      }
+      if (isStrictRef(op.ref)) throw annotationNotFound(op.ref);
+      // Lenient fallback for base-index refs: seeded layers have no session
+      // state, so a canned annotation keeps direct-seed tests valid.
+      const ann = cannedAnnotation(pon, op.ref.baseIndex);
+      return {
+        type: op.type,
+        page: op.ref.page,
+        annotation: ann,
+        appearance: { action: 'regenerated', changed: true },
+        meta: { ...mutationMeta(pon, ann.ref.objectNumber), ...stamp },
+      };
+    }
+    case 'annotations.delete': {
+      const pon = ponOf(op.ref.page);
+      const found = resolveRef(meta, op.ref);
+      if (found) {
+        meta.annots = (meta.annots ?? []).filter((x) => x !== found);
+        return {
+          type: op.type,
+          page: op.ref.page,
+          meta: { ...mutationMeta(pon, OBJECT_NUMBER_BASE + found.seq), ...stamp },
+        };
+      }
+      if (isStrictRef(op.ref)) throw annotationNotFound(op.ref);
+      return {
+        type: op.type,
+        page: op.ref.page,
+        meta: { ...mutationMeta(pon, OBJECT_NUMBER_BASE + pon), ...stamp },
+      };
+    }
+    case 'annotations.move': {
+      const pon = ponOf(op.page);
+      const annots = meta.annots ?? [];
+      const moving = op.refs.map((ref) => resolveRef(meta, ref)).filter(Boolean);
+      if (moving.length === op.refs.length && moving.length > 0) {
+        // Reorder within the page: remove the moved annots, reinsert at
+        // toIndex (in the page-local index space), like the real mutator.
+        const page = annots.filter((a) => a.pon === pon && !moving.includes(a));
+        const others = annots.filter((a) => a.pon !== pon);
+        page.splice(op.toIndex, 0, ...moving);
+        meta.annots = [...others, ...page];
+        return {
+          type: op.type,
+          page: op.page,
+          annotations: moving.map((a, i) => annotationDto(a, op.toIndex + i)),
+          meta: { ...mutationMeta(pon, OBJECT_NUMBER_BASE + moving[0].seq), ...stamp },
+        };
+      }
+      return {
+        type: op.type,
+        page: op.page,
+        annotations: op.refs.map((_, i) => cannedAnnotation(pon, op.toIndex + i)),
+        meta: { ...mutationMeta(pon, OBJECT_NUMBER_BASE + pon), ...stamp },
+      };
+    }
+    default:
+      throw stubError('NotImplemented', `stub worker: op '${op.type}' not implemented`);
+  }
+}
+
+function annotationNotFound(ref) {
+  return stubError('NotFound', `annotation not found: ${JSON.stringify(ref)}`);
 }
 
 parentPort.on('message', (msg) => {
@@ -641,141 +760,58 @@ parentPort.on('message', (msg) => {
       });
       return;
     }
-    case 'annotations.create': {
-      // Boundary-kill test hook: a draft with contents '__STALL__' never
-      // replies, deterministically parking the engine apply so a test
-      // can kill the host mid-operation.
-      if (msg.draft?.contents === '__STALL__') return;
+    case 'document.applyChanges': {
+      // Boundary-kill test hook: a create with contents '__STALL__' never
+      // replies, deterministically parking the engine apply so a test can
+      // kill the host mid-operation.
+      if (changeOps(msg).some((op) => op.data?.contents === '__STALL__')) return;
       const meta = openDocs.get(sessionKey(msg));
       if (!meta) {
         rejectNotOpen(msg);
         return;
       }
-      const pon = ponOf(msg.page);
-      meta.annots = meta.annots ?? [];
-      meta.seq = meta.seq ?? 1;
-      const a = {
-        pon,
-        seq: meta.seq++,
-        nm: `stub-${pon}-${meta.seq - 1}`,
-        contents: msg.draft?.contents ?? null,
-      };
-      meta.annots.push(a);
-      const index = meta.annots.filter((x) => x.pon === pon).length - 1;
-      const objectNumber = OBJECT_NUMBER_BASE + a.seq;
-      resolveMutation(msg, {
-        tag: 'annotations.create',
-        result: {
-          annotation: annotationDto(a, index),
-          meta: mutationMeta(pon, objectNumber),
-        },
-        artifact: layerArtifact(msg, meta),
-      });
-      return;
-    }
-    case 'annotations.update': {
-      const meta = openDocs.get(sessionKey(msg));
-      if (!meta) {
-        rejectNotOpen(msg);
-        return;
-      }
-      const pon = ponOf(msg.ref.page);
-      const found = resolveRef(meta, msg.ref);
-      if (found) {
-        if (msg.patch && 'contents' in msg.patch) found.contents = msg.patch.contents ?? null;
-        const index = (meta.annots ?? []).filter((x) => x.pon === pon).indexOf(found);
-        resolveMutation(msg, {
-          tag: 'annotations.update',
-          result: {
-            annotation: annotationDto(found, index),
-            meta: mutationMeta(pon, OBJECT_NUMBER_BASE + found.seq),
-          },
-          artifact: layerArtifact(msg, meta),
-        });
-        return;
-      }
-      if (isStrictRef(msg.ref)) {
-        rejectAnnotationNotFound(msg);
-        return;
-      }
-      // Lenient fallback for base-index refs: seeded layers have no session
-      // state — answer with a canned annotation so direct-seed tests stay valid.
-      const ann = cannedAnnotation(pon, msg.ref.baseIndex);
-      resolveMutation(msg, {
-        tag: 'annotations.update',
-        result: {
-          annotation: ann,
-          meta: mutationMeta(pon, ann.ref.objectNumber),
-        },
-        artifact: layerArtifact(msg, meta),
-      });
-      return;
-    }
-    case 'annotations.delete': {
-      const meta = openDocs.get(sessionKey(msg));
-      if (!meta) {
-        rejectNotOpen(msg);
-        return;
-      }
-      const pon = ponOf(msg.ref.page);
-      const found = resolveRef(meta, msg.ref);
-      if (found) {
-        meta.annots = (meta.annots ?? []).filter((x) => x !== found);
-        resolveMutation(msg, {
-          tag: 'annotations.delete',
-          result: {
-            meta: mutationMeta(pon, OBJECT_NUMBER_BASE + found.seq),
-          },
-          artifact: layerArtifact(msg, meta),
-        });
-        return;
-      }
-      if (isStrictRef(msg.ref)) {
-        rejectAnnotationNotFound(msg);
-        return;
+      // Each change on its own, as the real host runs it: a refusal is its
+      // answer and takes its ops back; anything else fails the job.
+      const outcomes = [];
+      let wrote = false;
+      for (const entry of msg.changes) {
+        const before = { annots: [...(meta.annots ?? [])], seq: meta.seq };
+        try {
+          if (!entry.change.ops) {
+            throw stubError('NotImplemented', 'stub worker: undo is not implemented');
+          }
+          const items = entry.change.ops.map((op) => applyStubOp(meta, op, entry.opId));
+          const pages = new Map();
+          for (const item of items) for (const page of item.meta.affectedPages) pages.set(page.objectNumber, page);
+          outcomes.push({
+            opId: entry.opId,
+            status: 'applied',
+            result: {
+              items,
+              meta: {
+                affectedPages: [...pages.values()],
+                cacheDelta: null,
+                opId: entry.opId,
+                undoable: false,
+              },
+            },
+            record: null,
+          });
+          wrote = true;
+        } catch (err) {
+          meta.annots = before.annots;
+          meta.seq = before.seq;
+          if (!err.code || !KEPT_REFUSALS.has(err.code)) {
+            parentPort.postMessage({ kind: 'reject', jobId: msg.jobId, error: serializedOf(err) });
+            return;
+          }
+          outcomes.push({ opId: entry.opId, status: 'refused', error: serializedOf(err) });
+        }
       }
       resolveMutation(msg, {
-        tag: 'annotations.delete',
-        result: {
-          meta: mutationMeta(pon, OBJECT_NUMBER_BASE + pon),
-        },
-        artifact: layerArtifact(msg, meta),
-      });
-      return;
-    }
-    case 'annotations.move': {
-      const meta = openDocs.get(sessionKey(msg));
-      if (!meta) {
-        rejectNotOpen(msg);
-        return;
-      }
-      const pon = ponOf(msg.page);
-      const annots = meta.annots ?? [];
-      const moving = msg.refs.map((ref) => resolveRef(meta, ref)).filter(Boolean);
-      if (moving.length === msg.refs.length && moving.length > 0) {
-        // Reorder within the page: remove the moved annots, reinsert at
-        // toIndex (in the page-local index space), like the real mutator.
-        const page = annots.filter((a) => a.pon === pon && !moving.includes(a));
-        const others = annots.filter((a) => a.pon !== pon);
-        page.splice(msg.toIndex, 0, ...moving);
-        meta.annots = [...others, ...page];
-        resolveMutation(msg, {
-          tag: 'annotations.move',
-          result: {
-            annotations: moving.map((a, i) => annotationDto(a, msg.toIndex + i)),
-            meta: mutationMeta(pon, OBJECT_NUMBER_BASE + moving[0].seq),
-          },
-          artifact: layerArtifact(msg, meta),
-        });
-        return;
-      }
-      resolveMutation(msg, {
-        tag: 'annotations.move',
-        result: {
-          annotations: msg.refs.map((_, i) => cannedAnnotation(pon, msg.toIndex + i)),
-          meta: mutationMeta(pon, OBJECT_NUMBER_BASE + pon),
-        },
-        artifact: layerArtifact(msg, meta),
+        tag: 'document.applyChanges',
+        outcomes,
+        ...(wrote ? { artifact: layerArtifact(msg, meta) } : {}),
       });
       return;
     }

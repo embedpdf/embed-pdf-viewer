@@ -51,6 +51,7 @@ export * from './features/geometry';
 export { EPDF_CHAR_GEOMETRY_LAYOUT } from './runtime/memory/structs';
 export * from './features/render';
 export * from './features/annotations';
+export * from './features/changes';
 export * from './features/attachments';
 export * from './features/security';
 export * from './features/save';

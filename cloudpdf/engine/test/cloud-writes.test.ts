@@ -1,8 +1,13 @@
 import { describe, expect, test, vi } from 'vitest';
-import { AbortError, EngineError, EngineErrorCode } from '@embedpdf/engine-core/runtime';
+import {
+  AbortError,
+  EngineError,
+  EngineErrorCode,
+  type ChangeAnswer,
+} from '@embedpdf/engine-core/runtime';
 import { resolveResourceIdForPath, wirePaths } from '@embedpdf/engine-core/wire';
 import { CloudObjectNumberPool } from '../src/document/CloudObjectNumberPool';
-import { CloudWrites } from '../src/document/CloudWrites';
+import { CloudWrites, type ChangeSender, type SentChange } from '../src/document/CloudWrites';
 import { HttpClient } from '../src/transport/HttpClient';
 
 /**
@@ -102,6 +107,137 @@ describe('the write line', () => {
     pool.sync({ held: [{ first: 12, count: 1 }], expiresIn: 900 });
     // Off the server's list: the spent one isn't reported, the kept one is.
     expect(lost).toEqual([kept]);
+  });
+});
+
+describe('changes in the line', () => {
+  /** A sender that records each request's opIds and answers each change applied. */
+  function recordingSender(gate?: Promise<void>) {
+    const requests: string[][] = [];
+    let inFlight = 0;
+    let most = 0;
+    const send: ChangeSender = async (changes) => {
+      inFlight++;
+      most = Math.max(most, inFlight);
+      requests.push(changes.map((sent) => sent.opId));
+      await (gate ?? tick());
+      inFlight--;
+      return changes.map(({ opId }) => applied(opId));
+    };
+    return { send, requests, most: () => most };
+  }
+
+  const applied = (opId: string): ChangeAnswer => ({
+    opId,
+    status: 'applied',
+    result: { items: [], meta: { affectedPages: [], cacheDelta: null, opId, undoable: true } },
+  });
+
+  const sent = (opId: string): Promise<SentChange> =>
+    Promise.resolve({ opId, change: { undoOf: `before-${opId}` } });
+
+  test('changes called while a write is in flight go out together, each answered on its own', async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => (release = resolve));
+    const sender = recordingSender();
+    const writes = new CloudWrites(newPool(), sender.send);
+    const first = writes.run('w', signal(), (line) => line.send(() => gate));
+    const answers = Promise.all(['a', 'b', 'c'].map((opId) => writes.change(signal(), sent(opId))));
+    await tick();
+    expect(sender.requests).toEqual([]);
+    release();
+    await first;
+    expect((await answers).map((answer) => answer.opId)).toEqual(['a', 'b', 'c']);
+    expect(sender.requests).toEqual([['a', 'b', 'c']]);
+  });
+
+  test('one request in flight: changes called while one is out wait for the next', async () => {
+    let release!: () => void;
+    const sender = recordingSender(new Promise<void>((resolve) => (release = resolve)));
+    const writes = new CloudWrites(newPool(), sender.send);
+    const a = writes.change(signal(), sent('a'));
+    await tick();
+    const rest = Promise.all([
+      writes.change(signal(), sent('b')),
+      writes.change(signal(), sent('c')),
+    ]);
+    await tick();
+    expect(sender.requests).toEqual([['a']]);
+    release();
+    await Promise.all([a, rest]);
+    expect(sender.requests).toEqual([['a'], ['b', 'c']]);
+    expect(sender.most()).toBe(1);
+  });
+
+  test('a write between changes keeps its place: what follows it goes after it', async () => {
+    const order: string[] = [];
+    const writes = new CloudWrites(newPool(), async (changes) => {
+      order.push(changes.map((change) => change.opId).join('+'));
+      return changes.map(({ opId }) => applied(opId));
+    });
+    await Promise.all([
+      writes.change(signal(), sent('a')),
+      writes.run('w', signal(), (line) => line.send(async () => order.push('w'))),
+      writes.change(signal(), sent('b')),
+      writes.change(signal(), sent('c')),
+    ]);
+    expect(order).toEqual(['a', 'w', 'b+c']);
+  });
+
+  test('a change with bytes goes in a request of its own', async () => {
+    const sender = recordingSender();
+    const writes = new CloudWrites(newPool(), sender.send);
+    await Promise.all([
+      writes.change(signal(), sent('a')),
+      writes.change(signal(), sent('stamp'), { alone: true }),
+      writes.change(signal(), sent('b')),
+    ]);
+    expect(sender.requests).toEqual([['a'], ['stamp'], ['b']]);
+  });
+
+  test('a request holds at most 64 changes', async () => {
+    const sender = recordingSender();
+    const writes = new CloudWrites(newPool(), sender.send);
+    await Promise.all(Array.from({ length: 65 }, (_, i) => writes.change(signal(), sent(`c${i}`))));
+    expect(sender.requests.map((request) => request.length)).toEqual([64, 1]);
+  });
+
+  test('a change aborted, or failing to get ready, before its turn is left out; the rest go', async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => (release = resolve));
+    const sender = recordingSender();
+    const writes = new CloudWrites(newPool(), sender.send);
+    const first = writes.run('w', signal(), (line) => line.send(() => gate));
+    const abort = new AbortController();
+    const aborted = writes.change(abort.signal, sent('aborted'));
+    const broken = writes.change(signal(), Promise.reject(new Error('unreadable')));
+    const kept = writes.change(signal(), sent('kept'));
+    abort.abort();
+    release();
+    await first;
+    await expect(aborted).rejects.toBeInstanceOf(AbortError);
+    await expect(broken).rejects.toThrow('unreadable');
+    expect((await kept).opId).toBe('kept');
+    expect(sender.requests).toEqual([['kept']]);
+  });
+
+  test('a request that fails fails every change in it, and their numbers stay the callers’', async () => {
+    const pool = newPool();
+    pool.opened({ session: 'new', expiresIn: 900, objectNumbers: [{ first: 10, count: 2 }] });
+    const writes = new CloudWrites(pool, async () => {
+      throw new EngineError(EngineErrorCode.Network, 'down');
+    });
+    const [a, b] = [pool.take()!, pool.take()!];
+    const results = await Promise.allSettled([
+      writes.change(signal(), sent('a'), { named: [a] }),
+      writes.change(signal(), sent('b'), { named: [b] }),
+    ]);
+    expect(results.map((result) => result.status)).toEqual(['rejected', 'rejected']);
+    const lost: number[] = [];
+    pool.onLost((event) => lost.push(...event.numbers));
+    pool.sync({ held: [], expiresIn: 900 });
+    // Neither was spent: both are reported lost when the server forgets them.
+    expect(lost.sort()).toEqual([a, b]);
   });
 });
 

@@ -53,7 +53,7 @@ export function runPageFlattenConformance(
 
         const noOp = await doc.pages.flatten([toPageRef(pageObjectNumber)], { usage: 'display' });
         expect(noOp.results.map((item) => item.status)).toEqual(['unchanged']);
-        expect(noOp.meta).toEqual({ affectedPages: [], cacheDelta: null });
+        expect(noOp.meta).toMatchObject({ affectedPages: [], cacheDelta: null, undoable: false });
         expect(events).toHaveLength(1);
         unsubscribe();
 

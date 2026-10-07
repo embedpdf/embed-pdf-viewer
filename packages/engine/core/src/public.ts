@@ -113,6 +113,12 @@ export type {
   FlattenOptions,
   // Writes: how to write, and this session's object numbers.
   WriteOptions,
+  Change,
+  ChangeOp,
+  ChangeItem,
+  ChangeResult,
+  ChangeItemType,
+  SkippedChangeItem,
   AnnotationCreateOptions,
   AnnotationUpdateOptions,
   FlattenWriteOptions,

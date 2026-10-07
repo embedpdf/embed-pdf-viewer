@@ -135,11 +135,24 @@ export const FormSnapshotSchema: z.ZodType<FormSnapshot> = z.object({
   calculationOrder: z.array(FormFieldRefSchema.nullable()),
 });
 
-export const FormFieldValueSchema: z.ZodType<FormFieldValue> = z.union([
-  z.object({ value: z.string().nullable() }).strict(),
-  z.object({ checked: z.boolean() }).strict(),
-  z.object({ selectedValues: z.array(z.string()) }).strict(),
-]);
+/**
+ * `{ value }`, `{ checked }` or `{ selectedValues }`: one object with exactly
+ * one of the three, so the wire has no untagged union (the API reference
+ * labels variants by a discriminating literal, and a value has none to add).
+ */
+export const FormFieldValueSchema: z.ZodType<FormFieldValue> = z
+  .object({
+    value: z.string().nullable().optional(),
+    checked: z.boolean().optional(),
+    selectedValues: z.array(z.string()).optional(),
+  })
+  .strict()
+  .refine(
+    (value) =>
+      [value.value, value.checked, value.selectedValues].filter((set) => set !== undefined)
+        .length === 1,
+    { message: 'exactly one of value, checked or selectedValues' },
+  ) as unknown as z.ZodType<FormFieldValue>;
 
 export const FormDataFormatSchema: z.ZodType<FormDataFormat> = z.enum(['fdf', 'xfdf']);
 

@@ -366,7 +366,7 @@ describe('idempotent writes', () => {
       .selectFrom('audit_log')
       .select('idempotency_key')
       .where('layer_name', '=', layer)
-      .where('idempotency_key', 'is not', null)
+      .where('idempotency_key', 'like', 'write-%')
       .execute();
     expect(rows.map((row) => row.idempotency_key).sort()).toEqual(
       writes.map((_, i) => `write-${i}`).sort(),

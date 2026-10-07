@@ -123,7 +123,7 @@ export class PagesMutator {
     // reordered session via the shared reader (identical output local +
     // cloud). `cache` is null — local engines have no manifest/CDN.
     const layout = new PagesReader(this.runtime, this.session).read(signal);
-    return { layout, meta: { affectedPages: [], cacheDelta: null } };
+    return { layout, meta: { affectedPages: [], cacheDelta: null, ...this.session.writeStamp() } };
   }
 
   /**
@@ -173,7 +173,7 @@ export class PagesMutator {
     }
 
     const layout = new PagesReader(this.runtime, this.session).read(signal);
-    return { layout, meta: { affectedPages: [], cacheDelta: null } };
+    return { layout, meta: { affectedPages: [], cacheDelta: null, ...this.session.writeStamp() } };
   }
 
   /**
@@ -232,7 +232,7 @@ export class PagesMutator {
     this.session.refreshPageRegistry();
 
     const layout = new PagesReader(this.runtime, this.session).read(signal);
-    return { layout, meta: { affectedPages: [], cacheDelta: null } };
+    return { layout, meta: { affectedPages: [], cacheDelta: null, ...this.session.writeStamp() } };
   }
 
   /**
@@ -266,7 +266,7 @@ export class PagesMutator {
       );
     }
     const layout = new PagesReader(this.runtime, this.session).read(signal);
-    return { layout, meta: { affectedPages: [], cacheDelta: null } };
+    return { layout, meta: { affectedPages: [], cacheDelta: null, ...this.session.writeStamp() } };
   }
 
   /** Remove one `/Names /Pages` registration; the page stays. */
@@ -290,7 +290,7 @@ export class PagesMutator {
       );
     }
     const layout = new PagesReader(this.runtime, this.session).read(signal);
-    return { layout, meta: { affectedPages: [], cacheDelta: null } };
+    return { layout, meta: { affectedPages: [], cacheDelta: null, ...this.session.writeStamp() } };
   }
 
   /** Shared input check: non-empty, no duplicate page object numbers. */

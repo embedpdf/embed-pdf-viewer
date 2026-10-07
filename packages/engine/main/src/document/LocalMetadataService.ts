@@ -19,6 +19,7 @@ import type { SessionEventPublisher } from '@embedpdf/engine-services';
 
 import type { ScopeGuard } from '../scope';
 import type { WorkerResultPayload } from '../worker/protocol';
+import type { JobId } from '../worker/protocol';
 import type { JobQueue, JobSpec } from '../worker/WorkerQueue';
 
 interface DocClosedView {
@@ -35,12 +36,13 @@ interface MetadataDeps {
 /**
  * One metadata job: refused on a closed document, a missing capability or an
  * invalid `opId`, otherwise the worker round trip, with the payload's tag
- * checked. `pick` gets the job's `opId` (the caller's, else a fresh one).
+ * checked. `buildPack` and `pick` get the job's `opId` (the caller's, else a
+ * fresh one).
  */
 function runMetadataJob<Tag extends WorkerResultPayload['tag'], T>(
   deps: MetadataDeps,
   capability: DocCapability,
-  job: { tag: Tag; buildPack: JobSpec['buildPack'] },
+  job: { tag: Tag; buildPack: (jobId: JobId, opId: string) => ReturnType<JobSpec['buildPack']> },
   pick: (payload: Extract<WorkerResultPayload, { tag: Tag }>, opId: string) => T,
   options?: WriteOptions,
 ): AbortablePromise<T> {
@@ -56,7 +58,9 @@ function runMetadataJob<Tag extends WorkerResultPayload['tag'], T>(
   } catch (err) {
     return AbortablePromise.rejectReason(err);
   }
-  const submission = deps.queue.enqueue<WorkerResultPayload>({ buildPack: job.buildPack });
+  const submission = deps.queue.enqueue<WorkerResultPayload>({
+    buildPack: (jobId) => job.buildPack(jobId, opId),
+  });
   return AbortablePromise.run<T>(async (signal) => {
     const onAbort = () => submission.abort(signal.reason);
     if (signal.aborted) onAbort();
@@ -103,8 +107,8 @@ class LocalCustomMetadataService implements CustomMetadataService {
       'doc.metadata.modify',
       {
         tag: 'metadata.updateCustom',
-        buildPack: (jobId) =>
-          wirePack({ kind: 'metadata.updateCustom', effect: 'write', jobId, docId, patch }),
+        buildPack: (jobId, opId) =>
+          wirePack({ kind: 'metadata.updateCustom', effect: 'write', jobId, opId, docId, patch }),
       },
       (payload, opId) => {
         this.publisher.publishWrite(opId, { type: 'metadata.customUpdated', ...payload.result });
@@ -150,8 +154,8 @@ export class LocalMetadataService implements MetadataService {
       'doc.metadata.modify',
       {
         tag: 'metadata.update',
-        buildPack: (jobId) =>
-          wirePack({ kind: 'metadata.update', effect: 'write', jobId, docId, patch }),
+        buildPack: (jobId, opId) =>
+          wirePack({ kind: 'metadata.update', effect: 'write', jobId, opId, docId, patch }),
       },
       (payload, opId) => {
         this.publisher.publishWrite(opId, { type: 'metadata.updated', ...payload.result });

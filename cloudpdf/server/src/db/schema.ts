@@ -146,6 +146,11 @@ export interface LayersTable {
    * layer first needs one.
    */
   next_object_number: number | null;
+  /**
+   * The audit id of the layer's last final change (migration 033): no change
+   * before it can be undone. NULL until the first.
+   */
+  undo_horizon: number | null;
   created_at: number;
   updated_at: number;
 }
@@ -178,6 +183,8 @@ export interface AuditLogTable {
   /** Engine-instance session id of the mutating client (X-Engine-Session-Id);
    *  lets SSE subscribers drop their own echoes. NULL when not sent. */
   origin_session_id: string | null;
+  /** An undo's row: the opId of the change it undid (migration 033). */
+  undo_of: string | null;
 }
 
 export type AuditExportStatus = 'running' | 'succeeded' | 'failed';
@@ -513,6 +520,33 @@ export interface ObjectNumberBlocksTable {
   session_id: string | null;
 }
 
+/** Whether a change was applied or refused (migration 033). */
+export type ChangeOutcomeStatus = 'applied' | 'refused';
+
+/**
+ * What one change answered, under its opId (migration 033): kept so a retry
+ * gets the same answer, refusals included, and, while it can be undone, the
+ * reverse the engine recorded and the key of its capture blob.
+ */
+export interface ChangeOutcomesTable {
+  layer_id: string;
+  op_id: string;
+  /** The change's fingerprint: a retry under the opId must send the same change. */
+  payload_hash: string;
+  status: ChangeOutcomeStatus;
+  /** The answer as the client got it (JSON): the result, or the error. */
+  response: string;
+  /** The token subject that made it: only they may undo it. */
+  actor: string;
+  /** Its audit row, when applied. */
+  audit_id: number | null;
+  /** The recorded reverse (JSON, captures by offset into the blob), while it can be undone. */
+  reverse: string | null;
+  capture_key: string | null;
+  created_at: number;
+  expires_at: number;
+}
+
 export type DocumentSigningState = 'prepared' | 'completed' | 'aborted' | 'expired';
 
 /** A durable signing candidate between prepare and complete (migration 030). */
@@ -566,6 +600,7 @@ export interface Database {
   document_signings: DocumentSigningsTable;
   edit_sessions: EditSessionsTable;
   object_number_blocks: ObjectNumberBlocksTable;
+  change_outcomes: ChangeOutcomesTable;
   audit_log: AuditLogTable;
   audit_exports: AuditExportsTable;
   pdf_password_verifications: PdfPasswordVerificationsTable;

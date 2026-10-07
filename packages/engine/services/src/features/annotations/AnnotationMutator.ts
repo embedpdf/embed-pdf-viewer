@@ -347,6 +347,7 @@ export class AnnotationMutator {
       joinWidgetFieldNumbers(this.runtime, this.session, [dto]);
 
       const meta = annotationMutationMeta(
+        this.session.writeStamp(),
         ref.page.objectNumber,
         uniqueRefs([dto.ref, linkedParent, linkedOpen]),
       );
@@ -450,7 +451,7 @@ export class AnnotationMutator {
     }
     // The annotation first, then what went with it.
     const changed = [...members].reverse().map((member) => member.ref);
-    return { meta: annotationMutationMeta(pageObjectNumber, changed) };
+    return { meta: annotationMutationMeta(this.session.writeStamp(), pageObjectNumber, changed) };
   }
 
   /**
@@ -479,7 +480,7 @@ export class AnnotationMutator {
     if (!fn.EPDFPage_RemoveAnnotRaw(docPtr, pageIndex, index)) {
       throw new EngineError(EngineErrorCode.Unknown, `failed to remove annotation: ${ref.kind}`);
     }
-    return { meta: annotationMutationMeta(pageObjectNumber, [deleted]) };
+    return { meta: annotationMutationMeta(this.session.writeStamp(), pageObjectNumber, [deleted]) };
   }
 
   /**
@@ -600,6 +601,7 @@ export class AnnotationMutator {
     });
 
     const meta = annotationMutationMeta(
+      this.session.writeStamp(),
       pageObjectNumber,
       annotations.map((annotation) => annotation.ref),
     );

@@ -1,4 +1,6 @@
 import {
+  ChangeRequestSchema,
+  ChangeResponseSchema,
   PageScaleInputSchema,
   PageScaleResultSchema,
   PageMeasurementViewportListSchema,
@@ -1761,6 +1763,46 @@ export const docOperations = {
       200: { contentType: 'application/json', schema: AnnotationListSchema },
       404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
       409: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
+    },
+  },
+  'doc.changes': {
+    operationId: 'doc.changes',
+    title: 'Apply changes',
+    summary:
+      'Apply user actions to a layer, each a change whose ops apply in order, all or none, or the undo of an earlier change.',
+    method: 'POST',
+    path: wireTemplates.layerChanges,
+    credentials: docCredentials,
+    scope: [],
+    docCapabilities: [
+      'doc.annotate.modify',
+      'doc.forms.fill',
+      'doc.forms.modify',
+      'doc.metadata.modify',
+    ],
+    requestHeaders: [documentPasswordHeader],
+    params: DocLayerParamsSchema,
+    body: {
+      contentType: ['application/json', 'multipart/form-data'],
+      schema: ChangeRequestSchema,
+    },
+    notes:
+      'Each change stands on its own and names itself by `opId`: a refused change rolls back alone, and the answer lists ' +
+      'every change in order, applied with its result or refused with its error. Asked again under its `opId`, a change ' +
+      'gets the same answer, refusals included; a different change under an answered `opId` is refused ' +
+      '(IdempotencyKeyReused). `{ opId, undoOf }` undoes an earlier change of the caller, here or in an earlier request; ' +
+      'an undo leaves alone what was changed since, and the undo of an undo redoes. A redaction, a flatten, a form repair ' +
+      'or a completed signature ends undo for the changes before it (UndoUnavailable). Each op is checked against its own ' +
+      'capability: annotation ops need `doc.annotate.modify`, form values `doc.forms.fill`, form structure ' +
+      "`doc.forms.modify`, metadata `doc.metadata.modify`. Bytes (a stamp's drawing, an attached file, a signature's " +
+      'artwork) travel as multipart `resource:<key>` parts beside a JSON `body` part that names them by key. ' +
+      'At most 64 changes per request and 512 ops per change.',
+    responses: {
+      200: { contentType: 'application/json', schema: ChangeResponseSchema },
+      400: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
+      404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
+      409: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
+      413: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
     },
   },
   'doc.annotations.create': {

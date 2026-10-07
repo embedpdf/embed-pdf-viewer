@@ -239,7 +239,15 @@ export class SignatureMutator {
     }
   }
 
-  complete(input: SignatureCompleteInput): SignatureCompleteResult<PdfCoordinates> {
+  /**
+   * `opId` names the write. A signing runs outside a layer transaction (it
+   * replaces the document's bytes), so it takes its id here, and it is final:
+   * never undoable.
+   */
+  complete(
+    input: SignatureCompleteInput,
+    opId: string,
+  ): SignatureCompleteResult<PdfCoordinates> {
     const pending = this.session.pendingSigning;
     if (!pending || pending.prepared.signingId !== input.signingId) {
       const last = this.session.lastCompletion;
@@ -310,6 +318,8 @@ export class SignatureMutator {
       meta: {
         affectedPages: this.session.allRecords().map((r) => toPageRef(r.pageObjectNumber)),
         cacheDelta: null,
+        opId,
+        undoable: false,
       },
     };
     this.session.lastCompletion = { signingId: input.signingId, cms: input.cms.slice(), result };

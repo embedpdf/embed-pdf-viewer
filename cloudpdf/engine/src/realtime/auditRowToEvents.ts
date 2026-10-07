@@ -1,4 +1,5 @@
 import {
+  changeEvents,
   formResetFacts,
   annotationImportFacts,
   deletedAnnotationsOf,
@@ -12,6 +13,7 @@ import {
   type AnnotationUpdateResult,
   type AttachmentCreateResult,
   type AttachmentDeleteResult,
+  type ChangeResult,
   type DocumentEvent,
   type EventOrigin,
   type FormFieldCreateResult,
@@ -50,16 +52,19 @@ export interface AuditEventRow {
   originSessionId: string | null;
   /** The request's `Idempotency-Key`, when it named the change. */
   idempotencyKey?: string | null;
+  /** On a change that undid another: the `opId` of the change it undid. */
+  undoOf?: string | null;
   payload: unknown;
 }
 
 /**
  * Translate a remote audit row into the `DocumentEvent`s it records — pure,
  * so the exactly-once and verbatim-payload invariants are unit-testable
- * without a server. Most rows are one fact; a form reset is one
- * `forms.valueSet` per field it changed, an import is one
- * `annotations.created` per annotation, and a completed signing is the
- * signature and the new version. Every event of a row shares `origin.tx`,
+ * without a server. Most rows are one fact; a change is the events of its
+ * items, a form reset is one `forms.valueSet` per field it changed, an
+ * import is one `annotations.created` per annotation, and a completed
+ * signing is the signature and the new version. An undo's events name the
+ * change it undid (`origin.undoOf`). Every event of a row shares `origin.tx`,
  * its id the request's `Idempotency-Key`. Returns none for an own echo and for kinds
  * this engine version doesn't know (a newer server's events degrade to
  * "ignored", never to a crash).
@@ -84,6 +89,7 @@ export function auditRowToEvents(row: AuditEventRow, mySessionId: string): Docum
     sub: row.sub,
     ts: row.ts,
     serverId: row.id,
+    ...(row.undoOf ? { undoOf: row.undoOf } : {}),
   };
   // Every event of the write shares its id: the request's `Idempotency-Key`,
   // or the row's own id when it came without one.
@@ -97,6 +103,12 @@ export function auditRowToEvents(row: AuditEventRow, mySessionId: string): Docum
 
 /** The events a row records, in order, or none for a kind this version doesn't know. */
 function factsOf(row: AuditEventRow, origin: EventOrigin): DocumentEvent[] {
+  if (row.kind === 'change') {
+    // A change is the events its items publish, in op order, as locally.
+    return changeEvents(row.payload as ChangeResult).map(
+      (event) => ({ ...event, origin }) as DocumentEvent,
+    );
+  }
   if (row.kind === 'annot.import') {
     return annotationImportFacts(row.payload as AnnotationImportResult).map((fact) => ({
       type: 'annotations.created',

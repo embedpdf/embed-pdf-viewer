@@ -72,11 +72,6 @@ const CHANGED_WIDGETS_CAPACITY = 256;
 // Mirrors EPDF_FORM_REPAIR_* in public/epdf_form.h.
 const REPAIR_BAKE_APPEARANCES = 0x1;
 
-/**
- * Value writes are non-structural: the cloud layer computes its own cache
- * delta server-side.
- */
-const EMPTY_META: MutationMeta = { affectedPages: [], cacheDelta: null };
 
 /** The families that hold a value: the ones `reset` puts back. */
 const VALUE_FAMILIES: ReadonlySet<FormFieldFamily> = new Set([
@@ -117,6 +112,14 @@ export class FormMutator {
     );
     const changed = this.applyWrite(resolved.fieldObjectNumber, nativeWriteOf(before, value));
     return this.readBack(resolved.fieldObjectNumber, changed);
+  }
+
+  /**
+   * The meta of a value write that changed no page list: the cloud layer
+   * computes its own cache delta server-side.
+   */
+  private emptyMeta(): MutationMeta {
+    return { affectedPages: [], cacheDelta: null, ...this.session.writeStamp() };
   }
 
   /**
@@ -165,6 +168,7 @@ export class FormMutator {
     return {
       fields,
       meta: formMutationMeta(
+        this.session.writeStamp(),
         fields.map((field) => field.ref),
         changedWidgets,
       ),
@@ -242,8 +246,12 @@ export class FormMutator {
     const form = readFormSnapshot(this.runtime, fresh, this.session.requireDocPtr());
     // The import names no widgets, so every page with a widget may have repainted.
     const widgets = counts.applied > 0 ? form.fields.flatMap((field) => field.widgets) : [];
-    const { affectedPages, cacheDelta } = formMutationMeta([], widgets);
-    return { form, ...counts, meta: { affectedPages, cacheDelta } };
+    const { affectedPages, cacheDelta, opId, undoable } = formMutationMeta(
+      this.session.writeStamp(),
+      [],
+      widgets,
+    );
+    return { form, ...counts, meta: { affectedPages, cacheDelta, opId, undoable } };
   }
 
   repair(bakeAppearances: boolean, signal: AbortSignal): FormRepairResult {
@@ -267,7 +275,7 @@ export class FormMutator {
     });
 
     this.session.invalidateDerived();
-    return { ...report, meta: EMPTY_META };
+    return { ...report, meta: this.emptyMeta() };
   }
 
   /**
@@ -862,7 +870,7 @@ export class FormMutator {
     const changedWidgets: FormWidget[] = field.widgets
       .filter((w) => changedSet.has(w.objectNumber))
       .map((w) => formWidget(w.objectNumber, w.page));
-    return { field, meta: formMutationMeta([field.ref], changedWidgets) };
+    return { field, meta: formMutationMeta(this.session.writeStamp(), [field.ref], changedWidgets) };
   }
 }
 

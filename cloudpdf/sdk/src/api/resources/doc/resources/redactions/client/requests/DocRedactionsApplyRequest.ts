@@ -16,24 +16,6 @@ export interface DocRedactionsApplyRequest {
     "X-Document-Password"?: string;
     /** Names the change: 1 to 255 printable ASCII characters. A retry under the same key on the same layer answers with what the first request committed, and changes nothing. */
     "Idempotency-Key"?: string;
-    pages?: DocRedactionsApplyRequest.Pages.Item[];
-    annotations?: CloudPDF.doc.DocRedactionsApplyRequestAnnotationsItem[];
-}
-
-export namespace DocRedactionsApplyRequest {
-    export type Pages = Pages.Item[];
-
-    export namespace Pages {
-        export interface Item {
-            kind: Item.Kind;
-            objectNumber: number;
-        }
-
-        export namespace Item {
-            export const Kind = {
-                ObjectNumber: "objectNumber",
-            } as const;
-            export type Kind = (typeof Kind)[keyof typeof Kind];
-        }
-    }
+    pages?: CloudPDF.PageRef[];
+    annotations?: CloudPDF.AnnotationRef[];
 }

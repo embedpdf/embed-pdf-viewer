@@ -67,6 +67,21 @@ export interface SigningCompletion {
   readonly result: SignatureCompleteResult<PdfCoordinates>;
 }
 
+/** What every meta of a write carries: its id, and whether it can be undone. */
+export interface WriteStamp {
+  readonly opId: string;
+  readonly undoable: boolean;
+}
+
+/** The layer transaction a write runs in (see `DocumentSession.beginTransaction`). */
+interface OpenTransaction {
+  readonly docPtr: Ptr;
+  /** The write's id: what its metas carry, and what undoing it names. */
+  readonly opId: string;
+  /** Whether the write records its reverse. */
+  undoable: boolean;
+}
+
 export class DocumentSession {
   private docPtr: Ptr | null = null;
   private closeDocument: (() => void) | null = null;
@@ -85,7 +100,7 @@ export class DocumentSession {
   /** Bumped by {@link noteEdit}: one per committed write, never inside or for an abort. */
   private editsSeqCounter = 0;
   /** The open layer transaction, if any (see {@link beginTransaction}). */
-  private transaction: { readonly docPtr: Ptr } | null = null;
+  private transaction: OpenTransaction | null = null;
   /** Why the session can't be used anymore, after a transaction neither committed nor aborted. */
   private unusableReason: string | null = null;
   private pages: PagePtrPool | null = null;
@@ -408,9 +423,9 @@ export class DocumentSession {
    * Open a layer transaction: until {@link commitTransaction} or
    * {@link abortTransaction}, every write lands in an overlay that only a
    * commit keeps, and every read sees it. Only a layer document has
-   * transactions.
+   * transactions. `opId` names the write it runs (see {@link writeStamp}).
    */
-  beginTransaction(): void {
+  beginTransaction(opId: string): void {
     const docPtr = this.requireDocPtr();
     if (this.transaction) {
       throw new EngineError(EngineErrorCode.Unknown, 'a transaction is already open');
@@ -418,7 +433,22 @@ export class DocumentSession {
     if (!this.runtime.fn.EPDFLayer_BeginTransaction(docPtr)) {
       throw new EngineError(EngineErrorCode.Unknown, 'EPDFLayer_BeginTransaction refused');
     }
-    this.transaction = { docPtr };
+    this.transaction = { docPtr, opId, undoable: false };
+  }
+
+  /**
+   * What every meta of the running write carries: its `opId`, and whether
+   * it can be undone. A write is undoable once {@link markUndoable} said so,
+   * which a write does when it records its reverse.
+   */
+  writeStamp(): WriteStamp {
+    const { opId, undoable } = this.requireTransaction();
+    return { opId, undoable };
+  }
+
+  /** The running write records its reverse, so `{ undoOf: opId }` can undo it. */
+  markUndoable(): void {
+    this.requireTransaction().undoable = true;
   }
 
   /**
@@ -582,7 +612,7 @@ export class DocumentSession {
     }
   }
 
-  private requireTransaction(): { readonly docPtr: Ptr } {
+  private requireTransaction(): OpenTransaction {
     if (!this.transaction) {
       throw new EngineError(EngineErrorCode.Unknown, 'no transaction is open');
     }

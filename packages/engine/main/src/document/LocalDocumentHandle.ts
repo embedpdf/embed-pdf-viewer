@@ -23,7 +23,10 @@ import {
   type PdfSaveMode,
   type PageRef,
   type CallFacts,
+  type Change,
+  type ChangeResult,
   type WorkingSetPage,
+  type WriteOptions,
 } from '@embedpdf/engine-core/runtime';
 import { EventHub, SessionEventPublisher } from '@embedpdf/engine-services';
 
@@ -32,6 +35,7 @@ import type { ScopeGuard } from '../scope';
 import { LocalDocumentActionsService } from './LocalDocumentActionsService';
 import { LocalDocumentAnnotationsService } from './LocalDocumentAnnotationsService';
 import { LocalDocumentAttachmentsService } from './LocalDocumentAttachmentsService';
+import { LocalDocumentChanges } from './LocalDocumentChanges';
 import { LocalDocumentFontSettings } from './LocalDocumentFontSettings';
 import { LocalDocumentFormsService } from './LocalDocumentFormsService';
 import { LocalDocumentPagesService } from './LocalDocumentPagesService';
@@ -96,6 +100,7 @@ export class LocalDocumentHandle implements LocalDocumentHandleContract {
   readonly id: string;
   /** The queue with this handle's facts: every call made through it carries them. */
   private readonly queue: JobQueue;
+  private readonly changes: LocalDocumentChanges;
 
   /** A newly opened document's handle, its calls carrying no facts. */
   static open(
@@ -167,6 +172,7 @@ export class LocalDocumentHandle implements LocalDocumentHandleContract {
     this.pages = new LocalDocumentPagesService(id, queue, view, guard, publisher);
     this.redaction = new LocalDocumentRedactionService(id, queue, view, guard, publisher);
     this.signatures = new LocalDocumentSignaturesService(id, queue, view, guard, publisher);
+    this.changes = new LocalDocumentChanges(id, queue, view, guard, publisher);
   }
 
   private get closed(): boolean {
@@ -190,6 +196,11 @@ export class LocalDocumentHandle implements LocalDocumentHandleContract {
       this.doc.withFacts.set(key, handle);
     }
     return handle;
+  }
+
+  /** One change as one transaction, or the undo of one (see `DocumentHandle.apply`). */
+  apply(change: Change, options?: WriteOptions): AbortablePromise<ChangeResult> {
+    return this.changes.apply(change, options);
   }
 
   /** What `view` shows of the document (see `DocumentHandle.setWorkingSet`). */

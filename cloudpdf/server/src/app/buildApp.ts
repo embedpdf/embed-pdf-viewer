@@ -63,6 +63,7 @@ import { registerAdminTenantsRoutes } from '../routes/admin/tenants';
 import { registerAdminTokensRoutes } from '../routes/admin/tokens';
 import { registerAnnotationRoutes } from '../routes/annotations';
 import { registerAttachmentRoutes } from '../routes/attachments';
+import { registerChangeRoutes } from '../routes/changes';
 import { registerDocsRoutes } from '../routes/docs';
 import { registerEventsRoutes } from '../routes/events';
 import { registerFormRoutes } from '../routes/forms';
@@ -1355,6 +1356,7 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
         annotationBundleLimits: opts.annotationBundleLimits ?? DEFAULT_ANNOTATION_BUNDLE_LIMITS,
       });
       await registerObjectNumberRoutes(app, { documentService, layerService });
+      await registerChangeRoutes(app, { documentService, layerService });
       await registerDocsRoutes(app, { service: documentService });
       await registerMetadataRoutes(app, { service: documentService, layerService });
       await registerSignatureRoutes(app, { service: documentService, layerService });
@@ -1405,6 +1407,9 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
         layerService
           ?.expireSignings(Date.now())
           .catch((err) => app.log.error({ err }, 'expireSignings failed'));
+        layerService
+          ?.sweepChanges(Date.now())
+          .catch((err) => app.log.error({ err }, 'sweepChanges failed'));
       }, sweepIntervalMs);
       sweeperTimer.unref();
     }

@@ -3,6 +3,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import {
+  BARE_PAGE_FIXTURE_PDF,
   runRedactionApplyConformance,
   type ConformanceTestRunner,
 } from '@embedpdf/engine-core/conformance';
@@ -29,4 +30,9 @@ runRedactionApplyConformance(runner, {
     expected: {},
   },
   makeEngine: () => createLocalEngine({ runtime: { prefer: 'wasm' } }),
+  openBarePage: (engine) =>
+    engine.open(
+      { kind: 'bytes', id: 'redaction-bare-page-local', bytes: BARE_PAGE_FIXTURE_PDF.slice() },
+      { scope: ['*'] },
+    ),
 });
