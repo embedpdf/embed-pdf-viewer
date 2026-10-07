@@ -34,6 +34,7 @@ const base = (objectNumber: number) => ({
   page: PAGE,
   index: objectNumber,
   hasAppearance: true,
+  appearanceState: null,
   nm: null,
   ...FLAGS,
   contents: null,

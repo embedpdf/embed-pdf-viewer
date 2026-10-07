@@ -1987,6 +1987,7 @@ export class WorkerHost {
       encoded.push({
         ref: a.ref,
         mode: a.mode,
+        state: a.state,
         rect: a.rect,
         image: await this.encodeRaster(a.raster, encode, signal),
       });

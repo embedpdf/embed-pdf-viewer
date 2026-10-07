@@ -17,6 +17,7 @@ const callout = {
   page: PAGE,
   index: 0,
   hasAppearance: true,
+  appearanceState: null,
   nm: null,
   invisible: false,
   hidden: false,

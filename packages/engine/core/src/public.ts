@@ -43,6 +43,7 @@ export {
   shapeForRect,
 } from './pageSpace/helpers';
 export type { DraftAttribution, DraftContext } from './annotation/resolve/annotationOfDraft';
+export { shownAppearances } from './dto/AnnotationRender';
 export { ANNOTATION_DEFAULTS, type AnnotationDefaults } from './annotation/defaults';
 export { buildCommentThreads } from './annotation/comments';
 export { AnnotationTransfer } from './transfer/AnnotationTransfer';

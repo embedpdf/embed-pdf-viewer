@@ -8,7 +8,12 @@ import type {
 import { toPageRef } from '@embedpdf/engine-core/runtime';
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
 
-import { readAnnotFlags, readAnnotRect, readAnnotString } from './annotationReadPrimitives';
+import {
+  readAnnotFlags,
+  readAnnotRect,
+  readAnnotString,
+  readAppearanceState,
+} from './annotationReadPrimitives';
 import { readAnnotationRelationship, readLinkedAnnotationRef } from './readAnnotationRelationship';
 import { readEmbedMetadata } from './readEmbedMetadata';
 import { pdfDateToIso } from '../../../../shared/pdf-date';
@@ -55,6 +60,7 @@ export function readAnnotationBase(
     page,
     index,
     hasAppearance: fn.EPDFAnnot_HasAppearanceStream(annotPtr, APPEARANCE_MODE_NORMAL),
+    appearanceState: readAppearanceState(fn, mem, annotPtr),
     nm: readAnnotString(fn, mem, annotPtr, 'NM'),
     ...flags,
     rect,

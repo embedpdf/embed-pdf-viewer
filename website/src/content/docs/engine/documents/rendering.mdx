@@ -138,12 +138,23 @@ The image's `source` is `{ kind: 'url', url }`, an address that needs the docume
 The page is drawn on white. For a transparent background, pass `background: 'transparent'` with
 PNG or WebP.
 
-Annotations are drawn on the page. To draw the page without them, when you draw annotations
-yourself, pass `includeAnnotations: false`:
+Annotations are drawn on the page, form fields included, each in the state it shows: the page as
+it is printed. To draw the page without them, when you draw annotations yourself, pass
+`includeAnnotations: false`:
 
 ```ts
 await page.render.image({ includeAnnotations: false, background: 'transparent', format: 'png' });
 ```
+
+When you draw only the form fields yourself, over the page, leave out just those with
+`includeFormFields: false`. The other annotations stay in the picture:
+
+```ts
+await page.render.image({ includeFormFields: false });
+```
+
+Hidden form fields are never drawn, and fields marked not to show on screen are drawn only when
+printing.
 
 ## Part of a page
 
@@ -278,15 +289,16 @@ milliseconds, so the renders waiting behind it start right away. See
 
 ## Options
 
-| Option               | What it does                                                        | Default         |
-| :------------------- | :------------------------------------------------------------------ | :-------------- |
-| `viewport`           | `{ kind: 'width', width }` in pixels, or `{ kind: 'scale', scale }` | scale `1`       |
-| `rotation`           | Turns the image clockwise: `0`, `90`, `180` or `270`                | `0`             |
-| `format`             | `'png'` or `'webp'` (see [Format and quality](#format-and-quality)) | see above       |
-| `quality`            | WebP quality, from `0` to `1`                                       | encoder default |
-| `background`         | `'white'` or `'transparent'`                                        | `'white'`       |
-| `includeAnnotations` | Draw the page's annotations                                         | `true`          |
-| `target`             | `{ kind: 'page' }`, or `{ kind: 'rect', rect }` for one area        | the whole page  |
+| Option               | What it does                                                        | Default                 |
+| :------------------- | :------------------------------------------------------------------ | :---------------------- |
+| `viewport`           | `{ kind: 'width', width }` in pixels, or `{ kind: 'scale', scale }` | scale `1`               |
+| `rotation`           | Turns the image clockwise: `0`, `90`, `180` or `270`                | `0`                     |
+| `format`             | `'png'` or `'webp'` (see [Format and quality](#format-and-quality)) | see above               |
+| `quality`            | WebP quality, from `0` to `1`                                       | encoder default         |
+| `background`         | `'white'` or `'transparent'`                                        | `'white'`               |
+| `includeAnnotations` | Draw the page's annotations                                         | `true`                  |
+| `includeFormFields`  | Draw the form fields too                                            | as `includeAnnotations` |
+| `target`             | `{ kind: 'page' }`, or `{ kind: 'rect', rect }` for one area        | the whole page          |
 
 ## Permissions
 

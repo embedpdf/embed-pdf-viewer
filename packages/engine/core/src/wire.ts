@@ -236,6 +236,7 @@ export {
   encodeTokenText,
   decodeTokenText,
   SEARCH_RESULT_FORMAT,
+  encodeAppearanceModes,
 } from './wire/tokens';
 export type { DownloadToken, SearchToken } from './wire/tokens';
 export { flatten, unflatten } from './wire/flatten';

@@ -64,6 +64,7 @@ const square = (objectNumber: number, extra: Record<string, unknown> = {}): File
     page: PAGE,
     index: objectNumber,
     hasAppearance: true,
+    appearanceState: null,
     nm: null,
     ...NO_FLAGS,
     contents: null,

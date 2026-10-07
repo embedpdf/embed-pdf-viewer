@@ -33,6 +33,7 @@ function annotation(
     page,
     index,
     hasAppearance: true,
+    appearanceState: null,
     nm: null,
     rect: box,
     // A square's shape is its box; a note's icon fills its rect.

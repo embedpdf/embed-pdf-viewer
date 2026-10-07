@@ -982,7 +982,7 @@ async function renderAnnotationAppearances(input: {
   // stamp at a high scale is a full-page memory bomb wearing a different
   // token. Same scoping as pages: only versioned (token) requests are
   // enforced; the unversioned alias stays compute-only (no-store), which is
-  // the escape hatch for off-canonical needs (rollover/down modes, quality).
+  // the escape hatch for off-canonical needs (an unusual quality).
   const derived = input.derivedRenders;
   if (
     derived !== undefined &&
@@ -1053,15 +1053,16 @@ async function renderAnnotationAppearances(input: {
           `unexpected annotations.renderAppearancesEncoded payload: ${payload.tag}`,
         );
       }
-      // Every annotation with an appearance stream is emitted: the client
-      // addresses the image by `part` name and identifies the annotation
-      // by `ref`.
+      // Every annotation with an appearance stream is emitted, once per mode
+      // and state: the client addresses the image by `part` name and
+      // identifies it by `ref`, `mode` and `state`.
       for (const appearance of payload.result.appearances) {
         const partName = `appearance-${i++}`;
         entries.push({
           part: partName,
           ref: appearance.ref,
           mode: appearance.mode,
+          state: appearance.state,
           rect: appearance.rect,
           width: appearance.image.width,
           height: appearance.image.height,
@@ -1120,6 +1121,7 @@ async function renderAnnotationAppearances(input: {
         part: partName,
         ref: appearance.ref,
         mode: appearance.mode,
+        state: appearance.state,
         rect: appearance.rect,
         width: appearance.raster.width,
         height: appearance.raster.height,

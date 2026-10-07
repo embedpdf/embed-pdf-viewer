@@ -11,6 +11,7 @@ import type {
   PdfRotation,
 } from '@embedpdf/engine-core/runtime';
 import {
+  appearanceModesOf,
   pdfAppearanceTurnOf,
   EngineError,
   EngineErrorCode,
@@ -30,7 +31,12 @@ import type { DocumentSession } from '../../document-session/DocumentSession';
 import { withScratch } from '../../runtime/memory/scratch';
 import { RECTF_BYTES, readRectF, writeRectF } from '../../runtime/memory/structs';
 import { FPDF_REVERSE_BYTE_ORDER, rasterize, readPageBox } from '../render/deviceRaster';
-import { readAnnotRect, readIntent } from './internal/read/annotationReadPrimitives';
+import {
+  readAnnotRect,
+  readAppearanceState,
+  readAppearanceStateNames,
+  readIntent,
+} from './internal/read/annotationReadPrimitives';
 import { annotationRefOf } from './internal/identity/annotationName';
 import { pdfFromClockwise } from './internal/read/readAnnotationTransformMetadata';
 import { throwIfAborted } from '../../shared/abort';
@@ -66,7 +72,8 @@ const APPEARANCE_MODES: ReadonlyArray<{
 
 /**
  * Batch-renders the appearances of every annotation on a page, one bitmap per
- * requested mode, in PDF user space and against the `PdfRuntimeModule`
+ * mode it stores (or each requested one) and per state of that mode, each
+ * labelled with both, in PDF user space and against the `PdfRuntimeModule`
  * (`fn` + `mem`).
  *
  * A stored appearance (`/AP`) renders into its annotation's `/Rect`. An
@@ -160,24 +167,29 @@ export class AnnotationAppearanceReader {
             const stored = !!(available & mode.bit);
             const box = stored ? rect : mode === NORMAL ? drawn : null;
             if (!box) continue;
-            const raster = this.renderOne(
-              pagePtr,
-              annotPtr,
-              mode.modeInt,
-              box,
-              page,
-              rotation,
-              scale,
-              stored ? stripped : undefined,
-              options.maxOutputPixels,
-            );
-            if (!raster) continue;
-            appearances.push({
-              ref,
-              mode: mode.name,
-              rect: box,
-              raster,
-            });
+            const states = stored ? statesOf(fn, mem, annotPtr, mode.modeInt) : SHOWN_ONLY;
+            for (const state of states) {
+              const raster = this.renderOne(
+                pagePtr,
+                annotPtr,
+                mode.modeInt,
+                state.draw,
+                box,
+                page,
+                rotation,
+                scale,
+                stored ? stripped : undefined,
+                options.maxOutputPixels,
+              );
+              if (!raster) continue;
+              appearances.push({
+                ref,
+                mode: mode.name,
+                state: state.label,
+                rect: box,
+                raster,
+              });
+            }
           }
         } finally {
           fn.FPDFPage_CloseAnnot(annotPtr);
@@ -199,6 +211,7 @@ export class AnnotationAppearanceReader {
     pagePtr: Ptr,
     annotPtr: Ptr,
     modeInt: number,
+    state: string,
     rect: PdfRect,
     page: PdfRect,
     rotation: PdfRotation,
@@ -245,6 +258,7 @@ export class AnnotationAppearanceReader {
                 pagePtr,
                 annotPtr,
                 modeInt,
+                state,
                 pdfFromClockwise(turn.rotation),
                 boxPtr,
                 matrixPtr,
@@ -256,6 +270,7 @@ export class AnnotationAppearanceReader {
               pagePtr,
               annotPtr,
               modeInt,
+              state,
               matrixPtr,
               FPDF_REVERSE_BYTE_ORDER,
             ),
@@ -278,14 +293,50 @@ function readDrawingRect(fn: PdfFunctions, mem: PdfRuntimeMemory, annotPtr: Ptr)
   );
 }
 
+/** The modes a request asks for: every mode unless it names some (`appearanceModesOf`). */
 function resolveModes(
   requested: AnnotationAppearanceMode[] | undefined,
 ): ReadonlyArray<(typeof APPEARANCE_MODES)[number]> {
-  if (!requested || requested.length === 0) {
-    return APPEARANCE_MODES.filter((m) => m.name === 'normal');
+  const asked = appearanceModesOf(requested);
+  return asked ? APPEARANCE_MODES.filter((mode) => asked.includes(mode.name)) : APPEARANCE_MODES;
+}
+
+/**
+ * At most this many states of one mode are rendered; past it, only the one
+ * the annotation shows. Check boxes and radio buttons have two.
+ */
+const MAX_STATES = 8;
+
+/**
+ * One image to render for a mode: the state to draw (`''`: the one `/AS`
+ * selects) and the state the image is labelled with.
+ */
+interface StateToRender {
+  readonly draw: string;
+  readonly label: string | null;
+}
+
+/** A mode that is a single appearance, or drawn in memory: one image, no state. */
+const SHOWN_ONLY: readonly StateToRender[] = [{ draw: '', label: null }];
+
+/**
+ * The images to render for a stored mode: one per state it stores, so a
+ * caller has every look of a check box whatever it shows now; one, with no
+ * state, for a single appearance; only the shown state when there are more
+ * than {@link MAX_STATES}.
+ */
+function statesOf(
+  fn: PdfFunctions,
+  mem: PdfRuntimeMemory,
+  annotPtr: Ptr,
+  modeInt: number,
+): readonly StateToRender[] {
+  const names = readAppearanceStateNames(fn, mem, annotPtr, modeInt);
+  if (names.length === 0) return SHOWN_ONLY;
+  if (names.length > MAX_STATES) {
+    return [{ draw: '', label: readAppearanceState(fn, mem, annotPtr) }];
   }
-  const wanted = new Set(requested);
-  return APPEARANCE_MODES.filter((m) => wanted.has(m.name));
+  return names.map((name) => ({ draw: name, label: name }));
 }
 
 /**

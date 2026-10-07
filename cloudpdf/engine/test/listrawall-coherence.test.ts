@@ -51,6 +51,7 @@ function annotation(pageObjectNumber: number, index: number) {
     page: toPageRef(pageObjectNumber),
     index,
     hasAppearance: true,
+    appearanceState: null,
     nm: `stub-${pageObjectNumber}-${index}`,
     invisible: false,
     hidden: false,

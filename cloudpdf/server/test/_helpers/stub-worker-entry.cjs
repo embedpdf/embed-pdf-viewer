@@ -199,6 +199,7 @@ function annotationDto(a, index) {
     page: pageRef(a.pon),
     index,
     hasAppearance: true,
+    appearanceState: null,
     nm: a.nm,
     flags: {
       invisible: false,
@@ -976,6 +977,7 @@ parentPort.on('message', (msg) => {
                 {
                   ref: { kind: 'objectNumber', page: pageRef(pon), objectNumber: 9001 },
                   mode: 'normal',
+                  state: null,
                   rect: { x: 0, y: 0, width: 8, height: 8 },
                   raster: { width: side, height: side, data: data.buffer },
                 },
@@ -1039,6 +1041,7 @@ parentPort.on('message', (msg) => {
                     {
                       ref: { kind: 'objectNumber', page: pageRef(pon), objectNumber: 9001 },
                       mode: 'normal',
+                      state: null,
                       rect: { x: 0, y: 0, width: 8, height: 8 },
                       image,
                     },

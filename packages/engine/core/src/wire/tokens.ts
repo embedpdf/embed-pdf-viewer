@@ -252,6 +252,9 @@ export const decodeRenderToken = (raw: string): TokenQuery => decodeToken(Render
  * plus cache versions). Semantic validation lives in
  * `AnnotationAppearancesQuerySchema`.
  */
+/** `modes` as one token value: the modes in engine order, joined by `-`. */
+export const encodeAppearanceModes = (modes: readonly string[]): string => modes.join('-');
+
 export const encodeAnnotationAppearancesRenderToken = (input: TokenInput): string =>
   encodeToken(AnnotationAppearancesRenderTokenSchema, input);
 

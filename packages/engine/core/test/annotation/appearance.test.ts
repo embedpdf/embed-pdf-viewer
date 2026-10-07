@@ -133,6 +133,7 @@ describe('appearanceImpactOf — value diffing (inert)', () => {
       page: { kind: 'objectNumber', objectNumber: 3 },
       index: 7,
       hasAppearance: true,
+      appearanceState: null,
       author: 'Someone else',
       modifiedAt: '2026-01-01T00:00:00Z',
       userId: 'u_other',

@@ -50,6 +50,13 @@ export const annotationBaseFields = {
    * written.
    */
   hasAppearance: field.engine(z.boolean()),
+  /**
+   * `/AS`: which state of its appearance the annotation shows, when the
+   * appearance has states (a check box's `Off` and its on state); `null`
+   * when it names none. The appearance images are labelled with the same
+   * names, so this picks the one to show.
+   */
+  appearanceState: field.engine(z.string()).nullable(),
   nm: field.data(z.string()).nullable().optional().createOnly(),
   rect: field.data(PdfRectSchema).space('box'),
   contents: field.data(z.string()).nullable().optional(),

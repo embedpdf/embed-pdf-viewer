@@ -10,7 +10,7 @@ import {
   viewable,
   type ViewEnv,
 } from '@embedpdf/core-annotation';
-import type { PageRef } from '@embedpdf/engine-core/runtime';
+import { shownAppearances, type PageRef } from '@embedpdf/engine-core/runtime';
 
 import type { LinkNavItem, TextItem } from '../contract';
 import type { AnnotationState } from '../model';
@@ -171,7 +171,8 @@ export function createRenderReads(
         // Conversation-plane annotations never paint — a remote reply or
         // status change must not churn the page's raster cache key.
         if (isSubstrateOnly(record)) continue;
-        parts.push(`${id}@${record.apVersion ?? 0}`);
+        // The state it shows picks its picture among those the page brought.
+        parts.push(`${id}@${record.apVersion ?? 0}:${record.annotation.appearanceState ?? ''}`);
       }
       return parts.sort().join('|');
     },
@@ -183,15 +184,21 @@ export function createRenderReads(
     renderAppearances: (page: PageRef, scale: number, signal?: AbortSignal) => {
       const doc = ctx.doc;
       if (!doc) return Promise.resolve([]);
+      // The look at rest only, in every state: a check box keeps both its
+      // pictures, and the looks under the pointer and pressed aren't drawn.
       const task = doc
         .page(page)
-        .annotations.renderAppearances({ viewport: { kind: 'scale', scale } });
+        .annotations.renderAppearances({ viewport: { kind: 'scale', scale }, modes: ['normal'] });
       if (signal) {
         if (signal.aborted) task.abort(signal.reason);
         else signal.addEventListener('abort', () => task.abort(signal.reason), { once: true });
       }
       return task.then(
-        (result) => result.appearances,
+        (result) => {
+          const model = pageModel(page.objectNumber);
+          const annotations = model.order.map((id) => model.byId[id]!.annotation);
+          return shownAppearances(result.appearances, annotations);
+        },
         () => [],
       );
     },

@@ -112,6 +112,7 @@ describe('whether the file holds an appearance after the write', () => {
   const bare = (annotation: Annotation): Annotation => ({
     ...annotation,
     hasAppearance: false,
+    appearanceState: null,
   });
 
   it('a create bakes one, except a link: it is written with no border to draw', () => {

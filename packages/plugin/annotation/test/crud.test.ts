@@ -33,6 +33,7 @@ const squareDTO = (objectNumber: number): FileAnnotation =>
     page: PAGE,
     index: objectNumber,
     hasAppearance: true,
+    appearanceState: null,
     nm: null,
     ...NO_FLAGS,
     contents: null,

@@ -978,6 +978,7 @@ export interface AnnotationsRenderAppearancesEncodedWorkerRequest {
 export interface EncodedAppearanceWire<C extends Coordinates = PageCoordinates> {
   ref: AnnotationRef;
   mode: AnnotationAppearanceMode;
+  state: string | null;
   rect: C['box'];
   image: EncodedImageWire;
 }

@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import type { LocalDocumentHandle, LocalEngine, PageRaster } from '@embedpdf/engine-core/runtime';
-import { toPageRef } from '@embedpdf/engine-core/runtime';
+import { annotationKey, toPageRef } from '@embedpdf/engine-core/runtime';
 import { createLocalEngine } from '../src/index';
 
 /** Small independent PDF fixtures: asymmetric vector bands expose wrong crops. */
@@ -58,9 +58,19 @@ function pixel(raster: PageRaster, x: number, y: number): number[] {
   return [...new Uint8Array(raster.data).slice(index, index + 4)];
 }
 
+/** The `index`-th annotation's look at rest, in the state it shows. */
 async function appearance(doc: LocalDocumentHandle, index = 0): Promise<PageRaster> {
-  return (await doc.page(toPageRef(3)).annotations.renderAppearancesRaw()).appearances[index]!
-    .raster;
+  const page = doc.page(toPageRef(3));
+  const annotation = (await page.annotations.list()).annotations[index]!;
+  const { appearances } = await page.annotations.renderAppearancesRaw();
+  const shown = appearances.find(
+    (candidate) =>
+      annotationKey(candidate.ref) === annotationKey(annotation.ref) &&
+      candidate.mode === 'normal' &&
+      (candidate.state === null || candidate.state === annotation.appearanceState),
+  );
+  if (!shown) throw new Error(`no appearance shown for annotation ${index}`);
+  return shown.raster;
 }
 
 describe('vector stamp resizing (wasm)', () => {

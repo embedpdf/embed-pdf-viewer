@@ -1,8 +1,13 @@
 import { flatten, type WireFlat } from './flatten';
-import { encodeAnnotationAppearancesRenderToken, encodeRenderToken } from './tokens';
-import type {
-  AnnotationAppearanceImageOptions,
-  AnnotationAppearanceRenderOptions,
+import {
+  encodeAnnotationAppearancesRenderToken,
+  encodeAppearanceModes,
+  encodeRenderToken,
+} from './tokens';
+import {
+  appearanceModesOf,
+  type AnnotationAppearanceImageOptions,
+  type AnnotationAppearanceRenderOptions,
 } from '../dto/AnnotationRender';
 import type { PageImageOptions, PageRenderOptions } from '../dto/PageRender';
 
@@ -39,10 +44,17 @@ export function renderImageOptionsToWire(
   options: PageImageOptions,
   versions: RenderVersions,
 ): WireFlat {
-  // Path-expressed, never token-expressed (see above).
-  const { includeAnnotations: _pathExpressed, ...wireOptions } = options;
+  // Path-expressed, never token-expressed (see above). Form fields are a
+  // parameter of the annotated family, encoded only when left out.
+  const {
+    includeAnnotations: _pathExpressed,
+    includeFormFields,
+    ...wireOptions
+  } = options;
+  const withoutFormFields = options.includeAnnotations !== false && includeFormFields === false;
   return flatten({
     ...wireOptions,
+    ...(withoutFormFields ? { formFields: false } : {}),
     contentVersion: versions.contentVersion,
     ...(versions.annotationVersion !== undefined
       ? { annotationVersion: versions.annotationVersion }
@@ -76,6 +88,7 @@ export function pageRenderOptionsFromImageOptions(
     ...(options.rotation !== undefined ? { rotation: options.rotation } : {}),
     ...(options.background !== undefined ? { background: options.background } : {}),
     includeAnnotations,
+    ...(options.includeFormFields === false ? { includeFormFields: false } : {}),
   };
 }
 
@@ -97,8 +110,13 @@ export function annotationAppearancesImageOptionsToWire(
   options: AnnotationAppearanceImageOptions,
   versions: AnnotationRenderVersion,
 ): WireFlat {
+  // `modes` only when it asks for fewer than every mode, as one value, so
+  // every request for all of them is one URL.
+  const { modes, ...rest } = options;
+  const asked = appearanceModesOf(modes);
   return flatten({
-    ...options,
+    ...rest,
+    ...(asked ? { modes: encodeAppearanceModes(asked) } : {}),
     annotationVersion: versions.annotationVersion,
   });
 }

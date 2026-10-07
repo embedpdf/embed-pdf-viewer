@@ -232,14 +232,16 @@ export class DerivedRenderService {
   }): { onLattice: boolean } {
     const o = input.imageOptions;
     const scale = o.viewport === undefined ? 1 : appearanceLatticeScale(o.viewport);
-    const normalOnly = o.modes === undefined || (o.modes.length === 1 && o.modes[0] === 'normal');
+    // Every mode (the default, what the viewer asks), or the look at rest only.
+    const canonicalModes =
+      o.modes === undefined || (o.modes.length === 1 && o.modes[0] === 'normal');
     const onLattice =
       scale !== undefined &&
       this.appearanceScales.includes(scale) &&
       input.format === 'webp' &&
       (o.rotation === undefined || o.rotation === 0) &&
       o.quality === undefined &&
-      normalOnly;
+      canonicalModes;
     return { onLattice };
   }
 

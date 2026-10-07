@@ -593,6 +593,7 @@ async function parseAppearanceForm(form: FormData): Promise<AnnotationAppearance
       return {
         ref: entry.ref,
         mode: entry.mode,
+        state: entry.state,
         rect: entry.rect,
         image,
       };

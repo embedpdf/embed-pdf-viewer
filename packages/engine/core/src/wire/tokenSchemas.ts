@@ -73,7 +73,10 @@ export const DownloadTokenSchema = {
  * set, so it is expressed by the path family (`…/render/pages/` vs
  * `…/render/annotated/pages/`), never inside the token. `annotationVersion`
  * belongs to the annotated family's tokens only — each family's query
- * schema enforces its own pin grammar.
+ * schema enforces its own pin grammar. `formFields` is a token field of the
+ * annotated family: form fields are annotations (widgets), so leaving them
+ * out changes no plane the picture depends on; it is encoded only as
+ * `false`, its one non-default value.
  */
 export const RenderTokenSchema = {
   fields: [
@@ -81,6 +84,7 @@ export const RenderTokenSchema = {
     'background',
     'contentVersion',
     'format',
+    'formFields',
     'quality',
     'rotation',
     'target.kind',
@@ -126,14 +130,17 @@ export const SearchTokenSchema = {
 /**
  * Token for the batch annotation-appearance render endpoint. Narrower than
  * the page render token: appearance bitmaps are sized per annotation `/Rect`
- * so there is no target — only the page's `viewport` and `rotation`. Keyed by `annotationVersion` only (appearances do not depend on
- * page base content). The cloud endpoint renders the Normal appearance only,
- * so `modes` is intentionally absent here (it is a worker/local-only option).
+ * so there is no target — only the page's `viewport` and `rotation`. Keyed by
+ * `annotationVersion` only (appearances do not depend on page base content).
+ * `modes` is present only when a request asks for fewer than every mode, as
+ * one value (`normal-down`, in the engine's mode order), so one request for
+ * every mode is one URL.
  */
 export const AnnotationAppearancesRenderTokenSchema = {
   fields: [
     'annotationVersion',
     'format',
+    'modes',
     'quality',
     'rotation',
     'viewport.kind',

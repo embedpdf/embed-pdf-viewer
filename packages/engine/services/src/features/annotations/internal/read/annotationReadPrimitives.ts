@@ -439,3 +439,41 @@ export function readAnnotName(
 ): string | null {
   return readUtf8String(mem, (buf, capacity) => fn.EPDFAnnot_GetName(annotPtr, buf, capacity));
 }
+
+/**
+ * `/AS`, the state of its appearance the annotation shows
+ * (`EPDFAnnot_GetAppearanceState`). `null` when it names none. Decoded as
+ * the state names are ({@link readAppearanceStateNames}), so one matches
+ * the other.
+ */
+export function readAppearanceState(
+  fn: PdfFunctions,
+  mem: PdfRuntimeMemory,
+  annotPtr: Ptr,
+): string | null {
+  return readUtf8String(mem, (buf, capacity) =>
+    fn.EPDFAnnot_GetAppearanceState(annotPtr, buf, capacity),
+  );
+}
+
+/**
+ * The states appearance mode `modeInt` stores, in the file's key order
+ * (`EPDFAnnot_GetAppearanceStateName`): none when the mode is a single
+ * appearance or missing.
+ */
+export function readAppearanceStateNames(
+  fn: PdfFunctions,
+  mem: PdfRuntimeMemory,
+  annotPtr: Ptr,
+  modeInt: number,
+): string[] {
+  const names: string[] = [];
+  const count = fn.EPDFAnnot_GetAppearanceStateCount(annotPtr, modeInt);
+  for (let index = 0; index < count; index++) {
+    const name = readUtf8String(mem, (buf, capacity) =>
+      fn.EPDFAnnot_GetAppearanceStateName(annotPtr, modeInt, index, buf, capacity),
+    );
+    if (name !== null) names.push(name);
+  }
+  return names;
+}

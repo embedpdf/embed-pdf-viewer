@@ -48,7 +48,20 @@ export interface PageRenderOptions<C extends Coordinates = PageCoordinates> {
   viewport?: PageRenderViewport;
   rotation?: PdfRotation;
   background?: PageRenderBackground;
+  /**
+   * Draw the page's annotations into the picture, from their appearances.
+   * Default `true`: the page as it is shown and printed.
+   */
   includeAnnotations?: boolean;
+  /**
+   * Draw the form fields too: the widgets, each in the state its field
+   * shows. Default: the same as `includeAnnotations`, so a page with
+   * annotations is the page as printed, filled form included. Pass `false`
+   * when something else paints the fields over the picture, as a viewer's
+   * form layer does. Hidden fields are never drawn, and no-view ones only
+   * when printing.
+   */
+  includeFormFields?: boolean;
   /**
    * Output-pixel budget: the renderer rejects (InvalidArg) instead of
    * allocating when `outputWidth × outputHeight` exceeds it. A width

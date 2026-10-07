@@ -15,6 +15,8 @@ import { throwIfAborted } from '../../shared/abort';
 import type { Slices } from '../../shared/slices';
 
 const FPDF_RENDER_ANNOT = 0x01;
+/** `EPDF_RENDER_WIDGETS`: with annotations, the form fields too. */
+const EPDF_RENDER_WIDGETS = 0x8000;
 const FPDF_RENDER_TOBECONTINUED = 1;
 const FPDF_RENDER_DONE = 2;
 
@@ -50,7 +52,9 @@ export class PageRenderReader {
       const viewport = options.viewport ?? { kind: 'scale', scale: 1 };
 
       let flags = FPDF_REVERSE_BYTE_ORDER;
-      if (options.includeAnnotations ?? true) flags |= FPDF_RENDER_ANNOT;
+      const includeAnnotations = options.includeAnnotations ?? true;
+      if (includeAnnotations) flags |= FPDF_RENDER_ANNOT;
+      if (includeAnnotations && (options.includeFormFields ?? true)) flags |= EPDF_RENDER_WIDGETS;
 
       const raster = await rasterizeAsync(this.runtime, {
         rect: target,

@@ -14,10 +14,12 @@ import {
   PdfLinkTargetSchema,
   PdfLinkTargetWritableSchema,
 } from '../annotation/kinds';
-import type {
-  AnnotationAppearanceImageOptions,
-  AnnotationAppearanceManifest,
-  AnnotationAppearancesQuery,
+import {
+  ANNOTATION_APPEARANCE_MODES,
+  type AnnotationAppearanceImageOptions,
+  type AnnotationAppearanceManifest,
+  type AnnotationAppearanceMode,
+  type AnnotationAppearancesQuery,
 } from '../dto/AnnotationRender';
 import { AttachmentRefSchema, AttachmentSchema } from '../dto/Attachment.schema';
 import type { CachePins } from '../dto/CachePins';
@@ -742,6 +744,31 @@ const RenderBackgroundSchema = z.enum(['white', 'transparent']);
 /** WebP quality, 0 (smallest) to 1 (best) — the `canvas.toBlob` scale. */
 const RenderQualitySchema = z.coerce.number().min(0).max(1);
 
+const AppearanceModeSchema = z.enum(['normal', 'rollover', 'down']);
+
+/**
+ * A token's `modes`: the modes it asks for, in the engine's mode order,
+ * joined by `-` (`normal-down`). Anything else is refused, so one set of
+ * modes has one spelling and one URL.
+ */
+const AppearanceModesSchema = z.string().transform((value, ctx) => {
+  const modes = value.split('-') as AnnotationAppearanceMode[];
+  const canonical = ANNOTATION_APPEARANCE_MODES.filter((mode) => modes.includes(mode));
+  if (
+    canonical.length === 0 ||
+    canonical.length === ANNOTATION_APPEARANCE_MODES.length ||
+    canonical.join('-') !== value
+  ) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message:
+        'modes must name some but not all of normal, rollover, down, in that order, joined by -',
+    });
+    return z.NEVER;
+  }
+  return canonical;
+});
+
 /**
  * Token/path rule: annotatedness is path-expressed —
  * the render family the route belongs to — never token/query-expressed.
@@ -763,7 +790,13 @@ function buildPageRenderQuerySchema(annotated: boolean): z.ZodType<PageRenderQue
   return z
     .object({
       contentVersion: z.coerce.number().int().positive().optional(),
-      ...(annotated ? { annotationVersion: z.coerce.number().int().positive().optional() } : {}),
+      ...(annotated
+        ? {
+            annotationVersion: z.coerce.number().int().positive().optional(),
+            // Encoded only when the fields are left out (the default draws them).
+            formFields: z.literal('false').optional(),
+          }
+        : {}),
       format: PageNetworkRenderFormatSchema.optional(),
       viewport: RenderViewportSchema.optional(),
       target: RenderTargetSchema.optional(),
@@ -801,7 +834,11 @@ function buildPageRenderQuerySchema(annotated: boolean): z.ZodType<PageRenderQue
       }
     })
     .transform((v) => {
-      const pins = v as { contentVersion?: number; annotationVersion?: number };
+      const pins = v as {
+        contentVersion?: number;
+        annotationVersion?: number;
+        formFields?: 'false';
+      };
       const options: PageImageOptions = {
         ...(v.target ? { target: v.target } : {}),
         ...(v.viewport ? { viewport: v.viewport } : {}),
@@ -810,6 +847,7 @@ function buildPageRenderQuerySchema(annotated: boolean): z.ZodType<PageRenderQue
         ...(v.quality !== undefined ? { quality: v.quality } : {}),
         ...(v.format !== undefined ? { format: v.format } : {}),
         includeAnnotations: annotated,
+        ...(pins.formFields === 'false' ? { includeFormFields: false } : {}),
       };
       return {
         options,
@@ -832,12 +870,14 @@ export const PageRenderAnnotatedQuerySchema = buildPageRenderQuerySchema(true);
  * or `includeAnnotations` (appearances are always annotation-derived), and
  * keyed by `annotationVersion` only — appearance bitmaps do not depend on
  * page base content, so `contentVersion` is not part of the cache key. The
- * endpoint renders the Normal appearance only.
+ * endpoint renders every mode and state an annotation stores, or the
+ * `modes` asked for.
  */
 export const AnnotationAppearancesQuerySchema = z
   .object({
     annotationVersion: z.coerce.number().int().positive().optional(),
     format: PageNetworkRenderFormatSchema.optional(),
+    modes: AppearanceModesSchema.optional(),
     rotation: RenderRotationSchema.optional(),
     viewport: RenderViewportSchema.optional(),
     quality: RenderQualitySchema.optional(),
@@ -860,6 +900,7 @@ export const AnnotationAppearancesQuerySchema = z
       ...(v.viewport ? { viewport: v.viewport } : {}),
       ...(v.quality !== undefined ? { quality: v.quality } : {}),
       ...(v.format !== undefined ? { format: v.format } : {}),
+      ...(v.modes !== undefined ? { modes: v.modes } : {}),
     };
     return {
       options,
@@ -879,7 +920,8 @@ export const AnnotationAppearanceManifestSchema: z.ZodType<AnnotationAppearanceM
       z.object({
         part: z.string().min(1),
         ref: AnnotationRefSchema,
-        mode: z.enum(['normal', 'rollover', 'down']),
+        mode: AppearanceModeSchema,
+        state: z.string().nullable(),
         rect: PageBoxSchema,
         width: z.number().int().positive(),
         height: z.number().int().positive(),

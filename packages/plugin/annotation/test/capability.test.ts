@@ -37,6 +37,7 @@ const square = (objectNumber: number, extra: Partial<FileAnnotation> = {}): File
     page: PAGE,
     index: objectNumber,
     hasAppearance: true,
+    appearanceState: null,
     nm: null,
     ...NO_FLAGS,
     contents: null,

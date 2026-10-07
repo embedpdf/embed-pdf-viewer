@@ -39,6 +39,7 @@ const base = (annotObjectNumber: number) => ({
   index: annotObjectNumber,
   identityQuality: 'durable' as const,
   hasAppearance: true,
+  appearanceState: null,
   nm: null,
   ...NO_FLAGS,
   contents: null,

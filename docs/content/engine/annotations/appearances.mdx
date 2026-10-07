@@ -15,16 +15,20 @@ exporting them as a PDF.
 What you draw is an annotation's **appearance**: the drawing stored with it.
 
 ```ts
+import { shownAppearances } from '@embedpdf/engine';
+
 const pageImage = await page.render.image({
   viewport: { kind: 'scale', scale: 2 },
   includeAnnotations: false,
 }); // the page on its own
 
+const { annotations } = await page.annotations.list();
 const { appearances } = await page.annotations.renderAppearances({
   viewport: { kind: 'scale', scale: 2 },
 });
 
-for (const appearance of appearances) {
+// Each annotation as the page shows it now: its look at rest, in the state it shows.
+for (const appearance of shownAppearances(appearances, annotations)) {
   const { url } = await appearance.image.objectUrl();
   const box = pageImage.transform.pageToPixels(appearance.rect); // { x, y, width, height } in the page image
   placeImage(url, box);
@@ -38,37 +42,64 @@ for (const appearance of appearances) {
 
 ## Render each annotation as an image
 
-`renderAppearances()` draws every annotation of the page that has an appearance, each as its own
-image:
+`renderAppearances()` draws every annotation of the page that has an appearance, each look as
+its own image:
 
-| Field   | What it is                                                                           |
-| :------ | :----------------------------------------------------------------------------------- |
-| `ref`   | Which annotation it is.                                                              |
-| `rect`  | Where the image goes, in page space.                                                 |
-| `mode`  | Which look it is: `'normal'` unless you asked for others.                            |
-| `image` | The image; `image.objectUrl()` gives a URL for an `<img>`, `image.blob()` its bytes. |
+| Field   | What it is                                                                                                           |
+| :------ | :------------------------------------------------------------------------------------------------------------------- |
+| `ref`   | Which annotation it is.                                                                                              |
+| `rect`  | Where the image goes, in page space.                                                                                 |
+| `mode`  | Which look it is: `'normal'` at rest, `'rollover'` under the pointer, `'down'` while pressed.                        |
+| `state` | Which state it draws, for an annotation whose look has states (a check box's `'Off'` and its on state); else `null`. |
+| `image` | The image; `image.objectUrl()` gives a URL for an `<img>`, `image.blob()` its bytes.                                 |
 
-| Option     | What it is                                                                                                                                                         | Default   |
-| :--------- | :----------------------------------------------------------------------------------------------------------------------------------------------------------------- | :-------- |
-| `viewport` | The size, the same option as for [a page image](/docs/engine/documents/rendering#choose-the-size). Pass the page image's `viewport`, and the annotations match it. | scale `1` |
-| `rotation` | The page's rotation as you show it: `0`, `90`, `180` or `270`, clockwise.                                                                                          | `0`       |
-| `format`   | `'png'` or `'webp'`.                                                                                                                                               | see below |
+| Option     | What it is                                                                                                                                                         | Default    |
+| :--------- | :----------------------------------------------------------------------------------------------------------------------------------------------------------------- | :--------- |
+| `viewport` | The size, the same option as for [a page image](/docs/engine/documents/rendering#choose-the-size). Pass the page image's `viewport`, and the annotations match it. | scale `1`  |
+| `rotation` | The page's rotation as you show it: `0`, `90`, `180` or `270`, clockwise.                                                                                          | `0`        |
+| `modes`    | Which looks to render, of those each annotation has. `['normal']` gives only the look at rest. An empty list is refused.                                           | every look |
+| `format`   | `'png'` or `'webp'`.                                                                                                                                               | see below  |
 
 <Engine local>
 
 Images are PNG unless you ask for WebP.
-
-An annotation can also have a look for when the pointer is over it and for when it's pressed.
-`modes: ['normal', 'rollover', 'down']` renders those too, one image per look the annotation has.
 
 </Engine>
 
 <Engine cloud>
 
 Images are WebP unless you ask for PNG. The server sends the whole page's images in one response,
-and it's cached until the page's annotations change.
+and it's cached until the page's annotations change. Switching a check box changes no image.
 
 </Engine>
+
+### Looks and states
+
+One call brings every look an annotation has, so you can show it at rest, under the pointer and
+pressed without asking again:
+
+- **Modes.** An annotation can have a look for when the pointer is over it (`'rollover'`) and for
+  when it's pressed (`'down'`), besides the look at rest (`'normal'`). Form fields often do. You
+  get one image for each look the annotation has, and none for a look it doesn't have.
+- **States.** A check box or radio button has a look for each state: `'Off'` and its on state
+  (`'Yes'`, or its export value). You get every state, whatever the check box shows now, each
+  image labelled with its `state`. So when someone ticks the box, you already have the picture.
+- **Which state shows** is the annotation's `appearanceState` (its `/AS`), or for a form field,
+  its value.
+
+`shownAppearances(appearances, annotations)` picks, for each annotation, its look at rest in the
+state it shows: the page as it is now. To show a look under the pointer, pick it yourself:
+
+```ts
+import { annotationKey } from '@embedpdf/engine';
+
+const hovered = appearances.find(
+  (appearance) =>
+    annotationKey(appearance.ref) === annotationKey(checkbox.ref) &&
+    appearance.mode === 'rollover' &&
+    (appearance.state === null || appearance.state === checkbox.appearanceState),
+);
+```
 
 ### Turned annotations
 

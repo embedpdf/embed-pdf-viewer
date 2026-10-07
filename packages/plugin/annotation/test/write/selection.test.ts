@@ -22,6 +22,7 @@ const square = (objectNumber: number, x: number, extra: Record<string, unknown> 
     page: PAGE,
     index: objectNumber,
     hasAppearance: true,
+    appearanceState: null,
     nm: null,
     invisible: false,
     hidden: false,

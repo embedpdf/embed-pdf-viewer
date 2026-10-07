@@ -109,6 +109,7 @@ const NOT_DEFAULTS = [
   'page',
   'index',
   'hasAppearance',
+  'appearanceState',
   'nm',
   'rect',
   'box',

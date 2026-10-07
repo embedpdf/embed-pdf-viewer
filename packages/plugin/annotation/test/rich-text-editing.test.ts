@@ -37,6 +37,7 @@ const freeTextDTO = (
     page: PAGE,
     index: 30,
     hasAppearance: true,
+    appearanceState: null,
     nm: null,
     ...NO_FLAGS,
     contents,

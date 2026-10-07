@@ -80,6 +80,11 @@ export {
   type ColorConformanceOptions,
 } from './conformance/runColorConformance';
 export {
+  APPEARANCE_STATES_FIXTURE_PDF,
+  runAppearanceStatesConformance,
+  type AppearanceStatesConformanceOptions,
+} from './conformance/runAppearanceStatesConformance';
+export {
   DRAWING_FIXTURE_PDF,
   runDrawingDetailsConformance,
   type DrawingDetailsConformanceOptions,

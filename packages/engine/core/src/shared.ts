@@ -117,6 +117,11 @@ export type {
   PageRenderViewport,
 } from './dto/PageRender';
 export { checkImageQuality, createPageImageHandle } from './dto/PageRender';
+export {
+  ANNOTATION_APPEARANCE_MODES,
+  appearanceModesOf,
+  shownAppearances,
+} from './dto/AnnotationRender';
 export type {
   AnnotationAppearanceMode,
   AnnotationAppearanceRenderOptions,

@@ -221,6 +221,7 @@ export class LocalPageAnnotationsService implements LocalPageAnnotationsServiceC
         appearances.push({
           ref: appearance.ref,
           mode: appearance.mode,
+          state: appearance.state,
           rect: appearance.rect,
           image,
         });

@@ -1,3 +1,5 @@
+import { EngineError } from '../errors/EngineError';
+import { EngineErrorCode } from '../errors/EngineErrorCode';
 import type {
   PageImageHandle,
   PageNetworkRenderFormat,
@@ -5,16 +7,44 @@ import type {
   PageRenderViewport,
 } from './PageRender';
 import type { PdfRotation } from '../geometry/primitives';
+import { annotationKey } from '../identity/annotationKey';
 import type { AnnotationRef } from '../identity/AnnotationRef';
 import type { PageRef } from '../identity/PageRef';
 import type { Coordinates, PageCoordinates } from '../pageSpace/coordinates';
 
 /**
- * Which `/AP` sub-dictionary to render. PDFium exposes Normal (`/N`),
- * Rollover (`/R`) and Down (`/D`); the overwhelming common case for a
- * static appearance is `normal`.
+ * Which `/AP` entry an appearance is: Normal (`/N`), shown at rest;
+ * Rollover (`/R`), while the pointer is over the annotation; Down (`/D`),
+ * while it is pressed (ISO 32000-2 §12.5.5).
  */
 export type AnnotationAppearanceMode = 'normal' | 'rollover' | 'down';
+
+/** Every appearance mode, in the one order the engine renders and names them. */
+export const ANNOTATION_APPEARANCE_MODES: readonly AnnotationAppearanceMode[] = [
+  'normal',
+  'rollover',
+  'down',
+];
+
+/**
+ * The modes a request asks for, each once and in
+ * {@link ANNOTATION_APPEARANCE_MODES} order; `undefined` when it asks for
+ * every mode, whether by leaving `modes` out or by naming all three, so both
+ * are one request (and one cached image set). An empty list asks for nothing
+ * and is refused with `InvalidArg`.
+ */
+export function appearanceModesOf(
+  modes: readonly AnnotationAppearanceMode[] | undefined,
+): readonly AnnotationAppearanceMode[] | undefined {
+  if (modes === undefined) return undefined;
+  if (modes.length === 0) {
+    throw new EngineError(EngineErrorCode.InvalidArg, 'modes must name at least one mode', {
+      details: { field: 'modes' },
+    });
+  }
+  const wanted = ANNOTATION_APPEARANCE_MODES.filter((mode) => modes.includes(mode));
+  return wanted.length === ANNOTATION_APPEARANCE_MODES.length ? undefined : wanted;
+}
 
 /**
  * Options for batch-rendering a page's annotation appearance streams.
@@ -32,8 +62,11 @@ export interface AnnotationAppearanceRenderOptions {
   /** Page rotation in degrees clockwise. Default `0`. */
   rotation?: PdfRotation;
   /**
-   * Appearance modes to render per annotation. Only modes that actually
-   * exist on the annotation's `/AP` are emitted. Default `['normal']`.
+   * Which appearance modes to render, of those each annotation stores.
+   * Default: every mode it stores, so one call gives the look at rest, under
+   * the pointer and pressed. A mode an annotation doesn't store gives no
+   * image for it. Pass `['normal']` for the look at rest only. An empty list
+   * is refused with `InvalidArg`.
    */
   modes?: AnnotationAppearanceMode[];
   /**
@@ -65,7 +98,9 @@ export interface AnnotationAppearanceImageOptions extends AnnotationAppearanceRe
  * purely from the annotation's own `/AP` stream, so it changes iff the
  * annotation changes. Page base content (`contentVersion`/`docVersion`) does
  * not affect appearances and is deliberately not part of the cache key —
- * same as the annotation list endpoint.
+ * same as the annotation list endpoint. Which state an annotation shows
+ * (`/AS`) is not part of it either: every state is rendered, so switching a
+ * check box changes no image.
  */
 export interface AnnotationAppearancesQuery {
   options: AnnotationAppearanceImageOptions;
@@ -98,6 +133,13 @@ export interface AnnotationAppearanceRaster<C extends Coordinates = PageCoordina
   /** The annotation's name, for every annotation with an appearance. */
   ref: AnnotationRef;
   mode: AnnotationAppearanceMode;
+  /**
+   * The state this image draws, when the mode stores several (a check box's
+   * `Off` and its on state): every state comes back, whatever `/AS` says,
+   * and the annotation's `appearanceState` (or its form field's value) says
+   * which one shows. `null` when the mode is a single appearance.
+   */
+  state: string | null;
   rect: C['box'];
   raster: PageRaster;
 }
@@ -121,6 +163,8 @@ export interface AnnotationAppearancesResult<C extends Coordinates = PageCoordin
 export interface AnnotationAppearanceImage<C extends Coordinates = PageCoordinates> {
   ref: AnnotationRef;
   mode: AnnotationAppearanceMode;
+  /** The state this image draws — see {@link AnnotationAppearanceRaster}. */
+  state: string | null;
   /** Placement box (unrotated for rotation-stripped renders) — see
    *  {@link AnnotationAppearanceRaster}. */
   rect: C['box'];
@@ -149,6 +193,7 @@ export interface AnnotationAppearanceManifestEntry<C extends Coordinates = PageC
   part: string;
   ref: AnnotationRef;
   mode: AnnotationAppearanceMode;
+  state: string | null;
   rect: C['box'];
   width: number;
   height: number;
@@ -163,4 +208,33 @@ export interface AnnotationAppearanceManifestEntry<C extends Coordinates = PageC
 export interface AnnotationAppearanceManifest<C extends Coordinates = PageCoordinates> {
   page: PageRef;
   appearances: AnnotationAppearanceManifestEntry<C>[];
+}
+
+/**
+ * The pictures that show the page as it is now: each annotation's look at
+ * rest (`normal`), in the state it shows. An appearance batch holds every
+ * look and state an annotation stores; this picks, for each annotation, the
+ * one a page shows: the state its `appearanceState` names, or `Off` when it
+ * names none, as PDFium draws it. A state with no picture shows nothing.
+ */
+export function shownAppearances<
+  Appearance extends {
+    readonly ref: AnnotationRef;
+    readonly mode: AnnotationAppearanceMode;
+    readonly state: string | null;
+  },
+>(
+  appearances: readonly Appearance[],
+  annotations: readonly { readonly ref: AnnotationRef; readonly appearanceState: string | null }[],
+): Appearance[] {
+  const shownState = new Map<string, string>();
+  for (const annotation of annotations) {
+    shownState.set(annotationKey(annotation.ref), annotation.appearanceState ?? 'Off');
+  }
+  return appearances.filter(
+    (appearance) =>
+      appearance.mode === 'normal' &&
+      (appearance.state === null ||
+        appearance.state === (shownState.get(annotationKey(appearance.ref)) ?? 'Off')),
+  );
 }
