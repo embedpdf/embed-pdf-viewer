@@ -8,6 +8,7 @@ import { colorOf } from '@embedpdf/engine-core/runtime';
 import { type PdfFunctions, type PdfRuntimeMemory, type Ptr } from '@embedpdf/engine-runtime';
 
 import { withScratchN } from '../../../../runtime/memory/scratch';
+import { readUtf16String } from '../../../../runtime/memory/strings';
 import { readI32 } from '../../../../runtime/memory/structs';
 import { standardFontFromCode } from '../standardFont';
 import { textAlignmentFromCode } from '../textAlignment';
@@ -16,6 +17,7 @@ import { readBorderFields } from './readStyle';
 
 const MK_BORDER_COLOR = 0; // EPDF_MK_COLOR_BC
 const MK_BACKGROUND_COLOR = 1; // EPDF_MK_COLOR_BG
+const MK_CAPTION = 0; // EPDF_MK_TEXT_CA
 const I32_BYTES = 4;
 
 function readMKColor(
@@ -62,6 +64,10 @@ export function readWidget(
     fontSize: da ? da.fontSize : null,
     fontColor: da ? da.color : null,
     textAlign: textAlignmentFromCode(readTextAlignment(fn, annotPtr)),
+    // `/MK /CA` as stored; the field join keeps it on a push button's widget only.
+    caption: readUtf16String(mem, (buf, capacity) =>
+      fn.EPDFAnnot_GetMKText(annotPtr, MK_CAPTION, buf, capacity),
+    ),
     // Joined by the caller (joinWidgetFieldNumbers): the /Parent target is
     // a field dictionary, which annotation-plane primitives cannot follow.
     field: null,

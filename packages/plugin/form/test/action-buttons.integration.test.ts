@@ -189,6 +189,35 @@ describe('action buttons e2e (scripting OFF — actions ≠ JavaScript)', () => 
     expect(harness.valueOf('alpha')).toBe('filled-a'); // excluded — untouched
   });
 
+  it('a button made through create() draws, and resets the form when pressed', async () => {
+    await using harness = await boot(false);
+    const { field } = await harness.form.create({
+      family: 'pushbutton',
+      name: 'clear',
+      widgets: [
+        {
+          page: harness.page,
+          rect: { x: 10, y: 10, width: 80, height: 20 },
+          caption: 'Clear form',
+          actions: { activate: { type: 'reset-form', fields: null, exclude: false } },
+        },
+      ],
+    });
+    const widget = field.widgets[0]!.ref!;
+    const row = harness.form
+      .getSnapshot()
+      ?.widgets.find((candidate) => annotationKey(candidate.ref) === annotationKey(widget));
+    expect(row).toMatchObject({ caption: 'Clear form', hasAppearance: true });
+
+    const pressed = await harness.form.activateWidget(widget);
+    expect(pressed.kind).toBe('dispatched');
+    if (pressed.kind !== 'dispatched') throw new Error('unreachable');
+    expect(pressed.result.steps[0]!.result.nodes).toEqual([
+      expect.objectContaining({ type: 'reset-form', status: 'executed' }),
+    ]);
+    expect([harness.valueOf('alpha'), harness.valueOf('beta')]).toEqual(['default-a', 'default-b']);
+  });
+
   it('runs the ResetForm in a JS chain while the JS nodes stay inert', async () => {
     await using harness = await boot(false);
     const chain = await harness.press('btn-chain');

@@ -139,13 +139,22 @@ export interface SignatureFieldDraft<
 }
 
 /**
- * What `doc.forms.createField` takes: per-family, mirroring the DTO union.
- * Push buttons are not authorable.
+ * A push button: no value, only widgets, each with its `caption` and
+ * usually an `activate` action (reset the form, go to a page, submit).
  */
+export interface PushButtonFieldDraft<
+  C extends Coordinates = PageCoordinates,
+> extends FormFieldDraftBase {
+  family: 'pushbutton';
+  widgets?: WidgetPlacement<C>[];
+}
+
+/** What `doc.forms.create` takes: per family, mirroring the DTO union. */
 export type FormFieldDraft<C extends Coordinates = PageCoordinates> =
   | TextFieldDraft<C>
   | CheckboxFieldDraft<C>
   | RadioFieldDraft<C>
   | ComboBoxFieldDraft<C>
   | ListBoxFieldDraft<C>
+  | PushButtonFieldDraft<C>
   | SignatureFieldDraft<C>;

@@ -231,6 +231,7 @@ export const FormFieldDraftSchema: z.ZodType<FormFieldDraft> = z.discriminatedUn
       defaultValue: z.array(z.string()).optional(),
     })
     .strict(),
+  z.object({ ...FormFieldDraftBaseShape, family: z.literal('pushbutton') }).strict(),
   z.object({ ...FormFieldDraftBaseShape, family: z.literal('signature') }).strict(),
 ]) as unknown as z.ZodType<FormFieldDraft>;
 
@@ -252,7 +253,9 @@ const FormFieldPatchBaseShape = {
 export const FormFieldPatchSchema: z.ZodType<FormFieldPatch> = z
   .object({
     ...FormFieldPatchBaseShape,
-    family: z.enum(['text', 'checkbox', 'radio', 'combobox', 'listbox', 'signature']).optional(),
+    family: z
+      .enum(['text', 'checkbox', 'radio', 'combobox', 'listbox', 'pushbutton', 'signature'])
+      .optional(),
     // A string for text fields and dropdowns, option values for a list.
     defaultValue: z
       .union([z.string(), z.array(z.string())])

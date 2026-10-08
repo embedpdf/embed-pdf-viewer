@@ -1,6 +1,6 @@
 ---
 title: Creating form fields
-description: Add text fields, checkboxes, radio groups, dropdowns, lists and signature fields to a PDF, change or delete them, and repair a broken form.
+description: Add text fields, checkboxes, radio groups, dropdowns, lists, buttons and signature fields to a PDF, change or delete them, and repair a broken form.
 ---
 
 {/* Generated from docs/content — edit there, then `pnpm docs:sync`. */}
@@ -41,7 +41,7 @@ and [add a widget](#add-a-widget) later.
 
 | Field           | What it is                                                                                                                               | Default    |
 | :-------------- | :--------------------------------------------------------------------------------------------------------------------------------------- | :--------- |
-| `family`        | `'text'`, `'checkbox'`, `'radio'`, `'combobox'`, `'listbox'` or `'signature'`                                                            |            |
+| `family`        | `'text'`, `'checkbox'`, `'radio'`, `'combobox'`, `'listbox'`, `'pushbutton'` or `'signature'`                                            |            |
 | `name`          | The full name. Dots make groups: `customer.email` creates `customer` if it's new.                                                        |            |
 | `widgets`       | Where it shows: a list of `{ page, rect }`, `rect` in points from the page's top-left, each with the [widget's look](#the-widgets-look). | not placed |
 | `readOnly`      | PDF apps don't let the user change it.                                                                                                   | `false`    |
@@ -52,18 +52,19 @@ and [add a widget](#add-a-widget) later.
 
 `create()` is one change: when any part of the draft is invalid, it fails with `InvalidArg` (or
 `NotFound` for a page that isn't there) and creates nothing. A name that's already taken fails
-with `InvalidArg` too. Push buttons can't be created.
+with `InvalidArg` too.
 
 Each family adds its own settings:
 
-| Family      | Settings                                                                                               |
-| :---------- | :----------------------------------------------------------------------------------------------------- |
-| `text`      | `defaultValue`, `maxLength`, `multiline`, `password`, `comb` (one character per box, with `maxLength`) |
-| `checkbox`  | Each widget's `exportValue`: what the form data holds when it's checked. Default `'Yes'`.              |
-| `radio`     | Each widget's `exportValue` (one widget per button), `noToggleToOff`, `radiosInUnison`                 |
-| `combobox`  | `options`, `defaultValue`, `edit` (the user may also type their own text)                              |
-| `listbox`   | `options`, `multiSelect`, `defaultValue` (option values; more than one needs `multiSelect`)            |
-| `signature` | Only widgets. Signing it is on [Digital signatures](/docs/engine/forms/signatures).                    |
+| Family       | Settings                                                                                               |
+| :----------- | :----------------------------------------------------------------------------------------------------- |
+| `text`       | `defaultValue`, `maxLength`, `multiline`, `password`, `comb` (one character per box, with `maxLength`) |
+| `checkbox`   | Each widget's `exportValue`: what the form data holds when it's checked. Default `'Yes'`.              |
+| `radio`      | Each widget's `exportValue` (one widget per button), `noToggleToOff`, `radiosInUnison`                 |
+| `combobox`   | `options`, `defaultValue`, `edit` (the user may also type their own text)                              |
+| `listbox`    | `options`, `multiSelect`, `defaultValue` (option values; more than one needs `multiSelect`)            |
+| `pushbutton` | Only widgets, each with its `caption`. See [A push button](#a-push-button).                            |
+| `signature`  | Only widgets. Signing it is on [Digital signatures](/docs/engine/forms/signatures).                    |
 
 ### A radio group
 
@@ -105,6 +106,32 @@ await doc.forms.create({
 });
 ```
 
+### A push button
+
+A push button holds no value: it does something when it's clicked. Give each widget its
+`caption` and what a click does, in `actions` (see [Widget actions](#widget-actions)):
+
+```ts
+await doc.forms.create({
+  family: 'pushbutton',
+  name: 'clear',
+  widgets: [
+    {
+      page: page.ref,
+      rect: { x: 400, y: 700, width: 120, height: 28 },
+      caption: 'Clear form',
+      interiorColor: '#f6f8fa',
+      actions: { activate: { type: 'reset-form', fields: null, exclude: false } },
+    },
+  ],
+});
+```
+
+The engine draws the button: its background, its border, and the caption centred in the widget's
+font. `setValue()` refuses a push button with `InvalidArg`. A button that only goes to a page,
+resets the form or shows and hides fields needs `doc.forms.modify` alone; one that runs a script,
+submits the form or opens a web address needs `doc.forms.script` too.
+
 ### The widget's look
 
 Next to `page` and `rect`, each entry of `widgets` takes the widget's style. These are the same
@@ -120,6 +147,7 @@ fields you change later with `doc.forms.updateWidget()`:
 | `fontSize`      | Text size in points                                                 |
 | `fontColor`     | Text color                                                          |
 | `textAlign`     | `'left'`, `'center'` or `'right'`                                   |
+| `caption`       | A push button's caption; other widgets take none                    |
 
 ```ts
 widgets: [

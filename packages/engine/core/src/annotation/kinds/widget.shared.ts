@@ -12,11 +12,12 @@ const WIDGET_STYLE_NAMES = [
   'fontSize',
   'fontColor',
   'textAlign',
+  'caption',
 ] as const;
 
 type WidgetStyleName = (typeof WIDGET_STYLE_NAMES)[number];
 
-/** A widget's appearance characteristics (`/MK`) and default appearance (`/DA`). */
+/** A widget's appearance characteristics (`/MK`, a push button's caption among them) and default appearance (`/DA`). */
 export type WidgetStyleFields = Pick<WidgetAnnotation, WidgetStyleName>;
 export type WidgetStyleDraftFields = Pick<WidgetPatch, WidgetStyleName>;
 export type WidgetStylePatchFields = WidgetStyleDraftFields;

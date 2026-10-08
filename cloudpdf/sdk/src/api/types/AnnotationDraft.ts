@@ -1892,6 +1892,7 @@ export namespace AnnotationDraft {
         fontSize?: (number | null) | undefined;
         fontColor?: (string | null) | undefined;
         textAlign?: AnnotationDraftWidget.TextAlign | undefined;
+        caption?: (string | null) | undefined;
         field?: unknown | undefined;
         fieldFamily?: unknown | undefined;
     }

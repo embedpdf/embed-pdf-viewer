@@ -15,6 +15,7 @@ export interface WidgetPlacement {
     fontSize?: (number | null) | undefined;
     fontColor?: (string | null) | undefined;
     textAlign?: WidgetPlacement.TextAlign | undefined;
+    caption?: (string | null) | undefined;
 }
 
 export namespace WidgetPlacement {

@@ -42,6 +42,7 @@ export interface WidgetAnnotation {
     fontSize: number | null;
     fontColor: string | null;
     textAlign: WidgetAnnotation.TextAlign;
+    caption: string | null;
     field: CloudPDF.FormFieldRef | null;
     fieldFamily: WidgetAnnotation.FieldFamily;
 }

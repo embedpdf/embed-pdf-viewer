@@ -15656,6 +15656,10 @@
                 "type": "string",
                 "enum": ["left", "center", "right"]
               },
+              "caption": {
+                "type": "string",
+                "nullable": true
+              },
               "field": {},
               "fieldFamily": {}
             },
@@ -20096,6 +20100,41 @@
               },
               "family": {
                 "type": "string",
+                "enum": ["pushbutton"]
+              }
+            },
+            "required": ["name", "family"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "name": {
+                "$ref": "#/components/schemas/FormFieldDraft/anyOf/0/properties/name"
+              },
+              "readOnly": {
+                "$ref": "#/components/schemas/FormFieldDraft/anyOf/0/properties/readOnly"
+              },
+              "required": {
+                "$ref": "#/components/schemas/FormFieldDraft/anyOf/0/properties/required"
+              },
+              "noExport": {
+                "$ref": "#/components/schemas/FormFieldDraft/anyOf/0/properties/noExport"
+              },
+              "alternateName": {
+                "$ref": "#/components/schemas/FormFieldDraft/anyOf/0/properties/alternateName"
+              },
+              "mappingName": {
+                "$ref": "#/components/schemas/FormFieldDraft/anyOf/0/properties/mappingName"
+              },
+              "actions": {
+                "$ref": "#/components/schemas/FieldActionsPatch"
+              },
+              "widgets": {
+                "$ref": "#/components/schemas/FormFieldDraft/anyOf/0/properties/widgets"
+              },
+              "family": {
+                "type": "string",
                 "enum": ["signature"]
               }
             },
@@ -20133,7 +20172,7 @@
           },
           "family": {
             "type": "string",
-            "enum": ["text", "checkbox", "radio", "combobox", "listbox", "signature"]
+            "enum": ["text", "checkbox", "radio", "combobox", "listbox", "pushbutton", "signature"]
           },
           "defaultValue": {
             "anyOf": [
@@ -20306,6 +20345,10 @@
           "textAlign": {
             "type": "string",
             "enum": ["left", "center", "right"]
+          },
+          "caption": {
+            "type": "string",
+            "nullable": true
           }
         },
         "required": ["page", "rect"],
@@ -20542,6 +20585,10 @@
             "type": "string",
             "enum": ["left", "center", "right"]
           },
+          "caption": {
+            "type": "string",
+            "nullable": true
+          },
           "field": {
             "allOf": [
               {
@@ -20604,6 +20651,7 @@
           "fontSize",
           "fontColor",
           "textAlign",
+          "caption",
           "field",
           "fieldFamily"
         ],
@@ -20809,6 +20857,10 @@
           "textAlign": {
             "type": "string",
             "enum": ["left", "center", "right"]
+          },
+          "caption": {
+            "type": "string",
+            "nullable": true
           },
           "field": {},
           "fieldFamily": {}

@@ -26,7 +26,11 @@ export function resolveWidgetFieldObjectNumber(
   return runtime.fn.EPDFForm_GetFieldObjNum(model, fieldIndex);
 }
 
-/** Stamp the field ref and family onto every widget DTO in a freshly read list. */
+/**
+ * Stamp the field ref and family onto every widget DTO in a freshly read
+ * list. Only a push button's `/MK /CA` is a caption; another widget's (a
+ * checkbox's symbol) reads as none.
+ */
 export function joinWidgetFieldNumbers(
   runtime: PdfRuntimeModule,
   session: DocumentSession,
@@ -34,7 +38,10 @@ export function joinWidgetFieldNumbers(
 ): void {
   for (const annotation of annotations) {
     if (annotation.subtype !== 'widget') continue;
-    if (annotation.ref.kind !== 'objectNumber') continue;
+    if (annotation.ref.kind !== 'objectNumber') {
+      annotation.caption = null;
+      continue;
+    }
     const model = acquireFormModel(runtime, session);
     const fieldIndex = runtime.fn.EPDFForm_GetFieldIndexForWidget(
       model,
@@ -46,10 +53,12 @@ export function joinWidgetFieldNumbers(
       // In no field, or in one stored inline, which no ref can address.
       annotation.field = null;
       annotation.fieldFamily = 'unknown';
+      annotation.caption = null;
       continue;
     }
     annotation.field = { kind: 'objectNumber', objectNumber: fieldObjectNumber };
     annotation.fieldFamily =
       FAMILY_BY_CODE[runtime.fn.EPDFForm_GetFieldFamily(model, fieldIndex)] ?? 'unknown';
+    if (annotation.fieldFamily !== 'pushbutton') annotation.caption = null;
   }
 }

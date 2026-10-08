@@ -30,6 +30,7 @@ export namespace FormFieldPatch {
         Radio: "radio",
         Combobox: "combobox",
         Listbox: "listbox",
+        Pushbutton: "pushbutton",
         Signature: "signature",
     } as const;
     export type Family = (typeof Family)[keyof typeof Family];

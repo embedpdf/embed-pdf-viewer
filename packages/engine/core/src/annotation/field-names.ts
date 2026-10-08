@@ -678,6 +678,7 @@ export const ANNOTATION_FIELD_NAMES: Readonly<Record<AnnotationSubtype, readonly
     'fontSize',
     'fontColor',
     'textAlign',
+    'caption',
     'field',
     'fieldFamily',
   ],

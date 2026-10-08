@@ -8,6 +8,7 @@ export type FormFieldDraft =
     | CloudPDF.FormFieldDraft.Radio
     | CloudPDF.FormFieldDraft.Combobox
     | CloudPDF.FormFieldDraft.Listbox
+    | CloudPDF.FormFieldDraft.Pushbutton
     | CloudPDF.FormFieldDraft.Signature;
 
 export namespace FormFieldDraft {
@@ -104,6 +105,18 @@ export namespace FormFieldDraft {
                 value: string;
             }
         }
+    }
+
+    export interface Pushbutton {
+        family: "pushbutton";
+        name: string;
+        readOnly?: boolean | undefined;
+        required?: boolean | undefined;
+        noExport?: boolean | undefined;
+        alternateName?: string | undefined;
+        mappingName?: string | undefined;
+        actions?: CloudPDF.FieldActionsPatch | undefined;
+        widgets?: CloudPDF.WidgetPlacement[] | undefined;
     }
 
     export interface Signature {

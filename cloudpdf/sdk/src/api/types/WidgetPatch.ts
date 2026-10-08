@@ -42,6 +42,7 @@ export interface WidgetPatch {
     fontSize?: (number | null) | undefined;
     fontColor?: (string | null) | undefined;
     textAlign?: WidgetPatch.TextAlign | undefined;
+    caption?: (string | null) | undefined;
     field?: unknown | undefined;
     fieldFamily?: unknown | undefined;
 }

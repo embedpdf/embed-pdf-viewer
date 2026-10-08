@@ -557,6 +557,8 @@ export type {
   RadioFieldDraft,
   ComboBoxFieldDraft,
   ListBoxFieldDraft,
+  PushButtonFieldDraft,
+  SignatureFieldDraft,
   FormFieldDraft,
 } from './forms/draft';
 export { draftWritesScripts } from './forms/draft';
@@ -566,6 +568,8 @@ export type {
   RadioFieldPatch,
   ComboBoxFieldPatch,
   ListBoxFieldPatch,
+  PushButtonFieldPatch,
+  SignatureFieldPatch,
   FormFieldPatch,
 } from './forms/patch';
 export type { FormFieldValue, FormDataFormat } from './forms/value';

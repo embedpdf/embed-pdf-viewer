@@ -765,6 +765,91 @@ export function runFormConformance(
       }
     });
 
+    test('a push button has a caption and an action, and holds no value', async () => {
+      const doc = await open(opts.fixtures.toggleFields);
+      const page = toPageRef(opts.fixtures.toggleFields.pageObjectNumber);
+      try {
+        const { field } = await doc.forms.create({
+          family: 'pushbutton',
+          name: 'clear',
+          widgets: [
+            {
+              page,
+              rect: { x: 20, y: 120, width: 120, height: 28 },
+              caption: 'Clear form',
+              interiorColor: '#f6f8fa',
+              actions: { activate: { type: 'reset-form', fields: null, exclude: false } },
+            },
+          ],
+        });
+        expect(field.family).toBe('pushbutton');
+        const widget = field.widgets[0]!.ref!;
+        const rowOf = async (ref: AnnotationRef) =>
+          (await doc.forms.list()).widgets.find((w) => annotationKey(w.ref) === annotationKey(ref))!;
+        let row = await rowOf(widget);
+        expect(row).toMatchObject({
+          fieldFamily: 'pushbutton',
+          caption: 'Clear form',
+          interiorColor: '#f6f8fa',
+          hasAppearance: true,
+        });
+        expect(row.actions?.activate?.root?.type).toBe('reset-form');
+
+        // A push button holds no value: the value writes refuse it.
+        await expect(
+          doc.forms.setValue(field.ref, { value: 'x' }),
+        ).rejects.toMatchObject({ code: EngineErrorCode.InvalidArg });
+        // Its field takes the settings every field has, and no family's own.
+        await doc.forms.update(field.ref, { alternateName: 'Clears every field' });
+        await expect(doc.forms.update(field.ref, { multiline: true })).rejects.toMatchObject({
+          code: EngineErrorCode.InvalidArg,
+        });
+
+        // Its drawing is the engine's to keep: a move, new actions or the row
+        // sent back keep it; a new caption draws it again.
+        const moved = await doc.forms.updateWidget(widget, {
+          rect: { x: 30, y: 130, width: 120, height: 28 },
+        });
+        const restyled = await doc.forms.updateWidget(widget, {
+          actions: { focus: { type: 'reset-form', fields: null, exclude: false } },
+        });
+        const sentBack = await doc.forms.updateWidget(widget, { ...(await rowOf(widget)) });
+        expect(
+          [moved, restyled, sentBack].map((result) => result.appearance.action),
+        ).toEqual(['preserved', 'preserved', 'preserved']);
+
+        // The caption changes with the widget, and undo puts it back.
+        const renamed = await doc.forms.updateWidget(widget, { caption: 'Start over' });
+        expect(renamed.appearance.action).toBe('regenerated');
+        expect((await rowOf(widget)).caption).toBe('Start over');
+        await doc.apply({ undoOf: renamed.meta.opId });
+        expect((await rowOf(widget)).caption).toBe('Clear form');
+        await doc.forms.updateWidget(widget, { caption: null });
+        row = await rowOf(widget);
+        expect([row.caption, row.hasAppearance]).toEqual([null, true]);
+
+        // Another widget has no caption: its row reads none, sent back it is
+        // kept, and a caption is refused, on its placement too.
+        const checkbox = (await doc.forms.list()).widgets.find(
+          (w) => w.fieldFamily === 'checkbox',
+        )!;
+        expect(checkbox.caption).toBeNull();
+        await doc.forms.updateWidget(checkbox.ref, { ...checkbox });
+        await expect(
+          doc.forms.updateWidget(checkbox.ref, { caption: 'Yes' }),
+        ).rejects.toMatchObject({ code: EngineErrorCode.InvalidArg });
+        await expect(
+          doc.forms.create({
+            family: 'text',
+            name: 'captioned',
+            widgets: [{ page, rect: { x: 20, y: 160, width: 120, height: 20 }, caption: 'x' }],
+          }),
+        ).rejects.toMatchObject({ code: EngineErrorCode.InvalidArg });
+      } finally {
+        await doc.close();
+      }
+    });
+
     test('create is one change: a rejected draft creates nothing', async () => {
       const doc = await open(opts.fixtures.toggleFields);
       const page = toPageRef(opts.fixtures.toggleFields.pageObjectNumber);

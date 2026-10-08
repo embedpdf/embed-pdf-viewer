@@ -33,6 +33,7 @@ import { throwIfAborted } from '../../shared/abort';
 import { withScratch, withScratchN } from '../../runtime/memory/scratch';
 import { U64_BYTES, pokeU64 } from '../../runtime/memory/u64';
 import { createUnattachedWidget } from './internal/authorWidget';
+import { fitCaptionToFamily } from './internal/widgetCaption';
 import { flagMasks } from './internal/fieldFlagBits';
 import { acquireFormModel } from './internal/formModelCache';
 import {
@@ -76,6 +77,7 @@ import { readUtf16String } from '../../runtime/memory/strings';
 
 // Mirrors EPDF_FORMFIELD_FAMILY_* in public/epdf_form.h.
 const FAMILY_CODE = {
+  pushbutton: 1,
   checkbox: 2,
   radio: 3,
   text: 4,
@@ -333,7 +335,9 @@ export class FormMutator {
     const { fn } = this.runtime;
     const docPtr = this.session.requireDocPtr();
 
-    const placements = draft.widgets ?? [];
+    const placements = (draft.widgets ?? []).map((placement) =>
+      fitCaptionToFamily(draft.family, placement),
+    );
     const pageIndexes = placements.map((placement) => this.preflightPlacement(placement));
     const onStates = placements.map((placement) => onStateOf(draft.family, placement));
     if (draft.family === 'listbox' && draft.defaultValue !== undefined) {
@@ -769,8 +773,9 @@ export class FormMutator {
     const resolved = resolveFieldRef(this.runtime, model, ref);
     this.assertWritable(resolved);
     const before = readFieldAt(this.runtime, model, resolved.fieldIndex, docPtr);
-    const pageIndex = this.preflightPlacement(placement);
-    const onState = onStateOf(before.family, placement);
+    const fitted = fitCaptionToFamily(before.family, placement);
+    const pageIndex = this.preflightPlacement(fitted);
+    const onState = onStateOf(before.family, fitted);
     // A merged field/widget splits: its widget half becomes a new widget, at
     // a new number in the same place in that page's /Annots.
     const mergedPage =
@@ -787,7 +792,7 @@ export class FormMutator {
       this.runtime,
       docPtr,
       pageIndex,
-      placement,
+      fitted,
       numbers.objectNumber,
     );
     if (

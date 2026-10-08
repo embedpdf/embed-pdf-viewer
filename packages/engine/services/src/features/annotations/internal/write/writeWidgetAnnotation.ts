@@ -5,8 +5,14 @@ import type {
   PdfCoordinates,
 } from '@embedpdf/engine-core/runtime';
 import { EngineError, EngineErrorCode, rgbOf } from '@embedpdf/engine-core/runtime';
-import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
+import {
+  NULL_PTR,
+  type PdfFunctions,
+  type PdfRuntimeMemory,
+  type Ptr,
+} from '@embedpdf/engine-runtime';
 
+import { withUtf16String } from '../../../../runtime/memory/strings';
 import { writeWidgetActions } from '../../../actions/internal/writeWidgetActions';
 import { borderStyleToCode } from '../shapeBorderStyle';
 import type { AnnotationWriteContext } from './annotationWriteContext';
@@ -17,13 +23,14 @@ import { applyAnnotationBaseDraft, applyAnnotationBasePatch } from './writeAnnot
 
 const MK_BORDER_COLOR = 0; // EPDF_MK_COLOR_BC
 const MK_BACKGROUND_COLOR = 1; // EPDF_MK_COLOR_BG
+const MK_CAPTION = 0; // EPDF_MK_TEXT_CA
 
 export function isWidgetSubtype(subtype: string): subtype is 'widget' {
   return subtype === 'widget';
 }
 
 /**
- * The widget-plane style writer: /MK colours, /BS, /DA, /Q. Both entry
+ * The widget-plane style writer: /MK colours and caption, /BS, /DA, /Q. Both entry
  * points funnel here — the widget annotation kind (create/patch) and
  * `doc.forms.createField`'s inline placements — so creation-time and
  * edit-time styling can never drift apart.
@@ -74,6 +81,15 @@ export function applyWidgetStyle(
   if (style.textAlign !== undefined) {
     fn.EPDFAnnot_SetTextAlignment(annotPtr, textAlignmentToCode(style.textAlign));
   }
+
+  // Only a push button's widget gets here with a caption (`fitCaptionToFamily`).
+  if (style.caption === null) {
+    fn.EPDFAnnot_SetMKText(annotPtr, MK_CAPTION, NULL_PTR);
+  } else if (style.caption !== undefined) {
+    withUtf16String(mem, style.caption, (text) =>
+      fn.EPDFAnnot_SetMKText(annotPtr, MK_CAPTION, text),
+    );
+  }
 }
 
 /** Create an inert widget: the fields every kind has, placement and style. Adoption is a forms concern. */
@@ -91,9 +107,8 @@ export function applyWidgetDraft(
 }
 
 /**
- * Move, restyle or retarget a widget. When the widget is attached to a field
- * the family-correct appearance is re-baked afterwards; on inert widgets the
- * regenerator is a no-op (no /FT context) and that is fine.
+ * Move, restyle or retarget a widget. Whether its appearance is drawn again
+ * is the update's decision (`AnnotationMutator`), as for every kind.
  */
 export function applyWidgetPatch(
   fn: PdfFunctions,
@@ -118,5 +133,4 @@ export function applyWidgetPatch(
     // A read's actions sent back unchanged never get here (`checkAnnotationPatch`).
     writeWidgetActions(ctx.runtime, ctx.docPtr, annotPtr, patch.actions as never);
   }
-  fn.EPDFAnnot_GenerateFormFieldAP(annotPtr);
 }

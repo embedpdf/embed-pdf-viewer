@@ -25,6 +25,12 @@ export const WidgetDeclaration = defineKind('widget', {
   fontColor: field.data(ColorSchema).nullable().optional(),
   textAlign: field.data(TextAlignmentSchema).optional(),
   /**
+   * A push button's caption (`/MK /CA`), drawn centred on the button.
+   * `null` for every other widget, whose `/MK /CA` is no caption (a
+   * checkbox's is its symbol); a caption written to one is refused.
+   */
+  caption: field.data(z.string()).nullable().optional(),
+  /**
    * `/A` and `/AA`: what the widget does when clicked, entered, focused and
    * so on. A write sets an event's action, `null` removes it, an event left
    * out keeps what it has; `null` for the whole removes them all. The

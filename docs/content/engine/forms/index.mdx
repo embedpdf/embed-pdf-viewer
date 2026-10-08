@@ -66,7 +66,7 @@ if (field.family === 'listbox') console.log(field.selectedValues); // string[]
 | `radio`      | `value`: the export value of the chosen button, or `'Off'`         | `noToggleToOff`, `radiosInUnison`                                               |
 | `combobox`   | `value`                                                            | `options`, `edit` (free text allowed), `defaultValue`                           |
 | `listbox`    | `selectedValues`, in option order                                  | `options`, `multiSelect`, `defaultValue` (option values)                        |
-| `pushbutton` | none: a button only runs an action                                 |                                                                                 |
+| `pushbutton` | none: a button only runs an action                                 | Each widget's `caption`, on its row in `widgets`                                |
 | `signature`  | none here: see [Digital signatures](/docs/engine/forms/signatures) |                                                                                 |
 
 Each option of a dropdown (`combobox`) or list is `{ label, value, selected }`. `label` is what the

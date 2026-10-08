@@ -312,14 +312,14 @@ export class AnnotationMutator {
       if (impact === 'inert' || impact === 'translation') {
         appearance = { action: 'preserved', changed: false };
       } else {
-        const ok = generateAppearance(
-          this.runtime.fn,
-          annotPtr,
-          patch.blendMode ?? previousBlendMode,
-        );
+        const ok =
+          currentDto.subtype === 'widget'
+            ? // Drawn as its field's family draws it; a widget in no field has none.
+              fn.EPDFAnnot_GenerateFormFieldAP(annotPtr)
+            : generateAppearance(fn, annotPtr, patch.blendMode ?? previousBlendMode);
         appearance = ok
           ? { action: 'regenerated', changed: true }
-          : // No generic generator for this subtype (e.g. widgets). The
+          : // No generator for this annotation (a widget in no field). The
             // dictionary still changed when the patch was appearance-relevant,
             // so `changed` stays true in that case — form-layer renderers may
             // paint differently even though no /AP was written.

@@ -16,7 +16,7 @@
 import type { FormFieldFamily, WidgetAppearance } from '@embedpdf/engine-core/runtime';
 import type { ClickCreate } from '@embedpdf/plugin-annotation/contract';
 
-/** The families the palette can author (push buttons are not authorable). */
+/** The families the palette places; a push button is made through `create()`. */
 export type AuthorableFormFamily = Exclude<FormFieldFamily, 'pushbutton' | 'unknown'>;
 
 export interface FormToolDef {

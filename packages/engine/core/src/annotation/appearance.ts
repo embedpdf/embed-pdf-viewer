@@ -121,6 +121,9 @@ const INERT_KEYS: ReadonlySet<string> = new Set([
   'actions',
   // A file attachment's icon is drawn from `/Name` and `/C`, never from its file.
   'file',
+  // The field a widget belongs to, as the form reads it.
+  'field',
+  'fieldFamily',
 ]);
 
 /**
@@ -174,6 +177,7 @@ const TRANSLATABLE_GEOMETRY: Record<string, readonly string[]> = {
   stamp: ['box'],
   'file-attachment': ['rect'],
   link: ['rect'],
+  widget: ['rect'],
 };
 
 const numEq = (a: number, b: number): boolean => Math.abs(a - b) <= EPSILON;

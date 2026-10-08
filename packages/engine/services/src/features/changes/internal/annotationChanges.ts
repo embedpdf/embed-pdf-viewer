@@ -20,6 +20,7 @@ import {
   type ChangeItem,
   type ChangeOp,
   type FormWidget,
+  type WidgetPatch,
   type PageObjectNumber,
   type PageRef,
   type PdfCoordinates,
@@ -48,6 +49,7 @@ import {
   type PlannedReorder,
 } from '../../annotations/internal/stackingOrder';
 import { promoteInlineAnnotations } from '../../annotations/internal/write/promoteInlineAnnotations';
+import { fitCaptionToFamily } from '../../forms/internal/widgetCaption';
 import { RawAnnotationReader } from '../../annotations/RawAnnotationReader';
 import { formMutationMeta } from '../../forms/internal/formMutationMeta';
 import type {
@@ -417,7 +419,11 @@ export function writeUpdate(
   // Captures go by object number: an annotation born inline gets one first.
   promoteInlineAnnotations(ctx.runtime, ctx.session, ref.page.objectNumber);
   const before = readAnnotation(ctx, ref);
-  const linked = linkedTo(before, patch).map((other) => ({
+  const written =
+    before.subtype === 'widget'
+      ? fitCaptionToFamily(before.fieldFamily, patch as WidgetPatch<PdfCoordinates>)
+      : patch;
+  const linked = linkedTo(before, written).map((other) => ({
     objectNumber: objectNumberOf(ctx, other),
     deep: [],
   }));
@@ -425,7 +431,7 @@ export function writeUpdate(
     { objectNumber: objectNumberOf(ctx, ref), deep: APPEARANCE_KEYS },
     ...linked,
   ]);
-  const result = mutator(ctx).update(ref, patch, ctx.authority, ctx.signal, resources);
+  const result = mutator(ctx).update(ref, written, ctx.authority, ctx.signal, resources);
   const objects = captureAfter(ctx.runtime, ctx.session, pending);
   return {
     item: updatedItem(ctx, reports, ref, result),
@@ -436,7 +442,7 @@ export function writeUpdate(
         objects,
         subject: { annotation: ref },
         appearanceChanged: result.appearance.changed,
-        fallback: valuesChanged(before, result.annotation, patch),
+        fallback: valuesChanged(before, result.annotation, written),
       },
     ],
   };

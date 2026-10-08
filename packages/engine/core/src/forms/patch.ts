@@ -68,6 +68,11 @@ export interface ListBoxFieldPatch extends FormFieldPatchBase {
   defaultValue?: string[] | null;
 }
 
+/** A push button: only the settings every field has. Its captions are its widgets'. */
+export interface PushButtonFieldPatch extends FormFieldPatchBase {
+  family?: 'pushbutton';
+}
+
 /** A signature field: only the settings every field has. Signing is `doc.signatures`'. */
 export interface SignatureFieldPatch extends FormFieldPatchBase {
   family?: 'signature';
@@ -80,4 +85,5 @@ export type FormFieldPatch =
   | RadioFieldPatch
   | ComboBoxFieldPatch
   | ListBoxFieldPatch
+  | PushButtonFieldPatch
   | SignatureFieldPatch;
