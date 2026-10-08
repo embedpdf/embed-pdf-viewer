@@ -1,5 +1,6 @@
 import { hasLocalEngineBrand } from './localEngineBrand';
 import type { LocalPageAnnotationsService } from './PageAnnotationsService';
+import type { LocalPageFormsService } from './PageFormsService';
 import type { PageHandle } from './PageHandle';
 import type { LocalPageRenderService } from './PageRenderService';
 import type { PieceInfoService } from './PieceInfoService';
@@ -10,6 +11,7 @@ import type { PieceInfoService } from './PieceInfoService';
  */
 export interface LocalPageHandle extends PageHandle {
   readonly annotations: LocalPageAnnotationsService;
+  readonly forms: LocalPageFormsService;
   readonly render: LocalPageRenderService;
   /**
    * Page-level `/PieceInfo` private application data (ISO 32000 §14.5), such

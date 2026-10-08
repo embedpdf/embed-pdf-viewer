@@ -15,10 +15,10 @@ import {
   pdfFormFieldDraftOf,
   pdfMeasureOf,
   pdfWidgetPlacementOf,
-  pageSignatureCompleteOf,
-  pageSignatureSnapshotOf,
+  pageWidgetOf,
   pdfRenderTargetOf,
   type Annotation,
+  type AnnotationPatch,
   type Change,
   type ChangeItem,
   type ChangeOp,
@@ -31,6 +31,8 @@ import {
   type PdfDestination,
   type PdfRect,
   type VisibleBoxOf,
+  type WidgetAnnotation,
+  type WidgetPatch,
   type ShutdownWorkerRequest,
   type WorkerJobRequest,
   type WorkerResultPayload,
@@ -55,10 +57,12 @@ export function resultInPageSpace(
   const toPage = (destination: PdfDestination) => pageDestinationOf(destination, boxOf);
   const annotation = (read: Annotation<PdfCoordinates>) =>
     pageAnnotationOf(read, boxOf(read.page), boxOf);
+  const widgets = (rows: readonly WidgetAnnotation<PdfCoordinates>[]) =>
+    rows.map((row) => pageWidgetOf(row, boxOf));
   switch (payload.tag) {
     case 'pages.list':
       return { ...payload, snapshot: pageListOf(payload.snapshot) };
-    case 'pages.move':
+    case 'pages.reorder':
     case 'pages.rotate':
     case 'pages.delete':
     case 'pages.setName':
@@ -100,11 +104,6 @@ export function resultInPageSpace(
         ...payload,
         result: { ...payload.result, annotation: annotation(payload.result.annotation) },
       };
-    case 'annotations.move':
-      return {
-        ...payload,
-        result: { ...payload.result, annotations: payload.result.annotations.map(annotation) },
-      };
     case 'document.apply':
       return { ...payload, result: changeResultInPageSpace(payload.result, boxOf) };
     case 'document.applyChanges':
@@ -139,6 +138,7 @@ export function resultInPageSpace(
             ...effect,
             fields: effect.fields.map((field) => pageFormFieldOf(field, boxOf)),
           })),
+          widgets: widgets(payload.result.widgets),
         },
       };
     case 'forms.setValue':
@@ -149,7 +149,11 @@ export function resultInPageSpace(
     case 'forms.detachWidget':
       return {
         ...payload,
-        result: { ...payload.result, field: pageFormFieldOf(payload.result.field, boxOf) },
+        result: {
+          ...payload.result,
+          field: pageFormFieldOf(payload.result.field, boxOf),
+          widgets: widgets(payload.result.widgets),
+        },
       } as WorkerResultPayload;
     case 'forms.reset':
       return {
@@ -157,12 +161,22 @@ export function resultInPageSpace(
         result: {
           ...payload.result,
           fields: payload.result.fields.map((field) => pageFormFieldOf(field, boxOf)),
+          widgets: widgets(payload.result.widgets),
         },
       };
-    case 'signatures.list':
-      return { ...payload, snapshot: pageSignatureSnapshotOf(payload.snapshot, boxOf) };
-    case 'signatures.complete':
-      return { ...payload, result: pageSignatureCompleteOf(payload.result, boxOf) };
+    case 'forms.updateWidget':
+      return {
+        ...payload,
+        result: { ...payload.result, widget: pageWidgetOf(payload.result.widget, boxOf) },
+      };
+    case 'forms.deleteWidget':
+      return {
+        ...payload,
+        result: {
+          ...payload.result,
+          field: payload.result.field && pageFormFieldOf(payload.result.field, boxOf),
+        },
+      };
     default:
       return payload;
   }
@@ -189,6 +203,8 @@ export function requestInFileSpace(job: PageSpaceJob, boxOf: VisibleBoxOf): File
       return { ...job, draft: pdfAnnotationDraftOf(job.draft, boxOf(job.page), boxOf) };
     case 'annotations.update':
       return { ...job, patch: pdfAnnotationPatchOf(job.patch, boxOf(job.ref.page), boxOf) };
+    case 'forms.updateWidget':
+      return { ...job, patch: pdfWidgetPatchOf(job.patch, boxOf(job.widget.page), boxOf) };
     case 'forms.createField':
       return { ...job, draft: pdfFormFieldDraftOf(job.draft, boxOf) };
     case 'document.apply':
@@ -275,6 +291,21 @@ function opInFileSpace(
       return { ...op, draft: pdfFormFieldDraftOf(op.draft, boxOf) };
     case 'forms.addWidget':
       return { ...op, placement: pdfWidgetPlacementOf(op.placement, boxOf) };
+    case 'forms.updateWidget': {
+      const box = boxOf(op.widget.page);
+      const { expect, ...rest } = op;
+      return {
+        ...rest,
+        patch: pdfWidgetPatchOf(op.patch, box, boxOf),
+        ...(expect ? { expect: pdfWidgetPatchOf(expect, box, boxOf) } : {}),
+      };
+    }
+    case 'forms.deleteWidget': {
+      const { expect, ...rest } = op;
+      return expect
+        ? { ...rest, expect: pdfWidgetPatchOf(expect, boxOf(op.widget.page), boxOf) }
+        : rest;
+    }
     default:
       // The rest hold no places: values, flags, names, metadata.
       return op;
@@ -294,11 +325,12 @@ function itemInPageSpace(item: ChangeItem<PdfCoordinates>, boxOf: VisibleBoxOf):
   if (isSkippedItem(item)) return item;
   const annotation = (read: Annotation<PdfCoordinates>) =>
     pageAnnotationOf(read, boxOf(read.page), boxOf);
+  const widgets = (rows: readonly WidgetAnnotation<PdfCoordinates>[]) =>
+    rows.map((row) => pageWidgetOf(row, boxOf));
   switch (item.type) {
     case 'annotations.create':
     case 'annotations.update':
       return { ...item, annotation: annotation(item.annotation) } as ChangeItem;
-    case 'annotations.move':
     case 'annotations.restore':
       return { ...item, annotations: item.annotations.map(annotation) } as ChangeItem;
     case 'forms.setValue':
@@ -310,11 +342,42 @@ function itemInPageSpace(item: ChangeItem<PdfCoordinates>, boxOf: VisibleBoxOf):
     case 'forms.restore':
     case 'forms.addWidget':
     case 'forms.removeWidget':
-      return { ...item, field: pageFormFieldOf(item.field, boxOf) } as ChangeItem;
+      return {
+        ...item,
+        field: pageFormFieldOf(item.field, boxOf),
+        widgets: widgets(item.widgets),
+      } as ChangeItem;
     case 'forms.reset':
-      return { ...item, fields: item.fields.map((field) => pageFormFieldOf(field, boxOf)) };
+      return {
+        ...item,
+        fields: item.fields.map((field) => pageFormFieldOf(field, boxOf)),
+        widgets: widgets(item.widgets),
+      };
+    case 'forms.updateWidget':
+      return { ...item, widget: pageWidgetOf(item.widget, boxOf) };
+    case 'forms.deleteWidget':
+      return { ...item, field: item.field && pageFormFieldOf(item.field, boxOf) };
+    case 'forms.restoreWidget':
+      return {
+        ...item,
+        field: item.field && pageFormFieldOf(item.field, boxOf),
+        widgets: widgets(item.widgets),
+      };
     default:
       // The rest hold no places: deletes, metadata.
       return item;
   }
+}
+
+/** A page-space widget patch in the file's coordinates: an annotation patch of a widget. */
+function pdfWidgetPatchOf(
+  patch: WidgetPatch,
+  visible: PdfRect,
+  boxOf: VisibleBoxOf,
+): WidgetPatch<PdfCoordinates> {
+  return pdfAnnotationPatchOf(
+    { ...patch, subtype: 'widget' } as AnnotationPatch,
+    visible,
+    boxOf,
+  ) as WidgetPatch<PdfCoordinates>;
 }

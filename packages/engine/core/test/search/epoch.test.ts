@@ -13,6 +13,7 @@ function manifest(
     actionsVersion: 0,
     attachmentsVersion: 0,
     annotationsVersion: 0,
+    formsVersion: 0,
     auditHead: 42,
     baseSha: 'abc',
     layerVersion: 0,

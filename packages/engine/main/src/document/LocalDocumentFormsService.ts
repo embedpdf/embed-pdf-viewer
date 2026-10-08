@@ -18,6 +18,11 @@ import {
   type FormFieldUpdateResult,
   type SignatureAppearanceInput,
   type FormWidgetLinkResult,
+  type FormWidgetDeleteResult,
+  type FormWidgetUpdateResult,
+  type FormWidgetsReorderResult,
+  type WidgetPatch,
+  type AnnotationPosition,
   type AnnotationRef,
   type FormFieldValue,
   type FormResetResult,
@@ -327,6 +332,95 @@ export class LocalDocumentFormsService implements DocumentFormsService {
     });
     return this.await(submission, 'forms.detachWidget', (payload) => {
       this.publisher.publishWrite(write.opId, { type: 'forms.widgetRemoved', ...payload.result });
+      return payload.result;
+    });
+  }
+
+  deleteWidget(
+    widget: AnnotationRef,
+    options?: WriteOptions,
+  ): AbortablePromise<FormWidgetDeleteResult> {
+    const write = this.beginWrite('doc.forms.modify', options);
+    if (write.rejected) return write.rejected;
+    const docId = this.docId;
+    const submission = this.queue.enqueue<WorkerResultPayload>({
+      buildPack: (jobId: JobId) =>
+        wirePack({
+          kind: 'forms.deleteWidget',
+          effect: 'write',
+          jobId,
+          opId: write.opId,
+          docId,
+          widget,
+        }),
+    });
+    return this.await(submission, 'forms.deleteWidget', (payload) => {
+      this.publisher.publishWrite(write.opId, { type: 'forms.widgetDeleted', ...payload.result });
+      return payload.result;
+    });
+  }
+
+  updateWidget(
+    widget: AnnotationRef,
+    patch: WidgetPatch,
+    options?: WriteOptions,
+  ): AbortablePromise<FormWidgetUpdateResult> {
+    const write = this.beginWrite('doc.forms.modify', options);
+    if (write.rejected) return write.rejected;
+    const docId = this.docId;
+    const submission = this.queue.enqueue<WorkerResultPayload>({
+      buildPack: (jobId: JobId) =>
+        wirePack({
+          kind: 'forms.updateWidget',
+          effect: 'write',
+          jobId,
+          opId: write.opId,
+          docId,
+          widget,
+          patch,
+        }),
+    });
+    return this.await(submission, 'forms.updateWidget', (payload) => {
+      this.publisher.publishWrite(write.opId, { type: 'forms.widgetUpdated', ...payload.result });
+      return payload.result;
+    });
+  }
+
+  reorderWidgets(
+    widgets: AnnotationRef[],
+    position: AnnotationPosition,
+    options?: WriteOptions,
+  ): AbortablePromise<FormWidgetsReorderResult> {
+    const write = this.beginWrite('doc.forms.modify', options);
+    if (write.rejected) return write.rejected;
+    // The widgets' page: a reorder stays on one page, which the worker checks.
+    const page = widgets[0]?.page;
+    if (!page) {
+      return AbortablePromise.rejectReason(
+        new EngineError(EngineErrorCode.InvalidArg, 'a reorder names at least one widget', {
+          details: { field: 'widgets' },
+        }),
+      );
+    }
+    const docId = this.docId;
+    const submission = this.queue.enqueue<WorkerResultPayload>({
+      buildPack: (jobId: JobId) =>
+        wirePack({
+          kind: 'forms.reorderWidgets',
+          effect: 'write',
+          jobId,
+          opId: write.opId,
+          docId,
+          page,
+          widgets,
+          position,
+        }),
+    });
+    return this.await(submission, 'forms.reorderWidgets', (payload) => {
+      this.publisher.publishWrite(write.opId, {
+        type: 'forms.widgetsReordered',
+        ...payload.result,
+      });
       return payload.result;
     });
   }

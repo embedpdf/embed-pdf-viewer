@@ -13,13 +13,11 @@ const ref = (n: number): AnnotationRef => ({
   objectNumber: n,
 });
 
-let autoIndex = 0;
 const annot = (n: number, over: Record<string, unknown> = {}): Annotation =>
   ({
     subtype: 'highlight',
     ref: ref(n),
     page: { kind: 'objectNumber', objectNumber: 1 },
-    index: autoIndex++,
     nm: null,
     contents: `annot ${n}`,
     author: null,

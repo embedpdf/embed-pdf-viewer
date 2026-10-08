@@ -62,7 +62,7 @@ export interface AnnotationUpdateOptions extends WriteOptions {
 /** `page.annotations.flatten(refs, options)` and `pages.flatten(pages, options)`. */
 export interface FlattenWriteOptions extends FlattenOptions, WriteOptions {}
 
-/** `pages.insertBlank(spec, toIndex, options)`. */
+/** `pages.insertBlank(spec, position, options)`. */
 export interface PageInsertBlankOptions extends WriteOptions {
   /**
    * The object numbers the new pages get, in order, one per page: numbers

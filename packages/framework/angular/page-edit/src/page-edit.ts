@@ -23,7 +23,7 @@ export class EpdfPageEdit extends pluginService({
   methods: [
     'rotateBy',
     'setRotation',
-    'move',
+    'reorder',
     'delete',
     'insertBlank',
     'insertFromBytes',

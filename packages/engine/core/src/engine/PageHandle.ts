@@ -1,4 +1,5 @@
 import type { PageAnnotationsService } from './PageAnnotationsService';
+import type { PageFormsService } from './PageFormsService';
 import type { PageRenderService } from './PageRenderService';
 import type { PageTextService } from './PageTextService';
 import type { PageMeasureService } from './PageMeasureService';
@@ -12,6 +13,7 @@ import type { PageRef } from '../identity/PageRef';
 export interface PageHandle {
   readonly ref: PageRef;
   readonly annotations: PageAnnotationsService;
+  readonly forms: PageFormsService;
   readonly text: PageTextService;
   readonly render: PageRenderService;
   readonly measure: PageMeasureService;

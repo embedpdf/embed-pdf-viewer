@@ -9,6 +9,7 @@ import {
 import type { SessionEventPublisher } from '@embedpdf/engine-services';
 
 import { LocalPageAnnotationsService } from './LocalPageAnnotationsService';
+import { LocalPageFormsService } from './LocalPageFormsService';
 import { LocalPageRenderService } from './LocalPageRenderService';
 import { LocalPageTextService } from './LocalPageTextService';
 import { LocalPieceInfoService } from './LocalPieceInfoService';
@@ -29,6 +30,7 @@ interface DocClosedView {
 export class LocalPageHandle implements LocalPageHandleContract {
   readonly [LOCAL_ENGINE_BRAND] = true;
   readonly annotations: LocalPageAnnotationsService;
+  readonly forms: LocalPageFormsService;
   readonly text: LocalPageTextService;
   readonly render: LocalPageRenderService;
   readonly pieceInfo: LocalPieceInfoService;
@@ -52,6 +54,15 @@ export class LocalPageHandle implements LocalPageHandleContract {
       imageEncoder,
       guard,
       publisher,
+      renderPolicy,
+    );
+    this.forms = new LocalPageFormsService(
+      docId,
+      ref,
+      queue,
+      view,
+      imageEncoder,
+      guard,
       renderPolicy,
     );
     this.text = new LocalPageTextService(docId, ref, queue, view, guard);

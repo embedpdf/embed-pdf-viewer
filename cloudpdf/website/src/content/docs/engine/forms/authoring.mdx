@@ -29,8 +29,8 @@ A form has two parts. The **field** holds the value: it has a name, a family and
 and it belongs to the document, not to a page. A **widget** is where the field shows: the box on
 a page that you see and click.
 
-A widget is an annotation of kind `'widget'`. It's listed with the page's annotations, and you
-move and style it like one. Most fields have one widget. A radio group has one per button, and a
+A widget is an annotation of kind `'widget'`, but it's the form's: `doc.forms.list()` lists it
+in `widgets`, and you place, move and style it through the form. Most fields have one widget. A radio group has one per button, and a
 field can have widgets on several pages that all show the same value.
 
 ## Create a field
@@ -108,7 +108,7 @@ await doc.forms.create({
 ### The widget's look
 
 Next to `page` and `rect`, each entry of `widgets` takes the widget's style. These are the same
-fields you change later with `page.annotations.update()`:
+fields you change later with `doc.forms.updateWidget()`:
 
 | Field           | What it is                                                          |
 | :-------------- | :------------------------------------------------------------------ |
@@ -181,29 +181,36 @@ const { field: updated } = await doc.forms.addWidget(field.ref, {
 The field now shows in both places, with the same value. For a radio group, pass the new
 button's `exportValue` in the same object; a checkbox widget gets `'Yes'` when you leave it out.
 
-## Remove a widget
+## Delete a widget
 
-`removeWidget()` takes a widget out of its field. It stays on the page with the look it had, as a
-plain widget annotation (its `field` is `null`) that holds no value and that you can delete:
+`deleteWidget()` deletes a widget: it leaves its page, and its field when it has one. It resolves
+the field as it is now, or `null` for a widget that was in no field:
 
 ```ts
-await doc.forms.removeWidget(field.ref, widget.ref);
-await page.annotations.delete(widget.ref);
+const { field: updated } = await doc.forms.deleteWidget(widget.ref);
 ```
 
 The field stays. Without widgets it isn't on any page (`widgets` is empty), until you add one
-again.
+again. To take a field off its pages entirely, delete the field. A widget that is its field's own
+dictionary (see [Good to know](#good-to-know)) is refused with `InvalidArg`: delete the field.
 
-A widget that's in a field can't be deleted with `page.annotations.delete()`: that fails with
-`InvalidArg`. Remove it from its field first, or delete the field.
+`removeWidget()` only takes a widget out of its field. It stays on the page with the look it had,
+as a widget in no field (its `field` is `null`) that holds no value, until `deleteWidget()` takes
+it off:
+
+```ts
+await doc.forms.removeWidget(field.ref, widget.ref);
+```
+
+A widget is the form's, so `page.annotations.delete()` refuses one with `InvalidArg`.
 
 ## Move and style widgets
 
-Widgets change like every annotation: `page.annotations.update()` with the widget's `ref` and the
-fields to change. The engine redraws the widget:
+`updateWidget()` takes the widget's `ref` and the fields to change, the way
+`page.annotations.update()` takes an annotation's. The engine redraws the widget:
 
 ```ts
-await page.annotations.update(widget.ref, {
+const { widget: moved } = await doc.forms.updateWidget(widget.ref, {
   rect: { x: 300, y: 128, width: 180, height: 24 },
   interiorColor: '#fff7db',
 });
@@ -213,6 +220,23 @@ The style fields are the ones in [The widget's look](#the-widgets-look). A widge
 as `hidden` and `print`, work as for other annotations; see
 [Annotations](/docs/engine/annotations#flags). To stop the user changing a field, set the
 field's `readOnly`: PDF apps ignore a widget annotation's own `readOnly`.
+
+A widget is the form's, so `page.annotations.update()` refuses one with `InvalidArg`.
+
+### Stacking order
+
+Widgets are drawn above every annotation, later ones over earlier ones. `reorderWidgets()`
+restacks the widgets of one page: they go together, in the order you pass them, right after or
+before another widget of the page, or to the bottom (`'start'`) or the top (`'end'`):
+
+```ts
+const { order } = await doc.forms.reorderWidgets([widget.ref], { after: other.ref });
+```
+
+`order` is the page's widgets in their new order, as refs. Where a page's tab order follows the
+order of its widgets, this changes the tab order too. An annotation is never a neighbour here:
+`reorderWidgets()` refuses one with `InvalidArg`; restack annotations with
+[`page.annotations.reorder()`](/docs/engine/annotations#delete-and-reorder).
 
 ## Repair a broken form
 
@@ -251,14 +275,19 @@ repair can't be undone, and it ends undo for every change made before it; see
 | `forms.updated`                            | `update()`, and `setSignatureAppearance()` |
 | `forms.deleted`                            | `delete()`                                 |
 | `forms.widgetAdded`, `forms.widgetRemoved` | `addWidget()`, `removeWidget()`            |
+| `forms.widgetDeleted`                      | `deleteWidget()`                           |
+| `forms.widgetUpdated`                      | `updateWidget()`                           |
+| `forms.widgetsReordered`                   | `reorderWidgets()`                         |
 | `forms.repaired`                           | `repair()`                                 |
 
-Each event carries what the call returned. See [Events](/docs/engine/concepts/events).
+Each event carries what the call returned, with the rows of the widgets it changed (`widgets`). See
+[Events](/docs/engine/concepts/events).
 
 ## Permissions
 
-Creating, changing and deleting fields, adding and removing widgets and repairing the form need
-`doc.forms.modify`, which includes `doc.forms.fill` and `doc.forms.read`. See
+Creating, changing and deleting fields, adding, moving, restacking and removing widgets and
+repairing the form need `doc.forms.modify`, which includes `doc.forms.fill` and `doc.forms.read`.
+See
 [Permissions](/docs/engine/concepts/permissions).
 
 A certified document doesn't allow changes to its fields: these calls fail with
@@ -272,8 +301,9 @@ A certified document doesn't allow changes to its fields: these calls fail with
 - **Field and widget in one object.** Many PDFs store a field with a single widget as one object.
   Such a widget can't be removed from its field (`removeWidget()` fails with `InvalidArg`); delete
   the field instead. Fields the engine creates always keep the two apart.
-- **Widgets in both lists.** `field.widgets` gives each widget's `page`, `rect` and `ref`, and
-  `page.annotations.list()` returns the same widgets as annotations, each with its `field`.
+- **Widgets come with the form.** `field.widgets` names each widget (`page` and `ref`), and the
+  form's `widgets` holds each one's row, with its `field`. `page.annotations.list()` never returns
+  a widget.
 - **Checked looks in the file.** How a checkbox or radio widget's `exportValue` relates to its
   look in the file is in
   [Checkboxes with several widgets](/docs/engine/forms#checkboxes-with-several-widgets).

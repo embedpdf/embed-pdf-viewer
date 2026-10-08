@@ -56,13 +56,8 @@ export function followConfirmedChanges(
         // A note goes with its thread and popups: one event names them all, the note first.
         announce.deleted(event.deleted, event.page, origin);
         return;
-      case 'annotations.moved':
-        announce.moved(
-          event.annotations.map((annotation) => annotation.ref),
-          event.page,
-          event.annotations[0]?.index ?? 0,
-          origin,
-        );
+      case 'annotations.reordered':
+        announce.reordered(event.page, event.order, origin);
         return;
       default:
         return;

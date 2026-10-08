@@ -15,8 +15,8 @@ describe("AnnotationsClient", () => {
                     subtype: "highlight",
                     ref: { kind: "objectNumber", page: { kind: "objectNumber", objectNumber: 1 }, objectNumber: 1 },
                     page: { kind: "objectNumber", objectNumber: 1 },
-                    index: 1,
                     hasAppearance: true,
+                    appearanceState: "appearanceState",
                     nm: "nm",
                     rect: { x: 1.1, y: 1.1, width: 1.1, height: 1.1 },
                     contents: "contents",
@@ -131,8 +131,8 @@ describe("AnnotationsClient", () => {
                     subtype: "highlight",
                     ref: { kind: "objectNumber", page: { kind: "objectNumber", objectNumber: 1 }, objectNumber: 1 },
                     page: { kind: "objectNumber", objectNumber: 1 },
-                    index: 1,
                     hasAppearance: true,
+                    appearanceState: "appearanceState",
                     nm: "nm",
                     rect: { x: 1.1, y: 1.1, width: 1.1, height: 1.1 },
                     contents: "contents",
@@ -226,8 +226,8 @@ describe("AnnotationsClient", () => {
                 subtype: "highlight",
                 ref: { kind: "objectNumber", page: { kind: "objectNumber", objectNumber: 1 }, objectNumber: 1 },
                 page: { kind: "objectNumber", objectNumber: 1 },
-                index: 1,
                 hasAppearance: true,
+                appearanceState: "appearanceState",
                 nm: "nm",
                 rect: { x: 1.1, y: 1.1, width: 1.1, height: 1.1 },
                 contents: "contents",
@@ -286,6 +286,7 @@ describe("AnnotationsClient", () => {
                     previousDocVersion: 1,
                     docVersion: 1,
                     annotationsVersion: 1,
+                    formsVersion: 1,
                     layoutVersion: 1,
                     metadataVersion: 1,
                     attachmentsVersion: 1,
@@ -294,7 +295,7 @@ describe("AnnotationsClient", () => {
                     pages: [
                         {
                             page: { kind: "objectNumber", objectNumber: 1 },
-                            cache: { contentVersion: 1, annotationVersion: 1 },
+                            cache: { contentVersion: 1, annotationVersion: 1, widgetVersion: 1 },
                         },
                     ],
                 },
@@ -393,6 +394,7 @@ describe("AnnotationsClient", () => {
                     previousDocVersion: 1,
                     docVersion: 1,
                     annotationsVersion: 1,
+                    formsVersion: 1,
                     layoutVersion: 1,
                     metadataVersion: 1,
                     attachmentsVersion: 1,
@@ -401,7 +403,7 @@ describe("AnnotationsClient", () => {
                     pages: [
                         {
                             page: { kind: "objectNumber", objectNumber: 1 },
-                            cache: { contentVersion: 1, annotationVersion: 1 },
+                            cache: { contentVersion: 1, annotationVersion: 1, widgetVersion: 1 },
                         },
                     ],
                 },
@@ -461,8 +463,8 @@ describe("AnnotationsClient", () => {
                 subtype: "highlight",
                 ref: { kind: "objectNumber", page: { kind: "objectNumber", objectNumber: 1 }, objectNumber: 1 },
                 page: { kind: "objectNumber", objectNumber: 1 },
-                index: 1,
                 hasAppearance: true,
+                appearanceState: "appearanceState",
                 nm: "nm",
                 rect: { x: 1.1, y: 1.1, width: 1.1, height: 1.1 },
                 contents: "contents",
@@ -522,6 +524,7 @@ describe("AnnotationsClient", () => {
                     previousDocVersion: 1,
                     docVersion: 1,
                     annotationsVersion: 1,
+                    formsVersion: 1,
                     layoutVersion: 1,
                     metadataVersion: 1,
                     attachmentsVersion: 1,
@@ -530,7 +533,7 @@ describe("AnnotationsClient", () => {
                     pages: [
                         {
                             page: { kind: "objectNumber", objectNumber: 1 },
-                            cache: { contentVersion: 1, annotationVersion: 1 },
+                            cache: { contentVersion: 1, annotationVersion: 1, widgetVersion: 1 },
                         },
                     ],
                 },
@@ -640,6 +643,7 @@ describe("AnnotationsClient", () => {
                     previousDocVersion: 1,
                     docVersion: 1,
                     annotationsVersion: 1,
+                    formsVersion: 1,
                     layoutVersion: 1,
                     metadataVersion: 1,
                     attachmentsVersion: 1,
@@ -648,7 +652,7 @@ describe("AnnotationsClient", () => {
                     pages: [
                         {
                             page: { kind: "objectNumber", objectNumber: 1 },
-                            cache: { contentVersion: 1, annotationVersion: 1 },
+                            cache: { contentVersion: 1, annotationVersion: 1, widgetVersion: 1 },
                         },
                     ],
                 },
@@ -731,6 +735,166 @@ describe("AnnotationsClient", () => {
                         key: "value",
                     },
                 },
+            });
+        }).rejects.toThrow(CloudPDF.NotFoundError);
+    });
+
+    test("reorder (1)", async () => {
+        const server = mockServerPool.createServer();
+        const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
+        const rawRequestBody = {
+            refs: [{ kind: "objectNumber", page: { kind: "objectNumber", objectNumber: 1 }, objectNumber: 1 }],
+            position: "start",
+        };
+        const rawResponseBody = {
+            order: [{ kind: "objectNumber", page: { kind: "objectNumber", objectNumber: 1 }, objectNumber: 1 }],
+            meta: {
+                affectedPages: [{ kind: "objectNumber", objectNumber: 1 }],
+                cacheDelta: {
+                    previousDocVersion: 1,
+                    docVersion: 1,
+                    annotationsVersion: 1,
+                    formsVersion: 1,
+                    layoutVersion: 1,
+                    metadataVersion: 1,
+                    attachmentsVersion: 1,
+                    layerVersion: 1,
+                    working: true,
+                    pages: [
+                        {
+                            page: { kind: "objectNumber", objectNumber: 1 },
+                            cache: { contentVersion: 1, annotationVersion: 1, widgetVersion: 1 },
+                        },
+                    ],
+                },
+                opId: "opId",
+                undoable: true,
+                changed: [{ kind: "objectNumber", page: { kind: "objectNumber", objectNumber: 1 }, objectNumber: 1 }],
+            },
+        };
+
+        server
+            .mockEndpoint()
+            .post("/v1/docs/docId/layers/layerName/annotations/pages/pageKey/items/reorder")
+            .jsonBody(rawRequestBody)
+            .respondWith()
+            .statusCode(200)
+            .jsonBody(rawResponseBody)
+            .build();
+
+        const response = await client.doc.annotations.reorder({
+            docId: "docId",
+            layerName: "layerName",
+            pageKey: "pageKey",
+            refs: [
+                {
+                    kind: "objectNumber",
+                    page: {
+                        kind: "objectNumber",
+                        objectNumber: 1,
+                    },
+                    objectNumber: 1,
+                },
+            ],
+            position: "start",
+        });
+        expect(response).toEqual(rawResponseBody);
+    });
+
+    test("reorder (2)", async () => {
+        const server = mockServerPool.createServer();
+        const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
+        const rawRequestBody = {
+            refs: [
+                { kind: "objectNumber", page: { kind: "objectNumber", objectNumber: 1 }, objectNumber: 1 },
+                { kind: "objectNumber", page: { kind: "objectNumber", objectNumber: 1 }, objectNumber: 1 },
+            ],
+            position: "start",
+        };
+        const rawResponseBody = { key: "value" };
+
+        server
+            .mockEndpoint()
+            .post("/v1/docs/docId/layers/layerName/annotations/pages/pageKey/items/reorder")
+            .jsonBody(rawRequestBody)
+            .respondWith()
+            .statusCode(400)
+            .jsonBody(rawResponseBody)
+            .build();
+
+        await expect(async () => {
+            return await client.doc.annotations.reorder({
+                docId: "docId",
+                layerName: "layerName",
+                pageKey: "pageKey",
+                refs: [
+                    {
+                        kind: "objectNumber",
+                        page: {
+                            kind: "objectNumber",
+                            objectNumber: 1,
+                        },
+                        objectNumber: 1,
+                    },
+                    {
+                        kind: "objectNumber",
+                        page: {
+                            kind: "objectNumber",
+                            objectNumber: 1,
+                        },
+                        objectNumber: 1,
+                    },
+                ],
+                position: "start",
+            });
+        }).rejects.toThrow(CloudPDF.BadRequestError);
+    });
+
+    test("reorder (3)", async () => {
+        const server = mockServerPool.createServer();
+        const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
+        const rawRequestBody = {
+            refs: [
+                { kind: "objectNumber", page: { kind: "objectNumber", objectNumber: 1 }, objectNumber: 1 },
+                { kind: "objectNumber", page: { kind: "objectNumber", objectNumber: 1 }, objectNumber: 1 },
+            ],
+            position: "start",
+        };
+        const rawResponseBody = { key: "value" };
+
+        server
+            .mockEndpoint()
+            .post("/v1/docs/docId/layers/layerName/annotations/pages/pageKey/items/reorder")
+            .jsonBody(rawRequestBody)
+            .respondWith()
+            .statusCode(404)
+            .jsonBody(rawResponseBody)
+            .build();
+
+        await expect(async () => {
+            return await client.doc.annotations.reorder({
+                docId: "docId",
+                layerName: "layerName",
+                pageKey: "pageKey",
+                refs: [
+                    {
+                        kind: "objectNumber",
+                        page: {
+                            kind: "objectNumber",
+                            objectNumber: 1,
+                        },
+                        objectNumber: 1,
+                    },
+                    {
+                        kind: "objectNumber",
+                        page: {
+                            kind: "objectNumber",
+                            objectNumber: 1,
+                        },
+                        objectNumber: 1,
+                    },
+                ],
+                position: "start",
             });
         }).rejects.toThrow(CloudPDF.NotFoundError);
     });

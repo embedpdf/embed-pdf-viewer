@@ -6,6 +6,7 @@ export interface DocFormsList200Response {
     formKind: DocFormsList200Response.FormKind;
     needsAppearances: boolean;
     fields: CloudPDF.FormField[];
+    widgets: CloudPDF.WidgetAnnotation[];
     calculationOrder: (CloudPDF.FormFieldRef | null)[];
 }
 

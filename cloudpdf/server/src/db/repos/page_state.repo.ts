@@ -5,7 +5,10 @@ import type { Database as Schema } from '../schema';
 export interface DurablePageRow {
   pageObjectNumber: number;
   contentVersion: number;
+  /** The page's annotations except widgets. */
   annotationVersion: number;
+  /** The page's widgets. */
+  widgetVersion: number;
   updatedAt: number;
 }
 
@@ -13,6 +16,7 @@ export interface UpsertDurablePageInput {
   pageObjectNumber: number;
   contentVersion?: number;
   annotationVersion?: number;
+  widgetVersion?: number;
   updatedAt?: number;
 }
 
@@ -52,6 +56,7 @@ export class DocumentPagesRepo {
             page_object_number: page.pageObjectNumber,
             content_version: page.contentVersion ?? 1,
             annotation_version: page.annotationVersion ?? 1,
+            widget_version: page.widgetVersion ?? 1,
             updated_at: page.updatedAt ?? now,
           })),
         )
@@ -70,6 +75,7 @@ export class DocumentPagesRepo {
           page_object_number: page.pageObjectNumber,
           content_version: page.contentVersion ?? 1,
           annotation_version: page.annotationVersion ?? 1,
+          widget_version: page.widgetVersion ?? 1,
           updated_at: page.updatedAt ?? now,
         })),
       )
@@ -77,12 +83,12 @@ export class DocumentPagesRepo {
         oc.columns(['doc_id', 'page_object_number']).doUpdateSet((eb) => ({
           content_version: eb.ref('excluded.content_version'),
           annotation_version: eb.ref('excluded.annotation_version'),
+          widget_version: eb.ref('excluded.widget_version'),
           updated_at: eb.ref('excluded.updated_at'),
         })),
       )
       .execute();
   }
-
 }
 
 export interface LayerRow {
@@ -98,6 +104,8 @@ export interface LayerRow {
   attachmentsVersion: number;
   /** Bulk-annotations pointer — see `LayersTable.annotations_version`. */
   annotationsVersion: number;
+  /** Form pointer — see `LayersTable.forms_version`. */
+  formsVersion: number;
   /** Audit-log head at this layer's state — the manifest's `auditHead`. */
   lastAuditId: number;
   currentVersion: number;
@@ -127,6 +135,7 @@ export interface CreateLayerInput {
   metadataVersion?: number;
   attachmentsVersion?: number;
   annotationsVersion?: number;
+  formsVersion?: number;
 }
 
 export class LayersRepo {
@@ -155,6 +164,7 @@ export class LayersRepo {
         doc_version: input.docVersion ?? 1,
         attachments_version: input.attachmentsVersion ?? 1,
         annotations_version: input.annotationsVersion ?? 1,
+        forms_version: input.formsVersion ?? 1,
         layout_version: input.layoutVersion ?? 1,
         metadata_version: input.metadataVersion ?? 1,
         last_audit_id: 0,
@@ -210,6 +220,7 @@ export class LayerPagesRepo {
             page_object_number: page.pageObjectNumber,
             content_version: page.contentVersion ?? 1,
             annotation_version: page.annotationVersion ?? 1,
+            widget_version: page.widgetVersion ?? 1,
             updated_at: page.updatedAt ?? now,
           })),
         )
@@ -239,6 +250,7 @@ export class LayerPagesRepo {
           // `layer_pages` advance.
           content_version: page.contentVersion,
           annotation_version: page.annotationVersion,
+          widget_version: page.widgetVersion,
           updated_at: page.updatedAt ?? now,
         })),
       )
@@ -251,12 +263,14 @@ function mapDocumentPageRow(row: {
   page_object_number: number;
   content_version: number;
   annotation_version: number;
+  widget_version: number;
   updated_at: number;
 }): DurablePageRow {
   return {
     pageObjectNumber: Number(row.page_object_number),
     contentVersion: Number(row.content_version),
     annotationVersion: Number(row.annotation_version),
+    widgetVersion: Number(row.widget_version),
     updatedAt: Number(row.updated_at),
   };
 }
@@ -265,6 +279,7 @@ function mapLayerPageRow(row: {
   page_object_number: number;
   content_version: number;
   annotation_version: number;
+  widget_version: number;
   updated_at: number;
 }): DurablePageRow {
   return mapDocumentPageRow(row);
@@ -281,6 +296,7 @@ function mapLayerRow(row: {
   metadata_version: number;
   attachments_version: number;
   annotations_version?: number | bigint;
+  forms_version?: number | bigint;
   current_version: number;
   current_artifact_key: string | null;
   current_artifact_sha: string | null;
@@ -300,6 +316,7 @@ function mapLayerRow(row: {
     metadataVersion: Number(row.metadata_version),
     attachmentsVersion: Number(row.attachments_version),
     annotationsVersion: Number(row.annotations_version ?? 1),
+    formsVersion: Number(row.forms_version ?? 1),
     lastAuditId: Number(row.last_audit_id ?? 0),
     currentVersion: Number(row.current_version),
     currentArtifactKey: row.current_artifact_key,

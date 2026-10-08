@@ -2,7 +2,7 @@
  * @embedpdf/angular/page-edit: changing a document's pages.
  *
  *   withPageEdit()          the plugin, for provideEmbedPdf()
- *   inject(EpdfPageEdit)    rotateBy(), move(), delete(), insertBlank(), extract(), canEdit(), …
+ *   inject(EpdfPageEdit)    rotateBy(), reorder(), delete(), insertBlank(), extract(), canEdit(), …
  *
  * The pages themselves are `inject(EpdfDocument).pages()`, which follows every change.
  */

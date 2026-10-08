@@ -13,10 +13,12 @@ import {
   ContentTokenSchema,
   DocTokenSchema,
   DownloadTokenSchema,
+  FormTokenSchema,
   LayoutTokenSchema,
   MetadataTokenSchema,
   RenderTokenSchema,
   SearchTokenSchema,
+  WidgetAppearancesRenderTokenSchema,
 } from './tokenSchemas';
 import type { PdfSaveMode } from '../dto/PdfSaveMode';
 import { decodeAnnotKey, encodeAnnotKey } from '../identity/AnnotationRef';
@@ -127,6 +129,11 @@ export const decodeAnnotationsAllToken = (raw: string): number =>
     decodeToken(AnnotationsAllTokenSchema, raw).annotationsVersion,
     'annotationsVersion',
   );
+
+export const encodeFormToken = (formsVersion: number): string =>
+  encodeToken(FormTokenSchema, { formsVersion });
+export const decodeFormToken = (raw: string): number =>
+  decodePositiveInteger(decodeToken(FormTokenSchema, raw).formsVersion, 'formsVersion');
 
 /** What a `doc.annotations.export` leaf is: two pins and a selection. */
 export interface AnnotationsExportToken {
@@ -261,6 +268,14 @@ export const encodeAnnotationAppearancesRenderToken = (input: TokenInput): strin
 /** Decode an annotation-appearance render token to a flat field map. */
 export const decodeAnnotationAppearancesRenderToken = (raw: string): TokenQuery =>
   decodeToken(AnnotationAppearancesRenderTokenSchema, raw);
+
+/** Encode a widget-appearance render token, the annotation one's twin keyed by `widgetVersion`. */
+export const encodeWidgetAppearancesRenderToken = (input: TokenInput): string =>
+  encodeToken(WidgetAppearancesRenderTokenSchema, input);
+
+/** Decode a widget-appearance render token to a flat field map. */
+export const decodeWidgetAppearancesRenderToken = (raw: string): TokenQuery =>
+  decodeToken(WidgetAppearancesRenderTokenSchema, raw);
 
 /**
  * The decoded state of a versioned search URL — the whole cache key.

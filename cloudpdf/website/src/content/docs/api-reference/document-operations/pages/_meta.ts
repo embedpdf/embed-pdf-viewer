@@ -7,8 +7,8 @@ export default {
   flatten: 'Flatten',
   insert: 'Insert',
   'insert-blank': 'Insert Blank',
-  move: 'Move',
   'set-name': 'Set Name',
   'remove-name': 'Remove Name',
+  reorder: 'Reorder',
   rotate: 'Rotate',
 };

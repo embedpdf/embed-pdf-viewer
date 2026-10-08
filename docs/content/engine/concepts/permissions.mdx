@@ -120,6 +120,10 @@ doc.security.allowsAnnotation('update', annotation); // may they change this one
 doc.security.allowsAnnotation('delete', annotation); // …delete this one?
 ```
 
+A form field's widget is an annotation in the PDF, but changing it is designing the form: moving,
+resizing, restyling or deleting a widget takes `doc.forms.modify`, and the `annotations:…`
+permissions never apply to it. `allowsAnnotation('update', widget)` answers the same way.
+
 ## The PDF's own restrictions
 
 A PDF can restrict itself: a file protected with an owner password may forbid printing or

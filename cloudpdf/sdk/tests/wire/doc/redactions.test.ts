@@ -26,6 +26,7 @@ describe("RedactionsClient", () => {
                     previousDocVersion: 1,
                     docVersion: 1,
                     annotationsVersion: 1,
+                    formsVersion: 1,
                     layoutVersion: 1,
                     metadataVersion: 1,
                     attachmentsVersion: 1,
@@ -34,7 +35,7 @@ describe("RedactionsClient", () => {
                     pages: [
                         {
                             page: { kind: "objectNumber", objectNumber: 1 },
-                            cache: { contentVersion: 1, annotationVersion: 1 },
+                            cache: { contentVersion: 1, annotationVersion: 1, widgetVersion: 1 },
                         },
                     ],
                 },

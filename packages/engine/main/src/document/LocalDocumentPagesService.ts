@@ -9,7 +9,6 @@ import {
   type PageInsertBlankSpec,
   type PageInsertResult,
   type PageListSnapshot,
-  type PageMoveResult,
   type PageNameInput,
   type PageNameResult,
   type PageRemoveNameInput,
@@ -18,7 +17,9 @@ import {
   type FlattenWriteOptions,
   type PageInsertBlankOptions,
   type WriteOptions,
+  type PagePosition,
   type PageRef,
+  type PageReorderResult,
   type PdfRotation,
 } from '@embedpdf/engine-core/runtime';
 import type { SessionEventPublisher } from '@embedpdf/engine-services';
@@ -41,7 +42,7 @@ function copyToExactBuffer(view: Uint8Array): ArrayBuffer {
 /**
  * Document-scoped page service for the local engine. All work funnels
  * through the same in-process worker the rest of the engine uses, so
- * `pages.move()` is sequenced against any in-flight annotation
+ * `pages.reorder()` is sequenced against any in-flight annotation
  * mutations: a page reorder cannot land while a write to one of those
  * pages is mid-flight, and the reorder is observed atomically by every
  * subsequent read.
@@ -85,17 +86,17 @@ export class LocalDocumentPagesService implements DocumentPagesService {
     });
   }
 
-  move(
+  reorder(
     pages: PageRef[],
-    toIndex: number,
+    position: PagePosition,
     options?: WriteOptions,
-  ): AbortablePromise<PageMoveResult> {
+  ): AbortablePromise<PageReorderResult> {
     if (this.view.isClosed()) {
       return AbortablePromise.rejectReason(
         new EngineError(EngineErrorCode.DocNotOpen, `document not open: ${this.docId}`),
       );
     }
-    // pages.move maps to the cloud's POST /pages/move (gated by
+    // pages.reorder maps to the cloud's POST /pages/reorder (gated by
     // `doc.pages.assemble`).
     let opId: string;
     try {
@@ -108,29 +109,24 @@ export class LocalDocumentPagesService implements DocumentPagesService {
     const submission = this.queue.enqueue<WorkerResultPayload>({
       buildPack: (jobId: JobId) =>
         wirePack({
-          kind: 'pages.move',
+          kind: 'pages.reorder',
           effect: 'contentWrite',
           jobId,
           opId,
           docId,
           pages,
-          toIndex,
+          position,
         }),
     });
-    return AbortablePromise.run<PageMoveResult>(async (signal) => {
+    return AbortablePromise.run<PageReorderResult>(async (signal) => {
       const onAbort = () => submission.abort(signal.reason);
       if (signal.aborted) onAbort();
       else signal.addEventListener('abort', onAbort, { once: true });
       const payload = await submission;
-      if (payload.tag !== 'pages.move') {
+      if (payload.tag !== 'pages.reorder') {
         throw new EngineError(EngineErrorCode.WireFormat, `unexpected payload tag: ${payload.tag}`);
       }
-      this.publisher.publishWrite(opId, {
-        type: 'pages.moved',
-        pages,
-        toIndex,
-        ...payload.result,
-      });
+      this.publisher.publishWrite(opId, { type: 'pages.reordered', ...payload.result });
       return payload.result;
     });
   }
@@ -322,7 +318,15 @@ export class LocalDocumentPagesService implements DocumentPagesService {
     const docId = this.docId;
     const submission = this.queue.enqueue<WorkerResultPayload>({
       buildPack: (jobId: JobId) =>
-        wirePack({ kind: 'pages.flatten', effect: 'contentWrite', jobId, opId, docId, pages, usage }),
+        wirePack({
+          kind: 'pages.flatten',
+          effect: 'contentWrite',
+          jobId,
+          opId,
+          docId,
+          pages,
+          usage,
+        }),
     });
     return AbortablePromise.run<PageFlattenResult>(async (signal) => {
       const onAbort = () => submission.abort(signal.reason);
@@ -341,7 +345,7 @@ export class LocalDocumentPagesService implements DocumentPagesService {
 
   insert(
     bytes: Uint8Array | ArrayBuffer,
-    toIndex?: number,
+    position: PagePosition = 'end',
     options?: WriteOptions,
   ): AbortablePromise<PageInsertResult> {
     if (this.view.isClosed()) {
@@ -349,8 +353,8 @@ export class LocalDocumentPagesService implements DocumentPagesService {
         new EngineError(EngineErrorCode.DocNotOpen, `document not open: ${this.docId}`),
       );
     }
-    // pages.insert is a structure verb like move/delete — same gate; it will
-    // map to the cloud's POST /pages/insert (multipart) when that ships.
+    // pages.insert is a structure verb like reorder/delete — same gate (the
+    // cloud's multipart POST /pages/insert).
     let opId: string;
     try {
       opId = opIdOf(options);
@@ -366,7 +370,15 @@ export class LocalDocumentPagesService implements DocumentPagesService {
     const submission = this.queue.enqueue<WorkerResultPayload>({
       buildPack: (jobId: JobId) =>
         wirePack(
-          { kind: 'pages.insert', effect: 'contentWrite', jobId, opId, docId, bytes: buffer, toIndex },
+          {
+            kind: 'pages.insert',
+            effect: 'contentWrite',
+            jobId,
+            opId,
+            docId,
+            bytes: buffer,
+            position,
+          },
           [buffer],
         ),
     });
@@ -378,18 +390,14 @@ export class LocalDocumentPagesService implements DocumentPagesService {
       if (payload.tag !== 'pages.insert') {
         throw new EngineError(EngineErrorCode.WireFormat, `unexpected payload tag: ${payload.tag}`);
       }
-      this.publisher.publishWrite(opId, {
-        type: 'pages.inserted',
-        toIndex,
-        ...payload.result,
-      });
+      this.publisher.publishWrite(opId, { type: 'pages.inserted', ...payload.result });
       return payload.result;
     });
   }
 
   insertBlank(
     spec: PageInsertBlankSpec,
-    toIndex?: number,
+    position: PagePosition = 'end',
     options: PageInsertBlankOptions = {},
   ): AbortablePromise<PageInsertResult> {
     if (this.view.isClosed()) {
@@ -418,7 +426,7 @@ export class LocalDocumentPagesService implements DocumentPagesService {
           docId,
           size: spec.size,
           count: spec.count,
-          toIndex,
+          position,
           ...(options.objectNumbers ? { objectNumbers: [...options.objectNumbers] } : {}),
         }),
     });
@@ -430,11 +438,7 @@ export class LocalDocumentPagesService implements DocumentPagesService {
       if (payload.tag !== 'pages.insertBlank') {
         throw new EngineError(EngineErrorCode.WireFormat, `unexpected payload tag: ${payload.tag}`);
       }
-      this.publisher.publishWrite(opId, {
-        type: 'pages.inserted',
-        toIndex,
-        ...payload.result,
-      });
+      this.publisher.publishWrite(opId, { type: 'pages.inserted', ...payload.result });
       return payload.result;
     });
   }

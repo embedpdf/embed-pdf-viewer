@@ -9,7 +9,7 @@ import { createActionsTestContext } from './helpers/context';
 function harness() {
   const ctx = createActionsTestContext({
     id: 'actions',
-    doc: { forms: { list: async () => ({ fields: [] }) } } as unknown as Partial<DocumentHandle>,
+    doc: { forms: { list: async () => ({ fields: [], widgets: [] }) } } as unknown as Partial<DocumentHandle>,
   });
   return ctx.connect(createActionsController(ctx));
 }

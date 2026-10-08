@@ -1,3 +1,4 @@
+import type { WidgetPatch } from '../annotation/kinds/widget';
 import type { AnnotationRef } from '../identity/AnnotationRef';
 import type { FormFieldDraft, WidgetPlacement } from '../forms/draft';
 import type { FormFieldDTO } from '../forms/field';
@@ -17,8 +18,12 @@ import type {
   FormRepairResult,
   FormResetResult,
   FormSetValueResult,
+  FormWidgetDeleteResult,
   FormWidgetLinkResult,
+  FormWidgetsReorderResult,
+  FormWidgetUpdateResult,
 } from '../mutation/FormMutationResults';
+import type { AnnotationPosition } from '../mutation/ListPosition';
 import type {
   FormFieldCreateOptions,
   FormWidgetAddOptions,
@@ -40,9 +45,9 @@ export interface FormRepairOptions extends WriteOptions {
 /**
  * The document's interactive form: a document-scoped record system where
  * fields hold the values and widget annotations are their page-scoped
- * views. Filling mutates the field plane; rendering only ever reads the
- * widget plane (through the annotation subsystem — join widgets to
- * annotations via `FormWidget.ref`).
+ * views. A form field's widgets come with the form, never with the
+ * annotations: `list()` holds the fields and every widget's row, and widget
+ * writes are form writes.
  *
  * Reads are gated by `doc.forms.read`, value writes and imports by
  * `doc.forms.fill`, and repair by `doc.forms.modify`. On layer documents
@@ -52,8 +57,9 @@ export interface FormRepairOptions extends WriteOptions {
 export interface DocumentFormsService {
   /**
    * The complete reconciled form state: every terminal field with its
-   * effective value, options, and widgets. Fields broken producers left
-   * out of /AcroForm /Fields are included with `origin: 'recovered'`.
+   * effective value and options, and every widget with its place, look and
+   * state. Fields broken producers left out of /AcroForm /Fields are
+   * included with `origin: 'recovered'`.
    */
   list(): AbortablePromise<FormSnapshot>;
 
@@ -204,16 +210,55 @@ export interface DocumentFormsService {
 
   /**
    * Take a widget out of its field: it keeps its page placement and last
-   * appearance but becomes an ordinary, inert widget annotation (its
-   * `field` is `null`, deletable through the annotation APIs). The field
-   * survives, "unplaced" when this was its last widget. Emits
-   * `forms.widgetRemoved`.
+   * appearance but belongs to no field any more (its `field` is `null`;
+   * `deleteWidget` takes it off the page). The field survives, "unplaced"
+   * when this was its last widget. Emits `forms.widgetRemoved`.
    */
   removeWidget(
     ref: FormFieldRef,
     widget: AnnotationRef,
     options?: WriteOptions,
   ): AbortablePromise<FormWidgetLinkResult>;
+
+  /**
+   * Delete a widget: it leaves its page, and its field when it has one. The
+   * field survives, "unplaced" when this was its last widget. A widget that
+   * is its field's own dictionary (a merged field/widget) is refused with
+   * `InvalidArg`: delete the field with `delete`. A widget is the form's, so
+   * `annotations.delete` refuses one. Gated by `doc.forms.modify`. Emits
+   * `forms.widgetDeleted`.
+   */
+  deleteWidget(
+    widget: AnnotationRef,
+    options?: WriteOptions,
+  ): AbortablePromise<FormWidgetDeleteResult>;
+
+  /**
+   * Change a widget's place and look: what `annotations.update` takes for a
+   * widget (rect, colors, border, font, alignment, flags). A widget is the
+   * form's, so `annotations.update` refuses one. Gated by
+   * `doc.forms.modify`. Emits `forms.widgetUpdated`.
+   */
+  updateWidget(
+    widget: AnnotationRef,
+    patch: WidgetPatch,
+    options?: WriteOptions,
+  ): AbortablePromise<FormWidgetUpdateResult>;
+
+  /**
+   * Change the widgets' stacking order on their page: they go together, in
+   * the order given, to `position` among the page's widgets, next to a
+   * neighbour widget or at `'start'` (bottom) / `'end'` (top). Widgets paint
+   * above every annotation, so only widgets are named here; an annotation is
+   * refused with `InvalidArg` (`page.annotations.reorder()` orders those).
+   * Where a page's `/Tabs` is `/A` or `/W`, this is also the fields' tab
+   * order. Gated by `doc.forms.modify`. Emits `forms.widgetsReordered`.
+   */
+  reorderWidgets(
+    widgets: AnnotationRef[],
+    position: AnnotationPosition,
+    options?: WriteOptions,
+  ): AbortablePromise<FormWidgetsReorderResult>;
 
   /**
    * Make the engine's read-time reconciliation durable in the document

@@ -87,6 +87,7 @@ export type {
   LocalPageAnnotationsService,
   PageAnnotationsService,
 } from './engine/PageAnnotationsService';
+export type { LocalPageFormsService, PageFormsService } from './engine/PageFormsService';
 export type { DocumentAttachmentsService } from './engine/DocumentAttachmentsService';
 export type {
   PieceInfoDeleteResult,
@@ -134,7 +135,7 @@ export type {
   AnnotationsCreateWorkerRequest,
   AnnotationsUpdateWorkerRequest,
   AnnotationsDeleteWorkerRequest,
-  AnnotationsMoveWorkerRequest,
+  AnnotationsReorderWorkerRequest,
   DocumentApplyWorkerRequest,
   DocumentApplyChangesWorkerRequest,
   ChangeRecordPayload,
@@ -159,7 +160,7 @@ export type {
   SignaturesCancelWorkerRequest,
   SignaturesAnalyzeWorkerRequest,
   SignaturesFinalizeCandidateWorkerRequest,
-  PagesMoveWorkerRequest,
+  PagesReorderWorkerRequest,
   PagesRotateWorkerRequest,
   PagesDeleteWorkerRequest,
   AnnotationsFlattenWorkerRequest,
@@ -194,6 +195,9 @@ export type {
   FormsDeleteFieldWorkerRequest,
   FormsAddWidgetWorkerRequest,
   FormsDetachWidgetWorkerRequest,
+  FormsDeleteWidgetWorkerRequest,
+  FormsReorderWidgetsWorkerRequest,
+  FormsUpdateWidgetWorkerRequest,
   FontsRegisterWorkerRequest,
   FontsAddFallbackWorkerRequest,
   FontsClearFallbacksWorkerRequest,

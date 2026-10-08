@@ -600,6 +600,7 @@ export class DocumentService {
           metadataVersion: headVersion.metadataVersion,
           attachmentsVersion: headVersion.attachmentsVersion,
           annotationsVersion: headVersion.annotationsVersion,
+          formsVersion: headVersion.formsVersion,
           lastAuditId: 0,
           currentVersion: 0,
           currentArtifactKey: null,
@@ -2357,6 +2358,7 @@ function legacyVersionRow(row: DocumentRow, sha: string): BaseVersionRow {
     metadataVersion: 1,
     attachmentsVersion: 1,
     annotationsVersion: 1,
+    formsVersion: 1,
     createdAt: row.createdAt,
   };
 }

@@ -4,7 +4,13 @@ import type { FormFieldDTO, FormSnapshot } from '@embedpdf/engine-core/runtime';
 import { scriptFieldsFromSnapshot } from '../src/input';
 
 function snapshotWith(field: FormFieldDTO): FormSnapshot {
-  return { formKind: 'acroform', needsAppearances: false, fields: [field], calculationOrder: [] };
+  return {
+    formKind: 'acroform',
+    needsAppearances: false,
+    fields: [field],
+    widgets: [],
+    calculationOrder: [],
+  };
 }
 
 describe('scriptFieldsFromSnapshot', () => {

@@ -60,8 +60,8 @@ export function summarizeList(list: AnnotationList): AnnotationsSummary {
       pageIndex,
       annotations: list.annotations
         .filter((a) => a.page.objectNumber === page.objectNumber)
-        .map((a) => ({
-          index: a.index,
+        .map((a, index) => ({
+          index,
           subtype: a.subtype,
           ref: describeRef(a),
           nm: a.nm,

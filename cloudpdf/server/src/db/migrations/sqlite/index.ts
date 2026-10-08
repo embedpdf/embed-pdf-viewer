@@ -64,6 +64,8 @@ import down032 from './032_object_numbers.down.sql';
 import sql032 from './032_object_numbers.sql';
 import down033 from './033_change_outcomes.down.sql';
 import sql033 from './033_change_outcomes.sql';
+import down034 from './034_forms_version.down.sql';
+import sql034 from './034_forms_version.sql';
 import type { MigrationSource } from '../../migrator/runner';
 
 /**
@@ -125,5 +127,11 @@ export const sqliteMigrations: ReadonlyArray<MigrationSource> = [
     name: '033_change_outcomes.sql',
     sql: sql033,
     down: down033,
+  },
+  {
+    version: '034',
+    name: '034_forms_version.sql',
+    sql: sql034,
+    down: down034,
   },
 ];

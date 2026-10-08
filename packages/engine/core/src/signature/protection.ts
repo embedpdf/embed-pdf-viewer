@@ -83,9 +83,7 @@ export function lockCovers(spec: FieldLockSpec, fieldName: string): boolean {
  *              signed field. Unsigned fields' /Lock entries describe a
  *              future signature and lock nothing yet.
  */
-export function deriveProtection(
-  signatures: ReadonlyArray<SignatureDTO<Coordinates>>,
-): DocumentProtection {
+export function deriveProtection(signatures: ReadonlyArray<SignatureDTO>): DocumentProtection {
   let signed = false;
   let enforced: ModificationLevel | null = null;
   let certification: DocumentProtection['certification'] = null;

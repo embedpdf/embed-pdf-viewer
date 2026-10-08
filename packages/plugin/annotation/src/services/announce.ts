@@ -15,8 +15,8 @@ export function createAnnouncer(events: AnnotationEvents) {
       events.updated.emit({ annotation, origin }),
     deleted: (refs: readonly AnnotationRef[], page: PageRef, origin: EventOrigin) =>
       events.deleted.emit({ refs, page, origin }),
-    moved: (refs: readonly AnnotationRef[], page: PageRef, toIndex: number, origin: EventOrigin) =>
-      events.moved.emit({ refs, page, toIndex, origin }),
+    reordered: (page: PageRef, order: readonly AnnotationRef[], origin: EventOrigin) =>
+      events.reordered.emit({ page, order, origin }),
   };
 }
 

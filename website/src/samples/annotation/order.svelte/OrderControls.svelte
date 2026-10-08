@@ -12,17 +12,15 @@
   const first = $derived(selected.current[0]);
   const onPage = useAnnotationList(() => (first ? { pages: [first.page] } : undefined));
   const position = $derived(
-    first
-      ? onPage.current.findIndex((a) => annotationKey(a.ref) === annotationKey(first.ref))
-      : -1,
+    first ? onPage.current.findIndex((a) => annotationKey(a.ref) === annotationKey(first.ref)) : -1,
   );
 
   function sendToBack() {
-    if (first) void annotation.move([first.ref], 0);
+    if (first) void annotation.reorder([first.ref], 'start');
   }
 
   function bringToFront() {
-    if (first) void annotation.move([first.ref], onPage.current.length - 1);
+    if (first) void annotation.reorder([first.ref], 'end');
   }
 </script>
 
@@ -45,6 +43,8 @@
   </button>
   <span class="spacer"></span>
   <output class="readout">
-    {position >= 0 ? `${position + 1} of ${onPage.current.length}, from the back` : 'Select a rectangle'}
+    {position >= 0
+      ? `${position + 1} of ${onPage.current.length}, from the back`
+      : 'Select a rectangle'}
   </output>
 </div>

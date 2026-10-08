@@ -1387,6 +1387,9 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
       await registerFormRoutes(app, {
         documentService,
         layerService,
+        imageEncoder: new SharpImageEncoder(),
+        ...(opts.encodeInEngine !== undefined ? { encodeInEngine: opts.encodeInEngine } : {}),
+        ...(derivedRenders ? { derivedRenders } : {}),
       });
       await registerAttachmentRoutes(app, {
         documentService,

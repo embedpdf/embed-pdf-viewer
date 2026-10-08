@@ -35,7 +35,6 @@ const freeTextDTO = (
   ({
     ref: REF,
     page: PAGE,
-    index: 30,
     hasAppearance: true,
     appearanceState: null,
     nm: null,

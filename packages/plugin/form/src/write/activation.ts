@@ -4,17 +4,13 @@
  * tree-less widget falls back to the form's own scripted activation.
  */
 import { PluginError } from '@embedpdf/core';
-import {
-  annotationKey,
-  type AnnotationRef,
-  type FormFieldRef,
-} from '@embedpdf/engine-core/runtime';
+import { type AnnotationRef, type FormFieldRef } from '@embedpdf/engine-core/runtime';
 import { ActionsToken, createHoverPump } from '@embedpdf/plugin-actions/contract';
 import type { ActionSource } from '@embedpdf/plugin-actions/contract';
 
 import type { FormCommitResult, WidgetActivationResult } from '../contract';
 import type { FormHostCapability } from '../host-contract';
-import { fieldForWidget } from '../model';
+import { fieldForWidget, widgetRowOf } from '../model';
 import { widgetObjectOf } from '../read/fields';
 import type { FormContext, FormServices } from '../services';
 
@@ -23,15 +19,12 @@ export function createActivation(
   services: Pick<FormServices, 'fields' | 'siblings' | 'scripting' | 'enqueue'>,
 ) {
   const { fields, enqueue, scripting } = services;
-  const annotationHost = services.siblings.annotation;
 
+  /** The widget's activation action, from its row in the form. */
   const annotationActivation = async (ref: AnnotationRef) => {
-    const loaded = annotationHost?.get(ref);
-    if (loaded?.subtype === 'widget') return loaded.actions?.activate ?? null;
-    const { annotations } = await ctx.doc.page(ref.page).annotations.list();
-    const key = annotationKey(ref);
-    const annotation = annotations.find((candidate) => annotationKey(candidate.ref) === key);
-    return annotation?.subtype === 'widget' ? (annotation.actions?.activate ?? null) : null;
+    await fields.settled();
+    const row = ref.kind === 'objectNumber' ? widgetRowOf(fields.get(), ref.objectNumber) : null;
+    return row?.actions?.activate ?? null;
   };
 
   const activateThroughScripts = async (
@@ -86,11 +79,14 @@ export function createActivation(
   const widgetHoverFlags = (
     annotationRef: AnnotationRef,
   ): { enter: boolean; exit: boolean } | null => {
-    const loaded = annotationHost?.get(annotationRef);
-    if (loaded?.subtype !== 'widget') return null;
+    const row =
+      annotationRef.kind === 'objectNumber'
+        ? widgetRowOf(fields.get(), annotationRef.objectNumber)
+        : null;
+    if (!row) return null;
     return {
-      enter: Boolean(loaded.actions?.cursorEnter?.root),
-      exit: Boolean(loaded.actions?.cursorExit?.root),
+      enter: Boolean(row.actions?.cursorEnter?.root),
+      exit: Boolean(row.actions?.cursorExit?.root),
     };
   };
 
@@ -119,7 +115,8 @@ export function createActivation(
         return {
           kind: 'form',
           result: await enqueue(
-            () => ctx.cancellable(options?.signal, activateThroughScripts(field.ref, annotationRef)),
+            () =>
+              ctx.cancellable(options?.signal, activateThroughScripts(field.ref, annotationRef)),
             options,
           ),
         };

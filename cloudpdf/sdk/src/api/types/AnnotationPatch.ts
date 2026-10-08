@@ -28,8 +28,8 @@ export namespace AnnotationPatch {
         subtype: "highlight";
         ref?: unknown | undefined;
         page?: unknown | undefined;
-        index?: unknown | undefined;
         hasAppearance?: unknown | undefined;
+        appearanceState?: unknown | undefined;
         nm?: (string | null) | undefined;
         rect?: AnnotationPatchHighlight.Rect | undefined;
         contents?: (string | null) | undefined;
@@ -140,8 +140,8 @@ export namespace AnnotationPatch {
         subtype: "underline";
         ref?: unknown | undefined;
         page?: unknown | undefined;
-        index?: unknown | undefined;
         hasAppearance?: unknown | undefined;
+        appearanceState?: unknown | undefined;
         nm?: (string | null) | undefined;
         rect?: AnnotationPatchUnderline.Rect | undefined;
         contents?: (string | null) | undefined;
@@ -252,8 +252,8 @@ export namespace AnnotationPatch {
         subtype: "squiggly";
         ref?: unknown | undefined;
         page?: unknown | undefined;
-        index?: unknown | undefined;
         hasAppearance?: unknown | undefined;
+        appearanceState?: unknown | undefined;
         nm?: (string | null) | undefined;
         rect?: AnnotationPatchSquiggly.Rect | undefined;
         contents?: (string | null) | undefined;
@@ -364,8 +364,8 @@ export namespace AnnotationPatch {
         subtype: "strikeout";
         ref?: unknown | undefined;
         page?: unknown | undefined;
-        index?: unknown | undefined;
         hasAppearance?: unknown | undefined;
+        appearanceState?: unknown | undefined;
         nm?: (string | null) | undefined;
         rect?: AnnotationPatchStrikeout.Rect | undefined;
         contents?: (string | null) | undefined;
@@ -482,8 +482,8 @@ export namespace AnnotationPatch {
         subtype: "circle";
         ref?: unknown | undefined;
         page?: unknown | undefined;
-        index?: unknown | undefined;
         hasAppearance?: unknown | undefined;
+        appearanceState?: unknown | undefined;
         nm?: (string | null) | undefined;
         rect?: AnnotationPatchCircle.Rect | undefined;
         contents?: (string | null) | undefined;
@@ -576,8 +576,8 @@ export namespace AnnotationPatch {
         subtype: "square";
         ref?: unknown | undefined;
         page?: unknown | undefined;
-        index?: unknown | undefined;
         hasAppearance?: unknown | undefined;
+        appearanceState?: unknown | undefined;
         nm?: (string | null) | undefined;
         rect?: AnnotationPatchSquare.Rect | undefined;
         contents?: (string | null) | undefined;
@@ -670,8 +670,8 @@ export namespace AnnotationPatch {
         subtype: "polygon";
         ref?: unknown | undefined;
         page?: unknown | undefined;
-        index?: unknown | undefined;
         hasAppearance?: unknown | undefined;
+        appearanceState?: unknown | undefined;
         nm?: (string | null) | undefined;
         rect?: AnnotationPatchPolygon.Rect | undefined;
         contents?: (string | null) | undefined;
@@ -781,8 +781,8 @@ export namespace AnnotationPatch {
         subtype: "polyline";
         ref?: unknown | undefined;
         page?: unknown | undefined;
-        index?: unknown | undefined;
         hasAppearance?: unknown | undefined;
+        appearanceState?: unknown | undefined;
         nm?: (string | null) | undefined;
         rect?: AnnotationPatchPolyline.Rect | undefined;
         contents?: (string | null) | undefined;
@@ -925,8 +925,8 @@ export namespace AnnotationPatch {
         subtype: "line";
         ref?: unknown | undefined;
         page?: unknown | undefined;
-        index?: unknown | undefined;
         hasAppearance?: unknown | undefined;
+        appearanceState?: unknown | undefined;
         nm?: (string | null) | undefined;
         rect?: AnnotationPatchLine.Rect | undefined;
         contents?: (string | null) | undefined;
@@ -1091,8 +1091,8 @@ export namespace AnnotationPatch {
         subtype: "link";
         ref?: unknown | undefined;
         page?: unknown | undefined;
-        index?: unknown | undefined;
         hasAppearance?: unknown | undefined;
+        appearanceState?: unknown | undefined;
         nm?: (string | null) | undefined;
         rect?: AnnotationPatchLink.Rect | undefined;
         contents?: (string | null) | undefined;
@@ -1170,8 +1170,8 @@ export namespace AnnotationPatch {
         subtype: "ink";
         ref?: unknown | undefined;
         page?: unknown | undefined;
-        index?: unknown | undefined;
         hasAppearance?: unknown | undefined;
+        appearanceState?: unknown | undefined;
         nm?: (string | null) | undefined;
         rect?: AnnotationPatchInk.Rect | undefined;
         contents?: (string | null) | undefined;
@@ -1269,8 +1269,8 @@ export namespace AnnotationPatch {
         subtype: "free-text";
         ref?: unknown | undefined;
         page?: unknown | undefined;
-        index?: unknown | undefined;
         hasAppearance?: unknown | undefined;
+        appearanceState?: unknown | undefined;
         nm?: (string | null) | undefined;
         rect?: AnnotationPatchFreeText.Rect | undefined;
         contents?: (string | null) | undefined;
@@ -1546,8 +1546,8 @@ export namespace AnnotationPatch {
         subtype: "caret";
         ref?: unknown | undefined;
         page?: unknown | undefined;
-        index?: unknown | undefined;
         hasAppearance?: unknown | undefined;
+        appearanceState?: unknown | undefined;
         nm?: (string | null) | undefined;
         rect?: AnnotationPatchCaret.Rect | undefined;
         contents?: (string | null) | undefined;
@@ -1639,8 +1639,8 @@ export namespace AnnotationPatch {
         subtype: "text";
         ref?: unknown | undefined;
         page?: unknown | undefined;
-        index?: unknown | undefined;
         hasAppearance?: unknown | undefined;
+        appearanceState?: unknown | undefined;
         nm?: (string | null) | undefined;
         rect?: AnnotationPatchText.Rect | undefined;
         contents?: (string | null) | undefined;
@@ -1732,8 +1732,8 @@ export namespace AnnotationPatch {
         subtype: "stamp";
         ref?: unknown | undefined;
         page?: unknown | undefined;
-        index?: unknown | undefined;
         hasAppearance?: unknown | undefined;
+        appearanceState?: unknown | undefined;
         nm?: (string | null) | undefined;
         rect?: AnnotationPatchStamp.Rect | undefined;
         contents?: (string | null) | undefined;
@@ -1827,8 +1827,8 @@ export namespace AnnotationPatch {
         subtype: "file-attachment";
         ref?: unknown | undefined;
         page?: unknown | undefined;
-        index?: unknown | undefined;
         hasAppearance?: unknown | undefined;
+        appearanceState?: unknown | undefined;
         nm?: (string | null) | undefined;
         rect?: AnnotationPatchFileAttachment.Rect | undefined;
         contents?: (string | null) | undefined;
@@ -1917,129 +1917,16 @@ export namespace AnnotationPatch {
         }
     }
 
-    export interface Widget {
+    export interface Widget extends CloudPDF.WidgetPatch {
         subtype: "widget";
-        ref?: unknown | undefined;
-        page?: unknown | undefined;
-        index?: unknown | undefined;
-        hasAppearance?: unknown | undefined;
-        nm?: (string | null) | undefined;
-        rect?: AnnotationPatchWidget.Rect | undefined;
-        contents?: (string | null) | undefined;
-        subject?: (string | null) | undefined;
-        blendMode?: AnnotationPatchWidget.BlendMode | undefined;
-        invisible?: boolean | undefined;
-        hidden?: boolean | undefined;
-        print?: boolean | undefined;
-        noZoom?: boolean | undefined;
-        noRotate?: boolean | undefined;
-        noView?: boolean | undefined;
-        readOnly?: boolean | undefined;
-        locked?: boolean | undefined;
-        toggleNoView?: boolean | undefined;
-        lockedContents?: boolean | undefined;
-        reply?: (AnnotationPatchWidget.Reply | null) | undefined;
-        popup?: unknown | undefined;
-        groupId?: (string | null) | undefined;
-        author?: unknown | undefined;
-        createdAt?: unknown | undefined;
-        modifiedAt?: unknown | undefined;
-        userId?: unknown | undefined;
-        createdBy?: unknown | undefined;
-        modifiedBy?: unknown | undefined;
-        importedBy?: unknown | undefined;
-        actions?: unknown | undefined;
-        color?: (string | null) | undefined;
-        interiorColor?: (string | null) | undefined;
-        strokeWidth?: number | undefined;
-        borderStyle?: AnnotationPatchWidget.BorderStyle | undefined;
-        fontFamily?: (AnnotationPatchWidget.FontFamily | null) | undefined;
-        fontSize?: (number | null) | undefined;
-        fontColor?: (string | null) | undefined;
-        textAlign?: AnnotationPatchWidget.TextAlign | undefined;
-        field?: unknown | undefined;
-        fieldFamily?: unknown | undefined;
-    }
-
-    export namespace AnnotationPatchWidget {
-        export interface Rect {
-            x: number;
-            y: number;
-            width: number;
-            height: number;
-        }
-
-        export const BlendMode = {
-            Normal: "normal",
-            Multiply: "multiply",
-            Screen: "screen",
-            Overlay: "overlay",
-            Darken: "darken",
-            Lighten: "lighten",
-            ColorDodge: "color-dodge",
-            ColorBurn: "color-burn",
-            HardLight: "hard-light",
-            SoftLight: "soft-light",
-            Difference: "difference",
-            Exclusion: "exclusion",
-            Hue: "hue",
-            Saturation: "saturation",
-            Color: "color",
-            Luminosity: "luminosity",
-        } as const;
-        export type BlendMode = (typeof BlendMode)[keyof typeof BlendMode];
-
-        export interface Reply {
-            to: CloudPDF.AnnotationRef;
-            type?: Reply.Type | undefined;
-        }
-
-        export namespace Reply {
-            export const Type = {
-                Reply: "reply",
-                Group: "group",
-            } as const;
-            export type Type = (typeof Type)[keyof typeof Type];
-        }
-
-        export const BorderStyle = {
-            Solid: "solid",
-            Dashed: "dashed",
-            Beveled: "beveled",
-            Inset: "inset",
-        } as const;
-        export type BorderStyle = (typeof BorderStyle)[keyof typeof BorderStyle];
-        export const FontFamily = {
-            Courier: "courier",
-            CourierBold: "courier-bold",
-            CourierBoldOblique: "courier-bold-oblique",
-            CourierOblique: "courier-oblique",
-            Helvetica: "helvetica",
-            HelveticaBold: "helvetica-bold",
-            HelveticaBoldOblique: "helvetica-bold-oblique",
-            HelveticaOblique: "helvetica-oblique",
-            TimesRoman: "times-roman",
-            TimesBold: "times-bold",
-            TimesBoldItalic: "times-bold-italic",
-            TimesItalic: "times-italic",
-            Symbol: "symbol",
-            ZapfDingbats: "zapf-dingbats",
-        } as const;
-        export type FontFamily = (typeof FontFamily)[keyof typeof FontFamily];
-        export const TextAlign = {
-            Left: "left",
-            Center: "center",
-            Right: "right",
-        } as const;
-        export type TextAlign = (typeof TextAlign)[keyof typeof TextAlign];
     }
 
     export interface Redact {
         subtype: "redact";
         ref?: unknown | undefined;
         page?: unknown | undefined;
-        index?: unknown | undefined;
         hasAppearance?: unknown | undefined;
+        appearanceState?: unknown | undefined;
         nm?: (string | null) | undefined;
         rect?: AnnotationPatchRedact.Rect | undefined;
         contents?: (string | null) | undefined;
@@ -2164,8 +2051,8 @@ export namespace AnnotationPatch {
         subtype: "popup";
         ref?: unknown | undefined;
         page?: unknown | undefined;
-        index?: unknown | undefined;
         hasAppearance?: unknown | undefined;
+        appearanceState?: unknown | undefined;
         nm?: (string | null) | undefined;
         rect?: AnnotationPatchPopup.Rect | undefined;
         contents?: (string | null) | undefined;

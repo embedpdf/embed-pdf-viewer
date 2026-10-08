@@ -31,7 +31,6 @@ const recordOn = (
       objectNumber: annotObjectNumber,
     },
     page: toPageRef(pageObjectNumber),
-    index: annotObjectNumber,
     subtype: 'square',
     ...extra,
   }) as unknown as Annotation;

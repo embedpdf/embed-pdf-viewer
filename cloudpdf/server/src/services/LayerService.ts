@@ -36,7 +36,8 @@ import {
   type AnnotationDeleteResult,
   type AnnotationDraft,
   type AnnotationFlattenResult,
-  type AnnotationMoveResult,
+  type AnnotationPosition,
+  type AnnotationReorderResult,
   type AnnotationPatch,
   type WireAnnotationBundle,
   type WireAnnotationResources,
@@ -59,6 +60,10 @@ import {
   type FormSetValueResult,
   type FormSnapshot,
   type FormWidgetLinkResult,
+  type FormWidgetDeleteResult,
+  type FormWidgetUpdateResult,
+  type FormWidgetsReorderResult,
+  type WidgetPatch,
   type FormWidget,
   type Identity,
   type WidgetPlacement,
@@ -76,7 +81,8 @@ import {
   type RedactionApplyResult,
   type RedactionApplyScope,
   type PageListSnapshot,
-  type PageMoveResult,
+  type PagePosition,
+  type PageReorderResult,
   type PageNameResult,
   type PageObjectNumber,
   type PageRef,
@@ -211,27 +217,14 @@ export class LayerFenceConflict extends EngineError {
   }
 }
 
-/**
- * Form audit kinds that change annotation list bodies (field/widget
- * structure) and therefore bump the bulk `annotations_version` pin.
- * Value writes, effects, import and repair only re-bake `/AP` rasters —
- * the per-page `annotationVersion` covers those; the bulk pin stays put
- * so hydration caches survive form-filling sessions.
- */
-const FORM_STRUCTURE_AUDIT_KINDS: ReadonlySet<string> = new Set([
-  'form.createField',
-  'form.updateField',
-  'form.deleteField',
-  'form.addWidget',
-  'form.detachWidget',
-]);
-
 /** The durable state a document mutation produced inside its transaction. Mutations
  *  are document-scoped, so 0..N pages may have been touched. */
 interface CommittedDocumentMutation {
   pages: DurablePageRow[];
   previousLayerDocVersion: number;
   layerDocVersion: number;
+  /** The form's new pin, for a form write. */
+  formsVersion?: number;
 }
 
 /** Flatten has form-like multi-page persistence, but with explicit content
@@ -425,6 +418,7 @@ export class LayerService {
             metadataVersion: base.metadataVersion,
             attachmentsVersion: base.attachmentsVersion,
             annotationsVersion: base.annotationsVersion,
+            formsVersion: base.formsVersion,
           }
         : {}),
     });
@@ -578,67 +572,70 @@ export class LayerService {
     );
   }
 
-  async moveAnnotations(
+  async reorderAnnotations(
     ctx: LayerWriteContext,
     input: {
       docId: string;
       layerName: string;
       pageObjectNumber: PageObjectNumber;
       refs: AnnotationRef[];
-      toIndex: number;
+      position: AnnotationPosition;
+      /** Who the reorder acts for and what they may do, checked against each annotation it moves. */
+      authority: AnnotationAuthority;
     },
     signal?: AbortSignal,
-  ): Promise<AnnotationMoveResult> {
-    return this.applySingleOp<AnnotationMoveResult>(
+  ): Promise<AnnotationReorderResult> {
+    return this.applySingleOp<AnnotationReorderResult>(
       ctx,
       input,
       {
-        type: 'annotations.move',
+        type: 'annotations.reorder',
         page: toPageRef(input.pageObjectNumber),
         refs: input.refs,
-        toIndex: input.toIndex,
+        position: input.position,
       },
-      checkedAuthority(),
-      'annot.move',
+      { ...input.authority, protection: null },
+      'annot.reorder',
       signal,
     );
   }
 
-  async movePages(
+  async reorderPages(
     ctx: LayerWriteContext,
     input: {
       docId: string;
       layerName: string;
       pages: PageRef[];
-      toIndex: number;
+      position: PagePosition;
     },
     signal?: AbortSignal,
-  ): Promise<PageMoveResult> {
+  ): Promise<PageReorderResult> {
     const opId = writeOpIdOf(ctx);
     return this.enqueueLayerWrite(ctx, input.docId, input.layerName, async () => {
       const { layer } = await this.prepareLayerMutation(ctx, input.docId, input.layerName);
       return this.withTempWorkerFile('layer-artifact', 'artifact.layer', async (artifactPath) => {
         const build = (jobId: WorkerJobId) =>
           wirePack({
-            kind: 'pages.move' as const,
+            kind: 'pages.reorder' as const,
             effect: 'contentWrite' as const,
             jobId,
             opId,
             docId: input.docId,
             layerName: input.layerName,
             pages: input.pages,
-            toIndex: input.toIndex,
+            position: input.position,
             artifactPath,
           });
         const payload = await this.runLayerWrite(input.docId, build, signal);
-        if (payload.tag !== 'pages.move') {
+        if (payload.tag !== 'pages.reorder') {
           throw new EngineError(
             EngineErrorCode.WireFormat,
-            `unexpected pages.move payload: ${payload.tag}`,
+            `unexpected pages.reorder payload: ${payload.tag}`,
           );
         }
-        return this.persistPageMove(ctx, input.docId, input.layerName, layer, {
+        return this.persistPageLayout(ctx, input.docId, input.layerName, layer, {
           result: payload.result,
+          pages: payload.result.pages,
           artifact: requireLayerArtifact(payload as unknown),
         });
       });
@@ -776,9 +773,10 @@ export class LayerService {
             `unexpected ${tag} payload: ${payload.tag}`,
           );
         }
-        // Layout-shaped result — the page-move persistence path is exact.
-        return this.persistPageMove(ctx, docId, layerName, layer, {
+        // Layout-shaped result: the reorder's persistence, with no page moved.
+        return this.persistPageLayout(ctx, docId, layerName, layer, {
           result: payload.result,
+          pages: [],
           artifact: requireLayerArtifact(payload as unknown),
         });
       });
@@ -931,7 +929,7 @@ export class LayerService {
        *  this op, and a transferred (detached) buffer would corrupt the
        *  retry. Structured clone copies it, like annotation resources. */
       bytes: ArrayBuffer;
-      toIndex?: number;
+      position?: PagePosition;
     },
     signal?: AbortSignal,
   ): Promise<PageInsertResult> {
@@ -950,7 +948,7 @@ export class LayerService {
             docId: input.docId,
             layerName: input.layerName,
             bytes: input.bytes,
-            ...(input.toIndex !== undefined ? { toIndex: input.toIndex } : {}),
+            ...(input.position !== undefined ? { position: input.position } : {}),
             artifactPath,
           });
         const payload = await this.runLayerWrite(input.docId, build, signal);
@@ -976,7 +974,7 @@ export class LayerService {
       layerName: string;
       size: PdfSize;
       count?: number;
-      toIndex?: number;
+      position?: PagePosition;
       /** The new pages' object numbers, one per page: ones the editing session holds. */
       objectNumbers?: readonly number[];
     },
@@ -999,7 +997,7 @@ export class LayerService {
             layerName: input.layerName,
             size: input.size,
             ...(input.count !== undefined ? { count: input.count } : {}),
-            ...(input.toIndex !== undefined ? { toIndex: input.toIndex } : {}),
+            ...(input.position !== undefined ? { position: input.position } : {}),
             ...(input.objectNumbers ? { objectNumbers: [...input.objectNumbers] } : {}),
             artifactPath,
           });
@@ -1588,6 +1586,64 @@ export class LayerService {
     );
   }
 
+  /** A widget leaves its page and its field: a form write, never an annotation delete. */
+  async deleteFormWidget(
+    ctx: LayerWriteContext,
+    input: { docId: string; layerName: string; widget: AnnotationRef },
+    signal?: AbortSignal,
+  ): Promise<FormWidgetDeleteResult> {
+    return this.applySingleOp<FormWidgetDeleteResult>(
+      ctx,
+      input,
+      { type: 'forms.deleteWidget', widget: input.widget },
+      checkedAuthority(),
+      'form.deleteWidget',
+      signal,
+    );
+  }
+
+  /** A widget's place and look: a form write, never an annotation update. */
+  async updateFormWidget(
+    ctx: LayerWriteContext,
+    input: { docId: string; layerName: string; widget: AnnotationRef; patch: WidgetPatch },
+    signal?: AbortSignal,
+  ): Promise<FormWidgetUpdateResult> {
+    return this.applySingleOp<FormWidgetUpdateResult>(
+      ctx,
+      input,
+      { type: 'forms.updateWidget', widget: input.widget, patch: input.patch },
+      checkedAuthority(),
+      'form.updateWidget',
+      signal,
+    );
+  }
+
+  async reorderFormWidgets(
+    ctx: LayerWriteContext,
+    input: {
+      docId: string;
+      layerName: string;
+      page: PageRef;
+      widgets: AnnotationRef[];
+      position: AnnotationPosition;
+    },
+    signal?: AbortSignal,
+  ): Promise<FormWidgetsReorderResult> {
+    return this.applySingleOp<FormWidgetsReorderResult>(
+      ctx,
+      input,
+      {
+        type: 'forms.reorderWidgets',
+        page: input.page,
+        widgets: input.widgets,
+        position: input.position,
+      },
+      checkedAuthority(),
+      'form.reorderWidgets',
+      signal,
+    );
+  }
+
   /**
    * The shared form mutation rail: enqueue on the layer write queue,
    * materialize, run the worker job, upload the artifact, and commit the
@@ -1687,6 +1743,7 @@ export class LayerService {
       layerName,
       previousDocVersion: durable.previousLayerDocVersion,
       docVersion: durable.layerDocVersion,
+      ...(durable.formsVersion !== undefined ? { formsVersion: durable.formsVersion } : {}),
       pages: durable.pages,
     });
     return {
@@ -1700,10 +1757,12 @@ export class LayerService {
   }
 
   /**
-   * Document mutation commit: advance the layer's `doc_version` (a new artifact always
-   * exists) and the annotation version of every page it touched. Non-rendering mutations (field rename, unplaced create, page calibration)
-   * legitimately touch zero pages — the layer still advances so the new
-   * artifact becomes current.
+   * Document mutation commit: advance the layer's `doc_version` (a new
+   * artifact always exists), and the pins of the family it wrote: a form
+   * write's `forms_version` and the widget version of every page it
+   * touched, a calibration's annotation versions. Writes that draw nothing
+   * (a repair that only links fields) legitimately touch zero pages — the
+   * layer still advances so the new artifact becomes current.
    */
   private async commitDocumentMutation(input: {
     ctx: LayerWriteContext;
@@ -1724,6 +1783,8 @@ export class LayerService {
         const now = Date.now();
         const currentLayer = await this.readLayerForCommit(trx, input.layer);
 
+        // A form write moves the form's pins; a calibration its pages' annotations.
+        const formWrite = input.kind.startsWith('form.');
         const nextPages: DurablePageRow[] = [];
         for (const pageObjectNumber of input.touchedPages) {
           const page = await trx
@@ -1741,7 +1802,8 @@ export class LayerService {
           nextPages.push({
             pageObjectNumber: Number(page.page_object_number),
             contentVersion: Number(page.content_version),
-            annotationVersion: Number(page.annotation_version) + 1,
+            annotationVersion: Number(page.annotation_version) + (formWrite ? 0 : 1),
+            widgetVersion: Number(page.widget_version) + (formWrite ? 1 : 0),
             updatedAt: now,
           });
         }
@@ -1753,6 +1815,7 @@ export class LayerService {
           pages: nextPages,
           previousLayerDocVersion,
           layerDocVersion,
+          ...(formWrite ? { formsVersion: Number(currentLayer.forms_version ?? 1) + 1 } : {}),
         };
         // Finalize before the audit append so the row stores exactly what
         // the caller will receive.
@@ -1782,12 +1845,7 @@ export class LayerService {
           input,
           {
             doc_version: layerDocVersion,
-            // Structural form ops change the widget population / DTOs;
-            // clients re-pin the bulk leaf via the 404-refresh rail (the
-            // form cacheDelta does not carry the pin).
-            ...(FORM_STRUCTURE_AUDIT_KINDS.has(input.kind)
-              ? { annotations_version: Number(currentLayer.annotations_version ?? 1) + 1 }
-              : {}),
+            ...(durable.formsVersion !== undefined ? { forms_version: durable.formsVersion } : {}),
           },
           auditId,
           now,
@@ -1799,6 +1857,7 @@ export class LayerService {
             .set({
               content_version: page.contentVersion,
               annotation_version: page.annotationVersion,
+              widget_version: page.widgetVersion,
               updated_at: now,
             })
             .where('layer_id', '=', input.layer.id)
@@ -2142,6 +2201,9 @@ export class LayerService {
             ...(bumped.versions.annotations_version !== undefined
               ? { annotationsVersion: bumped.versions.annotations_version }
               : {}),
+            ...(bumped.versions.forms_version !== undefined
+              ? { formsVersion: bumped.versions.forms_version }
+              : {}),
             pages: bumped.pages,
           });
           if (bumped.versions.metadata_version !== undefined) {
@@ -2159,7 +2221,11 @@ export class LayerService {
             for (const page of bumped.pages) {
               await trx
                 .updateTable('layer_pages')
-                .set({ annotation_version: page.annotationVersion, updated_at: now })
+                .set({
+                  annotation_version: page.annotationVersion,
+                  widget_version: page.widgetVersion,
+                  updated_at: now,
+                })
                 .where('layer_id', '=', layer.id)
                 .where('page_object_number', '=', page.pageObjectNumber)
                 .execute();
@@ -2263,9 +2329,9 @@ export class LayerService {
 
   /**
    * The version bumps a commit's facts call for, read inside its transaction:
-   * the document version always, each touched page's annotation version, the
-   * bulk annotation list when annotations or form structure changed, the
-   * metadata when it changed.
+   * the document version always; each touched page's pin of the family that
+   * changed on it (`annotation_version`, `widget_version`); the annotation
+   * list and the form when they changed; the metadata when it changed.
    */
   private async bumpChangeVersions(
     trx: Transaction<Schema>,
@@ -2274,17 +2340,24 @@ export class LayerService {
     now: number,
   ): Promise<{
     previousDocVersion: number;
-    versions: { doc_version: number; annotations_version?: number; metadata_version?: number };
+    versions: {
+      doc_version: number;
+      annotations_version?: number;
+      forms_version?: number;
+      metadata_version?: number;
+    };
     pages: DurablePageRow[];
   }> {
     const current = await trx
       .selectFrom('layers')
-      .select(['doc_version', 'annotations_version', 'metadata_version'])
+      .select(['doc_version', 'annotations_version', 'forms_version', 'metadata_version'])
       .where('id', '=', layer.id)
       .executeTakeFirst();
     if (!current) throw new EngineError(EngineErrorCode.NotFound, `layer not found: ${layer.id}`);
+    const annotationPages = new Set(facts.annotationPages);
+    const widgetPages = new Set(facts.widgetPages);
     const pages: DurablePageRow[] = [];
-    for (const pageObjectNumber of facts.pages) {
+    for (const pageObjectNumber of new Set([...annotationPages, ...widgetPages])) {
       const page = await trx
         .selectFrom('layer_pages')
         .selectAll()
@@ -2300,7 +2373,9 @@ export class LayerService {
       pages.push({
         pageObjectNumber,
         contentVersion: Number(page.content_version),
-        annotationVersion: Number(page.annotation_version) + 1,
+        annotationVersion:
+          Number(page.annotation_version) + (annotationPages.has(pageObjectNumber) ? 1 : 0),
+        widgetVersion: Number(page.widget_version) + (widgetPages.has(pageObjectNumber) ? 1 : 0),
         updatedAt: now,
       });
     }
@@ -2312,6 +2387,7 @@ export class LayerService {
         ...(facts.annotationList
           ? { annotations_version: Number(current.annotations_version ?? 1) + 1 }
           : {}),
+        ...(facts.form ? { forms_version: Number(current.forms_version ?? 1) + 1 } : {}),
         ...(facts.metadata ? { metadata_version: Number(current.metadata_version) + 1 } : {}),
       },
       pages,
@@ -2584,16 +2660,22 @@ export class LayerService {
     }
   }
 
-  private async persistPageMove(
+  /**
+   * The commit of a write that changes the layout and keeps the page set: a
+   * reorder, and a page name (`pages` empty: no page moved).
+   */
+  private async persistPageLayout(
     ctx: LayerWriteContext,
     docId: string,
     layerName: string,
     layer: LayerRow,
     input: {
-      result: PageMoveResult;
+      result: { layout: PageListSnapshot; meta: MutationMeta };
+      /** The pages that moved, in their new order. */
+      pages: PageRef[];
       artifact: LayerArtifactInput;
     },
-  ): Promise<PageMoveResult> {
+  ): Promise<PageReorderResult> {
     const nextVersion = layer.currentVersion + 1;
     const artifactKey = this.nextArtifactKey(ctx, docId, layerName, nextVersion);
     const uploaded = await this.uploadLayerArtifact(artifactKey, input.artifact);
@@ -2605,7 +2687,8 @@ export class LayerService {
       docId,
       layerName,
       layer,
-      kind: 'pages.move',
+      kind: 'pages.reorder',
+      pages: input.pages,
       layout: input.result.layout,
       stamp: input.result.meta,
       // Every page's position is touched by a reorder.
@@ -2616,11 +2699,11 @@ export class LayerService {
       nextVersion,
     });
     this.finishLayerCommit(ctx, docId, layerName, nextVersion, artifactKey, committed.auditId);
-    return committed.result;
+    return { ...committed.result, pages: input.pages };
   }
 
   /**
-   * Rotate shares the move commit exactly (the corrected model: rotation is
+   * Rotate shares the reorder commit exactly (the corrected model: rotation is
    * presentation metadata — `doc_version` + `layout_version` bump, no
    * `layer_pages` touch, every per-page cache stays warm). Only the audit
    * kind and the affected-page set differ.
@@ -2856,7 +2939,7 @@ export class LayerService {
 
   /**
    * Shared commit for the page-structure ops that keep the page set intact
-   * (move + rotate). Both have the same shape: the layer's `doc_version` and
+   * (reorder + rotate). Both have the same shape: the layer's `doc_version` and
    * `layout_version` advance, `layer_pages` rows are left entirely untouched
    * (display order and rotation live in the artifact, read back via /layout),
    * and every per-page content/annotation cache stays warm.
@@ -2866,7 +2949,9 @@ export class LayerService {
     docId: string;
     layerName: string;
     layer: LayerRow;
-    kind: 'pages.move' | 'pages.rotate';
+    kind: 'pages.reorder' | 'pages.rotate';
+    /** A reorder's moved pages, in their new order: `result.pages`. */
+    pages?: PageRef[];
     /** The worker's post-mutation layout — becomes `result.layout`. */
     layout: PageListSnapshot;
     /** The write's id and whether it can be undone, as the worker stamped them. */
@@ -2877,7 +2962,7 @@ export class LayerService {
     artifactSize: number;
     nextVersion: number;
   }): Promise<{
-    result: { layout: PageListSnapshot; meta: MutationMeta };
+    result: { pages?: PageRef[]; layout: PageListSnapshot; meta: MutationMeta };
     auditId: number;
   }> {
     return this.requireDb()
@@ -2919,7 +3004,11 @@ export class LayerService {
 
         // The finalized result — audited and returned identically: what we
         // tell the caller is what we tell history (and remote subscribers).
-        const result = { layout: input.layout, meta: planeMeta(input.stamp, versions) };
+        const result = {
+          ...(input.pages ? { pages: input.pages } : {}),
+          layout: input.layout,
+          meta: planeMeta(input.stamp, versions),
+        };
 
         const auditEvent = makeAuditEvent({
           ctx: input.ctx,
@@ -3142,6 +3231,7 @@ export class LayerService {
               page_object_number: pageObjectNumber,
               content_version: 1,
               annotation_version: 1,
+              widget_version: 1,
               updated_at: now,
             })),
           )
@@ -3185,10 +3275,11 @@ export class LayerService {
           {
             doc_version: versions.docVersion,
             layout_version: versions.layoutVersion,
-            // The page set grew — the bulk annotation corpus changed.
+            // The page set grew — the annotation list and the form changed.
             // Clients re-pin via the 404-refresh rail (the layout delta
-            // carries no annotationsVersion).
+            // carries neither pin).
             annotations_version: Number(currentLayer.annotations_version ?? 1) + 1,
+            forms_version: Number(currentLayer.forms_version ?? 1) + 1,
           },
           auditId,
           now,
@@ -3244,13 +3335,16 @@ export class LayerService {
             pageObjectNumber,
             contentVersion: Number(row.content_version) + 1,
             annotationVersion: Number(row.annotation_version) + 1,
+            widgetVersion: Number(row.widget_version) + 1,
             updatedAt: now,
           });
         }
 
         const previousLayerDocVersion = Number(currentLayer.doc_version);
-        // Flatten bakes annotations into content — list bodies change.
+        // Flatten bakes annotations and form fields into content — both
+        // lists change.
         const annotationsVersion = Number(currentLayer.annotations_version ?? 1) + 1;
+        const formsVersion = Number(currentLayer.forms_version ?? 1) + 1;
         const durable: CommittedPageFlatten = {
           pages: nextPages,
           previousLayerDocVersion,
@@ -3266,6 +3360,7 @@ export class LayerService {
               previousDocVersion: durable.previousLayerDocVersion,
               docVersion: durable.layerDocVersion,
               annotationsVersion,
+              formsVersion,
               pages: nextPages,
             }),
           },
@@ -3293,7 +3388,11 @@ export class LayerService {
         await this.writeLayerAdvance(
           trx,
           input,
-          { doc_version: durable.layerDocVersion, annotations_version: annotationsVersion },
+          {
+            doc_version: durable.layerDocVersion,
+            annotations_version: annotationsVersion,
+            forms_version: formsVersion,
+          },
           auditId,
           now,
         );
@@ -3303,6 +3402,7 @@ export class LayerService {
             .set({
               content_version: page.contentVersion,
               annotation_version: page.annotationVersion,
+              widget_version: page.widgetVersion,
               updated_at: now,
             })
             .where('layer_id', '=', input.layer.id)
@@ -3355,6 +3455,7 @@ export class LayerService {
             pageObjectNumber,
             contentVersion: Number(row.content_version),
             annotationVersion: Number(row.annotation_version) + 1,
+            widgetVersion: Number(row.widget_version),
             updatedAt: now,
           });
         }
@@ -3407,6 +3508,7 @@ export class LayerService {
             .set({
               content_version: page.contentVersion,
               annotation_version: page.annotationVersion,
+              widget_version: page.widgetVersion,
               updated_at: now,
             })
             .where('layer_id', '=', input.layer.id)
@@ -3462,15 +3564,17 @@ export class LayerService {
             pageObjectNumber,
             contentVersion: Number(row.content_version) + 1,
             annotationVersion: Number(row.annotation_version) + 1,
+            widgetVersion: Number(row.widget_version) + 1,
             updatedAt: now,
           });
         }
 
         const previousLayerDocVersion = Number(currentLayer.doc_version);
         const layerDocVersion = previousLayerDocVersion + 1;
-        // Redaction consumes the marks and rewrites annotations — list
-        // bodies change.
+        // Redaction consumes the marks and removes what it covers, form
+        // fields included — both lists change.
         const annotationsVersion = Number(currentLayer.annotations_version ?? 1) + 1;
+        const formsVersion = Number(currentLayer.forms_version ?? 1) + 1;
         const result: RedactionApplyResult = {
           ...input.raw,
           meta: {
@@ -3481,6 +3585,7 @@ export class LayerService {
               previousDocVersion: previousLayerDocVersion,
               docVersion: layerDocVersion,
               annotationsVersion,
+              formsVersion,
               pages: nextPages,
             }),
           },
@@ -3508,7 +3613,11 @@ export class LayerService {
         await this.writeLayerAdvance(
           trx,
           input,
-          { doc_version: layerDocVersion, annotations_version: annotationsVersion },
+          {
+            doc_version: layerDocVersion,
+            annotations_version: annotationsVersion,
+            forms_version: formsVersion,
+          },
           auditId,
           now,
         );
@@ -3518,6 +3627,7 @@ export class LayerService {
             .set({
               content_version: page.contentVersion,
               annotation_version: page.annotationVersion,
+              widget_version: page.widgetVersion,
               updated_at: now,
             })
             .where('layer_id', '=', input.layer.id)
@@ -3539,12 +3649,19 @@ export class LayerService {
     doc_version: number | bigint;
     layout_version: number | bigint;
     annotations_version: number | bigint;
+    forms_version: number | bigint;
   }> {
     // Plain read — values feed the next-version computation. The fence is
     // the guarded UPDATE (see guardedVersionBump), never a SELECT check.
     const currentLayer = await trx
       .selectFrom('layers')
-      .select(['current_version', 'doc_version', 'layout_version', 'annotations_version'])
+      .select([
+        'current_version',
+        'doc_version',
+        'layout_version',
+        'annotations_version',
+        'forms_version',
+      ])
       .where('id', '=', layer.id)
       .executeTakeFirst();
     if (!currentLayer) {
@@ -4308,6 +4425,9 @@ export class LayerService {
             current_artifact_sha: null,
             current_artifact_size: null,
             doc_version: layerDocVersion + 1,
+            // The signed field reads differently in the new version: its
+            // form gets a pin of its own, which the layer inherits.
+            forms_version: layer.formsVersion + 1,
             updated_at: now,
           },
         );
@@ -4354,6 +4474,7 @@ export class LayerService {
           metadataVersion: layer.metadataVersion,
           attachmentsVersion: layer.attachmentsVersion,
           annotationsVersion: layer.annotationsVersion,
+          formsVersion: layer.formsVersion + 1,
           createdAt: now,
         });
 
@@ -4508,6 +4629,7 @@ export class LayerService {
       metadata_version?: number;
       attachments_version?: number;
       annotations_version?: number;
+      forms_version?: number;
     },
     lastAuditId: number,
     now: number,

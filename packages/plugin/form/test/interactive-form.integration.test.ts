@@ -37,11 +37,12 @@ async function activationFor(
   if (!widget || widget.objectNumber <= 0 || !widget.page) {
     throw new Error(`field '${field.name}' has no addressable widget`);
   }
-  const { annotations } = await doc.page(widget.page).annotations.list();
-  const annotation = annotations.find(
+  // A widget's row, with its actions, comes with the form.
+  const { widgets } = await doc.forms.list();
+  const row = widgets.find(
     ({ ref }) => ref.kind === 'objectNumber' && ref.objectNumber === widget.objectNumber,
   );
-  const action = annotation?.actions?.activate;
+  const action = row?.actions?.activate;
   if (!action) throw new Error(`field '${field.name}' has no activation action`);
   return action;
 }

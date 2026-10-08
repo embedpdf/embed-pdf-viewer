@@ -27,9 +27,9 @@ function itemEvents(item: ChangeItem): DocumentEventInit[] {
       const { type: _type, ...result } = item;
       return [{ type: 'annotations.deleted', deleted: deletedAnnotationsOf(result), ...result }];
     }
-    case 'annotations.move': {
+    case 'annotations.reorder': {
       const { type: _type, ...result } = item;
-      return [{ type: 'annotations.moved', ...result }];
+      return [{ type: 'annotations.reordered', ...result }];
     }
     case 'annotations.restore': {
       const { type: _type, ...result } = item;
@@ -72,6 +72,22 @@ function itemEvents(item: ChangeItem): DocumentEventInit[] {
     case 'forms.removeWidget': {
       const { type: _type, ...result } = item;
       return [{ type: 'forms.widgetRemoved', ...result }];
+    }
+    case 'forms.deleteWidget': {
+      const { type: _type, ...result } = item;
+      return [{ type: 'forms.widgetDeleted', ...result }];
+    }
+    case 'forms.restoreWidget': {
+      const { type: _type, ...result } = item;
+      return [{ type: 'forms.widgetRestored', ...result }];
+    }
+    case 'forms.reorderWidgets': {
+      const { type: _type, ...result } = item;
+      return [{ type: 'forms.widgetsReordered', ...result }];
+    }
+    case 'forms.updateWidget': {
+      const { type: _type, skipped: _skipped, ...result } = item;
+      return [{ type: 'forms.widgetUpdated', ...result }];
     }
     case 'metadata.update': {
       const { type: _type, skipped: _skipped, ...result } = item;

@@ -4,7 +4,8 @@ import type { PageRef } from '../identity/PageRef';
 import type { PageDeleteResult } from '../mutation/PageDeleteResult';
 import type { PageInsertBlankSpec } from '../mutation/PageInsertBlankInput';
 import type { PageInsertResult } from '../mutation/PageInsertResult';
-import type { PageMoveResult } from '../mutation/PageMoveResult';
+import type { PagePosition } from '../mutation/ListPosition';
+import type { PageReorderResult } from '../mutation/PageReorderResult';
 import type { PageNameInput, PageRemoveNameInput } from '../mutation/PageNameInput';
 import type { PageNameResult } from '../mutation/PageNameResult';
 import type { PageRotateResult } from '../mutation/PageRotateResult';
@@ -21,7 +22,7 @@ import { AbortablePromise } from '../promise/AbortablePromise';
  *
  * Mirrors the shape of `DocumentAnnotationsService` so that anything
  * touching "many things at the document level" lives in one place: the
- * structure verbs (`move`, `rotate`, `delete`, `insert`, `insertBlank`),
+ * structure verbs (`reorder`, `rotate`, `delete`, `insert`, `insertBlank`),
  * `extract`, `flatten` and the page names.
  *
  * Identity rule: pages are addressed by `PageRef` (the durable object
@@ -37,16 +38,18 @@ export interface DocumentPagesService {
   list(): AbortablePromise<PageListSnapshot>;
 
   /**
-   * Reorder pages. The supplied pages are detached and re-inserted as
-   * a contiguous block starting at `toIndex` in the post-removal
-   * index space, preserving caller order. Annotation refs the caller is
-   * holding stay valid across a page reorder.
-   *
-   * @param pages Pages to move, in the order they should appear after
-   *              the move.
-   * @param toIndex Insertion point in `[0, pageCount - len]`.
+   * Reorder pages: they go together, in the order given, to `position`,
+   * next to a neighbour (`{ before: page }`, `{ after: page }`) or at
+   * `'start'` / `'end'`. Annotation refs the caller is holding stay valid
+   * across a page reorder. A neighbour that isn't in the document is
+   * `NotFound`; one of the pages that move is `InvalidArg`. Emits
+   * `pages.reordered`.
    */
-  move(pages: PageRef[], toIndex: number, options?: WriteOptions): AbortablePromise<PageMoveResult>;
+  reorder(
+    pages: PageRef[],
+    position: PagePosition,
+    options?: WriteOptions,
+  ): AbortablePromise<PageReorderResult>;
 
   /**
    * Set the absolute display rotation of the supplied pages (one value
@@ -74,7 +77,7 @@ export interface DocumentPagesService {
    * other key in the same job (rename). Named pages are layout — read them
    * back from `list().namedPages` — so this is a page-structure mutation:
    * `docVersion` + `layoutVersion` advance, per-page pins do not. Gated like
-   * `move` (`doc.pages.assemble`).
+   * `reorder` (`doc.pages.assemble`).
    *
    * Rejects with `InvalidArg` for an empty name and `NotFound` for a page
    * that is not in the page tree (hidden templates included).
@@ -110,8 +113,8 @@ export interface DocumentPagesService {
   extract(pages: PageRef[]): AbortablePromise<Uint8Array>;
 
   /**
-   * Insert every page of a standalone PDF (`bytes`) at `toIndex`
-   * (omitted → append). The pages are copied in; the inserted copies get
+   * Insert every page of a standalone PDF (`bytes`) at `position`
+   * (default `'end'`). The pages are copied in; the inserted copies get
    * fresh object numbers, returned in insertion order. Bytes are a call
    * argument (the same law as annotation binaries): the local engine
    * transfers them to its worker, the cloud engine ships them as a
@@ -123,13 +126,13 @@ export interface DocumentPagesService {
    */
   insert(
     bytes: Uint8Array | ArrayBuffer,
-    toIndex?: number,
+    position?: PagePosition,
     options?: WriteOptions,
   ): AbortablePromise<PageInsertResult>;
 
   /**
    * Create `spec.count` (default 1) blank pages of `spec.size` (PDF points)
-   * at `toIndex` (omitted → append). The blank-page sibling of `insert`:
+   * at `position` (default `'end'`). The blank-page sibling of `insert`:
    * same gate (`doc.pages.assemble`), same result shape, same
    * `pages.inserted` event — it is a separate verb because its wire is pure
    * parameters where `insert`'s is a binary payload (cloud: JSON
@@ -144,7 +147,7 @@ export interface DocumentPagesService {
    */
   insertBlank(
     spec: PageInsertBlankSpec,
-    toIndex?: number,
+    position?: PagePosition,
     options?: PageInsertBlankOptions,
   ): AbortablePromise<PageInsertResult>;
 }

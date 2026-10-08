@@ -8,19 +8,16 @@ import {
   checkSetGroup,
   wirePack,
   type AnnotationActor,
-  type AnnotationAppearanceImageOptions,
   type AnnotationBundleLimits,
-  type AnnotationAppearanceManifest,
-  type AnnotationAppearanceManifestEntry,
   type AnnotationDeleteResult,
   type AnnotationUpdateResult,
   type AnnotationDraft,
   type AnnotationPatch,
   type AnnotationResourceRole,
   type WireAnnotationResources,
+  type AnnotationPosition,
   type AnnotationRef,
   type CollabTarget,
-  type PageNetworkRenderFormat,
   type DocumentProtection,
   type PdfBits,
   type WorkerJobId,
@@ -30,22 +27,17 @@ import {
   PermissionDenied,
 } from '@embedpdf/engine-core/runtime';
 import {
-  AnnotationAppearancesQuerySchema,
   AnnotationDraftSchema,
   AnnotationPatchSchema,
   AnnotationAppearanceExportInputSchema,
   AnnotationFlattenInputSchema,
-  AnnotationRefSchema,
-  annotationRenderOptionsFromImageOptions,
+  AnnotationReorderBodySchema,
   decodeAnnotationAppearancesRenderToken,
   decodeAnnotationToken,
   decodeAnnotationsAllToken,
   AnnotationsExportRequestSchema,
   decodeAnnotationsExportToken,
   type AnnotationsExportToken,
-  PageNetworkRenderFormatSchema,
-  unflatten,
-  type ManifestPage,
 } from '@embedpdf/engine-core/wire';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 
@@ -60,6 +52,7 @@ import {
   objectNumberQuery,
 } from './_helpers';
 import { readAnnotationImportRequest } from './_annotationImportRequest';
+import { renderAppearanceBatch, resolvePageForRead, type ReadScope } from './_appearanceBatch';
 import { buildMultipart, type MultipartPart } from './_multipart';
 import { readMutationEnvelope, type MutationEnvelope } from './_mutationEnvelope';
 import { requireSharedDocRead } from './_planeGuard';
@@ -74,7 +67,7 @@ import {
 } from '../app/jwt-plugin';
 import { SharpImageEncoder } from '../render/SharpImageEncoder';
 import type { DerivedRenderService } from '../services/DerivedRenderService';
-import type { DocumentService, OpenContext } from '../services/DocumentService';
+import type { DocumentService } from '../services/DocumentService';
 import type { LayerService } from '../services/LayerService';
 
 interface AnnotationRouteDeps {
@@ -89,10 +82,6 @@ interface AnnotationRouteDeps {
   /** How large an exported or imported annotation bundle may be; the defaults otherwise. */
   bundleLimits?: AnnotationBundleLimits;
 }
-
-type ReadScope =
-  | { kind: 'base'; ctx: OpenContext; docId: string }
-  | { kind: 'layer'; ctx: OpenContext; docId: string; layerName: string };
 
 export async function registerAnnotationRoutes(
   app: FastifyInstance,
@@ -145,7 +134,8 @@ export async function registerAnnotationRoutes(
       const ctx = await requireSharedDocRead(req, documentService, docId, 'page-annotations', [
         'annotations',
       ]);
-      return renderAnnotationAppearances({
+      return renderAppearanceBatch({
+        family: 'annotations',
         documentService,
         imageEncoder,
         encodeInEngine,
@@ -378,7 +368,8 @@ export async function registerAnnotationRoutes(
       const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
       const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
       const ctx = requireLayerResource(req, docId, layerName, 'annotations-read', pdfBits);
-      return renderAnnotationAppearances({
+      return renderAppearanceBatch({
+        family: 'annotations',
         documentService,
         imageEncoder,
         encodeInEngine,
@@ -409,7 +400,8 @@ export async function registerAnnotationRoutes(
       const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
       const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
       const ctx = requireLayerResource(req, docId, layerName, 'annotations-read', pdfBits);
-      return renderAnnotationAppearances({
+      return renderAppearanceBatch({
+        family: 'annotations',
         documentService,
         imageEncoder,
         encodeInEngine,
@@ -554,7 +546,7 @@ export async function registerAnnotationRoutes(
   );
 
   app.post(
-    '/v1/docs/:docId/layers/:layerName/annotations/pages/:pageKey/items/move',
+    '/v1/docs/:docId/layers/:layerName/annotations/pages/:pageKey/items/reorder',
     async (req, reply) => {
       const { docId, layerName, pageKey } = req.params as {
         docId: string;
@@ -565,43 +557,26 @@ export async function registerAnnotationRoutes(
       const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
       const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
       const protection = await documentService.getProtection(accessCtx, docId, layerName);
-      const ctx = requireLayerCapability(
-        req,
-        docId,
-        layerName,
-        'doc.annotate.modify',
-        pdfBits,
-        protection,
+      // The worker checks each annotation it moves inside the write: a
+      // reorder takes `doc.annotate.modify`. Widgets have their own order.
+      const ctx = requireLayerAnnotationWrite(req, docId, layerName, pdfBits, protection);
+      const { refs, position } = parseOrInvalidArg<{
+        refs: AnnotationRef[];
+        position: AnnotationPosition;
+      }>(
+        AnnotationReorderBodySchema as unknown as SchemaLike<{
+          refs: AnnotationRef[];
+          position: AnnotationPosition;
+        }>,
+        req.body ?? {},
+        'body',
       );
-      const body = req.body as Record<string, unknown> | null | undefined;
-      const rawRefs = body?.refs;
-      const rawToIndex = body?.toIndex;
-      if (!Array.isArray(rawRefs) || rawRefs.length === 0) {
-        throw new EngineError(
-          EngineErrorCode.InvalidArg,
-          'body.refs: expected non-empty array of AnnotationRef',
-        );
-      }
-      if (typeof rawToIndex !== 'number' || !Number.isInteger(rawToIndex) || rawToIndex < 0) {
-        throw new EngineError(
-          EngineErrorCode.InvalidArg,
-          'body.toIndex: expected non-negative integer',
-        );
-      }
-      const refs: AnnotationRef[] = rawRefs.map((raw, i) => {
-        const ref = parseOrInvalidArg<AnnotationRef>(
-          AnnotationRefSchema as unknown as SchemaLike<AnnotationRef>,
-          raw,
-          `body.refs[${i}]`,
-        );
-        assertRefMatchesPage(ref, pageObjectNumber);
-        return ref;
-      });
+      for (const ref of refs) assertRefMatchesPage(ref, pageObjectNumber);
 
       setNoStore(reply);
-      return layerService.moveAnnotations(
+      return layerService.reorderAnnotations(
         ctx,
-        { docId, layerName, pageObjectNumber, refs, toIndex: rawToIndex },
+        { docId, layerName, pageObjectNumber, refs, position, authority: ctx.authority },
         abortSignalOf(reply),
       );
     },
@@ -932,237 +907,6 @@ function actorFromJwt(
   return actor.userId || actor.groupId || actor.displayName ? actor : undefined;
 }
 
-async function renderAnnotationAppearances(input: {
-  documentService: DocumentService;
-  imageEncoder: SharpImageEncoder;
-  encodeInEngine: boolean;
-  derivedRenders?: DerivedRenderService;
-  reply: FastifyReply;
-  signal: AbortSignal;
-  scope: ReadScope;
-  pageObjectNumber: number;
-  tokenQuery?: Record<string, string>;
-  query: unknown;
-}) {
-  const page = await resolvePageForRead(input);
-  if (input.tokenQuery !== undefined) rejectQueryParamsOnTokenUrl(input.query);
-
-  // Token (versioned) and query (unversioned) both arrive as flat string maps.
-  // `unflatten` turns the dotted `viewport.*` keys into the nested object the
-  // schema expects; z.coerce handles the string→number/enum coercions.
-  const flatInput = (input.tokenQuery ?? input.query) as Record<string, unknown>;
-  const parsedQuery = parseOrInvalidArg(
-    AnnotationAppearancesQuerySchema,
-    unflatten(flatInput),
-    input.tokenQuery === undefined ? 'appearance render query' : 'appearance render token',
-  );
-  const imageOptions: AnnotationAppearanceImageOptions = parsedQuery.options;
-  const requestedAnnotationVersion = parsedQuery.annotationVersion;
-  // Format lives in the token (versioned) or query (unversioned). The schema
-  // requires it on versioned requests; the unversioned alias defaults to webp.
-  const format: PageNetworkRenderFormat = parseOrInvalidArg(
-    PageNetworkRenderFormatSchema,
-    imageOptions.format ?? 'webp',
-    'render format',
-  );
-
-  if (
-    requestedAnnotationVersion !== undefined &&
-    requestedAnnotationVersion !== page.cache.annotationVersion
-  ) {
-    setNoStore(input.reply);
-    throw new EngineError(
-      EngineErrorCode.NotFound,
-      `appearance annotationVersion ${requestedAnnotationVersion} no longer current (current=${page.cache.annotationVersion}) for page ${input.pageObjectNumber}`,
-    );
-  }
-
-  // Appearance-scale enforcement: the appearance lattice
-  // bounds scale — appearances are sized by `rect × scale`, so a page-sized
-  // stamp at a high scale is a full-page memory bomb wearing a different
-  // token. Same scoping as pages: only versioned (token) requests are
-  // enforced; the unversioned alias stays compute-only (no-store), which is
-  // the escape hatch for off-canonical needs (an unusual quality).
-  const derived = input.derivedRenders;
-  if (
-    derived !== undefined &&
-    derived.enforced &&
-    input.tokenQuery !== undefined &&
-    !derived.classifyAppearance({ imageOptions, format }).onLattice
-  ) {
-    setNoStore(input.reply);
-    derived.rejectOffLattice(
-      "use a scale viewport: { kind: 'scale', scale: snapAppearanceScale(policy, scale) }",
-    );
-  }
-
-  if (input.scope.kind === 'layer') {
-    await input.documentService.ensureLayerOnPool(
-      input.scope.ctx,
-      input.scope.docId,
-      input.scope.layerName,
-    );
-  }
-
-  // Every server render carries the deployment's output-pixel budget —
-  // the worker rejects before allocating (degenerate-geometry guard).
-  const renderOptions = {
-    ...annotationRenderOptionsFromImageOptions(imageOptions),
-    ...(derived !== undefined ? { maxOutputPixels: derived.maxRenderPixels } : {}),
-  };
-  // Both branches produce the same manifest ingredients. In-engine encode
-  // With in-engine encoding (the default), the appearance raster batch never leaves
-  // the worker — it crosses the engine boundary as compressed images.
-  // The legacy branch (CLOUDPDF_ENCODE_IN_ENGINE=0) keeps API-side sharp
-  // on the raw raster payload for one release.
-  const collect = async (): Promise<{
-    page: AnnotationAppearanceManifest['page'];
-    entries: AnnotationAppearanceManifestEntry[];
-    parts: MultipartPart[];
-  }> => {
-    const entries: AnnotationAppearanceManifestEntry[] = [];
-    const parts: MultipartPart[] = [];
-    const ext = format === 'webp' ? 'webp' : 'png';
-    let i = 0;
-    if (input.encodeInEngine) {
-      const build = (jobId: WorkerJobId) =>
-        wirePack({
-          kind: 'annotations.renderAppearancesEncoded' as const,
-          effect: 'read' as const,
-          jobId,
-          docId: input.scope.docId,
-          ...(input.scope.kind === 'layer' ? { layerName: input.scope.layerName } : {}),
-          page: toPageRef(input.pageObjectNumber),
-          options: renderOptions,
-          encode: {
-            format,
-            ...(imageOptions.quality !== undefined ? { quality: imageOptions.quality } : {}),
-          },
-        });
-      const scope = input.scope;
-      const payload = await input.documentService.readOnPool(
-        scope.ctx,
-        scope.docId,
-        scope.kind === 'layer' ? scope.layerName : undefined,
-        build,
-        input.signal,
-      );
-      if (payload.tag !== 'annotations.renderAppearancesEncoded') {
-        throw new EngineError(
-          EngineErrorCode.WireFormat,
-          `unexpected annotations.renderAppearancesEncoded payload: ${payload.tag}`,
-        );
-      }
-      // Every annotation with an appearance stream is emitted, once per mode
-      // and state: the client addresses the image by `part` name and
-      // identifies it by `ref`, `mode` and `state`.
-      for (const appearance of payload.result.appearances) {
-        const partName = `appearance-${i++}`;
-        entries.push({
-          part: partName,
-          ref: appearance.ref,
-          mode: appearance.mode,
-          state: appearance.state,
-          rect: appearance.rect,
-          width: appearance.image.width,
-          height: appearance.image.height,
-          format,
-          contentType: appearance.image.contentType,
-        });
-        parts.push({
-          name: partName,
-          filename: `${partName}.${ext}`,
-          contentType: appearance.image.contentType,
-          body: Buffer.from(appearance.image.bytes),
-        });
-      }
-      return { page: payload.result.page, entries, parts };
-    }
-    const build = (jobId: WorkerJobId) =>
-      wirePack({
-        kind: 'annotations.renderAppearances' as const,
-        effect: 'read' as const,
-        jobId,
-        docId: input.scope.docId,
-        ...(input.scope.kind === 'layer' ? { layerName: input.scope.layerName } : {}),
-        page: toPageRef(input.pageObjectNumber),
-        options: renderOptions,
-      });
-    const scope = input.scope;
-    const payload = await input.documentService.readOnPool(
-      scope.ctx,
-      scope.docId,
-      scope.kind === 'layer' ? scope.layerName : undefined,
-      build,
-      input.signal,
-    );
-    if (payload.tag !== 'annotations.renderAppearances') {
-      throw new EngineError(
-        EngineErrorCode.WireFormat,
-        `unexpected annotations.renderAppearances payload: ${payload.tag}`,
-      );
-    }
-    // The worker payload nests the render result under `.result`
-    // (`{ tag, result: { pageState, appearances } }`), unlike the flat
-    // `pages.render` payload — unwrap it before consuming.
-    const result = payload.result;
-
-    // Encode each appearance to the requested format. Every annotation with an
-    // appearance stream is emitted: the client addresses the image by `part`
-    // name and identifies the annotation by `ref`.
-    for (const appearance of result.appearances) {
-      const encoded = input.imageEncoder.encode(appearance.raster, {
-        format,
-        ...(imageOptions.quality !== undefined ? { quality: imageOptions.quality } : {}),
-      });
-      const body = await encoded.stream.toBuffer();
-      const partName = `appearance-${i++}`;
-      entries.push({
-        part: partName,
-        ref: appearance.ref,
-        mode: appearance.mode,
-        state: appearance.state,
-        rect: appearance.rect,
-        width: appearance.raster.width,
-        height: appearance.raster.height,
-        format,
-        contentType: encoded.contentType,
-      });
-      parts.push({
-        name: partName,
-        filename: `${partName}.${ext}`,
-        contentType: encoded.contentType,
-        body,
-      });
-    }
-    return { page: result.page, entries, parts };
-  };
-  const collected = await collect();
-
-  const manifest: AnnotationAppearanceManifest = {
-    page: collected.page,
-    appearances: collected.entries,
-  };
-
-  requestedAnnotationVersion === undefined
-    ? setNoStore(input.reply)
-    : setImmutableCache(input.reply);
-
-  const { contentType, body } = buildMultipart(manifest, collected.parts);
-  input.reply.type(contentType);
-  input.reply.header('X-EmbedPDF-Appearance-Count', String(collected.entries.length));
-  return input.reply.send(body);
-}
-
-function rejectQueryParamsOnTokenUrl(query: unknown): void {
-  if (query && typeof query === 'object' && Object.keys(query).length > 0) {
-    throw new EngineError(
-      EngineErrorCode.InvalidArg,
-      'versioned appearance URLs must encode options in the path token, not query params',
-    );
-  }
-}
-
 async function readAnnotations(input: {
   documentService: DocumentService;
   reply: { header(name: 'Cache-Control', value: string): unknown };
@@ -1416,30 +1160,5 @@ async function readAnnotationsAll(input: {
   throw new EngineError(
     EngineErrorCode.LayerVersionConflict,
     `${scope.kind === 'layer' ? 'layer ' : ''}annotations changed while reading; retry the request`,
-  );
-}
-
-async function resolvePageForRead(input: {
-  documentService: DocumentService;
-  scope: ReadScope;
-  pageObjectNumber: number;
-}): Promise<ManifestPage> {
-  const manifest =
-    input.scope.kind === 'layer'
-      ? await input.documentService.getLayerManifest(
-          input.scope.ctx,
-          input.scope.docId,
-          input.scope.layerName,
-        )
-      : await input.documentService.getManifest(input.scope.ctx, input.scope.docId);
-  const page = manifest.pages.find((p) => p.page.objectNumber === input.pageObjectNumber);
-  if (page) {
-    return page;
-  }
-  throw new EngineError(
-    EngineErrorCode.NotFound,
-    input.scope.kind === 'layer'
-      ? `no page with object number ${input.pageObjectNumber} in layer ${input.scope.layerName} for document ${input.scope.docId}`
-      : `no page with object number ${input.pageObjectNumber} in document ${input.scope.docId}`,
   );
 }

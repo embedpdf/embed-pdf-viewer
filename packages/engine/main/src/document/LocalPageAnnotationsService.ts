@@ -5,14 +5,12 @@ import {
   EngineError,
   EngineErrorCode,
   deletedAnnotationsOf,
-  createPageImageHandle,
   hasAnnotationResources,
   opIdOf,
   resolveAnnotationResources,
   withFileFromResource,
   wirePack,
   type EngineRenderPolicy,
-  type AnnotationAppearanceImage,
   type AnnotationAppearanceImageOptions,
   type AnnotationAppearanceImagesResult,
   type AnnotationAppearanceRenderOptions,
@@ -27,18 +25,22 @@ import {
   type AnnotationCreateResult,
   type AnnotationDeleteResult,
   type AnnotationFlattenResult,
-  type AnnotationMoveResult,
+  type AnnotationPosition,
+  type AnnotationReorderResult,
   type FlattenWriteOptions,
   type AnnotationUpdateResult,
   type LocalPageAnnotationsService as LocalPageAnnotationsServiceContract,
   type PageRef,
   type WriteOptions,
-  checkImageQuality,
 } from '@embedpdf/engine-core/runtime';
 import type { SessionEventPublisher } from '@embedpdf/engine-services';
 
+import {
+  renderAppearanceImages,
+  renderAppearanceRasters,
+  type AppearanceBatchContext,
+} from './appearanceBatch';
 import type { LocalImageEncoder } from '../render/BrowserImageEncoder';
-import { assertAppearanceOnLattice, withAppearanceBudget } from '../render/renderPolicyGuard';
 import type { ScopeGuard } from '../scope';
 import type { JobId, WorkerResultPayload } from '../worker/protocol';
 import type { JobQueue } from '../worker/WorkerQueue';
@@ -142,92 +144,24 @@ export class LocalPageAnnotationsService implements LocalPageAnnotationsServiceC
   renderAppearancesRaw(
     options?: AnnotationAppearanceRenderOptions,
   ): AbortablePromise<AnnotationAppearancesResult> {
-    if (this.view.isClosed()) {
-      return AbortablePromise.rejectReason(
-        new EngineError(EngineErrorCode.DocNotOpen, `document not open: ${this.docId}`),
-      );
-    }
-    // Rendering an appearance reveals the annotation's `/AP` stream, so it
-    // gates on the same `doc.annotate.read` capability as `list()` — reading
-    // an annotation implies you may see how it draws.
-    // The deployment policy applies the same way it does to full pages:
-    // appearances are sized by `rect × scale`, so an enforced appearance
-    // lattice bounds the scale and the pixel budget rides into the worker.
-    try {
-      this.guard.assertCapability('doc.annotate.read');
-      assertAppearanceOnLattice(this.policy, options);
-    } catch (err) {
-      return AbortablePromise.rejectReason(err);
-    }
-    const effectiveOptions = withAppearanceBudget(this.policy, options);
-    const docId = this.docId;
-    const ref = this.ref;
-    const submission = this.queue.enqueue<WorkerResultPayload>({
-      buildPack: (jobId: JobId) =>
-        wirePack({
-          kind: 'annotations.renderAppearances',
-          effect: 'read',
-          jobId,
-          docId,
-          page: ref,
-          ...(effectiveOptions ? { options: effectiveOptions } : {}),
-        }),
-    });
-    return AbortablePromise.run<AnnotationAppearancesResult>(async (signal) => {
-      const onAbort = () => submission.abort(signal.reason);
-      if (signal.aborted) onAbort();
-      else signal.addEventListener('abort', onAbort, { once: true });
-      const payload = await submission;
-      if (payload.tag !== 'annotations.renderAppearances') {
-        throw new EngineError(EngineErrorCode.WireFormat, `unexpected payload tag: ${payload.tag}`);
-      }
-      return payload.result;
-    });
+    return renderAppearanceRasters(this.appearanceBatch(), 'annotations', options);
   }
 
   renderAppearances(
     options: AnnotationAppearanceImageOptions = {},
   ): AbortablePromise<AnnotationAppearanceImagesResult> {
-    return AbortablePromise.run<AnnotationAppearanceImagesResult>(async (signal) => {
-      checkImageQuality(options.quality);
-      const raw = this.renderAppearancesRaw(options);
-      const onAbort = () => raw.abort(signal.reason);
-      if (signal.aborted) onAbort();
-      else signal.addEventListener('abort', onAbort, { once: true });
-      const result = await raw;
-      if (signal.aborted)
-        throw new EngineError(EngineErrorCode.Aborted, 'annotation appearance render aborted');
+    return renderAppearanceImages(this.appearanceBatch(), this.encoder, 'annotations', options);
+  }
 
-      // Encode each raster sequentially. `encoder.encode` transfers the
-      // raster's backing buffer into a worker, so we never touch
-      // `appearance.raster.data` again after this point.
-      const appearances: AnnotationAppearanceImage[] = [];
-      for (const appearance of result.appearances) {
-        if (signal.aborted)
-          throw new EngineError(EngineErrorCode.Aborted, 'annotation appearance render aborted');
-        const encoded = await this.encoder.encode(appearance.raster, options, signal);
-        if (encoded.source.kind !== 'bytes') {
-          throw new EngineError(
-            EngineErrorCode.WireFormat,
-            'local appearance image handle expected a byte source',
-          );
-        }
-        const bytes = encoded.source.bytes;
-        const image = createPageImageHandle(encoded, {
-          async blob() {
-            return new Blob([copyToExactArrayBuffer(bytes)], { type: encoded.contentType });
-          },
-        });
-        appearances.push({
-          ref: appearance.ref,
-          mode: appearance.mode,
-          state: appearance.state,
-          rect: appearance.rect,
-          image,
-        });
-      }
-      return { page: result.page, appearances };
-    });
+  private appearanceBatch(): AppearanceBatchContext {
+    return {
+      docId: this.docId,
+      page: this.ref,
+      queue: this.queue,
+      isClosed: () => this.view.isClosed(),
+      guard: this.guard,
+      policy: this.policy,
+    };
   }
 
   create(
@@ -416,51 +350,53 @@ export class LocalPageAnnotationsService implements LocalPageAnnotationsServiceC
     });
   }
 
-  move(
+  reorder(
     refs: AnnotationRef[],
-    toIndex: number,
+    position: AnnotationPosition,
     options?: WriteOptions,
-  ): AbortablePromise<AnnotationMoveResult> {
+  ): AbortablePromise<AnnotationReorderResult> {
     if (this.view.isClosed()) {
       return AbortablePromise.rejectReason(
         new EngineError(EngineErrorCode.DocNotOpen, `document not open: ${this.docId}`),
       );
     }
-    // Move is a structural reorder — gates on `doc.annotate.modify`,
-    // not on per-record collab (no specific target to check). For
-    // wildcard / admin tokens, this passes trivially.
+    // The worker checks the caller's authority against each annotation it
+    // moves, inside the write: a reorder takes `doc.annotate.modify`. A
+    // signature's protection is the document's, checked here.
     let opId: string;
     try {
       opId = opIdOf(options);
-      this.guard.assertCapability('doc.annotate.modify');
+      this.guard.assertAnnotationsUnprotected();
     } catch (err) {
       return AbortablePromise.rejectReason(err);
     }
+    const authority = this.guard.annotationAuthority();
     const docId = this.docId;
     const ref = this.ref;
     const submission = this.queue.enqueue<WorkerResultPayload>({
       buildPack: (jobId: JobId) =>
         wirePack({
-          kind: 'annotations.move',
+          kind: 'annotations.reorder',
           effect: 'write',
           jobId,
           opId,
           docId,
           page: ref,
           refs,
-          toIndex,
+          position,
+          authority,
         }),
     });
-    return AbortablePromise.run<AnnotationMoveResult>(async (signal) => {
+    return AbortablePromise.run<AnnotationReorderResult>(async (signal) => {
       const onAbort = () => submission.abort(signal.reason);
       if (signal.aborted) onAbort();
       else signal.addEventListener('abort', onAbort, { once: true });
       const payload = await submission;
-      if (payload.tag !== 'annotations.move') {
+      if (payload.tag !== 'annotations.reorder') {
         throw new EngineError(EngineErrorCode.WireFormat, `unexpected payload tag: ${payload.tag}`);
       }
       this.publisher.publishWrite(opId, {
-        type: 'annotations.moved',
+        type: 'annotations.reordered',
         page: this.ref,
         ...payload.result,
       });
@@ -555,10 +491,4 @@ export class LocalPageAnnotationsService implements LocalPageAnnotationsServiceC
       return new Uint8Array(payload.bytes);
     });
   }
-}
-
-function copyToExactArrayBuffer(bytes: Uint8Array): ArrayBuffer {
-  const body = new ArrayBuffer(bytes.byteLength);
-  new Uint8Array(body).set(bytes);
-  return body;
 }

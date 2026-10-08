@@ -26,6 +26,11 @@ export const AnnotationsAllTokenSchema = {
   fields: ['annotationsVersion'],
 } as const satisfies TokenSchema;
 
+/** The form (`form@`): its fields, widget rows and calculation order. */
+export const FormTokenSchema = {
+  fields: ['formsVersion'],
+} as const satisfies TokenSchema;
+
 /**
  * `doc.annotations.export` leaf: the annotation and layout pins (the bundle
  * carries each page's position and box, which only the layout pin covers)
@@ -73,10 +78,10 @@ export const DownloadTokenSchema = {
  * set, so it is expressed by the path family (`…/render/pages/` vs
  * `…/render/annotated/pages/`), never inside the token. `annotationVersion`
  * belongs to the annotated family's tokens only — each family's query
- * schema enforces its own pin grammar. `formFields` is a token field of the
- * annotated family: form fields are annotations (widgets), so leaving them
- * out changes no plane the picture depends on; it is encoded only as
- * `false`, its one non-default value.
+ * schema enforces its own pin grammar. Form fields have no token field:
+ * who may read the form isn't who may read the annotations, and a CDN grant
+ * is a path prefix, so a picture with fields needs a path of its own. Cloud
+ * pictures draw none until it has one.
  */
 export const RenderTokenSchema = {
   fields: [
@@ -84,7 +89,6 @@ export const RenderTokenSchema = {
     'background',
     'contentVersion',
     'format',
-    'formFields',
     'quality',
     'rotation',
     'target.kind',
@@ -146,6 +150,25 @@ export const AnnotationAppearancesRenderTokenSchema = {
     'viewport.kind',
     'viewport.scale',
     'viewport.width',
+  ],
+  maxLength: 256,
+} as const satisfies TokenSchema;
+
+/**
+ * Token for a page's widget images (`form/pages/{p}/appearances@`): the
+ * annotation appearance token's options, keyed by the page's
+ * `widgetVersion`.
+ */
+export const WidgetAppearancesRenderTokenSchema = {
+  fields: [
+    'format',
+    'modes',
+    'quality',
+    'rotation',
+    'viewport.kind',
+    'viewport.scale',
+    'viewport.width',
+    'widgetVersion',
   ],
   maxLength: 256,
 } as const satisfies TokenSchema;

@@ -337,8 +337,7 @@ function asTaken(bundle: AnnotationBundle, dropped: readonly AnnotationImportDro
 /**
  * What two documents can agree on after import. Refs to
  * annotations become positions in the bundle, pages their position in the
- * source document; `index`, `importedBy` and
- * `hasAppearance` (how the source stored it: an import draws its copies from
+ * source document; `importedBy` and `hasAppearance` (how the source stored it: an import draws its copies from
  * data) and a file's size and checksum (the bytes', which are compared by
  * their id) go, and in `stamp` mode the attribution it stamps.
  * A link's `activate` action is its `target`, compared there: a `/Dest`
@@ -386,7 +385,6 @@ function normalized(bundle: AnnotationBundle, attribution: Attribution) {
     items: bundle.items.map(({ data, resources }) => {
       const {
         ref,
-        index: _index,
         importedBy: _importedBy,
         hasAppearance: _hasAppearance,
         popup,

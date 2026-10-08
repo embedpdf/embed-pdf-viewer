@@ -64,7 +64,7 @@ export interface PendingSigning {
 export interface SigningCompletion {
   readonly signingId: string;
   readonly cms: Uint8Array;
-  readonly result: SignatureCompleteResult<PdfCoordinates>;
+  readonly result: SignatureCompleteResult;
 }
 
 /** What every meta of a write carries: its id, and whether it can be undone. */

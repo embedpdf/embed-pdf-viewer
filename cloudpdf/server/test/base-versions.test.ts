@@ -334,6 +334,7 @@ describe('layers over base versions', () => {
     expect(await layerState.computeLayerScopesFromDb(DOC, 'bob')).toEqual({
       content: 'base',
       annotations: 'base',
+      forms: 'base',
       layout: 'base',
       attachments: 'base',
       metadata: 'base',
@@ -342,6 +343,7 @@ describe('layers over base versions', () => {
     expect(await layerState.computeLayerScopesFromDb(DOC, 'alice')).toEqual({
       content: 'layer',
       annotations: 'layer',
+      forms: 'layer',
       layout: 'layer',
       attachments: 'layer',
       metadata: 'layer',

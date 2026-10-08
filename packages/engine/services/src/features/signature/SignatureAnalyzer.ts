@@ -32,7 +32,6 @@ import { deriveProtection } from '@embedpdf/engine-core/runtime';
 import { NULL_PTR, type PdfRuntimeModule, type Ptr } from '@embedpdf/engine-runtime';
 
 import { SignatureReader } from './SignatureReader';
-import { withWidgetRects } from '../forms/internal/widgetRects';
 import type { DocumentSession } from '../../document-session/DocumentSession';
 import {
   CloseStack,
@@ -96,7 +95,7 @@ export class SignatureAnalyzer {
    * over the loaded bytes. Identical to the loaded-bytes snapshot when
    * nothing is unsaved.
    */
-  readWorkingCopySnapshot(): SignatureSnapshot<PdfCoordinates> {
+  readWorkingCopySnapshot(): SignatureSnapshot {
     const stack = new CloseStack();
     try {
       const copy = this.openWorkingCopy(stack);
@@ -106,9 +105,7 @@ export class SignatureAnalyzer {
       const target = copy.target;
       return withSignatureModel(this.runtime, target, (model) => {
         const chainValid = this.runtime.fn.EPDFSig_IsRevisionChainValid(model);
-        const signatures = withWidgetRects(this.runtime, target, (rectOf) =>
-          readSignaturesFromModel(this.runtime, model, rectOf),
-        );
+        const signatures = readSignaturesFromModel(this.runtime, model);
         const revisions = chainValid ? readRevisions(this.runtime, target, signatures) : [];
         return { chainValid, revisions, signatures, protection: deriveProtection(signatures) };
       });

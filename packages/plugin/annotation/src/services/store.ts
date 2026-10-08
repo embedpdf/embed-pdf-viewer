@@ -181,9 +181,6 @@ function statedChangeOf(model: Model, change: StoreChange): StatedChange {
     const nm = change.draft.nm ?? generateUuid();
     const ref: AnnotationRef = { kind: 'nm', page: change.page, nm };
     const draft = { ...change.draft, nm } as AnnotationDraft;
-    const onPage = model.order.filter(
-      (id) => model.byId[id]?.annotation.page.objectNumber === change.page.objectNumber,
-    ).length;
     // The annotations it links to are the engine's to look up as it writes
     // (as a change set links them): read without them, then stated.
     const { reply, parent, ...fields } = draft as AnnotationDraft & {
@@ -191,7 +188,7 @@ function statedChangeOf(model: Model, change: StoreChange): StatedChange {
       parent?: AnnotationRef | null;
     };
     const annotation = {
-      ...annotationOfNew(fields as AnnotationDraft, { ref, index: onPage }),
+      ...annotationOfNew(fields as AnnotationDraft, { ref }),
       ...(reply ? { reply: { to: reply.to, type: reply.type ?? 'reply' } } : {}),
       ...(parent ? { parent } : {}),
     } as Annotation;

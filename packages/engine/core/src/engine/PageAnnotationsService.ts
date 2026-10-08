@@ -9,10 +9,11 @@ import type {
 } from '../dto/AnnotationRender';
 import type { AnnotationRef } from '../identity/AnnotationRef';
 import type { AnnotationFlattenResult } from '../mutation/AnnotationFlattenResult';
+import type { AnnotationPosition } from '../mutation/ListPosition';
 import type {
   AnnotationCreateResult,
   AnnotationDeleteResult,
-  AnnotationMoveResult,
+  AnnotationReorderResult,
   AnnotationUpdateResult,
 } from '../mutation/AnnotationMutationResults';
 import type {
@@ -26,14 +27,16 @@ import { AbortablePromise } from '../promise/AbortablePromise';
 /**
  * Per-page annotation service exposed via `PageHandle.annotations`.
  *
- * `list()` returns the page's fully typed annotations; every annotation
- * write of one page goes through this service.
+ * `list()` returns the page's fully typed annotations except widgets, which
+ * are the form's (`doc.forms.list()`); every annotation write of one page
+ * goes through this service.
  */
 export interface PageAnnotationsService {
-  /** This page's annotations, in display order: `doc.annotations.list()` for one page. */
+  /** This page's annotations except widgets, in display order: `doc.annotations.list()` for one page. */
   list(): AbortablePromise<AnnotationList>;
   /**
-   * Batch-render every annotation appearance (`/AP`) stream on the page into
+   * Batch-render every annotation appearance (`/AP`) stream on the page,
+   * widgets excepted (`page.forms.renderAppearances()` has those), into
    * its own image, sized to the annotation's `/Rect`: encoded by the engine's
    * image encoder (local) or fetched as a `multipart/form-data` body (cloud),
    * each a lazily-resolved `PageImageHandle`. Read-only and gated by
@@ -84,20 +87,20 @@ export interface PageAnnotationsService {
   ): AbortablePromise<AnnotationUpdateResult>;
   delete(ref: AnnotationRef, options?: WriteOptions): AbortablePromise<AnnotationDeleteResult>;
   /**
-   * Batch move (contiguous-block; `refs.length === 1` is the
-   * single-annotation case). Moved annotations keep their names. All or
-   * nothing, one impact per batch.
-   *
-   * @param refs Annotations to move, in the order they should appear
-   *             after the move.
-   * @param toIndex Insertion point in the post-removal /Annots index
-   *                space, in `[0, count - refs.length]`.
+   * Change the stacking order: the annotations go together, in the order
+   * given, to `position` in the page's paint order (later paints over
+   * earlier): next to a neighbour (`{ before: ref }`, `{ after: ref }`) or at
+   * `'start'` (bottom) / `'end'` (top). Widgets paint above every annotation
+   * and have their own order (`doc.forms.reorderWidgets()`): a widget, as a
+   * row or a neighbour, is refused with `InvalidArg`. A neighbour that isn't
+   * on the page is `NotFound`. Answers the page's new order. Emits
+   * `annotations.reordered`.
    */
-  move(
+  reorder(
     refs: AnnotationRef[],
-    toIndex: number,
+    position: AnnotationPosition,
     options?: WriteOptions,
-  ): AbortablePromise<AnnotationMoveResult>;
+  ): AbortablePromise<AnnotationReorderResult>;
 
   /**
    * Flatten the given annotations of this page into its content —

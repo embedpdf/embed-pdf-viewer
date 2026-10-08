@@ -47,7 +47,7 @@ const sameRef = (left: PageRef, right: PageRef) => left.objectNumber === right.o
         type="button"
         class="button"
         [disabled]="!canEdit || count === 0"
-        (click)="pageEdit.move(selected(), { index: 0 })"
+        (click)="pageEdit.reorder(selected(), 'start')"
       >
         Move to front
       </button>

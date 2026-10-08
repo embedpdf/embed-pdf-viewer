@@ -25,9 +25,12 @@ import type { PageRotation } from '@embedpdf/core-geometry';
 import {
   annotationKey,
   generateUuid,
+  reorderedList,
+  reorderPart,
   type Annotation,
   type AnnotationPatch,
   type AnnotationRef,
+  type ListPosition,
   type PageRef,
 } from '@embedpdf/engine-core/runtime';
 
@@ -95,37 +98,39 @@ export interface GhostPointer {
 
 /**
  * A change of a page's drawing order the engine hasn't confirmed yet: these
- * records sit from `toIndex` on, in this order. The view shows it at once.
+ * records go to `position` among the page's others, in this order. The view
+ * shows it at once.
  */
-export interface PendingMove {
+export interface PendingReorder {
   /** Unique: the write that carries it removes exactly it. */
   readonly token: number;
   readonly page: number;
   readonly ids: readonly Id[];
-  readonly toIndex: number;
+  readonly position: ListPosition<Id>;
 }
 
 /**
- * `order` with one page's `ids` moved to `toIndex` among that page's other
- * records, in the order given. Other pages keep their places: the page's
- * records take back the slots they had. The engine's rule for a move.
+ * `order` with one page's `ids` moved to `position` among that page's other
+ * records, in the order given: the engine's rule for a reorder. Other pages
+ * keep their places. Unchanged when the engine would refuse it (a record or
+ * the neighbour no longer on the page): the view shows what can happen.
  */
-export function moveInOrder<Key>(
-  order: readonly Key[],
-  onPage: (key: Key) => boolean,
-  ids: readonly Key[],
-  toIndex: number,
-): Key[] {
-  const moving = new Set(ids);
-  const page = order.filter(onPage);
-  const rest = page.filter((key) => !moving.has(key));
-  const moved = ids.filter((key) => page.includes(key));
-  if (!moved.length) return [...order];
-  const at = Math.max(0, Math.min(toIndex, rest.length));
-  const next = [...rest.slice(0, at), ...moved, ...rest.slice(at)];
-  let slot = 0;
-  return order.map((key) => (onPage(key) ? next[slot++]! : key));
+export function reorderInOrder(
+  order: readonly Id[],
+  onPage: (id: Id) => boolean,
+  ids: readonly Id[],
+  position: ListPosition<Id>,
+): Id[] {
+  let page: Id[];
+  try {
+    page = reorderedList(order.filter(onPage), ids, position, sameId);
+  } catch {
+    return [...order];
+  }
+  return reorderPart(order, onPage, page, sameId);
 }
+
+const sameId = (id: Id) => id;
 
 /** A sibling plugin's placement gesture with one of this plugin's tools: its press, and the pointer now. */
 export interface ForeignPlacement {
@@ -147,7 +152,7 @@ export interface AnnotationState {
    */
   readonly vector: Readonly<Record<Id, true>>;
   /** Drawing-order changes the engine hasn't confirmed yet, oldest first. */
-  readonly moves: readonly PendingMove[];
+  readonly reorders: readonly PendingReorder[];
   /**
    * Where the active tool's ghost is: the pointer, while a click there would
    * make something. Only the pointer is state; what the ghost paints is
@@ -178,7 +183,7 @@ export const initialAnnotationState = (): AnnotationState => ({
   },
   pending: [],
   vector: {},
-  moves: [],
+  reorders: [],
   ghostAt: null,
   placing: null,
   textSelection: null,
@@ -353,14 +358,14 @@ export function preferBaked(state: AnnotationState, ids: readonly Id[]): Annotat
 
 /* ── drawing order, ghost and text selection ─────────────────────────────── */
 
-export const addMove = (state: AnnotationState, move: PendingMove): AnnotationState => ({
+export const addReorder = (state: AnnotationState, reorder: PendingReorder): AnnotationState => ({
   ...state,
-  moves: [...state.moves, move],
+  reorders: [...state.reorders, reorder],
 });
 
-export const dropMove = (state: AnnotationState, token: number): AnnotationState =>
-  state.moves.some((move) => move.token === token)
-    ? { ...state, moves: state.moves.filter((move) => move.token !== token) }
+export const dropReorder = (state: AnnotationState, token: number): AnnotationState =>
+  state.reorders.some((reorder) => reorder.token === token)
+    ? { ...state, reorders: state.reorders.filter((reorder) => reorder.token !== token) }
     : state;
 
 export const setGhostAt = (

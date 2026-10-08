@@ -4,6 +4,7 @@ import {
   toPageRef,
   type FormFieldDTO,
   type FormSnapshot,
+  type WidgetAnnotation,
 } from '@embedpdf/engine-core/runtime';
 import { createTestContext } from '@embedpdf/core/testing';
 import { InteractionToken } from '@embedpdf/plugin-interaction/contract/host';
@@ -26,7 +27,7 @@ const field = (): FormFieldDTO => ({
   mappingName: null,
   valueEntry: { kind: 'scalar', value: '' },
   defaultValueEntry: { kind: 'scalar', value: '' },
-  widgets: [{ ...formWidget(9, toPageRef(1)), rect: null }],
+  widgets: [formWidget(9, toPageRef(1))],
   value: '',
   defaultValue: '',
   maxLength: null,
@@ -38,6 +39,14 @@ const field = (): FormFieldDTO => ({
 const SNAPSHOT: FormSnapshot = {
   formKind: 'acroform',
   needsAppearances: false,
+  widgets: [
+    {
+      subtype: 'widget',
+      ref: { kind: 'objectNumber', page: toPageRef(1), objectNumber: 9 },
+      page: toPageRef(1),
+      rect: { x: 0, y: 0, width: 100, height: 20 },
+    } as unknown as WidgetAnnotation,
+  ],
   fields: [field()],
   calculationOrder: [],
 };
@@ -59,19 +68,6 @@ function harness(granted: readonly string[]) {
     capabilities: [[InteractionToken, interaction]],
     doc: {
       forms: { list, setValue, create },
-      page: () => ({
-        annotations: {
-          list: async () => ({
-            annotations: [
-              {
-                subtype: 'widget',
-                ref: { kind: 'objectNumber', page: toPageRef(1), objectNumber: 9 },
-                rect: { x: 0, y: 0, width: 100, height: 20 },
-              },
-            ],
-          }),
-        },
-      }),
       security: { allows: (capability: string) => granted.includes(capability) },
     } as never,
   });

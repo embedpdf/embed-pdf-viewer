@@ -131,7 +131,6 @@ describe('appearanceImpactOf — value diffing (inert)', () => {
     const p = patch({
       subtype: 'square',
       page: { kind: 'objectNumber', objectNumber: 3 },
-      index: 7,
       hasAppearance: true,
       appearanceState: null,
       author: 'Someone else',

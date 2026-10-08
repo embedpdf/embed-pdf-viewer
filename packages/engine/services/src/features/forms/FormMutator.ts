@@ -46,7 +46,8 @@ import {
   type NativeFieldWrite,
 } from './internal/fieldValues';
 import { withWideStringArray } from './internal/wideStringArray';
-import { readFieldAt, readFormSnapshot } from './internal/readFormSnapshot';
+import { readFieldAt } from './internal/readFormSnapshot';
+import { readForm } from './internal/widgetRows';
 import {
   fieldObjectNumberOf,
   resolveFieldRef,
@@ -72,7 +73,6 @@ const CHANGED_WIDGETS_CAPACITY = 256;
 // Mirrors EPDF_FORM_REPAIR_* in public/epdf_form.h.
 const REPAIR_BAKE_APPEARANCES = 0x1;
 
-
 /** The families that hold a value: the ones `reset` puts back. */
 const VALUE_FAMILIES: ReadonlySet<FormFieldFamily> = new Set([
   'text',
@@ -88,6 +88,12 @@ const VALUE_FAMILIES: ReadonlySet<FormFieldFamily> = new Set([
  * the document untouched (on layers: nothing promoted), and each success
  * bumps the session's mutation sequence so version-keyed caches rebuild.
  */
+/**
+ * A form write's result as the mutator gives it: the fields, without the
+ * widget rows, which the change that ran it reads (`withWidgetRows`).
+ */
+export type FieldWriteResult<T> = Omit<T, 'widgets'>;
+
 export class FormMutator {
   constructor(
     private readonly runtime: PdfRuntimeModule,
@@ -98,7 +104,7 @@ export class FormMutator {
     ref: FormFieldRef,
     value: FormFieldValue,
     signal: AbortSignal,
-  ): FormSetValueResult<PdfCoordinates> {
+  ): FieldWriteResult<FormSetValueResult<PdfCoordinates>> {
     throwIfAborted(signal);
     const model = acquireFormModel(this.runtime, this.session);
     const resolved = resolveFieldRef(this.runtime, model, ref);
@@ -129,7 +135,10 @@ export class FormMutator {
    * by a signature (named, they are refused). Every field is checked before
    * the first write. Returns the fields that changed.
    */
-  reset(refs: FormFieldRef[] | undefined, signal: AbortSignal): FormResetResult<PdfCoordinates> {
+  reset(
+    refs: FormFieldRef[] | undefined,
+    signal: AbortSignal,
+  ): FieldWriteResult<FormResetResult<PdfCoordinates>> {
     throwIfAborted(signal);
     const { fn } = this.runtime;
     const docPtr = this.session.requireDocPtr();
@@ -242,8 +251,7 @@ export class FormMutator {
     });
 
     this.session.invalidateDerived();
-    const fresh = acquireFormModel(this.runtime, this.session);
-    const form = readFormSnapshot(this.runtime, fresh, this.session.requireDocPtr());
+    const form = readForm(this.runtime, this.session, signal);
     // The import names no widgets, so every page with a widget may have repainted.
     const widgets = counts.applied > 0 ? form.fields.flatMap((field) => field.widgets) : [];
     const { affectedPages, cacheDelta, opId, undoable } = formMutationMeta(
@@ -853,7 +861,7 @@ export class FormMutator {
   private readBack(
     fieldObjectNumber: number,
     changedObjNums: number[],
-  ): FormSetValueResult<PdfCoordinates> {
+  ): FieldWriteResult<FormSetValueResult<PdfCoordinates>> {
     this.session.invalidateDerived();
     const fresh = acquireFormModel(this.runtime, this.session);
     const fieldIndex = this.runtime.fn.EPDFForm_GetFieldIndexByObjNum(fresh, fieldObjectNumber);
@@ -870,7 +878,10 @@ export class FormMutator {
     const changedWidgets: FormWidget[] = field.widgets
       .filter((w) => changedSet.has(w.objectNumber))
       .map((w) => formWidget(w.objectNumber, w.page));
-    return { field, meta: formMutationMeta(this.session.writeStamp(), [field.ref], changedWidgets) };
+    return {
+      field,
+      meta: formMutationMeta(this.session.writeStamp(), [field.ref], changedWidgets),
+    };
   }
 }
 

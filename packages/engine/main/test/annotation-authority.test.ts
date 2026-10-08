@@ -85,7 +85,7 @@ describe('annotation writes check the caller inside the write (local engine)', (
       const { annotation } = await annotations.create({ subtype: 'square', box: box(20) });
 
       const { annotation: moved } = await annotations.update(annotation.ref, { box: box(60) });
-      expect(moved.box).toMatchObject(box(60));
+      expect(moved).toMatchObject({ subtype: 'square', box: box(60) });
       expect(moved.modifiedBy).toBe('bob');
 
       const regrouped = await refusal(annotations.update(annotation.ref, { groupId: 'legal' }));
@@ -96,6 +96,62 @@ describe('annotation writes check the caller inside the write (local engine)', (
 
       await annotations.delete(annotation.ref);
       expect((await annotations.list()).annotations).toEqual([]);
+    } finally {
+      await engine.destroy();
+    }
+  });
+  test("a widget is form design: annotation rights alone can't change or move it", async () => {
+    const engine = await createLocalEngine({ runtime: { prefer: 'wasm' } });
+    try {
+      const bytes = new Uint8Array(
+        await readFile(new URL('./fixtures/listbox_form.pdf', import.meta.url)),
+      );
+      const open = (id: string, scope: string[]) =>
+        engine.open({ kind: 'bytes', id, bytes }, { scope, identity: { userId: 'bob' } });
+
+      const commenter = await open('widget-commenter', [
+        'doc.open',
+        'doc.annotate.modify',
+        'doc.forms.read',
+      ]);
+      const page: PageRef = (await commenter.pages.list()).pages[0]!.ref;
+      const annotations = commenter.page(page).annotations;
+      const before = await commenter.forms.list();
+      const widget = before.widgets[0]!;
+      expect(widget).toBeDefined();
+      expect(commenter.security.allowsAnnotation('update', widget)).toBe(false);
+
+      // A widget's place and look are the form's: never an annotation update.
+      const asAnnotation = await refusal(
+        annotations.update(widget.ref, { subtype: 'widget', interiorColor: '#ffd500' }),
+      );
+      expect(EngineError.is(asAnnotation, EngineErrorCode.InvalidArg)).toBe(true);
+      const updated = await refusal(
+        commenter.forms.updateWidget(widget.ref, { interiorColor: '#ffd500' }),
+      );
+      expect(EngineError.is(updated, EngineErrorCode.Forbidden)).toBe(true);
+      expect((updated as EngineError).details).toMatchObject({ required: 'doc.forms.modify' });
+      // Its stacking order is the form's too.
+      const asAnnotationOrder = await refusal(annotations.reorder([widget.ref], 'start'));
+      expect(EngineError.is(asAnnotationOrder, EngineErrorCode.InvalidArg)).toBe(true);
+      const reordered = await refusal(commenter.forms.reorderWidgets([widget.ref], 'start'));
+      expect(EngineError.is(reordered, EngineErrorCode.Forbidden)).toBe(true);
+      expect(await commenter.forms.list()).toEqual(before);
+
+      const designer = await open('widget-designer', [
+        'doc.open',
+        'doc.annotate.modify',
+        'doc.forms.modify',
+      ]);
+      expect(designer.security.allowsAnnotation('update', widget)).toBe(true);
+      const designed = await designer.forms.updateWidget(widget.ref, { interiorColor: '#ffd500' });
+      expect(designed.widget).toMatchObject({ interiorColor: '#ffd500' });
+
+      // A widget has no group of its own: its field's group is the field's.
+      const grouped = await refusal(
+        designer.forms.updateWidget(widget.ref, { groupId: 'legal' } as never),
+      );
+      expect(EngineError.is(grouped, EngineErrorCode.InvalidArg)).toBe(true);
     } finally {
       await engine.destroy();
     }

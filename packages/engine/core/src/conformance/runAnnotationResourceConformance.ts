@@ -543,7 +543,6 @@ function copyOnItsPage(dto: Annotation): AnnotationDraft {
 function dataOf(dto: Annotation): Record<string, unknown> {
   const {
     ref: _ref,
-    index: _index,
     nm: _nm,
     author: _author,
     createdAt: _createdAt,

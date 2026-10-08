@@ -1,6 +1,9 @@
 import {
+  annotationKey,
   authorizeCapability,
   deserializeError,
+  EngineError,
+  EngineErrorCode,
   type ChangeItem,
   type ChangeItemType,
   type ChangeOp,
@@ -10,12 +13,21 @@ import {
   type FormFieldPatch,
   type FormFieldRef,
   type FormFieldValue,
+  type FormMutationMeta,
+  type AnnotationRef,
   type FormWidget,
   type PdfCoordinates,
+  type WidgetAnnotation,
   type WireAnnotationResources,
 } from '@embedpdf/engine-core/runtime';
 
-import { exportField, importField } from './captures';
+import {
+  objectNumberOf,
+  readAnnotation,
+  reordered,
+  writeUpdate as writeAnnotationUpdate,
+} from './annotationChanges';
+import { exportAnnots, exportField, importAnnots, importField } from './captures';
 import { assertExpected, leftAlone, type ChangeContext, type Done } from './changeContext';
 import {
   captureAfter,
@@ -25,18 +37,25 @@ import {
   type PendingCapture,
 } from './objectCaptures';
 import { valuesEqual } from '../../../shared/valuesEqual';
+import { AnnotationMutator } from '../../annotations/AnnotationMutator';
+import { resolveAnnotIndexRaw } from '../../annotations/internal/identity/resolveAnnotIndexRaw';
+import { applyReorder, planReorder, readPageStack } from '../../annotations/internal/stackingOrder';
+import { promoteInlineAnnotations } from '../../annotations/internal/write/promoteInlineAnnotations';
 import { FormMutator } from '../../forms/FormMutator';
 import { FormsEffectsApplier } from '../../forms/FormsEffectsApplier';
 import { acquireFormModel } from '../../forms/internal/formModelCache';
 import { formMutationMeta } from '../../forms/internal/formMutationMeta';
 import { readFieldAt } from '../../forms/internal/readFormSnapshot';
 import { resolveFieldRef } from '../../forms/internal/resolveFieldRef';
+import { withWidgetRows } from '../../forms/internal/widgetRows';
 import type {
   CapturedObject,
   FieldRemoveStep,
   FieldRestoreStep,
   ObjectsRevertStep,
   RevertFallback,
+  WidgetDeleteStep,
+  WidgetRestoreStep,
 } from '../ChangeRecord';
 
 type Op<T extends ChangeOp['type']> = Extract<
@@ -105,7 +124,7 @@ export function reset(ctx: ChangeContext, op: Op<'forms.reset'>): Done {
   const objects = captureAfter(ctx.runtime, ctx.session, pending);
   const changed = new Set(result.fields.map((field) => numberOf(field.ref)));
   return {
-    item: { type: 'forms.reset', ...result },
+    item: { type: 'forms.reset', ...rows(ctx, result) },
     reverse: [
       {
         kind: 'objects.revert',
@@ -195,8 +214,10 @@ export function addWidget(ctx: ChangeContext, op: Op<'forms.addWidget'>): Done {
   return {
     item: {
       type: 'forms.addWidget',
-      field,
-      meta: formMutationMeta(ctx.session.writeStamp(), [field.ref], [widget]),
+      ...rows(ctx, {
+        field,
+        meta: formMutationMeta(ctx.session.writeStamp(), [field.ref], [widget]),
+      }),
     },
     reverse: [revertStep('forms.removeWidget', objects, [before.objectNumber])],
   };
@@ -220,11 +241,124 @@ export function removeWidget(ctx: ChangeContext, op: Op<'forms.removeWidget'>): 
   return {
     item: {
       type: 'forms.removeWidget',
-      field: result.field,
-      meta: formMutationMeta(ctx.session.writeStamp(), [result.field.ref], [result.widget]),
+      ...rows(ctx, {
+        field: result.field,
+        meta: formMutationMeta(ctx.session.writeStamp(), [result.field.ref], [result.widget]),
+      }),
     },
     reverse: [revertStep('forms.addWidget', objects, [before.objectNumber])],
   };
+}
+
+/**
+ * `forms.deleteWidget`: the widget leaves its page, and its field when it has
+ * one. Its reverse brings it back at its place and into its field.
+ */
+export function deleteWidget(
+  ctx: ChangeContext,
+  op: Op<'forms.deleteWidget'>,
+  opIndex: number,
+): Done {
+  authorizeCapability(ctx.authority, 'doc.forms.modify');
+  const current = readAnnotation(ctx, op.widget);
+  if (current.subtype !== 'widget') {
+    throw new EngineError(
+      EngineErrorCode.InvalidArg,
+      `${current.subtype} is not a widget: delete it with page.annotations.delete`,
+      { details: { field: 'widget' } },
+    );
+  }
+  assertExpected(opIndex, current, op.expect);
+  return writeWidgetDelete(ctx, current);
+}
+
+/**
+ * Brings back a widget a delete removed (see `WidgetRestoreStep`): onto its
+ * page at its place, then into its field, whose dictionary goes back as it
+ * was before the widget left it.
+ */
+export function restoreWidget(ctx: ChangeContext, step: WidgetRestoreStep): Done {
+  authorizeCapability(ctx.authority, 'doc.forms.modify');
+  let pageIndex: number;
+  try {
+    pageIndex = ctx.session.resolvePageRef(step.page).pageIndex;
+  } catch {
+    return leftAlone(ctx, 'forms.restoreWidget');
+  }
+  if (tryWidgetRow(ctx, step.widget)) return leftAlone(ctx, 'forms.restoreWidget');
+  // The widget is gone, so only its field shows whether the delete still holds.
+  const fieldObjects = step.detached.filter(
+    (object) => object.objectNumber === step.fieldObjectNumber,
+  );
+  if (!unchangedSince(ctx.runtime, ctx.session, fieldObjects)) {
+    return leftAlone(ctx, 'forms.restoreWidget');
+  }
+  importAnnots(ctx.runtime, ctx.session.requireDocPtr(), pageIndex, step.capture);
+  ctx.session.invalidateDerived();
+  if (step.detached.length > 0) revertObjects(ctx.runtime, ctx.session, step.detached);
+  const row = widgetRow(ctx, step.widget);
+  const field =
+    step.fieldObjectNumber === null ? null : readFieldByNumber(ctx, step.fieldObjectNumber).field;
+  return {
+    item: {
+      type: 'forms.restoreWidget',
+      field,
+      widgets: [row],
+      meta: formMutationMeta(ctx.session.writeStamp(), field ? [field.ref] : [], [
+        widgetOf(ctx, step.widget),
+      ]),
+    },
+    reverse: [{ kind: 'widget.delete', widget: step.widget, left: row }],
+  };
+}
+
+/** Deletes a widget a restore brought back, when it is as the restore left it. */
+export function deleteRestoredWidget(ctx: ChangeContext, step: WidgetDeleteStep): Done {
+  authorizeCapability(ctx.authority, 'doc.forms.modify');
+  const current = tryWidgetRow(ctx, step.widget);
+  if (!current || !valuesEqual(current, step.left)) return leftAlone(ctx, 'forms.deleteWidget');
+  return writeWidgetDelete(ctx, current);
+}
+
+/**
+ * `forms.updateWidget`: a widget's place and look, written as an annotation
+ * update writes them. Its reverse puts the widget back as it was, or by value
+ * what still shows the update.
+ */
+export function updateWidget(
+  ctx: ChangeContext,
+  op: Op<'forms.updateWidget'>,
+  opIndex: number,
+): Done {
+  authorizeCapability(ctx.authority, 'doc.forms.modify');
+  const current = readAnnotation(ctx, op.widget);
+  if (current.subtype !== 'widget') {
+    throw new EngineError(
+      EngineErrorCode.InvalidArg,
+      `${current.subtype} is not a widget: change it with doc.annotations.update`,
+      { details: { field: 'widget' } },
+    );
+  }
+  assertExpected(opIndex, current, op.expect);
+  return writeAnnotationUpdate(
+    ctx,
+    op.widget,
+    { ...op.patch, subtype: 'widget' },
+    'forms.updateWidget',
+  );
+}
+
+/**
+ * `forms.reorderWidgets`: the widgets' stacking order on their page, which is
+ * also their tab order where the page's `/Tabs` follows it. Its reverse puts
+ * them back beside their old neighbours.
+ */
+export function reorderWidgets(ctx: ChangeContext, op: Op<'forms.reorderWidgets'>): Done {
+  authorizeCapability(ctx.authority, 'doc.forms.modify');
+  const stack = readPageStack(ctx.runtime, ctx.session, op.page);
+  const plan = planReorder(stack, 'widgets', op.widgets, op.position);
+  applyReorder(ctx.runtime, ctx.session, plan);
+  return reordered(ctx, plan, op.widgets);
 }
 
 /** `forms.setSignatureAppearance`; its reverse puts the widgets' appearances back. */
@@ -360,6 +494,68 @@ export function restoreField(ctx: ChangeContext, step: FieldRestoreStep): Done {
 // Writes, each recording its reverse
 // ---------------------------------------------------------------------------
 
+/**
+ * A widget's delete: out of its field (the field's dictionary and the
+ * widget's captured around it), then off its page (the widget captured as it
+ * is there), recording the restore.
+ */
+function writeWidgetDelete(ctx: ChangeContext, widget: WidgetAnnotation<PdfCoordinates>): Done {
+  const ref = widget.ref;
+  // Captures go by object number: a widget born inline gets one first.
+  promoteInlineAnnotations(ctx.runtime, ctx.session, ref.page.objectNumber);
+  const widgetNumber = objectNumberOf(ctx, ref);
+  const owner = widget.field ? readField(ctx, widget.field) : null;
+  if (owner && owner.objectNumber === widgetNumber) {
+    throw new EngineError(
+      EngineErrorCode.InvalidArg,
+      `widget ${widgetNumber} is its field's own dictionary (a merged field/widget) - delete the field with doc.forms.delete`,
+      { details: { field: 'widget' } },
+    );
+  }
+
+  let detached: CapturedObject[] = [];
+  if (owner) {
+    const pending = captureBefore(ctx.runtime, ctx.session, [
+      { objectNumber: owner.objectNumber, deep: [] },
+      { objectNumber: widgetNumber, deep: [] },
+    ]);
+    new FormMutator(ctx.runtime, ctx.session).detachWidget(
+      { kind: 'objectNumber', objectNumber: owner.objectNumber },
+      ref,
+      ctx.signal,
+    );
+    detached = captureAfter(ctx.runtime, ctx.session, pending);
+  }
+
+  const { pageIndex, index } = resolveAnnotIndexRaw(ctx.runtime, ctx.session, ref);
+  const capture = exportAnnots(ctx.runtime, ctx.session.requireDocPtr(), pageIndex, [index]);
+  new AnnotationMutator(ctx.runtime, ctx.session, ctx.fonts).deleteReleasedWidget(ref, 0);
+  ctx.session.invalidateDerived();
+
+  const field = owner ? readFieldByNumber(ctx, owner.objectNumber).field : null;
+  return {
+    item: {
+      type: 'forms.deleteWidget',
+      widget: ref,
+      page: ref.page,
+      field,
+      meta: formMutationMeta(ctx.session.writeStamp(), field ? [field.ref] : [], [
+        { ref, objectNumber: widgetNumber, page: ref.page },
+      ]),
+    },
+    reverse: [
+      {
+        kind: 'widget.restore',
+        page: ref.page,
+        widget: ref,
+        capture,
+        fieldObjectNumber: owner?.objectNumber ?? null,
+        detached,
+      },
+    ],
+  };
+}
+
 /** A value write to the field `before` reads, recording what it writes. */
 function writeValue(ctx: ChangeContext, before: ReadField, value: FormFieldValue): Done {
   const ref: FormFieldRef = { kind: 'objectNumber', objectNumber: before.objectNumber };
@@ -367,7 +563,7 @@ function writeValue(ctx: ChangeContext, before: ReadField, value: FormFieldValue
   const result = new FormMutator(ctx.runtime, ctx.session).setValue(ref, value, ctx.signal);
   const objects = captureAfter(ctx.runtime, ctx.session, pending);
   return {
-    item: { type: 'forms.setValue', ...result },
+    item: { type: 'forms.setValue', ...rows(ctx, result) },
     reverse: [
       {
         ...revertStep('forms.setValue', objects, [before.objectNumber]),
@@ -527,6 +723,32 @@ function readField(ctx: ChangeContext, ref: FormFieldRef): ReadField {
   return { objectNumber: resolved.fieldObjectNumber, field };
 }
 
+/** A widget's row as the form reads it now. */
+function widgetRow(ctx: ChangeContext, ref: AnnotationRef): WidgetAnnotation<PdfCoordinates> {
+  const row = readAnnotation(ctx, ref);
+  if (row.subtype !== 'widget') throw new Error(`${annotationKey(ref)} reads as no widget`);
+  return row;
+}
+
+/** The same, or null when the widget isn't on its page. */
+function tryWidgetRow(
+  ctx: ChangeContext,
+  ref: AnnotationRef,
+): WidgetAnnotation<PdfCoordinates> | null {
+  try {
+    const row = readAnnotation(ctx, ref);
+    return row.subtype === 'widget' ? row : null;
+  } catch (error) {
+    if (EngineError.is(error)) return null;
+    throw error;
+  }
+}
+
+/** A widget as a form result names it. */
+function widgetOf(ctx: ChangeContext, ref: AnnotationRef): FormWidget {
+  return { ref, objectNumber: objectNumberOf(ctx, ref), page: ref.page };
+}
+
 function readFieldByNumber(ctx: ChangeContext, objectNumber: number): ReadField {
   return readField(ctx, { kind: 'objectNumber', objectNumber });
 }
@@ -643,10 +865,15 @@ function valueOf(field: FormFieldDTO<PdfCoordinates>): FormFieldValue {
 }
 
 function fieldResult(ctx: ChangeContext, field: FormFieldDTO<PdfCoordinates>) {
-  return {
+  return rows(ctx, {
     field,
     meta: formMutationMeta(ctx.session.writeStamp(), [field.ref], field.widgets as FormWidget[]),
-  };
+  });
+}
+
+/** `result` with the rows of the widgets it changed, read now. */
+function rows<T extends { meta: FormMutationMeta }>(ctx: ChangeContext, result: T) {
+  return withWidgetRows(ctx.runtime, ctx.session, result, ctx.fonts);
 }
 
 /** A reset's item: the fields it wrote, read back. */
@@ -656,12 +883,14 @@ function resetResult(
 ): Extract<ChangeItem<PdfCoordinates>, { type: 'forms.reset' }> {
   return {
     type: 'forms.reset',
-    fields: [...fields],
-    meta: formMutationMeta(
-      ctx.session.writeStamp(),
-      fields.map((field) => field.ref),
-      fields.flatMap((field) => field.widgets as FormWidget[]),
-    ),
+    ...rows(ctx, {
+      fields: [...fields],
+      meta: formMutationMeta(
+        ctx.session.writeStamp(),
+        fields.map((field) => field.ref),
+        fields.flatMap((field) => field.widgets as FormWidget[]),
+      ),
+    }),
   };
 }
 

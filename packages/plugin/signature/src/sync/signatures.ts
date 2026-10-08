@@ -25,7 +25,7 @@ const WORKING_COPY_EDITS: ReadonlySet<DocumentEvent['type']> = new Set([
   'annotations.created',
   'annotations.updated',
   'annotations.deleted',
-  'annotations.moved',
+  'annotations.reordered',
   'forms.valueSet',
   'forms.updated',
   'forms.effectsApplied',

@@ -5,7 +5,7 @@
  * `baseIndex`), and the layer saves and reopens to the same page.
  */
 import { describe, expect, test } from 'vitest';
-import type { Annotation, DocumentHandle, Engine, PageRef } from '@embedpdf/engine-core/runtime';
+import type { DocumentHandle, Engine, PageRef } from '@embedpdf/engine-core/runtime';
 import { createLocalEngine } from '../src/index';
 
 /**
@@ -33,9 +33,6 @@ function inlineAnnotationsPdf(): Uint8Array {
   pdf += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`;
   return new TextEncoder().encode(pdf);
 }
-
-/** An annotation as a read gives it, apart from its stacking order. */
-const shown = ({ index: _index, ...rest }: Annotation) => rest;
 
 describe.each(['wasm', 'native'] as const)(
   'inline annotations are promoted first (%s runtime)',
@@ -85,9 +82,9 @@ describe.each(['wasm', 'native'] as const)(
         await doc.page(page).annotations.delete(victim.ref);
 
         const after = (await doc.page(page).annotations.list()).annotations;
-        const kept = before.filter((a) => a !== victim).map(shown);
-        expect(after.map(shown)).toEqual(kept);
-        expect((await reopened(engine, baseBytes, doc, page)).map(shown)).toEqual(kept);
+        const kept = before.filter((a) => a !== victim);
+        expect(after).toEqual(kept);
+        expect(await reopened(engine, baseBytes, doc, page)).toEqual(kept);
       } finally {
         await engine.destroy();
       }
@@ -98,12 +95,12 @@ describe.each(['wasm', 'native'] as const)(
       try {
         const last = before.at(-1)!;
 
-        await doc.page(page).annotations.move([last.ref], 0);
+        await doc.page(page).annotations.reorder([last.ref], 'start');
 
         const after = (await doc.page(page).annotations.list()).annotations;
-        const reordered = [last, ...before.slice(0, -1)].map(shown);
-        expect(after.map(shown)).toEqual(reordered);
-        expect((await reopened(engine, baseBytes, doc, page)).map(shown)).toEqual(reordered);
+        const reordered = [last, ...before.slice(0, -1)];
+        expect(after).toEqual(reordered);
+        expect(await reopened(engine, baseBytes, doc, page)).toEqual(reordered);
       } finally {
         await engine.destroy();
       }

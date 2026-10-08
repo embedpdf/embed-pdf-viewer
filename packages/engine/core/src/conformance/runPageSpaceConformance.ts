@@ -189,8 +189,9 @@ export function runPageSpaceConformance(
           });
         });
 
-        // Widgets are read like every annotation (checked against the pixels
-        // above), so reading back the rect that was asked shows where it went.
+        // Widget rows are read like every annotation (checked against the
+        // pixels above), so reading back the rect that was asked shows where
+        // it went: in the create's answer and in the form.
         test("a form field's widget is placed where it was put", async () => {
           await eachShownPage(async (page, layout) => {
             const visible = page.expected.visible;
@@ -200,16 +201,16 @@ export function runPageSpaceConformance(
               width: 60,
               height: 20,
             };
-            const { field } = await doc.forms.create({
+            const { field, widgets } = await doc.forms.create({
               family: 'text',
               name: `placed_${layout.ref.objectNumber}`,
               widgets: [{ page: layout.ref, rect: spot }],
             });
             try {
               const widget = field.widgets[0]!;
-              const { annotations } = await doc.page(layout.ref).annotations.list();
-              const read = annotations.find(
-                (a) => a.ref.kind === 'objectNumber' && a.ref.objectNumber === widget.objectNumber,
+              expect(widgets.map((w) => w.rect)).toEqual([spot]);
+              const read = (await doc.forms.list()).widgets.find(
+                (w) => w.ref.kind === 'objectNumber' && w.ref.objectNumber === widget.objectNumber,
               );
               expect(read?.rect).toEqual(spot);
             } finally {

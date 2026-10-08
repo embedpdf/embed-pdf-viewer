@@ -3,7 +3,6 @@ import {
   EngineError,
   EngineErrorCode,
   deletedAnnotationsOf,
-  createPageImageHandle,
   encodeAnnotKey,
   hasAnnotationResources,
   opIdOf,
@@ -13,7 +12,6 @@ import {
   type AnnotationCreateOptions,
   type AnnotationUpdateOptions,
   type WireAnnotationResources,
-  type AnnotationAppearanceImage,
   type AnnotationAppearanceImageOptions,
   type AnnotationAppearanceImagesResult,
   type AnnotationDraft,
@@ -23,13 +21,13 @@ import {
   type AnnotationCreateResult,
   type AnnotationDeleteResult,
   type AnnotationFlattenResult,
-  type AnnotationMoveResult,
+  type AnnotationPosition,
+  type AnnotationReorderResult,
   type FlattenWriteOptions,
   type AnnotationUpdateResult,
   type DocumentEventInit,
   type MutationMeta,
   type PageAnnotationsService,
-  type PageImageResult,
   type PageNetworkRenderFormat,
   type PageRef,
   type WriteOptions,
@@ -39,15 +37,15 @@ import {
   AnnotationCreateResultSchema,
   AnnotationDeleteResultSchema,
   AnnotationListSchema,
-  AnnotationAppearanceManifestSchema,
   AnnotationFlattenResultSchema,
-  AnnotationMoveResultSchema,
+  AnnotationReorderResultSchema,
   AnnotationUpdateResultSchema,
   annotationAppearancesImageOptionsToWire,
   wirePaths,
 } from '@embedpdf/engine-core/wire';
 import type { SessionEventPublisher } from '@embedpdf/engine-services';
 
+import { parseAppearanceForm } from './appearanceForm';
 import { buildAnnotationMutationForm } from './buildMutationForm';
 import type { ManifestAccessor } from './CloudDocumentHandle';
 import type { CloudWrite, CloudWrites } from './CloudWrites';
@@ -387,11 +385,11 @@ export class CloudPageAnnotationsService implements PageAnnotationsService {
     );
   }
 
-  move(
+  reorder(
     refs: AnnotationRef[],
-    toIndex: number,
+    position: AnnotationPosition,
     options?: WriteOptions,
-  ): AbortablePromise<AnnotationMoveResult> {
+  ): AbortablePromise<AnnotationReorderResult> {
     if (this.isClosed()) {
       return AbortablePromise.rejectReason(
         new EngineError(EngineErrorCode.DocNotOpen, `document ${this.docId} is closed`),
@@ -410,24 +408,31 @@ export class CloudPageAnnotationsService implements PageAnnotationsService {
         return AbortablePromise.rejectReason(
           new EngineError(
             EngineErrorCode.InvalidArg,
-            `move ref points at page ${r.page.objectNumber}; service is bound to page ${this.pageRef.objectNumber}`,
+            `reorder ref points at page ${r.page.objectNumber}; service is bound to page ${this.pageRef.objectNumber}`,
           ),
         );
       }
     }
-    const path = wirePaths.layerPageAnnotationsMove(this.docId, this.layerName, this.pageRef);
-    return AbortablePromise.run<AnnotationMoveResult>((signal) =>
+    const path = wirePaths.layerPageAnnotationsReorder(this.docId, this.layerName, this.pageRef);
+    return AbortablePromise.run<AnnotationReorderResult>((signal) =>
       this.writes.run(opId, signal, async (write) => {
         const result = await write.send((sent) =>
           this.http.postJson(
             path,
-            { refs, toIndex },
-            (raw) => AnnotationMoveResultSchema.parse(raw),
+            { refs, position },
+            (raw) => AnnotationReorderResultSchema.parse(raw),
             signal,
             sent,
           ),
         );
-        return this.absorbMutation(opId, result, 'annotations.moved');
+        // A reorder moves only the annotations: widgets have their own order.
+        this.manifest.apply(result.meta, ['annotations']);
+        this.publisher.publishWrite(opId, {
+          type: 'annotations.reordered',
+          page: this.pageRef,
+          ...result,
+        });
+        return result;
       }),
     );
   }
@@ -473,8 +478,8 @@ export class CloudPageAnnotationsService implements PageAnnotationsService {
         // Nothing applied comes back without a cache delta: no artifact, no
         // coherence bump, no event.
         if (result.meta.cacheDelta === null) return result;
-        // Flatten bakes annotations into page content, so both planes flip.
-        this.manifest.apply(result.meta, ['content', 'annotations']);
+        // Flatten bakes annotations and form fields into page content.
+        this.manifest.apply(result.meta, ['content', 'annotations', 'forms']);
         this.publisher.publishWrite(opId, { type: 'annotations.flattened', ...result });
         return result;
       }),
@@ -529,7 +534,7 @@ export class CloudPageAnnotationsService implements PageAnnotationsService {
   private absorbMutation<T extends { meta: MutationMeta }>(
     opId: string,
     result: T,
-    type: 'annotations.created' | 'annotations.updated' | 'annotations.moved',
+    type: 'annotations.created' | 'annotations.updated',
   ): T {
     this.manifest.apply(result.meta, ['annotations']);
     this.publisher.publishWrite(opId, {
@@ -539,66 +544,4 @@ export class CloudPageAnnotationsService implements PageAnnotationsService {
     } as unknown as DocumentEventInit);
     return result;
   }
-}
-
-/**
- * Parse the appearance `multipart/form-data` response into the same
- * `AnnotationAppearanceImagesResult` shape the local engine produces. The
- * `manifest` part is validated against the wire schema; each image part is
- * wrapped in a `PageImageHandle` backed by the in-memory blob we already
- * downloaded.
- */
-async function parseAppearanceForm(form: FormData): Promise<AnnotationAppearanceImagesResult> {
-  const manifestRaw = form.get('manifest');
-  if (typeof manifestRaw !== 'string') {
-    throw new EngineError(
-      EngineErrorCode.WireFormat,
-      'appearance response missing JSON manifest part',
-    );
-  }
-  let parsedJson: unknown;
-  try {
-    parsedJson = JSON.parse(manifestRaw);
-  } catch (err) {
-    throw new EngineError(
-      EngineErrorCode.WireFormat,
-      `appearance manifest is not valid JSON: ${(err as Error)?.message ?? err}`,
-    );
-  }
-  const manifest = AnnotationAppearanceManifestSchema.parse(parsedJson);
-
-  const appearances: AnnotationAppearanceImage[] = await Promise.all(
-    manifest.appearances.map(async (entry) => {
-      const partValue = form.get(entry.part);
-      if (partValue === null || typeof partValue === 'string') {
-        throw new EngineError(
-          EngineErrorCode.WireFormat,
-          `appearance response missing image part "${entry.part}"`,
-        );
-      }
-      const blob = partValue as Blob;
-      const bytes = new Uint8Array(await blob.arrayBuffer());
-      const result: PageImageResult = {
-        width: entry.width,
-        height: entry.height,
-        format: entry.format,
-        contentType: entry.contentType,
-        source: { kind: 'bytes', bytes },
-      };
-      const image = createPageImageHandle(result, {
-        async blob() {
-          return blob;
-        },
-      });
-      return {
-        ref: entry.ref,
-        mode: entry.mode,
-        state: entry.state,
-        rect: entry.rect,
-        image,
-      };
-    }),
-  );
-
-  return { page: manifest.page, appearances };
 }

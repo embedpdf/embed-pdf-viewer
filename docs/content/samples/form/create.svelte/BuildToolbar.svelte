@@ -47,7 +47,7 @@
     added = true;
     untrack(() => {
       void addDropdown(form, last, 0).then(({ field }) =>
-        stage.reveal(last, { rect: field.widgets[0].rect }),
+        stage.reveal(last, { rect: form.getWidget(field.widgets[0])!.rect }),
       );
     });
   });
@@ -57,7 +57,7 @@
     const last = page;
     if (!last) return;
     void addField(form, last, formState.fields.length).then(({ field }) =>
-      stage.reveal(last, { rect: field.widgets[0].rect }),
+      stage.reveal(last, { rect: form.getWidget(field.widgets[0])!.rect }),
     );
   }
 

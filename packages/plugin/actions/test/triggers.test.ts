@@ -102,7 +102,7 @@ function harness(options?: {
             },
           },
         }),
-        forms: { list: async () => ({ fields: [] }) },
+        forms: { list: async () => ({ fields: [], widgets: [] }) },
         ...(options?.docActions !== undefined
           ? {
               actions: {

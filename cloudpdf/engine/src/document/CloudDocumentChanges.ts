@@ -202,12 +202,14 @@ function carriesBytes(change: Change): boolean {
   );
 }
 
-/** The planes a change's writes took over from the base: annotations and forms, or metadata. */
+/** The planes a change's writes took over from the base, each op by its family. */
 function planesOf(result: ChangeResult): LayerScopePlane[] {
   const planes = new Set<LayerScopePlane>();
   for (const item of result.items) {
     if (isSkippedItem(item)) continue;
-    planes.add(item.type.startsWith('metadata.') ? 'metadata' : 'annotations');
+    if (item.type.startsWith('metadata.')) planes.add('metadata');
+    else if (item.type.startsWith('forms.')) planes.add('forms');
+    else planes.add('annotations');
   }
   return [...planes];
 }

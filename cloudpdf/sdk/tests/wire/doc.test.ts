@@ -251,6 +251,7 @@ describe("DocClient", () => {
             actionsVersion: 1,
             attachmentsVersion: 1,
             annotationsVersion: 1,
+            formsVersion: 1,
             auditHead: 1,
             baseSha: "baseSha",
             layerVersion: 1,
@@ -259,6 +260,7 @@ describe("DocClient", () => {
             scopes: {
                 content: "base",
                 annotations: "base",
+                forms: "base",
                 layout: "base",
                 attachments: "base",
                 metadata: "base",
@@ -272,7 +274,10 @@ describe("DocClient", () => {
                 policyVersion: 1,
             },
             pages: [
-                { page: { kind: "objectNumber", objectNumber: 1 }, cache: { contentVersion: 1, annotationVersion: 1 } },
+                {
+                    page: { kind: "objectNumber", objectNumber: 1 },
+                    cache: { contentVersion: 1, annotationVersion: 1, widgetVersion: 1 },
+                },
             ],
         };
 

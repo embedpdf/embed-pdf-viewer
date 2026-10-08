@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { DocumentHead } from '@embedpdf/engine-core/wire';
 
 import { CloudDocumentHandle } from '../src/document/CloudDocumentHandle';
+import { CloudDocumentSecurityService } from '../src/document/CloudDocumentSecurityService';
 import { HttpClient } from '../src/transport/HttpClient';
 
 /**
@@ -105,5 +106,49 @@ describe('security collab mirrors (cloud SDK, token-fallback path)', () => {
     });
     expect(doc.security.allowsAnnotation('set-group', { groupId: 'legal' })).toBe(true);
     expect(doc.security.allowsAnnotation('set-group', { groupId: 'other' })).toBe(false);
+  });
+});
+
+describe('widgets and page pictures (cloud SDK, token-fallback path)', () => {
+  it('a widget is form design: annotation rights and scopes never reach it', () => {
+    const widget = { subtype: 'widget', userId: 'me' };
+    const commenter = openWith({
+      scope: ['doc.annotate.modify', 'annotations:update:self'],
+      identity: { userId: 'me' },
+    });
+    expect(commenter.security.allowsAnnotation('update', { userId: 'me' })).toBe(true);
+    expect(commenter.security.allowsAnnotation('update', widget)).toBe(false);
+    expect(commenter.security.allowsAnnotation('delete', widget)).toBe(false);
+    const designer = openWith({ scope: ['doc.forms.modify'], identity: { userId: 'me' } });
+    expect(designer.security.allowsAnnotation('update', widget)).toBe(true);
+  });
+
+  it("knows what a picture may draw only from a document token's scope", () => {
+    const rights = (token: string | null) =>
+      new CloudDocumentSecurityService(
+        http,
+        DOC_ID,
+        'default',
+        head(),
+        { isClosed: () => false },
+        token,
+      ).pageLayerRights();
+    // No token, or one that isn't a document token with a scope: the server decides.
+    expect(rights(null)).toBeNull();
+    expect(rights(docToken({}))).toBeNull();
+    expect(
+      rights(
+        [
+          base64UrlJson({ alg: 'none', typ: 'JWT' }),
+          base64UrlJson({ tenant_id: 't1', scope: ['*'] }),
+          'sig',
+        ].join('.'),
+      ),
+    ).toBeNull();
+    expect(rights(docToken({ scope: ['doc.open', 'doc.render', 'doc.forms.fill'] }))).toEqual({
+      annotations: false,
+      formFields: true,
+    });
+    expect(rights(docToken({ scope: ['*'] }))).toEqual({ annotations: true, formFields: true });
   });
 });

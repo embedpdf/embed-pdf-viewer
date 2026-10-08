@@ -6,7 +6,7 @@ import {
   type Engine,
   type PageLayout,
 } from '@embedpdf/core';
-import type { FormFieldDTO, FormSnapshot } from '@embedpdf/engine-core/runtime';
+import type { FormFieldDTO, FormSnapshot, WidgetAnnotation } from '@embedpdf/engine-core/runtime';
 import { interactionPlugin } from '@embedpdf/plugin-interaction';
 
 import { formPlugin } from '../src/form.plugin';
@@ -67,6 +67,14 @@ const snapshot = (value: string): FormSnapshot => ({
   formKind: 'acroform',
   needsAppearances: false,
   fields: [textField(value)],
+  widgets: [
+    {
+      subtype: 'widget',
+      ref: { kind: 'objectNumber', page: toPageRef(1), objectNumber: 9 },
+      page: toPageRef(1),
+      rect: { x: 10, y: 10, width: 100, height: 20 },
+    } as unknown as WidgetAnnotation,
+  ],
   calculationOrder: [],
 });
 
@@ -93,27 +101,13 @@ async function boot() {
       lastServerId: () => null,
     },
     pages: { list: () => Promise.resolve({ pageCount: 1, pages: [page] }) },
-    page: () => ({
-      annotations: {
-        list: () =>
-          Promise.resolve({
-            annotations: [
-              {
-                subtype: 'widget',
-                ref: { kind: 'objectNumber', page: toPageRef(1), objectNumber: 9 },
-                rect: { x: 10, y: 10, width: 100, height: 20 },
-              },
-            ],
-          }),
-      },
-    }),
     security: { allows: () => true },
     forms: {
       list: () => new Promise<FormSnapshot>((resolve) => reads.push(resolve)),
       setValue: (_ref: unknown, value: { value: string }) =>
         new Promise((resolve) =>
           writes.push(() => {
-            const result = { field: textField(value.value), meta: NOTHING_CHANGED };
+            const result = { field: textField(value.value), widgets: [], meta: NOTHING_CHANGED };
             // Like both real engines: the event is published before the promise settles.
             emit({ type: 'forms.valueSet', origin: origin('local'), ...result });
             resolve(result);
@@ -144,7 +138,10 @@ describe('form fields mirror', () => {
     await settle();
     expect(harness.form.getStatus()).toBe('ready');
 
-    const written = harness.form.setValue({ kind: 'objectNumber', objectNumber: 5 }, { value: 'own' });
+    const written = harness.form.setValue(
+      { kind: 'objectNumber', objectNumber: 5 },
+      { value: 'own' },
+    );
     await settle();
     harness.writes[0]!();
     await written;
@@ -154,6 +151,7 @@ describe('form fields mirror', () => {
       type: 'forms.valueSet',
       origin: origin('remote'),
       field: textField('remote'),
+      widgets: [],
       meta: NOTHING_CHANGED,
     });
     expect(nameValue(harness.form as never)).toEqual({ value: 'remote' });
@@ -176,6 +174,7 @@ describe('form fields mirror', () => {
       type: 'forms.valueSet',
       origin: origin('remote'),
       field: textField('remote edit'),
+      widgets: [],
       meta: NOTHING_CHANGED,
     });
     expect(harness.form.listWidgets(0)[0]?.disabled).toBe(true);

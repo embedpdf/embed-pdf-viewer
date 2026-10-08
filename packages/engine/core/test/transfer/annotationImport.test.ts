@@ -24,14 +24,12 @@ const refOf = (page: PageRef, annotObjectNumber: number): AnnotationRef => ({
 function annotation(
   page: PageRef,
   annotObjectNumber: number,
-  index: number,
   fields: Record<string, unknown> = {},
 ): Annotation {
   return {
     subtype: 'square',
     ref: refOf(page, annotObjectNumber),
     page,
-    index,
     hasAppearance: true,
     appearanceState: null,
     nm: null,
@@ -75,13 +73,13 @@ function plan(
 
 describe('planAnnotationImport', () => {
   test('creates the items in bundle order, linked by their place in the plan', () => {
-    const note = annotation(first, 10, 0, { subtype: 'text', popup: refOf(first, 11) });
-    const popup = annotation(first, 11, 1, { subtype: 'popup', parent: refOf(first, 10) });
-    const reply = annotation(first, 12, 2, {
+    const note = annotation(first, 10, { subtype: 'text', popup: refOf(first, 11) });
+    const popup = annotation(first, 11, { subtype: 'popup', parent: refOf(first, 10) });
+    const reply = annotation(first, 12, {
       subtype: 'text',
       reply: { to: refOf(first, 10), type: 'reply' },
     });
-    const square = annotation(second, 20, 0);
+    const square = annotation(second, 20);
     const { creates, dropped } = plan(bundleOf(note, popup, reply, square));
 
     expect(dropped).toEqual([]);
@@ -100,8 +98,8 @@ describe('planAnnotationImport', () => {
 
   test('finds a link to a target named by its base index', () => {
     const inline = { kind: 'baseIndex', page: first, baseIndex: 0 } as const;
-    const note = annotation(first, 10, 0, { subtype: 'text', nm: 'note', ref: inline });
-    const byBaseIndex = annotation(first, 12, 1, {
+    const note = annotation(first, 10, { subtype: 'text', nm: 'note', ref: inline });
+    const byBaseIndex = annotation(first, 12, {
       subtype: 'text',
       reply: { to: inline, type: 'group' },
     });
@@ -111,7 +109,7 @@ describe('planAnnotationImport', () => {
   });
 
   test('maps pages by position, destinations included', () => {
-    const link = annotation(first, 10, 0, {
+    const link = annotation(first, 10, {
       subtype: 'link',
       target: { kind: 'goto', destination: { kind: 'fit', page: second } },
     });
@@ -119,7 +117,7 @@ describe('planAnnotationImport', () => {
       { page: toPageRef(50), position: 0 },
       { page: toPageRef(51), position: 4 },
     ];
-    const { creates } = plan(bundleOf(link, annotation(second, 20, 0)), {
+    const { creates } = plan(bundleOf(link, annotation(second, 20)), {
       pages: 'by-position',
       target,
     });
@@ -132,14 +130,14 @@ describe('planAnnotationImport', () => {
   test('maps exactly the pairs a list gives', () => {
     const to = toPageRef(50);
     const target = [{ page: to, position: 0 }];
-    const { creates } = plan(bundleOf(annotation(first, 10, 0)), {
+    const { creates } = plan(bundleOf(annotation(first, 10)), {
       pages: [{ from: first, to }],
       target,
     });
     expect(creates[0]!.page).toEqual(to);
 
     expect(() =>
-      plan(bundleOf(annotation(first, 10, 0)), {
+      plan(bundleOf(annotation(first, 10)), {
         pages: [
           { from: first, to },
           { from: first, to },
@@ -148,7 +146,7 @@ describe('planAnnotationImport', () => {
       }),
     ).toThrow(expect.objectContaining({ code: EngineErrorCode.InvalidArg }));
     expect(() =>
-      plan(bundleOf(annotation(first, 10, 0)), {
+      plan(bundleOf(annotation(first, 10)), {
         pages: [{ from: first, to: toPageRef(99) }],
         target,
       }),
@@ -156,7 +154,7 @@ describe('planAnnotationImport', () => {
   });
 
   test('refuses the import when a page an item is on or points at maps nowhere', () => {
-    const link = annotation(first, 10, 0, {
+    const link = annotation(first, 10, {
       subtype: 'link',
       target: { kind: 'goto', destination: { kind: 'fit', page: second } },
     });
@@ -170,16 +168,16 @@ describe('planAnnotationImport', () => {
   });
 
   test('leaves out an unsupported kind, and what points at it', () => {
-    const watermark = annotation(first, 10, 0, {
+    const watermark = annotation(first, 10, {
       subtype: 'unsupported',
       rawSubtypeCode: 26,
       rawSubtypeName: 'Watermark',
     });
-    const reply = annotation(first, 11, 1, {
+    const reply = annotation(first, 11, {
       subtype: 'text',
       reply: { to: refOf(first, 10), type: 'reply' },
     });
-    const answer = annotation(first, 12, 2, {
+    const answer = annotation(first, 12, {
       subtype: 'text',
       reply: { to: refOf(first, 11), type: 'reply' },
     });
@@ -193,11 +191,11 @@ describe('planAnnotationImport', () => {
   });
 
   test('leaves out what points at nothing in the bundle', () => {
-    const reply = annotation(first, 11, 0, {
+    const reply = annotation(first, 11, {
       subtype: 'text',
       reply: { to: refOf(first, 99), type: 'reply' },
     });
-    const popup = annotation(first, 12, 1, { subtype: 'popup', parent: refOf(first, 11) });
+    const popup = annotation(first, 12, { subtype: 'popup', parent: refOf(first, 11) });
     const { creates, dropped } = plan(bundleOf(reply, popup));
     expect(creates).toEqual([]);
     expect(dropped).toEqual([
@@ -207,8 +205,8 @@ describe('planAnnotationImport', () => {
   });
 
   test('finds a parent only on the same page', () => {
-    const note = annotation(first, 10, 0, { subtype: 'text' });
-    const elsewhere = annotation(second, 20, 0, {
+    const note = annotation(first, 10, { subtype: 'text' });
+    const elsewhere = annotation(second, 20, {
       subtype: 'text',
       reply: { to: refOf(first, 10), type: 'reply' },
     });
@@ -218,10 +216,10 @@ describe('planAnnotationImport', () => {
   });
 
   test('gives a name to the first item that carries it, if the page has it free', () => {
-    const taken = annotation(first, 10, 0, { nm: 'taken' });
-    const once = annotation(first, 11, 1, { nm: 'twice' });
-    const twice = annotation(first, 12, 2, { nm: 'twice' });
-    const elsewhere = annotation(second, 20, 0, { nm: 'twice' });
+    const taken = annotation(first, 10, { nm: 'taken' });
+    const once = annotation(first, 11, { nm: 'twice' });
+    const twice = annotation(first, 12, { nm: 'twice' });
+    const elsewhere = annotation(second, 20, { nm: 'twice' });
     const { creates, dropped } = plan(bundleOf(taken, once, twice, elsewhere), {
       taken: [`${encodePageKey(first)}:taken`],
     });
@@ -233,8 +231,8 @@ describe('planAnnotationImport', () => {
   });
 
   test('two pages mapped onto one share its names', () => {
-    const one = annotation(first, 10, 0, { nm: 'same' });
-    const other = annotation(second, 20, 0, { nm: 'same' });
+    const one = annotation(first, 10, { nm: 'same' });
+    const other = annotation(second, 20, { nm: 'same' });
     const to = toPageRef(50);
     const { creates, dropped } = plan(bundleOf(one, other), {
       pages: [
@@ -248,8 +246,8 @@ describe('planAnnotationImport', () => {
   });
 
   test('imports an item without a field it can only read as a marker', () => {
-    const geo = annotation(first, 10, 0, { subtype: 'line', measure: { subtype: 'geospatial' } });
-    const unknown = annotation(first, 11, 1, { subtype: 'line', measure: { subtype: 'unknown' } });
+    const geo = annotation(first, 10, { subtype: 'line', measure: { subtype: 'geospatial' } });
+    const unknown = annotation(first, 11, { subtype: 'line', measure: { subtype: 'unknown' } });
     const { creates, dropped } = plan(
       bundleOf(
         { ...geo, linePoints: { start: { x: 0, y: 0 }, end: { x: 1, y: 1 } } } as Annotation,
@@ -265,26 +263,30 @@ describe('planAnnotationImport', () => {
   });
 
   test('imports a link without an action a write cannot make', () => {
-    const script = annotation(first, 10, 0, { subtype: 'link', target: { kind: 'javascript' } });
+    const script = annotation(first, 10, { subtype: 'link', target: { kind: 'javascript' } });
     const { creates, dropped } = plan(bundleOf(script));
     expect(creates[0]!.draft).toHaveProperty('target', null);
     expect(dropped).toEqual([{ ref: script.ref, field: 'target', reason: 'unsupported-action' }]);
   });
 
-  test("leaves out a form field's widget, which travels with its field", () => {
-    const field = annotation(first, 10, 0, {
+  test('leaves out every widget, in a field or not: widgets travel with the form', () => {
+    const field = annotation(first, 10, {
       subtype: 'widget',
       field: { kind: 'objectNumber', objectNumber: 44 },
       fieldFamily: 'text',
     });
-    const inert = annotation(first, 11, 1, {
+    const inert = annotation(first, 11, {
       subtype: 'widget',
       field: null,
       fieldFamily: 'unknown',
     });
-    const { creates, dropped } = plan(bundleOf(field, inert));
-    expect(creates.map((create) => create.item)).toEqual([1]);
-    expect(dropped).toEqual([{ ref: field.ref, reason: 'form-field' }]);
+    const square = annotation(first, 12);
+    const { creates, dropped } = plan(bundleOf(field, inert, square));
+    expect(creates.map((create) => create.item)).toEqual([2]);
+    expect(dropped).toEqual([
+      { ref: field.ref, reason: 'widget' },
+      { ref: inert.ref, reason: 'widget' },
+    ]);
   });
 
   test('reports the actions a copy leaves out, and not the one a link target carries', () => {
@@ -295,19 +297,19 @@ describe('planAnnotationImport', () => {
       root: { type: 'goto', subtype: 'GoTo', next: [], destination: { kind: 'fit', page: first } },
     };
     const target = { kind: 'goto', destination: { kind: 'fit', page: first } };
-    const link = annotation(first, 10, 0, { subtype: 'link', target, actions: { activate: goto } });
-    const hovering = annotation(first, 11, 1, {
+    const link = annotation(first, 10, { subtype: 'link', target, actions: { activate: goto } });
+    const hovering = annotation(first, 11, {
       subtype: 'link',
       target,
       actions: { activate: goto, cursorEnter: goto },
     });
-    const chained = annotation(first, 12, 2, {
+    const chained = annotation(first, 12, {
       subtype: 'link',
       target,
       actions: { activate: { ...goto, root: { ...goto.root, next: [goto.root] } } },
     });
-    const square = annotation(first, 13, 3, { actions: { activate: goto } });
-    const map = annotation(first, 14, 4, {
+    const square = annotation(first, 13, { actions: { activate: goto } });
+    const map = annotation(first, 14, {
       subtype: 'link',
       target: { kind: 'uri', uri: 'https://example.com/map' },
       actions: {
@@ -335,8 +337,8 @@ describe('planAnnotationImport', () => {
   });
 
   test('refuses an item whose data is not valid for its kind, naming it', () => {
-    const broken = annotation(first, 10, 0, { box: { left: 'no' } });
-    expect(() => plan(bundleOf(annotation(first, 9, 0), broken))).toThrow(
+    const broken = annotation(first, 10, { box: { left: 'no' } });
+    expect(() => plan(bundleOf(annotation(first, 9), broken))).toThrow(
       expect.objectContaining({
         code: EngineErrorCode.InvalidArg,
         details: expect.objectContaining({ item: 1 }),

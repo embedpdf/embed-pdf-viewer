@@ -2,7 +2,12 @@
  *  memoized per snapshot so they stay reference-stable for selectors. */
 import { memo, type Mirror } from '@embedpdf/core';
 import type { SignatureVerdict } from '@embedpdf/core-signature';
-import type { FormFieldRef, SignatureDTO } from '@embedpdf/engine-core/runtime';
+import type {
+  AnnotationRef,
+  FormFieldRef,
+  FormWidget,
+  SignatureDTO,
+} from '@embedpdf/engine-core/runtime';
 
 import type { SignatureCapability, SignatureFieldAddress, SignatureInfo } from '../contract';
 import { sameFieldRef, type SignatureRecord } from '../model';
@@ -11,11 +16,13 @@ import type { SignatureContext, SignatureServices } from '../services';
 const EMPTY_SIGNATURES: readonly SignatureInfo[] = [];
 const EMPTY_FIELDS: readonly FormFieldRef[] = [];
 
-/** The widget object number an address names, or null for a field ref. */
-const widgetObjectOf = (field: SignatureFieldAddress): number | null => {
-  if (!('kind' in field)) return field.objectNumber;
+/** The widget an address names, or null for a field ref. */
+const widgetOf = (
+  field: SignatureFieldAddress,
+): Extract<AnnotationRef, { kind: 'objectNumber' }> | FormWidget | null => {
+  if (!('kind' in field)) return field;
   // An annotation ref names its page; a field ref doesn't.
-  if (field.kind === 'objectNumber' && 'page' in field) return field.objectNumber;
+  if (field.kind === 'objectNumber' && 'page' in field) return field;
   return null;
 };
 
@@ -51,13 +58,13 @@ export function createSignatureReads(
   const getSignature = (field: SignatureFieldAddress): SignatureDTO | null => {
     const current = snapshot();
     if (!current) return null;
-    const widgetObject = widgetObjectOf(field);
-    if (widgetObject !== null) {
+    const widget = widgetOf(field);
+    if (widget) {
       const byWidget = current.signatures.find(
-        (signature) => signature.widget?.objectNumber === widgetObject,
+        (signature) => signature.widget?.objectNumber === widget.objectNumber,
       );
       if (byWidget) return byWidget;
-      const owner = form.getFieldForWidget({ objectNumber: widgetObject });
+      const owner = form.getFieldForWidget(widget);
       return owner ? getSignature(owner.ref) : null;
     }
     if (!isFieldRef(field)) return null;

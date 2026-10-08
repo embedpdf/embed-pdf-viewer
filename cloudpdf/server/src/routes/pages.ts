@@ -9,7 +9,8 @@ import {
   type PageNetworkRenderFormat,
   type PageDeleteInput,
   type PageFlattenInput,
-  type PageMoveInput,
+  type PagePosition,
+  type PageReorderInput,
   type PageNameInput,
   type PageRemoveNameInput,
   type PageRef,
@@ -26,7 +27,7 @@ import {
   PageFlattenInputSchema,
   PageInsertBlankInputSchema,
   PageInsertInputSchema,
-  PageMoveInputSchema,
+  PageReorderInputSchema,
   PageNameInputSchema,
   PageNetworkRenderFormatSchema,
   PageRemoveNameInputSchema,
@@ -477,7 +478,7 @@ export async function registerPageRoutes(app: FastifyInstance, deps: PageRouteDe
     );
   });
 
-  app.post('/v1/docs/:docId/layers/:layerName/pages/move', async (req, reply) => {
+  app.post('/v1/docs/:docId/layers/:layerName/pages/reorder', async (req, reply) => {
     const { docId, layerName } = req.params as {
       docId: string;
       layerName: string;
@@ -493,21 +494,16 @@ export async function registerPageRoutes(app: FastifyInstance, deps: PageRouteDe
       pdfBits,
       protection,
     );
-    const body = parseOrInvalidArg<PageMoveInput>(
-      PageMoveInputSchema as unknown as SchemaLike<PageMoveInput>,
+    const body = parseOrInvalidArg<PageReorderInput>(
+      PageReorderInputSchema as unknown as SchemaLike<PageReorderInput>,
       req.body,
       'request body',
     );
 
     setNoStore(reply);
-    return layerService.movePages(
+    return layerService.reorderPages(
       ctx,
-      {
-        docId,
-        layerName,
-        pages: body.pages,
-        toIndex: body.toIndex,
-      },
+      { docId, layerName, pages: body.pages, position: body.position },
       abortSignalOf(reply),
     );
   });
@@ -582,7 +578,7 @@ export async function registerPageRoutes(app: FastifyInstance, deps: PageRouteDe
   });
 
   // Named pages are layout: registering/renaming/removing a `/Names /Pages`
-  // entry is a page-structure mutation like move/rotate/delete (same gate,
+  // entry is a page-structure mutation like reorder/rotate/delete (same gate,
   // same docVersion + layoutVersion bump, read back via /layout).
   app.post('/v1/docs/:docId/layers/:layerName/pages/names', async (req, reply) => {
     const { docId, layerName } = req.params as {
@@ -662,8 +658,8 @@ export async function registerPageRoutes(app: FastifyInstance, deps: PageRouteDe
     // conformance contract wants malformed source bytes to surface as
     // MalformedPdf (the parser's verdict), never the envelope's InvalidArg.
     const envelope = await readMutationEnvelope(req, () => 'any');
-    const body = parseOrInvalidArg<{ toIndex?: number }>(
-      PageInsertInputSchema as unknown as SchemaLike<{ toIndex?: number }>,
+    const body = parseOrInvalidArg<{ position?: PagePosition }>(
+      PageInsertInputSchema as unknown as SchemaLike<{ position?: PagePosition }>,
       envelope.body,
       'request body',
     );
@@ -682,7 +678,7 @@ export async function registerPageRoutes(app: FastifyInstance, deps: PageRouteDe
         docId,
         layerName,
         bytes: source.bytes,
-        ...(body.toIndex !== undefined ? { toIndex: body.toIndex } : {}),
+        ...(body.position !== undefined ? { position: body.position } : {}),
       },
       abortSignalOf(reply),
     );
@@ -707,12 +703,12 @@ export async function registerPageRoutes(app: FastifyInstance, deps: PageRouteDe
     const body = parseOrInvalidArg<{
       size: { width: number; height: number };
       count?: number;
-      toIndex?: number;
+      position?: PagePosition;
     }>(
       PageInsertBlankInputSchema as unknown as SchemaLike<{
         size: { width: number; height: number };
         count?: number;
-        toIndex?: number;
+        position?: PagePosition;
       }>,
       req.body,
       'request body',
@@ -727,7 +723,7 @@ export async function registerPageRoutes(app: FastifyInstance, deps: PageRouteDe
         layerName,
         size: body.size,
         ...(body.count !== undefined ? { count: body.count } : {}),
-        ...(body.toIndex !== undefined ? { toIndex: body.toIndex } : {}),
+        ...(body.position !== undefined ? { position: body.position } : {}),
         ...(objectNumbers ? { objectNumbers } : {}),
       },
       abortSignalOf(reply),

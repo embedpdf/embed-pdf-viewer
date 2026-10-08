@@ -38,7 +38,6 @@ const RADIO: FormFieldDTO = {
       onState: 'male',
       exportValue: 'male',
       checked: true,
-      rect: { x: 72, y: 100, width: 12, height: 12 },
     },
     {
       ref: {
@@ -51,7 +50,6 @@ const RADIO: FormFieldDTO = {
       onState: 'female',
       exportValue: 'female',
       checked: false,
-      rect: { x: 72, y: 120, width: 12, height: 12 },
     },
   ],
 };
@@ -80,7 +78,6 @@ const LISTBOX: FormFieldDTO = {
       },
       objectNumber: 9,
       page: { kind: 'objectNumber', objectNumber: 3 },
-      rect: null,
     },
   ],
 };
@@ -103,6 +100,7 @@ describe('form schemas', () => {
       formKind: 'acroform',
       needsAppearances: false,
       fields: [RADIO, LISTBOX],
+      widgets: [],
       calculationOrder: [RADIO.ref, null, LISTBOX.ref],
     };
     expect(FormSnapshotSchema.parse(snapshot)).toEqual(snapshot);

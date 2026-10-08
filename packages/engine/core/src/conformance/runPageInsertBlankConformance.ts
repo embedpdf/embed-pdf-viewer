@@ -3,10 +3,13 @@ import type { DocumentHandle } from '../engine/DocumentHandle';
 import type { Engine } from '../engine/Engine';
 import { EngineError } from '../errors/EngineError';
 import { EngineErrorCode } from '../errors/EngineErrorCode';
+import { toPageRef } from '../identity/PageRef';
 import { PAGE_INSERT_BLANK_MAX_COUNT } from '../mutation/PageInsertBlankInput';
 
 /** An on-purpose non-default size so the assertions can't pass by accident. */
 const SIZE = { width: 396, height: 612 };
+/** No fixture has a page object this high. */
+const UNKNOWN_PAGE = 999_999;
 
 /**
  * Blank-page insert conformance. `pages.insertBlank` is a required member —
@@ -67,14 +70,17 @@ export function runPageInsertBlankConformance(
       }
     });
 
-    test('toIndex + count places the blank block mid-document', async () => {
+    test('a position + count places the blank block after its neighbour', async () => {
       const doc = await openFixture(engine, opts);
       try {
         const before = await doc.pages.list();
         if (before.pages.length < 2) return;
         const beforePageObjectNumbers = before.pages.map((p) => p.ref.objectNumber);
 
-        const result = await doc.pages.insertBlank({ size: SIZE, count: 2 }, 1);
+        const result = await doc.pages.insertBlank(
+          { size: SIZE, count: 2 },
+          { after: before.pages[0].ref },
+        );
         expect(result.insertedPages.length).toBe(2);
         expect(result.insertedPages[0].objectNumber === result.insertedPages[1].objectNumber).toBe(
           false,
@@ -117,7 +123,7 @@ export function runPageInsertBlankConformance(
       }
     });
 
-    test('non-positive size, bad count, and out-of-range toIndex reject with InvalidArg', async () => {
+    test('non-positive size and bad count reject with InvalidArg; an unknown neighbour with NotFound', async () => {
       const doc = await openFixture(engine, opts);
       try {
         const before = await doc.pages.list();
@@ -126,7 +132,6 @@ export function runPageInsertBlankConformance(
           () => doc.pages.insertBlank({ size: { width: 396, height: -10 } }),
           () => doc.pages.insertBlank({ size: SIZE, count: 0 }),
           () => doc.pages.insertBlank({ size: SIZE, count: PAGE_INSERT_BLANK_MAX_COUNT + 1 }),
-          () => doc.pages.insertBlank({ size: SIZE }, before.pageCount + 1),
         ];
         for (const attempt of rejects) {
           let caught: unknown;
@@ -137,6 +142,13 @@ export function runPageInsertBlankConformance(
           }
           expect(EngineError.is(caught, EngineErrorCode.InvalidArg)).toBe(true);
         }
+        let caught: unknown;
+        try {
+          await doc.pages.insertBlank({ size: SIZE }, { after: toPageRef(UNKNOWN_PAGE) });
+        } catch (err) {
+          caught = err;
+        }
+        expect(EngineError.is(caught, EngineErrorCode.NotFound)).toBe(true);
 
         // Untouched after every rejection.
         const list = await doc.pages.list();

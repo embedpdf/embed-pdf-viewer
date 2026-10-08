@@ -1,16 +1,23 @@
-import type { FastifyInstance, FastifyRequest } from 'fastify';
+import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import {
   EngineError,
   EngineErrorCode,
+  decodeAnnotKey,
   decodeFieldRefKey,
+  toPageRef,
+  wirePack,
   type FormDataFormat,
   type FormEffect,
   type FormFieldDraft,
   type FormFieldPatch,
   type FormFieldRef,
   type FormFieldValue,
+  type AnnotationPosition,
   type AnnotationRef,
+  type FormSnapshot,
+  type WidgetPatch,
   type WidgetPlacement,
+  type WorkerJobId,
 } from '@embedpdf/engine-core/runtime';
 import {
   FormDataFormatSchema,
@@ -21,24 +28,44 @@ import {
   FormResetBodySchema,
   AnnotationRefSchema,
   SignatureAppearanceBodySchema,
+  FormWidgetUpdateBodySchema,
+  FormWidgetsReorderBodySchema,
   WidgetPlacementSchema,
+  decodeFormToken,
+  decodeWidgetAppearancesRenderToken,
 } from '@embedpdf/engine-core/wire';
-import { requireLayerCapability, requireLayerDocAccessOnly } from '../app/jwt-plugin';
+import {
+  requireLayerCapability,
+  requireLayerDocAccessOnly,
+  requireLayerResource,
+} from '../app/jwt-plugin';
+import type { SharpImageEncoder } from '../render/SharpImageEncoder';
+import type { DerivedRenderService } from '../services/DerivedRenderService';
 import type { DocumentService } from '../services/DocumentService';
 import type { LayerService } from '../services/LayerService';
+import { renderAppearanceBatch, type ReadScope } from './_appearanceBatch';
 import {
   abortSignalOf,
   objectNumberQuery,
   objectNumbersQuery,
   parseOrInvalidArg,
+  parseTokenOrInvalidArg,
+  resolvePageKeyParam,
+  setImmutableCache,
   setNoStore,
   type SchemaLike,
 } from './_helpers';
 import { readMutationEnvelope } from './_mutationEnvelope';
+import { requireSharedDocRead } from './_planeGuard';
 
 interface FormRouteDeps {
   documentService: DocumentService;
   layerService: LayerService;
+  imageEncoder: SharpImageEncoder;
+  /** Encode appearance renders in the engine worker by default. */
+  encodeInEngine?: boolean;
+  /** Render-lattice policy plane (absent = legacy compute-only). */
+  derivedRenders?: DerivedRenderService;
 }
 
 /** Serialized form data content types (RFC-registered Adobe types). */
@@ -48,14 +75,17 @@ const EXPORT_CONTENT_TYPE: Record<FormDataFormat, string> = {
 };
 
 /**
- * Layer-scoped form routes.
+ * Form routes.
  *
- * Forms are document-scoped (one AcroForm per layer document), so unlike
- * annotations there is no per-page collection and no content-addressed
- * `@version` read URL — every response here is `no-store`. Coherence with
- * the page-scoped caches is preserved the other way around: mutation
- * results carry a real `cacheDelta` for every page whose widget
- * appearances changed, produced by the form commit's version bumps.
+ * The form is its own read family, apart from the annotations: who may read
+ * the form isn't who may read the annotations, and a cached object is never
+ * filtered per row. `form@{formsVersion}` holds the fields and every widget
+ * row (`doc.forms.list()`), and `form/pages/{p}/appearances@{widgetVersion}`
+ * a page's widget images; each has a base twin, served from the base
+ * session while a layer inherits the `forms` plane. The unversioned layer
+ * routes stay for API callers, `no-store`. Mutation results carry a real
+ * `cacheDelta` for every page whose widgets changed, produced by the form
+ * commit's version bumps.
  *
  * Scope model (narrowing, resolver-enforced):
  *   - `doc.forms.read`   — snapshot, single field, FDF/XFDF export
@@ -64,7 +94,222 @@ const EXPORT_CONTENT_TYPE: Record<FormDataFormat, string> = {
  *                          widget adoption (attach/detach), repair
  */
 export async function registerFormRoutes(app: FastifyInstance, deps: FormRouteDeps): Promise<void> {
-  const { documentService, layerService } = deps;
+  const { documentService, layerService, imageEncoder, derivedRenders } = deps;
+  const encodeInEngine = deps.encodeInEngine ?? true;
+
+  app.get('/v1/docs/:docId/form@:token', async (req, reply) => {
+    const { docId, token } = req.params as { docId: string; token: string };
+    const ctx = await requireSharedDocRead(req, documentService, docId, 'form', ['forms']);
+    return readForm({
+      documentService,
+      reply,
+      signal: abortSignalOf(reply),
+      scope: { kind: 'base', ctx, docId },
+      requestedVersion: parseTokenOrInvalidArg(decodeFormToken, token, 'formsVersion token'),
+    });
+  });
+
+  app.get('/v1/docs/:docId/layers/:layerName/form@:token', async (req, reply) => {
+    const { docId, layerName } = layerParams(req);
+    const { token } = req.params as { token: string };
+    const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
+    const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
+    const ctx = requireLayerResource(req, docId, layerName, 'layer-form', pdfBits);
+    return readForm({
+      documentService,
+      reply,
+      signal: abortSignalOf(reply),
+      scope: { kind: 'layer', ctx, docId, layerName },
+      requestedVersion: parseTokenOrInvalidArg(decodeFormToken, token, 'formsVersion token'),
+    });
+  });
+
+  // A page's widget images, every mode and state: the form's twin of the
+  // annotation appearance batch, keyed by the page's `widgetVersion`.
+  // `compress: false` keeps the binary multipart body un-gzipped end to end.
+  const renderWidgets = (
+    reply: FastifyReply,
+    scope: ReadScope,
+    pageKey: string,
+    query: unknown,
+    token?: string,
+  ) =>
+    renderAppearanceBatch({
+      family: 'widgets',
+      documentService,
+      imageEncoder,
+      encodeInEngine,
+      ...(derivedRenders ? { derivedRenders } : {}),
+      reply,
+      signal: abortSignalOf(reply),
+      scope,
+      pageObjectNumber: resolvePageKeyParam(pageKey),
+      ...(token !== undefined
+        ? {
+            tokenQuery: parseTokenOrInvalidArg(
+              decodeWidgetAppearancesRenderToken,
+              token,
+              'appearance render token',
+            ),
+          }
+        : {}),
+      query,
+    });
+
+  app.get(
+    '/v1/docs/:docId/form/pages/:pageKey/appearances@:token',
+    { config: { compress: false } },
+    async (req, reply) => {
+      const { docId, pageKey, token } = req.params as {
+        docId: string;
+        pageKey: string;
+        token: string;
+      };
+      const ctx = await requireSharedDocRead(req, documentService, docId, 'page-form', ['forms']);
+      return renderWidgets(reply, { kind: 'base', ctx, docId }, pageKey, req.query, token);
+    },
+  );
+
+  app.get(
+    '/v1/docs/:docId/layers/:layerName/form/pages/:pageKey/appearances@:token',
+    { config: { compress: false } },
+    async (req, reply) => {
+      const { docId, layerName } = layerParams(req);
+      const { pageKey, token } = req.params as { pageKey: string; token: string };
+      const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
+      const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
+      const ctx = requireLayerResource(req, docId, layerName, 'layer-page-form', pdfBits);
+      return renderWidgets(
+        reply,
+        { kind: 'layer', ctx, docId, layerName },
+        pageKey,
+        req.query,
+        token,
+      );
+    },
+  );
+
+  app.get(
+    '/v1/docs/:docId/layers/:layerName/form/pages/:pageKey/appearances',
+    { config: { compress: false } },
+    async (req, reply) => {
+      const { docId, layerName } = layerParams(req);
+      const { pageKey } = req.params as { pageKey: string };
+      const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
+      const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
+      const ctx = requireLayerResource(req, docId, layerName, 'layer-page-form', pdfBits);
+      return renderWidgets(reply, { kind: 'layer', ctx, docId, layerName }, pageKey, req.query);
+    },
+  );
+
+  // A widget's place and look: a form write (`doc.forms.updateWidget`).
+  app.patch(
+    '/v1/docs/:docId/layers/:layerName/form/widgets/:pageKey/:annotKey',
+    async (req, reply) => {
+      const { docId, layerName } = layerParams(req);
+      const { pageKey, annotKey } = req.params as { pageKey: string; annotKey: string };
+      const widget = decodeAnnotKey(
+        { kind: 'objectNumber', objectNumber: resolvePageKeyParam(pageKey) },
+        annotKey,
+      );
+      if (!widget) {
+        throw new EngineError(EngineErrorCode.InvalidArg, `malformed widget key: ${annotKey}`);
+      }
+      const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
+      const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
+      const protection = await documentService.getProtection(accessCtx, docId, layerName);
+      const ctx = requireLayerCapability(
+        req,
+        docId,
+        layerName,
+        'doc.forms.modify',
+        pdfBits,
+        protection,
+      );
+      const { patch } = parseOrInvalidArg<{ patch: WidgetPatch }>(
+        FormWidgetUpdateBodySchema as unknown as SchemaLike<{ patch: WidgetPatch }>,
+        req.body ?? {},
+        'body',
+      );
+      setNoStore(reply);
+      return layerService.updateFormWidget(
+        ctx,
+        { docId, layerName, widget, patch },
+        abortSignalOf(reply),
+      );
+    },
+  );
+
+  // The widgets' stacking order on a page: a form write (`doc.forms.reorderWidgets`).
+  app.post(
+    '/v1/docs/:docId/layers/:layerName/form/widgets/:pageKey/reorder',
+    async (req, reply) => {
+      const { docId, layerName } = layerParams(req);
+      const { pageKey } = req.params as { pageKey: string };
+      const page = toPageRef(resolvePageKeyParam(pageKey));
+      const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
+      const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
+      const protection = await documentService.getProtection(accessCtx, docId, layerName);
+      const ctx = requireLayerCapability(
+        req,
+        docId,
+        layerName,
+        'doc.forms.modify',
+        pdfBits,
+        protection,
+      );
+      const { widgets, position } = parseOrInvalidArg<{
+        widgets: AnnotationRef[];
+        position: AnnotationPosition;
+      }>(
+        FormWidgetsReorderBodySchema as unknown as SchemaLike<{
+          widgets: AnnotationRef[];
+          position: AnnotationPosition;
+        }>,
+        req.body ?? {},
+        'body',
+      );
+      setNoStore(reply);
+      return layerService.reorderFormWidgets(
+        ctx,
+        { docId, layerName, page, widgets, position },
+        abortSignalOf(reply),
+      );
+    },
+  );
+
+  // A widget leaves its page and its field: a form write (`doc.forms.deleteWidget`).
+  app.delete(
+    '/v1/docs/:docId/layers/:layerName/form/widgets/:pageKey/:annotKey',
+    async (req, reply) => {
+      const { docId, layerName } = layerParams(req);
+      const { pageKey, annotKey } = req.params as { pageKey: string; annotKey: string };
+      const widget = decodeAnnotKey(
+        { kind: 'objectNumber', objectNumber: resolvePageKeyParam(pageKey) },
+        annotKey,
+      );
+      if (!widget) {
+        throw new EngineError(EngineErrorCode.InvalidArg, `malformed widget key: ${annotKey}`);
+      }
+      const accessCtx = requireLayerDocAccessOnly(req, docId, layerName);
+      const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
+      const protection = await documentService.getProtection(accessCtx, docId, layerName);
+      const ctx = requireLayerCapability(
+        req,
+        docId,
+        layerName,
+        'doc.forms.modify',
+        pdfBits,
+        protection,
+      );
+      setNoStore(reply);
+      return layerService.deleteFormWidget(
+        ctx,
+        { docId, layerName, widget },
+        abortSignalOf(reply),
+      );
+    },
+  );
 
   app.get('/v1/docs/:docId/layers/:layerName/form', async (req, reply) => {
     const { docId, layerName } = layerParams(req);
@@ -481,4 +726,61 @@ function importBodyBytes(req: FastifyRequest): ArrayBuffer {
     );
   }
   return new Uint8Array(body).slice().buffer;
+}
+
+/**
+ * The form at a pinned `formsVersion` (immutable, CDN-cacheable), read on
+ * the base session or the layer's. The pin is checked before and after the
+ * worker read, so a write that landed in between is a 404 into the client's
+ * manifest refresh, never a body filed under the wrong pin.
+ */
+async function readForm(input: {
+  documentService: DocumentService;
+  reply: FastifyReply;
+  signal: AbortSignal;
+  scope: ReadScope;
+  requestedVersion: number;
+}): Promise<FormSnapshot> {
+  const { scope } = input;
+  const getManifest = () =>
+    scope.kind === 'layer'
+      ? input.documentService.getLayerManifest(scope.ctx, scope.docId, scope.layerName)
+      : input.documentService.getManifest(scope.ctx, scope.docId);
+  const assertCurrent = (current: number) => {
+    if (input.requestedVersion === current) return;
+    setNoStore(input.reply);
+    throw new EngineError(
+      EngineErrorCode.NotFound,
+      `${scope.kind === 'layer' ? 'layer ' : ''}forms version ${input.requestedVersion} no longer current (current=${current})`,
+    );
+  };
+
+  assertCurrent((await getManifest()).formsVersion);
+  if (scope.kind === 'layer') {
+    await input.documentService.ensureLayerOnPool(scope.ctx, scope.docId, scope.layerName);
+  }
+  const build = (jobId: WorkerJobId) =>
+    wirePack({
+      kind: 'forms.list' as const,
+      effect: 'read' as const,
+      jobId,
+      docId: scope.docId,
+      ...(scope.kind === 'layer' ? { layerName: scope.layerName } : {}),
+    });
+  const result = await input.documentService.readOnPool(
+    scope.ctx,
+    scope.docId,
+    scope.kind === 'layer' ? scope.layerName : undefined,
+    build,
+    input.signal,
+  );
+  if (result.tag !== 'forms.list') {
+    throw new EngineError(
+      EngineErrorCode.WireFormat,
+      `unexpected forms.list payload: ${result.tag}`,
+    );
+  }
+  assertCurrent((await getManifest()).formsVersion);
+  setImmutableCache(input.reply);
+  return result.snapshot;
 }

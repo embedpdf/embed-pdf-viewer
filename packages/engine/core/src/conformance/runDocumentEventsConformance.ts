@@ -145,7 +145,10 @@ export function runDocumentEventsConformance(
         const events: DocumentEvent[] = [];
         doc.events.subscribe((event) => events.push(event));
 
-        const inserted = await doc.pages.insertBlank({ size: { width: 396, height: 612 } }, 0);
+        const inserted = await doc.pages.insertBlank(
+          { size: { width: 396, height: 612 } },
+          'start',
+        );
 
         expect(events.map((event) => event.type)).toEqual(['pages.inserted']);
         const [evInserted] = events;
@@ -153,7 +156,6 @@ export function runDocumentEventsConformance(
           expect(evInserted.insertedPages).toEqual(inserted.insertedPages);
           expect(evInserted.layout).toEqual(inserted.layout);
           expect(evInserted.meta).toEqual(inserted.meta);
-          expect(evInserted.toIndex).toBe(0);
           expect(evInserted.origin.kind).toBe('local');
         }
       } finally {

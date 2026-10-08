@@ -11,7 +11,6 @@ import {
   type ChangeAuthority,
   type Change,
   type ChangeItem,
-  type ChangeItemType,
   type ChangeResult,
   type PageCoordinates,
   type SerializedEngineError,
@@ -60,43 +59,52 @@ export function objectNumberEstimateOf(changes: readonly RequestedChange[]): num
   return forms || undo ? OBJECT_NUMBER_ESTIMATES.forms : OBJECT_NUMBER_ESTIMATES.default;
 }
 
-/** Items whose kind changes the bulk annotation list: annotations, and form structure. */
-const LIST_ITEMS: ReadonlySet<ChangeItemType> = new Set([
-  'annotations.create',
-  'annotations.update',
-  'annotations.delete',
-  'annotations.move',
-  'annotations.restore',
-  'forms.create',
-  'forms.update',
-  'forms.delete',
-  'forms.restore',
-  'forms.addWidget',
-  'forms.removeWidget',
-]);
-
-/** What a commit bumps for the changes that wrote: from what they did, not what they were. */
+/**
+ * What a commit bumps for the changes that wrote: from what they did, not
+ * what they were. Each read family has its own pins: an annotation write
+ * moves the annotation list and its pages' `annotation_version`; a form
+ * write moves the form and its widgets' pages' `widget_version`.
+ */
 export interface ChangeFacts {
-  /** The pages whose annotations changed: their `annotation_version`. */
-  readonly pages: readonly number[];
-  /** The layer's bulk annotation list (`annotations_version`). */
+  /** The pages whose annotations (widgets excepted) changed: their `annotation_version`. */
+  readonly annotationPages: readonly number[];
+  /** The pages whose widgets changed: their `widget_version`. */
+  readonly widgetPages: readonly number[];
+  /** The layer's annotation list (`annotations_version`). */
   readonly annotationList: boolean;
+  /** The layer's form: fields and widget rows (`forms_version`). */
+  readonly form: boolean;
   /** The document's metadata (`metadata_version`). */
   readonly metadata: boolean;
 }
 
 /** The facts of every item that wrote. */
 export function factsOf(results: readonly ChangeResult[]): ChangeFacts {
-  const pages = new Set<number>();
+  const annotationPages = new Set<number>();
+  const widgetPages = new Set<number>();
   let annotationList = false;
+  let form = false;
   let metadata = false;
   for (const item of results.flatMap((result) => result.items)) {
     if (isSkippedItem(item)) continue;
-    for (const page of item.meta.affectedPages) pages.add(page.objectNumber);
-    if (LIST_ITEMS.has(item.type)) annotationList = true;
-    if (item.type === 'metadata.update' || item.type === 'metadata.updateCustom') metadata = true;
+    const pages = item.meta.affectedPages.map((page) => page.objectNumber);
+    if (item.type.startsWith('annotations.')) {
+      for (const page of pages) annotationPages.add(page);
+      annotationList = true;
+    } else if (item.type.startsWith('forms.')) {
+      for (const page of pages) widgetPages.add(page);
+      form = true;
+    } else if (item.type === 'metadata.update' || item.type === 'metadata.updateCustom') {
+      metadata = true;
+    }
   }
-  return { pages: [...pages], annotationList, metadata };
+  return {
+    annotationPages: [...annotationPages],
+    widgetPages: [...widgetPages],
+    annotationList,
+    form,
+    metadata,
+  };
 }
 
 /** Whether any item of a result wrote: a change left alone entirely wrote nothing. */
@@ -232,20 +240,16 @@ export function checkedAuthority(actor?: AnnotationActor): ChangeAuthority {
   return { identity: actor ?? {}, grants: null, protection: null };
 }
 
-/** A one-op change's result as its single verb answers it: the item, without its type and page. */
+/** A one-op change's result as its single verb answers it: the item, without its type. */
 export function verbResultOf(result: ChangeResult): unknown {
   const item = result.items[0];
   if (!item || isSkippedItem(item)) {
     throw new EngineError(EngineErrorCode.Unknown, 'a single verb wrote nothing');
   }
-  const {
-    type: _type,
-    page: _page,
-    skipped: _skipped,
-    ...rest
-  } = item as ChangeItem & {
-    page?: unknown;
-    skipped?: unknown;
-  };
-  return rest;
+  const { type: _type, skipped: _skipped, ...rest } = item as ChangeItem & { skipped?: unknown };
+  // An annotation item names its page beside the verb's result; a form
+  // result that names one (`forms.reorderWidgets`) keeps it.
+  if (!item.type.startsWith('annotations.')) return rest;
+  const { page: _page, ...verbResult } = rest as { page?: unknown };
+  return verbResult;
 }

@@ -29,11 +29,17 @@ import type { AnalysisToken, AnnotationsExportToken } from './tokens';
  *   /v1/docs/{id}/layers/{L}/annotations/pages/{N}/items@{ver}    — collection (read)
  *   /v1/docs/{id}/layers/{L}/annotations/pages/{N}/items          — collection (create)
  *   /v1/docs/{id}/layers/{L}/annotations/pages/{N}/items/{key}    — member
- *   /v1/docs/{id}/layers/{L}/annotations/pages/{N}/items/move     — batch reorder
- *   /v1/docs/{id}/layers/{L}/pages/move                           — batch page reorder
+ *   /v1/docs/{id}/layers/{L}/annotations/pages/{N}/items/reorder  — stacking order
+ *   /v1/docs/{id}/layers/{L}/pages/reorder                        — page order
  *   /v1/docs/{id}/layers/{L}/pages/rotate                         — batch absolute rotation
  *   /v1/docs/{id}/layers/{L}/pages/delete                         — batch page delete
- *   /v1/docs/{id}/layers/{L}/form                                 — reconciled snapshot (read)
+ *   /v1/docs/{id}/form@{ver}                                      — the form: fields + widget rows (read)
+ *   /v1/docs/{id}/form/pages/{N}/appearances@{ver}                — a page's widget images (read)
+ *   /v1/docs/{id}/layers/{L}/form@{ver}
+ *   /v1/docs/{id}/layers/{L}/form/pages/{N}/appearances@{ver}
+ *   /v1/docs/{id}/layers/{L}/form                                 — the form, current (read)
+ *   /v1/docs/{id}/layers/{L}/form/widgets/{N}/{key}               — a widget's place and look (patch)
+ *   /v1/docs/{id}/layers/{L}/form/widgets/{N}/reorder             — the widgets' stacking order
  *   /v1/docs/{id}/layers/{L}/form/fields                          — field collection (create)
  *   /v1/docs/{id}/layers/{L}/form/fields/{key}                    — field member (read/patch/delete)
  *   /v1/docs/{id}/layers/{L}/form/fields/{key}/value              — value write (fill)
@@ -60,10 +66,12 @@ import {
   encodeContentToken,
   encodeDocToken,
   encodeDownloadToken,
+  encodeFormToken,
   encodeLayoutToken,
   encodeMetadataToken,
   encodeRenderToken,
   encodeTokenText,
+  encodeWidgetAppearancesRenderToken,
   type DownloadToken,
   type TokenInput,
 } from './tokens';
@@ -483,8 +491,8 @@ export const wirePaths = {
   ) =>
     `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/annotations/pages/${encodeURIComponent(encodePageKey(page))}/items/${encodeURIComponent(key)}/resources/appearance`,
 
-  layerPageAnnotationsMove: (docId: string, layerName: string, page: PageRef) =>
-    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/annotations/pages/${encodeURIComponent(encodePageKey(page))}/items/move`,
+  layerPageAnnotationsReorder: (docId: string, layerName: string, page: PageRef) =>
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/annotations/pages/${encodeURIComponent(encodePageKey(page))}/items/reorder`,
   /** POST: flatten a chosen set of the page's annotations into its content
    *  (a content + annotation mutation of that page). */
   layerPageAnnotationsFlatten: (docId: string, layerName: string, page: PageRef) =>
@@ -495,15 +503,48 @@ export const wirePaths = {
     `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/annotations/pages/${encodeURIComponent(encodePageKey(page))}/items/appearance`,
 
   /**
-   * GET: the reconciled form snapshot (field tree + widget joins) for the
-   * layer's current state. Forms are document-scoped (one AcroForm per
-   * document), so there is no per-page collection and — unlike annotations —
-   * no content-addressed `@version` variant: the snapshot is always served
-   * `no-store`. Mutation results carry the per-page `cacheDelta` that keeps
-   * annotation/render caches coherent when widget appearances change.
+   * Immutable base form: the fields, every widget row, the calculation
+   * order (`doc.forms.list()`), at the document's `formsVersion`. Needs
+   * `doc.forms.read`, under its own prefix, so the CDN signs it apart from
+   * the annotations.
    */
-  layerForm: (docId: string, layerName: string) =>
+  docForm: (docId: string, formsVersion: number) =>
+    `/v1/docs/${encodeURIComponent(docId)}/form@${encodeFormToken(formsVersion)}`,
+
+  /** Immutable layer form (twin of `docForm`). */
+  layerForm: (docId: string, layerName: string, formsVersion: number) =>
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/form@${encodeFormToken(formsVersion)}`,
+
+  /** GET: the layer's form as it is now — for API callers, served `no-store`. */
+  layerFormCurrent: (docId: string, layerName: string) =>
     `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/form`,
+
+  /**
+   * Immutable base batch of a page's widget images, every mode and state, as
+   * `multipart/form-data` (`page.forms.renderAppearances()`), keyed by the
+   * page's `widgetVersion`.
+   */
+  docPageFormAppearances: (docId: string, page: PageRef, token: TokenInput) =>
+    `/v1/docs/${encodeURIComponent(docId)}/form/pages/${encodeURIComponent(encodePageKey(page))}/appearances@${encodeWidgetAppearancesRenderToken(token)}`,
+
+  /** Immutable layer twin of `docPageFormAppearances`. */
+  layerPageFormAppearances: (docId: string, layerName: string, page: PageRef, token: TokenInput) =>
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/form/pages/${encodeURIComponent(encodePageKey(page))}/appearances@${encodeWidgetAppearancesRenderToken(token)}`,
+
+  layerPageFormAppearancesCurrent: (docId: string, layerName: string, page: PageRef) =>
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/form/pages/${encodeURIComponent(encodePageKey(page))}/appearances`,
+
+  /**
+   * PATCH: a widget's place and look (`doc.forms.updateWidget`). `key` is
+   * the widget's annotation key. Not under `form/pages/`, which the CDN
+   * signs for reads.
+   */
+  /** POST: the stacking order of a page's widgets (`doc.forms.reorderWidgets`). */
+  layerFormWidgetsReorder: (docId: string, layerName: string, page: PageRef) =>
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/form/widgets/${encodeURIComponent(encodePageKey(page))}/reorder`,
+
+  layerFormWidget: (docId: string, layerName: string, page: PageRef, key: string) =>
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/form/widgets/${encodeURIComponent(encodePageKey(page))}/${encodeURIComponent(key)}`,
 
   /** POST: create a field (optionally with styled widget placements). */
   layerFormFields: (docId: string, layerName: string) =>
@@ -583,8 +624,8 @@ export const wirePaths = {
   layerPageScale: (docId: string, layerName: string, page: PageRef) =>
     `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/pages/${encodeURIComponent(encodePageKey(page))}/scale`,
 
-  layerPagesMove: (docId: string, layerName: string) =>
-    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/pages/move`,
+  layerPagesReorder: (docId: string, layerName: string) =>
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/pages/reorder`,
 
   layerPagesRotate: (docId: string, layerName: string) =>
     `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/pages/rotate`,
@@ -685,6 +726,8 @@ export const wireTemplates = {
   layerAnnotationItems: '/v1/docs/:docId/layers/:layerName/annotations/pages/:pageKey/items',
   layerAnnotationItem:
     '/v1/docs/:docId/layers/:layerName/annotations/pages/:pageKey/items/:annotKey',
+  layerAnnotationItemsReorder:
+    '/v1/docs/:docId/layers/:layerName/annotations/pages/:pageKey/items/reorder',
   layerAnnotationItemsFlatten:
     '/v1/docs/:docId/layers/:layerName/annotations/pages/:pageKey/items/flatten',
   layerAnnotationItemsAppearance:
@@ -692,6 +735,8 @@ export const wireTemplates = {
   layerAnnotationItemAppearanceResource:
     '/v1/docs/:docId/layers/:layerName/annotations/pages/:pageKey/items/:annotKey/resources/appearance',
   layerForm: '/v1/docs/:docId/layers/:layerName/form',
+  layerFormWidget: '/v1/docs/:docId/layers/:layerName/form/widgets/:pageKey/:annotKey',
+  layerFormWidgetsReorder: '/v1/docs/:docId/layers/:layerName/form/widgets/:pageKey/reorder',
   layerFormFieldValue: '/v1/docs/:docId/layers/:layerName/form/fields/:fieldKey/value',
   layerFormReset: '/v1/docs/:docId/layers/:layerName/form/reset',
   layerFormFieldSignatureAppearance:
@@ -699,7 +744,7 @@ export const wireTemplates = {
   layerFormData: '/v1/docs/:docId/layers/:layerName/form/data',
   layerPageViewports: '/v1/docs/:docId/layers/:layerName/pages/:pageKey/viewports',
   layerPageScale: '/v1/docs/:docId/layers/:layerName/pages/:pageKey/scale',
-  layerPagesMove: '/v1/docs/:docId/layers/:layerName/pages/move',
+  layerPagesReorder: '/v1/docs/:docId/layers/:layerName/pages/reorder',
   layerPagesRotate: '/v1/docs/:docId/layers/:layerName/pages/rotate',
   layerPagesDelete: '/v1/docs/:docId/layers/:layerName/pages/delete',
   layerPagesNames: '/v1/docs/:docId/layers/:layerName/pages/names',

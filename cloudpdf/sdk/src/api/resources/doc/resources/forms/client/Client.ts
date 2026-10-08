@@ -432,4 +432,284 @@ export class FormsClient {
             "/v1/docs/{docId}/layers/{layerName}/form/reset",
         );
     }
+
+    /**
+     * @param {CloudPDF.doc.DeleteWidgetFormsRequest} request
+     * @param {FormsClient.RequestOptions} requestOptions - Request-specific configuration.
+     *
+     * @throws {@link CloudPDF.BadRequestError}
+     * @throws {@link CloudPDF.NotFoundError}
+     * @throws {@link errors.CloudPDFError}
+     * @throws {@link errors.CloudPDFTimeoutError}
+     *
+     * @example
+     *     await client.doc.forms.deleteWidget({
+     *         docId: "docId",
+     *         layerName: "layerName",
+     *         pageKey: "pageKey",
+     *         annotKey: "annotKey"
+     *     })
+     */
+    public deleteWidget(
+        request: CloudPDF.doc.DeleteWidgetFormsRequest,
+        requestOptions?: FormsClient.RequestOptions,
+    ): core.HttpResponsePromise<CloudPDF.DocFormsDeleteWidget200Response> {
+        return core.HttpResponsePromise.fromPromise(this.__deleteWidget(request, requestOptions));
+    }
+
+    private async __deleteWidget(
+        request: CloudPDF.doc.DeleteWidgetFormsRequest,
+        requestOptions?: FormsClient.RequestOptions,
+    ): Promise<core.WithRawResponse<CloudPDF.DocFormsDeleteWidget200Response>> {
+        const {
+            docId,
+            layerName,
+            pageKey,
+            annotKey,
+            "X-Document-Password": documentPassword,
+            "Idempotency-Key": idempotencyKey,
+        } = request;
+        const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
+        const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
+            _authRequest.headers,
+            this._options?.headers,
+            mergeOnlyDefinedHeaders({ "X-Document-Password": documentPassword, "Idempotency-Key": idempotencyKey }),
+            requestOptions?.headers,
+        );
+        const _response = await core.fetcher({
+            url: core.url.join(
+                (await core.Supplier.get(this._options.baseUrl)) ??
+                    (await core.Supplier.get(this._options.environment)),
+                `v1/docs/${core.url.encodePathParam(docId)}/layers/${core.url.encodePathParam(layerName)}/form/widgets/${core.url.encodePathParam(pageKey)}/${core.url.encodePathParam(annotKey)}`,
+            ),
+            method: "DELETE",
+            headers: _headers,
+            queryString: core.url.queryBuilder().mergeAdditional(requestOptions?.queryParams).build(),
+            timeoutMs: (requestOptions?.timeoutInSeconds ?? this._options?.timeoutInSeconds ?? 60) * 1000,
+            maxRetries: requestOptions?.maxRetries ?? this._options?.maxRetries,
+            abortSignal: requestOptions?.abortSignal,
+            fetchFn: this._options?.fetch,
+            logging: this._options.logging,
+        });
+        if (_response.ok) {
+            return {
+                data: _response.body as CloudPDF.DocFormsDeleteWidget200Response,
+                rawResponse: _response.rawResponse,
+            };
+        }
+
+        if (_response.error.reason === "status-code") {
+            switch (_response.error.statusCode) {
+                case 400:
+                    throw new CloudPDF.BadRequestError(_response.error.body as unknown, _response.rawResponse);
+                case 404:
+                    throw new CloudPDF.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                default:
+                    throw new errors.CloudPDFError({
+                        statusCode: _response.error.statusCode,
+                        body: _response.error.body,
+                        rawResponse: _response.rawResponse,
+                    });
+            }
+        }
+
+        return handleNonStatusCodeError(
+            _response.error,
+            _response.rawResponse,
+            "DELETE",
+            "/v1/docs/{docId}/layers/{layerName}/form/widgets/{pageKey}/{annotKey}",
+        );
+    }
+
+    /**
+     * @param {CloudPDF.doc.DocFormsUpdateWidgetRequest} request
+     * @param {FormsClient.RequestOptions} requestOptions - Request-specific configuration.
+     *
+     * @throws {@link CloudPDF.BadRequestError}
+     * @throws {@link CloudPDF.NotFoundError}
+     * @throws {@link errors.CloudPDFError}
+     * @throws {@link errors.CloudPDFTimeoutError}
+     *
+     * @example
+     *     await client.doc.forms.updateWidget({
+     *         docId: "docId",
+     *         layerName: "layerName",
+     *         pageKey: "pageKey",
+     *         annotKey: "annotKey",
+     *         patch: {}
+     *     })
+     */
+    public updateWidget(
+        request: CloudPDF.doc.DocFormsUpdateWidgetRequest,
+        requestOptions?: FormsClient.RequestOptions,
+    ): core.HttpResponsePromise<CloudPDF.DocFormsUpdateWidget200Response> {
+        return core.HttpResponsePromise.fromPromise(this.__updateWidget(request, requestOptions));
+    }
+
+    private async __updateWidget(
+        request: CloudPDF.doc.DocFormsUpdateWidgetRequest,
+        requestOptions?: FormsClient.RequestOptions,
+    ): Promise<core.WithRawResponse<CloudPDF.DocFormsUpdateWidget200Response>> {
+        const {
+            docId,
+            layerName,
+            pageKey,
+            annotKey,
+            "X-Document-Password": documentPassword,
+            "Idempotency-Key": idempotencyKey,
+            ..._body
+        } = request;
+        const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
+        const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
+            _authRequest.headers,
+            this._options?.headers,
+            mergeOnlyDefinedHeaders({ "X-Document-Password": documentPassword, "Idempotency-Key": idempotencyKey }),
+            requestOptions?.headers,
+        );
+        const _response = await core.fetcher({
+            url: core.url.join(
+                (await core.Supplier.get(this._options.baseUrl)) ??
+                    (await core.Supplier.get(this._options.environment)),
+                `v1/docs/${core.url.encodePathParam(docId)}/layers/${core.url.encodePathParam(layerName)}/form/widgets/${core.url.encodePathParam(pageKey)}/${core.url.encodePathParam(annotKey)}`,
+            ),
+            method: "PATCH",
+            headers: _headers,
+            contentType: "application/json",
+            queryString: core.url.queryBuilder().mergeAdditional(requestOptions?.queryParams).build(),
+            requestType: "json",
+            body: mergeAdditionalBodyParameters(_body, requestOptions?.additionalBodyParameters),
+            timeoutMs: (requestOptions?.timeoutInSeconds ?? this._options?.timeoutInSeconds ?? 60) * 1000,
+            maxRetries: requestOptions?.maxRetries ?? this._options?.maxRetries,
+            abortSignal: requestOptions?.abortSignal,
+            fetchFn: this._options?.fetch,
+            logging: this._options.logging,
+        });
+        if (_response.ok) {
+            return {
+                data: _response.body as CloudPDF.DocFormsUpdateWidget200Response,
+                rawResponse: _response.rawResponse,
+            };
+        }
+
+        if (_response.error.reason === "status-code") {
+            switch (_response.error.statusCode) {
+                case 400:
+                    throw new CloudPDF.BadRequestError(_response.error.body as unknown, _response.rawResponse);
+                case 404:
+                    throw new CloudPDF.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                default:
+                    throw new errors.CloudPDFError({
+                        statusCode: _response.error.statusCode,
+                        body: _response.error.body,
+                        rawResponse: _response.rawResponse,
+                    });
+            }
+        }
+
+        return handleNonStatusCodeError(
+            _response.error,
+            _response.rawResponse,
+            "PATCH",
+            "/v1/docs/{docId}/layers/{layerName}/form/widgets/{pageKey}/{annotKey}",
+        );
+    }
+
+    /**
+     * @param {CloudPDF.doc.DocFormsReorderWidgetsRequest} request
+     * @param {FormsClient.RequestOptions} requestOptions - Request-specific configuration.
+     *
+     * @throws {@link CloudPDF.BadRequestError}
+     * @throws {@link CloudPDF.NotFoundError}
+     * @throws {@link errors.CloudPDFError}
+     * @throws {@link errors.CloudPDFTimeoutError}
+     *
+     * @example
+     *     await client.doc.forms.reorderWidgets({
+     *         docId: "docId",
+     *         layerName: "layerName",
+     *         pageKey: "pageKey",
+     *         widgets: [{
+     *                 kind: "objectNumber",
+     *                 page: {
+     *                     kind: "objectNumber",
+     *                     objectNumber: 1
+     *                 },
+     *                 objectNumber: 1
+     *             }],
+     *         position: "start"
+     *     })
+     */
+    public reorderWidgets(
+        request: CloudPDF.doc.DocFormsReorderWidgetsRequest,
+        requestOptions?: FormsClient.RequestOptions,
+    ): core.HttpResponsePromise<CloudPDF.DocFormsReorderWidgets200Response> {
+        return core.HttpResponsePromise.fromPromise(this.__reorderWidgets(request, requestOptions));
+    }
+
+    private async __reorderWidgets(
+        request: CloudPDF.doc.DocFormsReorderWidgetsRequest,
+        requestOptions?: FormsClient.RequestOptions,
+    ): Promise<core.WithRawResponse<CloudPDF.DocFormsReorderWidgets200Response>> {
+        const {
+            docId,
+            layerName,
+            pageKey,
+            "X-Document-Password": documentPassword,
+            "Idempotency-Key": idempotencyKey,
+            ..._body
+        } = request;
+        const _authRequest: core.AuthRequest = await this._options.authProvider.getAuthRequest();
+        const _headers: core.Fetcher.Args["headers"] = mergeHeaders(
+            _authRequest.headers,
+            this._options?.headers,
+            mergeOnlyDefinedHeaders({ "X-Document-Password": documentPassword, "Idempotency-Key": idempotencyKey }),
+            requestOptions?.headers,
+        );
+        const _response = await core.fetcher({
+            url: core.url.join(
+                (await core.Supplier.get(this._options.baseUrl)) ??
+                    (await core.Supplier.get(this._options.environment)),
+                `v1/docs/${core.url.encodePathParam(docId)}/layers/${core.url.encodePathParam(layerName)}/form/widgets/${core.url.encodePathParam(pageKey)}/reorder`,
+            ),
+            method: "POST",
+            headers: _headers,
+            contentType: "application/json",
+            queryString: core.url.queryBuilder().mergeAdditional(requestOptions?.queryParams).build(),
+            requestType: "json",
+            body: mergeAdditionalBodyParameters(_body, requestOptions?.additionalBodyParameters),
+            timeoutMs: (requestOptions?.timeoutInSeconds ?? this._options?.timeoutInSeconds ?? 60) * 1000,
+            maxRetries: requestOptions?.maxRetries ?? this._options?.maxRetries,
+            abortSignal: requestOptions?.abortSignal,
+            fetchFn: this._options?.fetch,
+            logging: this._options.logging,
+        });
+        if (_response.ok) {
+            return {
+                data: _response.body as CloudPDF.DocFormsReorderWidgets200Response,
+                rawResponse: _response.rawResponse,
+            };
+        }
+
+        if (_response.error.reason === "status-code") {
+            switch (_response.error.statusCode) {
+                case 400:
+                    throw new CloudPDF.BadRequestError(_response.error.body as unknown, _response.rawResponse);
+                case 404:
+                    throw new CloudPDF.NotFoundError(_response.error.body as unknown, _response.rawResponse);
+                default:
+                    throw new errors.CloudPDFError({
+                        statusCode: _response.error.statusCode,
+                        body: _response.error.body,
+                        rawResponse: _response.rawResponse,
+                    });
+            }
+        }
+
+        return handleNonStatusCodeError(
+            _response.error,
+            _response.rawResponse,
+            "POST",
+            "/v1/docs/{docId}/layers/{layerName}/form/widgets/{pageKey}/reorder",
+        );
+    }
 }

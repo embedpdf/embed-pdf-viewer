@@ -51,7 +51,7 @@ error. The document is as it was before the call.
 | `annotations.create`           | `page`, `data`, `objectNumber`, `resources`               | `page.annotations.create(data, { objectNumber, resources })`                    |
 | `annotations.update`           | `ref`, `patch`, `resources`, `expect`                     | `page.annotations.update(ref, patch, { resources })`                            |
 | `annotations.delete`           | `ref`, `expect`                                           | `page.annotations.delete(ref)`                                                  |
-| `annotations.move`             | `page`, `refs`, `toIndex`, `expect`                       | `page.annotations.move(refs, toIndex)`                                          |
+| `annotations.reorder`          | `page`, `refs`, `position`                                | `page.annotations.reorder(refs, position)`                                      |
 | `forms.setValue`               | `field`, `value`, `expect`                                | `doc.forms.setValue(field, value)`                                              |
 | `forms.reset`                  | `fields`                                                  | `doc.forms.reset(fields)`                                                       |
 | `forms.create`                 | `draft`, `objectNumber`, `widgetObjectNumbers`            | `doc.forms.create(draft, { objectNumber, widgetObjectNumbers })`                |
@@ -59,6 +59,9 @@ error. The document is as it was before the call.
 | `forms.delete`                 | `field`, `expect`                                         | `doc.forms.delete(field)`                                                       |
 | `forms.addWidget`              | `field`, `placement`, `objectNumber`, `splitObjectNumber` | `doc.forms.addWidget(field, placement, { objectNumber, splitObjectNumber })`    |
 | `forms.removeWidget`           | `field`, `widget`                                         | `doc.forms.removeWidget(field, widget)`                                         |
+| `forms.deleteWidget`           | `widget`, `expect`                                        | `doc.forms.deleteWidget(widget)`                                                |
+| `forms.updateWidget`           | `widget`, `patch`, `expect`                               | `doc.forms.updateWidget(widget, patch)`                                         |
+| `forms.reorderWidgets`         | `page`, `widgets`, `position`                             | `doc.forms.reorderWidgets(widgets, position)`                                   |
 | `forms.setSignatureAppearance` | `field`, `appearance`                                     | `doc.forms.setSignatureAppearance(field, appearance)`                           |
 | `forms.setDisplay`             | `field`, `display`, `expect`                              | Shows or hides a field's widgets, as a form script does                         |
 | `forms.setAppearanceText`      | `field`, `text`                                           | Sets the text a field shows without changing its value, as a format script does |
@@ -183,6 +186,8 @@ they left it:
 - An op whose annotation or field is gone, or was changed all over, is left alone entirely. Its
   item is `{ type: 'skipped', op }`, with `op` the type of item it would have been.
 - A create isn't undone when someone changed what it made, or replied to it.
+- A reorder puts each annotation or widget back next to the neighbours it had, unless it was
+  moved since or the one below it changed. Neighbours that are gone are skipped over.
 
 Nothing is written for what's left alone, and no event fires for it. Tell the user when it
 happened:
@@ -199,7 +204,8 @@ put back.
 
 Undoing a delete brings back what was deleted as it was: the same refs, its place among the
 page's annotations, its replies and popup, and who wrote it. The item is `annotations.restore`,
-with the annotations that came back, or `forms.restore`, with the field.
+with the annotations that came back, `forms.restore`, with the field, or `forms.restoreWidget`, with
+the widget back at its place and in its field.
 
 ### What can't be undone
 
@@ -252,8 +258,9 @@ await doc.apply({
 
 When the document doesn't match, the whole change is refused with `ChangeConflict`, and nothing
 is written. `error.details.opIndex` is the op that didn't match and `error.details.fields` the
-fields that differed. `annotations.move` expects the index each ref has now, `annotations.delete`
-and `forms.delete` the values the thing has before it goes.
+fields that differed. `annotations.delete` and `forms.delete` expect the values the thing has
+before it goes. A reorder takes no `expect`: its position names a neighbour, which is already
+what it assumes.
 
 ## Asking again
 

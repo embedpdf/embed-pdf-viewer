@@ -342,6 +342,7 @@ export class CloudDocumentHandle implements DocumentHandle {
       this.publisher,
       this.writes,
       (signal) => this.pages.pageLayout(ref, signal),
+      () => this.cloudSecurity.pageLayerRights(),
     );
   }
 
@@ -486,12 +487,14 @@ export class CloudDocumentHandle implements DocumentHandle {
     this.manifestCache = {
       ...this.manifestCache,
       docVersion: delta?.docVersion ?? this.manifestCache.docVersion,
-      // Bulk annotations pin: absorbed when the mutation bumped it, so the
-      // next `annotations.list()` addresses the fresh bulk leaf without a
-      // 404-refresh round trip.
+      // The document pins of the annotation list and the form: absorbed when
+      // the mutation bumped them, so the next `annotations.list()` or
+      // `forms.list()` addresses the fresh leaf without a 404-refresh round
+      // trip.
       ...(delta?.annotationsVersion !== undefined
         ? { annotationsVersion: delta.annotationsVersion }
         : {}),
+      ...(delta?.formsVersion !== undefined ? { formsVersion: delta.formsVersion } : {}),
       // The plane pins a page-structure, metadata or attachment write bumps:
       // absorbed so the next read addresses the fresh leaf.
       ...(delta?.layoutVersion !== undefined ? { layoutVersion: delta.layoutVersion } : {}),
@@ -519,10 +522,10 @@ export class CloudDocumentHandle implements DocumentHandle {
    * page object number can be built from the cache (a stale request would
    * 404 anyway — this keeps the failure local and instant). Delete changes
    * the page set: a view that removed content must never resolve base
-   * artifacts again, so content and annotations flip with layout.
+   * artifacts again, so content, annotations and forms flip with layout.
    */
   private absorbPageDelete(meta: MutationMeta, deletedPages: readonly PageRef[]): void {
-    this.absorbMutation(meta, ['layout', 'content', 'annotations']);
+    this.absorbMutation(meta, ['layout', 'content', 'annotations', 'forms']);
     if (!this.manifestCache) return;
     const deleted = new Set(deletedPages.map((page) => page.objectNumber));
     this.manifestCache = {
@@ -537,13 +540,13 @@ export class CloudDocumentHandle implements DocumentHandle {
    * cached manifest losslessly (it only removes rows), but an insert needs
    * manifest rows for the fresh page object numbers and the result doesn't carry them. So
    * this absorb flips the planes (insert changes the page set, so like
-   * delete it owns content + annotations alongside layout), raises the
+   * delete it owns content, annotations and forms alongside layout), raises the
    * version floor, and drops the cache — the next read refetches a manifest
    * that includes the new pages' rows. The UI never waits on that refetch:
    * the mutation result / event already carries the full new layout.
    */
   private absorbPageInsert(meta: MutationMeta): void {
-    this.flipScopes(['layout', 'content', 'annotations']);
+    this.flipScopes(['layout', 'content', 'annotations', 'forms']);
     if (meta.cacheDelta) {
       this.manifestFloorVersion = Math.max(this.manifestFloorVersion, meta.cacheDelta.docVersion);
     }
@@ -649,6 +652,17 @@ export class CloudDocumentHandle implements DocumentHandle {
         if (this.manifestCache && row.id > this.manifestCache.auditHead) {
           this.manifestCache = { ...this.manifestCache, auditHead: row.id };
         }
+        // A change this connection may not read: the server sent only its
+        // pins, absorbed so reads stay warm. Which family it changed is part
+        // of what was withheld, so both planes flip: never wrong, only
+        // unshared until the next manifest.
+        if (row.withheld) {
+          const meta = (row.payload as { meta?: MutationMeta } | null)?.meta;
+          if (meta && row.originSessionId !== this.sessionId) {
+            this.absorbMutation(meta, ['annotations', 'forms']);
+          }
+          return;
+        }
         // A new version, this engine's own included: in stream order, before
         // the `session` event that hands out its fresh numbers.
         if (row.kind === 'signature.complete') {
@@ -702,10 +716,10 @@ export class CloudDocumentHandle implements DocumentHandle {
       case 'annotations.created':
       case 'annotations.updated':
       case 'annotations.deleted':
-      case 'annotations.moved':
+      case 'annotations.reordered':
         this.absorbMutation(event.meta, ['annotations']);
         return;
-      case 'pages.moved':
+      case 'pages.reordered':
       case 'pages.rotated':
       case 'pages.named':
         this.absorbMutation(event.meta, ['layout']);
@@ -730,20 +744,22 @@ export class CloudDocumentHandle implements DocumentHandle {
       case 'forms.created':
       case 'forms.updated':
       case 'forms.deleted':
+      case 'forms.restored':
       case 'forms.widgetAdded':
       case 'forms.widgetRemoved':
-        // Form mutations ship the same MutationMeta rails as annotations:
-        // affected pages are the ones whose widget appearances changed.
-        // Widgets are annotations, so they own the same plane.
-        this.absorbMutation(event.meta, ['annotations']);
-        return;
+      case 'forms.widgetUpdated':
+      case 'forms.widgetDeleted':
+      case 'forms.widgetRestored':
+      case 'forms.widgetsReordered':
       case 'forms.effectsApplied':
-        this.absorbMutation(event.meta, ['annotations']);
+        // Form writes move the form's pins: the affected pages are the
+        // ones whose widgets changed.
+        this.absorbMutation(event.meta, ['forms']);
         return;
       case 'pages.flattened':
       case 'annotations.flattened':
-        // Flatten bakes annotations into page content: both planes flip.
-        this.absorbMutation(event.meta, ['content', 'annotations']);
+        // Flatten bakes annotations and form fields into page content.
+        this.absorbMutation(event.meta, ['content', 'annotations', 'forms']);
         return;
       case 'signatures.prepared':
       case 'document.versioned':
@@ -753,10 +769,10 @@ export class CloudDocumentHandle implements DocumentHandle {
         this.inflightManifest = null;
         return;
       case 'redaction.applied':
-        // Redaction-apply rewrites content and consumes the marks: both
-        // planes flip — and this is the security-relevant divergence, so a
-        // remote apply must stop this client's base reads immediately.
-        this.absorbMutation(event.meta, ['content', 'annotations']);
+        // Redaction-apply rewrites content and consumes the marks: every
+        // page plane flips — and this is the security-relevant divergence,
+        // so a remote apply must stop this client's base reads immediately.
+        this.absorbMutation(event.meta, ['content', 'annotations', 'forms']);
         return;
     }
   }

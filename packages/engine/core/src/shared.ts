@@ -106,6 +106,7 @@ export type {
   PageImageSource,
   PageNetworkRenderFormat,
   PageRaster,
+  PageLayerRights,
   PageRenderBackground,
   PageRenderEncodedFormat,
   PageRenderFormat,
@@ -116,7 +117,7 @@ export type {
   PageRenderTarget,
   PageRenderViewport,
 } from './dto/PageRender';
-export { checkImageQuality, createPageImageHandle } from './dto/PageRender';
+export { checkImageQuality, createPageImageHandle, resolvePageLayers } from './dto/PageRender';
 export {
   ANNOTATION_APPEARANCE_MODES,
   appearanceModesOf,
@@ -127,6 +128,7 @@ export type {
   AnnotationAppearanceRenderOptions,
   AnnotationAppearanceImageOptions,
   AnnotationAppearancesQuery,
+  WidgetAppearancesQuery,
   AnnotationAppearanceRaster,
   AnnotationAppearancesResult,
   AnnotationAppearanceImage,
@@ -231,6 +233,8 @@ export {
   subtypeFromCode,
 } from './annotation/subtype';
 export type { AnnotationSubtype } from './annotation/subtype';
+export { familyOfSubtype } from './annotation/family';
+export type { AnnotationFamily } from './annotation/family';
 
 // Binary payloads — zod-free.
 export type {
@@ -447,7 +451,7 @@ export type {
   AnnotationCreateResult,
   AnnotationUpdateResult,
   AnnotationDeleteResult,
-  AnnotationMoveResult,
+  AnnotationReorderResult,
 } from './mutation/AnnotationMutationResults';
 export { deletedAnnotationsOf } from './mutation/AnnotationMutationResults';
 export type {
@@ -654,7 +658,12 @@ export type {
   FormFieldCreateResult,
   FormFieldUpdateResult,
   FormFieldDeleteResult,
+  FormWidgetDeleteResult,
   FormWidgetLinkResult,
+  FormWidgetRestoreResult,
+  FormWidgetRows,
+  FormWidgetsReorderResult,
+  FormWidgetUpdateResult,
 } from './mutation/FormMutationResults';
 // Search: contract types + the pure match/anchor stages. The matcher and
 // line-merge are exported (not just types) because the local worker, the
@@ -699,8 +708,10 @@ export {
 export type { CharBoundaryBias, CharMapAnchor } from './text/charmap';
 export { searchContentEpoch, canonicalSearchQuery } from './search/epoch';
 
-export type { PageMoveInput } from './mutation/PageMoveInput';
-export type { PageMoveResult } from './mutation/PageMoveResult';
+export type { PageReorderInput } from './mutation/PageReorderInput';
+export type { PageReorderResult } from './mutation/PageReorderResult';
+export { anchorOf, positionIndex, reorderPart, reorderedList } from './mutation/ListPosition';
+export type { AnnotationPosition, ListPosition, PagePosition } from './mutation/ListPosition';
 export type { PageNameInput, PageRemoveNameInput } from './mutation/PageNameInput';
 export type { PageNameResult } from './mutation/PageNameResult';
 export type {
@@ -778,6 +789,8 @@ export { parseScope, validateScopeArray } from './auth/scope';
 export { InvalidScope, MissingIdentity, PermissionDenied } from './auth/scope';
 export type { AnnotationAuthority, ChangeAuthority } from './auth/scope';
 export {
+  annotationWriteCapabilities,
+  annotationWriteCapability,
   authorizeAnnotationCreate,
   authorizeCapability,
   authorizeUnprotected,

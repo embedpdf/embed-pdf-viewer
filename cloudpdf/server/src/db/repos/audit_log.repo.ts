@@ -7,10 +7,11 @@ export type AuditMutationKind =
   | 'annot.create'
   | 'annot.update'
   | 'annot.delete'
-  | 'annot.move'
+  /** A page's annotations restacked (`page.annotations.reorder`). */
+  | 'annot.reorder'
   /** A bundle's annotations, created as one change (`doc.annotations.import`). */
   | 'annot.import'
-  | 'pages.move'
+  | 'pages.reorder'
   | 'pages.rotate'
   | 'pages.delete'
   | 'pages.insert'
@@ -30,6 +31,12 @@ export type AuditMutationKind =
   | 'form.deleteField'
   | 'form.addWidget'
   | 'form.detachWidget'
+  /** A widget's place and look (`doc.forms.updateWidget`). */
+  | 'form.updateWidget'
+  /** A page's widgets restacked (`doc.forms.reorderWidgets`). */
+  | 'form.reorderWidgets'
+  /** A widget deleted from its page and its field (`doc.forms.deleteWidget`). */
+  | 'form.deleteWidget'
   | 'form.applyEffects'
   | 'form.setSignatureAppearance'
   /** A signing was prepared on this layer: the layer is locked until it ends. */

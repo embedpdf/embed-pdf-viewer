@@ -57,7 +57,6 @@ const freeText = (
   } as AnnotationDraft;
   const annotation = annotationOfDraft(draft, {
     ref: { kind: 'nm', page: PAGE, nm: id },
-    index: 0,
   });
   return { id, unconfirmed: true, source: 'baked', annotation };
 };

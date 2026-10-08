@@ -4,12 +4,14 @@ import {
   PAGE_INSERT_BLANK_MAX_COUNT,
   type PageInsertBlankSpec,
   type PageInsertResult,
+  type PagePosition,
   type PageRef,
   type PdfCoordinates,
 } from '@embedpdf/engine-core/runtime';
 import { NULL_PTR } from '@embedpdf/engine-runtime';
 import type { PdfRuntimeModule, Ptr } from '@embedpdf/engine-runtime';
 
+import { pageIndexAt } from './internal/pageIndexAt';
 import { PagesReader } from './PagesReader';
 import { promoteInlineAnnotations } from '../annotations/internal/write/promoteInlineAnnotations';
 import {
@@ -23,7 +25,7 @@ import { throwIfAborted } from '../../shared/abort';
  * Insert every page of a standalone PDF into the session document. A
  * structural mutation (like move/delete): the source bytes are loaded as a
  * throwaway PDFium document, `FPDF_ImportPagesByIndex` deep-copies its
- * pages in at `toIndex`, and the page registry is rebuilt. Pre-existing
+ * pages in at `position`, and the page registry is rebuilt. Pre-existing
  * pages keep their identity and `RevisionToken`s; the inserted copies get
  * fresh object numbers, resolved from the post-insert registry.
  */
@@ -35,7 +37,7 @@ export class PagesInserter {
 
   insert(
     bytes: ArrayBuffer,
-    toIndex: number | undefined,
+    position: PagePosition,
     signal: AbortSignal,
   ): PageInsertResult<PdfCoordinates> {
     throwIfAborted(signal);
@@ -45,14 +47,7 @@ export class PagesInserter {
 
     const { fn, mem } = this.runtime;
     const destPtr = this.session.requireDocPtr();
-    const beforeCount = fn.FPDF_GetPageCount(destPtr);
-    const at = toIndex ?? beforeCount;
-    if (!Number.isInteger(at) || at < 0 || at > beforeCount) {
-      throw new EngineError(
-        EngineErrorCode.InvalidArg,
-        `pages.insert toIndex ${at} out of range [0, ${beforeCount}]`,
-      );
-    }
+    const at = pageIndexAt(this.session, position, fn.FPDF_GetPageCount(destPtr));
 
     // FPDF_ImportPagesByIndex does not fully detach imported objects from
     // their source document (imported streams still read through it), so
@@ -112,11 +107,15 @@ export class PagesInserter {
     for (const page of insertedPages) {
       promoteInlineAnnotations(this.runtime, this.session, page.objectNumber);
     }
-    return { insertedPages, layout, meta: { affectedPages: [], cacheDelta: null, ...this.session.writeStamp() } };
+    return {
+      insertedPages,
+      layout,
+      meta: { affectedPages: [], cacheDelta: null, ...this.session.writeStamp() },
+    };
   }
 
   /**
-   * Create `count` blank pages of `size` at `toIndex`. Same mutation
+   * Create `count` blank pages of `size` at `position`. Same mutation
    * contract as `insert`, but native creation (`EPDFPage_InsertBlankRaw`,
    * which never loads the page) instead of a deep copy: no source document,
    * so none of the retain-until-close lifetime hazard above. A blank page has
@@ -127,7 +126,7 @@ export class PagesInserter {
    */
   insertBlank(
     spec: PageInsertBlankSpec,
-    toIndex: number | undefined,
+    position: PagePosition,
     signal: AbortSignal,
     objectNumbers?: readonly number[],
   ): PageInsertResult<PdfCoordinates> {
@@ -154,14 +153,7 @@ export class PagesInserter {
 
     const { fn } = this.runtime;
     const destPtr = this.session.requireDocPtr();
-    const beforeCount = fn.FPDF_GetPageCount(destPtr);
-    const at = toIndex ?? beforeCount;
-    if (!Number.isInteger(at) || at < 0 || at > beforeCount) {
-      throw new EngineError(
-        EngineErrorCode.InvalidArg,
-        `pages.insertBlank toIndex ${at} out of range [0, ${beforeCount}]`,
-      );
-    }
+    const at = pageIndexAt(this.session, position, fn.FPDF_GetPageCount(destPtr));
 
     if (objectNumbers && objectNumbers.length !== count) {
       throw new EngineError(
@@ -194,6 +186,10 @@ export class PagesInserter {
 
     const layout = new PagesReader(this.runtime, this.session).read(signal);
     const insertedPages: PageRef[] = layout.pages.slice(at, at + count).map((page) => page.ref);
-    return { insertedPages, layout, meta: { affectedPages: [], cacheDelta: null, ...this.session.writeStamp() } };
+    return {
+      insertedPages,
+      layout,
+      meta: { affectedPages: [], cacheDelta: null, ...this.session.writeStamp() },
+    };
   }
 }

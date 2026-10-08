@@ -1,5 +1,6 @@
 import type {
   Annotation,
+  AnnotationFamily,
   AnnotationPatch,
   AnnotationRef,
   ChangeItemType,
@@ -10,6 +11,7 @@ import type {
   MetadataPatch,
   PageRef,
   PdfCoordinates,
+  WidgetAnnotation,
 } from '@embedpdf/engine-core/runtime';
 
 /**
@@ -33,6 +35,8 @@ export type ReverseStep =
   | AnnotationReorderStep
   | FieldRemoveStep
   | FieldRestoreStep
+  | WidgetRestoreStep
+  | WidgetDeleteStep
   | MetadataRevertStep;
 
 /**
@@ -120,17 +124,44 @@ export interface AnnotationRestoreStep {
 }
 
 /**
- * Moves annotations to `targets`, when they are still `at`: back where a move
- * took them from, or, for a redo, where it put them.
+ * Puts rows of one family on a page back beside the neighbours they had
+ * before a reorder: its reverse, and, the other way round, its redo. A row
+ * runs only when it is still where the reorder left it.
  */
 export interface AnnotationReorderStep {
   readonly kind: 'annotation.reorder';
   readonly page: PageRef;
+  readonly family: AnnotationFamily;
+  /** The rows the reorder moved, in the order it was given them. */
   readonly refs: readonly AnnotationRef[];
-  /** Where each of `refs` is when the step may run. */
-  readonly at: readonly number[];
-  /** Where each of `refs` goes. */
-  readonly targets: readonly number[];
+  /** The family's order before the reorder, bottom to top: where the rows go back to. */
+  readonly before: readonly AnnotationRef[];
+  /** The family's order it left. */
+  readonly after: readonly AnnotationRef[];
+}
+
+/**
+ * Brings back a widget a delete removed: onto its page at its place, and into
+ * its field again when it had one. Left alone when the page is gone, the
+ * widget is back already, or its field changed since.
+ */
+export interface WidgetRestoreStep {
+  readonly kind: 'widget.restore';
+  readonly page: PageRef;
+  readonly widget: AnnotationRef;
+  /** The widget as it was on its page, out of its field. */
+  readonly capture: Uint8Array;
+  /** The field it was in; `null` for a widget in no field. */
+  readonly fieldObjectNumber: number | null;
+  /** The field's dictionary and the widget's, before and after it left the field. */
+  readonly detached: readonly CapturedObject[];
+}
+
+/** Deletes a widget a restore brought back, when nobody changed it since: the redo of a delete. */
+export interface WidgetDeleteStep {
+  readonly kind: 'widget.delete';
+  readonly widget: AnnotationRef;
+  readonly left: WidgetAnnotation<PdfCoordinates>;
 }
 
 /** Deletes a field a create made, when nobody changed it since. */

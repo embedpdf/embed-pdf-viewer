@@ -33,10 +33,7 @@ export {
   pageFieldActionsOf,
   pageFormFieldOf,
   pageFormSnapshotOf,
-  pageFormWidgetOf,
-  pageSignatureCompleteOf,
-  pageSignatureOf,
-  pageSignatureSnapshotOf,
+  pageWidgetOf,
   pdfFormFieldDraftOf,
   pdfWidgetPlacementOf,
 } from './forms';

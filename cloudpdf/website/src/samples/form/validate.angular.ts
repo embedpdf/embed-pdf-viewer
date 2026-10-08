@@ -82,8 +82,10 @@ export class App {
   protected submit() {
     const result = this.form.validate();
     this.check.set(result);
-    const widget = result.missing[0]?.widgets[0];
-    if (widget?.page) this.stage()?.reveal(widget.page, { rect: widget.rect });
+    // Where a field shows is its widget's row in the form.
+    const first = result.missing[0]?.widgets[0];
+    const widget = first ? this.form.getWidget(first) : null;
+    if (widget) this.stage()?.reveal(widget.page, { rect: widget.rect });
   }
 
   protected missingNames(check: FormValidation) {

@@ -1718,7 +1718,7 @@ function ThumbnailSidebar() {
                       <button
                         style={itemStyle}
                         onClick={(e) =>
-                          act(e, () => editor.move([page.ref], { index: page.pageIndex - 1 }))
+                          act(e, () => editor.reorder([page.ref], { before: page.pageIndex - 1 }))
                         }
                       >
                         ↑ Move page up
@@ -1728,7 +1728,7 @@ function ThumbnailSidebar() {
                       <button
                         style={itemStyle}
                         onClick={(e) =>
-                          act(e, () => editor.move([page.ref], { index: page.pageIndex + 1 }))
+                          act(e, () => editor.reorder([page.ref], { after: page.pageIndex + 1 }))
                         }
                       >
                         ↓ Move page down

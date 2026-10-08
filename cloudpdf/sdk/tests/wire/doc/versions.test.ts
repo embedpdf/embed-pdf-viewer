@@ -162,7 +162,7 @@ describe("VersionsClient", () => {
                     index: 1,
                     field: { kind: "objectNumber", objectNumber: 1 },
                     fieldName: "fieldName",
-                    widget: { ref: null, objectNumber: 1, page: null, rect: null },
+                    widget: { ref: null, objectNumber: 1, page: null },
                     signed: true,
                     kind: "signature",
                     filter: "filter",

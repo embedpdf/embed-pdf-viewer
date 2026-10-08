@@ -62,8 +62,8 @@ export interface AnnotationImportManifest {
 export type AnnotationDropReason =
   /** A kind the engine doesn't model (`subtype: 'unsupported'`). */
   | 'unsupported-kind'
-  /** A form field's widget: it travels with its field, through the forms API. */
-  | 'form-field'
+  /** A widget, in a field or not: widgets are the form's, and travel with it. */
+  | 'widget'
   /** A geospatial measure, which the engine reads only as a marker. */
   | 'geospatial'
   /** A measure of a kind the engine doesn't know, read only as a marker. */
@@ -216,8 +216,8 @@ export function planAnnotationImport(input: {
       drops.set(index, 'unsupported-kind');
       return;
     }
-    if (data.subtype === 'widget' && data.field !== null) {
-      drops.set(index, 'form-field');
+    if (data.subtype === 'widget') {
+      drops.set(index, 'widget');
       return;
     }
     // A popup shows another annotation; one that names none can't be made.

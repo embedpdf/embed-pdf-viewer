@@ -4,7 +4,8 @@ import {
   AnnotationCreateResultSchema,
   AnnotationDeleteResultSchema,
   AnnotationListMutationMetaSchema,
-  AnnotationMoveResultSchema,
+  AnnotationPositionSchema,
+  AnnotationReorderResultSchema,
   AnnotationUpdateResultSchema,
   CustomMetadataPatchSchema,
   CustomMetadataUpdateResultSchema,
@@ -15,7 +16,11 @@ import {
   FormMutationMetaSchema,
   FormResetResultSchema,
   FormSetValueResultSchema,
+  FormWidgetDeleteResultSchema,
   FormWidgetLinkResultSchema,
+  FormWidgetRestoreResultSchema,
+  FormWidgetsReorderResultSchema,
+  FormWidgetUpdateResultSchema,
   MetadataPatchSchema,
   MetadataUpdateResultSchema,
   MutationMetaSchema,
@@ -26,6 +31,7 @@ import {
   AnnotationPatchSchema,
   AnnotationSchema,
 } from '../annotation/kinds';
+import { WidgetDTOSchema, WidgetPatchSchema } from '../annotation/kinds/widget';
 import {
   FormFieldDraftSchema,
   FormFieldDTOSchema,
@@ -77,11 +83,10 @@ export const ChangeOpWireSchema = z.discriminatedUnion('type', [
     expect: AnnotationPatchSchema.optional(),
   }),
   z.object({
-    type: z.literal('annotations.move'),
+    type: z.literal('annotations.reorder'),
     page: PageRefSchema,
     refs: z.array(AnnotationRefSchema).min(1),
-    toIndex: z.number().int().min(0),
-    expect: z.array(z.number().int().min(0)).optional(),
+    position: AnnotationPositionSchema,
   }),
   z.object({
     type: z.literal('forms.setValue'),
@@ -132,6 +137,23 @@ export const ChangeOpWireSchema = z.discriminatedUnion('type', [
     type: z.literal('forms.removeWidget'),
     field: FormFieldRefSchema,
     widget: AnnotationRefSchema,
+  }),
+  z.object({
+    type: z.literal('forms.deleteWidget'),
+    widget: AnnotationRefSchema,
+    expect: WidgetPatchSchema.optional(),
+  }),
+  z.object({
+    type: z.literal('forms.reorderWidgets'),
+    page: PageRefSchema,
+    widgets: z.array(AnnotationRefSchema).min(1),
+    position: AnnotationPositionSchema,
+  }),
+  z.object({
+    type: z.literal('forms.updateWidget'),
+    widget: AnnotationRefSchema,
+    patch: WidgetPatchSchema,
+    expect: WidgetPatchSchema.optional(),
   }),
   z.object({
     type: z.literal('forms.setSignatureAppearance'),
@@ -215,7 +237,7 @@ export const ChangeItemSchema = z.union([
     skipped: SkippedFieldsSchema,
   }),
   itemOf('annotations.delete', AnnotationDeleteResultSchema, { page: PageRefSchema }),
-  itemOf('annotations.move', AnnotationMoveResultSchema, { page: PageRefSchema }),
+  itemOf('annotations.reorder', AnnotationReorderResultSchema, { page: PageRefSchema }),
   z.object({
     type: z.literal('annotations.restore'),
     page: PageRefSchema,
@@ -232,11 +254,16 @@ export const ChangeItemSchema = z.union([
   z.object({
     type: z.literal('forms.restore'),
     field: FormFieldDTOSchema,
+    widgets: z.array(WidgetDTOSchema),
     meta: FormMutationMetaSchema,
   }),
   itemOf('forms.setSignatureAppearance', FormFieldUpdateResultSchema),
   itemOf('forms.addWidget', FormWidgetLinkResultSchema),
   itemOf('forms.removeWidget', FormWidgetLinkResultSchema),
+  itemOf('forms.deleteWidget', FormWidgetDeleteResultSchema),
+  itemOf('forms.restoreWidget', FormWidgetRestoreResultSchema),
+  itemOf('forms.reorderWidgets', FormWidgetsReorderResultSchema),
+  itemOf('forms.updateWidget', FormWidgetUpdateResultSchema, { skipped: SkippedFieldsSchema }),
   itemOf('metadata.update', MetadataUpdateResultSchema, { skipped: SkippedFieldsSchema }),
   itemOf('metadata.updateCustom', CustomMetadataUpdateResultSchema, {
     skipped: SkippedFieldsSchema,

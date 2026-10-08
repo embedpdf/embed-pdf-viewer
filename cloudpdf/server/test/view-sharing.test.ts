@@ -44,6 +44,7 @@ const W320_ANNOTATED_TOKEN =
 const ALL_BASE = {
   content: 'base',
   annotations: 'base',
+  forms: 'base',
   layout: 'base',
   attachments: 'base',
   metadata: 'base',
@@ -267,6 +268,7 @@ describe('plane-scoped view sharing', () => {
       ...ALL_BASE,
       content: 'layer',
       annotations: 'layer',
+      forms: 'layer',
       layout: 'layer',
     });
 

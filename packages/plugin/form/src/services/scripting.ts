@@ -8,7 +8,10 @@
 import type { ActionOrigin } from '@embedpdf/plugin-actions/contract';
 
 import type { FormCommitResult } from '../contract';
-import { createFormScriptingController, type FormScriptingController } from '../scripting/controller';
+import {
+  createFormScriptingController,
+  type FormScriptingController,
+} from '../scripting/controller';
 import type { FormContext } from './context';
 import type { FormSiblings } from './siblings';
 

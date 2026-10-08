@@ -130,8 +130,8 @@ export function runAnnotationExportConformance(
     // or to the canonical drawing, changes these on purpose: update them here.
     test('exports a document to the same file on every engine', async () => {
       const expected = {
-        'acrobat-stamps': 'ea047cf47961801b1058e60e29f0b4ffc5bf3ea68e8ca98d25644716972e9807',
-        'acrobat-rewrapped': 'e01af14cdd535d3e42e1c62513242dd25fe821c3dfe4feb83efb16da1e00dffb',
+        'acrobat-stamps': '597d8f5a58db2cb3e44d14cf09be2a0fb602cbb9d557fb802cebd950b2cf2c58',
+        'acrobat-rewrapped': '3806fd47a844c9eb784d8fb8643dc1a05a703d6576ed9335560e78299ea836d0',
       } as const;
       for (const [fixture, hash] of Object.entries(expected)) {
         await onPage(fixture as AnnotationResourceFixture, async (_page, doc) => {
@@ -196,9 +196,9 @@ export function runAnnotationExportConformance(
 
         // A page move changes where the pages are, and nothing about the
         // annotations: the export gives the new position.
-        await doc.pages.insertBlank({ size: { width: 200, height: 200 } }, 0);
+        await doc.pages.insertBlank({ size: { width: 200, height: 200 } }, 'start');
         expect((await doc.annotations.export()).pages.map((entry) => entry.position)).toEqual([1]);
-        await doc.pages.move([first], 0);
+        await doc.pages.reorder([first], 'start');
         const moved = await doc.annotations.export();
         expect(moved.pages).toEqual([{ ...before.pages[0]!, position: 0 }]);
       });

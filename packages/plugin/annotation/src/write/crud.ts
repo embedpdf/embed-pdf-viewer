@@ -15,20 +15,23 @@ import {
 import { defaultsFor } from '@embedpdf/core-annotation';
 import {
   ANNOTATION_FIELD_NAMES,
+  anchorOf,
   annotationKey,
   type Annotation,
   type AnnotationBundle,
   type AnnotationDraft,
   type AnnotationImportOptions,
   type AnnotationPatch,
+  type AnnotationPosition,
   type AnnotationRef,
   type AnnotationResourceRole,
   type AnnotationResources,
+  type ListPosition,
   type PageRef,
 } from '@embedpdf/engine-core/runtime';
 
 import type { AnnotationExportSelection, AnnotationImportResult } from '../contract';
-import { addMove, dropMove } from '../model';
+import { addReorder, dropReorder } from '../model';
 import type { AnnotationReads } from '../read/annotations';
 import type { AnnotationContext, AnnotationServices } from '../services';
 import { recordOfRef } from '../services/store';
@@ -123,52 +126,60 @@ export function createCrud(
     await ctx.cancellable(options.signal, appliedOrThrow(store.apply([{ type: 'delete', ref }])));
   };
 
-  /** The last pending move's token: each move is removed by its own. */
-  let moveToken = 0;
+  /** The last pending reorder's token: each reorder is removed by its own. */
+  let reorderToken = 0;
 
   /**
-   * Move annotations on one page to a new place in its drawing order. The
-   * new order shows at once; once the engine confirmed it, the confirmed
-   * records hold it and the pending move goes. A refused move goes at once.
+   * Move annotations on one page to a new place in its drawing order, next to
+   * a neighbour or to the bottom or top. The new order shows at once; once
+   * the engine confirmed it, the confirmed records hold it and the pending
+   * reorder goes. A refused reorder goes at once.
    */
-  const move = async (
+  const reorder = async (
     refs: readonly AnnotationRef[],
-    toIndex: number,
+    position: AnnotationPosition,
     options: OperationOptions = {},
   ): Promise<void> => {
     if (!refs.length) return;
     const model = store.model();
-    const moving = refs.map((ref) => {
+    const recordOf = (ref: AnnotationRef) => {
       const record = recordOfRef(model, ref);
       if (!record) {
         throw new PluginError('not-found', 'annotation', `no annotation ${annotationKey(ref)}`);
       }
       return record;
-    });
+    };
+    const moving = refs.map(recordOf);
+    const anchor = anchorOf(position);
+    const neighbour = anchor ? recordOf(anchor) : null;
     const page = moving[0]!.annotation.page;
-    if (moving.some((record) => record.annotation.page.objectNumber !== page.objectNumber)) {
+    const onOtherPage = (record: { annotation: { page: PageRef } }) =>
+      record.annotation.page.objectNumber !== page.objectNumber;
+    if (moving.some(onOtherPage) || (neighbour && onOtherPage(neighbour))) {
       throw new PluginError(
         'invalid-input',
         'annotation',
-        'the annotations to move must be on one page',
+        'a reorder stays on one page: the annotations and their neighbour',
       );
     }
-    if (!Number.isInteger(toIndex) || toIndex < 0) {
-      throw new PluginError('invalid-input', 'annotation', `toIndex ${toIndex} is not an index`);
-    }
-    const token = ++moveToken;
-    ctx.state.update(addMove, {
+    // The same position, by record for the view and by ref for the engine.
+    const at = <T>(name: (record: (typeof moving)[number]) => T): ListPosition<T> => {
+      if (!neighbour || typeof position !== 'object') return position as 'start' | 'end';
+      return 'before' in position ? { before: name(neighbour) } : { after: name(neighbour) };
+    };
+    const token = ++reorderToken;
+    ctx.state.update(addReorder, {
       token,
       page: page.objectNumber,
       ids: moving.map((record) => record.id),
-      toIndex,
+      position: at((record) => record.id),
     });
     try {
       await ctx.cancellable(
         options.signal,
-        ctx.doc.page(page).annotations.move(
+        ctx.doc.page(page).annotations.reorder(
           moving.map((record) => record.annotation.ref),
-          toIndex,
+          at((record) => record.annotation.ref),
         ),
       );
       await records.settled();
@@ -182,7 +193,7 @@ export function createCrud(
       }
       throw refused;
     } finally {
-      ctx.state.update(dropMove, token);
+      ctx.state.update(dropReorder, token);
     }
   };
 
@@ -237,7 +248,7 @@ export function createCrud(
     create,
     update,
     delete: remove,
-    move,
+    reorder,
     export: exportBundle,
     import: importBundle,
     downloadResource,

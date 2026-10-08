@@ -2,7 +2,7 @@ import type { AnnotationListMutationMeta } from './AnnotationListMutationMeta';
 import type {
   AnnotationCreateResult,
   AnnotationDeleteResult,
-  AnnotationMoveResult,
+  AnnotationReorderResult,
   AnnotationUpdateResult,
 } from './AnnotationMutationResults';
 import type { CustomMetadataUpdateResult } from './CustomMetadataUpdateResult';
@@ -13,11 +13,17 @@ import type {
   FormMutationMeta,
   FormResetResult,
   FormSetValueResult,
+  FormWidgetDeleteResult,
   FormWidgetLinkResult,
+  FormWidgetRestoreResult,
+  FormWidgetsReorderResult,
+  FormWidgetUpdateResult,
 } from './FormMutationResults';
+import type { AnnotationPosition } from './ListPosition';
 import type { MetadataUpdateResult } from './MetadataUpdateResult';
 import type { MutationMeta } from './MutationMeta';
 import type { Annotation, AnnotationDraft, AnnotationPatch } from '../annotation/kinds';
+import type { WidgetAnnotation, WidgetPatch } from '../annotation/kinds/widget';
 import {
   annotationResourceBuffers,
   hasAnnotationResources,
@@ -66,6 +72,8 @@ export type Change<C extends Coordinates = PageCoordinates, R = AnnotationResour
  * what it writes: an update's `expect` is a patch of the values the fields
  * must have. When the document doesn't match, the whole change is refused
  * with `ChangeConflict`. Without it, the last write wins.
+ * A reorder takes none: its position names a neighbour, so it keeps its
+ * meaning when other rows came and went.
  */
 export type ChangeOp<C extends Coordinates = PageCoordinates, R = AnnotationResources> =
   | {
@@ -88,12 +96,11 @@ export type ChangeOp<C extends Coordinates = PageCoordinates, R = AnnotationReso
       readonly expect?: AnnotationPatch<C>;
     }
   | {
-      readonly type: 'annotations.move';
+      /** Stacking order: the annotations go together to `position` among the page's annotations. */
+      readonly type: 'annotations.reorder';
       readonly page: PageRef;
       readonly refs: readonly AnnotationRef[];
-      readonly toIndex: number;
-      /** The index each of `refs` has now, in `refs` order. */
-      readonly expect?: readonly number[];
+      readonly position: AnnotationPosition;
     }
   | {
       readonly type: 'forms.setValue';
@@ -149,6 +156,26 @@ export type ChangeOp<C extends Coordinates = PageCoordinates, R = AnnotationReso
       readonly widget: AnnotationRef;
     }
   | {
+      /** The widget leaves its page, and its field when it has one. */
+      readonly type: 'forms.deleteWidget';
+      readonly widget: AnnotationRef;
+      readonly expect?: WidgetPatch<C>;
+    }
+  | {
+      /** Stacking order: the widgets go together to `position` among the page's widgets. */
+      readonly type: 'forms.reorderWidgets';
+      readonly page: PageRef;
+      readonly widgets: readonly AnnotationRef[];
+      readonly position: AnnotationPosition;
+    }
+  | {
+      /** A widget's place and look: what `annotations.update` takes for a widget. */
+      readonly type: 'forms.updateWidget';
+      readonly widget: AnnotationRef;
+      readonly patch: WidgetPatch<C>;
+      readonly expect?: WidgetPatch<C>;
+    }
+  | {
       readonly type: 'forms.setSignatureAppearance';
       readonly field: FormFieldRef;
       readonly appearance: SignatureAppearanceInput;
@@ -164,7 +191,11 @@ export type ChangeOp<C extends Coordinates = PageCoordinates, R = AnnotationReso
     };
 
 /** What an item can be: an op's type, or a restore (only in an undo). */
-export type ChangeItemType = ChangeOp['type'] | 'annotations.restore' | 'forms.restore';
+export type ChangeItemType =
+  | ChangeOp['type']
+  | 'annotations.restore'
+  | 'forms.restore'
+  | 'forms.restoreWidget';
 
 /**
  * An op an undo left alone entirely: the document no longer showed what the
@@ -193,7 +224,7 @@ export type ChangeItem<C extends Coordinates = PageCoordinates> =
       skipped?: readonly string[];
     } & AnnotationUpdateResult<C>)
   | ({ type: 'annotations.delete'; page: PageRef } & AnnotationDeleteResult)
-  | ({ type: 'annotations.move'; page: PageRef } & AnnotationMoveResult<C>)
+  | ({ type: 'annotations.reorder'; page: PageRef } & AnnotationReorderResult)
   | {
       type: 'annotations.restore';
       page: PageRef;
@@ -219,11 +250,20 @@ export type ChangeItem<C extends Coordinates = PageCoordinates> =
   | {
       type: 'forms.restore';
       field: FormFieldDTO<C>;
+      widgets: WidgetAnnotation<C>[];
       meta: FormMutationMeta;
     }
   | ({ type: 'forms.setSignatureAppearance' } & FormFieldUpdateResult<C>)
   | ({ type: 'forms.addWidget' } & FormWidgetLinkResult<C>)
   | ({ type: 'forms.removeWidget' } & FormWidgetLinkResult<C>)
+  | ({ type: 'forms.deleteWidget' } & FormWidgetDeleteResult<C>)
+  | ({ type: 'forms.restoreWidget' } & FormWidgetRestoreResult<C>)
+  | ({ type: 'forms.reorderWidgets' } & FormWidgetsReorderResult)
+  | ({
+      type: 'forms.updateWidget';
+      /** The fields an undo left alone: they no longer showed what the change had set. */
+      skipped?: readonly string[];
+    } & FormWidgetUpdateResult<C>)
   | ({
       type: 'metadata.update';
       /** The entries an undo left alone. */

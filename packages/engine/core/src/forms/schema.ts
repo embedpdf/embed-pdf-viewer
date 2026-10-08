@@ -3,6 +3,7 @@ import { PageRefSchema } from '../identity/PageRef.schema';
 import { AnnotationRefSchema } from '../annotation/base.schema';
 import { z } from 'zod';
 
+import { WidgetDTOSchema } from '../annotation/kinds/widget';
 import { WIDGET_STYLE_SHAPE, WidgetAppearanceSchema } from '../annotation/kinds/widget.shared';
 import { PageBoxSchema } from '../geometry/schemas';
 import type { FormWidget } from '../identity/FormFieldRef';
@@ -26,16 +27,10 @@ const FormWidgetShape = {
 
 export const FormWidgetSchema: z.ZodType<FormWidget> = z.object(FormWidgetShape);
 
-const FormFieldWidgetShape = {
-  ...FormWidgetShape,
-  // Null for a widget on no page.
-  rect: PageBoxSchema.nullable(),
-};
-
-export const FormFieldWidgetSchema: z.ZodType<FormFieldWidget> = z.object(FormFieldWidgetShape);
+export const FormFieldWidgetSchema: z.ZodType<FormFieldWidget> = FormWidgetSchema;
 
 export const ToggleFieldWidgetSchema: z.ZodType<ToggleFieldWidget> = z.object({
-  ...FormFieldWidgetShape,
+  ...FormWidgetShape,
   onState: z.string(),
   exportValue: z.string(),
   checked: z.boolean(),
@@ -132,8 +127,9 @@ export const FormSnapshotSchema: z.ZodType<FormSnapshot> = z.object({
   formKind: FormKindSchema,
   needsAppearances: z.boolean(),
   fields: z.array(FormFieldDTOSchema),
+  widgets: z.array(WidgetDTOSchema),
   calculationOrder: z.array(FormFieldRefSchema.nullable()),
-});
+}) as unknown as z.ZodType<FormSnapshot>;
 
 /**
  * `{ value }`, `{ checked }` or `{ selectedValues }`: one object with exactly

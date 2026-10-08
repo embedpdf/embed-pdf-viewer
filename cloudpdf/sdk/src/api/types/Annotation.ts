@@ -29,8 +29,8 @@ export namespace Annotation {
         subtype: "highlight";
         ref: CloudPDF.AnnotationRef;
         page: CloudPDF.PageRef;
-        index: number;
         hasAppearance: boolean;
+        appearanceState: string | null;
         nm: string | null;
         rect: AnnotationHighlight.Rect;
         contents: string | null;
@@ -141,8 +141,8 @@ export namespace Annotation {
         subtype: "underline";
         ref: CloudPDF.AnnotationRef;
         page: CloudPDF.PageRef;
-        index: number;
         hasAppearance: boolean;
+        appearanceState: string | null;
         nm: string | null;
         rect: AnnotationUnderline.Rect;
         contents: string | null;
@@ -253,8 +253,8 @@ export namespace Annotation {
         subtype: "squiggly";
         ref: CloudPDF.AnnotationRef;
         page: CloudPDF.PageRef;
-        index: number;
         hasAppearance: boolean;
+        appearanceState: string | null;
         nm: string | null;
         rect: AnnotationSquiggly.Rect;
         contents: string | null;
@@ -365,8 +365,8 @@ export namespace Annotation {
         subtype: "strikeout";
         ref: CloudPDF.AnnotationRef;
         page: CloudPDF.PageRef;
-        index: number;
         hasAppearance: boolean;
+        appearanceState: string | null;
         nm: string | null;
         rect: AnnotationStrikeout.Rect;
         contents: string | null;
@@ -483,8 +483,8 @@ export namespace Annotation {
         subtype: "circle";
         ref: CloudPDF.AnnotationRef;
         page: CloudPDF.PageRef;
-        index: number;
         hasAppearance: boolean;
+        appearanceState: string | null;
         nm: string | null;
         rect: AnnotationCircle.Rect;
         contents: string | null;
@@ -583,8 +583,8 @@ export namespace Annotation {
         subtype: "square";
         ref: CloudPDF.AnnotationRef;
         page: CloudPDF.PageRef;
-        index: number;
         hasAppearance: boolean;
+        appearanceState: string | null;
         nm: string | null;
         rect: AnnotationSquare.Rect;
         contents: string | null;
@@ -683,8 +683,8 @@ export namespace Annotation {
         subtype: "polygon";
         ref: CloudPDF.AnnotationRef;
         page: CloudPDF.PageRef;
-        index: number;
         hasAppearance: boolean;
+        appearanceState: string | null;
         nm: string | null;
         rect: AnnotationPolygon.Rect;
         contents: string | null;
@@ -799,8 +799,8 @@ export namespace Annotation {
         subtype: "polyline";
         ref: CloudPDF.AnnotationRef;
         page: CloudPDF.PageRef;
-        index: number;
         hasAppearance: boolean;
+        appearanceState: string | null;
         nm: string | null;
         rect: AnnotationPolyline.Rect;
         contents: string | null;
@@ -948,8 +948,8 @@ export namespace Annotation {
         subtype: "line";
         ref: CloudPDF.AnnotationRef;
         page: CloudPDF.PageRef;
-        index: number;
         hasAppearance: boolean;
+        appearanceState: string | null;
         nm: string | null;
         rect: AnnotationLine.Rect;
         contents: string | null;
@@ -1120,8 +1120,8 @@ export namespace Annotation {
         subtype: "link";
         ref: CloudPDF.AnnotationRef;
         page: CloudPDF.PageRef;
-        index: number;
         hasAppearance: boolean;
+        appearanceState: string | null;
         nm: string | null;
         rect: AnnotationLink.Rect;
         contents: string | null;
@@ -1197,8 +1197,8 @@ export namespace Annotation {
         subtype: "ink";
         ref: CloudPDF.AnnotationRef;
         page: CloudPDF.PageRef;
-        index: number;
         hasAppearance: boolean;
+        appearanceState: string | null;
         nm: string | null;
         rect: AnnotationInk.Rect;
         contents: string | null;
@@ -1302,8 +1302,8 @@ export namespace Annotation {
         subtype: "free-text";
         ref: CloudPDF.AnnotationRef;
         page: CloudPDF.PageRef;
-        index: number;
         hasAppearance: boolean;
+        appearanceState: string | null;
         nm: string | null;
         rect: AnnotationFreeText.Rect;
         contents: string | null;
@@ -1588,8 +1588,8 @@ export namespace Annotation {
         subtype: "caret";
         ref: CloudPDF.AnnotationRef;
         page: CloudPDF.PageRef;
-        index: number;
         hasAppearance: boolean;
+        appearanceState: string | null;
         nm: string | null;
         rect: AnnotationCaret.Rect;
         contents: string | null;
@@ -1681,8 +1681,8 @@ export namespace Annotation {
         subtype: "text";
         ref: CloudPDF.AnnotationRef;
         page: CloudPDF.PageRef;
-        index: number;
         hasAppearance: boolean;
+        appearanceState: string | null;
         nm: string | null;
         rect: AnnotationText.Rect;
         contents: string | null;
@@ -1774,8 +1774,8 @@ export namespace Annotation {
         subtype: "stamp";
         ref: CloudPDF.AnnotationRef;
         page: CloudPDF.PageRef;
-        index: number;
         hasAppearance: boolean;
+        appearanceState: string | null;
         nm: string | null;
         rect: AnnotationStamp.Rect;
         contents: string | null;
@@ -1869,8 +1869,8 @@ export namespace Annotation {
         subtype: "file-attachment";
         ref: CloudPDF.AnnotationRef;
         page: CloudPDF.PageRef;
-        index: number;
         hasAppearance: boolean;
+        appearanceState: string | null;
         nm: string | null;
         rect: AnnotationFileAttachment.Rect;
         contents: string | null;
@@ -1963,140 +1963,16 @@ export namespace Annotation {
         }
     }
 
-    export interface Widget {
+    export interface Widget extends CloudPDF.WidgetAnnotation {
         subtype: "widget";
-        ref: CloudPDF.AnnotationRef;
-        page: CloudPDF.PageRef;
-        index: number;
-        hasAppearance: boolean;
-        nm: string | null;
-        rect: AnnotationWidget.Rect;
-        contents: string | null;
-        subject: string | null;
-        blendMode: AnnotationWidget.BlendMode;
-        invisible: boolean;
-        hidden: boolean;
-        print: boolean;
-        noZoom: boolean;
-        noRotate: boolean;
-        noView: boolean;
-        readOnly: boolean;
-        locked: boolean;
-        toggleNoView: boolean;
-        lockedContents: boolean;
-        reply: AnnotationWidget.Reply | null;
-        popup: CloudPDF.AnnotationRef | null;
-        groupId: string | null;
-        author: string | null;
-        createdAt: string | null;
-        modifiedAt: string | null;
-        userId: string | null;
-        createdBy: string | null;
-        modifiedBy: string | null;
-        importedBy: string | null;
-        actions: CloudPDF.PdfAnnotationActions | null;
-        color: string | null;
-        interiorColor: string | null;
-        strokeWidth: number;
-        borderStyle: AnnotationWidget.BorderStyle;
-        fontFamily: AnnotationWidget.FontFamily | null;
-        fontSize: number | null;
-        fontColor: string | null;
-        textAlign: AnnotationWidget.TextAlign;
-        field: CloudPDF.FormFieldRef | null;
-        fieldFamily: AnnotationWidget.FieldFamily;
-    }
-
-    export namespace AnnotationWidget {
-        export interface Rect {
-            x: number;
-            y: number;
-            width: number;
-            height: number;
-        }
-
-        export const BlendMode = {
-            Normal: "normal",
-            Multiply: "multiply",
-            Screen: "screen",
-            Overlay: "overlay",
-            Darken: "darken",
-            Lighten: "lighten",
-            ColorDodge: "color-dodge",
-            ColorBurn: "color-burn",
-            HardLight: "hard-light",
-            SoftLight: "soft-light",
-            Difference: "difference",
-            Exclusion: "exclusion",
-            Hue: "hue",
-            Saturation: "saturation",
-            Color: "color",
-            Luminosity: "luminosity",
-        } as const;
-        export type BlendMode = (typeof BlendMode)[keyof typeof BlendMode];
-
-        export interface Reply {
-            to: CloudPDF.AnnotationRef;
-            type: Reply.Type;
-        }
-
-        export namespace Reply {
-            export const Type = {
-                Reply: "reply",
-                Group: "group",
-            } as const;
-            export type Type = (typeof Type)[keyof typeof Type];
-        }
-
-        export const BorderStyle = {
-            Solid: "solid",
-            Dashed: "dashed",
-            Beveled: "beveled",
-            Inset: "inset",
-        } as const;
-        export type BorderStyle = (typeof BorderStyle)[keyof typeof BorderStyle];
-        export const FontFamily = {
-            Courier: "courier",
-            CourierBold: "courier-bold",
-            CourierBoldOblique: "courier-bold-oblique",
-            CourierOblique: "courier-oblique",
-            Helvetica: "helvetica",
-            HelveticaBold: "helvetica-bold",
-            HelveticaBoldOblique: "helvetica-bold-oblique",
-            HelveticaOblique: "helvetica-oblique",
-            TimesRoman: "times-roman",
-            TimesBold: "times-bold",
-            TimesBoldItalic: "times-bold-italic",
-            TimesItalic: "times-italic",
-            Symbol: "symbol",
-            ZapfDingbats: "zapf-dingbats",
-        } as const;
-        export type FontFamily = (typeof FontFamily)[keyof typeof FontFamily];
-        export const TextAlign = {
-            Left: "left",
-            Center: "center",
-            Right: "right",
-        } as const;
-        export type TextAlign = (typeof TextAlign)[keyof typeof TextAlign];
-        export const FieldFamily = {
-            Text: "text",
-            Checkbox: "checkbox",
-            Radio: "radio",
-            Combobox: "combobox",
-            Listbox: "listbox",
-            Pushbutton: "pushbutton",
-            Signature: "signature",
-            Unknown: "unknown",
-        } as const;
-        export type FieldFamily = (typeof FieldFamily)[keyof typeof FieldFamily];
     }
 
     export interface Redact {
         subtype: "redact";
         ref: CloudPDF.AnnotationRef;
         page: CloudPDF.PageRef;
-        index: number;
         hasAppearance: boolean;
+        appearanceState: string | null;
         nm: string | null;
         rect: AnnotationRedact.Rect;
         contents: string | null;
@@ -2221,8 +2097,8 @@ export namespace Annotation {
         subtype: "popup";
         ref: CloudPDF.AnnotationRef;
         page: CloudPDF.PageRef;
-        index: number;
         hasAppearance: boolean;
+        appearanceState: string | null;
         nm: string | null;
         rect: AnnotationPopup.Rect;
         contents: string | null;
@@ -2299,8 +2175,8 @@ export namespace Annotation {
         subtype: "unsupported";
         ref: CloudPDF.AnnotationRef;
         page: CloudPDF.PageRef;
-        index: number;
         hasAppearance: boolean;
+        appearanceState: string | null;
         nm: string | null;
         rect: AnnotationUnsupported.Rect;
         contents: string | null;

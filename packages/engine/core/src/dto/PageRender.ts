@@ -1,3 +1,4 @@
+import { PermissionDenied } from '../auth/scope/errors';
 import { EngineError } from '../errors/EngineError';
 import { EngineErrorCode } from '../errors/EngineErrorCode';
 import type { PageRenderTransform } from '../geometry/pageTransform';
@@ -16,6 +17,37 @@ export type PageNetworkRenderFormat = 'png' | 'webp';
 export type PageRenderFormat = PageRenderEncodedFormat | 'rgba';
 
 export type PageRenderBackground = 'white' | 'transparent';
+
+/** What a caller may read, for {@link resolvePageLayers}. */
+export interface PageLayerRights {
+  /** `doc.annotate.read`. */
+  readonly annotations: boolean;
+  /** `doc.forms.read`. */
+  readonly formFields: boolean;
+}
+
+/**
+ * What a page picture draws: the options as passed, and for each one left
+ * out, what the caller may read. A left-out option never asks for more than
+ * the caller may see; `true` for something they may not read is refused
+ * (`PermissionDenied`, naming the option).
+ */
+export function resolvePageLayers(
+  options: { includeAnnotations?: boolean; includeFormFields?: boolean } | undefined,
+  may: PageLayerRights,
+): { includeAnnotations: boolean; includeFormFields: boolean } {
+  const { includeAnnotations, includeFormFields } = options ?? {};
+  if (includeAnnotations === true && !may.annotations) {
+    throw new PermissionDenied('doc.annotate.read', 'includeAnnotations');
+  }
+  if (includeFormFields === true && !may.formFields) {
+    throw new PermissionDenied('doc.forms.read', 'includeFormFields');
+  }
+  return {
+    includeAnnotations: includeAnnotations ?? may.annotations,
+    includeFormFields: includeFormFields ?? (includeAnnotations === false ? false : may.formFields),
+  };
+}
 
 export type PageRenderViewport =
   | {
@@ -50,16 +82,20 @@ export interface PageRenderOptions<C extends Coordinates = PageCoordinates> {
   background?: PageRenderBackground;
   /**
    * Draw the page's annotations into the picture, from their appearances.
-   * Default `true`: the page as it is shown and printed.
+   * Default: `true` when the caller may read annotations
+   * (`doc.annotate.read`), so the page is drawn as the caller may see it.
+   * `true` for a caller who may not is refused.
    */
   includeAnnotations?: boolean;
   /**
    * Draw the form fields too: the widgets, each in the state its field
-   * shows. Default: the same as `includeAnnotations`, so a page with
-   * annotations is the page as printed, filled form included. Pass `false`
-   * when something else paints the fields over the picture, as a viewer's
-   * form layer does. Hidden fields are never drawn, and no-view ones only
-   * when printing.
+   * shows. Default: `false` when `includeAnnotations` is `false`, otherwise
+   * `true` when the caller may read the form (`doc.forms.read`), so a page
+   * with annotations is the page as printed, filled form included. Pass
+   * `false` when something else paints the fields over the picture, as a
+   * viewer's form layer does. `true` for a caller who may not read the form
+   * is refused. Hidden fields are never drawn, and no-view ones only when
+   * printing.
    */
   includeFormFields?: boolean;
   /**

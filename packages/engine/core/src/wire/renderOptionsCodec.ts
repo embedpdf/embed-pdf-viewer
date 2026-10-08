@@ -3,6 +3,7 @@ import {
   encodeAnnotationAppearancesRenderToken,
   encodeAppearanceModes,
   encodeRenderToken,
+  encodeWidgetAppearancesRenderToken,
 } from './tokens';
 import {
   appearanceModesOf,
@@ -44,17 +45,15 @@ export function renderImageOptionsToWire(
   options: PageImageOptions,
   versions: RenderVersions,
 ): WireFlat {
-  // Path-expressed, never token-expressed (see above). Form fields are a
-  // parameter of the annotated family, encoded only when left out.
+  // Annotations are path-expressed, never token-expressed (see above); form
+  // fields aren't drawn in cloud pictures (see `RenderTokenSchema`).
   const {
     includeAnnotations: _pathExpressed,
-    includeFormFields,
+    includeFormFields: _notDrawn,
     ...wireOptions
   } = options;
-  const withoutFormFields = options.includeAnnotations !== false && includeFormFields === false;
   return flatten({
     ...wireOptions,
-    ...(withoutFormFields ? { formFields: false } : {}),
     contentVersion: versions.contentVersion,
     ...(versions.annotationVersion !== undefined
       ? { annotationVersion: versions.annotationVersion }
@@ -76,7 +75,9 @@ export function renderImageOptionsToToken(
 /**
  * Re-attach `includeAnnotations` onto the worker-side `PageRenderOptions`
  * shape. Pure shape transform; consumed by the server route after
- * `PageRenderQuerySchema` has produced the SDK-shaped options.
+ * `PageRenderQuerySchema` has produced the SDK-shaped options. Form fields
+ * are never drawn: an annotated picture is read with `doc.annotate.read`,
+ * and the fields would show the form to a caller who may not read it.
  */
 export function pageRenderOptionsFromImageOptions(
   options: PageImageOptions,
@@ -88,7 +89,7 @@ export function pageRenderOptionsFromImageOptions(
     ...(options.rotation !== undefined ? { rotation: options.rotation } : {}),
     ...(options.background !== undefined ? { background: options.background } : {}),
     includeAnnotations,
-    ...(options.includeFormFields === false ? { includeFormFields: false } : {}),
+    includeFormFields: false,
   };
 }
 
@@ -110,15 +111,7 @@ export function annotationAppearancesImageOptionsToWire(
   options: AnnotationAppearanceImageOptions,
   versions: AnnotationRenderVersion,
 ): WireFlat {
-  // `modes` only when it asks for fewer than every mode, as one value, so
-  // every request for all of them is one URL.
-  const { modes, ...rest } = options;
-  const asked = appearanceModesOf(modes);
-  return flatten({
-    ...rest,
-    ...(asked ? { modes: encodeAppearanceModes(asked) } : {}),
-    annotationVersion: versions.annotationVersion,
-  });
+  return appearancesToWire(options, { annotationVersion: versions.annotationVersion });
 }
 
 /** Convenience: build the full encoded appearance render token in one call. */
@@ -129,6 +122,47 @@ export function annotationAppearancesImageOptionsToToken(
   return encodeAnnotationAppearancesRenderToken(
     annotationAppearancesImageOptionsToWire(options, versions),
   );
+}
+
+/**
+ * Cache version for the widget appearance token: a page's widget images
+ * change exactly when its widgets do.
+ */
+export interface WidgetRenderVersion {
+  widgetVersion: number;
+}
+
+/** The widget twin of {@link annotationAppearancesImageOptionsToWire}. */
+export function widgetAppearancesImageOptionsToWire(
+  options: AnnotationAppearanceImageOptions,
+  versions: WidgetRenderVersion,
+): WireFlat {
+  return appearancesToWire(options, { widgetVersion: versions.widgetVersion });
+}
+
+/** The widget twin of {@link annotationAppearancesImageOptionsToToken}. */
+export function widgetAppearancesImageOptionsToToken(
+  options: AnnotationAppearanceImageOptions,
+  versions: WidgetRenderVersion,
+): string {
+  return encodeWidgetAppearancesRenderToken(widgetAppearancesImageOptionsToWire(options, versions));
+}
+
+/**
+ * Appearance options and a pin, flat. `modes` only when it asks for fewer
+ * than every mode, as one value, so every request for all of them is one URL.
+ */
+function appearancesToWire(
+  options: AnnotationAppearanceImageOptions,
+  pin: Record<string, number>,
+): WireFlat {
+  const { modes, ...rest } = options;
+  const asked = appearanceModesOf(modes);
+  return flatten({
+    ...rest,
+    ...(asked ? { modes: encodeAppearanceModes(asked) } : {}),
+    ...pin,
+  });
 }
 
 /**

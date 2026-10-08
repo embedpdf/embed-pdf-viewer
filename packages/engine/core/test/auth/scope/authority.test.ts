@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
+  annotationWriteCapabilities,
+  annotationWriteCapability,
+  authorizeAnnotationCreate,
   authorizeAnnotationDelete,
   authorizeAnnotationUpdate,
   decodePdfBits,
@@ -103,5 +106,75 @@ describe('authorizeAnnotationDelete', () => {
     expect(() =>
       authorizeAnnotationDelete(TENANT, [{ ref: ref(11), userId: 'alice' }]),
     ).not.toThrow();
+  });
+});
+
+// A widget belongs to a form field: writing one is designing the form, never
+// an annotation write, and it has no group of its own.
+describe('widgets', () => {
+  const COMMENTER = bob(['doc.annotate.modify']);
+  const DESIGNER = bob(['doc.forms.modify']);
+  const widget = { subtype: 'widget', userId: 'bob' };
+
+  it('take doc.forms.modify, whoever owns them', () => {
+    expect(annotationWriteCapability('widget')).toBe('doc.forms.modify');
+    expect(annotationWriteCapability('square')).toBe('doc.annotate.modify');
+    expect(
+      annotationWriteCapabilities([
+        { subtype: 'widget' },
+        { subtype: 'ink' },
+        { subtype: 'widget' },
+      ]),
+    ).toEqual(['doc.forms.modify', 'doc.annotate.modify']);
+
+    expect(() => authorizeAnnotationUpdate(COMMENTER, widget, undefined)).toThrow(
+      expect.objectContaining({ required: 'doc.forms.modify' }),
+    );
+    expect(authorizeAnnotationUpdate(DESIGNER, widget, undefined)).toEqual({
+      userId: 'bob',
+      displayName: 'Bob',
+    });
+    expect(() => authorizeAnnotationCreate(COMMENTER, 'widget', undefined)).toThrow(
+      PermissionDenied,
+    );
+    expect(() => authorizeAnnotationCreate(DESIGNER, 'widget', undefined)).not.toThrow();
+  });
+
+  it('ignore the annotation scopes', () => {
+    // `annotations:update:self` would match Bob's own annotation, never his widget.
+    expect(() => authorizeAnnotationUpdate(SELF_ONLY, widget, undefined)).toThrow(
+      expect.objectContaining({ required: 'doc.forms.modify' }),
+    );
+    expect(() =>
+      authorizeAnnotationUpdate(
+        bob(['doc.forms.modify', 'annotations:update:createdBy=alice']),
+        widget,
+        undefined,
+      ),
+    ).not.toThrow();
+  });
+
+  it('have no group to set', () => {
+    expect(() => authorizeAnnotationUpdate(DESIGNER, widget, 'legal')).toThrow(
+      expect.objectContaining({ code: EngineErrorCode.InvalidArg }),
+    );
+    expect(() => authorizeAnnotationCreate(DESIGNER, 'widget', 'legal')).toThrow(
+      expect.objectContaining({ code: EngineErrorCode.InvalidArg }),
+    );
+    expect(authorizeAnnotationUpdate(DESIGNER, widget, null)).toBeDefined();
+  });
+
+  it('are deleted with form design, the rest with the annotation scopes', () => {
+    const members = [
+      { ref: ref(20), subtype: 'widget', userId: 'bob' },
+      { ref: ref(21), subtype: 'square', userId: 'bob' },
+    ];
+    expect(() => authorizeAnnotationDelete(SELF_ONLY, members)).toThrow(
+      expect.objectContaining({ refs: [ref(20)] }),
+    );
+    expect(() =>
+      authorizeAnnotationDelete(bob(['doc.forms.modify', 'annotations:delete:self']), members),
+    ).not.toThrow();
+    expect(() => authorizeAnnotationDelete(TENANT, members)).not.toThrow();
   });
 });

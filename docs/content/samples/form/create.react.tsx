@@ -62,7 +62,7 @@ function BuildToolbar() {
     if (status !== 'ready' || !page || added.current) return;
     added.current = true;
     void addDropdown(form, page, 0).then(({ field }) =>
-      stage.reveal(page, { rect: field.widgets[0].rect }),
+      stage.reveal(page, { rect: form.getWidget(field.widgets[0])!.rect }),
     );
   }, [form, stage, status, page]);
 
@@ -70,7 +70,7 @@ function BuildToolbar() {
   const add = (addField: typeof addDropdown) => {
     if (!page) return;
     void addField(form, page, fields.length).then(({ field }) =>
-      stage.reveal(page, { rect: field.widgets[0].rect }),
+      stage.reveal(page, { rect: form.getWidget(field.widgets[0])!.rect }),
     );
   };
 

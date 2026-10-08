@@ -116,7 +116,9 @@ export function projectWidget(
         comb: field.comb,
       };
     case 'checkbox': {
-      const toggle = field.widgets.find((candidate) => candidate.objectNumber === annotObjectNumber);
+      const toggle = field.widgets.find(
+        (candidate) => candidate.objectNumber === annotObjectNumber,
+      );
       return {
         ...base,
         control: 'toggle',
@@ -126,7 +128,9 @@ export function projectWidget(
       };
     }
     case 'radio': {
-      const toggle = field.widgets.find((candidate) => candidate.objectNumber === annotObjectNumber);
+      const toggle = field.widgets.find(
+        (candidate) => candidate.objectNumber === annotObjectNumber,
+      );
       return {
         ...base,
         control: 'toggle',

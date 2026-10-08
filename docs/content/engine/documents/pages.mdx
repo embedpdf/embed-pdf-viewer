@@ -1,6 +1,6 @@
 ---
 title: Pages
-description: List a document's pages, then rotate, move, delete, insert, extract and flatten them.
+description: List a document's pages, then rotate, reorder, delete, insert, extract and flatten them.
 ---
 
 # Pages
@@ -111,20 +111,22 @@ Rotating changes how the page is shown, not its content, so annotations and text
 positions. Renders don't turn by themselves: pass the page's `rotation` to show it turned (see
 [Turn the page](/docs/engine/documents/rendering#turn-the-page)).
 
-## Move
+## Reorder
 
-`move(refs, toIndex)` takes the pages out and puts them back together, in the order you pass
-them, at `toIndex`:
+`reorder(refs, position)` takes the pages out and puts them back together, in the order you pass
+them, at `position`: right after or before another page, or at the start or the end.
 
 ```ts
 const { pages } = await doc.pages.list();
+const last = pages[pages.length - 1].ref;
 
-// Move the last page to the front
-await doc.pages.move([pages[pages.length - 1].ref], 0);
+await doc.pages.reorder([last], 'start'); // the last page to the front
+await doc.pages.reorder([pages[0].ref], { after: pages[1].ref }); // swap the first two
 ```
 
-`toIndex` counts the pages that remain after the moved ones are taken out: from `0` to
-`pageCount - refs.length`.
+A position names a page, never a number, so it means the same when other pages come or go
+before the call lands. The page you name can't be one of the pages you move (`InvalidArg`);
+one the document doesn't have fails with `NotFound`.
 
 ## Delete
 
@@ -137,8 +139,8 @@ with `InvalidArg`.
 
 ## Insert another PDF
 
-`insert(bytes, toIndex?)` copies every page of another PDF into this one, with their annotations.
-Without `toIndex`, the pages go at the end:
+`insert(bytes, position?)` copies every page of another PDF into this one, with their
+annotations. Without a position, the pages go at the end:
 
 ```ts
 const response = await fetch('/appendix.pdf');
@@ -154,7 +156,9 @@ after the other.
 
 ```ts
 // Two US Letter pages after the first page
-await doc.pages.insertBlank({ size: { width: 612, height: 792 }, count: 2 }, 1);
+const { pages } = await doc.pages.list();
+const letter = { width: 612, height: 792 };
+await doc.pages.insertBlank({ size: letter, count: 2 }, { after: pages[0].ref });
 ```
 
 A4 is `{ width: 595, height: 842 }`. `count` is 1 by default and at most 100 per call.
@@ -181,7 +185,7 @@ And taking pages from one document into another is `extract()` then `insert()`:
 
 ```ts
 const bytes = await source.pages.extract([ref]);
-await target.pages.insert(bytes, 0);
+await target.pages.insert(bytes, 'start');
 ```
 
 ## Flatten a page's annotations
@@ -215,12 +219,12 @@ To flatten only some annotations, see
 
 ## Permissions
 
-| Call                                                          | Needs                                        |
-| :------------------------------------------------------------ | :------------------------------------------- |
-| `list()`                                                      | `doc.open`                                   |
-| `rotate()`, `move()`, `delete()`, `insert()`, `insertBlank()` | `doc.pages.assemble`                         |
-| `extract()`                                                   | `doc.download`: the pages leave the document |
-| `flatten()`                                                   | `doc.pages.modify` and `doc.annotate.modify` |
+| Call                                                             | Needs                                        |
+| :--------------------------------------------------------------- | :------------------------------------------- |
+| `list()`                                                         | `doc.open`                                   |
+| `rotate()`, `reorder()`, `delete()`, `insert()`, `insertBlank()` | `doc.pages.assemble`                         |
+| `extract()`                                                      | `doc.download`: the pages leave the document |
+| `flatten()`                                                      | `doc.pages.modify` and `doc.annotate.modify` |
 
 See [Permissions](/docs/engine/concepts/permissions).
 
@@ -228,16 +232,16 @@ See [Permissions](/docs/engine/concepts/permissions).
 
 ### What a change returns
 
-`rotate()`, `move()`, `delete()`, `insert()`, `insertBlank()`, `setName()` and `removeName()`
+`rotate()`, `reorder()`, `delete()`, `insert()`, `insertBlank()`, `setName()` and `removeName()`
 return the new page list as `layout`, the same shape `list()` returns, so you can replace the list
 you hold without asking again:
 
 ```ts
-const { layout } = await doc.pages.move([ref], 0);
+const { layout } = await doc.pages.reorder([ref], 'start');
 showThumbnails(layout.pages);
 ```
 
-Other code that shows pages can listen for `pages.moved`, `pages.rotated`, `pages.deleted`,
+Other code that shows pages can listen for `pages.reordered`, `pages.rotated`, `pages.deleted`,
 `pages.inserted` and `pages.flattened` instead. See [Events](/docs/engine/concepts/events).
 
 ### Inserting

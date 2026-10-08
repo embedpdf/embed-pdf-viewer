@@ -1004,6 +1004,126 @@
         }
       }
     },
+    "/v1/docs/{docId}/layers/{layerName}/annotations/pages/{pageKey}/items/reorder": {
+      "post": {
+        "operationId": "doc.annotations.reorder",
+        "x-fern-sdk-group-name": ["doc", "annotations"],
+        "x-fern-sdk-method-name": "reorder",
+        "x-docs-title": "Reorder annotations",
+        "summary": "Change the stacking order of one page's annotations: they go together, in the order given, next to a neighbour annotation (`{ before }`, `{ after }`) or to the bottom (`'start'`) or top (`'end'`). Widgets paint above every annotation and have their own order (`doc.forms.reorderWidgets`): a widget is refused. Returns the page's new order.",
+        "security": [
+          {
+            "apiToken": []
+          },
+          {
+            "docToken": []
+          }
+        ],
+        "x-required-scope": [],
+        "x-required-capability": ["doc.annotate.modify"],
+        "parameters": [
+          {
+            "name": "docId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]+$"
+            }
+          },
+          {
+            "name": "layerName",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "name": "pageKey",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "pattern": "^obj:[1-9][0-9]*$",
+              "description": "The page's address, `obj:N`: the page's indirect object number, the durable identity every `PageLayout.ref` carries. Mirrors `annotKey` and `fieldKey`."
+            }
+          },
+          {
+            "name": "X-Document-Password",
+            "in": "header",
+            "required": false,
+            "description": "Base64-encoded password for an encrypted document. Valid only with the API token (403 anywhere else). An encrypted document answers 422 DocPasswordRequired when the header is absent. Viewer doc JWTs use the SDK password-session flow instead.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "description": "Names the change: 1 to 255 printable ASCII characters. A retry under the same key on the same layer answers with what the first request committed, and changes nothing.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DocAnnotationsReorderRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocAnnotationsReorder200Response"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocAnnotationsReorder400Response"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocAnnotationsReorder404Response"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EngineErrorPayload"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/docs/{docId}/layers/{layerName}/changes": {
       "post": {
         "operationId": "doc.changes",
@@ -1222,7 +1342,7 @@
         "x-fern-sdk-group-name": ["doc", "forms"],
         "x-fern-sdk-method-name": "list",
         "x-docs-title": "List form fields",
-        "summary": "Reconciled form snapshot: fields, widgets, values.",
+        "summary": "The form: every field with its value, every widget's row (its place, look and state), and the calculation order. A form field's widgets come with the form, never with the annotations.",
         "security": [
           {
             "apiToken": []
@@ -1709,6 +1829,376 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/DocFormsReset404Response"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EngineErrorPayload"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/docs/{docId}/layers/{layerName}/form/widgets/{pageKey}/{annotKey}": {
+      "patch": {
+        "operationId": "doc.forms.updateWidget",
+        "x-fern-sdk-group-name": ["doc", "forms"],
+        "x-fern-sdk-method-name": "updateWidget",
+        "x-docs-title": "Update form widget",
+        "summary": "Change a widget's place and look: what an annotation update takes, for a form field's widget. A widget is the form's, so the annotation routes refuse one.",
+        "security": [
+          {
+            "apiToken": []
+          },
+          {
+            "docToken": []
+          }
+        ],
+        "x-required-scope": [],
+        "x-required-capability": ["doc.forms.modify"],
+        "parameters": [
+          {
+            "name": "docId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]+$"
+            }
+          },
+          {
+            "name": "layerName",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "name": "pageKey",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "pattern": "^obj:[1-9][0-9]*$",
+              "description": "The page's address, `obj:N`: the page's indirect object number, the durable identity every `PageLayout.ref` carries. Mirrors `annotKey` and `fieldKey`."
+            }
+          },
+          {
+            "name": "annotKey",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "pattern": "^(obj:[1-9][0-9]*|base:(0|[1-9][0-9]*))$",
+              "description": "The annotation's address on the page: `obj:N`, its indirect object number, or `base:N` for an annotation the uploaded file stored inline (without an object number of its own), the position it was born at in the page's /Annots. The name the annotation's `ref` carries for life."
+            }
+          },
+          {
+            "name": "X-Document-Password",
+            "in": "header",
+            "required": false,
+            "description": "Base64-encoded password for an encrypted document. Valid only with the API token (403 anywhere else). An encrypted document answers 422 DocPasswordRequired when the header is absent. Viewer doc JWTs use the SDK password-session flow instead.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "description": "Names the change: 1 to 255 printable ASCII characters. A retry under the same key on the same layer answers with what the first request committed, and changes nothing.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DocFormsUpdateWidgetRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocFormsUpdateWidget200Response"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocFormsUpdateWidget400Response"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocFormsUpdateWidget404Response"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EngineErrorPayload"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "doc.forms.deleteWidget",
+        "x-fern-sdk-group-name": ["doc", "forms"],
+        "x-fern-sdk-method-name": "deleteWidget",
+        "x-docs-title": "Delete form widget",
+        "summary": "Delete a widget: it leaves its page, and its field when it has one. The field survives, unplaced when this was its last widget. A widget that is its field's own dictionary is refused: delete the field. A widget is the form's, so the annotation routes refuse one.",
+        "security": [
+          {
+            "apiToken": []
+          },
+          {
+            "docToken": []
+          }
+        ],
+        "x-required-scope": [],
+        "x-required-capability": ["doc.forms.modify"],
+        "parameters": [
+          {
+            "name": "docId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]+$"
+            }
+          },
+          {
+            "name": "layerName",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "name": "pageKey",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "pattern": "^obj:[1-9][0-9]*$",
+              "description": "The page's address, `obj:N`: the page's indirect object number, the durable identity every `PageLayout.ref` carries. Mirrors `annotKey` and `fieldKey`."
+            }
+          },
+          {
+            "name": "annotKey",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "pattern": "^(obj:[1-9][0-9]*|base:(0|[1-9][0-9]*))$",
+              "description": "The annotation's address on the page: `obj:N`, its indirect object number, or `base:N` for an annotation the uploaded file stored inline (without an object number of its own), the position it was born at in the page's /Annots. The name the annotation's `ref` carries for life."
+            }
+          },
+          {
+            "name": "X-Document-Password",
+            "in": "header",
+            "required": false,
+            "description": "Base64-encoded password for an encrypted document. Valid only with the API token (403 anywhere else). An encrypted document answers 422 DocPasswordRequired when the header is absent. Viewer doc JWTs use the SDK password-session flow instead.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "description": "Names the change: 1 to 255 printable ASCII characters. A retry under the same key on the same layer answers with what the first request committed, and changes nothing.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocFormsDeleteWidget200Response"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocFormsDeleteWidget400Response"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocFormsDeleteWidget404Response"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EngineErrorPayload"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/docs/{docId}/layers/{layerName}/form/widgets/{pageKey}/reorder": {
+      "post": {
+        "operationId": "doc.forms.reorderWidgets",
+        "x-fern-sdk-group-name": ["doc", "forms"],
+        "x-fern-sdk-method-name": "reorderWidgets",
+        "x-docs-title": "Reorder form widgets",
+        "summary": "Change the stacking order of one page's widgets: they go together, in the order given, next to a neighbour widget or to the bottom (`'start'`) or top (`'end'`) of the page's widgets, which paint above every annotation. Where the page's `/Tabs` follows it, this is also the tab order. Returns the page's new widget order.",
+        "security": [
+          {
+            "apiToken": []
+          },
+          {
+            "docToken": []
+          }
+        ],
+        "x-required-scope": [],
+        "x-required-capability": ["doc.forms.modify"],
+        "parameters": [
+          {
+            "name": "docId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]+$"
+            }
+          },
+          {
+            "name": "layerName",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "name": "pageKey",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "pattern": "^obj:[1-9][0-9]*$",
+              "description": "The page's address, `obj:N`: the page's indirect object number, the durable identity every `PageLayout.ref` carries. Mirrors `annotKey` and `fieldKey`."
+            }
+          },
+          {
+            "name": "X-Document-Password",
+            "in": "header",
+            "required": false,
+            "description": "Base64-encoded password for an encrypted document. Valid only with the API token (403 anywhere else). An encrypted document answers 422 DocPasswordRequired when the header is absent. Viewer doc JWTs use the SDK password-session flow instead.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "description": "Names the change: 1 to 255 printable ASCII characters. A retry under the same key on the same layer answers with what the first request committed, and changes nothing.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DocFormsReorderWidgetsRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocFormsReorderWidgets200Response"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocFormsReorderWidgets400Response"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocFormsReorderWidgets404Response"
                 }
               }
             }
@@ -2504,7 +2994,7 @@
         "x-fern-sdk-method-name": "insert",
         "x-docs-title": "Insert pages from a PDF",
         "summary": "Copy every page of an uploaded PDF into the document at an index.",
-        "description": "Multipart mutation envelope: a `body` field holding `{\"toIndex\"?: number}` (omitted → append) plus a `resource:source` file part carrying the standalone PDF whose pages are copied in. The inserted copies get fresh page object numbers, returned in insertion order.",
+        "description": "Multipart mutation envelope: a `body` field holding `{\"position\"?: PagePosition}` (omitted → the end) plus a `resource:source` file part carrying the standalone PDF whose pages are copied in. The inserted copies get fresh page object numbers, returned in insertion order.",
         "security": [
           {
             "apiToken": []
@@ -2620,8 +3110,8 @@
         "x-fern-sdk-group-name": ["doc", "pages"],
         "x-fern-sdk-method-name": "insertBlank",
         "x-docs-title": "Insert blank pages",
-        "summary": "Create blank pages of an explicit size at an index.",
-        "description": "Body is `{\"size\": {\"width\", \"height\"}, \"count\"?, \"toIndex\"?}` — size in PDF points, count in [1, 100], toIndex omitted → append.",
+        "summary": "Create blank pages of an explicit size at a position.",
+        "description": "Body is `{\"size\": {\"width\", \"height\"}, \"count\"?, \"position\"?}` — size in PDF points, count in [1, 100], `position` a `PagePosition` (omitted → the end).",
         "security": [
           {
             "apiToken": []
@@ -2707,115 +3197,6 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/DocPagesInsertBlank404Response"
-                }
-              }
-            }
-          },
-          "default": {
-            "description": "Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/EngineErrorPayload"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/v1/docs/{docId}/layers/{layerName}/pages/move": {
-      "post": {
-        "operationId": "doc.pages.move",
-        "x-fern-sdk-group-name": ["doc", "pages"],
-        "x-fern-sdk-method-name": "move",
-        "x-docs-title": "Move pages",
-        "summary": "Reorder pages.",
-        "security": [
-          {
-            "apiToken": []
-          },
-          {
-            "docToken": []
-          }
-        ],
-        "x-required-scope": [],
-        "x-required-capability": ["doc.pages.assemble"],
-        "parameters": [
-          {
-            "name": "docId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "pattern": "^[A-Za-z0-9_-]+$"
-            }
-          },
-          {
-            "name": "layerName",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "minLength": 1
-            }
-          },
-          {
-            "name": "X-Document-Password",
-            "in": "header",
-            "required": false,
-            "description": "Base64-encoded password for an encrypted document. Valid only with the API token (403 anywhere else). An encrypted document answers 422 DocPasswordRequired when the header is absent. Viewer doc JWTs use the SDK password-session flow instead.",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "Idempotency-Key",
-            "in": "header",
-            "required": false,
-            "description": "Names the change: 1 to 255 printable ASCII characters. A retry under the same key on the same layer answers with what the first request committed, and changes nothing.",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/DocPagesMoveRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/DocPagesMove200Response"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Bad request",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/DocPagesMove400Response"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Not found",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/DocPagesMove404Response"
                 }
               }
             }
@@ -3034,6 +3415,115 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/DocPagesRemoveName404Response"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EngineErrorPayload"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/docs/{docId}/layers/{layerName}/pages/reorder": {
+      "post": {
+        "operationId": "doc.pages.reorder",
+        "x-fern-sdk-group-name": ["doc", "pages"],
+        "x-fern-sdk-method-name": "reorder",
+        "x-docs-title": "Reorder pages",
+        "summary": "Move pages together, in the order given, next to a neighbour page (`{ before }`, `{ after }`) or to the start or end. Returns the new layout.",
+        "security": [
+          {
+            "apiToken": []
+          },
+          {
+            "docToken": []
+          }
+        ],
+        "x-required-scope": [],
+        "x-required-capability": ["doc.pages.assemble"],
+        "parameters": [
+          {
+            "name": "docId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]+$"
+            }
+          },
+          {
+            "name": "layerName",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "name": "X-Document-Password",
+            "in": "header",
+            "required": false,
+            "description": "Base64-encoded password for an encrypted document. Valid only with the API token (403 anywhere else). An encrypted document answers 422 DocPasswordRequired when the header is absent. Viewer doc JWTs use the SDK password-session flow instead.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "description": "Names the change: 1 to 255 printable ASCII characters. A retry under the same key on the same layer answers with what the first request committed, and changes nothing.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DocPagesReorderRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocPagesReorder200Response"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocPagesReorder400Response"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocPagesReorder404Response"
                 }
               }
             }
@@ -6633,6 +7123,26 @@
         "required": ["kind", "objectNumber"],
         "additionalProperties": false
       },
+      "PagePosition": {
+        "anyOf": [
+          {
+            "type": "string",
+            "enum": ["start", "end"]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "before": {
+                "$ref": "#/components/schemas/PageRef"
+              },
+              "after": {
+                "$ref": "#/components/schemas/PageRef"
+              }
+            },
+            "additionalProperties": false
+          }
+        ]
+      },
       "CacheDelta": {
         "type": "object",
         "properties": {
@@ -6646,6 +7156,11 @@
             "minimum": 0
           },
           "annotationsVersion": {
+            "type": "integer",
+            "exclusiveMinimum": true,
+            "minimum": 0
+          },
+          "formsVersion": {
             "type": "integer",
             "exclusiveMinimum": true,
             "minimum": 0
@@ -6692,9 +7207,14 @@
                       "type": "integer",
                       "exclusiveMinimum": true,
                       "minimum": 0
+                    },
+                    "widgetVersion": {
+                      "type": "integer",
+                      "exclusiveMinimum": true,
+                      "minimum": 0
                     }
                   },
-                  "required": ["contentVersion", "annotationVersion"],
+                  "required": ["contentVersion", "annotationVersion", "widgetVersion"],
                   "additionalProperties": false
                 }
               },
@@ -7653,12 +8173,12 @@
               "page": {
                 "$ref": "#/components/schemas/PageRef"
               },
-              "index": {
-                "type": "integer",
-                "minimum": 0
-              },
               "hasAppearance": {
                 "type": "boolean"
+              },
+              "appearanceState": {
+                "type": "string",
+                "nullable": true
               },
               "nm": {
                 "type": "string",
@@ -7860,8 +8380,8 @@
               "subtype",
               "ref",
               "page",
-              "index",
               "hasAppearance",
+              "appearanceState",
               "nm",
               "rect",
               "contents",
@@ -7907,11 +8427,12 @@
               "page": {
                 "$ref": "#/components/schemas/PageRef"
               },
-              "index": {
-                "$ref": "#/components/schemas/Annotation/anyOf/0/properties/index"
-              },
               "hasAppearance": {
                 "$ref": "#/components/schemas/Annotation/anyOf/0/properties/hasAppearance"
+              },
+              "appearanceState": {
+                "type": "string",
+                "nullable": true
               },
               "nm": {
                 "type": "string",
@@ -8043,8 +8564,8 @@
               "subtype",
               "ref",
               "page",
-              "index",
               "hasAppearance",
+              "appearanceState",
               "nm",
               "rect",
               "contents",
@@ -8090,11 +8611,12 @@
               "page": {
                 "$ref": "#/components/schemas/PageRef"
               },
-              "index": {
-                "$ref": "#/components/schemas/Annotation/anyOf/0/properties/index"
-              },
               "hasAppearance": {
                 "$ref": "#/components/schemas/Annotation/anyOf/0/properties/hasAppearance"
+              },
+              "appearanceState": {
+                "type": "string",
+                "nullable": true
               },
               "nm": {
                 "type": "string",
@@ -8226,8 +8748,8 @@
               "subtype",
               "ref",
               "page",
-              "index",
               "hasAppearance",
+              "appearanceState",
               "nm",
               "rect",
               "contents",
@@ -8273,11 +8795,12 @@
               "page": {
                 "$ref": "#/components/schemas/PageRef"
               },
-              "index": {
-                "$ref": "#/components/schemas/Annotation/anyOf/0/properties/index"
-              },
               "hasAppearance": {
                 "$ref": "#/components/schemas/Annotation/anyOf/0/properties/hasAppearance"
+              },
+              "appearanceState": {
+                "type": "string",
+                "nullable": true
               },
               "nm": {
                 "type": "string",
@@ -8414,8 +8937,8 @@
               "subtype",
               "ref",
               "page",
-              "index",
               "hasAppearance",
+              "appearanceState",
               "nm",
               "rect",
               "contents",
@@ -8462,11 +8985,12 @@
               "page": {
                 "$ref": "#/components/schemas/PageRef"
               },
-              "index": {
-                "$ref": "#/components/schemas/Annotation/anyOf/0/properties/index"
-              },
               "hasAppearance": {
                 "$ref": "#/components/schemas/Annotation/anyOf/0/properties/hasAppearance"
+              },
+              "appearanceState": {
+                "type": "string",
+                "nullable": true
               },
               "nm": {
                 "type": "string",
@@ -8632,8 +9156,8 @@
               "subtype",
               "ref",
               "page",
-              "index",
               "hasAppearance",
+              "appearanceState",
               "nm",
               "rect",
               "contents",
@@ -8685,11 +9209,12 @@
               "page": {
                 "$ref": "#/components/schemas/PageRef"
               },
-              "index": {
-                "$ref": "#/components/schemas/Annotation/anyOf/0/properties/index"
-              },
               "hasAppearance": {
                 "$ref": "#/components/schemas/Annotation/anyOf/0/properties/hasAppearance"
+              },
+              "appearanceState": {
+                "type": "string",
+                "nullable": true
               },
               "nm": {
                 "type": "string",
@@ -8855,8 +9380,8 @@
               "subtype",
               "ref",
               "page",
-              "index",
               "hasAppearance",
+              "appearanceState",
               "nm",
               "rect",
               "contents",
@@ -8908,11 +9433,12 @@
               "page": {
                 "$ref": "#/components/schemas/PageRef"
               },
-              "index": {
-                "$ref": "#/components/schemas/Annotation/anyOf/0/properties/index"
-              },
               "hasAppearance": {
                 "$ref": "#/components/schemas/Annotation/anyOf/0/properties/hasAppearance"
+              },
+              "appearanceState": {
+                "type": "string",
+                "nullable": true
               },
               "nm": {
                 "type": "string",
@@ -9225,8 +9751,8 @@
               "subtype",
               "ref",
               "page",
-              "index",
               "hasAppearance",
+              "appearanceState",
               "nm",
               "rect",
               "contents",
@@ -9282,11 +9808,12 @@
               "page": {
                 "$ref": "#/components/schemas/PageRef"
               },
-              "index": {
-                "$ref": "#/components/schemas/Annotation/anyOf/0/properties/index"
-              },
               "hasAppearance": {
                 "$ref": "#/components/schemas/Annotation/anyOf/0/properties/hasAppearance"
+              },
+              "appearanceState": {
+                "type": "string",
+                "nullable": true
               },
               "nm": {
                 "type": "string",
@@ -9497,8 +10024,8 @@
               "subtype",
               "ref",
               "page",
-              "index",
               "hasAppearance",
+              "appearanceState",
               "nm",
               "rect",
               "contents",
@@ -9554,11 +10081,12 @@
               "page": {
                 "$ref": "#/components/schemas/PageRef"
               },
-              "index": {
-                "$ref": "#/components/schemas/Annotation/anyOf/0/properties/index"
-              },
               "hasAppearance": {
                 "$ref": "#/components/schemas/Annotation/anyOf/0/properties/hasAppearance"
+              },
+              "appearanceState": {
+                "type": "string",
+                "nullable": true
               },
               "nm": {
                 "type": "string",
@@ -9781,8 +10309,8 @@
               "subtype",
               "ref",
               "page",
-              "index",
               "hasAppearance",
+              "appearanceState",
               "nm",
               "rect",
               "contents",
@@ -9840,11 +10368,12 @@
               "page": {
                 "$ref": "#/components/schemas/PageRef"
               },
-              "index": {
-                "$ref": "#/components/schemas/Annotation/anyOf/0/properties/index"
-              },
               "hasAppearance": {
                 "$ref": "#/components/schemas/Annotation/anyOf/0/properties/hasAppearance"
+              },
+              "appearanceState": {
+                "type": "string",
+                "nullable": true
               },
               "nm": {
                 "type": "string",
@@ -9975,8 +10504,8 @@
               "subtype",
               "ref",
               "page",
-              "index",
               "hasAppearance",
+              "appearanceState",
               "nm",
               "rect",
               "contents",
@@ -10020,11 +10549,12 @@
               "page": {
                 "$ref": "#/components/schemas/PageRef"
               },
-              "index": {
-                "$ref": "#/components/schemas/Annotation/anyOf/0/properties/index"
-              },
               "hasAppearance": {
                 "$ref": "#/components/schemas/Annotation/anyOf/0/properties/hasAppearance"
+              },
+              "appearanceState": {
+                "type": "string",
+                "nullable": true
               },
               "nm": {
                 "type": "string",
@@ -10186,8 +10716,8 @@
               "subtype",
               "ref",
               "page",
-              "index",
               "hasAppearance",
+              "appearanceState",
               "nm",
               "rect",
               "contents",
@@ -10238,11 +10768,12 @@
               "page": {
                 "$ref": "#/components/schemas/PageRef"
               },
-              "index": {
-                "$ref": "#/components/schemas/Annotation/anyOf/0/properties/index"
-              },
               "hasAppearance": {
                 "$ref": "#/components/schemas/Annotation/anyOf/0/properties/hasAppearance"
+              },
+              "appearanceState": {
+                "type": "string",
+                "nullable": true
               },
               "nm": {
                 "type": "string",
@@ -10653,8 +11184,8 @@
               "subtype",
               "ref",
               "page",
-              "index",
               "hasAppearance",
+              "appearanceState",
               "nm",
               "rect",
               "contents",
@@ -10715,11 +11246,12 @@
               "page": {
                 "$ref": "#/components/schemas/PageRef"
               },
-              "index": {
-                "$ref": "#/components/schemas/Annotation/anyOf/0/properties/index"
-              },
               "hasAppearance": {
                 "$ref": "#/components/schemas/Annotation/anyOf/0/properties/hasAppearance"
+              },
+              "appearanceState": {
+                "type": "string",
+                "nullable": true
               },
               "nm": {
                 "type": "string",
@@ -10860,8 +11392,8 @@
               "subtype",
               "ref",
               "page",
-              "index",
               "hasAppearance",
+              "appearanceState",
               "nm",
               "rect",
               "contents",
@@ -10909,11 +11441,12 @@
               "page": {
                 "$ref": "#/components/schemas/PageRef"
               },
-              "index": {
-                "$ref": "#/components/schemas/Annotation/anyOf/0/properties/index"
-              },
               "hasAppearance": {
                 "$ref": "#/components/schemas/Annotation/anyOf/0/properties/hasAppearance"
+              },
+              "appearanceState": {
+                "type": "string",
+                "nullable": true
               },
               "nm": {
                 "type": "string",
@@ -11059,8 +11592,8 @@
               "subtype",
               "ref",
               "page",
-              "index",
               "hasAppearance",
+              "appearanceState",
               "nm",
               "rect",
               "contents",
@@ -11109,11 +11642,12 @@
               "page": {
                 "$ref": "#/components/schemas/PageRef"
               },
-              "index": {
-                "$ref": "#/components/schemas/Annotation/anyOf/0/properties/index"
-              },
               "hasAppearance": {
                 "$ref": "#/components/schemas/Annotation/anyOf/0/properties/hasAppearance"
+              },
+              "appearanceState": {
+                "type": "string",
+                "nullable": true
               },
               "nm": {
                 "type": "string",
@@ -11257,8 +11791,8 @@
               "subtype",
               "ref",
               "page",
-              "index",
               "hasAppearance",
+              "appearanceState",
               "nm",
               "rect",
               "contents",
@@ -11306,11 +11840,12 @@
               "page": {
                 "$ref": "#/components/schemas/PageRef"
               },
-              "index": {
-                "$ref": "#/components/schemas/Annotation/anyOf/0/properties/index"
-              },
               "hasAppearance": {
                 "$ref": "#/components/schemas/Annotation/anyOf/0/properties/hasAppearance"
+              },
+              "appearanceState": {
+                "type": "string",
+                "nullable": true
               },
               "nm": {
                 "type": "string",
@@ -11495,8 +12030,8 @@
               "subtype",
               "ref",
               "page",
-              "index",
               "hasAppearance",
+              "appearanceState",
               "nm",
               "rect",
               "contents",
@@ -11531,266 +12066,7 @@
             "additionalProperties": false
           },
           {
-            "type": "object",
-            "properties": {
-              "subtype": {
-                "type": "string",
-                "enum": ["widget"]
-              },
-              "ref": {
-                "$ref": "#/components/schemas/AnnotationRef"
-              },
-              "page": {
-                "$ref": "#/components/schemas/PageRef"
-              },
-              "index": {
-                "$ref": "#/components/schemas/Annotation/anyOf/0/properties/index"
-              },
-              "hasAppearance": {
-                "$ref": "#/components/schemas/Annotation/anyOf/0/properties/hasAppearance"
-              },
-              "nm": {
-                "type": "string",
-                "nullable": true
-              },
-              "rect": {
-                "$ref": "#/components/schemas/Annotation/anyOf/0/properties/rect"
-              },
-              "contents": {
-                "type": "string",
-                "nullable": true
-              },
-              "subject": {
-                "type": "string",
-                "nullable": true
-              },
-              "blendMode": {
-                "$ref": "#/components/schemas/Annotation/anyOf/0/properties/blendMode"
-              },
-              "invisible": {
-                "$ref": "#/components/schemas/Annotation/anyOf/0/properties/invisible"
-              },
-              "hidden": {
-                "$ref": "#/components/schemas/Annotation/anyOf/0/properties/hidden"
-              },
-              "print": {
-                "$ref": "#/components/schemas/Annotation/anyOf/0/properties/print"
-              },
-              "noZoom": {
-                "$ref": "#/components/schemas/Annotation/anyOf/0/properties/noZoom"
-              },
-              "noRotate": {
-                "$ref": "#/components/schemas/Annotation/anyOf/0/properties/noRotate"
-              },
-              "noView": {
-                "$ref": "#/components/schemas/Annotation/anyOf/0/properties/noView"
-              },
-              "readOnly": {
-                "$ref": "#/components/schemas/Annotation/anyOf/0/properties/readOnly"
-              },
-              "locked": {
-                "$ref": "#/components/schemas/Annotation/anyOf/0/properties/locked"
-              },
-              "toggleNoView": {
-                "$ref": "#/components/schemas/Annotation/anyOf/0/properties/toggleNoView"
-              },
-              "lockedContents": {
-                "$ref": "#/components/schemas/Annotation/anyOf/0/properties/lockedContents"
-              },
-              "reply": {
-                "allOf": [
-                  {
-                    "$ref": "#/components/schemas/Annotation/anyOf/0/properties/reply"
-                  }
-                ],
-                "nullable": true
-              },
-              "popup": {
-                "allOf": [
-                  {
-                    "$ref": "#/components/schemas/AnnotationRef"
-                  }
-                ],
-                "nullable": true
-              },
-              "groupId": {
-                "allOf": [
-                  {
-                    "$ref": "#/components/schemas/Annotation/anyOf/0/properties/groupId"
-                  }
-                ],
-                "nullable": true
-              },
-              "author": {
-                "type": "string",
-                "nullable": true
-              },
-              "createdAt": {
-                "allOf": [
-                  {
-                    "$ref": "#/components/schemas/Annotation/anyOf/0/properties/createdAt"
-                  }
-                ],
-                "nullable": true
-              },
-              "modifiedAt": {
-                "allOf": [
-                  {
-                    "$ref": "#/components/schemas/Annotation/anyOf/0/properties/createdAt"
-                  }
-                ],
-                "nullable": true
-              },
-              "userId": {
-                "type": "string",
-                "nullable": true
-              },
-              "createdBy": {
-                "type": "string",
-                "nullable": true
-              },
-              "modifiedBy": {
-                "type": "string",
-                "nullable": true
-              },
-              "importedBy": {
-                "type": "string",
-                "nullable": true
-              },
-              "actions": {
-                "allOf": [
-                  {
-                    "$ref": "#/components/schemas/PdfAnnotationActions"
-                  }
-                ],
-                "nullable": true
-              },
-              "color": {
-                "allOf": [
-                  {
-                    "$ref": "#/components/schemas/Annotation/anyOf/0/properties/color"
-                  }
-                ],
-                "nullable": true
-              },
-              "interiorColor": {
-                "allOf": [
-                  {
-                    "$ref": "#/components/schemas/Annotation/anyOf/0/properties/color"
-                  }
-                ],
-                "nullable": true
-              },
-              "strokeWidth": {
-                "type": "number",
-                "minimum": 0
-              },
-              "borderStyle": {
-                "$ref": "#/components/schemas/Annotation/anyOf/4/properties/borderStyle"
-              },
-              "fontFamily": {
-                "type": "string",
-                "enum": [
-                  "courier",
-                  "courier-bold",
-                  "courier-bold-oblique",
-                  "courier-oblique",
-                  "helvetica",
-                  "helvetica-bold",
-                  "helvetica-bold-oblique",
-                  "helvetica-oblique",
-                  "times-roman",
-                  "times-bold",
-                  "times-bold-italic",
-                  "times-italic",
-                  "symbol",
-                  "zapf-dingbats"
-                ],
-                "nullable": true
-              },
-              "fontSize": {
-                "type": "number",
-                "minimum": 0,
-                "nullable": true
-              },
-              "fontColor": {
-                "allOf": [
-                  {
-                    "$ref": "#/components/schemas/Annotation/anyOf/0/properties/color"
-                  }
-                ],
-                "nullable": true
-              },
-              "textAlign": {
-                "type": "string",
-                "enum": ["left", "center", "right"]
-              },
-              "field": {
-                "allOf": [
-                  {
-                    "$ref": "#/components/schemas/FormFieldRef"
-                  }
-                ],
-                "nullable": true
-              },
-              "fieldFamily": {
-                "type": "string",
-                "enum": [
-                  "text",
-                  "checkbox",
-                  "radio",
-                  "combobox",
-                  "listbox",
-                  "pushbutton",
-                  "signature",
-                  "unknown"
-                ]
-              }
-            },
-            "required": [
-              "subtype",
-              "ref",
-              "page",
-              "index",
-              "hasAppearance",
-              "nm",
-              "rect",
-              "contents",
-              "subject",
-              "blendMode",
-              "invisible",
-              "hidden",
-              "print",
-              "noZoom",
-              "noRotate",
-              "noView",
-              "readOnly",
-              "locked",
-              "toggleNoView",
-              "lockedContents",
-              "reply",
-              "popup",
-              "groupId",
-              "author",
-              "createdAt",
-              "modifiedAt",
-              "userId",
-              "createdBy",
-              "modifiedBy",
-              "importedBy",
-              "actions",
-              "color",
-              "interiorColor",
-              "strokeWidth",
-              "borderStyle",
-              "fontFamily",
-              "fontSize",
-              "fontColor",
-              "textAlign",
-              "field",
-              "fieldFamily"
-            ],
-            "additionalProperties": false
+            "$ref": "#/components/schemas/WidgetAnnotation"
           },
           {
             "type": "object",
@@ -11805,11 +12081,12 @@
               "page": {
                 "$ref": "#/components/schemas/PageRef"
               },
-              "index": {
-                "$ref": "#/components/schemas/Annotation/anyOf/0/properties/index"
-              },
               "hasAppearance": {
                 "$ref": "#/components/schemas/Annotation/anyOf/0/properties/hasAppearance"
+              },
+              "appearanceState": {
+                "type": "string",
+                "nullable": true
               },
               "nm": {
                 "type": "string",
@@ -11965,15 +12242,16 @@
                 "$ref": "#/components/schemas/Annotation/anyOf/0/properties/color"
               },
               "textAlign": {
-                "$ref": "#/components/schemas/Annotation/anyOf/16/properties/textAlign"
+                "type": "string",
+                "enum": ["left", "center", "right"]
               }
             },
             "required": [
               "subtype",
               "ref",
               "page",
-              "index",
               "hasAppearance",
+              "appearanceState",
               "nm",
               "rect",
               "contents",
@@ -12026,11 +12304,12 @@
               "page": {
                 "$ref": "#/components/schemas/PageRef"
               },
-              "index": {
-                "$ref": "#/components/schemas/Annotation/anyOf/0/properties/index"
-              },
               "hasAppearance": {
                 "$ref": "#/components/schemas/Annotation/anyOf/0/properties/hasAppearance"
+              },
+              "appearanceState": {
+                "type": "string",
+                "nullable": true
               },
               "nm": {
                 "type": "string",
@@ -12164,8 +12443,8 @@
               "subtype",
               "ref",
               "page",
-              "index",
               "hasAppearance",
+              "appearanceState",
               "nm",
               "rect",
               "contents",
@@ -12210,11 +12489,12 @@
               "page": {
                 "$ref": "#/components/schemas/PageRef"
               },
-              "index": {
-                "$ref": "#/components/schemas/Annotation/anyOf/0/properties/index"
-              },
               "hasAppearance": {
                 "$ref": "#/components/schemas/Annotation/anyOf/0/properties/hasAppearance"
+              },
+              "appearanceState": {
+                "type": "string",
+                "nullable": true
               },
               "nm": {
                 "type": "string",
@@ -12344,8 +12624,8 @@
               "subtype",
               "ref",
               "page",
-              "index",
               "hasAppearance",
+              "appearanceState",
               "nm",
               "rect",
               "contents",
@@ -12431,8 +12711,8 @@
               },
               "ref": {},
               "page": {},
-              "index": {},
               "hasAppearance": {},
+              "appearanceState": {},
               "nm": {
                 "type": "string",
                 "nullable": true
@@ -12581,8 +12861,8 @@
               },
               "ref": {},
               "page": {},
-              "index": {},
               "hasAppearance": {},
+              "appearanceState": {},
               "nm": {
                 "type": "string",
                 "nullable": true
@@ -12676,8 +12956,8 @@
               },
               "ref": {},
               "page": {},
-              "index": {},
               "hasAppearance": {},
+              "appearanceState": {},
               "nm": {
                 "type": "string",
                 "nullable": true
@@ -12771,8 +13051,8 @@
               },
               "ref": {},
               "page": {},
-              "index": {},
               "hasAppearance": {},
+              "appearanceState": {},
               "nm": {
                 "type": "string",
                 "nullable": true
@@ -12871,8 +13151,8 @@
               },
               "ref": {},
               "page": {},
-              "index": {},
               "hasAppearance": {},
+              "appearanceState": {},
               "nm": {
                 "type": "string",
                 "nullable": true
@@ -13018,8 +13298,8 @@
               },
               "ref": {},
               "page": {},
-              "index": {},
               "hasAppearance": {},
+              "appearanceState": {},
               "nm": {
                 "type": "string",
                 "nullable": true
@@ -13147,8 +13427,8 @@
               },
               "ref": {},
               "page": {},
-              "index": {},
               "hasAppearance": {},
+              "appearanceState": {},
               "nm": {
                 "type": "string",
                 "nullable": true
@@ -13430,8 +13710,8 @@
               },
               "ref": {},
               "page": {},
-              "index": {},
               "hasAppearance": {},
+              "appearanceState": {},
               "nm": {
                 "type": "string",
                 "nullable": true
@@ -13605,8 +13885,8 @@
               },
               "ref": {},
               "page": {},
-              "index": {},
               "hasAppearance": {},
+              "appearanceState": {},
               "nm": {
                 "type": "string",
                 "nullable": true
@@ -13791,8 +14071,8 @@
               },
               "ref": {},
               "page": {},
-              "index": {},
               "hasAppearance": {},
+              "appearanceState": {},
               "nm": {
                 "type": "string",
                 "nullable": true
@@ -13887,8 +14167,8 @@
               },
               "ref": {},
               "page": {},
-              "index": {},
               "hasAppearance": {},
+              "appearanceState": {},
               "nm": {
                 "type": "string",
                 "nullable": true
@@ -14015,8 +14295,8 @@
               },
               "ref": {},
               "page": {},
-              "index": {},
               "hasAppearance": {},
+              "appearanceState": {},
               "nm": {
                 "type": "string",
                 "nullable": true
@@ -14376,8 +14656,8 @@
               },
               "ref": {},
               "page": {},
-              "index": {},
               "hasAppearance": {},
+              "appearanceState": {},
               "nm": {
                 "type": "string",
                 "nullable": true
@@ -14480,8 +14760,8 @@
               },
               "ref": {},
               "page": {},
-              "index": {},
               "hasAppearance": {},
+              "appearanceState": {},
               "nm": {
                 "type": "string",
                 "nullable": true
@@ -14591,8 +14871,8 @@
               },
               "ref": {},
               "page": {},
-              "index": {},
               "hasAppearance": {},
+              "appearanceState": {},
               "nm": {
                 "type": "string",
                 "nullable": true
@@ -14698,8 +14978,8 @@
               },
               "ref": {},
               "page": {},
-              "index": {},
               "hasAppearance": {},
+              "appearanceState": {},
               "nm": {
                 "type": "string",
                 "nullable": true
@@ -14816,8 +15096,8 @@
               },
               "ref": {},
               "page": {},
-              "index": {},
               "hasAppearance": {},
+              "appearanceState": {},
               "nm": {
                 "type": "string",
                 "nullable": true
@@ -14967,8 +15247,8 @@
               },
               "ref": {},
               "page": {},
-              "index": {},
               "hasAppearance": {},
+              "appearanceState": {},
               "nm": {
                 "type": "string",
                 "nullable": true
@@ -15095,8 +15375,8 @@
               },
               "ref": {},
               "page": {},
-              "index": {},
               "hasAppearance": {},
+              "appearanceState": {},
               "nm": {
                 "type": "string",
                 "nullable": true
@@ -15193,8 +15473,8 @@
               },
               "ref": {},
               "page": {},
-              "index": {},
               "hasAppearance": {},
+              "appearanceState": {},
               "nm": {
                 "type": "string",
                 "nullable": true
@@ -15362,8 +15642,8 @@
               },
               "ref": {},
               "page": {},
-              "index": {},
               "hasAppearance": {},
+              "appearanceState": {},
               "nm": {
                 "type": "string",
                 "nullable": true
@@ -15458,8 +15738,8 @@
               },
               "ref": {},
               "page": {},
-              "index": {},
               "hasAppearance": {},
+              "appearanceState": {},
               "nm": {
                 "type": "string",
                 "nullable": true
@@ -15554,8 +15834,8 @@
               },
               "ref": {},
               "page": {},
-              "index": {},
               "hasAppearance": {},
+              "appearanceState": {},
               "nm": {
                 "type": "string",
                 "nullable": true
@@ -15655,8 +15935,8 @@
               },
               "ref": {},
               "page": {},
-              "index": {},
               "hasAppearance": {},
+              "appearanceState": {},
               "nm": {
                 "type": "string",
                 "nullable": true
@@ -15793,8 +16073,8 @@
               },
               "ref": {},
               "page": {},
-              "index": {},
               "hasAppearance": {},
+              "appearanceState": {},
               "nm": {
                 "type": "string",
                 "nullable": true
@@ -15930,8 +16210,8 @@
               },
               "ref": {},
               "page": {},
-              "index": {},
               "hasAppearance": {},
+              "appearanceState": {},
               "nm": {
                 "type": "string",
                 "nullable": true
@@ -16231,8 +16511,8 @@
               },
               "ref": {},
               "page": {},
-              "index": {},
               "hasAppearance": {},
+              "appearanceState": {},
               "nm": {
                 "type": "string",
                 "nullable": true
@@ -16424,8 +16704,8 @@
               },
               "ref": {},
               "page": {},
-              "index": {},
               "hasAppearance": {},
+              "appearanceState": {},
               "nm": {
                 "type": "string",
                 "nullable": true
@@ -16618,8 +16898,8 @@
               },
               "ref": {},
               "page": {},
-              "index": {},
               "hasAppearance": {},
+              "appearanceState": {},
               "nm": {
                 "type": "string",
                 "nullable": true
@@ -16725,8 +17005,8 @@
               },
               "ref": {},
               "page": {},
-              "index": {},
               "hasAppearance": {},
+              "appearanceState": {},
               "nm": {
                 "type": "string",
                 "nullable": true
@@ -16882,8 +17162,8 @@
               },
               "ref": {},
               "page": {},
-              "index": {},
               "hasAppearance": {},
+              "appearanceState": {},
               "nm": {
                 "type": "string",
                 "nullable": true
@@ -17259,8 +17539,8 @@
               },
               "ref": {},
               "page": {},
-              "index": {},
               "hasAppearance": {},
+              "appearanceState": {},
               "nm": {
                 "type": "string",
                 "nullable": true
@@ -17364,8 +17644,8 @@
               },
               "ref": {},
               "page": {},
-              "index": {},
               "hasAppearance": {},
+              "appearanceState": {},
               "nm": {
                 "type": "string",
                 "nullable": true
@@ -17474,8 +17754,8 @@
               },
               "ref": {},
               "page": {},
-              "index": {},
               "hasAppearance": {},
+              "appearanceState": {},
               "nm": {
                 "type": "string",
                 "nullable": true
@@ -17582,8 +17862,8 @@
               },
               "ref": {},
               "page": {},
-              "index": {},
               "hasAppearance": {},
+              "appearanceState": {},
               "nm": {
                 "type": "string",
                 "nullable": true
@@ -17691,153 +17971,7 @@
             "additionalProperties": false
           },
           {
-            "type": "object",
-            "properties": {
-              "subtype": {
-                "type": "string",
-                "enum": ["widget"]
-              },
-              "ref": {},
-              "page": {},
-              "index": {},
-              "hasAppearance": {},
-              "nm": {
-                "type": "string",
-                "nullable": true
-              },
-              "rect": {
-                "$ref": "#/components/schemas/AnnotationPatch/anyOf/0/properties/rect"
-              },
-              "contents": {
-                "type": "string",
-                "nullable": true
-              },
-              "subject": {
-                "type": "string",
-                "nullable": true
-              },
-              "blendMode": {
-                "$ref": "#/components/schemas/AnnotationPatch/anyOf/0/properties/blendMode"
-              },
-              "invisible": {
-                "$ref": "#/components/schemas/AnnotationPatch/anyOf/0/properties/invisible"
-              },
-              "hidden": {
-                "$ref": "#/components/schemas/AnnotationPatch/anyOf/0/properties/hidden"
-              },
-              "print": {
-                "$ref": "#/components/schemas/AnnotationPatch/anyOf/0/properties/print"
-              },
-              "noZoom": {
-                "$ref": "#/components/schemas/AnnotationPatch/anyOf/0/properties/noZoom"
-              },
-              "noRotate": {
-                "$ref": "#/components/schemas/AnnotationPatch/anyOf/0/properties/noRotate"
-              },
-              "noView": {
-                "$ref": "#/components/schemas/AnnotationPatch/anyOf/0/properties/noView"
-              },
-              "readOnly": {
-                "$ref": "#/components/schemas/AnnotationPatch/anyOf/0/properties/readOnly"
-              },
-              "locked": {
-                "$ref": "#/components/schemas/AnnotationPatch/anyOf/0/properties/locked"
-              },
-              "toggleNoView": {
-                "$ref": "#/components/schemas/AnnotationPatch/anyOf/0/properties/toggleNoView"
-              },
-              "lockedContents": {
-                "$ref": "#/components/schemas/AnnotationPatch/anyOf/0/properties/lockedContents"
-              },
-              "reply": {
-                "allOf": [
-                  {
-                    "$ref": "#/components/schemas/AnnotationPatch/anyOf/0/properties/reply"
-                  }
-                ],
-                "nullable": true
-              },
-              "popup": {},
-              "groupId": {
-                "allOf": [
-                  {
-                    "$ref": "#/components/schemas/AnnotationPatch/anyOf/0/properties/groupId"
-                  }
-                ],
-                "nullable": true
-              },
-              "author": {},
-              "createdAt": {},
-              "modifiedAt": {},
-              "userId": {},
-              "createdBy": {},
-              "modifiedBy": {},
-              "importedBy": {},
-              "actions": {},
-              "color": {
-                "allOf": [
-                  {
-                    "$ref": "#/components/schemas/AnnotationPatch/anyOf/0/properties/color"
-                  }
-                ],
-                "nullable": true
-              },
-              "interiorColor": {
-                "allOf": [
-                  {
-                    "$ref": "#/components/schemas/AnnotationPatch/anyOf/0/properties/color"
-                  }
-                ],
-                "nullable": true
-              },
-              "strokeWidth": {
-                "type": "number",
-                "minimum": 0
-              },
-              "borderStyle": {
-                "$ref": "#/components/schemas/AnnotationPatch/anyOf/4/properties/borderStyle/anyOf/1"
-              },
-              "fontFamily": {
-                "type": "string",
-                "enum": [
-                  "courier",
-                  "courier-bold",
-                  "courier-bold-oblique",
-                  "courier-oblique",
-                  "helvetica",
-                  "helvetica-bold",
-                  "helvetica-bold-oblique",
-                  "helvetica-oblique",
-                  "times-roman",
-                  "times-bold",
-                  "times-bold-italic",
-                  "times-italic",
-                  "symbol",
-                  "zapf-dingbats"
-                ],
-                "nullable": true
-              },
-              "fontSize": {
-                "type": "number",
-                "minimum": 0,
-                "nullable": true
-              },
-              "fontColor": {
-                "allOf": [
-                  {
-                    "$ref": "#/components/schemas/AnnotationPatch/anyOf/0/properties/color"
-                  }
-                ],
-                "nullable": true
-              },
-              "textAlign": {
-                "type": "string",
-                "enum": ["left", "center", "right"]
-              },
-              "field": {},
-              "fieldFamily": {}
-            },
-            "additionalProperties": false
+            "$ref": "#/components/schemas/WidgetPatch"
           },
           {
             "type": "object",
@@ -17848,8 +17982,8 @@
               },
               "ref": {},
               "page": {},
-              "index": {},
               "hasAppearance": {},
+              "appearanceState": {},
               "nm": {
                 "type": "string",
                 "nullable": true
@@ -17961,7 +18095,8 @@
                 "$ref": "#/components/schemas/AnnotationPatch/anyOf/0/properties/color"
               },
               "textAlign": {
-                "$ref": "#/components/schemas/AnnotationPatch/anyOf/16/properties/textAlign"
+                "type": "string",
+                "enum": ["left", "center", "right"]
               }
             },
             "additionalProperties": false
@@ -17975,8 +18110,8 @@
               },
               "ref": {},
               "page": {},
-              "index": {},
               "hasAppearance": {},
+              "appearanceState": {},
               "nm": {
                 "type": "string",
                 "nullable": true
@@ -18272,6 +18407,26 @@
         "required": ["affectedPages", "cacheDelta", "opId", "undoable", "changed"],
         "additionalProperties": false
       },
+      "AnnotationPosition": {
+        "anyOf": [
+          {
+            "type": "string",
+            "enum": ["start", "end"]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "before": {
+                "$ref": "#/components/schemas/AnnotationRef"
+              },
+              "after": {
+                "$ref": "#/components/schemas/AnnotationRef"
+              }
+            },
+            "additionalProperties": false
+          }
+        ]
+      },
       "FormFieldRef": {
         "anyOf": [
           {
@@ -18405,53 +18560,7 @@
               "widgets": {
                 "type": "array",
                 "items": {
-                  "type": "object",
-                  "properties": {
-                    "ref": {
-                      "allOf": [
-                        {
-                          "$ref": "#/components/schemas/AnnotationRef"
-                        }
-                      ],
-                      "nullable": true
-                    },
-                    "objectNumber": {
-                      "type": "integer",
-                      "minimum": 0
-                    },
-                    "page": {
-                      "allOf": [
-                        {
-                          "$ref": "#/components/schemas/PageRef"
-                        }
-                      ],
-                      "nullable": true
-                    },
-                    "rect": {
-                      "type": "object",
-                      "properties": {
-                        "x": {
-                          "type": "number"
-                        },
-                        "y": {
-                          "type": "number"
-                        },
-                        "width": {
-                          "type": "number",
-                          "minimum": 0
-                        },
-                        "height": {
-                          "type": "number",
-                          "minimum": 0
-                        }
-                      },
-                      "required": ["x", "y", "width", "height"],
-                      "additionalProperties": false,
-                      "nullable": true
-                    }
-                  },
-                  "required": ["ref", "objectNumber", "page", "rect"],
-                  "additionalProperties": false
+                  "$ref": "#/components/schemas/FormWidget"
                 }
               },
               "family": {
@@ -18544,16 +18653,24 @@
                   "type": "object",
                   "properties": {
                     "ref": {
-                      "$ref": "#/components/schemas/FormField/anyOf/0/properties/widgets/items/properties/ref"
+                      "allOf": [
+                        {
+                          "$ref": "#/components/schemas/AnnotationRef"
+                        }
+                      ],
+                      "nullable": true
                     },
                     "objectNumber": {
-                      "$ref": "#/components/schemas/FormField/anyOf/0/properties/widgets/items/properties/objectNumber"
+                      "type": "integer",
+                      "minimum": 0
                     },
                     "page": {
-                      "$ref": "#/components/schemas/FormField/anyOf/0/properties/widgets/items/properties/page"
-                    },
-                    "rect": {
-                      "$ref": "#/components/schemas/FormField/anyOf/0/properties/widgets/items/properties/rect"
+                      "allOf": [
+                        {
+                          "$ref": "#/components/schemas/PageRef"
+                        }
+                      ],
+                      "nullable": true
                     },
                     "onState": {
                       "type": "string"
@@ -18565,15 +18682,7 @@
                       "type": "boolean"
                     }
                   },
-                  "required": [
-                    "ref",
-                    "objectNumber",
-                    "page",
-                    "rect",
-                    "onState",
-                    "exportValue",
-                    "checked"
-                  ],
+                  "required": ["ref", "objectNumber", "page", "onState", "exportValue", "checked"],
                   "additionalProperties": false
                 }
               },
@@ -19531,6 +19640,491 @@
         "required": ["page", "rect"],
         "additionalProperties": false
       },
+      "WidgetAnnotation": {
+        "type": "object",
+        "properties": {
+          "subtype": {
+            "type": "string",
+            "enum": ["widget"]
+          },
+          "ref": {
+            "$ref": "#/components/schemas/AnnotationRef"
+          },
+          "page": {
+            "$ref": "#/components/schemas/PageRef"
+          },
+          "hasAppearance": {
+            "type": "boolean"
+          },
+          "appearanceState": {
+            "type": "string",
+            "nullable": true
+          },
+          "nm": {
+            "type": "string",
+            "nullable": true
+          },
+          "rect": {
+            "type": "object",
+            "properties": {
+              "x": {
+                "type": "number"
+              },
+              "y": {
+                "type": "number"
+              },
+              "width": {
+                "type": "number",
+                "minimum": 0
+              },
+              "height": {
+                "type": "number",
+                "minimum": 0
+              }
+            },
+            "required": ["x", "y", "width", "height"],
+            "additionalProperties": false
+          },
+          "contents": {
+            "type": "string",
+            "nullable": true
+          },
+          "subject": {
+            "type": "string",
+            "nullable": true
+          },
+          "blendMode": {
+            "type": "string",
+            "enum": [
+              "normal",
+              "multiply",
+              "screen",
+              "overlay",
+              "darken",
+              "lighten",
+              "color-dodge",
+              "color-burn",
+              "hard-light",
+              "soft-light",
+              "difference",
+              "exclusion",
+              "hue",
+              "saturation",
+              "color",
+              "luminosity"
+            ]
+          },
+          "invisible": {
+            "type": "boolean"
+          },
+          "hidden": {
+            "type": "boolean"
+          },
+          "print": {
+            "type": "boolean"
+          },
+          "noZoom": {
+            "type": "boolean"
+          },
+          "noRotate": {
+            "type": "boolean"
+          },
+          "noView": {
+            "type": "boolean"
+          },
+          "readOnly": {
+            "type": "boolean"
+          },
+          "locked": {
+            "type": "boolean"
+          },
+          "toggleNoView": {
+            "type": "boolean"
+          },
+          "lockedContents": {
+            "type": "boolean"
+          },
+          "reply": {
+            "type": "object",
+            "properties": {
+              "to": {
+                "$ref": "#/components/schemas/AnnotationRef"
+              },
+              "type": {
+                "type": "string",
+                "enum": ["reply", "group"]
+              }
+            },
+            "required": ["to", "type"],
+            "additionalProperties": false,
+            "nullable": true
+          },
+          "popup": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AnnotationRef"
+              }
+            ],
+            "nullable": true
+          },
+          "groupId": {
+            "type": "string",
+            "minLength": 1,
+            "nullable": true
+          },
+          "author": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "modifiedAt": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/WidgetAnnotation/properties/createdAt"
+              }
+            ],
+            "nullable": true
+          },
+          "userId": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdBy": {
+            "type": "string",
+            "nullable": true
+          },
+          "modifiedBy": {
+            "type": "string",
+            "nullable": true
+          },
+          "importedBy": {
+            "type": "string",
+            "nullable": true
+          },
+          "actions": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PdfAnnotationActions"
+              }
+            ],
+            "nullable": true
+          },
+          "color": {
+            "type": "string",
+            "pattern": "^#[0-9a-fA-F]{6}$",
+            "nullable": true
+          },
+          "interiorColor": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/WidgetAnnotation/properties/color"
+              }
+            ],
+            "nullable": true
+          },
+          "strokeWidth": {
+            "type": "number",
+            "minimum": 0
+          },
+          "borderStyle": {
+            "type": "string",
+            "enum": ["solid", "dashed", "beveled", "inset"]
+          },
+          "fontFamily": {
+            "type": "string",
+            "enum": [
+              "courier",
+              "courier-bold",
+              "courier-bold-oblique",
+              "courier-oblique",
+              "helvetica",
+              "helvetica-bold",
+              "helvetica-bold-oblique",
+              "helvetica-oblique",
+              "times-roman",
+              "times-bold",
+              "times-bold-italic",
+              "times-italic",
+              "symbol",
+              "zapf-dingbats"
+            ],
+            "nullable": true
+          },
+          "fontSize": {
+            "type": "number",
+            "minimum": 0,
+            "nullable": true
+          },
+          "fontColor": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/WidgetAnnotation/properties/color"
+              }
+            ],
+            "nullable": true
+          },
+          "textAlign": {
+            "type": "string",
+            "enum": ["left", "center", "right"]
+          },
+          "field": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/FormFieldRef"
+              }
+            ],
+            "nullable": true
+          },
+          "fieldFamily": {
+            "type": "string",
+            "enum": [
+              "text",
+              "checkbox",
+              "radio",
+              "combobox",
+              "listbox",
+              "pushbutton",
+              "signature",
+              "unknown"
+            ]
+          }
+        },
+        "required": [
+          "subtype",
+          "ref",
+          "page",
+          "hasAppearance",
+          "appearanceState",
+          "nm",
+          "rect",
+          "contents",
+          "subject",
+          "blendMode",
+          "invisible",
+          "hidden",
+          "print",
+          "noZoom",
+          "noRotate",
+          "noView",
+          "readOnly",
+          "locked",
+          "toggleNoView",
+          "lockedContents",
+          "reply",
+          "popup",
+          "groupId",
+          "author",
+          "createdAt",
+          "modifiedAt",
+          "userId",
+          "createdBy",
+          "modifiedBy",
+          "importedBy",
+          "actions",
+          "color",
+          "interiorColor",
+          "strokeWidth",
+          "borderStyle",
+          "fontFamily",
+          "fontSize",
+          "fontColor",
+          "textAlign",
+          "field",
+          "fieldFamily"
+        ],
+        "additionalProperties": false
+      },
+      "WidgetPatch": {
+        "type": "object",
+        "properties": {
+          "subtype": {
+            "type": "string",
+            "enum": ["widget"]
+          },
+          "ref": {},
+          "page": {},
+          "hasAppearance": {},
+          "appearanceState": {},
+          "nm": {
+            "type": "string",
+            "nullable": true
+          },
+          "rect": {
+            "type": "object",
+            "properties": {
+              "x": {
+                "type": "number"
+              },
+              "y": {
+                "type": "number"
+              },
+              "width": {
+                "type": "number",
+                "minimum": 0
+              },
+              "height": {
+                "type": "number",
+                "minimum": 0
+              }
+            },
+            "required": ["x", "y", "width", "height"],
+            "additionalProperties": false
+          },
+          "contents": {
+            "type": "string",
+            "nullable": true
+          },
+          "subject": {
+            "type": "string",
+            "nullable": true
+          },
+          "blendMode": {
+            "type": "string",
+            "enum": [
+              "normal",
+              "multiply",
+              "screen",
+              "overlay",
+              "darken",
+              "lighten",
+              "color-dodge",
+              "color-burn",
+              "hard-light",
+              "soft-light",
+              "difference",
+              "exclusion",
+              "hue",
+              "saturation",
+              "color",
+              "luminosity"
+            ]
+          },
+          "invisible": {
+            "type": "boolean"
+          },
+          "hidden": {
+            "type": "boolean"
+          },
+          "print": {
+            "type": "boolean"
+          },
+          "noZoom": {
+            "type": "boolean"
+          },
+          "noRotate": {
+            "type": "boolean"
+          },
+          "noView": {
+            "type": "boolean"
+          },
+          "readOnly": {
+            "type": "boolean"
+          },
+          "locked": {
+            "type": "boolean"
+          },
+          "toggleNoView": {
+            "type": "boolean"
+          },
+          "lockedContents": {
+            "type": "boolean"
+          },
+          "reply": {
+            "type": "object",
+            "properties": {
+              "to": {
+                "$ref": "#/components/schemas/AnnotationRef"
+              },
+              "type": {
+                "type": "string",
+                "enum": ["reply", "group"]
+              }
+            },
+            "required": ["to"],
+            "additionalProperties": false,
+            "nullable": true
+          },
+          "popup": {},
+          "groupId": {
+            "type": "string",
+            "minLength": 1,
+            "nullable": true
+          },
+          "author": {},
+          "createdAt": {},
+          "modifiedAt": {},
+          "userId": {},
+          "createdBy": {},
+          "modifiedBy": {},
+          "importedBy": {},
+          "actions": {},
+          "color": {
+            "type": "string",
+            "pattern": "^#[0-9a-fA-F]{6}$",
+            "nullable": true
+          },
+          "interiorColor": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/WidgetPatch/properties/color"
+              }
+            ],
+            "nullable": true
+          },
+          "strokeWidth": {
+            "type": "number",
+            "minimum": 0
+          },
+          "borderStyle": {
+            "type": "string",
+            "enum": ["solid", "dashed", "beveled", "inset"]
+          },
+          "fontFamily": {
+            "type": "string",
+            "enum": [
+              "courier",
+              "courier-bold",
+              "courier-bold-oblique",
+              "courier-oblique",
+              "helvetica",
+              "helvetica-bold",
+              "helvetica-bold-oblique",
+              "helvetica-oblique",
+              "times-roman",
+              "times-bold",
+              "times-bold-italic",
+              "times-italic",
+              "symbol",
+              "zapf-dingbats"
+            ],
+            "nullable": true
+          },
+          "fontSize": {
+            "type": "number",
+            "minimum": 0,
+            "nullable": true
+          },
+          "fontColor": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/WidgetPatch/properties/color"
+              }
+            ],
+            "nullable": true
+          },
+          "textAlign": {
+            "type": "string",
+            "enum": ["left", "center", "right"]
+          },
+          "field": {},
+          "fieldFamily": {}
+        },
+        "additionalProperties": false
+      },
       "FormMutationMeta": {
         "type": "object",
         "properties": {
@@ -19660,7 +20254,7 @@
             "properties": {
               "type": {
                 "type": "string",
-                "enum": ["annotations.move"]
+                "enum": ["annotations.reorder"]
               },
               "page": {
                 "$ref": "#/components/schemas/PageRef"
@@ -19672,19 +20266,11 @@
                 },
                 "minItems": 1
               },
-              "toIndex": {
-                "type": "integer",
-                "minimum": 0
-              },
-              "expect": {
-                "type": "array",
-                "items": {
-                  "type": "integer",
-                  "minimum": 0
-                }
+              "position": {
+                "$ref": "#/components/schemas/AnnotationPosition"
               }
             },
-            "required": ["type", "page", "refs", "toIndex"],
+            "required": ["type", "page", "refs", "position"],
             "additionalProperties": false
           },
           {
@@ -19875,6 +20461,67 @@
             "properties": {
               "type": {
                 "type": "string",
+                "enum": ["forms.deleteWidget"]
+              },
+              "widget": {
+                "$ref": "#/components/schemas/AnnotationRef"
+              },
+              "expect": {
+                "$ref": "#/components/schemas/WidgetPatch"
+              }
+            },
+            "required": ["type", "widget"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": ["forms.reorderWidgets"]
+              },
+              "page": {
+                "$ref": "#/components/schemas/PageRef"
+              },
+              "widgets": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/AnnotationRef"
+                },
+                "minItems": 1
+              },
+              "position": {
+                "$ref": "#/components/schemas/AnnotationPosition"
+              }
+            },
+            "required": ["type", "page", "widgets", "position"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": ["forms.updateWidget"]
+              },
+              "widget": {
+                "$ref": "#/components/schemas/AnnotationRef"
+              },
+              "patch": {
+                "$ref": "#/components/schemas/WidgetPatch"
+              },
+              "expect": {
+                "$ref": "#/components/schemas/WidgetPatch"
+              }
+            },
+            "required": ["type", "widget", "patch"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
                 "enum": ["forms.setSignatureAppearance"]
               },
               "field": {
@@ -19947,7 +20594,7 @@
                   "annotations.create",
                   "annotations.update",
                   "annotations.delete",
-                  "annotations.move",
+                  "annotations.reorder",
                   "forms.setValue",
                   "forms.setDisplay",
                   "forms.setAppearanceText",
@@ -19957,6 +20604,9 @@
                   "forms.delete",
                   "forms.addWidget",
                   "forms.removeWidget",
+                  "forms.deleteWidget",
+                  "forms.reorderWidgets",
+                  "forms.updateWidget",
                   "forms.setSignatureAppearance",
                   "metadata.update",
                   "metadata.updateCustom",
@@ -20053,22 +20703,22 @@
             "properties": {
               "type": {
                 "type": "string",
-                "enum": ["annotations.move"]
+                "enum": ["annotations.reorder"]
               },
               "page": {
                 "$ref": "#/components/schemas/PageRef"
               },
-              "annotations": {
+              "order": {
                 "type": "array",
                 "items": {
-                  "$ref": "#/components/schemas/Annotation"
+                  "$ref": "#/components/schemas/AnnotationRef"
                 }
               },
               "meta": {
                 "$ref": "#/components/schemas/AnnotationMutationMeta"
               }
             },
-            "required": ["type", "page", "annotations", "meta"],
+            "required": ["type", "page", "order", "meta"],
             "additionalProperties": false
           },
           {
@@ -20104,11 +20754,17 @@
               "field": {
                 "$ref": "#/components/schemas/FormField"
               },
+              "widgets": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/WidgetAnnotation"
+                }
+              },
               "meta": {
                 "$ref": "#/components/schemas/FormMutationMeta"
               }
             },
-            "required": ["type", "field", "meta"],
+            "required": ["type", "field", "widgets", "meta"],
             "additionalProperties": false
           },
           {
@@ -20121,11 +20777,17 @@
               "field": {
                 "$ref": "#/components/schemas/FormField"
               },
+              "widgets": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/WidgetAnnotation"
+                }
+              },
               "meta": {
                 "$ref": "#/components/schemas/FormMutationMeta"
               }
             },
-            "required": ["type", "field", "meta"],
+            "required": ["type", "field", "widgets", "meta"],
             "additionalProperties": false
           },
           {
@@ -20138,11 +20800,14 @@
               "field": {
                 "$ref": "#/components/schemas/FormField"
               },
+              "widgets": {
+                "$ref": "#/components/schemas/ChangeItem/anyOf/7/properties/widgets"
+              },
               "meta": {
                 "$ref": "#/components/schemas/FormMutationMeta"
               }
             },
-            "required": ["type", "field", "meta"],
+            "required": ["type", "field", "widgets", "meta"],
             "additionalProperties": false
           },
           {
@@ -20161,11 +20826,17 @@
                   "$ref": "#/components/schemas/FormField"
                 }
               },
+              "widgets": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/WidgetAnnotation"
+                }
+              },
               "meta": {
                 "$ref": "#/components/schemas/FormMutationMeta"
               }
             },
-            "required": ["type", "fields", "meta"],
+            "required": ["type", "fields", "widgets", "meta"],
             "additionalProperties": false
           },
           {
@@ -20178,11 +20849,17 @@
               "field": {
                 "$ref": "#/components/schemas/FormField"
               },
+              "widgets": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/WidgetAnnotation"
+                }
+              },
               "meta": {
                 "$ref": "#/components/schemas/FormMutationMeta"
               }
             },
-            "required": ["type", "field", "meta"],
+            "required": ["type", "field", "widgets", "meta"],
             "additionalProperties": false
           },
           {
@@ -20198,11 +20875,14 @@
               "field": {
                 "$ref": "#/components/schemas/FormField"
               },
+              "widgets": {
+                "$ref": "#/components/schemas/ChangeItem/anyOf/7/properties/widgets"
+              },
               "meta": {
                 "$ref": "#/components/schemas/FormMutationMeta"
               }
             },
-            "required": ["type", "field", "meta"],
+            "required": ["type", "field", "widgets", "meta"],
             "additionalProperties": false
           },
           {
@@ -20229,11 +20909,17 @@
               "field": {
                 "$ref": "#/components/schemas/FormField"
               },
+              "widgets": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/WidgetAnnotation"
+                }
+              },
               "meta": {
                 "$ref": "#/components/schemas/FormMutationMeta"
               }
             },
-            "required": ["type", "field", "meta"],
+            "required": ["type", "field", "widgets", "meta"],
             "additionalProperties": false
           },
           {
@@ -20246,11 +20932,14 @@
               "field": {
                 "$ref": "#/components/schemas/FormField"
               },
+              "widgets": {
+                "$ref": "#/components/schemas/ChangeItem/anyOf/7/properties/widgets"
+              },
               "meta": {
                 "$ref": "#/components/schemas/FormMutationMeta"
               }
             },
-            "required": ["type", "field", "meta"],
+            "required": ["type", "field", "widgets", "meta"],
             "additionalProperties": false
           },
           {
@@ -20263,11 +20952,17 @@
               "field": {
                 "$ref": "#/components/schemas/FormField"
               },
+              "widgets": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/WidgetAnnotation"
+                }
+              },
               "meta": {
                 "$ref": "#/components/schemas/FormMutationMeta"
               }
             },
-            "required": ["type", "field", "meta"],
+            "required": ["type", "field", "widgets", "meta"],
             "additionalProperties": false
           },
           {
@@ -20280,11 +20975,116 @@
               "field": {
                 "$ref": "#/components/schemas/FormField"
               },
+              "widgets": {
+                "$ref": "#/components/schemas/ChangeItem/anyOf/15/properties/widgets"
+              },
               "meta": {
                 "$ref": "#/components/schemas/FormMutationMeta"
               }
             },
-            "required": ["type", "field", "meta"],
+            "required": ["type", "field", "widgets", "meta"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": ["forms.deleteWidget"]
+              },
+              "widget": {
+                "$ref": "#/components/schemas/AnnotationRef"
+              },
+              "page": {
+                "$ref": "#/components/schemas/PageRef"
+              },
+              "field": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/FormField"
+                  }
+                ],
+                "nullable": true
+              },
+              "meta": {
+                "$ref": "#/components/schemas/FormMutationMeta"
+              }
+            },
+            "required": ["type", "widget", "page", "field", "meta"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": ["forms.restoreWidget"]
+              },
+              "field": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/FormField"
+                  }
+                ],
+                "nullable": true
+              },
+              "widgets": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/WidgetAnnotation"
+                }
+              },
+              "meta": {
+                "$ref": "#/components/schemas/FormMutationMeta"
+              }
+            },
+            "required": ["type", "field", "widgets", "meta"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": ["forms.reorderWidgets"]
+              },
+              "page": {
+                "$ref": "#/components/schemas/PageRef"
+              },
+              "order": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/AnnotationRef"
+                }
+              },
+              "meta": {
+                "$ref": "#/components/schemas/FormMutationMeta"
+              }
+            },
+            "required": ["type", "page", "order", "meta"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": ["forms.updateWidget"]
+              },
+              "skipped": {
+                "$ref": "#/components/schemas/ChangeItem/anyOf/2/properties/skipped"
+              },
+              "widget": {
+                "$ref": "#/components/schemas/WidgetAnnotation"
+              },
+              "appearance": {
+                "$ref": "#/components/schemas/ChangeItem/anyOf/2/properties/appearance"
+              },
+              "meta": {
+                "$ref": "#/components/schemas/FormMutationMeta"
+              }
+            },
+            "required": ["type", "widget", "appearance", "meta"],
             "additionalProperties": false
           },
           {
@@ -22187,6 +22987,12 @@
             "minimum": 0,
             "default": 1
           },
+          "formsVersion": {
+            "type": "integer",
+            "exclusiveMinimum": true,
+            "minimum": 0,
+            "default": 1
+          },
           "auditHead": {
             "type": "integer",
             "minimum": 0
@@ -22218,6 +23024,9 @@
               "annotations": {
                 "$ref": "#/components/schemas/DocManifest200Response/properties/scopes/properties/content"
               },
+              "forms": {
+                "$ref": "#/components/schemas/DocManifest200Response/properties/scopes/properties/content"
+              },
               "layout": {
                 "$ref": "#/components/schemas/DocManifest200Response/properties/scopes/properties/content"
               },
@@ -22231,7 +23040,15 @@
                 "$ref": "#/components/schemas/DocManifest200Response/properties/scopes/properties/content"
               }
             },
-            "required": ["content", "annotations", "layout", "attachments", "metadata", "actions"],
+            "required": [
+              "content",
+              "annotations",
+              "forms",
+              "layout",
+              "attachments",
+              "metadata",
+              "actions"
+            ],
             "additionalProperties": false
           },
           "protection": {
@@ -22344,9 +23161,14 @@
                       "type": "integer",
                       "exclusiveMinimum": true,
                       "minimum": 0
+                    },
+                    "widgetVersion": {
+                      "type": "integer",
+                      "exclusiveMinimum": true,
+                      "minimum": 0
                     }
                   },
-                  "required": ["contentVersion", "annotationVersion"],
+                  "required": ["contentVersion", "annotationVersion", "widgetVersion"],
                   "additionalProperties": false
                 }
               },
@@ -22433,53 +23255,11 @@
                   "type": "string"
                 },
                 "widget": {
-                  "type": "object",
-                  "properties": {
-                    "ref": {
-                      "allOf": [
-                        {
-                          "$ref": "#/components/schemas/AnnotationRef"
-                        }
-                      ],
-                      "nullable": true
-                    },
-                    "objectNumber": {
-                      "type": "integer",
-                      "minimum": 0
-                    },
-                    "page": {
-                      "allOf": [
-                        {
-                          "$ref": "#/components/schemas/PageRef"
-                        }
-                      ],
-                      "nullable": true
-                    },
-                    "rect": {
-                      "type": "object",
-                      "properties": {
-                        "x": {
-                          "type": "number"
-                        },
-                        "y": {
-                          "type": "number"
-                        },
-                        "width": {
-                          "type": "number",
-                          "minimum": 0
-                        },
-                        "height": {
-                          "type": "number",
-                          "minimum": 0
-                        }
-                      },
-                      "required": ["x", "y", "width", "height"],
-                      "additionalProperties": false,
-                      "nullable": true
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/FormWidget"
                     }
-                  },
-                  "required": ["ref", "objectNumber", "page", "rect"],
-                  "additionalProperties": false,
+                  ],
                   "nullable": true
                 },
                 "signed": {
@@ -23114,53 +23894,11 @@
                 "type": "string"
               },
               "widget": {
-                "type": "object",
-                "properties": {
-                  "ref": {
-                    "allOf": [
-                      {
-                        "$ref": "#/components/schemas/AnnotationRef"
-                      }
-                    ],
-                    "nullable": true
-                  },
-                  "objectNumber": {
-                    "type": "integer",
-                    "minimum": 0
-                  },
-                  "page": {
-                    "allOf": [
-                      {
-                        "$ref": "#/components/schemas/PageRef"
-                      }
-                    ],
-                    "nullable": true
-                  },
-                  "rect": {
-                    "type": "object",
-                    "properties": {
-                      "x": {
-                        "type": "number"
-                      },
-                      "y": {
-                        "type": "number"
-                      },
-                      "width": {
-                        "type": "number",
-                        "minimum": 0
-                      },
-                      "height": {
-                        "type": "number",
-                        "minimum": 0
-                      }
-                    },
-                    "required": ["x", "y", "width", "height"],
-                    "additionalProperties": false,
-                    "nullable": true
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/FormWidget"
                   }
-                },
-                "required": ["ref", "objectNumber", "page", "rect"],
-                "additionalProperties": false,
+                ],
                 "nullable": true
               },
               "signed": {
@@ -23618,53 +24356,11 @@
                   "type": "string"
                 },
                 "widget": {
-                  "type": "object",
-                  "properties": {
-                    "ref": {
-                      "allOf": [
-                        {
-                          "$ref": "#/components/schemas/AnnotationRef"
-                        }
-                      ],
-                      "nullable": true
-                    },
-                    "objectNumber": {
-                      "type": "integer",
-                      "minimum": 0
-                    },
-                    "page": {
-                      "allOf": [
-                        {
-                          "$ref": "#/components/schemas/PageRef"
-                        }
-                      ],
-                      "nullable": true
-                    },
-                    "rect": {
-                      "type": "object",
-                      "properties": {
-                        "x": {
-                          "type": "number"
-                        },
-                        "y": {
-                          "type": "number"
-                        },
-                        "width": {
-                          "type": "number",
-                          "minimum": 0
-                        },
-                        "height": {
-                          "type": "number",
-                          "minimum": 0
-                        }
-                      },
-                      "required": ["x", "y", "width", "height"],
-                      "additionalProperties": false,
-                      "nullable": true
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/FormWidget"
                     }
-                  },
-                  "required": ["ref", "objectNumber", "page", "rect"],
-                  "additionalProperties": false,
+                  ],
                   "nullable": true
                 },
                 "signed": {
@@ -24395,6 +25091,45 @@
       "DocAnnotationsDelete404Response": {
         "$ref": "#/components/schemas/EngineErrorPayload"
       },
+      "DocAnnotationsReorderRequest": {
+        "type": "object",
+        "properties": {
+          "refs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AnnotationRef"
+            },
+            "minItems": 1
+          },
+          "position": {
+            "$ref": "#/components/schemas/AnnotationPosition"
+          }
+        },
+        "required": ["refs", "position"],
+        "additionalProperties": false
+      },
+      "DocAnnotationsReorder200Response": {
+        "type": "object",
+        "properties": {
+          "order": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AnnotationRef"
+            }
+          },
+          "meta": {
+            "$ref": "#/components/schemas/AnnotationMutationMeta"
+          }
+        },
+        "required": ["order", "meta"],
+        "additionalProperties": false
+      },
+      "DocAnnotationsReorder400Response": {
+        "$ref": "#/components/schemas/EngineErrorPayload"
+      },
+      "DocAnnotationsReorder404Response": {
+        "$ref": "#/components/schemas/EngineErrorPayload"
+      },
       "DocAnnotationsFlattenRequest": {
         "type": "object",
         "additionalProperties": {}
@@ -24471,6 +25206,12 @@
               "$ref": "#/components/schemas/FormField"
             }
           },
+          "widgets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WidgetAnnotation"
+            }
+          },
           "calculationOrder": {
             "type": "array",
             "items": {
@@ -24483,7 +25224,7 @@
             }
           }
         },
-        "required": ["formKind", "needsAppearances", "fields", "calculationOrder"],
+        "required": ["formKind", "needsAppearances", "fields", "widgets", "calculationOrder"],
         "additionalProperties": false
       },
       "DocFormsList404Response": {
@@ -24499,17 +25240,138 @@
           "field": {
             "$ref": "#/components/schemas/FormField"
           },
+          "widgets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WidgetAnnotation"
+            }
+          },
           "meta": {
             "$ref": "#/components/schemas/FormMutationMeta"
           }
         },
-        "required": ["field", "meta"],
+        "required": ["field", "widgets", "meta"],
         "additionalProperties": false
       },
       "DocFormsSetValue400Response": {
         "$ref": "#/components/schemas/EngineErrorPayload"
       },
       "DocFormsSetValue404Response": {
+        "$ref": "#/components/schemas/EngineErrorPayload"
+      },
+      "DocFormsUpdateWidgetRequest": {
+        "type": "object",
+        "properties": {
+          "patch": {
+            "$ref": "#/components/schemas/WidgetPatch"
+          }
+        },
+        "required": ["patch"],
+        "additionalProperties": false
+      },
+      "DocFormsUpdateWidget200Response": {
+        "type": "object",
+        "properties": {
+          "widget": {
+            "$ref": "#/components/schemas/WidgetAnnotation"
+          },
+          "appearance": {
+            "type": "object",
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": ["preserved", "regenerated", "generation-unavailable", "restored"]
+              },
+              "changed": {
+                "type": "boolean"
+              }
+            },
+            "required": ["action", "changed"],
+            "additionalProperties": false
+          },
+          "meta": {
+            "$ref": "#/components/schemas/FormMutationMeta"
+          }
+        },
+        "required": ["widget", "appearance", "meta"],
+        "additionalProperties": false
+      },
+      "DocFormsUpdateWidget400Response": {
+        "$ref": "#/components/schemas/EngineErrorPayload"
+      },
+      "DocFormsUpdateWidget404Response": {
+        "$ref": "#/components/schemas/EngineErrorPayload"
+      },
+      "DocFormsDeleteWidget200Response": {
+        "type": "object",
+        "properties": {
+          "widget": {
+            "$ref": "#/components/schemas/AnnotationRef"
+          },
+          "page": {
+            "$ref": "#/components/schemas/PageRef"
+          },
+          "field": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/FormField"
+              }
+            ],
+            "nullable": true
+          },
+          "meta": {
+            "$ref": "#/components/schemas/FormMutationMeta"
+          }
+        },
+        "required": ["widget", "page", "field", "meta"],
+        "additionalProperties": false
+      },
+      "DocFormsDeleteWidget400Response": {
+        "$ref": "#/components/schemas/EngineErrorPayload"
+      },
+      "DocFormsDeleteWidget404Response": {
+        "$ref": "#/components/schemas/EngineErrorPayload"
+      },
+      "DocFormsReorderWidgetsRequest": {
+        "type": "object",
+        "properties": {
+          "widgets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AnnotationRef"
+            },
+            "minItems": 1
+          },
+          "position": {
+            "$ref": "#/components/schemas/AnnotationPosition"
+          }
+        },
+        "required": ["widgets", "position"],
+        "additionalProperties": false
+      },
+      "DocFormsReorderWidgets200Response": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "$ref": "#/components/schemas/PageRef"
+          },
+          "order": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AnnotationRef"
+            }
+          },
+          "meta": {
+            "$ref": "#/components/schemas/FormMutationMeta"
+          }
+        },
+        "required": ["page", "order", "meta"],
+        "additionalProperties": false
+      },
+      "DocFormsReorderWidgets400Response": {
+        "$ref": "#/components/schemas/EngineErrorPayload"
+      },
+      "DocFormsReorderWidgets404Response": {
         "$ref": "#/components/schemas/EngineErrorPayload"
       },
       "DocFormsResetRequest": {
@@ -24533,11 +25395,17 @@
               "$ref": "#/components/schemas/FormField"
             }
           },
+          "widgets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WidgetAnnotation"
+            }
+          },
           "meta": {
             "$ref": "#/components/schemas/FormMutationMeta"
           }
         },
-        "required": ["fields", "meta"],
+        "required": ["fields", "widgets", "meta"],
         "additionalProperties": false
       },
       "DocFormsReset400Response": {
@@ -24572,6 +25440,12 @@
                   "$ref": "#/components/schemas/FormField"
                 }
               },
+              "widgets": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/WidgetAnnotation"
+                }
+              },
               "calculationOrder": {
                 "type": "array",
                 "items": {
@@ -24584,7 +25458,7 @@
                 }
               }
             },
-            "required": ["formKind", "needsAppearances", "fields", "calculationOrder"],
+            "required": ["formKind", "needsAppearances", "fields", "widgets", "calculationOrder"],
             "additionalProperties": false
           },
           "applied": {
@@ -24916,13 +25790,32 @@
       "DocPagesSetScale404Response": {
         "$ref": "#/components/schemas/EngineErrorPayload"
       },
-      "DocPagesMoveRequest": {
-        "type": "object",
-        "additionalProperties": {}
-      },
-      "DocPagesMove200Response": {
+      "DocPagesReorderRequest": {
         "type": "object",
         "properties": {
+          "pages": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PageRef"
+            },
+            "minItems": 1
+          },
+          "position": {
+            "$ref": "#/components/schemas/PagePosition"
+          }
+        },
+        "required": ["pages", "position"],
+        "additionalProperties": false
+      },
+      "DocPagesReorder200Response": {
+        "type": "object",
+        "properties": {
+          "pages": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PageRef"
+            }
+          },
           "layout": {
             "type": "object",
             "properties": {
@@ -25011,16 +25904,16 @@
                           "additionalProperties": false
                         },
                         "crop": {
-                          "$ref": "#/components/schemas/DocPagesMove200Response/properties/layout/properties/pages/items/properties/boxes/properties/media"
+                          "$ref": "#/components/schemas/DocPagesReorder200Response/properties/layout/properties/pages/items/properties/boxes/properties/media"
                         },
                         "bleed": {
-                          "$ref": "#/components/schemas/DocPagesMove200Response/properties/layout/properties/pages/items/properties/boxes/properties/media"
+                          "$ref": "#/components/schemas/DocPagesReorder200Response/properties/layout/properties/pages/items/properties/boxes/properties/media"
                         },
                         "trim": {
-                          "$ref": "#/components/schemas/DocPagesMove200Response/properties/layout/properties/pages/items/properties/boxes/properties/media"
+                          "$ref": "#/components/schemas/DocPagesReorder200Response/properties/layout/properties/pages/items/properties/boxes/properties/media"
                         },
                         "art": {
-                          "$ref": "#/components/schemas/DocPagesMove200Response/properties/layout/properties/pages/items/properties/boxes/properties/media"
+                          "$ref": "#/components/schemas/DocPagesReorder200Response/properties/layout/properties/pages/items/properties/boxes/properties/media"
                         }
                       },
                       "required": ["media", "crop", "bleed", "trim", "art"],
@@ -25128,13 +26021,13 @@
             "$ref": "#/components/schemas/MutationMeta"
           }
         },
-        "required": ["layout", "meta"],
+        "required": ["pages", "layout", "meta"],
         "additionalProperties": false
       },
-      "DocPagesMove400Response": {
+      "DocPagesReorder400Response": {
         "$ref": "#/components/schemas/EngineErrorPayload"
       },
-      "DocPagesMove404Response": {
+      "DocPagesReorder404Response": {
         "$ref": "#/components/schemas/EngineErrorPayload"
       },
       "DocPagesRotateRequest": {

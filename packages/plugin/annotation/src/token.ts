@@ -14,7 +14,7 @@ export const AnnotationToken = createCapabilityToken<AnnotationCapability>('anno
     createFromSelection: true,
     update: true,
     delete: true,
-    move: true,
+    reorder: true,
     export: true,
     import: true,
     downloadResource: true,

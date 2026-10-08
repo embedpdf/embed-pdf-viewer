@@ -77,7 +77,7 @@ function OrderControls() {
         type="button"
         className="button"
         disabled={!first || selected.length !== 1}
-        onClick={() => first && annotation.move([first.ref], 0)}
+        onClick={() => first && annotation.reorder([first.ref], 'start')}
       >
         Send to back
       </button>
@@ -85,7 +85,7 @@ function OrderControls() {
         type="button"
         className="button"
         disabled={!first || selected.length !== 1}
-        onClick={() => first && annotation.move([first.ref], onPage.length - 1)}
+        onClick={() => first && annotation.reorder([first.ref], 'end')}
       >
         Bring to front
       </button>

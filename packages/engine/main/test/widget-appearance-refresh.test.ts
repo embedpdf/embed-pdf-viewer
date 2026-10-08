@@ -1,8 +1,8 @@
 /**
- * Regression: a widget style patch through the annotation plane followed by a
- * value write through the form plane must both be visible in the appearance
- * render — the exact interleaving a viewer produces (style a field in design
- * mode, then fill it). Guards the "yellow background lost / committed text
+ * Regression: a widget style patch (`forms.updateWidget`) followed by a value
+ * write must both be visible in the widget's appearance render — the exact
+ * interleaving a viewer produces (style a field in design mode, then fill
+ * it). Guards the "yellow background lost / committed text
  * invisible" bug class where the appearance raster came back empty or one
  * write behind.
  */
@@ -89,7 +89,7 @@ describe('widget appearance refresh across planes (engine-local, wasm)', () => {
   async function widgetRaster(): Promise<Raster | null> {
     const result = await doc
       .page(toPageRef(pageObjectNumber))
-      .annotations.renderAppearancesRaw({ viewport: { kind: 'scale', scale: 2 } });
+      .forms.renderAppearancesRaw({ viewport: { kind: 'scale', scale: 2 } });
     const entry = result.appearances.find(
       (a) =>
         a.ref.kind === 'objectNumber' &&
@@ -98,11 +98,8 @@ describe('widget appearance refresh across planes (engine-local, wasm)', () => {
     return entry?.raster ?? null;
   }
 
-  test('an annotation-plane style patch shows up in the appearance render', async () => {
-    await doc.page(toPageRef(pageObjectNumber)).annotations.update(widgetRef, {
-      subtype: 'widget',
-      interiorColor: '#ffd500',
-    });
+  test('a widget style patch shows up in the appearance render', async () => {
+    await doc.forms.updateWidget(widgetRef, { interiorColor: '#ffd500' });
     const raster = await widgetRaster();
     expect(raster, 'style patch must produce a renderable /AP').not.toBeNull();
     const yellowish = countPixels(

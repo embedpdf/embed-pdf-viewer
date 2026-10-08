@@ -233,14 +233,13 @@ export function runObjectNumberConformance(
         );
         expect(created.field.ref).toEqual({ kind: 'objectNumber', objectNumber: field });
         expect(created.field.widgets.map((w) => w.objectNumber)).toEqual([left, right]);
-        // Widgets are annotations: named like any other.
-        const { annotations } = await doc.page(second!).annotations.list();
+        // Widgets are annotation rows of the form: named like any other annotation.
         for (const number of [left, right]) {
-          const read = annotations.find(
-            (annotation) =>
-              annotation.ref.kind === 'objectNumber' && annotation.ref.objectNumber === number,
+          const read = created.widgets.find(
+            (w) => w.ref.kind === 'objectNumber' && w.ref.objectNumber === number,
           );
           expect(read?.nm).toMatch(UUID_V7);
+          expect(read?.page).toEqual(second);
         }
 
         const added = await doc.forms.addWidget(

@@ -190,10 +190,13 @@ export interface DocumentUnlockResult {
 }
 
 /**
- * Whose an annotation is: what `allowsAnnotation('update' | 'delete', …)`
- * reads. An `Annotation` is one; so is `{ userId, groupId }`.
+ * What an annotation is and whose: what `allowsAnnotation('update' |
+ * 'delete', …)` reads. An `Annotation` is one; so is `{ userId, groupId }`.
+ * A widget (`subtype: 'widget'`) belongs to a form field: changing or
+ * deleting one takes `doc.forms.modify`, whoever's it is.
  */
 export interface AnnotationOwner {
+  subtype?: string;
   userId?: string | null;
   groupId?: string | null;
 }

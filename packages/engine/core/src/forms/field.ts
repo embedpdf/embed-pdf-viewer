@@ -31,20 +31,16 @@ export type FormFieldFamily =
 export type FormFieldOrigin = 'acroform' | 'recovered';
 
 /**
- * A widget of a field: its address, and where it shows. `rect` is `null`
- * for a widget on no page.
+ * A widget of a field: its address and its page. Its place, look and state
+ * are its row in the form's `widgets`, joined by `ref`.
  */
-export interface FormFieldWidget<C extends Coordinates = PageCoordinates> extends FormWidget {
-  rect: C['box'] | null;
-}
+export type FormFieldWidget = FormWidget;
 
 /**
  * A widget of a toggle (checkbox/radio) field. Toggle widgets always carry
  * their appearance-state machinery — no nullable fields to probe.
  */
-export interface ToggleFieldWidget<
-  C extends Coordinates = PageCoordinates,
-> extends FormFieldWidget<C> {
+export interface ToggleFieldWidget extends FormFieldWidget {
   /**
    * The widget's appearance state name in the file (the non-"Off" key of
    * its /AP /N dictionary), usually its export value. Writes never need it.
@@ -107,7 +103,7 @@ export interface FormFieldBase<C extends Coordinates = PageCoordinates> {
   /** Effective inherited field `/AA` actions. */
   actions?: PdfFieldActions<C['destination']>;
   /** The field's widget annotations, in control order. May be empty ("unplaced"). */
-  widgets: FormFieldWidget<C>[];
+  widgets: FormFieldWidget[];
 }
 
 /** A text field. Write with `{ value }`. */
@@ -132,7 +128,7 @@ export interface CheckboxFieldDTO<
   checked: boolean;
   /** The export value reported while checked ("Off" is never exported). */
   exportValue: string;
-  widgets: ToggleFieldWidget<C>[];
+  widgets: ToggleFieldWidget[];
 }
 
 /** A radio group: One field, N widgets. Write with `{ value }`, a button's export value. */
@@ -144,7 +140,7 @@ export interface RadioFieldDTO<C extends Coordinates = PageCoordinates> extends 
   radiosInUnison: boolean;
   /** The group cannot be cleared once a choice is made. */
   noToggleToOff: boolean;
-  widgets: ToggleFieldWidget<C>[];
+  widgets: ToggleFieldWidget[];
 }
 
 /** A combo box (dropdown). Write with `{ value }`. */

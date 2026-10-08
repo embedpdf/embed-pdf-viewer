@@ -56,15 +56,18 @@ By the time `await page.annotations.create(…)` returns, your listeners have ru
 
 | Type                                                                      | When                                                                                      |
 | :------------------------------------------------------------------------ | :---------------------------------------------------------------------------------------- |
-| `annotations.created`, `.updated`, `.deleted`, `.moved`                   | An annotation changed.                                                                    |
+| `annotations.created`, `.updated`, `.deleted`                             | An annotation changed.                                                                    |
+| `annotations.reordered`                                                   | A page's annotations were restacked. `order` is the page's new order, bottom to top.      |
 | `annotations.restored`                                                    | An undo brought back deleted annotations.                                                 |
 | `annotations.flattened`                                                   | Annotations were baked into a page.                                                       |
-| `pages.moved`, `.rotated`, `.deleted`, `.inserted`                        | The page order or rotation changed.                                                       |
+| `pages.reordered`, `.rotated`, `.deleted`, `.inserted`                    | The page order or rotation changed.                                                       |
 | `pages.named`                                                             | A page name was added or removed.                                                         |
 | `pages.flattened`                                                         | All annotations of pages were baked in.                                                   |
 | `pages.scaleSet`                                                          | A page's measurement scale changed.                                                       |
 | `forms.valueSet`                                                          | A field was filled in.                                                                    |
 | `forms.created`, `.updated`, `.deleted`, `.widgetAdded`, `.widgetRemoved` | A field's structure changed.                                                              |
+| `forms.widgetUpdated`, `forms.widgetsReordered`                           | A widget was moved or restyled, or a page's widgets were restacked.                       |
+| `forms.widgetDeleted`, `forms.widgetRestored`                             | A widget was deleted, or an undo brought it back.                                         |
 | `forms.restored`                                                          | An undo brought back a deleted field.                                                     |
 | `forms.imported`, `forms.repaired`, `forms.effectsApplied`                | Many values or fields changed at once.                                                    |
 | `attachments.created`, `.deleted`                                         | An attached file was added or removed.                                                    |

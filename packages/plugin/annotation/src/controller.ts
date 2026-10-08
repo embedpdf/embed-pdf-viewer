@@ -131,7 +131,7 @@ export function createAnnotationController(ctx: AnnotationContext) {
       onCreated: events.created.on,
       onUpdated: events.updated.on,
       onDeleted: events.deleted.on,
-      onMoved: events.moved.on,
+      onReordered: events.reordered.on,
       onSelectionChanged: events.selectionChanged.on,
       onDraftChanged: events.draftChanged.on,
       onEditingChanged: events.editingChanged.on,

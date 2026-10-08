@@ -60,7 +60,7 @@ export class CloudDocumentRedactionService implements DocumentRedactionService {
         if (result.meta.cacheDelta === null) return result;
         // Redaction-apply rewrites content and consumes the marks, so both
         // planes flip.
-        this.manifest.apply(result.meta, ['content', 'annotations']);
+        this.manifest.apply(result.meta, ['content', 'annotations', 'forms']);
         this.publisher.publishWrite(opId, {
           type: 'redaction.applied',
           ...result,

@@ -1,4 +1,4 @@
-import type { PageListSnapshot, PageMoveResult } from '@embedpdf/engine-core';
+import type { PageListSnapshot, PageReorderResult } from '@embedpdf/engine-core';
 import type { Engine } from '@embedpdf/engine-core/runtime';
 
 /**
@@ -24,8 +24,8 @@ export interface PagesDemoResult {
   docId: string;
   elapsedMs: number;
   before: PageListSnapshot;
-  movedSingle: PageMoveResult;
-  movedBatch: PageMoveResult;
+  movedSingle: PageReorderResult;
+  movedBatch: PageReorderResult;
   after: PageListSnapshot;
   /** Computed for the summary; true means the geometry invariants held. */
   invariants: {
@@ -48,20 +48,16 @@ export async function runPagesDemo(
       throw new Error(`pages demo requires at least 2 pages; fixture has ${before.pages.length}`);
     }
 
-    // 1) Single-page move: send the LAST page to the FRONT.
+    // 1) Single-page reorder: send the LAST page to the FRONT.
     const lastPageObjectNumber = before.pages[before.pages.length - 1].pageObjectNumber;
-    const movedSingle = await doc.pages.move([lastPageObjectNumber], 0);
+    const movedSingle = await doc.pages.reorder([lastPageObjectNumber], 'start');
 
-    // 2) Multi-page contiguous-block move: send pages [0, 1] (post-
-    //    single-move order) to the END. Mirrors `FPDF_MovePages`
-    //    semantics — the block is detached and re-inserted at the
-    //    destination in the post-removal index space, preserving
-    //    caller order.
+    // 2) Multi-page reorder: send pages [0, 1] (post-single-reorder
+    //    order) to the END, together and in caller order.
     const singlePageOrder = movedSingle.layout.pages;
     if (singlePageOrder.length >= 3) {
       const block = [singlePageOrder[0].pageObjectNumber, singlePageOrder[1].pageObjectNumber];
-      const dest = singlePageOrder.length - block.length;
-      const movedBatch = await doc.pages.move(block, dest);
+      const movedBatch = await doc.pages.reorder(block, 'end');
       const after = await doc.pages.list();
 
       return {

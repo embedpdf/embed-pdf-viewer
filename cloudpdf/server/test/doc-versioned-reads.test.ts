@@ -313,6 +313,38 @@ describe('Phase 4 versioned reads — GET /pages/:pageKey/text@cN', () => {
     expect(res.status).toBe(403);
   });
 
+  test('a picture with annotations takes doc.annotate.read, at both tiers', async () => {
+    const tenantId = 'tenant-annotatedperm';
+    const docId = 'doctxx009';
+    await seedDocument(fx, tenantId, docId);
+    const token =
+      'annotationVersion=1,background=white,contentVersion=1,format=webp,viewport.kind=width,viewport.width=320';
+    const fetchAs = (scope: string[], path: string) =>
+      fetch(`${fx.baseUrl}/v1/docs/${docId}${path}`, {
+        headers: { Authorization: `Bearer ${docToken(tenantId, docId, { scope })}` },
+      });
+
+    for (const path of [
+      `/render/annotated/pages/obj:1/data@${token}`,
+      `/layers/default/render/annotated/pages/obj:1/data@${token}`,
+    ]) {
+      expect((await fetchAs(['doc.open', 'doc.render'], path)).status).toBe(403);
+      expect((await fetchAs(['doc.open', 'doc.render', 'doc.forms.fill'], path)).status).toBe(403);
+      expect(
+        (await fetchAs(['doc.open', 'doc.render', 'doc.annotate.read'], path)).status,
+      ).toBe(200);
+    }
+    // The page alone still takes doc.render only.
+    expect(
+      (
+        await fetchAs(
+          ['doc.open', 'doc.render'],
+          '/render/pages/obj:1/data@background=white,contentVersion=1,format=webp,viewport.kind=width,viewport.width=320',
+        )
+      ).status,
+    ).toBe(200);
+  });
+
   test('missing Authorization header returns 401', async () => {
     const tenantId = 'tenant-tunauth';
     const docId = 'doctxx008';

@@ -50,6 +50,12 @@ export interface AppearanceStatesConformanceOptions {
   makeEngine: () => Promise<Engine> | Engine;
   /** Open {@link APPEARANCE_STATES_FIXTURE_PDF}, fresh for each call. */
   open: (engine: Engine) => Promise<DocumentHandle>;
+  /**
+   * Whether this engine's page pictures draw form fields. The cloud's don't
+   * yet: whether a caller may read the form isn't in a picture's path.
+   * Default `true`.
+   */
+  pageRendersDrawFormFields?: boolean;
 }
 
 /**
@@ -57,8 +63,12 @@ export interface AppearanceStatesConformanceOptions {
  * every engine. A page's appearance batch holds every appearance an
  * annotation stores: each mode it has, and every state of each mode, each
  * image labelled with both, whatever `/AS` says. The annotation's
- * `appearanceState` says which state it shows. A page rendered with its
- * annotations shows its form fields too, unless `includeFormFields` is false.
+ * `appearanceState` says which state it shows. Each family has its own
+ * batch: `page.annotations` the square's, `page.forms` the check box's, and
+ * neither holds the other's. A page rendered with its
+ * annotations shows its form fields too, unless `includeFormFields` is false
+ * (or the engine's pictures draw none, see
+ * {@link AppearanceStatesConformanceOptions.pageRendersDrawFormFields}).
  */
 export function runAppearanceStatesConformance(
   runner: ConformanceTestRunner,
@@ -85,9 +95,11 @@ export function runAppearanceStatesConformance(
 
     const annotations = async () => {
       const { annotations: listed } = await page.annotations.list();
-      const box = listed.find((annotation) => annotation.subtype === 'widget');
+      const { widgets } = await doc.forms.list();
+      const box = widgets.find((widget) => widget.page.objectNumber === page.ref.objectNumber);
       const square = listed.find((annotation) => annotation.subtype === 'square');
       if (!box || !square) throw new Error('the fixture has a check box and a square');
+      expect(listed.some((annotation) => annotation.subtype === 'widget')).toBe(false);
       return { box, square };
     };
 
@@ -101,12 +113,32 @@ export function runAppearanceStatesConformance(
       return labels;
     };
 
-    const render = (modes?: AnnotationAppearanceMode[]) =>
-      page.annotations.renderAppearances({
-        format: 'png',
-        viewport: { kind: 'scale', scale: 1 },
+    /** Both families' pictures, each from its own batch. */
+    const render = async (modes?: AnnotationAppearanceMode[]) => {
+      const options = {
+        format: 'png' as const,
+        viewport: { kind: 'scale' as const, scale: 1 },
         ...(modes ? { modes } : {}),
-      });
+      };
+      const [annotationImages, widgetImages] = await Promise.all([
+        page.annotations.renderAppearances(options),
+        page.forms.renderAppearances(options),
+      ]);
+      return { appearances: [...annotationImages.appearances, ...widgetImages.appearances] };
+    };
+
+    test("each family's batch holds only its own pictures", async () => {
+      const { box, square } = await annotations();
+      const options = { format: 'png' as const, viewport: { kind: 'scale' as const, scale: 1 } };
+      const keys = async (batch: Promise<{ appearances: readonly AnnotationAppearanceImage[] }>) =>
+        new Set((await batch).appearances.map((appearance) => annotationKey(appearance.ref)));
+      expect(await keys(page.annotations.renderAppearances(options))).toEqual(
+        new Set([annotationKey(square.ref)]),
+      );
+      expect(await keys(page.forms.renderAppearances(options))).toEqual(
+        new Set([annotationKey(box.ref)]),
+      );
+    });
 
     test('every mode and state an annotation stores comes back, labelled', async () => {
       const { box, square } = await annotations();
@@ -159,7 +191,13 @@ export function runAppearanceStatesConformance(
     });
 
     test('an empty modes list is refused', async () => {
-      await expect(render([])).rejects.toMatchObject({ code: EngineErrorCode.InvalidArg });
+      const options = { format: 'png' as const, modes: [] };
+      await expect(page.annotations.renderAppearances(options)).rejects.toMatchObject({
+        code: EngineErrorCode.InvalidArg,
+      });
+      await expect(page.forms.renderAppearances(options)).rejects.toMatchObject({
+        code: EngineErrorCode.InvalidArg,
+      });
     });
 
     test('a page rendered with its annotations shows its form fields', async () => {
@@ -180,7 +218,8 @@ export function runAppearanceStatesConformance(
           square: pixel(raster, 120, 160).slice(0, 3),
         };
       };
-      expect(await middleOf({})).toEqual({ box: GREEN, square: CYAN });
+      const fields = opts.pageRendersDrawFormFields ?? true;
+      expect(await middleOf({})).toEqual({ box: fields ? GREEN : WHITE, square: CYAN });
       expect(await middleOf({ includeFormFields: false })).toEqual({ box: WHITE, square: CYAN });
       expect(await middleOf({ includeAnnotations: false })).toEqual({ box: WHITE, square: WHITE });
     });

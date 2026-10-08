@@ -242,7 +242,6 @@ export function runAnnotationReadConformance(
           objectNumber: 1,
         },
         pageObjectNumber: 1,
-        index: 0,
         nm: null,
         flags: emptyFlags(),
         rect: { left: 0, top: 0, right: 0, bottom: 0 },
@@ -263,7 +262,6 @@ export function runAnnotationReadConformance(
           const { annotations } = await page.annotations.list();
           const inline = annotations.find((a) => a.ref.kind === 'baseIndex');
           expect(inline !== undefined).toBe(true);
-          expect(inline!.ref.kind === 'baseIndex' && inline!.ref.baseIndex).toBe(inline!.index);
           // The name resolves: a read by it finds the same annotation.
           const again = await page.annotations.list();
           expect(

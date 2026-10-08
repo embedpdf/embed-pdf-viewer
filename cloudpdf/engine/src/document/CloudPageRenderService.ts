@@ -6,6 +6,7 @@ import {
   type PageImageHandle,
   type PageImageOptions,
   type PageImageResult,
+  type PageLayerRights,
   type PageLayout,
   type PageNetworkRenderFormat,
   type PageRef,
@@ -15,6 +16,7 @@ import {
   renderAreaTransform,
   renderTargetArea,
   checkImageQuality,
+  resolvePageLayers,
 } from '@embedpdf/engine-core/runtime';
 import { renderImageOptionsToWire, wirePaths } from '@embedpdf/engine-core/wire';
 
@@ -31,6 +33,8 @@ export class CloudPageRenderService implements PageRenderService {
     private readonly isClosed: () => boolean,
     private readonly manifest: ManifestAccessor,
     private readonly layout: (signal: AbortSignal) => Promise<PageLayout>,
+    /** What the caller may read, when the client can know it; null leaves it to the server. */
+    private readonly layerRights: () => PageLayerRights | null,
   ) {}
 
   image(options: PageImageOptions = {}): AbortablePromise<PageRenderImage> {
@@ -42,7 +46,19 @@ export class CloudPageRenderService implements PageRenderService {
     return AbortablePromise.run<PageRenderImage>(async (signal) => {
       checkImageQuality(options.quality);
       const format = normalizeFormat(options.format);
-      const includeAnnotations = options.includeAnnotations ?? true;
+      // A picture draws the annotations the caller may read. Cloud pictures
+      // draw no form fields yet: the path doesn't say whether the caller may
+      // read the form (see `RenderTokenSchema`).
+      const rights = this.layerRights();
+      const includeAnnotations = rights
+        ? resolvePageLayers(options, rights).includeAnnotations
+        : (options.includeAnnotations ?? true);
+      if (options.includeFormFields === true) {
+        throw new EngineError(
+          EngineErrorCode.InvalidArg,
+          'cloud page pictures draw no form fields yet: leave includeFormFields out, or pass false',
+        );
+      }
       const buildPath = async (s: AbortSignal): Promise<string> => {
         const manifest = await this.manifest.get(s);
         const pageObjectNumber = this.pageRef.objectNumber;

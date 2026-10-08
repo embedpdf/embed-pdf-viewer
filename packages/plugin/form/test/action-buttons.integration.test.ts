@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest';
 import { createKernel } from '@embedpdf/core';
 import { createQuickJsSandbox } from '@embedpdf/core-js-sandbox';
 import { createLocalEngine } from '@embedpdf/engine';
-import type { AnnotationRef } from '@embedpdf/engine-core/runtime';
+import { annotationKey, type AnnotationRef } from '@embedpdf/engine-core/runtime';
 import { actionsPlugin, ActionsToken } from '@embedpdf/plugin-actions';
 import type { PdfAnnotationEventKind } from '@embedpdf/plugin-actions';
 import { annotationPlugin } from '@embedpdf/plugin-annotation';
@@ -93,7 +93,11 @@ async function boot(scripting: boolean, scope?: string[]) {
   };
   const press = (name: string): Promise<WidgetActivationResult> =>
     form.activateWidget(widgetRefOf(name));
-  const paintedIds = () => annotation.listPageItems(page).map((item) => item.id);
+  // The page's widgets that show, as the form's rows say (`hidden` is their display).
+  const paintedIds = () =>
+    (form.getSnapshot()?.widgets ?? [])
+      .filter((widget) => widget.page.objectNumber === page.objectNumber && !widget.hidden)
+      .map((widget) => annotationKey(widget.ref));
   const widgetId = (name: string) => `obj:${fieldOf(name).widgets[0]!.objectNumber}`;
   const notify = (name: string, event: PdfAnnotationEventKind) =>
     form.notifyWidgetEvent(fieldOf(name).ref, widgetRefOf(name), event);

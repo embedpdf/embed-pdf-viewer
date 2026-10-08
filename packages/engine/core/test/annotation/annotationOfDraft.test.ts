@@ -11,13 +11,12 @@ describe('annotationOfDraft', () => {
     const drawn = { x: 71.5, y: 71.5, width: 121, height: 81 };
     const square = annotationOfDraft(
       { subtype: 'square', box, color: '#123456' },
-      { ref, index: 4, attribution: { author: 'Ada', userId: 'u-1' }, rect: drawn },
+      { ref, attribution: { author: 'Ada', userId: 'u-1' }, rect: drawn },
     );
     expect(square).toMatchObject({
       subtype: 'square',
       ref,
       page,
-      index: 4,
       nm: null,
       box,
       rect: drawn,
@@ -48,7 +47,7 @@ describe('annotationOfDraft', () => {
         color: '#0000FF',
         contents: 'One\nTwo',
       },
-      { ref, index: 0 },
+      { ref },
     );
     expect(text.subtype === 'free-text' && text.contents).toBe('One\rTwo');
     expect(text.subtype === 'free-text' && text.richText).toEqual({

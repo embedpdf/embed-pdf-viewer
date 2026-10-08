@@ -222,6 +222,7 @@ describe('cdnCoverageForScope', () => {
   const ALL_BASE = {
     content: 'base',
     annotations: 'base',
+    forms: 'base',
     layout: 'base',
     attachments: 'base',
     metadata: 'base',
@@ -329,6 +330,24 @@ describe('cdnCoverageForScope', () => {
     expect(layoutOwned.has('page-render')).toBe(true);
     expect(layoutOwned.has('page-annotations')).toBe(true);
 
+    // Forms owned (a layer that only fills): the form and its widget images
+    // go; the annotations and every picture without fields stay shared.
+    const formsOwned = ids(
+      cdnCoverageForScope(['*'], NO_BITS, {
+        docId: 'doc_1',
+        layerName: 'L1',
+        scopes: { ...ALL_BASE, forms: 'layer' },
+      }),
+    );
+    expect(formsOwned.has('form')).toBe(false);
+    expect(formsOwned.has('page-form')).toBe(false);
+    expect(formsOwned.has('annotations-all')).toBe(true);
+    expect(formsOwned.has('page-annotations')).toBe(true);
+    expect(formsOwned.has('page-render-annotated')).toBe(true);
+    expect(formsOwned.has('layer-form')).toBe(true);
+    expect(annotationsOwned.has('form')).toBe(true);
+    expect(annotationsOwned.has('page-form')).toBe(true);
+
     const metadataOwned = ids(
       cdnCoverageForScope(['*'], NO_BITS, {
         docId: 'doc_1',
@@ -344,7 +363,8 @@ describe('cdnCoverageForScope', () => {
   it('a single capability scope covers both doc-level and layer-scoped variants gated by that capability', () => {
     // doc.render → page-render (doc-level) and layer-page-render (layer-scoped).
     // Both share the same capability gate; both get signed so the CDN
-    // covers whichever variant the SDK actually requests.
+    // covers whichever variant the SDK actually requests. Pictures with
+    // annotations aren't among them: they also take doc.annotate.read.
     const coverage = cdnCoverageForScope(['doc.render'], NO_BITS, { docId: 'doc_1' });
     expect(coverage).toEqual([
       {
@@ -353,21 +373,72 @@ describe('cdnCoverageForScope', () => {
         pathPrefix: '/v1/docs/doc_1/render/pages/',
       },
       {
-        resourceId: 'page-render-annotated',
-        pathPattern: '/v1/docs/doc_1/render/annotated/pages/*/data@*',
-        pathPrefix: '/v1/docs/doc_1/render/annotated/pages/',
-      },
-      {
         resourceId: 'layer-page-render',
         pathPattern: '/v1/docs/doc_1/layers/default/render/pages/*/data@*',
         pathPrefix: '/v1/docs/doc_1/layers/default/render/pages/',
       },
-      {
-        resourceId: 'layer-page-render-annotated',
-        pathPattern: '/v1/docs/doc_1/layers/default/render/annotated/pages/*/data@*',
-        pathPrefix: '/v1/docs/doc_1/layers/default/render/annotated/pages/',
-      },
     ]);
+  });
+
+  it('the form takes doc.forms.read, the annotations doc.annotate.read: a filler gets only the form', () => {
+    const covered = (scope: string[]) =>
+      new Set(
+        cdnCoverageForScope(scope, NO_BITS, { docId: 'doc_1', layerName: 'L1' }).map(
+          (entry) => entry.resourceId,
+        ),
+      );
+    const filler = covered(['doc.open', 'doc.render', 'doc.forms.fill']);
+    for (const id of ['form', 'page-form', 'layer-form', 'layer-page-form'] as const) {
+      expect(filler.has(id)).toBe(true);
+    }
+    for (const id of [
+      'annotations-all',
+      'page-annotations',
+      'layer-annotations-all',
+      'annotations-read',
+      'page-render-annotated',
+      'layer-page-render-annotated',
+    ] as const) {
+      expect(filler.has(id)).toBe(false);
+    }
+    const commenter = covered(['doc.open', 'doc.render', 'doc.annotate.read']);
+    expect(commenter.has('annotations-all')).toBe(true);
+    for (const id of ['form', 'page-form', 'layer-form', 'layer-page-form'] as const) {
+      expect(commenter.has(id)).toBe(false);
+    }
+    // `form@`, never `form`: the write routes under `form/` stay unsigned.
+    const prefixes = cdnCoverageForScope(['doc.forms.read'], NO_BITS, {
+      docId: 'doc_1',
+      layerName: 'L1',
+    }).map((entry) => entry.pathPrefix);
+    expect(prefixes).toEqual(
+      expect.arrayContaining([
+        '/v1/docs/doc_1/form@',
+        '/v1/docs/doc_1/form/pages/',
+        '/v1/docs/doc_1/layers/L1/form@',
+        '/v1/docs/doc_1/layers/L1/form/pages/',
+      ]),
+    );
+    expect(prefixes.some((prefix) => prefix.endsWith('/form') || prefix.endsWith('/form/'))).toBe(
+      false,
+    );
+  });
+
+  it('pictures with annotations take doc.render and doc.annotate.read', () => {
+    const covered = (scope: string[]) =>
+      new Set(
+        cdnCoverageForScope(scope, NO_BITS, { docId: 'doc_1' }).map((entry) => entry.resourceId),
+      );
+    for (const scope of [['doc.render'], ['doc.annotate.read']]) {
+      expect(covered(scope).has('page-render-annotated')).toBe(false);
+      expect(covered(scope).has('layer-page-render-annotated')).toBe(false);
+    }
+    const both = covered(['doc.render', 'doc.annotate.read']);
+    expect(both.has('page-render-annotated')).toBe(true);
+    expect(both.has('layer-page-render-annotated')).toBe(true);
+    expect(
+      checkResourceAccess('page-render-annotated', ['doc.render', 'doc.forms.fill'], NO_BITS),
+    ).toBe(false);
   });
 
   it('layer-bearing entries use the supplied layerName', () => {
@@ -470,6 +541,11 @@ describe('cdnCoverageForScope', () => {
         'layer-signatures-analysis',
         'version-signatures',
         'version-analysis',
+        // ...and the form: its fields and widget rows, and the widget images.
+        'form',
+        'page-form',
+        'layer-form',
+        'layer-page-form',
       ]),
     );
     // download is cloud-only — not granted by pdf.permissions

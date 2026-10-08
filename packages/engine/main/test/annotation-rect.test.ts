@@ -311,7 +311,6 @@ describe.each(['wasm', 'native'] as const)('annotation rect (%s)', (prefer) => {
     const { annotation } = await page.annotations.create(draft as unknown as AnnotationDraft);
     const shown = annotationOfNew({ ...draft, nm: annotation.nm } as unknown as AnnotationDraft, {
       ref: annotation.ref,
-      index: annotation.index,
     });
     return { annotation, shown };
   }
@@ -470,13 +469,15 @@ describe.each(['wasm', 'native'] as const)('annotation rect: from another app (%
       { scope: ['*'] },
     );
     page = doc.page((await doc.pages.list()).pages[0]!.ref);
-    const { appearances } = await page.annotations.renderAppearancesRaw({
-      viewport: { kind: 'scale', scale: 1 },
-    });
-    const drawn = appearances
+    const options = { viewport: { kind: 'scale' as const, scale: 1 } };
+    const [annotationImages, widgetImages] = await Promise.all([
+      page.annotations.renderAppearancesRaw(options),
+      page.forms.renderAppearancesRaw(options),
+    ]);
+    const drawn = [...annotationImages.appearances, ...widgetImages.appearances]
       .filter((a) => a.mode === 'normal' && visible(a.raster))
       .map((a) => objectNumberOf(a.ref));
-    // Note, caret, square, text field, file attachment and a link with a border.
+    // Note, caret, square, text field (the form's), file attachment and a link with a border.
     expect(drawn.sort((a, b) => a - b)).toEqual([4, 5, 6, 7, 9, 10]);
     const saved = await doc.download({ mode: 'rewrite' });
     for (const objectNumber of [4, 5, 6, 7, 9, 10]) {
@@ -492,8 +493,10 @@ describe.each(['wasm', 'native'] as const)('annotation rect: from another app (%
     );
     page = doc.page((await doc.pages.list()).pages[0]!.ref);
     await page.annotations.list();
+    await doc.forms.list();
     await page.render.raw({ viewport: { kind: 'scale', scale: 1 } });
     await page.annotations.renderAppearancesRaw({ viewport: { kind: 'scale', scale: 1 } });
+    await page.forms.renderAppearancesRaw({ viewport: { kind: 'scale', scale: 1 } });
     const saved = await doc.download({ mode: 'rewrite' });
     for (const [objectNumber, kind] of [
       [4, 'note'],

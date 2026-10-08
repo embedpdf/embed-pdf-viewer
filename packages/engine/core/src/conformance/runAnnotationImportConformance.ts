@@ -217,7 +217,7 @@ export function runAnnotationImportConformance(
       await twoCopies('authoring', async (source, target, pageRef) => {
         await create(source.page(pageRef), { subtype: 'square', box: box(20) });
         const bundle = await source.annotations.export();
-        await target.pages.insertBlank({ size: { width: 300, height: 300 } }, 0);
+        await target.pages.insertBlank({ size: { width: 300, height: 300 } }, 'start');
         const { pages } = await target.pages.list();
         const blank = toPageRef(pages[0]!.ref.objectNumber);
 
@@ -246,7 +246,7 @@ export function runAnnotationImportConformance(
           { subtype: 'stamp', box: box(20) },
           { resources: { appearance: PNG_1X1 } },
         );
-        await source.pages.insertBlank({ size: { width: 300, height: 300 } }, 1);
+        await source.pages.insertBlank({ size: { width: 300, height: 300 } }, { after: pageRef });
         const { pages } = await source.pages.list();
         const second = toPageRef(pages[1]!.ref.objectNumber);
         await create(source.page(second), { subtype: 'square', box: box(20) });

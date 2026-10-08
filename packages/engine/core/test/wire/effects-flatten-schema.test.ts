@@ -6,6 +6,7 @@ describe('batch mutation wire schemas', () => {
   test('a no-op effects batch carries a meta that names nothing', () => {
     const result = {
       results: [],
+      widgets: [],
       meta: {
         affectedPages: [],
         cacheDelta: null,
@@ -24,6 +25,7 @@ describe('batch mutation wire schemas', () => {
         { index: 0, status: 'failed' as const, fields: [], changedWidgets: [] },
         { index: 1, status: 'skipped' as const, fields: [], changedWidgets: [] },
       ],
+      widgets: [],
       meta: {
         affectedPages: [],
         cacheDelta: null,

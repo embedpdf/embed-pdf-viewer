@@ -14,6 +14,7 @@ import {
   type LocalPageRenderService as LocalPageRenderServiceContract,
   type PageRef,
   checkImageQuality,
+  resolvePageLayers,
 } from '@embedpdf/engine-core/runtime';
 
 import type { LocalImageEncoder } from '../render/BrowserImageEncoder';
@@ -44,20 +45,26 @@ export class LocalPageRenderService implements LocalPageRenderServiceContract {
       );
     }
     // Cloud parity: /render gates on `doc.render` (the session-level
-    // rendering capability). image() flows through raw() so a single
-    // assertion here covers both.
+    // rendering capability), and a picture draws the annotations and form
+    // fields the caller may read. image() flows through raw() so the checks
+    // here cover both.
     // Deployment render policy (localEngine({ renderPolicy })): an
     // enforced lattice rejects off-lattice full-page renders exactly like
     // the enforcing server, and the policy's pixel budget rides into the
     // worker either way. Both are the identity under the default
     // `continuous` policy.
+    let layers: ReturnType<typeof resolvePageLayers>;
     try {
       this.guard.assertCapability('doc.render');
+      layers = resolvePageLayers(options, {
+        annotations: this.guard.can('doc.annotate.read'),
+        formFields: this.guard.can('doc.forms.read'),
+      });
       assertFullPageOnLattice(this.policy, options);
     } catch (err) {
       return AbortablePromise.rejectReason(err);
     }
-    const effectiveOptions = withRenderBudget(this.policy, options);
+    const effectiveOptions = withRenderBudget(this.policy, { ...options, ...layers });
     const docId = this.docId;
     const ref = this.ref;
     const target = options?.target;

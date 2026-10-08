@@ -8,6 +8,8 @@
  */
 import { useEffect, useState } from 'react';
 import { Anchored } from '@embedpdf/react/anchored';
+import { FormToken } from '@embedpdf/react/form';
+import { useOptionalCapability } from '@embedpdf/react/runtime';
 import { useSurface } from '@embedpdf/react/shell';
 import { useT } from '@embedpdf/react/i18n';
 import {
@@ -59,7 +61,9 @@ export function SignatureInspector() {
   const dto = field ? signature.getSignature(field) : null;
   const verdict = field ? signature.getVerdict(field) : null;
   const widget = dto?.widget ?? null;
-  const box = widget?.rect ?? null;
+  // Where the signature shows is its widget's row in the form.
+  const form = useOptionalCapability(FormToken);
+  const box = (widget && form?.getWidget(widget)?.rect) ?? null;
 
   // Open on a field never validated: judge it now.
   useEffect(() => {

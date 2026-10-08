@@ -200,42 +200,53 @@ describe('the selection', () => {
 });
 
 describe('the drawing order', () => {
-  it('move shows the new order at once, then the engine’s, and fires onMoved', async () => {
+  it('reorder shows the new order at once, then the engine’s, and fires onReordered', async () => {
     const harness = annotationHarness();
     await harness.load([square(20), square(21), square(22)]);
     let release!: () => void;
-    harness.move.mockImplementationOnce(
+    harness.reorder.mockImplementationOnce(
       () =>
         new Promise((resolve) => {
-          release = () =>
-            resolve({ annotations: [square(22, { index: 0 } as never)] as FileAnnotation[] });
+          release = () => resolve({ order: [ref(22), ref(20), ref(21)] });
         }),
     );
-    const moved: { refs: readonly AnnotationRef[]; toIndex: number }[] = [];
-    harness.capability.onMoved(({ refs, toIndex }) => moved.push({ refs, toIndex }));
+    const reordered: (readonly AnnotationRef[])[] = [];
+    harness.capability.onReordered(({ order }) => reordered.push(order));
 
-    const done = harness.capability.move([ref(22)], 0);
+    const done = harness.capability.reorder([ref(22)], { before: ref(20) });
     // Shown before the engine answered.
     expect(keys(harness.capability.list())).toEqual(keys([square(22), square(20), square(21)]));
+    expect(harness.reorder).toHaveBeenCalledWith([ref(22)], { before: ref(20) });
     release();
     await done;
     expect(keys(harness.capability.list())).toEqual(keys([square(22), square(20), square(21)]));
-    expect(harness.state().moves).toEqual([]);
-    expect(moved).toEqual([{ refs: [ref(22)], toIndex: 0 }]);
+    expect(harness.state().reorders).toEqual([]);
+    expect(reordered).toEqual([[ref(22), ref(20), ref(21)]]);
   });
 
-  it('a refused move goes at once, and onWriteFailed says why', async () => {
+  it('reorder goes to the top with end, and refuses a neighbour that is not there', async () => {
+    const harness = annotationHarness();
+    await harness.load([square(20), square(21), square(22)]);
+    const done = harness.capability.reorder([ref(20)], 'end');
+    expect(keys(harness.capability.list())).toEqual(keys([square(21), square(22), square(20)]));
+    await done;
+    await expect(harness.capability.reorder([ref(20)], { after: ref(99) })).rejects.toMatchObject({
+      code: 'not-found',
+    });
+  });
+
+  it('a refused reorder goes at once, and onWriteFailed says why', async () => {
     const harness = annotationHarness();
     await harness.load([square(20), square(21)]);
-    harness.move.mockRejectedValueOnce(new Error('locked elsewhere'));
+    harness.reorder.mockRejectedValueOnce(new Error('locked elsewhere'));
     const failed: readonly AnnotationRef[][] = [];
     harness.capability.onWriteFailed(({ refs }) => (failed as AnnotationRef[][]).push([...refs]));
-    await expect(harness.capability.move([ref(21)], 0)).rejects.toSatisfy(isPluginError);
+    await expect(harness.capability.reorder([ref(21)], 'start')).rejects.toSatisfy(isPluginError);
     expect(keys(harness.capability.list())).toEqual(keys([square(20), square(21)]));
     expect(failed).toEqual([[ref(21)]]);
   });
 
-  it('move refuses annotations on two pages', async () => {
+  it('reorder refuses annotations on two pages', async () => {
     const harness = annotationHarness();
     await harness.load([square(20)]);
     // A new square on the second page, shown before the engine confirms it.
@@ -247,9 +258,9 @@ describe('the drawing order', () => {
       },
     ]);
     await expect(
-      harness.capability.move([ref(20), { kind: 'nm', page: toPageRef(2), nm: 'x' }], 0),
+      harness.capability.reorder([ref(20), { kind: 'nm', page: toPageRef(2), nm: 'x' }], 'start'),
     ).rejects.toMatchObject({ code: 'invalid-input' });
-    expect(harness.move).not.toHaveBeenCalled();
+    expect(harness.reorder).not.toHaveBeenCalled();
   });
 });
 

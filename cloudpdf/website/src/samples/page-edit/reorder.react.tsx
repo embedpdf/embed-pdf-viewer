@@ -36,7 +36,7 @@ function PageOrder() {
           type="button"
           className="button"
           disabled={!canEdit || !before}
-          onClick={() => page && pageEdit.move([page.ref], { index: 0 })}
+          onClick={() => page && pageEdit.reorder([page.ref], 'start')}
         >
           ⇤ To the front
         </button>
@@ -44,7 +44,7 @@ function PageOrder() {
           type="button"
           className="button"
           disabled={!canEdit || !before}
-          onClick={() => page && before && pageEdit.move([page.ref], { before: before.ref })}
+          onClick={() => page && before && pageEdit.reorder([page.ref], { before: before.ref })}
         >
           ← Earlier
         </button>
@@ -52,7 +52,7 @@ function PageOrder() {
           type="button"
           className="button"
           disabled={!canEdit || !after}
-          onClick={() => page && after && pageEdit.move([page.ref], { after: after.ref })}
+          onClick={() => page && after && pageEdit.reorder([page.ref], { after: after.ref })}
         >
           Later →
         </button>
@@ -60,7 +60,7 @@ function PageOrder() {
           type="button"
           className="button"
           disabled={!canEdit || !after}
-          onClick={() => page && pageEdit.move([page.ref], 'end')}
+          onClick={() => page && pageEdit.reorder([page.ref], 'end')}
         >
           To the back ⇥
         </button>

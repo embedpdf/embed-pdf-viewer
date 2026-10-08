@@ -19,13 +19,11 @@ const refOf = (page: PageRef, annotObjectNumber: number): AnnotationRef => ({
 function annotation(
   page: PageRef,
   annotObjectNumber: number,
-  index: number,
   fields: Record<string, unknown> = {},
 ): Annotation {
   return {
     subtype: 'text',
     ref: refOf(page, annotObjectNumber),
-    index,
     nm: null,
     reply: null,
     popup: null,
@@ -41,13 +39,13 @@ function annotation(
  */
 const document: Record<number, Annotation[]> = {
   3: [
-    annotation(first, 10, 0, { popup: refOf(first, 11) }),
-    annotation(first, 11, 1, { subtype: 'popup', parent: refOf(first, 10) }),
-    annotation(first, 12, 2, { reply: { to: refOf(first, 10), type: 'reply' } }),
-    annotation(first, 13, 3, { reply: { to: refOf(first, 12), type: 'reply' } }),
-    annotation(first, 14, 4, { reply: { to: refOf(first, 10), type: 'reply' } }),
+    annotation(first, 10, { popup: refOf(first, 11) }),
+    annotation(first, 11, { subtype: 'popup', parent: refOf(first, 10) }),
+    annotation(first, 12, { reply: { to: refOf(first, 10), type: 'reply' } }),
+    annotation(first, 13, { reply: { to: refOf(first, 12), type: 'reply' } }),
+    annotation(first, 14, { reply: { to: refOf(first, 10), type: 'reply' } }),
   ],
-  7: [annotation(second, 21, 0, { subtype: 'square' })],
+  7: [annotation(second, 21, { subtype: 'square' })],
 };
 
 function exported(selection: Parameters<typeof closeExportSelection>[0]) {
@@ -101,7 +99,7 @@ describe('closeExportSelection', () => {
   test('finds an annotation by its base index', () => {
     const named = { ...document };
     named[3] = [
-      annotation(first, 10, 0, { nm: 'note', popup: refOf(first, 11) }),
+      annotation(first, 10, { nm: 'note', popup: refOf(first, 11) }),
       ...document[3]!.slice(1),
     ];
     const inline: AnnotationRef = { kind: 'baseIndex', page: first, baseIndex: 0 };
@@ -114,7 +112,7 @@ describe('closeExportSelection', () => {
       pages,
       (page) => born[page.objectNumber] ?? [],
     );
-    expect(byBaseIndex.map((item) => item.index)).toEqual([0, 1]);
+    expect(byBaseIndex.map((item) => item.ref)).toEqual([inline, refOf(first, 11)]);
   });
 
   test('refuses a page or an annotation the document does not have', () => {

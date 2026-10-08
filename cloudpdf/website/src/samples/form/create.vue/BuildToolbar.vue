@@ -49,7 +49,7 @@ watch(
     if (current !== 'ready' || !page || added) return;
     added = true;
     void addDropdown(form, page, 0).then(({ field }) =>
-      stage.reveal(page, { rect: field.widgets[0].rect }),
+      stage.reveal(page, { rect: form.getWidget(field.widgets[0])!.rect }),
     );
   },
   { immediate: true },
@@ -60,7 +60,7 @@ function add(addField: typeof addDropdown) {
   const page = lastPage.value;
   if (!page) return;
   void addField(form, page, fields.value.length).then(({ field }) =>
-    stage.reveal(page, { rect: field.widgets[0].rect }),
+    stage.reveal(page, { rect: form.getWidget(field.widgets[0])!.rect }),
   );
 }
 

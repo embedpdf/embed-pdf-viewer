@@ -60,6 +60,7 @@ const textField = (value: string): FormFieldDTO =>
 const snapshot: FormSnapshot = {
   formKind: 'acroform',
   needsAppearances: false,
+  widgets: [],
   fields: [textField('')],
   calculationOrder: [],
 };

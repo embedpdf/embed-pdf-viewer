@@ -30,7 +30,9 @@ import type {
   FormRepairOptions,
   FormRepairResult,
   FormSnapshot,
+  FormWidget,
   PageRef,
+  WidgetAnnotation,
 } from '@embedpdf/engine-core/runtime';
 import type { ActionOrigin, ActionTriggerResult } from '@embedpdf/plugin-actions/contract';
 
@@ -55,6 +57,7 @@ export type {
   FormRepairOptions,
   FormRepairResult,
   FormSnapshot,
+  WidgetAnnotation,
 } from '@embedpdf/engine-core/runtime';
 
 // ── settings ──────────────────────────────────────────────────────────────
@@ -145,8 +148,12 @@ export interface FormFieldResult {
   readonly field: FormFieldDTO;
 }
 
-/** A widget, addressed by its annotation ref or its object number alone. */
-export type WidgetAddress = AnnotationRef | { objectNumber: number };
+/**
+ * A widget: its annotation ref, or a widget as a field or a signature names
+ * it (`FormWidget`). Never a field: a field can show in several places, and
+ * `getWidgets(ref)` gives them all.
+ */
+export type WidgetAddress = AnnotationRef | FormWidget;
 
 /** What one widget activation did: the form's own scripts ran, or the widget's action did. */
 export type WidgetActivationResult =
@@ -236,6 +243,18 @@ export interface FormCapability extends SettingsApi<FormSettings> {
   get(ref: FormFieldRef): FormFieldDTO | null;
   /** The field a widget belongs to, or `null`. */
   getFieldForWidget(widget: WidgetAddress): FormFieldDTO | null;
+  /**
+   * A widget's row: where it is (`page`, `rect`), how it looks and its state,
+   * or `null` when no page shows it. A field's `widgets` name them.
+   */
+  getWidget(widget: WidgetAddress): WidgetAnnotation | null;
+  /**
+   * Every place a field shows: its widgets' rows, in the field's order (a
+   * radio group's buttons in order). Widgets no page shows are left out, and
+   * a field the form doesn't have has none. The same array while they stay
+   * the same.
+   */
+  getWidgets(ref: FormFieldRef): readonly WidgetAnnotation[];
   /** One field's value in the shape `setValue()` takes, or `null` for a field without one. */
   getValue(ref: FormFieldRef): FormFieldValue | null;
   /**
@@ -293,7 +312,10 @@ export interface FormCapability extends SettingsApi<FormSettings> {
    */
   reset(refs?: readonly FormFieldRef[], options?: OperationOptions): Promise<FormResetResult>;
   /** Do what a click on a widget does, such as running a button's action. Rejects `not-found` for a widget of no field. */
-  activateWidget(widget: AnnotationRef, options?: OperationOptions): Promise<WidgetActivationResult>;
+  activateWidget(
+    widget: AnnotationRef,
+    options?: OperationOptions,
+  ): Promise<WidgetActivationResult>;
 
   // ── form data ──
   /** The form data as XFDF, or FDF with `'fdf'`. Rejects `permission-denied` without `doc.forms.read`. */
@@ -325,14 +347,25 @@ export interface FormCapability extends SettingsApi<FormSettings> {
   delete(ref: FormFieldRef, options?: OperationOptions): Promise<void>;
   /**
    * Take one widget out of a field that shows in several places: it stays on
-   * its page as an ordinary widget annotation. Fires `onFieldUpdated`.
-   * Rejects `permission-denied` without `doc.forms.modify`.
+   * its page, in no field (`deleteWidget()` takes it off the page). Fires
+   * `onFieldUpdated`. Rejects `permission-denied` without `doc.forms.modify`.
    */
   removeWidget(
     ref: FormFieldRef,
     widget: AnnotationRef,
     options?: OperationOptions,
   ): Promise<FormFieldResult>;
+  /**
+   * Delete a widget: it leaves its page, and its field when it has one, and
+   * resolves that field as it is now (`null` for a widget in no field). Fires
+   * `onFieldUpdated` when it had a field. A field shown in one place is
+   * deleted with `delete()`. Rejects `permission-denied` without
+   * `doc.forms.modify`.
+   */
+  deleteWidget(
+    widget: AnnotationRef,
+    options?: OperationOptions,
+  ): Promise<{ readonly field: FormFieldDTO | null }>;
   /**
    * Fix a form other PDF apps read differently, such as fields missing from
    * the form's list, and resolve what was fixed. Fires `onResynced`. Rejects

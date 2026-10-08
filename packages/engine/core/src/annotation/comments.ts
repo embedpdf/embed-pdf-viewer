@@ -30,7 +30,8 @@
  * composer never sorts by page (display order is a layout concern —
  * callers join `pages.list()`). Replies sort chronologically by
  * `createdAt ?? modifiedAt`, entries without a date last, page z-order
- * (`index`) as the final deterministic tiebreak.
+ * (their place in `annotations`, bottom to top) as the final deterministic
+ * tiebreak.
  */
 
 import type { Annotation } from './kinds';
@@ -137,6 +138,8 @@ export function buildCommentThreads(
   const eligible = annotations.filter((a) => !EXCLUDED_SUBTYPES.has(a.subtype));
 
   const byKey = new Map(eligible.map((a) => [annotationKey(a.ref), a]));
+  const zOrder = new Map(eligible.map((a, at) => [annotationKey(a.ref), at]));
+  const chronological = chronologicalIn(zOrder);
 
   // Children adjacency over resolvable /IRT edges.
   const children = new Map<string, Annotation[]>();
@@ -203,14 +206,16 @@ export function buildCommentThreads(
 }
 
 /** `createdAt ?? modifiedAt` ascending; undated last; z-order tiebreak. */
-function chronological(a: Annotation, b: Annotation): number {
-  const at = a.createdAt ?? a.modifiedAt;
-  const bt = b.createdAt ?? b.modifiedAt;
-  const order = at !== null && bt !== null ? compareIsoDateTime(at, bt) : 0;
-  if (order !== 0) return order;
-  if (at !== null && bt === null) return -1;
-  if (at === null && bt !== null) return 1;
-  return a.index - b.index;
+function chronologicalIn(zOrder: ReadonlyMap<string, number>) {
+  return (a: Annotation, b: Annotation): number => {
+    const at = a.createdAt ?? a.modifiedAt;
+    const bt = b.createdAt ?? b.modifiedAt;
+    const order = at !== null && bt !== null ? compareIsoDateTime(at, bt) : 0;
+    if (order !== 0) return order;
+    if (at !== null && bt === null) return -1;
+    if (at === null && bt !== null) return 1;
+    return zOrder.get(annotationKey(a.ref))! - zOrder.get(annotationKey(b.ref))!;
+  };
 }
 
 function computeReview(

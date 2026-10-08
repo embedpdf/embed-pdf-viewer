@@ -58,9 +58,8 @@ function ActivityLog() {
       ),
   );
   useAnnotationEvent(
-    (annotation) => annotation.onMoved,
-    ({ refs, toIndex, origin }) =>
-      log(`Moved ${refs.length} to position ${toIndex + 1}`, origin.kind),
+    (annotation) => annotation.onReordered,
+    ({ order, origin }) => log(`Restacked ${order.length} on a page`, origin.kind),
   );
 
   return (

@@ -11,9 +11,9 @@ import type { ChangeRecord, ReverseStep } from './ChangeRecord';
 import {
   createAnnotation,
   deleteAnnotation,
-  moveAnnotations,
   removeAnnotation,
   reorderAnnotations,
+  reorderBack,
   restoreAnnotations,
   revertAnnotation,
   updateAnnotation,
@@ -23,16 +23,21 @@ import {
   addWidget,
   createField,
   deleteField,
+  deleteRestoredWidget,
+  deleteWidget,
   removeField,
   removeWidget,
+  reorderWidgets,
   reset,
   restoreField,
+  restoreWidget,
   revertForm,
   setAppearanceText,
   setDisplay,
   setSignatureAppearance,
   setValue,
   updateField,
+  updateWidget,
 } from './internal/formChanges';
 import { revertMetadata, updateCustomMetadata, updateMetadata } from './internal/metadataChanges';
 import type { DocumentSession } from '../../document-session/DocumentSession';
@@ -129,8 +134,8 @@ function runOp(
       return updateAnnotation(ctx, op, at);
     case 'annotations.delete':
       return deleteAnnotation(ctx, op, at);
-    case 'annotations.move':
-      return moveAnnotations(ctx, op, at);
+    case 'annotations.reorder':
+      return reorderAnnotations(ctx, op);
     case 'forms.setValue':
       return setValue(ctx, op, at);
     case 'forms.setDisplay':
@@ -149,6 +154,12 @@ function runOp(
       return addWidget(ctx, op);
     case 'forms.removeWidget':
       return removeWidget(ctx, op);
+    case 'forms.deleteWidget':
+      return deleteWidget(ctx, op, at);
+    case 'forms.updateWidget':
+      return updateWidget(ctx, op, at);
+    case 'forms.reorderWidgets':
+      return reorderWidgets(ctx, op);
     case 'forms.setSignatureAppearance':
       return setSignatureAppearance(ctx, op);
     case 'metadata.update':
@@ -169,11 +180,15 @@ function runStep(ctx: ChangeContext, step: ReverseStep): Done {
     case 'annotation.restore':
       return restoreAnnotations(ctx, step);
     case 'annotation.reorder':
-      return reorderAnnotations(ctx, step);
+      return reorderBack(ctx, step);
     case 'field.remove':
       return removeField(ctx, step);
     case 'field.restore':
       return restoreField(ctx, step);
+    case 'widget.restore':
+      return restoreWidget(ctx, step);
+    case 'widget.delete':
+      return deleteRestoredWidget(ctx, step);
     case 'metadata.revert':
       return revertMetadata(ctx, step);
   }

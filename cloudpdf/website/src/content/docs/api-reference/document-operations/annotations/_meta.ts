@@ -8,4 +8,5 @@ export default {
   'read-appearance': 'Read Appearance',
   'export-appearance': 'Export Appearance',
   flatten: 'Flatten',
+  reorder: 'Reorder',
 };

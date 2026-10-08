@@ -9,6 +9,7 @@ export interface DocManifest200Response {
     actionsVersion?: number | undefined;
     attachmentsVersion?: number | undefined;
     annotationsVersion?: number | undefined;
+    formsVersion?: number | undefined;
     auditHead: number;
     baseSha: string;
     layerVersion?: number | undefined;
@@ -23,6 +24,7 @@ export namespace DocManifest200Response {
     export interface Scopes {
         content: Scopes.Content;
         annotations: Scopes.Annotations;
+        forms: Scopes.Forms;
         layout: Scopes.Layout;
         attachments: Scopes.Attachments;
         metadata: Scopes.Metadata;
@@ -40,6 +42,11 @@ export namespace DocManifest200Response {
             Layer: "layer",
         } as const;
         export type Annotations = (typeof Annotations)[keyof typeof Annotations];
+        export const Forms = {
+            Base: "base",
+            Layer: "layer",
+        } as const;
+        export type Forms = (typeof Forms)[keyof typeof Forms];
         export const Layout = {
             Base: "base",
             Layer: "layer",
@@ -137,6 +144,7 @@ export namespace DocManifest200Response {
             export interface Cache {
                 contentVersion: number;
                 annotationVersion: number;
+                widgetVersion: number;
             }
         }
     }

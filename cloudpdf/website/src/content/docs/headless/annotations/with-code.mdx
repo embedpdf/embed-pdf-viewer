@@ -161,13 +161,18 @@ Deleting an annotation also deletes its popup and its replies, as other PDF apps
 
 ## Change the drawing order
 
-Annotations on a page are drawn in order, and the last one is on top. `move()` moves one
-annotation, or several that sit next to each other, to a new position in that order:
+Annotations on a page are drawn in order, and the last one is on top. `reorder()` moves
+annotations together, in the order you pass them, next to another annotation of the page or to the
+back or the front:
 
 ```ts
-await annotation.move([ref], 0); // to the back
-await annotation.move([ref], annotation.list({ pages: [page.ref] }).length - 1); // to the front
+await annotation.reorder([ref], 'start'); // to the back
+await annotation.reorder([ref], 'end'); // to the front
+await annotation.reorder([ref], { after: other }); // just above another annotation
 ```
+
+Form fields are drawn above every annotation and keep their own order, so `reorder()` never
+places an annotation above a field.
 
 <Example name="annotation/order" />
 
@@ -230,34 +235,34 @@ What `useAnnotation()` gives you directly. Its parts have their own pages: `sele
 `text` are on [Selecting & editing](selecting#methods), `tools` and `stamps` on
 [Tools & defaults](tools#methods), and `comments` on [Comments & replies](comments#methods).
 
-| Method                                                         | What it does                                                                                                                                           |
-| :------------------------------------------------------------- | :----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `get(ref)`                                                     | One annotation as it shows now, pending changes included, or `null`                                                                                    |
-| `list({ pages?, subtype? })`                                   | Every annotation in drawing order, or the ones on some pages or of one kind. In a component, use `useAnnotationList(filter)`. [Read annotations](#read-annotations) |
-| `getAt(page, point)`                                           | The topmost annotation at a point on a page, or `null`. A selected annotation's handles count as the annotation.                                       |
-| `isPending(ref)`                                               | Whether the engine is still saving a change to it. [Changes show at once](#changes-show-at-once)                                                       |
+| Method                                                         | What it does                                                                                                                                                                                                                                     |
+| :------------------------------------------------------------- | :----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `get(ref)`                                                     | One annotation as it shows now, pending changes included, or `null`                                                                                                                                                                              |
+| `list({ pages?, subtype? })`                                   | Every annotation in drawing order, or the ones on some pages or of one kind. In a component, use `useAnnotationList(filter)`. [Read annotations](#read-annotations)                                                                              |
+| `getAt(page, point)`                                           | The topmost annotation at a point on a page, or `null`. A selected annotation's handles count as the annotation.                                                                                                                                 |
+| `isPending(ref)`                                               | Whether the engine is still saving a change to it. [Changes show at once](#changes-show-at-once)                                                                                                                                                 |
 | `create(page, fields, resources?, { tool?, select? })`         | Creates an annotation from its kind and fields, and shows it at once. A stamp's drawing or an attachment's file goes in `resources`, as `{ appearance }` or `{ file }`. Resolves `{ annotation }`. [Create an annotation](#create-an-annotation) |
-| `createFromSelection(tool, { clear? })`                        | Turns the selected text into a highlight, an underline, a strikeout or a squiggly line, one per page. Resolves `{ annotations }`. [From the selected text](#from-the-selected-text) |
-| `update(ref, changes, resources?)`                             | Changes only the fields you pass, and `null` removes one. New `resources` replace a stamp's drawing or an attachment's file. Resolves `{ annotation }`. [Change an annotation](#change-an-annotation) |
-| `delete(ref)`                                                  | Deletes an annotation, with its popup and its replies. [Delete an annotation](#delete-an-annotation)                                                   |
-| `move(refs, toIndex)`                                          | Moves annotations that sit next to each other to a new place in their page's drawing order. [Change the drawing order](#change-the-drawing-order)      |
-| `export({ refs?, pages? })`, `import(bundle, options?)`        | Takes annotations out as a bundle, with the bytes they carry, or puts a bundle in. `import` resolves `{ annotations, refMap, dropped }`. [Export and import](saving#export-and-import) |
-| `downloadResource(ref, role)`                                  | Downloads a stamp's drawing (`'appearance'`) or an attachment's file (`'file'`), ready to pass back to `create()`. [Copy an annotation](#copy-an-annotation) |
-| `links.get(ref)`, `links.set(ref, target)`, `links.clear(ref)` | Where an annotation links to, such as a page or a website: read it, set it, or remove the link                                                         |
-| `refresh()`                                                    | Reads every annotation from the engine again. Changes arrive by themselves, so you rarely need it.                                                     |
-| `getSettings()`, `updateSettings(changes)`, `resetSettings()`  | Reads `snap`, `chrome` and `afterCreate`, changes them while the app runs, or goes back to what you registered. In a component, use `useAnnotationSettings()`. [Settings](../annotations#settings) |
-| `canRead()`, `canCreate()`, `canUpdate(ref)`, `canDelete(ref)` | Whether the user may see, create, change or delete annotations. The checks that take a `ref` answer for that annotation. [Permissions](#permissions)   |
+| `createFromSelection(tool, { clear? })`                        | Turns the selected text into a highlight, an underline, a strikeout or a squiggly line, one per page. Resolves `{ annotations }`. [From the selected text](#from-the-selected-text)                                                              |
+| `update(ref, changes, resources?)`                             | Changes only the fields you pass, and `null` removes one. New `resources` replace a stamp's drawing or an attachment's file. Resolves `{ annotation }`. [Change an annotation](#change-an-annotation)                                            |
+| `delete(ref)`                                                  | Deletes an annotation, with its popup and its replies. [Delete an annotation](#delete-an-annotation)                                                                                                                                             |
+| `reorder(refs, position)`                                      | Moves annotations to a new place in their page's drawing order: next to another annotation, or to the back or front. [Change the drawing order](#change-the-drawing-order)                                                                       |
+| `export({ refs?, pages? })`, `import(bundle, options?)`        | Takes annotations out as a bundle, with the bytes they carry, or puts a bundle in. `import` resolves `{ annotations, refMap, dropped }`. [Export and import](saving#export-and-import)                                                           |
+| `downloadResource(ref, role)`                                  | Downloads a stamp's drawing (`'appearance'`) or an attachment's file (`'file'`), ready to pass back to `create()`. [Copy an annotation](#copy-an-annotation)                                                                                     |
+| `links.get(ref)`, `links.set(ref, target)`, `links.clear(ref)` | Where an annotation links to, such as a page or a website: read it, set it, or remove the link                                                                                                                                                   |
+| `refresh()`                                                    | Reads every annotation from the engine again. Changes arrive by themselves, so you rarely need it.                                                                                                                                               |
+| `getSettings()`, `updateSettings(changes)`, `resetSettings()`  | Reads `snap`, `chrome` and `afterCreate`, changes them while the app runs, or goes back to what you registered. In a component, use `useAnnotationSettings()`. [Settings](../annotations#settings)                                               |
+| `canRead()`, `canCreate()`, `canUpdate(ref)`, `canDelete(ref)` | Whether the user may see, create, change or delete annotations. The checks that take a `ref` answer for that annotation. [Permissions](#permissions)                                                                                             |
 
 Every method that returns a promise also takes a `signal` in its options, to cancel it.
 
 ## Permissions
 
-| Permission            | What it allows                  | Check                       |
-| :-------------------- | :------------------------------ | :-------------------------- |
-| `doc.annotate.read`   | Seeing annotations              | `annotation.canRead()`      |
-| `annotations:create`  | Creating them                   | `annotation.canCreate()`    |
-| `annotations:update`  | Changing them                   | `annotation.canUpdate(ref)` |
-| `annotations:delete`  | Deleting them                   | `annotation.canDelete(ref)` |
+| Permission           | What it allows     | Check                       |
+| :------------------- | :----------------- | :-------------------------- |
+| `doc.annotate.read`  | Seeing annotations | `annotation.canRead()`      |
+| `annotations:create` | Creating them      | `annotation.canCreate()`    |
+| `annotations:update` | Changing them      | `annotation.canUpdate(ref)` |
+| `annotations:delete` | Deleting them      | `annotation.canDelete(ref)` |
 
 A permission can end in `:self`, the user's own annotations, or `:group`, their group's.
 `annotations:update:self` lets someone change what they made and only look at the rest, so the checks

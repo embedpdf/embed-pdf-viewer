@@ -218,9 +218,9 @@ describe('settings, permissions and cancelling', () => {
       await expect(
         signature.sign({ field: SIG, mark: { assetId: 'people:signature' } }),
       ).rejects.toMatchObject({ code: 'permission-denied', permission: 'doc.sign' });
-      await expect(
-        signature.fillField(SIG, { assetId: 'people:signature' }),
-      ).rejects.toMatchObject({ code: 'permission-denied', permission: 'doc.forms.fill' });
+      await expect(signature.fillField(SIG, { assetId: 'people:signature' })).rejects.toMatchObject(
+        { code: 'permission-denied', permission: 'doc.forms.fill' },
+      );
       await expect(signature.readRevision({ revisionIndex: 0 })).rejects.toMatchObject({
         code: 'permission-denied',
         permission: 'doc.download',
@@ -330,9 +330,7 @@ describe('signing', () => {
         signed: true,
         coverage: 'whole-revision',
       });
-      expect(
-        signature.getSignature({ objectNumber: result.signature.widget!.objectNumber })?.signed,
-      ).toBe(true);
+      expect(signature.getSignature(result.signature.widget!)?.signed).toBe(true);
       const signedEvents = events.filter((event) => event.type === 'signed');
       expect(signedEvents).toHaveLength(1);
       expect(signedEvents[0]).toMatchObject({

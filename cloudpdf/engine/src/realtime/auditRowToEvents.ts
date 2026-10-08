@@ -9,7 +9,7 @@ import {
   type AnnotationCreateResult,
   type AnnotationImportResult,
   type AnnotationDeleteResult,
-  type AnnotationMoveResult,
+  type AnnotationReorderResult,
   type AnnotationUpdateResult,
   type AttachmentCreateResult,
   type AttachmentDeleteResult,
@@ -25,12 +25,15 @@ import {
   type FormResetResult,
   type FormSetValueResult,
   type FormWidgetLinkResult,
+  type FormWidgetDeleteResult,
+  type FormWidgetUpdateResult,
+  type FormWidgetsReorderResult,
   type MetadataUpdateResult,
   type CustomMetadataUpdateResult,
   type PageDeleteResult,
   type PageFlattenResult,
   type PageInsertResult,
-  type PageMoveResult,
+  type PageReorderResult,
   type PageRotateResult,
   type PdfRotation,
   type PageScaleResult,
@@ -54,6 +57,11 @@ export interface AuditEventRow {
   idempotencyKey?: string | null;
   /** On a change that undid another: the `opId` of the change it undid. */
   undoOf?: string | null;
+  /**
+   * The change holds nothing this connection may read: `payload` is only
+   * `{ meta: { cacheDelta } }`, its pins.
+   */
+  withheld?: boolean;
   payload: unknown;
 }
 
@@ -73,15 +81,15 @@ export interface AuditEventRow {
  *   - rotate/delete: `affectedPages` is exactly the op's page set; rotation
  *     is recovered from the layout (it's absolute — every affected page
  *     carries the value).
- *   - move: the originator knows which block it moved; the audit row only
- *     records the resulting order, so `pages` is the full new order and
- *     `toIndex` is absent (remote consumers use `layout`).
+ *   - reorder: the payload is the result, as the originator got it: the
+ *     pages that moved and the new `layout`.
  *
  * The audit row keys pages by object number (its storage identity); the
  * event carries them as `PageRef` addresses, like every other event.
  */
 export function auditRowToEvents(row: AuditEventRow, mySessionId: string): DocumentEvent[] {
   if (row.originSessionId === mySessionId) return []; // own echo — local publish covered it
+  if (row.withheld) return []; // nothing this connection may read: no facts, only pins
 
   const origin: EventOrigin = {
     kind: 'remote',
@@ -169,20 +177,15 @@ function eventOf(row: AuditEventRow, origin: EventOrigin): DocumentEvent | null 
         deleted: deletedAnnotationsOf(row.payload as AnnotationDeleteResult),
         ...(row.payload as AnnotationDeleteResult),
       };
-    case 'annot.move':
+    case 'annot.reorder':
       return {
-        type: 'annotations.moved',
+        type: 'annotations.reordered',
         page: rowPage(),
         origin,
-        ...(row.payload as AnnotationMoveResult),
+        ...(row.payload as AnnotationReorderResult),
       };
-    case 'pages.move':
-      return {
-        type: 'pages.moved',
-        pages: affectedPages(),
-        origin,
-        ...(row.payload as PageMoveResult),
-      };
+    case 'pages.reorder':
+      return { type: 'pages.reordered', origin, ...(row.payload as PageReorderResult) };
     case 'pages.rotate': {
       const payload = row.payload as PageRotateResult;
       const rotation = (payload.layout.pages.find(
@@ -205,9 +208,7 @@ function eventOf(row: AuditEventRow, origin: EventOrigin): DocumentEvent | null 
       };
     // Two audit kinds share the `pages.inserted` event (bytes-import and
     // blank creation produce the same result shape) — the audit log keeps
-    // them distinct for history, the event stream cares about effect. The
-    // originator's `toIndex` gesture field stays absent on remote events
-    // by design: remote consumers derive placement from `layout`.
+    // them distinct for history, the event stream cares about effect.
     case 'pages.insert':
     case 'pages.insertBlank':
       return {
@@ -267,6 +268,16 @@ function eventOf(row: AuditEventRow, origin: EventOrigin): DocumentEvent | null 
       return { type: 'forms.widgetAdded', origin, ...(row.payload as FormWidgetLinkResult) };
     case 'form.detachWidget':
       return { type: 'forms.widgetRemoved', origin, ...(row.payload as FormWidgetLinkResult) };
+    case 'form.updateWidget':
+      return { type: 'forms.widgetUpdated', origin, ...(row.payload as FormWidgetUpdateResult) };
+    case 'form.deleteWidget':
+      return { type: 'forms.widgetDeleted', origin, ...(row.payload as FormWidgetDeleteResult) };
+    case 'form.reorderWidgets':
+      return {
+        type: 'forms.widgetsReordered',
+        origin,
+        ...(row.payload as FormWidgetsReorderResult),
+      };
     case 'form.applyEffects':
       return { type: 'forms.effectsApplied', origin, ...(row.payload as FormEffectsResult) };
     case 'signature.prepare': {

@@ -22,6 +22,7 @@ import {
 import type { PdfRuntimeModule, Ptr } from '@embedpdf/engine-runtime';
 
 import { sha256HexOf } from './internal/digest';
+import { openAnnotRaw } from './internal/identity/resolveAnnotIndexRaw';
 import { exportUnturnedAppearance } from './internal/read/exportUnturnedAppearance';
 import { saveDocumentToBuffer } from './internal/saveDocumentToBuffer';
 import { RawAnnotationReader } from './RawAnnotationReader';
@@ -63,7 +64,8 @@ export class AnnotationExporter {
     const annotations = closeExportSelection(
       selection,
       records.map((record) => toPageRef(record.pageObjectNumber)),
-      (page) => reader.listOne(page.objectNumber, signal).annotations,
+      // A bundle holds no widgets: form data travels as FDF or XFDF.
+      (page) => reader.listOne(page.objectNumber, signal, 'annotations').annotations,
     );
     assertWithinLimit(limits, 'items', annotations.length);
 
@@ -142,32 +144,9 @@ class ResourceCollector {
   }
 
   // The annotation a read returned, through the page's /Annots: no page is
-  // loaded. The read and this lookup are one job, so the position holds.
+  // loaded.
   private rawHandleOf(data: Annotation<PdfCoordinates>): Ptr {
-    const { fn } = this.runtime;
-    const record = this.session.resolvePageRef(data.ref.page);
-    const annotPtr = fn.EPDFPage_GetAnnotRaw(
-      this.session.requireDocPtr(),
-      record.pageIndex,
-      data.index,
-    );
-    if (!annotPtr) {
-      throw new EngineError(
-        EngineErrorCode.Unknown,
-        'export: an annotation moved while it was read',
-      );
-    }
-    if (
-      data.ref.kind === 'objectNumber' &&
-      fn.EPDFAnnot_GetObjectNumber(annotPtr) !== data.ref.objectNumber
-    ) {
-      fn.FPDFPage_CloseAnnot(annotPtr);
-      throw new EngineError(
-        EngineErrorCode.Unknown,
-        'export: an annotation moved while it was read',
-      );
-    }
-    return annotPtr;
+    return openAnnotRaw(this.runtime, this.session, data.ref);
   }
 
   // A stamp placing a drawing exports the drawing, once however many stamps

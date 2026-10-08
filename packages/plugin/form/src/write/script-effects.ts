@@ -66,6 +66,7 @@ export function createScriptEffects(ctx: FormContext) {
                 new EngineError(EngineErrorCode.NotImplemented, 'no form-effects batch door'),
               ),
             })),
+            widgets: [],
             meta: nothingChanged(opId),
           };
         }
@@ -84,11 +85,12 @@ export function createScriptEffects(ctx: FormContext) {
               changedWidgets: [],
               error: refusal,
             })),
+            widgets: [],
             meta: nothingChanged(opId),
           };
         }
-        // The fields mirror and the annotation plugin apply the confirmed
-        // effects from the `forms.effectsApplied` event.
+        // The form's mirror applies the confirmed effects from the
+        // `forms.effectsApplied` event.
         return result;
       },
     } satisfies Partial<FormHostCapability>,

@@ -28,8 +28,8 @@ export namespace AnnotationDraft {
         subtype: "highlight";
         ref?: unknown | undefined;
         page?: unknown | undefined;
-        index?: unknown | undefined;
         hasAppearance?: unknown | undefined;
+        appearanceState?: unknown | undefined;
         nm?: (string | null) | undefined;
         rect?: unknown | undefined;
         contents?: (string | null) | undefined;
@@ -133,8 +133,8 @@ export namespace AnnotationDraft {
         subtype: "underline";
         ref?: unknown | undefined;
         page?: unknown | undefined;
-        index?: unknown | undefined;
         hasAppearance?: unknown | undefined;
+        appearanceState?: unknown | undefined;
         nm?: (string | null) | undefined;
         rect?: unknown | undefined;
         contents?: (string | null) | undefined;
@@ -238,8 +238,8 @@ export namespace AnnotationDraft {
         subtype: "squiggly";
         ref?: unknown | undefined;
         page?: unknown | undefined;
-        index?: unknown | undefined;
         hasAppearance?: unknown | undefined;
+        appearanceState?: unknown | undefined;
         nm?: (string | null) | undefined;
         rect?: unknown | undefined;
         contents?: (string | null) | undefined;
@@ -343,8 +343,8 @@ export namespace AnnotationDraft {
         subtype: "strikeout";
         ref?: unknown | undefined;
         page?: unknown | undefined;
-        index?: unknown | undefined;
         hasAppearance?: unknown | undefined;
+        appearanceState?: unknown | undefined;
         nm?: (string | null) | undefined;
         rect?: unknown | undefined;
         contents?: (string | null) | undefined;
@@ -454,8 +454,8 @@ export namespace AnnotationDraft {
         subtype: "circle";
         ref?: unknown | undefined;
         page?: unknown | undefined;
-        index?: unknown | undefined;
         hasAppearance?: unknown | undefined;
+        appearanceState?: unknown | undefined;
         nm?: (string | null) | undefined;
         rect?: unknown | undefined;
         contents?: (string | null) | undefined;
@@ -545,8 +545,8 @@ export namespace AnnotationDraft {
         subtype: "square";
         ref?: unknown | undefined;
         page?: unknown | undefined;
-        index?: unknown | undefined;
         hasAppearance?: unknown | undefined;
+        appearanceState?: unknown | undefined;
         nm?: (string | null) | undefined;
         rect?: unknown | undefined;
         contents?: (string | null) | undefined;
@@ -636,8 +636,8 @@ export namespace AnnotationDraft {
         subtype: "polygon";
         ref?: unknown | undefined;
         page?: unknown | undefined;
-        index?: unknown | undefined;
         hasAppearance?: unknown | undefined;
+        appearanceState?: unknown | undefined;
         nm?: (string | null) | undefined;
         rect?: unknown | undefined;
         contents?: (string | null) | undefined;
@@ -743,8 +743,8 @@ export namespace AnnotationDraft {
         subtype: "polyline";
         ref?: unknown | undefined;
         page?: unknown | undefined;
-        index?: unknown | undefined;
         hasAppearance?: unknown | undefined;
+        appearanceState?: unknown | undefined;
         nm?: (string | null) | undefined;
         rect?: unknown | undefined;
         contents?: (string | null) | undefined;
@@ -883,8 +883,8 @@ export namespace AnnotationDraft {
         subtype: "line";
         ref?: unknown | undefined;
         page?: unknown | undefined;
-        index?: unknown | undefined;
         hasAppearance?: unknown | undefined;
+        appearanceState?: unknown | undefined;
         nm?: (string | null) | undefined;
         rect?: unknown | undefined;
         contents?: (string | null) | undefined;
@@ -1046,8 +1046,8 @@ export namespace AnnotationDraft {
         subtype: "link";
         ref?: unknown | undefined;
         page?: unknown | undefined;
-        index?: unknown | undefined;
         hasAppearance?: unknown | undefined;
+        appearanceState?: unknown | undefined;
         nm?: (string | null) | undefined;
         rect: AnnotationDraftLink.Rect;
         contents?: (string | null) | undefined;
@@ -1123,8 +1123,8 @@ export namespace AnnotationDraft {
         subtype: "ink";
         ref?: unknown | undefined;
         page?: unknown | undefined;
-        index?: unknown | undefined;
         hasAppearance?: unknown | undefined;
+        appearanceState?: unknown | undefined;
         nm?: (string | null) | undefined;
         rect?: unknown | undefined;
         contents?: (string | null) | undefined;
@@ -1219,8 +1219,8 @@ export namespace AnnotationDraft {
         subtype: "free-text";
         ref?: unknown | undefined;
         page?: unknown | undefined;
-        index?: unknown | undefined;
         hasAppearance?: unknown | undefined;
+        appearanceState?: unknown | undefined;
         nm?: (string | null) | undefined;
         rect?: unknown | undefined;
         contents?: (string | null) | undefined;
@@ -1495,8 +1495,8 @@ export namespace AnnotationDraft {
         subtype: "caret";
         ref?: unknown | undefined;
         page?: unknown | undefined;
-        index?: unknown | undefined;
         hasAppearance?: unknown | undefined;
+        appearanceState?: unknown | undefined;
         nm?: (string | null) | undefined;
         rect?: unknown | undefined;
         contents?: (string | null) | undefined;
@@ -1581,8 +1581,8 @@ export namespace AnnotationDraft {
         subtype: "text";
         ref?: unknown | undefined;
         page?: unknown | undefined;
-        index?: unknown | undefined;
         hasAppearance?: unknown | undefined;
+        appearanceState?: unknown | undefined;
         nm?: (string | null) | undefined;
         rect: AnnotationDraftText.Rect;
         contents?: (string | null) | undefined;
@@ -1674,8 +1674,8 @@ export namespace AnnotationDraft {
         subtype: "stamp";
         ref?: unknown | undefined;
         page?: unknown | undefined;
-        index?: unknown | undefined;
         hasAppearance?: unknown | undefined;
+        appearanceState?: unknown | undefined;
         nm?: (string | null) | undefined;
         rect?: unknown | undefined;
         contents?: (string | null) | undefined;
@@ -1762,8 +1762,8 @@ export namespace AnnotationDraft {
         subtype: "file-attachment";
         ref?: unknown | undefined;
         page?: unknown | undefined;
-        index?: unknown | undefined;
         hasAppearance?: unknown | undefined;
+        appearanceState?: unknown | undefined;
         nm?: (string | null) | undefined;
         rect: AnnotationDraftFileAttachment.Rect;
         contents?: (string | null) | undefined;
@@ -1856,8 +1856,8 @@ export namespace AnnotationDraft {
         subtype: "widget";
         ref?: unknown | undefined;
         page?: unknown | undefined;
-        index?: unknown | undefined;
         hasAppearance?: unknown | undefined;
+        appearanceState?: unknown | undefined;
         nm?: (string | null) | undefined;
         rect: AnnotationDraftWidget.Rect;
         contents?: (string | null) | undefined;
@@ -1973,8 +1973,8 @@ export namespace AnnotationDraft {
         subtype: "redact";
         ref?: unknown | undefined;
         page?: unknown | undefined;
-        index?: unknown | undefined;
         hasAppearance?: unknown | undefined;
+        appearanceState?: unknown | undefined;
         nm?: (string | null) | undefined;
         rect?: AnnotationDraftRedact.Rect | undefined;
         contents?: (string | null) | undefined;
@@ -2099,8 +2099,8 @@ export namespace AnnotationDraft {
         subtype: "popup";
         ref?: unknown | undefined;
         page?: unknown | undefined;
-        index?: unknown | undefined;
         hasAppearance?: unknown | undefined;
+        appearanceState?: unknown | undefined;
         nm?: (string | null) | undefined;
         rect: AnnotationDraftPopup.Rect;
         contents?: (string | null) | undefined;

@@ -84,9 +84,9 @@ export function annotationHarness(options: AnnotationHarnessOptions = {}) {
   const create = vi.fn();
   const update = vi.fn();
   const remove = vi.fn(async (_ref: AnnotationRef) => ({}));
-  /** A page's drawing-order move: resolves with the moved annotations (the file's values) in their new order. */
-  const move = vi.fn(async (_refs: AnnotationRef[], _toIndex: number) => ({
-    annotations: [] as FileAnnotation[],
+  /** A page's drawing-order change: resolves with the page's new order. */
+  const reorder = vi.fn(async (_refs: AnnotationRef[], _position: unknown) => ({
+    order: [] as AnnotationRef[],
   }));
   const downloadResource = vi.fn(async (_ref: AnnotationRef, _role: string) => new Uint8Array([1]));
   const exportBundle = vi.fn(async (_selection?: unknown) => ({ version: 1 }) as unknown);
@@ -182,17 +182,16 @@ export function annotationHarness(options: AnnotationHarnessOptions = {}) {
             return result;
           },
           list: async () => readAll(await list()),
-          move: async (refs: AnnotationRef[], toIndex: number) => {
-            const result = await move(refs, toIndex);
-            const annotations = result.annotations.map(read);
+          reorder: async (refs: AnnotationRef[], position: unknown) => {
+            const { order } = await reorder(refs, position);
             ctx.emitDocumentEvent({
-              type: 'annotations.moved',
+              type: 'annotations.reordered',
               page,
               origin: localOrigin,
-              annotations,
+              order,
               meta: metaOf(),
             } as unknown as DocumentEvent);
-            return { annotations, meta: metaOf() };
+            return { order, meta: metaOf() };
           },
           downloadResource: (ref: AnnotationRef, role: string) => downloadResource(ref, role),
         },
@@ -256,7 +255,7 @@ export function annotationHarness(options: AnnotationHarnessOptions = {}) {
     create,
     update,
     remove,
-    move,
+    reorder,
     downloadResource,
     exportBundle,
     importBundle,

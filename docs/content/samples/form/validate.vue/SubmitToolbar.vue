@@ -61,8 +61,10 @@ const check = ref<FormValidation | null>(null);
 function submit() {
   const result = form.validate();
   check.value = result;
-  const widget = result.missing[0]?.widgets[0];
-  if (widget?.page) stage.reveal(widget.page, { rect: widget.rect });
+  // Where a field shows is its widget's row in the form.
+  const first = result.missing[0]?.widgets[0];
+  const widget = first ? form.getWidget(first) : null;
+  if (widget) stage.reveal(widget.page, { rect: widget.rect });
 }
 useSignUpForm(submit);
 </script>

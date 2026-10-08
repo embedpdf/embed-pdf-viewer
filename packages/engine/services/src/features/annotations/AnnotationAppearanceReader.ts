@@ -1,4 +1,5 @@
 import type {
+  AnnotationFamily,
   AnnotationAppearanceMode,
   AnnotationAppearanceRaster,
   AnnotationAppearanceRenderOptions,
@@ -37,6 +38,7 @@ import {
   readAppearanceStateNames,
   readIntent,
 } from './internal/read/annotationReadPrimitives';
+import { familyOfCode } from './internal/familyOfCode';
 import { annotationRefOf } from './internal/identity/annotationName';
 import { pdfFromClockwise } from './internal/read/readAnnotationTransformMetadata';
 import { throwIfAborted } from '../../shared/abort';
@@ -71,10 +73,10 @@ const APPEARANCE_MODES: ReadonlyArray<{
 ];
 
 /**
- * Batch-renders the appearances of every annotation on a page, one bitmap per
- * mode it stores (or each requested one) and per state of that mode, each
- * labelled with both, in PDF user space and against the `PdfRuntimeModule`
- * (`fn` + `mem`).
+ * Batch-renders the appearances of one family of a page's annotations (its
+ * annotations except widgets, or its widgets), one bitmap per mode it stores
+ * (or each requested one) and per state of that mode, each labelled with
+ * both, in PDF user space and against the `PdfRuntimeModule` (`fn` + `mem`).
  *
  * A stored appearance (`/AP`) renders into its annotation's `/Rect`. An
  * annotation with no normal appearance renders as PDFium draws it in memory,
@@ -97,6 +99,7 @@ export class AnnotationAppearanceReader {
    */
   async render(
     pageObjectNumber: PageObjectNumber,
+    family: AnnotationFamily,
     options: AnnotationAppearanceRenderOptions,
     signal: AbortSignal,
     slices: Slices,
@@ -129,6 +132,8 @@ export class AnnotationAppearanceReader {
         if (!annotPtr) continue;
 
         try {
+          const subtypeCode = fn.FPDFAnnot_GetSubtype(annotPtr);
+          if (familyOfCode(subtypeCode) !== family) continue;
           const available = fn.EPDFAnnot_GetAvailableAppearanceModes(annotPtr);
           // With no normal appearance stored, where the engine draws one in memory.
           const drawn = available & NORMAL.bit ? null : readDrawingRect(fn, mem, annotPtr);
@@ -144,7 +149,6 @@ export class AnnotationAppearanceReader {
           // Everything else renders as the page shows it, placed by `/Rect`.
           // Normalize once at the read boundary — the wire `rect` and the
           // render matrix both rely on the normalized invariant.
-          const subtypeCode = fn.FPDFAnnot_GetSubtype(annotPtr);
           const pageRect = normalizePdfRect(readAnnotRect(fn, mem, annotPtr));
           const turn = readAnnotationTurn(fn, mem, annotPtr);
           const stripped =

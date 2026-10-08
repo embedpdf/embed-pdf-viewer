@@ -76,7 +76,7 @@ await page.annotations.update(ref, { color: '#e11d48' }); // fine before the cre
 
 The object is made at exactly that number, so the ref is final from the start. Writes apply in the
 order you make them, so the update above runs after the create. Pages and form fields work the
-same way: `pages.insertBlank(spec, toIndex, { objectNumbers })` names each new page, and
+same way: `pages.insertBlank(spec, position, { objectNumbers })` names each new page, and
 `forms.create(draft, { objectNumber, widgetObjectNumbers })` names a field and its widgets.
 
 The numbers are this document session's alone. A create that names a number the session doesn't

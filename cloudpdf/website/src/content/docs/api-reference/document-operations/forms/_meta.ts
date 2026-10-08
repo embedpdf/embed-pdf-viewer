@@ -5,4 +5,7 @@ export default {
   'import-data': 'Import Data',
   'set-value': 'Set Value',
   reset: 'Reset',
+  'update-widget': 'Update Widget',
+  'delete-widget': 'Delete Widget',
+  'reorder-widgets': 'Reorder Widgets',
 };

@@ -108,7 +108,7 @@ function docHarness(options: {
           },
         },
         forms: {
-          list: async () => ({ fields: [] }),
+          list: async () => ({ fields: [], widgets: [] }),
           ...(options.formsSubmit ? { submit: options.formsSubmit } : {}),
         },
       } as unknown as Partial<DocumentHandle>,

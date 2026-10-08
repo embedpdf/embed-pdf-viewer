@@ -27,7 +27,10 @@ import {
   type FormsAddWidgetWorkerRequest,
   type FormsCreateFieldWorkerRequest,
   type FormsDeleteFieldWorkerRequest,
+  type FormsDeleteWidgetWorkerRequest,
   type FormsDetachWidgetWorkerRequest,
+  type FormsReorderWidgetsWorkerRequest,
+  type FormsUpdateWidgetWorkerRequest,
   type FormsExportWorkerRequest,
   type FormsImportWorkerRequest,
   type FormsListWorkerRequest,
@@ -56,7 +59,7 @@ import {
   type DocumentSetFontSettingsWorkerRequest,
   type AnnotationsListWorkerRequest,
   type AnnotationsRenderAppearancesWorkerRequest,
-  type AnnotationsMoveWorkerRequest,
+  type AnnotationsReorderWorkerRequest,
   type AnnotationsUpdateWorkerRequest,
   type CloseWorkerRequest,
   type LayerCloseWorkerRequest,
@@ -68,7 +71,7 @@ import {
   type OpenWorkerRequest,
   type PagesListWorkerRequest,
   type PagesGeometryWorkerRequest,
-  type PagesMoveWorkerRequest,
+  type PagesReorderWorkerRequest,
   type PagesRotateWorkerRequest,
   type PagesDeleteWorkerRequest,
   type PagesSetNameWorkerRequest,
@@ -535,8 +538,8 @@ export class WorkerHost {
         case 'annotations.delete':
           resultPack = this.handleAnnotationsDelete(msg, ctrl.signal);
           break;
-        case 'annotations.move':
-          resultPack = this.handleAnnotationsMove(msg, ctrl.signal);
+        case 'annotations.reorder':
+          resultPack = this.handleAnnotationsReorder(msg, ctrl.signal);
           break;
         case 'document.apply':
           resultPack = this.handleDocumentApply(msg, ctrl.signal);
@@ -613,11 +616,20 @@ export class WorkerHost {
         case 'forms.detachWidget':
           resultPack = this.handleFormsDetachWidget(msg, ctrl.signal);
           break;
+        case 'forms.updateWidget':
+          resultPack = this.handleFormsUpdateWidget(msg, ctrl.signal);
+          break;
+        case 'forms.deleteWidget':
+          resultPack = this.handleFormsDeleteWidget(msg, ctrl.signal);
+          break;
+        case 'forms.reorderWidgets':
+          resultPack = this.handleFormsReorderWidgets(msg, ctrl.signal);
+          break;
         case 'pages.list':
           resultPack = this.handlePagesList(msg, ctrl.signal);
           break;
-        case 'pages.move':
-          resultPack = this.handlePagesMove(msg, ctrl.signal);
+        case 'pages.reorder':
+          resultPack = this.handlePagesReorder(msg, ctrl.signal);
           break;
         case 'pages.rotate':
           resultPack = this.handlePagesRotate(msg, ctrl.signal);
@@ -1124,7 +1136,7 @@ export class WorkerHost {
     const session = this.requireSession(req);
     const pages = req.pages?.map((page) => session.resolvePageRef(page).pageObjectNumber);
     const reader = new RawAnnotationReader(this.runtime, session, this.fonts);
-    return wirePack({ tag: 'annotations.list', list: reader.list(pages, signal) });
+    return wirePack({ tag: 'annotations.list', list: reader.list(pages, signal, 'annotations') });
   }
 
   private async handleAnnotationsRenderAppearances(
@@ -1134,7 +1146,13 @@ export class WorkerHost {
     const session = this.requireSession(req);
     const pageObjectNumber = session.resolvePageRef(req.page).pageObjectNumber;
     const reader = new AnnotationAppearanceReader(this.runtime, session);
-    const result = await reader.render(pageObjectNumber, req.options ?? {}, signal, this.slices);
+    const result = await reader.render(
+      pageObjectNumber,
+      req.family,
+      req.options ?? {},
+      signal,
+      this.slices,
+    );
     // Transfer every appearance raster buffer back zero-copy, like pages.render.
     const transfer = result.appearances.map((a) => a.raster.data);
     return wirePack({ tag: 'annotations.renderAppearances', page: req.page, result }, transfer);
@@ -1293,8 +1311,8 @@ export class WorkerHost {
     );
   }
 
-  private handleAnnotationsMove(
-    req: AnnotationsMoveWorkerRequest,
+  private handleAnnotationsReorder(
+    req: AnnotationsReorderWorkerRequest,
     signal: AbortSignal,
   ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
@@ -1305,11 +1323,11 @@ export class WorkerHost {
     } = this.applyOne(
       session,
       req.opId,
-      { type: 'annotations.move', page: req.page, refs: req.refs, toIndex: req.toIndex },
-      checkedAuthority(),
+      { type: 'annotations.reorder', page: req.page, refs: req.refs, position: req.position },
+      { ...req.authority, protection: null },
       signal,
     );
-    return this.finishMutation(session, { tag: 'annotations.move', result }, req.artifactPath);
+    return this.finishMutation(session, { tag: 'annotations.reorder', result }, req.artifactPath);
   }
 
   /**
@@ -1491,14 +1509,14 @@ export class WorkerHost {
     return wirePack({ tag: 'pages.list', snapshot });
   }
 
-  private handlePagesMove(
-    req: PagesMoveWorkerRequest,
+  private handlePagesReorder(
+    req: PagesReorderWorkerRequest,
     signal: AbortSignal,
   ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
     const mutator = new PagesMutator(this.runtime, session);
-    const result = mutator.move(req.pages, req.toIndex, signal);
-    return this.finishMutation(session, { tag: 'pages.move', result }, req.artifactPath);
+    const result = mutator.reorder(req.pages, req.position, signal);
+    return this.finishMutation(session, { tag: 'pages.reorder', result }, req.artifactPath);
   }
 
   private handlePagesRotate(
@@ -1594,7 +1612,7 @@ export class WorkerHost {
   ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
     const inserter = new PagesInserter(this.runtime, session);
-    const result = inserter.insert(req.bytes, req.toIndex, signal);
+    const result = inserter.insert(req.bytes, req.position ?? 'end', signal);
     return this.finishMutation(session, { tag: 'pages.insert', result }, req.artifactPath);
   }
 
@@ -1606,7 +1624,7 @@ export class WorkerHost {
     const inserter = new PagesInserter(this.runtime, session);
     const result = inserter.insertBlank(
       { size: req.size, count: req.count },
-      req.toIndex,
+      req.position ?? 'end',
       signal,
       req.objectNumbers,
     );
@@ -2324,7 +2342,7 @@ export class WorkerHost {
     signal: AbortSignal,
   ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
-    const reader = new FormReader(this.runtime, session);
+    const reader = new FormReader(this.runtime, session, this.fonts);
     return wirePack({ tag: 'forms.list', snapshot: reader.snapshot(signal) });
   }
 
@@ -2524,6 +2542,60 @@ export class WorkerHost {
       signal,
     );
     return this.finishMutation(session, { tag: 'forms.detachWidget', result }, req.artifactPath);
+  }
+
+  private handleFormsUpdateWidget(
+    req: FormsUpdateWidgetWorkerRequest<PdfCoordinates>,
+    signal: AbortSignal,
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
+    const session = this.requireSession(req);
+    const {
+      type: _type,
+      skipped: _skipped,
+      ...result
+    } = this.applyOne(
+      session,
+      req.opId,
+      { type: 'forms.updateWidget', widget: req.widget, patch: req.patch },
+      checkedAuthority(),
+      signal,
+    );
+    return this.finishMutation(session, { tag: 'forms.updateWidget', result }, req.artifactPath);
+  }
+
+  private handleFormsDeleteWidget(
+    req: FormsDeleteWidgetWorkerRequest,
+    signal: AbortSignal,
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
+    const session = this.requireSession(req);
+    const { type: _type, ...result } = this.applyOne(
+      session,
+      req.opId,
+      { type: 'forms.deleteWidget', widget: req.widget },
+      checkedAuthority(),
+      signal,
+    );
+    return this.finishMutation(session, { tag: 'forms.deleteWidget', result }, req.artifactPath);
+  }
+
+  private handleFormsReorderWidgets(
+    req: FormsReorderWidgetsWorkerRequest,
+    signal: AbortSignal,
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
+    const session = this.requireSession(req);
+    const { type: _type, ...result } = this.applyOne(
+      session,
+      req.opId,
+      {
+        type: 'forms.reorderWidgets',
+        page: req.page,
+        widgets: req.widgets,
+        position: req.position,
+      },
+      checkedAuthority(),
+      signal,
+    );
+    return this.finishMutation(session, { tag: 'forms.reorderWidgets', result }, req.artifactPath);
   }
 
   private finishMutation<P extends WorkerResultPayload<PdfCoordinates>>(

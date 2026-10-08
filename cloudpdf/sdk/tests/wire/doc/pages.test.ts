@@ -17,6 +17,7 @@ describe("PagesClient", () => {
                     previousDocVersion: 1,
                     docVersion: 1,
                     annotationsVersion: 1,
+                    formsVersion: 1,
                     layoutVersion: 1,
                     metadataVersion: 1,
                     attachmentsVersion: 1,
@@ -25,7 +26,7 @@ describe("PagesClient", () => {
                     pages: [
                         {
                             page: { kind: "objectNumber", objectNumber: 1 },
-                            cache: { contentVersion: 1, annotationVersion: 1 },
+                            cache: { contentVersion: 1, annotationVersion: 1, widgetVersion: 1 },
                         },
                     ],
                 },
@@ -195,6 +196,7 @@ describe("PagesClient", () => {
                     previousDocVersion: 1,
                     docVersion: 1,
                     annotationsVersion: 1,
+                    formsVersion: 1,
                     layoutVersion: 1,
                     metadataVersion: 1,
                     attachmentsVersion: 1,
@@ -203,7 +205,7 @@ describe("PagesClient", () => {
                     pages: [
                         {
                             page: { kind: "objectNumber", objectNumber: 1 },
-                            cache: { contentVersion: 1, annotationVersion: 1 },
+                            cache: { contentVersion: 1, annotationVersion: 1, widgetVersion: 1 },
                         },
                     ],
                 },
@@ -301,6 +303,7 @@ describe("PagesClient", () => {
                     previousDocVersion: 1,
                     docVersion: 1,
                     annotationsVersion: 1,
+                    formsVersion: 1,
                     layoutVersion: 1,
                     metadataVersion: 1,
                     attachmentsVersion: 1,
@@ -309,7 +312,7 @@ describe("PagesClient", () => {
                     pages: [
                         {
                             page: { kind: "objectNumber", objectNumber: 1 },
-                            cache: { contentVersion: 1, annotationVersion: 1 },
+                            cache: { contentVersion: 1, annotationVersion: 1, widgetVersion: 1 },
                         },
                     ],
                 },
@@ -429,6 +432,7 @@ describe("PagesClient", () => {
                     previousDocVersion: 1,
                     docVersion: 1,
                     annotationsVersion: 1,
+                    formsVersion: 1,
                     layoutVersion: 1,
                     metadataVersion: 1,
                     attachmentsVersion: 1,
@@ -437,7 +441,7 @@ describe("PagesClient", () => {
                     pages: [
                         {
                             page: { kind: "objectNumber", objectNumber: 1 },
-                            cache: { contentVersion: 1, annotationVersion: 1 },
+                            cache: { contentVersion: 1, annotationVersion: 1, widgetVersion: 1 },
                         },
                     ],
                 },
@@ -521,133 +525,6 @@ describe("PagesClient", () => {
         }).rejects.toThrow(CloudPDF.NotFoundError);
     });
 
-    test("move (1)", async () => {
-        const server = mockServerPool.createServer();
-        const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
-        const rawRequestBody = { key: "value" };
-        const rawResponseBody = {
-            layout: {
-                pageCount: 1,
-                pages: [
-                    {
-                        index: 1,
-                        ref: { kind: "objectNumber", objectNumber: 1 },
-                        label: null,
-                        size: { width: 1.1, height: 1.1 },
-                        rotation: 1.1,
-                        userUnit: 1.1,
-                        boxes: {
-                            media: { x: 1.1, y: 1.1, width: 1.1, height: 1.1 },
-                            crop: { x: 1.1, y: 1.1, width: 1.1, height: 1.1 },
-                            bleed: { x: 1.1, y: 1.1, width: 1.1, height: 1.1 },
-                            trim: { x: 1.1, y: 1.1, width: 1.1, height: 1.1 },
-                            art: { x: 1.1, y: 1.1, width: 1.1, height: 1.1 },
-                        },
-                        pdfCropBox: { left: 1.1, bottom: 1.1, right: 1.1, top: 1.1 },
-                    },
-                ],
-                namedPages: [
-                    { name: "name", target: { kind: "page", page: { kind: "objectNumber", objectNumber: 1 } } },
-                ],
-            },
-            meta: {
-                affectedPages: [{ kind: "objectNumber", objectNumber: 1 }],
-                cacheDelta: {
-                    previousDocVersion: 1,
-                    docVersion: 1,
-                    annotationsVersion: 1,
-                    layoutVersion: 1,
-                    metadataVersion: 1,
-                    attachmentsVersion: 1,
-                    layerVersion: 1,
-                    working: true,
-                    pages: [
-                        {
-                            page: { kind: "objectNumber", objectNumber: 1 },
-                            cache: { contentVersion: 1, annotationVersion: 1 },
-                        },
-                    ],
-                },
-                opId: "opId",
-                undoable: true,
-            },
-        };
-
-        server
-            .mockEndpoint()
-            .post("/v1/docs/docId/layers/layerName/pages/move")
-            .jsonBody(rawRequestBody)
-            .respondWith()
-            .statusCode(200)
-            .jsonBody(rawResponseBody)
-            .build();
-
-        const response = await client.doc.pages.move({
-            docId: "docId",
-            layerName: "layerName",
-            body: {
-                key: "value",
-            },
-        });
-        expect(response).toEqual(rawResponseBody);
-    });
-
-    test("move (2)", async () => {
-        const server = mockServerPool.createServer();
-        const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
-        const rawRequestBody = { string: { key: "value" } };
-        const rawResponseBody = { key: "value" };
-
-        server
-            .mockEndpoint()
-            .post("/v1/docs/docId/layers/layerName/pages/move")
-            .jsonBody(rawRequestBody)
-            .respondWith()
-            .statusCode(400)
-            .jsonBody(rawResponseBody)
-            .build();
-
-        await expect(async () => {
-            return await client.doc.pages.move({
-                docId: "docId",
-                layerName: "layerName",
-                body: {
-                    string: {
-                        key: "value",
-                    },
-                },
-            });
-        }).rejects.toThrow(CloudPDF.BadRequestError);
-    });
-
-    test("move (3)", async () => {
-        const server = mockServerPool.createServer();
-        const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
-        const rawRequestBody = { string: { key: "value" } };
-        const rawResponseBody = { key: "value" };
-
-        server
-            .mockEndpoint()
-            .post("/v1/docs/docId/layers/layerName/pages/move")
-            .jsonBody(rawRequestBody)
-            .respondWith()
-            .statusCode(404)
-            .jsonBody(rawResponseBody)
-            .build();
-
-        await expect(async () => {
-            return await client.doc.pages.move({
-                docId: "docId",
-                layerName: "layerName",
-                body: {
-                    string: {
-                        key: "value",
-                    },
-                },
-            });
-        }).rejects.toThrow(CloudPDF.NotFoundError);
-    });
-
     test("setName (1)", async () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
@@ -683,6 +560,7 @@ describe("PagesClient", () => {
                     previousDocVersion: 1,
                     docVersion: 1,
                     annotationsVersion: 1,
+                    formsVersion: 1,
                     layoutVersion: 1,
                     metadataVersion: 1,
                     attachmentsVersion: 1,
@@ -691,7 +569,7 @@ describe("PagesClient", () => {
                     pages: [
                         {
                             page: { kind: "objectNumber", objectNumber: 1 },
-                            cache: { contentVersion: 1, annotationVersion: 1 },
+                            cache: { contentVersion: 1, annotationVersion: 1, widgetVersion: 1 },
                         },
                     ],
                 },
@@ -810,6 +688,7 @@ describe("PagesClient", () => {
                     previousDocVersion: 1,
                     docVersion: 1,
                     annotationsVersion: 1,
+                    formsVersion: 1,
                     layoutVersion: 1,
                     metadataVersion: 1,
                     attachmentsVersion: 1,
@@ -818,7 +697,7 @@ describe("PagesClient", () => {
                     pages: [
                         {
                             page: { kind: "objectNumber", objectNumber: 1 },
-                            cache: { contentVersion: 1, annotationVersion: 1 },
+                            cache: { contentVersion: 1, annotationVersion: 1, widgetVersion: 1 },
                         },
                     ],
                 },
@@ -902,6 +781,163 @@ describe("PagesClient", () => {
         }).rejects.toThrow(CloudPDF.NotFoundError);
     });
 
+    test("reorder (1)", async () => {
+        const server = mockServerPool.createServer();
+        const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
+        const rawRequestBody = { pages: [{ kind: "objectNumber", objectNumber: 1 }], position: "start" };
+        const rawResponseBody = {
+            pages: [{ kind: "objectNumber", objectNumber: 1 }],
+            layout: {
+                pageCount: 1,
+                pages: [
+                    {
+                        index: 1,
+                        ref: { kind: "objectNumber", objectNumber: 1 },
+                        label: null,
+                        size: { width: 1.1, height: 1.1 },
+                        rotation: 1.1,
+                        userUnit: 1.1,
+                        boxes: {
+                            media: { x: 1.1, y: 1.1, width: 1.1, height: 1.1 },
+                            crop: { x: 1.1, y: 1.1, width: 1.1, height: 1.1 },
+                            bleed: { x: 1.1, y: 1.1, width: 1.1, height: 1.1 },
+                            trim: { x: 1.1, y: 1.1, width: 1.1, height: 1.1 },
+                            art: { x: 1.1, y: 1.1, width: 1.1, height: 1.1 },
+                        },
+                        pdfCropBox: { left: 1.1, bottom: 1.1, right: 1.1, top: 1.1 },
+                    },
+                ],
+                namedPages: [
+                    { name: "name", target: { kind: "page", page: { kind: "objectNumber", objectNumber: 1 } } },
+                ],
+            },
+            meta: {
+                affectedPages: [{ kind: "objectNumber", objectNumber: 1 }],
+                cacheDelta: {
+                    previousDocVersion: 1,
+                    docVersion: 1,
+                    annotationsVersion: 1,
+                    formsVersion: 1,
+                    layoutVersion: 1,
+                    metadataVersion: 1,
+                    attachmentsVersion: 1,
+                    layerVersion: 1,
+                    working: true,
+                    pages: [
+                        {
+                            page: { kind: "objectNumber", objectNumber: 1 },
+                            cache: { contentVersion: 1, annotationVersion: 1, widgetVersion: 1 },
+                        },
+                    ],
+                },
+                opId: "opId",
+                undoable: true,
+            },
+        };
+
+        server
+            .mockEndpoint()
+            .post("/v1/docs/docId/layers/layerName/pages/reorder")
+            .jsonBody(rawRequestBody)
+            .respondWith()
+            .statusCode(200)
+            .jsonBody(rawResponseBody)
+            .build();
+
+        const response = await client.doc.pages.reorder({
+            docId: "docId",
+            layerName: "layerName",
+            pages: [
+                {
+                    kind: "objectNumber",
+                    objectNumber: 1,
+                },
+            ],
+            position: "start",
+        });
+        expect(response).toEqual(rawResponseBody);
+    });
+
+    test("reorder (2)", async () => {
+        const server = mockServerPool.createServer();
+        const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
+        const rawRequestBody = {
+            pages: [
+                { kind: "objectNumber", objectNumber: 1 },
+                { kind: "objectNumber", objectNumber: 1 },
+            ],
+            position: "start",
+        };
+        const rawResponseBody = { key: "value" };
+
+        server
+            .mockEndpoint()
+            .post("/v1/docs/docId/layers/layerName/pages/reorder")
+            .jsonBody(rawRequestBody)
+            .respondWith()
+            .statusCode(400)
+            .jsonBody(rawResponseBody)
+            .build();
+
+        await expect(async () => {
+            return await client.doc.pages.reorder({
+                docId: "docId",
+                layerName: "layerName",
+                pages: [
+                    {
+                        kind: "objectNumber",
+                        objectNumber: 1,
+                    },
+                    {
+                        kind: "objectNumber",
+                        objectNumber: 1,
+                    },
+                ],
+                position: "start",
+            });
+        }).rejects.toThrow(CloudPDF.BadRequestError);
+    });
+
+    test("reorder (3)", async () => {
+        const server = mockServerPool.createServer();
+        const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
+        const rawRequestBody = {
+            pages: [
+                { kind: "objectNumber", objectNumber: 1 },
+                { kind: "objectNumber", objectNumber: 1 },
+            ],
+            position: "start",
+        };
+        const rawResponseBody = { key: "value" };
+
+        server
+            .mockEndpoint()
+            .post("/v1/docs/docId/layers/layerName/pages/reorder")
+            .jsonBody(rawRequestBody)
+            .respondWith()
+            .statusCode(404)
+            .jsonBody(rawResponseBody)
+            .build();
+
+        await expect(async () => {
+            return await client.doc.pages.reorder({
+                docId: "docId",
+                layerName: "layerName",
+                pages: [
+                    {
+                        kind: "objectNumber",
+                        objectNumber: 1,
+                    },
+                    {
+                        kind: "objectNumber",
+                        objectNumber: 1,
+                    },
+                ],
+                position: "start",
+            });
+        }).rejects.toThrow(CloudPDF.NotFoundError);
+    });
+
     test("rotate (1)", async () => {
         const server = mockServerPool.createServer();
         const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
@@ -937,6 +973,7 @@ describe("PagesClient", () => {
                     previousDocVersion: 1,
                     docVersion: 1,
                     annotationsVersion: 1,
+                    formsVersion: 1,
                     layoutVersion: 1,
                     metadataVersion: 1,
                     attachmentsVersion: 1,
@@ -945,7 +982,7 @@ describe("PagesClient", () => {
                     pages: [
                         {
                             page: { kind: "objectNumber", objectNumber: 1 },
-                            cache: { contentVersion: 1, annotationVersion: 1 },
+                            cache: { contentVersion: 1, annotationVersion: 1, widgetVersion: 1 },
                         },
                     ],
                 },

@@ -14,7 +14,7 @@ import { createPageEditController } from '../src/controller';
 /**
  * The controller forwards page edits to the engine handle with three bits of
  * its own: the relative `rotateBy` turned into the engine's absolute rotation
- * (grouped by the result), placements resolved to positions, and refusals
+ * (grouped by the result), placements as positions with their pages fixed, and refusals
  * before anything starts.
  */
 
@@ -29,12 +29,12 @@ function harness(
   } = {},
 ) {
   const rotate = vi.fn(async (_pages: PageRef[], _rotation: number) => ({}));
-  const move = vi.fn(async (_pages: PageRef[], _toIndex: number) => ({}));
+  const reorder = vi.fn(async (_pages: PageRef[], _position: unknown) => ({}));
   const deletePages = vi.fn(async (_pages: PageRef[]) => ({}));
-  const insert = vi.fn(async (_bytes: unknown, _toIndex?: number) => ({
+  const insert = vi.fn(async (_bytes: unknown, _position?: unknown) => ({
     insertedPages: NEW_PAGES,
   }));
-  const insertBlank = vi.fn(async (_spec: unknown, _toIndex?: number) => ({
+  const insertBlank = vi.fn(async (_spec: unknown, _position?: unknown) => ({
     insertedPages: NEW_PAGES,
   }));
   const extract = vi.fn(async (_pages: PageRef[]): Promise<Uint8Array> => new Uint8Array([9]));
@@ -44,7 +44,7 @@ function harness(
     pages: options.pages ?? [],
     doc: {
       security: { allows },
-      pages: { rotate, move, delete: deletePages, insert, insertBlank, extract },
+      pages: { rotate, reorder, delete: deletePages, insert, insertBlank, extract },
     } as unknown as Partial<DocumentHandle>,
   });
   if (options.otherDocument) {
@@ -60,7 +60,7 @@ function harness(
       documentId === 'other' ? (handle as DocumentHandle) : documentHandle(documentId);
   }
   const pageEdit = ctx.connect(createPageEditController(ctx));
-  return { ctx, pageEdit, rotate, move, deletePages, insert, insertBlank, extract, allows };
+  return { ctx, pageEdit, rotate, reorder, deletePages, insert, insertBlank, extract, allows };
 }
 
 /** Three pages in display order, distinct sizes so defaults are observable. */
@@ -113,31 +113,31 @@ describe('PageEditCapability', () => {
     });
   });
 
-  describe('setRotation, move and delete', () => {
+  describe('setRotation, reorder and delete', () => {
     it('setRotation gives every page the same rotation', async () => {
       const { pageEdit, rotate } = harness({ pages: THREE_PAGES });
       await expect(pageEdit.setRotation([toPageRef(10), 2], 180)).resolves.toBeUndefined();
       expect(rotate).toHaveBeenCalledWith([toPageRef(10), toPageRef(30)], 180);
     });
 
-    it('move resolves the placement to a position when the edit runs', async () => {
-      const { pageEdit, move } = harness({ pages: THREE_PAGES });
-      await pageEdit.move([toPageRef(20), toPageRef(30)], { index: 0 });
-      expect(move).toHaveBeenLastCalledWith([toPageRef(20), toPageRef(30)], 0);
-      await pageEdit.move([toPageRef(10)], { after: toPageRef(20) });
-      expect(move).toHaveBeenLastCalledWith([toPageRef(10)], 2);
-      await pageEdit.move([0], { before: 2 });
-      expect(move).toHaveBeenLastCalledWith([toPageRef(10)], 2);
-      await pageEdit.move([toPageRef(10)], 'end');
-      expect(move).toHaveBeenLastCalledWith([toPageRef(10)], 3);
+    it('reorder hands the engine the placement, its page fixed when called', async () => {
+      const { pageEdit, reorder } = harness({ pages: THREE_PAGES });
+      await pageEdit.reorder([toPageRef(20), toPageRef(30)], 'start');
+      expect(reorder).toHaveBeenLastCalledWith([toPageRef(20), toPageRef(30)], 'start');
+      await pageEdit.reorder([toPageRef(10)], { after: toPageRef(20) });
+      expect(reorder).toHaveBeenLastCalledWith([toPageRef(10)], { after: toPageRef(20) });
+      await pageEdit.reorder([0], { before: 2 });
+      expect(reorder).toHaveBeenLastCalledWith([toPageRef(10)], { before: toPageRef(30) });
+      await pageEdit.reorder([toPageRef(10)], 'end');
+      expect(reorder).toHaveBeenLastCalledWith([toPageRef(10)], 'end');
     });
 
-    it('move rejects a placement page the document does not have', async () => {
-      const { pageEdit, move } = harness({ pages: THREE_PAGES });
-      await expect(pageEdit.move([0], { after: toPageRef(99) })).rejects.toMatchObject({
+    it('reorder rejects a placement page the document does not have', async () => {
+      const { pageEdit, reorder } = harness({ pages: THREE_PAGES });
+      await expect(pageEdit.reorder([0], { after: toPageRef(99) })).rejects.toMatchObject({
         code: 'not-found',
       });
-      expect(move).not.toHaveBeenCalled();
+      expect(reorder).not.toHaveBeenCalled();
     });
 
     it('delete forwards the pages, and refuses deleting every page', async () => {
@@ -155,7 +155,7 @@ describe('PageEditCapability', () => {
       await expect(pageEdit.insertBlank()).resolves.toEqual({ pages: NEW_PAGES });
       expect(insertBlank).toHaveBeenCalledWith(
         { size: { width: 500, height: 600 }, count: undefined },
-        undefined,
+        'end',
       );
     });
 
@@ -164,35 +164,30 @@ describe('PageEditCapability', () => {
       await pageEdit.insertBlank();
       expect(insertBlank).toHaveBeenCalledWith(
         { size: { width: 612, height: 792 }, count: undefined },
-        undefined,
+        'end',
       );
     });
 
-    it('insertBlank { after } lands after the page and matches its size; { before } at its position', async () => {
+    it('insertBlank { after } and { before } go next to the page and match its size', async () => {
       const { pageEdit, insertBlank } = harness({ pages: THREE_PAGES });
       await pageEdit.insertBlank({ placement: { after: toPageRef(20) } });
       expect(insertBlank).toHaveBeenLastCalledWith(
         { size: { width: 300, height: 400 }, count: undefined },
-        2,
+        { after: toPageRef(20) },
       );
       await pageEdit.insertBlank({ placement: { before: 0 } });
       expect(insertBlank).toHaveBeenLastCalledWith(
         { size: { width: 100, height: 200 }, count: undefined },
-        0,
+        { before: toPageRef(10) },
       );
     });
 
-    it('insertBlank { index } is the position, sized like the page before it', async () => {
+    it("insertBlank 'start' goes first, sized like the first page", async () => {
       const { pageEdit, insertBlank } = harness({ pages: THREE_PAGES });
-      await pageEdit.insertBlank({ placement: { index: 2 } });
-      expect(insertBlank).toHaveBeenLastCalledWith(
-        { size: { width: 300, height: 400 }, count: undefined },
-        2,
-      );
-      await pageEdit.insertBlank({ placement: { index: 0 } });
+      await pageEdit.insertBlank({ placement: 'start' });
       expect(insertBlank).toHaveBeenLastCalledWith(
         { size: { width: 100, height: 200 }, count: undefined },
-        0,
+        'start',
       );
     });
 
@@ -203,7 +198,10 @@ describe('PageEditCapability', () => {
         count: 3,
         placement: { after: toPageRef(10) },
       });
-      expect(insertBlank).toHaveBeenCalledWith({ size: { width: 612, height: 792 }, count: 3 }, 1);
+      expect(insertBlank).toHaveBeenCalledWith(
+        { size: { width: 612, height: 792 }, count: 3 },
+        { after: toPageRef(10) },
+      );
     });
 
     it('insertBlank rejects a placement page the document does not have', async () => {
@@ -214,20 +212,20 @@ describe('PageEditCapability', () => {
       expect(insertBlank).not.toHaveBeenCalled();
     });
 
-    it('insertFromBytes appends by default and resolves a page placement to a position', async () => {
+    it('insertFromBytes appends by default and goes next to a page the placement names', async () => {
       const { pageEdit, insert } = harness({ pages: THREE_PAGES });
       const bytes = new Uint8Array([1, 2, 3]);
       await expect(pageEdit.insertFromBytes(bytes)).resolves.toEqual({ pages: NEW_PAGES });
-      expect(insert).toHaveBeenLastCalledWith(bytes, undefined);
-      await pageEdit.insertFromBytes(bytes, { placement: { after: toPageRef(20) } });
-      expect(insert).toHaveBeenLastCalledWith(bytes, 2);
+      expect(insert).toHaveBeenLastCalledWith(bytes, 'end');
+      await pageEdit.insertFromBytes(bytes, { placement: { after: 1 } });
+      expect(insert).toHaveBeenLastCalledWith(bytes, { after: toPageRef(20) });
     });
 
     it('duplicate inserts copies right after the last of the pages', async () => {
       const { pageEdit, extract, insert } = harness({ pages: THREE_PAGES });
       await expect(pageEdit.duplicate([toPageRef(10), 1])).resolves.toEqual({ pages: NEW_PAGES });
       expect(extract).toHaveBeenCalledWith([toPageRef(10), toPageRef(20)]);
-      expect(insert).toHaveBeenCalledWith(new Uint8Array([9]), 2);
+      expect(insert).toHaveBeenCalledWith(new Uint8Array([9]), { after: toPageRef(20) });
     });
 
     it('insertFromDocument copies pages of another open document, by ref or index', async () => {
@@ -244,10 +242,10 @@ describe('PageEditCapability', () => {
         },
       });
       await expect(
-        pageEdit.insertFromDocument('other', [1, toPageRef(500)], { placement: { index: 0 } }),
+        pageEdit.insertFromDocument('other', [1, toPageRef(500)], { placement: 'start' }),
       ).resolves.toEqual({ pages: NEW_PAGES });
       expect(otherExtract).toHaveBeenCalledWith([toPageRef(501), toPageRef(500)]);
-      expect(insert).toHaveBeenCalledWith(new Uint8Array([7]), 0);
+      expect(insert).toHaveBeenCalledWith(new Uint8Array([7]), 'start');
       await expect(pageEdit.insertFromDocument('other', [5])).rejects.toMatchObject({
         code: 'not-found',
       });

@@ -154,6 +154,19 @@ await page.render.image({ includeFormFields: false });
 Hidden form fields are never drawn, and fields marked not to show on screen are drawn only when
 printing.
 
+The picture holds only what the user may read. Left out, `includeAnnotations` draws the
+annotations when the user may read them (`doc.annotate.read`), and `includeFormFields` the form
+fields when they may read the form (`doc.forms.read`). So someone who may fill a form but not read
+its comments gets a picture without the comments. Asking for annotations or fields the user may
+not read fails with `Forbidden`, naming the option.
+
+<Engine cloud>
+
+Pictures from the server don't draw form fields yet: leave `includeFormFields` out, or pass
+`false`. Draw the fields over the picture yourself, as the viewer's form layer does.
+
+</Engine>
+
 ## Part of a page
 
 `target` renders one area instead of the whole page. The rect is in page space, from the page's
@@ -294,13 +307,15 @@ milliseconds, so the renders waiting behind it start right away. See
 | `format`             | `'png'` or `'webp'` (see [Format and quality](#format-and-quality)) | see above               |
 | `quality`            | WebP quality, from `0` to `1`                                       | encoder default         |
 | `background`         | `'white'` or `'transparent'`                                        | `'white'`               |
-| `includeAnnotations` | Draw the page's annotations                                         | `true`                  |
-| `includeFormFields`  | Draw the form fields too                                            | as `includeAnnotations` |
+| `includeAnnotations` | Draw the page's annotations                                         | `true` when the user may read them |
+| `includeFormFields`  | Draw the form fields too                                            | `false` without annotations; else `true` when the user may read the form |
 | `target`             | `{ kind: 'page' }`, or `{ kind: 'rect', rect }` for one area        | the whole page          |
 
 ## Permissions
 
-Rendering needs the `doc.render` permission. Without it, the call fails with `Forbidden`.
+Rendering needs the `doc.render` permission. Without it, the call fails with `Forbidden`. A
+picture with annotations also needs `doc.annotate.read`, and one with form fields
+`doc.forms.read`.
 
 ## Good to know
 

@@ -59,6 +59,7 @@ const FILE_SQUARE = at(5);
 const FILE_NOTE = at(6);
 const FILE_POPUP = at(7);
 const FILE_REPLY = at(8);
+const FILE_WIDGET = at(9);
 const NAME: FormFieldRef = { kind: 'fqn', name: 'name' };
 
 const BLUE = '#0000ff';
@@ -110,8 +111,15 @@ const ROUND_TRIPS: { readonly [T in ChangeOp['type']]: RoundTrip } = {
     // The note goes with its popup and its reply.
     ops: () => [{ type: 'annotations.delete', ref: FILE_NOTE }],
   },
-  'annotations.move': {
-    ops: () => [{ type: 'annotations.move', page: PAGE, refs: [FILE_SQUARE], toIndex: 3 }],
+  'annotations.reorder': {
+    ops: () => [
+      {
+        type: 'annotations.reorder',
+        page: PAGE,
+        refs: [FILE_SQUARE],
+        position: { after: FILE_REPLY },
+      },
+    ],
   },
   'forms.setValue': {
     ops: () => [{ type: 'forms.setValue', field: NAME, value: { value: 'Bea' } }],
@@ -164,6 +172,60 @@ const ROUND_TRIPS: { readonly [T in ChangeOp['type']]: RoundTrip } = {
     ],
     ops: ([widget]) => [
       { type: 'forms.removeWidget', field: NAME, widget: at(widget!, EMPTY_PAGE) },
+    ],
+  },
+  'forms.deleteWidget': {
+    // One of a field's two widgets goes; the undo brings it back into the field.
+    setup: ([field, left, right]) => [
+      {
+        type: 'forms.create',
+        draft: {
+          family: 'text',
+          name: 'email',
+          widgets: [
+            { page: PAGE, rect: { x: 20, y: 60, width: 140, height: 24 } },
+            { page: PAGE, rect: { x: 20, y: 100, width: 140, height: 24 } },
+          ],
+        },
+        objectNumber: field,
+        widgetObjectNumbers: [left!, right!],
+      },
+    ],
+    ops: ([, , right]) => [{ type: 'forms.deleteWidget', widget: at(right!) }],
+  },
+  'forms.reorderWidgets': {
+    // The file's widget goes on top of two new ones.
+    setup: ([field, left, right]) => [
+      {
+        type: 'forms.create',
+        draft: {
+          family: 'text',
+          name: 'email',
+          widgets: [
+            { page: PAGE, rect: { x: 20, y: 60, width: 140, height: 24 } },
+            { page: PAGE, rect: { x: 20, y: 100, width: 140, height: 24 } },
+          ],
+        },
+        objectNumber: field,
+        widgetObjectNumbers: [left!, right!],
+      },
+    ],
+    ops: ([, , right]) => [
+      {
+        type: 'forms.reorderWidgets',
+        page: PAGE,
+        widgets: [FILE_WIDGET],
+        position: { after: at(right!) },
+      },
+    ],
+  },
+  'forms.updateWidget': {
+    ops: () => [
+      {
+        type: 'forms.updateWidget',
+        widget: FILE_WIDGET,
+        patch: { rect: { x: 20, y: 250, width: 200, height: 30 }, color: '#e11d48' },
+      },
     ],
   },
   'forms.setSignatureAppearance': {
@@ -253,6 +315,7 @@ export function runChangeConformance(
       return {
         annotations: [onPage.annotations, onEmptyPage.annotations],
         fields: form.fields,
+        widgets: form.widgets,
         metadata: { title: metadata.title, subject: metadata.subject },
         custom,
       };
@@ -486,7 +549,10 @@ export function runChangeConformance(
         expect(update.skipped).toEqual(['color']);
         expect(await colorOf(doc, FILE_SQUARE)).toBe('#00ff00');
         const { annotations } = await doc.page(PAGE).annotations.list();
-        const square = annotations.find((annotation) => annotation.index === 0)!;
+        const square = annotations.find(
+          (annotation) =>
+            annotation.ref.kind === 'objectNumber' && annotation.ref.objectNumber === 5,
+        )!;
         expect(square.contents).toBe(null);
       });
     });
@@ -614,7 +680,14 @@ export function runChangeConformance(
         expect(note!.popup).toEqual(FILE_POPUP);
         expect(reply!.author).toBe('Bea');
         expect(reply!.reply?.to).toEqual(FILE_NOTE);
-        expect(restore.annotations.map((annotation) => annotation.index)).toEqual([1, 2, 3]);
+        // Back in their places in the stacking order, between the square and the widget.
+        const { annotations } = await doc.page(PAGE).annotations.list();
+        expect(annotations.map((annotation) => annotation.ref)).toEqual([
+          FILE_SQUARE,
+          FILE_NOTE,
+          FILE_POPUP,
+          FILE_REPLY,
+        ]);
 
         expect(recorded.events.map((event) => event.type)).toEqual(['annotations.restored']);
         expect(txOf(recorded.events[0]!)).toEqual({ id: undo.meta.opId, index: 0, count: 1 });

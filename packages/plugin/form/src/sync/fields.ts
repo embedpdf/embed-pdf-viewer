@@ -44,6 +44,10 @@ export function createFieldsMirror(ctx: FormContext, events: FormEvents): Mirror
         case 'forms.widgetRemoved':
           events.fieldUpdated.emit({ field: event.field, origin });
           return;
+        case 'forms.widgetDeleted':
+        case 'forms.widgetRestored':
+          if (event.field) events.fieldUpdated.emit({ field: event.field, origin });
+          return;
         case 'forms.deleted':
           if (event.deleted) events.fieldDeleted.emit({ ref: event.deleted, origin });
           return;

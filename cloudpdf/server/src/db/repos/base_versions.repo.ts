@@ -20,6 +20,7 @@ export interface BasePlanePointers {
   metadataVersion: number;
   attachmentsVersion: number;
   annotationsVersion: number;
+  formsVersion: number;
 }
 
 /** The initial epochs: what version 1 (an upload) carries. */
@@ -28,6 +29,7 @@ export const INITIAL_BASE_POINTERS: Readonly<BasePlanePointers> = Object.freeze(
   metadataVersion: 1,
   attachmentsVersion: 1,
   annotationsVersion: 1,
+  formsVersion: 1,
 });
 
 export interface BaseVersionRow extends BasePlanePointers {
@@ -126,6 +128,7 @@ export class BaseVersionsRepo {
         metadata_version: INITIAL_BASE_POINTERS.metadataVersion,
         attachments_version: INITIAL_BASE_POINTERS.attachmentsVersion,
         annotations_version: INITIAL_BASE_POINTERS.annotationsVersion,
+        forms_version: INITIAL_BASE_POINTERS.formsVersion,
         created_at: input.createdAt,
       })
       .onConflict((oc) => oc.columns(['doc_id', 'sha256']).doNothing())
@@ -156,6 +159,7 @@ export class BaseVersionsRepo {
       metadata_version: input.metadataVersion,
       attachments_version: input.attachmentsVersion,
       annotations_version: input.annotationsVersion,
+      forms_version: input.formsVersion,
       created_at: input.createdAt,
     };
     await trx.insertInto('base_versions').values(values).execute();
@@ -178,6 +182,7 @@ function mapRow(row: BaseVersionsTable): BaseVersionRow {
     metadataVersion: Number(row.metadata_version),
     attachmentsVersion: Number(row.attachments_version),
     annotationsVersion: Number(row.annotations_version),
+    formsVersion: Number(row.forms_version),
     createdAt: Number(row.created_at),
   };
 }

@@ -140,7 +140,7 @@ export interface RevisionStructure {
   pages: number[];
   fields: RevisionField[];
   /** In the file's coordinates: a past revision's pages may not be the document's now. */
-  signatures: SignatureDTO<PdfCoordinates>[];
+  signatures: SignatureDTO[];
 }
 
 export interface ChangeFinding {

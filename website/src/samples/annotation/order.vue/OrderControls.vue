@@ -19,11 +19,11 @@ const position = computed(() => {
 });
 
 function sendToBack() {
-  if (first.value) void annotation.move([first.value.ref], 0);
+  if (first.value) void annotation.reorder([first.value.ref], 'start');
 }
 
 function bringToFront() {
-  if (first.value) void annotation.move([first.value.ref], onPage.value.length - 1);
+  if (first.value) void annotation.reorder([first.value.ref], 'end');
 }
 </script>
 

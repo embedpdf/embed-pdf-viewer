@@ -98,8 +98,8 @@ function change(
 function signature(
   index: number,
   fieldObjectNumber: number,
-  extra: Partial<SignatureDTO<PdfCoordinates>> = {},
-): SignatureDTO<PdfCoordinates> {
+  extra: Partial<SignatureDTO> = {},
+): SignatureDTO {
   return {
     index,
     field: { kind: 'objectNumber', objectNumber: fieldObjectNumber },

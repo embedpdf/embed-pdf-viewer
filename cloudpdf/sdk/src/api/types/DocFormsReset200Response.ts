@@ -4,5 +4,6 @@ import type * as CloudPDF from "../index.js";
 
 export interface DocFormsReset200Response {
     fields: CloudPDF.FormField[];
+    widgets: CloudPDF.WidgetAnnotation[];
     meta: CloudPDF.FormMutationMeta;
 }

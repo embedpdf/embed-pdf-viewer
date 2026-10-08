@@ -30,6 +30,8 @@ export { InvalidScope, MissingIdentity, PermissionDenied } from './errors';
 
 export type { AnnotationAuthority, ChangeAuthority } from './authority';
 export {
+  annotationWriteCapabilities,
+  annotationWriteCapability,
   authorizeAnnotationCreate,
   authorizeCapability,
   authorizeUnprotected,

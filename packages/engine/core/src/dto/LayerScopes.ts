@@ -8,8 +8,8 @@
  *
  * A read resolves at the doc-level path iff every plane it depends on is
  * inherited: annotation-free renders/text/geometry depend on `content`;
- * annotated renders on `content + annotations`; the full-document download on
- * all six.
+ * annotated renders on `content + annotations`; the form on `forms`; the
+ * full-document download on all seven.
  *
  * Present on layer manifests only. Absent on base manifests (meaningless
  * there) and on pre-plane servers — consumers treat absence as all-`'layer'`
@@ -22,11 +22,17 @@ export interface LayerScopes {
    *  `contentVersion` vs the base counterpart, plus page-set equality
    *  (insert/delete own it; move/rotate do not — artifacts are normalized). */
   content: 'base' | 'layer';
-  /** Annotation lists and appearance batches (and, with `content`,
-   *  annotated renders) — per-page `annotationVersion` vs the base
-   *  counterpart plus page-set equality. A base's own annotations, inline
-   *  ones included, are visible through an inheriting layer. */
+  /** Annotation lists and appearance batches, widgets excepted (and, with
+   *  `content`, annotated renders) — `annotationsVersion` and per-page
+   *  `annotationVersion` vs the base counterpart plus page-set equality. A
+   *  base's own annotations, inline ones included, are visible through an
+   *  inheriting layer. */
   annotations: 'base' | 'layer';
+  /** The form: fields and widget rows (`form@`), and the widget images
+   *  (`form/pages/`) — `formsVersion` and per-page `widgetVersion` vs the
+   *  base counterpart plus page-set equality. A layer that only fills owns
+   *  this plane and inherits `annotations`. */
+  forms: 'base' | 'layer';
   /** The /layout leaf (page order, geometry, rotation) — `layoutVersion`. */
   layout: 'base' | 'layer';
   /** The /attachments listing and /attachment-files byte leaves —

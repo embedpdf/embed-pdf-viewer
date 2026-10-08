@@ -27,6 +27,12 @@ import {
   type FormSetValueResult,
   type FormSnapshot,
   type FormWidgetLinkResult,
+  type FormWidgetDeleteResult,
+  type FormWidgetUpdateResult,
+  type FormWidgetsReorderResult,
+  type WidgetPatch,
+  encodeAnnotKey,
+  type AnnotationPosition,
   type AnnotationRef,
   type MutationMeta,
   type FormResetResult,
@@ -47,6 +53,9 @@ import {
   FormSetValueResultSchema,
   FormSnapshotSchema,
   FormWidgetLinkResultSchema,
+  FormWidgetDeleteResultSchema,
+  FormWidgetUpdateResultSchema,
+  FormWidgetsReorderResultSchema,
   wirePaths,
 } from '@embedpdf/engine-core/wire';
 import type { SessionEventPublisher } from '@embedpdf/engine-services';
@@ -54,6 +63,7 @@ import type { SessionEventPublisher } from '@embedpdf/engine-services';
 import { buildMutationForm } from './buildMutationForm';
 import type { ManifestAccessor } from './CloudDocumentHandle';
 import type { CloudWrites } from './CloudWrites';
+import { planesInherited } from './planes';
 import { withObjectNumbers } from '../shared/withObjectNumbers';
 import type { HttpClient } from '../transport/HttpClient';
 
@@ -69,11 +79,11 @@ const IMPORT_CONTENT_TYPE: Record<FormDataFormat, string> = {
  * produces an `AbortablePromise` that propagates `signal.abort()` down to
  * `fetch` and validates the JSON response with the wire-stable Zod schema.
  *
- * Forms are document-scoped, so reads use the unversioned `/form` URLs
- * (always `no-store` — there is no content-addressed variant). Mutation
- * results carry the per-page `cacheDelta` for pages whose widget
- * appearances changed; `absorbMutation` folds it into the cached manifest
- * so annotation/render reads stay coherent.
+ * The form is its own read family: `list()` reads the immutable `form@`
+ * leaf at the manifest's `formsVersion`. Mutation results carry the
+ * `cacheDelta` of the form's pins (`formsVersion`, and each changed widget
+ * page's `widgetVersion`); `absorbMutation` folds it into the cached
+ * manifest and owns the `forms` plane.
  */
 export class CloudDocumentFormsService implements DocumentFormsService {
   constructor(
@@ -86,13 +96,28 @@ export class CloudDocumentFormsService implements DocumentFormsService {
     private readonly writes: CloudWrites,
   ) {}
 
+  /**
+   * The form: one read of the immutable `form@formsVersion=N` leaf at the
+   * manifest's pin, at the base's URL while the layer inherits the `forms`
+   * plane, CDN-cacheable because the pin moves only when the form does. A
+   * stale pin (a write landed → 404) refreshes the manifest and reads again,
+   * once.
+   */
   list(): AbortablePromise<FormSnapshot> {
     const rejected = this.rejectIfClosed<FormSnapshot>();
     if (rejected) return rejected;
     return AbortablePromise.run<FormSnapshot>((signal) =>
-      this.http.getJson(
-        wirePaths.layerForm(this.docId, this.layerName),
+      this.http.getJsonWithRefresh(
+        async (s) => {
+          const manifest = await this.manifest.get(s);
+          return planesInherited(manifest, ['forms'])
+            ? wirePaths.docForm(this.docId, manifest.formsVersion)
+            : wirePaths.layerForm(this.docId, this.layerName, manifest.formsVersion);
+        },
         (raw) => FormSnapshotSchema.parse(raw),
+        async (s) => {
+          await this.manifest.refresh(s);
+        },
         signal,
       ),
     );
@@ -153,7 +178,7 @@ export class CloudDocumentFormsService implements DocumentFormsService {
             sent,
           ),
         );
-        this.manifest.apply(result.meta, ['annotations']);
+        this.manifest.apply(result.meta, ['forms']);
         // One event per field that changed, sharing the write's opId.
         this.publisher.publishWrite(
           opId,
@@ -183,7 +208,7 @@ export class CloudDocumentFormsService implements DocumentFormsService {
         // preflight) comes back without a cache delta: no artifact, cache
         // advance, or event.
         if (result.meta.cacheDelta === null) return result;
-        this.manifest.apply(result.meta, ['annotations']);
+        this.manifest.apply(result.meta, ['forms']);
         this.publisher.publishWrite(opId, { type: 'forms.effectsApplied', ...result });
         return result;
       });
@@ -332,7 +357,7 @@ export class CloudDocumentFormsService implements DocumentFormsService {
             sent,
           ),
         );
-        this.manifest.apply(result.meta, ['annotations']);
+        this.manifest.apply(result.meta, ['forms']);
         this.publisher.publishWrite(opId, {
           type: 'forms.deleted',
           deleted: deletedFieldOf(result),
@@ -404,6 +429,95 @@ export class CloudDocumentFormsService implements DocumentFormsService {
     });
   }
 
+  updateWidget(
+    widget: AnnotationRef,
+    patch: WidgetPatch,
+    options?: WriteOptions,
+  ): AbortablePromise<FormWidgetUpdateResult> {
+    const rejected = this.rejectIfClosed<FormWidgetUpdateResult>();
+    if (rejected) return rejected;
+    return AbortablePromise.run<FormWidgetUpdateResult>(async (signal) => {
+      const opId = opIdOf(options);
+      return this.writes.run(opId, signal, async (write) => {
+        const result = await write.send((sent) =>
+          this.http.patchJson(
+            wirePaths.layerFormWidget(
+              this.docId,
+              this.layerName,
+              widget.page,
+              encodeAnnotKey(widget),
+            ),
+            { patch },
+            (raw) => FormWidgetUpdateResultSchema.parse(raw),
+            signal,
+            sent,
+          ),
+        );
+        return this.absorbMutation(opId, result, 'forms.widgetUpdated');
+      });
+    });
+  }
+
+  deleteWidget(
+    widget: AnnotationRef,
+    options?: WriteOptions,
+  ): AbortablePromise<FormWidgetDeleteResult> {
+    const rejected = this.rejectIfClosed<FormWidgetDeleteResult>();
+    if (rejected) return rejected;
+    return AbortablePromise.run<FormWidgetDeleteResult>(async (signal) => {
+      const opId = opIdOf(options);
+      return this.writes.run(opId, signal, async (write) => {
+        const result = await write.send((sent) =>
+          this.http.deleteJson(
+            wirePaths.layerFormWidget(
+              this.docId,
+              this.layerName,
+              widget.page,
+              encodeAnnotKey(widget),
+            ),
+            (raw) => FormWidgetDeleteResultSchema.parse(raw),
+            signal,
+            sent,
+          ),
+        );
+        return this.absorbMutation(opId, result, 'forms.widgetDeleted');
+      });
+    });
+  }
+
+  reorderWidgets(
+    widgets: AnnotationRef[],
+    position: AnnotationPosition,
+    options?: WriteOptions,
+  ): AbortablePromise<FormWidgetsReorderResult> {
+    const rejected = this.rejectIfClosed<FormWidgetsReorderResult>();
+    if (rejected) return rejected;
+    // The widgets' page is part of the URL; the server checks they are all on it.
+    const page = widgets[0]?.page;
+    if (!page) {
+      return AbortablePromise.rejectReason(
+        new EngineError(EngineErrorCode.InvalidArg, 'a reorder names at least one widget', {
+          details: { field: 'widgets' },
+        }),
+      );
+    }
+    return AbortablePromise.run<FormWidgetsReorderResult>(async (signal) => {
+      const opId = opIdOf(options);
+      return this.writes.run(opId, signal, async (write) => {
+        const result = await write.send((sent) =>
+          this.http.postJson(
+            wirePaths.layerFormWidgetsReorder(this.docId, this.layerName, page),
+            { widgets, position },
+            (raw) => FormWidgetsReorderResultSchema.parse(raw),
+            signal,
+            sent,
+          ),
+        );
+        return this.absorbMutation(opId, result, 'forms.widgetsReordered');
+      });
+    });
+  }
+
   repair(options?: FormRepairOptions): AbortablePromise<FormRepairResult> {
     const rejected = this.rejectIfClosed<FormRepairResult>();
     if (rejected) return rejected;
@@ -448,9 +562,12 @@ export class CloudDocumentFormsService implements DocumentFormsService {
       | 'forms.created'
       | 'forms.updated'
       | 'forms.widgetAdded'
-      | 'forms.widgetRemoved',
+      | 'forms.widgetRemoved'
+      | 'forms.widgetUpdated'
+      | 'forms.widgetDeleted'
+      | 'forms.widgetsReordered',
   ): T {
-    this.manifest.apply(result.meta, ['annotations']);
+    this.manifest.apply(result.meta, ['forms']);
     this.publisher.publishWrite(opId, { type, ...result } as unknown as DocumentEventInit);
     return result;
   }

@@ -326,13 +326,13 @@ describe('Phase 5 layer mutation pipeline', () => {
     const layerName = 'alice';
     await seedDocument(fx, tenantId, docId, { pageCount: 3 });
 
-    const res = await fetch(`${fx.baseUrl}/v1/docs/${docId}/layers/${layerName}/pages/move`, {
+    const res = await fetch(`${fx.baseUrl}/v1/docs/${docId}/layers/${layerName}/pages/reorder`, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${docToken(tenantId, docId, layerName)}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ pages: [3].map(toPageRef), toIndex: 0 }),
+      body: JSON.stringify({ pages: [3].map(toPageRef), position: 'start' }),
     });
 
     expect(res.status).toBe(200);
@@ -548,13 +548,13 @@ describe('Phase 5 layer mutation pipeline', () => {
     expect(created.status).toBe(200);
     mutations.push({ kind: 'annot.create', response: await created.json() });
 
-    const moved = await fetch(`${fx.baseUrl}/v1/docs/${docId}/layers/${layerName}/pages/move`, {
+    const moved = await fetch(`${fx.baseUrl}/v1/docs/${docId}/layers/${layerName}/pages/reorder`, {
       method: 'POST',
       headers,
-      body: JSON.stringify({ pages: [3].map(toPageRef), toIndex: 0 }),
+      body: JSON.stringify({ pages: [3].map(toPageRef), position: 'start' }),
     });
     expect(moved.status).toBe(200);
-    mutations.push({ kind: 'pages.move', effect: 'contentWrite', response: await moved.json() });
+    mutations.push({ kind: 'pages.reorder', effect: 'contentWrite', response: await moved.json() });
 
     const rotated = await fetch(`${fx.baseUrl}/v1/docs/${docId}/layers/${layerName}/pages/rotate`, {
       method: 'POST',

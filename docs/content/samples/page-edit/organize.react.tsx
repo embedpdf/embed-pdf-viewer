@@ -63,7 +63,7 @@ function PageOrganizer() {
           type="button"
           className="button"
           disabled={!canEdit || count === 0}
-          onClick={() => pageEdit.move(selected, { index: 0 })}
+          onClick={() => pageEdit.reorder(selected, 'start')}
         >
           Move to front
         </button>

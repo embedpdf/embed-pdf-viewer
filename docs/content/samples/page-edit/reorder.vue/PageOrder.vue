@@ -20,16 +20,18 @@ const before = computed(() => page.value && pages.value[page.value.index - 1]);
 const after = computed(() => page.value && pages.value[page.value.index + 1]);
 
 function toFront() {
-  if (page.value) void pageEdit.move([page.value.ref], { index: 0 });
+  if (page.value) void pageEdit.reorder([page.value.ref], 'start');
 }
 function earlier() {
-  if (page.value && before.value) void pageEdit.move([page.value.ref], { before: before.value.ref });
+  if (page.value && before.value)
+    void pageEdit.reorder([page.value.ref], { before: before.value.ref });
 }
 function later() {
-  if (page.value && after.value) void pageEdit.move([page.value.ref], { after: after.value.ref });
+  if (page.value && after.value)
+    void pageEdit.reorder([page.value.ref], { after: after.value.ref });
 }
 function toBack() {
-  if (page.value) void pageEdit.move([page.value.ref], 'end');
+  if (page.value) void pageEdit.reorder([page.value.ref], 'end');
 }
 </script>
 

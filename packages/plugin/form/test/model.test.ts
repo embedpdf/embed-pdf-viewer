@@ -4,6 +4,7 @@ import {
   toPageRef,
   type FormFieldDTO,
   type FormSnapshot,
+  type WidgetAnnotation,
 } from '@embedpdf/engine-core/runtime';
 
 import { reload } from '@embedpdf/core';
@@ -20,7 +21,10 @@ import {
   foldFormEvent,
   indexFields,
   initialFormState,
+  removeWidgets,
+  upsertWidgets,
   widgetAt,
+  widgetRowOf,
   type FieldIndex,
   type FormWidgetLook,
   type PageWidgets,
@@ -39,7 +43,7 @@ const text = (over: Partial<Extract<FormFieldDTO, { family: 'text' }>> = {}): Fo
   mappingName: null,
   valueEntry: { kind: 'scalar', value: over.value ?? 'abc' },
   defaultValueEntry: { kind: 'scalar', value: '' },
-  widgets: [{ ...formWidget(4, toPageRef(3)), rect: null }],
+  widgets: [formWidget(4, toPageRef(3))],
   value: 'abc',
   defaultValue: '',
   maxLength: 5,
@@ -50,10 +54,16 @@ const text = (over: Partial<Extract<FormFieldDTO, { family: 'text' }>> = {}): Fo
 });
 
 const snapshot = (fields: FormFieldDTO[]): FormSnapshot =>
-  ({ formKind: 'acroform', needsAppearances: false, fields, calculationOrder: [] }) as FormSnapshot;
+  ({
+    formKind: 'acroform',
+    needsAppearances: false,
+    fields,
+    widgets: [],
+    calculationOrder: [],
+  }) as FormSnapshot;
 
 const origin = { kind: 'remote', sessionId: 'them', sub: null, ts: 0, serverId: null };
-const event = (value: object) => ({ origin, ...value }) as unknown as DocumentEvent;
+const event = (value: object) => ({ origin, widgets: [], ...value }) as unknown as DocumentEvent;
 const NO_WRITES = {};
 const LOOK: FormWidgetLook = {
   border: '#6b7280',
@@ -65,7 +75,10 @@ const LOOK: FormWidgetLook = {
   fontSize: 12,
   textAlign: 'left',
 };
-const placed = (box: { x: number; y: number; width: number; height: number }) => ({ box, look: LOOK });
+const placed = (box: { x: number; y: number; width: number; height: number }) => ({
+  box,
+  look: LOOK,
+});
 const BOXES: PageWidgets = { 4: placed({ x: 10, y: 20, width: 200, height: 24 }) };
 
 describe('field index', () => {
@@ -85,6 +98,27 @@ describe('field index', () => {
     expect(fieldKeyOf(text())).toBe('obj:4');
   });
 
+  test('finds a widget row by its object number, through upserts and removals', () => {
+    const row = (objectNumber: number, x: number) =>
+      ({
+        subtype: 'widget',
+        ref: { kind: 'objectNumber', page: toPageRef(3), objectNumber },
+        page: toPageRef(3),
+        rect: { x, y: 0, width: 10, height: 10 },
+      }) as unknown as WidgetAnnotation;
+    let index = indexFields({ ...snapshot([text()]), widgets: [row(4, 0), row(7, 20)] });
+    expect(widgetRowOf(index, 7)?.rect.x).toBe(20);
+    expect(widgetRowOf(index, 9)).toBeNull();
+
+    index = upsertWidgets(index, [row(7, 40), row(9, 60)]);
+    expect(widgetRowOf(index, 7)?.rect.x).toBe(40);
+    expect(widgetRowOf(index, 9)?.rect.x).toBe(60);
+
+    index = removeWidgets(index, [formWidget(4, toPageRef(3))]);
+    expect(widgetRowOf(index, 4)).toBeNull();
+    expect(widgetRowOf(index, 9)?.rect.x).toBe(60);
+  });
+
   test('folds value, structural and batch events from their data', () => {
     let index: FieldIndex = indexFields(snapshot([text()]));
     index = foldFormEvent(
@@ -100,7 +134,7 @@ describe('field index', () => {
     const other = text({
       ref: { kind: 'objectNumber', objectNumber: 7 },
       name: 'other',
-      widgets: [{ ...formWidget(8, toPageRef(3)), rect: null }],
+      widgets: [formWidget(8, toPageRef(3))],
     });
     index = foldFormEvent(index, event({ type: 'forms.created', field: other })) as FieldIndex;
     expect(fieldForWidget(index, 8)?.name).toBe('other');
@@ -175,7 +209,6 @@ describe('fill projection', () => {
     expect(fillItems(index, 99, BOXES, NO_WRITES)).toEqual([]);
   });
 
-
   test('read-only and in-flight fields project as disabled', () => {
     const readOnly = text({ readOnly: true });
     expect(fillItems(indexFields(snapshot([readOnly])), 3, BOXES, NO_WRITES)[0]!.disabled).toBe(
@@ -200,7 +233,7 @@ const signature = (
   mappingName: null,
   valueEntry: { kind: 'none' },
   defaultValueEntry: { kind: 'none' },
-  widgets: [{ ...formWidget(9, toPageRef(3)), rect: null }],
+  widgets: [formWidget(9, toPageRef(3))],
   ...over,
 });
 
@@ -220,7 +253,7 @@ describe('signature widgets', () => {
 
   test('widgetAt resolves the smallest containing widget from loaded geometry', () => {
     const index = indexFields(
-      snapshot([text(), signature({ widgets: [{ ...formWidget(9, toPageRef(3)), rect: null }] })]),
+      snapshot([text(), signature({ widgets: [formWidget(9, toPageRef(3))] })]),
     );
     expect(widgetAt(index, undefined, { x: 10, y: 10 })).toBeNull();
     const boxes = {

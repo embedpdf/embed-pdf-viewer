@@ -1,16 +1,25 @@
 import {
   annotationKey,
+  annotationWriteCapabilities,
+  annotationWriteCapability,
   authorizeAnnotationCreate,
   authorizeAnnotationDelete,
   authorizeAnnotationUpdate,
   authorizeCapability,
   authorizeUnprotected,
   deletedWith,
+  EngineError,
+  EngineErrorCode,
+  formWidget,
   isSkippedItem,
   type Annotation,
+  type AnnotationFamily,
   type AnnotationPatch,
   type AnnotationRef,
+  type AnnotationUpdateResult,
+  type ChangeItem,
   type ChangeOp,
+  type FormWidget,
   type PageObjectNumber,
   type PageRef,
   type PdfCoordinates,
@@ -27,8 +36,17 @@ import {
   resolveAnnotIndexRaw,
 } from '../../annotations/internal/identity/resolveAnnotIndexRaw';
 import { annotationMutationMeta } from '../../annotations/internal/mutations/annotationMutationMeta';
+import {
+  applyReorder,
+  familyOrder,
+  planReorder,
+  readPageStack,
+  type PageStack,
+  type PlannedReorder,
+} from '../../annotations/internal/stackingOrder';
 import { promoteInlineAnnotations } from '../../annotations/internal/write/promoteInlineAnnotations';
 import { RawAnnotationReader } from '../../annotations/RawAnnotationReader';
+import { formMutationMeta } from '../../forms/internal/formMutationMeta';
 import type {
   AnnotationRemoveStep,
   AnnotationReorderStep,
@@ -42,8 +60,8 @@ type Op<T extends ChangeOp['type']> = Extract<
   { type: T }
 >;
 
-/** An annotation's position is where it is, not what it is: guards leave it out. */
-const POSITION = new Set(['index']);
+/** The ops that update an annotation's dictionary in place: a widget's is a form op. */
+export type UpdateReport = 'annotations.update' | 'forms.updateWidget';
 
 /** What an update may write in an annotation's appearance and attached file. */
 const APPEARANCE_KEYS = ['AP', 'FS'];
@@ -54,9 +72,17 @@ const APPEARANCE_KEYS = ['AP', 'FS'];
 
 /** `annotations.create`; its reverse deletes it, when nobody changed it since. */
 export function createAnnotation(ctx: ChangeContext, op: Op<'annotations.create'>): Done {
-  authorizeUnprotected(ctx.authority, 'doc.annotate.modify');
+  if (op.data.subtype === 'widget') {
+    throw new EngineError(
+      EngineErrorCode.InvalidArg,
+      "a widget is the form's: create one with doc.forms.create or doc.forms.addWidget",
+      { details: { field: 'subtype' } },
+    );
+  }
+  authorizeUnprotected(ctx.authority, annotationWriteCapability(op.data.subtype));
   const actor = authorizeAnnotationCreate(
     ctx.authority,
+    op.data.subtype,
     (op.data as { groupId?: string | null }).groupId,
   );
   const page = ctx.session.resolvePageRef(op.page).pageObjectNumber;
@@ -81,9 +107,16 @@ export function updateAnnotation(
   op: Op<'annotations.update'>,
   opIndex: number,
 ): Done {
-  authorizeUnprotected(ctx.authority, 'doc.annotate.modify');
-  assertExpected(opIndex, readAnnotation(ctx, op.ref), op.expect);
-  return writeUpdate(ctx, op.ref, op.patch, op.resources);
+  const current = readAnnotation(ctx, op.ref);
+  if (current.subtype === 'widget') {
+    throw new EngineError(
+      EngineErrorCode.InvalidArg,
+      "a widget is the form's: change its place and look with doc.forms.updateWidget",
+    );
+  }
+  authorizeUnprotected(ctx.authority, annotationWriteCapability(current.subtype));
+  assertExpected(opIndex, current, op.expect);
+  return writeUpdate(ctx, op.ref, op.patch, 'annotations.update', op.resources);
 }
 
 /** `annotations.delete`; its reverse brings back everything it removed. */
@@ -92,26 +125,60 @@ export function deleteAnnotation(
   op: Op<'annotations.delete'>,
   opIndex: number,
 ): Done {
-  authorizeUnprotected(ctx.authority, 'doc.annotate.modify');
-  assertExpected(opIndex, readAnnotation(ctx, op.ref), op.expect);
+  const current = readAnnotation(ctx, op.ref);
+  if (current.subtype === 'widget') throw widgetDeleteRefused(current);
+  authorizeUnprotected(ctx.authority, annotationWriteCapability(current.subtype));
+  assertExpected(opIndex, current, op.expect);
   return writeDelete(ctx, op.ref);
 }
 
-/** `annotations.move`; its reverse moves them back, when they are still where it put them. */
-export function moveAnnotations(
+/** Why a widget isn't deleted as an annotation, naming the form op that removes it. */
+function widgetDeleteRefused(widget: Extract<Annotation<PdfCoordinates>, { subtype: 'widget' }>) {
+  const merged =
+    widget.field?.kind === 'objectNumber' &&
+    widget.ref.kind === 'objectNumber' &&
+    widget.field.objectNumber === widget.ref.objectNumber;
+  return new EngineError(
+    EngineErrorCode.InvalidArg,
+    merged
+      ? "widget is its form field's own dictionary (a merged field/widget) - delete the field with doc.forms.delete"
+      : widget.field
+        ? 'widget is attached to a form field - use doc.forms.removeWidget or doc.forms.delete'
+        : "a widget is the form's: it isn't deleted as an annotation",
+  );
+}
+
+/** `annotations.reorder`; its reverse puts them back beside their old neighbours. */
+export function reorderAnnotations(ctx: ChangeContext, op: Op<'annotations.reorder'>): Done {
+  const stack = readPageStack(ctx.runtime, ctx.session, op.page);
+  const plan = planReorder(stack, 'annotations', op.refs, op.position);
+  authorizeReorder(ctx, 'annotations', op.refs);
+  applyReorder(ctx.runtime, ctx.session, plan);
+  return reordered(ctx, plan, op.refs);
+}
+
+/**
+ * A reorder's item, as its family's op reports it, and the step that puts
+ * its rows back.
+ */
+export function reordered(
   ctx: ChangeContext,
-  op: Op<'annotations.move'>,
-  opIndex: number,
+  plan: PlannedReorder,
+  refs: readonly AnnotationRef[],
 ): Done {
-  authorizeCapability(ctx.authority, 'doc.annotate.modify');
-  const from = op.refs.map((ref) => resolveAnnotIndexRaw(ctx.runtime, ctx.session, ref).index);
-  assertExpected(opIndex, { indexes: from }, op.expect ? { indexes: op.expect } : undefined);
-  const page = ctx.session.resolvePageRef(op.page).pageObjectNumber;
-  const result = mutator(ctx).move(page, [...op.refs], op.toIndex, ctx.signal);
-  const at = op.refs.map((_, i) => op.toIndex + i);
+  const { page } = plan.stack;
   return {
-    item: { type: 'annotations.move', page: op.page, ...result },
-    reverse: [{ kind: 'annotation.reorder', page: op.page, refs: op.refs, at, targets: from }],
+    item: reorderItem(ctx, plan.family, page, plan.after, refs),
+    reverse: [
+      {
+        kind: 'annotation.reorder',
+        page,
+        family: plan.family,
+        refs,
+        before: plan.before,
+        after: plan.after,
+      },
+    ],
   };
 }
 
@@ -124,41 +191,38 @@ export function revertAnnotation(
   ctx: ChangeContext,
   step: ObjectsRevertStep & { subject: { annotation: AnnotationRef } },
 ): Done {
-  authorizeUnprotected(ctx.authority, 'doc.annotate.modify');
   const ref = step.subject.annotation;
+  const reports = step.reports as UpdateReport;
   const current = tryReadAnnotation(ctx, ref);
-  if (!current) return leftAlone(ctx, 'annotations.update');
+  if (!current) return leftAlone(ctx, reports);
+  authorizeUnprotected(ctx.authority, annotationWriteCapability(current.subtype));
   if (unchangedSince(ctx.runtime, ctx.session, step.objects)) {
     authorizeAnnotationUpdate(ctx.authority, current, undefined);
     const redo = revertObjects(ctx.runtime, ctx.session, step.objects);
     const annotation = readAnnotation(ctx, ref);
     return {
-      item: {
-        type: 'annotations.update',
-        page: ref.page,
+      item: updatedItem(ctx, reports, ref, {
         annotation,
         appearance: { action: 'restored', changed: step.appearanceChanged ?? true },
         meta: annotationMutationMeta(ctx.session.writeStamp(), ref.page.objectNumber, [ref]),
-      },
+      }),
       reverse: [{ ...step, objects: redo, ...swapFallback(step.fallback) }],
     };
   }
   // Someone changed it since: put back by value what still shows the update.
   const fallback = step.fallback;
-  if (fallback?.kind !== 'annotation') return leftAlone(ctx, 'annotations.update');
+  if (fallback?.kind !== 'annotation') return leftAlone(ctx, reports);
   const now = current as unknown as Record<string, unknown>;
   const left = fallback.left as Record<string, unknown>;
   const restore = fallback.restore as Record<string, unknown>;
   const keys = Object.keys(left);
   const kept = keys.filter((key) => valuesEqual(now[key], left[key]));
-  if (kept.length === 0) return leftAlone(ctx, 'annotations.update');
+  if (kept.length === 0) return leftAlone(ctx, reports);
   const patch = Object.fromEntries(kept.map((key) => [key, restore[key]]));
-  const done = writeUpdate(ctx, ref, patch as AnnotationPatch<PdfCoordinates>);
+  const done = writeUpdate(ctx, ref, patch as AnnotationPatch<PdfCoordinates>, reports);
   const skipped = keys.filter((key) => !kept.includes(key));
   const item = done.item;
-  if (skipped.length === 0 || isSkippedItem(item) || item.type !== 'annotations.update') {
-    return done;
-  }
+  if (skipped.length === 0 || isSkippedItem(item) || item.type !== reports) return done;
   return { ...done, item: { ...item, skipped } };
 }
 
@@ -173,10 +237,12 @@ export function removeAnnotation(ctx: ChangeContext, step: AnnotationRemoveStep)
     members.length === expected.size &&
     members.every((member) => {
       const left = expected.get(annotationKey(member.ref));
-      return left !== undefined && valuesEqual(member, left, POSITION);
+      return left !== undefined && valuesEqual(member, left);
     });
   if (!unchanged) return leftAlone(ctx, 'annotations.delete');
-  authorizeUnprotected(ctx.authority, 'doc.annotate.modify');
+  for (const capability of annotationWriteCapabilities(members)) {
+    authorizeUnprotected(ctx.authority, capability);
+  }
   return writeDelete(ctx, step.ref);
 }
 
@@ -186,7 +252,6 @@ export function removeAnnotation(ctx: ChangeContext, step: AnnotationRemoveStep)
  * delete took over each owner of what comes back.
  */
 export function restoreAnnotations(ctx: ChangeContext, step: AnnotationRestoreStep): Done {
-  authorizeUnprotected(ctx.authority, 'doc.annotate.modify');
   const before = tryListPage(ctx, step.page);
   const root = step.members[0];
   if (!before || !root) return leftAlone(ctx, 'annotations.restore');
@@ -207,6 +272,11 @@ export function restoreAnnotations(ctx: ChangeContext, step: AnnotationRestoreSt
     if (!found) throw new Error(`a restored annotation is missing: ${annotationKey(ref)}`);
     return found;
   });
+  // What comes back is checked once it is read; a refusal undoes the import
+  // with the rest of the change.
+  for (const capability of annotationWriteCapabilities(restored)) {
+    authorizeUnprotected(ctx.authority, capability);
+  }
   authorizeAnnotationDelete(ctx.authority, restored);
   return {
     item: {
@@ -220,48 +290,114 @@ export function restoreAnnotations(ctx: ChangeContext, step: AnnotationRestoreSt
 }
 
 /**
- * Moves annotations to `targets`, when they are still `at`: the reverse of a
- * move, and of that reverse.
+ * Puts the rows of a reorder back beside their old neighbours (see
+ * `AnnotationReorderStep`). A row goes back only while it is where the
+ * reorder left it, above the same row; it goes above the nearest row that
+ * was below it before and is still there, or to the bottom.
  */
-export function reorderAnnotations(ctx: ChangeContext, step: AnnotationReorderStep): Done {
-  authorizeCapability(ctx.authority, 'doc.annotate.modify');
-  const record = ctx.session.resolvePageRef(step.page);
-  const now = step.refs.map((ref) => tryIndexOf(ctx, ref));
-  if (!valuesEqual(now, step.at)) return leftAlone(ctx, 'annotations.move');
-  const moving = mutator(ctx);
-  const page = record.pageObjectNumber;
-  // Out to the end, the others closing up in their order, then each back in at
-  // its place, lowest first: every place below it is already as it should be.
-  const count = ctx.runtime.fn.EPDFPage_GetAnnotCountRaw(
-    ctx.session.requireDocPtr(),
-    record.pageIndex,
-  );
-  moving.move(page, [...step.refs], count - step.refs.length, ctx.signal);
-  const order = step.refs
-    .map((ref, i) => ({ ref, target: step.targets[i]! }))
-    .sort((a, b) => a.target - b.target);
-  for (const { ref, target } of order) moving.move(page, [ref], target, ctx.signal);
-  const annotations = step.refs.map((ref) => readAnnotation(ctx, ref));
+export function reorderBack(ctx: ChangeContext, step: AnnotationReorderStep): Done {
+  const reports = step.family === 'annotations' ? 'annotations.reorder' : 'forms.reorderWidgets';
+  const stack = tryReadPageStack(ctx, step.page);
+  if (!stack) return leftAlone(ctx, reports);
+  const now = familyOrder(stack, step.family);
+  const back = step.refs.filter((ref) => {
+    const below = rowBelow(now, ref);
+    return below !== undefined && below === rowBelow(step.after, ref);
+  });
+  if (back.length === 0) return leftAlone(ctx, reports);
+  authorizeReorder(ctx, step.family, back);
+
+  const going = new Set(back.map(annotationKey));
+  const inPlace = new Set(now.map(annotationKey).filter((key) => !going.has(key)));
+  let current = stack;
+  // Lowest first, so a row's old neighbour that moves too is back before it.
+  for (const ref of step.before.filter((row) => going.has(annotationKey(row)))) {
+    const at = step.before.findIndex((row) => annotationKey(row) === annotationKey(ref));
+    const neighbour = step.before
+      .slice(0, at)
+      .reverse()
+      .find((row) => inPlace.has(annotationKey(row)));
+    const plan = planReorder(
+      current,
+      step.family,
+      [ref],
+      neighbour ? { after: neighbour } : 'start',
+    );
+    applyReorder(ctx.runtime, ctx.session, plan);
+    inPlace.add(annotationKey(ref));
+    current = readPageStack(ctx.runtime, ctx.session, step.page);
+  }
+  const after = familyOrder(current, step.family);
   return {
-    item: {
-      type: 'annotations.move',
-      page: step.page,
-      annotations,
-      meta: annotationMutationMeta(ctx.session.writeStamp(), page, step.refs),
-    },
-    reverse: [{ ...step, at: step.targets, targets: step.at }],
+    item: reorderItem(ctx, step.family, step.page, after, back),
+    reverse: [{ ...step, refs: back, before: now, after }],
   };
+}
+
+/**
+ * The key of the row right below `ref` in `order`; `null` at the bottom,
+ * `undefined` when `ref` isn't in it.
+ */
+function rowBelow(order: readonly AnnotationRef[], ref: AnnotationRef): string | null | undefined {
+  const at = order.findIndex((row) => annotationKey(row) === annotationKey(ref));
+  if (at < 0) return undefined;
+  return at === 0 ? null : annotationKey(order[at - 1]!);
+}
+
+/** A reorder may move these rows: each annotation's kind, or the form's design. */
+function authorizeReorder(
+  ctx: ChangeContext,
+  family: AnnotationFamily,
+  refs: readonly AnnotationRef[],
+): void {
+  if (family === 'widgets') {
+    authorizeCapability(ctx.authority, 'doc.forms.modify');
+    return;
+  }
+  const moving = refs.map((ref) => readAnnotation(ctx, ref));
+  for (const capability of annotationWriteCapabilities(moving)) {
+    authorizeCapability(ctx.authority, capability);
+  }
+}
+
+/** A reorder's item: the family's new order on the page, and the rows that moved. */
+function reorderItem(
+  ctx: ChangeContext,
+  family: AnnotationFamily,
+  page: PageRef,
+  order: AnnotationRef[],
+  moved: readonly AnnotationRef[],
+): ChangeItem<PdfCoordinates> {
+  const stamp = ctx.session.writeStamp();
+  if (family === 'annotations') {
+    return {
+      type: 'annotations.reorder',
+      page,
+      order,
+      meta: annotationMutationMeta(stamp, page.objectNumber, moved),
+    };
+  }
+  const widgets: FormWidget[] = moved.map((ref) => ({
+    ref,
+    objectNumber: objectNumberOf(ctx, ref),
+    page,
+  }));
+  return { type: 'forms.reorderWidgets', page, order, meta: formMutationMeta(stamp, [], widgets) };
 }
 
 // ---------------------------------------------------------------------------
 // Writes, each recording its reverse
 // ---------------------------------------------------------------------------
 
-/** An update of `ref` with `patch`, recording the dictionaries it writes. */
-function writeUpdate(
+/**
+ * An update of `ref` with `patch`, recording the dictionaries it writes, and
+ * reported as `reports`: an annotation's update, or a widget's form op.
+ */
+export function writeUpdate(
   ctx: ChangeContext,
   ref: AnnotationRef,
   patch: AnnotationPatch<PdfCoordinates>,
+  reports: UpdateReport,
   resources?: WireAnnotationResources,
 ): Done {
   // Captures go by object number: an annotation born inline gets one first.
@@ -278,17 +414,42 @@ function writeUpdate(
   const result = mutator(ctx).update(ref, patch, ctx.authority, ctx.signal, resources);
   const objects = captureAfter(ctx.runtime, ctx.session, pending);
   return {
-    item: { type: 'annotations.update', page: ref.page, ...result },
+    item: updatedItem(ctx, reports, ref, result),
     reverse: [
       {
         kind: 'objects.revert',
-        reports: 'annotations.update',
+        reports,
         objects,
         subject: { annotation: ref },
         appearanceChanged: result.appearance.changed,
         fallback: valuesChanged(before, result.annotation, patch),
       },
     ],
+  };
+}
+
+/**
+ * The item of an in-place update: an annotation's, with its page; or a
+ * widget's form op, with the form's meta.
+ */
+function updatedItem(
+  ctx: ChangeContext,
+  reports: UpdateReport,
+  ref: AnnotationRef,
+  result: AnnotationUpdateResult<PdfCoordinates>,
+): ChangeItem<PdfCoordinates> {
+  if (reports === 'annotations.update') {
+    return { type: 'annotations.update', page: ref.page, ...result };
+  }
+  const widget = result.annotation;
+  if (widget.subtype !== 'widget') throw new Error('a widget update read back no widget');
+  return {
+    type: 'forms.updateWidget',
+    widget,
+    appearance: result.appearance,
+    meta: formMutationMeta(ctx.session.writeStamp(), widget.field ? [widget.field] : [], [
+      formWidget(objectNumberOf(ctx, ref), ref.page),
+    ]),
   };
 }
 
@@ -314,7 +475,7 @@ function writeDelete(ctx: ChangeContext, ref: AnnotationRef): Done {
           ctx.runtime,
           ctx.session.requireDocPtr(),
           pageIndex,
-          members.map((member) => member.index),
+          members.map((member) => resolveAnnotIndexRaw(ctx.runtime, ctx.session, member.ref).index),
         )
       : new Uint8Array();
   const result = mutator(ctx).delete(ref, ctx.authority, ctx.signal);
@@ -392,10 +553,13 @@ function mutator(ctx: ChangeContext): AnnotationMutator {
 }
 
 /** The annotation `ref` names, as it reads now; `NotFound` when there is none. */
-function readAnnotation(ctx: ChangeContext, ref: AnnotationRef): Annotation<PdfCoordinates> {
-  const { index } = resolveAnnotIndexRaw(ctx.runtime, ctx.session, ref);
-  const found = listPage(ctx, ref.page.objectNumber)[index];
-  if (!found) throw new Error(`annotation ${annotationKey(ref)} is not at ${index}`);
+export function readAnnotation(ctx: ChangeContext, ref: AnnotationRef): Annotation<PdfCoordinates> {
+  resolveAnnotIndexRaw(ctx.runtime, ctx.session, ref);
+  const key = annotationKey(ref);
+  const found = listPage(ctx, ref.page.objectNumber).find(
+    (annotation) => annotationKey(annotation.ref) === key,
+  );
+  if (!found) throw new Error(`annotation ${key} is on its page but reads as none`);
   return found;
 }
 
@@ -409,14 +573,19 @@ function tryReadAnnotation(
   );
 }
 
-function tryIndexOf(ctx: ChangeContext, ref: AnnotationRef): number | null {
-  return tryReadAnnotation(ctx, ref)?.index ?? null;
-}
-
 /** Every annotation of a page, read from its dictionaries; the page is not loaded. */
 function listPage(ctx: ChangeContext, page: PageObjectNumber): Annotation<PdfCoordinates>[] {
   return new RawAnnotationReader(ctx.runtime, ctx.session, ctx.fonts).listOne(page, ctx.signal)
     .annotations;
+}
+
+/** A page's stack, or null when the page is gone. */
+function tryReadPageStack(ctx: ChangeContext, page: PageRef): PageStack | null {
+  try {
+    return readPageStack(ctx.runtime, ctx.session, page);
+  } catch {
+    return null;
+  }
 }
 
 /** The same, or null when the page is gone. */
@@ -429,7 +598,7 @@ function tryListPage(ctx: ChangeContext, page: PageRef): Annotation<PdfCoordinat
 }
 
 /** The object number of the annotation `ref` names (born inline, it must be promoted first). */
-function objectNumberOf(ctx: ChangeContext, ref: AnnotationRef): number {
+export function objectNumberOf(ctx: ChangeContext, ref: AnnotationRef): number {
   if (ref.kind === 'objectNumber') return ref.objectNumber;
   const { pageIndex, index } = resolveAnnotIndexRaw(ctx.runtime, ctx.session, ref);
   const annotPtr = openAnnotAtRaw(ctx.runtime, ctx.session, pageIndex, index);

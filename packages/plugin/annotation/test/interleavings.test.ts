@@ -47,7 +47,6 @@ const squareOf = (state: EngineState): FileAnnotation =>
   ({
     ref: REF,
     page: PAGE,
-    index: 20,
     hasAppearance: true,
     appearanceState: null,
     nm: null,

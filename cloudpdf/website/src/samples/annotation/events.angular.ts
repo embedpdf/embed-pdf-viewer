@@ -63,10 +63,10 @@ export class ActivityLog {
           origin.kind,
         ),
       );
-    this.annotation.moved$
+    this.annotation.reordered$
       .pipe(takeUntilDestroyed())
-      .subscribe(({ refs, toIndex, origin }) =>
-        this.log(`Moved ${refs.length} to position ${toIndex + 1}`, origin.kind),
+      .subscribe(({ order, origin }) =>
+        this.log(`Restacked ${order.length} on a page`, origin.kind),
       );
   }
 

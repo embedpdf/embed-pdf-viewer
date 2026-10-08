@@ -15,7 +15,7 @@ new ones, blank or from another PDF. These are edits to the file, kept when it's
 
 ```ts
 await pageEdit.rotateBy([page.ref], 90);
-await pageEdit.move([page.ref], { index: 0 }); // to the front
+await pageEdit.reorder([page.ref], 'start'); // to the front
 await pageEdit.delete([page.ref]);
 ```
 
@@ -40,13 +40,13 @@ This rotates the page in the file. To only turn how pages are shown, use the Sta
 
 ## Reorder pages
 
-`move()` takes the pages and where they go:
+`reorder()` takes the pages and where they go:
 
 ```ts
-await pageEdit.move([page.ref], { index: 0 }); // to the front
-await pageEdit.move([page.ref], 'end'); // to the back
-await pageEdit.move([pageA.ref, pageB.ref], { after: pageC.ref }); // after another page
-await pageEdit.move([page.ref], { before: pageC.ref });
+await pageEdit.reorder([page.ref], 'start'); // to the front
+await pageEdit.reorder([page.ref], 'end'); // to the back
+await pageEdit.reorder([pageA.ref, pageB.ref], { after: pageC.ref }); // after another page
+await pageEdit.reorder([page.ref], { before: pageC.ref });
 ```
 
 Several pages keep their order and land together.
@@ -69,7 +69,7 @@ await pageEdit.insertBlank({ placement: { after: page.ref }, size: { width: 595,
 
 // Pages from another PDF: all of them, or the ones you name
 await pageEdit.insertFromBytes(otherPdf, { placement: 'end' });
-await pageEdit.insertFromBytes(otherPdf, { pageIndexes: [0, 2], placement: { index: 0 } });
+await pageEdit.insertFromBytes(otherPdf, { pageIndexes: [0, 2], placement: 'start' });
 
 // Pages from another document open in the viewer
 await pageEdit.insertFromDocument(otherDocumentId, [pageRef], { placement: 'end' });
@@ -96,29 +96,33 @@ saveFile(bytes, 'chapter-2.pdf');
 
 ## Where a page goes
 
-| Placement               | Means                         |
-| :---------------------- | :---------------------------- |
-| `{ index: n }`          | At position `n`, from 0       |
-| `{ after: pageRef }`    | Right after that page         |
-| `{ before: pageRef }`   | Right before that page        |
-| `'end'`                 | After the last page           |
+| Placement             | Means                  |
+| :-------------------- | :--------------------- |
+| `{ after: pageRef }`  | Right after that page  |
+| `{ before: pageRef }` | Right before that page |
+| `'start'`             | Before the first page  |
+| `'end'`               | After the last page    |
+
+A placement names a page, not a position, so it stays right when pages move while the edit waits
+its turn. The page can also be an index, as everywhere in this plugin: the page at that index
+when you call.
 
 ## Methods
 
 Everything `usePageEdit()` gives you.
 
-| Method                                                  | What it does                                                                                                                      |
-| :------------------------------------------------------ | :-------------------------------------------------------------------------------------------------------------------------------- |
-| `rotateBy(pages, delta)`                                | Turns each page by `90`, `-90` or `180` degrees from where it is. [Rotate pages](#rotate-pages)                                    |
-| `setRotation(pages, rotation)`                          | Gives every page the same rotation: `0`, `90`, `180` or `270`                                                                     |
-| `move(pages, placement)`                                | Moves pages to a new place. Several pages keep their order and land together. [Reorder pages](#reorder-pages)                     |
-| `delete(pages)`                                         | Deletes pages. Deleting every page is refused. [Delete pages](#delete-pages)                                                      |
-| `insertBlank({ placement?, size?, count? })`            | Inserts blank pages, one unless you pass a `count`. Resolves `{ pages }`, the new pages. [Insert pages](#insert-pages)            |
-| `insertFromBytes(bytes, { pageIndexes?, placement? })`  | Inserts the pages of another PDF, or only the ones at `pageIndexes`. Resolves `{ pages }`.                                        |
-| `insertFromDocument(documentId, pages, { placement? })` | Inserts copies of pages from another document open in the viewer. Resolves `{ pages }`.                                           |
-| `duplicate(pages, { placement? })`                      | Copies pages, right after the last of them unless you pass a placement. Resolves `{ pages }`.                                     |
-| `extract(pages)`                                        | Copies pages into a new PDF and resolves its bytes. This document doesn't change. [Extract pages](#extract-pages)                 |
-| `canEdit()`, `canExtract()`                             | Whether rotating, reordering, deleting and inserting are allowed, and whether copying pages out is. [Permissions](#permissions)   |
+| Method                                                  | What it does                                                                                                                    |
+| :------------------------------------------------------ | :------------------------------------------------------------------------------------------------------------------------------ |
+| `rotateBy(pages, delta)`                                | Turns each page by `90`, `-90` or `180` degrees from where it is. [Rotate pages](#rotate-pages)                                 |
+| `setRotation(pages, rotation)`                          | Gives every page the same rotation: `0`, `90`, `180` or `270`                                                                   |
+| `reorder(pages, placement)`                             | Moves pages to a new place. Several pages keep their order and land together. [Reorder pages](#reorder-pages)                   |
+| `delete(pages)`                                         | Deletes pages. Deleting every page is refused. [Delete pages](#delete-pages)                                                    |
+| `insertBlank({ placement?, size?, count? })`            | Inserts blank pages, one unless you pass a `count`. Resolves `{ pages }`, the new pages. [Insert pages](#insert-pages)          |
+| `insertFromBytes(bytes, { pageIndexes?, placement? })`  | Inserts the pages of another PDF, or only the ones at `pageIndexes`. Resolves `{ pages }`.                                      |
+| `insertFromDocument(documentId, pages, { placement? })` | Inserts copies of pages from another document open in the viewer. Resolves `{ pages }`.                                         |
+| `duplicate(pages, { placement? })`                      | Copies pages, right after the last of them unless you pass a placement. Resolves `{ pages }`.                                   |
+| `extract(pages)`                                        | Copies pages into a new PDF and resolves its bytes. This document doesn't change. [Extract pages](#extract-pages)               |
+| `canEdit()`, `canExtract()`                             | Whether rotating, reordering, deleting and inserting are allowed, and whether copying pages out is. [Permissions](#permissions) |
 
 `placement` is one of the values in [Where a page goes](#where-a-page-goes); without one, new pages go
 at the end. Every method that returns a promise also takes a `signal` in its options, to cancel it.
@@ -135,10 +139,10 @@ The page edit plugin has no events of its own. <Fw only={['react', 'vue', 'svelt
 
 ## Permissions
 
-| Permission          | What it allows                                                  | Check                  |
-| :------------------ | :-------------------------------------------------------------- | :--------------------- |
-| `doc.pages.assemble` | Rotate, reorder, delete and insert pages                       | `pageEdit.canEdit()`   |
-| `doc.download`      | `extract()`, `duplicate()` and `insertFromDocument()`, which copy pages out | `pageEdit.canExtract()` |
+| Permission           | What it allows                                                              | Check                   |
+| :------------------- | :-------------------------------------------------------------------------- | :---------------------- |
+| `doc.pages.assemble` | Rotate, reorder, delete and insert pages                                    | `pageEdit.canEdit()`    |
+| `doc.download`       | `extract()`, `duplicate()` and `insertFromDocument()`, which copy pages out | `pageEdit.canExtract()` |
 
 ## Good to know
 

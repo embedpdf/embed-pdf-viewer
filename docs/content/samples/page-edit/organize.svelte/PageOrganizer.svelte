@@ -53,7 +53,7 @@
     type="button"
     class="button"
     disabled={!canEdit || count === 0}
-    onclick={() => pageEdit.move(selected, { index: 0 })}
+    onclick={() => pageEdit.reorder(selected, 'start')}
   >
     Move to front
   </button>

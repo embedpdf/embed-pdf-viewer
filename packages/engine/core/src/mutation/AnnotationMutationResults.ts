@@ -55,22 +55,15 @@ export function deletedAnnotationsOf(result: AnnotationDeleteResult): Annotation
 }
 
 /**
- * Batch annotation move (contiguous-block semantics; symmetric with
- * `pages.move`). The single-annotation case is `move([ref], toIndex)`.
- *
- * Moved annotations keep their names. Each `annotations[i].index` reflects
- * the post-move index, which is exactly `toIndex + i`.
+ * Result of a stacking-order change (`page.annotations.reorder()`): the
+ * page's annotations in their new paint order, whole, as refs (widgets
+ * excepted: they paint above every annotation, in their own order). The
+ * moved annotations keep their names and their data, so nothing else is
+ * read back.
  */
-export interface AnnotationMoveResult<C extends Coordinates = PageCoordinates> {
-  /**
-   * The moved annotations in their **new order**. `length === refs.length`.
-   * `annotations[i]` is the post-move DTO of `refs[i]`, and lives at index
-   * `toIndex + i` in the page's /Annots array.
-   */
-  annotations: Annotation<C>[];
-  /**
-   * One envelope per batch, regardless of `refs.length`. `meta.changed`
-   * lists every moved annotation, in caller order.
-   */
+export interface AnnotationReorderResult {
+  /** Every annotation of the page, widgets excepted, bottom to top. */
+  order: AnnotationRef[];
+  /** `meta.changed` names the annotations that moved, in the order given. */
   meta: AnnotationListMutationMeta;
 }

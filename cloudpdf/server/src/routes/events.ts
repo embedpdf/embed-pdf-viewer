@@ -1,5 +1,6 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import type { Kysely } from 'kysely';
+import { checkCapability, type DocCapability } from '@embedpdf/engine-core/runtime';
 
 import type { DrainCoordinator } from '../app/drain';
 import {
@@ -13,6 +14,7 @@ import type { Database as Schema } from '../db/schema';
 import type { RealtimeBus } from '../realtime/RealtimeBus';
 import type { DocumentService } from '../services/DocumentService';
 import { toJsonlEvent } from '../services/EventLogService';
+import { visibleRow, type StreamRow } from '../services/eventVisibility';
 import type { LayerService } from '../services/LayerService';
 
 /** Per-drain page size; rings coalesce, so a burst streams in pages. */
@@ -84,11 +86,13 @@ export async function registerEventsRoutes(
     // Events are a read of the document's mutation history — same gate as
     // opening the document at all.
     const ctx = requireLayerCapability(req, docId, layerName, 'doc.open', pdfBits);
-    const mayCreate = mayCreateObjects(
-      ctx,
-      pdfBits,
-      await opts.documentService.getProtection(accessCtx, docId, layerName),
-    );
+    const protection = await opts.documentService.getProtection(accessCtx, docId, layerName);
+    const mayCreate = mayCreateObjects(ctx, pdfBits, protection);
+    // Each row is filtered to what this connection may read, as the reads
+    // are: annotations and the form each take their own read capability.
+    const may = (capability: DocCapability) =>
+      ctx.mode === 'tenant' || checkCapability(capability, ctx.jwt.scope, pdfBits, protection);
+    const rights = { annotations: may('doc.annotate.read'), forms: may('doc.forms.read') };
 
     const head = await layerAuditHead(opts.db, ctx.tenantId, docId, layerName);
     const requested = parseLastEventId(req);
@@ -148,9 +152,8 @@ export async function registerEventsRoutes(
             // A `signature.complete` row changes the whole manifest (base sha,
             // every promoted page pin, the plane pointers); the client drops
             // its cached manifest when it reads that row.
-            raw.write(
-              `id: ${row.id}\nevent: mutation\ndata: ${JSON.stringify(toJsonlEvent(row))}\n\n`,
-            );
+            const visible = visibleRow(toJsonlEvent(row) as StreamRow, rights);
+            raw.write(`id: ${row.id}\nevent: mutation\ndata: ${JSON.stringify(visible)}\n\n`);
             cursor = row.id;
             // A publish dropped every session's numbers: tell this one now.
             if (row.kind === 'signature.complete') void sendSession();

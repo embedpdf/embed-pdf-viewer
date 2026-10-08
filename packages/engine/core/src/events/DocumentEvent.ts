@@ -6,7 +6,7 @@ import type { PageRef } from '../identity/PageRef';
 import type {
   AnnotationCreateResult,
   AnnotationDeleteResult,
-  AnnotationMoveResult,
+  AnnotationReorderResult,
   AnnotationUpdateResult,
 } from '../mutation/AnnotationMutationResults';
 import type {
@@ -21,10 +21,15 @@ import type {
   FormMutationMeta,
   FormRepairResult,
   FormSetValueResult,
+  FormWidgetDeleteResult,
   FormWidgetLinkResult,
+  FormWidgetRestoreResult,
+  FormWidgetsReorderResult,
+  FormWidgetUpdateResult,
 } from '../mutation/FormMutationResults';
 import type { AnnotationListMutationMeta } from '../mutation/AnnotationListMutationMeta';
 import type { Annotation } from '../annotation/kinds';
+import type { WidgetAnnotation } from '../annotation/kinds/widget';
 import type { FormFieldDTO } from '../forms/field';
 import type { CustomMetadataUpdateResult } from '../mutation/CustomMetadataUpdateResult';
 import type { MetadataUpdateResult } from '../mutation/MetadataUpdateResult';
@@ -33,7 +38,7 @@ import type { PageDeleteResult } from '../mutation/PageDeleteResult';
 import type { PageFlattenResult, PageFlattenUsage } from '../mutation/PageFlattenResult';
 import type { RedactionApplyResult } from '../mutation/RedactionApplyResult';
 import type { PageInsertResult } from '../mutation/PageInsertResult';
-import type { PageMoveResult } from '../mutation/PageMoveResult';
+import type { PageReorderResult } from '../mutation/PageReorderResult';
 import type { PageNameResult } from '../mutation/PageNameResult';
 import type { PageRotateResult } from '../mutation/PageRotateResult';
 import type { FormFieldRef } from '../identity/FormFieldRef';
@@ -128,10 +133,11 @@ export type DocumentEvent =
       deleted: AnnotationRef[];
     } & AnnotationDeleteResult)
   | ({
-      type: 'annotations.moved';
+      /** A stacking-order change: the page's annotations in their new order. */
+      type: 'annotations.reordered';
       page: PageRef;
       origin: EventOrigin;
-    } & AnnotationMoveResult)
+    } & AnnotationReorderResult)
   | {
       /**
        * An undo brought deleted annotations back: the same objects, under
@@ -149,16 +155,7 @@ export type DocumentEvent =
       type: 'annotations.flattened';
       origin: EventOrigin;
     } & AnnotationFlattenResult)
-  | ({
-      type: 'pages.moved';
-      /** Locally: the moved block. Remotely the audit row only records the
-       *  outcome, so this is the full new order — consumers should read
-       *  `layout` for positions, never reconstruct the gesture. */
-      pages: PageRef[];
-      /** The originator's insertion point; absent on remote events. */
-      toIndex?: number;
-      origin: EventOrigin;
-    } & PageMoveResult)
+  | ({ type: 'pages.reordered'; origin: EventOrigin } & PageReorderResult)
   | ({
       type: 'pages.rotated';
       pages: PageRef[];
@@ -171,12 +168,7 @@ export type DocumentEvent =
       pages: PageRef[];
       origin: EventOrigin;
     } & PageDeleteResult)
-  | ({
-      type: 'pages.inserted';
-      /** The originator's insertion point; absent on remote events. */
-      toIndex?: number;
-      origin: EventOrigin;
-    } & PageInsertResult)
+  | ({ type: 'pages.inserted'; origin: EventOrigin } & PageInsertResult)
   | ({
       type: 'pages.named';
       /** The decoded key that was registered, renamed, or removed. */
@@ -213,10 +205,23 @@ export type DocumentEvent =
       type: 'forms.restored';
       origin: EventOrigin;
       field: FormFieldDTO;
+      widgets: WidgetAnnotation[];
       meta: FormMutationMeta;
     }
   | ({ type: 'forms.widgetAdded'; origin: EventOrigin } & FormWidgetLinkResult)
   | ({ type: 'forms.widgetRemoved'; origin: EventOrigin } & FormWidgetLinkResult)
+  | ({ type: 'forms.widgetDeleted'; origin: EventOrigin } & FormWidgetDeleteResult)
+  | ({
+      /** An undo brought a deleted widget back: onto its page at its place, into its field. */
+      type: 'forms.widgetRestored';
+      origin: EventOrigin;
+    } & FormWidgetRestoreResult)
+  | ({ type: 'forms.widgetUpdated'; origin: EventOrigin } & FormWidgetUpdateResult)
+  | ({
+      /** A stacking-order change: the page's widgets in their new order. */
+      type: 'forms.widgetsReordered';
+      origin: EventOrigin;
+    } & FormWidgetsReorderResult)
   | ({ type: 'forms.effectsApplied'; origin: EventOrigin } & FormEffectsResult)
   | ({
       type: 'pages.flattened';

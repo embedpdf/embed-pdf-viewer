@@ -6,6 +6,7 @@ export interface CacheDelta {
     previousDocVersion: number;
     docVersion: number;
     annotationsVersion?: number | undefined;
+    formsVersion?: number | undefined;
     layoutVersion?: number | undefined;
     metadataVersion?: number | undefined;
     attachmentsVersion?: number | undefined;
@@ -27,6 +28,7 @@ export namespace CacheDelta {
             export interface Cache {
                 contentVersion: number;
                 annotationVersion: number;
+                widgetVersion: number;
             }
         }
     }

@@ -3,7 +3,7 @@ import type {
   DocumentProtection,
   SignatureDTO,
 } from '@embedpdf/engine-core/runtime';
-import { EngineError, EngineErrorCode, pageSignatureOf } from '@embedpdf/engine-core/runtime';
+import { EngineError, EngineErrorCode } from '@embedpdf/engine-core/runtime';
 import type { PdfRuntimeModule } from '@embedpdf/engine-runtime';
 
 import { writeContentsIntoFile } from './internal/candidateStore';
@@ -14,7 +14,6 @@ import { DocumentSession } from '../../document-session/DocumentSession';
 import type { BaseDocumentRegistry } from '../../document-session/lifecycle/BaseDocumentRegistry';
 import { openLayerDocument } from '../../document-session/lifecycle/PdfDocumentOpener';
 import { generateUuid } from '../../shared/uuid';
-import { visibleBoxReader } from '../pages/PagesReader';
 
 export interface FinalizeCandidateInput {
   /** The rebuilt candidate on this filesystem; patched in place. */
@@ -106,7 +105,7 @@ export class CandidateFinalizer {
         (s) => s.field.kind === 'objectNumber' && s.field.objectNumber === input.fieldObjectNumber,
       )!;
       return {
-        signature: pageSignatureOf(signature, visibleBoxReader(this.runtime, session)),
+        signature,
         protection: snapshot.protection,
         version: reader.version(),
         lastObjectNumber: session.lastObjectNumber(),

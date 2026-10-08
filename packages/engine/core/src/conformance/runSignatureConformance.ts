@@ -805,14 +805,13 @@ function runSigningTests(
       });
       expect(result.signature.coverage).toBe('whole-revision');
       expect(result.signature.widget).toBeTruthy();
-      const page = doc.page(result.signature.widget!.page!);
-      const annots = await page.annotations.list();
-      const widget = annots.annotations.find(
-        (a) =>
-          a.ref.kind === 'objectNumber' &&
-          a.ref.objectNumber === result.signature.widget!.objectNumber,
+      // Where it shows is the widget's row in the form.
+      const widget = (await doc.forms.list()).widgets.find(
+        (w) =>
+          w.ref.kind === 'objectNumber' &&
+          w.ref.objectNumber === result.signature.widget!.objectNumber,
       );
-      expect(widget).toBeTruthy();
+      expect(widget?.page).toEqual(result.signature.widget!.page);
     } finally {
       await doc.close();
     }

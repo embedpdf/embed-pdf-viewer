@@ -18,6 +18,7 @@ import {
   FormResetResultSchema,
   FormSetValueResultSchema,
   FormWidgetLinkResultSchema,
+  FormWidgetsReorderResultSchema,
 } from '../wire/schemas';
 import { FormSnapshotSchema } from '../forms/schema';
 
@@ -462,7 +463,7 @@ export function runFormConformance(
       }
     });
 
-    test('widgets live the full annotation-plane loop', async () => {
+    test('widgets live the full form loop', async () => {
       const doc = await open(opts.fixtures.toggleFields);
       const pageRef = toPageRef(opts.fixtures.toggleFields.pageObjectNumber);
       const page = doc.page(pageRef);
@@ -480,47 +481,193 @@ export function runFormConformance(
           fontSize: 10,
         });
         FormWidgetLinkResultSchema.parse(added);
-        expect(added.field.widgets.map((widget) => widget.rect)).toEqual([rect]);
+        expect(added.widgets.map((widget) => widget.rect)).toEqual([rect]);
         expect(added.meta.changedWidgets.length).toBe(1);
         const widgetRef = added.field.widgets[0]?.ref;
         if (widgetRef?.kind !== 'objectNumber') throw new Error('expected durable ref');
 
-        // 2. The annotation plane sees it, joined to its field.
-        const widgetDto = (await page.annotations.list()).annotations.find(
-          (a) => a.ref.kind === 'objectNumber' && a.ref.objectNumber === widgetRef.objectNumber,
+        // 2. The form holds its row, joined to its field; the annotations never do.
+        const widgetRow = (await doc.forms.list()).widgets.find(
+          (w) => annotationKey(w.ref) === annotationKey(widgetRef),
         );
-        if (widgetDto?.subtype !== 'widget') throw new Error('expected widget DTO');
-        expect(widgetDto.field).toEqual(field.field.ref);
-        expect(widgetDto.fieldFamily).toBe('text');
-        expect(widgetDto.rect).toEqual(rect);
-        expect(widgetDto.interiorColor).toEqual('#f6f8fa');
+        if (!widgetRow) throw new Error('expected a widget row');
+        expect(widgetRow.field).toEqual(field.field.ref);
+        expect(widgetRow.fieldFamily).toBe('text');
+        expect(widgetRow.rect).toEqual(rect);
+        expect(widgetRow.interiorColor).toEqual('#f6f8fa');
+        expect(
+          (await page.annotations.list()).annotations.some((a) => a.subtype === 'widget'),
+        ).toBe(false);
 
-        // 3. Restyled/moved through the same annotation path as every kind.
-        const patched = await page.annotations.update(widgetRef, {
-          subtype: 'widget',
+        // 3. Restyled and moved through the form, never the annotation path.
+        const patched = await doc.forms.updateWidget(widgetRef, {
           interiorColor: '#fff7db',
+          rect: { ...rect, y: 40 },
         });
-        if (patched.annotation.subtype !== 'widget') throw new Error('expected widget DTO');
-        expect(patched.annotation.interiorColor).toEqual('#fff7db');
-
-        // 4. Deleting an attached widget is refused - the field-tree owns it.
+        expect(patched.widget.interiorColor).toEqual('#fff7db');
+        expect(patched.widget.rect).toEqual({ ...rect, y: 40 });
+        await expect(
+          page.annotations.update(widgetRef, { subtype: 'widget', interiorColor: '#ffffff' }),
+        ).rejects.toMatchObject({ code: EngineErrorCode.InvalidArg });
         await expect(page.annotations.delete(widgetRef)).rejects.toMatchObject({
           code: EngineErrorCode.InvalidArg,
         });
 
-        // 5. Removed from its field -> inert -> ordinary annotation delete succeeds.
-        await doc.forms.removeWidget(field.field.ref, widgetRef);
-        const inert = (await page.annotations.list()).annotations.find(
-          (a) => a.ref.kind === 'objectNumber' && a.ref.objectNumber === widgetRef.objectNumber,
+        // 4. Removed from its field, it stays on its page as a row in no field.
+        const removed = await doc.forms.removeWidget(field.field.ref, widgetRef);
+        expect(removed.widgets.map((w) => w.field)).toEqual([null]);
+        const inert = (await doc.forms.list()).widgets.find(
+          (w) => annotationKey(w.ref) === annotationKey(widgetRef),
         );
-        if (inert?.subtype !== 'widget') throw new Error('expected widget DTO');
-        expect(inert.field).toBeNull();
-        await page.annotations.delete(widgetRef);
+        expect(inert?.field).toBeNull();
 
         // The field survives, unplaced.
         const after = await doc.forms.get(field.field.ref);
         expect(after.widgets.length).toBe(0);
       } finally {
+        await doc.close();
+      }
+    });
+
+    test('deleteWidget takes a widget off its page, and out of its field', async () => {
+      const doc = await open(opts.fixtures.toggleFields);
+      const pageRef = toPageRef(opts.fixtures.toggleFields.pageObjectNumber);
+      const page = doc.page(pageRef);
+      const events: DocumentEvent[] = [];
+      const stop = doc.events.subscribe((event) => events.push(event));
+      try {
+        const created = await doc.forms.create({
+          family: 'text',
+          name: 'delete_me',
+          widgets: [
+            { page: pageRef, rect: { x: 20, y: 300, width: 120, height: 20 } },
+            { page: pageRef, rect: { x: 20, y: 330, width: 120, height: 20 } },
+          ],
+        });
+        const [first, second] = created.field.widgets.map((w) => w.ref!) as [
+          AnnotationRef,
+          AnnotationRef,
+        ];
+        const onPage = async (ref: AnnotationRef) =>
+          (await doc.forms.list()).widgets.some((w) => annotationKey(w.ref) === annotationKey(ref));
+
+        // A widget in a field: it leaves the page and the field; the field keeps the other.
+        const deleted = await doc.forms.deleteWidget(first);
+        expect(annotationKey(deleted.widget)).toBe(annotationKey(first));
+        expect(deleted.page).toEqual(pageRef);
+        expect(deleted.field?.widgets.map((w) => w.ref && annotationKey(w.ref))).toEqual([
+          annotationKey(second),
+        ]);
+        expect(await onPage(first)).toBe(false);
+        expect(events.some((event) => event.type === 'forms.widgetDeleted')).toBe(true);
+
+        // A widget in no field goes too.
+        await doc.forms.removeWidget(created.field.ref, second);
+        const inert = await doc.forms.deleteWidget(second);
+        expect(inert.field).toBeNull();
+        expect(await onPage(second)).toBe(false);
+        expect((await doc.forms.get(created.field.ref)).widgets).toEqual([]);
+
+        // A merged field/widget is the field: delete the field instead.
+        const merged = await doc.forms.get(toFieldRef('opt_check'));
+        const mergedRefusal = await doc.forms.deleteWidget(merged.widgets[0]!.ref!).then(
+          () => null,
+          (error: unknown) => error as { code?: unknown; message?: unknown },
+        );
+        expect(mergedRefusal).toMatchObject({ code: EngineErrorCode.InvalidArg });
+        expect(String(mergedRefusal?.message)).toMatch(/doc\.forms\.delete/);
+
+        // An annotation isn't a widget.
+        const square = (
+          await page.annotations.create({
+            subtype: 'square',
+            box: { x: 300, y: 300, width: 40, height: 40 },
+          })
+        ).annotation.ref;
+        const notWidget = await doc.forms.deleteWidget(square).then(
+          () => null,
+          (error: unknown) => error as { code?: unknown; message?: unknown },
+        );
+        expect(notWidget).toMatchObject({ code: EngineErrorCode.InvalidArg });
+        expect(String(notWidget?.message)).toMatch(/annotations\.delete/);
+      } finally {
+        stop();
+        await doc.close();
+      }
+    });
+
+    test('widgets and annotations each keep their own stacking order', async () => {
+      const doc = await open(opts.fixtures.toggleFields);
+      const pageRef = toPageRef(opts.fixtures.toggleFields.pageObjectNumber);
+      const page = doc.page(pageRef);
+      const events: DocumentEvent[] = [];
+      const stop = doc.events.subscribe((event) => events.push(event));
+      try {
+        const widgetOrder = async () =>
+          (await doc.forms.list()).widgets
+            .filter((w) => w.page.objectNumber === pageRef.objectNumber)
+            .map((w) => w.ref);
+        const annotationOrder = async () =>
+          (await page.annotations.list()).annotations.map((a) => a.ref);
+        const keys = (refs: readonly AnnotationRef[]) => refs.map(annotationKey);
+        const square = (
+          await page.annotations.create({
+            subtype: 'square',
+            box: { x: 300, y: 300, width: 40, height: 40 },
+          })
+        ).annotation.ref;
+        const widgets = await widgetOrder();
+        const annotations = await annotationOrder();
+        expect(widgets.length >= 2).toBe(true);
+        const [bottom, next] = widgets as [AnnotationRef, AnnotationRef];
+
+        // A widget to the top of the widgets: the annotations don't move.
+        const toTop = await doc.forms.reorderWidgets([bottom], 'end');
+        FormWidgetsReorderResultSchema.parse(toTop);
+        expect(toTop.page).toEqual(pageRef);
+        expect(keys(toTop.order)).toEqual(keys([...widgets.slice(1), bottom]));
+        expect(toTop.meta.changedWidgets.map((w) => w.ref && annotationKey(w.ref))).toEqual(
+          keys([bottom]),
+        );
+        expect(keys(await widgetOrder())).toEqual(keys(toTop.order));
+        expect(keys(await annotationOrder())).toEqual(keys(annotations));
+        const reordered = events.find((event) => event.type === 'forms.widgetsReordered');
+        expect(reordered?.type === 'forms.widgetsReordered' && keys(reordered.order)).toEqual(
+          keys(toTop.order),
+        );
+
+        // And back under its neighbour.
+        const back = await doc.forms.reorderWidgets([bottom], { before: next });
+        expect(keys(back.order)).toEqual(keys(widgets));
+
+        // An annotation to the bottom of the annotations: the widgets don't move.
+        const toBottom = await page.annotations.reorder([square], 'start');
+        expect(keys(toBottom.order)).toEqual(
+          keys([square, ...annotations.filter((a) => annotationKey(a) !== annotationKey(square))]),
+        );
+        expect(keys(await widgetOrder())).toEqual(keys(widgets));
+
+        // Each verb orders its own family only, as rows and as neighbours.
+        const refusal = (attempt: Promise<unknown>) =>
+          attempt.then(
+            () => null,
+            (error: unknown) => error as { code?: unknown; message?: unknown },
+          );
+        const widgetAsAnnotation = await refusal(page.annotations.reorder([bottom], 'start'));
+        expect(widgetAsAnnotation).toMatchObject({ code: EngineErrorCode.InvalidArg });
+        expect(String(widgetAsAnnotation?.message)).toMatch(/doc\.forms\.reorderWidgets/);
+        await expect(page.annotations.reorder([square], { after: bottom })).rejects.toMatchObject({
+          code: EngineErrorCode.InvalidArg,
+        });
+        const annotationAsWidget = await refusal(doc.forms.reorderWidgets([square], 'end'));
+        expect(annotationAsWidget).toMatchObject({ code: EngineErrorCode.InvalidArg });
+        expect(String(annotationAsWidget?.message)).toMatch(/annotations\.reorder/);
+        await expect(doc.forms.reorderWidgets([bottom], { before: square })).rejects.toMatchObject({
+          code: EngineErrorCode.InvalidArg,
+        });
+        expect(keys(await widgetOrder())).toEqual(keys(widgets));
+      } finally {
+        stop();
         await doc.close();
       }
     });
@@ -552,21 +699,17 @@ export function runFormConformance(
         expect(created.field.noToggleToOff).toBe(true);
         expect(created.field.widgets.map((w) => w.exportValue)).toEqual(['yes', 'no']);
         // Each widget lands where it was placed, measured from the page's top-left,
-        // and the field reads back the same rects the annotation plane does.
+        // and the form reads back the same rects the create answered.
         const rects = [
           { x: 20, y: 60, width: 20, height: 20 },
           { x: 60, y: 60, width: 20, height: 20 },
         ];
-        expect(created.field.widgets.map((w) => w.rect)).toEqual(rects);
-        const placed = await doc.page(toPageRef(pageObjectNumber)).annotations.list();
-        const rectOf = (ref: AnnotationRef | null) =>
-          placed.annotations.find((a) => ref && annotationKey(a.ref) === annotationKey(ref))?.rect;
-        expect(created.field.widgets.map((w) => rectOf(w.ref))).toEqual(rects);
-        const styled = placed.annotations.find(
-          (a) => annotationKey(a.ref) === annotationKey(created.field.widgets[0]!.ref!),
-        );
-        if (styled?.subtype !== 'widget') throw new Error('expected widget DTO');
-        expect(styled.color).toEqual('#000000');
+        expect(created.widgets.map((w) => w.rect)).toEqual(rects);
+        const placed = (await doc.forms.list()).widgets;
+        const rowOf = (ref: AnnotationRef | null) =>
+          placed.find((w) => ref && annotationKey(w.ref) === annotationKey(ref));
+        expect(created.field.widgets.map((w) => rowOf(w.ref)?.rect)).toEqual(rects);
+        expect(rowOf(created.field.widgets[0]!.ref)?.color).toEqual('#000000');
 
         // A second button joins the group where its placement says.
         const third = await doc.forms.addWidget(created.field.ref, {
@@ -577,16 +720,14 @@ export function runFormConformance(
         if (third.field.family !== 'radio') throw new Error('expected radio');
         expect(third.field.widgets.map((w) => w.exportValue)).toEqual(['yes', 'no', 'maybe']);
         // A button needs an export value; a refused add creates nothing.
-        const countBefore = (await doc.page(toPageRef(pageObjectNumber)).annotations.list())
-          .annotations.length;
+        const countBefore = (await doc.forms.list()).widgets.length;
         await expect(
           doc.forms.addWidget(created.field.ref, {
             page: toPageRef(pageObjectNumber),
             rect: { x: 140, y: 60, width: 20, height: 20 },
           }),
         ).rejects.toMatchObject({ code: EngineErrorCode.InvalidArg });
-        const countAfter = (await doc.page(toPageRef(pageObjectNumber)).annotations.list())
-          .annotations.length;
+        const countAfter = (await doc.forms.list()).widgets.length;
         expect(countAfter).toBe(countBefore);
         expect((await doc.forms.get(created.field.ref)).widgets.length).toBe(3);
 
@@ -609,13 +750,13 @@ export function runFormConformance(
         ).rejects.toMatchObject({ code: EngineErrorCode.InvalidArg });
 
         // delete cascades: field gone and its widgets gone; meta names both.
-        const before = await doc.page(toPageRef(pageObjectNumber)).annotations.list();
+        const before = (await doc.forms.list()).widgets;
         const removed = await doc.forms.delete(created.field.ref);
         expect(Object.keys(removed)).toEqual(['meta']);
         expect(removed.meta.changedFields).toEqual([created.field.ref]);
         expect(removed.meta.changedWidgets.length).toBe(3);
-        const after = await doc.page(toPageRef(pageObjectNumber)).annotations.list();
-        expect(after.annotations.length).toBe(before.annotations.length - 3);
+        const after = (await doc.forms.list()).widgets;
+        expect(after.length).toBe(before.length - 3);
         await expect(doc.forms.get({ kind: 'fqn', name: 'renamed_radio' })).rejects.toMatchObject({
           code: EngineErrorCode.NotFound,
         });
@@ -628,7 +769,9 @@ export function runFormConformance(
       const doc = await open(opts.fixtures.toggleFields);
       const page = toPageRef(opts.fixtures.toggleFields.pageObjectNumber);
       const names = async () => (await doc.forms.list()).fields.map((field) => field.name);
-      const widgetCount = async () => (await doc.page(page).annotations.list()).annotations.length;
+      const widgetCount = async () =>
+        (await doc.forms.list()).widgets.filter((w) => w.page.objectNumber === page.objectNumber)
+          .length;
       try {
         const namesBefore = await names();
         const widgetsBefore = await widgetCount();
@@ -761,10 +904,9 @@ export function runFormConformance(
       const doc = opts.fixtures.deleteTarget
         ? await open(opts.fixtures.deleteTarget)
         : await open(opts.fixtures.toggleFields, '-delete-target');
-      const page = doc.page(toPageRef(opts.fixtures.toggleFields.pageObjectNumber));
       const placed = async () =>
-        (await page.annotations.list()).annotations.flatMap((a) =>
-          a.ref.kind === 'objectNumber' ? [a.ref.objectNumber] : [],
+        (await doc.forms.list()).widgets.flatMap((w) =>
+          w.ref.kind === 'objectNumber' ? [w.ref.objectNumber] : [],
         );
       try {
         const events: DocumentEvent[] = [];
@@ -826,10 +968,10 @@ export function runFormConformance(
         // Both refusals left the field and its placement untouched.
         const after = await doc.forms.get(field.ref);
         expect(after.widgets.map((w) => w.objectNumber)).toEqual([widgetRef.objectNumber]);
-        const { annotations } = await page.annotations.list();
+        const { widgets } = await doc.forms.list();
         expect(
-          annotations.some(
-            (a) => a.ref.kind === 'objectNumber' && a.ref.objectNumber === widgetRef.objectNumber,
+          widgets.some(
+            (w) => w.ref.kind === 'objectNumber' && w.ref.objectNumber === widgetRef.objectNumber,
           ),
         ).toBe(true);
       } finally {

@@ -1,22 +1,29 @@
 /**
  * The form plugin's data, all pure:
  *
- * - `FieldIndex` is the field tree as the engine confirmed it, indexed by
- *   field key and by widget. It is the value of the plugin's `fields` mirror
- *   and changes only through `foldFormEvent` and loads.
- * - `PageWidgets` is one page's widgets, where each is and how it looks: the
- *   value of the `widgetBoxes` page mirror.
+ * - `FieldIndex` is the form as the engine confirmed it: the field tree and
+ *   every widget row, indexed by field key and by widget. It is the value of
+ *   the plugin's `fields` mirror and changes only through `foldFormEvent` and
+ *   loads.
+ * - `PageWidgets` is one page's widgets, where each is and how it looks,
+ *   derived from the index's widget rows (`pageWidgetsOf`).
  * - `FormState` is the session state: which fields have a write in flight.
  *
  * The text being typed in a field is not here: it waits in `write/typing.ts`
  * until it is committed.
  */
 import { reload, type MirrorReload } from '@embedpdf/core';
-import type {
-  DocumentEvent,
-  FormFieldDTO,
-  FormFieldRef,
-  FormSnapshot,
+import {
+  annotationKey,
+  reorderPart,
+  type AnnotationRef,
+  type DocumentEvent,
+  type FormFieldDTO,
+  type FormFieldRef,
+  type FormSnapshot,
+  type FormWidget,
+  type PageRef,
+  type WidgetAnnotation,
 } from '@embedpdf/engine-core/runtime';
 
 /** A page-space box (top-left origin, y-down, PDF points). */
@@ -46,6 +53,8 @@ export interface FieldIndex {
   readonly byName: Readonly<Record<string, number>>;
   /** Widget annotation object number → index into `snapshot.fields`. */
   readonly byWidget: Readonly<Record<number, number>>;
+  /** Widget annotation object number → index into `snapshot.widgets`, its row. */
+  readonly rowByWidget: Readonly<Record<number, number>>;
 }
 
 export const emptyFieldIndex = (): FieldIndex => ({
@@ -53,12 +62,14 @@ export const emptyFieldIndex = (): FieldIndex => ({
   byKey: {},
   byName: {},
   byWidget: {},
+  rowByWidget: {},
 });
 
 export function indexFields(snapshot: FormSnapshot): FieldIndex {
   const byKey: Record<FieldKey, number> = {};
   const byName: Record<string, number> = {};
   const byWidget: Record<number, number> = {};
+  const rowByWidget: Record<number, number> = {};
   snapshot.fields.forEach((field, position) => {
     byKey[fieldKeyOf(field)] = position;
     byName[field.name] ??= position;
@@ -66,7 +77,10 @@ export function indexFields(snapshot: FormSnapshot): FieldIndex {
       if (widget.objectNumber > 0) byWidget[widget.objectNumber] = position;
     }
   });
-  return { snapshot, byKey, byName, byWidget };
+  snapshot.widgets.forEach((row, position) => {
+    if (row.ref.kind === 'objectNumber') rowByWidget[row.ref.objectNumber] = position;
+  });
+  return { snapshot, byKey, byName, byWidget, rowByWidget };
 }
 
 /** Replace a field by key, or append it when it is new. */
@@ -79,6 +93,46 @@ export function upsertFields(index: FieldIndex, fields: readonly FormFieldDTO[])
     else next[position] = field;
   }
   return indexFields({ ...index.snapshot, fields: next });
+}
+
+const widgetNumber = (widget: WidgetAnnotation): number =>
+  widget.ref.kind === 'objectNumber' ? widget.ref.objectNumber : 0;
+
+/** Replace widget rows by object number, or append the ones that are new. */
+export function upsertWidgets(index: FieldIndex, rows: readonly WidgetAnnotation[]): FieldIndex {
+  if (!index.snapshot || rows.length === 0) return index;
+  const incoming = new Map(rows.map((row) => [widgetNumber(row), row]));
+  const next = index.snapshot.widgets.map((row) => {
+    const replaced = incoming.get(widgetNumber(row));
+    if (replaced) incoming.delete(widgetNumber(row));
+    return replaced ?? row;
+  });
+  return indexFields({ ...index.snapshot, widgets: [...next, ...incoming.values()] });
+}
+
+/** The page's widget rows in `order` (bottom to top), in their slots: other pages' keep theirs. */
+export function reorderWidgetRows(
+  index: FieldIndex,
+  page: PageRef,
+  order: readonly AnnotationRef[],
+): FieldIndex {
+  if (!index.snapshot) return index;
+  const widgets = reorderPart(
+    index.snapshot.widgets,
+    (row) => row.page.objectNumber === page.objectNumber,
+    order.map(annotationKey),
+    (row) => annotationKey(row.ref),
+  );
+  return indexFields({ ...index.snapshot, widgets });
+}
+
+/** Drop the rows of widgets that went (with their field, or with their page). */
+export function removeWidgets(index: FieldIndex, gone: readonly FormWidget[]): FieldIndex {
+  if (!index.snapshot || gone.length === 0) return index;
+  const numbers = new Set(gone.map((widget) => widget.objectNumber));
+  const widgets = index.snapshot.widgets.filter((row) => !numbers.has(widgetNumber(row)));
+  if (widgets.length === index.snapshot.widgets.length) return index;
+  return indexFields({ ...index.snapshot, widgets });
 }
 
 export function removeField(index: FieldIndex, ref: FormFieldRef): FieldIndex {
@@ -94,8 +148,9 @@ export function removeField(index: FieldIndex, ref: FormFieldRef): FieldIndex {
 
 /**
  * Apply one confirmed document event to the field index. Every form event
- * carries the fields it touched as the engine read them back, so the index
- * never needs a re-read except for a repair, whose result reports only counts.
+ * carries the fields and the widget rows it touched as the engine read them
+ * back, so the index never needs a re-read except for a repair, whose result
+ * reports only counts, and for writes that remove widgets with their pages.
  */
 export function foldFormEvent(index: FieldIndex, event: DocumentEvent): FieldIndex | MirrorReload {
   switch (event.type) {
@@ -103,24 +158,50 @@ export function foldFormEvent(index: FieldIndex, event: DocumentEvent): FieldInd
     case 'forms.updated':
     case 'forms.widgetAdded':
     case 'forms.widgetRemoved':
-      return upsertFields(index, [event.field]);
+    case 'forms.restored':
+      return upsertWidgets(upsertFields(index, [event.field]), event.widgets);
     case 'forms.created': {
       // The first field of a document without a form creates its /AcroForm.
-      const created = upsertFields(index, [event.field]);
+      const created = upsertWidgets(upsertFields(index, [event.field]), event.widgets);
       return created.snapshot?.formKind === 'none'
         ? indexFields({ ...created.snapshot, formKind: 'acroform' })
         : created;
     }
+    case 'forms.widgetDeleted': {
+      const gone = removeWidgets(index, event.meta.changedWidgets);
+      return event.field ? upsertFields(gone, [event.field]) : gone;
+    }
+    case 'forms.widgetRestored':
+      return upsertWidgets(
+        event.field ? upsertFields(index, [event.field]) : index,
+        event.widgets,
+      );
+    case 'forms.widgetUpdated':
+      return upsertWidgets(index, [event.widget]);
+    case 'forms.widgetsReordered':
+      return reorderWidgetRows(index, event.page, event.order);
     case 'forms.deleted':
-      return event.deleted ? removeField(index, event.deleted) : reload();
+      return event.deleted
+        ? removeWidgets(removeField(index, event.deleted), event.meta.changedWidgets)
+        : reload();
     case 'forms.effectsApplied':
-      return upsertFields(
-        index,
-        event.results.flatMap((result) => result.fields),
+      return upsertWidgets(
+        upsertFields(
+          index,
+          event.results.flatMap((result) => result.fields),
+        ),
+        event.widgets,
       );
     case 'forms.imported':
       return indexFields(event.form);
+    // A repair reports only counts; the others remove pages, or paint their
+    // widgets into the content.
     case 'forms.repaired':
+    case 'pages.deleted':
+    case 'pages.inserted':
+    case 'pages.flattened':
+    case 'annotations.flattened':
+    case 'redaction.applied':
       return reload();
     default:
       return index;
@@ -163,7 +244,7 @@ export function fieldsWithChangedValues(previous: FieldIndex, next: FieldIndex):
 const valueEntryOf = (field: FormFieldDTO): unknown =>
   'valueEntry' in field ? field.valueEntry : null;
 
-// ── widgets (the `widgetBoxes` page mirror) ──────────────────────────────────
+// ── widgets (each page's, from the index's widget rows) ──────────────────────
 
 /**
  * How a widget looks in the PDF, as its own appearance settings say: `null`
@@ -195,6 +276,34 @@ export interface PageWidget {
 
 /** One page's widgets: widget annotation object number → where it is and how it looks. */
 export type PageWidgets = Readonly<Record<number, PageWidget>>;
+
+/** The widgets one page shows, from the form's widget rows. */
+export function pageWidgetsOf(index: FieldIndex, pageObjectNumber: number): PageWidgets {
+  const widgets: Record<number, PageWidget> = {};
+  for (const row of index.snapshot?.widgets ?? []) {
+    if (row.page.objectNumber !== pageObjectNumber || row.ref.kind !== 'objectNumber') continue;
+    widgets[row.ref.objectNumber] = {
+      box: row.rect,
+      look: {
+        border: row.color ?? null,
+        borderWidth: row.strokeWidth ?? 1,
+        borderStyle: row.borderStyle ?? 'solid',
+        background: row.interiorColor ?? null,
+        color: row.fontColor ?? null,
+        fontFamily: row.fontFamily ?? null,
+        fontSize: row.fontSize ?? null,
+        textAlign: row.textAlign ?? 'left',
+      },
+    };
+  }
+  return widgets;
+}
+
+/** A widget's row, by its object number; `null` when no page shows it. */
+export function widgetRowOf(index: FieldIndex, annotObjectNumber: number): WidgetAnnotation | null {
+  const position = index.rowByWidget[annotObjectNumber];
+  return position === undefined ? null : (index.snapshot?.widgets[position] ?? null);
+}
 
 /** A widget hit: the annotation under the point and the field it belongs to. */
 export interface WidgetHit {

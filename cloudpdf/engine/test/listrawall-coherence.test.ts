@@ -49,7 +49,6 @@ function annotation(pageObjectNumber: number, index: number) {
       objectNumber: pageObjectNumber * 1000 + index,
     },
     page: toPageRef(pageObjectNumber),
-    index,
     hasAppearance: true,
     appearanceState: null,
     nm: `stub-${pageObjectNumber}-${index}`,
@@ -160,6 +159,7 @@ function buildStub(overrides: Partial<StubState> = {}): Stub {
           cache: {
             contentVersion: 1,
             annotationVersion: state.annotationVersions.get(pageObjectNumber)!,
+            widgetVersion: 1,
           },
         })),
       });

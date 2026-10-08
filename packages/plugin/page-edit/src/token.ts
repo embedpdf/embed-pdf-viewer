@@ -10,7 +10,7 @@ export const PageEditToken = createCapabilityToken<PageEditCapability>('page-edi
   promises: {
     rotateBy: true,
     setRotation: true,
-    move: true,
+    reorder: true,
     delete: true,
     insertBlank: true,
     insertFromBytes: true,

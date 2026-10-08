@@ -119,6 +119,20 @@ export {
   runChangeConformance,
   type ChangeConformanceOptions,
 } from './conformance/runChangeConformance';
+export { pdfOf } from './conformance/pdfOf';
+export {
+  PERMISSION_TOKENS,
+  runPermissionConformance,
+  type PermissionConformanceOptions,
+  type PermissionToken,
+} from './conformance/runPermissionConformance';
+export {
+  WIDGET_FINDING_CASES,
+  runWidgetFindingConformance,
+  type WidgetFindingCase,
+  type WidgetFindingCaseName,
+  type WidgetFindingConformanceOptions,
+} from './conformance/runWidgetFindingConformance';
 export {
   runPieceInfoConformance,
   type PieceInfoConformanceOptions,

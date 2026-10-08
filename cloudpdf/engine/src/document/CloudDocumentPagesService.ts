@@ -10,7 +10,8 @@ import {
   type PageInsertResult,
   type PageLayout,
   type PageListSnapshot,
-  type PageMoveResult,
+  type PagePosition,
+  type PageReorderResult,
   type PageNameInput,
   type PageNameResult,
   type PageRef,
@@ -27,7 +28,7 @@ import {
   PageFlattenResultSchema,
   PageInsertResultSchema,
   PageListSnapshotSchema,
-  PageMoveResultSchema,
+  PageReorderResultSchema,
   PageNameResultSchema,
   PageRotateResultSchema,
   wirePaths,
@@ -52,7 +53,7 @@ function copyToExactBuffer(view: Uint8Array): ArrayBuffer {
 
 /**
  * Cloud-side document pages service. Mirrors `LocalDocumentPagesService`
- * over HTTP: GET /pages for `list`, POST /pages/move for the reorder.
+ * over HTTP: GET /pages for `list`, POST /pages/reorder for the reorder.
  *
  * Page identity rule (locked with the user, do not change):
  *   - Pages are addressed exclusively by `PageRef` (their indirect
@@ -60,8 +61,8 @@ function copyToExactBuffer(view: Uint8Array): ArrayBuffer {
  *     The wire never sends a page index for a mutation. This keeps
  *     multi-call client logic from having to account for index drift
  *     between requests.
- *   - Successful `move()` returns the new `layout` (order + geometry) plus
- *     cloud coherence pins. A page move bumps only `docVersion` +
+ *   - Successful `reorder()` returns the new `layout` (order + geometry) plus
+ *     cloud coherence pins. A page reorder bumps only `docVersion` +
  *     `layoutVersion`; every per-page pin stays warm.
  */
 export class CloudDocumentPagesService implements DocumentPagesService {
@@ -128,7 +129,7 @@ export class CloudDocumentPagesService implements DocumentPagesService {
 
   /**
    * Plane-scope rule: the layout leaf depends on the `layout` plane —
-   * while inherited (no move/rotate/insert/delete ever ran), every
+   * while inherited (no reorder/rotate/insert/delete ever ran), every
    * visitor's page list is one doc-level URL served from the base
    * session; the SDK open sequence creates no layer session.
    */
@@ -150,34 +151,34 @@ export class CloudDocumentPagesService implements DocumentPagesService {
     );
   }
 
-  move(
+  reorder(
     pages: PageRef[],
-    toIndex: number,
+    position: PagePosition,
     options?: WriteOptions,
-  ): AbortablePromise<PageMoveResult> {
+  ): AbortablePromise<PageReorderResult> {
     if (this.isClosed()) {
       return AbortablePromise.rejectReason(
         new EngineError(EngineErrorCode.DocNotOpen, `document ${this.docId} is closed`),
       );
     }
-    return AbortablePromise.run<PageMoveResult>(async (signal) => {
+    return AbortablePromise.run<PageReorderResult>(async (signal) => {
       const opId = opIdOf(options);
       return this.writes.run(opId, signal, async (write) => {
         const result = await write.send((sent) =>
           this.http.postJson(
-            wirePaths.layerPagesMove(this.docId, this.layerName),
-            { pages, toIndex },
-            (raw) => PageMoveResultSchema.parse(raw),
+            wirePaths.layerPagesReorder(this.docId, this.layerName),
+            { pages, position },
+            (raw) => PageReorderResultSchema.parse(raw),
             signal,
             sent,
           ),
         );
-        // A move only advances docVersion + layoutVersion (no per-page pin
+        // A reorder only advances docVersion + layoutVersion (no per-page pin
         // changes), so the cached manifest can be patched in place — no refetch.
         this.manifest.apply(result.meta, ['layout']);
         // Publish after absorb: listeners reading the manifest in their
         // callback must see post-mutation state.
-        this.publisher.publishWrite(opId, { type: 'pages.moved', pages, toIndex, ...result });
+        this.publisher.publishWrite(opId, { type: 'pages.reordered', ...result });
         return result;
       });
     });
@@ -204,7 +205,7 @@ export class CloudDocumentPagesService implements DocumentPagesService {
   }
 
   /**
-   * Named pages are layout: both verbs share the page-move patch exactly —
+   * Named pages are layout: both verbs share the page-reorder patch exactly —
    * docVersion + layoutVersion advance, no per-page pin changes, so the
    * cached manifest is patched in place and the fresh layout is published.
    */
@@ -255,7 +256,7 @@ export class CloudDocumentPagesService implements DocumentPagesService {
             sent,
           ),
         );
-        // Rotation shares the move patch exactly: docVersion + layoutVersion
+        // Rotation shares the reorder patch exactly: docVersion + layoutVersion
         // advance, every per-page pin (and its cached render) stays warm.
         this.manifest.apply(result.meta, ['layout']);
         this.publisher.publishWrite(opId, { type: 'pages.rotated', pages, rotation, ...result });
@@ -293,7 +294,7 @@ export class CloudDocumentPagesService implements DocumentPagesService {
 
   insert(
     bytes: Uint8Array | ArrayBuffer,
-    toIndex?: number,
+    position: PagePosition = 'end',
     options?: WriteOptions,
   ): AbortablePromise<PageInsertResult> {
     if (this.isClosed()) {
@@ -307,9 +308,12 @@ export class CloudDocumentPagesService implements DocumentPagesService {
         // The multipart mutation envelope: the JSON the plain request would
         // have been rides the `body` part; the source PDF is `resource:source`.
         const buffer = bytes instanceof ArrayBuffer ? bytes : copyToExactBuffer(bytes);
-        const form = buildMutationForm(toIndex !== undefined ? { toIndex } : {}, {
-          source: { bytes: buffer, mimeType: 'application/pdf', name: 'source.pdf' },
-        });
+        const form = buildMutationForm(
+          { position },
+          {
+            source: { bytes: buffer, mimeType: 'application/pdf', name: 'source.pdf' },
+          },
+        );
         const result = await write.send((sent) =>
           this.http.postMultipartJson(
             wirePaths.layerPagesInsert(this.docId, this.layerName),
@@ -323,7 +327,7 @@ export class CloudDocumentPagesService implements DocumentPagesService {
         // the fresh page object numbers, so the absorb drops it for a lazy refetch (the
         // result already carries the full new layout — nothing waits).
         this.manifest.applyPageInsert(result.meta);
-        this.publisher.publishWrite(opId, { type: 'pages.inserted', toIndex, ...result });
+        this.publisher.publishWrite(opId, { type: 'pages.inserted', ...result });
         return result;
       });
     });
@@ -331,7 +335,7 @@ export class CloudDocumentPagesService implements DocumentPagesService {
 
   insertBlank(
     spec: PageInsertBlankSpec,
-    toIndex?: number,
+    position: PagePosition = 'end',
     options: PageInsertBlankOptions = {},
   ): AbortablePromise<PageInsertResult> {
     if (this.isClosed()) {
@@ -354,7 +358,7 @@ export class CloudDocumentPagesService implements DocumentPagesService {
               {
                 size: spec.size,
                 ...(spec.count !== undefined ? { count: spec.count } : {}),
-                ...(toIndex !== undefined ? { toIndex } : {}),
+                position,
               },
               (raw) => PageInsertResultSchema.parse(raw),
               signal,
@@ -362,7 +366,7 @@ export class CloudDocumentPagesService implements DocumentPagesService {
             ),
           );
           this.manifest.applyPageInsert(result.meta);
-          this.publisher.publishWrite(opId, { type: 'pages.inserted', toIndex, ...result });
+          this.publisher.publishWrite(opId, { type: 'pages.inserted', ...result });
           return result;
         },
         objectNumbers ?? [],
@@ -409,8 +413,8 @@ export class CloudDocumentPagesService implements DocumentPagesService {
         // Nothing flattened comes back without a cache delta: no artifact, no
         // coherence bump, no event.
         if (result.meta.cacheDelta === null) return result;
-        // Flatten bakes annotations into page content, so both planes flip.
-        this.manifest.apply(result.meta, ['content', 'annotations']);
+        // Flatten bakes annotations and form fields into page content.
+        this.manifest.apply(result.meta, ['content', 'annotations', 'forms']);
         this.publisher.publishWrite(opId, {
           type: 'pages.flattened',
           ...result,

@@ -35,7 +35,7 @@ const ebook: OpenInput = { kind: 'share', shareToken: 'shr_WGj1goAtlNN_fQ5OswPrb
         type="button"
         class="button"
         [disabled]="!canEdit || !before()"
-        (click)="moveTo({ index: 0 })"
+        (click)="moveTo('start')"
       >
         ⇤ To the front
       </button>
@@ -106,7 +106,7 @@ export class PageOrder {
 
   protected moveTo(placement: PagePlacement) {
     const page = this.page();
-    if (page) void this.pageEdit.move([page.ref], placement);
+    if (page) void this.pageEdit.reorder([page.ref], placement);
   }
 
   protected moveBefore(other: PageInfo | null) {

@@ -39,6 +39,7 @@ import type {
   AnnotationImportDrop,
   AnnotationImportOptions,
   AnnotationPatch,
+  AnnotationPosition,
   AnnotationRef,
   AnnotationResourceRole,
   AnnotationResources,
@@ -66,6 +67,7 @@ export type {
   AnnotationImportDrop,
   AnnotationImportOptions,
   AnnotationPatch,
+  AnnotationPosition,
   AnnotationRef,
   AnnotationResourceRole,
   AnnotationResources,
@@ -445,11 +447,10 @@ export interface AnnotationDeletedEvent {
   readonly origin: EventOrigin;
 }
 
-/** The drawing order on a page changed: `refs` now sit from `toIndex` on, in this order. */
-export interface AnnotationMovedEvent {
-  readonly refs: readonly AnnotationRef[];
+/** The drawing order on a page changed: `order` is the page's annotations, bottom to top. */
+export interface AnnotationReorderedEvent {
   readonly page: PageRef;
-  readonly toIndex: number;
+  readonly order: readonly AnnotationRef[];
   readonly origin: EventOrigin;
 }
 
@@ -838,12 +839,18 @@ export interface AnnotationCapability extends SettingsApi<AnnotationSettings> {
   /** Delete an annotation, with its popup and its replies. Fires `onDeleted`. */
   delete(ref: AnnotationRef, options?: OperationOptions): Promise<void>;
   /**
-   * Move annotations that sit next to each other on one page to a new place
-   * in its drawing order: `refs` in the order they should end in, `toIndex`
-   * among the page's other annotations. Shows at once; fires `onMoved`.
-   * Rejects `invalid-input` for refs on different pages.
+   * Change the drawing order on one page: the annotations go together, in
+   * the order given, right after or before a neighbour annotation of the page
+   * (`{ after: ref }`, `{ before: ref }`), or to the bottom (`'start'`) or the
+   * top (`'end'`). Shows at once; fires `onReordered`. Rejects `invalid-input`
+   * for refs on different pages and `not-found` for a neighbour that isn't
+   * there. Widgets paint above every annotation and are ordered by the form.
    */
-  move(refs: readonly AnnotationRef[], toIndex: number, options?: OperationOptions): Promise<void>;
+  reorder(
+    refs: readonly AnnotationRef[],
+    position: AnnotationPosition,
+    options?: OperationOptions,
+  ): Promise<void>;
   /**
    * Take annotations out as a bundle, with the bytes they carry (a stamp's
    * drawing, an attached file): every annotation, a selection of them (with
@@ -910,7 +917,7 @@ export interface AnnotationCapability extends SettingsApi<AnnotationSettings> {
   /** Annotations were deleted: one, plus its popup and replies. */
   readonly onDeleted: EventHook<AnnotationDeletedEvent>;
   /** The drawing order on a page changed. */
-  readonly onMoved: EventHook<AnnotationMovedEvent>;
+  readonly onReordered: EventHook<AnnotationReorderedEvent>;
   /** Annotations were read again, as after loading a document. */
   readonly onResynced: EventHook<AnnotationResyncedEvent>;
   /** The engine refused a change the user made; the view already shows the engine's record again. */

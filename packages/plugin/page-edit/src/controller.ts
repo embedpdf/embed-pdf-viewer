@@ -1,8 +1,8 @@
 /**
  * The page-edit controller. Stateless: it turns the engine handle's page
  * service into page edits that take refs or indexes. Turning a page relative
- * to its own rotation, and resolving a placement to a position, live here
- * once instead of in every app's click handler.
+ * to its own rotation, and fixing a placement's page, live here once instead
+ * of in every app's click handler.
  *
  * A verb refuses before anything starts (permission, pages, placement), then
  * queues its edit: edits run one at a time, in the order they were called.
@@ -11,6 +11,7 @@ import { DocumentsToken, PluginError, toPluginError } from '@embedpdf/core';
 import type {
   DocCapability,
   PageInfo,
+  PagePosition,
   PageRef,
   PdfRotation,
   PdfSize,
@@ -52,36 +53,35 @@ export function createPageEditController(ctx: PluginContext<void>) {
     return pages.map((page) => ctx.pageOf(page).ref);
   };
 
-  /** A placement whose page is fixed when the verb is called, like the verb's own pages. */
-  const fixPlacement = (placement: PagePlacement | undefined): PagePlacement | undefined => {
-    if (!placement || placement === 'end' || 'index' in placement) return placement;
+  /**
+   * A placement as the engine's position, its page fixed when the verb is
+   * called, like the verb's own pages. Default `'end'`.
+   */
+  const positionOf = (placement: PagePlacement | undefined): PagePosition => {
+    if (!placement || placement === 'start' || placement === 'end') return placement ?? 'end';
     if ('after' in placement) return { after: ctx.pageOf(placement.after).ref };
     return { before: ctx.pageOf(placement.before).ref };
   };
-
-  /** A placement → the engine's position, from the page list when the edit runs. */
-  const positionOf = (placement: PagePlacement | undefined) => {
-    if (!placement || placement === 'end') return { toIndex: undefined, anchor: undefined };
-    if ('index' in placement) return { toIndex: placement.index, anchor: undefined };
-    const anchor = ctx.pageOf('after' in placement ? placement.after : placement.before);
-    return { toIndex: 'after' in placement ? anchor.index + 1 : anchor.index, anchor };
-  };
-  /** Default blank-page size: the page the new ones follow, else the last page, else Letter. */
-  const neighbourSize = (toIndex: number | undefined): PdfSize => {
+  /**
+   * Default blank-page size: the page the placement names, else the page the
+   * new ones go next to (the first or the last), else Letter.
+   */
+  const sizeAt = (position: PagePosition): PdfSize => {
+    if (typeof position === 'object') {
+      return ctx.pageOf('after' in position ? position.after : position.before).size;
+    }
     const pages = registry();
     if (pages.length === 0) return LETTER_SIZE;
-    if (toIndex === undefined) return pages[pages.length - 1].size;
-    return pages[Math.max(0, Math.min(toIndex - 1, pages.length - 1))].size;
+    return (position === 'start' ? pages[0] : pages[pages.length - 1]).size;
   };
 
   /** Insert a PDF's pages; resolves the new pages. */
   const insertBytes = async (
     bytes: Uint8Array | ArrayBuffer,
-    placement: PagePlacement | undefined,
+    position: PagePosition,
     signal: AbortSignal | undefined,
   ): Promise<PageEditInsertResult> => {
-    const { toIndex } = positionOf(placement);
-    const result = await ctx.cancellable(signal, ctx.doc.pages.insert(bytes, toIndex));
+    const result = await ctx.cancellable(signal, ctx.doc.pages.insert(bytes, position));
     return { pages: result.insertedPages };
   };
 
@@ -118,17 +118,14 @@ export function createPageEditController(ctx: PluginContext<void>) {
       );
     },
 
-    move: async (pages, placement, options) => {
-      ctx.assertAllowed(ASSEMBLE, 'pageEdit.move');
+    reorder: async (pages, placement, options) => {
+      ctx.assertAllowed(ASSEMBLE, 'pageEdit.reorder');
       const refs = refsOf(pages);
-      const fixed = fixPlacement(placement);
-      await enqueue(() => {
-        const { toIndex } = positionOf(fixed);
-        return ctx.cancellable(
-          options?.signal,
-          ctx.doc.pages.move(refs, toIndex ?? registry().length),
-        );
-      }, options);
+      const position = positionOf(placement);
+      await enqueue(
+        () => ctx.cancellable(options?.signal, ctx.doc.pages.reorder(refs, position)),
+        options,
+      );
     },
 
     delete: async (pages, options) => {
@@ -143,15 +140,12 @@ export function createPageEditController(ctx: PluginContext<void>) {
 
     insertBlank: async (options = {}) => {
       ctx.assertAllowed(ASSEMBLE, 'pageEdit.insertBlank');
-      const placement = fixPlacement(options.placement);
+      const position = positionOf(options.placement);
       return enqueue(async () => {
-        const { toIndex, anchor } = positionOf(placement);
-        // A page placement matches the page the user is looking at; anything
-        // else matches the page the new ones follow.
-        const size = options.size ?? anchor?.size ?? neighbourSize(toIndex);
+        const size = options.size ?? sizeAt(position);
         const result = await ctx.cancellable(
           options.signal,
-          ctx.doc.pages.insertBlank({ size, count: options.count }, toIndex),
+          ctx.doc.pages.insertBlank({ size, count: options.count }, position),
         );
         return { pages: result.insertedPages };
       }, options);
@@ -159,11 +153,11 @@ export function createPageEditController(ctx: PluginContext<void>) {
 
     insertFromBytes: async (bytes, options = {}) => {
       ctx.assertAllowed(ASSEMBLE, 'pageEdit.insertFromBytes');
-      const placement = fixPlacement(options.placement);
+      const position = positionOf(options.placement);
       const { pageIndexes, signal } = options;
       if (pageIndexes?.length === 0) throw noPages();
       return enqueue(async () => {
-        if (!pageIndexes) return insertBytes(bytes, placement, signal);
+        if (!pageIndexes) return insertBytes(bytes, position, signal);
         // Some of the pages: open the bytes beside the document, extract them, insert those.
         const source = await mapErrors(() =>
           ctx.engine.open(
@@ -185,7 +179,7 @@ export function createPageEditController(ctx: PluginContext<void>) {
             return page.ref;
           });
           const subset = await mapErrors(() => ctx.cancellable(signal, source.pages.extract(refs)));
-          return await insertBytes(subset, placement, signal);
+          return await insertBytes(subset, position, signal);
         } finally {
           await source.close();
         }
@@ -215,14 +209,14 @@ export function createPageEditController(ctx: PluginContext<void>) {
         }
         return found.ref;
       });
-      const placement = fixPlacement(options.placement);
+      const position = positionOf(options.placement);
       return enqueue(async () => {
         // The other document's session decides whether its pages may be copied
         // out: the engine refuses `doc.download` there with the permission named.
         const bytes = await mapErrors(() =>
           ctx.cancellable(options.signal, other.pages.extract(refs)),
         );
-        return insertBytes(bytes, placement, options.signal);
+        return insertBytes(bytes, position, options.signal);
       }, options);
     },
 
@@ -230,10 +224,12 @@ export function createPageEditController(ctx: PluginContext<void>) {
       ctx.assertAllowed(ASSEMBLE, 'pageEdit.duplicate');
       ctx.assertAllowed(DOWNLOAD, 'pageEdit.duplicate');
       const refs = refsOf(pages);
-      const placement = fixPlacement(options.placement) ?? { after: refs[refs.length - 1] };
+      const position = options.placement
+        ? positionOf(options.placement)
+        : { after: refs[refs.length - 1]! };
       return enqueue(async () => {
         const bytes = await ctx.cancellable(options.signal, ctx.doc.pages.extract(refs));
-        return insertBytes(bytes, placement, options.signal);
+        return insertBytes(bytes, position, options.signal);
       }, options);
     },
 

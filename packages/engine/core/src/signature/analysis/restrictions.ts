@@ -18,7 +18,7 @@ import type { RestrictionAnchor, RevisionStructure } from './types';
  */
 export function restrictionsFor(
   before: RevisionStructure,
-  judged: SignatureDTO<Coordinates> | null,
+  judged: SignatureDTO | null,
 ): { anchors: RestrictionAnchor[]; level: ModificationLevel; locks: DocumentFieldLock[] } {
   const anchors: RestrictionAnchor[] = [];
   const locks: DocumentFieldLock[] = [];

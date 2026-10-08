@@ -28,7 +28,7 @@ export namespace DocSignaturesList200Response {
             index: number;
             field: CloudPDF.FormFieldRef;
             fieldName: string;
-            widget: Item.Widget | null;
+            widget: CloudPDF.FormWidget | null;
             signed: boolean;
             kind: Item.Kind;
             filter: string | null;
@@ -46,22 +46,6 @@ export namespace DocSignaturesList200Response {
         }
 
         export namespace Item {
-            export interface Widget {
-                ref: CloudPDF.AnnotationRef | null;
-                objectNumber: number;
-                page: CloudPDF.PageRef | null;
-                rect: Widget.Rect | null;
-            }
-
-            export namespace Widget {
-                export interface Rect {
-                    x: number;
-                    y: number;
-                    width: number;
-                    height: number;
-                }
-            }
-
             export const Kind = {
                 Signature: "signature",
                 Timestamp: "timestamp",

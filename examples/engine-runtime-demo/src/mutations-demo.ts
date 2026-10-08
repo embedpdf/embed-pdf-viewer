@@ -2,7 +2,7 @@ import type {
   AnnotationCreateResult,
   AnnotationDeleteResult,
   AnnotationList,
-  AnnotationMoveResult,
+  AnnotationReorderResult,
   AnnotationRef,
   AnnotationUpdateResult,
   HighlightDraft,
@@ -29,8 +29,8 @@ export interface MutationsDemoResult {
   createdPolyline: AnnotationCreateResult;
   createdLine: AnnotationCreateResult;
   updated: AnnotationUpdateResult | null;
-  movedSingle: AnnotationMoveResult;
-  movedBatch: AnnotationMoveResult;
+  movedSingle: AnnotationReorderResult;
+  movedBatch: AnnotationReorderResult;
   deletedA: AnnotationDeleteResult;
   deletedB: AnnotationDeleteResult;
   after: AnnotationList;
@@ -163,20 +163,17 @@ export async function runMutationsDemo(
       lineEndings: { start: 'none', end: 'open-arrow' },
     });
 
-    // 3) Single-annotation move: move B to position 0. This exercises
-    //    `move([ref], toIndex)` as the single-as-batch case.
-    const movedSingle = await page.annotations.move([createdB.annotation.ref], 0);
+    // 3) Single-annotation reorder: B to the bottom of the stack.
+    const movedSingle = await page.annotations.reorder([createdB.annotation.ref], 'start');
 
-    // 4) Multi-block move: move [A, B] to position 0 in caller order.
-    //    Verifies that caller-supplied order is preserved at the
-    //    destination.
-    const movedBatch = await page.annotations.move(
+    // 4) Multi-annotation reorder: [A, B] to the bottom, in caller order.
+    const movedBatch = await page.annotations.reorder(
       [createdA.annotation.ref, createdB.annotation.ref],
-      0,
+      'start',
     );
 
     // 5) Delete both annotations we created so the fixture is unchanged.
-    //    Their refs survive the moves: a ref is an annotation's name for
+    //    Their refs survive the reorders: a ref is an annotation's name for
     //    life.
     const deletedA = await page.annotations.delete(createdA.annotation.ref);
     const deletedB = await page.annotations.delete(createdB.annotation.ref);
@@ -265,11 +262,11 @@ export function summarizeMutations(result: MutationsDemoResult) {
       meta: metaSummary(result.createdLine.meta),
     },
     moveSingle: {
-      moved: result.movedSingle.annotations.map((d) => refSummary(d.ref)),
+      moved: result.movedSingle.meta.changed.map(refSummary),
       meta: metaSummary(result.movedSingle.meta),
     },
     moveBatch: {
-      moved: result.movedBatch.annotations.map((d) => refSummary(d.ref)),
+      moved: result.movedBatch.meta.changed.map(refSummary),
       meta: metaSummary(result.movedBatch.meta),
     },
     deleteA: {

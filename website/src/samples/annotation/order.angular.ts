@@ -68,12 +68,12 @@ export class OrderControls {
 
   protected sendToBack() {
     const first = this.first();
-    if (first) void this.annotation.move([first.ref], 0);
+    if (first) void this.annotation.reorder([first.ref], 'start');
   }
 
   protected bringToFront() {
     const first = this.first();
-    if (first) void this.annotation.move([first.ref], this.onPage().length - 1);
+    if (first) void this.annotation.reorder([first.ref], 'end');
   }
 }
 

@@ -6,7 +6,8 @@ import type { PdfRect } from '../../src/geometry/primitives';
 import { toPageRef } from '../../src/identity/PageRef';
 import type { PdfCoordinates } from '../../src/pageSpace/coordinates';
 import type { FormFieldDTO } from '../../src/forms/field';
-import { pageFormFieldOf, pdfWidgetPlacementOf } from '../../src/pageSpace/forms';
+import type { WidgetAnnotation } from '../../src/annotation/kinds/widget';
+import { pageFormFieldOf, pageWidgetOf, pdfWidgetPlacementOf } from '../../src/pageSpace/forms';
 import { pageViewportsOf, pdfMeasureOf } from '../../src/pageSpace/measure';
 import { pageListOf, pageSpaceBoxesOf, visibleBoxesOf } from '../../src/pageSpace/pages';
 import { pageAppearancesOf, pdfRenderTargetOf } from '../../src/pageSpace/rendering';
@@ -145,25 +146,15 @@ describe('render, form and measure values', () => {
     expect(pageFormFieldOf(plain, boxOf)).toEqual(plain);
   });
 
-  test("a field's widgets are measured on their pages; one on no page has no rect", () => {
+  test("the form's widget rows are measured on their pages", () => {
     const boxOf = visibleBoxesOf([layout(4, crop)]);
-    const field = {
-      family: 'text',
-      name: 'placed',
-      widgets: [
-        {
-          annotObjectNumber: 8,
-          page: toPageRef(4),
-          ref: null,
-          rect: { left: 100, right: 150, bottom: 600, top: 650 },
-        },
-        { objectNumber: 9, page: null, ref: null, rect: null },
-      ],
-    } as unknown as FormFieldDTO<PdfCoordinates>;
-    expect(pageFormFieldOf(field, boxOf).widgets.map((widget) => widget.rect)).toEqual([
-      { x: 50, y: 82, width: 50, height: 50 },
-      null,
-    ]);
+    const widget = {
+      subtype: 'widget',
+      page: toPageRef(4),
+      ref: { kind: 'objectNumber', page: toPageRef(4), objectNumber: 8 },
+      rect: { left: 100, right: 150, bottom: 600, top: 650 },
+    } as unknown as WidgetAnnotation<PdfCoordinates>;
+    expect(pageWidgetOf(widget, boxOf).rect).toEqual({ x: 50, y: 82, width: 50, height: 50 });
   });
 
   test('a widget is placed on its own page', () => {

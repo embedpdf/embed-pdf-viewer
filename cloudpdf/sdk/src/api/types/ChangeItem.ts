@@ -7,7 +7,7 @@ export type ChangeItem =
     | CloudPDF.ChangeItem.AnnotationsCreate
     | CloudPDF.ChangeItem.AnnotationsUpdate
     | CloudPDF.ChangeItem.AnnotationsDelete
-    | CloudPDF.ChangeItem.AnnotationsMove
+    | CloudPDF.ChangeItem.AnnotationsReorder
     | CloudPDF.ChangeItem.AnnotationsRestore
     | CloudPDF.ChangeItem.FormsSetValue
     | CloudPDF.ChangeItem.FormsSetDisplay
@@ -20,6 +20,10 @@ export type ChangeItem =
     | CloudPDF.ChangeItem.FormsSetSignatureAppearance
     | CloudPDF.ChangeItem.FormsAddWidget
     | CloudPDF.ChangeItem.FormsRemoveWidget
+    | CloudPDF.ChangeItem.FormsDeleteWidget
+    | CloudPDF.ChangeItem.FormsRestoreWidget
+    | CloudPDF.ChangeItem.FormsReorderWidgets
+    | CloudPDF.ChangeItem.FormsUpdateWidget
     | CloudPDF.ChangeItem.MetadataUpdate
     | CloudPDF.ChangeItem.MetadataUpdateCustom;
 
@@ -35,7 +39,7 @@ export namespace ChangeItem {
             AnnotationsCreate: "annotations.create",
             AnnotationsUpdate: "annotations.update",
             AnnotationsDelete: "annotations.delete",
-            AnnotationsMove: "annotations.move",
+            AnnotationsReorder: "annotations.reorder",
             FormsSetValue: "forms.setValue",
             FormsSetDisplay: "forms.setDisplay",
             FormsSetAppearanceText: "forms.setAppearanceText",
@@ -45,6 +49,9 @@ export namespace ChangeItem {
             FormsDelete: "forms.delete",
             FormsAddWidget: "forms.addWidget",
             FormsRemoveWidget: "forms.removeWidget",
+            FormsDeleteWidget: "forms.deleteWidget",
+            FormsReorderWidgets: "forms.reorderWidgets",
+            FormsUpdateWidget: "forms.updateWidget",
             FormsSetSignatureAppearance: "forms.setSignatureAppearance",
             MetadataUpdate: "metadata.update",
             MetadataUpdateCustom: "metadata.updateCustom",
@@ -93,10 +100,10 @@ export namespace ChangeItem {
         meta: CloudPDF.AnnotationMutationMeta;
     }
 
-    export interface AnnotationsMove {
-        type: "annotations.move";
+    export interface AnnotationsReorder {
+        type: "annotations.reorder";
         page: CloudPDF.PageRef;
-        annotations: CloudPDF.Annotation[];
+        order: CloudPDF.AnnotationRef[];
         meta: CloudPDF.AnnotationMutationMeta;
     }
 
@@ -110,18 +117,21 @@ export namespace ChangeItem {
     export interface FormsSetValue {
         type: "forms.setValue";
         field: CloudPDF.FormField;
+        widgets: CloudPDF.WidgetAnnotation[];
         meta: CloudPDF.FormMutationMeta;
     }
 
     export interface FormsSetDisplay {
         type: "forms.setDisplay";
         field: CloudPDF.FormField;
+        widgets: CloudPDF.WidgetAnnotation[];
         meta: CloudPDF.FormMutationMeta;
     }
 
     export interface FormsSetAppearanceText {
         type: "forms.setAppearanceText";
         field: CloudPDF.FormField;
+        widgets: CloudPDF.WidgetAnnotation[];
         meta: CloudPDF.FormMutationMeta;
     }
 
@@ -129,12 +139,14 @@ export namespace ChangeItem {
         type: "forms.reset";
         skipped?: string[] | undefined;
         fields: CloudPDF.FormField[];
+        widgets: CloudPDF.WidgetAnnotation[];
         meta: CloudPDF.FormMutationMeta;
     }
 
     export interface FormsCreate {
         type: "forms.create";
         field: CloudPDF.FormField;
+        widgets: CloudPDF.WidgetAnnotation[];
         meta: CloudPDF.FormMutationMeta;
     }
 
@@ -142,6 +154,7 @@ export namespace ChangeItem {
         type: "forms.update";
         skipped?: string[] | undefined;
         field: CloudPDF.FormField;
+        widgets: CloudPDF.WidgetAnnotation[];
         meta: CloudPDF.FormMutationMeta;
     }
 
@@ -153,25 +166,76 @@ export namespace ChangeItem {
     export interface FormsRestore {
         type: "forms.restore";
         field: CloudPDF.FormField;
+        widgets: CloudPDF.WidgetAnnotation[];
         meta: CloudPDF.FormMutationMeta;
     }
 
     export interface FormsSetSignatureAppearance {
         type: "forms.setSignatureAppearance";
         field: CloudPDF.FormField;
+        widgets: CloudPDF.WidgetAnnotation[];
         meta: CloudPDF.FormMutationMeta;
     }
 
     export interface FormsAddWidget {
         type: "forms.addWidget";
         field: CloudPDF.FormField;
+        widgets: CloudPDF.WidgetAnnotation[];
         meta: CloudPDF.FormMutationMeta;
     }
 
     export interface FormsRemoveWidget {
         type: "forms.removeWidget";
         field: CloudPDF.FormField;
+        widgets: CloudPDF.WidgetAnnotation[];
         meta: CloudPDF.FormMutationMeta;
+    }
+
+    export interface FormsDeleteWidget {
+        type: "forms.deleteWidget";
+        widget: CloudPDF.AnnotationRef;
+        page: CloudPDF.PageRef;
+        field: CloudPDF.FormField | null;
+        meta: CloudPDF.FormMutationMeta;
+    }
+
+    export interface FormsRestoreWidget {
+        type: "forms.restoreWidget";
+        field: CloudPDF.FormField | null;
+        widgets: CloudPDF.WidgetAnnotation[];
+        meta: CloudPDF.FormMutationMeta;
+    }
+
+    export interface FormsReorderWidgets {
+        type: "forms.reorderWidgets";
+        page: CloudPDF.PageRef;
+        order: CloudPDF.AnnotationRef[];
+        meta: CloudPDF.FormMutationMeta;
+    }
+
+    export interface FormsUpdateWidget {
+        type: "forms.updateWidget";
+        skipped?: string[] | undefined;
+        widget: CloudPDF.WidgetAnnotation;
+        appearance: ChangeItemFormsUpdateWidget.Appearance;
+        meta: CloudPDF.FormMutationMeta;
+    }
+
+    export namespace ChangeItemFormsUpdateWidget {
+        export interface Appearance {
+            action: Appearance.Action;
+            changed: boolean;
+        }
+
+        export namespace Appearance {
+            export const Action = {
+                Preserved: "preserved",
+                Regenerated: "regenerated",
+                GenerationUnavailable: "generation-unavailable",
+                Restored: "restored",
+            } as const;
+            export type Action = (typeof Action)[keyof typeof Action];
+        }
     }
 
     export interface MetadataUpdate {

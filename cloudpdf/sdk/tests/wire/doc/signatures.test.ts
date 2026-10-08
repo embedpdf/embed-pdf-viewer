@@ -17,7 +17,7 @@ describe("SignaturesClient", () => {
                     index: 1,
                     field: { kind: "objectNumber", objectNumber: 1 },
                     fieldName: "fieldName",
-                    widget: { ref: null, objectNumber: 1, page: null, rect: null },
+                    widget: { ref: null, objectNumber: 1, page: null },
                     signed: true,
                     kind: "signature",
                     filter: "filter",
@@ -149,7 +149,6 @@ describe("SignaturesClient", () => {
                     ref: { kind: "objectNumber", page: { kind: "objectNumber", objectNumber: 1 }, objectNumber: 1 },
                     objectNumber: 1,
                     page: { kind: "objectNumber", objectNumber: 1 },
-                    rect: { x: 1.1, y: 1.1, width: 1.1, height: 1.1 },
                 },
                 signed: true,
                 kind: "signature",
@@ -197,6 +196,7 @@ describe("SignaturesClient", () => {
                     previousDocVersion: 1,
                     docVersion: 1,
                     annotationsVersion: 1,
+                    formsVersion: 1,
                     layoutVersion: 1,
                     metadataVersion: 1,
                     attachmentsVersion: 1,
@@ -205,7 +205,7 @@ describe("SignaturesClient", () => {
                     pages: [
                         {
                             page: { kind: "objectNumber", objectNumber: 1 },
-                            cache: { contentVersion: 1, annotationVersion: 1 },
+                            cache: { contentVersion: 1, annotationVersion: 1, widgetVersion: 1 },
                         },
                     ],
                 },

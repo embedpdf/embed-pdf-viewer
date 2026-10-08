@@ -71,6 +71,7 @@ function harness(config?: ActionsConfig, fields: Array<{ name: string; widgets: 
               ref: { kind: 'objectNumber', objectNumber: 100 + index },
               widgets: widgets.map((objectNumber) => ({ objectNumber, page: toPageRef(3) })),
             })),
+            widgets: [],
           }),
         },
       } as unknown as Partial<DocumentHandle>,
@@ -246,7 +247,15 @@ describe('actions dispatcher', () => {
           fields: [],
           changedWidgets: [],
         })),
-        meta: { affectedPages: [], cacheDelta: null, changedFields: [], changedWidgets: [] },
+        widgets: [],
+        meta: {
+          affectedPages: [],
+          cacheDelta: null,
+          opId: 'test',
+          undoable: false,
+          changedFields: [],
+          changedWidgets: [],
+        },
       };
     });
     const flagged: Array<{ annotObjectNumber: number; hidden: boolean | undefined }> = [];

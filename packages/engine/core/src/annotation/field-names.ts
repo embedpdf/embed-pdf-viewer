@@ -11,7 +11,6 @@ export const ANNOTATION_FIELD_NAMES: Readonly<Record<AnnotationSubtype, readonly
   highlight: [
     'ref',
     'page',
-    'index',
     'hasAppearance',
     'appearanceState',
     'nm',
@@ -47,7 +46,6 @@ export const ANNOTATION_FIELD_NAMES: Readonly<Record<AnnotationSubtype, readonly
   underline: [
     'ref',
     'page',
-    'index',
     'hasAppearance',
     'appearanceState',
     'nm',
@@ -83,7 +81,6 @@ export const ANNOTATION_FIELD_NAMES: Readonly<Record<AnnotationSubtype, readonly
   squiggly: [
     'ref',
     'page',
-    'index',
     'hasAppearance',
     'appearanceState',
     'nm',
@@ -119,7 +116,6 @@ export const ANNOTATION_FIELD_NAMES: Readonly<Record<AnnotationSubtype, readonly
   strikeout: [
     'ref',
     'page',
-    'index',
     'hasAppearance',
     'appearanceState',
     'nm',
@@ -156,7 +152,6 @@ export const ANNOTATION_FIELD_NAMES: Readonly<Record<AnnotationSubtype, readonly
   circle: [
     'ref',
     'page',
-    'index',
     'hasAppearance',
     'appearanceState',
     'nm',
@@ -198,7 +193,6 @@ export const ANNOTATION_FIELD_NAMES: Readonly<Record<AnnotationSubtype, readonly
   square: [
     'ref',
     'page',
-    'index',
     'hasAppearance',
     'appearanceState',
     'nm',
@@ -240,7 +234,6 @@ export const ANNOTATION_FIELD_NAMES: Readonly<Record<AnnotationSubtype, readonly
   polygon: [
     'ref',
     'page',
-    'index',
     'hasAppearance',
     'appearanceState',
     'nm',
@@ -286,7 +279,6 @@ export const ANNOTATION_FIELD_NAMES: Readonly<Record<AnnotationSubtype, readonly
   polyline: [
     'ref',
     'page',
-    'index',
     'hasAppearance',
     'appearanceState',
     'nm',
@@ -332,7 +324,6 @@ export const ANNOTATION_FIELD_NAMES: Readonly<Record<AnnotationSubtype, readonly
   line: [
     'ref',
     'page',
-    'index',
     'hasAppearance',
     'appearanceState',
     'nm',
@@ -380,7 +371,6 @@ export const ANNOTATION_FIELD_NAMES: Readonly<Record<AnnotationSubtype, readonly
   link: [
     'ref',
     'page',
-    'index',
     'hasAppearance',
     'appearanceState',
     'nm',
@@ -414,7 +404,6 @@ export const ANNOTATION_FIELD_NAMES: Readonly<Record<AnnotationSubtype, readonly
   ink: [
     'ref',
     'page',
-    'index',
     'hasAppearance',
     'appearanceState',
     'nm',
@@ -455,7 +444,6 @@ export const ANNOTATION_FIELD_NAMES: Readonly<Record<AnnotationSubtype, readonly
   'free-text': [
     'ref',
     'page',
-    'index',
     'hasAppearance',
     'appearanceState',
     'nm',
@@ -506,7 +494,6 @@ export const ANNOTATION_FIELD_NAMES: Readonly<Record<AnnotationSubtype, readonly
   caret: [
     'ref',
     'page',
-    'index',
     'hasAppearance',
     'appearanceState',
     'nm',
@@ -544,7 +531,6 @@ export const ANNOTATION_FIELD_NAMES: Readonly<Record<AnnotationSubtype, readonly
   text: [
     'ref',
     'page',
-    'index',
     'hasAppearance',
     'appearanceState',
     'nm',
@@ -583,7 +569,6 @@ export const ANNOTATION_FIELD_NAMES: Readonly<Record<AnnotationSubtype, readonly
   stamp: [
     'ref',
     'page',
-    'index',
     'hasAppearance',
     'appearanceState',
     'nm',
@@ -621,7 +606,6 @@ export const ANNOTATION_FIELD_NAMES: Readonly<Record<AnnotationSubtype, readonly
   'file-attachment': [
     'ref',
     'page',
-    'index',
     'hasAppearance',
     'appearanceState',
     'nm',
@@ -658,7 +642,6 @@ export const ANNOTATION_FIELD_NAMES: Readonly<Record<AnnotationSubtype, readonly
   widget: [
     'ref',
     'page',
-    'index',
     'hasAppearance',
     'appearanceState',
     'nm',
@@ -701,7 +684,6 @@ export const ANNOTATION_FIELD_NAMES: Readonly<Record<AnnotationSubtype, readonly
   redact: [
     'ref',
     'page',
-    'index',
     'hasAppearance',
     'appearanceState',
     'nm',
@@ -744,7 +726,6 @@ export const ANNOTATION_FIELD_NAMES: Readonly<Record<AnnotationSubtype, readonly
   popup: [
     'ref',
     'page',
-    'index',
     'hasAppearance',
     'appearanceState',
     'nm',
@@ -779,7 +760,6 @@ export const ANNOTATION_FIELD_NAMES: Readonly<Record<AnnotationSubtype, readonly
   unsupported: [
     'ref',
     'page',
-    'index',
     'hasAppearance',
     'appearanceState',
     'nm',

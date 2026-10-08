@@ -3,6 +3,7 @@ import { UUID_V7 } from './names';
 import { pdfOf } from './pdfOf';
 import type { ConformanceTestRunner } from './runMetadataConformance';
 import type { AnnotationDraft, Annotation, AnnotationPatch } from '../annotation/kinds';
+import type { WidgetPatch } from '../annotation/kinds/widget';
 import type { AnnotationResources } from '../annotation/resources';
 import { DRAWN_RECT_KINDS } from '../annotation/shapeForRect';
 import type { DocumentHandle } from '../engine/DocumentHandle';
@@ -275,10 +276,17 @@ const CASES: PredictionCase[] = [
     resources: { file: new TextEncoder().encode('attached') },
     patch: { file: { name: 'note.txt', description: 'Another note' } },
   },
+];
+
+/**
+ * A widget's update, predicted the same way: widgets are the form's, so the
+ * widget is placed by a field create and changed by `forms.updateWidget`.
+ */
+const WIDGET_CASES: { name: string; patch: WidgetPatch }[] = [
+  { name: 'hidden and locked', patch: { hidden: true, locked: true } },
   {
-    name: 'widget: hidden and locked',
-    draft: { subtype: 'widget', rect: BOX },
-    patch: { hidden: true, locked: true },
+    name: 'moved and restyled',
+    patch: { rect: { ...BOX, x: 300 }, color: '#1f6feb', strokeWidth: 2 },
   },
 ];
 
@@ -319,11 +327,6 @@ const CREATE_CASES: CreateCase[] = [
   { name: 'note, as little as it takes', draft: { subtype: 'text', rect: iconRect(400, 72) } },
   { name: 'link, as little as it takes', draft: { subtype: 'link', rect: BOX, target: null } },
   { name: 'redaction, as little as it takes', draft: { subtype: 'redact', rect: BOX } },
-  { name: 'widget, as little as it takes', draft: { subtype: 'widget', rect: BOX } },
-  {
-    name: 'widget, named, described and not printed',
-    draft: { subtype: 'widget', rect: BOX, nm: 'field-1', contents: 'Your name', print: false },
-  },
   {
     name: 'stamp, as little as it takes',
     draft: { subtype: 'stamp', box: BOX },
@@ -553,6 +556,20 @@ export function runAnnotationPredictionConformance(
       });
     }
 
+    for (const [at, scenario] of WIDGET_CASES.entries()) {
+      test(`widget: ${scenario.name}`, async () => {
+        const { widgets } = await doc.forms.create({
+          family: 'text',
+          name: `predicted_${at}`,
+          widgets: [{ page: page.ref, rect: BOX }],
+        });
+        const created = widgets[0]!;
+        const predicted = applyAnnotationPatch(created, { subtype: 'widget', ...scenario.patch });
+        const { widget: actual } = await doc.forms.updateWidget(created.ref, scenario.patch);
+        expect(differences(predicted, actual)).toEqual([]);
+      });
+    }
+
     for (const scenario of CREATE_CASES) {
       test(`create: ${scenario.name}`, async () => {
         const { annotation: actual } = await page.annotations.create(scenario.draft, {
@@ -564,7 +581,6 @@ export function runAnnotationPredictionConformance(
         // engine gives, and the drawing's box, which the engine works out.
         const predicted = annotationOfDraft(scenario.draft, {
           ref: actual.ref,
-          index: actual.index,
           ...(actual.nm !== null ? { nm: actual.nm } : {}),
           attribution: {
             ...(actual.author !== null ? { author: actual.author } : {}),

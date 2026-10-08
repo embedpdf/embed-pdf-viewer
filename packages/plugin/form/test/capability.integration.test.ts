@@ -8,13 +8,27 @@ import { createLocalEngine } from '@embedpdf/engine';
 import type { FormFieldDTO } from '@embedpdf/engine-core/runtime';
 import { interactionPlugin } from '@embedpdf/plugin-interaction';
 
-import { toFieldRef, type FormFieldCreatedEvent, type FormValueChangedEvent } from '../src/contract';
+import {
+  toFieldRef,
+  type FormFieldCreatedEvent,
+  type FormValueChangedEvent,
+} from '../src/contract';
 import { formPlugin } from '../src/form.plugin';
 import { FormToken } from '../src/host-contract';
 import { formState } from '../src/state';
 
 const here = dirname(fileURLToPath(import.meta.url));
-const fixturePath = resolve(here, '..', '..', '..', 'engine', 'main', 'test', 'fixtures', 'hello_world.pdf');
+const fixturePath = resolve(
+  here,
+  '..',
+  '..',
+  '..',
+  'engine',
+  'main',
+  'test',
+  'fixtures',
+  'hello_world.pdf',
+);
 
 /**
  * Each Methods row of the forms pages, on a real engine and a document with no
@@ -51,7 +65,12 @@ async function buildForm({ form, page }: Harness) {
     required: true,
     widgets: [{ page, rect: box(100) }],
   });
-  await form.create({ family: 'checkbox', name: 'agree', required: true, widgets: [{ page, rect: box(140, 72, 14, 14) }] });
+  await form.create({
+    family: 'checkbox',
+    name: 'agree',
+    required: true,
+    widgets: [{ page, rect: box(140, 72, 14, 14) }],
+  });
   await form.create({
     family: 'radio',
     name: 'plan',
@@ -80,7 +99,11 @@ async function buildForm({ form, page }: Harness) {
     ],
     widgets: [{ page, rect: box(220, 72, 160, 40) }],
   });
-  await form.create({ family: 'signature', name: 'approval', widgets: [{ page, rect: box(280, 72, 160, 40) }] });
+  await form.create({
+    family: 'signature',
+    name: 'approval',
+    widgets: [{ page, rect: box(280, 72, 160, 40) }],
+  });
 }
 
 const names = (fields: readonly FormFieldDTO[]) => fields.map((field) => field.name);
@@ -115,7 +138,7 @@ describe('the form capability on a real engine', () => {
     expect(form.get(field.ref)).toBeNull();
   }, 30_000);
 
-  it('lists each page\'s widgets with where they are and how they look', async () => {
+  it("lists each page's widgets with where they are and how they look", async () => {
     await using harness = await boot();
     const { form, page } = harness;
     await form.ensureLoaded(page);
@@ -132,7 +155,11 @@ describe('the form capability on a real engine', () => {
         },
       ],
     });
-    await form.create({ family: 'checkbox', name: 'bare', widgets: [{ page, rect: { x: 72, y: 140, width: 14, height: 14 } }] });
+    await form.create({
+      family: 'checkbox',
+      name: 'bare',
+      widgets: [{ page, rect: { x: 72, y: 140, width: 14, height: 14 } }],
+    });
     await expect.poll(() => form.listWidgets(0).length).toBe(2);
     const [boxed, bare] = form.listWidgets(page);
     expect(boxed).toMatchObject({
@@ -157,6 +184,20 @@ describe('the form capability on a real engine', () => {
     ]);
     expect(harness.form.list({ page: 0 })).toHaveLength(6);
     expect(harness.form.list({ family: 'radio' })).toEqual([plan]);
+
+    // Every place the field shows: one row per button, in button order.
+    const { form } = harness;
+    const rows = form.getWidgets(plan.ref);
+    expect(rows).toEqual(plan.widgets.map((widget) => form.getWidget(widget)));
+    expect(rows.map((row) => row.fieldFamily)).toEqual(['radio', 'radio']);
+    expect(form.getWidgets(toFieldRef('plan'))).toBe(rows);
+    expect(form.getWidgets(toFieldRef('no.such.field'))).toEqual([]);
+    // A field is never a widget address: a radio group has no one place.
+    const ref = plan.ref;
+    if (ref.kind === 'objectNumber') {
+      // @ts-expect-error a field ref names a field, not one of its widgets
+      void (() => form.getWidget(ref));
+    }
   }, 30_000);
 
   it('fills fields in with setValue, each shape, and resolves { field, status }', async () => {

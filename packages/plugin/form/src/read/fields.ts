@@ -1,6 +1,7 @@
 /**
- * Reads over the mirrored field tree: fields, values, the widget → field
- * join, the field of the selected widget, and the required-field check.
+ * Reads over the mirrored field tree: fields, values, the joins between a
+ * field and its widgets' rows, the field of the selected widget, and the
+ * required-field check.
  */
 import { memo, memoByKey } from '@embedpdf/core';
 import {
@@ -8,6 +9,7 @@ import {
   type FormFieldDTO,
   type FormFieldValue,
   type FormKind,
+  type WidgetAnnotation,
 } from '@embedpdf/engine-core/runtime';
 
 import type {
@@ -17,7 +19,7 @@ import type {
   FormValidation,
   WidgetAddress,
 } from '../contract';
-import { canonicalKey, fieldByKey, fieldByRef, fieldForWidget } from '../model';
+import { canonicalKey, fieldByKey, fieldByRef, fieldForWidget, widgetRowOf } from '../model';
 import type { FormContext, FormServices } from '../services';
 
 const NO_FIELDS: readonly FormFieldDTO[] = Object.freeze([]);
@@ -132,6 +134,18 @@ export function createFieldReads(
     { maxEntries: 1024 },
   );
 
+  // One array per field while its widgets' rows stay the same objects.
+  const widgetsByKey = memoByKey(
+    (key: string) => {
+      const index = fields.get();
+      const field = fieldByKey(index, key);
+      return (field?.widgets ?? []).map((widget) => widgetRowOf(index, widget.objectNumber));
+    },
+    (_key, ...rows): readonly WidgetAnnotation[] =>
+      Object.freeze(rows.filter((row): row is WidgetAnnotation => row !== null)),
+    { maxEntries: 1024 },
+  );
+
   const exportValues = memo(
     () => [fields.get()],
     (index): Readonly<Record<string, FormPlainValue>> => {
@@ -146,9 +160,12 @@ export function createFieldReads(
 
   /** Where a field first shows: its page's index, then top to bottom, then left to right. */
   const placeOf = (field: FormFieldDTO): readonly [number, number, number] => {
-    const widget = field.widgets.find((candidate) => candidate.page && candidate.rect);
-    const index = widget?.page ? (ctx.getPage(widget.page)?.index ?? Infinity) : Infinity;
-    return [index, widget?.rect?.y ?? 0, widget?.rect?.x ?? 0];
+    const index = fields.get();
+    const row = field.widgets
+      .map((widget) => widgetRowOf(index, widget.objectNumber))
+      .find((candidate) => candidate !== null);
+    const page = row ? (ctx.getPage(row.page)?.index ?? Infinity) : Infinity;
+    return [page, row?.rect.y ?? 0, row?.rect.x ?? 0];
   };
 
   // The page order is an input too: moving a page moves its fields in the list.
@@ -188,6 +205,8 @@ export function createFieldReads(
       refresh: (options) => ctx.cancellable(options?.signal, fields.refresh()),
       get: (ref) => fieldByRef(fields.get(), ref),
       getFieldForWidget: (widget) => fieldForWidget(fields.get(), widgetObjectOf(widget)),
+      getWidget: (widget) => widgetRowOf(fields.get(), widgetObjectOf(widget)),
+      getWidgets: (ref) => widgetsByKey(canonicalKey(fields.get(), ref)),
       list,
       getValue: (ref) => valueByKey(canonicalKey(fields.get(), ref)),
       getSelectedField,

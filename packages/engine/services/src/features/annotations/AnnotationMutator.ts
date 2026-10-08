@@ -15,7 +15,6 @@ import {
   type AnnotationCreateResult,
   type AnnotationDeleteResult,
   type AnnotationDraft,
-  type AnnotationMoveResult,
   type AnnotationPatch,
   type WireAnnotationResources,
   type AnnotationRef,
@@ -32,7 +31,6 @@ import { AnnotationBatchApplier } from './AnnotationBatchApplier';
 import { blendModeFromCode } from './internal/blendMode';
 import { assertCaptionMetadataWritable } from './internal/mutations/captionMetadata';
 import type { DocumentSession } from '../../document-session/DocumentSession';
-import { withScratch } from '../../runtime/memory/scratch';
 import { throwIfAborted } from '../../shared/abort';
 import type { FontRegistrar } from '../fonts';
 import { annotationRefOf } from './internal/identity/annotationName';
@@ -414,10 +412,11 @@ export class AnnotationMutator {
     const members = deletedWith(annotations, ref);
     if (members.length === 0) throw missingAnnotation(ref);
     authorizeAnnotationDelete(authority, members);
-    for (const member of members) {
-      this.withAnnotAt(pageIndex, member.index, (annotPtr) =>
-        this.assertNotAttachedWidget(annotPtr, 0),
-      );
+    const indexOf = (member: AnnotationRef) =>
+      resolveAnnotIndexRaw(this.runtime, this.session, member).index;
+    const positions = members.map((member) => indexOf(member.ref));
+    for (const index of positions) {
+      this.withAnnotAt(pageIndex, index, (annotPtr) => this.assertNotAttachedWidget(annotPtr, 0));
     }
     // A popup deleted without the annotation it shows leaves that
     // annotation, which stops naming it.
@@ -426,7 +425,7 @@ export class AnnotationMutator {
       if (member.subtype !== 'popup' || !member.parent) return [];
       const key = annotationKey(member.parent);
       const parent = annotations.find((annotation) => annotationKey(annotation.ref) === key);
-      return parent && !going.has(key) ? [parent] : [];
+      return parent && !going.has(key) ? [indexOf(parent.ref)] : [];
     });
 
     // Apply boundary. Promotion keeps every position; then the highest
@@ -434,18 +433,18 @@ export class AnnotationMutator {
     // deletes the indirect object.
     throwIfAborted(signal);
     promoteInlineAnnotations(this.runtime, this.session, pageObjectNumber);
-    for (const member of [...members].sort((a, b) => b.index - a.index)) {
-      if (!fn.EPDFPage_RemoveAnnotRaw(docPtr, pageIndex, member.index)) {
+    for (const index of [...positions].sort((a, b) => b - a)) {
+      if (!fn.EPDFPage_RemoveAnnotRaw(docPtr, pageIndex, index)) {
         throw new EngineError(
           EngineErrorCode.Unknown,
-          `failed to remove annotation ${member.index} on page ${pageObjectNumber}`,
+          `failed to remove annotation ${index} on page ${pageObjectNumber}`,
         );
       }
     }
     // After the removals, at the position each kept parent now has.
     for (const parent of keptParents) {
-      const before = members.filter((member) => member.index < parent.index).length;
-      this.withAnnotAt(pageIndex, parent.index - before, (annotPtr) =>
+      const before = positions.filter((index) => index < parent).length;
+      this.withAnnotAt(pageIndex, parent - before, (annotPtr) =>
         fn.EPDFAnnot_RemoveKey(annotPtr, 'Popup'),
       );
     }
@@ -481,131 +480,6 @@ export class AnnotationMutator {
       throw new EngineError(EngineErrorCode.Unknown, `failed to remove annotation: ${ref.kind}`);
     }
     return { meta: annotationMutationMeta(this.session.writeStamp(), pageObjectNumber, [deleted]) };
-  }
-
-  /**
-   * Batch reorder of a contiguous block of annotations within a single
-   * page's /Annots array. Symmetric with `pages.move()` for pages.
-   *
-   * Semantics (mirrors `EPDFPage_MoveAnnotsRaw`):
-   *   - Each ref in `refs` is resolved to its current /Annots index.
-   *     The block is detached, then re-inserted at `toIndex` in the
-   *     post-removal index space, preserving caller-supplied order.
-   *   - Single-annotation case is `move([ref], toIndex)`. There is no
-   *     separate single-move path; one batch primitive serves both.
-   *   - One `AnnotationListMutationMeta` envelope per batch, regardless of
-   *     `refs.length`; the moved annotations keep their names.
-   *
-   * Validation rules applied here before calling the helper, so callers
-   * get clean errors instead of an opaque `false` return code:
-   *   - `refs.length >= 1`.
-   *   - All refs target the page identified by `pageObjectNumber`.
-   *   - `toIndex >= 0` and `toIndex <= count - refs.length` (count is
-   *     captured after ref resolution, so the helper sees the same view).
-   *   - Resolved indices have no duplicates.
-   *
-   * `EPDFPage_MoveAnnotsRaw` itself enforces the same rules; the up-front
-   * validation is purely for a usable error surface.
-   */
-  move(
-    pageObjectNumber: PageObjectNumber,
-    refs: AnnotationRef[],
-    toIndex: number,
-    signal: AbortSignal,
-  ): AnnotationMoveResult<PdfCoordinates> {
-    throwIfAborted(signal);
-    if (refs.length === 0) {
-      throw new EngineError(EngineErrorCode.InvalidArg, 'move requires at least one ref');
-    }
-    if (toIndex < 0 || !Number.isInteger(toIndex)) {
-      throw new EngineError(
-        EngineErrorCode.InvalidArg,
-        `move toIndex must be a non-negative integer (got ${toIndex})`,
-      );
-    }
-    for (const r of refs) {
-      if (r.page.objectNumber !== pageObjectNumber) {
-        throw new EngineError(
-          EngineErrorCode.InvalidArg,
-          `move refs must all target page ${pageObjectNumber}; got ref on page ${r.page.objectNumber}`,
-        );
-      }
-    }
-
-    const { fn, mem } = this.runtime;
-    const docPtr = this.session.requireDocPtr();
-    const page = toPageRef(pageObjectNumber);
-    const { pageIndex } = this.session.resolvePageRef(page);
-
-    // 1. Resolve every ref, in caller order, to its current /Annots index.
-    const fromIndices = refs.map((ref) => {
-      throwIfAborted(signal);
-      return resolveAnnotIndexRaw(this.runtime, this.session, ref).index;
-    });
-
-    // 2. Two refs that resolve to one index would break the helper's
-    //    invariant (and are a confused caller).
-    const seen = new Set<number>();
-    for (const idx of fromIndices) {
-      if (seen.has(idx)) {
-        throw new EngineError(
-          EngineErrorCode.InvalidArg,
-          `move refs resolve to duplicate /Annots index ${idx}`,
-        );
-      }
-      seen.add(idx);
-    }
-
-    // 3. Range-check toIndex against the post-removal count, matching the
-    //    helper's contract.
-    const postRemovalCount = fn.EPDFPage_GetAnnotCountRaw(docPtr, pageIndex) - fromIndices.length;
-    if (toIndex > postRemovalCount) {
-      throw new EngineError(
-        EngineErrorCode.InvalidArg,
-        `move toIndex ${toIndex} out of range; post-removal count is ${postRemovalCount}`,
-      );
-    }
-
-    // Apply boundary.
-    throwIfAborted(signal);
-
-    // 4. Promotion keeps every position; then the block moves.
-    promoteInlineAnnotations(this.runtime, this.session, pageObjectNumber);
-    const moved = withScratch(mem, 4 * fromIndices.length, (arrPtr) => {
-      fromIndices.forEach((index, i) => mem.poke(arrPtr, 'i32', index, 4 * i));
-      return fn.EPDFPage_MoveAnnotsRaw(docPtr, pageIndex, arrPtr, fromIndices.length, toIndex);
-    });
-    if (!moved) {
-      throw new EngineError(
-        EngineErrorCode.InvalidArg,
-        `EPDFPage_MoveAnnotsRaw rejected the request (toIndex=${toIndex}, fromIndices=[${fromIndices.join(
-          ',',
-        )}])`,
-      );
-    }
-
-    // 5. Read the moved annotations back where they now are; each keeps its
-    //    name.
-    const annotations = fromIndices.map((_, i) => {
-      throwIfAborted(signal);
-      return this.withAnnotAt(pageIndex, toIndex + i, (annotPtr) =>
-        readAnnotationFromPtr(
-          fn,
-          mem,
-          annotPtr,
-          pageObjectNumber,
-          toIndex + i,
-          readContextFor(this.session, this.fonts),
-        ),
-      );
-    });
-
-    const meta = annotationMutationMeta(
-      this.session.writeStamp(),
-      pageObjectNumber,
-      annotations.map((annotation) => annotation.ref),
-    );
-    return { annotations, meta };
   }
 
   /** An annotation of the page opened raw at `index`, closed after `body`. */

@@ -115,7 +115,8 @@ await form.delete(field.ref);
 ```
 
 This removes the field and every box it has. To remove one box of a field that shows in several places,
-such as a reference number on every page, use `form.removeWidget(field.ref, widget.ref)`.
+such as a reference number on every page, use `form.deleteWidget(widget.ref)`. It resolves the field
+as it is now.
 
 ## Methods
 
@@ -127,7 +128,8 @@ What `useForm()` gives you for building forms. Reading, filling and the form's s
 | `create(draft)`             | Adds a field, with a box for each place it shows. Resolves `{ field }`. [Add fields from code](#add-fields-from-code)                                                                                 |
 | `update(ref, patch)`        | Changes a field's settings; pass only what changes. Resolves `{ field }`. [Change a field's settings](#change-a-fields-settings)                                                                      |
 | `delete(ref)`               | Removes a field and every box it has. [Remove a field](#remove-a-field)                                                                                                                               |
-| `removeWidget(ref, widget)` | Removes one box of a field that shows in several places                                                                                                                                               |
+| `deleteWidget(widget)`      | Removes one box from its page, and from its field when it has one. Resolves `{ field }`, or `{ field: null }` for a box in no field. [Remove a field](#remove-a-field)                                |
+| `removeWidget(ref, widget)` | Takes one box out of its field; it stays on the page, in no field, until `deleteWidget()` removes it                                                                                                  |
 | `repair(options?)`          | Fixes a form other PDF apps read differently, such as fields missing from the form's list, and resolves what it fixed. See [Repair a broken form](/docs/engine/forms/authoring#repair-a-broken-form). |
 | `canDesign()`               | Whether adding, changing and removing fields is allowed. [Permissions](#permissions)                                                                                                                  |
 

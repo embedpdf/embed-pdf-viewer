@@ -14,6 +14,7 @@ export namespace DocFormsImportData200Response {
         formKind: Form.FormKind;
         needsAppearances: boolean;
         fields: CloudPDF.FormField[];
+        widgets: CloudPDF.WidgetAnnotation[];
         calculationOrder: (CloudPDF.FormFieldRef | null)[];
     }
 

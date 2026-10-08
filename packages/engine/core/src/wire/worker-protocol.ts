@@ -1,5 +1,7 @@
 import type { AnnotationList } from '../annotation/AnnotationList';
+import type { AnnotationFamily } from '../annotation/family';
 import type { AnnotationDraft, AnnotationPatch } from '../annotation/kinds';
+import type { WidgetPatch } from '../annotation/kinds/widget';
 import type { WireAnnotationResources } from '../annotation/resources';
 import type { AnnotationActor, AnnotationAuthority, ChangeAuthority } from '../auth/scope';
 import type {
@@ -38,7 +40,7 @@ import type { Change, ChangeResult } from '../mutation/Change';
 import type {
   AnnotationCreateResult,
   AnnotationDeleteResult,
-  AnnotationMoveResult,
+  AnnotationReorderResult,
   AnnotationUpdateResult,
 } from '../mutation/AnnotationMutationResults';
 import type {
@@ -55,12 +57,16 @@ import type {
   FormResetResult,
   FormSetValueResult,
   FormWidgetLinkResult,
+  FormWidgetsReorderResult,
+  FormWidgetUpdateResult,
+  FormWidgetDeleteResult,
 } from '../mutation/FormMutationResults';
 import type { MetadataUpdateResult } from '../mutation/MetadataUpdateResult';
 import type { PageDeleteResult } from '../mutation/PageDeleteResult';
 import type { PageFlattenResult, PageFlattenUsage } from '../mutation/PageFlattenResult';
 import type { PageInsertResult } from '../mutation/PageInsertResult';
-import type { PageMoveResult } from '../mutation/PageMoveResult';
+import type { AnnotationPosition, PagePosition } from '../mutation/ListPosition';
+import type { PageReorderResult } from '../mutation/PageReorderResult';
 import type { PageNameResult } from '../mutation/PageNameResult';
 import type { PageRotateResult } from '../mutation/PageRotateResult';
 import type { PageScaleResult } from '../mutation/PageScaleResult';
@@ -416,10 +422,9 @@ export interface AnnotationsListWorkerRequest {
 }
 
 /**
- * Batch-render every annotation appearance stream on a page. Acquires a
+ * Batch-render every appearance stream of one family on a page. Acquires a
  * `pagePtr`, iterates `/Annots`, and renders each annotation's `/AP` via
- * `EPDF_RenderAnnotBitmap` into its own raster. Read-only; gated on the
- * render capability like `pages.render`.
+ * `EPDF_RenderAnnotBitmap` into its own raster. Read-only.
  */
 export interface AnnotationsRenderAppearancesWorkerRequest {
   kind: 'annotations.renderAppearances';
@@ -428,6 +433,8 @@ export interface AnnotationsRenderAppearancesWorkerRequest {
   docId: string;
   layerName?: string;
   page: PageRef;
+  /** The page's annotations except widgets, or its widgets (`page.forms`). */
+  family: AnnotationFamily;
   options?: AnnotationAppearanceRenderOptions;
 }
 
@@ -653,20 +660,18 @@ export interface AnnotationsReadAppearanceWorkerRequest {
   ref: AnnotationRef;
 }
 
-/**
- * Batch annotation reorder. Refs are resolved on the worker before the
- * move so the impact computation has a single before-state and one
- * revision bump per batch.
- */
-export interface AnnotationsMoveWorkerRequest extends WriteJobFields {
-  kind: 'annotations.move';
+/** A page's annotations' stacking order: `refs` go together to `position`. */
+export interface AnnotationsReorderWorkerRequest extends WriteJobFields {
+  kind: 'annotations.reorder';
   effect: 'write';
   jobId: WorkerJobId;
   docId: string;
   layerName?: string;
   page: PageRef;
   refs: AnnotationRef[];
-  toIndex: number;
+  position: AnnotationPosition;
+  /** Who the reorder acts for and what they may do: checked against each annotation, inside the write. */
+  authority: AnnotationAuthority;
   artifactPath?: string;
 }
 
@@ -824,6 +829,43 @@ export interface FormsDetachWidgetWorkerRequest extends WriteJobFields {
   artifactPath?: string;
 }
 
+/** A widget leaves its page, and its field when it has one. */
+export interface FormsDeleteWidgetWorkerRequest extends WriteJobFields {
+  kind: 'forms.deleteWidget';
+  effect: 'write';
+  jobId: WorkerJobId;
+  docId: string;
+  layerName?: string;
+  widget: AnnotationRef;
+  artifactPath?: string;
+}
+
+/** A page's widgets' stacking order: `widgets` go together to `position`. */
+export interface FormsReorderWidgetsWorkerRequest extends WriteJobFields {
+  kind: 'forms.reorderWidgets';
+  effect: 'write';
+  jobId: WorkerJobId;
+  docId: string;
+  layerName?: string;
+  page: PageRef;
+  widgets: AnnotationRef[];
+  position: AnnotationPosition;
+  artifactPath?: string;
+}
+
+export interface FormsUpdateWidgetWorkerRequest<
+  C extends Coordinates = PageCoordinates,
+> extends WriteJobFields {
+  kind: 'forms.updateWidget';
+  effect: 'write';
+  jobId: WorkerJobId;
+  docId: string;
+  layerName?: string;
+  widget: AnnotationRef;
+  patch: WidgetPatch<C>;
+  artifactPath?: string;
+}
+
 export interface PagesListWorkerRequest {
   kind: 'pages.list';
   effect: 'read';
@@ -969,6 +1011,8 @@ export interface AnnotationsRenderAppearancesEncodedWorkerRequest {
   docId: string;
   layerName?: string;
   page: PageRef;
+  /** The page's annotations except widgets, or its widgets (`page.forms`). */
+  family: AnnotationFamily;
   options?: AnnotationAppearanceRenderOptions;
   encode: RenderEncode;
 }
@@ -988,14 +1032,14 @@ export interface AnnotationAppearancesEncodedResultWire<C extends Coordinates = 
   appearances: EncodedAppearanceWire<C>[];
 }
 
-export interface PagesMoveWorkerRequest extends WriteJobFields {
-  kind: 'pages.move';
+export interface PagesReorderWorkerRequest extends WriteJobFields {
+  kind: 'pages.reorder';
   effect: 'contentWrite';
   jobId: WorkerJobId;
   docId: string;
   layerName?: string;
   pages: PageRef[];
-  toIndex: number;
+  position: PagePosition;
   artifactPath?: string;
 }
 
@@ -1153,8 +1197,8 @@ export interface AnnotationsReadFileWorkerRequest {
 }
 
 /** Insert every page of a standalone PDF (transferable `bytes`) at
- *  `toIndex` (omitted → append). A structural mutation: layer sessions
- *  persist an artifact like move/rotate/delete. */
+ *  `position` (omitted → `'end'`). A structural mutation: layer sessions
+ *  persist an artifact like reorder/rotate/delete. */
 export interface PagesInsertWorkerRequest extends WriteJobFields {
   kind: 'pages.insert';
   effect: 'contentWrite';
@@ -1162,12 +1206,12 @@ export interface PagesInsertWorkerRequest extends WriteJobFields {
   docId: string;
   layerName?: string;
   bytes: ArrayBuffer;
-  toIndex?: number;
+  position?: PagePosition;
   artifactPath?: string;
 }
 
 /** Create `count` (default 1) blank pages of `size` (PDF points) at
- *  `toIndex` (omitted → append). A structural mutation exactly like
+ *  `position` (omitted → `'end'`). A structural mutation exactly like
  *  `pages.insert`, minus the bytes: pure parameters, so nothing transfers;
  *  layer sessions persist an artifact identically. */
 export interface PagesInsertBlankWorkerRequest extends WriteJobFields {
@@ -1178,7 +1222,7 @@ export interface PagesInsertBlankWorkerRequest extends WriteJobFields {
   layerName?: string;
   size: PdfSize;
   count?: number;
-  toIndex?: number;
+  position?: PagePosition;
   /** The object numbers the new pages get, one per page; the next free ones when absent. */
   objectNumbers?: number[];
   artifactPath?: string;
@@ -1482,7 +1526,7 @@ export type WorkerRequest<C extends Coordinates = PageCoordinates> =
   | AnnotationsCreateWorkerRequest<C>
   | AnnotationsUpdateWorkerRequest<C>
   | AnnotationsDeleteWorkerRequest
-  | AnnotationsMoveWorkerRequest
+  | AnnotationsReorderWorkerRequest
   | DocumentApplyWorkerRequest<C>
   | DocumentApplyChangesWorkerRequest<C>
   | FormsListWorkerRequest
@@ -1498,8 +1542,11 @@ export type WorkerRequest<C extends Coordinates = PageCoordinates> =
   | FormsDeleteFieldWorkerRequest
   | FormsAddWidgetWorkerRequest<C>
   | FormsDetachWidgetWorkerRequest
+  | FormsDeleteWidgetWorkerRequest
+  | FormsReorderWidgetsWorkerRequest
+  | FormsUpdateWidgetWorkerRequest<C>
   | PagesListWorkerRequest
-  | PagesMoveWorkerRequest
+  | PagesReorderWorkerRequest
   | PagesRotateWorkerRequest
   | PagesDeleteWorkerRequest
   | AnnotationsFlattenWorkerRequest
@@ -1595,7 +1642,7 @@ export type WorkerResultPayload<C extends Coordinates = PageCoordinates> =
       lastObjectNumber?: number;
     }
   | { tag: 'objectNumbers.reserve'; range: ObjectNumberRange }
-  | { tag: 'signatures.list'; snapshot: SignatureSnapshot<C> }
+  | { tag: 'signatures.list'; snapshot: SignatureSnapshot }
   | { tag: 'signatures.contents'; bytes: ArrayBuffer }
   | { tag: 'signatures.digest'; digest: ArrayBuffer }
   | { tag: 'signatures.revisionBytes'; bytes: ArrayBuffer; size: number }
@@ -1603,7 +1650,7 @@ export type WorkerResultPayload<C extends Coordinates = PageCoordinates> =
   | { tag: 'signatures.prepare'; result: SignaturePrepared }
   | {
       tag: 'signatures.complete';
-      result: SignatureCompleteResult<C>;
+      result: SignatureCompleteResult;
       artifact?: LayerArtifactWorkerPayload;
       artifactFile?: LayerArtifactFileWorkerPayload;
     }
@@ -1682,8 +1729,8 @@ export type WorkerResultPayload<C extends Coordinates = PageCoordinates> =
       artifactFile?: LayerArtifactFileWorkerPayload;
     }
   | {
-      tag: 'annotations.move';
-      result: AnnotationMoveResult<C>;
+      tag: 'annotations.reorder';
+      result: AnnotationReorderResult;
       artifact?: LayerArtifactWorkerPayload;
       artifactFile?: LayerArtifactFileWorkerPayload;
     }
@@ -1776,10 +1823,28 @@ export type WorkerResultPayload<C extends Coordinates = PageCoordinates> =
       artifact?: LayerArtifactWorkerPayload;
       artifactFile?: LayerArtifactFileWorkerPayload;
     }
+  | {
+      tag: 'forms.reorderWidgets';
+      result: FormWidgetsReorderResult;
+      artifact?: LayerArtifactWorkerPayload;
+      artifactFile?: LayerArtifactFileWorkerPayload;
+    }
+  | {
+      tag: 'forms.updateWidget';
+      result: FormWidgetUpdateResult<C>;
+      artifact?: LayerArtifactWorkerPayload;
+      artifactFile?: LayerArtifactFileWorkerPayload;
+    }
+  | {
+      tag: 'forms.deleteWidget';
+      result: FormWidgetDeleteResult<C>;
+      artifact?: LayerArtifactWorkerPayload;
+      artifactFile?: LayerArtifactFileWorkerPayload;
+    }
   | { tag: 'pages.list'; snapshot: PageListSnapshot<C> }
   | {
-      tag: 'pages.move';
-      result: PageMoveResult<C>;
+      tag: 'pages.reorder';
+      result: PageReorderResult<C>;
       artifact?: LayerArtifactWorkerPayload;
       artifactFile?: LayerArtifactFileWorkerPayload;
     }

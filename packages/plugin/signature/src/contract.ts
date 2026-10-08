@@ -26,6 +26,7 @@ import type {
   DocumentProtection,
   FieldLockSpec,
   FormFieldRef,
+  FormWidget,
   SignatureCompleteResult,
   SignatureDTO,
   SignaturePrepared,
@@ -98,8 +99,11 @@ export type SignatureConfig = Partial<SignatureSettings>;
 /** The mark: a stamp-plugin asset, or bytes the embedder brings (PNG, JPEG, or a one-page PDF). */
 export type Mark = { assetId: string } | { source: BinarySource };
 
-/** How a signature field is addressed: its field ref, its widget's annotation ref, or the widget's object number. */
-export type SignatureFieldAddress = FormFieldRef | AnnotationRef | { objectNumber: number };
+/**
+ * How a signature field is addressed: its field ref, or its widget, by
+ * annotation ref or as a signature names it (`SignatureDTO.widget`).
+ */
+export type SignatureFieldAddress = FormFieldRef | AnnotationRef | FormWidget;
 
 export interface SignFieldInput {
   field: FormFieldRef;

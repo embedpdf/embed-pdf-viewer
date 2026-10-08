@@ -24,7 +24,7 @@ async function opaquePixels(
 ): Promise<number> {
   const { appearances } = await doc
     .page(toPageRef(pageObjectNumber))
-    .annotations.renderAppearancesRaw({ viewport: { kind: 'scale', scale: 2 } });
+    .forms.renderAppearancesRaw({ viewport: { kind: 'scale', scale: 2 } });
   const ap = appearances.find(
     (a) => a.ref.kind === 'objectNumber' && a.ref.objectNumber === annotObjectNumber,
   );

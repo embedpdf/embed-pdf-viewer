@@ -1,7 +1,11 @@
 import type { MutationMeta } from './MutationMeta';
+import type { AppearanceOutcome } from '../annotation/appearance';
+import type { WidgetAnnotation } from '../annotation/kinds/widget';
 import type { FormFieldDTO } from '../forms/field';
 import type { FormSnapshot } from '../forms/snapshot';
+import type { AnnotationRef } from '../identity/AnnotationRef';
 import type { FormFieldRef, FormWidget } from '../identity/FormFieldRef';
+import type { PageRef } from '../identity/PageRef';
 import type { Coordinates, PageCoordinates } from '../pageSpace/coordinates';
 
 /**
@@ -17,8 +21,19 @@ export interface FormMutationMeta extends MutationMeta {
   changedWidgets: FormWidget[];
 }
 
+/**
+ * The widget rows a form write changed, read back after it: each widget of
+ * `meta.changedWidgets` that is still on a page, as `doc.forms.list()` shows
+ * it. A form's mirror folds them without a read.
+ */
+export interface FormWidgetRows<C extends Coordinates = PageCoordinates> {
+  widgets: WidgetAnnotation<C>[];
+}
+
 /** Result of a value write (`setValue` / `reset`): the field read back after the write. */
-export interface FormSetValueResult<C extends Coordinates = PageCoordinates> {
+export interface FormSetValueResult<
+  C extends Coordinates = PageCoordinates,
+> extends FormWidgetRows<C> {
   field: FormFieldDTO<C>;
   meta: FormMutationMeta;
 }
@@ -28,7 +43,9 @@ export interface FormSetValueResult<C extends Coordinates = PageCoordinates> {
  * all of them. An empty `fields` means every field was already at its
  * default.
  */
-export interface FormResetResult<C extends Coordinates = PageCoordinates> {
+export interface FormResetResult<
+  C extends Coordinates = PageCoordinates,
+> extends FormWidgetRows<C> {
   fields: FormFieldDTO<C>[];
   meta: FormMutationMeta;
 }
@@ -45,11 +62,15 @@ export function formResetFacts<C extends Coordinates>(
     const changedWidgets = result.meta.changedWidgets.filter((widget) =>
       own.has(widget.objectNumber),
     );
+    const widgets = result.widgets.filter(
+      (widget) => widget.ref.kind === 'objectNumber' && own.has(widget.ref.objectNumber),
+    );
     const pages = new Set(
       changedWidgets.flatMap((widget) => (widget.page ? [widget.page.objectNumber] : [])),
     );
     return {
       field,
+      widgets,
       meta: {
         affectedPages: result.meta.affectedPages.filter((page) => pages.has(page.objectNumber)),
         cacheDelta: null,
@@ -83,15 +104,41 @@ export interface FormDataExport {
   bytes: Uint8Array;
 }
 
-/** Result of `create`: the field read back, widgets included. */
-export interface FormFieldCreateResult<C extends Coordinates = PageCoordinates> {
+/** Result of `create`: the field read back, and its widget rows. */
+export interface FormFieldCreateResult<
+  C extends Coordinates = PageCoordinates,
+> extends FormWidgetRows<C> {
   field: FormFieldDTO<C>;
   meta: FormMutationMeta;
 }
 
 /** Result of `update` and `setSignatureAppearance`. */
-export interface FormFieldUpdateResult<C extends Coordinates = PageCoordinates> {
+export interface FormFieldUpdateResult<
+  C extends Coordinates = PageCoordinates,
+> extends FormWidgetRows<C> {
   field: FormFieldDTO<C>;
+  meta: FormMutationMeta;
+}
+
+/**
+ * Result of `updateWidget`: the widget read back after the patch, and the
+ * engine's appearance verdict (see `AnnotationUpdateResult.appearance`).
+ */
+export interface FormWidgetUpdateResult<C extends Coordinates = PageCoordinates> {
+  widget: WidgetAnnotation<C>;
+  appearance: AppearanceOutcome;
+  meta: FormMutationMeta;
+}
+
+/**
+ * Result of `reorderWidgets`: the page's widgets in their new paint order,
+ * whole, as refs. Widgets paint above every annotation, in this order.
+ */
+export interface FormWidgetsReorderResult {
+  page: PageRef;
+  /** Every widget of the page, bottom to top. */
+  order: AnnotationRef[];
+  /** `meta.changedWidgets` names the widgets that moved, in the order given. */
   meta: FormMutationMeta;
 }
 
@@ -109,9 +156,37 @@ export function deletedFieldOf(result: FormFieldDeleteResult): FormFieldRef | nu
   return result.meta.changedFields[0] ?? null;
 }
 
-/** Result of `addWidget` / `removeWidget`: the field read back. */
-export interface FormWidgetLinkResult<C extends Coordinates = PageCoordinates> {
+/**
+ * Result of `addWidget` / `removeWidget`: the field read back, and the
+ * widget's row (a removed widget stays on its page, in no field).
+ */
+export interface FormWidgetLinkResult<
+  C extends Coordinates = PageCoordinates,
+> extends FormWidgetRows<C> {
   field: FormFieldDTO<C>;
+  meta: FormMutationMeta;
+}
+
+/**
+ * Result of `deleteWidget`: the widget is gone from its page, and from its
+ * field when it had one. `field` is that field read back, `null` for a widget
+ * in no field.
+ */
+export interface FormWidgetDeleteResult<C extends Coordinates = PageCoordinates> {
+  widget: AnnotationRef;
+  page: PageRef;
+  field: FormFieldDTO<C> | null;
+  meta: FormMutationMeta;
+}
+
+/**
+ * What an undo of `deleteWidget` answers: the widget's row, back on its page
+ * at its place, and its field with it again (`null` for a widget in no field).
+ */
+export interface FormWidgetRestoreResult<
+  C extends Coordinates = PageCoordinates,
+> extends FormWidgetRows<C> {
+  field: FormFieldDTO<C> | null;
   meta: FormMutationMeta;
 }
 

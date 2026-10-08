@@ -108,6 +108,15 @@ export interface AnnotationAppearancesQuery {
 }
 
 /**
+ * The widget twin of {@link AnnotationAppearancesQuery}: a page's widget
+ * images change exactly when its widgets do, so `widgetVersion` keys them.
+ */
+export interface WidgetAppearancesQuery {
+  options: AnnotationAppearanceImageOptions;
+  widgetVersion?: number;
+}
+
+/**
  * One rendered appearance: the raw RGBA raster plus the metadata needed to
  * position and identify it. `rect` is the placement box in page space, so
  * the consumer can place the bitmap without a second read.

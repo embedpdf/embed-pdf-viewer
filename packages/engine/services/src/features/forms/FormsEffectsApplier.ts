@@ -29,6 +29,7 @@ import {
 import { formMutationMeta } from './internal/formMutationMeta';
 import { readFieldAt } from './internal/readFormSnapshot';
 import { resolveFieldRef } from './internal/resolveFieldRef';
+import { withWidgetRows } from './internal/widgetRows';
 import {
   applyNativeWrite,
   isNoOpWrite,
@@ -166,8 +167,15 @@ export class FormsEffectsApplier {
       }
     }
 
-    const meta = formMutationMeta(this.session.writeStamp(), [...allChangedFields.values()], [...allChangedWidgets.values()]);
-    return { result: { results, meta }, wrote: mustFinalize };
+    const meta = formMutationMeta(
+      this.session.writeStamp(),
+      [...allChangedFields.values()],
+      [...allChangedWidgets.values()],
+    );
+    return {
+      result: withWidgetRows(this.runtime, this.session, { results, meta }),
+      wrote: mustFinalize,
+    };
   }
 
   private preflight(

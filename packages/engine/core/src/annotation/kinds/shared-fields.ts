@@ -42,8 +42,6 @@ const flag = () => field.data(z.boolean()).optional();
 export const annotationBaseFields = {
   ref: field.engine(AnnotationRefSchema),
   page: field.engine(PageRefSchema),
-  /** Position in the page's `/Annots`, 0-based: the stacking order, not a name. */
-  index: field.engine(z.number().int().nonnegative()),
   /**
    * Whether the file holds its appearance (`/AP /N`). Without one, every
    * viewer draws the annotation from its fields: the engine in memory, never

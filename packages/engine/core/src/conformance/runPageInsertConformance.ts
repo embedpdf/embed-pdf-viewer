@@ -20,6 +20,9 @@ import { toPageRef } from '../identity/PageRef';
  *   4. Empty bytes / malformed bytes / out-of-range toIndex reject with
  *      InvalidArg / MalformedPdf, leaving the document untouched.
  */
+/** No fixture has a page object this high. */
+const UNKNOWN_PAGE = 999_999;
+
 export function runPageInsertConformance(
   runner: ConformanceTestRunner,
   opts: ConformanceOptions,
@@ -63,7 +66,7 @@ export function runPageInsertConformance(
       }
     });
 
-    test('toIndex places the block mid-document, in source order', async () => {
+    test('a position places the block after its neighbour, in source order', async () => {
       const doc = await openFixture(engine, opts);
       try {
         const before = await doc.pages.list();
@@ -74,7 +77,7 @@ export function runPageInsertConformance(
           toPageRef(beforePageObjectNumbers[1]),
         ]);
 
-        const result = await doc.pages.insert(two, 1);
+        const result = await doc.pages.insert(two, { after: before.pages[0].ref });
         expect(result.insertedPages.length).toBe(2);
         const pageObjectNumbers = result.layout.pages.map((p) => p.ref.objectNumber);
         expect(pageObjectNumbers[0]).toBe(beforePageObjectNumbers[0]);
@@ -137,18 +140,19 @@ export function runPageInsertConformance(
       }
     });
 
-    test('out-of-range toIndex rejects with InvalidArg', async () => {
+    test('a neighbour that is not a page of the document rejects with NotFound', async () => {
       const doc = await openFixture(engine, opts);
       try {
         const before = await doc.pages.list();
         const single = await doc.pages.extract([before.pages[0].ref]);
         let caught: unknown;
         try {
-          await doc.pages.insert(single, before.pageCount + 1);
+          await doc.pages.insert(single, { before: toPageRef(UNKNOWN_PAGE) });
         } catch (err) {
           caught = err;
         }
-        expect(EngineError.is(caught, EngineErrorCode.InvalidArg)).toBe(true);
+        expect(EngineError.is(caught, EngineErrorCode.NotFound)).toBe(true);
+        expect((await doc.pages.list()).pageCount).toBe(before.pageCount);
       } finally {
         await doc.close();
       }

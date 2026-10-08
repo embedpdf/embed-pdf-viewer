@@ -36,7 +36,7 @@ import { toPageRef } from '../identity/PageRef';
 import { AbortError } from '../promise/AbortError';
 import {
   AnnotationCreateResultSchema,
-  AnnotationMoveResultSchema,
+  AnnotationReorderResultSchema,
   AnnotationUpdateResultSchema,
 } from '../wire/schemas';
 
@@ -139,8 +139,8 @@ const DEFAULT_INK_STROKES: InkDraft['inkList'] = [
  * @cloudpdf/server) implementations must pass identically.
  *
  * The locked rules being verified here:
- *   - `create` is append-only: PDFium drops the new annotation at
- *     `index = previousCount`, so no existing index shifts.
+ *   - `create` is append-only: the new annotation paints on top of the
+ *     page's others, and none of them moves.
  *   - Every annotation keeps its name through every write: an object
  *     number, or the `baseIndex` of one born inline in the file. No write
  *     stamps an /NM to name one.
@@ -170,7 +170,7 @@ export function runAnnotationMutationConformance(
       if (engine) await engine.destroy();
     });
 
-    test('create appends without shifting indices', async () => {
+    test('create appends on top without moving the others', async () => {
       const doc = await openFixture(engine, opts);
       try {
         const page = doc.page(toPageRef(fix.pageObjectNumber));
@@ -196,12 +196,12 @@ export function runAnnotationMutationConformance(
 
         expect(result.meta.changed.length).toBe(1);
 
-        // The annotation is actually on the page now, at the end of the
-        // /Annots array. This is the invariant that justifies the
-        // non-invalidating impact: every prior index is preserved.
+        // The annotation is actually on the page now, on top of the others.
         const after = await page.annotations.list();
         expect(after.annotations.length).toBe(beforeCount + 1);
-        expect(result.annotation.index).toBe(beforeCount);
+        expect(annotationKey(after.annotations.at(-1)!.ref)).toBe(
+          annotationKey(result.annotation.ref),
+        );
       } finally {
         await doc.close();
       }
@@ -1169,7 +1169,7 @@ export function runAnnotationMutationConformance(
         }
         // The list read agrees with the create echo.
         const listed = (await page.annotations.list()).annotations.find(
-          (a) => a.index === created.annotation.index,
+          (a) => annotationKey(a.ref) === annotationKey(created.annotation.ref),
         );
         expect(listed?.subtype).toBe('free-text');
         if (listed?.subtype === 'free-text') {
@@ -1309,7 +1309,7 @@ export function runAnnotationMutationConformance(
         expect(EngineError.is(caught, EngineErrorCode.InvalidArg)).toBe(true);
         // The refused write left the annotation untouched.
         const after = (await page.annotations.list()).annotations.find(
-          (a) => a.index === created.annotation.index,
+          (a) => annotationKey(a.ref) === annotationKey(created.annotation.ref),
         );
         expect(after?.contents).toBe('x');
         const agreed = await page.annotations.update(ref, {
@@ -1736,7 +1736,7 @@ export function runAnnotationMutationConformance(
     // Runs before the inline delete below: an engine whose documents persist
     // between tests (cloud) loses the fixture's one inline annotation to it.
     if (fix.expectsInlineAnnotation) {
-      test('move of an annotation born inline keeps its baseIndex name', async () => {
+      test('reorder of an annotation born inline keeps its baseIndex name', async () => {
         const doc = await openFixture(engine, opts);
         try {
           const page = doc.page(toPageRef(fix.pageObjectNumber));
@@ -1745,13 +1745,14 @@ export function runAnnotationMutationConformance(
           expect(inline !== undefined).toBe(true);
           if (!inline) return;
 
-          const target = inline.index === 0 ? 1 : 0;
-          const result = await page.annotations.move([inline.ref], target);
-          expect(result.annotations.length).toBe(1);
-          expect(annotationKey(result.annotations[0].ref)).toBe(annotationKey(inline.ref));
-          expect(result.annotations[0].index).toBe(target);
-          expect(result.annotations[0].nm).toBe(inline.nm);
+          const atBottom = annotationKey(before.annotations[0]!.ref) === annotationKey(inline.ref);
+          const result = await page.annotations.reorder([inline.ref], atBottom ? 'end' : 'start');
+          const at = atBottom ? result.order.length - 1 : 0;
+          expect(annotationKey(result.order[at]!)).toBe(annotationKey(inline.ref));
           expect(result.meta.changed).toEqual([inline.ref]);
+          const after = (await page.annotations.list()).annotations[at]!;
+          expect(annotationKey(after.ref)).toBe(annotationKey(inline.ref));
+          expect(after.nm).toBe(inline.nm);
         } finally {
           await doc.close();
         }
@@ -1847,77 +1848,55 @@ export function runAnnotationMutationConformance(
     });
 
     // ─────────────────────────────────────────────────────────────────
-    //  move() — batch contiguous-block reorder. Locked invariants:
-    //  - `move([ref], toIndex)` is the single-annotation case; same
-    //    primitive as multi-move.
-    //  - Caller-supplied order is preserved at the destination.
-    //  - Moved annotations keep their names; `meta.changed` lists them.
-    //  - Out-of-range, duplicate, and abort all reject.
+    //  reorder() — the stacking order. Locked invariants:
+    //  - The annotations go together, in the order given, next to a
+    //    neighbour or at 'start' (bottom) / 'end' (top).
+    //  - The answer is the page's whole new order; `meta.changed` lists
+    //    the moved annotations, which keep their names.
+    //  - A row named twice or a neighbour that moves is InvalidArg; a
+    //    neighbour that isn't on the page is NotFound; abort rejects.
     // ─────────────────────────────────────────────────────────────────
 
-    test('move single durable annotation reorders within the page (single-as-batch)', async () => {
+    test('reorder puts annotations right after or before their neighbour', async () => {
       const doc = await openFixture(engine, opts);
       try {
         const page = doc.page(toPageRef(fix.pageObjectNumber));
+        const seeded: AnnotationRef[] = [];
+        for (const label of ['order-a', 'order-b', 'order-c']) {
+          const created = await page.annotations.create({
+            subtype: 'highlight',
+            contents: label,
+            quadPoints: quad,
+          });
+          seeded.push(created.annotation.ref);
+        }
+        const [a, b, c] = seeded as [AnnotationRef, AnnotationRef, AnnotationRef];
+        const listed = async () =>
+          (await page.annotations.list()).annotations.map((x) => annotationKey(x.ref));
+        const before = await listed();
+        const others = before.filter((key) => !seeded.map(annotationKey).includes(key));
 
-        // Seed two durable annotations we can predict ordering for.
-        const aDraft: HighlightDraft = {
-          subtype: 'highlight',
-          contents: 'move-a',
-          quadPoints: quad,
-        };
-        const bDraft: HighlightDraft = {
-          subtype: 'highlight',
-          contents: 'move-b',
-          quadPoints: quad,
-        };
-        const a = await page.annotations.create(aDraft);
-        const b = await page.annotations.create(bDraft);
-        const list = await page.annotations.list();
-
-        // Find current indices of a and b.
-        const aIdx = list.annotations.findIndex(
-          (x) =>
-            x.ref.kind === 'objectNumber' &&
-            a.annotation.ref.kind === 'objectNumber' &&
-            x.ref.objectNumber === a.annotation.ref.objectNumber,
-        );
-        const bIdx = list.annotations.findIndex(
-          (x) =>
-            x.ref.kind === 'objectNumber' &&
-            b.annotation.ref.kind === 'objectNumber' &&
-            x.ref.objectNumber === b.annotation.ref.objectNumber,
-        );
-        expect(aIdx >= 0 && bIdx >= 0).toBe(true);
-        expect(aIdx < bIdx).toBe(true);
-
-        // Move A to B's slot. Post-removal index space: A was removed,
-        // so B's position becomes bIdx - 1. Targeting bIdx puts A after
-        // B's original position. Use `bIdx` as toIndex => A lands right
-        // after B in the new order.
-        const result = await page.annotations.move([a.annotation.ref], bIdx);
-        expect(AnnotationMoveResultSchema.safeParse(result).success).toBe(true);
+        const result = await page.annotations.reorder([a], { after: c });
+        expect(AnnotationReorderResultSchema.safeParse(result).success).toBe(true);
         expect(result.meta.affectedPages).toEqual([toPageRef(fix.pageObjectNumber)]);
         expect('cacheDelta' in result.meta).toBe(true);
-        expect(result.annotations.length).toBe(1);
+        expect(result.meta.changed.map(annotationKey)).toEqual([annotationKey(a)]);
+        const afterC = [...others, annotationKey(b), annotationKey(c), annotationKey(a)];
+        expect(result.order.map(annotationKey)).toEqual(afterC);
+        expect(await listed()).toEqual(afterC);
 
-        // The moved DTO keeps its name and sits at toIndex.
-        expect(annotationKey(result.annotations[0].ref)).toBe(annotationKey(a.annotation.ref));
-        expect(result.annotations[0].index).toBe(bIdx);
-
-        const after = await page.annotations.list();
-        expect(after.annotations.length).toBe(list.annotations.length);
+        const backBeforeB = await page.annotations.reorder([a], { before: b });
+        expect(backBeforeB.order.map(annotationKey)).toEqual(before);
+        expect(await listed()).toEqual(before);
       } finally {
         await doc.close();
       }
     });
 
-    test('move multi-block preserves caller-supplied order at the destination', async () => {
+    test('reorder keeps the order given and goes to the bottom or the top', async () => {
       const doc = await openFixture(engine, opts);
       try {
         const page = doc.page(toPageRef(fix.pageObjectNumber));
-
-        // Seed three durable annotations.
         const ids = await Promise.all(
           ['multi-1', 'multi-2', 'multi-3'].map((label) =>
             page.annotations.create({
@@ -1928,46 +1907,62 @@ export function runAnnotationMutationConformance(
           ),
         );
 
-        // Move the three to position 0 in caller order [3, 1, 2].
-        const callerOrder = [ids[2].annotation.ref, ids[0].annotation.ref, ids[1].annotation.ref];
-        const result = await page.annotations.move(callerOrder, 0);
-        expect(result.annotations.length).toBe(3);
-        expect(result.meta.changed.length).toBe(3);
+        // The three go to the bottom in the order [3, 1, 2].
+        const given = [ids[2].annotation.ref, ids[0].annotation.ref, ids[1].annotation.ref];
+        const bottom = await page.annotations.reorder(given, 'start');
+        expect(bottom.meta.changed.map(annotationKey)).toEqual(given.map(annotationKey));
+        expect(bottom.order.slice(0, 3).map(annotationKey)).toEqual(given.map(annotationKey));
 
-        // Caller-supplied order preserved at the destination: indices 0, 1,
-        // 2 of the page now hold the moved DTOs in that order.
-        expect(result.annotations.map((d) => annotationKey(d.ref))).toEqual(
-          callerOrder.map(annotationKey),
-        );
+        const top = await page.annotations.reorder([ids[2].annotation.ref], 'end');
+        expect(annotationKey(top.order.at(-1)!)).toBe(annotationKey(ids[2].annotation.ref));
+        expect(top.order).toHaveLength(bottom.order.length);
       } finally {
         await doc.close();
       }
     });
 
-    test('move with out-of-range toIndex rejects with InvalidArg', async () => {
+    test('reorder refuses a neighbour that moves (InvalidArg) or is not on the page (NotFound)', async () => {
       const doc = await openFixture(engine, opts);
       try {
         const page = doc.page(toPageRef(fix.pageObjectNumber));
         const a = await page.annotations.create({
           subtype: 'highlight',
-          contents: 'oor-a',
+          contents: 'anchor-a',
           quadPoints: quad,
         });
-        const list = await page.annotations.list();
-        const farTooBig = list.annotations.length + 100;
-        let caught: unknown;
-        try {
-          await page.annotations.move([a.annotation.ref], farTooBig);
-        } catch (err) {
-          caught = err;
-        }
-        expect(EngineError.is(caught, EngineErrorCode.InvalidArg)).toBe(true);
+        const before = (await page.annotations.list()).annotations.map((x) => annotationKey(x.ref));
+        const refused = async (attempt: () => Promise<unknown>) => {
+          try {
+            await attempt();
+          } catch (err) {
+            return err;
+          }
+          return undefined;
+        };
+        const self = await refused(() =>
+          page.annotations.reorder([a.annotation.ref], { after: a.annotation.ref }),
+        );
+        expect(EngineError.is(self, EngineErrorCode.InvalidArg)).toBe(true);
+        const gone: AnnotationRef = {
+          kind: 'objectNumber',
+          page: toPageRef(fix.pageObjectNumber),
+          objectNumber: 999_999,
+        };
+        const missing = await refused(() =>
+          page.annotations.reorder([a.annotation.ref], { before: gone }),
+        );
+        expect(EngineError.is(missing, EngineErrorCode.NotFound)).toBe(true);
+        const missingRow = await refused(() => page.annotations.reorder([gone], 'start'));
+        expect(EngineError.is(missingRow, EngineErrorCode.NotFound)).toBe(true);
+        expect(
+          (await page.annotations.list()).annotations.map((x) => annotationKey(x.ref)),
+        ).toEqual(before);
       } finally {
         await doc.close();
       }
     });
 
-    test('move with duplicate refs rejects with InvalidArg', async () => {
+    test('reorder with duplicate refs rejects with InvalidArg', async () => {
       const doc = await openFixture(engine, opts);
       try {
         const page = doc.page(toPageRef(fix.pageObjectNumber));
@@ -1978,7 +1973,7 @@ export function runAnnotationMutationConformance(
         });
         let caught: unknown;
         try {
-          await page.annotations.move([a.annotation.ref, a.annotation.ref], 0);
+          await page.annotations.reorder([a.annotation.ref, a.annotation.ref], 'start');
         } catch (err) {
           caught = err;
         }
@@ -1988,7 +1983,7 @@ export function runAnnotationMutationConformance(
       }
     });
 
-    test('abort on move rejects with AbortError', async () => {
+    test('abort on reorder rejects with AbortError', async () => {
       const doc = await openFixture(engine, opts);
       try {
         const page = doc.page(toPageRef(fix.pageObjectNumber));
@@ -1997,7 +1992,7 @@ export function runAnnotationMutationConformance(
           contents: 'abort-a',
           quadPoints: quad,
         });
-        const p = page.annotations.move([a.annotation.ref], 0);
+        const p = page.annotations.reorder([a.annotation.ref], 'start');
         p.abort('test');
         await expect(p).rejects.toBeInstanceOf(AbortError);
       } finally {

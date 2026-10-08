@@ -6,7 +6,7 @@ import type {
   AnnotationDraftChangedEvent,
   AnnotationEditingChangedEvent,
   AnnotationHoverChangedEvent,
-  AnnotationMovedEvent,
+  AnnotationReorderedEvent,
   AnnotationResyncedEvent,
   AnnotationSelectionChangedEvent,
   AnnotationUpdatedEvent,
@@ -19,7 +19,7 @@ import type { AnnotationContext } from './context';
 import type { AnnotationRecords } from '../sync/records';
 
 /**
- * The plugin's events. Record events (created, updated, deleted, moved,
+ * The plugin's events. Record events (created, updated, deleted, reordered,
  * resynced) fire when the records mirror confirms a change (sync/confirmed.ts);
  * selection, draft, editing and hover events are derived from state changes
  * in the store service; `writeFailed` fires when the engine refuses a change
@@ -31,7 +31,7 @@ export function createAnnotationEvents(ctx: Pick<AnnotationContext, 'events'>) {
     created: ctx.events.source<AnnotationCreatedEvent>(),
     updated: ctx.events.source<AnnotationUpdatedEvent>(),
     deleted: ctx.events.source<AnnotationDeletedEvent>(),
-    moved: ctx.events.source<AnnotationMovedEvent>(),
+    reordered: ctx.events.source<AnnotationReorderedEvent>(),
     resynced: ctx.events.source<AnnotationResyncedEvent>(),
     selectionChanged: ctx.events.source<AnnotationSelectionChangedEvent>(),
     draftChanged: ctx.events.source<AnnotationDraftChangedEvent>(),

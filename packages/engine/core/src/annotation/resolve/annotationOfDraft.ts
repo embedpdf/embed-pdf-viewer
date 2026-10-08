@@ -19,14 +19,12 @@ export type DraftAttribution = Readonly<
 >;
 
 /**
- * What a draft alone doesn't say about the annotation it creates: where it
- * will sit, who creates it, and what the engine works out from its drawing.
+ * What a draft alone doesn't say about the annotation it creates: its name,
+ * who creates it, and what the engine works out from its drawing.
  */
 export interface DraftContext<Box = unknown> {
   /** The ref the read names it by. */
   readonly ref: AnnotationRef;
-  /** Its place among its page's annotations: a create goes last. */
-  readonly index: number;
   /**
    * The name the engine gives it when the draft has no `nm`: a fresh UUIDv7
    * the engine mints. Left out, the prediction says `null` until the engine
@@ -92,7 +90,6 @@ export function annotationOfResolvedDraft<C extends Coordinates>(
   if (read.nm === null && context.nm !== undefined) read.nm = context.nm;
   read.ref = context.ref;
   read.page = context.ref.page;
-  read.index = context.index;
   read.hasAppearance = !UNBAKED_KINDS.has(subtype);
   if (read.rect === null) read.rect = context.rect ?? given.rect ?? given.box ?? NO_BOX;
 

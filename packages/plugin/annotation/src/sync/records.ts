@@ -10,9 +10,13 @@
  * their keys, record events fire) is in sync/confirmed.ts.
  */
 import { reload, type DocumentEvent, type Mirror, type PageRef } from '@embedpdf/core';
-import { annotationKey, type Annotation, type FormWidget } from '@embedpdf/engine-core/runtime';
+import {
+  annotationKey,
+  reorderPart,
+  type Annotation,
+  type FormWidget,
+} from '@embedpdf/engine-core/runtime';
 
-import { moveInOrder } from '../model';
 import type { AnnotationContext } from '../services/context';
 import type { AnnotationEvents } from '../services/events';
 
@@ -128,23 +132,21 @@ export function foldRecords(
 ): AnnotationRecords | ReturnType<typeof reload> {
   switch (event.type) {
     // A new record comes with a freshly baked appearance; the engine says
-    // whether an update changed one; a z-order move changes none.
+    // whether an update changed one.
     case 'annotations.created':
       return put(records, [event.annotation], true);
     case 'annotations.updated':
       return put(records, [event.annotation], event.appearance.changed);
-    case 'annotations.moved': {
-      // The moved records, in their new order, from the first one's new index.
-      const moved = put(records, event.annotations, false);
-      const keys = event.annotations.map((annotation) => annotationKey(annotation.ref));
+    case 'annotations.reordered': {
+      // The page's records take the new order in their slots.
       const page = event.page.objectNumber;
       return {
-        ...moved,
-        order: moveInOrder(
-          moved.order,
-          (key) => moved.byKey[key]?.dto.page.objectNumber === page,
-          keys,
-          event.annotations[0]?.index ?? 0,
+        ...records,
+        order: reorderPart(
+          records.order,
+          (key) => records.byKey[key]?.dto.page.objectNumber === page,
+          event.order.map(annotationKey),
+          (key) => key,
         ),
       };
     }

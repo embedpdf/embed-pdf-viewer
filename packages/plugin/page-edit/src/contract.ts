@@ -11,15 +11,15 @@ export { PageEditToken } from './token';
 export type { PdfRotation, PdfSize } from '@embedpdf/core';
 
 /**
- * Where pages land. `after` and `before` name a page, so they stay right when
- * the pages are reordered between the click and the call; `index` is a
- * position from 0, and `'end'` appends. Resolved to a position when the edit
- * runs.
+ * Where pages land: right after or before a page, or at the start or the end.
+ * A page named by its index is the page at that index when the verb is
+ * called, the page the user clicked; from then on it is that page, so the
+ * placement stays right when pages are reordered before the edit runs.
  */
 export type PagePlacement =
   | { readonly after: PageRef | number }
   | { readonly before: PageRef | number }
-  | { readonly index: number }
+  | 'start'
   | 'end';
 
 /** What an insert resolves: the new pages, in the order they were inserted. */
@@ -79,7 +79,7 @@ export interface PageEditCapability {
     options?: OperationOptions,
   ): Promise<void>;
   /** Move pages to the placement; several pages keep their order and land together. */
-  move(
+  reorder(
     pages: readonly (PageRef | number)[],
     placement: PagePlacement,
     options?: OperationOptions,

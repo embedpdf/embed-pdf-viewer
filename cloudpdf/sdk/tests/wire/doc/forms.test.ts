@@ -25,13 +25,61 @@ describe("FormsClient", () => {
                     mappingName: "mappingName",
                     valueEntry: { kind: "none" },
                     defaultValueEntry: { kind: "none" },
-                    widgets: [{ ref: null, objectNumber: 1, page: null, rect: null }],
+                    widgets: [{ ref: null, objectNumber: 1, page: null }],
                     value: "value",
                     defaultValue: "defaultValue",
                     maxLength: 1,
                     multiline: true,
                     password: true,
                     comb: true,
+                },
+            ],
+            widgets: [
+                {
+                    subtype: "widget",
+                    ref: { kind: "objectNumber", page: { kind: "objectNumber", objectNumber: 1 }, objectNumber: 1 },
+                    page: { kind: "objectNumber", objectNumber: 1 },
+                    hasAppearance: true,
+                    appearanceState: "appearanceState",
+                    nm: "nm",
+                    rect: { x: 1.1, y: 1.1, width: 1.1, height: 1.1 },
+                    contents: "contents",
+                    subject: "subject",
+                    blendMode: "normal",
+                    invisible: true,
+                    hidden: true,
+                    print: true,
+                    noZoom: true,
+                    noRotate: true,
+                    noView: true,
+                    readOnly: true,
+                    locked: true,
+                    toggleNoView: true,
+                    lockedContents: true,
+                    reply: {
+                        to: { kind: "objectNumber", page: { kind: "objectNumber", objectNumber: 1 }, objectNumber: 1 },
+                        type: "reply",
+                    },
+                    popup: { kind: "objectNumber", page: { kind: "objectNumber", objectNumber: 1 }, objectNumber: 1 },
+                    groupId: "groupId",
+                    author: "author",
+                    createdAt: "2024-01-15T09:30:00Z",
+                    modifiedAt: "2024-01-15T09:30:00Z",
+                    userId: "userId",
+                    createdBy: "createdBy",
+                    modifiedBy: "modifiedBy",
+                    importedBy: "importedBy",
+                    actions: {},
+                    color: "color",
+                    interiorColor: "interiorColor",
+                    strokeWidth: 1.1,
+                    borderStyle: "solid",
+                    fontFamily: "courier",
+                    fontSize: 1.1,
+                    fontColor: "fontColor",
+                    textAlign: "left",
+                    field: { kind: "objectNumber", objectNumber: 1 },
+                    fieldFamily: "text",
                 },
             ],
             calculationOrder: [{ kind: "objectNumber", objectNumber: 1 }],
@@ -95,13 +143,58 @@ describe("FormsClient", () => {
                         mappingName: null,
                         valueEntry: { kind: "none" },
                         defaultValueEntry: { kind: "none" },
-                        widgets: [{ ref: null, objectNumber: 1, page: null, rect: null }],
+                        widgets: [{ ref: null, objectNumber: 1, page: null }],
                         value: "value",
                         defaultValue: "defaultValue",
                         maxLength: null,
                         multiline: true,
                         password: true,
                         comb: true,
+                    },
+                ],
+                widgets: [
+                    {
+                        subtype: "widget",
+                        ref: { kind: "objectNumber", page: { kind: "objectNumber", objectNumber: 1 }, objectNumber: 1 },
+                        page: { kind: "objectNumber", objectNumber: 1 },
+                        hasAppearance: true,
+                        appearanceState: null,
+                        nm: null,
+                        rect: { x: 1.1, y: 1.1, width: 1.1, height: 1.1 },
+                        contents: null,
+                        subject: null,
+                        blendMode: "normal",
+                        invisible: true,
+                        hidden: true,
+                        print: true,
+                        noZoom: true,
+                        noRotate: true,
+                        noView: true,
+                        readOnly: true,
+                        locked: true,
+                        toggleNoView: true,
+                        lockedContents: true,
+                        reply: null,
+                        popup: null,
+                        groupId: null,
+                        author: null,
+                        createdAt: null,
+                        modifiedAt: null,
+                        userId: null,
+                        createdBy: null,
+                        modifiedBy: null,
+                        importedBy: null,
+                        actions: null,
+                        color: null,
+                        interiorColor: null,
+                        strokeWidth: 1.1,
+                        borderStyle: "solid",
+                        fontFamily: null,
+                        fontSize: null,
+                        fontColor: null,
+                        textAlign: "left",
+                        field: null,
+                        fieldFamily: "text",
                     },
                 ],
                 calculationOrder: [{ kind: "objectNumber", objectNumber: 1 }],
@@ -114,6 +207,7 @@ describe("FormsClient", () => {
                     previousDocVersion: 1,
                     docVersion: 1,
                     annotationsVersion: 1,
+                    formsVersion: 1,
                     layoutVersion: 1,
                     metadataVersion: 1,
                     attachmentsVersion: 1,
@@ -122,7 +216,7 @@ describe("FormsClient", () => {
                     pages: [
                         {
                             page: { kind: "objectNumber", objectNumber: 1 },
-                            cache: { contentVersion: 1, annotationVersion: 1 },
+                            cache: { contentVersion: 1, annotationVersion: 1, widgetVersion: 1 },
                         },
                     ],
                 },
@@ -229,7 +323,7 @@ describe("FormsClient", () => {
                     validate: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
                     calculate: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
                 },
-                widgets: [{ ref: null, objectNumber: 1, page: null, rect: null }],
+                widgets: [{ ref: null, objectNumber: 1, page: null }],
                 value: "value",
                 defaultValue: "defaultValue",
                 maxLength: 1,
@@ -237,12 +331,61 @@ describe("FormsClient", () => {
                 password: true,
                 comb: true,
             },
+            widgets: [
+                {
+                    subtype: "widget",
+                    ref: { kind: "objectNumber", page: { kind: "objectNumber", objectNumber: 1 }, objectNumber: 1 },
+                    page: { kind: "objectNumber", objectNumber: 1 },
+                    hasAppearance: true,
+                    appearanceState: "appearanceState",
+                    nm: "nm",
+                    rect: { x: 1.1, y: 1.1, width: 1.1, height: 1.1 },
+                    contents: "contents",
+                    subject: "subject",
+                    blendMode: "normal",
+                    invisible: true,
+                    hidden: true,
+                    print: true,
+                    noZoom: true,
+                    noRotate: true,
+                    noView: true,
+                    readOnly: true,
+                    locked: true,
+                    toggleNoView: true,
+                    lockedContents: true,
+                    reply: {
+                        to: { kind: "objectNumber", page: { kind: "objectNumber", objectNumber: 1 }, objectNumber: 1 },
+                        type: "reply",
+                    },
+                    popup: { kind: "objectNumber", page: { kind: "objectNumber", objectNumber: 1 }, objectNumber: 1 },
+                    groupId: "groupId",
+                    author: "author",
+                    createdAt: "2024-01-15T09:30:00Z",
+                    modifiedAt: "2024-01-15T09:30:00Z",
+                    userId: "userId",
+                    createdBy: "createdBy",
+                    modifiedBy: "modifiedBy",
+                    importedBy: "importedBy",
+                    actions: {},
+                    color: "color",
+                    interiorColor: "interiorColor",
+                    strokeWidth: 1.1,
+                    borderStyle: "solid",
+                    fontFamily: "courier",
+                    fontSize: 1.1,
+                    fontColor: "fontColor",
+                    textAlign: "left",
+                    field: { kind: "objectNumber", objectNumber: 1 },
+                    fieldFamily: "text",
+                },
+            ],
             meta: {
                 affectedPages: [{ kind: "objectNumber", objectNumber: 1 }],
                 cacheDelta: {
                     previousDocVersion: 1,
                     docVersion: 1,
                     annotationsVersion: 1,
+                    formsVersion: 1,
                     layoutVersion: 1,
                     metadataVersion: 1,
                     attachmentsVersion: 1,
@@ -251,7 +394,7 @@ describe("FormsClient", () => {
                     pages: [
                         {
                             page: { kind: "objectNumber", objectNumber: 1 },
-                            cache: { contentVersion: 1, annotationVersion: 1 },
+                            cache: { contentVersion: 1, annotationVersion: 1, widgetVersion: 1 },
                         },
                     ],
                 },
@@ -358,7 +501,7 @@ describe("FormsClient", () => {
                     mappingName: "mappingName",
                     valueEntry: { kind: "none" },
                     defaultValueEntry: { kind: "none" },
-                    widgets: [{ ref: null, objectNumber: 1, page: null, rect: null }],
+                    widgets: [{ ref: null, objectNumber: 1, page: null }],
                     value: "value",
                     defaultValue: "defaultValue",
                     maxLength: 1,
@@ -367,12 +510,61 @@ describe("FormsClient", () => {
                     comb: true,
                 },
             ],
+            widgets: [
+                {
+                    subtype: "widget",
+                    ref: { kind: "objectNumber", page: { kind: "objectNumber", objectNumber: 1 }, objectNumber: 1 },
+                    page: { kind: "objectNumber", objectNumber: 1 },
+                    hasAppearance: true,
+                    appearanceState: "appearanceState",
+                    nm: "nm",
+                    rect: { x: 1.1, y: 1.1, width: 1.1, height: 1.1 },
+                    contents: "contents",
+                    subject: "subject",
+                    blendMode: "normal",
+                    invisible: true,
+                    hidden: true,
+                    print: true,
+                    noZoom: true,
+                    noRotate: true,
+                    noView: true,
+                    readOnly: true,
+                    locked: true,
+                    toggleNoView: true,
+                    lockedContents: true,
+                    reply: {
+                        to: { kind: "objectNumber", page: { kind: "objectNumber", objectNumber: 1 }, objectNumber: 1 },
+                        type: "reply",
+                    },
+                    popup: { kind: "objectNumber", page: { kind: "objectNumber", objectNumber: 1 }, objectNumber: 1 },
+                    groupId: "groupId",
+                    author: "author",
+                    createdAt: "2024-01-15T09:30:00Z",
+                    modifiedAt: "2024-01-15T09:30:00Z",
+                    userId: "userId",
+                    createdBy: "createdBy",
+                    modifiedBy: "modifiedBy",
+                    importedBy: "importedBy",
+                    actions: {},
+                    color: "color",
+                    interiorColor: "interiorColor",
+                    strokeWidth: 1.1,
+                    borderStyle: "solid",
+                    fontFamily: "courier",
+                    fontSize: 1.1,
+                    fontColor: "fontColor",
+                    textAlign: "left",
+                    field: { kind: "objectNumber", objectNumber: 1 },
+                    fieldFamily: "text",
+                },
+            ],
             meta: {
                 affectedPages: [{ kind: "objectNumber", objectNumber: 1 }],
                 cacheDelta: {
                     previousDocVersion: 1,
                     docVersion: 1,
                     annotationsVersion: 1,
+                    formsVersion: 1,
                     layoutVersion: 1,
                     metadataVersion: 1,
                     attachmentsVersion: 1,
@@ -381,7 +573,7 @@ describe("FormsClient", () => {
                     pages: [
                         {
                             page: { kind: "objectNumber", objectNumber: 1 },
-                            cache: { contentVersion: 1, annotationVersion: 1 },
+                            cache: { contentVersion: 1, annotationVersion: 1, widgetVersion: 1 },
                         },
                     ],
                 },
@@ -450,6 +642,453 @@ describe("FormsClient", () => {
             return await client.doc.forms.reset({
                 docId: "docId",
                 layerName: "layerName",
+            });
+        }).rejects.toThrow(CloudPDF.NotFoundError);
+    });
+
+    test("deleteWidget (1)", async () => {
+        const server = mockServerPool.createServer();
+        const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
+
+        const rawResponseBody = {
+            widget: { kind: "objectNumber", page: { kind: "objectNumber", objectNumber: 1 }, objectNumber: 1 },
+            page: { kind: "objectNumber", objectNumber: 1 },
+            field: {
+                family: "text",
+                ref: { kind: "objectNumber", objectNumber: 1 },
+                name: "name",
+                origin: "acroform",
+                readOnly: true,
+                required: true,
+                noExport: true,
+                alternateName: "alternateName",
+                mappingName: "mappingName",
+                valueEntry: { kind: "none" },
+                defaultValueEntry: { kind: "none" },
+                actions: {
+                    keystroke: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
+                    format: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
+                    validate: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
+                    calculate: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
+                },
+                widgets: [{ ref: null, objectNumber: 1, page: null }],
+                value: "value",
+                defaultValue: "defaultValue",
+                maxLength: 1,
+                multiline: true,
+                password: true,
+                comb: true,
+            },
+            meta: {
+                affectedPages: [{ kind: "objectNumber", objectNumber: 1 }],
+                cacheDelta: {
+                    previousDocVersion: 1,
+                    docVersion: 1,
+                    annotationsVersion: 1,
+                    formsVersion: 1,
+                    layoutVersion: 1,
+                    metadataVersion: 1,
+                    attachmentsVersion: 1,
+                    layerVersion: 1,
+                    working: true,
+                    pages: [
+                        {
+                            page: { kind: "objectNumber", objectNumber: 1 },
+                            cache: { contentVersion: 1, annotationVersion: 1, widgetVersion: 1 },
+                        },
+                    ],
+                },
+                opId: "opId",
+                undoable: true,
+                changedFields: [{ kind: "objectNumber", objectNumber: 1 }],
+                changedWidgets: [{ ref: null, objectNumber: 1, page: null }],
+            },
+        };
+
+        server
+            .mockEndpoint()
+            .delete("/v1/docs/docId/layers/layerName/form/widgets/pageKey/annotKey")
+            .respondWith()
+            .statusCode(200)
+            .jsonBody(rawResponseBody)
+            .build();
+
+        const response = await client.doc.forms.deleteWidget({
+            docId: "docId",
+            layerName: "layerName",
+            pageKey: "pageKey",
+            annotKey: "annotKey",
+        });
+        expect(response).toEqual(rawResponseBody);
+    });
+
+    test("deleteWidget (2)", async () => {
+        const server = mockServerPool.createServer();
+        const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
+
+        const rawResponseBody = { key: "value" };
+
+        server
+            .mockEndpoint()
+            .delete("/v1/docs/docId/layers/layerName/form/widgets/pageKey/annotKey")
+            .respondWith()
+            .statusCode(400)
+            .jsonBody(rawResponseBody)
+            .build();
+
+        await expect(async () => {
+            return await client.doc.forms.deleteWidget({
+                docId: "docId",
+                layerName: "layerName",
+                pageKey: "pageKey",
+                annotKey: "annotKey",
+            });
+        }).rejects.toThrow(CloudPDF.BadRequestError);
+    });
+
+    test("deleteWidget (3)", async () => {
+        const server = mockServerPool.createServer();
+        const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
+
+        const rawResponseBody = { key: "value" };
+
+        server
+            .mockEndpoint()
+            .delete("/v1/docs/docId/layers/layerName/form/widgets/pageKey/annotKey")
+            .respondWith()
+            .statusCode(404)
+            .jsonBody(rawResponseBody)
+            .build();
+
+        await expect(async () => {
+            return await client.doc.forms.deleteWidget({
+                docId: "docId",
+                layerName: "layerName",
+                pageKey: "pageKey",
+                annotKey: "annotKey",
+            });
+        }).rejects.toThrow(CloudPDF.NotFoundError);
+    });
+
+    test("updateWidget (1)", async () => {
+        const server = mockServerPool.createServer();
+        const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
+        const rawRequestBody = { patch: {} };
+        const rawResponseBody = {
+            widget: {
+                subtype: "widget",
+                ref: { kind: "objectNumber", page: { kind: "objectNumber", objectNumber: 1 }, objectNumber: 1 },
+                page: { kind: "objectNumber", objectNumber: 1 },
+                hasAppearance: true,
+                appearanceState: "appearanceState",
+                nm: "nm",
+                rect: { x: 1.1, y: 1.1, width: 1.1, height: 1.1 },
+                contents: "contents",
+                subject: "subject",
+                blendMode: "normal",
+                invisible: true,
+                hidden: true,
+                print: true,
+                noZoom: true,
+                noRotate: true,
+                noView: true,
+                readOnly: true,
+                locked: true,
+                toggleNoView: true,
+                lockedContents: true,
+                reply: {
+                    to: { kind: "objectNumber", page: { kind: "objectNumber", objectNumber: 1 }, objectNumber: 1 },
+                    type: "reply",
+                },
+                popup: { kind: "objectNumber", page: { kind: "objectNumber", objectNumber: 1 }, objectNumber: 1 },
+                groupId: "groupId",
+                author: "author",
+                createdAt: "2024-01-15T09:30:00Z",
+                modifiedAt: "2024-01-15T09:30:00Z",
+                userId: "userId",
+                createdBy: "createdBy",
+                modifiedBy: "modifiedBy",
+                importedBy: "importedBy",
+                actions: {
+                    activate: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
+                    cursorEnter: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
+                    cursorExit: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
+                    mouseDown: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
+                    mouseUp: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
+                    focus: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
+                    blur: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
+                    pageOpen: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
+                    pageClose: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
+                    pageVisible: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
+                    pageInvisible: { root: null, incomplete: true, warningFlags: 1, warnings: ["cycle-dropped"] },
+                },
+                color: "color",
+                interiorColor: "interiorColor",
+                strokeWidth: 1.1,
+                borderStyle: "solid",
+                fontFamily: "courier",
+                fontSize: 1.1,
+                fontColor: "fontColor",
+                textAlign: "left",
+                field: { kind: "objectNumber", objectNumber: 1 },
+                fieldFamily: "text",
+            },
+            appearance: { action: "preserved", changed: true },
+            meta: {
+                affectedPages: [{ kind: "objectNumber", objectNumber: 1 }],
+                cacheDelta: {
+                    previousDocVersion: 1,
+                    docVersion: 1,
+                    annotationsVersion: 1,
+                    formsVersion: 1,
+                    layoutVersion: 1,
+                    metadataVersion: 1,
+                    attachmentsVersion: 1,
+                    layerVersion: 1,
+                    working: true,
+                    pages: [
+                        {
+                            page: { kind: "objectNumber", objectNumber: 1 },
+                            cache: { contentVersion: 1, annotationVersion: 1, widgetVersion: 1 },
+                        },
+                    ],
+                },
+                opId: "opId",
+                undoable: true,
+                changedFields: [{ kind: "objectNumber", objectNumber: 1 }],
+                changedWidgets: [{ ref: null, objectNumber: 1, page: null }],
+            },
+        };
+
+        server
+            .mockEndpoint()
+            .patch("/v1/docs/docId/layers/layerName/form/widgets/pageKey/annotKey")
+            .jsonBody(rawRequestBody)
+            .respondWith()
+            .statusCode(200)
+            .jsonBody(rawResponseBody)
+            .build();
+
+        const response = await client.doc.forms.updateWidget({
+            docId: "docId",
+            layerName: "layerName",
+            pageKey: "pageKey",
+            annotKey: "annotKey",
+            patch: {},
+        });
+        expect(response).toEqual(rawResponseBody);
+    });
+
+    test("updateWidget (2)", async () => {
+        const server = mockServerPool.createServer();
+        const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
+        const rawRequestBody = { patch: {} };
+        const rawResponseBody = { key: "value" };
+
+        server
+            .mockEndpoint()
+            .patch("/v1/docs/docId/layers/layerName/form/widgets/pageKey/annotKey")
+            .jsonBody(rawRequestBody)
+            .respondWith()
+            .statusCode(400)
+            .jsonBody(rawResponseBody)
+            .build();
+
+        await expect(async () => {
+            return await client.doc.forms.updateWidget({
+                docId: "docId",
+                layerName: "layerName",
+                pageKey: "pageKey",
+                annotKey: "annotKey",
+                patch: {},
+            });
+        }).rejects.toThrow(CloudPDF.BadRequestError);
+    });
+
+    test("updateWidget (3)", async () => {
+        const server = mockServerPool.createServer();
+        const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
+        const rawRequestBody = { patch: {} };
+        const rawResponseBody = { key: "value" };
+
+        server
+            .mockEndpoint()
+            .patch("/v1/docs/docId/layers/layerName/form/widgets/pageKey/annotKey")
+            .jsonBody(rawRequestBody)
+            .respondWith()
+            .statusCode(404)
+            .jsonBody(rawResponseBody)
+            .build();
+
+        await expect(async () => {
+            return await client.doc.forms.updateWidget({
+                docId: "docId",
+                layerName: "layerName",
+                pageKey: "pageKey",
+                annotKey: "annotKey",
+                patch: {},
+            });
+        }).rejects.toThrow(CloudPDF.NotFoundError);
+    });
+
+    test("reorderWidgets (1)", async () => {
+        const server = mockServerPool.createServer();
+        const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
+        const rawRequestBody = {
+            widgets: [{ kind: "objectNumber", page: { kind: "objectNumber", objectNumber: 1 }, objectNumber: 1 }],
+            position: "start",
+        };
+        const rawResponseBody = {
+            page: { kind: "objectNumber", objectNumber: 1 },
+            order: [{ kind: "objectNumber", page: { kind: "objectNumber", objectNumber: 1 }, objectNumber: 1 }],
+            meta: {
+                affectedPages: [{ kind: "objectNumber", objectNumber: 1 }],
+                cacheDelta: {
+                    previousDocVersion: 1,
+                    docVersion: 1,
+                    annotationsVersion: 1,
+                    formsVersion: 1,
+                    layoutVersion: 1,
+                    metadataVersion: 1,
+                    attachmentsVersion: 1,
+                    layerVersion: 1,
+                    working: true,
+                    pages: [
+                        {
+                            page: { kind: "objectNumber", objectNumber: 1 },
+                            cache: { contentVersion: 1, annotationVersion: 1, widgetVersion: 1 },
+                        },
+                    ],
+                },
+                opId: "opId",
+                undoable: true,
+                changedFields: [{ kind: "objectNumber", objectNumber: 1 }],
+                changedWidgets: [{ ref: null, objectNumber: 1, page: null }],
+            },
+        };
+
+        server
+            .mockEndpoint()
+            .post("/v1/docs/docId/layers/layerName/form/widgets/pageKey/reorder")
+            .jsonBody(rawRequestBody)
+            .respondWith()
+            .statusCode(200)
+            .jsonBody(rawResponseBody)
+            .build();
+
+        const response = await client.doc.forms.reorderWidgets({
+            docId: "docId",
+            layerName: "layerName",
+            pageKey: "pageKey",
+            widgets: [
+                {
+                    kind: "objectNumber",
+                    page: {
+                        kind: "objectNumber",
+                        objectNumber: 1,
+                    },
+                    objectNumber: 1,
+                },
+            ],
+            position: "start",
+        });
+        expect(response).toEqual(rawResponseBody);
+    });
+
+    test("reorderWidgets (2)", async () => {
+        const server = mockServerPool.createServer();
+        const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
+        const rawRequestBody = {
+            widgets: [
+                { kind: "objectNumber", page: { kind: "objectNumber", objectNumber: 1 }, objectNumber: 1 },
+                { kind: "objectNumber", page: { kind: "objectNumber", objectNumber: 1 }, objectNumber: 1 },
+            ],
+            position: "start",
+        };
+        const rawResponseBody = { key: "value" };
+
+        server
+            .mockEndpoint()
+            .post("/v1/docs/docId/layers/layerName/form/widgets/pageKey/reorder")
+            .jsonBody(rawRequestBody)
+            .respondWith()
+            .statusCode(400)
+            .jsonBody(rawResponseBody)
+            .build();
+
+        await expect(async () => {
+            return await client.doc.forms.reorderWidgets({
+                docId: "docId",
+                layerName: "layerName",
+                pageKey: "pageKey",
+                widgets: [
+                    {
+                        kind: "objectNumber",
+                        page: {
+                            kind: "objectNumber",
+                            objectNumber: 1,
+                        },
+                        objectNumber: 1,
+                    },
+                    {
+                        kind: "objectNumber",
+                        page: {
+                            kind: "objectNumber",
+                            objectNumber: 1,
+                        },
+                        objectNumber: 1,
+                    },
+                ],
+                position: "start",
+            });
+        }).rejects.toThrow(CloudPDF.BadRequestError);
+    });
+
+    test("reorderWidgets (3)", async () => {
+        const server = mockServerPool.createServer();
+        const client = new CloudPDFClient({ maxRetries: 0, token: "test", environment: server.baseUrl });
+        const rawRequestBody = {
+            widgets: [
+                { kind: "objectNumber", page: { kind: "objectNumber", objectNumber: 1 }, objectNumber: 1 },
+                { kind: "objectNumber", page: { kind: "objectNumber", objectNumber: 1 }, objectNumber: 1 },
+            ],
+            position: "start",
+        };
+        const rawResponseBody = { key: "value" };
+
+        server
+            .mockEndpoint()
+            .post("/v1/docs/docId/layers/layerName/form/widgets/pageKey/reorder")
+            .jsonBody(rawRequestBody)
+            .respondWith()
+            .statusCode(404)
+            .jsonBody(rawResponseBody)
+            .build();
+
+        await expect(async () => {
+            return await client.doc.forms.reorderWidgets({
+                docId: "docId",
+                layerName: "layerName",
+                pageKey: "pageKey",
+                widgets: [
+                    {
+                        kind: "objectNumber",
+                        page: {
+                            kind: "objectNumber",
+                            objectNumber: 1,
+                        },
+                        objectNumber: 1,
+                    },
+                    {
+                        kind: "objectNumber",
+                        page: {
+                            kind: "objectNumber",
+                            objectNumber: 1,
+                        },
+                        objectNumber: 1,
+                    },
+                ],
+                position: "start",
             });
         }).rejects.toThrow(CloudPDF.NotFoundError);
     });

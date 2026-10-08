@@ -13,12 +13,10 @@ import type {
   PdfFieldActions,
   ToggleFieldWidget,
 } from '@embedpdf/engine-core/runtime';
-import { formWidget, normalizePdfRect, toPageRef } from '@embedpdf/engine-core/runtime';
+import { formWidget, toPageRef } from '@embedpdf/engine-core/runtime';
 import type { PdfRuntimeModule, Ptr } from '@embedpdf/engine-runtime';
 
-import { withScratch } from '../../../runtime/memory/scratch';
 import { readUtf16String, readUtf8String } from '../../../runtime/memory/strings';
-import { RECTF_BYTES, readRectF } from '../../../runtime/memory/structs';
 import { ActionReadBudgetTracker, readActionModel } from '../../actions/ActionModelReader';
 
 // Mirrors EPDF_FORMFIELD_FAMILY_* in public/epdf_form.h.
@@ -63,36 +61,28 @@ function readWideOrNull(
   return readUtf16String(runtime.mem, call, null);
 }
 
-/** One widget of a field: its address and its /Rect (none on no page, or without one). */
+/** One widget of a field: its address and its page. */
 function readWidgetAt(
   runtime: PdfRuntimeModule,
   model: Ptr,
   fieldIndex: number,
   w: number,
-): FormFieldWidget<PdfCoordinates> {
-  const { fn, mem } = runtime;
-  const widget = formWidget(
+): FormFieldWidget {
+  const { fn } = runtime;
+  return formWidget(
     fn.EPDFForm_GetFieldWidgetObjNum(model, fieldIndex, w),
     widgetPageRef(fn.EPDFForm_GetFieldWidgetPageObjNum(model, fieldIndex, w)),
   );
-  const rect = widget.page
-    ? withScratch(mem, RECTF_BYTES, (buf) =>
-        fn.EPDFForm_GetFieldWidgetRect(model, fieldIndex, w, buf)
-          ? normalizePdfRect(readRectF(mem, buf))
-          : null,
-      )
-    : null;
-  return { ...widget, rect };
 }
 
 function readToggleWidgets(
   runtime: PdfRuntimeModule,
   model: Ptr,
   fieldIndex: number,
-): ToggleFieldWidget<PdfCoordinates>[] {
+): ToggleFieldWidget[] {
   const { fn } = runtime;
   const count = fn.EPDFForm_CountFieldWidgets(model, fieldIndex);
-  const widgets: ToggleFieldWidget<PdfCoordinates>[] = [];
+  const widgets: ToggleFieldWidget[] = [];
   for (let w = 0; w < count; w++) {
     widgets.push({
       ...readWidgetAt(runtime, model, fieldIndex, w),
@@ -113,9 +103,9 @@ function readPlainWidgets(
   runtime: PdfRuntimeModule,
   model: Ptr,
   fieldIndex: number,
-): FormFieldWidget<PdfCoordinates>[] {
+): FormFieldWidget[] {
   const count = runtime.fn.EPDFForm_CountFieldWidgets(model, fieldIndex);
-  const widgets: FormFieldWidget<PdfCoordinates>[] = [];
+  const widgets: FormFieldWidget[] = [];
   for (let w = 0; w < count; w++) widgets.push(readWidgetAt(runtime, model, fieldIndex, w));
   return widgets;
 }
@@ -257,12 +247,16 @@ export function readFieldAt(
   }
 }
 
-/** Read the whole native model into a detached {@link FormSnapshot<PdfCoordinates>}. */
-export function readFormSnapshot(
+/**
+ * The form's fields, as the native model holds them, detached: every
+ * terminal field, the calculation order and the form kind. The widget rows
+ * are read from the pages (`readForm`).
+ */
+export function readFormFields(
   runtime: PdfRuntimeModule,
   model: Ptr,
   docPtr: Ptr,
-): FormSnapshot<PdfCoordinates> {
+): Omit<FormSnapshot<PdfCoordinates>, 'widgets'> {
   const { fn } = runtime;
   const count = fn.EPDFForm_CountFields(model);
   const fields: FormFieldDTO<PdfCoordinates>[] = [];

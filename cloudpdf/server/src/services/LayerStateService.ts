@@ -1,5 +1,6 @@
 import type {
   CacheDelta,
+  CachePins,
   DocumentManifest,
   DocumentProtection,
   LayerScopes,
@@ -60,6 +61,7 @@ const BASE_METADATA_VERSION = 1;
 const ALL_BASE_SCOPES: LayerScopes = {
   content: 'base',
   annotations: 'base',
+  forms: 'base',
   layout: 'base',
   attachments: 'base',
   metadata: 'base',
@@ -74,7 +76,7 @@ const ALL_BASE_SCOPES: LayerScopes = {
 function pagePlaneScope(
   layerPages: DurablePageRow[],
   basePages: DurablePageRow[],
-  pin: 'contentVersion' | 'annotationVersion',
+  pin: 'contentVersion' | 'annotationVersion' | 'widgetVersion',
 ): 'base' | 'layer' {
   if (layerPages.length !== basePages.length) return 'layer';
   const baseByPageObjectNumber = new Map(basePages.map((p) => [p.pageObjectNumber, p[pin]]));
@@ -126,6 +128,7 @@ export class LayerStateService {
         metadataVersion: row.metadataVersion,
         attachmentsVersion: row.attachmentsVersion,
         annotationsVersion: row.annotationsVersion,
+        formsVersion: row.formsVersion,
       };
     }
     return { sha256, byteLength: fallbackByteLength ?? 0, ...INITIAL_BASE_POINTERS };
@@ -170,30 +173,43 @@ export class LayerStateService {
    * the layer's view of that plane is the base's view) or `'layer'` (owned —
    * the first write to that plane transferred ownership).
    *
-   * Per-page planes (content, annotations) compare against the base
-   * counterpart and require page-set equality: insert/delete own both — a
-   * view that removed content must never resolve base artifacts. Structural
-   * ops that preserve the set (move, rotate) own only `layout`:
+   * Per-page planes (content, annotations, forms) compare against the base
+   * counterpart and require page-set equality: insert/delete own them all —
+   * a view that removed content must never resolve base artifacts.
+   * Structural ops that preserve the set (move, rotate) own only `layout`:
    * render/text/geometry artifacts are normalized (rotation is presentation
-   * metadata applied client-side — see `PageRotateResult`), so content and
-   * annotation sharing survive them. Doc-level planes compare their pin
-   * against the base epoch. `actions` is constant `'base'` until action
-   * writing exists (`actionsVersion` is frozen at 1 — no op can change
-   * catalog actions).
+   * metadata applied client-side — see `PageRotateResult`), so content,
+   * annotation and form sharing survive them. `annotations` and `forms` also
+   * compare their document pin (`annotationsVersion`, `formsVersion`): a
+   * write that moved only the document's list owns the plane too, so the
+   * shared list URL is never asked at a pin the base doesn't have. Doc-level
+   * planes compare their pin against the base epoch. `actions` is constant
+   * `'base'` until action writing exists (`actionsVersion` is frozen at 1 —
+   * no op can change catalog actions).
    *
    * Conservative by design: an unmatched page reads as owned.
    */
   computeLayerScopes(
     layer: Pick<
       LayerRow,
-      'layoutVersion' | 'metadataVersion' | 'attachmentsVersion' | 'baseSha'
+      | 'layoutVersion'
+      | 'metadataVersion'
+      | 'attachmentsVersion'
+      | 'annotationsVersion'
+      | 'formsVersion'
+      | 'baseSha'
     > | null,
     layerPages: DurablePageRow[],
     basePages: DurablePageRow[],
     /** The HEAD version's facts; a never-published document is at the initial epochs. */
     head: Pick<
       BaseVersionFacts,
-      'sha256' | 'layoutVersion' | 'metadataVersion' | 'attachmentsVersion'
+      | 'sha256'
+      | 'layoutVersion'
+      | 'metadataVersion'
+      | 'attachmentsVersion'
+      | 'annotationsVersion'
+      | 'formsVersion'
     > | null = null,
   ): LayerScopes {
     if (!layer) return { ...ALL_BASE_SCOPES };
@@ -205,6 +221,7 @@ export class LayerStateService {
       return {
         content: 'layer',
         annotations: 'layer',
+        forms: 'layer',
         layout: 'layer',
         attachments: 'layer',
         metadata: 'layer',
@@ -213,11 +230,20 @@ export class LayerStateService {
     }
     const base = head ?? { ...INITIAL_BASE_POINTERS, sha256: layer.baseSha ?? '' };
     // A layer row without page rows means no page-level write ever
-    // committed — content and annotations are trivially inherited.
+    // committed — every per-page plane is trivially inherited.
     const pagesKnown = layerPages.length > 0;
+    const pagePlane = (pin: 'contentVersion' | 'annotationVersion' | 'widgetVersion') =>
+      pagesKnown ? pagePlaneScope(layerPages, basePages, pin) : 'base';
+    const owned = (pages: 'base' | 'layer', pin: number, basePin: number) =>
+      pages === 'base' && pin === basePin ? 'base' : 'layer';
     return {
-      content: pagesKnown ? pagePlaneScope(layerPages, basePages, 'contentVersion') : 'base',
-      annotations: pagesKnown ? pagePlaneScope(layerPages, basePages, 'annotationVersion') : 'base',
+      content: pagePlane('contentVersion'),
+      annotations: owned(
+        pagePlane('annotationVersion'),
+        layer.annotationsVersion,
+        base.annotationsVersion,
+      ),
+      forms: owned(pagePlane('widgetVersion'), layer.formsVersion, base.formsVersion),
       // Doc-level planes compare against the base version's pointers (law
       // 9c): a layer seeded over a published version whose metadata sits
       // at epoch 2 is inherited at 2, not owned because 2 ≠ 1.
@@ -263,6 +289,7 @@ export class LayerStateService {
       actionsVersion: 1,
       attachmentsVersion: version.attachmentsVersion,
       annotationsVersion: version.annotationsVersion,
+      formsVersion: version.formsVersion,
       // No layer writes have happened on the base view; a fresh subscriber's
       // gapless cursor starts at 0 ("everything in the log is new to me").
       auditHead: 0,
@@ -289,6 +316,7 @@ export class LayerStateService {
       | 'metadataVersion'
       | 'attachmentsVersion'
       | 'annotationsVersion'
+      | 'formsVersion'
       | 'lastAuditId'
       | 'currentVersion'
       | 'currentArtifactKey'
@@ -308,6 +336,7 @@ export class LayerStateService {
       actionsVersion: 1,
       attachmentsVersion: layer.attachmentsVersion,
       annotationsVersion: layer.annotationsVersion,
+      formsVersion: layer.formsVersion,
       // Written in the same transaction as the audit append, so a client
       // subscribing from this manifest can never miss a row (gapless cursor).
       auditHead: layer.lastAuditId,
@@ -330,13 +359,13 @@ export class LayerStateService {
     previousDocVersion: number;
     docVersion: number;
     /**
-     * The new bulk-annotations pin when this mutation bumped it. Stamped
-     * by the annotation CRUD, flatten, and redaction paths; the form and
-     * page-structure paths bump the column but omit it here — their
-     * clients recover through the 404-refresh rail, which is correct,
-     * just one round trip slower.
+     * The new document pins when this mutation bumped them: the annotation
+     * list's and the form's. A path that bumps a column but omits it here
+     * leaves its clients to the 404-refresh rail, which is correct, just
+     * one round trip slower.
      */
     annotationsVersion?: number;
+    formsVersion?: number;
     pages: DurablePageRow[];
   }): CacheDelta {
     return {
@@ -345,6 +374,7 @@ export class LayerStateService {
       ...(input.annotationsVersion !== undefined
         ? { annotationsVersion: input.annotationsVersion }
         : {}),
+      ...(input.formsVersion !== undefined ? { formsVersion: input.formsVersion } : {}),
       // Every ordinary commit writes an artifact: the layer holds edits not
       // yet sealed into a version (a signature's publish clears it again,
       // and refreshes the manifest instead of sending a delta).
@@ -391,7 +421,8 @@ export class LayerStateService {
       return {
         pageObjectNumber: Number(row.page_object_number),
         contentVersion: Number(row.content_version),
-        annotationVersion: Number(row.annotation_version) + (signed ? 1 : 0),
+        annotationVersion: Number(row.annotation_version),
+        widgetVersion: Number(row.widget_version) + (signed ? 1 : 0),
         updatedAt: signed ? input.now : Number(row.updated_at),
       };
     });
@@ -405,6 +436,7 @@ export class LayerStateService {
             page_object_number: page.pageObjectNumber,
             content_version: page.contentVersion,
             annotation_version: page.annotationVersion,
+            widget_version: page.widgetVersion,
             updated_at: page.updatedAt,
           })),
         )
@@ -420,6 +452,7 @@ export class LayerStateService {
             page_object_number: page.pageObjectNumber,
             content_version: page.contentVersion,
             annotation_version: page.annotationVersion,
+            widget_version: page.widgetVersion,
             updated_at: page.updatedAt,
           })),
         )
@@ -448,10 +481,11 @@ export class LayerStateService {
     return { page: toPageRef(page.pageObjectNumber), cache: this.toCachePins(page) };
   }
 
-  private toCachePins(page: DurablePageRow): { contentVersion: number; annotationVersion: number } {
+  private toCachePins(page: DurablePageRow): CachePins {
     return {
       contentVersion: page.contentVersion,
       annotationVersion: page.annotationVersion,
+      widgetVersion: page.widgetVersion,
     };
   }
 }

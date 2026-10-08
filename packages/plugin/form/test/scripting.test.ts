@@ -60,7 +60,7 @@ const text = (
   multiline: false,
   password: false,
   comb: false,
-  widgets: [{ ...formWidget(fieldObjectNumber, toPageRef(10)), rect: null }],
+  widgets: [formWidget(fieldObjectNumber, toPageRef(10))],
   ...(actions ? { actions } : {}),
 });
 
@@ -76,7 +76,7 @@ const pushbutton = (fieldObjectNumber: number, name: string): FormFieldDTO => ({
   mappingName: null,
   valueEntry: { kind: 'none' },
   defaultValueEntry: { kind: 'none' },
-  widgets: [{ ...formWidget(fieldObjectNumber, toPageRef(10)), rect: null }],
+  widgets: [formWidget(fieldObjectNumber, toPageRef(10))],
 });
 
 class NodeSandbox implements ScriptSandbox {
@@ -166,6 +166,7 @@ describe('form scripting transaction', () => {
     const snapshot: FormSnapshot = {
       formKind: 'acroform',
       needsAppearances: false,
+      widgets: [],
       fields: [
         text(1, 'status', ''),
         text(2, 'amount', '1', {
@@ -199,6 +200,7 @@ describe('form scripting transaction', () => {
     const snapshot: FormSnapshot = {
       formKind: 'acroform',
       needsAppearances: false,
+      widgets: [],
       fields: [
         text(2, 'email', '', {
           validate: action(
@@ -225,6 +227,7 @@ describe('form scripting transaction', () => {
     const snapshot: FormSnapshot = {
       formKind: 'acroform',
       needsAppearances: false,
+      widgets: [],
       fields: [
         text(2, 'code', 'old', {
           keystroke: action(`event.change = event.change.toUpperCase();`),
@@ -243,6 +246,7 @@ describe('form scripting transaction', () => {
     const snapshot: FormSnapshot = {
       formKind: 'acroform',
       needsAppearances: false,
+      widgets: [],
       fields: [text(1, 'status', ''), pushbutton(2, 'summary')],
       calculationOrder: [],
     };
@@ -281,6 +285,7 @@ describe('form scripting transaction', () => {
     const snapshot: FormSnapshot = {
       formKind: 'acroform',
       needsAppearances: false,
+      widgets: [],
       fields: [text(2, 'value', '')],
       calculationOrder: [],
     };

@@ -188,16 +188,11 @@ function layoutSnapshot(meta) {
 }
 
 /** Full Annotation for a stored session annotation. */
-function annotationDto(a, index) {
+function annotationDto(a) {
   return {
     subtype: 'unsupported',
-    ref: {
-      kind: 'objectNumber',
-      page: pageRef(a.pon),
-      objectNumber: OBJECT_NUMBER_BASE + a.seq,
-    },
+    ref: annotationRef(a),
     page: pageRef(a.pon),
-    index,
     hasAppearance: true,
     appearanceState: null,
     nm: a.nm,
@@ -225,16 +220,27 @@ function annotationDto(a, index) {
 
 /** Legacy canned annotation for lenient fallbacks (ref did not resolve). */
 function cannedAnnotation(pon, index = 0) {
-  return annotationDto(
-    { pon, seq: pon + index, nm: `stub-${pon}-${index}`, contents: null },
-    index,
-  );
+  return annotationDto({ pon, seq: pon + index, nm: `stub-${pon}-${index}`, contents: null });
+}
+
+function annotationRef(a) {
+  return { kind: 'objectNumber', page: pageRef(a.pon), objectNumber: OBJECT_NUMBER_BASE + a.seq };
+}
+
+/** Where `position` falls in `rows` (the rows that stay), like the real engine. */
+function positionIn(rows, position, find) {
+  if (position === 'start') return 0;
+  if (position === 'end') return rows.length;
+  const anchor = 'before' in position ? position.before : position.after;
+  const at = rows.indexOf(find(anchor));
+  if (at < 0) throw stubError('NotFound', `no neighbour ${JSON.stringify(anchor)}`);
+  return 'before' in position ? at : at + 1;
 }
 
 /** Annotations of one page, in session order, as DTOs. */
 function pageAnnotationDtos(meta, pon) {
   const annots = (meta.annots ?? []).filter((a) => a.pon === pon);
-  return annots.map((a, index) => annotationDto(a, index));
+  return annots.map((a) => annotationDto(a));
 }
 
 /** Resolve an AnnotationRef against session state; null when absent. */
@@ -420,11 +426,10 @@ function applyStubOp(meta, op, opId) {
         contents: op.data?.contents ?? null,
       };
       meta.annots.push(a);
-      const index = meta.annots.filter((x) => x.pon === pon).length - 1;
       return {
         type: op.type,
         page: op.page,
-        annotation: annotationDto(a, index),
+        annotation: annotationDto(a),
         meta: { ...mutationMeta(pon, OBJECT_NUMBER_BASE + a.seq), ...stamp },
       };
     }
@@ -433,11 +438,10 @@ function applyStubOp(meta, op, opId) {
       const found = resolveRef(meta, op.ref);
       if (found) {
         if (op.patch && 'contents' in op.patch) found.contents = op.patch.contents ?? null;
-        const index = (meta.annots ?? []).filter((x) => x.pon === pon).indexOf(found);
         return {
           type: op.type,
           page: op.ref.page,
-          annotation: annotationDto(found, index),
+          annotation: annotationDto(found),
           appearance: { action: 'regenerated', changed: true },
           meta: { ...mutationMeta(pon, OBJECT_NUMBER_BASE + found.seq), ...stamp },
         };
@@ -472,28 +476,32 @@ function applyStubOp(meta, op, opId) {
         meta: { ...mutationMeta(pon, OBJECT_NUMBER_BASE + pon), ...stamp },
       };
     }
-    case 'annotations.move': {
+    case 'annotations.reorder': {
       const pon = ponOf(op.page);
       const annots = meta.annots ?? [];
       const moving = op.refs.map((ref) => resolveRef(meta, ref)).filter(Boolean);
       if (moving.length === op.refs.length && moving.length > 0) {
-        // Reorder within the page: remove the moved annots, reinsert at
-        // toIndex (in the page-local index space), like the real mutator.
+        // Restack within the page: take the moved annots out, put them back
+        // next to the neighbour, like the real engine.
         const page = annots.filter((a) => a.pon === pon && !moving.includes(a));
         const others = annots.filter((a) => a.pon !== pon);
-        page.splice(op.toIndex, 0, ...moving);
+        page.splice(
+          positionIn(page, op.position, (ref) => resolveRef(meta, ref)),
+          0,
+          ...moving,
+        );
         meta.annots = [...others, ...page];
         return {
           type: op.type,
           page: op.page,
-          annotations: moving.map((a, i) => annotationDto(a, op.toIndex + i)),
+          order: page.map(annotationRef),
           meta: { ...mutationMeta(pon, OBJECT_NUMBER_BASE + moving[0].seq), ...stamp },
         };
       }
       return {
         type: op.type,
         page: op.page,
-        annotations: op.refs.map((_, i) => cannedAnnotation(pon, op.toIndex + i)),
+        order: op.refs,
         meta: { ...mutationMeta(pon, OBJECT_NUMBER_BASE + pon), ...stamp },
       };
     }
@@ -816,7 +824,7 @@ parentPort.on('message', (msg) => {
       });
       return;
     }
-    case 'pages.move': {
+    case 'pages.reorder': {
       const meta = openDocs.get(sessionKey(msg));
       if (!meta) {
         rejectNotOpen(msg);
@@ -826,20 +834,18 @@ parentPort.on('message', (msg) => {
       const movingPons = ponsOf(msg);
       const moving = new Set(movingPons);
       const remaining = current.filter((pon) => !moving.has(pon));
-      const next = [
-        ...remaining.slice(0, msg.toIndex),
-        ...movingPons,
-        ...remaining.slice(msg.toIndex),
-      ];
+      const at = positionIn(remaining, msg.position, ponOf);
+      const next = [...remaining.slice(0, at), ...movingPons, ...remaining.slice(at)];
       meta.pageOrder = next;
-      // A move returns geometry, not liveness: the new layout + empty meta
+      // A reorder returns geometry, not liveness: the new layout + empty meta
       // (the server fills in the real coherence pins on commit).
       const result = {
+        pages: movingPons.map(pageRef),
         layout: layoutSnapshot(meta),
         meta: { affectedPages: [], cacheDelta: null },
       };
       resolveMutation(msg, {
-        tag: 'pages.move',
+        tag: 'pages.reorder',
         result,
         artifact: layerArtifact(msg, meta),
       });

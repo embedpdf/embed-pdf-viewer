@@ -72,6 +72,7 @@ function harness(
                 actions: { validate },
               },
             ],
+            widgets: [],
           }),
         },
         actions: { get: async () => ({ nameTreeScripts: [], openAction, willSave }) },

@@ -6,7 +6,7 @@ export type ChangeOp =
     | CloudPDF.ChangeOp.AnnotationsCreate
     | CloudPDF.ChangeOp.AnnotationsUpdate
     | CloudPDF.ChangeOp.AnnotationsDelete
-    | CloudPDF.ChangeOp.AnnotationsMove
+    | CloudPDF.ChangeOp.AnnotationsReorder
     | CloudPDF.ChangeOp.FormsSetValue
     | CloudPDF.ChangeOp.FormsSetDisplay
     | CloudPDF.ChangeOp.FormsSetAppearanceText
@@ -16,6 +16,9 @@ export type ChangeOp =
     | CloudPDF.ChangeOp.FormsDelete
     | CloudPDF.ChangeOp.FormsAddWidget
     | CloudPDF.ChangeOp.FormsRemoveWidget
+    | CloudPDF.ChangeOp.FormsDeleteWidget
+    | CloudPDF.ChangeOp.FormsReorderWidgets
+    | CloudPDF.ChangeOp.FormsUpdateWidget
     | CloudPDF.ChangeOp.FormsSetSignatureAppearance
     | CloudPDF.ChangeOp.MetadataUpdate
     | CloudPDF.ChangeOp.MetadataUpdateCustom;
@@ -57,12 +60,11 @@ export namespace ChangeOp {
         expect?: CloudPDF.AnnotationPatch | undefined;
     }
 
-    export interface AnnotationsMove {
-        type: "annotations.move";
+    export interface AnnotationsReorder {
+        type: "annotations.reorder";
         page: CloudPDF.PageRef;
         refs: CloudPDF.AnnotationRef[];
-        toIndex: number;
-        expect?: number[] | undefined;
+        position: CloudPDF.AnnotationPosition;
     }
 
     export interface FormsSetValue {
@@ -139,6 +141,26 @@ export namespace ChangeOp {
         type: "forms.removeWidget";
         field: CloudPDF.FormFieldRef;
         widget: CloudPDF.AnnotationRef;
+    }
+
+    export interface FormsDeleteWidget {
+        type: "forms.deleteWidget";
+        widget: CloudPDF.AnnotationRef;
+        expect?: CloudPDF.WidgetPatch | undefined;
+    }
+
+    export interface FormsReorderWidgets {
+        type: "forms.reorderWidgets";
+        page: CloudPDF.PageRef;
+        widgets: CloudPDF.AnnotationRef[];
+        position: CloudPDF.AnnotationPosition;
+    }
+
+    export interface FormsUpdateWidget {
+        type: "forms.updateWidget";
+        widget: CloudPDF.AnnotationRef;
+        patch: CloudPDF.WidgetPatch;
+        expect?: CloudPDF.WidgetPatch | undefined;
     }
 
     export interface FormsSetSignatureAppearance {

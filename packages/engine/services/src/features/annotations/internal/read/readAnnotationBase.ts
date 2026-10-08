@@ -58,7 +58,6 @@ export function readAnnotationBase(
   return {
     ref: annotationRefOf(fn, mem, docPtr, page, annotPtr, index),
     page,
-    index,
     hasAppearance: fn.EPDFAnnot_HasAppearanceStream(annotPtr, APPEARANCE_MODE_NORMAL),
     appearanceState: readAppearanceState(fn, mem, annotPtr),
     nm: readAnnotString(fn, mem, annotPtr, 'NM'),

@@ -70,7 +70,7 @@ const EMPTY_PAGES: readonly PageLayout[] = Object.freeze([]);
  *  same shape `pages.list()` returns, so callers swap it in directly. */
 function layoutFromEvent(event: DocumentEvent) {
   switch (event.type) {
-    case 'pages.moved':
+    case 'pages.reordered':
     case 'pages.rotated':
     case 'pages.deleted':
     case 'pages.inserted':

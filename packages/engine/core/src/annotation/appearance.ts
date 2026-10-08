@@ -108,7 +108,6 @@ const INERT_KEYS: ReadonlySet<string> = new Set([
   'stateModel',
   'ref',
   'page',
-  'index',
   'hasAppearance',
   // Which state shows: picked among the pictures the annotation has.
   'appearanceState',

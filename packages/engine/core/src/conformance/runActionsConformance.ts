@@ -90,9 +90,9 @@ export function runActionsConformance(
       try {
         const firstPage = (await doc.pages.list()).pages[0];
         const snapshot = await doc.page(firstPage.ref).annotations.list();
-        const button = snapshot.annotations.find(
-          (annotation) =>
-            annotation.ref.kind === 'objectNumber' && annotation.ref.objectNumber === 7,
+        // The button is a widget: its row comes with the form.
+        const button = (await doc.forms.list()).widgets.find(
+          (widget) => widget.ref.kind === 'objectNumber' && widget.ref.objectNumber === 7,
         );
         const link = snapshot.annotations.find(
           (annotation) =>
@@ -141,9 +141,8 @@ export function runActionsConformance(
         expect(form.fields).toHaveLength(1);
         expect(form.fields[0].actions?.format?.root?.type).toBe('javascript');
         expect(scriptOf(form.fields[0].actions?.format?.root)).toMatch(/AFDate_FormatEx/);
-        const page = (await doc.pages.list()).pages[0];
-        const widget = (await doc.page(page.ref).annotations.list()).annotations[0];
-        expect(widget.actions).toBe(null);
+        expect(form.widgets).toHaveLength(1);
+        expect(form.widgets[0]!.actions).toBe(null);
       } finally {
         await doc.close();
       }

@@ -59,7 +59,7 @@ const text = (
   multiline: false,
   password: false,
   comb: false,
-  widgets: [{ ...formWidget(fieldObjectNumber, toPageRef(10)), rect: null }],
+  widgets: [formWidget(fieldObjectNumber, toPageRef(10))],
   ...(actions ? { actions } : {}),
 });
 
@@ -164,6 +164,7 @@ describe('script fault ladder', () => {
     const snapshot: FormSnapshot = {
       formKind: 'acroform',
       needsAppearances: false,
+      widgets: [],
       fields: [text(2, 'amount', '', { keystroke: action(`definitelyNotInstalled();`) })],
       calculationOrder: [],
     };
@@ -184,6 +185,7 @@ describe('script fault ladder', () => {
     const snapshot: FormSnapshot = {
       formKind: 'acroform',
       needsAppearances: false,
+      widgets: [],
       fields: [
         text(2, 'price', '', { keystroke: action(`AFNumber_Keystroke(2, 0, 0, 0, "", true);`) }),
       ],
@@ -215,6 +217,7 @@ describe('script fault ladder', () => {
     const snapshot: FormSnapshot = {
       formKind: 'acroform',
       needsAppearances: false,
+      widgets: [],
       fields: [text(2, 'qty', '', { validate: action(`explode();`) })],
       calculationOrder: [],
     };
@@ -231,6 +234,7 @@ describe('script fault ladder', () => {
     const snapshot: FormSnapshot = {
       formKind: 'acroform',
       needsAppearances: false,
+      widgets: [],
       fields: [
         text(2, 'amount', '3'),
         text(3, 'broken', 'stale', { calculate: action(`explode();`) }),
@@ -256,6 +260,7 @@ describe('script fault ladder', () => {
     const snapshot: FormSnapshot = {
       formKind: 'acroform',
       needsAppearances: false,
+      widgets: [],
       fields: [text(2, 'amount', '', { format: action(`kaboom();`) })],
       calculationOrder: [],
     };
@@ -272,6 +277,7 @@ describe('script fault ladder', () => {
     const snapshot: FormSnapshot = {
       formKind: 'acroform',
       needsAppearances: false,
+      widgets: [],
       fields: [text(2, 'amount', '', { keystroke: action(`AFNumber_Keystroke(2, 0);`) })],
       calculationOrder: [],
     };

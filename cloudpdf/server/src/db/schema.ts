@@ -88,7 +88,10 @@ export interface DocumentPagesTable {
   doc_id: string;
   page_object_number: number;
   content_version: number;
+  /** The page's annotations except widgets. */
   annotation_version: number;
+  /** The page's widgets (migration 034). */
+  widget_version: number;
   updated_at: number;
 }
 
@@ -126,12 +129,18 @@ export interface LayersTable {
   /**
    * Bulk-annotations pointer epoch for the whole-document
    * `/annotations/items@annotationsVersion` leaf. Bumps only when
-   * annotation list bodies change (annotation CRUD, page insert/delete,
-   * redaction, flatten, form field/widget structure) — deliberately not
-   * on form value writes, metadata, attachments, or page move/rotate.
-   * The `metadata_version` independent-cadence design.
+   * annotation list bodies change (annotation CRUD, stacking order, page
+   * insert/delete, redaction, flatten) — never on form writes (widgets are
+   * the form's), metadata, attachments, or page move/rotate. The
+   * `metadata_version` independent-cadence design.
    */
   annotations_version: number;
+  /**
+   * Form pointer epoch for `/form@formsVersion` (migration 034): bumps on
+   * every form write, a stacking-order move, page insert/delete, redaction
+   * and flatten; never on an annotation write.
+   */
+  forms_version: number;
   /** Audit-log head at this layer's current state — advanced in the same
    *  transaction as every audit append. Published as the manifest's
    *  `auditHead` (the gapless subscribe cursor). */
@@ -159,7 +168,10 @@ export interface LayerPagesTable {
   layer_id: string;
   page_object_number: number;
   content_version: number;
+  /** The page's annotations except widgets. */
   annotation_version: number;
+  /** The page's widgets (migration 034). */
+  widget_version: number;
   updated_at: number;
 }
 
@@ -492,6 +504,7 @@ export interface BaseVersionsTable {
   metadata_version: number;
   attachments_version: number;
   annotations_version: number;
+  forms_version: number;
   created_at: number;
 }
 

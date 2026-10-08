@@ -1,19 +1,23 @@
 import {
+  anchorOf,
   EngineError,
   EngineErrorCode,
   type PageDeleteResult,
-  type PageMoveResult,
   type PageNameInput,
   type PageNameResult,
   type PageObjectNumber,
+  type PagePosition,
   type PageRef,
+  type PageReorderResult,
   type PdfCoordinates,
   type PageRemoveNameInput,
   type PageRotateResult,
   type PdfRotation,
+  toPageRef,
 } from '@embedpdf/engine-core/runtime';
 import type { PdfRuntimeModule } from '@embedpdf/engine-runtime';
 
+import { pageIndexAt } from './internal/pageIndexAt';
 import { PagesReader } from './PagesReader';
 import type { DocumentSession } from '../../document-session/DocumentSession';
 import { writeUtf16String } from '../../runtime/memory/strings';
@@ -26,12 +30,12 @@ import { throwIfAborted } from '../../shared/abort';
  * `worker_thread`) share the same code path.
  *
  * Architectural anchor — locked with the user, do not loosen without
- * re-reading the doc comment on `PageMoveResult`:
+ * re-reading the doc comment on `PageReorderResult`:
  *
  *   - Pages are addressed by their durable `pageObjectNumber`, which must
  *     remain stable across every reorder permutation.
  *
- *   - The /Annots array of each page is untouched by `move()` (PDFium just
+ *   - The /Annots array of each page is untouched by `reorder()` (PDFium just
  *     rewrites pointer entries in the doc-level pages tree), so every
  *     annotation ref the caller is holding stays valid across a page
  *     reorder: shuffling pages must not silently break a pending
@@ -44,9 +48,10 @@ export class PagesMutator {
   ) {}
 
   /**
-   * Reorder pages. Mirrors `FPDF_MovePages`: detach the supplied pages,
-   * then re-insert them as a contiguous block at `toIndex` in the
-   * post-removal index space, preserving caller order.
+   * Reorder pages: they go together, in the order given, to `position`, next
+   * to a neighbour page or at the start or end. Mirrors `FPDF_MovePages`,
+   * which detaches the pages and re-inserts them as a block at an index in
+   * the pages left: the neighbour's index there, or the one after it.
    *
    * Atomicity:
    *   - `FPDF_MovePages` rejects atomically: if it returns false, no
@@ -54,34 +59,29 @@ export class PagesMutator {
    *   - On success we refresh the per-session page registry and read the
    *     new layout back, which is what the result returns.
    *
-   * Validation done up front (the helper repeats these checks; we do
-   * them here for clean error messages):
-   *   - non-empty inputs;
-   *   - duplicate `pageObjectNumber`s rejected;
-   *   - every `pon` resolvable via the session's page registry;
-   *   - `toIndex` in `[0, pageCount - len]`.
+   * Validation done up front, for clean error messages: at least one page,
+   * none twice, and a neighbour that isn't one of them (`InvalidArg`); every
+   * page and the neighbour pages of the document (`NotFound`).
    */
-  move(pages: PageRef[], toIndex: number, signal: AbortSignal): PageMoveResult<PdfCoordinates> {
+  reorder(
+    pages: PageRef[],
+    position: PagePosition,
+    signal: AbortSignal,
+  ): PageReorderResult<PdfCoordinates> {
     const pageObjectNumbers = this.session.resolvePageRefs(pages);
     throwIfAborted(signal);
-    this.requireUniquePageObjectNumbers('pages.move', pageObjectNumbers);
-    if (toIndex < 0 || !Number.isInteger(toIndex)) {
+    this.requireUniquePageObjectNumbers('pages.reorder', pageObjectNumbers);
+    const anchor = anchorOf(position);
+    if (anchor && pageObjectNumbers.includes(anchor.objectNumber)) {
       throw new EngineError(
         EngineErrorCode.InvalidArg,
-        `pages.move toIndex must be a non-negative integer (got ${toIndex})`,
+        `pages.reorder: the neighbour page ${anchor.objectNumber} is one of the pages that move`,
+        { details: { field: 'position' } },
       );
     }
 
     const { fn, mem } = this.runtime;
     const docPtr = this.session.requireDocPtr();
-    const totalPages = fn.FPDF_GetPageCount(docPtr);
-    const postRemoval = totalPages - pageObjectNumbers.length;
-    if (toIndex > postRemoval) {
-      throw new EngineError(
-        EngineErrorCode.InvalidArg,
-        `pages.move toIndex ${toIndex} out of range; post-removal page count is ${postRemoval}`,
-      );
-    }
 
     // Resolve every pon to its current pageIndex via the session
     // registry. Bad pons throw `NotFound` from the session, which is
@@ -91,6 +91,9 @@ export class PagesMutator {
       throwIfAborted(signal);
       return this.session.recordByObjectNumber(pageObjectNumber).pageIndex;
     });
+    // Where the block goes among the pages left once it is out.
+    const at = pageIndexAt(this.session, position, fn.FPDF_GetPageCount(docPtr));
+    const toIndex = at - fromIndices.filter((index) => index < at).length;
 
     // Marshal int[] and call the helper.
     const arrPtr = mem.alloc(4 * fromIndices.length);
@@ -119,11 +122,15 @@ export class PagesMutator {
     // Page positions changed; rebuild the index<->pon map.
     this.session.refreshPageRegistry();
 
-    // A move returns geometry, not liveness: read the new layout off the
+    // A reorder returns geometry, not liveness: read the new layout off the
     // reordered session via the shared reader (identical output local +
-    // cloud). `cache` is null — local engines have no manifest/CDN.
+    // cloud).
     const layout = new PagesReader(this.runtime, this.session).read(signal);
-    return { layout, meta: { affectedPages: [], cacheDelta: null, ...this.session.writeStamp() } };
+    return {
+      pages: pageObjectNumbers.map(toPageRef),
+      layout,
+      meta: { affectedPages: [], cacheDelta: null, ...this.session.writeStamp() },
+    };
   }
 
   /**

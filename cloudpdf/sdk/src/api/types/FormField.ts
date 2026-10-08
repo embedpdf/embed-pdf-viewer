@@ -26,7 +26,7 @@ export namespace FormField {
         valueEntry: CloudPDF.FormFieldTextValueEntry;
         defaultValueEntry: CloudPDF.FormFieldTextDefaultValueEntry;
         actions?: CloudPDF.PdfFieldActions | undefined;
-        widgets: FormFieldText.Widgets.Item[];
+        widgets: CloudPDF.FormWidget[];
         value: string;
         defaultValue: string;
         maxLength: number | null;
@@ -41,25 +41,6 @@ export namespace FormField {
             Recovered: "recovered",
         } as const;
         export type Origin = (typeof Origin)[keyof typeof Origin];
-        export type Widgets = Widgets.Item[];
-
-        export namespace Widgets {
-            export interface Item {
-                ref: CloudPDF.AnnotationRef | null;
-                objectNumber: number;
-                page: CloudPDF.PageRef | null;
-                rect: Item.Rect | null;
-            }
-
-            export namespace Item {
-                export interface Rect {
-                    x: number;
-                    y: number;
-                    width: number;
-                    height: number;
-                }
-            }
-        }
     }
 
     export interface Checkbox {
@@ -93,19 +74,9 @@ export namespace FormField {
                 ref: CloudPDF.AnnotationRef | null;
                 objectNumber: number;
                 page: CloudPDF.PageRef | null;
-                rect: Item.Rect | null;
                 onState: string;
                 exportValue: string;
                 checked: boolean;
-            }
-
-            export namespace Item {
-                export interface Rect {
-                    x: number;
-                    y: number;
-                    width: number;
-                    height: number;
-                }
             }
         }
     }
@@ -142,19 +113,9 @@ export namespace FormField {
                 ref: CloudPDF.AnnotationRef | null;
                 objectNumber: number;
                 page: CloudPDF.PageRef | null;
-                rect: Item.Rect | null;
                 onState: string;
                 exportValue: string;
                 checked: boolean;
-            }
-
-            export namespace Item {
-                export interface Rect {
-                    x: number;
-                    y: number;
-                    width: number;
-                    height: number;
-                }
             }
         }
     }
@@ -172,7 +133,7 @@ export namespace FormField {
         valueEntry: CloudPDF.FormFieldComboboxValueEntry;
         defaultValueEntry: CloudPDF.FormFieldComboboxDefaultValueEntry;
         actions?: CloudPDF.PdfFieldActions | undefined;
-        widgets: FormFieldCombobox.Widgets.Item[];
+        widgets: CloudPDF.FormWidget[];
         value: string;
         defaultValue: string;
         edit: boolean;
@@ -185,26 +146,6 @@ export namespace FormField {
             Recovered: "recovered",
         } as const;
         export type Origin = (typeof Origin)[keyof typeof Origin];
-        export type Widgets = Widgets.Item[];
-
-        export namespace Widgets {
-            export interface Item {
-                ref: CloudPDF.AnnotationRef | null;
-                objectNumber: number;
-                page: CloudPDF.PageRef | null;
-                rect: Item.Rect | null;
-            }
-
-            export namespace Item {
-                export interface Rect {
-                    x: number;
-                    y: number;
-                    width: number;
-                    height: number;
-                }
-            }
-        }
-
         export type Options = Options.Item[];
 
         export namespace Options {
@@ -229,7 +170,7 @@ export namespace FormField {
         valueEntry: CloudPDF.FormFieldListboxValueEntry;
         defaultValueEntry: CloudPDF.FormFieldListboxDefaultValueEntry;
         actions?: CloudPDF.PdfFieldActions | undefined;
-        widgets: FormFieldListbox.Widgets.Item[];
+        widgets: CloudPDF.FormWidget[];
         selectedValues: string[];
         defaultValue: string[];
         multiSelect: boolean;
@@ -242,26 +183,6 @@ export namespace FormField {
             Recovered: "recovered",
         } as const;
         export type Origin = (typeof Origin)[keyof typeof Origin];
-        export type Widgets = Widgets.Item[];
-
-        export namespace Widgets {
-            export interface Item {
-                ref: CloudPDF.AnnotationRef | null;
-                objectNumber: number;
-                page: CloudPDF.PageRef | null;
-                rect: Item.Rect | null;
-            }
-
-            export namespace Item {
-                export interface Rect {
-                    x: number;
-                    y: number;
-                    width: number;
-                    height: number;
-                }
-            }
-        }
-
         export type Options = Options.Item[];
 
         export namespace Options {
@@ -286,7 +207,7 @@ export namespace FormField {
         valueEntry: CloudPDF.FormFieldPushbuttonValueEntry;
         defaultValueEntry: CloudPDF.FormFieldPushbuttonDefaultValueEntry;
         actions?: CloudPDF.PdfFieldActions | undefined;
-        widgets: FormFieldPushbutton.Widgets.Item[];
+        widgets: CloudPDF.FormWidget[];
     }
 
     export namespace FormFieldPushbutton {
@@ -295,25 +216,6 @@ export namespace FormField {
             Recovered: "recovered",
         } as const;
         export type Origin = (typeof Origin)[keyof typeof Origin];
-        export type Widgets = Widgets.Item[];
-
-        export namespace Widgets {
-            export interface Item {
-                ref: CloudPDF.AnnotationRef | null;
-                objectNumber: number;
-                page: CloudPDF.PageRef | null;
-                rect: Item.Rect | null;
-            }
-
-            export namespace Item {
-                export interface Rect {
-                    x: number;
-                    y: number;
-                    width: number;
-                    height: number;
-                }
-            }
-        }
     }
 
     export interface Signature {
@@ -329,7 +231,7 @@ export namespace FormField {
         valueEntry: CloudPDF.FormFieldSignatureValueEntry;
         defaultValueEntry: CloudPDF.FormFieldSignatureDefaultValueEntry;
         actions?: CloudPDF.PdfFieldActions | undefined;
-        widgets: FormFieldSignature.Widgets.Item[];
+        widgets: CloudPDF.FormWidget[];
     }
 
     export namespace FormFieldSignature {
@@ -338,25 +240,6 @@ export namespace FormField {
             Recovered: "recovered",
         } as const;
         export type Origin = (typeof Origin)[keyof typeof Origin];
-        export type Widgets = Widgets.Item[];
-
-        export namespace Widgets {
-            export interface Item {
-                ref: CloudPDF.AnnotationRef | null;
-                objectNumber: number;
-                page: CloudPDF.PageRef | null;
-                rect: Item.Rect | null;
-            }
-
-            export namespace Item {
-                export interface Rect {
-                    x: number;
-                    y: number;
-                    width: number;
-                    height: number;
-                }
-            }
-        }
     }
 
     export interface Unknown {
@@ -372,7 +255,7 @@ export namespace FormField {
         valueEntry: CloudPDF.FormFieldUnknownValueEntry;
         defaultValueEntry: CloudPDF.FormFieldUnknownDefaultValueEntry;
         actions?: CloudPDF.PdfFieldActions | undefined;
-        widgets: FormFieldUnknown.Widgets.Item[];
+        widgets: CloudPDF.FormWidget[];
         rawValue: string;
     }
 
@@ -382,24 +265,5 @@ export namespace FormField {
             Recovered: "recovered",
         } as const;
         export type Origin = (typeof Origin)[keyof typeof Origin];
-        export type Widgets = Widgets.Item[];
-
-        export namespace Widgets {
-            export interface Item {
-                ref: CloudPDF.AnnotationRef | null;
-                objectNumber: number;
-                page: CloudPDF.PageRef | null;
-                rect: Item.Rect | null;
-            }
-
-            export namespace Item {
-                export interface Rect {
-                    x: number;
-                    y: number;
-                    width: number;
-                    height: number;
-                }
-            }
-        }
     }
 }

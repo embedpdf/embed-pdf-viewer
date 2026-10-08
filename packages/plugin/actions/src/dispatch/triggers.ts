@@ -14,6 +14,7 @@ import type {
 
 import type { ActionSource, ActionTrigger } from '../contract';
 import type { ActionsContext, ActionsServices } from '../services';
+import { readPageAnnotations } from '../services/annotation-rows';
 
 /** An annotation that carries at least one page-lifecycle tree (/PO, /PC, /PV, /PI), as read. */
 interface LifecycleAnnotation {
@@ -31,9 +32,22 @@ const annotationPagesOf = (event: DocumentEvent): readonly PageRef[] | 'all' | n
     case 'annotations.created':
     case 'annotations.updated':
     case 'annotations.deleted':
-    case 'annotations.moved':
+    case 'annotations.reordered':
     case 'annotations.flattened':
+    case 'forms.widgetsReordered':
       return [event.page];
+    // A form write can add, move or remove widgets, which carry page actions too.
+    case 'forms.created':
+    case 'forms.deleted':
+    case 'forms.widgetAdded':
+    case 'forms.widgetRemoved':
+    case 'forms.widgetDeleted':
+    case 'forms.widgetRestored':
+    case 'forms.widgetUpdated':
+    case 'forms.restored':
+    case 'forms.imported':
+    case 'forms.repaired':
+      return 'all';
     case 'pages.flattened':
       return event.pages;
     case 'redaction.applied':
@@ -75,21 +89,18 @@ export function createTriggers(
     const key = page.objectNumber;
     const cached = lifecycleReads.get(key);
     if (cached) return cached;
-    const read = ctx.doc
-      .page(page)
-      .annotations.list()
-      .then(({ annotations }) =>
-        annotations
-          .filter(
-            (annotation) =>
-              annotation.actions &&
-              (annotation.actions.pageOpen?.root ||
-                annotation.actions.pageClose?.root ||
-                annotation.actions.pageVisible?.root ||
-                annotation.actions.pageInvisible?.root),
-          )
-          .map((annotation) => ({ ref: annotation.ref, actions: annotation.actions! })),
-      );
+    const read = readPageAnnotations(ctx, page).then((annotations) =>
+      annotations
+        .filter(
+          (annotation) =>
+            annotation.actions &&
+            (annotation.actions.pageOpen?.root ||
+              annotation.actions.pageClose?.root ||
+              annotation.actions.pageVisible?.root ||
+              annotation.actions.pageInvisible?.root),
+        )
+        .map((annotation) => ({ ref: annotation.ref, actions: annotation.actions! })),
+    );
     lifecycleReads.set(key, read);
     // A failed read is not kept: the next trigger for the page reads again.
     read.catch(() => {

@@ -51,6 +51,11 @@ export type DocResourceId =
   // Annotation export: data and resource bytes, so it egresses content and
   // needs `doc.download` beside the annotation read.
   | 'annotations-export'
+  // The form: fields and widget rows, and each page's widget images. Their
+  // own family with their own prefixes: who may read the form isn't who may
+  // read the annotations, and a cached object is never filtered per row.
+  | 'form'
+  | 'page-form'
   | 'layout'
   | 'metadata'
   // The Info dict's custom keys: their own path under `/metadata/`, so
@@ -83,8 +88,8 @@ export type DocResourceId =
   | 'layer-actions'
   | 'layer-page-render'
   // Layer twin of `page-render-annotated`: annotatedness is path-only at
-  // both tiers (uniform grammar), even though layer grants don't need the
-  // distinction — see the token/path law in wire/paths.ts.
+  // both tiers (uniform grammar), and both take `doc.annotate.read` — see
+  // the token/path law in wire/paths.ts.
   | 'layer-page-render-annotated'
   | 'layer-page-text'
   | 'layer-page-geometry'
@@ -96,6 +101,8 @@ export type DocResourceId =
   | 'annotations-read'
   | 'layer-annotations-all'
   | 'layer-annotations-export'
+  | 'layer-form'
+  | 'layer-page-form'
   // Attachments, split by permission tier under distinct prefixes (the
   // search-rects/search-full rule): the metadata listing rides the base
   // read capability, while decoded file bytes egress content and gate on
@@ -234,9 +241,9 @@ export const DOC_RESOURCES: Readonly<Record<DocResourceId, DocResourceDescriptor
     resolvePathPattern: (docId) => `/v1/docs/${docId}/render/annotated/pages/*/data@*`,
     pathPrefix: '/v1/docs/{docId}/render/annotated/pages/',
     resolvePathPrefix: (docId) => `/v1/docs/${docId}/render/annotated/pages/`,
-    // Same capability tier as `page-render` — the split is about plane
-    // dependencies (content+annotations vs content), not permissions.
-    requirement: { kind: 'single', capability: 'doc.render' },
+    // The annotations drawn are read like the annotation list: the family
+    // depends on the `annotations` plane and on who may read it.
+    requirement: { kind: 'all', capabilities: ['doc.render', 'doc.annotate.read'] },
     routeKind: 'versioned-read',
     cdnCacheable: true,
   },
@@ -270,6 +277,26 @@ export const DOC_RESOURCES: Readonly<Record<DocResourceId, DocResourceDescriptor
     pathPrefix: '/v1/docs/{docId}/annotations/export@',
     resolvePathPrefix: (docId) => `/v1/docs/${docId}/annotations/export@`,
     requirement: { kind: 'all', capabilities: ['doc.annotate.read', 'doc.download'] },
+    routeKind: 'versioned-read',
+    cdnCacheable: true,
+  },
+  form: {
+    id: 'form',
+    pathPattern: '/v1/docs/{docId}/form@*',
+    resolvePathPattern: (docId) => `/v1/docs/${docId}/form@*`,
+    pathPrefix: '/v1/docs/{docId}/form@',
+    resolvePathPrefix: (docId) => `/v1/docs/${docId}/form@`,
+    requirement: { kind: 'single', capability: 'doc.forms.read' },
+    routeKind: 'versioned-read',
+    cdnCacheable: true,
+  },
+  'page-form': {
+    id: 'page-form',
+    pathPattern: '/v1/docs/{docId}/form/pages/*/appearances@*',
+    resolvePathPattern: (docId) => `/v1/docs/${docId}/form/pages/*/appearances@*`,
+    pathPrefix: '/v1/docs/{docId}/form/pages/',
+    resolvePathPrefix: (docId) => `/v1/docs/${docId}/form/pages/`,
+    requirement: { kind: 'single', capability: 'doc.forms.read' },
     routeKind: 'versioned-read',
     cdnCacheable: true,
   },
@@ -431,7 +458,7 @@ export const DOC_RESOURCES: Readonly<Record<DocResourceId, DocResourceDescriptor
     pathPrefix: '/v1/docs/{docId}/layers/{layerName}/render/annotated/pages/',
     resolvePathPrefix: (docId, layerName = 'default') =>
       `/v1/docs/${docId}/layers/${layerName}/render/annotated/pages/`,
-    requirement: { kind: 'single', capability: 'doc.render' },
+    requirement: { kind: 'all', capabilities: ['doc.render', 'doc.annotate.read'] },
     routeKind: 'versioned-read',
     cdnCacheable: true,
   },
@@ -543,6 +570,32 @@ export const DOC_RESOURCES: Readonly<Record<DocResourceId, DocResourceDescriptor
     resolvePathPrefix: (docId, layerName = 'default') =>
       `/v1/docs/${docId}/layers/${layerName}/annotations/items@`,
     requirement: { kind: 'single', capability: 'doc.annotate.read' },
+    routeKind: 'versioned-read',
+    cdnCacheable: true,
+  },
+  'layer-form': {
+    id: 'layer-form',
+    pathPattern: '/v1/docs/{docId}/layers/{layerName}/form@*',
+    resolvePathPattern: (docId, layerName = 'default') =>
+      `/v1/docs/${docId}/layers/${layerName}/form@*`,
+    // `form@`, not `form`: a bare `form` prefix would also cover the write
+    // routes under `form/fields/` and `form/widgets/`.
+    pathPrefix: '/v1/docs/{docId}/layers/{layerName}/form@',
+    resolvePathPrefix: (docId, layerName = 'default') =>
+      `/v1/docs/${docId}/layers/${layerName}/form@`,
+    requirement: { kind: 'single', capability: 'doc.forms.read' },
+    routeKind: 'versioned-read',
+    cdnCacheable: true,
+  },
+  'layer-page-form': {
+    id: 'layer-page-form',
+    pathPattern: '/v1/docs/{docId}/layers/{layerName}/form/pages/*/appearances@*',
+    resolvePathPattern: (docId, layerName = 'default') =>
+      `/v1/docs/${docId}/layers/${layerName}/form/pages/*/appearances@*`,
+    pathPrefix: '/v1/docs/{docId}/layers/{layerName}/form/pages/',
+    resolvePathPrefix: (docId, layerName = 'default') =>
+      `/v1/docs/${docId}/layers/${layerName}/form/pages/`,
+    requirement: { kind: 'single', capability: 'doc.forms.read' },
     routeKind: 'versioned-read',
     cdnCacheable: true,
   },

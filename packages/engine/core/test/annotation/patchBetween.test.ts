@@ -12,7 +12,6 @@ const square = {
     objectNumber: 9,
   },
   page: { kind: 'objectNumber', objectNumber: 3 },
-  index: 0,
   hasAppearance: true,
   appearanceState: null,
   nm: 'shape',
@@ -74,7 +73,6 @@ describe('annotationPatchBetween', () => {
       ...square,
       rect: { x: 0, y: 0, width: 1, height: 1 },
       modifiedAt: '2026-09-29T00:00:00Z',
-      index: 4,
     } as Annotation;
     expect(annotationPatchBetween(square, after)).toEqual({});
   });

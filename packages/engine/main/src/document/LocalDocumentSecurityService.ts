@@ -89,8 +89,11 @@ export class LocalDocumentSecurityService implements DocumentSecurityService {
         return guard.canCollab('create', guard.targetForSelfCreate());
       case 'set-group':
         return guard.canSetGroup((target as { groupId: string }).groupId);
-      default:
-        return guard.canCollab(action, collabTargetOf((target ?? {}) as AnnotationOwner));
+      default: {
+        const annotation = (target ?? {}) as AnnotationOwner;
+        if (annotation.subtype === 'widget') return this.allows('doc.forms.modify');
+        return guard.canCollab(action, collabTargetOf(annotation));
+      }
     }
   }
 

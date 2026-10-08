@@ -45,18 +45,18 @@ subscription.unsubscribe();
 
 ## Events
 
-| Event               | Fires when                                                          | Carries                             |
-| :------------------ | :------------------------------------------------------------------ | :---------------------------------- |
-| `onCreated`         | An annotation was added.                                            | `annotation`, `origin`              |
-| `onUpdated`         | An annotation was changed.                                          | `annotation`, `origin`              |
-| `onDeleted`         | Annotations were deleted: one, plus its popup and replies.          | `refs`, `page`, `origin`            |
-| `onMoved`           | The drawing order on a page changed.                                | `refs`, `page`, `toIndex`, `origin` |
-| `onResynced`        | Annotations were read again, as after loading a document.           | `pages`                             |
-| `onWriteFailed`     | The engine refused a change the user made.                          | `refs`, `error`                     |
-| `onSettingsChanged` | A setting changed, through `updateSettings()` or `resetSettings()`. | `settings`, `changed`               |
+| Event               | Fires when                                                          | Carries                   |
+| :------------------ | :------------------------------------------------------------------ | :------------------------ |
+| `onCreated`         | An annotation was added.                                            | `annotation`, `origin`    |
+| `onUpdated`         | An annotation was changed.                                          | `annotation`, `origin`    |
+| `onDeleted`         | Annotations were deleted: one, plus its popup and replies.          | `refs`, `page`, `origin`  |
+| `onReordered`       | The drawing order on a page changed.                                | `page`, `order`, `origin` |
+| `onResynced`        | Annotations were read again, as after loading a document.           | `pages`                   |
+| `onWriteFailed`     | The engine refused a change the user made.                          | `refs`, `error`           |
+| `onSettingsChanged` | A setting changed, through `updateSettings()` or `resetSettings()`. | `settings`, `changed`     |
 
 - **Once, and after it's saved.** <Fw only={['react', 'vue', 'svelte']}>`onCreated`, `onUpdated`, `onDeleted` and
-  `onMoved`</Fw><Fw only="angular">`created$`, `updated$`, `deleted$` and `moved$`</Fw> fire when the engine has saved
+  `onReordered`</Fw><Fw only="angular">`created$`, `updated$`, `deleted$` and `reordered$`</Fw> fire when the engine has saved
   the change, never while it's still pending. A change fires once, however
   many screens show it.
 - **Loading isn't a list of creates.** When a document opens, its annotations arrive as one
@@ -64,6 +64,8 @@ subscription.unsubscribe();
   annotation. The same happens after a change that touches whole pages, such as flattening or
   redaction. Then read the `pages` it names again with `list()`.
 - **`annotation` is the record after the change.** It's what `get()` returns now.
+- **`order` is the whole page.** After a reorder, `order` holds the page's annotations as refs,
+  bottom to top, the same order `list({ pages: [page] })` returns.
 
 The selection, a shape being drawn, text editing and hover have events of their own
 (<Fw only={['react', 'vue', 'svelte']}>`onSelectionChanged`, `onDraftChanged`, `onEditingChanged`, `onHoverChanged`</Fw><Fw only="angular">`selectionChanged$`,

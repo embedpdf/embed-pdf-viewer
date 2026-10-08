@@ -7,7 +7,7 @@ import type { Coordinates, PageCoordinates } from '../pageSpace/coordinates';
  * layout: the post-mutation snapshot (with `namedPages`) is returned whole,
  * and the cloud's `meta.cacheDelta` says `docVersion` + `layoutVersion`
  * advanced — per-page content/annotation pins never move (same shape as
- * `PageMoveResult` on purpose).
+ * `PageReorderResult` on purpose).
  */
 export interface PageNameResult<C extends Coordinates = PageCoordinates> {
   layout: PageListSnapshot<C>;

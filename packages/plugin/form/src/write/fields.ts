@@ -64,6 +64,12 @@ export function createFieldWrites(
           async () => ({ field: (await ctx.doc.forms.removeWidget(ref, widget)).field }),
           options,
         ),
+      deleteWidget: (widget, options) =>
+        design(
+          'form.deleteWidget',
+          async () => ({ field: (await ctx.doc.forms.deleteWidget(widget)).field }),
+          options,
+        ),
       repair: (options) =>
         design(
           'form.repair',

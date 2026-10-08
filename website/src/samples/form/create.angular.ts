@@ -134,7 +134,7 @@ export class App {
     const page = this.page();
     if (!page) return;
     void addField(this.form, page, this.form.fields().length).then(({ field }) =>
-      this.stage()?.reveal(page, { rect: field.widgets[0].rect }),
+      this.stage()?.reveal(page, { rect: this.form.getWidget(field.widgets[0])!.rect }),
     );
   }
 

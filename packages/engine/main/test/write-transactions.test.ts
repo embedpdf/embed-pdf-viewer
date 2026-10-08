@@ -128,9 +128,9 @@ describe.each(['wasm', 'native'] as const)(
           write: () => page.annotations.update(square!, { box: rect(20 + ++n) }),
         },
         {
-          what: 'annotations.move',
+          what: 'annotations.reorder',
           setup: () => circle(70),
-          write: () => page.annotations.move([square!], 1),
+          write: () => page.annotations.reorder([square!], 'end'),
         },
         {
           what: 'annotations.flatten',
@@ -209,7 +209,7 @@ describe.each(['wasm', 'native'] as const)(
           },
         },
         { what: 'pages.rotate', write: () => doc.pages.rotate([blank!], 90) },
-        { what: 'pages.move', write: () => doc.pages.move([blank!], 0) },
+        { what: 'pages.reorder', write: () => doc.pages.reorder([blank!], 'start') },
         {
           what: 'pages.setName',
           write: () => doc.pages.setName({ name: 'probe', page: firstPage }),

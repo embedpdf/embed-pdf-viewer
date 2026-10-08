@@ -78,22 +78,23 @@ A field shows on a page through a **widget**: the box you see and click. Most fi
 radio group is one field with a widget per button, and a field repeated on every page (a
 reference number in the header, say) has a widget per page, all showing the same value.
 
-Each widget in `field.widgets` has its `page`, its `rect` (in points from the page's top-left)
-and a `ref`, so one read is enough to draw your own form layer over a page:
+Each widget in `field.widgets` has its `page` and its `ref`. The form also lists every widget in
+`widgets`: where it is (`rect`, in points from the page's top-left), how it looks, its state, and
+the ref of the field it belongs to (`field`). So one read is enough to draw your own form layer
+over a page:
 
 ```ts
-const { fields } = await doc.forms.list();
+const { widgets } = await doc.forms.list();
 
-for (const field of fields) {
-  for (const widget of field.widgets) drawBox(widget.page, widget.rect, field);
-}
+for (const widget of widgets) drawBox(widget.page, widget.rect, widget.field);
 ```
 
-Checkbox and radio widgets also have their `exportValue` (what the form data holds when this
-widget is checked) and `checked`.
+Checkbox and radio widgets in `field.widgets` also have their `exportValue` (what the form data
+holds when this widget is checked) and `checked`.
 
-Widgets are annotations of kind `'widget'`, so `page.annotations.list()` returns them too, with
-the same `ref`. A widget annotation's `field` is the ref of the field it belongs to.
+A form field's widgets come with the form, never with the annotations: `page.annotations.list()`
+doesn't return them, and reading them takes `doc.forms.read`, not `doc.annotate.read`. Each page's
+widget images, every look and state, come from `page.forms.renderAppearances()`.
 
 ## Find a field
 

@@ -1,5 +1,4 @@
 import type {
-  PdfCoordinates,
   DocMdpPermission,
   FieldLockSpec,
   IsoDateTime,
@@ -18,9 +17,8 @@ import { withScratch, withScratchN } from '../../../runtime/memory/scratch';
 import { readUtf16String } from '../../../runtime/memory/strings';
 import { pdfDateToIso } from '../../../shared/pdf-date';
 import { U64_BYTES, peekU64, pokeU64 } from '../../../runtime/memory/u64';
-import { readFormSnapshot, widgetPageRef } from '../../forms/internal/readFormSnapshot';
+import { readFormFields, widgetPageRef } from '../../forms/internal/readFormSnapshot';
 import { fieldObjectNumberOf } from '../../forms/internal/resolveFieldRef';
-import type { WidgetRectOf } from '../../forms/internal/widgetRects';
 
 // Mirrors public/epdf_signature.h.
 const KIND_DOC_TIMESTAMP = 1;
@@ -154,19 +152,11 @@ function readSeedValue(
   };
 }
 
-/**
- * Every signature field of a native signature model, in model order. A
- * widget's rect comes from `rectOf` (the signature model has none); without
- * it, rects are `null`, for reads that never show where a signature is.
- */
-export function readSignaturesFromModel(
-  runtime: PdfRuntimeModule,
-  model: Ptr,
-  rectOf: WidgetRectOf = () => null,
-): SignatureDTO<PdfCoordinates>[] {
+/** Every signature field of a native signature model, in model order. */
+export function readSignaturesFromModel(runtime: PdfRuntimeModule, model: Ptr): SignatureDTO[] {
   const { fn } = runtime;
   const count = fn.EPDFSig_Count(model);
-  const out: SignatureDTO<PdfCoordinates>[] = [];
+  const out: SignatureDTO[] = [];
   const str = (i: number, key: number) =>
     readWide(runtime, (buf, cap) => fn.EPDFSig_GetString(model, i, key, buf, cap));
   for (let i = 0; i < count; i++) {
@@ -180,10 +170,7 @@ export function readSignaturesFromModel(
       fieldName: readWide(runtime, (buf, cap) => fn.EPDFSig_GetFieldName(model, i, buf, cap)) ?? '',
       widget:
         widgetObjNum > 0
-          ? {
-              ...formWidget(widgetObjNum, widgetPageRef(fn.EPDFSig_GetWidgetPageObjNum(model, i))),
-              rect: rectOf(widgetObjNum),
-            }
+          ? formWidget(widgetObjNum, widgetPageRef(fn.EPDFSig_GetWidgetPageObjNum(model, i)))
           : null,
       signed,
       kind: fn.EPDFSig_GetKind(model, i) === KIND_DOC_TIMESTAMP ? 'timestamp' : 'signature',
@@ -235,7 +222,7 @@ export function readContentsAt(runtime: PdfRuntimeModule, model: Ptr, index: num
 export function readRevisions(
   runtime: PdfRuntimeModule,
   docPtr: Ptr,
-  signatures: ReadonlyArray<SignatureDTO<PdfCoordinates>>,
+  signatures: ReadonlyArray<SignatureDTO>,
 ): PdfRevision[] {
   const { fn, mem } = runtime;
   const count = fn.EPDFDoc_GetRevisionCount(docPtr);
@@ -314,7 +301,7 @@ export function readStructure(runtime: PdfRuntimeModule, docPtr: Ptr): RevisionS
   const formModel = fn.EPDFForm_LoadModel(docPtr);
   if (formModel !== NULL_PTR) {
     try {
-      const snapshot = readFormSnapshot(runtime, formModel, docPtr);
+      const snapshot = readFormFields(runtime, formModel, docPtr);
       // The snapshot lists the model's fields in model order.
       snapshot.fields.forEach((f, index) => {
         fields.push({

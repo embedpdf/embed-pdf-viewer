@@ -94,7 +94,6 @@ function annotation(index: number) {
       objectNumber: 10_000 + index,
     },
     page: toPageRef(PAGE_OBJECT_NUMBER),
-    index,
     hasAppearance: true,
     appearanceState: null,
     nm: `stub-${index}`,
@@ -236,6 +235,7 @@ function buildStub(initial: ServerState): StubbedFixture {
               cache: {
                 contentVersion: state.pageContentVersion,
                 annotationVersion: state.pageAnnotationVersion,
+                widgetVersion: 1,
               },
             },
           ],
@@ -391,6 +391,7 @@ function buildStub(initial: ServerState): StubbedFixture {
                   cache: {
                     contentVersion: state.pageContentVersion,
                     annotationVersion: state.pageAnnotationVersion,
+                    widgetVersion: 1,
                   },
                 },
               ],
@@ -809,6 +810,7 @@ describe('CloudPageTextService — end-to-end transparent retry', () => {
               cache: {
                 contentVersion: 1,
                 annotationVersion: 3,
+                widgetVersion: 1,
               },
             },
           ],
@@ -901,6 +903,7 @@ describe('CloudEngine schema parity — DocumentHeadSchema / DocumentManifestSch
           cache: {
             contentVersion: 1,
             annotationVersion: 1,
+            widgetVersion: 1,
           },
         },
       ],

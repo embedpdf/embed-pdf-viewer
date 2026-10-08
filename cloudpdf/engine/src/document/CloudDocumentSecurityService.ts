@@ -21,6 +21,7 @@ import {
   type DocumentUnlockResult,
   type EditSessionAccess,
   type Identity,
+  type PageLayerRights,
   type PasswordPrompt,
 } from '@embedpdf/engine-core/runtime';
 import { AccessResponseSchema, wirePaths, type DocumentHead } from '@embedpdf/engine-core/wire';
@@ -46,6 +47,8 @@ export class CloudDocumentSecurityService implements DocumentSecurityService {
    */
   private readonly tokenScope: ReadonlyArray<string>;
   private readonly tokenIdentity: Identity | null;
+  /** Whether the token is a document token with a scope: rights the client can know. */
+  private readonly tokenHasDocScope: boolean;
 
   /**
    * What the document's signatures forbid, as the server reports it with
@@ -67,6 +70,20 @@ export class CloudDocumentSecurityService implements DocumentSecurityService {
     const claims = initialToken ? safeDecodeClaims(initialToken) : null;
     this.tokenScope = Array.isArray(claims?.scope) ? (claims!.scope as ReadonlyArray<string>) : [];
     this.tokenIdentity = claims ? identityFromClaims(claims) : null;
+    this.tokenHasDocScope = typeof claims?.doc_id === 'string' && Array.isArray(claims?.scope);
+  }
+
+  /**
+   * What the caller may read of a page picture, when the client can know it:
+   * once `/access` answered, or from a document token's scope. Null without
+   * either (no token, a tenant or API token): the server decides.
+   */
+  pageLayerRights(): PageLayerRights | null {
+    if (!this.access && !this.tokenHasDocScope) return null;
+    return {
+      annotations: this.allows('doc.annotate.read'),
+      formFields: this.allows('doc.forms.read'),
+    };
   }
 
   get state(): DocumentSecurityState {
@@ -140,8 +157,10 @@ export class CloudDocumentSecurityService implements DocumentSecurityService {
           this.pdfBits(),
         );
       default: {
+        const annotation = (target ?? {}) as AnnotationOwner;
+        if (annotation.subtype === 'widget') return this.allows('doc.forms.modify');
         if (annotationsProtected) return false;
-        const owner = collabTargetOf((target ?? {}) as AnnotationOwner);
+        const owner = collabTargetOf(annotation);
         return checkCollab(action, owner, this.rawScope(), id, this.pdfBits());
       }
     }

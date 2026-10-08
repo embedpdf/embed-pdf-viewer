@@ -62,21 +62,69 @@ export function authorizeUnprotected(authority: ChangeAuthority, capability: Doc
   }
 }
 
-/** Whose an annotation is, as the write reads it. */
+/** What an annotation is and whose, as the write reads it. */
 interface Owned {
+  subtype?: string;
   userId?: string | null;
   groupId?: string | null;
 }
 
 /**
- * Check a create in `groupId` (the identity's own group without one) and
- * return the actor the write stamps: the creator, in that group. A group
- * other than the identity's takes the authority a reassignment takes.
+ * The capability writing an annotation of `subtype` takes. A widget belongs
+ * to a form field, so creating, changing, moving or deleting one is
+ * designing the form: `doc.forms.modify`. The annotation scopes
+ * (`annotations:*`) never apply to it, and it has no group of its own.
  */
-export function authorizeAnnotationCreate(
+export function annotationWriteCapability(subtype: string | undefined): DocCapability {
+  return subtype === 'widget' ? 'doc.forms.modify' : 'doc.annotate.modify';
+}
+
+/** The capabilities writing all of `annotations` takes, each once. */
+export function annotationWriteCapabilities(
+  annotations: readonly { readonly subtype?: string }[],
+): DocCapability[] {
+  return [
+    ...new Set(annotations.map((annotation) => annotationWriteCapability(annotation.subtype))),
+  ];
+}
+
+/**
+ * Check a widget write (see {@link annotationWriteCapability}): form design,
+ * and no group to set. Returns the actor the write stamps: the editor.
+ */
+function authorizeWidgetWrite(
   authority: AnnotationAuthority,
   groupId: string | null | undefined,
 ): AnnotationActor | undefined {
+  const { identity, grants } = authority;
+  if (grants && !checkCapability('doc.forms.modify', grants.scope, grants.pdfBits)) {
+    throw new PermissionDenied('doc.forms.modify', 'target');
+  }
+  if (typeof groupId === 'string') {
+    throw new EngineError(
+      EngineErrorCode.InvalidArg,
+      "a widget has no group of its own: a form field's group is the field's",
+    );
+  }
+  const actor: AnnotationActor = {
+    ...(identity.userId !== undefined ? { userId: identity.userId } : {}),
+    ...(identity.displayName !== undefined ? { displayName: identity.displayName } : {}),
+  };
+  return actor.userId || actor.displayName ? actor : undefined;
+}
+
+/**
+ * Check a create of a `subtype` annotation in `groupId` (the identity's own
+ * group without one) and return the actor the write stamps: the creator, in
+ * that group. A group other than the identity's takes the authority a
+ * reassignment takes. A widget takes form design instead, in no group.
+ */
+export function authorizeAnnotationCreate(
+  authority: AnnotationAuthority,
+  subtype: string,
+  groupId: string | null | undefined,
+): AnnotationActor | undefined {
+  if (subtype === 'widget') return authorizeWidgetWrite(authority, groupId);
   const { identity, grants } = authority;
   const group = groupId ?? identity.groupId;
   if (grants) {
@@ -102,13 +150,15 @@ export function authorizeAnnotationCreate(
 /**
  * Check an update of the annotation `owner` describes and return the actor
  * the write stamps: the editor, and the group only when the patch reassigns
- * it. An existing group can be reassigned, never removed.
+ * it. An existing group can be reassigned, never removed. A widget takes form
+ * design instead, and its patch sets no group.
  */
 export function authorizeAnnotationUpdate(
   authority: AnnotationAuthority,
   owner: Owned,
   patchGroupId: string | null | undefined,
 ): AnnotationActor | undefined {
+  if (owner.subtype === 'widget') return authorizeWidgetWrite(authority, patchGroupId);
   const { identity, grants } = authority;
   const target = collabTargetOf(owner);
   if (grants && !checkCollab('update', target, grants.scope, identity, grants.pdfBits)) {
@@ -136,7 +186,7 @@ export function authorizeAnnotationUpdate(
 /**
  * Check a delete of every annotation it removes (an annotation goes with its
  * thread and popups): all or nothing, `PermissionDenied` naming each one
- * refused.
+ * refused. A widget takes form design, never the annotation scopes.
  */
 export function authorizeAnnotationDelete(
   authority: AnnotationAuthority,
@@ -144,9 +194,11 @@ export function authorizeAnnotationDelete(
 ): void {
   const { identity, grants } = authority;
   if (!grants) return;
-  const refused = members.filter(
-    (member) =>
-      !checkCollab('delete', collabTargetOf(member), grants.scope, identity, grants.pdfBits),
+  const mayDesign = checkCapability('doc.forms.modify', grants.scope, grants.pdfBits);
+  const refused = members.filter((member) =>
+    member.subtype === 'widget'
+      ? !mayDesign
+      : !checkCollab('delete', collabTargetOf(member), grants.scope, identity, grants.pdfBits),
   );
   if (refused.length > 0) {
     throw new PermissionDenied(

@@ -190,7 +190,7 @@ describe('changes on the cloud engine', () => {
         [{ type: 'annotations.create', page: empty, data: { subtype: 'circle', box: box(80) } }],
         [{ type: 'annotations.update', ref: square.ref, patch: { color: '#16a34a' } }],
         [{ type: 'forms.setValue', field: name, value: { value: 'Bea' } }],
-        [{ type: 'annotations.move', page, refs: [square.ref], toIndex: 0 }],
+        [{ type: 'annotations.reorder', page, refs: [square.ref], position: 'start' }],
         [{ type: 'annotations.delete', ref: note.ref }],
         [{ type: 'metadata.update', patch: { subject: 'Burst' } }],
       ];

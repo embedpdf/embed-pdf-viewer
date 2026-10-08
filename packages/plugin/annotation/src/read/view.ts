@@ -18,7 +18,7 @@ import {
 } from '@embedpdf/core-annotation';
 import type { Annotation } from '@embedpdf/engine-core/runtime';
 
-import { moveInOrder, withPendingEdit, type PendingChange } from '../model';
+import { reorderInOrder, withPendingEdit, type PendingChange } from '../model';
 import { fromDTO } from '@embedpdf/core-annotation';
 import type { AnnotationContext } from '../services/context';
 import type { AnnotationRecord, AnnotationRecords } from '../sync/records';
@@ -109,10 +109,10 @@ export function createView(
         records.get(),
         ctx.state.get().pending,
         ctx.state.get().vector,
-        ctx.state.get().moves,
+        ctx.state.get().reorders,
         ctx.document(),
       ] as const,
-    (confirmedRecords, pending, vector, moves): AnnotationView => {
+    (confirmedRecords, pending, vector, reorders): AnnotationView => {
       const changesOf = new Map<Id, PendingChange[]>();
       for (const change of pending) {
         const list = changesOf.get(change.id);
@@ -146,12 +146,12 @@ export function createView(
       for (const id of layered.keys()) if (!(id in byId)) layered.delete(id);
       // Drawing-order changes the engine hasn't confirmed yet, in the order they were made.
       let shown: Id[] = order;
-      for (const move of moves) {
-        shown = moveInOrder(
+      for (const reorder of reorders) {
+        shown = reorderInOrder(
           shown,
-          (id) => byId[id]?.annotation.page.objectNumber === move.page,
-          move.ids,
-          move.toIndex,
+          (id) => byId[id]?.annotation.page.objectNumber === reorder.page,
+          reorder.ids,
+          reorder.position,
         );
       }
       return { byId, order: shown };

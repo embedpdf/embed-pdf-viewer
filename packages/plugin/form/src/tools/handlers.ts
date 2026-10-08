@@ -39,7 +39,11 @@ export function clampToPage(box: Box, page: Box): Box | null {
  * starts with two options, as in Acrobat; rename and change them in a
  * settings panel.
  */
-export function toolDraft(tool: FormToolDef, name: string, widget: WidgetPlacement): FormFieldDraft {
+export function toolDraft(
+  tool: FormToolDef,
+  name: string,
+  widget: WidgetPlacement,
+): FormFieldDraft {
   switch (tool.family) {
     case 'radio':
       return { family: 'radio', name, widgets: [{ ...widget, exportValue: 'Choice1' }] };
@@ -99,14 +103,18 @@ export function createPlaceHandler(
     // Style from the tool's live defaults when the annotation plugin holds
     // them (the user may have restyled the tool); without it, use the tool
     // table's defaults, so a field is never invisible.
-    const look = widgetAppearanceOf(annotation ? annotation.tools.getDefaults(tool.id) : tool.defaults);
+    const look = widgetAppearanceOf(
+      annotation ? annotation.tools.getDefaults(tool.id) : tool.defaults,
+    );
     const name = nextFieldName(tool.family, new Set(form.list().map((field) => field.name)));
     const { field } = await form.create(toolDraft(tool, name, { page, rect, ...look }));
     // `create()` resolves after the annotation plugin knows the new widget.
     // Skip the follow-up when the tool changed while the write ran.
     if (!annotation || interaction.getActiveToolId() !== tool.id) return;
     const policy = annotation.getSettings().afterCreate;
-    const widget = field.widgets.find((candidate) => candidate.page?.objectNumber === page.objectNumber);
+    const widget = field.widgets.find(
+      (candidate) => candidate.page?.objectNumber === page.objectNumber,
+    );
     if (policy.select && widget?.ref) annotation.selection.set([widget.ref]);
     if (policy.tool === 'default') interaction.activateDefaultTool();
   };

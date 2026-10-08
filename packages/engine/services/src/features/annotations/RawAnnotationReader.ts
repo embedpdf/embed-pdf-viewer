@@ -1,4 +1,5 @@
 import type {
+  AnnotationFamily,
   AnnotationList,
   PageObjectNumber,
   PdfCoordinates,
@@ -20,6 +21,10 @@ import { collectPageAnnotations } from './internal/read/collectPageAnnotations';
  * `collectPageAnnotations`), so the wire shape `Annotation[]` is
  * identical between raw and full read paths for the subtypes that don't
  * actually need a pagePtr to materialise their fields.
+ *
+ * `family` builds only one family's rows: the public reads pass it
+ * (`'annotations'` for `annotations.list()`, `'widgets'` for the form);
+ * the change internals read every row, by its `/Annots` index.
  */
 export class RawAnnotationReader {
   constructor(
@@ -33,6 +38,7 @@ export class RawAnnotationReader {
   list(
     pages: readonly PageObjectNumber[] | undefined,
     signal: AbortSignal,
+    family?: AnnotationFamily,
   ): AnnotationList<PdfCoordinates> {
     throwIfAborted(signal);
     if (pages === undefined) {
@@ -42,12 +48,16 @@ export class RawAnnotationReader {
     const lists: AnnotationList<PdfCoordinates>[] = [];
     for (const pageObjectNumber of pages) {
       throwIfAborted(signal);
-      lists.push(this.listOne(pageObjectNumber, signal));
+      lists.push(this.listOne(pageObjectNumber, signal, family));
     }
     return concatAnnotationLists(lists);
   }
 
-  listOne(pageObjectNumber: PageObjectNumber, signal: AbortSignal): AnnotationList<PdfCoordinates> {
+  listOne(
+    pageObjectNumber: PageObjectNumber,
+    signal: AbortSignal,
+    family?: AnnotationFamily,
+  ): AnnotationList<PdfCoordinates> {
     throwIfAborted(signal);
     const { fn } = this.runtime;
     const docPtr = this.session.requireDocPtr();
@@ -69,6 +79,7 @@ export class RawAnnotationReader {
       getAnnotPtrAt: (i) => fn.EPDFPage_GetAnnotRaw(docPtr, record.pageIndex, i),
       signal,
       ...(this.fonts ? { fonts: this.fonts } : {}),
+      ...(family ? { family } : {}),
     });
   }
 }
