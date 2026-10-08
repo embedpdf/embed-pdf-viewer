@@ -2,8 +2,9 @@ import fs from 'node:fs';
 
 /**
  * The publish gate: a headless page is live for a framework once its snippets compile for it and
- * it names nothing pending in `docs/content/reference.mjs`. `docs:check` works that out on every
- * build (`docs/content/scripts/publish-gate.mjs`) and writes
+ * it names nothing pending in `docs/content/reference.mjs`; a viewer page once its snippets and
+ * the code it shows compile, for each framework and for plain HTML (`vanilla`). `docs:check`
+ * works that out on every build (`docs/content/scripts/publish-gate.mjs`) and writes
  * `docs/content/generated/live-pages.json`; this module reads it for a site.
  *
  * A page that isn't live shows its title and why (`UnreleasedNotice` in `./release.tsx`), and
@@ -12,7 +13,10 @@ import fs from 'node:fs';
  */
 
 export type LivePages = {
-  /** Per page (`text/search`, `annotations/index`): what holds it back, and where it's live. */
+  /**
+   * Per page (`text/search`, `annotations/index`, and the viewer's `viewer/setup`): what holds it
+   * back, and where it's live.
+   */
   pages: Record<string, { pending: string[]; live: Record<string, boolean> }>;
 };
 
@@ -54,17 +58,25 @@ export function loadLivePages(file: string): LivePages {
   return livePages;
 }
 
-/** `docs/headless/text/search` → `text/search`; an index page is `annotations/index`. */
+/** The docs the gate decides for: the headless pages, and the viewer's. */
+const GATED = /^\/?docs\/(headless|viewer)(\/|$)/;
+
+/**
+ * `docs/headless/text/search` → `text/search`, `docs/viewer/customize/layout` →
+ * `viewer/customize/layout`; an index page is `annotations/index`, `viewer/index`.
+ */
 function pageName(contentPath: string, pages: LivePages['pages']): string {
-  const rest = contentPath.replace(/^\/?docs\/headless\/?/, '');
-  if (!rest) return 'index';
-  return rest in pages ? rest : `${rest}/index`;
+  const [, product, rest] = contentPath.match(/^\/?docs\/(headless|viewer)\/?(.*)$/) ?? [];
+  const prefix = product === 'viewer' ? 'viewer/' : '';
+  if (!rest) return `${prefix}index`;
+  const name = `${prefix}${rest}`;
+  return name in pages ? name : `${name}/index`;
 }
 
 /**
  * What a docs route shows: its page, or the notice that it isn't released for this framework.
- * Only headless pages are gated. `livePages` is read only when the gate decides, so the preview
- * site never needs `docs:check` to have run.
+ * Headless and viewer pages are gated. `livePages` is read only when the gate decides, so the
+ * preview site never needs `docs:check` to have run.
  */
 export function docsRelease({
   contentPath,
@@ -72,13 +84,13 @@ export function docsRelease({
   preview,
   livePages,
 }: {
-  /** The route's content source: `docs/headless/text/search`. */
+  /** The route's content source: `docs/headless/text/search`, `docs/viewer/setup`. */
   contentPath: string;
   framework: string | undefined;
   preview: boolean;
   livePages: () => LivePages;
 }): DocsRelease {
-  if (!/^\/?docs\/headless(\/|$)/.test(contentPath) || !framework) {
+  if (!GATED.test(contentPath) || !framework) {
     return { live: true, preview: false, reactLive: true };
   }
   if (preview) {

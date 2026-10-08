@@ -140,6 +140,7 @@ export type {
 export { isUprightQuad, quadInPixels, rectInPixels, svgPoints } from './page-pixels';
 export type { PagePoint, PageQuad, PageToPixels, PixelRect } from './page-pixels';
 export { isolatePointerDown, isolateWheel } from './event-isolation';
+export { observeOutsidePress } from './outside-press';
 export {
   samePageBounds,
   sameAnnotationAnchor,

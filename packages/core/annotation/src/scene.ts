@@ -9,6 +9,7 @@
  * underline/strikeout/squiggly stroke, widths derived from the line height), so it
  * has its own small painter — but it still emits the same generic SceneNodes.
  */
+import { cssFontFamilyForFont } from './font-css';
 import { distanceScene, measurementCaptionScene } from './measurement';
 import { shapeMeasurementLayout } from './measurement-shape';
 import { quadBounds, quadRing } from '@embedpdf/core-geometry';
@@ -221,7 +222,11 @@ export function layoutRedactLabel(
   const gap = helveticaAdvance(' ') * fontSize;
   const lineH = fontSize * HELVETICA_LINE_HEIGHT;
   const paint: Paint = { fill: text?.fontColor ?? '#ffffff', opacity: 1 };
-  const base = { fontSize, ...(text?.fontFamily ? { fontFamily: text.fontFamily } : {}), paint };
+  const base = {
+    fontSize,
+    ...(text?.fontFamily ? { fontFamily: cssFontFamilyForFont(text.fontFamily) } : {}),
+    paint,
+  };
   const baseline = (rowTop: number) => rowTop + fontSize * HELVETICA_ASCENT;
   /** Where a line `width` wide starts, by the label's alignment. */
   const lineStart = (width: number) =>

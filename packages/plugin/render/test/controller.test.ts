@@ -329,7 +329,7 @@ describe('policy conformance — the host door', () => {
 
   it('paint settings are reference-stable and reflect the config', async () => {
     const on = await boot();
-    expect(on.render.getPaintSettings()).toEqual({ fadeMs: 0, tiles: true });
+    expect(on.render.getPaintSettings()).toEqual({ tiles: true });
     expect(on.render.getPaintSettings()).toBe(on.render.getPaintSettings());
     const off = await boot({ config: { tiles: false } });
     expect(off.render.getPaintSettings().tiles).toBe(false);

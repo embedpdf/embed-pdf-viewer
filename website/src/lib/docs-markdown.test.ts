@@ -72,6 +72,29 @@ describe('renderDocsMarkdown', () => {
     expect(markdown).not.toContain('<Snippet');
   });
 
+  it('shows a viewer page’s <Fw> branch on its own integration, plain HTML included', () => {
+    const sourceCode = [
+      '# Events',
+      '',
+      '<Fw only="vanilla">Listen for `epdf:ready` on the element.</Fw>',
+      '',
+      "<Fw only={['react', 'vue']}>Pass `onReady`.</Fw>",
+    ].join('\n');
+    const exported = (integration: 'vanilla' | 'react' | 'angular') =>
+      renderDocsMarkdown({
+        sourceCode,
+        canonicalPath: `/docs/viewer/${integration}/code/viewer`,
+        integration,
+      });
+
+    expect(exported('vanilla')).toContain('Listen for `epdf:ready` on the element.');
+    expect(exported('vanilla')).not.toContain('Pass `onReady`.');
+    expect(exported('react')).toContain('Pass `onReady`.');
+    expect(exported('react')).not.toContain('epdf:ready');
+    expect(exported('angular')).not.toContain('epdf:ready');
+    expect(exported('angular')).not.toContain('onReady');
+  });
+
   it('fails when a custom component has no explicit Markdown projection', () => {
     expect(() =>
       renderDocsMarkdown({

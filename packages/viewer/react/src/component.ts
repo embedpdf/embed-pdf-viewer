@@ -26,21 +26,26 @@
  * `slot="name"` into the chrome's matching `custom()` socket while the child
  * stays in the host React tree, so its context, state, and page CSS all keep
  * working. There is no reactSlot()
- * bridge because none is needed: a slot is a child.
+ * bridge because none is needed: a slot is a child. The children mount once
+ * the viewer is ready, inside its kernel, so the headless hooks of
+ * `@embedpdf/react` in them read this viewer.
  *
  * Config is init-only (the element's contract). Later prop changes are
  * ignored; remount with a `key` to rebuild the viewer.
  */
+// The headless runtime carries no engine: it gives the children the viewer's kernel.
+import { KernelProvider, type Kernel } from '@embedpdf/react/runtime';
 // `ElementConfig` is the kernel's config — the widest of all, with the engine
 // seam left `unknown` — so the shared implementation sits above every door and
 // each entry re-types it narrower by plain assignment (parameter types are
-// contravariant, so this direction needs no cast). Every import here is
-// type-only, which is what keeps this module engine-blind.
+// contravariant, so this direction needs no cast). Every import from the
+// viewer is type-only, which is what keeps this module engine-blind.
 import type { ElementConfig, EmbedPdfViewerElement, ViewerHandle } from '@embedpdf/viewer/core';
 import {
   createElement,
   useLayoutEffect,
   useRef,
+  useState,
   type CSSProperties,
   type MutableRefObject,
   type ReactNode,
@@ -62,6 +67,11 @@ export interface PDFViewerExtras {
    *  the React face of the element's `epdf:documentchange` event. */
   onDocumentChange?: (documentId: string | null) => void;
 }
+
+/** Where the viewer handle keeps its kernel (`createViewerHandle` in `@embedpdf/viewer-chrome`). */
+const VIEWER_KERNEL = Symbol.for('@embedpdf/viewer/kernel');
+const kernelOf = (viewer: ViewerHandle): Kernel | null =>
+  (viewer as unknown as Partial<Record<symbol, Kernel>>)[VIEWER_KERNEL] ?? null;
 
 /** Init-only config: after mount, a changed prop is ignored. Dev warns once. */
 const warnConfigChange = (initial: ElementConfig, next: ElementConfig): void => {
@@ -96,6 +106,9 @@ export function PDFViewer({
   ...config
 }: PDFViewerImplProps) {
   const ref = useRef<EmbedPdfViewerElement | null>(null);
+  // The viewer's kernel once it's ready: the children render inside it, so the headless hooks
+  // in them read this viewer. Before that the viewer has no sockets to show them in.
+  const [kernel, setKernel] = useState<Kernel | null>(null);
   const configRef = useRef(config);
   configRef.current = config;
   const onReadyRef = useRef(onReady);
@@ -122,7 +135,12 @@ export function PDFViewer({
   useLayoutEffect(() => {
     const element = ref.current;
     if (!element) return;
-    const onEvent = () => element.viewer && onReadyRef.current?.(element.viewer);
+    const onEvent = () => {
+      const viewer = element.viewer;
+      if (!viewer) return;
+      setKernel(kernelOf(viewer));
+      onReadyRef.current?.(viewer);
+    };
     const onDocumentChangeEvent = (event: Event) =>
       onDocumentChangeRef.current?.(
         (event as CustomEvent<{ documentId: string | null }>).detail.documentId,
@@ -150,6 +168,6 @@ export function PDFViewer({
       className,
       style,
     },
-    children,
+    kernel ? createElement(KernelProvider, { kernel }, children) : null,
   );
 }

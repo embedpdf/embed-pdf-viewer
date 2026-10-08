@@ -26,8 +26,6 @@ export type { TilePaintPlan, TilePaintSource } from './paint-plan';
 
 /** Layer-facing paint settings (resolved config the view layers need). Reference-stable. */
 export interface PaintSettings {
-  /** Tile arrival cross-fade (ms); 0 = hard pop. */
-  readonly fadeMs: number;
   /** Whether the tile plane is enabled at all (`tiles: false` opts out). */
   readonly tiles: boolean;
 }

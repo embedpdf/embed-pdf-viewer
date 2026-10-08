@@ -6,6 +6,6 @@
   const element = document.getElementById('viewer');
   element.addEventListener('epdf:ready', () => {
     const { viewer } = element;
-    viewer.documents.onOpened(() => viewer.get('search').search('total'));
+    viewer.documents.onOpened(() => viewer.get('search').search({ text: 'total' }));
   });
 </script>

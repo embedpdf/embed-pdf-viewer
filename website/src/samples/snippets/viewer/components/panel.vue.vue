@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { PDFViewer, Panel } from '@embedpdf/viewer-vue';
+import { PDFViewer, Panel, type Layout } from '@embedpdf/viewer-vue';
 import Notes from './Notes.vue'; // your app
 
-const layout = (layout) =>
+const layout = (layout: Layout) =>
   layout
     .addPanel('notes', { side: 'end', title: 'Notes', icon: 'book' })
     .add('panel:notes', { to: 'main', section: 'end' });

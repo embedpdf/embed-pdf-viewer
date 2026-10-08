@@ -11,8 +11,10 @@ import {
   frameworkFromPath,
   frameworkHref,
   frameworkName,
+  integrationFromPath,
   stateIntroParts,
   type Framework as FrameworkKey,
+  type Integration,
   type NameContext,
 } from '../mdx/frameworks.mjs';
 
@@ -25,6 +27,11 @@ import {
 /** The framework this page is for, from the URL. React on pages without one. */
 export function useDocsFramework(): FrameworkKey {
   return frameworkFromPath(usePathname() ?? '');
+}
+
+/** The integration this page is for, from the URL: a framework, or `vanilla` on a viewer page. */
+export function useDocsIntegration(): Integration {
+  return integrationFromPath(usePathname() ?? '');
 }
 
 /** An inline code span, as the reader's framework names it (`useSearch()` → `inject(EpdfSearch)`). */
@@ -71,5 +78,5 @@ export function StateIntroText({ hook }: { hook: string }) {
 
 /** A docs link that keeps the reader's framework (`/docs/viewer` → `/docs/viewer/vue`). */
 export function FrameworkLink({ href = '', ...props }: AnchorHTMLAttributes<HTMLAnchorElement>) {
-  return <Link href={frameworkHref(href, useDocsFramework())} {...props} />;
+  return <Link href={frameworkHref(href, useDocsIntegration())} {...props} />;
 }

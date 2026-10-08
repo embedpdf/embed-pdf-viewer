@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { PDFViewer, ToolbarItem } from '@embedpdf/viewer-vue';
+import { PDFViewer, ToolbarItem, type Layout } from '@embedpdf/viewer-vue';
 import DocumentStatus from './DocumentStatus.vue';
 
-const layout = (layout) => layout.add({ custom: 'status' }, { to: 'main', section: 'end' });
+const layout = (layout: Layout) => layout.add({ custom: 'status' }, { to: 'main', section: 'end' });
 </script>
 
 <template>

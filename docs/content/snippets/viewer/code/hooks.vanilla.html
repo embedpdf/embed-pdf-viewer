@@ -11,7 +11,7 @@
   const element = document.getElementById('viewer');
   element.addEventListener('epdf:ready', () => {
     const search = element.viewer.get('search');
-    document.getElementById('query').oninput = (event) => search.search(event.target.value);
+    document.getElementById('query').oninput = (event) => search.search({ text: event.target.value });
     element.viewer.watch(
       () => search.getHitCount(),
       (count) => (document.getElementById('count').textContent = count ? `${count} matches` : ''),

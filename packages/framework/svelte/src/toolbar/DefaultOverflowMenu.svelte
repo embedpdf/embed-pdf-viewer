@@ -4,10 +4,19 @@
 -->
 <script lang="ts">
   import type { OverflowRow } from '@embedpdf/core-ui';
+  import { observeOutsidePress } from '@embedpdf/web';
   import type { OverflowMenuView } from './views';
   import { BORDER, SURFACE } from './paint';
 
   let { view }: { view: OverflowMenuView } = $props();
+  let menu = $state<HTMLElement | null>(null);
+
+  $effect(() => {
+    // The menu's parent holds its button too: a press on it is the button's own toggle.
+    const container = menu?.parentElement ?? menu;
+    if (!view.isOpen || !container) return;
+    return observeOutsidePress(container, () => view.close());
+  });
 
   function choose(row: OverflowRow) {
     view.execute(row.command);
@@ -17,9 +26,8 @@
 
 {#if view.isOpen}
   <!-- A press anywhere outside the menu closes it; Escape is the app's to add. -->
-  <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
-  <div style="position: fixed; inset: 0; z-index: 40" onclick={() => view.close()}></div>
   <div
+    bind:this={menu}
     role="menu"
     style:position="absolute"
     style:right="0"

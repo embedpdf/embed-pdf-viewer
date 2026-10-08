@@ -138,7 +138,7 @@ export function RenderLayer({ annotations = true, tiles = true }: RenderLayerPro
         }}
       />
       {tiles && settings.tiles ? (
-        <TilePlane annotations={annotations} fadeMs={settings.fadeMs} />
+        <TilePlane annotations={annotations} />
       ) : null}
     </>
   );
@@ -157,7 +157,7 @@ export function RenderLayer({ annotations = true, tiles = true }: RenderLayerPro
  * seams and per-zoom-step letter shifts that grow with depth. In view
  * space the same quantization is a fixed ~1/64 CSS px at every zoom.
  */
-function TilePlane({ annotations, fadeMs }: { annotations: boolean; fadeMs: number }) {
+function TilePlane({ annotations }: { annotations: boolean }) {
   const page = usePage();
   const render = useCapability(RenderToken);
   // Demand: the host's live camera view (Stage) or whole-page (PageView).
@@ -203,9 +203,6 @@ function TilePlane({ annotations, fadeMs }: { annotations: boolean; fadeMs: numb
         isolation: 'isolate',
       }}
     >
-      {fadeMs > 0 ? (
-        <style>{`@keyframes epdf-tile-in { from { opacity: 0 } to { opacity: 1 } }`}</style>
-      ) : null}
       {plan.paint.map((source) => (
         <TileImg
           key={source.key}
@@ -216,7 +213,6 @@ function TilePlane({ annotations, fadeMs }: { annotations: boolean; fadeMs: numb
             width: source.rect.width * viewScale,
             height: source.rect.height * viewScale,
           }}
-          fadeMs={fadeMs}
           onPainted={() => view.markPainted(page.ref, source.key)}
           onUnpainted={() => view.markUnpainted(page.ref, source.key)}
         />
@@ -231,14 +227,12 @@ function TilePlane({ annotations, fadeMs }: { annotations: boolean; fadeMs: numb
 function TileImg({
   source,
   view,
-  fadeMs,
   onPainted,
   onUnpainted,
 }: {
   source: TilePaintSource;
   /** Placement rect in view (CSS px) space. */
   view: { x: number; y: number; width: number; height: number };
-  fadeMs: number;
   onPainted: () => void;
   onUnpainted: () => void;
 }) {
@@ -276,7 +270,6 @@ function TileImg({
         width: view.width,
         height: view.height,
         zIndex: source.z,
-        ...(fadeMs > 0 ? { animation: `epdf-tile-in ${fadeMs}ms ease-out` } : null),
       }}
     />
   );

@@ -827,6 +827,9 @@ importers:
 
   examples/viewer-react:
     dependencies:
+      '@embedpdf/react':
+        specifier: workspace:*
+        version: link:../../packages/framework/react
       '@embedpdf/viewer-react':
         specifier: workspace:*
         version: link:../../packages/viewer/react
@@ -2204,6 +2207,15 @@ importers:
 
   packages/viewer/main:
     dependencies:
+      '@embedpdf/core':
+        specifier: workspace:*
+        version: link:../../core/main
+      '@embedpdf/core-annotation':
+        specifier: workspace:*
+        version: link:../../core/annotation
+      '@embedpdf/core-ui':
+        specifier: workspace:*
+        version: link:../../core/ui
       '@embedpdf/default-stamps':
         specifier: workspace:*
         version: link:../../default-stamps
@@ -2213,9 +2225,66 @@ importers:
       '@embedpdf/engine-core':
         specifier: workspace:*
         version: link:../../engine/core
+      '@embedpdf/plugin-actions':
+        specifier: workspace:*
+        version: link:../../plugin/actions
+      '@embedpdf/plugin-annotation':
+        specifier: workspace:*
+        version: link:../../plugin/annotation
+      '@embedpdf/plugin-commands':
+        specifier: workspace:*
+        version: link:../../plugin/commands
+      '@embedpdf/plugin-form':
+        specifier: workspace:*
+        version: link:../../plugin/form
+      '@embedpdf/plugin-i18n':
+        specifier: workspace:*
+        version: link:../../plugin/i18n
+      '@embedpdf/plugin-interaction':
+        specifier: workspace:*
+        version: link:../../plugin/interaction
+      '@embedpdf/plugin-link':
+        specifier: workspace:*
+        version: link:../../plugin/link
+      '@embedpdf/plugin-measurement':
+        specifier: workspace:*
+        version: link:../../plugin/measurement
+      '@embedpdf/plugin-metadata':
+        specifier: workspace:*
+        version: link:../../plugin/metadata
+      '@embedpdf/plugin-page-edit':
+        specifier: workspace:*
+        version: link:../../plugin/page-edit
+      '@embedpdf/plugin-redaction':
+        specifier: workspace:*
+        version: link:../../plugin/redaction
+      '@embedpdf/plugin-render':
+        specifier: workspace:*
+        version: link:../../plugin/render
+      '@embedpdf/plugin-search':
+        specifier: workspace:*
+        version: link:../../plugin/search
+      '@embedpdf/plugin-selection':
+        specifier: workspace:*
+        version: link:../../plugin/selection
+      '@embedpdf/plugin-shell':
+        specifier: workspace:*
+        version: link:../../plugin/shell
+      '@embedpdf/plugin-signature':
+        specifier: workspace:*
+        version: link:../../plugin/signature
+      '@embedpdf/plugin-stage':
+        specifier: workspace:*
+        version: link:../../plugin/stage
+      '@embedpdf/plugin-stamp':
+        specifier: workspace:*
+        version: link:../../plugin/stamp
       '@embedpdf/viewer-chrome':
         specifier: workspace:*
         version: link:../chrome
+      '@embedpdf/web':
+        specifier: workspace:*
+        version: link:../../framework/web
       preact:
         specifier: ^10.25.0
         version: 10.29.7
@@ -2253,6 +2322,9 @@ importers:
 
   packages/viewer/react:
     dependencies:
+      '@embedpdf/react':
+        specifier: workspace:*
+        version: link:../../framework/react
       '@embedpdf/viewer':
         specifier: workspace:*
         version: link:../main

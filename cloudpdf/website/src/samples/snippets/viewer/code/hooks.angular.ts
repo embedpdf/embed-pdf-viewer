@@ -6,7 +6,7 @@ import { EpdfSearch } from '@embedpdf/angular/search';
   selector: 'app-header-search',
   template: `
     <form (submit)="$event.preventDefault()">
-      <input type="search" placeholder="Search" (input)="search.search($any($event.target).value)" />
+      <input type="search" placeholder="Search" (input)="search.search({ text: $any($event.target).value })" />
       @if (search.hitCount() > 0) {
         <span>{{ search.activeHitIndex() + 1 }} of {{ search.hitCount() }}</span>
       }

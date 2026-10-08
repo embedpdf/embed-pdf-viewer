@@ -58,7 +58,7 @@ function fakeRender() {
     dispose: vi.fn(),
   };
   const createViewDemand = vi.fn(() => view);
-  const paint = { fadeMs: 0, tiles: true };
+  const paint = { tiles: true };
   const api = {
     getPaintSettings: () => paint,
     getSourceKey: (page: PageRef) => `page-${page.objectNumber}`,
@@ -197,4 +197,5 @@ describe('the tile plane', () => {
     expect(render.view.release).toHaveBeenLastCalledWith(toPageRef(2));
     expect(render.view.dispose).toHaveBeenCalledTimes(1);
   });
+
 });

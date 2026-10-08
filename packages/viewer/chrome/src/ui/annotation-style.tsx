@@ -32,6 +32,7 @@ import { useInteractionState } from '@embedpdf/react/interaction';
 import { useOptionalCapability } from '@embedpdf/react/runtime';
 import { RedactionToken } from '@embedpdf/react/redaction';
 import { useT } from '@embedpdf/react/i18n';
+import { observeOutsidePress } from '@embedpdf/web';
 import { Icon } from './icons';
 import { useAnnotationFonts } from './annotation-fonts';
 import { AnnotationFlagsSection } from './annotation-flags';
@@ -238,19 +239,12 @@ function RangeSlider({
 }
 
 // ── dropdown shell (open state, outside-click, trigger + panel) ───────────────
+/** Close an open dropdown on a press outside it; the root holds its trigger too. */
 function useOutsideClose(open: boolean, close: () => void) {
   const rootRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    if (!open) return;
-    const onDoc = (event: MouseEvent) => {
-      // composedPath, not contains(event.target): at the document level an event
-      // from inside the viewer's shadow root retargets to the host element, so
-      // contains() reads every inside click as outside and unmounts the panel
-      // on mousedown — before the option's click can fire.
-      if (rootRef.current && !event.composedPath().includes(rootRef.current)) close();
-    };
-    document.addEventListener('mousedown', onDoc);
-    return () => document.removeEventListener('mousedown', onDoc);
+    const root = rootRef.current;
+    return open && root ? observeOutsidePress(root, close) : undefined;
   }, [open, close]);
   return rootRef;
 }

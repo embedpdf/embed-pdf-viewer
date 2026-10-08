@@ -1,9 +1,9 @@
 import { describe, expect, test } from 'vitest';
 
-import { resolveInlineWasmSource, resolveWasmSource } from '../src/wasm-source';
+import { resolveDefaultWasmSource, resolveWasmSource } from '../src/wasm-source';
 
 describe('resolveWasmSource (explicit sources only)', () => {
-  test('nothing configured resolves to nothing — non-inline deliveries self-resolve', () => {
+  test('nothing configured resolves to nothing — configured and caller-built workers self-resolve', () => {
     expect(resolveWasmSource({})).toEqual({});
   });
 
@@ -42,16 +42,16 @@ describe('resolveWasmSource (explicit sources only)', () => {
   });
 });
 
-describe('resolveInlineWasmSource (the inline blob worker default)', () => {
+describe('resolveDefaultWasmSource (the default for the bundled and blob workers)', () => {
   test('explicit options win', async () => {
-    const resolved = await resolveInlineWasmSource({
+    const resolved = await resolveDefaultWasmSource({
       wasmUrl: 'https://example.test/embedpdf.wasm',
     });
     expect(resolved).toEqual({ wasmUrl: 'https://example.test/embedpdf.wasm' });
   });
 
   test('the default is the bundler-emitted sibling — a URL for the worker to stream, and nothing after it', async () => {
-    const resolved = await resolveInlineWasmSource({});
+    const resolved = await resolveDefaultWasmSource({});
     // In node the wasm-url module resolves at runtime to a file: URL of the
     // real workspace binary — a bundler would have rewritten it to an emitted
     // asset URL. Either way: one URL, no bytes, no fallback of any kind.

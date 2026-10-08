@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { mountWebFont, observeWebFonts } from '../src/web-font';
+import { fontKeyOfWebFamily, mountWebFont, observeWebFonts, webFontFamily } from '../src/web-font';
 
 /** A `Document` with a font set, and a `FontFace` that loads at once. */
 function fakeDocument() {
@@ -56,13 +56,17 @@ describe('mountWebFont', () => {
     expect(changed).toHaveBeenCalledTimes(4);
     stopOther();
   });
-  it('mounts the bytes as a @font-face named by the key, refcounted per document', async () => {
+  it("mounts the bytes as a @font-face in the viewer's namespace, refcounted per document", async () => {
     vi.stubGlobal('FontFace', FakeFontFace);
     const { doc, faces } = fakeDocument();
     const data = new Uint8Array([1, 2, 3]);
     const first = await mountWebFont('brand-sans', data, { document: doc, weight: 700 });
     const face = [...faces][0] as unknown as FakeFontFace;
-    expect(face.family).toBe('brand-sans');
+    // Namespaced: the page's own `brand-sans` family never stands in for it.
+    expect(face.family).toBe('epdf-brand-sans');
+    expect(webFontFamily('brand-sans')).toBe('epdf-brand-sans');
+    expect(fontKeyOfWebFamily('epdf-brand-sans')).toBe('brand-sans');
+    expect(fontKeyOfWebFamily('Helvetica')).toBe('Helvetica');
     expect(face.descriptors?.weight).toBe('700');
     expect(face.status).toBe('loaded');
     // A second mount of the same key adds nothing and holds its own reference.

@@ -100,6 +100,20 @@ describe('<Toolbar>', () => {
     expect(live(wrapper, '[role="menu"]')).toHaveLength(0);
   });
 
+  it('closes the "More" menu on a press outside it, not on one inside it or on its button', async () => {
+    room = 70;
+    const { wrapper } = await mountToolbar({ command: commandSlot });
+    const more = live(wrapper, 'button[title="More"]')[0];
+    await more.trigger('click');
+    await live(wrapper, '[role="menu"] button')[0].trigger('pointerdown');
+    await more.trigger('pointerdown');
+    expect(live(wrapper, '[role="menu"]')).toHaveLength(1);
+
+    document.body.dispatchEvent(new Event('pointerdown', { bubbles: true }));
+    await settle();
+    expect(live(wrapper, '[role="menu"]')).toHaveLength(0);
+  });
+
   it('keeps command state live', async () => {
     pressed = false;
     const { wrapper, kernel } = await mountToolbar({ command: commandSlot });

@@ -19,7 +19,7 @@ import { useKernelValue } from '../runtime/kernel';
 import { usePage } from '../runtime/page';
 import TileImage from './TileImage.vue';
 
-const props = defineProps<{ annotations: boolean; fadeMs: number }>();
+const props = defineProps<{ annotations: boolean }>();
 
 const page = usePage();
 const render = useOptionalCapability(RenderToken);
@@ -97,9 +97,6 @@ const planeStyle = computed(
 
 <template>
   <div v-if="view && plan && plan.paint.length > 0" :style="planeStyle">
-    <component :is="'style'" v-if="fadeMs > 0">
-      @keyframes epdf-tile-in { from { opacity: 0 } to { opacity: 1 } }
-    </component>
     <TileImage
       v-for="source in plan.paint"
       :key="source.key"
@@ -107,7 +104,6 @@ const planeStyle = computed(
       :view="view"
       :page="page.ref"
       :view-scale="page.transform.viewScale"
-      :fade-ms="fadeMs"
     />
   </div>
 </template>

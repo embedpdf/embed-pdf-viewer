@@ -101,6 +101,20 @@ describe('Toolbar', () => {
     expect(view.queryAllByRole('menuitem')).toHaveLength(0);
   });
 
+  it('closes the "More" menu on a press outside it, not on one inside it or on its button', async () => {
+    withWidth(0);
+    const { view } = await viewerWith(commands(), ToolbarHarness, { bar });
+    flushSync();
+    const more = split(view.container, 'button[title="More"]').live[0]!;
+    await fireEvent.click(more);
+    await fireEvent.pointerDown(view.getAllByRole('menuitem')[0]!);
+    await fireEvent.pointerDown(more);
+    expect(view.queryAllByRole('menu')).toHaveLength(1);
+
+    await fireEvent.pointerDown(document.body);
+    expect(view.queryAllByRole('menu')).toHaveLength(0);
+  });
+
   it('draws custom items with the custom snippet, by name, in the row and the measurement layer', async () => {
     withWidth(1000);
     const customBar: BarSchema = {

@@ -1,5 +1,5 @@
 import { Component } from '@angular/core';
-import { EpdfPdfViewer, EpdfToolbarItem } from '@embedpdf/viewer-angular';
+import { EpdfPdfViewer, EpdfToolbarItem, type Layout } from '@embedpdf/viewer-angular';
 import { DocumentStatus } from './document-status';
 
 @Component({
@@ -14,5 +14,5 @@ import { DocumentStatus } from './document-status';
   `,
 })
 export class App {
-  readonly layout = (layout) => layout.add({ custom: 'status' }, { to: 'main', section: 'end' });
+  readonly layout = (layout: Layout) => layout.add({ custom: 'status' }, { to: 'main', section: 'end' });
 }

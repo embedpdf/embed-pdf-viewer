@@ -2,7 +2,7 @@
  * The configured annotation fonts (`annotations.fonts`), loaded once per
  * viewer: fetch the bytes → register them on the viewer's engine under the
  * key (what a free-text `fontFamily` carries and what the engine embeds) →
- * mount the same bytes as a `@font-face` named by that key (what the plugin's
+ * mount the same bytes as a `@font-face` for that key (the family the plugin's
  * `cssFontFamily` emits for a registered font, so the live editor renders the
  * face the appearance stream will bake). The style panel lists a font only
  * once both have happened — an offered key always resolves on write.

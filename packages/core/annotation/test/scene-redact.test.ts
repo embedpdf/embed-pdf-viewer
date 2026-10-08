@@ -132,6 +132,17 @@ describe('layoutRedactLabel', () => {
     expect(node.at.y).toBeCloseTo(REGION.y + 12 * HELVETICA_ASCENT);
   });
 
+  it("draws the label in the font's CSS family: a standard stack, or a registered key's face", () => {
+    const [standard] = layoutRedactLabel(REGION, { text: 'A', repeat: false }, LABEL_STYLE);
+    expect(standard).toMatchObject({ fontFamily: 'Helvetica, Arial, sans-serif' });
+    const [registered] = layoutRedactLabel(
+      REGION,
+      { text: 'A', repeat: false },
+      { ...LABEL_STYLE, fontFamily: 'brand-sans' },
+    );
+    expect(registered).toMatchObject({ fontFamily: '"epdf-brand-sans", sans-serif' });
+  });
+
   it('alignment: right pushes the line to the region edge', () => {
     const [node] = layoutRedactLabel(
       REGION,

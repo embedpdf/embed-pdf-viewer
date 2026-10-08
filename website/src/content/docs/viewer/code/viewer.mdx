@@ -33,7 +33,7 @@ Every feature is a plugin, and `get()` gives you its API by name:
 ```js
 viewer.get('stage').goToPage(4);
 viewer.get('stage').updateSettings({ spread: 'odd' });
-await viewer.get('search').search('termination');
+await viewer.get('search').search({ text: 'termination' });
 const values = await viewer.get('form').exportValues();
 ```
 
@@ -81,7 +81,7 @@ With several documents open, `get()` talks to the active one. `forDocument(id)` 
 your choice, whether it's active or not:
 
 ```js
-viewer.forDocument(contractId).get('search').search('signature');
+viewer.forDocument(contractId).get('search').search({ text: 'signature' });
 ```
 
 ## Good to know

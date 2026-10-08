@@ -23,6 +23,18 @@ const LIVE_PAGES: LivePages = {
       pending: [],
       live: { react: false, vue: false, svelte: false, angular: true },
     },
+    'viewer/customize/layout': {
+      pending: [],
+      live: { vanilla: false, react: true, vue: false, svelte: false, angular: false },
+    },
+    'viewer/index': {
+      pending: [],
+      live: { vanilla: true, react: true, vue: false, svelte: false, angular: false },
+    },
+    'viewer/features/index': {
+      pending: [],
+      live: { vanilla: false, react: false, vue: false, svelte: false, angular: false },
+    },
   },
 };
 
@@ -59,18 +71,30 @@ describe('the publish gate', () => {
     });
   });
 
-  it('gates only the headless docs, and never reads the status for other pages', () => {
+  it('shows a viewer page where it is live, plain HTML included, and holds it back where it is not', () => {
+    expect(release('docs/viewer/customize/layout', 'react')).toEqual({
+      live: true,
+      preview: false,
+      reactLive: true,
+    });
+    expect(release('docs/viewer/customize/layout', 'vanilla')).toEqual({
+      live: false,
+      preview: false,
+      reactLive: true,
+    });
+    expect(release('docs/viewer', 'vanilla').live).toBe(true);
+    expect(release('docs/viewer/features', 'vue')).toMatchObject({ live: false, reactLive: false });
+  });
+
+  it('never takes a viewer page for the headless page of the same name', () => {
+    expect(release('docs/viewer/index', 'angular').live).toBe(false);
+    expect(release('docs/headless/annotations/index', 'angular').live).toBe(true);
+  });
+
+  it('gates only the headless and viewer docs, and never reads the status for other pages', () => {
     const unread = () => {
       throw new Error('read');
     };
-    expect(
-      docsRelease({
-        contentPath: 'docs/viewer/getting-started',
-        framework: 'vue',
-        preview: false,
-        livePages: unread,
-      }),
-    ).toEqual({ live: true, preview: false, reactLive: true });
     expect(
       docsRelease({
         contentPath: 'docs/engine/fonts',
@@ -79,6 +103,14 @@ describe('the publish gate', () => {
         livePages: unread,
       }).live,
     ).toBe(true);
+    expect(
+      docsRelease({
+        contentPath: 'docs/engine/fonts',
+        framework: 'react',
+        preview: false,
+        livePages: unread,
+      }),
+    ).toEqual({ live: true, preview: false, reactLive: true });
   });
 
   it('shows every headless page on the preview site, with the banner only where production holds it back', () => {

@@ -1,5 +1,5 @@
 import { Component } from '@angular/core';
-import { EpdfPanel, EpdfPdfViewer } from '@embedpdf/viewer-angular';
+import { EpdfPanel, EpdfPdfViewer, type Layout } from '@embedpdf/viewer-angular';
 import { Notes } from './notes'; // your app
 
 @Component({
@@ -14,7 +14,7 @@ import { Notes } from './notes'; // your app
   `,
 })
 export class Review {
-  readonly layout = (layout) =>
+  readonly layout = (layout: Layout) =>
     layout
       .addPanel('notes', { side: 'end', title: 'Notes', icon: 'book' })
       .add('panel:notes', { to: 'main', section: 'end' });

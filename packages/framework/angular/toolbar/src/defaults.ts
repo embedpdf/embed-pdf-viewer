@@ -7,6 +7,9 @@ import {
   ChangeDetectionStrategy,
   Component,
   computed,
+  effect,
+  ElementRef,
+  inject,
   input,
   output,
   signal,
@@ -14,7 +17,7 @@ import {
 } from '@angular/core';
 import { groupMenuView, type OverflowRow } from '@embedpdf/core-ui';
 import type { ResolvedCommand } from '@embedpdf/plugin-commands/contract';
-import { paintDefault } from '@embedpdf/web';
+import { observeOutsidePress, paintDefault } from '@embedpdf/web';
 import type { CollapsedGroupView, GroupDisclosureView, OverflowMenuView } from './templates';
 
 const SURFACE = paintDefault('toolbar-surface');
@@ -53,14 +56,13 @@ export class EpdfToolbarMoreButton {
     `font: inherit; border: 1px solid ${BORDER}; border-radius: 4px; cursor: pointer;`;
 }
 
-/** The plain popover menu: a click outside closes it, a row runs its command. */
+/** The plain popover menu: a press outside closes it, a row runs its command. */
 @Component({
   selector: 'epdf-toolbar-menu',
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { style: 'display: contents;' },
   template: `
     @if (view().isOpen) {
-      <div style="position: fixed; inset: 0; z-index: 40" (click)="view().close()"></div>
       <div role="menu" [style]="menuStyle">
         @for (section of view().sections; track $index; let first = $first) {
           @if (!first) {
@@ -95,6 +97,18 @@ export class EpdfToolbarMoreButton {
 })
 export class EpdfToolbarMenu {
   readonly view = input.required<OverflowMenuView>();
+
+  constructor() {
+    const host: HTMLElement = inject(ElementRef).nativeElement;
+    effect((onCleanup) => {
+      const view = this.view();
+      // This element is `display: contents`; its parent holds the menu's button too, so a press
+      // on the button is the button's own toggle.
+      const container = host.parentElement;
+      if (!view.isOpen || !container) return;
+      onCleanup(observeOutsidePress(container, () => view.close()));
+    });
+  }
 
   protected readonly menuStyle =
     'position: absolute; right: 0; top: 100%; z-index: 41; min-width: 200px; padding: 4px; ' +

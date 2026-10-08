@@ -79,7 +79,7 @@ function fakeRender() {
     dispose: vi.fn(),
   };
   const createViewDemand = vi.fn(() => view);
-  const paint = { fadeMs: 0, tiles: true };
+  const paint = { tiles: true };
   const task = <T>(value: T) =>
     Object.assign(Promise.resolve(value), { abortWith: () => Promise.resolve(value) });
   const api = {

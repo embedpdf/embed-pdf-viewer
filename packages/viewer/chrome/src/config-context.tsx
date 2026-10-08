@@ -51,8 +51,8 @@ export interface SignaturesCustomization {
 
 /** A font for free-text annotations beyond the standard 14. */
 export interface AnnotationFontSpec {
-  /** The stable id a free-text `fontFamily` carries — the engine key and the
-   *  CSS family the live editor renders with. Not one of the 14 standard names. */
+  /** The stable id a free-text `fontFamily` carries — the engine key, and the
+   *  name of the face the live editor renders with. Not one of the 14 standard names. */
   readonly key: string;
   /** Where the TTF/OTF bytes come from (same-origin or CORS-enabled). */
   readonly url: string;
@@ -69,8 +69,8 @@ export interface AnnotationsCustomization {
   /**
    * Fonts the free-text style panel offers beyond the standard 14. Each is
    * fetched once when the viewer mounts, registered on the viewer's engine
-   * under its `key`, and mounted as a `@font-face` of the same name — so the
-   * DOM editor shows the face the appearance stream will bake. A font whose
+   * under its `key`, and mounted as a `@font-face` for that key — so the DOM
+   * editor shows the face the appearance stream will bake. A font whose
    * URL fails is skipped with a console warning. On the cloud engine (no
    * `engine.fonts`) they are not offered: fonts there are a server policy.
    */

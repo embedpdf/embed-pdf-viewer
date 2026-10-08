@@ -91,6 +91,19 @@ describe('<Toolbar>', () => {
     expect(live('[role="menu"]')).toHaveLength(0);
   });
 
+  it('closes the "More" menu on a press outside it, not on one inside it or on its button', async () => {
+    room = 70;
+    await mountToolbar(<Toolbar bar={bar} renderCommand={renderCommand} />);
+    const more = live('button[title="More"]')[0]!;
+    fireEvent.click(more);
+    fireEvent.pointerDown(live('[role="menu"] button')[0]!);
+    fireEvent.pointerDown(more);
+    expect(live('[role="menu"]')).toHaveLength(1);
+
+    fireEvent.pointerDown(document.body);
+    expect(live('[role="menu"]')).toHaveLength(0);
+  });
+
   it('keeps command state live', async () => {
     pressed = false;
     const kernel = await mountToolbar(<Toolbar bar={bar} renderCommand={renderCommand} />);

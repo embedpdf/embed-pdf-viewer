@@ -13,6 +13,8 @@
  */
 import {
   faceForFont,
+  mountedFontFamily,
+  STANDARD_FONT_STACKS,
   type FieldValues,
   type FontLookup,
   locateOffset,
@@ -22,7 +24,6 @@ import {
   type RichTextStyleDelta,
 } from '@embedpdf/core-annotation';
 import {
-  isStandardFontName,
   STANDARD_FACES,
   type RichTextBody,
   type RichTextDocument,
@@ -84,16 +85,6 @@ const STANDARD_FAMILY_KEYS: Record<string, StandardFamily> = {
   dingbats: 'ZapfDingbats',
 };
 
-/** Web stacks with the standard families' metrics (what the DOM editor and
- *  the vector renderer show for text the engine sets in a standard font). */
-const STANDARD_STACKS: Record<StandardFamily, string> = {
-  Helvetica: 'Helvetica, Arial, sans-serif',
-  Times: '"Times New Roman", Times, serif',
-  Courier: '"Courier New", Courier, monospace',
-  Symbol: 'serif',
-  ZapfDingbats: 'serif',
-};
-
 /** The DTO font for a face: the registered key whose identity matches (the
  *  closest weight, italic first), else the standard kebab name, else the
  *  family itself. The inverse of {@link faceForFont}. */
@@ -124,21 +115,16 @@ export function fontForFace(face: Face, fonts?: FontLookup): string {
 }
 
 /** The CSS family list for a face family: a standard family's web stack, a
- *  registered family's `@font-face` name (its key — see `mountWebFont`),
- *  else the family itself with a generic fallback. */
+ *  registered family's mounted `@font-face` ({@link mountedFontFamily}), else
+ *  the family itself with a generic fallback. A DTO font's list is
+ *  `cssFontFamilyForFont`'s, in `@embedpdf/core-annotation`. */
 export function cssFontFamilyForFace(family: string, fonts?: FontLookup): string {
   const standard = STANDARD_FAMILY_KEYS[familyKey(family)];
-  if (standard) return STANDARD_STACKS[standard];
+  if (standard) return STANDARD_FONT_STACKS[standard];
   const wanted = familyKey(family);
   const registered = fonts?.().find((handle) => familyKey(handle.familyName) === wanted);
-  if (registered) return `"${registered.key}"`;
+  if (registered) return mountedFontFamily(registered.key);
   return `"${family}", sans-serif`;
-}
-
-/** The CSS family list for a DTO font (a standard kebab name or a key). */
-export function cssFontFamilyForFont(font: string, fonts?: FontLookup): string {
-  if (isStandardFontName(font)) return STANDARD_STACKS[STANDARD_FACES[font].family];
-  return `"${font}", sans-serif`;
 }
 
 // ---- Documents -----------------------------------------------------------------

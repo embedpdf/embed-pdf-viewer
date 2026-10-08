@@ -37,7 +37,29 @@ import { configFromAttributes, initialDocumentsOf, type ElementConfig } from './
  */
 export type DefaultEngineProvider = (engineOption: unknown) => Engine | EngineFactory;
 
-const HOST_CSS = `:host{display:block;height:100%;}`;
+/** The attribute that marks the shadow wrapper: the viewer's root, which the chrome's sheet themes. */
+const ROOT_ATTRIBUTE = 'data-embedpdf-root';
+const ROOT = `[${ROOT_ATTRIBUTE}]`;
+
+/**
+ * The host is the box the page sizes. The wrapper inside it is the viewer's
+ * own root, and nothing on the page reaches past it:
+ *   - `all: initial` drops what the page would pass down (the body's font, letter spacing,
+ *     alignment, color scheme…), then the viewer states its own text styles, in px. `all`
+ *     leaves custom properties alone, so `--epdf-*` set on the page still theme the viewer.
+ *   - Whether it shows or takes presses stays the page's call (`visibility`, `pointer-events`).
+ *   - It is the containing block of everything inside, `position: fixed` too, so a dialog
+ *     covers the viewer, not the page. Not `contain: paint`: menus may reach past the edge.
+ */
+const HOST_CSS =
+  ':host{display:block;height:100%}' +
+  `${ROOT}{all:initial;visibility:inherit;pointer-events:inherit;` +
+  'display:block;position:relative;isolation:isolate;contain:layout;box-sizing:border-box;' +
+  'height:100%;font-family:ui-sans-serif,system-ui,sans-serif,"Apple Color Emoji",' +
+  '"Segoe UI Emoji","Segoe UI Symbol","Noto Color Emoji";font-size:16px;line-height:1.5;' +
+  'color:var(--ep-fg);color-scheme:light;tab-size:4;-webkit-text-size-adjust:100%;' +
+  'text-size-adjust:100%;-webkit-tap-highlight-color:transparent}' +
+  `${ROOT}.dark{color-scheme:dark}`;
 
 let sheets: CSSStyleSheet[] | null = null;
 const adoptSheets = (): CSSStyleSheet[] => {
@@ -52,26 +74,42 @@ const adoptSheets = (): CSSStyleSheet[] => {
 };
 
 /**
- * The theme-token sheet: the overrides from `theme.tokens`/`theme.dark`,
- * adopted after the chrome sheet so same-specificity declarations win by
- * order. Base tokens are re-stated inside `.dark` (then dark overrides on
- * top), because the chrome's own `.dark` block would otherwise out-cascade a
- * host-level base token for every variable it defines.
+ * The theme-token sheet: the overrides from `theme.tokens`/`theme.dark` on the
+ * viewer's root, adopted after the chrome sheet so they win over its defaults
+ * by order. Base tokens are re-stated for `.dark` (then dark overrides on top),
+ * because the chrome's own `.dark` block would otherwise out-cascade a base
+ * token. A public `--epdf-*` token is a default only: like the chrome's own, it
+ * gives way to the page's value, read on the host as `--ep-host-<name>`.
  */
 function buildTokenSheet(tokens?: ThemeTokens, dark?: ThemeTokens): CSSStyleSheet | null {
-  const decl = (map: ThemeTokens): string =>
-    Object.entries(map)
-      .filter(([name, value]) => {
-        const ok = /^[a-z][a-z0-9-]*$/.test(name) && !/[{};]/.test(value);
-        if (!ok) console.warn(`[embedpdf] theme: ignoring invalid token "${name}"`);
-        return ok;
+  const valid = (map: ThemeTokens): Array<[string, string]> =>
+    Object.entries(map).filter(([name, value]) => {
+      const ok = /^[a-z][a-z0-9-]*$/.test(name) && !/[{};]/.test(value);
+      if (!ok) console.warn(`[embedpdf] theme: ignoring invalid token "${name}"`);
+      return ok;
+    });
+  const publicNames = new Set<string>();
+  const decl = (entries: Array<[string, string]>): string =>
+    entries
+      .map(([name, value]) => {
+        const property = themeTokenProperty(name);
+        if (!property.startsWith('--epdf-')) return `${property}:${value};`;
+        publicNames.add(name);
+        return `${property}:var(--ep-host-${name},${value});`;
       })
-      .map(([name, value]) => `${themeTokenProperty(name)}:${value};`)
       .join('');
 
-  const base = tokens ? decl(tokens) : '';
-  const darkDecl = tokens || dark ? decl({ ...tokens, ...dark }) : '';
-  const css = `${base ? `:host{${base}}` : ''}${darkDecl ? `.dark{${darkDecl}}` : ''}`;
+  const base = tokens ? valid(tokens) : [];
+  const darkOnly = dark ? valid(dark) : [];
+  const baseDecl = decl(base);
+  const darkDecl = decl([...base, ...darkOnly]);
+  const captures = [...publicNames]
+    .map((name) => `--ep-host-${name}:var(--epdf-${name});`)
+    .join('');
+  const css =
+    (captures ? `:host{${captures}}` : '') +
+    (baseDecl ? `${ROOT}{${baseDecl}}` : '') +
+    (darkDecl ? `${ROOT}.dark{${darkDecl}}` : '');
   if (!css) return null;
   const sheet = new CSSStyleSheet();
   sheet.replaceSync(css);
@@ -234,7 +272,7 @@ export class EmbedPdfViewerElement extends ElementBase {
     if (!this.shadowRoot) {
       const shadow = this.attachShadow({ mode: 'open' });
       this.#wrapper = document.createElement('div');
-      this.#wrapper.style.height = '100%';
+      this.#wrapper.setAttribute(ROOT_ATTRIBUTE, '');
       shadow.appendChild(this.#wrapper);
     }
     this.#unmount();

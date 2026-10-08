@@ -45,6 +45,7 @@ export {
   StateIntroText,
   Word,
   useDocsFramework,
+  useDocsIntegration,
 } from './framework';
 export * as mdast from './mdast';
 export {

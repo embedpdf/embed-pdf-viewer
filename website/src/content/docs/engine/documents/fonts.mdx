@@ -90,8 +90,9 @@ with the same key, as long as the font is registered.
 ## Show the font in the browser too
 
 The engine puts the font into the PDF; the browser doesn't know it. The text editor and any
-annotation the browser draws itself use the font's key as their CSS font family, so give the
-browser the same file under that name:
+annotation the browser draws itself use the CSS font family `epdf-` and the font's key, such as
+`epdf-noto-sc`, so give the browser the same file under that name. `mountWebFont()` names it for
+you, and the `epdf-` keeps a font of the same name on your page from standing in for it:
 
 ```ts
 import { mountWebFont } from '@embedpdf/web';

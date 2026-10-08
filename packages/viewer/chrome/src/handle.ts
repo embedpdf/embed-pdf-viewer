@@ -81,6 +81,9 @@ export interface ViewerHandle extends ScopedViewerHandle {
   watchCommand(id: string, callback: (cmd: ResolvedCommand | null) => void): Unsubscribe;
 }
 
+/** The key of the kernel on a {@link ViewerHandle}, for the framework wrappers only. */
+export const VIEWER_KERNEL: unique symbol = Symbol.for('@embedpdf/viewer/kernel');
+
 export function createViewerHandle(kernel: Kernel): ViewerHandle {
   const watch = <T>(
     select: () => T,
@@ -107,7 +110,7 @@ export function createViewerHandle(kernel: Kernel): ViewerHandle {
     pagesChanged: kernel.documents.onPagesChanged,
   };
 
-  return {
+  const handle: ViewerHandle = {
     documents: kernel.documents,
     get: (token) => kernel.capability(token),
     tryGet: (token) => kernel.tryCapability(token),
@@ -123,4 +126,9 @@ export function createViewerHandle(kernel: Kernel): ViewerHandle {
     watchCommand: (id, callback) =>
       watch(() => commands().resolveCommand(id) ?? null, callback, resolvedCommandsEqual),
   };
+  // Not part of the handle's API: the framework wrappers read it to give the components they
+  // slot into the viewer this kernel, so headless hooks work there. Non-enumerable, and keyed
+  // by a registered symbol so a wrapper reads it without importing this package.
+  Object.defineProperty(handle, VIEWER_KERNEL, { value: kernel });
+  return handle;
 }

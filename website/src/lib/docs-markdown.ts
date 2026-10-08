@@ -12,7 +12,6 @@ import { DOCS_SITE } from '../docs-site';
 import {
   DOCS_INTEGRATION_LABELS,
   docsIntegrationHref,
-  isHeadlessIntegration,
   isDocsIntegration,
   type DocsIntegration,
 } from './docs-integrations';
@@ -42,7 +41,7 @@ const site: DocsMarkdownSite = {
       ? collectSampleFiles(name)[integration]
       : undefined,
   readCodeFile: (codePath) => readDocsCodeFile(codePath),
-  isFramework: (value) => isHeadlessIntegration(value),
+  isFramework: (value) => isDocsIntegration(value),
   variantLabel: (integration) =>
     isDocsIntegration(integration) ? DOCS_INTEGRATION_LABELS[integration] : integration,
   resolveContentHref: (url, integration) =>
@@ -89,7 +88,7 @@ export function renderDocsMarkdown({
       ? releasedMarkdownSource({
           sourceCode,
           title: typeof metadata?.title === 'string' ? metadata.title : undefined,
-          framework: isHeadlessIntegration(integration) ? integration : undefined,
+          framework: isDocsIntegration(integration) ? integration : undefined,
           release,
           reactUrl: react ? `${SITE_ORIGIN}${react}` : null,
         })

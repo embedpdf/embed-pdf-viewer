@@ -7,6 +7,7 @@
 
 <script type="module">
   import 'https://cdn.jsdelivr.net/npm/@embedpdf/viewer@3/dist/embedpdf.js';
+  import { copyLink, emailLink } from './share.js'; // your app
 
   document.getElementById('copy-link').addEventListener('select', copyLink);
   document.getElementById('email-link').addEventListener('select', emailLink);

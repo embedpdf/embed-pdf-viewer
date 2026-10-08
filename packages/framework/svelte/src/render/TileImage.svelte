@@ -15,14 +15,12 @@
   let {
     source,
     viewScale,
-    fadeMs,
     onPainted,
     onUnpainted,
   }: {
     source: TilePaintSource;
     /** View pixels per page point: tiles are placed in view pixels. */
     viewScale: number;
-    fadeMs: number;
     onPainted: () => void;
     onUnpainted: () => void;
   } = $props();
@@ -64,5 +62,4 @@
   style:width="{source.rect.width * viewScale}px"
   style:height="{source.rect.height * viewScale}px"
   style:z-index={source.z}
-  style:animation={fadeMs > 0 ? `epdf-tile-in ${fadeMs}ms ease-out` : undefined}
 />

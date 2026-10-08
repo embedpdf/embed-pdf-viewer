@@ -8,6 +8,6 @@ import { EpdfPdfViewer, type Viewer } from '@embedpdf/viewer-angular';
 })
 export class App {
   onReady(viewer: Viewer) {
-    viewer.documents.onOpened(() => viewer.get('search').search('total'));
+    viewer.documents.onOpened(() => viewer.get('search').search({ text: 'total' }));
   }
 }

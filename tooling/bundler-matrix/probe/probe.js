@@ -51,7 +51,7 @@ export async function runProbeWith(root, createEngine, entry) {
       );
       const layout = await doc.pages.list();
       const raster = await doc
-        .page(layout.pages[0].pageObjectNumber)
+        .page(layout.pages[0].ref)
         .render.raw({ viewport: { kind: 'width', width: 64 } });
       await doc.close();
       return { pages: layout.pageCount, width: raster.width, height: raster.height };

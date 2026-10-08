@@ -5,10 +5,11 @@
  * identical wherever it surfaces. Rows resolve live through the command
  * registry: label, icon, active tick, enabled state.
  */
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useCommand, useCommands } from '@embedpdf/react/commands';
 import { useT } from '@embedpdf/react/i18n';
 import type { MenuSchema } from '@embedpdf/react/toolbar';
+import { observeOutsidePress } from '@embedpdf/web';
 import { Icon } from './icons';
 import { useMenuSchema } from '../config-context';
 
@@ -70,7 +71,12 @@ export function MenuBody({ menuId, onRun }: { menuId: string; onRun?: () => void
   );
 }
 
-/** The popover shell: a floating surface + click-away scrim. */
+/**
+ * The popover shell: a floating surface over a click-away scrim. The scrim
+ * covers the viewer (the element is the containing block of `fixed`), so a
+ * click anywhere else in the viewer only closes the menu; a press on the page
+ * around the viewer closes it too.
+ */
 export function Popover({
   children,
   onClose,
@@ -80,8 +86,15 @@ export function Popover({
   onClose: () => void;
   align?: 'start' | 'end';
 }) {
+  const root = useRef<HTMLDivElement>(null);
+  const close = useRef(onClose);
+  close.current = onClose;
+  useEffect(() => {
+    const element = root.current;
+    return element ? observeOutsidePress(element, () => close.current()) : undefined;
+  }, []);
   return (
-    <>
+    <div ref={root} className="contents">
       <div className="fixed inset-0 z-40" onClick={onClose} />
       <div
         part="menu"
@@ -91,7 +104,7 @@ export function Popover({
       >
         {children}
       </div>
-    </>
+    </div>
   );
 }
 

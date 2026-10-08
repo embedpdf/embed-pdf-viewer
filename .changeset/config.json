@@ -37,6 +37,7 @@
       "@embedpdf/engine-runtime-win32-arm64",
       "@embedpdf/engine-runtime-win32-x64",
       "@embedpdf/engine-services",
+      "@embedpdf/plugin-actions",
       "@embedpdf/plugin-annotation",
       "@embedpdf/plugin-commands",
       "@embedpdf/plugin-form",

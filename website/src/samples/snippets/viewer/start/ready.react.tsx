@@ -1,7 +1,7 @@
 import { PDFViewer, type Viewer } from '@embedpdf/viewer-react';
 
 function onReady(viewer: Viewer) {
-  viewer.documents.onOpened(() => viewer.get('search').search('total'));
+  viewer.documents.onOpened(() => viewer.get('search').search({ text: 'total' }));
 }
 
 export function App() {

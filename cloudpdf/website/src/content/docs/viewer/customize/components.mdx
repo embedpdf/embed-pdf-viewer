@@ -113,7 +113,7 @@ command and add it there:
       id: 'acme:explain',
       label: 'Explain',
       icon: 'message',
-      run: async ({ get }) => openAssistant(await get('selection').getText()),
+      run: async ({ get }) => openAssistant(await get('selection').readText()),
     },
   ],
   layout: (layout) => layout.add('acme:explain', { to: 'selection' }),

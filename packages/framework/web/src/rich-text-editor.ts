@@ -28,7 +28,7 @@
  * the appearance stream is the truth.
  */
 
-import { observeWebFonts } from './web-font';
+import { fontKeyOfWebFamily, observeWebFonts } from './web-font';
 import {
   firstLineShiftFor,
   lineModelFor,
@@ -86,7 +86,7 @@ export interface RichTextEditorHost {
   /** A keyboard command the host applies to the current selection. */
   onCommand(command: RichTextEditorCommand): void;
   /** The CSS family list for a PDF family ("Helvetica" → a web stack, a
-   *  registered family → itself, mounted as a @font-face). */
+   *  registered family → the family its face is mounted under, see `mountWebFont`). */
   cssFontFamily(family: string): string;
 }
 
@@ -247,8 +247,9 @@ export function styleDeltaOf(style: EditorStyle | undefined, scale: number): Ric
     if (Number.isFinite(px) && scale > 0) delta.size = round2(px / scale);
   }
   if (style.fontFamily) {
+    // A registered font is drawn in the family it is mounted under; the run names its key.
     const family = firstFamily(style.fontFamily);
-    if (family) delta.family = family;
+    if (family) delta.family = fontKeyOfWebFamily(family);
   }
   if (style.letterSpacing) {
     const px = parseFloat(style.letterSpacing);

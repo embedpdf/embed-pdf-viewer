@@ -24,7 +24,9 @@
     "./worker-source": {
       "types": "./workers/embedpdf-worker.source.d.ts",
       "default": "./workers/embedpdf-worker.source.js"
-    }
+    },
+    "./workers/embedpdf-worker.js": "./workers/embedpdf-worker.js",
+    "./workers/encoder-worker.js": "./workers/encoder-worker.js"
   },
   "scripts": {
     "build": "node scripts/build-workers.mjs && epdf-build",
@@ -90,13 +92,17 @@
       "./worker-source": {
         "types": "./workers/embedpdf-worker.source.d.ts",
         "default": "./workers/embedpdf-worker.source.js"
-      }
+      },
+      "./workers/embedpdf-worker.js": "./workers/embedpdf-worker.js",
+      "./workers/encoder-worker.js": "./workers/encoder-worker.js"
     }
   },
   "epdf": {
     "rawExports": [
       "./worker-entry",
-      "./worker-source"
+      "./worker-source",
+      "./workers/embedpdf-worker.js",
+      "./workers/encoder-worker.js"
     ],
     "devExports": "development",
     "conditions": {

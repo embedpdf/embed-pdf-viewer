@@ -216,6 +216,27 @@ describe('<epdf-toolbar>', () => {
     expect(liveMore()).toBeNull();
   });
 
+  it('closes the "More" menu on a press outside it, not on one inside it or on its button', async () => {
+    const { fixture, toolbar } = await toolbarWith(TestToolbar, 'test-toolbar');
+    layout.setContainer(200);
+    await fixture.whenStable();
+    const more = toolbar.querySelector(
+      ':scope > div:not([aria-hidden]) button[title="More"]',
+    ) as HTMLButtonElement;
+    more.click();
+    await fixture.whenStable();
+    const press = (target: EventTarget) =>
+      target.dispatchEvent(new Event('pointerdown', { bubbles: true, composed: true }));
+    press(toolbar.querySelector('[role="menu"] [role="menuitem"]')!);
+    press(more);
+    await fixture.whenStable();
+    expect(toolbar.querySelector('[role="menu"]')).not.toBeNull();
+
+    press(document.body);
+    await fixture.whenStable();
+    expect(toolbar.querySelector('[role="menu"]')).toBeNull();
+  });
+
   it('draws a plain button for a command without a template', async () => {
     const { toolbar } = await toolbarWith(DefaultToolbar, 'test-default-toolbar');
     const buttons = [...toolbar.querySelectorAll(':scope > div:not([aria-hidden]) button')];

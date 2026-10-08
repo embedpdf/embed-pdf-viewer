@@ -1,7 +1,7 @@
-import { PDFViewer, Panel } from '@embedpdf/viewer-react';
+import { PDFViewer, Panel, type Layout } from '@embedpdf/viewer-react';
 import { Notes } from './notes'; // your app
 
-const layout = (layout) =>
+const layout = (layout: Layout) =>
   layout
     .addPanel('notes', { side: 'end', title: 'Notes', icon: 'book' })
     .add('panel:notes', { to: 'main', section: 'end' });

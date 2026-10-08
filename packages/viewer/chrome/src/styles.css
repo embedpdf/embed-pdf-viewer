@@ -13,12 +13,27 @@
    (viewers/snippet/src/config/theme.ts). Runtime CSS variables so the theme
    switches with a class; `@theme inline` below turns each into a Tailwind
    color utility (bg-surface, text-fg-muted, border-subtle, …). */
-/* `:host` alongside `:root`: inside the <embedpdf-viewer> shadow root there is
-   no :root match, so the host carries the base tokens. The dark override stays
-   a plain `.dark` class — the element applies it to its shadow WRAPPER (and
-   apps to <html>), so one selector serves both worlds. */
-:root,
+
+/* The page's own value of each public `--epdf-*` variable this sheet gives a
+   default, read on the host, where the page's CSS arrives (set on the element
+   or inherited from around it). Nothing public is declared on the host: a
+   value there would hide one set around the viewer. */
 :host {
+  --ep-host-accent: var(--epdf-accent);
+  --ep-host-scrollbar-thumb: var(--epdf-scrollbar-thumb);
+  --ep-host-toolbar-surface: var(--epdf-toolbar-surface);
+  --ep-host-toolbar-border: var(--epdf-toolbar-border);
+  --ep-host-toolbar-active: var(--epdf-toolbar-active);
+}
+
+/* The tokens live on the viewer's root: the element's shadow wrapper
+   (`data-embedpdf-root`), or the document when the chrome is the page. A
+   public variable there is the page's value when it set one, else this mode's
+   default, so the parts drawn on the pages (which read the same variables)
+   always agree with the chrome. The dark override is a plain `.dark` class,
+   which the element puts on its wrapper and apps on <html>. */
+:root,
+[data-embedpdf-root] {
   --ep-app: #f3f4f6;
   --ep-surface: #ffffff;
   --ep-surface-alt: #f1f3f5;
@@ -39,11 +54,11 @@
      the pages and what is drawn on them read these. The chrome's accent is
      the same variable, and its shades are mixed from it, so one
      `--epdf-accent` themes both. */
-  --epdf-accent: #3b82f6;
-  --epdf-scrollbar-thumb: rgba(17, 24, 39, 0.35);
-  --epdf-toolbar-surface: var(--ep-elevated);
-  --epdf-toolbar-border: var(--ep-border);
-  --epdf-toolbar-active: var(--ep-active);
+  --epdf-accent: var(--ep-host-accent, #3b82f6);
+  --epdf-scrollbar-thumb: var(--ep-host-scrollbar-thumb, rgba(17, 24, 39, 0.35));
+  --epdf-toolbar-surface: var(--ep-host-toolbar-surface, var(--ep-elevated));
+  --epdf-toolbar-border: var(--ep-host-toolbar-border, var(--ep-border));
+  --epdf-toolbar-active: var(--ep-host-toolbar-active, var(--ep-active));
   --ep-accent: var(--epdf-accent);
   --ep-accent-hover: color-mix(in srgb, var(--epdf-accent) 80%, black);
   --ep-accent-active: color-mix(in srgb, var(--epdf-accent) 65%, black);
@@ -68,14 +83,13 @@
   --ep-active: #4b5563;
   --ep-canvas: #0d1117;
 
-  /* Restated, not inherited: the dark class may sit below the element the
-     light block themes (the custom element's shadow wrapper), and a variable
-     made of others is worked out where it is declared. */
-  --epdf-accent: #60a5fa;
-  --epdf-scrollbar-thumb: rgba(249, 250, 251, 0.28);
-  --epdf-toolbar-surface: var(--ep-elevated);
-  --epdf-toolbar-border: var(--ep-border);
-  --epdf-toolbar-active: var(--ep-active);
+  /* Restated, not inherited: a variable made of others is worked out where it
+     is declared, so the shades must be mixed again from the dark accent. */
+  --epdf-accent: var(--ep-host-accent, #60a5fa);
+  --epdf-scrollbar-thumb: var(--ep-host-scrollbar-thumb, rgba(249, 250, 251, 0.28));
+  --epdf-toolbar-surface: var(--ep-host-toolbar-surface, var(--ep-elevated));
+  --epdf-toolbar-border: var(--ep-host-toolbar-border, var(--ep-border));
+  --epdf-toolbar-active: var(--ep-host-toolbar-active, var(--ep-active));
   --ep-accent: var(--epdf-accent);
   --ep-accent-hover: color-mix(in srgb, var(--epdf-accent) 80%, black);
   --ep-accent-active: color-mix(in srgb, var(--epdf-accent) 65%, black);

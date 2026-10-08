@@ -1,10 +1,26 @@
+/** What every family {@link mountWebFont} mounts starts with. */
+const FAMILY_PREFIX = 'epdf-';
+
+/**
+ * The CSS family a registered font's key is mounted under: the key in the
+ * viewer's own namespace, so a family of the same name on the page (its own
+ * `@font-face`, or an installed font) never stands in for it. The annotation
+ * plugin's CSS for a registered font names the same family.
+ */
+export function webFontFamily(key: string): string {
+  return `${FAMILY_PREFIX}${key}`;
+}
+
+/** The key a family from {@link webFontFamily} was made from; any other family as it is. */
+export function fontKeyOfWebFamily(family: string): string {
+  return family.startsWith(FAMILY_PREFIX) ? family.slice(FAMILY_PREFIX.length) : family;
+}
+
 /**
  * Mount a registered font for the DOM: the engine lays text out with the
  * font's bytes, the browser needs the same face as a `@font-face` so the
  * live editor and the vector renderer show the glyphs the appearance stream
- * will bake. The family name is the font's key — the CSS family the
- * annotation plugin emits for a registered font (`cssFontFamily`) — so
- * mounting under the key is what makes the two agree.
+ * will bake. The face's family is {@link webFontFamily} of the key.
  *
  * Returns the unmount. Idempotent per (document, key): a second mount of a
  * key already in the document's font set is a no-op that still returns an
@@ -28,7 +44,7 @@ export async function mountWebFont(
     data instanceof Uint8Array
       ? (data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength) as ArrayBuffer)
       : data;
-  const face = new FontFace(key, buffer, {
+  const face = new FontFace(webFontFamily(key), buffer, {
     weight: options.weight !== undefined ? String(options.weight) : undefined,
     style: options.style,
   });

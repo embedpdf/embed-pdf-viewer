@@ -18,6 +18,10 @@ import { visit } from 'unist-util-visit';
  */
 
 /** @typedef {'react' | 'vue' | 'svelte' | 'angular'} Framework */
+/**
+ * What a viewer page is written for: the frameworks, and `vanilla`, a plain HTML page.
+ * @typedef {Framework | 'vanilla'} Integration
+ */
 /** @typedef {'name' | 'prop' | 'state' | 'event'} NameContext */
 /**
  * Where an inline code span stands: its context, and for a State value the React state hook that
@@ -33,6 +37,11 @@ export const FRAMEWORK_LABELS = {
   svelte: 'Svelte',
   angular: 'Angular',
 };
+
+/** Every integration a viewer page is written for: the frameworks, and a plain HTML page. */
+export const INTEGRATIONS = /** @type {const} */ (['vanilla', ...FRAMEWORKS]);
+
+export const INTEGRATION_LABELS = { vanilla: 'Vanilla JS', ...FRAMEWORK_LABELS };
 
 /** `<Word of="…" />`: the words that differ per framework. */
 export const FRAMEWORK_WORDS = {
@@ -297,6 +306,19 @@ export function frameworkFromPath(pathname) {
   return 'react';
 }
 
+/**
+ * The integration a docs page is for: as {@link frameworkFromPath}, and `vanilla` in
+ * `/docs/viewer/vanilla/…`.
+ *
+ * @param {string} pathname
+ * @returns {Integration}
+ */
+export function integrationFromPath(pathname) {
+  const [, docs, product, variant] = pathname.split('/');
+  if (docs === 'docs' && product === 'viewer' && variant === 'vanilla') return 'vanilla';
+  return frameworkFromPath(pathname);
+}
+
 // ── standard sentences ─────────────────────────────────────────────────────
 
 /**
@@ -377,20 +399,22 @@ const DOCS_LINK = /^((?:https:\/\/www\.(?:embedpdf|cloudpdf)\.com)?\/docs\/(head
 /**
  * Keep the reader's framework in a docs link: `/docs/viewer` → `/docs/viewer/vue`, and
  * `https://www.cloudpdf.com/docs/headless/setup` → `…/docs/headless/vue/setup`. A link that
- * already names a framework, and every other link, stays as written.
+ * already names a framework, and every other link, stays as written. From a plain-HTML viewer
+ * page (`vanilla`), a headless link goes to React: headless has no plain-HTML version.
  *
  * @param {string} href
- * @param {Framework} framework
+ * @param {Integration} framework
  * @returns {string}
  */
 export function frameworkHref(href, framework) {
   const match = href.match(DOCS_LINK);
-  if (!match || !FRAMEWORKS.includes(framework)) return href;
+  if (!match || !INTEGRATIONS.includes(framework)) return href;
   const [, base, product, rest = '', suffix = ''] = match;
   const first = rest.split('/')[1];
-  const named = product === 'viewer' ? [...FRAMEWORKS, 'vanilla'] : FRAMEWORKS;
+  const named = product === 'viewer' ? INTEGRATIONS : FRAMEWORKS;
   if (first && named.includes(first)) return href;
-  return `${base}/${framework}${rest}${suffix}`;
+  const target = product === 'headless' && framework === 'vanilla' ? 'react' : framework;
+  return `${base}/${target}${rest}${suffix}`;
 }
 
 // ── contexts ────────────────────────────────────────────────────────────────

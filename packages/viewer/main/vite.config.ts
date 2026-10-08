@@ -21,18 +21,29 @@
  *      dist by Vite from an explicit `?url&no-inline` asset import (the
  *      snippet door's own, and the engine's default via the alias below), so
  *      every chunk references it by a correct relative URL — the folder is
- *      the unit of delivery, from jsDelivr or an internal server alike.
+ *      the unit of delivery, from jsDelivr or an internal server alike. The
+ *      engine's `embedpdf-worker.js` and `encoder-worker.js` land beside it
+ *      the same way (build/worker-files.ts).
  */
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vite';
 import tailwindcss from '@tailwindcss/vite';
+import { shadowStylesheet } from './build/shadow-stylesheet';
+import { workerFilesAsAssets } from './build/worker-files';
 
 // Absolute file paths, resolved from this package: the react imports being
 // aliased live in @embedpdf/viewer-chrome and @embedpdf/react, whose own
 // node_modules have no preact (pnpm is strict) — a bare-specifier replacement
 // would re-resolve from the importer and fail.
 const preact = (specifier: string) => fileURLToPath(import.meta.resolve(specifier));
+
+/** The packages this build compiles to Preact, so the consumer can't share them. */
+const PREACT_COMPILED = /^@embedpdf\/(react|viewer-chrome)(\/|$)/;
+
+/** A package the npm pass leaves to the consumer's bundler (see `rollupOptions.external`). */
+const isSharedPackage = (id: string): boolean =>
+  id.startsWith('@embedpdf/') && !PREACT_COMPILED.test(id);
 
 export default defineConfig(({ mode }) => {
   const snippet = mode === 'snippet';
@@ -42,7 +53,12 @@ export default defineConfig(({ mode }) => {
     ? { embedpdf: 'src/doors/snippet.ts' }
     : { index: 'src/doors/local.ts', core: 'src/doors/core.ts' };
   return {
-    plugins: [tailwindcss()],
+    // The snippet's folder carries the engine's worker files beside embedpdf.wasm
+    // (build/worker-files.ts); the npm pass leaves them to the consumer's bundler.
+    plugins: [tailwindcss(), ...(snippet ? [workerFilesAsAssets()] : [])],
+    // Runs on Tailwind's output: the chrome's sheet, made to work inside the
+    // element's shadow root (see build/shadow-stylesheet.ts).
+    css: { postcss: { plugins: [shadowStylesheet()] } },
     resolve: {
       alias: [
         { find: 'react-dom/client', replacement: preact('preact/compat/client') },
@@ -88,18 +104,17 @@ export default defineConfig(({ mode }) => {
         fileName: (_format: string, entryName: string) => `${entryName}.js`,
       },
       rollupOptions: {
-        // npm pass only: the engine (and its lazily-imported worker-source
-        // module) stays a bare import for the consumer's bundler to process —
-        // and so does `@embedpdf/default-stamps/library`, whose lazy locale
-        // modules then become chunks of the consumer's build (one copy, next
-        // to their other code) instead of being duplicated into this dist.
-        // The snippet pass bundles them: its folder is the unit of delivery.
-        external: snippet
-          ? undefined
-          : (id: string) =>
-              id === '@embedpdf/engine' ||
-              id.startsWith('@embedpdf/engine/') ||
-              id.startsWith('@embedpdf/default-stamps/'),
+        // npm pass only: every framework-free `@embedpdf/*` package stays a
+        // bare import for the consumer's bundler — the engine (whose wasm and
+        // worker files must land in the consumer's asset pipeline), core, the
+        // plugins, `@embedpdf/web`, `@embedpdf/default-stamps/library`. The
+        // consumer then loads ONE copy of each, shared with its own headless
+        // adapter: capabilities are looked up by token identity, so a second
+        // copy of a plugin would be a different plugin. Only the packages
+        // compiled to Preact here stay inside: `@embedpdf/react` (the chrome's
+        // copy, not the app's) and `@embedpdf/viewer-chrome`. The snippet pass
+        // bundles everything: its folder is the unit of delivery.
+        external: snippet ? undefined : isSharedPackage,
         // Chunks land in chunks/, imported relatively from the entry —
         // relocatable as a folder. The snippet's one emitted asset keeps its
         // plain name: `dist/embedpdf.wasm`, the documented sibling.

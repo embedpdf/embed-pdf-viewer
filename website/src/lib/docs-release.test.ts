@@ -54,6 +54,26 @@ describe('a page the publish gate holds back', () => {
   });
 });
 
+describe('a viewer page the publish gate holds back', () => {
+  it('says so for plain HTML, and points at the React version', () => {
+    const markdown = renderDocsMarkdown({
+      sourceCode: fs.readFileSync(
+        path.resolve(process.cwd(), 'src/content/docs/viewer/customize/layout.mdx'),
+        'utf8',
+      ),
+      canonicalPath: '/docs/viewer/vanilla/customize/layout',
+      integration: 'vanilla',
+      metadata: { title: 'Layout', description: 'Put toolbars at any edge.' },
+      release: HELD_BACK,
+    });
+
+    expect(markdown.split('---\n').at(-1)?.trim()).toBe(
+      "# Layout\n\nThis page describes EmbedPDF 3.0 for Vanilla JS, which isn't released yet. " +
+        '[Read the React version](https://www.embedpdf.com/docs/viewer/react/customize/layout).',
+    );
+  });
+});
+
 describe('the preview site', () => {
   it('shows the page in full, with the banner under its title', () => {
     const markdown = markdownFor('vue', PREVIEW);

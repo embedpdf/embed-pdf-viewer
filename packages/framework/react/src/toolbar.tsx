@@ -77,6 +77,7 @@ import type { ResolvedCommand } from '@embedpdf/plugin-commands/contract';
 import {
   createToolbarWidths,
   observeContentWidth,
+  observeOutsidePress,
   observeWidth,
   paintDefault,
   toolbarMeasureKey,
@@ -330,71 +331,79 @@ const defaultRenderOverflowTrigger = (isOpen: boolean, toggle: () => void): Reac
 );
 
 function DefaultOverflowMenu({ view }: { view: OverflowMenuView }) {
+  const menu = useRef<HTMLDivElement>(null);
+  const close = useRef(view.close);
+  close.current = view.close;
+  useEffect(() => {
+    // The menu's parent holds its button too: a press on it is the button's own toggle.
+    const container = menu.current?.parentElement ?? menu.current;
+    return view.isOpen && container
+      ? observeOutsidePress(container, () => close.current())
+      : undefined;
+  }, [view.isOpen]);
   if (!view.isOpen) return null;
   return (
-    <>
-      <div style={{ position: 'fixed', inset: 0, zIndex: 40 }} onClick={view.close} />
-      <div
-        role="menu"
-        style={{
-          position: 'absolute',
-          right: 0,
-          top: '100%',
-          zIndex: 41,
-          minWidth: 200,
-          padding: 4,
-          background: SURFACE,
-          border: `1px solid ${BORDER}`,
-          borderRadius: 6,
-          boxShadow: '0 4px 16px rgba(0,0,0,0.15)',
-        }}
-      >
-        {view.sections.map((section, i) => (
-          <React.Fragment key={i}>
-            {i > 0 && <div style={{ height: 1, background: BORDER, margin: '4px 0' }} />}
-            {section.rows.map((row) => {
-              const cmd = view.resolve(row.command);
-              if (!cmd) return null;
-              const isSubmenu = row.type === 'submenu';
-              return (
-                <button
-                  key={row.command}
-                  type="button"
-                  role={section.role === 'radio' ? 'menuitemradio' : 'menuitem'}
-                  aria-checked={section.role === 'radio' ? cmd.active : undefined}
-                  disabled={!cmd.enabled}
-                  onClick={() => {
-                    view.execute(row.command);
-                    if (!isSubmenu) view.close();
-                  }}
-                  style={{
-                    display: 'flex',
-                    width: '100%',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    gap: 16,
-                    padding: '6px 8px',
-                    border: 'none',
-                    color: 'inherit',
-                    font: 'inherit',
-                    background: 'transparent',
-                    cursor: cmd.enabled ? 'pointer' : 'default',
-                    opacity: cmd.enabled ? 1 : 0.4,
-                    whiteSpace: 'nowrap',
-                  }}
-                >
-                  <span>
-                    {cmd.active && section.role === 'radio' ? '• ' : ''}
-                    {cmd.label}
-                  </span>
-                  {isSubmenu ? <span>▸</span> : null}
-                </button>
-              );
-            })}
-          </React.Fragment>
-        ))}
-      </div>
-    </>
+    <div
+      ref={menu}
+      role="menu"
+      style={{
+        position: 'absolute',
+        right: 0,
+        top: '100%',
+        zIndex: 41,
+        minWidth: 200,
+        padding: 4,
+        background: SURFACE,
+        border: `1px solid ${BORDER}`,
+        borderRadius: 6,
+        boxShadow: '0 4px 16px rgba(0,0,0,0.15)',
+      }}
+    >
+      {view.sections.map((section, i) => (
+        <React.Fragment key={i}>
+          {i > 0 && <div style={{ height: 1, background: BORDER, margin: '4px 0' }} />}
+          {section.rows.map((row) => {
+            const cmd = view.resolve(row.command);
+            if (!cmd) return null;
+            const isSubmenu = row.type === 'submenu';
+            return (
+              <button
+                key={row.command}
+                type="button"
+                role={section.role === 'radio' ? 'menuitemradio' : 'menuitem'}
+                aria-checked={section.role === 'radio' ? cmd.active : undefined}
+                disabled={!cmd.enabled}
+                onClick={() => {
+                  view.execute(row.command);
+                  if (!isSubmenu) view.close();
+                }}
+                style={{
+                  display: 'flex',
+                  width: '100%',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: 16,
+                  padding: '6px 8px',
+                  border: 'none',
+                  color: 'inherit',
+                  font: 'inherit',
+                  background: 'transparent',
+                  cursor: cmd.enabled ? 'pointer' : 'default',
+                  opacity: cmd.enabled ? 1 : 0.4,
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                <span>
+                  {cmd.active && section.role === 'radio' ? '• ' : ''}
+                  {cmd.label}
+                </span>
+                {isSubmenu ? <span>▸</span> : null}
+              </button>
+            );
+          })}
+        </React.Fragment>
+      ))}
+    </div>
   );
 }
 

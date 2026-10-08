@@ -1,8 +1,8 @@
 <script lang="ts">
-  import { PDFViewer, ToolbarItem } from '@embedpdf/viewer-svelte';
+  import { PDFViewer, ToolbarItem, type Layout } from '@embedpdf/viewer-svelte';
   import { versions } from './versions.svelte'; // your app
 
-  const layout = (layout) =>
+  const layout = (layout: Layout) =>
     layout.add({ custom: 'versions', command: 'acme:versions' }, { to: 'main', section: 'start' });
 </script>
 

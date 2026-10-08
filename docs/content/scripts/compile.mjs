@@ -22,12 +22,18 @@ export const siteRoot = path.join(repoRoot, 'website');
 export const siteRequire = createRequire(path.join(siteRoot, 'package.json'));
 
 export const FRAMEWORKS = ['react', 'vue', 'svelte', 'angular'];
+/** The viewer's docs have a plain-HTML version too: `vanilla`, a page with a script tag. */
+export const VIEWER_INTEGRATIONS = ['vanilla', ...FRAMEWORKS];
 export const FRAMEWORK_LABELS = {
+  vanilla: 'Vanilla JS',
   react: 'React',
   vue: 'Vue',
   svelte: 'Svelte',
   angular: 'Angular',
 };
+
+/** The viewer's CDN script, as the docs show it: the only URL a plain-HTML page loads it from. */
+export const VIEWER_CDN_URL = 'https://cdn.jsdelivr.net/npm/@embedpdf/viewer@3/dist/embedpdf.js';
 
 export const toPosix = (file) => file.split(path.sep).join('/');
 
@@ -79,6 +85,17 @@ const FRAMEWORK_OPTIONS = {
       types: ['@sveltejs/kit'],
     },
   },
+  // A plain-HTML page's scripts, as JavaScript checked against the viewer's types. Not strict: a
+  // reader's JavaScript doesn't check for null or annotate its parameters. A page loads the
+  // viewer for its side effects (`import '…/embedpdf.js'`), so that import must resolve too.
+  vanilla: {
+    compilerOptions: {
+      allowJs: true,
+      checkJs: true,
+      strict: false,
+      noUncheckedSideEffectImports: true,
+    },
+  },
 };
 
 /**
@@ -103,17 +120,38 @@ export function resolvePaths() {
 }
 
 /**
- * Write the tsconfig one framework's files compile with: `include` names them, and `overrides`
- * changes one of the framework's option groups (`{ vueCompilerOptions: {…} }`).
+ * `@embedpdf/viewer` at its source, under each name the docs import it by: its entries, and the
+ * CDN script. Its package names only its build, which the docs check never needs.
  */
-export function writeTsconfig(framework, root, include, overrides = {}) {
+function viewerPaths() {
+  const doors = path.join(repoRoot, 'packages/viewer/main/src/doors');
+  return {
+    '@embedpdf/viewer': [path.join(doors, 'local.ts')],
+    '@embedpdf/viewer/core': [path.join(doors, 'core.ts')],
+    '@embedpdf/viewer/snippet': [path.join(doors, 'snippet.ts')],
+    [VIEWER_CDN_URL]: [path.join(doors, 'snippet.ts')],
+  };
+}
+
+/**
+ * Write the tsconfig one framework's files compile with: `include` names them, and `overrides`
+ * changes one of the framework's option groups (`{ vueCompilerOptions: {…} }`). With `viewer`,
+ * the files read `@embedpdf/viewer` at its source ({@link viewerPaths}), which is `.tsx`: JSX
+ * is on, or a program leaves those files out.
+ */
+export function writeTsconfig(framework, root, include, overrides = {}, { viewer = false } = {}) {
   const groups = { ...FRAMEWORK_OPTIONS[framework] };
   for (const [group, options] of Object.entries(overrides)) {
     groups[group] = { ...groups[group], ...options };
   }
   const { compilerOptions, ...rest } = groups;
   const tsconfig = {
-    compilerOptions: { ...COMPILER_OPTIONS, ...compilerOptions, paths: resolvePaths() },
+    compilerOptions: {
+      ...COMPILER_OPTIONS,
+      ...(viewer ? { jsx: 'react-jsx' } : {}),
+      ...compilerOptions,
+      paths: { ...resolvePaths(), ...(viewer ? viewerPaths() : {}) },
+    },
     include,
     ...rest,
   };
@@ -197,6 +235,18 @@ import { anything } from '@embedpdf/not-a-package'; // ${EXPECTED}
 <p>{notAField}</p> <!-- ${EXPECTED} -->
 `,
   },
+  // A plain-HTML page's script, after the check took it out of the page: a member the viewer
+  // doesn't have, and an element the page names that the viewer doesn't define.
+  vanilla: {
+    file: '_canary.vanilla.js',
+    source: `// The check's canary (compile.mjs): each marked line must be an error.
+import EmbedPDF, { notAViewerExport } from '${VIEWER_CDN_URL}'; // ${EXPECTED}
+import { anything } from '@embedpdf/not-a-package'; // ${EXPECTED}
+import '@embedpdf/not-a-package/loaded-for-its-side-effects'; // ${EXPECTED}
+EmbedPDF.notAViewerMethod(); // ${EXPECTED}
+/** @type {HTMLElementTagNameMap['epdf-not-an-element']} */ (undefined); // ${EXPECTED}
+`,
+  },
 };
 
 /** Whether a file is a run's canary (at the root of the run, named `_canary.<framework>.<ext>`). */
@@ -240,6 +290,7 @@ export function fromTypeScript(ts, diagnostics) {
         line: position ? position.line + 1 : null,
         column: position ? position.character + 1 : null,
         message: ts.flattenDiagnosticMessageText(diagnostic.messageText, ' '),
+        code: diagnostic.code,
       };
     });
 }
@@ -255,8 +306,11 @@ const checkedFiles = (program, root, checks) =>
     return absolute.startsWith(`${root}${path.sep}`) && checks(absolute);
   });
 
-/** Compile a React (or plain TypeScript) tree with `tsc`, in this process. */
-async function compileWithTsc(root, checks) {
+/**
+ * Compile a React (or plain TypeScript) tree with `tsc`, in this process. `ignores(ts, program,
+ * diagnostic)` drops the diagnostics a check doesn't report.
+ */
+async function compileWithTsc(root, checks, ignores = () => false) {
   const tool = findTool('typescript');
   if (!tool) return { tool: null, reason: "typescript isn't installed in website/" };
   const ts = siteRequire('typescript');
@@ -273,9 +327,78 @@ async function compileWithTsc(root, checks) {
       ...program.getSyntacticDiagnostics(file),
       ...program.getSemanticDiagnostics(file),
     ]),
-  ];
+  ].filter((diagnostic) => !ignores(ts, program, diagnostic));
   return { tool: `tsc ${tool.version}`, diagnostics: fromTypeScript(ts, diagnostics) };
 }
+
+/** The deepest node of a file that holds `position`. */
+function nodeAt(ts, file, position) {
+  let found = file;
+  const visit = (node) => {
+    if (position < node.getStart(file) || position >= node.getEnd()) return;
+    found = node;
+    ts.forEachChild(node, visit);
+  };
+  ts.forEachChild(file, visit);
+  return found;
+}
+
+/**
+ * The value a property name reads from: `element` in `element.viewer`, and in
+ * `const { viewer } = element`. Null for any other name.
+ */
+function readFrom(ts, name) {
+  const parent = name.parent;
+  if (parent && ts.isPropertyAccessExpression(parent) && parent.name === name) {
+    return parent.expression;
+  }
+  const declaration = parent?.parent?.parent;
+  if (
+    parent &&
+    ts.isBindingElement(parent) &&
+    (parent.propertyName ?? parent.name) === name &&
+    ts.isObjectBindingPattern(parent.parent) &&
+    declaration &&
+    ts.isVariableDeclaration(declaration) &&
+    declaration.initializer
+  ) {
+    return declaration.initializer;
+  }
+  return null;
+}
+
+const PROPERTY_MISSING = new Set([
+  2339, // Property 'value' does not exist on type 'EventTarget'.
+  2551, // …Did you mean 'values'?
+]);
+
+/**
+ * A plain-HTML page's own DOM code: in one of its scripts, a property a browser type doesn't have
+ * (`event.target.value`, where the target is an `EventTarget`). Nothing checks the types of a
+ * reader's JavaScript, so that's fine there; a property one of our types doesn't have is still an
+ * error, and so is anything else. A browser type is one TypeScript's DOM library declares, even
+ * where a package adds to it (`@types/react` declares an empty `HTMLElement`).
+ */
+function isReadersDomCode(ts, program, diagnostic) {
+  const { file, start } = diagnostic;
+  if (!PROPERTY_MISSING.has(diagnostic.code) || !file || start === undefined) return false;
+  if (!/\.js$/.test(file.fileName)) return false;
+  const object = readFrom(ts, nodeAt(ts, file, start));
+  if (!object) return false;
+  const type = program.getTypeChecker().getTypeAtLocation(object);
+  return (type.isUnion() ? type.types : [type]).every((member) =>
+    ((member.getSymbol() ?? member.aliasSymbol)?.declarations ?? []).some((declaration) => {
+      const declared = declaration.getSourceFile();
+      return (
+        program.isSourceFileDefaultLibrary(declared) &&
+        /^lib\.dom\b/.test(path.basename(declared.fileName))
+      );
+    }),
+  );
+}
+
+/** Compile a plain-HTML page's scripts, taken out of the page, as JavaScript with `tsc`. */
+const compileVanilla = (root, checks) => compileWithTsc(root, checks, isReadersDomCode);
 
 /** Compile an Angular tree with `ngc` and `strictTemplates`, in this process. */
 async function compileWithNgc(root, checks) {
@@ -433,6 +556,7 @@ const COMPILERS = {
   angular: compileWithNgc,
   vue: compileWithVueTsc,
   svelte: compileWithSvelteCheck,
+  vanilla: compileVanilla,
 };
 
 /**

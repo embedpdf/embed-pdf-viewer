@@ -7,7 +7,7 @@ export function HeaderSearch() {
 
   return (
     <form onSubmit={(event) => event.preventDefault()}>
-      <input type="search" placeholder="Search" onChange={(event) => search.search(event.target.value)} />
+      <input type="search" placeholder="Search" onChange={(event) => search.search({ text: event.target.value })} />
       {hitCount > 0 && <span>{activeHitIndex + 1} of {hitCount}</span>}
       <button type="button" onClick={() => search.nextHit()}>Next</button>
     </form>

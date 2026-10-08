@@ -17,6 +17,11 @@
  * served from jsDelivr, an internal server when the folder is copied there.
  * No CDN URL is baked in: air-gapping the snippet is "copy the dist folder",
  * zero config. An explicit `engine` config still overrides it.
+ *
+ * The engine's worker files sit in the folder too (`embedpdf-worker.js`,
+ * `encoder-worker.js`). Served from the page's own origin, they start as they
+ * are, under `worker-src 'self'`; from a CDN, where a browser refuses a worker
+ * of another origin, the engine starts them from blob: URLs instead.
  */
 import wasmUrl from '@embedpdf/engine-runtime-wasm32/embedpdf.wasm?url&no-inline';
 import { registerLocalEngine } from '../local/register';

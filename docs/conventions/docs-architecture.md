@@ -142,6 +142,22 @@ framework, and run in `docs:check`:
   page is live for a framework when its snippets compile for it and none of the
   names its Methods, State or Events tables list is `pending`.
 
+The viewer's pages go through the same gate, for five integrations: the four frameworks and
+`vanilla`, a plain HTML page. Their snippets compile against `@embedpdf/viewer` at its source.
+A `.vanilla.html` snippet's module scripts are taken out of the page and type-checked as
+JavaScript, at the page's own line numbers. The reader's own DOM code (`event.target.value`) is
+left alone, and the CDN script resolves to the viewer. The page's elements are checked too:
+every `<embedpdf-viewer>` and `<epdf-*>` element must be declared in the viewer's types, every
+`<embedpdf-viewer>` attribute must be a config key, a `slot` must name one of the viewer's, on a
+child of the viewer, and a `<script src>` must be the CDN script or a path. The `js` and `ts`
+blocks a viewer page shows are checked against `ViewerConfig` for every integration, as the
+config is the same in each. `docs/content/scripts/viewer.mjs` holds these checks. A viewer page
+whose prose promises what the viewer doesn't do yet lists those gaps in
+`docs/content/viewer-pending.mjs`, each with why, and stays coming for every integration until
+they're removed, however little code it has. In CI, `publish-gate.mjs --strict` (the docs gate
+job in `.github/workflows/packages.yml`) fails when a check crashes or stops checking, or a
+headless page's snippets don't compile; a viewer page that's coming fails nothing.
+
 Live examples (`docs/content/samples/`) are complete apps, so every one must compile.
 `docs/content/scripts/samples.mjs` checks them straight from `docs/content`, without syncing them
 into a site or starting one, reports per framework (React with `tsc`, Angular with `ngc`, Vue

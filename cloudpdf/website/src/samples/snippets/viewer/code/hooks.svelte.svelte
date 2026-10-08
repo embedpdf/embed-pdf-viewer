@@ -7,7 +7,7 @@
 </script>
 
 <form onsubmit={(event) => event.preventDefault()}>
-  <input type="search" placeholder="Search" oninput={(event) => search.search(event.currentTarget.value)} />
+  <input type="search" placeholder="Search" oninput={(event) => search.search({ text: event.currentTarget.value })} />
   {#if state.hitCount > 0}<span>{state.activeHitIndex + 1} of {state.hitCount}</span>{/if}
   <button type="button" onclick={() => search.nextHit()}>Next</button>
 </form>

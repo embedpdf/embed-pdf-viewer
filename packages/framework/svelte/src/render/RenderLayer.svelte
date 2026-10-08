@@ -91,5 +91,5 @@
   style="position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none"
 />
 {#if tiles && settings.current?.tiles}
-  <TilePlane {annotations} fadeMs={settings.current.fadeMs} />
+  <TilePlane {annotations} />
 {/if}

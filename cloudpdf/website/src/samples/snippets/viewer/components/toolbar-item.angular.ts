@@ -1,5 +1,5 @@
 import { Component, inject } from '@angular/core';
-import { EpdfPdfViewer, EpdfToolbarItem } from '@embedpdf/viewer-angular';
+import { EpdfPdfViewer, EpdfToolbarItem, type Layout } from '@embedpdf/viewer-angular';
 import { Versions } from './versions'; // your app
 
 @Component({
@@ -19,6 +19,6 @@ import { Versions } from './versions'; // your app
 })
 export class Contract {
   protected readonly versions = inject(Versions);
-  readonly layout = (layout) =>
+  readonly layout = (layout: Layout) =>
     layout.add({ custom: 'versions', command: 'acme:versions' }, { to: 'main', section: 'start' });
 }

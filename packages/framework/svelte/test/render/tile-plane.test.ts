@@ -1,5 +1,5 @@
 import { flushSync } from 'svelte';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { waitFor } from '@testing-library/svelte';
 import { toPageRef } from '@embedpdf/core';
 import type { CapabilityToken } from '@embedpdf/core';
@@ -128,4 +128,5 @@ describe('the tile plane', () => {
     expect(render.view.release).toHaveBeenCalledWith(toPageRef(1));
     expect(render.view.dispose).toHaveBeenCalledTimes(1);
   });
+
 });

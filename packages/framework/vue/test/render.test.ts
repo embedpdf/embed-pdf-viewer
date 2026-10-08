@@ -64,7 +64,7 @@ function fakeRender({ tiles }: { tiles: boolean }) {
   const keyOf = (page: PageRef, includeAnnotations = true) =>
     `page-${page.objectNumber}-${includeAnnotations ? 'with' : 'without'}`;
   const api = {
-    getPaintSettings: () => ({ fadeMs: 0, tiles }),
+    getPaintSettings: () => ({ tiles }),
     getSourceKey: (page: PageRef, options: { includeAnnotations?: boolean }) =>
       keyOf(page, options.includeAnnotations),
     renderSource: (page: PageRef, options: { includeAnnotations?: boolean }) => {

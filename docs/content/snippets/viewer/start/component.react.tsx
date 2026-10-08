@@ -1,7 +1,7 @@
-import { PDFViewer, ToolbarItem } from '@embedpdf/viewer-react';
+import { PDFViewer, ToolbarItem, type Layout } from '@embedpdf/viewer-react';
 import { useDocumentStatus } from './my-app';
 
-const layout = (layout) => layout.add({ custom: 'status' }, { to: 'main', section: 'end' });
+const layout = (layout: Layout) => layout.add({ custom: 'status' }, { to: 'main', section: 'end' });
 
 function DocumentStatus() {
   const status = useDocumentStatus(); // your own app state

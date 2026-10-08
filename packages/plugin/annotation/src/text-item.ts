@@ -1,11 +1,11 @@
 /**
  * The free-text presentation projection: the core's geometry-only `textBoxes`
  * joined with the DTO-derived font + CSS into render-ready {@link TextItem}s. This
- * is the text analogue of the core's `scene()` "paint" for shapes — it lives in
- * the plugin (not the portable core) because the font→CSS stack mapping and the
- * engine `Color`→CSS seam are web concerns, shared across every web framework.
+ * is the text analogue of the core's `scene()` "paint" for shapes, shared across
+ * every web framework; the font's CSS family is the core's `cssFontFamilyForFont`.
  */
 import {
+  cssFontFamilyForFont,
   initialTextStyle,
   type Model,
   refOf,
@@ -17,7 +17,7 @@ import {
 import type { PageRef } from '@embedpdf/engine-core/runtime';
 
 import type { TextItem } from './contract';
-import { cssFontFamilyForFont, stripBodyDefaults } from './rich-text';
+import { stripBodyDefaults } from './rich-text';
 import { styleOf, textOf } from '@embedpdf/core-annotation';
 
 /** Project the model's free-text boxes into render-ready {@link TextItem}s — the

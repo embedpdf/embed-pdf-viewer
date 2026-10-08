@@ -74,6 +74,20 @@ export function useKernel(): Kernel {
   return kernel;
 }
 
+export interface KernelProviderProps {
+  kernel: Kernel;
+  children?: React.ReactNode;
+}
+/**
+ * Give a subtree a kernel someone else created and owns, so every hook in it
+ * works against that kernel. The full viewer's wrapper puts the children it
+ * slots into the viewer inside one. The provider never starts or destroys the
+ * kernel; `<Viewer>` is the component that owns one.
+ */
+export function KernelProvider({ kernel, children }: KernelProviderProps) {
+  return <KernelCtx.Provider value={kernel}>{children}</KernelCtx.Provider>;
+}
+
 export const shallowArray = <T,>(left: readonly T[], right: readonly T[]): boolean =>
   left === right || (left.length === right.length && left.every((item, i) => item === right[i]));
 

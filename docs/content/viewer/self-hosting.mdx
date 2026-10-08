@@ -101,10 +101,17 @@ else, copy `workers/embedpdf-worker.js`, `workers/encoder-worker.js` and
 finds the WebAssembly as its own sibling:
 
 ```js
-{ engine: { worker: '/vendor/embedpdf/embedpdf-worker.js' } }
+{
+  engine: {
+    worker: '/vendor/embedpdf/embedpdf-worker.js',
+    encoderWorker: '/vendor/embedpdf/encoder-worker.js',
+  },
+}
 ```
 
-`encoderWorker: false` encodes images on the main thread instead.
+`encoderWorker: false` encodes images on the main thread instead. Builds that can't emit worker
+files (Angular, plain esbuild with the portable entry) start both workers from `blob:` URLs unless
+you set these two.
 WebAssembly itself needs `script-src 'wasm-unsafe-eval'`. The whole policy is
 on [Security & CSP](concepts/security).
 
@@ -126,7 +133,7 @@ in their browser's IndexedDB, never sent anywhere.
 
 The snippet, `dist/embedpdf.js`, is the one artifact designed to be loaded
 from another origin. Its folder is the unit of delivery: the entry, its
-`chunks/`, and `embedpdf.wasm` beside it. Every sibling is referenced by a
+`chunks/`, and `embedpdf.wasm`, `embedpdf-worker.js` and `encoder-worker.js` beside it. Every sibling is referenced by a
 path relative to the folder, so serving that folder from jsDelivr, from your
 own CDN, or from an intranet server is the same operation, and no URL in the
 code names any of them. Copy the folder, never the file alone.

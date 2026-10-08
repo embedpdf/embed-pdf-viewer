@@ -3,20 +3,25 @@
  * tsdown's dist clean never wipes them and publint sees them — this script
  * runs BEFORE epdf-build):
  *
- *   - embedpdf-worker.js         self-contained ESM worker: bootstrap +
+ *   - embedpdf-worker.js         self-contained worker: bootstrap +
  *                              engine-services + the Emscripten glue statically
  *                              bundled; only embedpdf.wasm stays external (the
- *                              worker init message says where it lives).
- *                              This file is ALSO what strict-CSP users copy
- *                              next to embedpdf.wasm as a same-origin worker.
- *   - embedpdf-worker.source.js  the same bundle as a string module — the
- *                              default inline delivery. localEngine() lazily
- *                              imports it (its own chunk in every bundler) and
- *                              spawns a blob worker from it.
+ *                              worker init message says where it lives, or the
+ *                              glue finds it as the script's sibling). The
+ *                              default delivery: src/worker-files.ts points the
+ *                              consumer's bundler at it, which copies it
+ *                              verbatim. Self-hosters copy it too.
+ *   - embedpdf-worker.source.js  the same bundle as a string module, for the
+ *                              blob: delivery (`worker: 'inline'`, and the
+ *                              viewer loaded from another origin than the page).
  *   - encoder-worker.js        the image-encoder worker, emitted verbatim from
  *                              src/render/encoder-worker-source.ts so the blob
- *                              and static deliveries can never drift.
+ *                              and file deliveries can never drift.
  *
+ * The engine worker holds no `import.meta`: the glue's own reference becomes
+ * `self.location.href` (the same URL in a worker), so a bundler that parses
+ * the file instead of copying it finds no asset reference to resolve, and the
+ * file runs as a module or a classic script alike.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -48,12 +53,11 @@ await esbuild.build({
   target: 'es2020',
   minify: true,
   legalComments: 'none',
-  // The glue's own `new URL('embedpdf.wasm', import.meta.url)` fallback stays in
-  // the bundle deliberately: when this file runs as a real URL worker (static
-  // copy or bundler-emitted) with no explicit wasm source configured, sibling
-  // resolution is exactly right. The inline blob delivery always receives an
-  // explicit wasmUrl instead (see src/wasm-source.ts).
-  logOverride: { 'empty-import-meta': 'silent' },
+  // The glue's `new URL('embedpdf.wasm', import.meta.url)` fallback stays, as
+  // `self.location.href`: a copied worker with no wasm source configured finds
+  // the wasm as its sibling. The bundled-file and blob deliveries always send
+  // an explicit wasmUrl instead (see src/wasm-source.ts).
+  define: { 'import.meta.url': 'self.location.href' },
 });
 
 const workerCode = fs.readFileSync(path.join(workersDir, 'embedpdf-worker.js'), 'utf8');

@@ -24,7 +24,7 @@ Content-Security-Policy:
 
 | Directive | Why the viewer needs it |
 | :-- | :-- |
-| `script-src 'wasm-unsafe-eval'` | The engine is WebAssembly, and the browser asks for this to compile any WebAssembly. It allows nothing else: no `eval`, no inline scripts. With CloudPDF, leave it out. |
+| `script-src 'wasm-unsafe-eval'` | The engine is WebAssembly, and the browser asks for this to compile any WebAssembly. It allows nothing else: no `eval`, no inline scripts. With CloudPDF it's needed only for Stamps and Signatures, which open their libraries in the browser. |
 | `worker-src 'self'` | The engine runs in a Web Worker, loaded from a file next to the viewer's |
 | `img-src blob: data:` | Pages are drawn into images the browser makes, and tool cursors are small inline images |
 | `connect-src 'self'` | The engine's WebAssembly, your documents, and any fonts or stamps you configure. Add each origin you load from. |
@@ -37,9 +37,30 @@ which the browser doesn't count as inline styles.
 ## Loading from a CDN
 
 A browser only starts a Web Worker from its own origin. When the viewer's script comes from
-jsDelivr, it starts the engine's worker from a `blob:` URL instead, so add `worker-src blob:`.
+jsDelivr, it starts the engine's workers from `blob:` URLs instead. Add the CDN to `script-src` and
+`connect-src` (the script, its chunks and the WebAssembly come from there), and allow `blob:`
+workers:
+
+```http
+script-src 'self' https://cdn.jsdelivr.net 'wasm-unsafe-eval';
+connect-src 'self' https://cdn.jsdelivr.net;
+worker-src blob:;
+```
+
 To keep `worker-src 'self'`, serve the viewer's files from your own site: install it from npm, or
 copy its folder. See [Self-hosting](../self-hosting).
+
+## Builds that use `blob:` workers
+
+Most bundlers (Vite, webpack, Rspack, Parcel) emit the workers as files of your build, so
+`worker-src 'self'` covers them. Two builds can't, and start the workers from `blob:` URLs, so they
+need `worker-src blob:`:
+
+- **Angular**, which loads the engine's portable build;
+- **plain esbuild**, with `@embedpdf/viewer/portable`.
+
+To keep `worker-src 'self'` there, copy the two worker files to your site and point the viewer at
+them: see [Self-hosting](../self-hosting#workers-and-content-security-policy).
 
 ## A PDF you can't trust
 

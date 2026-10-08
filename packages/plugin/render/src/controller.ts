@@ -460,8 +460,8 @@ export function createRenderController(ctx: PluginContext<RenderState, RenderSet
 
   // What the layers paint with: the same object until a setting it reads changes.
   const paintSettings = memo(
-    () => [resolvedOptions().tiles.fadeMs, resolvedOptions().tiles.enabled] as const,
-    (fadeMs, enabled): PaintSettings => Object.freeze({ fadeMs, tiles: enabled }),
+    () => [resolvedOptions().tiles.enabled] as const,
+    (enabled): PaintSettings => Object.freeze({ tiles: enabled }),
   );
 
   // A settings change reaches every view's plans at once: re-plan what they show.

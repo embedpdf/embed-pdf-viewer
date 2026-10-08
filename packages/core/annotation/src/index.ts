@@ -74,6 +74,8 @@ export {
   type RichTextRange,
   type RichTextStyleDelta,
 } from './richtext';
+// The CSS family the browser draws an annotation's font with.
+export { STANDARD_FONT_STACKS, cssFontFamilyForFont, mountedFontFamily } from './font-css';
 export { groupKeyOf, groupMembers, expandGroups, groupCaps, type GroupCaps } from './group';
 export { isAttachedLink, isConversationOnly, isSubstrateOnly } from './plane';
 export { linkChildrenOf, linkOf } from './links';

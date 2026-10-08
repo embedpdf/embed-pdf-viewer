@@ -2,7 +2,7 @@
   import { PDFViewer, type Viewer } from '@embedpdf/viewer-svelte';
 
   function onready(viewer: Viewer) {
-    viewer.documents.onOpened(() => viewer.get('search').search('total'));
+    viewer.documents.onOpened(() => viewer.get('search').search({ text: 'total' }));
   }
 </script>
 

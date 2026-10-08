@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import { PDFViewer, ToolbarItem } from '@embedpdf/viewer-vue';
+import { PDFViewer, ToolbarItem, type Layout } from '@embedpdf/viewer-vue';
 import { useVersions } from './versions'; // your app
 
 const { versions, current, currentUrl, select } = useVersions();
 
-const layout = (layout) =>
+const layout = (layout: Layout) =>
   layout.add({ custom: 'versions', command: 'acme:versions' }, { to: 'main', section: 'start' });
 </script>
 

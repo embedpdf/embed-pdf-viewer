@@ -26,7 +26,6 @@ import {
   signal,
   untracked,
   viewChild,
-  ViewEncapsulation,
 } from '@angular/core';
 import {
   RenderToken,
@@ -46,7 +45,7 @@ import {
   type EpdfPageContext,
 } from '@embedpdf/angular/runtime';
 
-const NO_PAINT_SETTINGS: PaintSettings = Object.freeze({ fadeMs: 0, tiles: false });
+const NO_PAINT_SETTINGS: PaintSettings = Object.freeze({ tiles: false });
 const NO_PLAN: TilePaintPlan = Object.freeze({
   engaged: false,
   paint: [],
@@ -104,9 +103,6 @@ export class EpdfTileImage {
   selector: 'epdf-tile-plane',
   imports: [EpdfTileImage],
   changeDetection: ChangeDetectionStrategy.OnPush,
-  // The fade's keyframes, by their own name, so the inline animation finds them.
-  encapsulation: ViewEncapsulation.None,
-  styles: '@keyframes epdf-tile-in { from { opacity: 0 } to { opacity: 1 } }',
   template: `
     @if (plan().paint.length > 0) {
       <!-- Its own stacking context: the tiles' z-index ranks stay inside it, below the
@@ -128,7 +124,6 @@ export class EpdfTileImage {
             [style.width.px]="tile.rect.width * page.transform().viewScale"
             [style.height.px]="tile.rect.height * page.transform().viewScale"
             [style.z-index]="tile.z"
-            [style.animation]="fadeMs() > 0 ? 'epdf-tile-in ' + fadeMs() + 'ms ease-out' : null"
             (load)="checkSize($event, tile)"
           />
         }
@@ -138,7 +133,6 @@ export class EpdfTileImage {
 })
 export class EpdfTilePlane {
   readonly annotations = input.required<boolean>();
-  readonly fadeMs = input.required<number>();
 
   protected readonly page = injectPage('<epdf-render-layer>');
   private readonly render = renderOf(this.page, '<epdf-render-layer>');
@@ -219,7 +213,7 @@ export class EpdfTilePlane {
       style="position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none"
     />
     @if (tiles() && paintSettings().tiles) {
-      <epdf-tile-plane [annotations]="annotations()" [fadeMs]="paintSettings().fadeMs" />
+      <epdf-tile-plane [annotations]="annotations()" />
     }
   `,
 })
