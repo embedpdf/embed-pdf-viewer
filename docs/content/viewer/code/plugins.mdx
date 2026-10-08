@@ -1,0 +1,105 @@
+---
+title: Plugins
+description: Every feature of the viewer is a headless plugin. Set any plugin's settings, change them while the viewer runs, use their hooks in your components, and add a plugin of your own.
+---
+
+# Plugins
+
+The viewer is the [headless](/docs/headless) plugins with an interface built on top. Every feature
+is a plugin: search is the search plugin, the comments panel uses the annotation plugin's comments.
+So everything the headless docs say about a plugin is true inside the viewer, with the same names:
+
+- its **settings** go in `plugins`, under its name;
+- its **API** is `viewer.get(name)`;
+- its **hooks** work in your own components inside the viewer.
+
+## Every plugin
+
+| Name | What it does | Headless page |
+| :-- | :-- | :-- |
+| `stage` | Scrolling, zoom, page layout and navigation | [Scroll, zoom & layout](/docs/headless/viewing/stage) |
+| `render` | Sharp pages at every zoom | [Rendering](/docs/headless/viewing/render) |
+| `link` | Links to pages and websites | [Links](/docs/headless/viewing/links) |
+| `selection` | Selecting and copying text | [Selecting & copying](/docs/headless/text/selection) |
+| `search` | Finding text | [Search](/docs/headless/text/search) |
+| `annotation` | Annotations, their tools, and comments | [Annotations](/docs/headless/annotations) |
+| `stamp` | Stamp libraries | [Stamps](/docs/headless/annotations/stamps) |
+| `measurement` | Measuring at a drawing's scale | [Measurements](/docs/headless/annotations/measurements) |
+| `redaction` | Removing content for good | [Redaction](/docs/headless/annotations/redaction) |
+| `form` | Filling and building forms | [Filling forms](/docs/headless/forms) |
+| `signature` | Signing and checking signatures | [Signatures](/docs/headless/forms/signatures) |
+| `pageEdit` | Rotating, moving, inserting and deleting pages | [Organizing pages](/docs/headless/documents/pages) |
+| `metadata` | A document's title, author and your own fields | [Metadata](/docs/headless/documents/metadata) |
+| `actions` | What a PDF does by itself: buttons, scripts, printing | [Actions & scripts](/docs/headless/documents/actions) |
+| `documents` | Opening, closing, tabs and saving | [Opening documents](/docs/headless/documents/opening) |
+| `interaction` | The active tool, cursors and touch | [Tools, cursors & touch](/docs/headless/ui/tools) |
+| `commands` | Every button's action, and shortcuts | [Commands & shortcuts](/docs/headless/ui/commands) |
+| `shell` | Which panels and menus are open | [Panels & dialogs](/docs/headless/ui/panels) |
+| `i18n` | The language | [Translations](/docs/headless/ui/translations) |
+
+## Settings
+
+`plugins` takes each plugin's settings by its name, exactly as its page lists them under
+**Settings**:
+
+```js
+{
+  plugins: {
+    stage: { spread: 'odd', zoom: { mode: 'fit-width' } },
+    selection: { color: 'rgb(124 58 237 / 0.3)' },
+    actions: { javascript: { enabled: false } },
+  },
+}
+```
+
+Change them while the viewer runs, and go back to what you set:
+
+```js
+viewer.get('stage').updateSettings({ layout: 'horizontal' });
+viewer.get('stage').resetSettings();
+```
+
+A few plugins take settings that only the viewer has, such as the standard stamps of
+`plugins.stamp`. The feature pages list them: [Annotations](../features/annotations),
+[Forms & signatures](../features/forms-and-signatures).
+
+## In your components
+
+Your own components inside the viewer can use every headless hook. Install the headless adapter
+for your framework next to the viewer (`@embedpdf/react`, `@embedpdf/vue`, `@embedpdf/svelte` or
+`@embedpdf/angular`, the same version), and use its hooks as the headless docs show them:
+
+<Snippet name="viewer/code/hooks" />
+
+Put `HeaderSearch` in the viewer's `header` [region](../customize/components#above-below-and-when-nothing-is-open),
+and it searches the open document. The hooks find the viewer they're in, and the document that's
+active, by themselves.
+
+## A plugin of your own
+
+A plugin you wrote for headless works in the viewer too. Give it a name in `plugins`:
+
+```js
+import { analyticsPlugin } from './analytics-plugin';
+
+export const config = {
+  plugins: {
+    analytics: analyticsPlugin({ endpoint: '/api/events' }),
+  },
+};
+```
+
+`viewer.get('analytics')` is then its API, its commands can go in the [layout](../customize/layout),
+and your components can use its hooks. See [How it works](/docs/headless/concepts/how-it-works#plugins)
+in the headless docs for writing one.
+
+## When to build your own interface
+
+The viewer lets you move, add and replace everything around the pages. Go [headless](/docs/headless)
+when you need to change what it doesn't open up:
+
+- the look of its own buttons, menus and panels beyond [theming](../customize/theming);
+- an arrangement that isn't bars, panels and regions;
+- what's drawn on the pages themselves, such as annotations drawn your own way.
+
+Everything on this page carries over: the same plugins, settings, names and hooks.

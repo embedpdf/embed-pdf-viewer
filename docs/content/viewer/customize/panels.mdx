@@ -1,0 +1,118 @@
+---
+title: Panels
+description: Move the built-in panels, choose how they open, set their width, and add your own.
+---
+
+# Panels
+
+Panels hold what sits next to the pages: thumbnails, the outline, search results, comments. Each
+one has a button, `panel:<id>`, and a side. Move one with `panel(id, changes)`:
+
+```js
+{
+  layout: (layout) => layout.panel('thumbnails', { side: 'end' }),
+}
+```
+
+## The built-in panels
+
+| Panel | What's in it | Side | Opens with |
+| :-- | :-- | :-- | :-- |
+| `thumbnails` | A small picture of every page; pick one to go there | `start` | `panel:thumbnails` |
+| `outline` | The document's table of contents | `start` | `panel:outline` |
+| `attachments` | Files inside the PDF | `start` | `panel:attachments` |
+| `search` | Find text, and every match in context | `end` | `panel:search`, `Ctrl`/`Cmd`+`F` |
+| `comments` | Every comment and its replies | `end` | `panel:comments` |
+| `style` | Color, width and font of the selected annotation, or of the tool | `end` | `panel:style` |
+| `stamps` | Stamp libraries; pick one, then click the page | `end` | `panel:stamps` |
+| `signatures` | Saved signatures and initials; the document's signatures | `end` | `panel:signatures` |
+| `redaction` | Marked areas waiting to be removed | `end` | `panel:redaction` |
+| `measurement` | The scale, and every measurement on the page | `end` | `panel:measurement` |
+
+A panel whose feature you [turn off](../features/turning-off) is gone, with its button.
+
+## How a panel opens
+
+A panel opens in one of three ways:
+
+| `present` | What it does |
+| :-- | :-- |
+| `'dock'` | Beside the pages, which make room for it |
+| `'overlay'` | Over the edge of the pages, which stay where they are; a click on the pages closes it |
+| `'sheet'` | Up from the bottom of the viewer, over the pages |
+
+By default a panel docks when the viewer is wide, overlays at medium widths, and is a sheet on a
+phone. Choose one yourself for every size, or per size with the layout function's
+[`env`](small-screens):
+
+```js
+{
+  layout: (layout, env) =>
+    layout
+      .panel('comments', { present: 'overlay' })
+      .panel('thumbnails', { present: env.size === 'compact' ? 'sheet' : 'dock' }),
+}
+```
+
+## Width
+
+A docked panel is 288 px wide unless you say otherwise. People can drag its edge to make it wider
+or narrower, and the viewer remembers that width.
+
+```js
+layout.panel('comments', { width: 360 });
+```
+
+## Panels on the same side
+
+One panel shows per side at a time. Opening another on that side closes the first, and the panel's
+header switches between the panels that share its side. Both sides can be open at once: the
+thumbnails on the left and the comments on the right.
+
+## Remove a panel
+
+```js
+layout.removePanel('attachments');
+```
+
+Its button goes with it, from every bar and menu.
+
+## Open a panel from code
+
+Run its command:
+
+```js
+viewer.commands.execute('panel:comments');
+```
+
+## Your own panel
+
+Add it with `addPanel(id, panel)` and give the viewer what goes inside:
+
+```js
+layout.addPanel('notes', { side: 'end', title: 'Notes', icon: 'book' });
+```
+
+| Field | What it is | Default |
+| :-- | :-- | :-- |
+| `side` | `'start'` or `'end'` | `'end'` |
+| `title` | Its title, in its header; or `titleKey` for a [translated](translations) one | none |
+| `icon` | Its button's icon | none |
+| `present` | `'dock'`, `'overlay'` or `'sheet'` | by the viewer's size |
+| `width` | Its width when docked, in px | `288` |
+
+The viewer draws the frame, the header and the way it opens; you draw what's inside. See [Your own
+components](components#a-panel-of-your-own) for the content in each framework.
+
+## Good to know
+
+### Each document keeps its panels
+
+With several documents open, each one remembers which panels were open, so switching tabs brings
+them back.
+
+### Focus
+
+An overlay or a sheet takes focus when it opens and gives it back to its button when it closes;
+`Escape` closes it. A docked panel doesn't take focus: it's part of the page, and `Tab` reaches it
+in order.

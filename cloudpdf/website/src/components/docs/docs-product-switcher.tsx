@@ -22,7 +22,7 @@ const PRODUCTS: DocsProductItem[] = [
   {
     key: 'viewer',
     label: 'Viewer',
-    href: '/docs/viewer/getting-started',
+    href: '/docs/viewer',
     icon: <BoltBadgeIcon />,
     tintClass: 'bg-[#E3EFFF] text-[#1677FF]',
   },

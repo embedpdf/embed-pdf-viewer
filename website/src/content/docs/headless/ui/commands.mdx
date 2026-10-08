@@ -107,6 +107,7 @@ A disabled command is still in the results, so show it greyed out.
 | `active`      | When it shows as pressed, such as the current tool                               |
 | `visible`     | When it shows at all                                                             |
 | `run`         | What it does                                                                     |
+| `requires`    | The [permissions](../concepts/permissions) it needs, such as `'doc.annotate.modify'`. Without them, it's hidden. |
 | `categories`  | Groups you can turn off together                                                 |
 | `panel`, `menu`, `modal` | A command that opens a [panel, menu or dialog](panels) needs no `run`  |
 
@@ -178,5 +179,7 @@ Set them when you register the plugin, and change them while the app runs with
 
 ### Commands and permissions
 
-A command's `enabled` is where permission checks go: `({ get }) => get(AnnotationToken).canCreate()`.
-The standard commands already check theirs.
+A command that needs a permission says so with `requires: ['doc.annotate.modify']`. When the user
+doesn't have it, the command isn't visible, so its buttons and menu rows are gone, and its shortcut
+does nothing. Keep `enabled` for what can't run right now, such as **Copy** with nothing selected.
+The standard commands already say what they need.

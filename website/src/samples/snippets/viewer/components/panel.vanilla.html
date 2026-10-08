@@ -1,0 +1,16 @@
+<embedpdf-viewer id="viewer" src="/report.pdf" style="height: 100vh">
+  <section slot="panel:notes" class="notes">
+    <textarea placeholder="Your notes"></textarea>
+  </section>
+</embedpdf-viewer>
+
+<script type="module">
+  import 'https://cdn.jsdelivr.net/npm/@embedpdf/viewer@3/dist/embedpdf.js';
+
+  document.getElementById('viewer').config = {
+    layout: (layout) =>
+      layout
+        .addPanel('notes', { side: 'end', title: 'Notes', icon: 'book' })
+        .add('panel:notes', { to: 'main', section: 'end' }),
+  };
+</script>

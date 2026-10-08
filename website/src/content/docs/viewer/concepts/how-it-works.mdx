@@ -1,0 +1,82 @@
+---
+title: How it works
+description: What's inside the viewer's tag, why your page's CSS can't break it, how your components end up inside it, and what loads when.
+---
+
+{/* Generated from docs/content — edit there, then `pnpm docs:sync`. */}
+
+# How it works
+
+The viewer is one HTML element, `<embedpdf-viewer>`, with the whole interface inside it. The
+framework packages are thin wrappers that render that element, so the viewer is the same in every
+framework, and an update to it reaches all of them at once.
+
+## Its own box
+
+The viewer draws inside its own [shadow DOM](https://developer.mozilla.org/docs/Web/API/Web_components/Using_shadow_DOM),
+so your page and the viewer can't change each other by accident:
+
+- Your page's CSS doesn't reach inside: not a global `button { … }` rule, not a CSS reset, not
+  `html { font-size: 62.5% }`, not your `body` font or line height. The viewer sets its own sizes
+  in pixels and its own text styles, so it looks the same on every page.
+- The viewer's CSS doesn't reach outside, so it never changes your page.
+- What you aim at it does reach it: its [CSS variables](../customize/theming#from-css) and its
+  parts, through `::part()`.
+
+Everything that belongs to the viewer stays inside its box: panels, sheets and dialogs, so a
+dialog in a viewer that fills half your page covers that half, not your page. Menus and tooltips
+may reach past its edge, like a menu in any app. They open in the browser's top layer, so they're
+never hidden behind your page's own headers, and no `z-index` on your page is needed.
+
+## Your components stay yours
+
+When you put [your own component](../customize/components) in the viewer, it isn't moved into the
+viewer. It stays where your framework rendered it, as a child of the `<embedpdf-viewer>` element,
+and the browser shows it in the place the viewer made for it, through a `<slot>`.
+
+That's why it keeps working the way you wrote it:
+
+- your framework renders and updates it, with your providers, your router, your store;
+- your CSS styles it, and the viewer's doesn't;
+- its events reach your handlers as usual.
+
+It does inherit the viewer's font, text color and CSS variables, so a plain element looks at home
+without any styling.
+
+## Plugins underneath
+
+Under the interface are the [headless plugins](../code/plugins): stage, render, search,
+annotation, form and the rest. Every button runs a command, every command talks to a plugin, and
+the `viewer` gives you the same plugins. The interface holds no state of its own that you can't
+reach.
+
+## The engine
+
+The PDF engine is PDFium, compiled to WebAssembly. It runs in a Web Worker, so a heavy page never
+freezes your app, and its files come from your own build or your own server. With CloudPDF, the
+engine runs on your server instead, and pages arrive as images.
+
+## What loads when
+
+The toolbar and panels show at once, while the engine starts in the background. The pages show as
+soon as the document is open. A feature's code loads the first time someone uses it: a viewer that's
+only read never loads the form builder, the signature dialogs or the annotation tools.
+
+## Good to know
+
+### React, Vue, Svelte, Angular
+
+Inside, the viewer is built with Preact and ships as one finished file, so it doesn't use your
+framework's copy and doesn't care which version you have. The wrapper for your framework only
+passes your config in and your components through.
+
+### Server-side rendering
+
+On the server, the wrapper renders an empty `<embedpdf-viewer>` element of the size you gave it. The
+viewer starts in the browser, when the page loads. See [Setup](../setup#server-side-rendering).
+
+### Accessibility
+
+Bars are toolbars to a screen reader, and arrow keys move between their buttons. Menus are menus,
+panels are labeled regions, and dialogs trap focus until they close. Every button has a label from
+its command, in the user's language.

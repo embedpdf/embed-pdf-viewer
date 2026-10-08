@@ -1,0 +1,119 @@
+---
+title: Forms & signatures
+description: Let people fill in and build PDF forms, sign with a drawn, typed or uploaded signature, and check the signatures a document carries.
+---
+
+{/* Generated from docs/content — edit there, then `pnpm docs:sync`. */}
+
+# Forms & signatures
+
+A PDF with a form can be filled in as soon as it opens: text fields, checkboxes, radio buttons,
+lists, and the form's own checks and calculations. The values are saved in the file when it's
+downloaded, so they open the same in Acrobat.
+
+## Read and fill in values from code
+
+`viewer.get('form')` is the form plugin. Fill in what you already know, and read what people
+entered:
+
+```js
+const form = viewer.get('form');
+
+await form.importValues({
+  'customer.name': 'Ada Lovelace',
+  'customer.email': 'ada@example.com',
+});
+const values = await form.exportValues(); // { 'customer.name': 'Ada Lovelace', … }
+```
+
+`onValueChanged` fires for every change, from people or from your code. See [Filling
+forms](/docs/headless/forms#methods) for every method.
+
+## Build a form
+
+In the **Form** mode, people add text fields, checkboxes, radio buttons, dropdowns, lists and
+signature fields, by dragging a box where each one goes, and give each one its name and options.
+To let people fill in a form but not change its fields, turn off building, and the Form mode is
+gone:
+
+```js
+{ disable: ['forms.building'] }
+```
+
+For a form people fill in and can't otherwise change, use
+`{ readOnly: { except: ['forms.filling'] } }`: see [Read-only](turning-off#read-only).
+
+## Form settings
+
+```js
+{
+  plugins: {
+    form: { validation: 'none', focus: { color: '#7c3aed' } },
+  },
+}
+```
+
+`validation: 'none'` accepts every value without running the form's own checks. Every setting is
+on [Filling forms](/docs/headless/forms#settings).
+
+## Signatures
+
+In the **Insert** mode, the signature button opens the signatures panel: one row per person, with
+their drawn, typed or uploaded signature and, if they want, their initials. People pick a mark and
+click a signature field to sign it, or click anywhere else to place it as a stamp. A click on an
+unsigned field starts there: the next mark picked goes in.
+
+What signing does depends on whether you give the viewer a key:
+
+```js
+{
+  plugins: {
+    signature: {
+      // your key, a signing service, or one kept in the browser
+      key: () => mySigningService.signer(),
+      trust: { anchors: async () => [rootCertificate] },
+      mode: 'ask',
+      allowCertify: true,
+      kinds: ['signature'], // no initials
+      fonts: [{ key: 'great-vibes', url: '/fonts/GreatVibes.ttf', label: 'Great Vibes' }],
+    },
+  },
+}
+```
+
+| Setting | What it does | Default |
+| :-- | :-- | :-- |
+| `key` | The signer, or a function that returns one when someone signs | none: a mark is only drawn into the field |
+| `mode` | `'sign'` seals the document, `'visual'` only draws, `'ask'` shows a dialog first | `'sign'` with a key, else `'visual'` |
+| `trust` | The certificates you trust, for checking signatures | none |
+| `allowCertify` | Let the first signature be a certification, which sets what may still change | `false` |
+| `kinds` | Which marks people keep: `'signature'`, `'initials'` | both |
+| `fonts` | Fonts for typed signatures | three handwriting fonts |
+
+`kinds` and `fonts` are the viewer's; the others are the [signature
+plugin's](/docs/headless/forms/signatures#settings).
+
+## Check signatures
+
+A click on a signed field shows its verdict: whether the document is unchanged since it was
+signed, whether the signature is valid, whether you trust the signer, and what changed since. It
+offers the signed revision as a download. The panel also says what a save would do: after an
+unsaved annotation, an approval signature reads "valid; unsaved changes will invalidate it", the
+way Acrobat warns.
+
+`viewer.get('signature')` gives you the same from code: see
+[Signatures](/docs/headless/forms/signatures#methods).
+
+## Good to know
+
+### Where keys live
+
+`personalSigner()` keeps one self-signed identity per person in the browser's storage, which is
+enough for a signature that proves the document hasn't changed. For a signature people outside
+your app trust, use your own key with `webCryptoSigner()` or a signing service with
+`remoteSigner()`. All three come from your viewer package.
+
+### Forms that run scripts
+
+A form's own JavaScript, for checks and calculations, runs in a sandbox with no access to your
+page. It can't open windows, fetch anything or read cookies.

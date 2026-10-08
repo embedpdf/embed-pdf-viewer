@@ -51,16 +51,18 @@ const MAX_ERRORS = 20;
 /**
  * Every snippet file: its framework, the name pages include it by, and the path the page shows.
  * A snippet is one file (`search/search-box.react.tsx`) or a directory of files, entry first
- * (`start/highlighter.vue/App.vue`).
+ * (`start/highlighter.vue/App.vue`). The viewer's snippets (`viewer/`, with plain-HTML
+ * `vanilla` versions) are the viewer docs', which this check doesn't cover yet.
  */
 function readSnippets() {
-  return walk(snippetsRoot).map((absolute) => {
+  return walk(snippetsRoot).flatMap((absolute) => {
     const file = toPosix(path.relative(snippetsRoot, absolute));
+    if (file.startsWith('viewer/')) return [];
     const match = file.match(/^(.*)\.(react|vue|svelte|angular)(\.[a-z]+$|\/)/);
     if (!match)
       throw new Error(`snippets/${file}: no framework in its name (<name>.<framework>.<ext>)`);
     const [, name, framework] = match;
-    return { file, name, framework, shownAs: file.replace(`.${framework}`, '') };
+    return [{ file, name, framework, shownAs: file.replace(`.${framework}`, '') }];
   });
 }
 

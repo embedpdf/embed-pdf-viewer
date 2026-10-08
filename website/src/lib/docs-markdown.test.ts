@@ -9,8 +9,8 @@ const quickStart = fs.readFileSync(
   path.resolve(process.cwd(), 'src/content/docs/headless/quick-start.mdx'),
   'utf8',
 );
-const viewerGettingStarted = fs.readFileSync(
-  path.resolve(process.cwd(), 'src/content/docs/viewer/getting-started.mdx'),
+const viewerQuickStart = fs.readFileSync(
+  path.resolve(process.cwd(), 'src/content/docs/viewer/quick-start.mdx'),
   'utf8',
 );
 
@@ -54,22 +54,22 @@ describe('renderDocsMarkdown', () => {
 
   it('exports only the selected Viewer integration', () => {
     const markdown = renderDocsMarkdown({
-      sourceCode: viewerGettingStarted,
-      canonicalPath: '/docs/viewer/vue/getting-started',
+      sourceCode: viewerQuickStart,
+      canonicalPath: '/docs/viewer/vue/quick-start',
       integration: 'vue',
       metadata: {
-        title: 'Getting Started',
-        description: 'Drop the EmbedPDF viewer into any page in minutes.',
+        title: 'Quick start',
+        description: 'Install the viewer, show a PDF, and make it yours.',
       },
     });
 
-    expect(markdown).toContain('title: "Getting Started — Vue"');
+    expect(markdown).toContain('title: "Quick start — Vue"');
     expect(markdown).toContain('integration: "Vue"');
-    expect(markdown).toContain('pnpm add @embedpdf/vue-pdf-viewer');
-    expect(markdown).toContain("import { PDFViewer } from '@embedpdf/vue-pdf-viewer'");
-    expect(markdown).not.toContain('@embedpdf/react-pdf-viewer');
-    expect(markdown).not.toContain('@embedpdf/angular-pdf-viewer');
-    expect(markdown).not.toContain('<Example');
+    expect(markdown).toContain('@embedpdf/viewer-vue');
+    expect(markdown).toContain("import { PDFViewer } from '@embedpdf/viewer-vue'");
+    expect(markdown).not.toContain('@embedpdf/viewer-react');
+    expect(markdown).not.toContain('@embedpdf/viewer-angular');
+    expect(markdown).not.toContain('<Snippet');
   });
 
   it('fails when a custom component has no explicit Markdown projection', () => {

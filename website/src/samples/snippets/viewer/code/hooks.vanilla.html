@@ -1,0 +1,20 @@
+<embedpdf-viewer id="viewer" src="/report.pdf" style="height: 100vh">
+  <form slot="header" id="search-form">
+    <input type="search" placeholder="Search" id="query" />
+    <span id="count"></span>
+  </form>
+</embedpdf-viewer>
+
+<script type="module">
+  import 'https://cdn.jsdelivr.net/npm/@embedpdf/viewer@3/dist/embedpdf.js';
+
+  const element = document.getElementById('viewer');
+  element.addEventListener('epdf:ready', () => {
+    const search = element.viewer.get('search');
+    document.getElementById('query').oninput = (event) => search.search(event.target.value);
+    element.viewer.watch(
+      () => search.getHitCount(),
+      (count) => (document.getElementById('count').textContent = count ? `${count} matches` : ''),
+    );
+  });
+</script>

@@ -1,0 +1,86 @@
+---
+title: Small screens
+description: How the viewer adapts to a phone, a narrow column and a wide screen, and how to give each size a layout of its own.
+---
+
+# Small screens
+
+The viewer adapts to its own width, not the window's. On a phone, or in a narrow column of a wide
+screen, it gets a phone's layout: panels and menus slide up from the bottom, and buttons that don't
+fit move into the "More" menu. You don't set anything for this.
+
+To change what happens at a size, use the second argument of the layout function:
+
+```js
+{
+  layout: (layout, env) =>
+    env.size === 'compact' ? layout.place('main', 'bottom') : layout,
+}
+```
+
+On a phone, the main toolbar now sits at the bottom, under the thumb. The function runs again
+whenever the size changes, so turning the phone or resizing the window switches layouts as it
+happens.
+
+## The three sizes
+
+| `env.size` | The viewer's width | What the default does |
+| :-- | :-- | :-- |
+| `'compact'` | Under 600 px | Panels and menus are sheets from the bottom. The mode tabs become one dropdown. The page number hides while you scroll. |
+| `'medium'` | 600 to 1023 px | Panels open over the pages instead of pushing them aside. |
+| `'expanded'` | 1024 px and wider | Panels dock beside the pages. |
+
+At every size, a toolbar keeps what fits and moves the rest into its "More" menu, least important
+first (see [Layout](layout#when-theres-no-room)).
+
+## What `env` tells you
+
+| Field | What it is |
+| :-- | :-- |
+| `size` | `'compact'`, `'medium'` or `'expanded'` |
+| `width` | The viewer's width in px, for a size of your own: `env.width < 480` |
+| `touch` | Whether the main way of pointing is a finger |
+| `dir` | `'ltr'` or `'rtl'`, from the user's language |
+
+## Sheets
+
+A panel or a menu on a phone is a sheet: it slides up from the bottom of the viewer, over the
+pages, with a handle at the top.
+
+- Drag the handle to make it taller or shorter, or down to close it.
+- A tap on the pages above it closes it.
+- A sheet that holds a list, such as the thumbnails or the search results, closes when you pick
+  something, so you see where it took you.
+
+To make a panel a sheet at other sizes too, or never, set its `present`: see
+[Panels](panels#how-a-panel-opens).
+
+## Touch
+
+When `env.touch` is true, every button and menu row is at least 44 px tall, and the viewer listens
+for touch gestures: pinch to zoom, a long press to select a word, the handles to stretch the
+selection.
+
+## The notch and the home bar
+
+When the viewer reaches the edge of the screen, as it does in full screen or as the whole page of
+a phone app, its bars and sheets keep clear of the notch, the rounded corners and the home bar.
+
+## Good to know
+
+### Why the viewer's width, not the window's
+
+A viewer in a sidebar or a dashboard card is small even on a big screen, and the layout that works
+there is the phone's. Measuring the viewer itself gives every embed the right layout without media
+queries.
+
+### Change the sizes
+
+To switch at other widths, decide on `env.width` yourself:
+
+```js
+{
+  layout: (layout, env) =>
+    env.width < 720 ? layout.place('main', 'bottom') : layout,
+}
+```

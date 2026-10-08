@@ -1,0 +1,285 @@
+---
+title: Layout
+description: Put toolbars at any edge, several at once or floating over the pages, and add, move, replace or remove any button.
+---
+
+# Layout
+
+The layout says where every toolbar, button, menu and panel goes. Give `layout` a function: it gets
+the default layout and returns yours, one change per line.
+
+```js
+{
+  layout: (layout) => layout.place('main', 'bottom'),
+}
+```
+
+That moves the main toolbar to the bottom. Its menus now open upward, the mode tools sit above it,
+and nothing else changes. Every change returns a new layout, so changes chain:
+
+```js
+{
+  layout: (layout) =>
+    layout
+      .place('main', 'bottom')
+      .remove(['tool:pan', 'panel:comments'], { from: 'main' })
+      .add('document:print', { to: 'main', section: 'end' }),
+}
+```
+
+## The default layout
+
+| Bar | Where | What's in it |
+| :-- | :-- | :-- |
+| `main` | `top` | The document menu, thumbnails, view menu, zoom and tools; the mode tabs in the middle; search and comments at the end |
+| `annotate`, `shapes`, `insert`, `form`, `redact`, `measure` | Along `main`, one at a time | The tools of the mode whose tab is selected |
+| `pager` | Floating at the bottom | The page number |
+| `selection` | Over selected text | Copy, highlight, underline, strike out |
+| `annotation` | Over selected annotations | Comment, style, delete |
+
+The ids of every bar, group, menu and button are at the [end of this page](#every-built-in-id).
+
+## Move a toolbar
+
+`place(bar, place)` moves a bar. A place is one of these:
+
+| Place | Where the bar goes |
+| :-- | :-- |
+| `'top'`, `'bottom'` | Along the top or bottom edge, horizontal |
+| `'start'`, `'end'` | Along the left or right edge, vertical. In a right-to-left language they swap sides. |
+| `{ float: 'bottom' }` | Floating over the pages: `'top-start'`, `'top'`, `'top-end'`, `'start'`, `'end'`, `'bottom-start'`, `'bottom'` or `'bottom-end'` |
+| `{ with: 'main' }` | Along another bar, on the side of the pages. The mode bars ride along `main` this way, so they follow it wherever it goes. |
+| `{ at: 'selection' }`, `{ at: 'annotation' }` | Over selected text, or over selected annotations |
+
+You never say which way a menu opens or where a tooltip goes. A menu opens away from its bar's
+edge, toward the pages, and flips when there's no room. A vertical bar shows icons, with the
+labels as tooltips.
+
+## Several toolbars
+
+Add a bar with `addBar(id, bar)`. This one puts the drawing tools in a rail on the left, next to
+the main toolbar at the top:
+
+```js
+{
+  layout: (layout) =>
+    layout.addBar('tools', {
+      place: 'start',
+      start: [
+        ['tool:pointer', 'tool:pan'],
+        ['tool:highlight', 'tool:underline', 'tool:ink', 'tool:note'],
+        ['history:undo', 'history:redo'],
+      ],
+    }),
+}
+```
+
+Several bars can share an edge. They stack from the outside in, in the order you add them. To put a
+bar in a particular spot, say which bar it goes before or after:
+
+```js
+layout.addBar('review', {
+  place: { edge: 'top', after: 'main' },
+  center: [['acme:approve', 'acme:reject']],
+});
+```
+
+## A floating toolbar
+
+A bar can float over the pages, as the page number does by default. This one puts zoom controls in
+the bottom-right corner:
+
+```js
+{
+  layout: (layout) =>
+    layout.addBar('zoom', {
+      place: { float: 'bottom-end' },
+      center: [['zoom:out', { custom: 'zoom' }, 'zoom:in']],
+    }),
+}
+```
+
+A floating bar has a shadow, keeps clear of the scrollbars, and sits above the pages but below
+menus and panels.
+
+## Add a button
+
+`add(item, { to })` puts an item in a bar or a menu. Without a position it goes at the end:
+
+```js
+layout.add('document:print', { to: 'main' });
+layout.add('document:print', { to: 'main', section: 'end' });
+layout.add('document:print', { to: 'main', after: 'panel:search' });
+layout.add('document:print', { to: 'document' }); // the document menu
+```
+
+| Option | What it is | Default |
+| :-- | :-- | :-- |
+| `to` | The bar or menu | none |
+| `section` | `'start'`, `'center'` or `'end'` | `'end'` |
+| `group` | The group to join; a new id starts a new group | a new group at the end of the section |
+| `before`, `after` | An item to put it next to, in that item's group | none |
+
+An item is a command id, such as one of yours from [Buttons & commands](commands). It can also be
+your own component: see [Your own components](components).
+
+## Remove buttons
+
+`remove(ids, { from })` takes items out of one bar or menu, and a group with nothing left
+disappears with its line:
+
+```js
+layout.remove(['tool:pan', 'menu:view'], { from: 'main' });
+layout.remove('view:fullscreen', { from: 'document' });
+```
+
+The command itself stays: it can sit in another bar, its shortcut works, and your code can run it.
+To leave something out everywhere at once, every button, menu row, tab and shortcut, use
+[`disable`](../features/turning-off) instead: the layout says where things go, `disable` says
+whether the viewer has them.
+
+`removeBar(id)` removes a whole bar. Removing a mode's bar removes its tab, while its tools stay
+available for a bar of your own:
+
+```js
+layout.removeBar('measure').removeBar('pager');
+```
+
+## Replace a button
+
+`replace(id, item)` puts another item in its place, everywhere it appears:
+
+```js
+layout.replace('document:download', 'acme:save');
+```
+
+## Build a bar
+
+A bar has three sections: `start` (left), `center` and `end` (right). The center stays centered in
+the room the others leave, and in a right-to-left language `start` and `end` swap. Each section is
+a list of groups, and a line separates the groups:
+
+```js
+layout.addBar('review', {
+  place: 'bottom',
+  start: [['acme:previous-issue', 'acme:next-issue']],
+  center: [{ id: 'verdict', items: ['acme:approve', 'acme:reject'], collapse: 'menu' }],
+  end: ['document:download'],
+});
+```
+
+A group is an array of items, or an object when it needs a name or options:
+
+| Field | What it is | Default |
+| :-- | :-- | :-- |
+| `id` | Its name, so `add(item, { group })` can find it | none |
+| `items` | The items | none |
+| `collapse` | Fold into one button with a menu (`'menu'`) or a dropdown (`'select'`) when there's no room | none |
+| `importance` | Who makes room first, `1` to `5` | `3` |
+
+A lone item in a section, like `'document:download'` above, is a group of one.
+
+## When there's no room
+
+A bar never wraps and never scrolls. When its items don't fit, it makes room in this order:
+
+1. An item gets smaller: from its first variant to the next, such as icon and label to icon only.
+2. A group with `collapse` folds into one button.
+3. Items move into a "More" menu at the end of the bar, the least important first.
+
+An item that needs more than a command id is an object:
+
+```js
+{ command: 'acme:share', variants: ['icon+label', 'icon'], importance: 5 }
+```
+
+`importance` goes from `1` (makes room first) to `5` (never leaves the bar). The bar measures what
+it really draws, so a longer translation or a bigger font just works.
+
+## A new mode
+
+The mode tabs list every bar that has a `mode`. Add one, and a tab appears:
+
+```js
+layout.addBar('review', {
+  place: { with: 'main' },
+  mode: 'review',
+  title: 'Review',
+  center: [['acme:approve', 'acme:reject', 'acme:request-changes']],
+});
+```
+
+The tab's command is `mode:review`, so a button of your own can open the mode too.
+
+## Your whole layout
+
+Instead of a function, `layout` can be a layout you wrote from scratch: bars, menus and panels,
+each by id.
+
+```js
+{
+  layout: {
+    bars: {
+      main: {
+        place: 'top',
+        start: [[{ custom: 'zoom' }]],
+        end: [['panel:search', 'document:download']],
+      },
+    },
+    panels: {
+      search: { side: 'end' },
+    },
+  },
+}
+```
+
+That's a reading room: zoom, search and download, nothing else. Which one to choose:
+
+- **A function** builds on the default, so a new version of the viewer brings its new buttons with it.
+- **A whole layout** stays exactly as you wrote it. New features arrive as new ids you add when you
+  want them.
+
+## Good to know
+
+### Every built-in id
+
+**Bars and their groups**
+
+| Bar | Groups |
+| :-- | :-- |
+| `main` | `document`, `view`, `zoom`, `tools` in `start`; `modes` in `center`; `panels` in `end` |
+| `annotate` | `comment`, `markup`, `draw`, `text`, `style`, `history` |
+| `shapes` | `shapes`, `polygons`, `style`, `history` |
+| `insert` | `stamps`, `style`, `history` |
+| `form` | `fields`, `choices`, `signatures`, `history` |
+| `redact` | `redact`, `style`, `history` |
+| `measure` | `measure`, `scale`, `style` |
+| `pager` | `pages` |
+| `selection` | `selection` |
+| `annotation` | `actions`, `danger` |
+
+**Menus**: `document`, `view`, `zoom`. Their buttons are `menu:document`, `menu:view` and
+`menu:zoom`. See [Menus](menus).
+
+**Your own components the viewer ships**: `{ custom: 'zoom' }` (the zoom field),
+`{ custom: 'page-number' }` (the page number and count), `{ custom: 'quick-stamps' }` (the stamps
+bar of the Insert mode), `{ custom: 'measurement-scale' }` (the scale of the Measure mode).
+
+**Buttons**: every command, listed with what it does on [Buttons & commands](commands#every-built-in-command).
+
+### What the user may not use
+
+A button for something the user [may not do](../features/turning-off#what-a-user-may-do), or that
+you [turned off](../features/turning-off), isn't in the bar, and a group,
+bar, mode tab or menu with nothing left disappears. Your layout stays the same: give the user the
+permission, and everything is back where you put it.
+
+### Ids are kept
+
+The ids on this page are part of the API. They don't change between minor versions, so a layout
+function written today keeps working.
+
+### Checked as you go
+
+A layout that names an id the viewer doesn't have, such as a typo in `remove()`, logs a warning with
+the id and the closest one that exists. The viewer still starts.

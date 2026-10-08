@@ -1,0 +1,139 @@
+---
+title: Setup
+description: Install the viewer, give it a size, pass it config, render on the server, and run several viewers on one page.
+---
+
+import { Callout } from '@/components/docs/callout';
+
+# Setup
+
+One package gives you the whole viewer: the toolbar and panels, the PDF engine, and everything the
+engine needs, served from your own site.
+
+<Snippet name="viewer/start/install" />
+
+On a plain HTML page, load the script from jsDelivr as above. In an app with a bundler, install
+`@embedpdf/viewer` and `import '@embedpdf/viewer'` once, which defines the `<embedpdf-viewer>`
+element.
+
+## Give it a size
+
+The viewer fills the box you give it and scrolls the pages inside it, so the box needs a height.
+Any height works: a fixed one, `100vh`, or the remaining space of a flex or grid layout
+(`flex: 1; min-height: 0`). Its width follows the box too, and the viewer adapts to it, not to the
+window: see [Small screens](customize/small-screens).
+
+## Pass it config
+
+Everything the viewer can do is one config object. In a framework, every key is a prop:
+
+<Snippet name="viewer/setup/config" />
+
+| Key | What it is | Page |
+| :-- | :-- | :-- |
+| `src` | One document: a URL, a `File`, or bytes | [Documents](documents) |
+| `documents` | Several documents, shown as tabs | [Documents](documents#several-documents) |
+| `layout` | Where every toolbar, button, menu and panel goes | [Layout](customize/layout) |
+| `commands` | Your own actions | [Buttons & commands](customize/commands) |
+| `icons` | Your own icons | [Buttons & commands](customize/commands#icons) |
+| `theme` | `'light'`, `'dark'`, `'system'`, or your colors | [Theming](customize/theming) |
+| `locale` | `'auto'` or a language code | [Translations](customize/translations) |
+| `strings` | Your own words, and other languages | [Translations](customize/translations) |
+| `disable` | Features, or single buttons, to leave out | [Turn features off](features/turning-off) |
+| `readOnly` | Every feature that changes the document off | [Turn features off](features/turning-off#read-only) |
+| `scope` | What the user may do, checked by the engine | [Turn features off](features/turning-off#what-a-user-may-do) |
+| `identity` | Who the user is: the author of their annotations | [All features](features#who-the-user-is) |
+| `notAllowed` | `'hide'` (default) or `'disable'` what the scope doesn't allow | [Turn features off](features/turning-off#what-a-user-may-do) |
+| `plugins` | The settings of each feature's plugin | [Plugins](code/plugins#settings) |
+| `engine` | Where the engine's files come from, or another engine | [Self-hosting](self-hosting) |
+| `onReady` | Called with the `viewer` once it's live | [The viewer in code](code/viewer) |
+| `onDocumentChange` | Called when the user switches to another document | [Documents](documents#several-documents) |
+
+The config is plain data and a few functions, the same in every framework. Keep it in a file of its
+own when it grows, and spread it into the viewer, as in the [Quick start](quick-start#3-make-it-yours).
+
+## TypeScript
+
+Every key is typed, including the ids of the built-in buttons and panels, so your editor completes
+them. A config in a file of its own gets its types from `satisfies`:
+
+```ts
+import type { ViewerConfig } from '@embedpdf/viewer';
+
+export const config = {
+  theme: { accent: '#7c3aed' },
+  layout: (layout) => layout.place('main', 'bottom'),
+} satisfies ViewerConfig;
+```
+
+Every framework package exports the same `ViewerConfig` type.
+
+## Server-side rendering
+
+The viewer runs in the browser only, and every framework package is safe to import on the server.
+The server renders an empty box of the size you gave it, and the viewer starts when the page loads
+in the browser, so there's nothing to wrap:
+
+<Snippet name="viewer/setup/ssr" />
+
+Next.js, Nuxt, SvelteKit, Astro and Angular SSR all work this way. With Angular, `@defer (on
+viewport)` also keeps the viewer's code out of the first download until it scrolls into view.
+
+<Engine cloud>
+
+## Open a CloudPDF document
+
+Each document opens with a token your backend creates for the user. It says who they are and what
+they may do:
+
+```js
+{
+  src: { token: await fetchDocumentToken('contract-42') },
+}
+```
+
+Pass a function to get a fresh token when an old one runs out:
+`src: { token: () => fetchDocumentToken('contract-42') }`. See
+[Authentication](/docs/engine/authentication) for the ways to open a document and what a token
+carries.
+
+</Engine>
+
+## Change the config later
+
+Five keys follow their prop while the viewer runs: `src` opens the new document in place of the
+old one; `theme` and `locale` switch the look and the language; `disable` and `readOnly` take tools
+away or bring them back. Any plugin's settings change
+through the `viewer` (see [The viewer in code](code/viewer)). Everything else is read once, when the
+viewer starts. To change it, mount a new viewer:
+
+<Snippet name="viewer/setup/remount" />
+
+A new viewer opens its documents again.
+
+## Several viewers on a page
+
+Each viewer has its own documents, layout, settings and state. Keyboard shortcuts work in the
+viewer that has focus, so two viewers never both zoom on one key press.
+
+## Good to know
+
+### What it needs from the browser
+
+Chrome and Edge 114, Firefox 125 and Safari 17, or newer: the browsers of the last two years. The
+engine runs in a Web Worker, as WebAssembly.
+
+### A strict Content Security Policy
+
+The viewer runs under a strict CSP with no `'unsafe-inline'`. [Security & CSP](concepts/security)
+has the policy to copy.
+
+### Air-gapped and self-hosted
+
+Nothing is fetched from a third party at runtime unless you point the viewer there. See
+[Self-hosting](self-hosting) for every file and the setting that controls it.
+
+<Callout type="info">
+  The viewer is built on the same packages as [headless](/docs/headless). Everything you set up here
+  still applies if you build your own interface later.
+</Callout>

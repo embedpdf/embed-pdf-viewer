@@ -1,0 +1,132 @@
+---
+title: Theming
+description: Light, dark or the system's choice, your accent color, every color and corner of the viewer, from config or from CSS.
+---
+
+{/* Generated from docs/content — edit there, then `pnpm docs:sync`. */}
+
+# Theming
+
+Give the viewer your brand color, and every part follows it: pressed buttons, the active tab,
+focus rings, the text selection, the handles of a selected annotation.
+
+```js
+{
+  theme: { preference: 'system', accent: '#7c3aed' },
+}
+```
+
+`preference` is `'light'`, `'dark'` or `'system'`, which follows the user's setting and switches
+when they change it. `theme: 'dark'` is short for `theme: { preference: 'dark' }`. `theme` follows
+its prop, so a theme switch in your app switches the viewer too.
+
+## Every color
+
+Change any of them with `tokens`, for both light and dark, and with `dark` for dark only:
+
+```js
+{
+  theme: {
+    accent: '#0f6e56',
+    tokens: { surface: '#fbfaf7', radius: '2px' },
+    dark: { surface: '#16201c' },
+  },
+}
+```
+
+| Token | What it colors | Light | Dark |
+| :-- | :-- | :-- | :-- |
+| `accent` | Pressed buttons, the active tab, links, focus rings, and every part on the pages that has no color of its own | `#3b82f6` | `#60a5fa` |
+| `background` | Behind the bars and panels | `#f3f4f6` | `#111827` |
+| `surface` | Bars and panels | `#ffffff` | `#1f2937` |
+| `surface-raised` | Menus, sheets, dialogs and floating bars | `#ffffff` | `#1f2937` |
+| `text` | Labels and text | `#111827` | `#f9fafb` |
+| `text-muted` | Secondary text, such as a page count | `#6b7280` | `#9ca3af` |
+| `border` | Lines between bars, panels and groups | `#e5e7eb` | `#374151` |
+| `hover` | A button under the pointer | `#f3f4f6` | `#374151` |
+| `canvas` | Behind the pages | `#f3f4f6` | `#0d1117` |
+| `radius` | The corners of buttons, menus and panels | `6px` | `6px` |
+| `font` | Every word the viewer writes | your system's font | your system's font |
+
+The pages themselves have their own colors: the text selection, search matches, the handles of a
+selected annotation, form fields. Every one follows `accent` until you set it, and every one is
+listed on [Colors & theming](/docs/headless/ui/theming#every-color) in the headless docs, as a
+plugin setting and a CSS variable. Both work in the viewer.
+
+## From CSS
+
+Every token is also a CSS variable: `--epdf-` and its name. Set it on the viewer or on any element
+around it. A CSS variable wins over the config:
+
+```css
+embedpdf-viewer {
+  --epdf-accent: #e91e63;
+  --epdf-radius: 0;
+}
+
+[data-theme='dark'] embedpdf-viewer {
+  --epdf-surface: #101418;
+}
+```
+
+Use it to keep colors in your stylesheet, to follow a theme class your app already switches, or
+to give two viewers on one page their own look.
+
+## Restyle a part
+
+The main parts have a name you can reach with `::part()`, for what tokens don't cover:
+
+```css
+embedpdf-viewer::part(toolbar-button) {
+  border-radius: 999px;
+}
+
+embedpdf-viewer::part(mode-tab-active) {
+  font-weight: 600;
+}
+```
+
+| Part | What it is |
+| :-- | :-- |
+| `toolbar` | A bar |
+| `toolbar-button`, `toolbar-button-active` | A button in a bar, and a pressed one |
+| `mode-tab`, `mode-tab-active` | A mode tab, and the selected one |
+| `tab`, `tab-active` | A document tab, and the open one |
+| `menu`, `menu-item`, `menu-item-active` | A menu, a row, and a checked row |
+| `panel`, `panel-header` | A panel, and its header |
+
+Part names are kept between minor versions, like every other id.
+
+## In your own components
+
+[Your own components](components) inherit the viewer's font and text color, and can use every
+token as a CSS variable:
+
+```css
+.version-picker {
+  background: var(--epdf-surface);
+  color: var(--epdf-text);
+  border: 1px solid var(--epdf-border);
+  border-radius: var(--epdf-radius);
+}
+```
+
+## Good to know
+
+### Your page's CSS stays out
+
+The viewer draws inside its own shadow DOM, so your page's styles don't change it and its styles
+don't change your page. A global `button { … }` rule, a CSS reset, or `html { font-size: 62.5% }`
+leaves the viewer as it is. What does reach it is what you aim at it: the CSS variables above and
+`::part()`.
+
+### Tailwind
+
+Set a variable with an arbitrary property on an element around the viewer:
+`class="[--epdf-accent:var(--color-violet-600)]"`.
+
+### Colors saved in the PDF
+
+An annotation's color, a redaction's fill and a form field's look belong to the document, not to
+the theme: they look the same in every app that opens the file. Their defaults are the tools'
+settings: see [Annotations](../features/annotations#the-tools).

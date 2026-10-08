@@ -1,0 +1,104 @@
+---
+title: Quick start
+description: Install the viewer, show a PDF, give it your color and your own button, put your own component in the toolbar, and talk to it from code.
+---
+
+{/* Generated from docs/content — edit there, then `pnpm docs:sync`. */}
+
+import { Cards, Card } from '@/components/docs/cards';
+
+# Quick start
+
+This guide adds the viewer to your app, then makes it yours in four small steps. Each step works on
+its own, so stop whenever it's enough.
+
+## 1. Install
+
+<Snippet name="viewer/start/install" />
+
+The package brings everything: the toolbar and panels, the PDF engine, and its WebAssembly, which
+your build serves from your own site.
+
+## 2. Show a PDF
+
+Give the viewer a document and a height:
+
+<Snippet name="viewer/start/first" />
+
+The viewer fills the box you give it, so it needs a height: a fixed one, `100vh`, or the rest of a
+flex layout. People can now scroll, zoom, search, select text, annotate, fill in forms, sign and
+download.
+
+## 3. Make it yours
+
+The config is plain data, the same in every framework, so keep it in a file of its own. This one
+uses your brand color, leaves out two features, and adds a button to the toolbar:
+
+```js filename="viewer-config.js"
+export const config = {
+  theme: { accent: '#7c3aed' },
+  disable: ['forms', 'redaction'],
+  icons: {
+    send: ['M10 14L21 3', 'M21 3l-6.5 18a.5.5 0 0 1-1 0L10 14l-7-3.5a.5.5 0 0 1 0-1L21 3z'],
+  },
+  commands: [
+    {
+      id: 'acme:send',
+      label: 'Send for signature',
+      icon: 'send',
+      run: ({ documentId }) => fetch(`/api/send/${documentId}`, { method: 'POST' }),
+    },
+  ],
+  layout: (layout) => layout.add('acme:send', { to: 'main', section: 'end' }),
+};
+```
+
+Then give it to the viewer:
+
+<Snippet name="viewer/start/customized" />
+
+The new button behaves like the built-in ones: it has a tooltip, it moves into the "More" menu when
+the toolbar runs out of room, and it's reachable with the keyboard. The icon is 24 × 24 SVG path
+data, so [Tabler](https://tabler.io/icons) and [Lucide](https://lucide.dev) icons paste in as they
+are.
+
+## 4. Put your own component in the toolbar
+
+A button runs one action. For anything more, such as a status from your app, put your own
+component in the toolbar. Make room for it in the layout, then give the viewer the component:
+
+<Snippet name="viewer/start/component" />
+
+Your component stays part of your app: your CSS styles it, and it reads your app's state as it
+always does. The viewer only decides where it goes. See [Your own components](customize/components)
+for menus, panels and the viewer's look.
+
+## 5. Talk to the viewer
+
+`onReady` gives you the `viewer` once it's live. This one searches each document when it opens:
+
+<Snippet name="viewer/start/ready" />
+
+`viewer.get('search')` is the search plugin, the same one the [headless
+docs](/docs/headless/text/search) describe. Every feature of the viewer is a plugin you can reach
+this way, by its name. See [The viewer in code](code/viewer).
+
+## Next steps
+
+<Cards>
+  <Card
+    title="Setup"
+    description="Sizing, server-side rendering, the engine, and several viewers on a page."
+    href="setup"
+  />
+  <Card
+    title="Layout"
+    description="Toolbars at the bottom, on the side, floating, or several at once."
+    href="customize/layout"
+  />
+  <Card
+    title="Theming"
+    description="Your colors, light and dark, and the look of every part."
+    href="customize/theming"
+  />
+</Cards>

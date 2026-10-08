@@ -74,10 +74,10 @@ export function integrationForProduct(
 }
 
 /**
- * Where each fanned-out product starts, below its integration segment: the
- * Viewer at its getting-started page, Headless at its overview (like Engine).
+ * Where each fanned-out product starts, below its integration segment:
+ * the Viewer and Headless at their overview (like Engine).
  */
-export const DOCS_ENTRY_TOPIC = { viewer: 'getting-started', headless: '' } as const;
+export const DOCS_ENTRY_TOPIC = { viewer: '', headless: '' } as const;
 
 /** The concrete entry URL of a fanned-out product for one integration. */
 export function docsEntryHref(product: 'viewer' | 'headless', integration: DocsIntegration): string {

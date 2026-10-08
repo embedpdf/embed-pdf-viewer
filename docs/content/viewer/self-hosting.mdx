@@ -14,15 +14,19 @@ the artifact you serve. This page is the complete inventory — every URL a
 deployment can touch and the setting that controls it — so an air-gapped or
 strict-CSP deployment is a checklist, not an investigation.
 
+Every engine setting on this page goes in the viewer's `engine` config, such as
+`engine: { assetsUrl: '/vendor/embedpdf/' }`. In a headless app, the same
+settings are `localEngine()` options.
+
 ## The inventory
 
 | What                                  | Where it comes from by default                                                                                                              | Setting                              |
 | ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------ |
-| `embedpdf.wasm` (the engine, ~6.4 MB) | Emitted by your bundler as an asset of your build, streamed from your origin. Under Angular, a lazy JavaScript chunk of your build instead. | `assetsUrl`, `wasmUrl`, `wasmBinary` |
-| The engine worker                     | Spawned from a `blob:` URL built from a script that ships inside `@embedpdf/engine` — no file, no request.                                  | `worker`                             |
-| The image-encoder worker              | Same: inline `blob:` worker, main-thread fallback.                                                                                          | `encoderWorker`                      |
-| Fonts                                 | None are fetched unless you configure them.                                                                                                 | `fonts`, `fallbackFonts`             |
-| The built-in stamp library            | A lazy JavaScript chunk of your build (`@embedpdf/default-stamps`).                                                                         | `stamps.defaultLibrary`              |
+| `embedpdf.wasm` (the engine, ~6.4 MB) | Emitted by your bundler as an asset of your build, streamed from your origin. Under Angular, a lazy JavaScript chunk of your build instead. | `engine.assetsUrl`, `engine.wasmUrl`, `engine.wasmBinary` |
+| The engine worker                     | A file of your build, next to the WebAssembly, emitted by your bundler. From a CDN, a `blob:` URL instead (see below).                      | `engine.worker`                      |
+| The image-encoder worker              | The same, with a main-thread fallback.                                                                                                      | `engine.encoderWorker`               |
+| Fonts                                 | None are fetched unless you configure them.                                                                                                 | `engine.fonts`, `engine.fallbackFonts` |
+| The standard stamps                   | A lazy JavaScript chunk of your build (`@embedpdf/default-stamps`).                                                                         | `plugins.stamp.standard`             |
 | Your documents                        | Whatever you pass as `src` or open yourself.                                                                                                | —                                    |
 
 <Engine cloud>
@@ -34,7 +38,7 @@ rows above still apply to the parts that run locally: the built-in stamp
 library opens in the browser, so the first time someone opens Stamps or
 Signatures the viewer loads `embedpdf.wasm` and the engine worker. The CDN
 snippet ships the WebAssembly in its folder; npm installs go through your
-bundler as above. `stamps.assetEngine` supplies your own local engine instead.
+bundler as above. `plugins.stamp.assetEngine` supplies your own local engine instead.
 
 </Engine>
 
@@ -45,15 +49,14 @@ fails on any request that leaves the app's origin.
 
 ## The engine's WebAssembly
 
-`localEngine()` with no options is the right call in almost every toolchain.
+With no `engine` settings, the viewer is right in almost every toolchain.
 Your bundler sees `new URL('./embedpdf.wasm', import.meta.url)` inside
 `@embedpdf/engine-runtime-wasm32`, copies the file into your build output, and
 the worker streams and compiles it from your origin. Verified out of the box:
 Vite, webpack 5, Rspack, Parcel 2, and Next.js with either webpack or Turbopack.
 
 **Angular** resolves packages with the `es2020` export condition, and
-`@embedpdf/engine` routes that condition to its portable build: the same
-`localEngine()`, with the binary carried as a lazy chunk of your build instead
+`@embedpdf/engine` routes that condition to its portable build: the same engine, with the binary carried as a lazy chunk of your build instead
 of an asset. Nothing to configure. It costs the same bytes over the wire and a
 short inflate at boot, and it does not stream-compile. If you want the streamed
 asset instead, copy the file with one `angular.json` entry and say where it is:
@@ -64,8 +67,8 @@ asset instead, copy the file with one `angular.json` entry and say where it is:
 ]
 ```
 
-```ts
-localEngine({ assetsUrl: '/embedpdf/' });
+```js
+{ engine: { assetsUrl: '/embedpdf/' } }
 ```
 
 Under pnpm, add `@embedpdf/engine-runtime-wasm32` to your own dependencies so
@@ -75,15 +78,15 @@ that path exists; npm and yarn hoist it for you.
 Import the portable entry instead:
 
 ```ts
-import { localEngine } from '@embedpdf/engine/portable';
+import '@embedpdf/viewer/portable';
 ```
 
 **Explicit sources** win over every default and never fall back to anything:
 
-```ts
-localEngine({ assetsUrl: '/vendor/embedpdf/' }); // a directory you serve; embedpdf.wasm is appended
-localEngine({ wasmUrl: '/vendor/embedpdf/engine.wasm' }); // the exact file
-localEngine({ wasmBinary: bytes }); // bytes you already have — no request at all
+```js
+{ engine: { assetsUrl: '/vendor/embedpdf/' } } // a directory you serve; embedpdf.wasm is appended
+{ engine: { wasmUrl: '/vendor/embedpdf/engine.wasm' } } // the exact file
+{ engine: { wasmBinary: bytes } } // bytes you already have, so no request at all
 ```
 
 If the file is missing at boot, the engine fails with a message that names
@@ -91,33 +94,29 @@ these options. It never tries another location on its own.
 
 ## Workers and Content-Security-Policy
 
-The default worker is spawned from a `blob:` URL, which needs
-`worker-src blob:` in your policy. A policy that forbids blob workers can
-serve the worker as a file instead: copy `workers/embedpdf-worker.js` and
-`embedpdf.wasm` from `@embedpdf/engine` into one directory you serve and pass
-the script's URL — the worker then finds the wasm as its own sibling:
+The engine's worker and the image-encoder worker are files of your build, next to
+the WebAssembly, so `worker-src 'self'` covers them. To serve them from somewhere
+else, copy `workers/embedpdf-worker.js`, `workers/encoder-worker.js` and
+`embedpdf.wasm` into one directory you serve and say where the worker is; it
+finds the WebAssembly as its own sibling:
 
-```ts
-localEngine({ worker: '/vendor/embedpdf/embedpdf-worker.js' });
+```js
+{ engine: { worker: '/vendor/embedpdf/embedpdf-worker.js' } }
 ```
 
-The image-encoder worker follows the same rule (`encoderWorker`), or set it to
-`false` to encode on the main thread. WebAssembly itself needs
-`script-src 'wasm-unsafe-eval'`.
+`encoderWorker: false` encodes images on the main thread instead.
+WebAssembly itself needs `script-src 'wasm-unsafe-eval'`. The whole policy is
+on [Security & CSP](concepts/security).
 
-## The stamps panel
+## The standard stamps
 
-The Insert tab's stamp library is a lazy chunk of your build, one per locale.
-To self-host a copy of `@embedpdf/default-stamps` or to ship no library at
-all:
+The stamps panel's standard stamps are a lazy chunk of your build, one per
+language. To serve a copy of `@embedpdf/default-stamps` yourself, or to ship
+none:
 
-```ts
-stamps: {
-  defaultLibrary: 'https://files.example.com/stamps/{locale}/stamps.pdf';
-}
-stamps: {
-  defaultLibrary: false;
-}
+```js
+{ plugins: { stamp: { standard: 'https://files.example.com/stamps/{locale}/stamps.pdf' } } }
+{ plugins: { stamp: { standard: false } } }
 ```
 
 A URL you give is used exactly as given. Libraries your users create are kept
@@ -132,7 +131,9 @@ path relative to the folder, so serving that folder from jsDelivr, from your
 own CDN, or from an intranet server is the same operation, and no URL in the
 code names any of them. Copy the folder, never the file alone.
 
-A strict policy for a page that loads it from `https://cdn.example`:
+A browser starts a Web Worker only from its own origin, so a page that loads
+the folder from another one starts the engine's worker from a `blob:` URL. A
+strict policy for a page that loads it from `https://cdn.example`:
 
 ```
 script-src 'self' https://cdn.example 'wasm-unsafe-eval';

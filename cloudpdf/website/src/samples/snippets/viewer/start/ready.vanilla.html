@@ -1,0 +1,11 @@
+<embedpdf-viewer id="viewer" src="/report.pdf" style="height: 100vh"></embedpdf-viewer>
+
+<script type="module">
+  import 'https://cdn.jsdelivr.net/npm/@embedpdf/viewer@3/dist/embedpdf.js';
+
+  const element = document.getElementById('viewer');
+  element.addEventListener('epdf:ready', () => {
+    const { viewer } = element;
+    viewer.documents.onOpened(() => viewer.get('search').search('total'));
+  });
+</script>

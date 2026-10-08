@@ -1,0 +1,131 @@
+---
+title: Menus
+description: Add your own menus, change the built-in ones, and add actions to the bars over selected text and annotations. Menus open the right way on their own.
+---
+
+# Menus
+
+A menu is a list of items in sections, with a line between sections. Add one with `addMenu()`, and
+open it from a button: a command with `menu` instead of `run`.
+
+```js
+{
+  commands: [
+    { id: 'acme:share', label: 'Share', icon: 'link', menu: 'share' },
+    { id: 'acme:copy-link', label: 'Copy link', icon: 'copy', run: copyLink },
+    { id: 'acme:email', label: 'Email a link', icon: 'message', run: emailLink },
+  ],
+  layout: (layout) =>
+    layout
+      .addMenu('share', [['acme:copy-link', 'acme:email'], ['document:download']])
+      .add('acme:share', { to: 'main', section: 'end' }),
+}
+```
+
+Each row is a command, so it shows its icon, label and shortcut, is disabled when the command
+can't run, and is gone when the command isn't visible.
+
+## Where a menu opens
+
+You don't choose. A menu opens away from the edge its bar sits on, toward the pages:
+
+| The button is in | The menu opens |
+| :-- | :-- |
+| A bar at the top | Below it |
+| A bar at the bottom | Above it |
+| A bar at the start or end | Beside it, toward the pages |
+| A floating bar | Away from the corner or edge it floats at |
+| A bar over a selection | Below the bar, or above it when that's closer to the selection |
+
+When there's no room on that side, it opens on the other. A menu can reach past the viewer's
+edge, like a menu in any app, and it never goes off the screen. On a phone, every menu opens as a
+sheet from the bottom of the viewer.
+
+## Change a built-in menu
+
+The built-in menus are `document`, `view` and `zoom`. Add to them and remove from them like a bar:
+
+```js
+layout
+  .add('acme:export-word', { to: 'document', after: 'document:print' })
+  .remove('view:fullscreen', { from: 'document' });
+```
+
+| Menu | Its button | What's in it |
+| :-- | :-- | :-- |
+| `document` | `menu:document` | Open, download, print; full screen |
+| `view` | `menu:view` | One page, two pages, cover page; vertical or horizontal scrolling; rotate the view; full screen |
+| `zoom` | `menu:zoom` | 50% to 400%; zoom in and out; fit page, fit width, automatic |
+
+## Sections with a title
+
+A section is an array, or an object when it has a title:
+
+```js
+layout.addMenu('export', [
+  { title: 'Export as', items: ['acme:export-word', 'acme:export-excel'] },
+  ['document:download'],
+]);
+```
+
+## A menu in a menu
+
+An item whose command has a `menu` opens that menu beside it, as a submenu. On a phone, it slides
+in over the first one, with a back button.
+
+```js
+// acme:share has `menu: 'share'`, so it opens the share menu beside it
+layout.add('acme:share', { to: 'document', after: 'document:download' });
+```
+
+## Choices
+
+A command that's `active` shows a check mark in a menu. The view menu uses this for one page or
+two, and for the scrolling direction, so the current choice is always marked.
+
+## Over a selection
+
+Two bars appear over what's selected:
+
+| Bar | Appears over | What's in it |
+| :-- | :-- | :-- |
+| `selection` | Selected text | Copy, highlight, underline, strike out |
+| `annotation` | Selected annotations | Comment, style, link, group, delete |
+
+They're bars, so the same edits work. Add your own action, or remove one:
+
+```js
+layout
+  .add('acme:explain', { to: 'selection' })
+  .remove(['annotation:group', 'annotation:ungroup'], { from: 'annotation' });
+```
+
+A selection bar appears when the selection is made, not while the mouse is still dragging. It sits
+above the selection, flips below it when there's no room, and on a touch screen keeps clear of the
+handles. Each item is shown only for a selection it works on: **Comment** isn't offered on a link,
+and **Group** only when more than one annotation is selected.
+
+## The "More" menu
+
+When a bar runs out of room, what doesn't fit goes into a "More" menu at its end, in the bar's own
+order, with the bar's groups as sections. The viewer builds it, so there's nothing to set: change
+the bar, and the "More" menu follows.
+
+## Good to know
+
+### Keyboard
+
+Arrow keys move through a menu, `Enter` picks, typing jumps to the first item that starts with
+that letter, and `Escape` closes it and puts focus back on its button. Each command's shortcut
+shows next to its label.
+
+### Disabled or hidden
+
+A command that can't run now, such as **Copy** with nothing selected, shows greyed out. A command
+that's not `visible` isn't in the menu at all, and a section with nothing left disappears with its
+line.
+
+### Your own menu component
+
+To draw a menu yourself, with your own rows, use `Menu` and `MenuItem` from [Your own
+components](components#look-like-the-viewer). They open the same way these do.

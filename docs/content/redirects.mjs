@@ -51,11 +51,25 @@ const HEADLESS_MOVED = {
 
 const HEADLESS_ROOT = '/docs/headless/:framework(react|vue|svelte|angular)';
 
+/**
+ * Where the viewer docs' old pages went (Oct 2026: the 3.0 viewer docs), below
+ * `/docs/viewer/<framework>/`.
+ */
+const VIEWER_MOVED = {
+  'getting-started': 'quick-start',
+};
+
+const VIEWER_ROOT = '/docs/viewer/:framework(vanilla|react|vue|svelte|angular)';
+
 /** Next.js `redirects()` entries for the docs on a site of `engine` flavor. */
 export function docsRedirects(engine) {
   const moved = { ...MOVED, ...MOVED_BY_ENGINE[engine] };
   for (const [from, to] of Object.entries(HEADLESS_MOVED)) {
     moved[`${HEADLESS_ROOT}/${from}`] = to ? `/docs/headless/:framework/${to}` : '/docs/headless/:framework';
+  }
+  for (const [from, to] of Object.entries(VIEWER_MOVED)) {
+    moved[`${VIEWER_ROOT}/${from}`] = `/docs/viewer/:framework/${to}`;
+    moved[`/docs/viewer/${from}`] = `/docs/viewer/${to}`;
   }
   return Object.entries(moved).flatMap(([source, destination]) => [
     { source, destination, permanent: true },

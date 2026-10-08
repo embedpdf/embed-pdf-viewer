@@ -1,0 +1,6 @@
+<script type="module">
+  const element = document.querySelector('embedpdf-viewer');
+
+  // Setting the config again builds a new viewer, with the documents opened again.
+  element.config = { ...element.config, disable: ['forms', 'annotations'] };
+</script>

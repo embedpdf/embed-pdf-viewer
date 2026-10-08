@@ -1,10 +1,11 @@
 export default {
-  'getting-started': {
-    title: 'Getting Started',
-    type: 'doc',
-  },
-  'self-hosting': {
-    title: 'Self-hosting & air-gapped',
-    type: 'doc',
-  },
+  index: 'Overview',
+  'quick-start': 'Quick start',
+  setup: 'Setup',
+  documents: 'Documents',
+  customize: 'Make it yours',
+  features: 'Features',
+  code: 'From code',
+  concepts: 'Good to know',
+  'self-hosting': 'Self-hosting',
 };

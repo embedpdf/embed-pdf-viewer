@@ -1,0 +1,87 @@
+---
+title: All features
+description: Everything the viewer can do, how to leave a feature out, who the user is, and where each feature's settings go.
+---
+
+# All features
+
+Every feature is on from the start. Leave out the ones you don't need with `disable`, by the name
+in the first column:
+
+```js
+{ disable: ['forms', 'redaction', 'measurement'] }
+```
+
+| Feature | What people can do | Settings |
+| :-- | :-- | :-- |
+| `annotations` | Highlight, underline and strike out text; draw; add notes, text boxes and callouts | [Annotations](features/annotations) |
+| `shapes` | Draw rectangles, circles, lines, arrows and polygons | [Annotations](features/annotations#the-tools) |
+| `comments` | Comment on annotations and reply, in a panel with every thread | [Annotations](features/annotations#comments) |
+| `stamps` | Place stamps: the standard ones, their own, or images | [Annotations](features/annotations#stamps) |
+| `signatures` | Draw, type or upload a signature; sign fields; check signatures | [Forms & signatures](features/forms-and-signatures#signatures) |
+| `forms` | Fill in forms; build them in the Form mode | [Forms & signatures](features/forms-and-signatures) |
+| `redaction` | Mark text and areas, then remove them from the file for good | [Annotations](features/annotations#redaction) |
+| `measurement` | Measure distances, perimeters and areas at the drawing's scale | [Annotations](features/annotations#measurements) |
+| `pages` | Rotate, move, insert and delete pages | [`plugins.pageEdit`](/docs/headless/documents/pages) |
+| `attachments` | See, open and add files inside the PDF | [Panels](customize/panels) |
+| `search` | Find text, with every match highlighted and listed | [`plugins.search`](/docs/headless/text/search#settings) |
+| `text` | Select and copy text | [`plugins.selection`](/docs/headless/text/selection#settings) |
+| `thumbnails` | A picture of every page, to jump around | [Panels](customize/panels) |
+| `outline` | The document's table of contents | [Panels](customize/panels) |
+| `documents` | Open other files, download, print, several documents in tabs | [Documents](documents) |
+
+## Leave features out
+
+A feature in `disable` is gone everywhere at once: its buttons, its mode tab, its panel, its menu
+rows and its shortcuts. Annotations already in the document still show; people just can't add new
+ones. Most features have parts you can turn off on their own, such as `forms.building` or
+`documents.download`, and one button goes by its command's name, such as `tool:highlight`.
+
+`disable` follows its prop, so a feature can come and go while the viewer runs, for example when
+a user's plan changes.
+
+[Turn features off](features/turning-off) has every name, read-only, and what to use when: the
+layout for where something goes, `disable` for whether the viewer has it, and the scope for what a
+user may do.
+
+## Who the user is
+
+The user's name becomes the author of the annotations and comments they make:
+
+```js
+{ identity: { displayName: 'Ada Lovelace' } }
+```
+
+<Engine cloud>
+
+On CloudPDF, who the user is and what they may do come from the document's token, so your server
+decides, and `identity` isn't needed.
+
+</Engine>
+
+## Each feature's settings
+
+Every feature is a headless plugin, and `plugins` takes its settings by the plugin's name, exactly
+as the plugin's page lists them:
+
+```js
+{
+  plugins: {
+    stage: { spread: 'odd', zoom: { mode: 'fit-width' } },
+    search: { highlight: { color: '#a7f3d0' } },
+    annotation: { tools: [{ id: 'highlight', defaults: { color: '#fde047' } }] },
+  },
+}
+```
+
+That opens documents as two-page spreads at the page's width, with green search matches and
+yellow highlights. See [Plugins](code/plugins) for every plugin and how to change its settings
+while the viewer runs.
+
+## Good to know
+
+### Not in your bundle
+
+A feature you disable is still in the viewer's code, but its code loads only when it's first
+used. A viewer that's only ever read never loads the annotation tools, the form builder or the
+signature dialogs.

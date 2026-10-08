@@ -1,0 +1,189 @@
+---
+title: Buttons & commands
+description: Add your own buttons, change what a built-in button does, give actions keyboard shortcuts and icons, and run any action from code.
+---
+
+{/* Generated from docs/content — edit there, then `pnpm docs:sync`. */}
+
+# Buttons & commands
+
+Every button in the viewer runs a **command**: one action with a label, an icon, a shortcut, and
+what it does. A toolbar button, a menu row and a key press all run the same command, so they always
+agree. Add one of yours, then put it in the [layout](layout):
+
+```js
+{
+  commands: [
+    {
+      id: 'acme:approve',
+      label: 'Approve',
+      icon: 'check',
+      shortcut: 'Mod+Enter',
+      run: ({ documentId }) => approve(documentId),
+    },
+  ],
+  layout: (layout) => layout.add('acme:approve', { to: 'main', section: 'end' }),
+}
+```
+
+The button has a tooltip with its shortcut, moves into the "More" menu when the toolbar is full,
+and `Ctrl`+`Enter` (`Cmd`+`Enter` on a Mac) runs it while the viewer has focus.
+
+## Define a command
+
+| Field | What it is |
+| :-- | :-- |
+| `id` | A unique name. Start yours with your own prefix, such as `acme:`. |
+| `label` | What people see, or `labelKey` for a [translated](translations) label |
+| `icon` | An icon's name: the viewer's or [your own](#icons) |
+| `shortcut` | A key, such as `'Mod+Shift+S'`, or a list of keys. `Mod` is `Cmd` on a Mac and `Ctrl` elsewhere. |
+| `run` | What it does |
+| `enabled` | When it can run. When it can't, its button is greyed out. |
+| `active` | When it shows as pressed, or checked in a menu |
+| `visible` | When it shows at all |
+| `menu` | A [menu](menus) it opens, instead of `run` |
+| `panel` | A [panel](panels) it opens and closes, instead of `run` |
+| `requires` | The [permissions](#permissions) it needs from the scope. Without them, it's hidden. |
+| `categories` | The features it belongs to, so [`disable`](../features/turning-off) turns it off with them. A name of your own makes a new feature. |
+
+A command is the same thing as in headless: see [Commands &
+shortcuts](/docs/headless/ui/commands#define-a-command).
+
+## Enabled, active and visible
+
+`enabled`, `active` and `visible` are functions of the viewer's state. They get `get`, which gives
+you any plugin by its name, and the viewer asks them again whenever something changes, so a
+button is always right:
+
+```js
+{
+  id: 'acme:flag',
+  label: 'Flag for review',
+  icon: 'eye',
+  enabled: ({ get }) => get('selection').hasSelection(),
+  active: ({ documentId }) => flagged.has(documentId),
+  run: ({ documentId }) => toggleFlag(documentId),
+}
+```
+
+`run` gets the same: `get`, the `viewer`, and the `documentId` of the document it runs for.
+
+## Change what a built-in button does
+
+A command with a built-in id replaces the built-in one, everywhere it appears: the button, the
+menu row and the shortcut. This one makes **Download** save to your server instead:
+
+```js
+{
+  commands: [
+    {
+      id: 'document:download',
+      run: async ({ viewer, documentId }) => {
+        const bytes = await viewer.documents.download(documentId);
+        await fetch(`/api/documents/${documentId}`, { method: 'PUT', body: bytes });
+      },
+    },
+  ],
+}
+```
+
+Give only the fields you change: the label, icon and shortcut stay the built-in ones.
+
+## Icons
+
+An icon is 24 × 24 SVG path data, drawn as a line, so [Tabler](https://tabler.io/icons) and
+[Lucide](https://lucide.dev) icons paste in as they are. Give a name to each of yours:
+
+```js
+{
+  icons: {
+    send: ['M10 14L21 3', 'M21 3l-6.5 18a.5.5 0 0 1-1 0L10 14l-7-3.5a.5.5 0 0 1 0-1L21 3z'],
+    logo: { paths: ['M4 4h16v16H4z'], fill: true },
+  },
+}
+```
+
+A string is one path, an array is several, and `{ paths, fill: true }` fills them instead of drawing
+their outline. An icon with the name of a built-in one replaces it, everywhere.
+
+## Permissions
+
+A command that needs a permission from the scope says which, with `requires`. When the user
+doesn't have it, the command is gone from every bar and menu, and its shortcut does nothing:
+
+```js
+{
+  id: 'acme:approve',
+  label: 'Approve',
+  icon: 'check',
+  requires: ['doc.annotate.modify'],
+  run: ({ documentId }) => approve(documentId),
+}
+```
+
+The names are the scope's permissions, listed on [Permissions](/docs/headless/concepts/permissions).
+The built-in commands already say what they need, so for a user whose scope doesn't allow
+changes the editing tools are gone, and with `notAllowed: 'disable'` they show greyed out instead,
+with the reason in their tooltip. To leave a command out for everyone, [disable](../features/turning-off)
+it instead: `disable: ['acme:approve']`.
+
+## Keyboard shortcuts
+
+A command's `shortcut` works while focus is anywhere inside the viewer, except in a text field.
+`?` opens a sheet with every shortcut. Your shortcut wins over a built-in one with the same keys.
+
+## Run a command from code
+
+```js
+await viewer.commands.execute('zoom:fit-width');
+await viewer.commands.execute('panel:search');
+```
+
+`execute()` resolves `{ status: 'executed' }`, or `{ status: 'rejected', reason }` when the command
+can't run now.
+
+## Every built-in command
+
+| Commands | What they do |
+| :-- | :-- |
+| `document:open`, `document:download`, `document:print` | Open another file, download, print |
+| `menu:document`, `menu:view`, `menu:zoom` | Open a built-in [menu](menus) |
+| `zoom:in`, `zoom:out`, `zoom:fit-width`, `zoom:fit-page`, `zoom:automatic` | Zoom |
+| `zoom:50`, `zoom:100`, `zoom:150`, `zoom:200`, `zoom:400` | Zoom to a level |
+| `page:next`, `page:previous`, `page:first`, `page:last`, `page:go-to` | Move through pages |
+| `view:single-page`, `view:two-pages`, `view:cover-page` | Pages side by side |
+| `view:scroll-vertical`, `view:scroll-horizontal` | The scrolling direction |
+| `view:rotate-clockwise`, `view:rotate-counterclockwise`, `view:fullscreen` | Turn the view, full screen |
+| `tool:pointer`, `tool:pan` | Select, or drag the pages |
+| `tool:note`, `tool:link`, `tool:highlight`, `tool:underline`, `tool:strikeout`, `tool:squiggly` | Comment and mark up |
+| `tool:ink`, `tool:ink-highlight`, `tool:free-text`, `tool:callout`, `tool:insert-text`, `tool:replace-text` | Draw and write |
+| `tool:square`, `tool:circle`, `tool:line`, `tool:arrow`, `tool:polygon`, `tool:polyline` | Shapes |
+| `tool:stamp`, `tool:image`, `tool:attachment`, `tool:signature` | Insert |
+| `tool:text-field`, `tool:checkbox`, `tool:radio`, `tool:combo-box`, `tool:list-box`, `tool:signature-field` | Build a form |
+| `tool:redact`, `redaction:apply` | Mark areas, then remove them for good |
+| `tool:distance`, `tool:perimeter`, `tool:area`, `measurement:calibrate` | Measure |
+| `mode:view`, `mode:annotate`, `mode:shapes`, `mode:insert`, `mode:form`, `mode:redact`, `mode:measure` | Switch mode |
+| `panel:<id>` | Open or close a [panel](panels) |
+| `history:undo`, `history:redo` | Undo and redo |
+| `selection:copy`, `selection:highlight`, `selection:underline`, `selection:strikeout` | Act on selected text |
+| `annotation:comment`, `annotation:style`, `annotation:link`, `annotation:group`, `annotation:ungroup`, `annotation:delete` | Act on selected annotations |
+
+Every tool you add to the [annotation plugin](/docs/headless/annotations/tools) gets its
+`tool:<id>` command too.
+
+## Good to know
+
+### The viewer's icons
+
+`area`, `bold`, `book`, `calibrate`, `callout`, `check`, `circle`, `comment`, `copy`, `distance`,
+`dots`, `download`, `eye`, `file`, `fullscreen`, `group`, `hand`, `highlight`, `italic`, `line`,
+`link`, `lock`, `menu`, `message`, `palette`, `paperclip`, `perimeter`, `photo`, `plus`,
+`pointer`, `polygon`, `print`, `redact`, `ruler`, `save`, `search`, `settings`, `sidebar`,
+`signature`, `square`, `squiggly`, `strikethrough`, `text`, `trash`, `underline`, `ungroup`,
+`unlock`, `x`, `zigzag`.
+
+### Enabled is for now, permissions are for good
+
+`enabled` is for what can't run *right now*: nothing selected, nothing to undo. Its button is
+greyed out, because the user can change that. What the user may never do here is a permission:
+say so with `requires`, and the button isn't there at all.

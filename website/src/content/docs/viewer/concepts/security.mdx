@@ -1,0 +1,66 @@
+---
+title: Security & CSP
+description: The Content Security Policy the viewer runs under, with no 'unsafe-inline', and what it does with a PDF you can't trust.
+---
+
+{/* Generated from docs/content — edit there, then `pnpm docs:sync`. */}
+
+# Security & CSP
+
+The viewer runs under a strict Content Security Policy: no `'unsafe-inline'`, no `'unsafe-eval'`,
+and Trusted Types on. This is the policy to start from:
+
+```http
+Content-Security-Policy:
+  default-src 'self';
+  script-src 'self' 'wasm-unsafe-eval';
+  style-src 'self';
+  worker-src 'self';
+  img-src 'self' blob: data:;
+  connect-src 'self';
+  require-trusted-types-for 'script';
+  trusted-types embedpdf;
+```
+
+| Directive | Why the viewer needs it |
+| :-- | :-- |
+| `script-src 'wasm-unsafe-eval'` | The engine is WebAssembly, and the browser asks for this to compile any WebAssembly. It allows nothing else: no `eval`, no inline scripts. With CloudPDF, leave it out. |
+| `worker-src 'self'` | The engine runs in a Web Worker, loaded from a file next to the viewer's |
+| `img-src blob: data:` | Pages are drawn into images the browser makes, and tool cursors are small inline images |
+| `connect-src 'self'` | The engine's WebAssembly, your documents, and any fonts or stamps you configure. Add each origin you load from. |
+| `trusted-types embedpdf` | The viewer's one Trusted Types policy, which only allows URLs of its own files and the ones you configure |
+
+`style-src 'self'` is enough, without `'unsafe-inline'` or a nonce: the viewer never adds a
+`<style>` tag or a `style` attribute to your page. Its styles go straight into its own shadow DOM,
+which the browser doesn't count as inline styles.
+
+## Loading from a CDN
+
+A browser only starts a Web Worker from its own origin. When the viewer's script comes from
+jsDelivr, it starts the engine's worker from a `blob:` URL instead, so add `worker-src blob:`.
+To keep `worker-src 'self'`, serve the viewer's files from your own site: install it from npm, or
+copy its folder. See [Self-hosting](../self-hosting).
+
+## A PDF you can't trust
+
+A PDF can carry links, scripts and forms that send data somewhere. The viewer treats every one as
+untrusted:
+
+- **Scripts** in a PDF, for form checks and calculations, run in a sandbox with no access to your
+  page, its cookies or the network. Turn them off with `plugins: { actions: { javascript: { enabled: false } } }`.
+- **Links** open only after the user clicks them, and only `http`, `https` and `mailto` links.
+  `javascript:` and `file:` links do nothing.
+- **Form submissions** never send anything by themselves. A form's submit button tells your code,
+  and you decide where the data goes. See [Actions & scripts](/docs/headless/documents/actions).
+
+## Good to know
+
+### Annotations and comments
+
+Text people type into annotations and comments is shown as text, never as HTML, so a comment can't
+run a script in anyone else's viewer.
+
+### Signatures
+
+A signature is checked against the certificates you trust and nothing else: the viewer never
+fetches a certificate or a revocation list from a URL inside the PDF.

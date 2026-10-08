@@ -25,7 +25,7 @@ export const DOCS_OVERVIEW_PATHS: readonly DocsOverviewPath[] = [
     title: 'Ready-made Viewer',
     eyebrow: 'Recommended for speed',
     description: 'Embed a polished, production-ready PDF viewer in minutes.',
-    href: '/docs/viewer/vanilla/getting-started',
+    href: '/docs/viewer/vanilla',
     cta: 'Start with the Viewer',
     illustration: '/illustration-readymade.svg',
     features: ['Drop-in integration', 'Prebuilt toolbar and layout', 'Framework-neutral API'],

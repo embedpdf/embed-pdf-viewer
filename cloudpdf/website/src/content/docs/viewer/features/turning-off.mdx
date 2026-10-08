@@ -1,0 +1,191 @@
+---
+title: Turn features off
+description: Leave out a whole feature or one button, make the viewer read-only, and say what a user may do, with the right tool for each.
+---
+
+{/* Generated from docs/content — edit there, then `pnpm docs:sync`. */}
+
+# Turn features off
+
+Leave out a feature, everywhere it appears, with `disable`:
+
+```js
+{ disable: ['redaction', 'measurement'] }
+```
+
+The Redact and Measure tabs are gone, with their tools, panels, menu rows and shortcuts.
+
+## Which one to use
+
+Three questions, three tools. Each one only takes away:
+
+| You want to say | Use | Reach |
+| :-- | :-- | :-- |
+| Where something goes | [`layout`](../customize/layout) | One place: a bar or a menu. It can still be elsewhere, and its shortcut still works. |
+| Whether this viewer has it | `disable`, or `readOnly` | Everywhere at once: every button, menu row, tab, panel and shortcut |
+| What this user may do | `scope` | Everything, your code included: the engine refuses it |
+
+A button shows when it's in the layout, isn't disabled, is allowed by the scope, and makes sense
+right now (Copy needs a selection).
+
+| I want | Write |
+| :-- | :-- |
+| No annotating at all | `disable: ['annotations']` |
+| No highlighter anywhere: toolbar, selection bar, shortcut | `disable: ['annotations.highlight']` |
+| Only the toolbar's Highlight button gone | `disable: ['tool:highlight']` |
+| The highlighter in my own bar instead of the Annotate bar | `layout.remove('tool:highlight', { from: 'annotate' })`, then [add it](../customize/layout#add-a-button) to yours |
+| No Measure tab, and no measuring | `disable: ['measurement']` |
+| No Measure tab, but its tools in my own bar | `layout.removeBar('measure')`, then add the tools to yours |
+| No downloading in this viewer | `disable: ['documents.download']` |
+| This user may never download, not even from code | Leave `doc.download` out of the [scope](#what-a-user-may-do) |
+| Read-only | `readOnly: true` |
+| Read-only, but people fill in the form | `readOnly: { except: ['forms.filling'] }` |
+
+## Turn off a feature, or one button
+
+`disable` takes two kinds of names, in one list:
+
+- **A feature**, such as `annotations`, or a part of one, such as `annotations.highlight`. Everything
+  that belongs to it goes.
+- **One command**, such as `tool:highlight`. Its name has a colon. Only that command goes; the rest
+  of its feature stays.
+
+```js
+{ disable: ['forms.building', 'annotations.drawing', 'document:open'] }
+```
+
+| Feature | Its parts | Off with `readOnly` |
+| :-- | :-- | :-- |
+| `annotations` | `.highlight`, `.markup` (underline, strike out, squiggly), `.drawing` (ink and ink highlighter), `.text` (text boxes, callouts, insert and replace text), `.notes`, `.links` | all |
+| `shapes` | | yes |
+| `stamps` | Stamps and images | yes |
+| `comments` | `.writing` (new comments and replies) | `.writing` only, so people still read them |
+| `forms` | `.filling`, `.building` | both |
+| `signatures` | `.signing`, `.checking` | `.signing` only |
+| `redaction` | | yes |
+| `measurement` | | yes |
+| `pages` | Rotating, moving, inserting and deleting pages | yes |
+| `attachments` | `.adding` (the attachment tool) | `.adding` only |
+| `text` | `.selection`, `.copy` | no |
+| `search` | | no |
+| `thumbnails`, `outline` | | no |
+| `documents` | `.open`, `.download`, `.print`, `.tabs` | no |
+
+A mode tab disappears by itself when nothing in its bar is left, so `disable: ['shapes']` removes
+the Shapes tab. Annotations, comments and form values already in the document still show; only
+making and changing them goes.
+
+`disable` and `readOnly` follow their props: change them while the viewer runs, and the tools
+disappear or come back without a reload.
+
+## Read-only
+
+```js
+{ readOnly: true }
+```
+
+It turns off every feature that changes the document, marked in the table above. People still
+scroll, zoom, search, select and copy text, read annotations and comments, follow links, download
+and print. A small **View only** label in the toolbar says why the tools are gone.
+
+Keep one way of changing it with `except`, and combine it with `disable` for what else should go:
+
+```js
+{
+  readOnly: { except: ['forms.filling'] },
+  disable: ['documents.download', 'documents.print'],
+}
+```
+
+That's a form people fill in and can't otherwise change, with no download or print button.
+
+## What a user may do
+
+`disable` and `readOnly` decide what the viewer offers. To decide what a user *may* do, give the
+document a scope: the list of permissions the engine checks on every call, from a button or from
+your code.
+
+<Engine local>
+
+```js
+{
+  scope: ['doc.open', 'doc.render', 'doc.text.select', 'doc.text.search', 'doc.annotate.read'],
+  identity: { displayName: 'Ada Lovelace' },
+}
+```
+
+Without a `scope`, the user may do everything, and the console reminds you once. The scope and every
+permission in it are the [headless ones](/docs/headless/concepts/permissions).
+
+</Engine>
+
+<Engine cloud>
+
+On CloudPDF, the user's token carries the scope, so your server decides. See [What a token
+carries](/docs/engine/authentication#what-a-token-carries).
+
+</Engine>
+
+What the scope doesn't allow is hidden, like a disabled feature: a user without
+`doc.annotate.modify` gets no annotation tools and no Annotate tab. To show those buttons greyed out
+instead, with the reason in their tooltip, for example to offer an upgrade:
+
+```js
+{ notAllowed: 'disable' }
+```
+
+### The PDF's own restrictions
+
+A PDF can carry restrictions of its own, set by its author with an owner password, such as no
+printing or no copying. They count when the scope includes `'pdf.permissions'`, which grants what the
+file allows:
+
+```js
+{ scope: ['pdf.permissions'] }
+```
+
+Permissions add up: a scope that lists `'doc.print'` next to `'pdf.permissions'` allows printing even
+when the file says no. To let the file decide, list `'pdf.permissions'` and leave its permissions out.
+The same rule holds on the server, so a document behaves the same on both engines.
+
+## Your own code
+
+- **Commands follow the viewer.** A disabled command doesn't run, from a button or from
+  `viewer.commands.execute()`, because commands are what the interface does.
+- **Plugins follow the scope.** `viewer.get('form').importValues(…)` works in a read-only viewer,
+  so your app can fill in a form from its own data and show it read-only.
+
+So `disable` and `readOnly` are about the interface, and `scope` is about security. Someone who opens
+the browser's developer tools can call the plugins too, so whatever a user truly may not do belongs in
+the scope.
+
+<Engine local>
+
+<CloudPdfCallout
+  title="Keep the file on your server"
+  href="https://www.cloudpdf.com/docs/viewer/features/turning-off"
+  cta="Protect documents with CloudPDF"
+>
+
+With the local engine, the PDF is in the browser, so even a scope without `doc.download` can't stop
+someone who saves the file from the network panel. With CloudPDF, pages arrive as images and the
+server checks every call: a user who may not download never receives the file, and one who may not
+copy never receives the text.
+
+</CloudPdfCallout>
+
+</Engine>
+
+## Good to know
+
+### Shortcuts don't fall through
+
+A turned-off or not-allowed command still catches its keys. `Ctrl`/`Cmd`+`C` on text the user may
+not copy says so, instead of the browser doing something else with the key.
+
+### Your own commands
+
+A command of yours joins features through `categories`, so `disable` turns it off with them, and a
+name of your own makes a new feature: `categories: ['acme.review']`, then
+`disable: ['acme.review']`. A command that needs a permission says which with `requires`. See
+[Buttons & commands](../customize/commands#permissions).

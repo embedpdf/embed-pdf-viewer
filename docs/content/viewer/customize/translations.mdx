@@ -1,0 +1,80 @@
+---
+title: Translations
+description: Show the viewer in the user's language, pick one, change any word, and translate your own buttons.
+---
+
+# Translations
+
+The viewer speaks the user's language: it picks the best match from the browser's languages. To
+choose one yourself, set `locale`:
+
+```js
+{ locale: 'de' }
+```
+
+`locale` follows its prop, so a language switch in your app switches the viewer too. Without it,
+or with `'auto'`, the viewer follows the browser.
+
+## The languages it speaks
+
+English, German, French, Spanish, Italian, Dutch, Portuguese, Polish, Japanese, Chinese
+(Simplified), Korean, Arabic and Hebrew. Each one loads only when it's needed. For Arabic and
+Hebrew, the viewer is right-to-left: the bars mirror, and `start` and `end` swap sides.
+
+## Change a word
+
+A built-in button's label has the command's id as its key. Give a new one, per language:
+
+```js
+{
+  strings: {
+    en: { 'document:download': 'Save a copy' },
+    de: { 'document:download': 'Kopie speichern' },
+  },
+}
+```
+
+## Translate your own buttons
+
+Give a command a `labelKey` instead of a `label`, and its words per language:
+
+```js
+{
+  commands: [{ id: 'acme:send', labelKey: 'acme.send', icon: 'send', run: send }],
+  strings: {
+    en: { 'acme.send': 'Send for signature' },
+    nl: { 'acme.send': 'Verstuur ter ondertekening' },
+  },
+}
+```
+
+Panels and mode bars take a `titleKey` the same way, for their title.
+
+## A language of your own
+
+Give `strings` for a language the viewer doesn't have, and it becomes one of its languages. Anything
+you don't translate falls back to English:
+
+```js
+{
+  locale: 'sv',
+  strings: { sv: { 'document:download': 'Ladda ner', 'zoom:in': 'Zooma in' } },
+}
+```
+
+## Good to know
+
+### Change the language from code
+
+`viewer.get('i18n').setLocale('fr')` does the same as the `locale` prop, and returns a promise that
+resolves once the language has loaded.
+
+### Add words while the app runs
+
+`viewer.get('i18n').addTranslations('nl', { … })` adds or replaces words in a language without
+starting over, for words that arrive from your own translation service.
+
+### Labels in the toolbar
+
+The toolbar measures the words it shows, so a longer translation moves fewer or more buttons into
+the "More" menu by itself.

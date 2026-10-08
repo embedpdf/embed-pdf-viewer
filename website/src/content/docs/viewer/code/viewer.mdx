@@ -1,0 +1,104 @@
+---
+title: The viewer in code
+description: Reach the viewer from your app to open documents, run commands, use any plugin, follow its state and react to what happens.
+---
+
+{/* Generated from docs/content — edit there, then `pnpm docs:sync`. */}
+
+# The viewer in code
+
+The `viewer` is how your app controls the viewer: open and close documents, run commands, use any
+feature's plugin, and follow what happens. Inside the viewer, any component of yours gets it with
+`usePDFViewer()`; outside it, keep the one `onReady` gives you:
+
+<Snippet name="viewer/code/get-viewer" />
+
+`onReady` fires once the viewer is live, before any document has opened. Until then there's no
+`viewer`.
+
+## What it gives you
+
+| Member | What it is |
+| :-- | :-- |
+| `get(name)` | A plugin's API, by its name: `viewer.get('search')`. The same object its headless hook gives you. |
+| `documents` | The documents plugin: open, close, switch, download. See [Documents](../documents). |
+| `commands` | The commands plugin: run a command, check one, turn features on and off. See [Buttons & commands](../customize/commands). |
+| `watch(read, onChange)` | Calls `onChange` whenever what `read` returns changes. Returns a function that stops it. |
+| `forDocument(id)` | The same `get` for one document, whichever is active |
+
+## Use a plugin
+
+Every feature is a plugin, and `get()` gives you its API by name:
+
+```js
+viewer.get('stage').goToPage(4);
+viewer.get('stage').updateSettings({ spread: 'odd' });
+await viewer.get('search').search('termination');
+const values = await viewer.get('form').exportValues();
+```
+
+The names, and the page that lists each plugin's methods, are on [Plugins](plugins#every-plugin).
+A plugin's token works too, `viewer.get(SearchToken)`, for code shared with a headless app.
+
+## Run a command
+
+A command does what a button does, with the same checks: a command that's disabled doesn't run.
+
+```js
+const { status } = await viewer.commands.execute('zoom:fit-width');
+```
+
+## Follow a value
+
+`watch()` follows anything you can read, and calls you when it changes:
+
+```js
+const stop = viewer.watch(
+  () => viewer.get('stage').getCurrentPageIndex(),
+  (index) => (pageLabel.textContent = `Page ${index + 1}`),
+);
+```
+
+In a component, use the plugin's state hook instead, such as `useStageState()`: see
+[Plugins](plugins#in-your-components).
+
+## React to what happens
+
+Events belong to the plugin they're about, as in headless. Each one returns a function that stops
+listening:
+
+```js
+viewer.documents.onOpened(({ documentId }) => track('opened', documentId));
+viewer.get('annotation').onCreated(({ annotation }) => saveAnnotation(annotation));
+viewer.commands.onExecuted(({ commandId }) => track('command', commandId));
+```
+
+Every plugin page in the headless docs lists its events under **Events**.
+
+## A specific document
+
+With several documents open, `get()` talks to the active one. `forDocument(id)` talks to one of
+your choice, whether it's active or not:
+
+```js
+viewer.forDocument(contractId).get('search').search('signature');
+```
+
+## Good to know
+
+### The same API as headless
+
+The `viewer` adds nothing of its own: `get('search')` is the object `useSearch()` returns in a
+headless app, with the same methods, state and events. What you learn on one side works on the
+other.
+
+### When the viewer goes away
+
+When the viewer unmounts, or [mounts again](../setup#change-the-config-later) with a new config,
+its `viewer` is done: listeners stop and calls reject. A new `onReady` brings the new one.
+
+### Events on the element
+
+The `<embedpdf-viewer>` element fires `epdf:ready` (with `event.detail.viewer`) and
+`epdf:documentchange` (with `event.detail.documentId`), for plain HTML pages. In a framework,
+`onReady` and `onDocumentChange` are the same events.

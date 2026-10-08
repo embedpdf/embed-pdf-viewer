@@ -1,0 +1,13 @@
+<embedpdf-viewer src="/report.pdf" style="height: 100vh">
+  <epdf-menu slot="item:share" icon="link" label="Share">
+    <epdf-menu-item icon="copy" id="copy-link">Copy link</epdf-menu-item>
+    <epdf-menu-item icon="message" id="email-link">Email a link</epdf-menu-item>
+  </epdf-menu>
+</embedpdf-viewer>
+
+<script type="module">
+  import 'https://cdn.jsdelivr.net/npm/@embedpdf/viewer@3/dist/embedpdf.js';
+
+  document.getElementById('copy-link').addEventListener('select', copyLink);
+  document.getElementById('email-link').addEventListener('select', emailLink);
+</script>

@@ -1,0 +1,181 @@
+---
+title: Annotations
+description: The annotation, shape and insert tools, comments, fonts, stamps, redaction and measurements, and the settings for each.
+---
+
+# Annotations
+
+People mark up a document in three modes: **Annotate** (highlights, notes, ink and text),
+**Shapes** and **Insert** (stamps, images, files and signatures). They select an annotation to
+move, resize or turn it, change its color and width in the style panel, and undo with
+`Ctrl`/`Cmd`+`Z`. Everything they make is a standard PDF annotation, so it opens the same in
+Acrobat and every other PDF app.
+
+## The tools
+
+| Mode | Tools |
+| :-- | :-- |
+| Annotate | `note`, `link`, `highlight`, `underline`, `strikeout`, `squiggly`, `ink`, `ink-highlight`, `free-text`, `callout`, `insert-text`, `replace-text` |
+| Shapes | `square`, `circle`, `line`, `arrow`, `polygon`, `polyline` |
+| Insert | `stamp`, `image`, `attachment`, `signature` |
+
+Each tool's button is `tool:<id>`. Change what a tool draws with the annotation plugin's `tools`:
+
+```js
+{
+  plugins: {
+    annotation: {
+      tools: [
+        { id: 'highlight', defaults: { color: '#fde047', opacity: 0.4 } },
+        { id: 'ink', defaults: { color: '#1d4ed8', strokeWidth: 2 } },
+      ],
+    },
+  },
+}
+```
+
+A tool of your own extends a built-in one, and its button goes wherever you put it:
+
+```js
+{
+  plugins: {
+    annotation: {
+      tools: [
+        {
+          id: 'approved',
+          extends: 'free-text',
+          defaults: { contents: 'Approved', fontColor: '#15803d' },
+        },
+      ],
+    },
+  },
+  layout: (layout) => layout.add('tool:approved', { to: 'annotate', group: 'text' }),
+}
+```
+
+Every field a tool takes, and what happens after drawing, is on [Tools &
+defaults](/docs/headless/annotations/tools).
+
+## Comments
+
+Every annotation can carry a comment and replies. The comments panel lists every thread in page
+order; picking one goes to its annotation. The user's [`identity`](../features#who-the-user-is) is the
+author of what they write. In a [read-only](turning-off#read-only) viewer, people read every thread but can't
+add to it.
+
+<Engine local>
+
+<CloudPdfCallout
+  title="Review together, live"
+  href="https://www.cloudpdf.com/docs/viewer/features/annotations"
+  cta="Share annotations with CloudPDF"
+>
+
+With CloudPDF, a team reviews one document together: everyone who has it open sees each other's
+annotations, comments and replies as they're made, and every change is stored on your server.
+
+</CloudPdfCallout>
+
+</Engine>
+
+## Fonts
+
+Text boxes and callouts use the 14 standard PDF fonts. Give the engine more, such as your brand's
+typeface or a script the standard fonts don't cover, and the style panel offers them:
+
+```js
+{
+  engine: {
+    fonts: [
+      { key: 'brand-sans', familyName: 'Brand Sans', url: '/fonts/BrandSans-Regular.ttf' },
+      { key: 'noto-sc', familyName: 'Noto Sans SC', url: '/fonts/NotoSansSC-Regular.otf' },
+    ],
+  },
+}
+```
+
+Each font is fetched once, and the text box shows the very face the PDF will carry: only the
+characters people use are embedded when they save. A `key` can't be one of the standard names,
+such as `helvetica`. On CloudPDF, fonts are your server's to configure.
+
+## Stamps
+
+The stamps panel has the standard stamps, such as Approved and Confidential, in the user's
+language, and every stamp library people make: from an image, from selected annotations, or from
+a PDF they import. The libraries they make are kept in the browser across visits.
+
+```js
+{
+  plugins: {
+    stamp: {
+      standard: 'https://files.example.com/stamps/{locale}.pdf', // or false for none
+      quick: ['standard:Approved', 'standard:Rejected'], // in the Insert toolbar
+    },
+  },
+}
+```
+
+| Setting | What it does | Default |
+| :-- | :-- | :-- |
+| `standard` | Where the standard stamps come from: `true` (from your own build), a URL with `{locale}`, or `false` for none | `true` |
+| `quick` | Stamps to show as buttons in the Insert toolbar, by library and name | none |
+
+The stamp plugin's own settings go in the same place: see [Stamps](/docs/headless/annotations/stamps#settings).
+
+## Redaction
+
+In the **Redact** mode, people mark text or areas, check them in the redaction panel, then apply.
+Applying removes what's under each mark from the file for good: the text, the images and the
+drawing, not just what shows. The color and label of a redacted area are settings:
+
+```js
+{
+  plugins: {
+    redaction: { overlay: { fill: '#111827', text: { color: '#ffffff' } } },
+  },
+}
+```
+
+See [Redaction](/docs/headless/annotations/redaction#settings).
+
+## Measurements
+
+In the **Measure** mode, people measure distances, perimeters and areas. A drawing's scale comes
+from the PDF when it has one; otherwise they set it once with **Calibrate**, by drawing a line of a
+known length. A page with no scale uses the default:
+
+```js
+{ plugins: { measurement: { defaultScale: 'imperial' } } }
+```
+
+See [Measurements](/docs/headless/annotations/measurements#settings).
+
+## From code
+
+`viewer.get('annotation')` is the annotation plugin: list, create, change and delete annotations,
+and listen for changes:
+
+```js
+const annotation = viewer.get('annotation');
+
+annotation.onCreated(({ annotation: created }) => save(created));
+await annotation.create(0, {
+  subtype: 'square',
+  rect: { x: 72, y: 72, width: 200, height: 100 },
+});
+```
+
+Every method is on [Annotations with code](/docs/headless/annotations/with-code).
+
+## Good to know
+
+### Saved in the PDF
+
+Annotations, comments and stamps are written into the file when it's downloaded, as standard PDF
+annotations. To keep them in your own database instead, export and import them with the
+annotation plugin: see [Saving annotations](/docs/headless/annotations/saving).
+
+### Undo
+
+Undo and redo cover everything people do to annotations: drawing, moving, restyling, deleting,
+and comments.

@@ -1,0 +1,146 @@
+---
+title: Your own components
+description: Put your own React, Vue, Svelte or Angular components in the viewer's toolbars, panels and header, with your styles, your app's state, and the viewer's commands.
+---
+
+# Your own components
+
+Put your own component in a toolbar, in a panel, or above and below the viewer. It stays a component
+of your app: your framework renders it, your CSS styles it, and it reads your app's state as it always
+does. The viewer only decides where it goes.
+
+Two steps: make room for it in the [layout](layout), then give the viewer the component. This one
+puts a version picker from your app in the toolbar:
+
+<Snippet name="viewer/components/toolbar-item" />
+
+`{ custom: 'versions' }` makes room in the toolbar, and the id ties it to your component. The
+toolbar measures your component like any button, so it fits it in, and when the toolbar runs out of
+room, `command` takes its place in the "More" menu: here, a command of yours that opens the same
+choice in a dialog. Leave `command` out, and your component stays in the toolbar while other items
+make room.
+
+## Know where it sits
+
+The same component can sit in a top bar, a vertical rail or a floating bar. `useToolbarItem()` tells
+it where it is, so it can lay itself out:
+
+<Snippet name="viewer/components/item-context" />
+
+| Field | What it is |
+| :-- | :-- |
+| `orientation` | `'horizontal'` or `'vertical'` |
+| `edge` | The bar's place: `'top'`, `'bottom'`, `'start'`, `'end'`, `'float'` or `'selection'` |
+| `variant` | Which of your `variants` the toolbar picked, when you gave some |
+| `size` | The viewer's [size](small-screens): `'compact'`, `'medium'` or `'expanded'` |
+
+The same values are on your element as `data-orientation`, `data-edge`, `data-variant` and
+`data-size`, for CSS.
+
+To have the toolbar pick a smaller form when it's short of room, list your forms, largest first:
+`{ custom: 'versions', variants: ['full', 'short'], command: 'acme:versions' }`. Draw the one
+`variant` names.
+
+## Look like the viewer
+
+`Button`, `Menu` and `MenuItem` are the viewer's own, for your components. A menu made with them
+opens the way the viewer's menus do: away from its bar, flipped when there's no room, and up from
+the bottom on a phone.
+
+<Snippet name="viewer/components/menu" />
+
+| Component | What it is |
+| :-- | :-- |
+| `Button` | A toolbar button. `command="zoom:in"` makes it that command, with its icon, tooltip and state; or give it `icon`, `label` and a click handler. |
+| `Menu` | A button that opens a menu: `icon`, `label`, and `MenuItem`s inside |
+| `MenuItem` | A row in a menu: `icon`, its text, and what happens when it's picked. `command="…"` makes it a command. |
+
+Icons are the viewer's icons and [yours](commands#icons), by name. For anything else, the viewer's
+colors are CSS variables your styles can use: `var(--epdf-surface)`, `var(--epdf-text)`,
+`var(--epdf-border)`, `var(--epdf-accent)`. See [Theming](theming#in-your-own-components).
+
+## Use the viewer's commands and state
+
+`useCommand(id)` gives you a command as a button needs it: its `label`, `icon` and `shortcut`,
+whether it's `enabled` and `active`, and `run()`. And every hook from the [headless
+docs](/docs/headless) works inside the viewer, so your component reads the viewer's state the same
+way a headless app does:
+
+<Snippet name="viewer/components/zoom" />
+
+`useStageState()` is the [Stage](/docs/headless/viewing/stage#state) plugin's state, from the
+headless adapter for your framework. Install it next to the viewer (`@embedpdf/react`,
+`@embedpdf/vue`, `@embedpdf/svelte` or `@embedpdf/angular`) and use any of its hooks: the search
+results, the selected annotation, the form values.
+
+## A panel of your own
+
+Add the panel to the layout with a side, a title and an icon, then give the viewer what goes inside:
+
+<Snippet name="viewer/components/panel" />
+
+Every panel gets a `panel:<id>` command that opens and closes it, so `panel:notes` is the toolbar
+button. The viewer draws the panel's frame: the header with its title and close button, and the way
+it opens, beside the pages on a wide screen and up from the bottom on a phone. You draw what's
+inside. See [Panels](panels).
+
+## Above, below, and when nothing is open
+
+Regions are places around the viewer for your own components:
+
+<Snippet name="viewer/components/region" />
+
+| Region | Where it is |
+| :-- | :-- |
+| `header` | Above everything, across the whole viewer |
+| `footer` | Below everything |
+| `tabs` | In place of the document tabs, for your own |
+| `empty` | Over the pages while no document is open |
+
+A region you don't fill shows nothing, or the viewer's own (the tabs).
+
+## In the menu over selected text
+
+To add an action to the bar that appears over selected text, such as "Explain this", make it a
+command and add it there:
+
+```js
+{
+  commands: [
+    {
+      id: 'acme:explain',
+      label: 'Explain',
+      icon: 'message',
+      run: async ({ get }) => openAssistant(await get('selection').getText()),
+    },
+  ],
+  layout: (layout) => layout.add('acme:explain', { to: 'selection' }),
+}
+```
+
+The bar over selected annotations is `annotation`. See [Menus](menus#over-a-selection).
+
+## Good to know
+
+### Your styles apply, the viewer's don't
+
+Your component lives in your page, not inside the viewer's shadow DOM. Your CSS styles it, and
+the viewer's CSS never touches it. It does inherit the viewer's font and text color and its CSS
+variables, so plain elements fit in without any styling.
+
+### One id, one component
+
+Each `id` is one item in one place. To show the same component in two bars, give each place its
+own id.
+
+### Keyboard
+
+Your item is part of the toolbar's keyboard order. Arrow keys move to it like any button; the first
+element in it that takes focus gets it. Inside your item, keys work as you wrote them: the viewer's
+shortcuts never fire while focus is in a text field or a `<select>`.
+
+### Plain HTML
+
+Without a framework, give the element a `slot` attribute: `item:<id>`, `panel:<id>`, or the
+region's name. The viewer's components are elements too: `<epdf-button>`, `<epdf-menu>` and
+`<epdf-menu-item>`, which fire a `select` event when picked.

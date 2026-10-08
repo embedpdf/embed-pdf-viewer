@@ -1,0 +1,14 @@
+<button id="print" disabled>Print</button>
+<embedpdf-viewer id="viewer" src="/report.pdf" style="height: 80vh"></embedpdf-viewer>
+
+<script type="module">
+  import 'https://cdn.jsdelivr.net/npm/@embedpdf/viewer@3/dist/embedpdf.js';
+
+  const element = document.getElementById('viewer');
+  const print = document.getElementById('print');
+
+  element.addEventListener('epdf:ready', () => {
+    print.disabled = false;
+    print.onclick = () => element.viewer.commands.execute('document:print');
+  });
+</script>

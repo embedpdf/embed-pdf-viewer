@@ -44,6 +44,14 @@ describe('code example pipeline', () => {
     // Highlighting every sample is real work (~4s); the default 5s budget flakes under a loaded matrix.
   }, 30_000);
 
+  it('stores every Viewer integration of a Viewer snippet', async () => {
+    const { attribute } = await compile('Snippet', 'viewer/start/first');
+
+    expect(attribute('codeFrameworks')).toBe('vanilla,react,vue,svelte,angular');
+    const files = readCodePanel(panelsDir, attribute('codeKey')!, 'vanilla');
+    expect(files[0].highlightedCode).toContain('embedpdf-viewer');
+  }, 30_000);
+
   it("reads back only the route's framework", async () => {
     const { attribute } = await compile('Example', 'viewer/getting-started/basic');
     const shown = routeCodePanels({

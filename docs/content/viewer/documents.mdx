@@ -1,0 +1,164 @@
+---
+title: Documents
+description: Open a PDF from a URL, a file or bytes, open several as tabs, handle passwords, and download, print or save to your server.
+---
+
+# Documents
+
+Give the viewer a document with `src`: a URL, a `File`, or bytes.
+
+```js
+{ src: '/reports/2026-q3.pdf' }
+```
+
+A relative URL is relative to your page. A URL on another site needs CORS headers that allow
+yours, like any `fetch`.
+
+## Open the file someone picks
+
+`src` follows its prop: give it another document, and the viewer opens that one in its place.
+
+<Snippet name="viewer/documents/pick-file" />
+
+People can also open files themselves: drop a PDF on the viewer, or use **Open** in the document
+menu. Both open it as a new tab.
+
+## Several documents
+
+Give `documents` instead of `src` to open several at once. Each one gets a tab:
+
+```js
+{
+  documents: [
+    { src: '/contract.pdf', name: 'Contract' },
+    { src: '/appendix.pdf', name: 'Appendix A' },
+    { src: '/scan.pdf', name: 'Signed scan', active: true },
+  ],
+}
+```
+
+| Field | What it is | Default |
+| :-- | :-- | :-- |
+| `src` | A URL, a `File`, or bytes | none |
+| `name` | What its tab shows | the file's name |
+| `password` | Its password, if it has one | none |
+| `active` | Show this one first | the first document |
+
+The tabs show while more than one document is open. To show them always or never, set
+`layout.tabs('always')` or `layout.tabs('never')` in your [layout](customize/layout).
+`onDocumentChange` tells you which document the user switched to.
+
+## Passwords
+
+A document with a password opens locked, and the viewer asks for it. When you know it, pass it
+along and nobody is asked:
+
+```js
+{ documents: [{ src: '/payroll.pdf', password: secret }] }
+```
+
+A wrong password asks again. A document that can't be opened at all shows why in its tab, with a
+**Try again** button.
+
+## Open and close documents from code
+
+`viewer.documents` opens, closes and switches documents. It's the documents plugin, the same as
+[in headless](/docs/headless/documents/opening):
+
+```js
+const { document } = await viewer.documents.open(
+  { kind: 'url', url: '/invoice-1042.pdf' },
+  { name: 'Invoice 1042' },
+);
+
+viewer.documents.setActive(document.id);
+viewer.documents.close(document.id);
+```
+
+`open()` resolves once the document is ready, and makes it the active one.
+
+## Download and print
+
+The document menu has **Download** and **Print**, and `Ctrl`/`Cmd`+`S` and `Ctrl`/`Cmd`+`P` work
+while the viewer has focus. Both include every annotation, form value and signature. When the
+scope doesn't allow printing, or you [turn it off](features/turning-off), **Print** isn't there, and
+`Ctrl`/`Cmd`+`P` says so instead of printing the web page.
+
+To run them from your own button, use the commands `document:download` and `document:print`, or
+call them from code:
+
+```js
+viewer.commands.execute('document:print');
+```
+
+## Save to your server
+
+`viewer.documents.download()` gives you the PDF with every change, as bytes, without a download
+dialog. Make it a button of your own:
+
+```js
+{
+  commands: [
+    {
+      id: 'acme:save',
+      label: 'Save',
+      icon: 'save',
+      shortcut: 'Mod+S',
+      run: async ({ viewer, documentId }) => {
+        const bytes = await viewer.documents.download(documentId);
+        await fetch(`/api/documents/${documentId}`, { method: 'PUT', body: bytes });
+      },
+    },
+  ],
+  layout: (layout) => layout.replace('document:download', 'acme:save'),
+}
+```
+
+`Mod+S` now saves to your server instead of downloading, because a command of yours wins over a
+built-in one with the same shortcut.
+
+<Engine local>
+
+<CloudPdfCallout
+  title="Nothing to save"
+  href="https://www.cloudpdf.com/docs/viewer/documents"
+  cta="Store changes as they're made"
+>
+
+With CloudPDF, every annotation, comment and form value is stored on your server the moment it's
+made, and everyone who has the document open sees it. There's no file to upload and nothing to
+lose when the tab closes.
+
+</CloudPdfCallout>
+
+</Engine>
+
+## Warn before changes are lost
+
+When someone closes a tab or leaves the page with unsaved changes, the viewer asks first. Unsaved
+means changed since it opened or since the last download. `viewer.documents.get().hasUnsavedChanges`
+tells you the same, and `onUnsavedChangesChanged` fires when it changes:
+
+```js
+viewer.documents.onUnsavedChangesChanged(({ documentId, hasUnsavedChanges }) => {
+  saveButton.disabled = !hasUnsavedChanges;
+});
+```
+
+## Good to know
+
+### Big files
+
+The local engine needs the whole file before the first page shows, so a large scan takes as long
+as its download. The toolbar is there at once; only the pages wait.
+
+### Where the bytes go
+
+With the local engine, a document never leaves the browser: no upload, no server. Each document
+runs in the engine's worker, so a heavy page doesn't freeze your app.
+
+### Every documents method
+
+`viewer.documents` is the headless documents plugin. Its methods, state and events are listed on
+[Opening documents](/docs/headless/documents/opening#methods), [Several
+documents](/docs/headless/documents/tabs#methods) and [Saving](/docs/headless/documents/saving#methods).
