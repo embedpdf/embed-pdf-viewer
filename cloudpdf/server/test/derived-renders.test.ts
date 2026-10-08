@@ -187,9 +187,7 @@ describe('derived renders', () => {
       enforced: false,
     });
     // The import limits ride the same response, so a client checks them first.
-    expect((body as { bundleLimits?: unknown }).bundleLimits).toEqual(
-      DEFAULT_BUNDLE_LIMITS,
-    );
+    expect((body as { bundleLimits?: unknown }).bundleLimits).toEqual(DEFAULT_BUNDLE_LIMITS);
   });
 
   test('appearance renders: scale lattice enforced on versioned tokens only', async () => {

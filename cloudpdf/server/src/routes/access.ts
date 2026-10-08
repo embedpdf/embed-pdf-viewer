@@ -49,15 +49,8 @@ export async function registerAccessRoutes(
   app: FastifyInstance,
   deps: AccessRouteDeps,
 ): Promise<void> {
-  const {
-    service,
-    layers,
-    cdnSigner,
-    derivedRenders,
-    usageMeters,
-    tenantUsage,
-    bundleLimits,
-  } = deps;
+  const { service, layers, cdnSigner, derivedRenders, usageMeters, tenantUsage, bundleLimits } =
+    deps;
 
   const handleAccess = async (
     req: FastifyRequest,

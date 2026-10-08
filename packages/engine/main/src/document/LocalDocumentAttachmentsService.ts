@@ -138,7 +138,7 @@ export class LocalDocumentAttachmentsService implements DocumentAttachmentsServi
       buildPack: async (jobId: JobId) => {
         // Same splitter the file-attachment annotation draft uses: metadata
         // into the JSON body, bytes onto the transfer list.
-        const { wireFile, resource } = await normalizeAttachmentFileSource(file, 'r0');
+        const { wireFile, resource } = await normalizeAttachmentFileSource(file, 'file');
         return wirePack(
           {
             kind: 'attachments.create',
@@ -147,7 +147,7 @@ export class LocalDocumentAttachmentsService implements DocumentAttachmentsServi
             opId,
             docId,
             file: wireFile,
-            resources: { r0: resource },
+            resources: { file: resource },
           },
           [resource.bytes],
         );

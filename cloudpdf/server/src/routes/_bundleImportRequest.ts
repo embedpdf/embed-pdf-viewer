@@ -11,27 +11,28 @@ import type { FastifyRequest } from 'fastify';
 
 import { parseOrInvalidArg, type SchemaLike } from './_helpers';
 
-export interface BundleImportRequest<Manifest> {
-  manifest: Manifest;
+export interface BundleImportRequest<Body> {
+  body: Body;
   /** Each resource's bytes, by the id its part is named for. */
   resources: Record<ResourceId, ArrayBuffer>;
 }
 
 /**
- * Read a bundle import, either family's, `multipart/form-data`: a `manifest`
+ * Read a bundle import, either family's, `multipart/form-data`: a `body`
  * part (the bundle without its bytes, and the options), checked against
- * `manifestSchema`, and one `resource:<id>` part per resource. The limits hold while the parts stream in, so a request past one
- * is stopped before the rest of it is read, with `PayloadTooLarge` naming
- * the limit: the manifest's size, each resource's size, how many resources,
- * and the bundle's bytes counted across every part. That the parts and the
- * manifest name each other, and each resource matches its id, is the
- * worker's check, with the rest of the bundle's.
+ * `bodySchema`, and one `resource:<id>` part per resource. The limits hold
+ * while the parts stream in, so a request past one is stopped before the
+ * rest of it is read, with `PayloadTooLarge` naming the limit: the body's
+ * size, each resource's size, how many resources, and the bundle's bytes
+ * counted across every part. That the bundle's rows and the parts name
+ * each other, and each resource matches its id, is the worker's check,
+ * with the rest of the bundle's.
  */
-export async function readBundleImportRequest<Manifest>(
+export async function readBundleImportRequest<Body>(
   req: FastifyRequest,
   limits: BundleLimits,
-  bundle: { readonly kind: BundleKind; readonly manifestSchema: SchemaLike<Manifest> },
-): Promise<BundleImportRequest<Manifest>> {
+  bundle: { readonly kind: BundleKind; readonly bodySchema: SchemaLike<Body> },
+): Promise<BundleImportRequest<Body>> {
   const tooLarge = (limit: keyof BundleLimits) =>
     new EngineError(
       EngineErrorCode.PayloadTooLarge,
@@ -41,10 +42,10 @@ export async function readBundleImportRequest<Manifest>(
   if (!req.isMultipart()) {
     throw new EngineError(
       EngineErrorCode.InvalidArg,
-      "an import is multipart/form-data: a 'manifest' part and a 'resource:<id>' part per resource",
+      "an import is multipart/form-data: a 'body' part and a 'resource:<id>' part per resource",
     );
   }
-  let manifest: unknown;
+  let body: unknown;
   let bundleBytes = 0;
   const count = (bytes: number) => {
     bundleBytes += bytes;
@@ -63,22 +64,19 @@ export async function readBundleImportRequest<Manifest>(
   try {
     for await (const part of parts) {
       if (part.type === 'field') {
-        if (part.fieldname !== 'manifest') {
+        if (part.fieldname !== 'body') {
           throw new EngineError(
             EngineErrorCode.InvalidArg,
-            `unexpected multipart field '${part.fieldname}' (expected 'manifest')`,
+            `unexpected multipart field '${part.fieldname}' (expected 'body')`,
           );
         }
         if (part.valueTruncated) throw tooLarge('manifestBytes');
         const text = String(part.value);
         count(Buffer.byteLength(text));
         try {
-          manifest = JSON.parse(text);
+          body = JSON.parse(text);
         } catch {
-          throw new EngineError(
-            EngineErrorCode.InvalidArg,
-            "multipart 'manifest' part: invalid JSON",
-          );
+          throw new EngineError(EngineErrorCode.InvalidArg, "multipart 'body' part: invalid JSON");
         }
         continue;
       }
@@ -109,13 +107,13 @@ export async function readBundleImportRequest<Manifest>(
       case 'FST_PARTS_LIMIT':
         throw tooLarge('resources');
       case 'FST_FIELDS_LIMIT':
-        throw new EngineError(EngineErrorCode.InvalidArg, "an import has one 'manifest' part");
+        throw new EngineError(EngineErrorCode.InvalidArg, "an import has one 'body' part");
       default:
         throw err;
     }
   }
-  if (manifest === undefined) {
-    throw new EngineError(EngineErrorCode.InvalidArg, "an import needs its 'manifest' part");
+  if (body === undefined) {
+    throw new EngineError(EngineErrorCode.InvalidArg, "an import needs its 'body' part");
   }
-  return { manifest: parseOrInvalidArg(bundle.manifestSchema, manifest, 'manifest'), resources };
+  return { body: parseOrInvalidArg(bundle.bodySchema, body, 'body'), resources };
 }

@@ -42,7 +42,7 @@ export interface AnnotationImportOptions extends WriteOptions {
  * resource is a part of its own) and the options, apart from the `opId`,
  * which is the request's `Idempotency-Key`.
  */
-export interface AnnotationImportManifest {
+export interface AnnotationImportBody {
   readonly bundle: Omit<AnnotationBundle, 'resources'>;
   readonly options: Omit<AnnotationImportOptions, 'opId'>;
 }

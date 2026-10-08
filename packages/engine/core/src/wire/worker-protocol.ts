@@ -1185,7 +1185,7 @@ export interface AttachmentsCreateWorkerRequest extends WriteJobFields {
   docId: string;
   layerName?: string;
   file: WireAttachmentFile;
-  /** Binary payload referenced by `file.resource` — transfer-list bytes. */
+  /** Binary payload referenced by `file.resources.file` — transfer-list bytes. */
   resources?: WireResourceMap;
   artifactPath?: string;
 }

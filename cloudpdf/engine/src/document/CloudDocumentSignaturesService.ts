@@ -28,7 +28,7 @@ import {
 } from '@embedpdf/engine-core/wire';
 import type { SessionEventPublisher } from '@embedpdf/engine-services';
 
-import { buildMutationForm } from './buildMutationForm';
+import { buildRoleMutationForm } from './buildMutationForm';
 import type { ManifestAccessor } from './CloudDocumentHandle';
 import type { CloudWrites } from './CloudWrites';
 import type { HttpClient } from '../transport/HttpClient';
@@ -172,22 +172,13 @@ export class CloudDocumentSignaturesService implements DocumentSignaturesService
       const opId = opIdOf(options);
       return this.writes.run(opId, signal, async (write) => {
         const { appearance, ...rest } = input;
-        const body = {
-          ...rest,
-          ...(appearance ? { appearance: { resource: 'appearance' } } : {}),
-        };
-        const form = buildMutationForm(
-          body,
-          appearance
-            ? {
-                appearance: {
-                  bytes: appearance.pdf.slice().buffer as ArrayBuffer,
-                  mimeType: 'application/pdf',
-                  name: 'appearance.pdf',
-                },
-              }
-            : {},
-        );
+        const form = buildRoleMutationForm(rest, {
+          appearance: appearance && {
+            bytes: appearance.pdf.slice().buffer as ArrayBuffer,
+            mimeType: 'application/pdf',
+            name: 'appearance.pdf',
+          },
+        });
         const prepared = await write.send((sent) =>
           this.http.postMultipartJson(
             wirePaths.layerSignaturesPrepare(this.docId, this.layerName),

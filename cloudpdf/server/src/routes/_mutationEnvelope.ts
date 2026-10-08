@@ -2,6 +2,7 @@ import {
   EngineError,
   EngineErrorCode,
   sniffBinaryMetadata,
+  type WireResource,
   type WireResourceMap,
 } from '@embedpdf/engine-core/runtime';
 import type { FastifyRequest } from 'fastify';
@@ -36,9 +37,10 @@ const STRICT_POLICY: ResourceBinaryPolicy = () => 'image-or-pdf';
  *
  *   - `application/json` — the body is the JSON payload (unchanged fast
  *     path; `resources` stays undefined).
- *   - `multipart/form-data` — a `body` field holding that exact same JSON,
- *     plus `resource:{key}` file parts carrying binary payloads. The
- *     mirror of the appearance-render response shape.
+ *   - `multipart/form-data` — a `body` part holding that same JSON, and one
+ *     `resource:<key>` part per file. The JSON names each file by role,
+ *     `resources: { <role>: <key> }` ({@link resourcesByRole}). Every
+ *     multipart message the API sends or takes has this shape.
  *
  * Binary acceptance is a per-kind policy (see {@link ResourceBinaryPolicy});
  * callers with no binary-carrying kinds keep the strict default. Oversize
@@ -126,5 +128,59 @@ export async function readMutationEnvelope(
   return {
     body,
     ...(pending.length > 0 ? { resources } : {}),
+  };
+}
+
+/**
+ * The files a write's JSON names by role (`resources: { <role>: <key> }`),
+ * each the part `resource:<key>`. A key with no part, and a part no role
+ * names, are refused.
+ */
+export function resourcesByRole<Role extends string>(
+  envelope: MutationEnvelope,
+  named: Readonly<Partial<Record<Role, string>>> | undefined,
+): Partial<Record<Role, WireResource>> {
+  const parts = envelope.resources ?? {};
+  const found: Partial<Record<Role, WireResource>> = {};
+  const used = new Set<string>();
+  for (const [role, key] of Object.entries(named ?? {}) as Array<[Role, string | undefined]>) {
+    if (key === undefined) continue;
+    const part = parts[key];
+    if (!part) {
+      throw new EngineError(
+        EngineErrorCode.InvalidArg,
+        `the body names '${role}' as the part 'resource:${key}', but no such part arrived`,
+      );
+    }
+    found[role] = part;
+    used.add(key);
+  }
+  assertEveryPartNamed(envelope, used);
+  return found;
+}
+
+/** Refuse a `resource:<key>` part whose key the body never names. */
+export function assertEveryPartNamed(envelope: MutationEnvelope, named: ReadonlySet<string>): void {
+  for (const key of Object.keys(envelope.resources ?? {})) {
+    if (!named.has(key)) {
+      throw new EngineError(
+        EngineErrorCode.InvalidArg,
+        `the part 'resource:${key}' is named by nothing in the body`,
+      );
+    }
+  }
+}
+
+/**
+ * A binary policy by role: each part is checked as the role the body's
+ * `resources` gives its key; `'image-or-pdf'` for any other.
+ */
+export function policyByRole(
+  policies: Readonly<Partial<Record<string, 'image-or-pdf' | 'any'>>>,
+): ResourceBinaryPolicy {
+  return (body, key) => {
+    const named = (body as { resources?: Record<string, unknown> } | null)?.resources;
+    const role = Object.entries(named ?? {}).find(([, value]) => value === key)?.[0];
+    return (role !== undefined ? policies[role] : undefined) ?? 'image-or-pdf';
   };
 }

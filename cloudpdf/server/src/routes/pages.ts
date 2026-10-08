@@ -39,7 +39,7 @@ import {
 } from '@embedpdf/engine-core/wire';
 import type { FastifyInstance, FastifyReply } from 'fastify';
 
-import { readMutationEnvelope } from './_mutationEnvelope';
+import { readMutationEnvelope, resourcesByRole } from './_mutationEnvelope';
 import {
   requireLayerCapability,
   requireLayerDocAccessOnly,
@@ -652,24 +652,21 @@ export async function registerPageRoutes(app: FastifyInstance, deps: PageRouteDe
       pdfBits,
       protection,
     );
-    // Multipart mutation envelope: `body` JSON part + a `resource:source`
-    // part carrying the standalone PDF. Policy 'any', not the strict sniff:
+    // Multipart: the `body` part names the standalone PDF's part as
+    // `resources.source`. Policy 'any', not the strict sniff:
     // the worker's FPDF_LoadMemDocument is the real gate here, and the
     // conformance contract wants malformed source bytes to surface as
     // MalformedPdf (the parser's verdict), never the envelope's InvalidArg.
     const envelope = await readMutationEnvelope(req, () => 'any');
-    const body = parseOrInvalidArg<{ position?: PagePosition }>(
-      PageInsertInputSchema as unknown as SchemaLike<{ position?: PagePosition }>,
+    const body = parseOrInvalidArg<{ position?: PagePosition; resources: { source: string } }>(
+      PageInsertInputSchema as unknown as SchemaLike<{
+        position?: PagePosition;
+        resources: { source: string };
+      }>,
       envelope.body,
       'request body',
     );
-    const source = envelope.resources?.['source'];
-    if (!source) {
-      throw new EngineError(
-        EngineErrorCode.InvalidArg,
-        `pages.insert requires a multipart 'resource:source' part carrying the source PDF`,
-      );
-    }
+    const source = resourcesByRole(envelope, body.resources).source!;
 
     setNoStore(reply);
     return layerService.insertPages(

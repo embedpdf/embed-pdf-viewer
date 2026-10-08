@@ -176,8 +176,13 @@ function changeRequestOf(changes: readonly SentChange[]): {
           },
         };
       }
-      case 'forms.setSignatureAppearance':
-        return { ...op, appearance: { pdf: part(op.appearance.pdf.buffer as ArrayBuffer) } };
+      case 'forms.setSignatureAppearance': {
+        const { appearance, ...rest } = op;
+        return {
+          ...rest,
+          resources: { appearance: part(appearance.pdf.slice().buffer as ArrayBuffer) },
+        };
+      }
       default:
         return op;
     }

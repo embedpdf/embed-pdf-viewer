@@ -18,12 +18,17 @@ import { WidgetDTOSchema, WidgetPatchSchema } from '../annotation/kinds/widget';
 import {
   ANNOTATION_APPEARANCE_MODES,
   type AnnotationAppearanceImageOptions,
-  type AnnotationAppearanceManifest,
+  type AnnotationAppearanceBatch,
   type AnnotationAppearanceMode,
   type AnnotationAppearancesQuery,
   type WidgetAppearancesQuery,
 } from '../dto/AnnotationRender';
 import { AttachmentRefSchema, AttachmentSchema } from '../dto/Attachment.schema';
+import {
+  AppearanceResourceKeysSchema,
+  ImageResourceKeysSchema,
+  SourceResourceKeysSchema,
+} from './resourceKeys';
 import type { CachePins } from '../dto/CachePins';
 import type { DocumentManifest, ManifestPage } from '../dto/DocumentManifest';
 import type { LayerScopes } from '../dto/LayerScopes';
@@ -128,7 +133,7 @@ import type { PageNameResult } from '../mutation/PageNameResult';
 import type { PageRotateInput } from '../mutation/PageRotateInput';
 import type { PageRotateResult } from '../mutation/PageRotateResult';
 import type {
-  AnnotationImportManifest,
+  AnnotationImportBody,
   AnnotationImportOptions,
   AnnotationImportResult,
 } from '../transfer/annotationImport';
@@ -925,28 +930,26 @@ export const WidgetAppearancesQuerySchema = buildAppearancesQuerySchema(
 ) as unknown as z.ZodType<WidgetAppearancesQuery>;
 
 /**
- * The JSON manifest part of the appearance `multipart/form-data` response.
- * Wire-stable; the cloud client validates the parsed `manifest` part against
+ * The `body` part of the appearance `multipart/form-data` response.
+ * Wire-stable; the cloud client validates the parsed `body` part against
  * this before reconstructing image handles from the binary parts.
  */
-export const AnnotationAppearanceManifestSchema: z.ZodType<AnnotationAppearanceManifest> = z.object(
-  {
-    page: PageRefSchema,
-    appearances: z.array(
-      z.object({
-        part: z.string().min(1),
-        ref: AnnotationRefSchema,
-        mode: AppearanceModeSchema,
-        state: z.string().nullable(),
-        rect: PageBoxSchema,
-        width: z.number().int().positive(),
-        height: z.number().int().positive(),
-        format: PageNetworkRenderFormatSchema,
-        contentType: z.string().min(1),
-      }),
-    ),
-  },
-);
+export const AnnotationAppearanceBatchSchema: z.ZodType<AnnotationAppearanceBatch> = z.object({
+  page: PageRefSchema,
+  appearances: z.array(
+    z.object({
+      resources: ImageResourceKeysSchema,
+      ref: AnnotationRefSchema,
+      mode: AppearanceModeSchema,
+      state: z.string().nullable(),
+      rect: PageBoxSchema,
+      width: z.number().int().positive(),
+      height: z.number().int().positive(),
+      format: PageNetworkRenderFormatSchema,
+      contentType: z.string().min(1),
+    }),
+  ),
+});
 
 export const CacheDeltaSchema: z.ZodType<CacheDelta> = z.object({
   previousDocVersion: z.number().int().nonnegative(),
@@ -1359,11 +1362,11 @@ export const AnnotationImportOptionsSchema: z.ZodType<Omit<AnnotationImportOptio
   .strict();
 
 /**
- * The `manifest` part of an import request. Only its envelope is checked
+ * The `body` part of an import request. Only its envelope is checked
  * here: the bundle's pages and items are the worker's to check, against the
  * limits and each kind's create schema.
  */
-export const AnnotationImportManifestSchema: z.ZodType<AnnotationImportManifest> = z
+export const AnnotationImportBodySchema: z.ZodType<AnnotationImportBody> = z
   .object({
     bundle: z
       .object({
@@ -1375,7 +1378,7 @@ export const AnnotationImportManifestSchema: z.ZodType<AnnotationImportManifest>
       .strict(),
     options: AnnotationImportOptionsSchema,
   })
-  .strict() as unknown as z.ZodType<AnnotationImportManifest>;
+  .strict() as unknown as z.ZodType<AnnotationImportBody>;
 
 export const PageFlattenInputSchema: z.ZodType<PageFlattenInput> = z.object({
   pages: z.array(PageRefSchema),
@@ -1501,12 +1504,15 @@ export const PageDeleteResultSchema: z.ZodType<PageDeleteResult> = z.object({
 });
 
 /**
- * Page insert (bytes) input — the JSON `body` part of the multipart
- * mutation envelope; the PDF itself rides the `resource:source` part.
- * `position` omitted → `'end'`.
+ * Page insert (bytes) input — the `body` part of the multipart envelope;
+ * the PDF rides the part `resources.source` names. `position` omitted →
+ * `'end'`.
  */
-export const PageInsertInputSchema: z.ZodType<{ position?: ListPosition<PageRef> }> = z
-  .object({ position: PagePositionSchema.optional() })
+export const PageInsertInputSchema: z.ZodType<{
+  position?: ListPosition<PageRef>;
+  resources: { source: string };
+}> = z
+  .object({ position: PagePositionSchema.optional(), resources: SourceResourceKeysSchema })
   .strict();
 
 /**
@@ -1798,16 +1804,15 @@ const SignatureSignerInputSchema = z.object({
   signedAt: IsoDateTimeSchema.optional(),
 });
 
-/** The JSON part of a visual signature fill (multipart envelope): which resource part holds the one-page PDF. */
+/** The `body` part of a visual signature fill: which part holds the one-page PDF. */
 export const SignatureAppearanceBodySchema = z.object({
-  resource: z.string().min(1),
+  resources: AppearanceResourceKeysSchema,
 });
 export type SignatureAppearanceBody = z.infer<typeof SignatureAppearanceBodySchema>;
 
 /**
- * The JSON part of a prepare (multipart envelope): `SignaturePrepareInput`
- * with the appearance artwork referenced by its resource part instead of
- * inline bytes.
+ * The `body` part of a prepare: `SignaturePrepareInput` with the
+ * appearance artwork named by the key of its part instead of inline bytes.
  */
 export const SignaturePrepareBodySchema = z.object({
   field: FormFieldRefSchema,
@@ -1818,7 +1823,7 @@ export const SignaturePrepareBodySchema = z.object({
   signer: SignatureSignerInputSchema.optional(),
   certify: z.object({ permission: DocMdpPermissionSchema }).optional(),
   lock: FieldLockSpecSchema.optional(),
-  appearance: z.object({ resource: z.string().min(1) }).optional(),
+  resources: AppearanceResourceKeysSchema.optional(),
 });
 export type SignaturePrepareBody = z.infer<typeof SignaturePrepareBodySchema>;
 

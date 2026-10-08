@@ -173,12 +173,12 @@ export namespace ChangeOp {
     export interface FormsSetSignatureAppearance {
         type: "forms.setSignatureAppearance";
         field: CloudPDF.FormFieldRef;
-        appearance: ChangeOpFormsSetSignatureAppearance.Appearance;
+        resources: ChangeOpFormsSetSignatureAppearance.Resources;
     }
 
     export namespace ChangeOpFormsSetSignatureAppearance {
-        export interface Appearance {
-            pdf: string;
+        export interface Resources {
+            appearance: string;
         }
     }
 

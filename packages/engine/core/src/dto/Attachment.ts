@@ -46,7 +46,8 @@ export interface AttachmentFileSource {
 
 /** An {@link AttachmentFileSource} ready to ship: its metadata, and the key of its bytes. */
 export interface WireAttachmentFile {
-  resource: string;
+  /** The file's key: its bytes are the part `resource:<key>`. */
+  resources: { file: string };
   name: string;
   mimeType?: string;
   description?: string;

@@ -1538,8 +1538,8 @@ export const docOperations = {
       409: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
     },
     notes:
-      'The multipart envelope: a JSON `body` part (field, subFilter, digest, contentsSize, signer, certify, lock, appearance) ' +
-      "and an optional `resource:<key>` PDF part the body's `appearance.resource` names. A certification (`certify.permission`) " +
+      'Multipart: a JSON `body` part (field, subFilter, digest, contentsSize, signer, certify, lock), naming the appearance ' +
+      "PDF it may carry as `resources: { appearance: '<key>' }`, and that PDF as the part `resource:<key>`. A certification (`certify.permission`) " +
       'additionally requires `doc.sign.certify`. The layer is read-only until the signing completes, is cancelled, or expires (15 minutes). ' +
       'A layer behind the document head cannot sign (StaleBase).',
   },
@@ -1805,7 +1805,8 @@ export const docOperations = {
       'or a completed signature ends undo for the changes before it (UndoUnavailable). Each op is checked against its own ' +
       'capability: annotation ops need `doc.annotate.modify`, form values `doc.forms.fill`, form structure ' +
       "`doc.forms.modify`, metadata `doc.metadata.modify`. Bytes (a stamp's drawing, an attached file, a signature's " +
-      'artwork) travel as multipart `resource:<key>` parts beside a JSON `body` part that names them by key. ' +
+      "artwork) travel as multipart: a JSON `body` part, each op naming its files by role as `resources: { <role>: '<key>' }`, " +
+      'and each file as the part `resource:<key>`. ' +
       'At most 64 changes per request and 512 ops per change.',
     responses: {
       200: { contentType: 'application/json', schema: ChangeResponseSchema },
@@ -2274,7 +2275,7 @@ export const docOperations = {
       404: { contentType: 'application/json', schema: EngineErrorPayloadSchema },
     },
     notes:
-      'Multipart mutation envelope: a `body` field holding `{"position"?: PagePosition}` (omitted → the end) plus a `resource:source` file part carrying the standalone PDF whose pages are copied in. The inserted copies get fresh page object numbers, returned in insertion order.',
+      'Multipart: a JSON `body` part `{"position"?: PagePosition, "resources": {"source": "<key>"}}` (position omitted → the end), and the standalone PDF whose pages are copied in as the part `resource:<key>`. The inserted copies get fresh page object numbers, returned in insertion order.',
   },
   'doc.pages.insertBlank': {
     operationId: 'doc.pages.insertBlank',

@@ -66,7 +66,7 @@ export {
   PageRenderAnnotatedQuerySchema,
   AnnotationAppearancesQuerySchema,
   WidgetAppearancesQuerySchema,
-  AnnotationAppearanceManifestSchema,
+  AnnotationAppearanceBatchSchema,
   AnnotationListMutationMetaSchema,
   AnnotationCreateResultSchema,
   AppearanceOutcomeSchema,
@@ -108,7 +108,7 @@ export {
   AnnotationAppearanceExportInputSchema,
   AnnotationExportSelectionSchema,
   AnnotationsExportRequestSchema,
-  AnnotationImportManifestSchema,
+  AnnotationImportBodySchema,
   AnnotationImportResultSchema,
   AnnotationImportOptionsSchema,
   NamedPageEntrySchema,
@@ -188,6 +188,14 @@ export {
   FormSubmissionReceiptSchema,
 } from './forms/submission';
 export { DEFAULT_LAYER_NAME, wirePaths, wireTemplates } from './wire/paths';
+export {
+  AnnotationResourceKeysSchema,
+  AppearanceResourceKeysSchema,
+  FileResourceKeysSchema,
+  ImageResourceKeysSchema,
+  ResourceKeySchema,
+  SourceResourceKeysSchema,
+} from './wire/resourceKeys';
 // General resource catalog + route-guard helper (server uses this for
 // every read endpoint, not just CDN-cacheable ones).
 export { checkResourceAccess, DOC_RESOURCES } from './wire/resources';

@@ -148,8 +148,8 @@ export type {
   AnnotationAppearancesResult,
   AnnotationAppearanceImage,
   AnnotationAppearanceImagesResult,
-  AnnotationAppearanceManifestEntry,
-  AnnotationAppearanceManifest,
+  AnnotationAppearanceBatchEntry,
+  AnnotationAppearanceBatch,
 } from './dto/AnnotationRender';
 export type { CachePins } from './dto/CachePins';
 export { DEFAULT_PDF_SAVE_MODE } from './dto/PdfSaveMode';
@@ -304,7 +304,7 @@ export type {
   AnnotationDropReason,
   AnnotationImportDrop,
   AnnotationImportOptions,
-  AnnotationImportManifest,
+  AnnotationImportBody,
   AnnotationImportPlan,
   AnnotationImportResult,
   PlannedAnnotation,

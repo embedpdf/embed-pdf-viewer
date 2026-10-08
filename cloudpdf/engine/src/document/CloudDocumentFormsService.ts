@@ -63,7 +63,7 @@ import {
 } from '@embedpdf/engine-core/wire';
 import type { SessionEventPublisher } from '@embedpdf/engine-services';
 
-import { buildMutationForm } from './buildMutationForm';
+import { buildRoleMutationForm } from './buildMutationForm';
 import type { ManifestAccessor } from './CloudDocumentHandle';
 import type { CloudWrites } from './CloudWrites';
 import { planesInherited } from './planes';
@@ -324,9 +324,9 @@ export class CloudDocumentFormsService implements DocumentFormsService {
       return this.writes.run(opId, signal, async (write) => {
         const bytes = new ArrayBuffer(appearance.pdf.byteLength);
         new Uint8Array(bytes).set(appearance.pdf);
-        const form = buildMutationForm(
-          { resource: 'r0' },
-          { r0: { bytes, mimeType: 'application/pdf', name: 'appearance.pdf' } },
+        const form = buildRoleMutationForm(
+          {},
+          { appearance: { bytes, mimeType: 'application/pdf', name: 'appearance.pdf' } },
         );
         const result = await write.send((sent) =>
           this.http.postMultipartJson(

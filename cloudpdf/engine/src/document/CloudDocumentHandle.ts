@@ -269,8 +269,8 @@ export class CloudDocumentHandle implements DocumentHandle {
       this.writes,
       // The deployment's import limits ride /v1/access, as the render lattice does.
       async () =>
-        (security.currentAccess ?? (await security.establishAccess()).access)
-          ?.bundleLimits ?? DEFAULT_BUNDLE_LIMITS,
+        (security.currentAccess ?? (await security.establishAccess()).access)?.bundleLimits ??
+        DEFAULT_BUNDLE_LIMITS,
     );
     this.actions = new CloudDocumentActionsService(
       http,

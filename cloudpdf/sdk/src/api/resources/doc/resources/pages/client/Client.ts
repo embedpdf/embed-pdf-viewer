@@ -436,7 +436,7 @@ export class PagesClient {
     }
 
     /**
-     * Multipart mutation envelope: a `body` field holding `{"position"?: PagePosition}` (omitted → the end) plus a `resource:source` file part carrying the standalone PDF whose pages are copied in. The inserted copies get fresh page object numbers, returned in insertion order.
+     * Multipart: a JSON `body` part `{"position"?: PagePosition, "resources": {"source": "<key>"}}` (position omitted → the end), and the standalone PDF whose pages are copied in as the part `resource:<key>`. The inserted copies get fresh page object numbers, returned in insertion order.
      *
      * @param {CloudPDF.doc.InsertPagesRequest} request
      * @param {PagesClient.RequestOptions} requestOptions - Request-specific configuration.

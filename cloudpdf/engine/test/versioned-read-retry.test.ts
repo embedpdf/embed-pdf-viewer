@@ -934,7 +934,7 @@ describe('CloudPageAnnotationsService — binary payload wire shape', () => {
     return Uint8Array.from(atob(b64), (ch) => ch.charCodeAt(0));
   })();
 
-  test('a stamp create ships as multipart: the data as `body`, its drawing as `resource:appearance`', async () => {
+  test('a stamp create ships as multipart: the `body` names its drawing by role, `resource:appearance` carries it', async () => {
     const fx = freshStub();
     const doc = new CloudDocumentHandle(fx.http, DOC_ID);
     try {
@@ -950,11 +950,12 @@ describe('CloudPageAnnotationsService — binary payload wire shape', () => {
       expect(post!.body).toBeInstanceOf(FormData);
       const form = post!.body as FormData;
 
-      // The body is the data exactly: no bytes and no resource keys inside it.
+      // The body is the data, naming its drawing by role; no bytes inside it.
       expect(JSON.parse(String(form.get('body')))).toEqual({
         subtype: 'stamp',
         box: { x: 10, y: 10, width: 100, height: 50 },
         fit: 'cover',
+        resources: { appearance: 'appearance' },
       });
       const part = form.get('resource:appearance');
       expect(part).toBeInstanceOf(Blob);

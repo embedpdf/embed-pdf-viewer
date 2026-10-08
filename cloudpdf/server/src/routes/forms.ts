@@ -59,7 +59,7 @@ import {
   setNoStore,
   type SchemaLike,
 } from './_helpers';
-import { readMutationEnvelope } from './_mutationEnvelope';
+import { readMutationEnvelope, resourcesByRole } from './_mutationEnvelope';
 import { requireSharedDocRead } from './_planeGuard';
 
 interface FormRouteDeps {
@@ -344,11 +344,7 @@ export async function registerFormRoutes(app: FastifyInstance, deps: FormRouteDe
         protection,
       );
       setNoStore(reply);
-      return layerService.deleteFormWidget(
-        ctx,
-        { docId, layerName, widget },
-        abortSignalOf(reply),
-      );
+      return layerService.deleteFormWidget(ctx, { docId, layerName, widget }, abortSignalOf(reply));
     },
   );
 
@@ -607,21 +603,15 @@ export async function registerFormRoutes(app: FastifyInstance, deps: FormRouteDe
       );
       const ref = fieldRefFromParams(req);
       // The mark is a page of a PDF (sniffed, never declared), riding the multipart envelope.
-      const { body, resources } = await readMutationEnvelope(req, () => 'image-or-pdf');
+      const envelope = await readMutationEnvelope(req, () => 'image-or-pdf');
       const parsed = parseOrInvalidArg(
         SignatureAppearanceBodySchema as unknown as SchemaLike<
           ReturnType<typeof SignatureAppearanceBodySchema.parse>
         >,
-        body,
+        envelope.body,
         'request body',
       );
-      const resource = resources?.[parsed.resource];
-      if (!resource) {
-        throw new EngineError(
-          EngineErrorCode.InvalidArg,
-          `body references resource '${parsed.resource}' but no such multipart part arrived`,
-        );
-      }
+      const resource = resourcesByRole(envelope, parsed.resources).appearance!;
       if (resource.mimeType !== 'application/pdf') {
         throw new EngineError(EngineErrorCode.InvalidArg, 'the appearance resource must be a PDF');
       }

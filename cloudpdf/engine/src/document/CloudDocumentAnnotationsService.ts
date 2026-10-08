@@ -10,7 +10,7 @@ import {
   type AnnotationBundle,
   type BundleLimits,
   type AnnotationExportSelection,
-  type AnnotationImportManifest,
+  type AnnotationImportBody,
   type AnnotationImportOptions,
   type AnnotationImportResult,
   type AnnotationList,
@@ -158,8 +158,8 @@ export class CloudDocumentAnnotationsService implements DocumentAnnotationsServi
         await this.manifest.refresh(signal);
         form = await read(signal);
       }
-      const { manifest, resources } = await readBundleParts('annotation', form);
-      const bundle = { ...(manifest as Omit<AnnotationBundle, 'resources'>), resources };
+      const { body, resources } = await readBundleParts('annotation', form);
+      const bundle = { ...(body as Omit<AnnotationBundle, 'resources'>), resources };
       await assertAnnotationBundle(bundle, NO_BUNDLE_LIMITS);
       return bundle;
     });
@@ -186,14 +186,14 @@ export class CloudDocumentAnnotationsService implements DocumentAnnotationsServi
         const { resources, ...rest } = bundle;
         const sizes = new Map(Object.entries(resources).map(([id, bytes]) => [id, bytes.length]));
         assertAnnotationBundleManifest(bundle, sizes, await this.importLimits());
-        const manifest: AnnotationImportManifest = {
+        const body: AnnotationImportBody = {
           bundle: rest,
           options: {
             ...(options.pages !== undefined ? { pages: options.pages } : {}),
             ...(options.attribution !== undefined ? { attribution: options.attribution } : {}),
           },
         };
-        const form = bundleImportForm(manifest, resources);
+        const form = bundleImportForm(body, resources);
         const result = await write.send((sent) =>
           this.http.postMultipartJson(
             wirePaths.layerAnnotationsImport(this.docId, this.layerName),

@@ -5,7 +5,7 @@
  *     GET  /v1/docs/:docId/layers/:layerName/signatures[@docVersion]
  *     GET  /v1/docs/:docId/layers/:layerName/signatures/analysis[@token]
  *   Mutations (current only; never cached):
- *     POST   …/signatures/prepare                 multipart envelope (JSON body + resource:appearance)
+ *     POST   …/signatures/prepare                 multipart (`body`, naming its artwork's `resource:<key>` part)
  *     POST   …/signatures/:signingId/complete     JSON { cms: base64, expectedVersion }
  *     DELETE …/signatures/:signingId
  *   Version-scoped reads (content-addressed by base sha; immutable; the
@@ -57,7 +57,7 @@ import {
   setNoStore,
   type SchemaLike,
 } from './_helpers';
-import { readMutationEnvelope } from './_mutationEnvelope';
+import { readMutationEnvelope, resourcesByRole } from './_mutationEnvelope';
 import {
   requireDocAccessOnly,
   requireLayerCapability,
@@ -206,27 +206,21 @@ export async function registerSignatureRoutes(
     const pdfBits = await bitsForLayer(accessCtx, docId, layerName);
     const ctx = requireLayerCapability(req, docId, layerName, 'doc.sign', pdfBits);
     // Appearance artwork is a page of a PDF: the stamp rule (sniffed, never declared).
-    const { body, resources } = await readMutationEnvelope(req, () => 'image-or-pdf');
+    const envelope = await readMutationEnvelope(req, () => 'image-or-pdf');
     const parsed = parseOrInvalidArg(
       SignaturePrepareBodySchema as unknown as SchemaLike<
         ReturnType<typeof SignaturePrepareBodySchema.parse>
       >,
-      body,
+      envelope.body,
       'request body',
     );
     if (parsed.certify) {
       requireLayerCapability(req, docId, layerName, 'doc.sign.certify', pdfBits);
     }
-    const { appearance, ...rest } = parsed;
+    const { resources: named, ...rest } = parsed;
     const input: SignaturePrepareInput = { ...rest };
-    if (appearance) {
-      const resource = resources?.[appearance.resource];
-      if (!resource) {
-        throw new EngineError(
-          EngineErrorCode.InvalidArg,
-          `body references resource '${appearance.resource}' but no such multipart part arrived`,
-        );
-      }
+    const resource = resourcesByRole(envelope, named).appearance;
+    if (resource) {
       if (resource.mimeType !== 'application/pdf') {
         throw new EngineError(EngineErrorCode.InvalidArg, 'the appearance resource must be a PDF');
       }
