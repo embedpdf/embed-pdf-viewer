@@ -68,8 +68,8 @@ export interface DocumentHandle {
   readonly signatures: DocumentSignaturesService;
   /**
    * The document's event stream — every confirmed mutation, exactly once,
-   * identical shape on local and cloud engines (see `DocumentEvent`). The
-   * engine-instance identity lives on each event's `origin.sessionId`.
+   * identical shape on local and cloud engines (see `DocumentEvent`). Each
+   * open is its own session, named on each event's `origin.sessionId`.
    */
   readonly events: DocumentEventStream;
   /**

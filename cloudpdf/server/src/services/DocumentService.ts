@@ -128,7 +128,7 @@ export interface OpenContext {
   tenantId: string;
   sub: string;
   jwt?: RequestJwtContext;
-  /** Mutating client's engine-instance id (X-Engine-Session-Id), stored on
+  /** Mutating open document's session id (X-Engine-Session-Id), stored on
    *  audit rows for SSE own-echo suppression. Absent on read contexts. */
   originSessionId?: string | null;
   /**

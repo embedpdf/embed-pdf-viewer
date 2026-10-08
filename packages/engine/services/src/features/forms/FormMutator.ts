@@ -666,8 +666,8 @@ export class FormMutator {
     const before = readFieldAt(this.runtime, model, resolved.fieldIndex, docPtr);
     const pageIndex = this.preflightPlacement(placement);
     const onState = onStateOf(before.family, placement);
-    // A merged field/widget splits: its widget half leaves its place in
-    // /Annots for a new widget at the end, which moves that page's entries.
+    // A merged field/widget splits: its widget half becomes a new widget, at
+    // a new number in the same place in that page's /Annots.
     const mergedPage =
       before.widgets.find((w) => w.objectNumber === resolved.fieldObjectNumber)?.page ?? null;
     if (numbers.objectNumber !== undefined) this.session.useObjectNumber(numbers.objectNumber);

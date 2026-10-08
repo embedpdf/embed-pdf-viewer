@@ -22,8 +22,8 @@ import { decodeUnverifiedClaims } from './transport/decodeUnverifiedClaims';
 import { HttpClient, type HttpClientOptions } from './transport/HttpClient';
 
 /**
- * `cloudEngine()`'s options: the HTTP client's, minus the session id the
- * engine mints for itself (one per engine instance, for its events' origin).
+ * `cloudEngine()`'s options: the HTTP client's, minus the session id, which
+ * the engine mints for each document it opens.
  */
 export interface CloudEngineOptions extends Omit<HttpClientOptions, 'sessionId'> {}
 
@@ -34,22 +34,14 @@ export interface CloudEngineOptions extends Omit<HttpClientOptions, 'sessionId'>
  */
 export class CloudEngine implements Engine {
   static fromOptions(opts: CloudEngineOptions): CloudEngine {
-    // One identity per engine instance: it stamps local events' origins and
-    // travels as X-Engine-Session-Id so the server can mark this instance's
-    // audit rows — the SSE stream drops those echoes (exactly-once events).
-    const sessionId = `cloud:${generateUuid()}`;
-    return new CloudEngine(new HttpClient({ ...opts, sessionId }), sessionId);
+    return new CloudEngine(new HttpClient(opts));
   }
 
   private destroyed = false;
   /** The documents this engine opened and nobody closed yet. */
   private readonly handles = new Set<CloudDocumentHandle>();
 
-  private constructor(
-    private readonly http: HttpClient,
-    /** This engine instance's identity on every event's `origin.sessionId`. */
-    private readonly sessionId: string,
-  ) {}
+  private constructor(private readonly http: HttpClient) {}
 
   open(input: OpenInput, options?: OpenOptions): AbortablePromise<DocumentHandle> {
     if (this.destroyed) {
@@ -101,7 +93,7 @@ export class CloudEngine implements Engine {
       // many handles each with a different bearer.
       const tokenSource = input.token;
       return AbortablePromise.run<DocumentHandle>(async (signal) => {
-        const docHttp = this.http.withToken(tokenSource);
+        const docHttp = this.http.forDocument({ sessionId: newSessionId(), token: tokenSource });
         const token = await docHttp.currentToken();
         const claims = decodeUnverifiedClaims(token);
         const docId = claims.doc_id;
@@ -126,7 +118,6 @@ export class CloudEngine implements Engine {
           layerName,
           head,
           token,
-          this.sessionId,
           () => this.handles.delete(handle),
         );
         this.handles.add(handle);
@@ -146,7 +137,10 @@ export class CloudEngine implements Engine {
       // `input.token`; the resulting handle then carries that
       // override for all of its RPCs.
       const id = input.id;
-      const docHttp = input.token ? this.http.withToken(input.token) : this.http;
+      const docHttp = this.http.forDocument({
+        sessionId: newSessionId(),
+        ...(input.token ? { token: input.token } : {}),
+      });
       return AbortablePromise.run<DocumentHandle>(async (signal) => {
         let layerName = input.layerName ?? DEFAULT_LAYER_NAME;
         // Resolve the bearer once so we have it for the layer-name
@@ -176,7 +170,6 @@ export class CloudEngine implements Engine {
           layerName,
           head,
           resolvedToken,
-          this.sessionId,
           () => this.handles.delete(handle),
         );
         this.handles.add(handle);
@@ -216,6 +209,18 @@ export class CloudEngine implements Engine {
       await Promise.all(open.map((handle) => handle.close()));
     });
   }
+}
+
+/**
+ * A session id for a document being opened. Every open is its own session,
+ * even a second open of the same document on this engine. The id stamps the
+ * document's own events' origins and travels as `X-Engine-Session-Id`: the
+ * server keeps the session's object numbers under it and marks its audit
+ * rows with it, so the document's stream drops its own echoes and hears
+ * every other open as remote.
+ */
+function newSessionId(): string {
+  return `cloud:${generateUuid()}`;
 }
 
 /**

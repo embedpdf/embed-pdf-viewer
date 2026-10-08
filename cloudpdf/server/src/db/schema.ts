@@ -192,7 +192,7 @@ export interface AuditLogTable {
   artifact_size: number;
   idempotency_key: string | null;
   payload_json: string;
-  /** Engine-instance session id of the mutating client (X-Engine-Session-Id);
+  /** Session id of the mutating open document (X-Engine-Session-Id);
    *  lets SSE subscribers drop their own echoes. NULL when not sent. */
   origin_session_id: string | null;
   /** An undo's row: the opId of the change it undid (migration 033). */
@@ -509,7 +509,7 @@ export interface BaseVersionsTable {
 }
 
 /**
- * An editing session (migration 032): an engine instance (its
+ * An editing session (migration 032): one open document (its
  * `X-Engine-Session-Id`) acting for one token subject on one layer. Its
  * blocks of object numbers stay its own while its expiry keeps moving.
  */

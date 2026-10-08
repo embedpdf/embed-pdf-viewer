@@ -39,13 +39,13 @@ doc.events.on('annotations.updated', ({ annotation, origin }) => {
 });
 ```
 
-| Field           | What it is                                                                    |
-| :-------------- | :---------------------------------------------------------------------------- |
-| `origin.kind`   | `'local'` when this engine made the change, `'remote'` when someone else did. |
-| `origin.sub`    | The user who made it (on the cloud).                                          |
-| `origin.ts`     | When it happened, in milliseconds.                                            |
-| `origin.tx`     | The write it came from: its `opId`, and its place among that write's events.  |
-| `origin.undoOf` | On an undo's events: the `opId` of the change it undid.                       |
+| Field           | What it is                                                                        |
+| :-------------- | :-------------------------------------------------------------------------------- |
+| `origin.kind`   | `'local'` when the change was made through this `doc`, `'remote'` when it wasn't. |
+| `origin.sub`    | The user who made it (on the cloud).                                              |
+| `origin.ts`     | When it happened, in milliseconds.                                                |
+| `origin.tx`     | The write it came from: its `opId`, and its place among that write's events.      |
+| `origin.undoOf` | On an undo's events: the `opId` of the change it undid.                           |
 
 An event fires after the change is saved, never before, and before the call's promise resolves.
 By the time `await page.annotations.create(…)` returns, your listeners have run.
@@ -142,8 +142,9 @@ the others, through the same `events.on()` you already use.
 ## Other people's changes
 
 Everyone who has the document open hears every change as the server saves it. Changes made
-through this engine arrive with `origin.kind: 'local'`; everyone else's with `'remote'` and the
-user in `origin.sub`. The same user in a second tab is someone else here: their changes arrive as
+through this `doc` arrive with `origin.kind: 'local'`; everyone else's with `'remote'` and the user
+in `origin.sub`. Every `open()` is someone else here, even by the same user: a second tab, or the
+same document opened twice in one app (a preview beside an editor). Their changes arrive as
 `'remote'`, with the same `sub`.
 
 The engine connects to the server when you add the first listener and disconnects after you
@@ -159,5 +160,5 @@ meantime, you get a `stream.desynced` event. Read what you show again (`doc.anno
 
 - **Each change arrives once.** Your own changes aren't sent back to you a second time.
 - **A listener that throws** doesn't stop the other listeners, and doesn't make the call fail.
-- **`origin.kind` is about the engine, not the user.** "Did I do this?" (undo, optimistic UI):
-  check `origin.kind`. "Did this user do it?": check `origin.sub`.
+- **`origin.kind` is about the open document, not the user.** "Did I do this?" (undo, optimistic
+  UI): check `origin.kind`. "Did this user do it?": check `origin.sub`.

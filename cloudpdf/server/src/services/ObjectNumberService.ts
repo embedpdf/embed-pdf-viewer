@@ -51,7 +51,7 @@ export const MAX_OBJECT_NUMBER_RESERVATION = 1_000;
 /** Expired sessions without blocks a single issue tidies away. */
 const TIDY_LIMIT = 16;
 
-/** Who acts: an engine instance's session on a layer, for one token subject. */
+/** Who acts: an open document's session on a layer, for one token subject. */
 export interface EditSessionKey {
   readonly layerId: string;
   readonly sessionId: string;

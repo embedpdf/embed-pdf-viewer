@@ -25,8 +25,8 @@ const QUAD: HighlightDraft['quadPoints'] = [
  *      after confirmation.
  *   3. Results ride verbatim: each event embeds the result the caller
  *      received, deep-equal field for field.
- *   4. Provenance: own mutations are `origin.kind: 'local'` with a stable
- *      per-engine-instance `sessionId`.
+ *   4. Provenance: own mutations are `origin.kind: 'local'` with the
+ *      handle's one `sessionId`.
  *   5. Unsubscribe stops delivery; `on(type)` hears only its type.
  *   6. Published before settlement: the event for a session's own mutation
  *      reaches subscribers before the mutation's promise settles, so a
@@ -116,7 +116,7 @@ export function runDocumentEventsConformance(
           expect(evCustom.meta).toEqual(custom.meta);
         }
 
-        // Provenance: own mutations, one engine instance. Every event in
+        // Provenance: own mutations, one handle. Every event in
         // this suite is a mutation event — transport notices
         // (`stream.desynced`) never fire from local mutations, so a
         // missing origin here is a real failure, asserted explicitly.

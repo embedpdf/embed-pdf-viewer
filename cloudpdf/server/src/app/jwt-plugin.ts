@@ -671,9 +671,9 @@ export function requireLayerCapability<C extends DocCapability>(
 }
 
 /**
- * The request's editing session. `originSessionId` is the client's
- * engine-instance id (X-Engine-Session-Id), stored on the audit row so SSE
- * subscribers can drop their own echoes; it is length-capped, not
+ * The request's editing session. `originSessionId` is the client's session
+ * id (X-Engine-Session-Id, one per open document), stored on the audit row
+ * so SSE subscribers can drop their own echoes; it is length-capped, not
  * validated. With it, `edit` says how many object numbers to top the session
  * up by (EmbedPDF-Reserve-Object-Numbers, at most 32) and collects what a
  * write hands out, for the response's `EmbedPDF-Object-Numbers`. Object

@@ -150,3 +150,44 @@ describe("X-CloudPDF-Doc emission (default ON — routing hints are client behav
     expect(new Headers(calls[0]!.init.headers).get('x-cloudpdf-doc')).toBe('docZ');
   });
 });
+
+describe('one client per open document', () => {
+  test('each keeps its own session and CDN binding, and the engine client its settings', async () => {
+    const { fetch, calls } = scriptedFetch([busy503(), { status: 200, body: {} }]);
+    const retries: string[] = [];
+    const engineClient = client(fetch, {
+      token: 'engine-token',
+      docAffinityHeader: false,
+      onRetry: (info: { code: string }) => retries.push(info.code),
+    });
+    const first = engineClient.forDocument({ sessionId: 'cloud:first' });
+    const second = engineClient.forDocument({ sessionId: 'cloud:second', token: 'doc-token' });
+
+    await first.postJson('/v1/docs/d1/layers/default/x', {}, (raw) => raw, signal(), {
+      write: { opId: 'op-1' },
+    });
+    await second.postJson('/v1/docs/d1/layers/default/x', {}, (raw) => raw, signal(), {
+      write: { opId: 'op-2' },
+    });
+    const sent = calls.map((call) => new Headers(call.init.headers));
+    // The first write was shed once and retried: the engine client's `onRetry` heard it.
+    expect(retries).toEqual(['EngineBusy']);
+    expect(sent.map((headers) => headers.get('x-engine-session-id'))).toEqual([
+      'cloud:first',
+      'cloud:first',
+      'cloud:second',
+    ]);
+    expect(sent.map((headers) => headers.get('authorization'))).toEqual([
+      'Bearer engine-token',
+      'Bearer engine-token',
+      'Bearer doc-token',
+    ]);
+    expect(sent.every((headers) => headers.get('x-cloudpdf-doc') === null)).toBe(true);
+
+    first.setCdnAccess({ cdn: null, docId: 'd1', layerName: 'default' });
+    expect(first.currentCdnBinding).not.toBeNull();
+    expect(second.currentCdnBinding).toBeNull();
+    expect(engineClient.currentCdnBinding).toBeNull();
+    expect(engineClient.sessionId).toBeNull();
+  });
+});

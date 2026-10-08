@@ -181,7 +181,7 @@ describe('cloud engine — open({ kind: "token", token })', () => {
     // therefore route to docmulti01) or get the second's token
     // racing with the first. Either way the handle ids would
     // collide. The fix gives each handle its own per-doc HttpClient
-    // via withToken, so the two opens are fully independent.
+    // via forDocument, so the two opens are fully independent.
     const [a, b] = await Promise.all([
       engine.open({ kind: 'token', token: docToken(tenantId, 'docmulti01') }),
       engine.open({ kind: 'token', token: docToken(tenantId, 'docmulti02') }),

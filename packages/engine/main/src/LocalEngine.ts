@@ -71,8 +71,6 @@ export class LocalEngine implements LocalEngineContract {
   private readonly queue: WorkerQueue;
   private readonly imageEncoder: LocalImageEncoder;
   private readonly renderPolicy: EngineRenderPolicy;
-  /** This engine instance's identity on every event's `origin.sessionId`. */
-  private readonly sessionId = `local:${generateUuid()}`;
   private destroyed = false;
 
   /**
@@ -306,7 +304,8 @@ export class LocalEngine implements LocalEngineContract {
         imageEncoder,
         payload.security,
         guard,
-        this.sessionId,
+        // Every open is its own session, as on the cloud engine.
+        `local:${generateUuid()}`,
         this.renderPolicy,
         payload.objectNumbers,
       );

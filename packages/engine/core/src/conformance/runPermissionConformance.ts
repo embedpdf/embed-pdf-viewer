@@ -38,11 +38,16 @@ export interface PermissionConformanceOptions {
   /** Open a fresh copy of {@link CHANGE_FIXTURE_PDF} with `scope`. */
   open: (engine: Engine, scope: readonly string[]) => Promise<DocumentHandle>;
   /**
-   * Open the document `doc` is on as another session, with `scope`: another
-   * user's engine. A local document is its own session's, so without it the
-   * events test is skipped.
+   * Open the document `doc` is on again, on `engine`, with `scope`: another
+   * user's session. Every open is its own session, even on the same engine.
+   * A local document is its own open's alone, so without it the events test
+   * is skipped.
    */
-  openSameDocument?: (doc: DocumentHandle, scope: readonly string[]) => Promise<DocumentHandle>;
+  openSameDocument?: (
+    engine: Engine,
+    doc: DocumentHandle,
+    scope: readonly string[],
+  ) => Promise<DocumentHandle>;
 }
 
 const PAGE = toPageRef(3);
@@ -221,8 +226,8 @@ export function runPermissionConformance(
       const openSameDocument = opts.openSameDocument;
       test("events: a token hears its own family of another session's writes, never the other", async () => {
         const writer = await opts.open(engine, PERMISSION_TOKENS.everything);
-        const filler = await openSameDocument(writer, PERMISSION_TOKENS.fill);
-        const commenter = await openSameDocument(writer, PERMISSION_TOKENS.comment);
+        const filler = await openSameDocument(engine, writer, PERMISSION_TOKENS.fill);
+        const commenter = await openSameDocument(engine, writer, PERMISSION_TOKENS.comment);
         try {
           const heardByFiller: DocumentEvent[] = [];
           const heardByCommenter: DocumentEvent[] = [];

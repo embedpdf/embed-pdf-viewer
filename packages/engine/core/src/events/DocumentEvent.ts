@@ -53,16 +53,18 @@ import type { AttachmentRef } from '../dto/Attachment';
  * Provenance of a `DocumentEvent` — whose hand caused the mutation, never
  * which transport delivered it (transport is invisible by design).
  *
- * `kind: 'local'` means caused by this engine instance — not "this user".
- * The same user in two tabs is two sessions: tab A's mutation arrives in
- * tab B as `'remote'` (with the same `sub`). Rule of thumb for consumers:
- * "is this my action" → check `kind` / `sessionId` (undo stacks, optimism
- * reconciliation); "is this my user" → check `sub` (attribution).
+ * `kind: 'local'` means made through this open document (this handle), not
+ * "this user". Every open is its own session: the same user in two tabs, or
+ * an app that opens one cloud document twice, is two sessions, and a
+ * mutation made through one arrives in the other as `'remote'` (with the
+ * same `sub`). Rule of thumb for consumers: "is this my action" → check
+ * `kind` / `sessionId` (undo stacks, optimism reconciliation); "is this my
+ * user" → check `sub` (attribution).
  */
 export interface EventOrigin {
-  /** 'local' = caused by this engine instance; 'remote' = another session. */
+  /** 'local' = made through this handle; 'remote' = another session. */
   kind: 'local' | 'remote';
-  /** Identifies the engine instance that caused the mutation. */
+  /** Identifies the session (the open document handle) that made the mutation. */
   sessionId: string;
   /** Authenticated subject of the originator (cloud); `null` locally. */
   sub: string | null;
@@ -90,7 +92,7 @@ export interface EventOrigin {
  * Invariants (locked — the collaboration design rests on these):
  *
  *   - exactly once: every mutation that touches your document appears in
- *     your stream exactly once. The engine that performs a mutation emits
+ *     your stream exactly once. The handle that performs a mutation emits
  *     the event itself at confirmation time; the remote channel exists to
  *     tell everyone else (own echoes are dropped by `sessionId`). A change
  *     that commits several facts at once, such as an import, emits one

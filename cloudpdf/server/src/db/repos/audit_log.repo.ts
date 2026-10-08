@@ -64,7 +64,7 @@ export interface AppendAuditLogInput {
   artifactSize: number;
   idempotencyKey?: string | null;
   payload: unknown;
-  /** Engine-instance session id of the mutating client (X-Engine-Session-Id).
+  /** Session id of the mutating open document (X-Engine-Session-Id).
    *  SSE subscribers drop rows whose origin matches their own session — their
    *  local publish already covered them (exactly-once). */
   originSessionId?: string | null;

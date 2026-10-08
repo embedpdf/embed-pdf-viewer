@@ -7,6 +7,7 @@ import {
   runObjectNumberConformance,
   type ConformanceTestRunner,
 } from '@embedpdf/engine-core/conformance';
+import type { DocumentEvent, DocumentHandle } from '@embedpdf/engine-core/runtime';
 import { cloudEngine } from '../src/index';
 import {
   buildDbSeededFixture,
@@ -218,5 +219,70 @@ describe('object numbers on the cloud', () => {
     expect(before).not.toContain(fresh);
     unsubscribe();
     await engine.destroy();
+  });
+
+  test('one engine opening a document twice holds two sessions: own numbers, each hears the other', async () => {
+    if (!fx) throw new Error('fixture not initialised');
+    const docId = `object-numbers-${++opened}`;
+    await seedDocumentFromBytes(fx, TENANT_ID, docId, fixturePath, 2);
+    const recorded = instrumentedFetch();
+    const engine = cloudEngine({ baseUrl: fx.baseUrl, fetch: recorded.fetch });
+    const token = docScopedToken(fx, TENANT_ID, docId);
+    const first = await engine.open({ kind: 'token', token });
+    const second = await engine.open({ kind: 'token', token });
+    try {
+      const sessions = recorded.requests.flatMap((r) => r.headers.get('x-engine-session-id') ?? []);
+      expect(new Set(sessions).size).toBe(2);
+
+      const heardByFirst: DocumentEvent[] = [];
+      const heardBySecond: DocumentEvent[] = [];
+      const lost: string[] = [];
+      first.events.subscribe((event) => heardByFirst.push(event));
+      second.events.subscribe((event) => heardBySecond.push(event));
+      first.objectNumbers.onLost(({ reason }) => lost.push(`first: ${reason}`));
+      second.objectNumbers.onLost(({ reason }) => lost.push(`second: ${reason}`));
+      // Give the lazy streams a beat to connect: each one's `session` event
+      // lists the numbers its own session holds.
+      await new Promise((resolve) => setTimeout(resolve, 300));
+
+      const { pages } = await first.pages.list();
+      const page = pages[1]!.ref;
+      const byFirst = first.objectNumbers.take()!;
+      const bySecond = second.objectNumbers.take()!;
+      await first
+        .page(page)
+        .annotations.create({ subtype: 'square', box: box(20) }, { objectNumber: byFirst });
+      await second
+        .page(page)
+        .annotations.create({ subtype: 'square', box: box(60) }, { objectNumber: bySecond });
+
+      // Each hears its own create as local, the other's as remote.
+      const created = (events: DocumentEvent[], kind: 'local' | 'remote') =>
+        events.flatMap((event) =>
+          event.type === 'annotations.created' && event.origin.kind === kind
+            ? [event.annotation.ref]
+            : [],
+        );
+      await expect.poll(() => created(heardByFirst, 'remote')).toHaveLength(1);
+      await expect.poll(() => created(heardBySecond, 'remote')).toHaveLength(1);
+      expect(created(heardByFirst, 'local')).toEqual(created(heardBySecond, 'remote'));
+      expect(created(heardBySecond, 'local')).toEqual(created(heardByFirst, 'remote'));
+
+      // The writes' `session` events reached only their own session, so the
+      // two pools still hold numbers nobody else may use.
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      const drain = (doc: DocumentHandle) =>
+        Array.from({ length: doc.objectNumbers.held }, () => doc.objectNumbers.take()!);
+      const leftWithFirst = drain(first);
+      const leftWithSecond = drain(second);
+      expect(leftWithFirst.length).toBeGreaterThan(0);
+      expect(leftWithSecond.length).toBeGreaterThan(0);
+      expect(leftWithFirst.filter((n) => leftWithSecond.includes(n))).toEqual([]);
+      expect([...leftWithFirst, ...leftWithSecond]).not.toContain(byFirst);
+      expect([...leftWithFirst, ...leftWithSecond]).not.toContain(bySecond);
+      expect(lost).toEqual([]);
+    } finally {
+      await engine.destroy();
+    }
   });
 });

@@ -25,11 +25,13 @@ export interface HttpClientOptions {
    */
   token?: TokenSource;
   /**
-   * Engine-instance session id, sent as `X-Engine-Session-Id` where the
+   * The open document's session id, sent as `X-Engine-Session-Id` where the
    * server reads it: on writes, `/access`, the event stream and the bulk
-   * reservation (see {@link RequestOptions}). The server stores it on a
-   * write's audit row, so this instance's stream can drop its own echoes,
-   * and hands the editing session it names its object numbers.
+   * reservation (see {@link RequestOptions}). The server keeps the editing
+   * session's object numbers under it, and stores it on a write's audit
+   * row, so the document's own stream can drop its echoes. Each open
+   * document has its own (see {@link HttpClient.forDocument}); the engine's
+   * client has none.
    */
   sessionId?: string;
   /** Replace the global fetch (e.g. in Node tests with undici). */
@@ -119,17 +121,18 @@ export class HttpClient {
   private static readonly RETRY_AFTER_DEFAULT_MS = 1_000;
   /** A write whose request failed on the network is sent again after these waits. */
   private static readonly NETWORK_RETRY_MS = [250, 1_000, 3_000];
-  private readonly sessionId: string | null;
+  /** The open document's session id; `null` on the engine's own client. */
+  readonly sessionId: string | null;
   private cdnBinding: CdnBinding | null = null;
 
-  constructor(opts: HttpClientOptions) {
-    this.base = opts.baseUrl.replace(/\/$/, '');
-    const token = opts.token;
+  constructor(private readonly options: HttpClientOptions) {
+    this.base = options.baseUrl.replace(/\/$/, '');
+    const token = options.token;
     this.tokenFn = token === undefined ? null : typeof token === 'function' ? token : () => token;
-    this.sessionId = opts.sessionId ?? null;
-    this.fetchFn = opts.fetch ?? globalThis.fetch.bind(globalThis);
-    this.docAffinityHeader = opts.docAffinityHeader ?? true;
-    this.onRetry = opts.onRetry;
+    this.sessionId = options.sessionId ?? null;
+    this.fetchFn = options.fetch ?? globalThis.fetch.bind(globalThis);
+    this.docAffinityHeader = options.docAffinityHeader ?? true;
+    this.onRetry = options.onRetry;
   }
 
   /** Normalized server base URL (no trailing slash). */
@@ -148,18 +151,17 @@ export class HttpClient {
   }
 
   /**
-   * Return a clone of this client bound to a different bearer. Used
-   * by `CloudEngine.open` to mint a per-handle client carrying the
-   * per-open token, so each opened document's RPCs go out under
-   * the right authorization without disturbing the engine-level
-   * token.
+   * A client for one open document: this client's settings, the document's
+   * own editing session, its own CDN binding, and `token` as its bearer
+   * when the open names one (else this client's). Two open documents never
+   * share object numbers, event echoes or a CDN binding, even two opens of
+   * the same document on one engine.
    */
-  withToken(token: string | (() => string | Promise<string>)): HttpClient {
+  forDocument({ sessionId, token }: { sessionId: string; token?: TokenSource }): HttpClient {
     return new HttpClient({
-      baseUrl: this.baseUrl,
-      token,
-      ...(this.sessionId ? { sessionId: this.sessionId } : {}),
-      fetch: this.fetchFn,
+      ...this.options,
+      ...(token !== undefined ? { token } : {}),
+      sessionId,
     });
   }
 

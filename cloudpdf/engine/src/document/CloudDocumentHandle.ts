@@ -145,7 +145,6 @@ export class CloudDocumentHandle implements DocumentHandle {
      * empty scope and null identity until /access is called.
      */
     initialToken: string | null = null,
-    sessionId: string = `cloud:anon:${id}`,
     /** Called once, when the handle closes (the engine forgets it). */
     private readonly onClose: () => void = () => {},
   ) {
@@ -206,6 +205,9 @@ export class CloudDocumentHandle implements DocumentHandle {
     };
     const hub = new EventHub();
     this.hub = hub;
+    // The handle's session is its client's: the id its writes carry, its
+    // events' origin. A client without one (a test's) still names the origin.
+    const sessionId = http.sessionId ?? `cloud:anon:${id}`;
     this.sessionId = sessionId;
     // Your own mutations publish here at POST-confirmation time (kind:
     // 'local'); the remote channel (SSE) publishes everyone else's into the
@@ -231,7 +233,7 @@ export class CloudDocumentHandle implements DocumentHandle {
       lastServerId: () => hub.lastServerId(),
     };
     this.publisher = new SessionEventPublisher(hub, sessionId);
-    // A version this engine published itself numbers objects anew too.
+    // A version this handle published itself numbers objects anew too.
     hub.subscribe((event) => {
       if (event.type === 'document.versioned') pool.versioned(event.version.sha256);
     });
@@ -663,7 +665,7 @@ export class CloudDocumentHandle implements DocumentHandle {
           }
           return;
         }
-        // A new version, this engine's own included: in stream order, before
+        // A new version, this handle's own included: in stream order, before
         // the `session` event that hands out its fresh numbers.
         if (row.kind === 'signature.complete') {
           const sha = (row.payload as { version?: { sha256?: unknown } }).version?.sha256;

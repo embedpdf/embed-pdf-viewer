@@ -94,7 +94,7 @@ export class SessionEventPublisher {
   ) {}
 
   /**
-   * Publish what one write of this engine instance just committed: one
+   * Publish what one write of this session just committed: one
    * event per fact, in order, all carrying the write's `opId` as
    * `origin.tx`.
    */

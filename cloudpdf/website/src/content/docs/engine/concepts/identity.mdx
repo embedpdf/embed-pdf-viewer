@@ -79,11 +79,12 @@ order you make them, so the update above runs after the create. Pages and form f
 same way: `pages.insertBlank(spec, position, { objectNumbers })` names each new page, and
 `forms.create(draft, { objectNumber, widgetObjectNumbers })` names a field and its widgets.
 
-The numbers are this document session's alone. A create that names a number the session doesn't
-hold (never taken from the pool, or already used) is refused with `ObjectNumberUnavailable` and
-`reason: 'not-held'`, and one a call uses twice with `reason: 'taken'`; nothing is written. Leave
-the number out and the engine picks one, as before. `doc.objectNumbers.reserve(n)` waits until at
-least `n` are held, for a large paste.
+The numbers are this open document's alone: every `open()` has its own, even a second open of the
+same document. A create that names a number the `doc` doesn't hold (never taken from the pool, or
+already used) is refused with `ObjectNumberUnavailable` and `reason: 'not-held'`, and one a call
+uses twice with `reason: 'taken'`; nothing is written. Leave the number out and the engine picks
+one, as before. `doc.objectNumbers.reserve(n)` waits until at least `n` are held, for a large
+paste.
 
 A number you hold stays yours until a create uses it, except in two cases, which
 `doc.objectNumbers.onLost` reports:
