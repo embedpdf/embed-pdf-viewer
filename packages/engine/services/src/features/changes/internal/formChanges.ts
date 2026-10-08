@@ -1,6 +1,8 @@
 import {
+  allowsCapability,
   annotationKey,
   authorizeCapability,
+  fieldValueOf,
   deserializeError,
   EngineError,
   EngineErrorCode,
@@ -13,6 +15,7 @@ import {
   type ChangeItemType,
   type ChangeOp,
   type FormEffect,
+  type FormImportOp,
   isSkippedItem,
   type FormFieldDTO,
   type FormFieldPatch,
@@ -46,6 +49,7 @@ import { AnnotationMutator } from '../../annotations/AnnotationMutator';
 import { resolveAnnotIndexRaw } from '../../annotations/internal/identity/resolveAnnotIndexRaw';
 import { applyReorder, planReorder, readPageStack } from '../../annotations/internal/stackingOrder';
 import { promoteInlineAnnotations } from '../../annotations/internal/write/promoteInlineAnnotations';
+import { FormImporter } from '../../forms/FormImporter';
 import { FormMutator } from '../../forms/FormMutator';
 import { FormsEffectsApplier } from '../../forms/FormsEffectsApplier';
 import {
@@ -66,7 +70,9 @@ import type {
   FieldRemoveStep,
   FieldRestoreStep,
   ObjectsRevertStep,
+  ReverseStep,
   RevertFallback,
+  StepRights,
   WidgetDeleteStep,
   WidgetRestoreStep,
 } from '../ChangeRecord';
@@ -451,6 +457,98 @@ export function setSignatureAppearance(
   );
 }
 
+/**
+ * `forms.import`: a bundle's fields, copied in (see `FormImporter.import`).
+ * Its reverse deletes each field it made, the last made first, when nobody
+ * changed it since; each takes its widgets and its place in the
+ * calculation order with it.
+ */
+export function importForm(ctx: ChangeContext, op: FormImportOp): Done {
+  authorizeCapability(ctx.authority, 'doc.forms.modify');
+  const rights = importRights(ctx, op);
+  const result = new FormImporter(ctx.runtime, ctx.session, ctx.fonts).import(
+    {
+      bundle: op.bundle,
+      ...(op.pages !== undefined ? { pages: op.pages } : {}),
+      attribution: op.attribution,
+      values: op.values ?? true,
+      actor: op.actor ?? {},
+      limits: op.limits,
+      mayScript: (op.mayScript ?? false) && allowsCapability(ctx.authority, 'doc.forms.script'),
+    },
+    ctx.signal,
+  );
+  const reverse = result.fields.map(
+    (field): FieldRemoveStep => ({
+      kind: 'field.remove',
+      objectNumber: numberOf(field.ref),
+      left: field,
+      ...(rights ? { rights } : {}),
+    }),
+  );
+  return { item: { type: 'forms.import', ...result }, reverse: reverse.reverse() };
+}
+
+/**
+ * `forms.importValues`: a bundle's values, filled into the fields of the
+ * same name (see `FormImporter.planValues`). Each field's reverse puts back
+ * its value and who filled it, as a `setValue`'s does.
+ */
+export function importFormValues(ctx: ChangeContext, op: FormImportOp): Done {
+  authorizeCapability(ctx.authority, 'doc.forms.fill');
+  const rights = importRights(ctx, op);
+  const importer = new FormImporter(ctx.runtime, ctx.session, ctx.fonts);
+  const plan = importer.planValues(op.bundle, op.limits, ctx.signal);
+  const fields: FormFieldDTO<PdfCoordinates>[] = [];
+  const reverse: ReverseStep[] = [];
+  for (const write of plan.writes) {
+    const before = { objectNumber: numberOf(write.target.ref), field: write.target };
+    const pending = captureBefore(ctx.runtime, ctx.session, objectsOf(before));
+    const field = importer.writeValue(write, op.bundle, op.attribution, op.actor ?? {}, ctx.signal);
+    const objects = captureAfter(ctx.runtime, ctx.session, pending);
+    fields.push(field);
+    reverse.push({
+      ...revertStep('forms.setValue', objects, [before.objectNumber]),
+      fallback: {
+        kind: 'value',
+        fields: [
+          {
+            objectNumber: before.objectNumber,
+            before: valueOf(write.target),
+            left: valueOf(field),
+          },
+        ],
+      },
+      ...(rights ? { rights } : {}),
+    });
+  }
+  return {
+    item: {
+      type: 'forms.importValues',
+      ...rows(ctx, {
+        fields,
+        dropped: [...plan.dropped],
+        meta: formMutationMeta(
+          ctx.session.writeStamp(),
+          fields.map((field) => field.ref),
+          fields.flatMap((field) => field.widgets as FormWidget[]),
+        ),
+      }),
+    },
+    reverse: reverse.reverse(),
+  };
+}
+
+/**
+ * A restoring import's rights, checked: `doc.forms.import`, which its undo
+ * and redo take too (see `StepRights`). A stamping import takes none.
+ */
+function importRights(ctx: ChangeContext, op: FormImportOp): StepRights | undefined {
+  if (op.attribution !== 'restore') return undefined;
+  authorizeCapability(ctx.authority, 'doc.forms.import');
+  return 'import';
+}
+
 // ---------------------------------------------------------------------------
 // Steps
 // ---------------------------------------------------------------------------
@@ -468,6 +566,7 @@ export function revertForm(
     ctx.authority,
     FILLS.has(step.reports) ? 'doc.forms.fill' : 'doc.forms.modify',
   );
+  if (step.rights) authorizeCapability(ctx.authority, 'doc.forms.import');
   if (unchangedSince(ctx.runtime, ctx.session, step.objects)) {
     const redo = revertObjects(ctx.runtime, ctx.session, step.objects);
     const fields = step.subject.fields.map(
@@ -533,12 +632,13 @@ function nameIsFree(ctx: ChangeContext, fullName: string, segment: string): bool
   return tryReadField(ctx, { kind: 'fqn', name: parent + segment }) === null;
 }
 
-/** Deletes a field a create made, when nobody changed it since. */
+/** Deletes a field a create or an import made, when nobody changed it since. */
 export function removeField(ctx: ChangeContext, step: FieldRemoveStep): Done {
   authorizeCapability(ctx.authority, 'doc.forms.modify');
+  if (step.rights) authorizeCapability(ctx.authority, 'doc.forms.import');
   const current = tryReadFieldByNumber(ctx, step.objectNumber);
   if (!current || !valuesEqual(current.field, step.left)) return leftAlone(ctx, 'forms.delete');
-  return writeDelete(ctx, current);
+  return writeDelete(ctx, current, step.rights);
 }
 
 /**
@@ -547,6 +647,7 @@ export function removeField(ctx: ChangeContext, step: FieldRemoveStep): Done {
  */
 export function restoreField(ctx: ChangeContext, step: FieldRestoreStep): Done {
   authorizeCapability(ctx.authority, 'doc.forms.modify');
+  if (step.rights) authorizeCapability(ctx.authority, 'doc.forms.import');
   if (tryReadField(ctx, { kind: 'fqn', name: step.name })) return leftAlone(ctx, 'forms.restore');
   for (const page of step.pages) {
     try {
@@ -560,7 +661,14 @@ export function restoreField(ctx: ChangeContext, step: FieldRestoreStep): Done {
   const { field } = readFieldByNumber(ctx, step.objectNumber);
   return {
     item: { type: 'forms.restore', ...fieldResult(ctx, field) },
-    reverse: [{ kind: 'field.remove', objectNumber: step.objectNumber, left: field }],
+    reverse: [
+      {
+        kind: 'field.remove',
+        objectNumber: step.objectNumber,
+        left: field,
+        ...(step.rights ? { rights: step.rights } : {}),
+      },
+    ],
   };
 }
 
@@ -674,10 +782,7 @@ function writeEffect(
       ctx.runtime,
       ctx.session,
       ctx.authority.identity,
-    ).apply(
-      [effect],
-      ctx.signal,
-    );
+    ).apply([effect], ctx.signal);
     const outcome = result.results[0]!;
     if (outcome.status !== 'applied' && outcome.status !== 'unchanged') {
       if (outcome.error) throw deserializeError(outcome.error);
@@ -699,11 +804,7 @@ function writeUpdate(ctx: ChangeContext, before: ReadField, patch: FormFieldPatc
     before,
     'forms.update',
     () => {
-      const updated = new FormMutator(ctx.runtime, ctx.session).updateField(
-        ref,
-        patch,
-        ctx.signal,
-      );
+      const updated = new FormMutator(ctx.runtime, ctx.session).updateField(ref, patch, ctx.signal);
       order = updated.calculationOrder;
       return updated;
     },
@@ -772,8 +873,11 @@ function recordRevert(
   };
 }
 
-/** A delete of the field `before` reads, capturing it first. */
-function writeDelete(ctx: ChangeContext, before: ReadField): Done {
+/**
+ * A delete of the field `before` reads, capturing it first. Its restore
+ * takes `rights` too.
+ */
+function writeDelete(ctx: ChangeContext, before: ReadField, rights?: StepRights): Done {
   const capture = exportField(ctx.runtime, ctx.session.requireDocPtr(), before.objectNumber);
   const ref: FormFieldRef = { kind: 'objectNumber', objectNumber: before.objectNumber };
   const { deleted, removedWidgets, calculationOrder } = new FormMutator(
@@ -795,6 +899,7 @@ function writeDelete(ctx: ChangeContext, before: ReadField): Done {
           name: before.field.name,
           pages: before.field.widgets.flatMap((widget) => (widget.page ? [widget.page] : [])),
           capture,
+          ...(rights ? { rights } : {}),
         },
       ],
     },
@@ -993,19 +1098,7 @@ function pick(values: Record<string, unknown>, keys: readonly string[]): Record<
 
 /** The value a field holds, in the shape a value write takes. */
 function valueOf(field: FormFieldDTO<PdfCoordinates>): FormFieldValue {
-  switch (field.family) {
-    case 'checkbox':
-      return { checked: field.checked };
-    case 'listbox':
-      return { selectedValues: field.selectedValues };
-    case 'radio':
-      return { value: field.value === 'Off' ? null : field.value };
-    case 'text':
-    case 'combobox':
-      return { value: field.value };
-    default:
-      return { value: null };
-  }
+  return fieldValueOf(field) ?? { value: null };
 }
 
 function fieldResult(ctx: ChangeContext, field: FormFieldDTO<PdfCoordinates>) {

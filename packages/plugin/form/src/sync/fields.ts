@@ -52,7 +52,6 @@ export function createFieldsMirror(ctx: FormContext, events: FormEvents): Mirror
           if (event.deleted) events.fieldDeleted.emit({ ref: event.deleted, origin });
           return;
         case 'forms.effectsApplied':
-        case 'forms.imported':
           for (const field of fieldsWithChangedValues(previous, next)) {
             events.valueChanged.emit({ field, origin });
           }

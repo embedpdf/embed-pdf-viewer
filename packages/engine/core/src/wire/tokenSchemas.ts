@@ -41,6 +41,11 @@ export const AnnotationsExportTokenSchema = {
   maxLength: 4096,
 } as const satisfies TokenSchema;
 
+export const FormExportTokenSchema = {
+  fields: ['formsVersion', 'layoutVersion', 'selection'],
+  maxLength: 4096,
+} as const satisfies TokenSchema;
+
 export const ActionsTokenSchema = {
   fields: ['actionsVersion'],
 } as const satisfies TokenSchema;

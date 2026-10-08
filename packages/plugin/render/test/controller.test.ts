@@ -176,7 +176,7 @@ describe('the ledger — confirmed events and the invalidate verb', () => {
         origin: { kind: 'remote', sessionId: 'other', sub: 'alice', ts: 1, serverId: 7 },
       }),
     );
-    fixture.emit(documentEvent({ type: 'forms.imported', origin: { kind: 'local' } }));
+    fixture.emit(documentEvent({ type: 'forms.repaired', origin: { kind: 'local' } }));
     fixture.render.invalidate({ pages: [toPageRef(22)], scope: 'content' });
     fixture.render.invalidate();
     expect(seen).toEqual([

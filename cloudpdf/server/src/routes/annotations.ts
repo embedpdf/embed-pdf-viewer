@@ -53,9 +53,9 @@ import {
   type SchemaLike,
   objectNumberQuery,
 } from './_helpers';
+import { sendBundle } from './_bundleExportResponse';
 import { readBundleImportRequest } from './_bundleImportRequest';
 import { renderAppearanceBatch, resolvePageForRead, type ReadScope } from './_appearanceBatch';
-import { buildMultipart, type MultipartPart } from './_multipart';
 import {
   policyByRole,
   readMutationEnvelope,
@@ -1077,19 +1077,7 @@ async function exportAnnotations(input: {
     );
   }
   await assertCurrent();
-
-  const { resources, ...manifest } = result.bundle;
-  const parts: MultipartPart[] = Object.entries(resources).map(([id, bytes]) => ({
-    key: id,
-    filename: id,
-    contentType: 'application/octet-stream',
-    body: Buffer.from(bytes),
-  }));
-  if (input.cache === 'no-store') setNoStore(input.reply);
-  else setImmutableCache(input.reply);
-  const { contentType, body } = buildMultipart(manifest, parts);
-  input.reply.type(contentType);
-  return input.reply.send(body);
+  return sendBundle(input.reply, result.bundle, input.cache ?? 'immutable');
 }
 
 async function readAnnotationsAll(input: {

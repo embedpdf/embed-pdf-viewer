@@ -196,19 +196,6 @@ describe('appearance versions', () => {
     expect(versionOf(next, 'obj:5')).toBe(1);
   });
 
-  it('an import that applied values repaints every widget of the imported form', () => {
-    const records = recordsOf(recordOn(11, 5), recordOn(12, 6), recordOn(12, 7));
-    const form = {
-      fields: [
-        { widgets: [formWidget(5, toPageRef(11))] },
-        { widgets: [formWidget(6, toPageRef(12)), formWidget(7, toPageRef(12))] },
-      ],
-    };
-    const imported = applied(records, event({ type: 'forms.imported', applied: 2, form }));
-    expect(['obj:5', 'obj:6', 'obj:7'].map((key) => versionOf(imported, key))).toEqual([1, 1, 1]);
-    expect(foldRecords(records, event({ type: 'forms.imported', applied: 0, form }))).toBe(records);
-  });
-
   it('a signature repaints its widget', () => {
     const records = recordsOf(recordOn(11, 5));
     const next = applied(

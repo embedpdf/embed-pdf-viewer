@@ -35,6 +35,7 @@ import {
   type FormsUpdateWidgetWorkerRequest,
   type FormsExportWorkerRequest,
   type FormsImportWorkerRequest,
+  type FormsImportValuesWorkerRequest,
   type FormsListWorkerRequest,
   type FormsRepairWorkerRequest,
   type FormsUpdateFieldWorkerRequest,
@@ -153,7 +154,6 @@ import { DocumentActionsReader } from '../features/actions';
 import {
   AnnotationAppearanceReader,
   AnnotationExporter,
-  AnnotationImporter,
   AnnotationFlattener,
   RawAnnotationReader,
 } from '../features/annotations';
@@ -166,7 +166,13 @@ import {
   type ChangeRecord,
 } from '../features/changes';
 import { FontRegistrar, type StartupFontSpec } from '../features/fonts';
-import { FormMutator, FormReader, FormsEffectsApplier, disposeFormModel } from '../features/forms';
+import {
+  FormExporter,
+  FormMutator,
+  FormReader,
+  FormsEffectsApplier,
+  disposeFormModel,
+} from '../features/forms';
 import { PageGeometryReader } from '../features/geometry';
 import { MeasureReader, MeasureMutator } from '../features/measure';
 import { MetadataReader } from '../features/metadata';
@@ -597,6 +603,9 @@ export class WorkerHost {
           break;
         case 'forms.import':
           resultPack = this.handleFormsImport(msg, ctrl.signal);
+          break;
+        case 'forms.importValues':
+          resultPack = this.handleFormsImportValues(msg, ctrl.signal);
           break;
         case 'forms.repair':
           resultPack = this.handleFormsRepair(msg, ctrl.signal);
@@ -2423,21 +2432,66 @@ export class WorkerHost {
     signal: AbortSignal,
   ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
-    const reader = new FormReader(this.runtime, session);
-    const exported = reader.exportData(req.format, signal);
-    return wirePack({ tag: 'forms.export', format: exported.format, bytes: exported.bytes }, [
-      exported.bytes,
-    ]);
+    const bundle = new FormExporter(this.runtime, session, this.fonts).export(
+      req.selection,
+      req.limits ?? DEFAULT_BUNDLE_LIMITS,
+      signal,
+    );
+    return wirePack({ tag: 'forms.export', bundle }, Object.values(bundle.resources));
   }
 
+  /**
+   * A design import, as a one-op change: kept under its `opId` with the
+   * record that undoes it, and a retry under it gets the first answer.
+   */
   private handleFormsImport(
     req: FormsImportWorkerRequest,
     signal: AbortSignal,
   ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
-    const mutator = new FormMutator(this.runtime, session);
-    const result = mutator.importData(req.data, req.format, signal);
+    const { type: _type, ...result } = this.applyOne(
+      session,
+      req.opId,
+      {
+        type: 'forms.import',
+        bundle: req.bundle,
+        ...(req.pages !== undefined ? { pages: req.pages } : {}),
+        attribution: req.attribution,
+        values: req.values,
+        ...(req.actor ? { actor: req.actor } : {}),
+        limits: req.limits ?? DEFAULT_BUNDLE_LIMITS,
+        mayScript: req.mayScript,
+      },
+      checkedAuthority(req.actor),
+      signal,
+    );
+    // Everything left out: nothing was written.
+    if (result.fields.length === 0) return wirePack({ tag: 'forms.import', result });
     return this.finishMutation(session, { tag: 'forms.import', result }, req.artifactPath);
+  }
+
+  /** A values import, as a one-op change (see {@link handleFormsImport}). */
+  private handleFormsImportValues(
+    req: FormsImportValuesWorkerRequest,
+    signal: AbortSignal,
+  ): WirePack<WorkerResultPayload<PdfCoordinates>> {
+    const session = this.requireSession(req);
+    const { type: _type, ...result } = this.applyOne(
+      session,
+      req.opId,
+      {
+        type: 'forms.importValues',
+        bundle: req.bundle,
+        attribution: req.attribution,
+        ...(req.actor ? { actor: req.actor } : {}),
+        limits: req.limits ?? DEFAULT_BUNDLE_LIMITS,
+      },
+      checkedAuthority(req.actor),
+      signal,
+    );
+    // Nothing filled: nothing was written.
+    if (result.fields.length === 0) return wirePack({ tag: 'forms.importValues', result });
+    return this.finishMutation(session, { tag: 'forms.importValues', result }, req.artifactPath);
   }
 
   private handleFormsRepair(
@@ -2869,10 +2923,16 @@ function passwordRequiredProbe() {
  */
 function assertNoImport(change: Change<PdfCoordinates, WireAnnotationResources>): void {
   if (isUndoChange(change)) return;
-  if ((change.ops as readonly { type: string }[]).some((op) => op.type === 'annotations.import')) {
+  const verbs: Record<string, string> = {
+    'annotations.import': 'doc.annotations.import',
+    'forms.import': 'doc.forms.import',
+    'forms.importValues': 'doc.forms.importValues',
+  };
+  const op = (change.ops as readonly { type: string }[]).find(({ type }) => type in verbs);
+  if (op) {
     throw new EngineError(
       EngineErrorCode.InvalidArg,
-      'doc.apply takes no import: import a bundle with doc.annotations.import',
+      `doc.apply takes no import: import a bundle with ${verbs[op.type]}`,
     );
   }
 }

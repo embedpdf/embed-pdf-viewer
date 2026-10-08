@@ -115,14 +115,7 @@ await form.reset([name.ref, email.ref]); // some fields
 
 ## Move form data in and out
 
-FDF and XFDF are the formats every PDF tool uses for form data: the values without the PDF.
-
-```ts
-const { bytes } = await form.export(); // XFDF; form.export('fdf') for FDF
-await otherForm.import(bytes);
-```
-
-For your own backend, plain values are simpler:
+For your own backend, plain values are simplest:
 
 ```ts
 const values = form.exportValues(); // { 'billing.name': 'Ada Lovelace', agree: true, … }
@@ -131,6 +124,22 @@ await form.importValues(values);
 
 Fields are matched by their full name. A field the form doesn't have, or a value it can't take, is
 skipped; the rest still land.
+
+To copy the fields themselves to another document, with their boxes, values and scripts, take
+them out as a bundle and import it there. `FormTransfer` turns a bundle into one JSON text to
+store, and back:
+
+```ts
+const bundle = await form.export(); // every field; or form.export({ fields }), ({ pages })
+const text = FormTransfer.stringify(bundle);
+
+const { fields, dropped } = await otherForm.import(await FormTransfer.parse(text));
+```
+
+The import adds the fields as one change you can undo. A field whose name the form has already is
+left out and listed in `dropped`. By default each field keeps who created and filled it in, which
+needs `canRestoreAttribution()`; pass `{ attribution: 'stamp' }` to make them yours. See
+[Import & export](/docs/engine/forms/import-export).
 
 <Example name="form/data" />
 
@@ -152,8 +161,8 @@ on [Building forms](forms/building#methods).
 | `setValues(entries)`       | Fills in several fields in order, each `{ ref, value }`; one that fails doesn't stop the rest. Resolves `{ applied, skipped, failed }`.        |
 | `importValues(values)`     | Fills in fields by full name from a plain object. Resolves `{ applied, skipped, failed }`. [Move form data in and out](#move-form-data-in-and-out) |
 | `exportValues()`           | Every value, keyed by full name, as a plain object                                                                                             |
-| `export(format?)`          | The form data as XFDF, or FDF with `'fdf'`. Resolves `{ format, bytes }`.                                                                      |
-| `import(bytes)`            | Fills in the fields from FDF or XFDF bytes, telling the format by itself. Resolves `{ applied, skipped }`.                                     |
+| `export(selection?)`       | Whole fields with their boxes, values and scripts, as a bundle: every field, or `{ fields }` or `{ pages }`. [Move form data in and out](#move-form-data-in-and-out) |
+| `import(bundle, options?)` | Adds a bundle's fields, as one change. Resolves `{ fields, refMap, dropped }`. Needs `canDesign()`. [Move form data in and out](#move-form-data-in-and-out) |
 | `reset(refs?)`             | Puts back each field's default, for the whole form or the fields you pass. Resolves `{ fields }`, the fields it changed. [Reset the form](#reset-the-form) |
 | `validate()`               | Checks the required fields. Returns `{ valid, missing }`, the empty ones in page order. [Check required fields](#check-required-fields)        |
 | `activateWidget(widget)`   | Does what a click on a field box does, such as running a button's action                                                                       |

@@ -3,7 +3,9 @@ import {
   EngineError,
   EngineErrorCode,
   deletedFieldOf,
+  formImportFacts,
   formResetFacts,
+  formValuesImportFacts,
   opIdOf,
   wirePack,
   draftWritesScripts,
@@ -12,8 +14,8 @@ import {
   type FieldPosition,
   type FormCalculationsReorderResult,
   type DocumentFormsService,
-  type FormDataExport,
-  type FormDataFormat,
+  type FormBundle,
+  type FormExportSelection,
   type FormFieldCreateResult,
   type FormFieldDeleteResult,
   type FormFieldDraft,
@@ -32,7 +34,10 @@ import {
   type FormFieldValue,
   type FormResetResult,
   type WidgetPlacement,
+  type FormImportOptions,
   type FormImportResult,
+  type FormValuesImportOptions,
+  type FormValuesImportResult,
   type FormRepairOptions,
   type FormFieldCreateOptions,
   type FormWidgetAddOptions,
@@ -45,6 +50,7 @@ import {
 } from '@embedpdf/engine-core/runtime';
 
 import type { SessionEventPublisher } from '@embedpdf/engine-services';
+import { ownedResources, transferableResources } from './bundleResources';
 import type { ScopeGuard } from '../scope';
 import type { JobId, WorkerResultPayload } from '../worker/protocol';
 import type { JobQueue } from '../worker/WorkerQueue';
@@ -55,10 +61,10 @@ interface DocClosedView {
 
 /**
  * Document-scoped forms service. Reads gate on `doc.forms.read`, value
- * writes and imports on `doc.forms.fill`, repair on `doc.forms.modify` —
- * cloud parity with the layer form routes. The worker host fans out to
- * `FormReader` / `FormMutator`, which serve every read from the session's
- * version-keyed form-model cache.
+ * writes and value imports on `doc.forms.fill`, design writes, design
+ * imports and repair on `doc.forms.modify` — cloud parity with the layer
+ * form routes. The worker host fans out to `FormReader` / `FormMutator`,
+ * which serve every read from the session's version-keyed form-model cache.
  */
 export class LocalDocumentFormsService implements DocumentFormsService {
   constructor(
@@ -138,7 +144,14 @@ export class LocalDocumentFormsService implements DocumentFormsService {
     const refs = fields === undefined ? undefined : Array.isArray(fields) ? fields : [fields];
     const submission = this.queue.enqueue<WorkerResultPayload>({
       buildPack: (jobId: JobId) =>
-        wirePack({ kind: 'forms.reset', effect: 'write', jobId, opId: write.opId, docId, ...(refs ? { refs } : {}) }),
+        wirePack({
+          kind: 'forms.reset',
+          effect: 'write',
+          jobId,
+          opId: write.opId,
+          docId,
+          ...(refs ? { refs } : {}),
+        }),
     });
     return this.await(submission, 'forms.reset', (payload) => {
       // One event per field that changed, sharing the write's opId.
@@ -180,29 +193,35 @@ export class LocalDocumentFormsService implements DocumentFormsService {
     });
   }
 
-  export(format: FormDataFormat = 'xfdf'): AbortablePromise<FormDataExport> {
-    const rejected = this.gate('doc.forms.read');
+  export(selection: FormExportSelection = {}): AbortablePromise<FormBundle> {
+    // The fields and their values: `downloadResource`'s gate too.
+    const rejected = this.gate('doc.forms.read') ?? this.gate('doc.download');
     if (rejected) return rejected;
     const docId = this.docId;
     const submission = this.queue.enqueue<WorkerResultPayload>({
       buildPack: (jobId: JobId) =>
-        wirePack({ kind: 'forms.export', effect: 'snapshot', jobId, docId, format }),
+        wirePack({
+          kind: 'forms.export',
+          effect: 'snapshot',
+          jobId,
+          docId,
+          selection: { ...selection },
+        }),
     });
-    return this.await(submission, 'forms.export', (payload) => ({
-      format: payload.format,
-      bytes: new Uint8Array(payload.bytes),
+    return this.await(submission, 'forms.export', ({ bundle }) => ({
+      ...bundle,
+      resources: ownedResources(bundle.resources),
     }));
   }
 
-  import(
-    data: Uint8Array | ArrayBuffer,
-    format?: FormDataFormat,
-    options?: WriteOptions,
-  ): AbortablePromise<FormImportResult> {
-    const write = this.beginWrite('doc.forms.fill', options);
+  import(bundle: FormBundle, options: FormImportOptions = {}): AbortablePromise<FormImportResult> {
+    const attribution = options.attribution ?? 'restore';
+    const write = this.beginImport('doc.forms.modify', attribution, options);
     if (write.rejected) return write.rejected;
+    // Without `doc.forms.script`, scripts, submits and links are left out, not refused.
+    const mayScript = this.guard.can('doc.forms.script');
     const docId = this.docId;
-    const buffer = toOwnedArrayBuffer(data);
+    const resources = transferableResources(bundle.resources);
     const submission = this.queue.enqueue<WorkerResultPayload>({
       buildPack: (jobId: JobId) =>
         wirePack(
@@ -212,14 +231,63 @@ export class LocalDocumentFormsService implements DocumentFormsService {
             jobId,
             opId: write.opId,
             docId,
-            data: buffer,
-            ...(format ? { format } : {}),
+            bundle: { ...bundle, resources },
+            ...(options.pages !== undefined ? { pages: options.pages } : {}),
+            attribution,
+            values: options.values ?? true,
+            ...this.actor(),
+            mayScript,
           },
-          [buffer],
+          Object.values(resources),
         ),
     });
     return this.await(submission, 'forms.import', (payload) => {
-      this.publisher.publishWrite(write.opId, { type: 'forms.imported', ...payload.result });
+      // One event per field it made, sharing the import's opId.
+      this.publisher.publishWrite(
+        write.opId,
+        ...formImportFacts(payload.result).map((fact) => ({
+          type: 'forms.created' as const,
+          ...fact,
+        })),
+      );
+      return payload.result;
+    });
+  }
+
+  importValues(
+    bundle: FormBundle,
+    options: FormValuesImportOptions = {},
+  ): AbortablePromise<FormValuesImportResult> {
+    const attribution = options.attribution ?? 'restore';
+    const write = this.beginImport('doc.forms.fill', attribution, options);
+    if (write.rejected) return write.rejected;
+    const docId = this.docId;
+    const resources = transferableResources(bundle.resources);
+    const submission = this.queue.enqueue<WorkerResultPayload>({
+      buildPack: (jobId: JobId) =>
+        wirePack(
+          {
+            kind: 'forms.importValues',
+            effect: 'write',
+            jobId,
+            opId: write.opId,
+            docId,
+            bundle: { ...bundle, resources },
+            attribution,
+            ...this.actor(),
+          },
+          Object.values(resources),
+        ),
+    });
+    return this.await(submission, 'forms.importValues', (payload) => {
+      // One event per field it filled, sharing the import's opId.
+      this.publisher.publishWrite(
+        write.opId,
+        ...formValuesImportFacts(payload.result).map((fact) => ({
+          type: 'forms.valueSet' as const,
+          ...fact,
+        })),
+      );
       return payload.result;
     });
   }
@@ -265,7 +333,15 @@ export class LocalDocumentFormsService implements DocumentFormsService {
     const submission = this.queue.enqueue<WorkerResultPayload>({
       buildPack: (jobId: JobId) =>
         wirePack(
-          { kind: 'forms.setSignatureAppearance', effect: 'write', jobId, opId: write.opId, docId, ref, pdf },
+          {
+            kind: 'forms.setSignatureAppearance',
+            effect: 'write',
+            jobId,
+            opId: write.opId,
+            docId,
+            ref,
+            pdf,
+          },
           [pdf],
         ),
     });
@@ -285,7 +361,15 @@ export class LocalDocumentFormsService implements DocumentFormsService {
     const docId = this.docId;
     const submission = this.queue.enqueue<WorkerResultPayload>({
       buildPack: (jobId: JobId) =>
-        wirePack({ kind: 'forms.updateField', effect: 'write', jobId, opId: write.opId, docId, ref, patch }),
+        wirePack({
+          kind: 'forms.updateField',
+          effect: 'write',
+          jobId,
+          opId: write.opId,
+          docId,
+          ref,
+          patch,
+        }),
     });
     return this.await(submission, 'forms.updateField', (payload) => {
       this.publisher.publishWrite(write.opId, { type: 'forms.updated', ...payload.result });
@@ -299,7 +383,14 @@ export class LocalDocumentFormsService implements DocumentFormsService {
     const docId = this.docId;
     const submission = this.queue.enqueue<WorkerResultPayload>({
       buildPack: (jobId: JobId) =>
-        wirePack({ kind: 'forms.deleteField', effect: 'write', jobId, opId: write.opId, docId, ref }),
+        wirePack({
+          kind: 'forms.deleteField',
+          effect: 'write',
+          jobId,
+          opId: write.opId,
+          docId,
+          ref,
+        }),
     });
     return this.await(submission, 'forms.deleteField', (payload) => {
       this.publisher.publishWrite(write.opId, {
@@ -351,7 +442,15 @@ export class LocalDocumentFormsService implements DocumentFormsService {
     const docId = this.docId;
     const submission = this.queue.enqueue<WorkerResultPayload>({
       buildPack: (jobId: JobId) =>
-        wirePack({ kind: 'forms.detachWidget', effect: 'write', jobId, opId: write.opId, docId, ref, widget }),
+        wirePack({
+          kind: 'forms.detachWidget',
+          effect: 'write',
+          jobId,
+          opId: write.opId,
+          docId,
+          ref,
+          widget,
+        }),
     });
     return this.await(submission, 'forms.detachWidget', (payload) => {
       this.publisher.publishWrite(write.opId, { type: 'forms.widgetRemoved', ...payload.result });
@@ -484,7 +583,14 @@ export class LocalDocumentFormsService implements DocumentFormsService {
     const bakeAppearances = options?.bakeAppearances ?? false;
     const submission = this.queue.enqueue<WorkerResultPayload>({
       buildPack: (jobId: JobId) =>
-        wirePack({ kind: 'forms.repair', effect: 'write', jobId, opId: write.opId, docId, bakeAppearances }),
+        wirePack({
+          kind: 'forms.repair',
+          effect: 'write',
+          jobId,
+          opId: write.opId,
+          docId,
+          bakeAppearances,
+        }),
     });
     return this.await(submission, 'forms.repair', (payload) => {
       this.publisher.publishWrite(write.opId, { type: 'forms.repaired', ...payload.result });
@@ -516,6 +622,21 @@ export class LocalDocumentFormsService implements DocumentFormsService {
     return rejected ? { rejected } : write;
   }
 
+  /**
+   * An import: `cap`, and `doc.forms.import` too when it restores
+   * attribution that isn't the session's (`'restore'`).
+   */
+  private beginImport(
+    cap: 'doc.forms.fill' | 'doc.forms.modify',
+    attribution: 'restore' | 'stamp',
+    options: WriteOptions | undefined,
+  ): ReturnType<LocalDocumentFormsService['beginWrite']> {
+    const write = this.beginWrite(cap, options);
+    if (write.rejected || attribution !== 'restore') return write;
+    const rejected = this.gate('doc.forms.import');
+    return rejected ? { rejected } : write;
+  }
+
   private beginWrite(
     cap: 'doc.forms.fill' | 'doc.forms.modify',
     options: WriteOptions | undefined,
@@ -530,7 +651,13 @@ export class LocalDocumentFormsService implements DocumentFormsService {
   }
 
   private gate(
-    cap: 'doc.forms.read' | 'doc.forms.fill' | 'doc.forms.modify' | 'doc.forms.script',
+    cap:
+      | 'doc.forms.read'
+      | 'doc.forms.fill'
+      | 'doc.forms.modify'
+      | 'doc.forms.script'
+      | 'doc.forms.import'
+      | 'doc.download',
   ): AbortablePromise<never> | null {
     if (this.view.isClosed()) {
       return AbortablePromise.rejectReason(
@@ -565,15 +692,4 @@ export class LocalDocumentFormsService implements DocumentFormsService {
     else signal.addEventListener('abort', onAbort, { once: true });
     return promise;
   }
-}
-
-function toOwnedArrayBuffer(data: Uint8Array | ArrayBuffer): ArrayBuffer {
-  if (data instanceof ArrayBuffer) {
-    // Copy: the buffer is transferred to the worker and would otherwise be
-    // detached under the caller's feet.
-    return data.slice(0);
-  }
-  const copy = new ArrayBuffer(data.byteLength);
-  new Uint8Array(copy).set(data);
-  return copy;
 }

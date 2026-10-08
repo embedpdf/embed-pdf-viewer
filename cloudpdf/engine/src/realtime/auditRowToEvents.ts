@@ -1,6 +1,8 @@
 import {
   changeEvents,
+  formImportFacts,
   formResetFacts,
+  formValuesImportFacts,
   annotationImportFacts,
   deletedAnnotationsOf,
   deletedAttachmentOf,
@@ -21,6 +23,7 @@ import {
   type FormFieldUpdateResult,
   type FormEffectsResult,
   type FormImportResult,
+  type FormValuesImportResult,
   type FormRepairResult,
   type FormResetResult,
   type FormSetValueResult,
@@ -121,6 +124,22 @@ function factsOf(row: AuditEventRow, origin: EventOrigin): DocumentEvent[] {
   if (row.kind === 'annot.import') {
     return annotationImportFacts(row.payload as AnnotationImportResult).map((fact) => ({
       type: 'annotations.created',
+      origin,
+      ...fact,
+    }));
+  }
+  if (row.kind === 'form.import') {
+    // One `forms.created` per field the import made, as locally.
+    return formImportFacts(row.payload as FormImportResult).map((fact) => ({
+      type: 'forms.created',
+      origin,
+      ...fact,
+    }));
+  }
+  if (row.kind === 'form.importValues') {
+    // One `forms.valueSet` per field the import filled, as locally.
+    return formValuesImportFacts(row.payload as FormValuesImportResult).map((fact) => ({
+      type: 'forms.valueSet',
       origin,
       ...fact,
     }));
@@ -248,12 +267,10 @@ function eventOf(row: AuditEventRow, origin: EventOrigin): DocumentEvent | null 
         deleted: deletedAttachmentOf(row.payload as AttachmentDeleteResult),
         ...(row.payload as AttachmentDeleteResult),
       };
-    // A value write is one `forms.valueSet`; a reset is one per field it
-    // changed (above).
+    // A value write is one `forms.valueSet`; a reset and an import are one
+    // per field they changed (above).
     case 'form.setValue':
       return { type: 'forms.valueSet', origin, ...(row.payload as FormSetValueResult) };
-    case 'form.import':
-      return { type: 'forms.imported', origin, ...(row.payload as FormImportResult) };
     case 'form.repair':
       return { type: 'forms.repaired', origin, ...(row.payload as FormRepairResult) };
     case 'form.createField':

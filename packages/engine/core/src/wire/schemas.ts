@@ -68,7 +68,6 @@ import {
   FormFieldDTOSchema,
   FormFieldPatchSchema,
   FormFieldWidgetSchema,
-  FormSnapshotSchema,
   FormWidgetSchema,
   WidgetPlacementSchema,
 } from '../forms/schema';
@@ -100,7 +99,6 @@ import type {
   FormCalculationsReorderResult,
   FormFieldDeleteResult,
   FormFieldUpdateResult,
-  FormImportResult,
   FormRepairResult,
   FormMutationMeta,
   FormResetResult,
@@ -137,6 +135,15 @@ import type {
   AnnotationImportOptions,
   AnnotationImportResult,
 } from '../transfer/annotationImport';
+import type { FormExportSelection } from '../transfer/formExport';
+import type {
+  FormImportBody,
+  FormImportOptions,
+  FormImportResult,
+  FormValuesImportBody,
+  FormValuesImportOptions,
+  FormValuesImportResult,
+} from '../transfer/formImport';
 import type { AnnotationExportSelection } from '../transfer/exportSelection';
 import { fromBase64, toBase64 } from '../resource/base64';
 import type {
@@ -1173,11 +1180,38 @@ export const FormEffectsResultSchema: z.ZodType<FormEffectsResult> = z.object({
 }) as unknown as z.ZodType<FormEffectsResult>;
 
 export const FormImportResultSchema: z.ZodType<FormImportResult> = z.object({
-  form: FormSnapshotSchema,
-  applied: z.number().int().nonnegative(),
-  skipped: z.number().int().nonnegative(),
-  meta: MutationMetaSchema,
-});
+  fields: z.array(FormFieldDTOSchema),
+  widgets: z.array(WidgetDTOSchema),
+  refMap: z.array(z.object({ from: FormFieldRefSchema, to: FormFieldRefSchema })),
+  dropped: z.array(
+    z.object({
+      ref: FormFieldRefSchema.nullable(),
+      widget: AnnotationRefSchema.optional(),
+      field: z.string().optional(),
+      reason: z.enum([
+        'name-conflict',
+        'no-field',
+        'unsupported-family',
+        'script-not-allowed',
+        'unsupported-action',
+      ]),
+    }),
+  ),
+  calculationOrder: z.array(FormFieldRefSchema).optional(),
+  meta: FormMutationMetaSchema,
+}) as unknown as z.ZodType<FormImportResult>;
+
+export const FormValuesImportResultSchema: z.ZodType<FormValuesImportResult> = z.object({
+  fields: z.array(FormFieldDTOSchema),
+  widgets: z.array(WidgetDTOSchema),
+  dropped: z.array(
+    z.object({
+      ref: FormFieldRefSchema,
+      reason: z.enum(['no-field', 'wrong-family', 'value-not-allowed', 'locked']),
+    }),
+  ),
+  meta: FormMutationMetaSchema,
+}) as unknown as z.ZodType<FormValuesImportResult>;
 
 export const FormFieldCreateResultSchema: z.ZodType<FormFieldCreateResult> = z.object({
   field: FormFieldDTOSchema,
@@ -1347,16 +1381,73 @@ export const AnnotationsExportRequestSchema = z
   })
   .strict();
 
+/** Where an import puts each page of a bundle — see `BundleImportPages`. */
+const BundleImportPagesSchema = z.union([
+  z.literal('same'),
+  z.literal('by-position'),
+  z.array(z.object({ from: PageRefSchema, to: PageRefSchema }).strict()),
+]);
+
+/** `doc.forms.export` selection — see `FormExportSelection`. */
+export const FormExportSelectionSchema: z.ZodType<FormExportSelection> = z
+  .object({
+    fields: z.array(FormFieldRefSchema).optional(),
+    pages: z.array(PageRefSchema).optional(),
+  })
+  .strict();
+
+/**
+ * The body of a POST form export: the pins a GET's token carries and the
+ * selection, for one a URL can't carry.
+ */
+export const FormExportRequestSchema = z
+  .object({
+    formsVersion: z.number().int().positive(),
+    layoutVersion: z.number().int().positive(),
+    selection: FormExportSelectionSchema,
+  })
+  .strict();
+
+/** `doc.forms.import` options on the wire; the `opId` is the `Idempotency-Key` header. */
+export const FormImportOptionsSchema: z.ZodType<Omit<FormImportOptions, 'opId'>> = z
+  .object({
+    pages: BundleImportPagesSchema.optional(),
+    attribution: z.enum(['restore', 'stamp']).optional(),
+    values: z.boolean().optional(),
+  })
+  .strict();
+
+/** `doc.forms.importValues` options on the wire. */
+export const FormValuesImportOptionsSchema: z.ZodType<Omit<FormValuesImportOptions, 'opId'>> = z
+  .object({ attribution: z.enum(['restore', 'stamp']).optional() })
+  .strict();
+
+/** A form bundle's envelope: its rows are the worker's to check, as an annotation bundle's. */
+const FormBundleEnvelopeSchema = z
+  .object({
+    format: z.literal('embedpdf/form'),
+    version: z.literal(1),
+    pages: z.array(z.unknown()),
+    fields: z.array(z.unknown()),
+    widgets: z.array(z.unknown()),
+    calculationOrder: z.array(z.unknown()),
+  })
+  .strict();
+
+/** The `body` part of a form import request. */
+export const FormImportBodySchema: z.ZodType<FormImportBody> = z
+  .object({ bundle: FormBundleEnvelopeSchema, options: FormImportOptionsSchema })
+  .strict() as unknown as z.ZodType<FormImportBody>;
+
+/** The `body` part of a form values import request. */
+export const FormValuesImportBodySchema: z.ZodType<FormValuesImportBody> = z
+  .object({ bundle: FormBundleEnvelopeSchema, options: FormValuesImportOptionsSchema })
+  .strict() as unknown as z.ZodType<FormValuesImportBody>;
+
 /** `doc.annotations.import` options on the wire; the `opId` is the `Idempotency-Key` header. */
 export const AnnotationImportOptionsSchema: z.ZodType<Omit<AnnotationImportOptions, 'opId'>> = z
   .object({
-    pages: z
-      .union([
-        z.literal('same'),
-        z.literal('by-position'),
-        z.array(z.object({ from: PageRefSchema, to: PageRefSchema }).strict()),
-      ])
-      .optional(),
+    pages: BundleImportPagesSchema.optional(),
     attribution: z.enum(['restore', 'stamp']).optional(),
   })
   .strict();

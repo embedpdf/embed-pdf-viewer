@@ -5,12 +5,18 @@ import {
   EngineErrorCode,
   deletedFieldOf,
   encodeFieldRefKey,
+  formImportFacts,
   formResetFacts,
+  formValuesImportFacts,
+  assertFormBundle,
+  assertFormBundleManifest,
+  type BundleLimits,
   type DocumentEventInit,
   type DocumentFormsService,
-  type FormDataExport,
-  type FormDataFormat,
+  type DocumentManifest,
+  type FormBundle,
   type FormEffect,
+  type FormExportSelection,
   type FormEffectsResult,
   type FormFieldCreateResult,
   type FormFieldDeleteResult,
@@ -21,7 +27,12 @@ import {
   type FormFieldUpdateResult,
   type SignatureAppearanceInput,
   type FormFieldValue,
+  type FormImportBody,
+  type FormImportOptions,
   type FormImportResult,
+  type FormValuesImportBody,
+  type FormValuesImportOptions,
+  type FormValuesImportResult,
   type FormRepairOptions,
   type FormRepairResult,
   type FormSetValueResult,
@@ -50,6 +61,7 @@ import {
   FormFieldUpdateResultSchema,
   FormEffectsResultSchema,
   FormImportResultSchema,
+  FormValuesImportResultSchema,
   FormRepairResultSchema,
   FormResetResultSchema,
   FormSetValueResultSchema,
@@ -68,14 +80,8 @@ import type { ManifestAccessor } from './CloudDocumentHandle';
 import type { CloudWrites } from './CloudWrites';
 import { planesInherited } from './planes';
 import { withObjectNumbers } from '../shared/withObjectNumbers';
+import { bundleImportForm, NO_BUNDLE_LIMITS, readBundleParts } from '../transport/bundleMultipart';
 import type { HttpClient } from '../transport/HttpClient';
-
-/** Content types the import POST body may carry; the server sniffs the
- *  actual format from the bytes, so this is advisory only. */
-const IMPORT_CONTENT_TYPE: Record<FormDataFormat, string> = {
-  fdf: 'application/vnd.fdf',
-  xfdf: 'application/vnd.adobe.xfdf',
-};
 
 /**
  * Cloud-side document forms service. Mirrors the local wiring: each call
@@ -97,6 +103,8 @@ export class CloudDocumentFormsService implements DocumentFormsService {
     private readonly manifest: ManifestAccessor,
     private readonly publisher: SessionEventPublisher,
     private readonly writes: CloudWrites,
+    /** The server's import limits, as its `/v1/access` advertises them. */
+    private readonly importLimits: () => Promise<BundleLimits>,
   ) {}
 
   /**
@@ -218,40 +226,124 @@ export class CloudDocumentFormsService implements DocumentFormsService {
     });
   }
 
-  export(format: FormDataFormat = 'xfdf'): AbortablePromise<FormDataExport> {
-    const rejected = this.rejectIfClosed<FormDataExport>();
+  /**
+   * One versioned, CDN-cacheable read at the manifest's form and layout
+   * pins, with the stale-pin retry (404 → refresh the manifest → once). The
+   * response is the bundle without its bytes and one part per resource;
+   * every part is checked against its id before it is returned.
+   */
+  export(selection: FormExportSelection = {}): AbortablePromise<FormBundle> {
+    const rejected = this.rejectIfClosed<FormBundle>();
     if (rejected) return rejected;
-    return AbortablePromise.run<FormDataExport>(async (signal) => {
-      const bytes = await this.http.getBytes(
-        wirePaths.layerFormData(this.docId, this.layerName, format),
-        signal,
-      );
-      return { format, bytes };
+    return AbortablePromise.run<FormBundle>(async (signal) => {
+      const read = async (s: AbortSignal): Promise<FormData> => {
+        const manifest = await this.manifest.get(s);
+        const path = this.exportPathAt(manifest, selection);
+        if (path) return this.http.getFormData(path, s);
+        // More fields than a URL holds: the pins and the selection in a
+        // POST body.
+        return this.http.postJsonFormData(
+          wirePaths.layerFormExportRequest(this.docId, this.layerName),
+          {
+            formsVersion: manifest.formsVersion,
+            layoutVersion: manifest.layoutVersion,
+            selection,
+          },
+          s,
+        );
+      };
+      let form: FormData;
+      try {
+        form = await read(signal);
+      } catch (error) {
+        // A pin that moved since the manifest was read: read it again, once.
+        if (!EngineError.is(error, EngineErrorCode.NotFound)) throw error;
+        await this.manifest.refresh(signal);
+        form = await read(signal);
+      }
+      const { body, resources } = await readBundleParts('form', form);
+      const bundle = { ...(body as Omit<FormBundle, 'resources'>), resources };
+      await assertFormBundle(bundle, NO_BUNDLE_LIMITS);
+      return bundle;
     });
   }
 
-  import(
-    data: Uint8Array | ArrayBuffer,
-    format?: FormDataFormat,
-    options?: WriteOptions,
-  ): AbortablePromise<FormImportResult> {
+  /**
+   * One request: the bundle's manifest and each resource once, as parts of
+   * one multipart POST under the import's `opId` as `Idempotency-Key`, so a
+   * retry applies once. The server holds the limits; the same numbers are
+   * checked here first, so a bundle past one fails before its bytes move.
+   */
+  import(bundle: FormBundle, options: FormImportOptions = {}): AbortablePromise<FormImportResult> {
     const rejected = this.rejectIfClosed<FormImportResult>();
     if (rejected) return rejected;
-    const bytes = data instanceof ArrayBuffer ? new Uint8Array(data) : data;
     return AbortablePromise.run<FormImportResult>(async (signal) => {
       const opId = opIdOf(options);
       return this.writes.run(opId, signal, async (write) => {
+        const body: FormImportBody = {
+          bundle: await this.checkedManifest(bundle),
+          options: {
+            ...(options.pages !== undefined ? { pages: options.pages } : {}),
+            ...(options.attribution !== undefined ? { attribution: options.attribution } : {}),
+            ...(options.values !== undefined ? { values: options.values } : {}),
+          },
+        };
         const result = await write.send((sent) =>
-          this.http.postBytesJson(
-            wirePaths.layerFormData(this.docId, this.layerName, format),
-            bytes,
-            format ? IMPORT_CONTENT_TYPE[format] : 'application/octet-stream',
+          this.http.postMultipartJson(
+            wirePaths.layerFormImport(this.docId, this.layerName),
+            bundleImportForm(body, bundle.resources),
             (raw) => FormImportResultSchema.parse(raw),
             signal,
             sent,
           ),
         );
-        return this.absorbMutation(opId, result, 'forms.imported');
+        this.manifest.apply(result.meta, ['forms']);
+        // One event per field it made, sharing the import's opId.
+        this.publisher.publishWrite(
+          opId,
+          ...formImportFacts(result).map((fact) => ({
+            type: 'forms.created' as const,
+            ...fact,
+          })),
+        );
+        return result;
+      });
+    });
+  }
+
+  /** One request, as {@link import} sends it. */
+  importValues(
+    bundle: FormBundle,
+    options: FormValuesImportOptions = {},
+  ): AbortablePromise<FormValuesImportResult> {
+    const rejected = this.rejectIfClosed<FormValuesImportResult>();
+    if (rejected) return rejected;
+    return AbortablePromise.run<FormValuesImportResult>(async (signal) => {
+      const opId = opIdOf(options);
+      return this.writes.run(opId, signal, async (write) => {
+        const body: FormValuesImportBody = {
+          bundle: await this.checkedManifest(bundle),
+          options: options.attribution !== undefined ? { attribution: options.attribution } : {},
+        };
+        const result = await write.send((sent) =>
+          this.http.postMultipartJson(
+            wirePaths.layerFormImportValues(this.docId, this.layerName),
+            bundleImportForm(body, bundle.resources),
+            (raw) => FormValuesImportResultSchema.parse(raw),
+            signal,
+            sent,
+          ),
+        );
+        this.manifest.apply(result.meta, ['forms']);
+        // One event per field it filled, sharing the import's opId.
+        this.publisher.publishWrite(
+          opId,
+          ...formValuesImportFacts(result).map((fact) => ({
+            type: 'forms.valueSet' as const,
+            ...fact,
+          })),
+        );
+        return result;
       });
     });
   }
@@ -565,6 +657,34 @@ export class CloudDocumentFormsService implements DocumentFormsService {
     });
   }
 
+  /** The bundle without its bytes, checked against the server's limits first. */
+  private async checkedManifest(bundle: FormBundle): Promise<Omit<FormBundle, 'resources'>> {
+    const { resources, ...manifest } = bundle;
+    const sizes = new Map(Object.entries(resources).map(([id, bytes]) => [id, bytes.length]));
+    assertFormBundleManifest(bundle, sizes, await this.importLimits());
+    return manifest;
+  }
+
+  /**
+   * The cacheable export URL for `selection` at the manifest's pins — the
+   * base leaf while the layer inherits both planes the bundle depends on —
+   * or `null` when a URL can't carry it.
+   */
+  private exportPathAt(manifest: DocumentManifest, selection: FormExportSelection): string | null {
+    const token = {
+      formsVersion: manifest.formsVersion,
+      layoutVersion: manifest.layoutVersion,
+      selection,
+    };
+    try {
+      return planesInherited(manifest, ['forms', 'layout'])
+        ? wirePaths.docFormExport(this.docId, token)
+        : wirePaths.layerFormExport(this.docId, this.layerName, token);
+    } catch {
+      return null;
+    }
+  }
+
   private rejectIfClosed<T>(): AbortablePromise<T> | null {
     if (this.isClosed()) {
       return AbortablePromise.rejectReason(
@@ -584,7 +704,6 @@ export class CloudDocumentFormsService implements DocumentFormsService {
     result: T,
     type:
       | 'forms.valueSet'
-      | 'forms.imported'
       | 'forms.repaired'
       | 'forms.created'
       | 'forms.updated'

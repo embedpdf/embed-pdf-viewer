@@ -313,9 +313,9 @@ describe('sdkOperationName', () => {
       groups: ['documents'],
       method: 'importFrom',
     });
-    expect(sdkOperationName('doc.forms.importData')).toEqual({
+    expect(sdkOperationName('doc.forms.setValue')).toEqual({
       groups: ['doc', 'forms'],
-      method: 'importData',
+      method: 'setValue',
     });
   });
 

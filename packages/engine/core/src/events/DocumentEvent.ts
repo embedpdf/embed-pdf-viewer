@@ -17,7 +17,6 @@ import type {
   FormFieldCreateResult,
   FormFieldDeleteResult,
   FormFieldUpdateResult,
-  FormImportResult,
   FormMutationMeta,
   FormRepairResult,
   FormSetValueResult,
@@ -190,7 +189,6 @@ export type DocumentEvent =
   | ({ type: 'metadata.updated'; origin: EventOrigin } & MetadataUpdateResult)
   | ({ type: 'metadata.customUpdated'; origin: EventOrigin } & CustomMetadataUpdateResult)
   | ({ type: 'forms.valueSet'; origin: EventOrigin } & FormSetValueResult)
-  | ({ type: 'forms.imported'; origin: EventOrigin } & FormImportResult)
   | ({ type: 'forms.repaired'; origin: EventOrigin } & FormRepairResult)
   | ({ type: 'forms.created'; origin: EventOrigin } & FormFieldCreateResult)
   | ({ type: 'forms.updated'; origin: EventOrigin } & FormFieldUpdateResult)

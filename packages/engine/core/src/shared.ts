@@ -317,6 +317,42 @@ export {
   assertAnnotationBundleManifest,
 } from './transfer/AnnotationBundle';
 export { AnnotationTransfer } from './transfer/AnnotationTransfer';
+// Form bundles: whole fields with their widgets, to copy a form's design or
+// fill it again, and the JSON file that holds one.
+export type {
+  FormBundle,
+  FormBundleField,
+  FormBundleWidget,
+  WireFormBundle,
+} from './transfer/FormBundle';
+export { assertFormBundle, assertFormBundleManifest } from './transfer/FormBundle';
+export { FormTransfer } from './transfer/FormTransfer';
+export type { FormExportRows, FormExportSelection } from './transfer/formExport';
+export { fieldMatches, formExportRowsOf } from './transfer/formExport';
+export type {
+  FormImportBody,
+  FormImportDrop,
+  FormImportDropReason,
+  FormImportOptions,
+  FormImportPlan,
+  FormImportResult,
+  FormValuesImportBody,
+  FormValuesImportDrop,
+  FormValuesImportDropReason,
+  FormValuesImportOptions,
+  FormValuesImportResult,
+  FormValuesImportTarget,
+  PlannedFormField,
+  PlannedValueWrite,
+  WidgetFlags,
+} from './transfer/formImport';
+export {
+  formImportFacts,
+  formValuesImportFacts,
+  planFormImport,
+  planFormValuesImport,
+  WIDGET_FLAG_NAMES,
+} from './transfer/formImport';
 
 // Attachment vocabulary — one set of file metadata fields shared by the
 // file-attachment kind and the document-level attachments service.
@@ -573,7 +609,8 @@ export type {
   SignatureFieldPatch,
   FormFieldPatch,
 } from './forms/patch';
-export type { FormFieldValue, FormDataFormat } from './forms/value';
+export type { FormFieldValue } from './forms/value';
+export { fieldValueOf } from './forms/value';
 export type {
   FormSubmissionEntry,
   FormSubmissionRequest,
@@ -673,8 +710,6 @@ export type {
   FormMutationMeta,
   FormSetValueResult,
   FormResetResult,
-  FormImportResult,
-  FormDataExport,
   FormRepairResult,
   FormFieldCreateResult,
   FormFieldUpdateResult,
@@ -764,6 +799,7 @@ export {
 export { changeFingerprint, isKeptRefusal } from './mutation/changeOutcome';
 export type {
   AnnotationImportOp,
+  FormImportOp,
   Change,
   ChangeAnswer,
   ChangeOp,
@@ -823,6 +859,7 @@ export {
   annotationWriteCapabilities,
   annotationWriteCapability,
   authorizeAnnotationCreate,
+  allowsCapability,
   authorizeCapability,
   authorizeUnprotected,
   authorizeAnnotationDelete,

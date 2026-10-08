@@ -24,7 +24,10 @@ export type AuditMutationKind =
   | 'attachment.delete'
   | 'form.setValue'
   | 'form.reset'
+  /** A bundle's fields, copied in as one change (`doc.forms.import`). */
   | 'form.import'
+  /** A bundle's values, filled in as one change (`doc.forms.importValues`). */
+  | 'form.importValues'
   | 'form.repair'
   | 'form.createField'
   | 'form.updateField'

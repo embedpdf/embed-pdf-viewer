@@ -279,16 +279,17 @@ describe('the form capability on a real engine', () => {
     expect(form.exportValues()['customer.name']).toBeUndefined();
   }, 30_000);
 
-  it('moves the form data out as XFDF and back in', async () => {
+  it('moves a field out as a bundle and back in, with its value', async () => {
     await using harness = await boot();
     await buildForm(harness);
     const { form } = harness;
     await form.setValue(toFieldRef('customer.name'), { value: 'Ada Lovelace' });
-    const exported = await form.export();
-    expect(exported.format).toBe('xfdf');
-    await form.reset();
-    const imported = await form.import(exported.bytes);
-    expect(imported.applied).toBeGreaterThan(0);
+    const bundle = await form.export({ fields: [toFieldRef('customer.name')] });
+    expect(bundle.fields.map(({ data }) => data.name)).toEqual(['customer.name']);
+    await form.delete(toFieldRef('customer.name'));
+    const imported = await form.import(bundle);
+    expect(imported.dropped).toEqual([]);
+    expect(names(imported.fields)).toEqual(['customer.name']);
     expect(form.getValue(toFieldRef('customer.name'))).toEqual({ value: 'Ada Lovelace' });
   }, 30_000);
 

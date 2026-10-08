@@ -51,8 +51,7 @@ export function pixelChangeOf(
     case 'forms.widgetAdded':
     case 'forms.widgetRemoved':
       return annotations(placedPages(event.field.widgets));
-    // Coarse results (counts only, no per-widget detail): repaint every page.
-    case 'forms.imported':
+    // A coarse result (counts only, no per-widget detail): repaint every page.
     case 'forms.repaired':
       return annotations(allPageObjectNumbers());
     // Sealing bakes the signature into its widget's appearance.

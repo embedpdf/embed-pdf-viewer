@@ -188,6 +188,7 @@ export type {
   FormsApplyEffectsWorkerRequest,
   FormsExportWorkerRequest,
   FormsImportWorkerRequest,
+  FormsImportValuesWorkerRequest,
   FormsRepairWorkerRequest,
   FormsCreateFieldWorkerRequest,
   FormsUpdateFieldWorkerRequest,

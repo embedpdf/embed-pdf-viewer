@@ -135,6 +135,11 @@ export {
   type FormAttributionConformanceOptions,
 } from './conformance/runFormAttributionConformance';
 export {
+  runFormTransferConformance,
+  TWO_PAGES_PDF,
+  type FormTransferConformanceOptions,
+} from './conformance/runFormTransferConformance';
+export {
   WIDGET_FINDING_CASES,
   runWidgetFindingConformance,
   type WidgetFindingCase,

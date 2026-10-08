@@ -190,10 +190,6 @@ export function foldRecords(
       return bumpAppearance(records, widgetKeys(event.meta.changedWidgets));
     case 'forms.updated':
       return bumpAppearance(records, widgetKeys(event.field.widgets));
-    case 'forms.imported':
-      return event.applied > 0
-        ? bumpAppearance(records, widgetKeys(event.form.fields.flatMap((field) => field.widgets)))
-        : records;
     case 'signatures.completed':
       return event.signature.widget
         ? bumpAppearance(records, widgetKeys([event.signature.widget]))

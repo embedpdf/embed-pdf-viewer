@@ -2,7 +2,6 @@ import type { MutationMeta } from './MutationMeta';
 import type { AppearanceOutcome } from '../annotation/appearance';
 import type { WidgetAnnotation } from '../annotation/kinds/widget';
 import type { FormFieldDTO } from '../forms/field';
-import type { FormSnapshot } from '../forms/snapshot';
 import type { AnnotationRef } from '../identity/AnnotationRef';
 import type { FormFieldRef, FormWidget } from '../identity/FormFieldRef';
 import type { PageRef } from '../identity/PageRef';
@@ -81,27 +80,6 @@ export function formResetFacts<C extends Coordinates>(
       },
     };
   });
-}
-
-/**
- * Result of applying an FDF/XFDF payload. Import is per-field: one bad
- * entry (unknown name, family mismatch, failed validation) is counted in
- * `skipped` and never poisons the rest.
- */
-export interface FormImportResult<C extends Coordinates = PageCoordinates> {
-  /** The complete form after the import — no second round trip. */
-  form: FormSnapshot<C>;
-  /** Fields filled. */
-  applied: number;
-  /** Fields left out: unknown, the wrong kind, a value they can't take, or locked. */
-  skipped: number;
-  meta: MutationMeta;
-}
-
-/** Serialized form data produced by `export`. */
-export interface FormDataExport {
-  format: 'fdf' | 'xfdf';
-  bytes: Uint8Array;
 }
 
 /** Result of `create`: the field read back, and its widget rows. */

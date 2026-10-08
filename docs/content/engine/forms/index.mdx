@@ -1,6 +1,6 @@
 ---
 title: Forms
-description: Read a PDF form's fields and values, fill them in, reset them, and move form data in and out as FDF or XFDF.
+description: Read a PDF form's fields and values, fill them in, reset them, and move fields and values between documents.
 ---
 
 # Forms
@@ -121,7 +121,7 @@ widget images, every look and state, come from `page.forms.renderAppearances()`.
 ## Find a field
 
 The `ref` from `list()` is the best address: it keeps working when the field is renamed. When you
-know a field by its name instead (from your backend, or from FDF data), make a ref from the name:
+know a field by its name instead (from your backend, or from data you stored), make a ref from the name:
 
 ```ts
 import { toFieldRef } from '@embedpdf/engine';
@@ -204,37 +204,25 @@ Fields that hold no value, such as push buttons and signature fields, are skippe
 whole form also skips the fields a signature locked and [fields stored inline](#fields-stored-inline);
 name one of those yourself and the call fails, the same as a `setValue()` would.
 
-## Import and export form data
+## Move fields and values between documents
 
-FDF and XFDF are the formats every PDF tool uses to move form data: the values without the PDF.
-`export()` returns the data as bytes, XFDF unless you ask for FDF:
-
-```ts
-const { bytes } = await doc.forms.export(); // XFDF, an XML file
-const { bytes: fdf } = await doc.forms.export('fdf');
-```
-
-`import()` fills the fields in from FDF or XFDF bytes. It tells the format from the bytes; pass
-`'fdf'` or `'xfdf'` as a second argument to name it yourself:
+`export()` takes fields out as one bundle, each with its value. `importValues()` fills another
+document's fields of the same name from it, and `import()` copies the fields themselves:
 
 ```ts
-const { applied, skipped, form } = await other.forms.import(bytes);
+const bundle = await doc.forms.export();
 
-console.log(`${applied} filled, ${skipped} skipped`);
+const { fields, dropped } = await other.forms.importValues(bundle);
 ```
 
-Fields are matched by their full name, and each value is checked like a `setValue()`. A field the
-document doesn't have, a value it can't take, or a field a signature locked is skipped and
-counted; the rest still land. `form` is the whole form after the import, the same thing `list()`
-returns. Bytes that aren't FDF or XFDF fail with `InvalidArg`.
-
-The data holds export values, the same `value` a radio group reads: a checked checkbox exports
-its `exportValue`, and importing that value checks it again.
+Each value is checked like a `setValue()`. A field the document doesn't have, a value it can't
+take, or a field a signature locked is left out and listed in `dropped`; the rest still land, as
+one change you can undo. See [Import & export](/docs/engine/forms/import-export).
 
 ## Events
 
-`setValue()` and `reset()` fire `forms.valueSet`, one per field that changed; `import()` fires
-`forms.imported`. Each carries what the call returned for that field:
+`setValue()`, `reset()` and `importValues()` fire `forms.valueSet`, one per field that changed.
+Each carries what the call returned for that field:
 
 ```ts
 doc.events.on('forms.valueSet', ({ field }) => {
@@ -242,8 +230,8 @@ doc.events.on('forms.valueSet', ({ field }) => {
 });
 ```
 
-When one call changes several fields, such as `reset()`, their events share `origin.tx`, like an
-annotation import.
+When one call changes several fields, such as `reset()` or `importValues()`, their events share
+`origin.tx`, like an annotation import.
 
 <Engine cloud>
 
@@ -255,8 +243,8 @@ with `origin.kind: 'remote'` for other people's changes. See
 
 ## Permissions
 
-Reading the form and exporting its data needs `doc.forms.read`. Filling in, resetting and
-importing needs `doc.forms.fill`, which includes `doc.forms.read`. See
+Reading the form needs `doc.forms.read`, and exporting it `doc.download` too. Filling in,
+resetting and importing values needs `doc.forms.fill`, which includes `doc.forms.read`. See
 [Permissions](/docs/engine/concepts/permissions).
 
 A signed document can take filling away, for the whole form or for single fields. The call then
@@ -267,6 +255,8 @@ fails with `ProtectedDocument`; see
 
 - [Creating form fields](/docs/engine/forms/authoring): add fields and widgets, change and delete
   them, repair a broken form.
+- [Import & export](/docs/engine/forms/import-export): copy fields from one document to another,
+  or fill a form in from a bundle.
 - [Digital signatures](/docs/engine/forms/signatures): sign a signature field and check the
   signatures in a document.
 - [Changes & undo](/docs/engine/documents/changes): fill in several fields as one action, and

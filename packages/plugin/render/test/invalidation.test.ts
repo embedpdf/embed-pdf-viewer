@@ -57,8 +57,11 @@ describe('pixelChangeOf — the built-in event → pixels map', () => {
     },
   );
 
-  it.each(['forms.imported', 'forms.repaired'])('%s (coarse result) repaints all pages', (type) => {
-    expect(changeOf({ type })).toEqual({ pages: PAGE_OBJECT_NUMBERS, scope: 'annotations' });
+  it('forms.repaired (coarse result) repaints all pages', () => {
+    expect(changeOf({ type: 'forms.repaired' })).toEqual({
+      pages: PAGE_OBJECT_NUMBERS,
+      scope: 'annotations',
+    });
   });
 
   it('signatures.completed repaints the sealed widget’s page', () => {

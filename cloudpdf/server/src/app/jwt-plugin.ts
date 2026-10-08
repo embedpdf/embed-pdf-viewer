@@ -620,6 +620,21 @@ export function mayCreateObjects(
   return checkCollab('create', self, scope, identity, pdfBits);
 }
 
+/**
+ * Whether the token holds `capability` on the document: what
+ * `requireCapability` checks, as a yes or no, for a write that leaves out
+ * what the caller may not write instead of refusing it.
+ */
+export function holdsCapability(
+  ctx: { mode: DocAccessMode; jwt: RequestJwtContext },
+  capability: DocCapability,
+  pdfBits: PdfBits,
+  protection: DocumentProtection | null,
+): boolean {
+  if (protection && protectedCapabilities(protection).has(capability)) return false;
+  return ctx.mode === 'tenant' || checkCapability(capability, ctx.jwt.scope, pdfBits);
+}
+
 // Layer-scoped variants — wrap the doc-only versions with the existing
 // layer pin check (the token's `layer_name` claim, defaulting to
 // 'default', must match the URL).

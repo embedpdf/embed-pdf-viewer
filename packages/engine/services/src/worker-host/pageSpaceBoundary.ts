@@ -129,7 +129,20 @@ export function resultInPageSpace(
     case 'forms.import':
       return {
         ...payload,
-        result: { ...payload.result, form: pageFormSnapshotOf(payload.result.form, boxOf) },
+        result: {
+          ...payload.result,
+          fields: payload.result.fields.map((field) => pageFormFieldOf(field, boxOf)),
+          widgets: widgets(payload.result.widgets),
+        },
+      };
+    case 'forms.importValues':
+      return {
+        ...payload,
+        result: {
+          ...payload.result,
+          fields: payload.result.fields.map((field) => pageFormFieldOf(field, boxOf)),
+          widgets: widgets(payload.result.widgets),
+        },
       };
     case 'forms.applyEffects':
       return {
@@ -282,6 +295,8 @@ function opInFileSpace(
   switch (op.type) {
     // A bundle is page space: the import converts each create on its page.
     case 'annotations.import':
+    case 'forms.import':
+    case 'forms.importValues':
       return op;
     case 'annotations.create':
       return { ...op, data: pdfAnnotationDraftOf(op.data, boxOf(op.page), boxOf) };
@@ -363,11 +378,13 @@ function itemInPageSpace(item: ChangeItem<PdfCoordinates>, boxOf: VisibleBoxOf):
         widgets: widgets(item.widgets),
       } as ChangeItem;
     case 'forms.reset':
+    case 'forms.import':
+    case 'forms.importValues':
       return {
         ...item,
         fields: item.fields.map((field) => pageFormFieldOf(field, boxOf)),
         widgets: widgets(item.widgets),
-      };
+      } as ChangeItem;
     case 'forms.updateWidget':
       return { ...item, widget: pageWidgetOf(item.widget, boxOf) };
     case 'forms.deleteWidget':

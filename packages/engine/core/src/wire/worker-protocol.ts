@@ -29,7 +29,7 @@ import type { FormFieldDraft, WidgetPlacement } from '../forms/draft';
 import type { FormEffect, FormEffectsResult } from '../forms/effects';
 import type { FormFieldPatch } from '../forms/patch';
 import type { FormSnapshot } from '../forms/snapshot';
-import type { FormDataFormat, FormFieldValue } from '../forms/value';
+import type { FormFieldValue } from '../forms/value';
 import type { PdfRect, PdfRotation, PdfSize } from '../geometry/primitives';
 import type { AnnotationRef } from '../identity/AnnotationRef';
 import type { FormFieldRef, FormWidget } from '../identity/FormFieldRef';
@@ -52,7 +52,6 @@ import type {
   FormFieldCreateResult,
   FormFieldDeleteResult,
   FormFieldUpdateResult,
-  FormImportResult,
   FormRepairResult,
   FormResetResult,
   FormSetValueResult,
@@ -93,6 +92,9 @@ import type {
 import type { WireAnnotationBundle } from '../transfer/AnnotationBundle';
 import type { AnnotationImportResult } from '../transfer/annotationImport';
 import type { BundleImportPages } from '../transfer/bundle';
+import type { WireFormBundle } from '../transfer/FormBundle';
+import type { FormExportSelection } from '../transfer/formExport';
+import type { FormImportResult, FormValuesImportResult } from '../transfer/formImport';
 import type { BundleLimits } from '../transfer/bundleLimits';
 import type { AnnotationExportSelection } from '../transfer/exportSelection';
 
@@ -727,25 +729,50 @@ export interface FormsApplyEffectsWorkerRequest extends WriteJobFields {
   actor?: AnnotationActor;
 }
 
+/** `doc.forms.export`: the fields a selection takes, as a bundle. A snapshot read. */
 export interface FormsExportWorkerRequest {
   kind: 'forms.export';
   effect: 'snapshot';
   jobId: WorkerJobId;
   docId: string;
   layerName?: string;
-  format: FormDataFormat;
+  selection: FormExportSelection;
+  /** The limits the bundle must stay within; the defaults otherwise. */
+  limits?: BundleLimits;
 }
 
+/** `doc.forms.import`: a bundle's design, as one change (see `FormImportOp`). */
 export interface FormsImportWorkerRequest extends WriteJobFields {
   kind: 'forms.import';
   effect: 'write';
   jobId: WorkerJobId;
   docId: string;
   layerName?: string;
-  /** FDF or XFDF payload; goes on the wirePack transfer list (zero-copy). */
-  data: ArrayBuffer;
-  /** Sniffed from the bytes when omitted. */
-  format?: FormDataFormat;
+  /** Page space; each resource on the transfer list. */
+  bundle: WireFormBundle;
+  pages?: BundleImportPages;
+  attribution: 'restore' | 'stamp';
+  values: boolean;
+  /** Whom `'stamp'` makes the creator and filler; whose user `'restore'` records as `importedBy`. */
+  actor?: AnnotationActor;
+  limits?: BundleLimits;
+  /** Whether the caller holds `doc.forms.script`: without it, scripts, submits and links are left out. */
+  mayScript: boolean;
+  artifactPath?: string;
+}
+
+/** `doc.forms.importValues`: a bundle's values, as one change (see `FormImportOp`). */
+export interface FormsImportValuesWorkerRequest extends WriteJobFields {
+  kind: 'forms.importValues';
+  effect: 'write';
+  jobId: WorkerJobId;
+  docId: string;
+  layerName?: string;
+  bundle: WireFormBundle;
+  attribution: 'restore' | 'stamp';
+  /** Whom `'stamp'` makes the filler; whose user `'restore'` records as `importedBy`. */
+  actor?: AnnotationActor;
+  limits?: BundleLimits;
   artifactPath?: string;
 }
 
@@ -1556,6 +1583,7 @@ export type WorkerRequest<C extends Coordinates = PageCoordinates> =
   | FormsApplyEffectsWorkerRequest
   | FormsExportWorkerRequest
   | FormsImportWorkerRequest
+  | FormsImportValuesWorkerRequest
   | FormsRepairWorkerRequest
   | FormsCreateFieldWorkerRequest<C>
   | FormsUpdateFieldWorkerRequest
@@ -1796,10 +1824,16 @@ export type WorkerResultPayload<C extends Coordinates = PageCoordinates> =
       artifact?: LayerArtifactWorkerPayload;
       artifactFile?: LayerArtifactFileWorkerPayload;
     }
-  | { tag: 'forms.export'; format: FormDataFormat; bytes: ArrayBuffer }
+  | { tag: 'forms.export'; bundle: WireFormBundle }
   | {
       tag: 'forms.import';
       result: FormImportResult<C>;
+      artifact?: LayerArtifactWorkerPayload;
+      artifactFile?: LayerArtifactFileWorkerPayload;
+    }
+  | {
+      tag: 'forms.importValues';
+      result: FormValuesImportResult<C>;
       artifact?: LayerArtifactWorkerPayload;
       artifactFile?: LayerArtifactFileWorkerPayload;
     }

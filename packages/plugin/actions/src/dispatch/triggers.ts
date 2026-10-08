@@ -45,7 +45,6 @@ const annotationPagesOf = (event: DocumentEvent): readonly PageRef[] | 'all' | n
     case 'forms.widgetRestored':
     case 'forms.widgetUpdated':
     case 'forms.restored':
-    case 'forms.imported':
     case 'forms.repaired':
       return 'all';
     case 'pages.flattened':

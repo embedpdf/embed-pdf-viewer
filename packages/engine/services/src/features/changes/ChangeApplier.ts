@@ -26,6 +26,8 @@ import {
   deleteField,
   deleteRestoredWidget,
   deleteWidget,
+  importForm,
+  importFormValues,
   removeField,
   removeWidget,
   reorderWidgets,
@@ -169,6 +171,10 @@ function runOp(
       return reorderCalculations(ctx, op);
     case 'forms.setSignatureAppearance':
       return setSignatureAppearance(ctx, op);
+    case 'forms.import':
+      return importForm(ctx, op);
+    case 'forms.importValues':
+      return importFormValues(ctx, op);
     case 'metadata.update':
       return updateMetadata(ctx, op, at);
     case 'metadata.updateCustom':

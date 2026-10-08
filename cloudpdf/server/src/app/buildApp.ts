@@ -650,13 +650,6 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
     { parseAs: 'buffer', bodyLimit: opts.bodyLimit ?? 50 * 1024 * 1024 },
     (_req, body, done) => done(null, body),
   );
-  // Serialized form data (FDF/XFDF import bodies). Same raw-buffer
-  // treatment: the payload goes to the worker byte-for-byte.
-  app.addContentTypeParser(
-    ['application/vnd.fdf', 'application/vnd.adobe.xfdf'],
-    { parseAs: 'buffer', bodyLimit: opts.bodyLimit ?? 50 * 1024 * 1024 },
-    (_req, body, done) => done(null, body),
-  );
   // Fastify's stock JSON parser rejects a bodyless request that still
   // advertises `Content-Type: application/json` (FST_ERR_CTP_EMPTY_JSON_BODY).
   // Real clients send exactly that shape on bodyless calls — the Fern
@@ -1390,6 +1383,7 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
         imageEncoder: new SharpImageEncoder(),
         ...(opts.encodeInEngine !== undefined ? { encodeInEngine: opts.encodeInEngine } : {}),
         ...(derivedRenders ? { derivedRenders } : {}),
+        ...(opts.bundleLimits ? { bundleLimits: opts.bundleLimits } : {}),
       });
       await registerAttachmentRoutes(app, {
         documentService,

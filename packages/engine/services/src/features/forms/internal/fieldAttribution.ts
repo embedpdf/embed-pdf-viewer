@@ -116,6 +116,43 @@ export function stampFieldFill(
   ]);
 }
 
+/**
+ * Write who created a field and when, as a restoring import has it, and
+ * the importing session's user as `importedBy`. A `null` clears the entry.
+ */
+export function restoreFieldCreation(
+  runtime: PdfRuntimeModule,
+  docPtr: Ptr,
+  fieldObjectNumber: number,
+  from: Pick<FieldAttribution, 'createdBy' | 'createdAt'>,
+  importedBy: string | null,
+): void {
+  writeAttribution(runtime, docPtr, fieldObjectNumber, [
+    [KEY_CREATED_BY, from.createdBy],
+    [KEY_CREATED_AT, from.createdAt ? formatPdfDate(from.createdAt) : null],
+    [KEY_IMPORTED_BY, importedBy],
+  ]);
+}
+
+/**
+ * Write who filled a field in and when, as a restoring import has it, and
+ * the importing session's user as `importedBy`. A `null` clears the entry.
+ */
+export function restoreFieldFill(
+  runtime: PdfRuntimeModule,
+  docPtr: Ptr,
+  fieldObjectNumber: number,
+  from: Pick<FieldAttribution, 'filledBy' | 'filledByName' | 'filledAt'>,
+  importedBy: string | null,
+): void {
+  writeAttribution(runtime, docPtr, fieldObjectNumber, [
+    [KEY_FILLED_BY, from.filledBy],
+    [KEY_FILLED_BY_NAME, from.filledByName],
+    [KEY_FILLED_AT, from.filledAt ? formatPdfDate(from.filledAt) : null],
+    [KEY_IMPORTED_BY, importedBy],
+  ]);
+}
+
 /** Clear who filled a field in: a reset put its value back to its default. */
 export function clearFieldFill(
   runtime: PdfRuntimeModule,

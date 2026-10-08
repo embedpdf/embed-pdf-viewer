@@ -33,6 +33,7 @@ import {
   FormLayer,
   useForm,
   useFormState,
+  FormTransfer,
   SearchLayer,
   useSearch,
   useSearchHits,
@@ -714,8 +715,7 @@ function AnnotationBar({
   );
 }
 
-/** Form-data interchange: export the current values as XFDF, or apply an
- *  FDF/XFDF file — the engine sniffs the format and validates per field. */
+/** Fields in and out: save every field as a bundle file, or copy a bundle's fields in. */
 function FormDataButtons() {
   const form = useForm();
   const [note, setNote] = useState('');
@@ -723,23 +723,23 @@ function FormDataButtons() {
     <div style={{ display: 'flex', gap: 2, alignItems: 'center' }}>
       {note && <span style={{ fontSize: 10, color: '#666' }}>{note}</span>}
       <button
-        title="export form data (XFDF)"
+        title="export every field (form bundle)"
         style={tbBtn}
         onClick={async () => {
-          const { bytes } = await form.export('xfdf');
-          saveToDisk(bytes, 'form-data.xfdf');
+          const bundle = await form.export();
+          saveToDisk(new TextEncoder().encode(FormTransfer.stringify(bundle)), 'form.json');
         }}
       >
         ⇩ form
       </button>
       <button
-        title="import form data (FDF/XFDF)"
+        title="import a form bundle's fields"
         style={tbBtn}
         onClick={async () => {
-          const file = await pickFile('.xfdf,.fdf');
+          const file = await pickFile('.json,application/json');
           if (!file) return;
-          const r = await form.import(new Uint8Array(await file.arrayBuffer()));
-          setNote(`applied ${r.applied}, skipped ${r.skipped}`);
+          const r = await form.import(await FormTransfer.parse(await file.text()));
+          setNote(`imported ${r.fields.length}, left out ${r.dropped.length}`);
         }}
       >
         ⇧ form

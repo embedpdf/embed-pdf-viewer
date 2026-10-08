@@ -2,8 +2,6 @@
 export default {
   list: 'List',
   'reorder-calculations': 'Reorder Calculations',
-  'export-data': 'Export Data',
-  'import-data': 'Import Data',
   'set-value': 'Set Value',
   reset: 'Reset',
   'update-widget': 'Update Widget',

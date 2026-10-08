@@ -181,10 +181,7 @@ export function foldFormEvent(index: FieldIndex, event: DocumentEvent): FieldInd
       return event.field ? upsertFields(gone, [event.field]) : gone;
     }
     case 'forms.widgetRestored':
-      return upsertWidgets(
-        event.field ? upsertFields(index, [event.field]) : index,
-        event.widgets,
-      );
+      return upsertWidgets(event.field ? upsertFields(index, [event.field]) : index, event.widgets);
     case 'forms.widgetUpdated':
       return upsertWidgets(index, [event.widget]);
     case 'forms.widgetsReordered':
@@ -204,8 +201,6 @@ export function foldFormEvent(index: FieldIndex, event: DocumentEvent): FieldInd
         ),
         event.widgets,
       );
-    case 'forms.imported':
-      return indexFields(event.form);
     // A repair reports only counts; the others remove pages, or paint their
     // widgets into the content.
     case 'forms.repaired':

@@ -83,7 +83,14 @@ export {
   FormResetResultSchema,
   FormResetBodySchema,
   FormWidgetUpdateBodySchema,
+  FormExportRequestSchema,
+  FormExportSelectionSchema,
+  FormImportBodySchema,
+  FormImportOptionsSchema,
   FormImportResultSchema,
+  FormValuesImportBodySchema,
+  FormValuesImportOptionsSchema,
+  FormValuesImportResultSchema,
   FormRepairResultSchema,
   FormFieldCreateResultSchema,
   FormFieldUpdateResultSchema,
@@ -174,7 +181,6 @@ export {
   FormKindSchema,
   FormSnapshotSchema,
   FormFieldValueSchema,
-  FormDataFormatSchema,
   WidgetAppearanceSchema,
   WidgetPlacementSchema,
   FormFieldOptionInputSchema,
@@ -239,6 +245,7 @@ export {
   decodeAnnotationToken,
   decodeAnnotationsAllToken,
   decodeAnnotationsExportToken,
+  decodeFormExportToken,
   decodeActionsToken,
   decodeAttachmentsToken,
   decodeContentToken,
@@ -253,6 +260,7 @@ export {
   encodeAnnotationToken,
   encodeAnnotationsAllToken,
   encodeAnnotationsExportToken,
+  encodeFormExportToken,
   encodeActionsToken,
   encodeAttachmentsToken,
   encodeContentToken,
@@ -416,7 +424,7 @@ export type {
   DocumentVersions,
 } from './wire/schemas';
 export { encodeAnalysisToken, decodeAnalysisToken, type AnalysisToken } from './wire/tokens';
-export type { AnnotationsExportToken } from './wire/tokens';
+export type { AnnotationsExportToken, FormExportToken } from './wire/tokens';
 export { analysisQueryString, type AnalysisQueryInput } from './wire/paths';
 
 export * from './dto/Measure.schema';

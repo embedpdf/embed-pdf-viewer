@@ -1,4 +1,5 @@
 import type { ConformanceFixture, ConformanceTestRunner } from './runMetadataConformance';
+import type { FormFieldDTO } from '../forms/field';
 import type { DocumentHandle } from '../engine/DocumentHandle';
 import type { Engine } from '../engine/Engine';
 import { isLocalDocument, type LocalDocumentHandle } from '../engine/LocalDocumentHandle';
@@ -298,16 +299,24 @@ export function runSignatureConformance(
           status: 'rejected',
           error: { code: EngineErrorCode.ProtectedDocument },
         });
-        // An import skips it and counts it.
-        const nested = fixture.lockedField
-          .split('.')
-          .reduceRight(
-            (inner, name) => `<field name="${name}">${inner}</field>`,
-            '<value>changed</value>',
-          );
-        const xfdf = `<?xml version="1.0"?><xfdf xmlns="http://ns.adobe.com/xfdf/"><fields>${nested}</fields></xfdf>`;
-        const imported = await doc.forms.import(new TextEncoder().encode(xfdf), 'xfdf');
-        expect(imported).toMatchObject({ applied: 0, skipped: 1 });
+        // A values import leaves it out, and says so.
+        const bundle = await doc.forms.export({ fields: [lockedRef] });
+        const [row] = bundle.fields;
+        const changed = {
+          ...bundle,
+          fields: [
+            {
+              data: {
+                ...row!.data,
+                valueEntry: { kind: 'scalar', value: 'changed' },
+                value: 'changed',
+              } as FormFieldDTO,
+            },
+          ],
+        };
+        const imported = await doc.forms.importValues(changed, { attribution: 'stamp' });
+        expect(imported.dropped).toEqual([{ ref: row!.data.ref, reason: 'locked' }]);
+        expect(imported.fields).toEqual([]);
         const field = await doc.forms.get(lockedRef);
         expect(field.family).toBe('text');
         expect((field as { value?: string }).value === 'changed').toBe(false);

@@ -69,6 +69,8 @@ export interface ObjectsRevertStep {
   /** Whether the op changed what the annotation shows (its update's `appearance.changed`). */
   readonly appearanceChanged?: boolean;
   readonly fallback?: RevertFallback;
+  /** The rights it takes beside its op's: an import's (see {@link StepRights}). */
+  readonly rights?: StepRights;
 }
 
 /** How a revert puts values back when the dictionaries it wrote changed since. */
@@ -113,11 +115,13 @@ export interface AnnotationRemoveStep {
 }
 
 /**
- * The rights a step takes instead of the per-annotation rules: `'import'`,
- * a restoring import's, `doc.annotate.modify` and `doc.annotate.import`. A
- * restoring import gives annotations other people's `userId`, which a
- * delete's rules (`annotations:delete:self`) would never let the importer
- * remove; its undo and redo take what the import took.
+ * The rights a step takes as a restoring import's undo or redo: what the
+ * import took. For annotations, `doc.annotate.modify` and
+ * `doc.annotate.import` instead of the per-annotation rules: a restoring
+ * import gives annotations other people's `userId`, which a delete's rules
+ * (`annotations:delete:self`) would never let the importer remove. For
+ * forms, `doc.forms.import` beside `doc.forms.modify` or `doc.forms.fill`:
+ * putting back who made or filled a field is restoring attribution too.
  */
 export type StepRights = 'import';
 
@@ -192,12 +196,14 @@ export interface WidgetDeleteStep {
   readonly left: WidgetAnnotation<PdfCoordinates>;
 }
 
-/** Deletes a field a create made, when nobody changed it since. */
+/** Deletes a field a create or an import made, when nobody changed it since. */
 export interface FieldRemoveStep {
   readonly kind: 'field.remove';
   readonly objectNumber: number;
   /** The field as the change left it. */
   readonly left: FormFieldDTO<PdfCoordinates>;
+  /** The rights it takes beside `doc.forms.modify`: an import's (see {@link StepRights}). */
+  readonly rights?: StepRights;
 }
 
 /** Brings back a field a delete removed, its widgets and the parents it pruned. */
@@ -209,6 +215,8 @@ export interface FieldRestoreStep {
   /** The pages its widgets were on: the restore is skipped when one is gone. */
   readonly pages: readonly PageRef[];
   readonly capture: Uint8Array;
+  /** The rights it takes: those of the remove it reverses (see {@link StepRights}). */
+  readonly rights?: StepRights;
 }
 
 /** Puts metadata back, entry by entry, where an entry still holds what the change set. */

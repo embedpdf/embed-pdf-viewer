@@ -1,7 +1,7 @@
 import { encodePageKey, type PageRef } from '../identity/PageRef';
 import type { ModificationLevel } from '../signature/types';
 import { SIGNATURE_POLICY_VERSION } from '../signature/protection';
-import type { AnalysisToken, AnnotationsExportToken } from './tokens';
+import type { AnalysisToken, AnnotationsExportToken, FormExportToken } from './tokens';
 /**
  * Single source of truth for cloud HTTP paths. Both @cloudpdf/engine and
  * @cloudpdf/server import these so they cannot drift.
@@ -46,7 +46,10 @@ import type { AnalysisToken, AnnotationsExportToken } from './tokens';
  *   /v1/docs/{id}/layers/{L}/form/fields/{key}/reset              — reset to /DV (fill)
  *   /v1/docs/{id}/layers/{L}/form/fields/{key}/widgets            — adopt a widget (attach)
  *   /v1/docs/{id}/layers/{L}/form/fields/{key}/widgets/detach     — release a widget
- *   /v1/docs/{id}/layers/{L}/form/data                            — FDF/XFDF export (GET) / import (POST)
+ *   /v1/docs/{id}/layers/{L}/form/export@{token}                  — form bundle export (GET)
+ *   /v1/docs/{id}/layers/{L}/form/export                          — form bundle export by body (POST)
+ *   /v1/docs/{id}/layers/{L}/form/import                          — design import (multipart POST)
+ *   /v1/docs/{id}/layers/{L}/form/import-values                   — values import (multipart POST)
  *   /v1/docs/{id}/layers/{L}/form/repair                          — durable reconciliation
  *   /v1/docs/{id}/layers/{L}/download@{ver}
  *
@@ -62,6 +65,7 @@ import {
   encodeAnnotationToken,
   encodeAnnotationsAllToken,
   encodeAnnotationsExportToken,
+  encodeFormExportToken,
   encodeAttachmentsToken,
   encodeContentToken,
   encodeDocToken,
@@ -583,13 +587,25 @@ export const wirePaths = {
   layerFormFieldWidgetsDetach: (docId: string, layerName: string, fieldKey: string) =>
     `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/form/fields/${encodeURIComponent(fieldKey)}/widgets/detach`,
 
-  /**
-   * GET: serialized form data (`?format=fdf|xfdf`, default `xfdf`).
-   * POST: import an FDF/XFDF payload (raw bytes body; format sniffed
-   * server-side unless `?format=` pins it).
-   */
-  layerFormData: (docId: string, layerName: string, format?: 'fdf' | 'xfdf') =>
-    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/form/data${format ? `?format=${format}` : ''}`,
+  /** Immutable base form export: a bundle as multipart, needing `doc.forms.read` and `doc.download`. */
+  docFormExport: (docId: string, token: FormExportToken) =>
+    `/v1/docs/${encodeURIComponent(docId)}/form/export@${encodeFormExportToken(token)}`,
+
+  /** Immutable layer form export (twin of `docFormExport`). */
+  layerFormExport: (docId: string, layerName: string, token: FormExportToken) =>
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/form/export@${encodeFormExportToken(token)}`,
+
+  /** A layer form export whose selection a URL can't carry: a POST of the pins and the selection, not cached. */
+  layerFormExportRequest: (docId: string, layerName: string) =>
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/form/export`,
+
+  /** A bundle's design, created in the layer as one change (`doc.forms.import`). */
+  layerFormImport: (docId: string, layerName: string) =>
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/form/import`,
+
+  /** A bundle's values, written in the layer as one change (`doc.forms.importValues`). */
+  layerFormImportValues: (docId: string, layerName: string) =>
+    `/v1/docs/${encodeURIComponent(docId)}/layers/${encodeURIComponent(layerName)}/form/import-values`,
 
   /** POST: durable reconciliation (`{ bakeAppearances? }`). */
   layerFormRepair: (docId: string, layerName: string) =>
@@ -746,7 +762,8 @@ export const wireTemplates = {
   layerFormReset: '/v1/docs/:docId/layers/:layerName/form/reset',
   layerFormFieldSignatureAppearance:
     '/v1/docs/:docId/layers/:layerName/form/fields/:fieldKey/signature-appearance',
-  layerFormData: '/v1/docs/:docId/layers/:layerName/form/data',
+  layerFormImport: '/v1/docs/:docId/layers/:layerName/form/import',
+  layerFormImportValues: '/v1/docs/:docId/layers/:layerName/form/import-values',
   layerPageViewports: '/v1/docs/:docId/layers/:layerName/pages/:pageKey/viewports',
   layerPageScale: '/v1/docs/:docId/layers/:layerName/pages/:pageKey/scale',
   layerPagesReorder: '/v1/docs/:docId/layers/:layerName/pages/reorder',

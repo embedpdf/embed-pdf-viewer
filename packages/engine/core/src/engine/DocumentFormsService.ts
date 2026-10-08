@@ -4,17 +4,23 @@ import type { FormFieldDraft, WidgetPlacement } from '../forms/draft';
 import type { FormFieldDTO } from '../forms/field';
 import type { FormFieldPatch } from '../forms/patch';
 import type { FormSnapshot } from '../forms/snapshot';
-import type { FormDataFormat, FormFieldValue } from '../forms/value';
+import type { FormFieldValue } from '../forms/value';
 import type { FormEffect, FormEffectsResult } from '../forms/effects';
 import type { FormSubmissionReceipt, FormSubmissionRequest } from '../forms/submission';
 import type { FormFieldRef } from '../identity/FormFieldRef';
 import type { SignatureAppearanceInput } from '../signature/types';
+import type { FormBundle } from '../transfer/FormBundle';
+import type { FormExportSelection } from '../transfer/formExport';
 import type {
-  FormDataExport,
+  FormImportOptions,
+  FormImportResult,
+  FormValuesImportOptions,
+  FormValuesImportResult,
+} from '../transfer/formImport';
+import type {
   FormFieldCreateResult,
   FormFieldDeleteResult,
   FormFieldUpdateResult,
-  FormImportResult,
   FormRepairResult,
   FormResetResult,
   FormSetValueResult,
@@ -120,25 +126,36 @@ export interface DocumentFormsService {
   submit?(request: FormSubmissionRequest): AbortablePromise<FormSubmissionReceipt>;
 
   /**
-   * Serialize the form data for interchange. Defaults to `'xfdf'` (the
-   * XML sibling; UTF-8, friendliest to web pipelines) — pass `'fdf'` for
-   * the PDF-native container. Exports read the same reconciled view as
-   * `list()`, so recovered fields are included and, on layer documents,
-   * filled values win over the base.
+   * The fields `selection` takes, each whole with all of its widgets, their
+   * values and who made and filled them, as one bundle (every field without
+   * a selection). A field the form doesn't export comes without its value,
+   * a signature field without its signature. Needs `doc.forms.read` and
+   * `doc.download`.
    */
-  export(format?: FormDataFormat): AbortablePromise<FormDataExport>;
+  export(selection?: FormExportSelection): AbortablePromise<FormBundle>;
 
   /**
-   * Apply an FDF or XFDF payload. The format is sniffed from the bytes
-   * when `format` is omitted. Each entry replays through the same typed,
-   * validated write path as `setValue` — one bad entry is skipped and
-   * counted, never fatal. Emits `forms.imported`.
+   * Copy a bundle's design into this document: its fields, their widgets,
+   * scripts and actions, values (`options.values`), and their place in the
+   * calculation order, created as one change, all or nothing. A field whose
+   * name is taken, and what can't be carried, is left out and reported in
+   * `dropped`. Needs `doc.forms.modify`; `doc.forms.import` to restore who
+   * made and filled the fields (the default); `doc.forms.script` to keep
+   * scripts, submits and links. Emits one `forms.created` per field.
    */
-  import(
-    data: Uint8Array | ArrayBuffer,
-    format?: FormDataFormat,
-    options?: WriteOptions,
-  ): AbortablePromise<FormImportResult>;
+  import(bundle: FormBundle, options?: FormImportOptions): AbortablePromise<FormImportResult>;
+
+  /**
+   * Fill this document's fields from a bundle, by full name, as one change.
+   * A field the document doesn't have, of another family, that can't take
+   * the value or that a signature locked is left out and reported. Runs no
+   * scripts. Needs `doc.forms.fill`; `doc.forms.import` to restore who
+   * filled the fields (the default). Emits one `forms.valueSet` per field.
+   */
+  importValues(
+    bundle: FormBundle,
+    options?: FormValuesImportOptions,
+  ): AbortablePromise<FormValuesImportResult>;
 
   /**
    * Create a logical form field, optionally with styled widgets, in one

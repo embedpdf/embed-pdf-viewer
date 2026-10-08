@@ -11,7 +11,7 @@ import type { FormFieldDraft, FormFieldOptionInput, WidgetPlacement } from './dr
 import type { FormFieldPatch } from './patch';
 import type { FormFieldDTO, FormFieldOption, FormFieldWidget, ToggleFieldWidget } from './field';
 import type { FormKind, FormSnapshot } from './snapshot';
-import type { FormDataFormat, FormFieldValue } from './value';
+import type { FormFieldValue } from './value';
 import type { FormValueEntry } from './value-entry';
 import { IsoDateTimeSchema } from '../dto/IsoDateTime.schema';
 import {
@@ -160,8 +160,6 @@ export const FormFieldValueSchema: z.ZodType<FormFieldValue> = z
         .length === 1,
     { message: 'exactly one of value, checked or selectedValues' },
   ) as unknown as z.ZodType<FormFieldValue>;
-
-export const FormDataFormatSchema: z.ZodType<FormDataFormat> = z.enum(['fdf', 'xfdf']);
 
 export { WidgetAppearanceSchema };
 

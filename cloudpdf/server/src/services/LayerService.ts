@@ -44,7 +44,6 @@ import {
   type WireResourceMap,
   type AnnotationRef,
   type AnnotationUpdateResult,
-  type FormDataFormat,
   type FormEffect,
   type FormEffectsResult,
   type FormFieldCreateResult,
@@ -55,6 +54,8 @@ import {
   type FormFieldUpdateResult,
   type FormFieldValue,
   type FormImportResult,
+  type FormValuesImportResult,
+  type WireFormBundle,
   type FormRepairResult,
   type FormResetResult,
   type FormSetValueResult,
@@ -1252,34 +1253,6 @@ export class LayerService {
     return payload.snapshot;
   }
 
-  /** Read: serialized FDF/XFDF of the reconciled form state. */
-  async exportFormData(
-    ctx: OpenContext,
-    input: { docId: string; layerName: string; format: FormDataFormat },
-    signal?: AbortSignal,
-  ): Promise<{ format: FormDataFormat; bytes: ArrayBuffer }> {
-    const documentService = this.requireDocumentService();
-    await documentService.getLayerManifest(ctx, input.docId, input.layerName);
-    await documentService.ensureLayerOnPool(ctx, input.docId, input.layerName);
-    const build = (jobId: WorkerJobId) =>
-      wirePack({
-        kind: 'forms.export' as const,
-        effect: 'snapshot' as const,
-        jobId,
-        docId: input.docId,
-        layerName: input.layerName,
-        format: input.format,
-      });
-    const payload = await this.requirePool().run(input.docId, build, signal);
-    if (payload.tag !== 'forms.export') {
-      throw new EngineError(
-        EngineErrorCode.WireFormat,
-        `unexpected forms.export payload: ${payload.tag}`,
-      );
-    }
-    return { format: payload.format, bytes: payload.bytes };
-  }
-
   async setFormValue(
     ctx: LayerWriteContext,
     input: { docId: string; layerName: string; ref: FormFieldRef; value: FormFieldValue },
@@ -1370,39 +1343,74 @@ export class LayerService {
     });
   }
 
-  async importFormData(
+  /**
+   * `doc.forms.import` on a layer: one change, its one op the import, kept
+   * under the request's `Idempotency-Key` with the record that undoes it,
+   * and audited as `form.import`.
+   */
+  async importForm(
     ctx: LayerWriteContext,
-    input: { docId: string; layerName: string; data: ArrayBuffer; format?: FormDataFormat },
+    input: {
+      docId: string;
+      layerName: string;
+      bundle: WireFormBundle;
+      pages?: BundleImportPages;
+      attribution: 'restore' | 'stamp';
+      values: boolean;
+      /** Whether the caller holds `doc.forms.script`, which the route checked. */
+      mayScript: boolean;
+      limits: BundleLimits;
+    },
     signal?: AbortSignal,
   ): Promise<FormImportResult> {
-    const opId = writeOpIdOf(ctx);
-    return this.runFormMutation(
+    const actor = actorFromContext(ctx);
+    return this.applySingleOp<FormImportResult>(
       ctx,
+      input,
       {
-        docId: input.docId,
-        layerName: input.layerName,
-        tag: 'forms.import',
-        auditKind: 'form.import',
-        build: (jobId, artifactPath) =>
-          wirePack(
-            {
-              kind: 'forms.import' as const,
-              effect: 'write' as const,
-              jobId,
-              opId,
-              docId: input.docId,
-              layerName: input.layerName,
-              data: input.data,
-              ...(input.format ? { format: input.format } : {}),
-              artifactPath,
-            },
-            [input.data],
-          ),
-        // The worker reports per-field counts, not per-widget pages; an
-        // import may touch widgets on any page, so every page's annotation
-        // collection is conservatively invalidated.
-        touchedPages: (_result: FormImportResult, materialized) => allPages(materialized),
+        type: 'forms.import',
+        bundle: input.bundle,
+        ...(input.pages !== undefined ? { pages: input.pages } : {}),
+        attribution: input.attribution,
+        values: input.values,
+        ...(actor ? { actor } : {}),
+        limits: input.limits,
+        mayScript: input.mayScript,
       },
+      checkedAuthority(actor),
+      'form.import',
+      signal,
+    );
+  }
+
+  /**
+   * `doc.forms.importValues` on a layer: one change, as {@link importForm},
+   * audited as `form.importValues`.
+   */
+  async importFormValues(
+    ctx: LayerWriteContext,
+    input: {
+      docId: string;
+      layerName: string;
+      bundle: WireFormBundle;
+      attribution: 'restore' | 'stamp';
+      limits: BundleLimits;
+    },
+    signal?: AbortSignal,
+  ): Promise<FormValuesImportResult> {
+    const actor = actorFromContext(ctx);
+    return this.applySingleOp<FormValuesImportResult>(
+      ctx,
+      input,
+      {
+        type: 'forms.importValues',
+        bundle: input.bundle,
+        attribution: input.attribution,
+        ...(actor ? { actor } : {}),
+        limits: input.limits,
+      },
+      checkedAuthority(actor),
+      'form.importValues',
       signal,
     );
   }

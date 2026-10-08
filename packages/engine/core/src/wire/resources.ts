@@ -56,6 +56,9 @@ export type DocResourceId =
   // read the annotations, and a cached object is never filtered per row.
   | 'form'
   | 'page-form'
+  // Form export: whole fields with their values, so it egresses content and
+  // needs `doc.download` beside the form read.
+  | 'form-export'
   | 'layout'
   | 'metadata'
   // The Info dict's custom keys: their own path under `/metadata/`, so
@@ -103,6 +106,7 @@ export type DocResourceId =
   | 'layer-annotations-export'
   | 'layer-form'
   | 'layer-page-form'
+  | 'layer-form-export'
   // Attachments, split by permission tier under distinct prefixes (the
   // search-rects/search-full rule): the metadata listing rides the base
   // read capability, while decoded file bytes egress content and gate on
@@ -277,6 +281,16 @@ export const DOC_RESOURCES: Readonly<Record<DocResourceId, DocResourceDescriptor
     pathPrefix: '/v1/docs/{docId}/annotations/export@',
     resolvePathPrefix: (docId) => `/v1/docs/${docId}/annotations/export@`,
     requirement: { kind: 'all', capabilities: ['doc.annotate.read', 'doc.download'] },
+    routeKind: 'versioned-read',
+    cdnCacheable: true,
+  },
+  'form-export': {
+    id: 'form-export',
+    pathPattern: '/v1/docs/{docId}/form/export@*',
+    resolvePathPattern: (docId) => `/v1/docs/${docId}/form/export@*`,
+    pathPrefix: '/v1/docs/{docId}/form/export@',
+    resolvePathPrefix: (docId) => `/v1/docs/${docId}/form/export@`,
+    requirement: { kind: 'all', capabilities: ['doc.forms.read', 'doc.download'] },
     routeKind: 'versioned-read',
     cdnCacheable: true,
   },
@@ -570,6 +584,18 @@ export const DOC_RESOURCES: Readonly<Record<DocResourceId, DocResourceDescriptor
     resolvePathPrefix: (docId, layerName = 'default') =>
       `/v1/docs/${docId}/layers/${layerName}/annotations/items@`,
     requirement: { kind: 'single', capability: 'doc.annotate.read' },
+    routeKind: 'versioned-read',
+    cdnCacheable: true,
+  },
+  'layer-form-export': {
+    id: 'layer-form-export',
+    pathPattern: '/v1/docs/{docId}/layers/{layerName}/form/export@*',
+    resolvePathPattern: (docId, layerName = 'default') =>
+      `/v1/docs/${docId}/layers/${layerName}/form/export@*`,
+    pathPrefix: '/v1/docs/{docId}/layers/{layerName}/form/export@',
+    resolvePathPrefix: (docId, layerName = 'default') =>
+      `/v1/docs/${docId}/layers/${layerName}/form/export@`,
+    requirement: { kind: 'all', capabilities: ['doc.forms.read', 'doc.download'] },
     routeKind: 'versioned-read',
     cdnCacheable: true,
   },

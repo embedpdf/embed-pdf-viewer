@@ -17,8 +17,7 @@ import type { ScriptDiagnostic, ScriptExecutionError, ScriptUiEffect } from '@em
 import type {
   AnnotationRef,
   FieldPosition,
-  FormDataExport,
-  FormDataFormat,
+  FormBundle,
   FormEffectsResult,
   FormFieldDraft,
   FormFieldDTO,
@@ -26,7 +25,8 @@ import type {
   FormFieldPatch,
   FormFieldRef,
   FormFieldValue,
-  FormImportResult,
+  FormImportDrop,
+  FormImportOptions,
   FormKind,
   FormRepairOptions,
   FormRepairResult,
@@ -42,18 +42,20 @@ import type { FormWidgetItem } from './read/fill-items';
 
 export { FormToken } from './token';
 export { toFieldRef } from '@embedpdf/engine-core/runtime';
+export { FormTransfer } from '@embedpdf/engine-core/public';
 export type { FormWidgetItem, FormWidgetLook } from './read/fill-items';
 export type { Box, WidgetHit } from './model';
 export type {
-  FormDataExport,
-  FormDataFormat,
+  FormBundle,
   FormFieldDraft,
   FormFieldDTO,
   FormFieldFamily,
   FormFieldPatch,
   FormFieldRef,
   FormFieldValue,
-  FormImportResult,
+  FormImportDrop,
+  FormImportDropReason,
+  FormImportOptions,
   FormKind,
   FormRepairOptions,
   FormRepairResult,
@@ -147,6 +149,23 @@ export interface FormResetResult {
 /** What `create()`, `update()` and `removeWidget()` resolve: the field as it is now. */
 export interface FormFieldResult {
   readonly field: FormFieldDTO;
+}
+
+/** Which fields `export()` takes, each whole. Without either, every field. */
+export interface FormExportSelection {
+  readonly fields?: readonly FormFieldRef[];
+  /** Every field with a widget on these pages, as refs or indexes. */
+  readonly pages?: readonly (PageRef | number)[];
+}
+
+/** What `import()` did: the new fields, where each bundle field went, and what was left out. */
+export interface FormImportResult {
+  /** The new fields, in bundle order. */
+  readonly fields: readonly FormFieldDTO[];
+  /** Each imported field's ref in the bundle, and its new ref here. */
+  readonly refMap: ReadonlyArray<{ readonly from: FormFieldRef; readonly to: FormFieldRef }>;
+  /** What was left out, and why, in bundle order. */
+  readonly dropped: readonly FormImportDrop[];
 }
 
 /**
@@ -318,15 +337,27 @@ export interface FormCapability extends SettingsApi<FormSettings> {
     options?: OperationOptions,
   ): Promise<WidgetActivationResult>;
 
-  // ── form data ──
-  /** The form data as XFDF, or FDF with `'fdf'`. Rejects `permission-denied` without `doc.forms.read`. */
-  export(format?: FormDataFormat, options?: OperationOptions): Promise<FormDataExport>;
+  // ── moving fields ──
   /**
-   * Fill in the fields from FDF or XFDF bytes, telling the format by itself;
-   * an entry the form can't take is skipped. Rejects `permission-denied`
-   * without `doc.forms.fill`.
+   * Take fields out as a bundle: each whole, with its widgets, value,
+   * scripts and actions. Every field, the ones named, or the ones on some
+   * pages. Waits for pending writes first. Rejects `permission-denied`
+   * without `doc.forms.read` or `doc.download`.
    */
-  import(data: Uint8Array | ArrayBuffer, options?: OperationOptions): Promise<FormImportResult>;
+  export(selection?: FormExportSelection, options?: OperationOptions): Promise<FormBundle>;
+  /**
+   * Copy a bundle's fields into this document, as one change you can undo:
+   * their widgets on the same pages (or `options.pages`), their values, and
+   * their place in the calculation order. A field whose name is taken is
+   * left out, as are scripts, submits and links without `doc.forms.script`.
+   * Fires `onFieldCreated` per field. Rejects `permission-denied` without
+   * `doc.forms.modify` (and, for the default `attribution: 'restore'`,
+   * `doc.forms.import`).
+   */
+  import(
+    bundle: FormBundle,
+    options?: FormImportOptions & OperationOptions,
+  ): Promise<FormImportResult>;
   /** Read the whole form again; fires `onResynced`. */
   refresh(options?: OperationOptions): Promise<void>;
 

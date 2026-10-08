@@ -233,9 +233,9 @@ with the authors, dates and owners they had in the source document. Only give it
 such as syncing from your own database: it lets the caller create annotations in someone else's
 name.
 
-`doc.forms.import` does the same for form fields: an import keeps who created each field and who
-filled it in, instead of naming the importing user. On a signed form, who filled a field in is
-evidence, so give it as carefully.
+`doc.forms.import` does the same for [form fields](/docs/engine/forms/import-export): an import
+keeps who created each field and who filled it in, instead of naming the importing user. On a
+signed form, who filled a field in is evidence, so give it as carefully.
 
 ### Scripts in forms
 
@@ -244,7 +244,8 @@ and buttons that submit the form or open a link. A script runs for everyone who 
 afterwards. In your viewer it can change what they type or hide fields; opened in another PDF app,
 a script or a submit button can send their answers anywhere. So a user who may design fields
 (`doc.forms.modify`) doesn't get it with that. Buttons that only go to a page, reset the form, or
-show and hide fields need `doc.forms.modify` alone.
+show and hide fields need `doc.forms.modify` alone. An import without it leaves the scripts, submits
+and links out and copies the rest.
 
 It doesn't make a script's result trustworthy: a client can skip scripts and send any value. A
 server that must trust a calculated value calculates it itself.

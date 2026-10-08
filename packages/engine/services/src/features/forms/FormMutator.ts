@@ -2,7 +2,6 @@ import type {
   FieldPosition,
   FieldScriptWrite,
   ListPosition,
-  FormDataFormat,
   FormFieldDraft,
   FormFieldDTO,
   FormFieldFamily,
@@ -10,7 +9,6 @@ import type {
   FormFieldPatch,
   FormFieldRef,
   FormFieldValue,
-  FormImportResult,
   FormRepairResult,
   FormResetResult,
   FormSetValueResult,
@@ -36,11 +34,7 @@ import { createUnattachedWidget } from './internal/authorWidget';
 import { fitCaptionToFamily } from './internal/widgetCaption';
 import { flagMasks } from './internal/fieldFlagBits';
 import { acquireFormModel } from './internal/formModelCache';
-import {
-  assertFieldNotLocked,
-  lockedFieldObjectNumbers,
-  readFieldLocks,
-} from './internal/signatureLocks';
+import { assertFieldNotLocked, readFieldLocks } from './internal/signatureLocks';
 import { formMutationMeta } from './internal/formMutationMeta';
 import { bakeWidgetAppearance } from '../signature/internal/appearance';
 import {
@@ -65,7 +59,6 @@ import {
 } from './internal/fieldValues';
 import { withWideStringArray } from './internal/wideStringArray';
 import { readFieldAt } from './internal/readFormSnapshot';
-import { readForm } from './internal/widgetRows';
 import {
   fieldObjectNumberOf,
   resolveFieldRef,
@@ -239,53 +232,6 @@ export class FormMutator {
       targets.push(field);
     }
     return targets;
-  }
-
-  importData(
-    data: ArrayBuffer,
-    format: FormDataFormat | undefined,
-    signal: AbortSignal,
-  ): FormImportResult<PdfCoordinates> {
-    throwIfAborted(signal);
-    const { fn, mem } = this.runtime;
-    const bytes = new Uint8Array(data);
-    if (bytes.byteLength === 0) {
-      throw new EngineError(EngineErrorCode.InvalidArg, 'empty form data payload');
-    }
-    const resolvedFormat = format ?? sniffFormat(bytes);
-    const call = resolvedFormat === 'fdf' ? fn.EPDFForm_ImportFDF : fn.EPDFForm_ImportXFDF;
-    const docPtr = this.session.requireDocPtr();
-
-    // A field a signature locked is never written: the import skips it.
-    const locked = lockedFieldObjectNumbers(this.runtime, this.session);
-    const scratch = [bytes.byteLength, 16, Math.max(locked.length, 1) * 4];
-    const counts = withScratchN(mem, scratch, ([dataPtr, resultPtr, skipPtr]) => {
-      mem.writeBytes(dataPtr, bytes);
-      locked.forEach((objectNumber, at) => mem.poke(skipPtr, 'i32', objectNumber, at * 4));
-      const ok = call(docPtr, dataPtr, bytes.byteLength, skipPtr, locked.length, resultPtr);
-      if (!ok) {
-        throw new EngineError(
-          EngineErrorCode.InvalidArg,
-          `payload is not valid ${resolvedFormat.toUpperCase()}`,
-        );
-      }
-      // The report also counts all fields (offset 0) and changed widgets (12).
-      return {
-        applied: Number(mem.peek(resultPtr, 'i32', 4)),
-        skipped: Number(mem.peek(resultPtr, 'i32', 8)),
-      };
-    });
-
-    this.session.invalidateDerived();
-    const form = readForm(this.runtime, this.session, signal);
-    // The import names no widgets, so every page with a widget may have repainted.
-    const widgets = counts.applied > 0 ? form.fields.flatMap((field) => field.widgets) : [];
-    const { affectedPages, cacheDelta, opId, undoable } = formMutationMeta(
-      this.session.writeStamp(),
-      [],
-      widgets,
-    );
-    return { form, ...counts, meta: { affectedPages, cacheDelta, opId, undoable } };
   }
 
   repair(bakeAppearances: boolean, signal: AbortSignal): FormRepairResult {
@@ -682,10 +628,7 @@ export class FormMutator {
     calculate: FieldScriptWrite | null | undefined,
   ): OrderChange | null {
     if (calculate === undefined) return null;
-    const before = readCalculationOrder(
-      this.runtime,
-      acquireFormModel(this.runtime, this.session),
-    );
+    const before = readCalculationOrder(this.runtime, acquireFormModel(this.runtime, this.session));
     const listed = before.includes(fieldObjectNumber);
     const after =
       calculate === null
@@ -1096,18 +1039,6 @@ function assertListDefault(
   const optionValues = new Set(options.map((option) => option.value));
   const unknown = values.find((value) => !optionValues.has(value));
   if (unknown !== undefined) throw invalid(`'${unknown}' is not an option value of the list`);
-}
-
-/** `%FDF-…` payloads are FDF; anything starting with markup is XFDF. */
-function sniffFormat(bytes: Uint8Array): FormDataFormat {
-  for (let i = 0; i < Math.min(bytes.length, 64); i++) {
-    const c = bytes[i];
-    // Skip UTF-8 BOM and whitespace.
-    if (c === 0xef || c === 0xbb || c === 0xbf) continue;
-    if (c === 0x20 || c === 0x09 || c === 0x0a || c === 0x0d) continue;
-    return c === 0x3c /* '<' */ ? 'xfdf' : 'fdf';
-  }
-  return 'fdf';
 }
 
 /** Widgets are addressed by object number: a name or index address cannot join a field. */

@@ -47,6 +47,13 @@ export function authorizeCapability(authority: ChangeAuthority, capability: DocC
   }
 }
 
+/** Whether the caller may use `capability`: what {@link authorizeCapability} checks, as a yes or no. */
+export function allowsCapability(authority: ChangeAuthority, capability: DocCapability): boolean {
+  const { grants, protection } = authority;
+  if (protection && protectedCapabilities(protection).has(capability)) return false;
+  return !grants || checkCapability(capability, grants.scope, grants.pdfBits, protection);
+}
+
 /**
  * Check only that no signature in the document took `capability` away
  * (`ProtectedDocument`). Annotation creates, updates and deletes take this

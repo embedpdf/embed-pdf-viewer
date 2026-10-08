@@ -13,7 +13,6 @@ import { annotationKey } from '../identity/annotationKey';
 import { toFieldRef } from '../identity/FormFieldRef';
 import { toPageRef } from '../identity/PageRef';
 import {
-  FormImportResultSchema,
   FormRepairResultSchema,
   FormResetResultSchema,
   FormSetValueResultSchema,
@@ -373,51 +372,6 @@ export function runFormConformance(
         const after = await doc.forms.list();
         const radio = after.fields.find((field) => field.name === 'ntto_radio');
         if (radio?.family === 'radio') expect(radio.value).toBe('x');
-      } finally {
-        await doc.close();
-      }
-    });
-
-    test('round-trips form data across documents via XFDF and FDF', async () => {
-      const first = await open(opts.fixtures.toggleFields);
-      let second: DocumentHandle | null = null;
-      try {
-        // A second, independent copy of the same fixture (a dedicated
-        // fixture when the transport needs server-side state, else the same
-        // bytes under a suffixed id so the two sessions coexist).
-        second = opts.fixtures.importTarget
-          ? await open(opts.fixtures.importTarget)
-          : await open(opts.fixtures.toggleFields, '-import-target');
-        const tricky = 'a<b>&"c" \'d\'';
-        await first.forms.setValue({ kind: 'fqn', name: 'billing.name' }, { value: tricky });
-
-        const xfdf = await first.forms.export('xfdf');
-        expect(xfdf.format).toBe('xfdf');
-        expect(xfdf.bytes.length > 0).toBe(true);
-
-        const imported = await second!.forms.import(xfdf.bytes);
-        FormImportResultSchema.parse(imported);
-        expect(imported.skipped).toBe(0);
-        expect(imported.applied > 0).toBe(true);
-        const nested = imported.form.fields.find((f) => f.name === 'billing.name');
-        if (nested?.family === 'text') expect(nested.value).toBe(tricky);
-
-        const fdf = await first.forms.export('fdf');
-        expect(fdf.format).toBe('fdf');
-        const head = String.fromCharCode(...fdf.bytes.slice(0, 5));
-        expect(head).toBe('%FDF-');
-      } finally {
-        await first.close();
-        if (second) await second.close();
-      }
-    });
-
-    test('rejects garbage import payloads', async () => {
-      const doc = await open(opts.fixtures.toggleFields);
-      try {
-        await expect(
-          doc.forms.import(new TextEncoder().encode('not a form payload')),
-        ).rejects.toMatchObject({ code: EngineErrorCode.InvalidArg });
       } finally {
         await doc.close();
       }
@@ -785,7 +739,9 @@ export function runFormConformance(
         expect(field.family).toBe('pushbutton');
         const widget = field.widgets[0]!.ref!;
         const rowOf = async (ref: AnnotationRef) =>
-          (await doc.forms.list()).widgets.find((w) => annotationKey(w.ref) === annotationKey(ref))!;
+          (await doc.forms.list()).widgets.find(
+            (w) => annotationKey(w.ref) === annotationKey(ref),
+          )!;
         let row = await rowOf(widget);
         expect(row).toMatchObject({
           fieldFamily: 'pushbutton',
@@ -796,9 +752,9 @@ export function runFormConformance(
         expect(row.actions?.activate?.root?.type).toBe('reset-form');
 
         // A push button holds no value: the value writes refuse it.
-        await expect(
-          doc.forms.setValue(field.ref, { value: 'x' }),
-        ).rejects.toMatchObject({ code: EngineErrorCode.InvalidArg });
+        await expect(doc.forms.setValue(field.ref, { value: 'x' })).rejects.toMatchObject({
+          code: EngineErrorCode.InvalidArg,
+        });
         // Its field takes the settings every field has, and no family's own.
         await doc.forms.update(field.ref, { alternateName: 'Clears every field' });
         await expect(doc.forms.update(field.ref, { multiline: true })).rejects.toMatchObject({
@@ -814,9 +770,11 @@ export function runFormConformance(
           actions: { focus: { type: 'reset-form', fields: null, exclude: false } },
         });
         const sentBack = await doc.forms.updateWidget(widget, { ...(await rowOf(widget)) });
-        expect(
-          [moved, restyled, sentBack].map((result) => result.appearance.action),
-        ).toEqual(['preserved', 'preserved', 'preserved']);
+        expect([moved, restyled, sentBack].map((result) => result.appearance.action)).toEqual([
+          'preserved',
+          'preserved',
+          'preserved',
+        ]);
 
         // The caption changes with the widget, and undo puts it back.
         const renamed = await doc.forms.updateWidget(widget, { caption: 'Start over' });

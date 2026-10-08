@@ -49,6 +49,8 @@ import type { Coordinates, PageCoordinates } from '../pageSpace/coordinates';
 import type { SignatureAppearanceInput } from '../signature/types';
 import type { WireAnnotationBundle } from '../transfer/AnnotationBundle';
 import type { AnnotationImportResult } from '../transfer/annotationImport';
+import type { WireFormBundle } from '../transfer/FormBundle';
+import type { FormImportResult, FormValuesImportResult } from '../transfer/formImport';
 import type { BundleImportPages } from '../transfer/bundle';
 import type { BundleLimits } from '../transfer/bundleLimits';
 
@@ -222,10 +224,38 @@ export interface AnnotationImportOp {
   readonly limits: BundleLimits;
 }
 
+/**
+ * A form import, as the one op of its change: `doc.forms.import` (the
+ * design) or `doc.forms.importValues` (the values). Like an annotation
+ * import, only its verb makes one.
+ */
+export interface FormImportOp {
+  readonly type: 'forms.import' | 'forms.importValues';
+  /** In page space, its resources as bytes. */
+  readonly bundle: WireFormBundle;
+  /** A design import's: where each page of the bundle goes. */
+  readonly pages?: BundleImportPages;
+  readonly attribution: 'restore' | 'stamp';
+  /** A design import's: whether each field gets the bundle's value. */
+  readonly values?: boolean;
+  /**
+   * Whom `'stamp'` makes the creator and filler, as `create` and `setValue`
+   * do, and whose user `'restore'` records as `importedBy`.
+   */
+  readonly actor?: AnnotationActor;
+  readonly limits: BundleLimits;
+  /**
+   * A design import's: whether the caller holds `doc.forms.script`, which
+   * the verb checked. Without it, scripts, submits and links are left out.
+   */
+  readonly mayScript?: boolean;
+}
+
 /** An op of a change the engine runs and records: one `doc.apply` takes, or an import. */
 export type RecordedOp<C extends Coordinates = PageCoordinates, R = AnnotationResources> =
   | ChangeOp<C, R>
-  | AnnotationImportOp;
+  | AnnotationImportOp
+  | FormImportOp;
 
 /** A change as the engine runs and records it: its ops, an import among them, or an undo. */
 export type RecordedChange<C extends Coordinates = PageCoordinates, R = AnnotationResources> =
@@ -269,6 +299,9 @@ export type ChangeItem<C extends Coordinates = PageCoordinates> =
   | ({ type: 'annotations.reorder'; page: PageRef } & AnnotationReorderResult)
   /** An import's answer: only `doc.annotations.import` answers one. */
   | ({ type: 'annotations.import' } & AnnotationImportResult<C>)
+  /** A form import's answer: only `doc.forms.import` and `doc.forms.importValues` answer one. */
+  | ({ type: 'forms.import' } & FormImportResult<C>)
+  | ({ type: 'forms.importValues' } & FormValuesImportResult<C>)
   | {
       type: 'annotations.restore';
       page: PageRef;
@@ -330,11 +363,20 @@ export function isSkippedItem<C extends Coordinates>(
 
 /**
  * Whether an item wrote to the document: not an op an undo left alone, nor
- * an import that left every item of its bundle out.
+ * an import that left every row of its bundle out.
  */
 export function itemWrote<C extends Coordinates>(item: ChangeItem<C>): boolean {
-  if (isSkippedItem(item)) return false;
-  return item.type !== 'annotations.import' || item.annotations.length > 0;
+  switch (item.type) {
+    case 'skipped':
+      return false;
+    case 'annotations.import':
+      return item.annotations.length > 0;
+    case 'forms.import':
+    case 'forms.importValues':
+      return item.fields.length > 0;
+    default:
+      return true;
+  }
 }
 
 /** What `doc.apply` resolves. */

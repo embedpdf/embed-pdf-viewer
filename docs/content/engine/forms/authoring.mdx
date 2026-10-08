@@ -416,4 +416,5 @@ A certified document doesn't allow changes to its fields: these calls fail with
   look in the file is in
   [Checkboxes with several widgets](/docs/engine/forms#checkboxes-with-several-widgets).
 - **Names and groups.** `billing.name` and `billing.email` are two fields in a group `billing`.
-  `list()` returns the two fields, not the group; XFDF nests them under it.
+  `list()` returns the two fields, not the group, and an import makes the group again from the
+  names.
