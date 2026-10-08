@@ -1,22 +1,28 @@
 import {
+  assertBundlePages,
+  assertKnownFields,
+  assertResourceIds,
+  assertResourcesNamed,
+  assertRowResources,
+  invalidBundle,
+  isBundlePageRef,
+  isRecord,
+  type BundlePage,
+  type ResourceId,
+} from './bundle';
+import {
   assertWithinLimit,
-  DEFAULT_ANNOTATION_BUNDLE_LIMITS,
+  DEFAULT_BUNDLE_LIMITS,
   manifestBytesOf,
-  type AnnotationBundleLimits,
+  type BundleLimits,
 } from './bundleLimits';
 import type { Annotation } from '../annotation/kinds';
 import {
   ANNOTATION_RESOURCE_ROLE_NAMES,
   type AnnotationResourceRole,
 } from '../annotation/resources';
-import { EngineError } from '../errors/EngineError';
-import { EngineErrorCode } from '../errors/EngineErrorCode';
-import type { PdfSize } from '../geometry/primitives';
-import { encodePageKey, type PageRef } from '../identity/PageRef';
+import { encodePageKey } from '../identity/PageRef';
 import type { Coordinates, PageCoordinates } from '../pageSpace/coordinates';
-
-/** A resource's name in a bundle: `sha256-` and the SHA-256 of its bytes, lowercase hex. */
-export type ResourceId = `sha256-${string}`;
 
 /**
  * Annotations and the bytes beside them, taken out of a document to go into
@@ -30,22 +36,10 @@ export interface AnnotationBundle<C extends Coordinates = PageCoordinates> {
   readonly format: 'embedpdf/annotations';
   readonly version: 1;
   /** Every page an item is on or points at, in document order. */
-  readonly pages: readonly AnnotationBundlePage[];
+  readonly pages: readonly BundlePage[];
   /** In page order, then in each page's annotation order. */
   readonly items: readonly AnnotationBundleItem<C>[];
   readonly resources: Readonly<Record<ResourceId, Uint8Array>>;
-}
-
-export interface AnnotationBundlePage {
-  readonly page: PageRef;
-  /** Where the page is in its document, for mapping pages by position; never a reference. */
-  readonly position: number;
-  /**
-   * The page's size, as its layout reports it. Positions are measured from
-   * the page's top-left, so an import puts each annotation at the same spot
-   * from the top-left of the page it goes to.
-   */
-  readonly size: PdfSize;
 }
 
 export interface AnnotationBundleItem<C extends Coordinates = PageCoordinates> {
@@ -64,20 +58,11 @@ export interface WireAnnotationBundle<C extends Coordinates = PageCoordinates> e
 export const ANNOTATION_BUNDLE_FORMAT = 'embedpdf/annotations';
 export const ANNOTATION_BUNDLE_VERSION = 1;
 
-const RESOURCE_ID_PATTERN = /^sha256-[0-9a-f]{64}$/;
-const BUNDLE_FIELDS = ['format', 'version', 'pages', 'items', 'resources'] as const;
-const PAGE_FIELDS = ['page', 'position', 'size'] as const;
-const ITEM_FIELDS = ['data', 'resources'] as const;
+/** The manifest's keys, in the order a file writes them. */
+export const ANNOTATION_BUNDLE_KEYS = ['format', 'version', 'pages', 'items'] as const;
 
-/** The id of a resource: the SHA-256 of its bytes. */
-export async function resourceIdOf(bytes: Uint8Array): Promise<ResourceId> {
-  const digest = new Uint8Array(
-    await crypto.subtle.digest('SHA-256', bytes as Uint8Array<ArrayBuffer>),
-  );
-  let hex = '';
-  for (const byte of digest) hex += byte.toString(16).padStart(2, '0');
-  return `sha256-${hex}`;
-}
+const BUNDLE_FIELDS = [...ANNOTATION_BUNDLE_KEYS, 'resources'] as const;
+const ITEM_FIELDS = ['data', 'resources'] as const;
 
 /**
  * Check a bundle before anything uses it, the checks cheapest first: its
@@ -86,16 +71,18 @@ export async function resourceIdOf(bytes: Uint8Array): Promise<ResourceId> {
  */
 export async function assertAnnotationBundle(
   bundle: AnnotationBundle,
-  limits: AnnotationBundleLimits = DEFAULT_ANNOTATION_BUNDLE_LIMITS,
+  limits: BundleLimits = DEFAULT_BUNDLE_LIMITS,
 ): Promise<void> {
-  const resources = isRecord(bundle?.resources) ? bundle.resources : invalid('no resources');
+  const resources = isRecord(bundle?.resources)
+    ? bundle.resources
+    : invalidBundle('annotation', 'no resources');
   const sizes = new Map<string, number>();
   for (const [id, bytes] of Object.entries(resources)) {
-    if (!(bytes instanceof Uint8Array)) invalid(`resource ${id} is not bytes`);
+    if (!(bytes instanceof Uint8Array)) invalidBundle('annotation', `resource ${id} is not bytes`);
     sizes.set(id, bytes.length);
   }
-  assertBundleManifest(bundle, sizes, limits);
-  await assertResourceIds(resources);
+  assertAnnotationBundleManifest(bundle, sizes, limits);
+  await assertResourceIds('annotation', resources);
 }
 
 /**
@@ -103,123 +90,54 @@ export async function assertAnnotationBundle(
  * and version, counts, sizes, the shape of pages and items, and that items
  * and resources name each other exactly.
  */
-export function assertBundleManifest(
+export function assertAnnotationBundleManifest(
   manifest: unknown,
   resourceSizes: ReadonlyMap<string, number>,
-  limits: AnnotationBundleLimits,
+  limits: BundleLimits,
 ): asserts manifest is Omit<AnnotationBundle, 'resources'> {
-  if (!isRecord(manifest)) invalid('not an annotation bundle');
-  assertKnownFields('the bundle', manifest, BUNDLE_FIELDS);
+  if (!isRecord(manifest)) invalidBundle('annotation', 'not an annotation bundle');
+  assertKnownFields('annotation', 'the bundle', manifest, BUNDLE_FIELDS);
   if (manifest.format !== ANNOTATION_BUNDLE_FORMAT) {
-    invalid(`unknown format ${JSON.stringify(manifest.format)}`);
+    invalidBundle('annotation', `unknown format ${JSON.stringify(manifest.format)}`);
   }
   if (manifest.version !== ANNOTATION_BUNDLE_VERSION) {
-    invalid(`unknown version ${JSON.stringify(manifest.version)}`);
+    invalidBundle('annotation', `unknown version ${JSON.stringify(manifest.version)}`);
   }
   const { pages, items } = manifest;
-  if (!Array.isArray(pages)) invalid('pages is not a list');
-  if (!Array.isArray(items)) invalid('items is not a list');
+  if (!Array.isArray(pages)) invalidBundle('annotation', 'pages is not a list');
+  if (!Array.isArray(items)) invalidBundle('annotation', 'items is not a list');
 
-  assertWithinLimit(limits, 'items', items.length);
-  assertWithinLimit(limits, 'pages', pages.length);
-  assertWithinLimit(limits, 'resources', resourceSizes.size);
+  assertWithinLimit('annotation', limits, 'items', items.length);
+  assertWithinLimit('annotation', limits, 'pages', pages.length);
+  assertWithinLimit('annotation', limits, 'resources', resourceSizes.size);
   let bundleBytes = manifestBytesOf({ pages, items });
-  assertWithinLimit(limits, 'manifestBytes', bundleBytes);
+  assertWithinLimit('annotation', limits, 'manifestBytes', bundleBytes);
   for (const size of resourceSizes.values()) {
-    assertWithinLimit(limits, 'resourceBytes', size);
+    assertWithinLimit('annotation', limits, 'resourceBytes', size);
     bundleBytes += size;
   }
-  assertWithinLimit(limits, 'bundleBytes', bundleBytes);
+  assertWithinLimit('annotation', limits, 'bundleBytes', bundleBytes);
 
-  const pageKeys = new Set<string>();
-  const positions = new Set<number>();
-  for (const entry of pages) {
-    if (!isRecord(entry) || !isPageRef(entry.page) || !isSize(entry.size)) {
-      invalid('a page needs a page ref, a position and a size');
-    }
-    assertKnownFields('a page', entry, PAGE_FIELDS);
-    const { position } = entry;
-    if (!Number.isInteger(position) || (position as number) < 0) {
-      invalid(`page position ${JSON.stringify(position)} is not a position`);
-    }
-    const key = encodePageKey(entry.page);
-    if (pageKeys.has(key)) invalid(`page ${key} is listed twice`);
-    if (positions.has(position as number)) invalid(`position ${position} is listed twice`);
-    pageKeys.add(key);
-    positions.add(position as number);
-  }
-
+  const pageKeys = assertBundlePages('annotation', pages);
   const named = new Set<string>();
   items.forEach((item, index) => {
     if (!isRecord(item) || !isRecord(item.data) || typeof item.data.subtype !== 'string') {
-      invalid(`item ${index} has no annotation data`);
+      invalidBundle('annotation', `item ${index} has no annotation data`);
     }
-    assertKnownFields(`item ${index}`, item, ITEM_FIELDS);
+    assertKnownFields('annotation', `item ${index}`, item, ITEM_FIELDS);
     const ref = item.data.ref;
     const page = isRecord(ref) ? ref.page : undefined;
-    if (!isPageRef(page) || !pageKeys.has(encodePageKey(page))) {
-      invalid(`item ${index} is on a page the bundle doesn't list`);
+    if (!isBundlePageRef(page) || !pageKeys.has(encodePageKey(page))) {
+      invalidBundle('annotation', `item ${index} is on a page the bundle doesn't list`);
     }
-    if (!isRecord(item.resources)) invalid(`item ${index} has no resources`);
-    for (const [role, id] of Object.entries(item.resources)) {
-      if (!(ANNOTATION_RESOURCE_ROLE_NAMES as readonly string[]).includes(role)) {
-        invalid(`item ${index} names an unknown resource role '${role}'`);
-      }
-      if (typeof id !== 'string' || !RESOURCE_ID_PATTERN.test(id)) {
-        invalid(`item ${index} names ${JSON.stringify(id)}, which is not a resource id`);
-      }
-      if (!resourceSizes.has(id))
-        invalid(`item ${index} names ${id}, which the bundle doesn't hold`);
-      named.add(id);
-    }
+    assertRowResources(
+      'annotation',
+      `item ${index}`,
+      item.resources,
+      ANNOTATION_RESOURCE_ROLE_NAMES,
+      resourceSizes,
+      named,
+    );
   });
-  for (const id of resourceSizes.keys()) {
-    if (!RESOURCE_ID_PATTERN.test(id)) invalid(`${JSON.stringify(id)} is not a resource id`);
-    if (!named.has(id)) invalid(`resource ${id} is named by no item`);
-  }
-}
-
-/** Every resource's bytes hash to its id. */
-export async function assertResourceIds(
-  resources: Readonly<Record<string, Uint8Array>>,
-): Promise<void> {
-  for (const [id, bytes] of Object.entries(resources)) {
-    if ((await resourceIdOf(bytes)) !== id) invalid(`resource ${id} doesn't match its id`);
-  }
-}
-
-function assertKnownFields(
-  what: string,
-  value: Record<string, unknown>,
-  fields: readonly string[],
-): void {
-  for (const field of Object.keys(value)) {
-    if (!fields.includes(field)) invalid(`${what} has an unknown field '${field}'`);
-  }
-}
-
-function invalid(message: string): never {
-  throw new EngineError(EngineErrorCode.InvalidArg, `annotation bundle: ${message}`);
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-function isPageRef(value: unknown): value is PageRef {
-  return (
-    isRecord(value) &&
-    value.kind === 'objectNumber' &&
-    Number.isInteger(value.objectNumber) &&
-    (value.objectNumber as number) > 0
-  );
-}
-
-function isSize(value: unknown): value is PdfSize {
-  return (
-    isRecord(value) &&
-    [value.width, value.height].every(
-      (length) => typeof length === 'number' && Number.isFinite(length) && length >= 0,
-    )
-  );
+  assertResourcesNamed('annotation', 'item', resourceSizes, named);
 }

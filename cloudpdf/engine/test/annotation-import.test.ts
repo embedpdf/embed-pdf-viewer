@@ -2,11 +2,11 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import {
-  DEFAULT_ANNOTATION_BUNDLE_LIMITS,
+  DEFAULT_BUNDLE_LIMITS,
   resourceIdOf,
   toPageRef,
   type AnnotationBundle,
-  type AnnotationBundleLimits,
+  type BundleLimits,
   type DocumentEvent,
   type ResourceId,
 } from '@embedpdf/engine-core/runtime';
@@ -194,8 +194,8 @@ describe('annotation import on the cloud engine', () => {
 });
 
 describe('the server holds the bundle limits while the request streams in', () => {
-  const limits: AnnotationBundleLimits = {
-    ...DEFAULT_ANNOTATION_BUNDLE_LIMITS,
+  const limits: BundleLimits = {
+    ...DEFAULT_BUNDLE_LIMITS,
     manifestBytes: 6000,
     resourceBytes: 3000,
     resources: 2,
@@ -206,7 +206,7 @@ describe('the server holds the bundle limits while the request streams in', () =
   beforeAll(async () => {
     small = await buildDbSeededFixture({
       secret: 'cloud-annotation-import-limits-secret',
-      annotationBundleLimits: limits,
+      bundleLimits: limits,
     });
   });
 
@@ -254,7 +254,7 @@ describe('the server holds the bundle limits while the request streams in', () =
         return { ...base, items, resources };
       };
 
-      const refused = async (bundle: AnnotationBundle, limit: keyof AnnotationBundleLimits) =>
+      const refused = async (bundle: AnnotationBundle, limit: keyof BundleLimits) =>
         expect(doc.annotations.import(bundle, { attribution: 'stamp' })).rejects.toMatchObject({
           code: 'PayloadTooLarge',
           details: { limit, max: limits[limit] },

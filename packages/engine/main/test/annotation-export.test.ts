@@ -3,9 +3,9 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import {
-  DEFAULT_ANNOTATION_BUNDLE_LIMITS,
+  DEFAULT_BUNDLE_LIMITS,
   EngineErrorCode,
-  type AnnotationBundleLimits,
+  type BundleLimits,
   type WirePack,
   type WorkerRequest,
   type WorkerResponse,
@@ -128,13 +128,13 @@ describe('annotation export on the local engine', () => {
     });
     expect(opened.kind).toBe('resolve');
 
-    const exported = (limits: Partial<AnnotationBundleLimits>) =>
+    const exported = (limits: Partial<BundleLimits>) =>
       send({
         kind: 'annotations.export',
         effect: 'snapshot',
         docId: 'limits',
         selection: {},
-        limits: { ...DEFAULT_ANNOTATION_BUNDLE_LIMITS, ...limits },
+        limits: { ...DEFAULT_BUNDLE_LIMITS, ...limits },
       });
     const whole = await exported({});
     expect(whole.kind).toBe('resolve');

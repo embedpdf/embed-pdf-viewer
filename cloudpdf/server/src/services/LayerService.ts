@@ -29,9 +29,9 @@ import {
   type ChangeRecordPayload,
   type PageCoordinates,
   type ServerChangeOutcome,
-  type AnnotationBundleLimits,
+  type BundleLimits,
   type AnnotationCreateResult,
-  type AnnotationImportPages,
+  type BundleImportPages,
   type AnnotationImportResult,
   type AnnotationDeleteResult,
   type AnnotationDraft,
@@ -477,11 +477,11 @@ export class LayerService {
       docId: string;
       layerName: string;
       bundle: WireAnnotationBundle;
-      pages?: AnnotationImportPages;
+      pages?: BundleImportPages;
       attribution: 'restore' | 'stamp';
       /** The caller's identity, which `'stamp'` attributes each annotation to. */
       actor?: AnnotationActor;
-      limits: AnnotationBundleLimits;
+      limits: BundleLimits;
     },
     signal?: AbortSignal,
   ): Promise<AnnotationImportResult> {

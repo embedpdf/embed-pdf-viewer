@@ -1,7 +1,7 @@
 import { EngineError, EngineErrorCode } from '@embedpdf/engine-core/runtime';
 import type { PdfFunctions, PdfRuntimeMemory, Ptr } from '@embedpdf/engine-runtime';
 
-import { withScratchN } from '../../../runtime/memory/scratch';
+import { withScratchN } from './memory/scratch';
 
 /** `EPDF_DIGEST_SHA256` from `public/epdf_digest.h`. */
 const EPDF_DIGEST_SHA256 = 1;

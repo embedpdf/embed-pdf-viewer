@@ -359,8 +359,8 @@ export const DocumentSecurityStateSchema: z.ZodType<DocumentSecurityState> = z.o
 
 const positiveCount = z.number().int().positive();
 
-/** See `AnnotationBundleLimits`. */
-export const AnnotationBundleLimitsSchema = z
+/** See `BundleLimits`. */
+export const BundleLimitsSchema = z
   .object({
     bundleBytes: positiveCount,
     manifestBytes: positiveCount,
@@ -474,8 +474,8 @@ export const AccessResponseSchema = z.object({
       enforced: z.boolean(),
     })
     .optional(),
-  /** The deployment's limits for an annotation import (see `AnnotationBundleLimits`). */
-  annotationBundleLimits: AnnotationBundleLimitsSchema,
+  /** The deployment's limits for an annotation import (see `BundleLimits`). */
+  bundleLimits: BundleLimitsSchema,
   /** The caller's editing session (see `DocumentAccessInfo.edit`). */
   edit: EditSessionAccessSchema.optional(),
 });

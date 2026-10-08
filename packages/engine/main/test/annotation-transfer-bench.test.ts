@@ -7,7 +7,7 @@
 import { describe, expect, test } from 'vitest';
 import {
   AnnotationTransfer,
-  DEFAULT_ANNOTATION_BUNDLE_LIMITS,
+  DEFAULT_BUNDLE_LIMITS,
   manifestBytesOf,
   type AnnotationBundle,
 } from '@embedpdf/engine-core/runtime';
@@ -84,7 +84,7 @@ describe.skipIf(!ENABLED).each(['wasm', 'native'] as const)(
     }, 600_000);
 
     describe.skipIf(!LIMITS)('a bundle at each default limit', () => {
-      const limits = DEFAULT_ANNOTATION_BUNDLE_LIMITS;
+      const limits = DEFAULT_BUNDLE_LIMITS;
 
       test(`items: ${limits.items} mixed annotations over 200 pages`, async () => {
         const engine = await createLocalEngine({ runtime: { prefer } });

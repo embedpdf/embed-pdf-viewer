@@ -16,7 +16,8 @@ import type { PageBox } from '../geometry/pageSpace';
 import { annotationKey } from '../identity/annotationKey';
 import type { AnnotationRef } from '../identity/AnnotationRef';
 import { encodePageKey, toPageRef, type PageRef } from '../identity/PageRef';
-import { resourceIdOf, type AnnotationBundle } from '../transfer/AnnotationBundle';
+import type { AnnotationBundle } from '../transfer/AnnotationBundle';
+import { resourceIdOf } from '../transfer/bundle';
 import type { AnnotationImportResult } from '../transfer/annotationImport';
 
 /**

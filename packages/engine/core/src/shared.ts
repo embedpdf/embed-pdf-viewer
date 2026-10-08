@@ -279,13 +279,24 @@ export {
 } from './annotation/resources';
 export { normalizeAttachmentFileSource } from './dto/normalizeAttachmentFileSource';
 
-// Annotation bundles: annotations and their resources, to move between
-// documents in one call, and the JSON file that holds one.
+// Bundles: rows and their resources, to move between documents in one call,
+// and the JSON file that holds one. What every family shares, then
+// annotations.
+export type {
+  BundleImportPages,
+  BundleImportTarget,
+  BundleKind,
+  BundlePage,
+  ResourceId,
+} from './transfer/bundle';
+export { bundlePageMapping, resourceIdOf } from './transfer/bundle';
+export type { BundleLimits } from './transfer/bundleLimits';
+export { assertWithinLimit, DEFAULT_BUNDLE_LIMITS, manifestBytesOf } from './transfer/bundleLimits';
+export type { BundleCodec, BundleFileSpec, BundleTransferOptions } from './transfer/codec';
+export { bundleCodec } from './transfer/codec';
 export type {
   AnnotationBundle,
   AnnotationBundleItem,
-  AnnotationBundlePage,
-  ResourceId,
   WireAnnotationBundle,
 } from './transfer/AnnotationBundle';
 export type { AnnotationExportSelection } from './transfer/exportSelection';
@@ -294,10 +305,8 @@ export type {
   AnnotationImportDrop,
   AnnotationImportOptions,
   AnnotationImportManifest,
-  AnnotationImportPages,
   AnnotationImportPlan,
   AnnotationImportResult,
-  AnnotationImportTarget,
   PlannedAnnotation,
 } from './transfer/annotationImport';
 export { annotationImportFacts, planAnnotationImport } from './transfer/annotationImport';
@@ -305,16 +314,8 @@ export { closeExportSelection } from './transfer/exportSelection';
 export { mapPageRefs, pageRefsIn } from './transfer/pageRefs';
 export {
   assertAnnotationBundle,
-  assertBundleManifest,
-  resourceIdOf,
+  assertAnnotationBundleManifest,
 } from './transfer/AnnotationBundle';
-export type { AnnotationBundleLimits } from './transfer/bundleLimits';
-export {
-  assertWithinLimit,
-  DEFAULT_ANNOTATION_BUNDLE_LIMITS,
-  manifestBytesOf,
-} from './transfer/bundleLimits';
-export type { AnnotationTransferOptions } from './transfer/AnnotationTransfer';
 export { AnnotationTransfer } from './transfer/AnnotationTransfer';
 
 // Attachment vocabulary — one set of file metadata fields shared by the

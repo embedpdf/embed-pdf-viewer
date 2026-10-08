@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import type { AnnotationBundleLimits, Identity } from '@embedpdf/engine-core';
+import type { BundleLimits, Identity } from '@embedpdf/engine-core';
 import type { Kysely } from 'kysely';
 import {
   createSqliteDb,
@@ -38,7 +38,7 @@ export interface DbSeededFixture {
 }
 
 export async function buildDbSeededFixture(
-  opts: { secret: string; annotationBundleLimits?: AnnotationBundleLimits } = {
+  opts: { secret: string; bundleLimits?: BundleLimits } = {
     secret: 'cloud-test-secret',
   },
 ): Promise<DbSeededFixture> {
@@ -58,7 +58,7 @@ export async function buildDbSeededFixture(
     sweepIntervalMs: 0,
     cacheRoot,
     cacheMaxBytes: 4 * 1024 * 1024,
-    ...(opts.annotationBundleLimits ? { annotationBundleLimits: opts.annotationBundleLimits } : {}),
+    ...(opts.bundleLimits ? { bundleLimits: opts.bundleLimits } : {}),
   });
   const addr = await bundle.app.listen({ host: '127.0.0.1', port: 0 });
   const baseUrl = typeof addr === 'string' ? addr : `http://127.0.0.1:${addr}`;

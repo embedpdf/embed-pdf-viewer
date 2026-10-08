@@ -2,10 +2,10 @@ import { TextDecoder } from 'node:util';
 
 import { adminOperations, adminWirePaths } from '@cloudpdf/contract';
 import {
-  DEFAULT_ANNOTATION_BUNDLE_LIMITS,
+  DEFAULT_BUNDLE_LIMITS,
   EngineError,
   EngineErrorCode,
-  type AnnotationBundleLimits,
+  type BundleLimits,
   formatObjectNumberRanges,
 } from '@embedpdf/engine-core/runtime';
 import compress from '@fastify/compress';
@@ -167,9 +167,9 @@ export interface BuildAppOptions {
   bodyLimit?: number;
   /**
    * How large an annotation bundle may be, exported or imported. Defaults to
-   * `DEFAULT_ANNOTATION_BUNDLE_LIMITS`.
+   * `DEFAULT_BUNDLE_LIMITS`.
    */
-  annotationBundleLimits?: AnnotationBundleLimits;
+  bundleLimits?: BundleLimits;
   /** Origin-mediated upload policy. Defaults to `fallback-only`. */
   uploadProxyPolicy?: UploadProxyPolicy;
   /**
@@ -1353,7 +1353,7 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
         ...(derivedRenders ? { derivedRenders } : {}),
         ...(usageMeters ? { usageMeters } : {}),
         tenantUsage: new TenantUsageRepo(opts.db),
-        annotationBundleLimits: opts.annotationBundleLimits ?? DEFAULT_ANNOTATION_BUNDLE_LIMITS,
+        bundleLimits: opts.bundleLimits ?? DEFAULT_BUNDLE_LIMITS,
       });
       await registerObjectNumberRoutes(app, { documentService, layerService });
       await registerChangeRoutes(app, { documentService, layerService });
@@ -1382,7 +1382,7 @@ async function buildAppUnchecked(opts: BuildAppOptions): Promise<AppBundle> {
         imageEncoder: new SharpImageEncoder(),
         ...(opts.encodeInEngine !== undefined ? { encodeInEngine: opts.encodeInEngine } : {}),
         ...(derivedRenders ? { derivedRenders } : {}),
-        ...(opts.annotationBundleLimits ? { bundleLimits: opts.annotationBundleLimits } : {}),
+        ...(opts.bundleLimits ? { bundleLimits: opts.bundleLimits } : {}),
       });
       await registerFormRoutes(app, {
         documentService,

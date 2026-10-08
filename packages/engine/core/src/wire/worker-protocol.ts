@@ -91,8 +91,9 @@ import type {
   SignedDocumentPolicy,
 } from '../signature/types';
 import type { WireAnnotationBundle } from '../transfer/AnnotationBundle';
-import type { AnnotationImportPages, AnnotationImportResult } from '../transfer/annotationImport';
-import type { AnnotationBundleLimits } from '../transfer/bundleLimits';
+import type { AnnotationImportResult } from '../transfer/annotationImport';
+import type { BundleImportPages } from '../transfer/bundle';
+import type { BundleLimits } from '../transfer/bundleLimits';
 import type { AnnotationExportSelection } from '../transfer/exportSelection';
 
 /**
@@ -622,7 +623,7 @@ export interface AnnotationsExportWorkerRequest {
   layerName?: string;
   selection: AnnotationExportSelection;
   /** The limits the bundle must stay within; the defaults otherwise. */
-  limits?: AnnotationBundleLimits;
+  limits?: BundleLimits;
 }
 
 /**
@@ -638,7 +639,7 @@ export interface AnnotationsImportWorkerRequest extends WriteJobFields {
   docId: string;
   layerName?: string;
   bundle: WireAnnotationBundle;
-  pages?: AnnotationImportPages;
+  pages?: BundleImportPages;
   attribution: 'restore' | 'stamp';
   /**
    * The session: who `'stamp'` attributes each annotation to, as on create,
@@ -646,7 +647,7 @@ export interface AnnotationsImportWorkerRequest extends WriteJobFields {
    */
   actor?: AnnotationActor;
   /** The limits the bundle must stay within; the defaults otherwise. */
-  limits?: AnnotationBundleLimits;
+  limits?: BundleLimits;
   artifactPath?: string;
 }
 

@@ -1,4 +1,5 @@
 import type { AnnotationBundle } from './AnnotationBundle';
+import { bundlePageMapping, type BundleImportPages, type BundleImportTarget } from './bundle';
 import { mapPageRefs, pageRefsIn } from './pageRefs';
 import {
   AnnotationDraftSchema,
@@ -20,24 +21,12 @@ import type { WriteOptions } from '../mutation/WriteOptions';
 import type { Coordinates, PageCoordinates } from '../pageSpace/coordinates';
 
 /**
- * Where an import puts each page of the bundle:
- *
- * - `'same'` (the default): each page ref as it is;
- * - `'by-position'`: a bundle page to the page at its `position`;
- * - a list: exactly the pairs given.
- */
-export type AnnotationImportPages =
-  | 'same'
-  | 'by-position'
-  | ReadonlyArray<{ readonly from: PageRef; readonly to: PageRef }>;
-
-/**
  * How to import. The `opId` names the import: its events share it as
  * `origin.tx.id`, and on the cloud a retry with the same id applies once.
  */
 export interface AnnotationImportOptions extends WriteOptions {
   /** Default `'same'`. A page an item is on or points at that maps nowhere refuses the import. */
-  readonly pages?: AnnotationImportPages;
+  readonly pages?: BundleImportPages;
   /**
    * `'restore'` (the default) writes the authors, dates and names (`nm`) as
    * the bundle has them, and needs `doc.annotate.import`; an item whose name
@@ -134,12 +123,6 @@ export function annotationImportFacts(
   });
 }
 
-/** A page of the target document: its ref and where it is. */
-export interface AnnotationImportTarget {
-  readonly page: PageRef;
-  readonly position: number;
-}
-
 /** One annotation an import creates. */
 export interface PlannedAnnotation {
   /** Its item in the bundle. */
@@ -184,29 +167,18 @@ export interface AnnotationImportPlan {
  */
 export function planAnnotationImport(input: {
   readonly bundle: Pick<AnnotationBundle, 'pages' | 'items'>;
-  readonly pages?: AnnotationImportPages;
-  readonly target: readonly AnnotationImportTarget[];
+  readonly pages?: BundleImportPages;
+  readonly target: readonly BundleImportTarget[];
   readonly nameTaken: (page: PageRef, nm: string) => boolean;
 }): AnnotationImportPlan {
   const { bundle, target, nameTaken } = input;
   const items = bundle.items.map((item) => item.data);
-  const table = pageTable(bundle, input.pages ?? 'same', target);
-
-  const unmapped = new Set<string>();
-  for (const data of items) {
-    for (const page of pagesNamedBy(data)) {
-      if (!table.has(encodePageKey(page))) unmapped.add(encodePageKey(page));
-    }
-  }
-  if (unmapped.size > 0) {
-    const pages = [...unmapped];
-    throw new EngineError(
-      EngineErrorCode.InvalidArg,
-      `import: ${pages.length === 1 ? 'page' : 'pages'} ${pages.join(', ')} map to no page of this document`,
-      { details: { pages } },
-    );
-  }
-  const mapPage = (page: PageRef) => table.get(encodePageKey(page))!;
+  const mapPage = bundlePageMapping({
+    bundlePages: bundle.pages,
+    pages: input.pages ?? 'same',
+    target,
+    named: items.flatMap(pagesNamedBy),
+  });
 
   const drops = new Map<number, AnnotationDropReason>();
   const fieldDrops = new Map<number, Array<{ field: string; reason: AnnotationDropReason }>>();
@@ -314,44 +286,6 @@ export function planAnnotationImport(input: {
     else for (const drop of fieldDrops.get(index) ?? []) dropped.push({ ref: data.ref, ...drop });
   });
   return { creates, dropped };
-}
-
-/** Bundle page key → target page. */
-function pageTable(
-  bundle: Pick<AnnotationBundle, 'pages'>,
-  pages: AnnotationImportPages,
-  target: readonly AnnotationImportTarget[],
-): Map<string, PageRef> {
-  const targetByKey = new Map(target.map((entry) => [encodePageKey(entry.page), entry.page]));
-  const table = new Map<string, PageRef>();
-  if (pages === 'same') {
-    for (const entry of bundle.pages) {
-      const to = targetByKey.get(encodePageKey(entry.page));
-      if (to) table.set(encodePageKey(entry.page), to);
-    }
-  } else if (pages === 'by-position') {
-    const byPosition = new Map(target.map((entry) => [entry.position, entry.page]));
-    for (const entry of bundle.pages) {
-      const to = byPosition.get(entry.position);
-      if (to) table.set(encodePageKey(entry.page), to);
-    }
-  } else {
-    for (const { from, to } of pages) {
-      const key = encodePageKey(from);
-      if (table.has(key)) {
-        throw new EngineError(EngineErrorCode.InvalidArg, `import: page ${key} is mapped twice`);
-      }
-      const found = targetByKey.get(encodePageKey(to));
-      if (!found) {
-        throw new EngineError(
-          EngineErrorCode.NotFound,
-          `import: the document has no page ${encodePageKey(to)}`,
-        );
-      }
-      table.set(key, found);
-    }
-  }
-  return table;
 }
 
 /**

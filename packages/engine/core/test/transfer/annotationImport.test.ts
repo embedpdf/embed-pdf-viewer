@@ -4,11 +4,8 @@ import { EngineErrorCode } from '../../src/errors/EngineErrorCode';
 import type { AnnotationRef } from '../../src/identity/AnnotationRef';
 import { encodePageKey, toPageRef, type PageRef } from '../../src/identity/PageRef';
 import type { AnnotationBundle } from '../../src/transfer/AnnotationBundle';
-import {
-  planAnnotationImport,
-  type AnnotationImportPages,
-  type AnnotationImportTarget,
-} from '../../src/transfer/annotationImport';
+import { planAnnotationImport } from '../../src/transfer/annotationImport';
+import type { BundleImportPages, BundleImportTarget } from '../../src/transfer/bundle';
 
 const box = { x: 10, y: 10, width: 30, height: 20 };
 const size = { width: 612, height: 792 };
@@ -50,7 +47,7 @@ function bundleOf(...items: Annotation[]): Pick<AnnotationBundle, 'pages' | 'ite
 }
 
 /** The same two pages, at positions 0 and 4. */
-const sameDocument: AnnotationImportTarget[] = [
+const sameDocument: BundleImportTarget[] = [
   { page: first, position: 0 },
   { page: second, position: 4 },
 ];
@@ -58,8 +55,8 @@ const sameDocument: AnnotationImportTarget[] = [
 function plan(
   bundle: Pick<AnnotationBundle, 'pages' | 'items'>,
   options: {
-    pages?: AnnotationImportPages;
-    target?: AnnotationImportTarget[];
+    pages?: BundleImportPages;
+    target?: BundleImportTarget[];
     taken?: string[];
   } = {},
 ) {

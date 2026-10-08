@@ -4,11 +4,11 @@ import {
   EngineError,
   EngineErrorCode,
   ANNOTATION_RESOURCE_ROLE_NAMES,
-  DEFAULT_ANNOTATION_BUNDLE_LIMITS,
+  DEFAULT_BUNDLE_LIMITS,
   checkSetGroup,
   wirePack,
   type AnnotationActor,
-  type AnnotationBundleLimits,
+  type BundleLimits,
   type AnnotationDeleteResult,
   type AnnotationUpdateResult,
   type AnnotationDraft,
@@ -23,6 +23,7 @@ import {
   type WorkerJobId,
   type AnnotationAppearanceExportInput,
   type AnnotationFlattenInput,
+  type AnnotationImportManifest,
   toPageRef,
   PermissionDenied,
 } from '@embedpdf/engine-core/runtime';
@@ -35,6 +36,7 @@ import {
   decodeAnnotationAppearancesRenderToken,
   decodeAnnotationToken,
   decodeAnnotationsAllToken,
+  AnnotationImportManifestSchema,
   AnnotationsExportRequestSchema,
   decodeAnnotationsExportToken,
   type AnnotationsExportToken,
@@ -51,7 +53,7 @@ import {
   type SchemaLike,
   objectNumberQuery,
 } from './_helpers';
-import { readAnnotationImportRequest } from './_annotationImportRequest';
+import { readBundleImportRequest } from './_bundleImportRequest';
 import { renderAppearanceBatch, resolvePageForRead, type ReadScope } from './_appearanceBatch';
 import { buildMultipart, type MultipartPart } from './_multipart';
 import { readMutationEnvelope, type MutationEnvelope } from './_mutationEnvelope';
@@ -80,7 +82,7 @@ interface AnnotationRouteDeps {
   /** Render-lattice policy plane (absent = legacy compute-only). */
   derivedRenders?: DerivedRenderService;
   /** How large an exported or imported annotation bundle may be; the defaults otherwise. */
-  bundleLimits?: AnnotationBundleLimits;
+  bundleLimits?: BundleLimits;
 }
 
 export async function registerAnnotationRoutes(
@@ -89,7 +91,7 @@ export async function registerAnnotationRoutes(
 ): Promise<void> {
   const { documentService, layerService, imageEncoder, derivedRenders } = deps;
   const encodeInEngine = deps.encodeInEngine ?? true;
-  const bundleLimits = deps.bundleLimits ?? DEFAULT_ANNOTATION_BUNDLE_LIMITS;
+  const bundleLimits = deps.bundleLimits ?? DEFAULT_BUNDLE_LIMITS;
 
   // ── Plane-scoped doc-level reads: a base's own annotations —
   //    inline ones included — are simply visible through every
@@ -424,7 +426,11 @@ export async function registerAnnotationRoutes(
     const pdfBits = await documentService.getEffectivePdfBits(accessCtx, docId, layerName);
     const protection = await documentService.getProtection(accessCtx, docId, layerName);
     const limits = bundleLimits;
-    const { manifest, resources } = await readAnnotationImportRequest(req, limits);
+    const { manifest, resources } = await readBundleImportRequest(req, limits, {
+      kind: 'annotation',
+      manifestSchema:
+        AnnotationImportManifestSchema as unknown as SchemaLike<AnnotationImportManifest>,
+    });
     const attribution = manifest.options.attribution ?? 'restore';
 
     let ctx: ReturnType<typeof requireLayerCollabAction>;
@@ -1012,7 +1018,7 @@ async function readAnnotations(input: {
  */
 async function exportAnnotations(input: {
   documentService: DocumentService;
-  limits: AnnotationBundleLimits;
+  limits: BundleLimits;
   reply: FastifyReply;
   signal: AbortSignal;
   scope: ReadScope;

@@ -3,7 +3,7 @@ import type {
   MeasureSetScaleWorkerRequest,
 } from '@embedpdf/engine-core/runtime';
 import {
-  DEFAULT_ANNOTATION_BUNDLE_LIMITS,
+  DEFAULT_BUNDLE_LIMITS,
   AbortError,
   EMPTY_TRANSFER,
   EngineError,
@@ -1278,7 +1278,7 @@ export class WorkerHost {
     const session = this.requireSession(req);
     const bundle = new AnnotationExporter(this.runtime, session, this.fonts).export(
       req.selection,
-      req.limits ?? DEFAULT_ANNOTATION_BUNDLE_LIMITS,
+      req.limits ?? DEFAULT_BUNDLE_LIMITS,
       signal,
     );
     return wirePack({ tag: 'annotations.export', bundle }, Object.values(bundle.resources));
@@ -1290,7 +1290,7 @@ export class WorkerHost {
   ): WirePack<WorkerResultPayload<PdfCoordinates>> {
     const session = this.requireSession(req);
     const result = new AnnotationImporter(this.runtime, session, this.fonts).import(
-      { ...req, limits: req.limits ?? DEFAULT_ANNOTATION_BUNDLE_LIMITS },
+      { ...req, limits: req.limits ?? DEFAULT_BUNDLE_LIMITS },
       signal,
     );
     // Everything left out: nothing was written.

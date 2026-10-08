@@ -1,6 +1,6 @@
 import {
   AbortablePromise,
-  DEFAULT_ANNOTATION_BUNDLE_LIMITS,
+  DEFAULT_BUNDLE_LIMITS,
   DEFAULT_PDF_SAVE_MODE,
   EngineError,
   EngineErrorCode,
@@ -270,7 +270,7 @@ export class CloudDocumentHandle implements DocumentHandle {
       // The deployment's import limits ride /v1/access, as the render lattice does.
       async () =>
         (security.currentAccess ?? (await security.establishAccess()).access)
-          ?.annotationBundleLimits ?? DEFAULT_ANNOTATION_BUNDLE_LIMITS,
+          ?.bundleLimits ?? DEFAULT_BUNDLE_LIMITS,
     );
     this.actions = new CloudDocumentActionsService(
       http,

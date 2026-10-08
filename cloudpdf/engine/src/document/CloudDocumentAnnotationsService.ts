@@ -5,10 +5,10 @@ import {
   annotationImportFacts,
   concatAnnotationLists,
   assertAnnotationBundle,
-  assertBundleManifest,
+  assertAnnotationBundleManifest,
   opIdOf,
   type AnnotationBundle,
-  type AnnotationBundleLimits,
+  type BundleLimits,
   type AnnotationExportSelection,
   type AnnotationImportManifest,
   type AnnotationImportOptions,
@@ -20,7 +20,6 @@ import {
   type ManifestPage,
   type PageObjectNumber,
   type PageRef,
-  type ResourceId,
 } from '@embedpdf/engine-core/runtime';
 import {
   AnnotationImportResultSchema,
@@ -32,22 +31,12 @@ import type { SessionEventPublisher } from '@embedpdf/engine-services';
 import type { ManifestAccessor } from './CloudDocumentHandle';
 import type { CloudWrites } from './CloudWrites';
 import { planesInherited } from './planes';
+import { bundleImportForm, NO_BUNDLE_LIMITS, readBundleParts } from '../transport/bundleMultipart';
 import type { HttpClient } from '../transport/HttpClient';
 
 /** Bulk-read restarts after a mid-flight mutation staled the pinned
  *  version (404 on the immutable leaf → refresh the manifest → retry). */
 const MAX_COHERENCE_RESTARTS = 2;
-
-/** The server holds the bundle limits; the client only checks what arrived. */
-const NO_LIMITS: AnnotationBundleLimits = {
-  bundleBytes: Infinity,
-  manifestBytes: Infinity,
-  items: Infinity,
-  pages: Infinity,
-  resources: Infinity,
-  resourceBytes: Infinity,
-  imagePixels: Infinity,
-};
 
 export class CloudDocumentAnnotationsService implements DocumentAnnotationsService {
   constructor(
@@ -59,7 +48,7 @@ export class CloudDocumentAnnotationsService implements DocumentAnnotationsServi
     private readonly publisher: SessionEventPublisher,
     private readonly writes: CloudWrites,
     /** The server's import limits, as its `/v1/access` advertises them. */
-    private readonly importLimits: () => Promise<AnnotationBundleLimits>,
+    private readonly importLimits: () => Promise<BundleLimits>,
   ) {}
 
   /**
@@ -169,30 +158,9 @@ export class CloudDocumentAnnotationsService implements DocumentAnnotationsServi
         await this.manifest.refresh(signal);
         form = await read(signal);
       }
-      const manifest = form.get('manifest');
-      if (typeof manifest !== 'string') {
-        throw new EngineError(EngineErrorCode.WireFormat, 'annotation export has no manifest part');
-      }
-      const resources: Record<ResourceId, Uint8Array> = {};
-      const parts: Array<[string, FormDataEntryValue]> = [];
-      form.forEach((value, name) => parts.push([name, value]));
-      for (const [name, value] of parts) {
-        if (!name.startsWith('resource:')) continue;
-        if (typeof value === 'string') {
-          throw new EngineError(
-            EngineErrorCode.WireFormat,
-            `annotation export part ${name} is text`,
-          );
-        }
-        resources[name.slice('resource:'.length) as ResourceId] = new Uint8Array(
-          await value.arrayBuffer(),
-        );
-      }
-      const bundle = {
-        ...(JSON.parse(manifest) as Omit<AnnotationBundle, 'resources'>),
-        resources,
-      };
-      await assertAnnotationBundle(bundle, NO_LIMITS);
+      const { manifest, resources } = await readBundleParts('annotation', form);
+      const bundle = { ...(manifest as Omit<AnnotationBundle, 'resources'>), resources };
+      await assertAnnotationBundle(bundle, NO_BUNDLE_LIMITS);
       return bundle;
     });
   }
@@ -217,7 +185,7 @@ export class CloudDocumentAnnotationsService implements DocumentAnnotationsServi
       return this.writes.run(opId, signal, async (write) => {
         const { resources, ...rest } = bundle;
         const sizes = new Map(Object.entries(resources).map(([id, bytes]) => [id, bytes.length]));
-        assertBundleManifest(bundle, sizes, await this.importLimits());
+        assertAnnotationBundleManifest(bundle, sizes, await this.importLimits());
         const manifest: AnnotationImportManifest = {
           bundle: rest,
           options: {
@@ -225,11 +193,7 @@ export class CloudDocumentAnnotationsService implements DocumentAnnotationsServi
             ...(options.attribution !== undefined ? { attribution: options.attribution } : {}),
           },
         };
-        const form = new FormData();
-        form.append('manifest', JSON.stringify(manifest));
-        for (const [id, bytes] of Object.entries(resources)) {
-          form.append(`resource:${id}`, new Blob([bytes as BlobPart]), id);
-        }
+        const form = bundleImportForm(manifest, resources);
         const result = await write.send((sent) =>
           this.http.postMultipartJson(
             wirePaths.layerAnnotationsImport(this.docId, this.layerName),

@@ -46,7 +46,7 @@ export {
   ObjectNumberRangeSchema,
   ObjectNumberReservationRequestSchema,
   ObjectNumberReservationResponseSchema,
-  AnnotationBundleLimitsSchema,
+  BundleLimitsSchema,
   OpenDocumentResponseSchema,
   DocumentHeadSchema,
   DocumentSecurityStateSchema,

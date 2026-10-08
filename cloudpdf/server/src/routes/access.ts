@@ -4,7 +4,7 @@ import {
   decodePdfBits,
   expandRawScope,
   permissionInfoWithAdvisory,
-  type AnnotationBundleLimits,
+  type BundleLimits,
   type DocumentAccessInfo,
   type DocumentProtection,
   type PdfBits,
@@ -40,7 +40,7 @@ export interface AccessRouteDeps {
   /** When present, /access advertises the deployment's render lattice. */
   derivedRenders?: DerivedRenderService;
   /** The deployment's annotation import limits, advertised so a client checks them first. */
-  annotationBundleLimits: AnnotationBundleLimits;
+  bundleLimits: BundleLimits;
   usageMeters?: UsageMeters;
   tenantUsage?: TenantUsageRepo;
 }
@@ -56,7 +56,7 @@ export async function registerAccessRoutes(
     derivedRenders,
     usageMeters,
     tenantUsage,
-    annotationBundleLimits,
+    bundleLimits,
   } = deps;
 
   const handleAccess = async (
@@ -132,7 +132,7 @@ export async function registerAccessRoutes(
       docId,
       layerName,
       `${req.protocol}://${req.hostname}`,
-      annotationBundleLimits,
+      bundleLimits,
       derivedRenders?.policy(),
       layerScopes,
     );
@@ -200,7 +200,7 @@ function buildAccessResponse(
   docId: string,
   layerName: string,
   originUrl: string,
-  annotationBundleLimits: AnnotationBundleLimits,
+  bundleLimits: BundleLimits,
   renderPolicy?: RenderPolicy,
   layerScopes?: LayerScopes,
 ): DocumentAccessInfo {
@@ -253,7 +253,7 @@ function buildAccessResponse(
     // version-pinned immutable objects; the lattice is mutable deployment
     // policy.
     ...(renderPolicy ? { renderPolicy } : {}),
-    annotationBundleLimits,
+    bundleLimits,
   };
 }
 

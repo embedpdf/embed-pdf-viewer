@@ -1,17 +1,13 @@
 import {
-  EngineError,
-  EngineErrorCode,
-  assertBundleManifest,
-  assertWithinLimit,
+  assertAnnotationBundleManifest,
   pdfAnnotationDraftOf,
   planAnnotationImport,
-  sniffBinaryMetadata,
   toPageRef,
   type AnnotationActor,
-  type AnnotationBundleLimits,
+  type BundleLimits,
   type AnnotationDraft,
   type Annotation,
-  type AnnotationImportPages,
+  type BundleImportPages,
   type AnnotationImportResult,
   type WireAnnotationBundle,
   type WireAnnotationResources,
@@ -20,24 +16,24 @@ import {
 import type { PdfRuntimeModule } from '@embedpdf/engine-runtime';
 
 import { AnnotationBatchApplier, type BatchCreate } from './AnnotationBatchApplier';
-import { sha256HexOf } from './internal/digest';
 import { annotationIndexByName } from './internal/read/annotationIndexByName';
 import type { DocumentSession } from '../../document-session/DocumentSession';
 import { throwIfAborted } from '../../shared/abort';
 import type { FontRegistrar } from '../fonts/FontRegistrar';
 import { visibleBoxReader } from '../pages/PagesReader';
+import { assertImageWithinLimit, checkWireBundle } from '../transfer/checkWireBundle';
 
 export interface AnnotationImportRequest {
   /** In page space, as bundles are: each item converts on the page it goes to. */
   readonly bundle: WireAnnotationBundle;
-  readonly pages?: AnnotationImportPages;
+  readonly pages?: BundleImportPages;
   readonly attribution: 'restore' | 'stamp';
   /**
    * The session's identity: who `'stamp'` attributes each annotation to, and
    * whose user `'restore'` records as `importedBy`.
    */
   readonly actor?: AnnotationActor;
-  readonly limits: AnnotationBundleLimits;
+  readonly limits: BundleLimits;
 }
 
 /**
@@ -129,41 +125,21 @@ export class AnnotationImporter {
     };
   }
 
-  private assertBundle(bundle: WireAnnotationBundle, limits: AnnotationBundleLimits): void {
-    const { fn, mem } = this.runtime;
-    const sizes = new Map<string, number>();
-    for (const [id, bytes] of Object.entries(bundle.resources ?? {})) {
-      if (!(bytes instanceof ArrayBuffer)) {
-        throw new EngineError(
-          EngineErrorCode.InvalidArg,
-          `annotation bundle: resource ${id} is not bytes`,
-        );
-      }
-      sizes.set(id, bytes.byteLength);
-    }
-    assertBundleManifest(bundle, sizes, limits);
-
-    // The id is the hash: checked here, and kept for the drawing index, so
-    // a resource that many stamps place is copied and hashed once.
+  private assertBundle(bundle: WireAnnotationBundle, limits: BundleLimits): void {
+    const hashes = checkWireBundle(
+      this.runtime,
+      'annotation',
+      bundle,
+      limits,
+      assertAnnotationBundleManifest,
+    );
+    // Kept for the drawing index, so a resource that many stamps place is
+    // copied and hashed once.
     const drawings = this.session.drawingIndex();
-    for (const [id, bytes] of Object.entries(bundle.resources)) {
-      const hex = sha256HexOf(fn, mem, new Uint8Array(bytes));
-      if (`sha256-${hex}` !== id) {
-        throw new EngineError(
-          EngineErrorCode.InvalidArg,
-          `annotation bundle: resource ${id} doesn't match its id`,
-        );
-      }
-      drawings.hashes.set(bytes, hex);
-    }
-
-    // A small PNG can decode to gigabytes: its size is read from its header.
+    for (const [bytes, hex] of hashes) drawings.hashes.set(bytes, hex);
     for (const item of bundle.items) {
       const id = item.resources.appearance;
-      const meta = id ? sniffBinaryMetadata(bundle.resources[id]!) : null;
-      if (meta && 'width' in meta) {
-        assertWithinLimit(limits, 'imagePixels', meta.width * meta.height);
-      }
+      if (id) assertImageWithinLimit('annotation', limits, bundle.resources[id]!);
     }
   }
 }

@@ -18,7 +18,7 @@ RenderInvalidatedEvent [InterfaceDeclaration] (from packages/plugin/render/src/c
 RenderPageOptions [InterfaceDeclaration] (from packages/plugin/render/src/contract.ts): export interface RenderPageOptions extends OperationOptions{ width?: number; scale?: number; includeAnnotations?: boolean; format?: RenderFormat; quality?: number; }
 RenderPagesOptions [InterfaceDeclaration] (from packages/plugin/render/src/contract.ts): export interface RenderPagesOptions extends RenderPageOptions{ concurrency?: number; }
 RenderSettings [InterfaceDeclaration] (from packages/plugin/render/src/contract.ts): export interface RenderSettings{ readonly fullPage: FullPageOptions; readonly tiles: TilesOptions | false; readonly format: RenderFormat | undefined; readonly quality: number | undefined; readonly debug: boolean; }
-RenderSourceOptions [InterfaceDeclaration]: export interface RenderSourceOptions{ scale: number; includeAnnotations?: boolean; }
+RenderSourceOptions [InterfaceDeclaration]: export interface RenderSourceOptions{ scale: number; includeAnnotations?: boolean; view?: string; }
 RenderThumbnailOptions [InterfaceDeclaration] (from packages/plugin/render/src/contract.ts): export interface RenderThumbnailOptions extends OperationOptions{ maxWidth: number; includeAnnotations?: boolean; }
 RenderToken [VariableDeclaration]: RenderToken = createHostToken<RenderHostCapability>(PublicRenderToken)
 TilePaintPlan [InterfaceDeclaration] (from packages/plugin/render/src/paint-plan.ts): export interface TilePaintPlan{ engaged: boolean; paint: TilePaintSource[]; fetching: string[]; stamp: string; }

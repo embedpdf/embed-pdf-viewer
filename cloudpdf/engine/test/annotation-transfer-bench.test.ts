@@ -10,7 +10,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import {
-  DEFAULT_ANNOTATION_BUNDLE_LIMITS,
+  DEFAULT_BUNDLE_LIMITS,
   manifestBytesOf,
   type AnnotationBundle,
 } from '@embedpdf/engine-core/runtime';
@@ -148,15 +148,15 @@ describe.skipIf(!ENABLED)('E8 annotation transfer (cloud, localhost)', () => {
     await onTheServer('100 stamps of one image', base, 1, bundle);
   }, 600_000);
 
-  test(`items: ${DEFAULT_ANNOTATION_BUNDLE_LIMITS.items} mixed annotations over 200 pages`, async () => {
+  test(`items: ${DEFAULT_BUNDLE_LIMITS.items} mixed annotations over 200 pages`, async () => {
     const base = pages(200);
-    const bundle = await bundleOf(base, (doc) => fill(doc, DEFAULT_ANNOTATION_BUNDLE_LIMITS.items));
-    await onTheServer(`${DEFAULT_ANNOTATION_BUNDLE_LIMITS.items} items`, base, 200, bundle);
+    const bundle = await bundleOf(base, (doc) => fill(doc, DEFAULT_BUNDLE_LIMITS.items));
+    await onTheServer(`${DEFAULT_BUNDLE_LIMITS.items} items`, base, 200, bundle);
   }, 1_800_000);
 
   test('bundle bytes: one file just under the bundle limit', async () => {
     const base = pages(1);
-    const bytes = new Uint8Array(DEFAULT_ANNOTATION_BUNDLE_LIMITS.bundleBytes - 64 * 1024).map(
+    const bytes = new Uint8Array(DEFAULT_BUNDLE_LIMITS.bundleBytes - 64 * 1024).map(
       (_, i) => (i * 31) & 255,
     );
     const bundle = await bundleOf(base, async (doc) => {
