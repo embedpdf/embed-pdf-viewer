@@ -25,7 +25,7 @@ import {
   wirePack,
   type AnnotationActor,
   type ChangeAuthority,
-  type ChangeOp,
+  type RecordedOp,
   type ChangeRecordPayload,
   type PageCoordinates,
   type ServerChangeOutcome,
@@ -467,9 +467,9 @@ export class LayerService {
   }
 
   /**
-   * `doc.annotations.import` on a layer: one worker job, whose failure
-   * leaves the session as it was, then one artifact, one commit across every
-   * page it touched and one audit row.
+   * `doc.annotations.import` on a layer: one change, its one op the import,
+   * kept under the request's `Idempotency-Key` with the record that undoes
+   * it, and audited as `annot.import`.
    */
   async importAnnotations(
     ctx: LayerWriteContext,
@@ -485,43 +485,21 @@ export class LayerService {
     },
     signal?: AbortSignal,
   ): Promise<AnnotationImportResult> {
-    const opId = writeOpIdOf(ctx);
-    return this.enqueueLayerWrite(ctx, input.docId, input.layerName, async () => {
-      const { layer } = await this.prepareLayerMutation(ctx, input.docId, input.layerName);
-      return this.withTempWorkerFile('layer-artifact', 'artifact.layer', async (artifactPath) => {
-        const build = (jobId: WorkerJobId) =>
-          wirePack(
-            {
-              kind: 'annotations.import' as const,
-              effect: 'write' as const,
-              jobId,
-              opId,
-              docId: input.docId,
-              layerName: input.layerName,
-              bundle: input.bundle,
-              ...(input.pages !== undefined ? { pages: input.pages } : {}),
-              attribution: input.attribution,
-              ...(input.actor ? { actor: input.actor } : {}),
-              limits: input.limits,
-              artifactPath,
-            },
-            Object.values(input.bundle.resources),
-          );
-        const payload = await this.runLayerWrite(input.docId, build, signal);
-        if (payload.tag !== 'annotations.import') {
-          throw new EngineError(
-            EngineErrorCode.WireFormat,
-            `unexpected annotations.import payload: ${payload.tag}`,
-          );
-        }
-        // Everything was left out: nothing was written, nothing to commit.
-        if (payload.result.annotations.length === 0) return payload.result;
-        return this.persistAnnotationImport(ctx, input.docId, input.layerName, layer, {
-          result: payload.result,
-          artifact: requireLayerArtifact(payload as unknown),
-        });
-      });
-    });
+    return this.applySingleOp<AnnotationImportResult>(
+      ctx,
+      input,
+      {
+        type: 'annotations.import',
+        bundle: input.bundle,
+        ...(input.pages !== undefined ? { pages: input.pages } : {}),
+        attribution: input.attribution,
+        ...(input.actor ? { actor: input.actor } : {}),
+        limits: input.limits,
+      },
+      checkedAuthority(input.actor),
+      'annot.import',
+      signal,
+    );
   }
 
   async updateAnnotation(
@@ -2423,7 +2401,7 @@ export class LayerService {
   private async applySingleOp<T>(
     ctx: LayerWriteContext,
     target: { docId: string; layerName: string },
-    op: ChangeOp<PageCoordinates, WireAnnotationResources>,
+    op: RecordedOp<PageCoordinates, WireAnnotationResources>,
     authority: ChangeAuthority,
     auditKind: AuditMutationKind,
     signal?: AbortSignal,
@@ -2786,35 +2764,6 @@ export class LayerService {
       nextVersion,
     });
     this.finishLayerCommit(ctx, docId, layerName, nextVersion, artifactKey, committed.auditId);
-    return committed.result;
-  }
-
-  private async persistAnnotationImport(
-    ctx: LayerWriteContext,
-    docId: string,
-    layerName: string,
-    layer: LayerRow,
-    input: {
-      result: AnnotationImportResult;
-      artifact: LayerArtifactInput;
-    },
-  ): Promise<AnnotationImportResult> {
-    const nextVersion = layer.currentVersion + 1;
-    const artifactKey = this.nextArtifactKey(ctx, docId, layerName, nextVersion);
-    const uploaded = await this.uploadLayerArtifact(artifactKey, input.artifact);
-    const committed = await this.commitAnnotationImport({
-      ctx,
-      docId,
-      layerName,
-      layer,
-      raw: input.result,
-      artifactKey,
-      artifactSha: uploaded.sha256,
-      artifactSize: uploaded.size,
-      nextVersion,
-    });
-    this.finishLayerCommit(ctx, docId, layerName, nextVersion, artifactKey, committed.auditId);
-    // The response is the audited payload — one fact for caller and history.
     return committed.result;
   }
 
@@ -3414,112 +3363,6 @@ export class LayerService {
             annotations_version: annotationsVersion,
             forms_version: formsVersion,
           },
-          auditId,
-          now,
-        );
-        for (const page of nextPages) {
-          await trx
-            .updateTable('layer_pages')
-            .set({
-              content_version: page.contentVersion,
-              annotation_version: page.annotationVersion,
-              widget_version: page.widgetVersion,
-              updated_at: now,
-            })
-            .where('layer_id', '=', input.layer.id)
-            .where('page_object_number', '=', page.pageObjectNumber)
-            .execute();
-        }
-
-        return { result, auditId };
-      });
-  }
-
-  /**
-   * An import's commit: every page it touched advances its annotation
-   * version, the layer's `doc_version` and bulk annotations pin once, and one audit row holds the finalized result
-   * under the request's idempotency key.
-   */
-  private async commitAnnotationImport(input: {
-    ctx: LayerWriteContext;
-    docId: string;
-    layerName: string;
-    layer: LayerRow;
-    raw: AnnotationImportResult;
-    artifactKey: string;
-    artifactSha: string;
-    artifactSize: number;
-    nextVersion: number;
-  }): Promise<{ result: AnnotationImportResult; auditId: number }> {
-    return this.requireDb()
-      .transaction()
-      .execute(async (trx) => {
-        const now = Date.now();
-        const currentLayer = await this.readLayerForCommit(trx, input.layer);
-        const affected = input.raw.meta.affectedPages.map((page) => page.objectNumber);
-
-        const nextPages: DurablePageRow[] = [];
-        for (const pageObjectNumber of affected) {
-          const row = await trx
-            .selectFrom('layer_pages')
-            .selectAll()
-            .where('layer_id', '=', input.layer.id)
-            .where('page_object_number', '=', pageObjectNumber)
-            .executeTakeFirst();
-          if (!row) {
-            throw new EngineError(
-              EngineErrorCode.WireFormat,
-              `annotations.import reported unknown page object number ${pageObjectNumber}`,
-            );
-          }
-          nextPages.push({
-            pageObjectNumber,
-            contentVersion: Number(row.content_version),
-            annotationVersion: Number(row.annotation_version) + 1,
-            widgetVersion: Number(row.widget_version),
-            updatedAt: now,
-          });
-        }
-
-        const previousLayerDocVersion = Number(currentLayer.doc_version);
-        const layerDocVersion = previousLayerDocVersion + 1;
-        const annotationsVersion = Number(currentLayer.annotations_version ?? 1) + 1;
-        const result: AnnotationImportResult = {
-          ...input.raw,
-          meta: {
-            ...input.raw.meta,
-            cacheDelta: this.layerState.buildCacheDelta({
-              docId: input.docId,
-              layerName: input.layerName,
-              previousDocVersion: previousLayerDocVersion,
-              docVersion: layerDocVersion,
-              annotationsVersion,
-              pages: nextPages,
-            }),
-          },
-        };
-
-        const auditEvent = makeAuditEvent({
-          ctx: input.ctx,
-          docId: input.docId,
-          layer: input.layer,
-          layerName: input.layerName,
-          kind: 'annot.import',
-          pageObjectNumber: null,
-          affectedPages: affected,
-          artifactVersion: input.nextVersion,
-          artifactKey: input.artifactKey,
-          artifactSha: input.artifactSha,
-          artifactSize: input.artifactSize,
-          payload: result,
-          ts: now,
-        });
-        const auditId = (await this.eventLog?.appendDb(trx, auditEvent)) ?? 0;
-
-        await this.writeLayerAdvance(
-          trx,
-          input,
-          { doc_version: layerDocVersion, annotations_version: annotationsVersion },
           auditId,
           now,
         );

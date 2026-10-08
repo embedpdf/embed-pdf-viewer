@@ -757,14 +757,18 @@ export { opIdOf } from './mutation/WriteOptions';
 export {
   isSkippedItem,
   isUndoChange,
+  itemWrote,
   objectNumbersNamedBy,
   resolveChangeResources,
 } from './mutation/Change';
 export { changeFingerprint, isKeptRefusal } from './mutation/changeOutcome';
 export type {
+  AnnotationImportOp,
   Change,
   ChangeAnswer,
   ChangeOp,
+  RecordedChange,
+  RecordedOp,
   ChangeItem,
   ChangeResult,
   ChangeItemType,

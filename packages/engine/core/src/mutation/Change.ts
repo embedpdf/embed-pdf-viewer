@@ -25,6 +25,7 @@ import type { MetadataUpdateResult } from './MetadataUpdateResult';
 import type { MutationMeta } from './MutationMeta';
 import type { Annotation, AnnotationDraft, AnnotationPatch } from '../annotation/kinds';
 import type { WidgetAnnotation, WidgetPatch } from '../annotation/kinds/widget';
+import type { AnnotationActor } from '../auth/scope/types';
 import {
   annotationResourceBuffers,
   hasAnnotationResources,
@@ -46,6 +47,10 @@ import type { FormFieldRef } from '../identity/FormFieldRef';
 import type { PageRef } from '../identity/PageRef';
 import type { Coordinates, PageCoordinates } from '../pageSpace/coordinates';
 import type { SignatureAppearanceInput } from '../signature/types';
+import type { WireAnnotationBundle } from '../transfer/AnnotationBundle';
+import type { AnnotationImportResult } from '../transfer/annotationImport';
+import type { BundleImportPages } from '../transfer/bundle';
+import type { BundleLimits } from '../transfer/bundleLimits';
 
 /**
  * One user action, applied as one transaction (`doc.apply`): its ops in
@@ -197,9 +202,39 @@ export type ChangeOp<C extends Coordinates = PageCoordinates, R = AnnotationReso
       readonly patch: CustomMetadataPatch;
     };
 
-/** What an item can be: an op's type, or a restore (only in an undo). */
+/**
+ * An import, as the one op of its change: `doc.annotations.import` runs it,
+ * so the import is kept under its `opId` with the record that undoes it,
+ * like any change. Only the import verb makes one: `doc.apply` takes no
+ * import, so writing restored attribution stays the import's.
+ */
+export interface AnnotationImportOp {
+  readonly type: 'annotations.import';
+  /** In page space, its resources as bytes. */
+  readonly bundle: WireAnnotationBundle;
+  readonly pages?: BundleImportPages;
+  readonly attribution: 'restore' | 'stamp';
+  /**
+   * Who `'stamp'` attributes each annotation to, as a create does, and whose
+   * user `'restore'` records as `importedBy`.
+   */
+  readonly actor?: AnnotationActor;
+  readonly limits: BundleLimits;
+}
+
+/** An op of a change the engine runs and records: one `doc.apply` takes, or an import. */
+export type RecordedOp<C extends Coordinates = PageCoordinates, R = AnnotationResources> =
+  | ChangeOp<C, R>
+  | AnnotationImportOp;
+
+/** A change as the engine runs and records it: its ops, an import among them, or an undo. */
+export type RecordedChange<C extends Coordinates = PageCoordinates, R = AnnotationResources> =
+  | { readonly ops: readonly RecordedOp<C, R>[] }
+  | { readonly undoOf: string };
+
+/** What an item can be: an op's type, an import's, or a restore (only in an undo). */
 export type ChangeItemType =
-  | ChangeOp['type']
+  | RecordedOp['type']
   | 'annotations.restore'
   | 'forms.restore'
   | 'forms.restoreWidget';
@@ -232,6 +267,8 @@ export type ChangeItem<C extends Coordinates = PageCoordinates> =
     } & AnnotationUpdateResult<C>)
   | ({ type: 'annotations.delete'; page: PageRef } & AnnotationDeleteResult)
   | ({ type: 'annotations.reorder'; page: PageRef } & AnnotationReorderResult)
+  /** An import's answer: only `doc.annotations.import` answers one. */
+  | ({ type: 'annotations.import' } & AnnotationImportResult<C>)
   | {
       type: 'annotations.restore';
       page: PageRef;
@@ -291,6 +328,15 @@ export function isSkippedItem<C extends Coordinates>(
   return item.type === 'skipped';
 }
 
+/**
+ * Whether an item wrote to the document: not an op an undo left alone, nor
+ * an import that left every item of its bundle out.
+ */
+export function itemWrote<C extends Coordinates>(item: ChangeItem<C>): boolean {
+  if (isSkippedItem(item)) return false;
+  return item.type !== 'annotations.import' || item.annotations.length > 0;
+}
+
 /** What `doc.apply` resolves. */
 export interface ChangeResult<C extends Coordinates = PageCoordinates> {
   /** One per op, in op order; for an undo, one per op of the reverse. */
@@ -304,7 +350,7 @@ export interface ChangeResult<C extends Coordinates = PageCoordinates> {
 
 /** Whether a change is an undo (`{ undoOf }`) rather than a list of ops. */
 export function isUndoChange<C extends Coordinates, R>(
-  change: Change<C, R>,
+  change: RecordedChange<C, R>,
 ): change is { readonly undoOf: string } {
   return 'undoOf' in change;
 }
@@ -322,7 +368,9 @@ export type ChangeAnswer =
  * The object numbers a change's creates name: each must be one its editing
  * session holds. An undo names none; what it restores keeps its numbers.
  */
-export function objectNumbersNamedBy<C extends Coordinates, R>(change: Change<C, R>): number[] {
+export function objectNumbersNamedBy<C extends Coordinates, R>(
+  change: RecordedChange<C, R>,
+): number[] {
   if (isUndoChange(change)) return [];
   const named: number[] = [];
   for (const op of change.ops) {

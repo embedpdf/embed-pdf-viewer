@@ -36,7 +36,7 @@ import type { FormFieldRef, FormWidget } from '../identity/FormFieldRef';
 import type { ObjectNumberRange } from '../identity/ObjectNumbers';
 import type { PageRef } from '../identity/PageRef';
 import type { AnnotationFlattenResult } from '../mutation/AnnotationFlattenResult';
-import type { Change, ChangeResult } from '../mutation/Change';
+import type { Change, ChangeResult, RecordedChange } from '../mutation/Change';
 import type {
   AnnotationCreateResult,
   AnnotationDeleteResult,
@@ -531,7 +531,8 @@ export interface ChangeRecordPayload {
 /** One change of a server request (see `DocumentApplyChangesWorkerRequest`). */
 export interface ServerChange<C extends Coordinates = PageCoordinates> {
   opId: string;
-  change: Change<C, WireAnnotationResources>;
+  /** Its ops (a single-verb route's one op, an import's among them), or an undo. */
+  change: RecordedChange<C, WireAnnotationResources>;
   /** Who the change acts for (see `DocumentApplyWorkerRequest.authority`). */
   authority: ChangeAuthority;
   /**

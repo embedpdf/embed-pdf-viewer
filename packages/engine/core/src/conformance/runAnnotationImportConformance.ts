@@ -4,10 +4,12 @@ import type {
   AnnotationResourceConformanceOptions,
   AnnotationResourceFixture,
 } from './runAnnotationResourceConformance';
+import { isPermissionRefusal } from './refusals';
 import type { ConformanceTestRunner } from './runMetadataConformance';
 import { BANDS_PDF } from './stampFixtures';
 import type { Annotation } from '../annotation/kinds';
 import type { DocumentHandle } from '../engine/DocumentHandle';
+import type { Change } from '../mutation/Change';
 import type { Engine } from '../engine/Engine';
 import type { PageHandle } from '../engine/PageHandle';
 import { EngineErrorCode } from '../errors/EngineErrorCode';
@@ -24,7 +26,9 @@ import type { AnnotationImportResult } from '../transfer/annotationImport';
  * `doc.annotations.import` on both engines, in `stamp` mode: a bundle comes
  * back as the export had it, one fact per annotation as one transaction,
  * what can't be carried left out and reported, pages mapped, and a refusal
- * before anything is written.
+ * before anything is written. An import is a change: undone and redone with
+ * `doc.apply({ undoOf })`, answered again on a retry, and a restoring
+ * import's undo takes the import's rights.
  */
 export function runAnnotationImportConformance(
   runner: ConformanceTestRunner,
@@ -289,6 +293,178 @@ export function runAnnotationImportConformance(
         expect((await target.annotations.list({ pages: [pageRef] })).annotations).toEqual([]);
         expect(events).toEqual([]);
       });
+    });
+
+    /** The page's annotations as the target reads them. */
+    const listed = async (doc: DocumentHandle, pageRef: PageRef) =>
+      (await doc.annotations.list({ pages: [pageRef] })).annotations as Annotation[];
+    const keysOf = (annotations: readonly { ref: AnnotationRef }[]) =>
+      annotations.map((annotation) => annotationKey(annotation.ref)).sort();
+
+    /** A thread (a note, its popup, a reply), a square and a stamp, exported. */
+    const threadBundle = async (source: DocumentHandle, pageRef: PageRef) => {
+      const page = source.page(pageRef);
+      const note = await create(page, {
+        subtype: 'text',
+        rect: iconRect(box(20).x, box(20).y),
+        contents: 'Check',
+      });
+      await create(page, { subtype: 'popup', rect: box(80), parent: note.ref });
+      await create(page, {
+        subtype: 'text',
+        rect: iconRect(box(20).x, box(20).y),
+        reply: { to: note.ref },
+      });
+      await create(page, { subtype: 'square', box: box(140) });
+      await create(
+        page,
+        { subtype: 'stamp', box: box(200) },
+        { resources: { appearance: PNG_1X1 } },
+      );
+      return source.annotations.export();
+    };
+
+    for (const attribution of ['stamp', 'restore'] as const) {
+      test(`an import (${attribution}) is undone and redone: the same refs and attribution`, async () => {
+        await twoCopies('authoring', async (source, target, pageRef) => {
+          const bundle = await threadBundle(source, pageRef);
+          const before = keysOf(await listed(target, pageRef));
+          const imported = await target.annotations.import(bundle, { attribution });
+          expect(imported.meta.undoable).toBe(true);
+          expect(imported.annotations).toHaveLength(5);
+
+          // The thread goes as one, the square and the stamp each alone.
+          const undo = await target.apply({ undoOf: imported.meta.opId });
+          expect(undo.items.map((item) => item.type)).toEqual([
+            'annotations.delete',
+            'annotations.delete',
+            'annotations.delete',
+          ]);
+          expect(keysOf(await listed(target, pageRef))).toEqual(before);
+
+          // The undo's undo brings back the same annotations, as the import wrote them.
+          await target.apply({ undoOf: undo.meta.opId });
+          const back = await listed(target, pageRef);
+          const byKey = new Map(
+            back.map((annotation) => [annotationKey(annotation.ref), annotation]),
+          );
+          for (const annotation of imported.annotations) {
+            const again = byKey.get(annotationKey(annotation.ref));
+            expect(again).toMatchObject({
+              nm: annotation.nm,
+              userId: annotation.userId,
+              createdBy: annotation.createdBy,
+              author: annotation.author,
+              rect: annotation.rect,
+            });
+          }
+        });
+      });
+    }
+
+    test('an imported annotation changed since stays; the rest of the import goes', async () => {
+      await twoCopies('authoring', async (source, target, pageRef) => {
+        const page = source.page(pageRef);
+        await create(page, { subtype: 'square', box: box(20) });
+        await create(page, { subtype: 'circle', box: box(80) });
+        const bundle = await source.annotations.export();
+        const imported = await target.annotations.import(bundle, { attribution: 'stamp' });
+        const [square, circle] = imported.annotations;
+        await target.page(pageRef).annotations.update(square!.ref, { color: '#00aa00' });
+
+        const undo = await target.apply({ undoOf: imported.meta.opId });
+        expect(undo.items.map((item) => item.type).sort()).toEqual([
+          'annotations.delete',
+          'skipped',
+        ]);
+        const left = keysOf(await listed(target, pageRef));
+        expect(left.includes(annotationKey(square!.ref))).toBe(true);
+        expect(left.includes(annotationKey(circle!.ref))).toBe(false);
+      });
+    });
+
+    test('a retry under the same opId answers again and writes nothing more', async () => {
+      await twoCopies('authoring', async (source, target, pageRef) => {
+        await create(source.page(pageRef), { subtype: 'square', box: box(20) });
+        const bundle = await source.annotations.export();
+        const first = await target.annotations.import(bundle, {
+          attribution: 'stamp',
+          opId: 'import-retry',
+        });
+        const again = await target.annotations.import(bundle, {
+          attribution: 'stamp',
+          opId: 'import-retry',
+        });
+        expect(keysOf(again.annotations)).toEqual(keysOf(first.annotations));
+        const squares = (await listed(target, pageRef)).filter((a) => a.subtype === 'square');
+        expect(squares).toHaveLength(1);
+      });
+    });
+
+    test("doc.apply takes no import: restoring attribution stays the import verb's", async () => {
+      await twoCopies('authoring', async (source, target) => {
+        const bundle = await source.annotations.export();
+        // No op of `doc.apply` is an import: a caller can only force one in.
+        const change = { ops: [{ type: 'annotations.import', bundle, attribution: 'restore' }] };
+        await expect(target.apply(change as unknown as Change)).rejects.toMatchObject({
+          code: EngineErrorCode.InvalidArg,
+        });
+      });
+    });
+
+    test('a final write ends undo for an import before it', async () => {
+      await twoCopies('authoring', async (source, target, pageRef) => {
+        await create(source.page(pageRef), { subtype: 'square', box: box(20) });
+        const bundle = await source.annotations.export();
+        const imported = await target.annotations.import(bundle, { attribution: 'stamp' });
+        await target.page(pageRef).annotations.flatten([imported.annotations[0]!.ref]);
+        await expect(target.apply({ undoOf: imported.meta.opId })).rejects.toMatchObject({
+          code: EngineErrorCode.UndoUnavailable,
+        });
+      });
+    });
+
+    test("undoing a restoring import takes the import's rights, not the per-annotation ones", async () => {
+      if (!opts.openScoped) return;
+      // May delete only its own annotations, and may import.
+      const scope = [
+        'doc.open',
+        'doc.render',
+        'doc.download',
+        'doc.annotate.modify',
+        'doc.annotate.import',
+        'annotations:delete:self',
+      ];
+      const source = await opts.open(engine, 'authoring');
+      const target = await opts.openScoped(engine, 'authoring', scope);
+      try {
+        const { pages } = await source.pages.list();
+        const pageRef = toPageRef(pages[0]!.ref.objectNumber);
+        await create(source.page(pageRef), { subtype: 'square', box: box(20) });
+        const bundle = await source.annotations.export();
+        const imported = await target.annotations.import(bundle, { attribution: 'restore' });
+        const [square] = imported.annotations;
+
+        // The square isn't the session's own: a delete is refused.
+        const refused = await target
+          .page(pageRef)
+          .annotations.delete(square!.ref)
+          .then(
+            () => null,
+            (error: unknown) => error,
+          );
+        expect(isPermissionRefusal(refused)).toBe(true);
+
+        // The import's undo and its redo take what the import took.
+        const undo = await target.apply({ undoOf: imported.meta.opId });
+        const key = annotationKey(square!.ref);
+        expect(keysOf(await listed(target, pageRef)).includes(key)).toBe(false);
+        await target.apply({ undoOf: undo.meta.opId });
+        expect(keysOf(await listed(target, pageRef)).includes(key)).toBe(true);
+      } finally {
+        await source.close();
+        await target.close();
+      }
     });
   });
 }

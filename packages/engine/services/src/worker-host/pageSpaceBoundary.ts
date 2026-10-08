@@ -22,6 +22,8 @@ import {
   type Change,
   type ChangeItem,
   type ChangeOp,
+  type RecordedChange,
+  type RecordedOp,
   type ChangeResult,
   type PageRef,
   type WireAnnotationResources,
@@ -260,16 +262,27 @@ export function renderOptionsInFileSpace(
 function changeInFileSpace(
   change: Change<PageCoordinates, WireAnnotationResources>,
   boxOf: VisibleBoxOf,
-): Change<PdfCoordinates, WireAnnotationResources> {
+): Change<PdfCoordinates, WireAnnotationResources>;
+function changeInFileSpace(
+  change: RecordedChange<PageCoordinates, WireAnnotationResources>,
+  boxOf: VisibleBoxOf,
+): RecordedChange<PdfCoordinates, WireAnnotationResources>;
+function changeInFileSpace(
+  change: RecordedChange<PageCoordinates, WireAnnotationResources>,
+  boxOf: VisibleBoxOf,
+): RecordedChange<PdfCoordinates, WireAnnotationResources> {
   if ('undoOf' in change) return change;
   return { ops: change.ops.map((op) => opInFileSpace(op, boxOf)) };
 }
 
 function opInFileSpace(
-  op: ChangeOp<PageCoordinates, WireAnnotationResources>,
+  op: RecordedOp<PageCoordinates, WireAnnotationResources>,
   boxOf: VisibleBoxOf,
-): ChangeOp<PdfCoordinates, WireAnnotationResources> {
+): RecordedOp<PdfCoordinates, WireAnnotationResources> {
   switch (op.type) {
+    // A bundle is page space: the import converts each create on its page.
+    case 'annotations.import':
+      return op;
     case 'annotations.create':
       return { ...op, data: pdfAnnotationDraftOf(op.data, boxOf(op.page), boxOf) };
     case 'annotations.update': {
@@ -333,6 +346,8 @@ function itemInPageSpace(item: ChangeItem<PdfCoordinates>, boxOf: VisibleBoxOf):
       return { ...item, annotation: annotation(item.annotation) } as ChangeItem;
     case 'annotations.restore':
       return { ...item, annotations: item.annotations.map(annotation) } as ChangeItem;
+    case 'annotations.import':
+      return { ...item, annotations: item.annotations.map(annotation) };
     case 'forms.setValue':
     case 'forms.setDisplay':
     case 'forms.setAppearanceText':

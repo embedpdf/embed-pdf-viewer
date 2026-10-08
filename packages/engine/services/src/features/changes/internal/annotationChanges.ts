@@ -13,10 +13,13 @@ import {
   formWidget,
   isSkippedItem,
   type Annotation,
+  type AnnotationAuthority,
   type AnnotationFamily,
+  type AnnotationImportOp,
   type AnnotationPatch,
   type AnnotationRef,
   type AnnotationUpdateResult,
+  type ChangeAuthority,
   type ChangeItem,
   type ChangeOp,
   type FormWidget,
@@ -34,6 +37,7 @@ import { exportAnnots, importAnnots } from './captures';
 import { assertExpected, leftAlone, type ChangeContext, type Done } from './changeContext';
 import { captureAfter, captureBefore, revertObjects, unchangedSince } from './objectCaptures';
 import { valuesEqual } from '../../../shared/valuesEqual';
+import { AnnotationImporter } from '../../annotations/AnnotationImporter';
 import { AnnotationMutator } from '../../annotations/AnnotationMutator';
 import {
   openAnnotAtRaw,
@@ -57,7 +61,9 @@ import type {
   AnnotationReorderStep,
   AnnotationRestoreStep,
   ObjectsRevertStep,
+  ReverseStep,
   RevertFallback,
+  StepRights,
 } from '../ChangeRecord';
 
 type Op<T extends ChangeOp['type']> = Extract<
@@ -106,6 +112,100 @@ export function createAnnotation(ctx: ChangeContext, op: Op<'annotations.create'
     item: { type: 'annotations.create', page: op.page, ...result },
     reverse: [{ kind: 'annotation.remove', ref: result.annotation.ref, left: [result.annotation] }],
   };
+}
+
+/**
+ * `annotations.import`: a bundle's annotations, created as the import plans
+ * them (`AnnotationImporter`), each checked as its create would be. Its
+ * reverse removes what the import made, thread by thread, as a create's
+ * undo does. A restoring import's steps take the import's rights.
+ */
+export function importAnnotations(ctx: ChangeContext, op: AnnotationImportOp): Done {
+  const rights: StepRights | undefined = op.attribution === 'restore' ? 'import' : undefined;
+  if (rights) authorizeImportRights(ctx.authority);
+  const result = new AnnotationImporter(ctx.runtime, ctx.session, ctx.fonts).import(
+    {
+      bundle: op.bundle,
+      ...(op.pages !== undefined ? { pages: op.pages } : {}),
+      attribution: op.attribution,
+      ...(op.actor ? { actor: op.actor } : {}),
+      limits: op.limits,
+      authorizeCreate: (draft) => {
+        authorizeUnprotected(ctx.authority, annotationWriteCapability(draft.subtype));
+        // A restoring import writes attribution that isn't the caller's,
+        // under the rights checked above; a copy is the caller's own create.
+        if (!rights) {
+          authorizeAnnotationCreate(
+            ctx.authority,
+            draft.subtype,
+            (draft as { groupId?: string | null }).groupId,
+          );
+        }
+      },
+    },
+    ctx.signal,
+  );
+  return {
+    item: { type: 'annotations.import', ...result },
+    reverse: importReverse(ctx, result.annotations, rights),
+  };
+}
+
+/**
+ * The undo of an import: one remove per imported annotation that no other
+ * imported one takes with it (a note takes its popup and its imported
+ * replies), the last made first, each holding its thread as the import
+ * left it. An imported reply to an annotation that was there goes alone.
+ */
+function importReverse(
+  ctx: ChangeContext,
+  created: readonly Annotation<PdfCoordinates>[],
+  rights: StepRights | undefined,
+): ReverseStep[] {
+  const pages = new Map<number, Annotation<PdfCoordinates>[]>();
+  const threadOf = (ref: AnnotationRef) => {
+    let annotations = pages.get(ref.page.objectNumber);
+    if (!annotations) {
+      annotations = listPage(ctx, ref.page.objectNumber);
+      pages.set(ref.page.objectNumber, annotations);
+    }
+    return deletedWith(annotations, ref);
+  };
+  const threads = created.map((annotation) => ({
+    ref: annotation.ref,
+    left: threadOf(annotation.ref),
+  }));
+  // `deletedWith` lists what goes with an annotation, then the annotation.
+  const takenWith = new Set(
+    threads.flatMap((thread) =>
+      thread.left
+        .map((member) => annotationKey(member.ref))
+        .filter((key) => key !== annotationKey(thread.ref)),
+    ),
+  );
+  return threads
+    .filter((thread) => !takenWith.has(annotationKey(thread.ref)))
+    .reverse()
+    .map((thread) => ({
+      kind: 'annotation.remove' as const,
+      ref: thread.ref,
+      left: thread.left,
+      ...(rights ? { rights } : {}),
+    }));
+}
+
+/** A restoring import's rights: `doc.annotate.modify` and `doc.annotate.import`. */
+function authorizeImportRights(authority: ChangeAuthority): void {
+  authorizeCapability(authority, 'doc.annotate.modify');
+  authorizeCapability(authority, 'doc.annotate.import');
+}
+
+/**
+ * The authority a step under an import's rights writes with: those rights
+ * were checked, so the per-annotation rules give way.
+ */
+function underImportRights(authority: ChangeAuthority): AnnotationAuthority {
+  return { ...authority, grants: null };
 }
 
 /**
@@ -259,7 +359,8 @@ export function removeAnnotation(ctx: ChangeContext, step: AnnotationRemoveStep)
   for (const capability of annotationWriteCapabilities(members)) {
     authorizeUnprotected(ctx.authority, capability);
   }
-  return writeDelete(ctx, step.ref);
+  if (step.rights) authorizeImportRights(ctx.authority);
+  return writeDelete(ctx, step.ref, step.rights);
 }
 
 /**
@@ -293,7 +394,8 @@ export function restoreAnnotations(ctx: ChangeContext, step: AnnotationRestoreSt
   for (const capability of annotationWriteCapabilities(restored)) {
     authorizeUnprotected(ctx.authority, capability);
   }
-  authorizeAnnotationDelete(ctx.authority, restored);
+  if (step.rights) authorizeImportRights(ctx.authority);
+  else authorizeAnnotationDelete(ctx.authority, restored);
   return {
     item: {
       type: 'annotations.restore',
@@ -301,7 +403,14 @@ export function restoreAnnotations(ctx: ChangeContext, step: AnnotationRestoreSt
       annotations: restored,
       meta: annotationMutationMeta(ctx.session.writeStamp(), pageObjectNumber, step.members),
     },
-    reverse: [{ kind: 'annotation.remove', ref: root, left: restored }],
+    reverse: [
+      {
+        kind: 'annotation.remove',
+        ref: root,
+        left: restored,
+        ...(step.rights ? { rights: step.rights } : {}),
+      },
+    ],
   };
 }
 
@@ -474,7 +583,8 @@ function updatedItem(
 }
 
 /** A delete of `ref` and what goes with it, capturing them first. */
-function writeDelete(ctx: ChangeContext, ref: AnnotationRef): Done {
+/** Deletes `ref` and what goes with it; `rights` is what a step under an import's rights checked. */
+function writeDelete(ctx: ChangeContext, ref: AnnotationRef, rights?: StepRights): Done {
   const page = ref.page.objectNumber;
   // A capture holds objects: whatever was born inline becomes one first.
   promoteInlineAnnotations(ctx.runtime, ctx.session, page);
@@ -498,7 +608,8 @@ function writeDelete(ctx: ChangeContext, ref: AnnotationRef): Done {
           members.map((member) => resolveAnnotIndexRaw(ctx.runtime, ctx.session, member.ref).index),
         )
       : new Uint8Array();
-  const result = mutator(ctx).delete(ref, ctx.authority, ctx.signal);
+  const authority = rights ? underImportRights(ctx.authority) : ctx.authority;
+  const result = mutator(ctx).delete(ref, authority, ctx.signal);
   return {
     item: { type: 'annotations.delete', page: ref.page, ...result },
     reverse: [
@@ -508,6 +619,7 @@ function writeDelete(ctx: ChangeContext, ref: AnnotationRef): Done {
         members: result.meta.changed,
         capture,
         unlinked: captureAfter(ctx.runtime, ctx.session, pending),
+        ...(rights ? { rights } : {}),
       },
     ],
   };

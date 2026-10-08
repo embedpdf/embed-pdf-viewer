@@ -2,6 +2,7 @@ import type { DocumentEventInit } from './DocumentEvent';
 import { deletedAnnotationsOf } from '../mutation/AnnotationMutationResults';
 import { isSkippedItem, type ChangeItem, type ChangeResult } from '../mutation/Change';
 import { deletedFieldOf, formResetFacts } from '../mutation/FormMutationResults';
+import { annotationImportFacts } from '../transfer/annotationImport';
 
 /**
  * The events a change publishes: each op's events as its single verb
@@ -34,6 +35,13 @@ function itemEvents(item: ChangeItem): DocumentEventInit[] {
     case 'annotations.restore': {
       const { type: _type, ...result } = item;
       return [{ type: 'annotations.restored', ...result }];
+    }
+    case 'annotations.import': {
+      const { type: _type, ...result } = item;
+      return annotationImportFacts(result).map((fact) => ({
+        type: 'annotations.created' as const,
+        ...fact,
+      }));
     }
     case 'forms.setValue': {
       const { type: _type, ...result } = item;

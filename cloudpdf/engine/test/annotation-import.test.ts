@@ -77,6 +77,12 @@ runAnnotationImportConformance(runner, {
     await seedDocumentFromBytes(fx, TENANT_ID, id, fixtures[fixture], 1);
     return engine.open({ kind: 'id', id });
   },
+  openScoped: async (engine, fixture, scope) => {
+    if (!fx) throw new Error('fixture not initialised');
+    const id = `${fixture}-${++opened}`;
+    await seedDocumentFromBytes(fx, TENANT_ID, id, fixtures[fixture], 1);
+    return engine.open({ kind: 'token', token: docScopedToken(fx, TENANT_ID, id, scope) });
+  },
 });
 
 async function waitFor(predicate: () => boolean, what: string, timeoutMs = 10_000): Promise<void> {

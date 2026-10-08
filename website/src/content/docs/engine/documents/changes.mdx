@@ -215,7 +215,9 @@ the widget back at its place and in its field.
 `meta.undoable` says whether a write can be undone. It's `false` for:
 
 - **A write that changed nothing**, such as a change with no ops.
-- **Writes a change can't hold**: page edits, attachments, imports. They're writes of their own.
+- **Writes a change can't hold**: page edits, attachments, form data imports. They're writes of
+  their own. An [annotation import](/docs/engine/annotations/import-export#undo-an-import) is a
+  change and can be undone.
 - **Final writes**: [applying redactions](/docs/engine/documents/redaction),
   [flattening](/docs/engine/documents/pages#flatten-a-pages-annotations),
   [signing](/docs/engine/forms/signatures) and

@@ -34,6 +34,11 @@ export interface AnnotationImportRequest {
    */
   readonly actor?: AnnotationActor;
   readonly limits: BundleLimits;
+  /**
+   * Checks each annotation the import will create, before anything is
+   * written: what its create would need. A refusal refuses the import.
+   */
+  readonly authorizeCreate?: (draft: AnnotationDraft<PdfCoordinates>) => void;
 }
 
 /**
@@ -108,6 +113,7 @@ export class AnnotationImporter {
         label: `import: item ${planned.item}`,
       };
     });
+    for (const create of creates) request.authorizeCreate?.(create.draft);
     const { created, meta } = new AnnotationBatchApplier(
       this.runtime,
       this.session,

@@ -1,8 +1,8 @@
 import type {
   ChangeAuthority,
   ChangeItem,
-  ChangeOp,
   PdfCoordinates,
+  RecordedOp,
   WireAnnotationResources,
 } from '@embedpdf/engine-core/runtime';
 import type { PdfRuntimeModule } from '@embedpdf/engine-runtime';
@@ -11,6 +11,7 @@ import type { ChangeRecord, ReverseStep } from './ChangeRecord';
 import {
   createAnnotation,
   deleteAnnotation,
+  importAnnotations,
   removeAnnotation,
   reorderAnnotations,
   reorderBack,
@@ -72,7 +73,7 @@ export class ChangeApplier {
   ) {}
 
   apply(
-    ops: readonly ChangeOp<PdfCoordinates, WireAnnotationResources>[],
+    ops: readonly RecordedOp<PdfCoordinates, WireAnnotationResources>[],
     authority: ChangeAuthority,
     signal: AbortSignal,
   ): AppliedChange {
@@ -126,12 +127,14 @@ function collect(
 
 function runOp(
   ctx: ChangeContext,
-  op: ChangeOp<PdfCoordinates, WireAnnotationResources>,
+  op: RecordedOp<PdfCoordinates, WireAnnotationResources>,
   at: number,
 ): Done {
   switch (op.type) {
     case 'annotations.create':
       return createAnnotation(ctx, op);
+    case 'annotations.import':
+      return importAnnotations(ctx, op);
     case 'annotations.update':
       return updateAnnotation(ctx, op, at);
     case 'annotations.delete':

@@ -99,16 +99,27 @@ export type RevertFallback =
     };
 
 /**
- * Deletes what a create or a restore brought back, when nobody changed it
- * since and deleting it takes nothing else: undoing a create never deletes
- * someone else's reply.
+ * Deletes what a create, an import or a restore brought back, when nobody
+ * changed it since and deleting it takes nothing else: undoing a create
+ * never deletes someone else's reply.
  */
 export interface AnnotationRemoveStep {
   readonly kind: 'annotation.remove';
   readonly ref: AnnotationRef;
   /** What the delete takes, as the change left it: the annotation first. */
   readonly left: readonly Annotation<PdfCoordinates>[];
+  /** The rights it takes: an import's (see {@link StepRights}); a delete's when absent. */
+  readonly rights?: StepRights;
 }
+
+/**
+ * The rights a step takes instead of the per-annotation rules: `'import'`,
+ * a restoring import's, `doc.annotate.modify` and `doc.annotate.import`. A
+ * restoring import gives annotations other people's `userId`, which a
+ * delete's rules (`annotations:delete:self`) would never let the importer
+ * remove; its undo and redo take what the import took.
+ */
+export type StepRights = 'import';
 
 /**
  * Brings back what a delete removed: the same objects, at the same numbers and
@@ -122,6 +133,8 @@ export interface AnnotationRestoreStep {
   readonly capture: Uint8Array;
   /** Annotations the delete unlinked a popup from, put back as they were. */
   readonly unlinked: readonly CapturedObject[];
+  /** The rights it takes: those of the remove it reverses (see {@link StepRights}). */
+  readonly rights?: StepRights;
 }
 
 /**

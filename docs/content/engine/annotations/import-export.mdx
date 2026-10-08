@@ -76,7 +76,7 @@ result.dropped; // what was left out, and why
 | :------------ | :--------------------------------------------------------------------- | :---------- |
 | `pages`       | Which page each bundle page goes to.                                   | `'same'`    |
 | `attribution` | `'restore'` keeps who wrote each annotation; `'stamp'` makes it yours. | `'restore'` |
-| `opId`        | A name for this import; its events carry it.                           | a new id    |
+| `opId`        | A name for this import: its events carry it, and it names its undo.    | a new id    |
 
 Everything is checked before anything is written. The import is all or nothing: a failure while
 writing leaves the document exactly as it was, with no new annotations and no events.
@@ -149,6 +149,22 @@ An import fires one `annotations.created` event per annotation, all with the sam
 you can update your interface once for the whole batch. See
 [Changes made together](/docs/engine/concepts/events#changes-made-together).
 
+### Undo an import
+
+An import is one change. `doc.apply({ undoOf })` with its `opId` takes it back, and the undo's
+undo brings back the same annotations, with the same refs and the attribution the import wrote:
+
+```ts
+const imported = await doc.annotations.import(bundle);
+const undo = await doc.apply({ undoOf: imported.meta.opId });
+await doc.apply({ undoOf: undo.meta.opId }); // back again
+```
+
+The undo removes each imported thread whole: a note with its popup and replies. An imported
+annotation that was changed since, or got a reply, stays, and its item is `skipped`; the rest of
+the import goes. As for every change, only the user who imported may undo it, and a final write
+ends undo for the imports before it. See [Changes & undo](/docs/engine/documents/changes).
+
 ## Limits
 
 One set of limits applies to making and reading bundles, so whatever an export makes, an import
@@ -190,6 +206,10 @@ An import with `attribution: 'stamp'` needs what creating the annotations needs:
 create their own annotations (`annotations:create:self`) may paste a bundle. An import with
 `attribution: 'restore'` needs `doc.annotate.modify` and `doc.annotate.import`. See
 [Permissions](/docs/engine/concepts/permissions).
+
+Undoing an import takes what the import took. For a `'restore'` import that's
+`doc.annotate.modify` and `doc.annotate.import`, not the rules for deleting other people's
+annotations: the importer can take back annotations that carry someone else's `userId`.
 
 ## Good to know
 

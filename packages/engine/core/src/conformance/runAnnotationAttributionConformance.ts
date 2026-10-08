@@ -6,9 +6,9 @@ import type { DocumentHandle } from '../engine/DocumentHandle';
 import type { Engine } from '../engine/Engine';
 import type { PageHandle } from '../engine/PageHandle';
 import { EngineError } from '../errors/EngineError';
-import { EngineErrorCode } from '../errors/EngineErrorCode';
 import type { AnnotationRef } from '../identity/AnnotationRef';
 import { annotationKey } from '../identity/annotationKey';
+import { isPermissionRefusal } from './refusals';
 
 /** Who a session is and what it may do: open-time options locally, token claims on the cloud. */
 export interface AttributionSession {
@@ -483,12 +483,4 @@ function expectNow(value: string | null, before: number, after: number): void {
       `expected a date between ${new Date(before).toISOString()} and ${new Date(after).toISOString()}, got ${value}`,
     );
   }
-}
-
-/** A refusal is the same on both engines: `Forbidden`, naming the permission it needed. */
-function isPermissionRefusal(error: unknown): boolean {
-  return (
-    EngineError.is(error, EngineErrorCode.Forbidden) &&
-    typeof error.details?.['required'] === 'string'
-  );
 }
